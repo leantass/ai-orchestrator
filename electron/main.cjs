@@ -99,6 +99,7 @@ const {
 const {
   buildUnavailableContextHubPack,
   emitContextHubEvent,
+  emitExecutionFailedEvent,
   emitExecutionFinishedEvent,
   fetchSuggestedContextHubPack,
 } = require('./context-hub-client.cjs')
@@ -137,9 +138,10 @@ const VALID_EXECUTOR_MODES = new Set(['command', 'mock'])
 const VALID_BRIDGE_MODES = new Set(['codex', 'mock'])
 const executorProgressSnapshots = new Map()
 const executorRecoveryHistories = new Map()
+const emittedExecutionFailedRequestIds = new Set()
 const emittedExecutionFinishedRequestIds = new Set()
 const MAX_EXECUTOR_RECOVERY_HISTORY = 20
-const MAX_EMITTED_EXECUTION_FINISHED_IDS = 500
+const MAX_EMITTED_EXECUTION_FINAL_EVENT_IDS = 500
 const mainStdoutGuard = installBrokenPipeGuard(process.stdout)
 const mainStderrGuard =
   process.stderr === process.stdout
@@ -453,7 +455,7 @@ function normalizeEventStringList(entries) {
   return [...new Set(entries.map(normalizeEventStringValue).filter(Boolean))]
 }
 
-function summarizeExecutionFinishedValidations(validationResults) {
+function summarizeExecutionEventValidations(validationResults) {
   if (!Array.isArray(validationResults)) {
     return {
       total: 0,
@@ -477,6 +479,45 @@ function summarizeExecutionFinishedValidations(validationResults) {
   }
 }
 
+function summarizeExecutionEventRecentFailures(recentFailures) {
+  if (!Array.isArray(recentFailures)) {
+    return []
+  }
+
+  return recentFailures
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') {
+        return null
+      }
+
+      const timestamp = normalizeEventStringValue(entry.timestamp)
+      const failureType = normalizeEventStringValue(entry.failureType)
+      const currentAction = normalizeEventStringValue(entry.currentAction)
+      const currentTargetPath = normalizeEventStringValue(entry.currentTargetPath)
+      const materialState = normalizeEventStringValue(entry.materialState)
+
+      if (
+        !timestamp &&
+        !failureType &&
+        !currentAction &&
+        !currentTargetPath &&
+        !materialState
+      ) {
+        return null
+      }
+
+      return {
+        ...(timestamp ? { timestamp } : {}),
+        ...(failureType ? { failureType } : {}),
+        ...(currentAction ? { currentAction } : {}),
+        ...(currentTargetPath ? { currentTargetPath } : {}),
+        ...(materialState ? { materialState } : {}),
+      }
+    })
+    .filter(Boolean)
+    .slice(-4)
+}
+
 function buildExecutionFinishedEventPayload({
   finalResponse,
   requestId,
@@ -496,7 +537,7 @@ function buildExecutionFinishedEventPayload({
     normalizeEventStringValue(responseDetails.decisionKey)
   const createdPaths = normalizeExecutorPathList(responseDetails.createdPaths)
   const touchedPaths = normalizeExecutorPathList(responseDetails.touchedPaths)
-  const validationSummary = summarizeExecutionFinishedValidations(
+  const validationSummary = summarizeExecutionEventValidations(
     responseDetails.validationResults,
   )
   const resultPreviewSource =
@@ -543,6 +584,99 @@ function buildExecutionFinishedEventPayload({
       touchedPaths,
     },
     validations: validationSummary,
+    reuse: {
+      appliedReuseMode: normalizeEventStringValue(responseDetails.appliedReuseMode),
+      reusedStyleFromArtifactId: normalizeEventStringValue(
+        responseDetails.reusedStyleFromArtifactId,
+      ),
+      reusedStructureFromArtifactId: normalizeEventStringValue(
+        responseDetails.reusedStructureFromArtifactId,
+      ),
+      reuseAppliedFields: normalizeEventStringList(responseDetails.reuseAppliedFields),
+    },
+  }
+}
+
+function buildExecutionFailedEventPayload({
+  finalResponse,
+  requestId,
+  instruction,
+  workspacePath,
+  decisionKey,
+}) {
+  const responseDetails =
+    finalResponse?.details && typeof finalResponse.details === 'object'
+      ? finalResponse.details
+      : {}
+  const resolvedRequestId =
+    normalizeEventStringValue(requestId) ||
+    normalizeEventStringValue(finalResponse?.requestId)
+  const resolvedDecisionKey =
+    normalizeEventStringValue(decisionKey) ||
+    normalizeEventStringValue(responseDetails.decisionKey)
+  const createdPaths = normalizeExecutorPathList(responseDetails.createdPaths)
+  const touchedPaths = normalizeExecutorPathList(responseDetails.touchedPaths)
+  const validationSummary = summarizeExecutionEventValidations(
+    responseDetails.validationResults,
+  )
+  const failureType =
+    normalizeEventStringValue(finalResponse?.failureType) ||
+    normalizeEventStringValue(responseDetails.failureType)
+  const resultPreviewSource =
+    normalizeEventStringValue(finalResponse?.resultPreview) ||
+    normalizeEventStringValue(finalResponse?.result)
+  const errorPreviewSource =
+    normalizeEventStringValue(finalResponse?.error) ||
+    normalizeEventStringValue(responseDetails.errorMessage)
+  const failureMessagePreviewSource =
+    errorPreviewSource || resultPreviewSource || normalizeEventStringValue(finalResponse?.result)
+
+  return {
+    type: 'execution_failed',
+    source: 'ai-orchestrator',
+    sourceApp: 'ai-orchestrator',
+    sourceProject: 'ai-orchestrator',
+    sourceWorkspacePath: normalizeEventStringValue(workspacePath),
+    timestamp: new Date().toISOString(),
+    requestId: resolvedRequestId,
+    decisionKey: resolvedDecisionKey,
+    instructionPreview: buildOutputPreview(
+      normalizeEventStringValue(instruction) ||
+        normalizeEventStringValue(finalResponse?.instruction),
+      220,
+    ),
+    resultPreview: buildOutputPreview(resultPreviewSource, 220),
+    errorPreview: buildOutputPreview(errorPreviewSource, 220),
+    execution: {
+      status: 'failed',
+      strategy:
+        normalizeEventStringValue(responseDetails.strategy) ||
+        normalizeEventStringValue(finalResponse?.strategy),
+      brainStrategy:
+        normalizeEventStringValue(responseDetails.brainStrategy) ||
+        normalizeEventStringValue(finalResponse?.brainStrategy),
+      executionMode:
+        normalizeEventStringValue(responseDetails.executionMode) ||
+        normalizeEventStringValue(finalResponse?.executionMode) ||
+        normalizeEventStringValue(finalResponse?.executorMode),
+      materializationLayer:
+        normalizeEventStringValue(finalResponse?.materializationLayer) ||
+        normalizeEventStringValue(responseDetails.materializationLayer),
+      materialState: normalizeEventStringValue(responseDetails.materialState),
+      currentAction: normalizeEventStringValue(responseDetails.currentAction),
+      currentTargetPath: normalizeEventStringValue(responseDetails.currentTargetPath),
+      failureType,
+    },
+    files: {
+      createdPaths,
+      touchedPaths,
+    },
+    validations: validationSummary,
+    failure: {
+      type: failureType,
+      messagePreview: buildOutputPreview(failureMessagePreviewSource, 220),
+      recentFailures: summarizeExecutionEventRecentFailures(responseDetails.recentFailures),
+    },
     reuse: {
       appliedReuseMode: normalizeEventStringValue(responseDetails.appliedReuseMode),
       reusedStyleFromArtifactId: normalizeEventStringValue(
@@ -606,24 +740,93 @@ function buildExecutionFinishedEventLogSummary({
   }
 }
 
-function markExecutionFinishedEventRequestId(requestId) {
+function buildExecutionFailedEventLogSummary({
+  eventPayload,
+  eventResult,
+  skippedDuplicate = false,
+  skippedBecauseFinished = false,
+}) {
+  const createdPathsCount = Array.isArray(eventPayload?.files?.createdPaths)
+    ? eventPayload.files.createdPaths.length
+    : 0
+  const touchedPathsCount = Array.isArray(eventPayload?.files?.touchedPaths)
+    ? eventPayload.files.touchedPaths.length
+    : 0
+  const recentFailuresCount = Array.isArray(eventPayload?.failure?.recentFailures)
+    ? eventPayload.failure.recentFailures.length
+    : 0
+
+  return {
+    type:
+      typeof eventPayload?.type === 'string' && eventPayload.type.trim()
+        ? eventPayload.type.trim()
+        : 'execution_failed',
+    requestId: normalizeEventStringValue(eventPayload?.requestId) || undefined,
+    decisionKey: normalizeEventStringValue(eventPayload?.decisionKey) || undefined,
+    status: normalizeEventStringValue(eventPayload?.execution?.status) || 'failed',
+    strategy:
+      normalizeEventStringValue(eventPayload?.execution?.strategy) || undefined,
+    brainStrategy:
+      normalizeEventStringValue(eventPayload?.execution?.brainStrategy) || undefined,
+    executionMode:
+      normalizeEventStringValue(eventPayload?.execution?.executionMode) || undefined,
+    materializationLayer:
+      normalizeEventStringValue(eventPayload?.execution?.materializationLayer) || undefined,
+    materialState:
+      normalizeEventStringValue(eventPayload?.execution?.materialState) || undefined,
+    currentAction:
+      normalizeEventStringValue(eventPayload?.execution?.currentAction) || undefined,
+    currentTargetPath:
+      normalizeEventStringValue(eventPayload?.execution?.currentTargetPath) || undefined,
+    failureType:
+      normalizeEventStringValue(eventPayload?.execution?.failureType) || undefined,
+    createdPathsCount,
+    touchedPathsCount,
+    validationsTotal:
+      Number.isInteger(eventPayload?.validations?.total) ? eventPayload.validations.total : 0,
+    validationsFailed:
+      Number.isInteger(eventPayload?.validations?.failed)
+        ? eventPayload.validations.failed
+        : 0,
+    recentFailuresCount,
+    appliedReuseMode:
+      normalizeEventStringValue(eventPayload?.reuse?.appliedReuseMode) || undefined,
+    skippedDuplicate,
+    skippedBecauseFinished,
+    ...(skippedDuplicate || skippedBecauseFinished
+      ? {}
+      : summarizeContextHubEventResultForLog(eventResult)),
+  }
+}
+
+function hasMarkedExecutionEventRequestId(eventSet, requestId) {
+  const normalizedRequestId = normalizeEventStringValue(requestId)
+
+  if (!normalizedRequestId) {
+    return false
+  }
+
+  return eventSet.has(normalizedRequestId)
+}
+
+function markExecutionEventRequestId(eventSet, requestId) {
   const normalizedRequestId = normalizeEventStringValue(requestId)
 
   if (!normalizedRequestId) {
     return true
   }
 
-  if (emittedExecutionFinishedRequestIds.has(normalizedRequestId)) {
+  if (eventSet.has(normalizedRequestId)) {
     return false
   }
 
-  emittedExecutionFinishedRequestIds.add(normalizedRequestId)
+  eventSet.add(normalizedRequestId)
 
-  if (emittedExecutionFinishedRequestIds.size > MAX_EMITTED_EXECUTION_FINISHED_IDS) {
-    const oldestRequestId = emittedExecutionFinishedRequestIds.values().next().value
+  if (eventSet.size > MAX_EMITTED_EXECUTION_FINAL_EVENT_IDS) {
+    const oldestRequestId = eventSet.values().next().value
 
     if (oldestRequestId) {
-      emittedExecutionFinishedRequestIds.delete(oldestRequestId)
+      eventSet.delete(oldestRequestId)
     }
   }
 
@@ -649,7 +852,7 @@ function emitExecutionFinishedEventBestEffort({
     decisionKey,
   })
 
-  if (!markExecutionFinishedEventRequestId(eventPayload.requestId)) {
+  if (!markExecutionEventRequestId(emittedExecutionFinishedRequestIds, eventPayload.requestId)) {
     debugMainLog(
       'execute-task:context-hub-execution-finished-skipped-duplicate',
       buildExecutionFinishedEventLogSummary({
@@ -678,6 +881,73 @@ function emitExecutionFinishedEventBestEffort({
             ok: false,
             endpoint: '/v1/events',
             eventType: 'execution_finished',
+            reason: 'error',
+          },
+        }),
+        error: error instanceof Error ? error.message : String(error),
+      })
+    })
+}
+
+function emitExecutionFailedEventBestEffort({
+  finalResponse,
+  requestId,
+  instruction,
+  workspacePath,
+  decisionKey,
+}) {
+  if (!finalResponse || finalResponse.ok === true || finalResponse.approvalRequired === true) {
+    return
+  }
+
+  const eventPayload = buildExecutionFailedEventPayload({
+    finalResponse,
+    requestId,
+    instruction,
+    workspacePath,
+    decisionKey,
+  })
+
+  if (hasMarkedExecutionEventRequestId(emittedExecutionFinishedRequestIds, eventPayload.requestId)) {
+    debugMainLog(
+      'execute-task:context-hub-execution-failed-skipped-finished',
+      buildExecutionFailedEventLogSummary({
+        eventPayload,
+        skippedBecauseFinished: true,
+      }),
+    )
+    return
+  }
+
+  if (!markExecutionEventRequestId(emittedExecutionFailedRequestIds, eventPayload.requestId)) {
+    debugMainLog(
+      'execute-task:context-hub-execution-failed-skipped-duplicate',
+      buildExecutionFailedEventLogSummary({
+        eventPayload,
+        skippedDuplicate: true,
+      }),
+    )
+    return
+  }
+
+  void emitExecutionFailedEvent(eventPayload)
+    .then((eventResult) => {
+      debugMainLog(
+        'execute-task:context-hub-execution-failed',
+        buildExecutionFailedEventLogSummary({
+          eventPayload,
+          eventResult,
+        }),
+      )
+    })
+    .catch((error) => {
+      debugMainLog('execute-task:context-hub-execution-failed', {
+        ...buildExecutionFailedEventLogSummary({
+          eventPayload,
+          eventResult: {
+            ok: false,
+            endpoint: '/v1/events',
+            eventType: 'execution_failed',
             reason: 'error',
           },
         }),
@@ -13132,6 +13402,13 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
           workspacePath,
           decisionKey,
         })
+        emitExecutionFailedEventBestEffort({
+          finalResponse: finalFastRouteResponse,
+          requestId,
+          instruction,
+          workspacePath,
+          decisionKey,
+        })
         debugMainLog('execute-task:before-fast-route-completion-event', {
           requestId: requestId || finalFastRouteResponse?.requestId,
           ok: finalFastRouteResponse?.ok === true,
@@ -13197,6 +13474,13 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
         workspacePath,
         decisionKey,
       })
+      emitExecutionFailedEventBestEffort({
+        finalResponse,
+        requestId,
+        instruction,
+        workspacePath,
+        decisionKey,
+      })
       debugMainLog('execute-task:before-completion-event', {
         requestId: requestId || finalResponse?.requestId,
         ok: finalResponse?.ok === true,
@@ -13239,6 +13523,13 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
         }),
         requestId,
       )
+      emitExecutionFailedEventBestEffort({
+        finalResponse: finalErrorResponse,
+        requestId,
+        instruction,
+        workspacePath,
+        decisionKey,
+      })
       debugMainLog('execute-task:before-completion-error-event', {
         requestId: requestId || finalErrorResponse?.requestId,
         error: finalErrorResponse?.error || undefined,

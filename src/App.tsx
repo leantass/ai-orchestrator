@@ -5430,22 +5430,31 @@ function App() {
 
     if (payload?.ok === false) {
       finalizeActiveExecutionRun({
-        status: 'recovery-pending',
+        status: 'error',
         failureType: payload.failureType,
         failureContext,
       })
-      releaseManualExecutionTracking(requestId)
-      void replanManualFlow(
-        buildPlannerFeedbackPayload({
-          type: 'execution-error',
-          source: 'executor',
-          instruction: fallbackInstruction,
-          error: fallbackResult,
-          resultPreview: payload.resultPreview,
-          executorFailureContext: extractExecutorFailureContext(payload) || undefined,
-        }),
-      )
-      return true
+      const wasClosed = closeManualExecutionState({
+        requestId,
+        source: 'completion-event',
+        instruction: fallbackInstruction,
+        result: fallbackResult,
+        approval: 'No requerida',
+        finalStatus: 'Ejecución fallida. Requiere revisión manual.',
+        currentStepLabel: 'La ejecución falló y requiere revisión manual',
+        sessionStatusLabel: 'Ejecución fallida. Requiere revisión manual.',
+        requestState: 'error',
+      })
+
+      if (wasClosed) {
+        setSessionEvents((currentEvents) => [
+          ...currentEvents,
+          'La UI cerró la ejecución manual con error desde el evento final dedicado',
+          'La ejecución quedó detenida hasta revisión manual',
+        ])
+      }
+
+      return wasClosed
     }
 
     finalizeActiveExecutionRun({
@@ -6414,7 +6423,7 @@ function App() {
           updateLastExecutorSnapshot(failureContext)
           recordExecutionSnapshotOnActiveRun(failureContext)
           finalizeActiveExecutionRun({
-            status: 'recovery-pending',
+            status: 'error',
             failureType: executeAck?.failureType,
             failureContext,
           })
@@ -6442,17 +6451,10 @@ function App() {
         setSessionEvents((currentEvents) => [
           ...currentEvents,
           'Falló el flujo automático en la etapa de ejecución',
+          'El flujo automático quedó detenido hasta revisión manual',
         ])
-          previousExecutionResult = buildPlannerFeedbackPayload({
-            type: 'execution-error',
-            source: 'executor',
-            instruction: instructionToExecute,
-            error: executorErrorMessage,
-            executorFailureContext: failureContext || undefined,
-          })
-          nextInstruction = ''
-          iteration += 1
-          continue
+          setCurrentStep('La ejecución automática terminó con error y requiere revisión manual')
+          return
         }
         addFlowMessage({
           source: 'orquestador',
@@ -6473,7 +6475,7 @@ function App() {
           updateLastExecutorSnapshot(failureContext)
           recordExecutionSnapshotOnActiveRun(failureContext)
           finalizeActiveExecutionRun({
-            status: 'recovery-pending',
+            status: 'error',
             failureType: executeResponse?.failureType,
             failureContext,
           })
@@ -6498,18 +6500,10 @@ function App() {
           setSessionEvents((currentEvents) => [
             ...currentEvents,
             'Falló el flujo automático en la etapa de ejecución',
+            'El flujo automático quedó detenido hasta revisión manual',
           ])
-          previousExecutionResult = buildPlannerFeedbackPayload({
-            type: 'execution-error',
-            source: 'executor',
-            instruction: executeResponse.instruction || instructionToExecute,
-            error: executorErrorMessage,
-            resultPreview: executeResponse.resultPreview,
-            executorFailureContext: failureContext || undefined,
-          })
-          nextInstruction = ''
-          iteration += 1
-          continue
+          setCurrentStep('La ejecución automática terminó con error y requiere revisión manual')
+          return
         }
 
         if (executeResponse.approvalRequired) {
