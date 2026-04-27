@@ -307,6 +307,10 @@ async function emitContextHubEvent(eventPayload) {
   }
 }
 
+async function emitExecutionFinishedEvent(payload) {
+  return emitContextHubEvent(payload)
+}
+
 module.exports = {
   DEFAULT_CONTEXT_HUB_API_URL,
   SUGGESTED_CONTEXT_HUB_ENDPOINT,
@@ -314,5 +318,6 @@ module.exports = {
   CONTEXT_HUB_TIMEOUT_MS,
   buildUnavailableContextHubPack,
   emitContextHubEvent,
+  emitExecutionFinishedEvent,
   fetchSuggestedContextHubPack,
 }

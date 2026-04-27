@@ -99,6 +99,7 @@ const {
 const {
   buildUnavailableContextHubPack,
   emitContextHubEvent,
+  emitExecutionFinishedEvent,
   fetchSuggestedContextHubPack,
 } = require('./context-hub-client.cjs')
 
@@ -136,7 +137,9 @@ const VALID_EXECUTOR_MODES = new Set(['command', 'mock'])
 const VALID_BRIDGE_MODES = new Set(['codex', 'mock'])
 const executorProgressSnapshots = new Map()
 const executorRecoveryHistories = new Map()
+const emittedExecutionFinishedRequestIds = new Set()
 const MAX_EXECUTOR_RECOVERY_HISTORY = 20
+const MAX_EMITTED_EXECUTION_FINISHED_IDS = 500
 const mainStdoutGuard = installBrokenPipeGuard(process.stdout)
 const mainStderrGuard =
   process.stderr === process.stdout
@@ -436,6 +439,251 @@ function buildPlanningFinishedEventLogSummary({
       : {}),
     ...summarizeContextHubEventResultForLog(eventResult),
   }
+}
+
+function normalizeEventStringValue(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : ''
+}
+
+function normalizeEventStringList(entries) {
+  if (!Array.isArray(entries)) {
+    return []
+  }
+
+  return [...new Set(entries.map(normalizeEventStringValue).filter(Boolean))]
+}
+
+function summarizeExecutionFinishedValidations(validationResults) {
+  if (!Array.isArray(validationResults)) {
+    return {
+      total: 0,
+      ok: 0,
+      failed: 0,
+    }
+  }
+
+  let okCount = 0
+
+  validationResults.forEach((entry) => {
+    if (entry && typeof entry === 'object' && entry.ok === true) {
+      okCount += 1
+    }
+  })
+
+  return {
+    total: validationResults.length,
+    ok: okCount,
+    failed: Math.max(0, validationResults.length - okCount),
+  }
+}
+
+function buildExecutionFinishedEventPayload({
+  finalResponse,
+  requestId,
+  instruction,
+  workspacePath,
+  decisionKey,
+}) {
+  const responseDetails =
+    finalResponse?.details && typeof finalResponse.details === 'object'
+      ? finalResponse.details
+      : {}
+  const resolvedRequestId =
+    normalizeEventStringValue(requestId) ||
+    normalizeEventStringValue(finalResponse?.requestId)
+  const resolvedDecisionKey =
+    normalizeEventStringValue(decisionKey) ||
+    normalizeEventStringValue(responseDetails.decisionKey)
+  const createdPaths = normalizeExecutorPathList(responseDetails.createdPaths)
+  const touchedPaths = normalizeExecutorPathList(responseDetails.touchedPaths)
+  const validationSummary = summarizeExecutionFinishedValidations(
+    responseDetails.validationResults,
+  )
+  const resultPreviewSource =
+    normalizeEventStringValue(finalResponse?.resultPreview) ||
+    normalizeEventStringValue(finalResponse?.result) ||
+    normalizeEventStringValue(finalResponse?.error)
+
+  return {
+    type: 'execution_finished',
+    source: 'ai-orchestrator',
+    sourceApp: 'ai-orchestrator',
+    sourceProject: 'ai-orchestrator',
+    sourceWorkspacePath: normalizeEventStringValue(workspacePath),
+    timestamp: new Date().toISOString(),
+    requestId: resolvedRequestId,
+    decisionKey: resolvedDecisionKey,
+    instructionPreview: buildOutputPreview(
+      normalizeEventStringValue(instruction) ||
+        normalizeEventStringValue(finalResponse?.instruction),
+      220,
+    ),
+    resultPreview: buildOutputPreview(resultPreviewSource, 220),
+    execution: {
+      status: 'success',
+      strategy:
+        normalizeEventStringValue(responseDetails.strategy) ||
+        normalizeEventStringValue(finalResponse?.strategy),
+      brainStrategy:
+        normalizeEventStringValue(responseDetails.brainStrategy) ||
+        normalizeEventStringValue(finalResponse?.brainStrategy),
+      executionMode:
+        normalizeEventStringValue(responseDetails.executionMode) ||
+        normalizeEventStringValue(finalResponse?.executionMode) ||
+        normalizeEventStringValue(finalResponse?.executorMode),
+      materializationLayer:
+        normalizeEventStringValue(finalResponse?.materializationLayer) ||
+        normalizeEventStringValue(responseDetails.materializationLayer),
+      materialState: normalizeEventStringValue(responseDetails.materialState),
+      currentAction: normalizeEventStringValue(responseDetails.currentAction),
+      currentTargetPath: normalizeEventStringValue(responseDetails.currentTargetPath),
+    },
+    files: {
+      createdPaths,
+      touchedPaths,
+    },
+    validations: validationSummary,
+    reuse: {
+      appliedReuseMode: normalizeEventStringValue(responseDetails.appliedReuseMode),
+      reusedStyleFromArtifactId: normalizeEventStringValue(
+        responseDetails.reusedStyleFromArtifactId,
+      ),
+      reusedStructureFromArtifactId: normalizeEventStringValue(
+        responseDetails.reusedStructureFromArtifactId,
+      ),
+      reuseAppliedFields: normalizeEventStringList(responseDetails.reuseAppliedFields),
+    },
+  }
+}
+
+function buildExecutionFinishedEventLogSummary({
+  eventPayload,
+  eventResult,
+  skippedDuplicate = false,
+}) {
+  const createdPathsCount = Array.isArray(eventPayload?.files?.createdPaths)
+    ? eventPayload.files.createdPaths.length
+    : 0
+  const touchedPathsCount = Array.isArray(eventPayload?.files?.touchedPaths)
+    ? eventPayload.files.touchedPaths.length
+    : 0
+
+  return {
+    type:
+      typeof eventPayload?.type === 'string' && eventPayload.type.trim()
+        ? eventPayload.type.trim()
+        : 'execution_finished',
+    requestId: normalizeEventStringValue(eventPayload?.requestId) || undefined,
+    decisionKey: normalizeEventStringValue(eventPayload?.decisionKey) || undefined,
+    status:
+      normalizeEventStringValue(eventPayload?.execution?.status) || 'success',
+    strategy:
+      normalizeEventStringValue(eventPayload?.execution?.strategy) || undefined,
+    brainStrategy:
+      normalizeEventStringValue(eventPayload?.execution?.brainStrategy) || undefined,
+    executionMode:
+      normalizeEventStringValue(eventPayload?.execution?.executionMode) || undefined,
+    materializationLayer:
+      normalizeEventStringValue(eventPayload?.execution?.materializationLayer) || undefined,
+    materialState:
+      normalizeEventStringValue(eventPayload?.execution?.materialState) || undefined,
+    currentAction:
+      normalizeEventStringValue(eventPayload?.execution?.currentAction) || undefined,
+    currentTargetPath:
+      normalizeEventStringValue(eventPayload?.execution?.currentTargetPath) || undefined,
+    createdPathsCount,
+    touchedPathsCount,
+    validationsTotal:
+      Number.isInteger(eventPayload?.validations?.total) ? eventPayload.validations.total : 0,
+    validationsFailed:
+      Number.isInteger(eventPayload?.validations?.failed)
+        ? eventPayload.validations.failed
+        : 0,
+    appliedReuseMode:
+      normalizeEventStringValue(eventPayload?.reuse?.appliedReuseMode) || undefined,
+    skippedDuplicate,
+    ...(skippedDuplicate ? {} : summarizeContextHubEventResultForLog(eventResult)),
+  }
+}
+
+function markExecutionFinishedEventRequestId(requestId) {
+  const normalizedRequestId = normalizeEventStringValue(requestId)
+
+  if (!normalizedRequestId) {
+    return true
+  }
+
+  if (emittedExecutionFinishedRequestIds.has(normalizedRequestId)) {
+    return false
+  }
+
+  emittedExecutionFinishedRequestIds.add(normalizedRequestId)
+
+  if (emittedExecutionFinishedRequestIds.size > MAX_EMITTED_EXECUTION_FINISHED_IDS) {
+    const oldestRequestId = emittedExecutionFinishedRequestIds.values().next().value
+
+    if (oldestRequestId) {
+      emittedExecutionFinishedRequestIds.delete(oldestRequestId)
+    }
+  }
+
+  return true
+}
+
+function emitExecutionFinishedEventBestEffort({
+  finalResponse,
+  requestId,
+  instruction,
+  workspacePath,
+  decisionKey,
+}) {
+  if (!finalResponse || finalResponse.ok !== true || finalResponse.approvalRequired === true) {
+    return
+  }
+
+  const eventPayload = buildExecutionFinishedEventPayload({
+    finalResponse,
+    requestId,
+    instruction,
+    workspacePath,
+    decisionKey,
+  })
+
+  if (!markExecutionFinishedEventRequestId(eventPayload.requestId)) {
+    debugMainLog(
+      'execute-task:context-hub-execution-finished-skipped-duplicate',
+      buildExecutionFinishedEventLogSummary({
+        eventPayload,
+        skippedDuplicate: true,
+      }),
+    )
+    return
+  }
+
+  void emitExecutionFinishedEvent(eventPayload)
+    .then((eventResult) => {
+      debugMainLog(
+        'execute-task:context-hub-execution-finished',
+        buildExecutionFinishedEventLogSummary({
+          eventPayload,
+          eventResult,
+        }),
+      )
+    })
+    .catch((error) => {
+      debugMainLog('execute-task:context-hub-execution-finished', {
+        ...buildExecutionFinishedEventLogSummary({
+          eventPayload,
+          eventResult: {
+            ok: false,
+            endpoint: '/v1/events',
+            eventType: 'execution_finished',
+            reason: 'error',
+          },
+        }),
+        error: error instanceof Error ? error.message : String(error),
+      })
+    })
 }
 
 function getArtifactMemoryUserDataPath() {
@@ -12877,6 +13125,13 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
           fastRouteResponse,
           requestId,
         )
+        emitExecutionFinishedEventBestEffort({
+          finalResponse: finalFastRouteResponse,
+          requestId,
+          instruction,
+          workspacePath,
+          decisionKey,
+        })
         debugMainLog('execute-task:before-fast-route-completion-event', {
           requestId: requestId || finalFastRouteResponse?.requestId,
           ok: finalFastRouteResponse?.ok === true,
@@ -12935,6 +13190,13 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
         executorResponse,
         requestId,
       )
+      emitExecutionFinishedEventBestEffort({
+        finalResponse,
+        requestId,
+        instruction,
+        workspacePath,
+        decisionKey,
+      })
       debugMainLog('execute-task:before-completion-event', {
         requestId: requestId || finalResponse?.requestId,
         ok: finalResponse?.ok === true,
