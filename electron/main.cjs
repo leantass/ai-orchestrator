@@ -5498,6 +5498,99 @@ function buildLegacyPlannerInstruction(goal, iteration, previousExecutionResult)
   }
 }
 
+function detectAnalysisProposalPlanningIntent(goal, context) {
+  const combinedText = [goal, context]
+    .filter((value) => typeof value === 'string' && value.trim())
+    .join(' ')
+    .toLocaleLowerCase()
+
+  if (!combinedText) {
+    return {
+      matches: false,
+      explicitNoExecution: false,
+      mentionsWorkflowSurface: false,
+      mentionsHistoricalContext: false,
+    }
+  }
+
+  const analysisProposalPatterns = [
+    /preparar\s+una?\s+mejora/u,
+    /proponer\s+una?\s+mejora/u,
+    /analizar\s+una?\s+mejora/u,
+    /revisar\s+flujo/u,
+    /mejorar\s+flujo/u,
+    /mejorar\s+flujo\s+de\s+trabajo/u,
+    /validar\s+integraci[oó]n/u,
+    /pensar\s+una?\s+mejora/u,
+    /solo\s+analizar/u,
+    /solo\s+proponer/u,
+    /solo\s+generar\s+un?\s+plan/u,
+  ]
+  const nonExecutionPatterns = [
+    /no\s+ejecutar/u,
+    /no\s+ejecutar\s+cambios/u,
+    /sin\s+ejecutar\s+cambios/u,
+    /no\s+modificar\s+archivos/u,
+    /sin\s+modificar\s+archivos/u,
+    /sin\s+tocar\s+archivos/u,
+    /solo\s+generar\s+un?\s+plan/u,
+    /solo\s+plan/u,
+    /solo\s+analizar/u,
+    /solo\s+proponer/u,
+    /todav[ií]a\s+no/u,
+  ]
+  const workflowSurfacePatterns = [
+    /\bflujo\b/u,
+    /\bplanificador\b/u,
+    /\bplanner\b/u,
+    /\bejecutor\b/u,
+    /\bexecutor\b/u,
+    /flujo\s+de\s+trabajo/u,
+    /integraci[oó]n/u,
+    /propuesta/u,
+    /an[aá]lisis/u,
+    /\bmejora\b/u,
+  ]
+  const historicalContextPatterns = [
+    /contexto\s+hist[oó]rico/u,
+    /memoria\s+externa/u,
+    /context\s+hub/u,
+    /memoria/u,
+  ]
+
+  const explicitNoExecution = nonExecutionPatterns.some((pattern) =>
+    pattern.test(combinedText),
+  )
+  const mentionsWorkflowSurface = workflowSurfacePatterns.some((pattern) =>
+    pattern.test(combinedText),
+  )
+  const mentionsHistoricalContext = historicalContextPatterns.some((pattern) =>
+    pattern.test(combinedText),
+  )
+  const matches =
+    analysisProposalPatterns.some((pattern) => pattern.test(combinedText)) &&
+    (explicitNoExecution || mentionsWorkflowSurface || mentionsHistoricalContext)
+
+  return {
+    matches,
+    explicitNoExecution,
+    mentionsWorkflowSurface,
+    mentionsHistoricalContext,
+  }
+}
+
+function buildAnalysisProposalInstruction({
+  goal,
+  contextHubPack,
+}) {
+  const normalizedGoal = typeof goal === 'string' ? goal.trim() : ''
+  const contextHubAvailable = contextHubPack?.available === true
+
+  return `Analizar el flujo actual entre planificador y ejecutor y proponer una mejora mínima para que el plan generado sea más accionable, usando MEMORIA externa como contexto auxiliar si ${
+    contextHubAvailable ? 'está disponible' : 'llega a estar disponible'
+  }, sin modificar archivos ni ejecutar cambios en esta iteración. Objetivo de referencia: ${normalizedGoal}`
+}
+
 const ORCHESTRATOR_PLANNER_FEEDBACK_PREFIX = '__orchestrator_feedback__:'
 
 function parseOrchestratorPlannerFeedback(previousExecutionResult) {
@@ -8655,6 +8748,7 @@ async function buildLocalStrategicBrainDecision({
   projectState,
   userParticipationMode,
   manualReusablePreference,
+  contextHubPack,
   reusablePlanningContext: providedReusablePlanningContext,
 }) {
   const normalizedGoal = goal.toLocaleLowerCase()
@@ -8710,6 +8804,7 @@ async function buildLocalStrategicBrainDecision({
       ? compositeCandidateSteps
       : []
   const localGoalDescriptor = detectBrainAtomicOperationDescriptor(goal)
+  const analysisProposalIntent = detectAnalysisProposalPlanningIntent(goal, context)
   const scopedFileEditIntent = detectScopedExistingFileEditIntent({
     goal,
     context,
@@ -8926,6 +9021,68 @@ async function buildLocalStrategicBrainDecision({
         'La ejecucion anterior fallo, pero aparecio un bloqueo critico nuevo y real. El Cerebro solo puede volver a preguntar por ese bloqueo antes de continuar.',
       question:
         'Aparecio un bloqueo critico nuevo tras la falla del executor. Necesito esa definicion humana para continuar sin riesgo.',
+    })
+  }
+
+  if (
+    analysisProposalIntent.matches &&
+    !scopedFileEditIntent &&
+    !localGoalDescriptor &&
+    !looksLikeWebBaseGoal &&
+    compositeSteps.length < 2 &&
+    (!previousExecutionResult ||
+      iteration === 1 ||
+      approvalAlreadyGranted ||
+      hasRecoverableExecutionError)
+  ) {
+    const contextHubAvailable = contextHubPack?.available === true
+
+    return buildBrainDecisionContract({
+      decisionKey: 'analysis-proposal-plan',
+      strategy: 'executor',
+      executionMode: 'executor',
+      reason:
+        'El objetivo pide analizar o proponer una mejora sin ejecución material en esta iteración, así que el Cerebro debe devolver un plan concreto y seguro en vez de una orden genérica.',
+      tasks: [
+        {
+          step: 1,
+          title: contextHubAvailable
+            ? 'Revisar el objetivo, el contexto disponible y el estado de MEMORIA externa ya consultada antes de planificar.'
+            : 'Revisar el objetivo y el contexto disponible, contemplando MEMORIA externa solo como apoyo opcional si aparece disponible.',
+        },
+        {
+          step: 2,
+          title:
+            'Identificar el punto débil del flujo planificador → ejecutor que vuelve demasiado genérica la instrucción generada.',
+        },
+        {
+          step: 3,
+          title:
+            'Proponer una mejora mínima, reversible y acotada para distinguir mejor entre análisis, propuesta y ejecución material.',
+        },
+        {
+          step: 4,
+          title:
+            'Definir explícitamente qué no se debe tocar en esta iteración: executor, bridge, reusable core, materializationPlan y UI de cierre.',
+        },
+        {
+          step: 5,
+          title:
+            'Devolver una recomendación técnica breve en español argentino con próximo paso sugerido, sin crear archivos ni ejecutar cambios todavía.',
+        },
+      ],
+      requiresApproval: false,
+      assumptions: [
+        'Esta iteración es de análisis y propuesta; no corresponde materializar cambios ni crear archivos.',
+        'MEMORIA externa puede aportar contexto auxiliar, pero el plan no debe depender de ella para ser útil.',
+        'La mejora propuesta debe ser mínima, reversible y compatible con los flujos existentes de web-scaffold-base y fast-local.',
+      ],
+      instruction: buildAnalysisProposalInstruction({
+        goal,
+        contextHubPack,
+      }),
+      completed: false,
+      nextExpectedAction: 'review-plan',
     })
   }
 
