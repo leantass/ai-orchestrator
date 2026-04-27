@@ -161,6 +161,30 @@ type ManualReusablePreference = {
   source?: string
 }
 
+type ProductArchitectureContract = {
+  productType?: string
+  domain?: string
+  users?: string[]
+  roles?: string[]
+  coreModules?: string[]
+  dataEntities?: string[]
+  keyFlows?: string[]
+  integrations?: string[]
+  criticalRisks?: string[]
+  approvalRequiredFor?: string[]
+  suggestedArchitecture?: {
+    frontend?: string
+    backend?: string
+    database?: string
+    auth?: string
+    payments?: string
+    storage?: string
+  }
+  phases?: string[]
+  safeFirstDelivery?: string[]
+  outOfScopeForFirstIteration?: string[]
+}
+
 type PlannerExecutionMetadata = {
   decisionKey: string
   businessSector: string
@@ -185,6 +209,7 @@ type PlannerExecutionMetadata = {
   reusedArtifactIds: string[]
   reuseMode: string
   contextHubStatus: ContextHubStatusSummary | null
+  productArchitecture: ProductArchitectureContract | null
 }
 
 type ContextHubStatusSummary = {
@@ -364,6 +389,7 @@ type PlannerDecisionResponse = {
   approvalRequest?: ApprovalRequestContract
   nextExpectedAction?: string
   contextHubStatus?: ContextHubStatusSummary | null
+  productArchitecture?: ProductArchitectureContract | null
   brainRoutingDecision?: BrainRoutingDecision
   tasks?: unknown[]
   assumptions?: string[]
@@ -548,6 +574,7 @@ const EMPTY_PLANNER_EXECUTION_METADATA: PlannerExecutionMetadata = {
   reusedArtifactIds: [],
   reuseMode: 'none',
   contextHubStatus: null,
+  productArchitecture: null,
 }
 const BRAIN_COST_MODE_OPTIONS: Array<{
   value: BrainCostMode
@@ -733,6 +760,122 @@ const getReuseModeLabel = (
   return noneLabel
 }
 
+const normalizeProductArchitectureContract = (
+  value: unknown,
+): ProductArchitectureContract | null => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const architecture = value as ProductArchitectureContract
+  const suggestedArchitecture =
+    architecture.suggestedArchitecture &&
+    typeof architecture.suggestedArchitecture === 'object'
+      ? {
+          ...(normalizeOptionalString(architecture.suggestedArchitecture.frontend)
+            ? {
+                frontend: normalizeOptionalString(
+                  architecture.suggestedArchitecture.frontend,
+                ),
+              }
+            : {}),
+          ...(normalizeOptionalString(architecture.suggestedArchitecture.backend)
+            ? {
+                backend: normalizeOptionalString(
+                  architecture.suggestedArchitecture.backend,
+                ),
+              }
+            : {}),
+          ...(normalizeOptionalString(architecture.suggestedArchitecture.database)
+            ? {
+                database: normalizeOptionalString(
+                  architecture.suggestedArchitecture.database,
+                ),
+              }
+            : {}),
+          ...(normalizeOptionalString(architecture.suggestedArchitecture.auth)
+            ? {
+                auth: normalizeOptionalString(architecture.suggestedArchitecture.auth),
+              }
+            : {}),
+          ...(normalizeOptionalString(architecture.suggestedArchitecture.payments)
+            ? {
+                payments: normalizeOptionalString(
+                  architecture.suggestedArchitecture.payments,
+                ),
+              }
+            : {}),
+          ...(normalizeOptionalString(architecture.suggestedArchitecture.storage)
+            ? {
+                storage: normalizeOptionalString(
+                  architecture.suggestedArchitecture.storage,
+                ),
+              }
+            : {}),
+        }
+      : null
+
+  const normalizedValue: ProductArchitectureContract = {
+    ...(normalizeOptionalString(architecture.productType)
+      ? { productType: normalizeOptionalString(architecture.productType) }
+      : {}),
+    ...(normalizeOptionalString(architecture.domain)
+      ? { domain: normalizeOptionalString(architecture.domain) }
+      : {}),
+    ...(normalizeOptionalStringArray(architecture.users).length > 0
+      ? { users: normalizeOptionalStringArray(architecture.users) }
+      : {}),
+    ...(normalizeOptionalStringArray(architecture.roles).length > 0
+      ? { roles: normalizeOptionalStringArray(architecture.roles) }
+      : {}),
+    ...(normalizeOptionalStringArray(architecture.coreModules).length > 0
+      ? { coreModules: normalizeOptionalStringArray(architecture.coreModules) }
+      : {}),
+    ...(normalizeOptionalStringArray(architecture.dataEntities).length > 0
+      ? { dataEntities: normalizeOptionalStringArray(architecture.dataEntities) }
+      : {}),
+    ...(normalizeOptionalStringArray(architecture.keyFlows).length > 0
+      ? { keyFlows: normalizeOptionalStringArray(architecture.keyFlows) }
+      : {}),
+    ...(normalizeOptionalStringArray(architecture.integrations).length > 0
+      ? { integrations: normalizeOptionalStringArray(architecture.integrations) }
+      : {}),
+    ...(normalizeOptionalStringArray(architecture.criticalRisks).length > 0
+      ? { criticalRisks: normalizeOptionalStringArray(architecture.criticalRisks) }
+      : {}),
+    ...(normalizeOptionalStringArray(architecture.approvalRequiredFor).length > 0
+      ? {
+          approvalRequiredFor: normalizeOptionalStringArray(
+            architecture.approvalRequiredFor,
+          ),
+        }
+      : {}),
+    ...(suggestedArchitecture &&
+    Object.values(suggestedArchitecture).some((fieldValue) => Boolean(fieldValue))
+      ? { suggestedArchitecture }
+      : {}),
+    ...(normalizeOptionalStringArray(architecture.phases).length > 0
+      ? { phases: normalizeOptionalStringArray(architecture.phases) }
+      : {}),
+    ...(normalizeOptionalStringArray(architecture.safeFirstDelivery).length > 0
+      ? {
+          safeFirstDelivery: normalizeOptionalStringArray(
+            architecture.safeFirstDelivery,
+          ),
+        }
+      : {}),
+    ...(normalizeOptionalStringArray(architecture.outOfScopeForFirstIteration).length > 0
+      ? {
+          outOfScopeForFirstIteration: normalizeOptionalStringArray(
+            architecture.outOfScopeForFirstIteration,
+          ),
+        }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
 const extractPlannerExecutionMetadata = (payload?: {
   decisionKey?: string
   businessSector?: string
@@ -750,6 +893,7 @@ const extractPlannerExecutionMetadata = (payload?: {
   reason?: string
   nextExpectedAction?: string
   contextHubStatus?: ContextHubStatusSummary | null
+  productArchitecture?: ProductArchitectureContract | null
   tasks?: unknown[]
   assumptions?: string[]
 } | null): PlannerExecutionMetadata => ({
@@ -906,6 +1050,9 @@ const extractPlannerExecutionMetadata = (payload?: {
     typeof payload?.nextExpectedAction === 'string'
       ? payload.nextExpectedAction.trim()
       : '',
+  productArchitecture: normalizeProductArchitectureContract(
+    payload?.productArchitecture,
+  ),
   tasks: Array.isArray(payload?.tasks)
     ? payload.tasks
         .map((task) =>
@@ -1535,6 +1682,272 @@ function MetricCard({
       <div className="mt-3 text-sm font-medium leading-6 text-slate-100">{value}</div>
       {detail ? (
         <div className="mt-2 text-xs leading-5 text-slate-400">{detail}</div>
+      ) : null}
+    </article>
+  )
+}
+
+const PRODUCT_ARCHITECTURE_TYPE_LABELS: Record<string, string> = {
+  'business-system': 'Sistema de negocio',
+  ecommerce: 'Ecommerce',
+  crm: 'CRM',
+  erp: 'ERP',
+  marketplace: 'Marketplace',
+  saas: 'SaaS',
+  'internal-tool': 'Herramienta interna',
+  unknown: 'No definido',
+}
+
+const getProductArchitectureTypeLabel = (value: unknown) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (!normalizedValue) {
+    return 'No definido'
+  }
+
+  return (
+    PRODUCT_ARCHITECTURE_TYPE_LABELS[normalizedValue] ||
+    normalizeOptionalString(value).replace(/-/g, ' ')
+  )
+}
+
+function ProductArchitectureList({
+  items,
+  compact = false,
+}: {
+  items?: string[]
+  compact?: boolean
+}) {
+  const normalizedItems = normalizeOptionalStringArray(items)
+  const visibleItems = compact ? normalizedItems.slice(0, 4) : normalizedItems
+
+  if (visibleItems.length === 0) {
+    return (
+      <div className="text-xs leading-5 text-slate-500">Sin datos definidos</div>
+    )
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {visibleItems.map((item) => (
+        <span
+          key={item}
+          className="rounded-full border border-white/10 bg-slate-950/60 px-3 py-1 text-xs leading-5 text-slate-200"
+        >
+          {item}
+        </span>
+      ))}
+      {compact && normalizedItems.length > visibleItems.length ? (
+        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs leading-5 text-slate-400">
+          +{normalizedItems.length - visibleItems.length} más
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
+function ProductArchitectureDetailBlock({
+  label,
+  value,
+}: {
+  label: string
+  value?: string
+}) {
+  const normalizedValue = normalizeOptionalString(value)
+
+  if (!normalizedValue) {
+    return null
+  }
+
+  return (
+    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-3">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+        {label}
+      </div>
+      <div className="mt-2 text-sm leading-6 text-slate-100">{normalizedValue}</div>
+    </div>
+  )
+}
+
+function ProductArchitectureGroup({
+  title,
+  items,
+  compact = false,
+  tone = 'default',
+}: {
+  title: string
+  items?: string[]
+  compact?: boolean
+  tone?: 'default' | 'amber' | 'rose' | 'emerald'
+}) {
+  const toneClassName =
+    tone === 'rose'
+      ? 'border-rose-300/20 bg-rose-300/8'
+      : tone === 'amber'
+        ? 'border-amber-300/20 bg-amber-300/8'
+        : tone === 'emerald'
+          ? 'border-emerald-300/20 bg-emerald-300/8'
+          : 'border-white/8 bg-white/[0.03]'
+
+  return (
+    <article className={joinClasses('rounded-2xl border px-4 py-4', toneClassName)}>
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+        {title}
+      </div>
+      <div className="mt-3">
+        <ProductArchitectureList items={items} compact={compact} />
+      </div>
+    </article>
+  )
+}
+
+function ProductArchitectureCard({
+  architecture,
+  compact = false,
+  reviewOnly = false,
+}: {
+  architecture: ProductArchitectureContract
+  compact?: boolean
+  reviewOnly?: boolean
+}) {
+  const suggestedArchitectureEntries = [
+    ['Frontend', architecture.suggestedArchitecture?.frontend],
+    ['Backend', architecture.suggestedArchitecture?.backend],
+    ['Database', architecture.suggestedArchitecture?.database],
+    ['Auth', architecture.suggestedArchitecture?.auth],
+    ['Payments', architecture.suggestedArchitecture?.payments],
+    ['Storage', architecture.suggestedArchitecture?.storage],
+  ].filter(([, value]) => normalizeOptionalString(value))
+  const hasSuggestedArchitecture = suggestedArchitectureEntries.length > 0
+
+  return (
+    <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Arquitectura del producto
+          </div>
+          <div className="mt-2 text-sm leading-6 text-slate-400">
+            {reviewOnly
+              ? 'Este bloque resume la arquitectura propuesta por el Cerebro para revisión, no para ejecución inmediata.'
+              : 'Resumen estructurado de la arquitectura propuesta por el planner.'}
+          </div>
+        </div>
+        {reviewOnly ? (
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
+            Revisión manual
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <MetricCard
+          label="Tipo de producto"
+          value={getProductArchitectureTypeLabel(architecture.productType)}
+          tone="sky"
+        />
+        <MetricCard
+          label="Dominio"
+          value={normalizeOptionalString(architecture.domain) || 'Sin datos definidos'}
+        />
+        <MetricCard
+          label="Primera entrega segura"
+          value={
+            normalizeOptionalStringArray(architecture.safeFirstDelivery)[0] ||
+            'Sin datos definidos'
+          }
+          tone="emerald"
+        />
+      </div>
+
+      <div className="mt-4 grid gap-3 xl:grid-cols-2">
+        <ProductArchitectureGroup
+          title="Usuarios"
+          items={architecture.users}
+          compact={compact}
+        />
+        <ProductArchitectureGroup
+          title="Roles"
+          items={architecture.roles}
+          compact={compact}
+        />
+        <ProductArchitectureGroup
+          title="Módulos principales"
+          items={architecture.coreModules}
+          compact={compact}
+          tone="sky"
+        />
+        <ProductArchitectureGroup
+          title="Entidades de datos"
+          items={architecture.dataEntities}
+          compact={compact}
+        />
+        <ProductArchitectureGroup
+          title="Flujos clave"
+          items={architecture.keyFlows}
+          compact={compact}
+        />
+        <ProductArchitectureGroup
+          title="Integraciones"
+          items={architecture.integrations}
+          compact={compact}
+        />
+      </div>
+
+      <div className="mt-4 grid gap-3 xl:grid-cols-2">
+        <ProductArchitectureGroup
+          title="Riesgos críticos"
+          items={architecture.criticalRisks}
+          compact={compact}
+          tone="rose"
+        />
+        <ProductArchitectureGroup
+          title="Aprobaciones necesarias"
+          items={architecture.approvalRequiredFor}
+          compact={compact}
+          tone="amber"
+        />
+      </div>
+
+      {hasSuggestedArchitecture ? (
+        <div className="mt-4">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Arquitectura sugerida
+          </div>
+          <div className="mt-3 grid gap-3 xl:grid-cols-2">
+            {suggestedArchitectureEntries.map(([label, value]) => (
+              <ProductArchitectureDetailBlock
+                key={label}
+                label={label}
+                value={normalizeOptionalString(value)}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-4 grid gap-3 xl:grid-cols-2">
+        <ProductArchitectureGroup
+          title="Fases sugeridas"
+          items={architecture.phases}
+          compact={compact}
+          tone="emerald"
+        />
+        <ProductArchitectureGroup
+          title="Fuera de alcance de la primera iteración"
+          items={architecture.outOfScopeForFirstIteration}
+          compact={compact}
+        />
+      </div>
+
+      {!compact ? (
+        <div className="mt-4">
+          <ProductArchitectureGroup
+            title="Primera entrega segura"
+            items={architecture.safeFirstDelivery}
+            tone="emerald"
+          />
+        </div>
       ) : null}
     </article>
   )
@@ -3780,6 +4193,7 @@ function App() {
       mode: manualReuseMode,
       selectedArtifact: selectedReusableArtifact,
     })
+  const activeProductArchitecture = effectivePlannerExecutionMetadata.productArchitecture
   const manualReuseModeLabel = getManualReuseModeLabel(manualReuseMode)
   const selectedReusableArtifactSummary = selectedReusableArtifact
     ? [
@@ -10261,6 +10675,13 @@ function App() {
                           detail={activeReuseArtifactSummary}
                         />
                       </div>
+                      {activeProductArchitecture ? (
+                        <ProductArchitectureCard
+                          architecture={activeProductArchitecture}
+                          compact
+                          reviewOnly={plannerIsReviewOnly}
+                        />
+                      ) : null}
                     </div>
                     <div className="space-y-4">
                       <MetricCard
@@ -11564,6 +11985,13 @@ function App() {
                     </article>
                   </div>
                 </div>
+
+                {activeProductArchitecture ? (
+                  <ProductArchitectureCard
+                    architecture={activeProductArchitecture}
+                    reviewOnly={plannerIsReviewOnly}
+                  />
+                ) : null}
 
                 <div className="grid gap-4 xl:grid-cols-2">
                   <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
