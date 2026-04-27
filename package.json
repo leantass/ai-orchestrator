@@ -1,0 +1,49 @@
+{
+  "name": "ai-orchestrator",
+  "private": true,
+  "version": "0.0.0",
+  "main": "electron/main.cjs",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --config vite.config.ts --configLoader native",
+    "build": "vite build --config vite.config.ts --configLoader native",
+    "electron:dev": "wait-on http://localhost:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .",
+    "electron:stable": "electron .",
+    "desktop:dev": "concurrently -k \"npm:dev\" \"npm:electron:dev\"",
+    "desktop:stable": "npm run build && npm run electron:stable",
+    "desktop:bridge": "cross-env AI_ORCHESTRATOR_EXECUTOR_MODE=command concurrently -k \"npm:dev\" \"npm:electron:dev\"",
+    "desktop:bridge:stable": "npm run build && cross-env AI_ORCHESTRATOR_EXECUTOR_MODE=command electron .",
+    "desktop:codex": "cross-env AI_ORCHESTRATOR_EXECUTOR_MODE=command AI_ORCHESTRATOR_BRIDGE_MODE=codex concurrently -k \"npm:dev\" \"npm:electron:dev\"",
+    "desktop:codex:stable": "npm run build && cross-env AI_ORCHESTRATOR_EXECUTOR_MODE=command AI_ORCHESTRATOR_BRIDGE_MODE=codex electron .",
+    "executor:bridge": "node ./executor-bridge/executor-bridge.cjs",
+    "lint": "eslint .",
+    "preview": "vite preview --config vite.config.ts --configLoader native"
+  },
+  "dependencies": {
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^41.2.0",
+    "electron-builder": "^26.8.1",
+    "lucide-react": "^1.8.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "wait-on": "^9.0.5",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@tailwindcss/vite": "^4.2.2",
+    "@types/node": "^24.12.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.4.0",
+    "tailwindcss": "^4.2.2",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.58.0",
+    "vite": "^8.0.4"
+  }
+}

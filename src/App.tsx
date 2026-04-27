@@ -1,0 +1,12911 @@
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
+
+type FlowMessage = {
+  id: number
+  source: 'operador' | 'orquestador' | 'planificador' | 'executor' | 'codex' | 'bridge'
+  title: string
+  content: string
+  raw?: string
+  status?: 'info' | 'success' | 'warning' | 'error'
+}
+
+type ExecutorTraceEntry = Omit<FlowMessage, 'id'>
+type ExecutionEventPayload = ExecutorTraceEntry & {
+  requestId?: string
+}
+
+type ExecutorValidationResult = {
+  type?: string
+  targetPath?: string
+  expectedKind?: string
+  ok?: boolean
+}
+
+type ExecutorFailureContext = {
+  timestamp?: string
+  decisionKey?: string
+  failureType?: string
+  executorMode?: string
+  executorModeSource?: string
+  bridgeMode?: string
+  bridgeModeSource?: string
+  executorCommand?: string
+  origin?: string
+  stepIndex?: number
+  totalSteps?: number
+  currentStep?: string
+  currentSubtask?: string
+  currentAction?: string
+  currentCommand?: string
+  currentTargetPath?: string
+  touchedPaths?: string[]
+  createdPaths?: string[]
+  stdout?: string
+  stderr?: string
+  lastProgressAt?: string
+  lastMaterialProgressAt?: string
+  hasMaterialProgress?: boolean
+  materialState?: string
+  strategy?: string
+  brainStrategy?: string
+  reasoningLayer?: string
+  materializationLayer?: string
+  materializationPlanSource?: string
+  validationResults?: ExecutorValidationResult[]
+  appliedReuseMode?: string
+  reusedStyleFromArtifactId?: string
+  reusedStructureFromArtifactId?: string
+  reuseAppliedFields?: string[]
+  acceptedAt?: string
+  attemptScope?: 'broad' | 'targeted' | 'subtask' | 'continuation'
+  fingerprint?: string
+  isRecoveryAttempt?: boolean
+  repeatedFailureCount?: number
+  lastAttemptScope?: 'broad' | 'targeted' | 'subtask' | 'continuation'
+  blockedRecoveryModes?: string[]
+  lastFailure?: ExecutorFailureContext
+  recentFailures?: ExecutorFailureContext[]
+}
+
+type ExecutionCompletePayload = {
+  requestId?: string
+  ok?: boolean
+  trace?: ExecutorTraceEntry[]
+  instruction?: string
+  result?: string
+  resultPreview?: string
+  approvalRequired?: boolean
+  approvalReason?: string
+  error?: string
+  failureType?: string
+  executorMode?: string
+  executorModeSource?: string
+  bridgeMode?: string
+  bridgeModeSource?: string
+  details?: ExecutorFailureContext
+}
+
+type ExecutorContinuationAnchor = {
+  targetPath?: string
+  subtask?: string
+  action?: string
+}
+
+type ExecutorExecutionScope = {
+  objectiveScope?: 'single-target' | 'single-subtask' | 'continuation'
+  allowedTargetPaths?: string[]
+  blockedTargetPaths?: string[]
+  successCriteria?: string[]
+  continuationAnchor?: ExecutorContinuationAnchor
+  enforceNarrowScope?: boolean
+}
+
+type ReusableArtifactLookupMatch = {
+  id: string
+  type?: string
+  sector?: string
+  visualStyle?: string
+  layoutVariant?: string
+  heroStyle?: string
+  localPath?: string
+  primaryCta?: string
+  secondaryCta?: string
+  typography?: {
+    headingFamily?: string
+    bodyFamily?: string
+    fontHref?: string
+  }
+  colors?: Record<string, string>
+  preview?: {
+    status?: string
+    imagePath?: string
+    generatedAt?: string
+    source?: string
+    errorMessage?: string
+  }
+  metadata?: Record<string, unknown>
+  matchReasons?: string[]
+}
+
+type ReusableArtifactLookupContract = {
+  executed: boolean
+  foundCount: number
+  matches: ReusableArtifactLookupMatch[]
+}
+
+type ReusableArtifactRecord = ReusableArtifactLookupMatch & {
+  sectorLabel?: string
+  tags?: string[]
+  createdAt?: string
+  updatedAt?: string
+}
+
+type ManualReuseMode =
+  | 'auto'
+  | 'none'
+  | 'inspiration-only'
+  | 'reuse-style'
+  | 'reuse-structure'
+  | 'reuse-style-and-structure'
+
+type ManualReusablePreference = {
+  artifactId?: string
+  reuseMode: Exclude<ManualReuseMode, 'auto'>
+  source?: string
+}
+
+type PlannerExecutionMetadata = {
+  decisionKey: string
+  businessSector: string
+  businessSectorLabel: string
+  creativeDirection: WebCreativeDirectionContract | null
+  executionScope: ExecutorExecutionScope | null
+  strategy: string
+  executionMode: string
+  reason: string
+  nextExpectedAction: string
+  tasks: Array<{
+    step?: number
+    title?: string
+    operation?: string
+    targetPath?: string
+  }>
+  assumptions: string[]
+  reusableArtifactLookup: ReusableArtifactLookupContract | null
+  reusableArtifactsFound: number
+  reuseDecision: boolean
+  reuseReason: string
+  reusedArtifactIds: string[]
+  reuseMode: string
+  contextHubStatus: ContextHubStatusSummary | null
+}
+
+type ContextHubStatusSummary = {
+  source: 'context-hub'
+  endpoint: string
+  available: boolean
+  id?: string
+  slug?: string
+  title?: string
+  itemsCount?: number
+  estimatedTokens?: number
+  reason?: string
+}
+
+type BrainCostMode = 'cheap' | 'balanced' | 'smart' | 'max-quality'
+
+type BrainRoutingDecision = {
+  selectedProvider?: string
+  resolvedProvider?: string
+  fallbackProvider?: string
+  fallbackUsed?: boolean
+  fallbackReason?: string
+  routingMode?: string
+  reason?: string
+  confidence?: number
+  costMode?: BrainCostMode
+  complexity?: 'low' | 'medium' | 'high'
+  ambiguity?: 'low' | 'medium' | 'high'
+  risk?: 'low' | 'medium' | 'high'
+  impact?: 'low' | 'medium' | 'high'
+  problemNature?: string
+}
+
+type ExecutionRunSummary = {
+  runId: string
+  latestRequestId: string
+  requestIds: string[]
+  objectiveSummary: string
+  instructionSummary: string
+  approvalsOpened: number
+  recoveries: number
+  repeatedFailureCount: number
+  latestFailureType: string
+  finalFailureType: string
+  hasMaterialProgress: boolean
+  createdPaths: string[]
+  touchedPaths: string[]
+  latestRecoveryMode: string
+  latestExecutorMode: string
+  latestBridgeMode: string
+  latestDecisionKey: string
+  latestAttemptScope: string
+  latestExecutionScope: string
+  blockedRecoveryModes: string[]
+  continuationAnchor: string
+  status: 'running' | 'approval-pending' | 'recovery-pending' | 'success' | 'error'
+  scenarioLabel:
+    | 'Caso feliz base'
+    | 'Falla recuperable'
+    | 'Recovery exitoso'
+    | 'Bloqueo por repeticion equivalente'
+    | 'Corrida fallida'
+    | 'Corrida en curso'
+  updatedAtLabel: string
+}
+
+type UserParticipationMode =
+  | 'user-will-contribute'
+  | 'brain-decides-missing'
+  | ''
+
+type ResolvedDecisionRecord = {
+  key: string
+  status: 'delegated' | 'approved' | 'rejected' | 'resolved'
+  source: 'system' | 'user' | 'planner' | 'executor'
+  summary?: string
+  responseMode?: 'binary' | 'options' | 'free-answer' | 'mixed'
+  selectedOption?: string
+  freeAnswer?: string
+  approvalFamily?: string
+  updatedAt?: string
+}
+
+type PlannerProjectState = {
+  userParticipationMode?: UserParticipationMode
+  resolvedDecisions?: ResolvedDecisionRecord[]
+}
+
+type WebCreativeDirectionContract = {
+  profileKey?: string
+  originalityLevel?: string
+  experienceType?: string
+  visualStyle?: string
+  tone?: string
+  heroStyle?: string
+  layoutVariant?: string
+  layoutRhythm?: string
+  contentDensity?: string
+  primaryCta?: string
+  secondaryCta?: string
+  sectionOrder?: string[]
+  prioritySections?: string[]
+  heroEyebrow?: string
+  heroPanelTitle?: string
+  heroPanelItems?: string[]
+  sectionLabels?: {
+    aboutTag?: string
+    servicesTag?: string
+    trustTag?: string
+    contactTag?: string
+  }
+  typography?: {
+    headingFamily?: string
+    bodyFamily?: string
+    fontHref?: string
+  }
+  paletteSuggestion?: Record<string, string>
+  cta?: {
+    primary?: string
+    secondary?: string
+  }
+  layoutCriteria?: string[]
+}
+
+type ApprovalRequestOption = {
+  key: string
+  label: string
+  description?: string
+}
+
+type ApprovalRequestContract = {
+  decisionKey?: string
+  reason?: string
+  question?: string
+  options?: ApprovalRequestOption[]
+  allowFreeAnswer?: boolean
+  allowBrainDefault?: boolean
+  impact?: string
+  nextExpectedAction?: string
+  responseMode?: 'binary' | 'options' | 'free-answer' | 'mixed'
+}
+
+type ProjectApprovalPolicy = {
+  scope: 'repeatable-executor-approval'
+  source: 'executor'
+  decisionKey: string
+  responseMode: 'binary'
+}
+
+type PlannerDecisionResponse = {
+  ok: boolean
+  goal?: string
+  instruction?: string
+  completed?: boolean
+  iterationLabel?: string
+  approvalRequired?: boolean
+  approvalReason?: string
+  businessSector?: string
+  businessSectorLabel?: string
+  creativeDirection?: WebCreativeDirectionContract
+  reusableArtifactLookup?: {
+    executed?: boolean
+    foundCount?: number
+    matches?: Array<Partial<ReusableArtifactLookupMatch>>
+  }
+  reusableArtifactsFound?: number
+  reuseDecision?: boolean
+  reuseReason?: string
+  reusedArtifactIds?: string[]
+  reuseMode?: string
+  executionScope?: ExecutorExecutionScope
+  strategy?: string
+  executionMode?: string
+  decisionKey?: string
+  reason?: string
+  question?: string
+  approvalRequest?: ApprovalRequestContract
+  nextExpectedAction?: string
+  contextHubStatus?: ContextHubStatusSummary | null
+  brainRoutingDecision?: BrainRoutingDecision
+  tasks?: unknown[]
+  assumptions?: string[]
+  error?: string
+}
+
+type OrchestratorPlannerFeedback = {
+  type: 'approval-granted' | 'approval-rejected' | 'execution-error'
+  source: 'planner' | 'executor'
+  approvalMode?: 'once' | 'project-rule'
+  instruction?: string
+  error?: string
+  approvalReason?: string
+  resultPreview?: string
+  approvalRequestDecisionKey?: string
+  responseMode?: 'binary' | 'options' | 'free-answer' | 'mixed'
+  selectedOption?: string
+  freeAnswer?: string
+  executorFailureContext?: ExecutorFailureContext
+}
+
+declare global {
+  interface Window {
+    aiOrchestrator?: {
+      platform?: string
+      getRuntimeStatus?: () => Promise<{
+        ok: boolean
+        platform: string
+        electron: string
+        node: string
+        executorMode: string
+        executorModeSource: string
+        bridgeMode: string
+        bridgeModeSource: string
+      }>
+      listReusableArtifacts?: (payload?: {
+        id?: string
+        type?: string
+        sector?: string
+        visualStyle?: string
+        layoutVariant?: string
+        heroStyle?: string
+        tags?: string[]
+        search?: string
+        limit?: number
+      }) => Promise<{
+        ok: boolean
+        artifacts?: ReusableArtifactRecord[]
+      }>
+      searchReusableArtifacts?: (payload?: {
+        sector?: string
+        visualStyle?: string
+        layoutVariant?: string
+        heroStyle?: string
+        tags?: string[]
+        limit?: number
+      }) => Promise<{
+        ok: boolean
+        artifacts?: ReusableArtifactRecord[]
+      }>
+      planTask?: (payload: {
+        goal: string
+        iteration?: number
+        previousExecutionResult?: string
+        context?: string
+        workspacePath?: string
+        userParticipationMode?: UserParticipationMode
+        projectState?: PlannerProjectState
+        autonomyLevel?: string
+        costMode?: BrainCostMode
+        routingHints?: {
+          forceProvider?: string
+          preferProvider?: string
+        }
+        manualReusablePreference?: ManualReusablePreference
+      }) => Promise<PlannerDecisionResponse>
+      executeTask?: (payload: {
+        instruction: string
+        context?: string
+        workspacePath?: string
+        requestId?: string
+        decisionKey?: string
+        businessSector?: string
+        businessSectorLabel?: string
+        creativeDirection?: WebCreativeDirectionContract
+        reusableArtifactLookup?: PlannerDecisionResponse['reusableArtifactLookup']
+        reusableArtifactsFound?: number
+        reuseDecision?: boolean
+        reuseReason?: string
+        reusedArtifactIds?: string[]
+        reuseMode?: string
+        executionScope?: ExecutorExecutionScope
+      }) => Promise<{
+        ok: boolean
+        accepted?: boolean
+        instruction?: string
+        result?: string
+        resultPreview?: string
+        requestId?: string
+        approvalRequired?: boolean
+        approvalReason?: string
+        error?: string
+        failureType?: string
+        details?: ExecutorFailureContext & {
+          exitCode?: number
+        }
+        trace?: ExecutorTraceEntry[]
+      }>
+      onExecutionEvent?: (
+        listener: (payload: ExecutionEventPayload) => void,
+      ) => (() => void) | void
+      onExecutionComplete?: (
+        listener: (payload: ExecutionCompletePayload) => void,
+      ) => (() => void) | void
+    }
+  }
+}
+
+const PROJECT_POLICY_KEY = 'ai-orchestrator.projectPolicyAllowed'
+const SESSION_EVENTS_KEY = 'ai-orchestrator.sessionEvents'
+const SESSION_SNAPSHOT_KEY = 'ai-orchestrator.sessionSnapshot'
+const WORKSPACE_PATH_KEY = 'ai-orchestrator.workspacePath'
+const USER_PARTICIPATION_MODE_KEY = 'ai-orchestrator.userParticipationMode'
+const RESOLVED_DECISIONS_KEY = 'ai-orchestrator.resolvedDecisions'
+const BRAIN_COST_MODE_KEY = 'ai-orchestrator.brainCostMode'
+const FLOW_CONSOLE_STATE_KEY = 'ai-orchestrator.flowConsoleState'
+const FLOW_MESSAGES_KEY = 'ai-orchestrator.flowMessages'
+const DEFAULT_SESSION_STATUS = 'Listo para recibir un objetivo'
+const DEFAULT_CURRENT_STEP = 'Esperando una nueva instrucción del planificador'
+const READY_WITH_PROJECT_RULE_STATUS =
+  'Listo para continuar con la regla del proyecto'
+const READY_WITH_PROJECT_RULE_STEP =
+  'Esperando una nueva acción con aprobación persistente'
+const DEFAULT_SESSION_EVENTS = [
+  'Sesión creada',
+  'El planificador cargó el objetivo inicial',
+  'Se abrió el punto de aprobación',
+]
+const DEFAULT_GOAL_INPUT =
+  'Preparar una mejora del flujo de trabajo entre planificador y ejecutor'
+const LEGACY_DEFAULT_WORKSPACE_PATH =
+  'C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\orquestadoria\\ai-orchestrator'
+const DEFAULT_WORKSPACE_PATH =
+  'C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\web-prueba'
+const DEFAULT_EXECUTION_CONTEXT_INPUT = ''
+const DEFAULT_USER_PARTICIPATION_MODE: UserParticipationMode = ''
+const DEFAULT_RESOLVED_DECISIONS: ResolvedDecisionRecord[] = []
+const DEFAULT_BRAIN_COST_MODE: BrainCostMode = 'balanced'
+const DEFAULT_PLANNER_INSTRUCTION = 'Todavía no se generó ninguna instrucción'
+const DEFAULT_EXECUTOR_RESULT = 'Todavía no se ejecutó ninguna instrucción'
+const DEFAULT_EXECUTOR_REQUEST_STATE = 'idle'
+const DEFAULT_APPROVAL_MESSAGE =
+  'Esta tarea necesita validación manual antes de continuar.'
+const AUTO_FLOW_COMPLETED_STATUS = 'Objetivo completado en flujo automático'
+const DEFAULT_LAST_RUN_TEXT = 'Todavía no se registró ninguna corrida'
+const DEFAULT_LAST_RUN_SUMMARY = {
+  objective: DEFAULT_LAST_RUN_TEXT,
+  instruction: DEFAULT_LAST_RUN_TEXT,
+  result: DEFAULT_LAST_RUN_TEXT,
+  context: DEFAULT_LAST_RUN_TEXT,
+  workspacePath: DEFAULT_LAST_RUN_TEXT,
+  approval: DEFAULT_LAST_RUN_TEXT,
+  finalStatus: DEFAULT_LAST_RUN_TEXT,
+}
+const DEFAULT_FLOW_MESSAGES: FlowMessage[] = []
+const EMPTY_PLANNER_EXECUTION_METADATA: PlannerExecutionMetadata = {
+  decisionKey: '',
+  businessSector: '',
+  businessSectorLabel: '',
+  creativeDirection: null,
+  executionScope: null,
+  strategy: '',
+  executionMode: '',
+  reason: '',
+  nextExpectedAction: '',
+  tasks: [],
+  assumptions: [],
+  reusableArtifactLookup: null,
+  reusableArtifactsFound: 0,
+  reuseDecision: false,
+  reuseReason: '',
+  reusedArtifactIds: [],
+  reuseMode: 'none',
+  contextHubStatus: null,
+}
+const BRAIN_COST_MODE_OPTIONS: Array<{
+  value: BrainCostMode
+  label: string
+  description: string
+}> = [
+  {
+    value: 'cheap',
+    label: 'Económico',
+    description: 'Prioriza reglas locales para pedidos simples y cuida el costo.',
+  },
+  {
+    value: 'balanced',
+    label: 'Equilibrado',
+    description: 'Equilibra costo y criterio sin romper el flujo actual.',
+  },
+  {
+    value: 'smart',
+    label: 'Inteligente',
+    description: 'Decide por dificultad, ambigüedad, riesgo e impacto.',
+  },
+  {
+    value: 'max-quality',
+    label: 'Máxima calidad',
+    description: 'Deriva más casos a OpenAI para maximizar criterio.',
+  },
+]
+const ORCHESTRATOR_PLANNER_FEEDBACK_PREFIX = '__orchestrator_feedback__:'
+
+const DEFAULT_RUNTIME_STATUS = {
+  connection: 'Todavía no se probó',
+  platform: 'No disponible',
+  electron: 'No disponible',
+  node: 'No disponible',
+  executorMode: 'unknown',
+  executorModeSource: '',
+  bridgeMode: 'unknown',
+  bridgeModeSource: '',
+}
+
+function formatExecutorRuntimeModeLabel(executorMode?: string, bridgeMode?: string) {
+  const normalizedExecutorMode =
+    typeof executorMode === 'string' ? executorMode.trim().toLocaleLowerCase() : ''
+  const normalizedBridgeMode =
+    typeof bridgeMode === 'string' ? bridgeMode.trim().toLocaleLowerCase() : ''
+
+  if (normalizedExecutorMode === 'mock') {
+    return 'Mock local'
+  }
+
+  if (normalizedExecutorMode === 'command' && normalizedBridgeMode === 'codex') {
+    return 'Real (Codex)'
+  }
+
+  if (normalizedExecutorMode === 'command') {
+    return 'Real por comando'
+  }
+
+  return 'No definido'
+}
+
+function formatExecutorRuntimeModeDetail({
+  executorModeSource,
+  bridgeMode,
+  bridgeModeSource,
+  executorCommand,
+}: {
+  executorModeSource?: string
+  bridgeMode?: string
+  bridgeModeSource?: string
+  executorCommand?: string
+}) {
+  const detailParts = []
+
+  if (typeof executorModeSource === 'string' && executorModeSource.trim()) {
+    detailParts.push(
+      executorModeSource.trim() === 'env' ? 'forzado por entorno' : 'default del flujo',
+    )
+  }
+
+  const normalizedBridgeMode =
+    typeof bridgeMode === 'string' ? bridgeMode.trim().toLocaleLowerCase() : ''
+
+  if (normalizedBridgeMode && normalizedBridgeMode !== 'unknown') {
+    const bridgeModeLabel = `bridge ${normalizedBridgeMode}`
+    const bridgeSourceLabel =
+      typeof bridgeModeSource === 'string' && bridgeModeSource.trim()
+        ? bridgeModeSource.trim() === 'env'
+          ? 'por entorno'
+          : 'por default'
+        : ''
+    detailParts.push(
+      bridgeSourceLabel ? `${bridgeModeLabel} ${bridgeSourceLabel}` : bridgeModeLabel,
+    )
+  }
+
+  if (typeof executorCommand === 'string' && executorCommand.trim()) {
+    detailParts.push(executorCommand.trim())
+  }
+
+  return detailParts.join(' · ') || 'Sin metadata de runtime'
+}
+
+const normalizeValidationResults = (value: unknown): ExecutorValidationResult[] =>
+  Array.isArray(value)
+    ? value
+        .map((entry) =>
+          entry && typeof entry === 'object'
+            ? {
+                ...(typeof (entry as { type?: unknown }).type === 'string'
+                  ? { type: (entry as { type: string }).type.trim() }
+                  : {}),
+                ...((typeof (entry as { targetPath?: unknown }).targetPath === 'string' &&
+                  (entry as { targetPath: string }).targetPath.trim()) ||
+                (typeof (entry as { path?: unknown }).path === 'string' &&
+                  (entry as { path: string }).path.trim())
+                  ? {
+                      targetPath:
+                        (typeof (entry as { targetPath?: unknown }).targetPath === 'string' &&
+                        (entry as { targetPath: string }).targetPath.trim()
+                          ? (entry as { targetPath: string }).targetPath.trim()
+                          : (entry as { path: string }).path.trim()),
+                    }
+                  : {}),
+                ...(typeof (entry as { expectedKind?: unknown }).expectedKind === 'string'
+                  ? { expectedKind: (entry as { expectedKind: string }).expectedKind.trim() }
+                  : {}),
+                ...(typeof (entry as { ok?: unknown }).ok === 'boolean'
+                  ? { ok: (entry as { ok: boolean }).ok }
+                  : {}),
+              }
+            : null,
+        )
+        .filter((entry): entry is ExecutorValidationResult => entry !== null)
+    : []
+
+const isLocalFastRouteExecution = (value?: {
+  strategy?: unknown
+  materializationPlanSource?: unknown
+  materialState?: unknown
+  executionMode?: unknown
+  decisionKey?: unknown
+} | null) => {
+  const normalizedStrategy = normalizeOptionalString(value?.strategy).toLocaleLowerCase()
+  const normalizedPlanSource = normalizeOptionalString(
+    value?.materializationPlanSource,
+  ).toLocaleLowerCase()
+  const normalizedMaterialState = normalizeOptionalString(value?.materialState).toLocaleLowerCase()
+  const normalizedExecutionMode = normalizeOptionalString(value?.executionMode).toLocaleLowerCase()
+  const normalizedDecisionKey = normalizeOptionalString(value?.decisionKey).toLocaleLowerCase()
+
+  return (
+    normalizedStrategy === 'local-deterministic-materialization' ||
+    normalizedPlanSource.startsWith('fast-route:') ||
+    normalizedMaterialState === 'local-deterministic-success' ||
+    normalizedExecutionMode === 'local-fast' ||
+    normalizedDecisionKey === 'fast-local'
+  )
+}
+
+const getReuseModeLabel = (
+  value: unknown,
+  { noneLabel = 'Sin reutilización aplicada' }: { noneLabel?: string } = {},
+) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (normalizedValue === 'reuse-style-and-structure') {
+    return 'Reutilizar estilo y estructura'
+  }
+
+  if (normalizedValue === 'reuse-style') {
+    return 'Reutilizar estilo'
+  }
+
+  if (normalizedValue === 'reuse-structure') {
+    return 'Reutilizar estructura'
+  }
+
+  if (normalizedValue === 'inspiration-only') {
+    return 'Solo inspiracion'
+  }
+
+  return noneLabel
+}
+
+const extractPlannerExecutionMetadata = (payload?: {
+  decisionKey?: string
+  businessSector?: string
+  businessSectorLabel?: string
+  creativeDirection?: WebCreativeDirectionContract
+  reusableArtifactLookup?: PlannerDecisionResponse['reusableArtifactLookup']
+  reusableArtifactsFound?: number
+  reuseDecision?: boolean
+  reuseReason?: string
+  reusedArtifactIds?: string[]
+  reuseMode?: string
+  executionScope?: ExecutorExecutionScope
+  strategy?: string
+  executionMode?: string
+  reason?: string
+  nextExpectedAction?: string
+  contextHubStatus?: ContextHubStatusSummary | null
+  tasks?: unknown[]
+  assumptions?: string[]
+} | null): PlannerExecutionMetadata => ({
+  decisionKey:
+    typeof payload?.decisionKey === 'string' ? payload.decisionKey.trim() : '',
+  businessSector:
+    typeof payload?.businessSector === 'string' ? payload.businessSector.trim() : '',
+  businessSectorLabel:
+    typeof payload?.businessSectorLabel === 'string'
+      ? payload.businessSectorLabel.trim()
+      : '',
+  creativeDirection:
+    payload?.creativeDirection && typeof payload.creativeDirection === 'object'
+      ? payload.creativeDirection
+      : null,
+  reusableArtifactLookup:
+    payload?.reusableArtifactLookup &&
+    typeof payload.reusableArtifactLookup === 'object'
+      ? {
+          executed: payload.reusableArtifactLookup.executed === true,
+          foundCount:
+            Number.isInteger(payload.reusableArtifactLookup.foundCount) &&
+            payload.reusableArtifactLookup.foundCount >= 0
+              ? payload.reusableArtifactLookup.foundCount
+              : Array.isArray(payload.reusableArtifactLookup.matches)
+                ? payload.reusableArtifactLookup.matches.length
+                : 0,
+          matches: Array.isArray(payload.reusableArtifactLookup.matches)
+            ? payload.reusableArtifactLookup.matches
+                .map((match) => ({
+                  id: typeof match?.id === 'string' ? match.id.trim() : '',
+                  type: typeof match?.type === 'string' ? match.type.trim() : '',
+                  sector:
+                    typeof match?.sector === 'string' ? match.sector.trim() : '',
+                  visualStyle:
+                    typeof match?.visualStyle === 'string'
+                      ? match.visualStyle.trim()
+                      : '',
+                  layoutVariant:
+                    typeof match?.layoutVariant === 'string'
+                      ? match.layoutVariant.trim()
+                      : '',
+                  heroStyle:
+                    typeof match?.heroStyle === 'string'
+                      ? match.heroStyle.trim()
+                      : '',
+                  localPath:
+                    typeof match?.localPath === 'string'
+                      ? match.localPath.trim()
+                      : '',
+                  primaryCta:
+                    typeof match?.primaryCta === 'string'
+                      ? match.primaryCta.trim()
+                      : '',
+                  secondaryCta:
+                    typeof match?.secondaryCta === 'string'
+                      ? match.secondaryCta.trim()
+                      : '',
+                  typography:
+                    match?.typography && typeof match.typography === 'object'
+                      ? {
+                          ...(typeof match.typography.headingFamily === 'string'
+                            ? { headingFamily: match.typography.headingFamily.trim() }
+                            : {}),
+                          ...(typeof match.typography.bodyFamily === 'string'
+                            ? { bodyFamily: match.typography.bodyFamily.trim() }
+                            : {}),
+                          ...(typeof match.typography.fontHref === 'string'
+                            ? { fontHref: match.typography.fontHref.trim() }
+                            : {}),
+                        }
+                      : undefined,
+                  colors:
+                    match?.colors && typeof match.colors === 'object'
+                      ? Object.fromEntries(
+                          Object.entries(match.colors).filter(
+                            ([, value]) =>
+                              typeof value === 'string' && value.trim(),
+                          ),
+                        )
+                      : undefined,
+                  metadata:
+                    match?.metadata && typeof match.metadata === 'object'
+                      ? match.metadata
+                      : undefined,
+                  matchReasons: Array.isArray(match?.matchReasons)
+                    ? match.matchReasons
+                        .filter((reason) => typeof reason === 'string' && reason.trim())
+                        .map((reason) => reason.trim())
+                    : [],
+                }))
+                .filter((match) => Boolean(match.id))
+            : [],
+        }
+      : null,
+  reusableArtifactsFound:
+    Number.isInteger(payload?.reusableArtifactsFound) &&
+    payload.reusableArtifactsFound >= 0
+      ? payload.reusableArtifactsFound
+      : 0,
+  reuseDecision: payload?.reuseDecision === true,
+  reuseReason:
+    typeof payload?.reuseReason === 'string' ? payload.reuseReason.trim() : '',
+  reusedArtifactIds: Array.isArray(payload?.reusedArtifactIds)
+    ? payload.reusedArtifactIds
+        .filter((artifactId) => typeof artifactId === 'string' && artifactId.trim())
+        .map((artifactId) => artifactId.trim())
+    : [],
+  reuseMode: typeof payload?.reuseMode === 'string' ? payload.reuseMode.trim() : 'none',
+  contextHubStatus:
+    payload?.contextHubStatus && typeof payload.contextHubStatus === 'object'
+      ? {
+          source: 'context-hub',
+          endpoint:
+            typeof payload.contextHubStatus.endpoint === 'string'
+              ? payload.contextHubStatus.endpoint.trim()
+              : '/v1/packs/suggested',
+          available: payload.contextHubStatus.available === true,
+          ...(typeof payload.contextHubStatus.id === 'string' &&
+          payload.contextHubStatus.id.trim()
+            ? { id: payload.contextHubStatus.id.trim() }
+            : {}),
+          ...(typeof payload.contextHubStatus.slug === 'string' &&
+          payload.contextHubStatus.slug.trim()
+            ? { slug: payload.contextHubStatus.slug.trim() }
+            : {}),
+          ...(typeof payload.contextHubStatus.title === 'string' &&
+          payload.contextHubStatus.title.trim()
+            ? { title: payload.contextHubStatus.title.trim() }
+            : {}),
+          ...(Number.isInteger(payload.contextHubStatus.itemsCount) &&
+          payload.contextHubStatus.itemsCount >= 0
+            ? { itemsCount: payload.contextHubStatus.itemsCount }
+            : {}),
+          ...(Number.isFinite(payload.contextHubStatus.estimatedTokens) &&
+          payload.contextHubStatus.estimatedTokens >= 0
+            ? { estimatedTokens: payload.contextHubStatus.estimatedTokens }
+            : {}),
+          ...(typeof payload.contextHubStatus.reason === 'string' &&
+          payload.contextHubStatus.reason.trim()
+            ? { reason: payload.contextHubStatus.reason.trim() }
+            : {}),
+        }
+      : null,
+  executionScope:
+    payload?.executionScope && typeof payload.executionScope === 'object'
+      ? payload.executionScope
+      : null,
+  strategy: typeof payload?.strategy === 'string' ? payload.strategy.trim() : '',
+  executionMode:
+    typeof payload?.executionMode === 'string' ? payload.executionMode.trim() : '',
+  reason: typeof payload?.reason === 'string' ? payload.reason.trim() : '',
+  nextExpectedAction:
+    typeof payload?.nextExpectedAction === 'string'
+      ? payload.nextExpectedAction.trim()
+      : '',
+  tasks: Array.isArray(payload?.tasks)
+    ? payload.tasks
+        .map((task) =>
+          task && typeof task === 'object'
+            ? {
+                ...(typeof (task as { step?: unknown }).step === 'number'
+                  ? { step: (task as { step: number }).step }
+                  : {}),
+                ...(typeof (task as { title?: unknown }).title === 'string'
+                  ? { title: (task as { title: string }).title.trim() }
+                  : {}),
+                ...(typeof (task as { operation?: unknown }).operation === 'string'
+                  ? { operation: (task as { operation: string }).operation.trim() }
+                  : {}),
+                ...(typeof (task as { targetPath?: unknown }).targetPath === 'string'
+                  ? { targetPath: (task as { targetPath: string }).targetPath.trim() }
+                  : {}),
+              }
+            : null,
+        )
+        .filter(Boolean)
+    : [],
+  assumptions: Array.isArray(payload?.assumptions)
+    ? payload.assumptions
+        .filter((assumption) => typeof assumption === 'string' && assumption.trim())
+        .map((assumption) => assumption.trim())
+    : [],
+})
+
+const normalizeReusableArtifactRecord = (
+  artifact?: Partial<ReusableArtifactRecord> | null,
+): ReusableArtifactRecord | null => {
+  if (!artifact || typeof artifact !== 'object') {
+    return null
+  }
+
+  const artifactId = typeof artifact.id === 'string' ? artifact.id.trim() : ''
+  if (!artifactId) {
+    return null
+  }
+
+  return {
+    id: artifactId,
+    type: typeof artifact.type === 'string' ? artifact.type.trim() : '',
+    sector: typeof artifact.sector === 'string' ? artifact.sector.trim() : '',
+    sectorLabel:
+      typeof artifact.sectorLabel === 'string' ? artifact.sectorLabel.trim() : '',
+    visualStyle:
+      typeof artifact.visualStyle === 'string' ? artifact.visualStyle.trim() : '',
+    layoutVariant:
+      typeof artifact.layoutVariant === 'string'
+        ? artifact.layoutVariant.trim()
+        : '',
+    heroStyle:
+      typeof artifact.heroStyle === 'string' ? artifact.heroStyle.trim() : '',
+    localPath:
+      typeof artifact.localPath === 'string' ? artifact.localPath.trim() : '',
+    primaryCta:
+      typeof artifact.primaryCta === 'string' ? artifact.primaryCta.trim() : '',
+    secondaryCta:
+      typeof artifact.secondaryCta === 'string'
+        ? artifact.secondaryCta.trim()
+        : '',
+    typography:
+      artifact.typography && typeof artifact.typography === 'object'
+        ? {
+            ...(typeof artifact.typography.headingFamily === 'string'
+              ? { headingFamily: artifact.typography.headingFamily.trim() }
+              : {}),
+            ...(typeof artifact.typography.bodyFamily === 'string'
+              ? { bodyFamily: artifact.typography.bodyFamily.trim() }
+              : {}),
+            ...(typeof artifact.typography.fontHref === 'string'
+              ? { fontHref: artifact.typography.fontHref.trim() }
+              : {}),
+          }
+        : undefined,
+    colors:
+      artifact.colors && typeof artifact.colors === 'object'
+        ? Object.fromEntries(
+            Object.entries(artifact.colors).filter(
+              ([, value]) => typeof value === 'string' && value.trim(),
+            ),
+          )
+        : undefined,
+    preview: normalizeReusableArtifactStoredPreview(
+      artifact.preview as ReusableArtifactStoredPreview | undefined,
+    ),
+    metadata:
+      artifact.metadata && typeof artifact.metadata === 'object'
+        ? artifact.metadata
+        : undefined,
+    tags: Array.isArray(artifact.tags)
+      ? artifact.tags
+          .filter((tag) => typeof tag === 'string' && tag.trim())
+          .map((tag) => tag.trim())
+      : [],
+    createdAt:
+      typeof artifact.createdAt === 'string' ? artifact.createdAt.trim() : '',
+    updatedAt:
+      typeof artifact.updatedAt === 'string' ? artifact.updatedAt.trim() : '',
+    matchReasons: Array.isArray(artifact.matchReasons)
+      ? artifact.matchReasons
+          .filter((reason) => typeof reason === 'string' && reason.trim())
+          .map((reason) => reason.trim())
+      : [],
+  }
+}
+
+const getManualReuseModeLabel = (mode: ManualReuseMode) => {
+  if (mode === 'reuse-style-and-structure') {
+    return 'Reutilizar estilo y estructura'
+  }
+
+  if (mode === 'reuse-style') {
+    return 'Reutilizar estilo'
+  }
+
+  if (mode === 'reuse-structure') {
+    return 'Reutilizar estructura'
+  }
+
+  if (mode === 'inspiration-only') {
+    return 'Usar solo inspiración'
+  }
+
+  if (mode === 'none') {
+    return 'No reutilizar'
+  }
+
+  return 'Búsqueda automática'
+}
+
+const getVisualStyleLabel = (value?: string) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (!normalizedValue) {
+    return ''
+  }
+
+  const labels: Record<string, string> = {
+    'clarity-first': 'Claridad primero',
+    'street-editorial': 'Editorial urbano',
+    'institutional-ledger': 'Institucional metódico',
+    'gastronomic-storytelling': 'Narrativa gastronómica',
+    'architectural-premium': 'Premium arquitectónico',
+    'performance-burst': 'Rendimiento intenso',
+  }
+
+  return labels[normalizedValue] || normalizeOptionalString(value).replace(/-/g, ' ')
+}
+
+const getLayoutVariantLabel = (value?: string) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (!normalizedValue) {
+    return ''
+  }
+
+  const labels: Record<string, string> = {
+    'structured-trust': 'Confianza estructurada',
+    'lookbook-flow': 'Flujo lookbook',
+    'evidence-ledger': 'Método probatorio',
+    'immersive-pulse': 'Pulso inmersivo',
+    'editorial-gallery': 'Galería editorial',
+    'editorial-mosaic': 'Mosaico editorial',
+  }
+
+  return labels[normalizedValue] || normalizeOptionalString(value).replace(/-/g, ' ')
+}
+
+const getHeroStyleLabel = (value?: string) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (!normalizedValue) {
+    return ''
+  }
+
+  const labels: Record<string, string> = {
+    'info-first': 'Información primero',
+    'lookbook-stack': 'Lookbook apilado',
+    'authority-columns': 'Columnas de autoridad',
+    'story-poster': 'Póster narrativo',
+    'statement-split': 'Declaración dividida',
+    'performance-mosaic': 'Mosaico de rendimiento',
+  }
+
+  return labels[normalizedValue] || normalizeOptionalString(value).replace(/-/g, ' ')
+}
+
+const sanitizePreviewText = (value?: string) =>
+  typeof value === 'string' ? value.replace(/['"]/g, '').trim() : ''
+
+const getPreviewFontFamily = (value?: string, fallback = 'sans-serif') =>
+  sanitizePreviewText(value) || fallback
+
+type ReusableArtifactPreviewModel = {
+  background: string
+  surface: string
+  text: string
+  muted: string
+  accent: string
+  accentStrong: string
+  headingFont: string
+  bodyFont: string
+  heroLabel: string
+  layoutLabel: string
+  previewHeading: string
+  previewBody: string
+  previewCta: string
+}
+
+type ReusableArtifactStoredPreview = {
+  status?: string
+  imagePath?: string
+  generatedAt?: string
+  source?: string
+  errorMessage?: string
+}
+
+// La preview sintetiza una lectura visual rapida usando la metadata reusable
+// ya guardada. Asi evitamos depender solo de texto sin abrir una galeria pesada.
+const buildReusableArtifactPreviewModel = (
+  artifact: ReusableArtifactRecord,
+): ReusableArtifactPreviewModel => {
+  const colors = artifact.colors || {}
+  const background =
+    colors.gradientStart && colors.gradientEnd
+      ? `linear-gradient(135deg, ${colors.gradientStart}, ${colors.gradientEnd})`
+      : colors.panel || 'linear-gradient(135deg, #0f172a, #111827)'
+
+  return {
+    background,
+    surface: colors.panel || 'rgba(15, 23, 42, 0.72)',
+    text: colors.text || '#f8fafc',
+    muted: colors.muted || 'rgba(226, 232, 240, 0.75)',
+    accent: colors.accent || '#38bdf8',
+    accentStrong: colors.accentStrong || colors.highlight || colors.accent || '#0ea5e9',
+    headingFont: getPreviewFontFamily(artifact.typography?.headingFamily, 'serif'),
+    bodyFont: getPreviewFontFamily(artifact.typography?.bodyFamily, 'sans-serif'),
+    heroLabel: getHeroStyleLabel(artifact.heroStyle) || 'apertura flexible',
+    layoutLabel: getLayoutVariantLabel(artifact.layoutVariant) || 'estructura adaptable',
+    previewHeading:
+      artifact.sectorLabel ||
+      artifact.sector ||
+      getVisualStyleLabel(artifact.visualStyle) ||
+      'Vista reutilizable',
+    previewBody:
+      artifact.visualStyle ||
+      artifact.layoutVariant ||
+      artifact.heroStyle ||
+      'Sin direccion visual registrada',
+    previewCta: artifact.primaryCta || artifact.secondaryCta || 'Ver propuesta',
+  }
+}
+
+const normalizeReusableArtifactStoredPreview = (
+  preview?: ReusableArtifactStoredPreview | null,
+): ReusableArtifactStoredPreview | undefined => {
+  if (!preview || typeof preview !== 'object') {
+    return undefined
+  }
+
+  const normalizedPreview = {
+    ...(typeof preview.status === 'string' && preview.status.trim()
+      ? { status: preview.status.trim() }
+      : {}),
+    ...(typeof preview.imagePath === 'string' && preview.imagePath.trim()
+      ? { imagePath: preview.imagePath.trim() }
+      : {}),
+    ...(typeof preview.generatedAt === 'string' && preview.generatedAt.trim()
+      ? { generatedAt: preview.generatedAt.trim() }
+      : {}),
+    ...(typeof preview.source === 'string' && preview.source.trim()
+      ? { source: preview.source.trim() }
+      : {}),
+    ...(typeof preview.errorMessage === 'string' && preview.errorMessage.trim()
+      ? { errorMessage: preview.errorMessage.trim() }
+      : {}),
+  }
+
+  return Object.keys(normalizedPreview).length > 0 ? normalizedPreview : undefined
+}
+
+const buildLocalFileUrl = (targetPath?: string) => {
+  if (typeof targetPath !== 'string' || !targetPath.trim()) {
+    return ''
+  }
+
+  const normalizedPath = targetPath.trim()
+  if (/^file:/i.test(normalizedPath)) {
+    return normalizedPath
+  }
+
+  return `file:///${normalizedPath.replace(/\\/g, '/').replace(/^\/+/, '')}`
+}
+
+const buildManualReusablePreferencePayload = ({
+  mode,
+  selectedArtifact,
+}: {
+  mode: ManualReuseMode
+  selectedArtifact: ReusableArtifactRecord | null
+}): ManualReusablePreference | null => {
+  if (mode === 'auto') {
+    return null
+  }
+
+  if (mode === 'none') {
+    return {
+      reuseMode: 'none',
+      source: 'ui-manual',
+    }
+  }
+
+  if (!selectedArtifact?.id) {
+    return null
+  }
+
+  return {
+    artifactId: selectedArtifact.id,
+    reuseMode: mode,
+    source: 'ui-manual',
+  }
+}
+
+const buildManualReusableLookupMatch = (
+  selectedArtifact: ReusableArtifactRecord,
+): ReusableArtifactLookupMatch => ({
+  id: selectedArtifact.id,
+  type: selectedArtifact.type,
+  sector: selectedArtifact.sector,
+  visualStyle: selectedArtifact.visualStyle,
+  layoutVariant: selectedArtifact.layoutVariant,
+  heroStyle: selectedArtifact.heroStyle,
+  localPath: selectedArtifact.localPath,
+  primaryCta: selectedArtifact.primaryCta,
+  secondaryCta: selectedArtifact.secondaryCta,
+  typography: selectedArtifact.typography,
+  colors: selectedArtifact.colors,
+  preview: selectedArtifact.preview,
+  metadata: selectedArtifact.metadata,
+  matchReasons: Array.from(
+    new Set(['manual-selection', ...(selectedArtifact.matchReasons || [])]),
+  ),
+})
+
+const applyManualReusablePreferenceToPlannerExecutionMetadata = ({
+  metadata,
+  mode,
+  selectedArtifact,
+}: {
+  metadata: PlannerExecutionMetadata
+  mode: ManualReuseMode
+  selectedArtifact: ReusableArtifactRecord | null
+}): PlannerExecutionMetadata => {
+  if (mode === 'auto') {
+    return metadata
+  }
+
+  if (mode === 'none') {
+    return {
+      ...metadata,
+      reuseDecision: false,
+      reuseMode: 'none',
+      reusedArtifactIds: [],
+      reuseReason:
+        metadata.reuseReason ||
+        'El operador desactivó manualmente la reutilización para esta corrida.',
+    }
+  }
+
+  if (!selectedArtifact?.id) {
+    return metadata
+  }
+
+  const manualMatch = buildManualReusableLookupMatch(selectedArtifact)
+  const currentMatches = metadata.reusableArtifactLookup?.matches || []
+  const mergedMatches = [
+    manualMatch,
+    ...currentMatches.filter((match) => match.id !== manualMatch.id),
+  ]
+  const nextLookup: ReusableArtifactLookupContract = {
+    executed: true,
+    foundCount: Math.max(
+      metadata.reusableArtifactLookup?.foundCount || 0,
+      metadata.reusableArtifactsFound,
+      mergedMatches.length,
+      1,
+    ),
+    matches: mergedMatches,
+  }
+  const reusedArtifactIds = [
+    selectedArtifact.id,
+    ...metadata.reusedArtifactIds.filter(
+      (artifactId) => artifactId !== selectedArtifact.id,
+    ),
+  ]
+  const hasMatchingPlannerDecision =
+    metadata.reuseDecision === true &&
+    metadata.reuseMode === mode &&
+    metadata.reusedArtifactIds.includes(selectedArtifact.id)
+
+  return {
+    ...metadata,
+    reusableArtifactLookup: nextLookup,
+    reusableArtifactsFound: Math.max(
+      metadata.reusableArtifactsFound,
+      nextLookup.foundCount,
+      1,
+    ),
+    reuseDecision: true,
+    reuseMode: mode,
+    reusedArtifactIds,
+    reuseReason: hasMatchingPlannerDecision
+      ? metadata.reuseReason
+      : `El operador seleccionó manualmente el artefacto ${selectedArtifact.id} en modo ${mode}; esa preferencia tiene prioridad para esta corrida.`,
+  }
+}
+
+type AppSectionKey =
+  | 'inicio'
+  | 'objetivo'
+  | 'planificacion'
+  | 'ejecucion'
+  | 'aprobaciones'
+  | 'memoria'
+  | 'corridas'
+  | 'consola'
+
+type ExperienceMode = 'guided' | 'advanced'
+
+type WizardStepKey =
+  | 'goal'
+  | 'context'
+  | 'brain'
+  | 'memory'
+  | 'plan'
+  | 'execution'
+  | 'result'
+
+const APP_NAV_SECTIONS: Array<{
+  key: AppSectionKey
+  label: string
+  description: string
+}> = [
+  {
+    key: 'inicio',
+    label: 'Inicio',
+    description: 'Estado general, resumen del flujo y acciones rapidas.',
+  },
+  {
+    key: 'objetivo',
+    label: 'Objetivo y contexto',
+    description: 'Objetivo actual, contexto, participacion y criterio del Cerebro.',
+  },
+  {
+    key: 'planificacion',
+    label: 'Planificacion',
+    description: 'Ruta planificada, decisionKey, motivo y siguiente accion.',
+  },
+  {
+    key: 'ejecucion',
+    label: 'Ejecucion',
+    description: 'Estado del ejecutor, resultado y accion manual.',
+  },
+  {
+    key: 'aprobaciones',
+    label: 'Aprobaciones',
+    description: 'Pendientes, ultima respuesta humana e historial corto.',
+  },
+  {
+    key: 'memoria',
+    label: 'Memoria reutilizable',
+    description: 'Catalogo, filtros, seleccion manual y modo reusable.',
+  },
+  {
+    key: 'corridas',
+    label: 'Corridas',
+    description: 'Resumen E2E, historial, archivos tocados y estado final.',
+  },
+  {
+    key: 'consola',
+    label: 'Consola tecnica',
+    description: 'Timeline, eventos, conversacion interna y logs tecnicos.',
+  },
+]
+
+const GUIDED_WIZARD_STEPS: Array<{
+  key: WizardStepKey
+  label: string
+  description: string
+}> = [
+  {
+    key: 'goal',
+    label: 'Objetivo',
+    description: 'Definí qué querés lograr.',
+  },
+  {
+    key: 'context',
+    label: 'Contexto',
+    description: 'Sumá alcance y participación.',
+  },
+  {
+    key: 'brain',
+    label: 'Criterio del Cerebro',
+    description: 'Elegí costo, calidad y autonomía.',
+  },
+  {
+    key: 'memory',
+    label: 'Memoria reutilizable',
+    description: 'Opcional: elegí un reusable.',
+  },
+  {
+    key: 'plan',
+    label: 'Plan',
+    description: 'Revisá la ruta antes de ejecutar.',
+  },
+  {
+    key: 'execution',
+    label: 'Ejecución',
+    description: 'Seguí el avance y bloqueos.',
+  },
+  {
+    key: 'result',
+    label: 'Resultado',
+    description: 'Leé la salida final y próximos pasos.',
+  },
+]
+
+const joinClasses = (...tokens: Array<string | false | null | undefined>) =>
+  tokens.filter(Boolean).join(' ')
+
+function SidebarSectionButton({
+  active,
+  label,
+  description,
+  badge,
+  onClick,
+}: {
+  active: boolean
+  label: string
+  description: string
+  badge?: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={joinClasses(
+        'w-full rounded-2xl border px-4 py-4 text-left transition',
+        active
+          ? 'border-sky-300/35 bg-sky-300/12 text-white shadow-[0_14px_40px_rgba(56,189,248,0.16)]'
+          : 'border-white/10 bg-white/[0.03] text-slate-200 hover:border-white/20 hover:bg-white/[0.06]',
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold">{label}</div>
+          <div className="mt-1 text-xs leading-5 text-slate-400">{description}</div>
+        </div>
+        {badge ? (
+          <span className="rounded-full border border-white/10 bg-slate-950/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300">
+            {badge}
+          </span>
+        ) : null}
+      </div>
+    </button>
+  )
+}
+
+function SectionHeader({
+  eyebrow,
+  title,
+  description,
+  actions,
+}: {
+  eyebrow?: string
+  title: string
+  description: string
+  actions?: ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-4 border-b border-white/8 pb-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="space-y-2">
+        {eyebrow ? (
+          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-200/80">
+            {eyebrow}
+          </div>
+        ) : null}
+        <div className="text-2xl font-semibold text-white">{title}</div>
+        <p className="max-w-3xl text-sm leading-6 text-slate-400">{description}</p>
+      </div>
+      {actions ? <div className="flex flex-wrap gap-3">{actions}</div> : null}
+    </div>
+  )
+}
+
+function MetricCard({
+  label,
+  value,
+  detail,
+  tone = 'default',
+}: {
+  label: string
+  value: string
+  detail?: string
+  tone?: 'default' | 'sky' | 'emerald' | 'amber' | 'rose'
+}) {
+  const toneClassName =
+    tone === 'sky'
+      ? 'border-sky-300/20 bg-sky-300/8'
+      : tone === 'emerald'
+        ? 'border-emerald-300/20 bg-emerald-300/8'
+        : tone === 'amber'
+          ? 'border-amber-300/20 bg-amber-300/8'
+          : tone === 'rose'
+            ? 'border-rose-300/20 bg-rose-300/8'
+            : 'border-white/8 bg-white/[0.03]'
+
+  return (
+    <article className={joinClasses('rounded-2xl border px-4 py-4', toneClassName)}>
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+        {label}
+      </div>
+      <div className="mt-3 text-sm font-medium leading-6 text-slate-100">{value}</div>
+      {detail ? (
+        <div className="mt-2 text-xs leading-5 text-slate-400">{detail}</div>
+      ) : null}
+    </article>
+  )
+}
+
+function ResultSectionCard({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description?: string
+  children: ReactNode
+}) {
+  return (
+    <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
+      <div className="flex flex-col gap-1">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+          {title}
+        </div>
+        {description ? (
+          <div className="text-sm leading-6 text-slate-400">{description}</div>
+        ) : null}
+      </div>
+      <div className="mt-4">{children}</div>
+    </article>
+  )
+}
+
+function ResultStatusBadge({
+  label,
+  tone = 'default',
+}: {
+  label: string
+  tone?: 'default' | 'sky' | 'emerald' | 'amber' | 'rose'
+}) {
+  const toneClassName =
+    tone === 'sky'
+      ? 'border-sky-300/20 bg-sky-300/10 text-sky-100'
+      : tone === 'emerald'
+        ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100'
+        : tone === 'amber'
+          ? 'border-amber-300/20 bg-amber-300/10 text-amber-100'
+          : tone === 'rose'
+            ? 'border-rose-300/20 bg-rose-300/10 text-rose-100'
+            : 'border-white/10 bg-white/5 text-slate-100'
+
+  return (
+    <span
+      className={joinClasses(
+        'inline-flex rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em]',
+        toneClassName,
+      )}
+    >
+      {label}
+    </span>
+  )
+}
+
+function ResultKeyValueGrid({
+  items,
+}: {
+  items: Array<{
+    label: string
+    value: string
+    detail?: string
+  }>
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {items.map((item) => (
+        <div
+          key={`${item.label}-${item.value}`}
+          className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3"
+        >
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            {item.label}
+          </div>
+          <div className="mt-2 text-sm font-medium leading-6 text-slate-100">
+            {item.value}
+          </div>
+          {item.detail ? (
+            <div className="mt-1 text-xs leading-5 text-slate-400">{item.detail}</div>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function DetailDialog({
+  open,
+  title,
+  description,
+  onClose,
+  maxWidthClassName = 'max-w-4xl',
+  children,
+}: {
+  open: boolean
+  title: string
+  description?: string
+  onClose: () => void
+  maxWidthClassName?: string
+  children: ReactNode
+}) {
+  if (!open) {
+    return null
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/72 px-4 py-5 backdrop-blur-sm sm:px-6">
+      <div
+        className={joinClasses(
+          'flex max-h-[90vh] w-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-slate-950/95 shadow-[0_24px_80px_rgba(0,0,0,0.45)]',
+          maxWidthClassName,
+        )}
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-5 sm:px-6">
+          <div className="min-w-0">
+            <div className="text-xl font-semibold text-white">{title}</div>
+            {description ? (
+              <p className="mt-2 text-sm leading-6 text-slate-400">{description}</p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+          >
+            Cerrar
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto px-5 py-5 sm:px-6">
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const buildPlannerFeedbackPayload = (
+  feedback: OrchestratorPlannerFeedback,
+) =>
+  `${ORCHESTRATOR_PLANNER_FEEDBACK_PREFIX}${JSON.stringify(feedback)}`
+
+const WINDOWS_1252_ENCODE_MAP = new Map<number, number>([
+  [0x20ac, 0x80],
+  [0x201a, 0x82],
+  [0x0192, 0x83],
+  [0x201e, 0x84],
+  [0x2026, 0x85],
+  [0x2020, 0x86],
+  [0x2021, 0x87],
+  [0x02c6, 0x88],
+  [0x2030, 0x89],
+  [0x0160, 0x8a],
+  [0x2039, 0x8b],
+  [0x0152, 0x8c],
+  [0x017d, 0x8e],
+  [0x2018, 0x91],
+  [0x2019, 0x92],
+  [0x201c, 0x93],
+  [0x201d, 0x94],
+  [0x2022, 0x95],
+  [0x2013, 0x96],
+  [0x2014, 0x97],
+  [0x02dc, 0x98],
+  [0x2122, 0x99],
+  [0x0161, 0x9a],
+  [0x203a, 0x9b],
+  [0x0153, 0x9c],
+  [0x017e, 0x9e],
+  [0x0178, 0x9f],
+])
+
+const countMojibakeMarkers = (value: string) =>
+  (value.match(/\u00c3|\u00c2|\u00e2\u20ac|\u00ef\u00bf|\u00c6\u2019|\ufffd/g) || [])
+    .length
+
+const encodeWindows1252Bytes = (value: string) => {
+  const bytes: number[] = []
+
+  for (const character of value) {
+    const codePoint = character.codePointAt(0)
+
+    if (typeof codePoint !== 'number') {
+      return null
+    }
+
+    if (codePoint <= 0xff) {
+      bytes.push(codePoint)
+      continue
+    }
+
+    const mappedByte = WINDOWS_1252_ENCODE_MAP.get(codePoint)
+
+    if (typeof mappedByte !== 'number') {
+      return null
+    }
+
+    bytes.push(mappedByte)
+  }
+
+  return Uint8Array.from(bytes)
+}
+
+const repairMojibakeText = (value: unknown) => {
+  if (typeof value !== 'string' || !value) {
+    return typeof value === 'string' ? value : ''
+  }
+
+  let currentValue = value
+
+  for (let iteration = 0; iteration < 4; iteration += 1) {
+    const currentMarkerCount = countMojibakeMarkers(currentValue)
+
+    if (currentMarkerCount === 0) {
+      break
+    }
+
+    const encodedBytes = encodeWindows1252Bytes(currentValue)
+
+    if (!encodedBytes) {
+      break
+    }
+
+    const candidateValue = new TextDecoder('utf-8', { fatal: false }).decode(
+      encodedBytes,
+    )
+
+    if (countMojibakeMarkers(candidateValue) >= currentMarkerCount) {
+      break
+    }
+
+    currentValue = candidateValue
+  }
+
+  return currentValue
+}
+
+const sanitizePersistedValue = <T,>(value: T, depth = 0): T => {
+  if (depth > 6 || value == null) {
+    return value
+  }
+
+  if (typeof value === 'string') {
+    return repairMojibakeText(value) as T
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizePersistedValue(entry, depth + 1)) as T
+  }
+
+  if (typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+        key,
+        sanitizePersistedValue(entry, depth + 1),
+      ]),
+    ) as T
+  }
+
+  return value
+}
+
+const normalizeOptionalString = (value: unknown) =>
+  typeof value === 'string' ? value.trim() : ''
+
+const normalizeBrainCostMode = (value: unknown): BrainCostMode => {
+  if (typeof value !== 'string' || !value.trim()) {
+    return DEFAULT_BRAIN_COST_MODE
+  }
+
+  const normalizedValue = value.trim().toLocaleLowerCase()
+
+  if (
+    normalizedValue === 'cheap' ||
+    normalizedValue === 'balanced' ||
+    normalizedValue === 'smart' ||
+    normalizedValue === 'max-quality'
+  ) {
+    return normalizedValue
+  }
+
+  if (
+    normalizedValue === 'low' ||
+    normalizedValue === 'local-first' ||
+    normalizedValue === 'local_first'
+  ) {
+    return 'cheap'
+  }
+
+  if (
+    normalizedValue === 'max_quality' ||
+    normalizedValue === 'maxquality' ||
+    normalizedValue === 'quality'
+  ) {
+    return 'max-quality'
+  }
+
+  return DEFAULT_BRAIN_COST_MODE
+}
+
+const normalizeOptionalStringArray = (value: unknown) =>
+  Array.isArray(value)
+    ? value.filter(
+        (entry): entry is string => typeof entry === 'string' && entry.trim() !== '',
+      )
+    : []
+
+const summarizeInlineText = (value: unknown, maxLength = 120) => {
+  const normalizedValue = normalizeOptionalString(value).replace(/\s+/g, ' ')
+
+  if (!normalizedValue) {
+    return 'No disponible'
+  }
+
+  return normalizedValue.length > maxLength
+    ? `${normalizedValue.slice(0, Math.max(1, maxLength - 3))}...`
+    : normalizedValue
+}
+
+const mergeUniqueStringValues = (
+  currentValues: string[],
+  incomingValues: unknown,
+  limit = 10,
+) => {
+  const mergedValues = [...currentValues]
+
+  normalizeOptionalStringArray(incomingValues).forEach((value) => {
+    if (!mergedValues.includes(value)) {
+      mergedValues.push(value)
+    }
+  })
+
+  return mergedValues.slice(0, limit)
+}
+
+const summarizeContinuationAnchor = (
+  continuationAnchor?: ExecutorContinuationAnchor | null,
+) => {
+  if (!continuationAnchor) {
+    return ''
+  }
+
+  if (normalizeOptionalString(continuationAnchor.targetPath)) {
+    if (normalizeOptionalString(continuationAnchor.subtask)) {
+      return `${normalizeOptionalString(continuationAnchor.targetPath)} (${normalizeOptionalString(
+        continuationAnchor.subtask,
+      )})`
+    }
+
+    return normalizeOptionalString(continuationAnchor.targetPath)
+  }
+
+  return (
+    normalizeOptionalString(continuationAnchor.subtask) ||
+    normalizeOptionalString(continuationAnchor.action)
+  )
+}
+
+const summarizeExecutionScope = (executionScope?: ExecutorExecutionScope | null) => {
+  if (!executionScope) {
+    return ''
+  }
+
+  const parts = [
+    normalizeOptionalString(executionScope.objectiveScope),
+    normalizeOptionalStringArray(executionScope.allowedTargetPaths).length > 0
+      ? `${normalizeOptionalStringArray(executionScope.allowedTargetPaths).length} path(s) permitido(s)`
+      : '',
+    executionScope.enforceNarrowScope === true ? 'scope acotado' : '',
+  ].filter(Boolean)
+
+  return parts.join(' · ')
+}
+
+const normalizePathValue = (value: unknown) =>
+  normalizeOptionalString(value).replace(/\//g, '\\')
+
+const formatWorkspaceRelativePath = (value: unknown, workspaceRoot: unknown) => {
+  const normalizedPath = normalizePathValue(value)
+  const normalizedWorkspaceRoot = normalizePathValue(workspaceRoot)
+
+  if (!normalizedPath) {
+    return ''
+  }
+
+  if (!normalizedWorkspaceRoot) {
+    return normalizedPath
+  }
+
+  const normalizedPathLower = normalizedPath.toLocaleLowerCase()
+  const normalizedWorkspaceRootLower = normalizedWorkspaceRoot.toLocaleLowerCase()
+
+  if (normalizedPathLower === normalizedWorkspaceRootLower) {
+    return '.'
+  }
+
+  if (normalizedPathLower.startsWith(`${normalizedWorkspaceRootLower}\\`)) {
+    return normalizedPath.slice(normalizedWorkspaceRoot.length + 1)
+  }
+
+  return normalizedPath
+}
+
+const getPathLeafName = (value: string) => {
+  const normalizedValue = normalizePathValue(value)
+
+  if (!normalizedValue) {
+    return ''
+  }
+
+  const pathSegments = normalizedValue.split('\\').filter(Boolean)
+  return pathSegments[pathSegments.length - 1] || normalizedValue
+}
+
+const getPathParentValue = (value: string) => {
+  const normalizedValue = normalizePathValue(value)
+  const lastSeparatorIndex = normalizedValue.lastIndexOf('\\')
+
+  if (lastSeparatorIndex <= 0) {
+    return ''
+  }
+
+  return normalizedValue.slice(0, lastSeparatorIndex)
+}
+
+const isLikelyFilePath = (value: string) =>
+  /\.[a-z0-9_-]{1,12}$/i.test(getPathLeafName(value))
+
+const buildComparablePath = (value: unknown, workspaceRoot: unknown) =>
+  normalizePathValue(formatWorkspaceRelativePath(value, workspaceRoot)).toLocaleLowerCase()
+
+const derivePrimaryAffectedPath = ({
+  createdPaths,
+  touchedPaths,
+  currentTargetPath,
+}: {
+  createdPaths: string[]
+  touchedPaths: string[]
+  currentTargetPath?: string
+}) => {
+  const createdFolderPath = createdPaths.find((pathValue) => !isLikelyFilePath(pathValue))
+
+  if (createdFolderPath) {
+    return createdFolderPath
+  }
+
+  const normalizedCurrentTargetPath = normalizePathValue(currentTargetPath)
+
+  if (normalizedCurrentTargetPath) {
+    return isLikelyFilePath(normalizedCurrentTargetPath)
+      ? getPathParentValue(normalizedCurrentTargetPath)
+      : normalizedCurrentTargetPath
+  }
+
+  const touchedFolderPath = touchedPaths.find((pathValue) => !isLikelyFilePath(pathValue))
+
+  if (touchedFolderPath) {
+    return touchedFolderPath
+  }
+
+  const firstAffectedPath = createdPaths[0] || touchedPaths[0] || ''
+
+  if (!firstAffectedPath) {
+    return ''
+  }
+
+  return isLikelyFilePath(firstAffectedPath)
+    ? getPathParentValue(firstAffectedPath)
+    : firstAffectedPath
+}
+
+const deriveResultStatusPresentation = ({
+  runStatus,
+  requestState,
+  sessionStatus,
+  finalStatus,
+}: {
+  runStatus?: ExecutionRunSummary['status'] | null
+  requestState?: 'idle' | 'running' | 'success' | 'error'
+  sessionStatus?: string
+  finalStatus?: string
+}): {
+  label: string
+  tone: 'default' | 'sky' | 'emerald' | 'amber' | 'rose'
+  detail: string
+} => {
+  const normalizedSessionStatus = normalizeOptionalString(sessionStatus).toLocaleLowerCase()
+  const normalizedFinalStatus = normalizeOptionalString(finalStatus)
+  const normalizedFinalStatusLower = normalizedFinalStatus.toLocaleLowerCase()
+
+  if (
+    runStatus === 'error' ||
+    requestState === 'error' ||
+    normalizedSessionStatus.includes('error')
+  ) {
+    return {
+      label: 'Error',
+      tone: 'rose',
+      detail: normalizedFinalStatus || 'La corrida termino con un error.',
+    }
+  }
+
+  if (runStatus === 'success' || requestState === 'success') {
+    const successDetail =
+      normalizedFinalStatus &&
+      normalizedFinalStatusLower !== 'ejecucion completada' &&
+      normalizedFinalStatusLower !== 'ejecución completada'
+        ? normalizedFinalStatus
+        : 'La corrida terminó correctamente.'
+
+    return {
+      label: 'Ejecución completada',
+      tone: 'emerald',
+      detail: successDetail,
+    }
+  }
+
+  if (
+    runStatus === 'approval-pending' ||
+    runStatus === 'recovery-pending' ||
+    runStatus === 'running' ||
+    requestState === 'running'
+  ) {
+    return {
+      label: 'Parcial',
+      tone: 'amber',
+      detail:
+        normalizedFinalStatus ||
+        normalizeOptionalString(sessionStatus) ||
+        'La corrida sigue abierta.',
+    }
+  }
+
+  return {
+    label: 'Sin cierre confirmado',
+    tone: 'default',
+    detail:
+      normalizedFinalStatus ||
+      normalizeOptionalString(sessionStatus) ||
+      'No hay un cierre consolidado.',
+  }
+}
+
+const getBrainCostModeLabel = (value: BrainCostMode) =>
+  BRAIN_COST_MODE_OPTIONS.find((option) => option.value === value)?.label ||
+  BRAIN_COST_MODE_OPTIONS.find(
+    (option) => option.value === DEFAULT_BRAIN_COST_MODE,
+  )?.label ||
+  'Equilibrado'
+
+const getBrainRoutingSeverityLabel = (
+  value?: 'low' | 'medium' | 'high',
+  fallback = 'No disponible',
+) => {
+  if (value === 'low') {
+    return 'Bajo'
+  }
+
+  if (value === 'medium') {
+    return 'Medio'
+  }
+
+  if (value === 'high') {
+    return 'Alto'
+  }
+
+  return fallback
+}
+
+const getBrainProviderLabel = (value: unknown) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (normalizedValue === 'openai') {
+    return 'OpenAI'
+  }
+
+  if (normalizedValue === 'local-rules') {
+    return 'Reglas locales'
+  }
+
+  return normalizeOptionalString(value) || 'No disponible'
+}
+
+const getBrainRoutingModeLabel = (value: unknown) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (normalizedValue === 'forced') {
+    return 'Forzado'
+  }
+
+  if (normalizedValue === 'hinted') {
+    return 'Con preferencia explícita'
+  }
+
+  if (normalizedValue === 'cheap-policy') {
+    return 'Política económica'
+  }
+
+  if (normalizedValue === 'balanced-policy') {
+    return 'Política equilibrada'
+  }
+
+  if (normalizedValue === 'smart-policy') {
+    return 'Política inteligente'
+  }
+
+  if (normalizedValue === 'max-quality-policy') {
+    return 'Política de máxima calidad'
+  }
+
+  return normalizeOptionalString(value) || 'No definida'
+}
+
+const getBrainProblemNatureLabel = (value: unknown) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (!normalizedValue) {
+    return 'No clasificada'
+  }
+
+  if (normalizedValue === 'forced-openai') {
+    return 'Forzada a OpenAI'
+  }
+
+  if (normalizedValue === 'forced-local') {
+    return 'Forzada a reglas locales'
+  }
+
+  if (normalizedValue === 'hinted-openai') {
+    return 'Sugerida hacia OpenAI'
+  }
+
+  if (normalizedValue === 'hinted-local') {
+    return 'Sugerida hacia reglas locales'
+  }
+
+  if (normalizedValue.includes('deterministic-composite')) {
+    return 'Tarea determinística compuesta'
+  }
+
+  if (normalizedValue.includes('deterministic-atomic')) {
+    return 'Tarea determinística puntual'
+  }
+
+  if (normalizedValue.includes('recoverable-error')) {
+    return 'Error recuperable'
+  }
+
+  if (normalizedValue.includes('creative-web')) {
+    return 'Web creativa'
+  }
+
+  if (normalizedValue.includes('open-ended')) {
+    return 'Pedido abierto'
+  }
+
+  if (normalizedValue.includes('trivial-local')) {
+    return 'Pedido trivial local'
+  }
+
+  return normalizeOptionalString(value).replace(/-/g, ' ')
+}
+
+const getExecutionModeLabel = (value: unknown) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (normalizedValue === 'local-fast' || normalizedValue === 'local_fast') {
+    return 'Ruta rápida local'
+  }
+
+  if (normalizedValue === 'ask-user' || normalizedValue === 'user-clarification') {
+    return 'Consulta al usuario'
+  }
+
+  if (normalizedValue === 'executor') {
+    return 'Ejecutor real'
+  }
+
+  return normalizeOptionalString(value) || 'No definido'
+}
+
+const getNextExpectedActionLabel = (value: unknown) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (!normalizedValue) {
+    return 'Sin siguiente acción declarada'
+  }
+
+  if (normalizedValue === 'execute-plan') {
+    return 'Ejecutar el plan actual'
+  }
+
+  if (normalizedValue === 'user-approval') {
+    return 'Esperar una aprobación humana'
+  }
+
+  if (normalizedValue === 'user-clarification') {
+    return 'Esperar una nueva definición del usuario'
+  }
+
+  return normalizeOptionalString(value).replace(/-/g, ' ')
+}
+
+const getDecisionKeyLabel = (value: unknown) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (!normalizedValue) {
+    return 'No definida'
+  }
+
+  if (normalizedValue === 'fast-local') {
+    return 'Ruta rápida local'
+  }
+
+  if (normalizedValue === 'executor-general') {
+    return 'Ejecución general'
+  }
+
+  if (normalizedValue === 'approval-response-rejected') {
+    return 'Rechazo de aprobación'
+  }
+
+  if (normalizedValue === 'ask-user-clarification') {
+    return 'Consulta al usuario'
+  }
+
+  if (normalizedValue === 'web-scaffold-base') {
+    return 'Base web local'
+  }
+
+  if (normalizedValue === 'recover-single-target') {
+    return 'Recuperación de objetivo acotado'
+  }
+
+  if (normalizedValue === 'recover-single-subtask') {
+    return 'Recuperación de subtarea acotada'
+  }
+
+  if (normalizedValue === 'recover-and-continue') {
+    return 'Recuperación y continuidad'
+  }
+
+  return normalizeOptionalString(value).replace(/-/g, ' ')
+}
+
+const getPlannerStrategyLabel = (value: unknown) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (!normalizedValue) {
+    return 'No definida'
+  }
+
+  if (normalizedValue === 'fast-local') {
+    return 'Ruta rápida local'
+  }
+
+  if (normalizedValue === 'executor') {
+    return 'Ejecutor real'
+  }
+
+  if (normalizedValue === 'ask-user') {
+    return 'Consulta al usuario'
+  }
+
+  if (normalizedValue === 'web-scaffold-base') {
+    return 'Base web local'
+  }
+
+  return normalizeOptionalString(value).replace(/-/g, ' ')
+}
+
+const getTechnicalDiagnosticLabel = (value: unknown, fallback = 'No disponible') => {
+  const normalizedValue = normalizeOptionalString(value)
+
+  if (!normalizedValue) {
+    return fallback
+  }
+
+  return normalizedValue
+    .replace(/-/g, ' ')
+    .replace(/approval/gi, 'aprobación')
+    .replace(/approved/gi, 'aprobada')
+    .replace(/rejected/gi, 'rechazada')
+    .replace(/pending/gi, 'pendiente')
+    .replace(/recovery/gi, 'recuperación')
+    .replace(/recoverable/gi, 'recuperable')
+    .replace(/executor/gi, 'ejecutor')
+    .replace(/command/gi, 'comando')
+    .replace(/failed/gi, 'fallido')
+    .replace(/failure/gi, 'fallo')
+    .replace(/scope/gi, 'alcance')
+    .replace(/target/gi, 'objetivo')
+    .replace(/subtask/gi, 'subtarea')
+    .replace(/continue/gi, 'continuidad')
+}
+
+const buildPlannedCurrentStepLabel = ({
+  plannerInstruction,
+  executionMode,
+}: {
+  plannerInstruction: string
+  executionMode?: string
+}) => {
+  const normalizedInstruction = normalizeOptionalString(plannerInstruction)
+  const normalizedExecutionMode = normalizeOptionalString(executionMode)
+
+  if (!normalizedInstruction || normalizedInstruction === DEFAULT_PLANNER_INSTRUCTION) {
+    return DEFAULT_CURRENT_STEP
+  }
+
+  if (!normalizedExecutionMode) {
+    return normalizedInstruction
+  }
+
+  return `La instruccion quedo lista para ${getExecutionModeLabel(
+    normalizedExecutionMode,
+  ).toLocaleLowerCase()}`
+}
+
+const isUserClarificationPlannerResponse = (value: {
+  nextExpectedAction?: string
+  executionMode?: string
+  strategy?: string
+}) => {
+  const normalizedNextExpectedAction = normalizeOptionalString(
+    value.nextExpectedAction,
+  ).toLocaleLowerCase()
+  const normalizedExecutionMode = normalizeOptionalString(
+    value.executionMode,
+  ).toLocaleLowerCase()
+  const normalizedStrategy = normalizeOptionalString(value.strategy).toLocaleLowerCase()
+
+  return (
+    normalizedNextExpectedAction === 'user-clarification' ||
+    normalizedExecutionMode === 'ask-user' ||
+    normalizedStrategy === 'ask-user'
+  )
+}
+
+const isFastRouteExecutionTitle = (value: unknown) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  return (
+    normalizedValue.includes('ruta') &&
+    (normalizedValue.includes('rapida') || normalizedValue.includes('rápida'))
+  )
+}
+
+const inferExecutionModeFromSnapshot = (
+  snapshot?: ExecutorFailureContext | null,
+) => {
+  const normalizedMaterialState = normalizeOptionalString(
+    snapshot?.materialState,
+  ).toLocaleLowerCase()
+  const normalizedCurrentAction = normalizeOptionalString(
+    snapshot?.currentAction,
+  ).toLocaleLowerCase()
+
+  if (normalizedMaterialState.includes('local-fast')) {
+    return 'local-fast'
+  }
+
+  if (
+    normalizedCurrentAction === 'composite-local' ||
+    normalizedCurrentAction === 'create-file' ||
+    normalizedCurrentAction === 'create-folder' ||
+    normalizedCurrentAction === 'append-file'
+  ) {
+    return 'local-fast'
+  }
+
+  return ''
+}
+
+const inferExecutionModeFromResultText = (value: unknown) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (
+    normalizedValue.includes('ruta rápida completada') ||
+    normalizedValue.includes('ruta rapida completada') ||
+    normalizedValue.includes('ruta rápida detectada') ||
+    normalizedValue.includes('ruta rapida detectada')
+  ) {
+    return 'local-fast'
+  }
+
+  return ''
+}
+
+const getResolvedDecisionStatusLabel = (record?: ResolvedDecisionRecord | null) => {
+  if (!record) {
+    return 'Sin decision registrada'
+  }
+
+  if (record.status === 'approved') {
+    return 'Aprobada'
+  }
+
+  if (record.status === 'rejected') {
+    return 'Rechazada'
+  }
+
+  if (record.status === 'delegated') {
+    return 'Delegada'
+  }
+
+  return 'Resuelta'
+}
+
+const deriveExecutionRunScenarioLabel = (
+  summary: Pick<
+    ExecutionRunSummary,
+    | 'status'
+    | 'recoveries'
+    | 'repeatedFailureCount'
+    | 'blockedRecoveryModes'
+    | 'latestFailureType'
+  >,
+): ExecutionRunSummary['scenarioLabel'] => {
+  // La UI no intenta "adivinar" el flujo completo: clasifica la corrida con
+  // una heurística compacta para leer rápido si fue caso feliz, recovery o
+  // bloqueo por repetición equivalente.
+  if (
+    summary.blockedRecoveryModes.length > 0 ||
+    summary.repeatedFailureCount >= 2
+  ) {
+    return 'Bloqueo por repeticion equivalente'
+  }
+
+  if (summary.status === 'error') {
+    return 'Corrida fallida'
+  }
+
+  if (summary.status === 'success' && summary.recoveries > 0) {
+    return 'Recovery exitoso'
+  }
+
+  if (
+    summary.recoveries > 0 ||
+    normalizeOptionalString(summary.latestFailureType)
+  ) {
+    return summary.status === 'success'
+      ? 'Recovery exitoso'
+      : 'Falla recuperable'
+  }
+
+  if (
+    summary.status === 'running' ||
+    summary.status === 'approval-pending' ||
+    summary.status === 'recovery-pending'
+  ) {
+    return 'Corrida en curso'
+  }
+
+  return 'Caso feliz base'
+}
+
+const buildExecutionRunSummary = (
+  partialSummary: Omit<ExecutionRunSummary, 'scenarioLabel'>,
+): ExecutionRunSummary => ({
+  ...partialSummary,
+  scenarioLabel: deriveExecutionRunScenarioLabel(partialSummary),
+})
+
+const normalizeResolvedDecisionKey = (value: unknown) =>
+  typeof value === 'string' ? value.trim().toLocaleLowerCase() : ''
+
+const normalizeApprovalFamilyKey = (value: unknown) =>
+  typeof value === 'string' ? value.trim().toLocaleLowerCase() : ''
+
+const deriveApprovalEquivalenceFamily = (...texts: unknown[]) => {
+  // Mantener en sync con electron/main.cjs.
+  // Si renderer y main separan familias distintas, la UI puede persistir una
+  // decisión activa que el planner no reconoce (o viceversa).
+  const combinedText = texts
+    .filter((value): value is string => typeof value === 'string' && value.trim() !== '')
+    .join(' ')
+    .toLocaleLowerCase()
+
+  if (!combinedText) {
+    return ''
+  }
+
+  const explicitlyNoDeploy =
+    combinedText.includes('approve_no_deploy') ||
+    combinedText.includes('repo sin deploy') ||
+    combinedText.includes('sin deploy') ||
+    combinedText.includes('no deploy') ||
+    combinedText.includes('sin publicar') ||
+    combinedText.includes('sin publicacion') ||
+    combinedText.includes('sin publicación')
+  const mentionsDeploy =
+    combinedText.includes('deploy') ||
+    combinedText.includes('github pages') ||
+    combinedText.includes('publicacion') ||
+    combinedText.includes('publicación') ||
+    combinedText.includes('publicar') ||
+    combinedText.includes('vercel') ||
+    combinedText.includes('produccion') ||
+    combinedText.includes('producción')
+  const mentionsPublicRepo =
+    combinedText.includes('repo publico') ||
+    combinedText.includes('repo público') ||
+    combinedText.includes('public repo') ||
+    combinedText.includes('github repo') ||
+    combinedText.includes('crear repo') ||
+    combinedText.includes('publicar repo') ||
+    combinedText.includes('subir repo') ||
+    explicitlyNoDeploy
+  const isProvisionalWebScaffoldApproval =
+    (combinedText.includes('scaffold') || combinedText.includes('generacion')) &&
+    (combinedText.includes('provisional') ||
+      combinedText.includes('placeholder') ||
+      combinedText.includes('mock endpoint') ||
+      combinedText.includes('mock api') ||
+      combinedText.includes('endpoint local') ||
+      combinedText.includes('continu') ||
+      combinedText.includes('clinic-website') ||
+      combinedText.includes('ruta local') ||
+      combinedText.includes('path local'))
+
+  if (mentionsDeploy && !explicitlyNoDeploy) {
+    return 'public-deploy'
+  }
+
+  if (mentionsPublicRepo) {
+    return 'public-repo-creation'
+  }
+
+  return isProvisionalWebScaffoldApproval ? 'provisional-web-scaffold' : ''
+}
+
+const resolveLatestDecisionTimestamp = (record?: ResolvedDecisionRecord | null) =>
+  normalizeOptionalString(record?.updatedAt) || new Date().toISOString()
+
+const mergeResolvedDecisionRecords = (
+  currentRecords: ResolvedDecisionRecord[],
+  incomingRecords: ResolvedDecisionRecord[],
+) => {
+  // El estado persistido se usa como verdad operativa, así que al entrar una
+  // nueva decisión de la misma familia debe reemplazar a la anterior en vez de
+  // convivir con ella y dejar al planner en un estado ambiguo.
+  const normalizedIncomingRecords = incomingRecords
+    .map((record) => {
+      const normalizedKey = normalizeResolvedDecisionKey(record?.key)
+
+      if (!normalizedKey) {
+        return null
+      }
+
+      return {
+        ...record,
+        key: normalizedKey,
+        status:
+          record?.status === 'delegated' ||
+          record?.status === 'approved' ||
+          record?.status === 'rejected' ||
+          record?.status === 'resolved'
+            ? record.status
+            : 'resolved',
+        approvalFamily: normalizeApprovalFamilyKey(record?.approvalFamily) || undefined,
+        updatedAt: resolveLatestDecisionTimestamp(record),
+      } satisfies ResolvedDecisionRecord
+    })
+    .filter((record): record is ResolvedDecisionRecord => record !== null)
+
+  if (normalizedIncomingRecords.length === 0) {
+    return currentRecords
+  }
+
+  const incomingKeys = new Set(
+    normalizedIncomingRecords.map((record) => normalizeResolvedDecisionKey(record.key)),
+  )
+  const incomingFamilies = new Set(
+    normalizedIncomingRecords
+      .map((record) => normalizeApprovalFamilyKey(record.approvalFamily))
+      .filter(Boolean),
+  )
+  const preservedCurrentRecords = currentRecords.filter((record) => {
+    const normalizedKey = normalizeResolvedDecisionKey(record?.key)
+    const normalizedFamily = normalizeApprovalFamilyKey(record?.approvalFamily)
+
+    if (incomingKeys.has(normalizedKey)) {
+      return false
+    }
+
+    if (!normalizedFamily || !incomingFamilies.has(normalizedFamily)) {
+      return true
+    }
+
+    return false
+  })
+
+  return [...preservedCurrentRecords, ...normalizedIncomingRecords]
+}
+
+const extractExecutorFailureContext = (payload?: {
+  failureType?: string
+  executorMode?: string
+  executorModeSource?: string
+  bridgeMode?: string
+  bridgeModeSource?: string
+  details?: ExecutorFailureContext | null
+} | null): ExecutorFailureContext | null => {
+  const details =
+    payload?.details && typeof payload.details === 'object' ? payload.details : null
+  const context: ExecutorFailureContext = {
+    ...(normalizeOptionalString(details?.timestamp)
+      ? { timestamp: normalizeOptionalString(details?.timestamp) }
+      : {}),
+    ...(normalizeOptionalString(details?.decisionKey)
+      ? { decisionKey: normalizeOptionalString(details?.decisionKey) }
+      : {}),
+    ...(normalizeOptionalString(payload?.failureType)
+      ? { failureType: normalizeOptionalString(payload?.failureType) }
+      : {}),
+    ...(normalizeOptionalString(payload?.executorMode) ||
+    normalizeOptionalString(details?.executorMode)
+      ? {
+          executorMode:
+            normalizeOptionalString(payload?.executorMode) ||
+            normalizeOptionalString(details?.executorMode),
+        }
+      : {}),
+    ...(normalizeOptionalString(payload?.executorModeSource) ||
+    normalizeOptionalString(details?.executorModeSource)
+      ? {
+          executorModeSource:
+            normalizeOptionalString(payload?.executorModeSource) ||
+            normalizeOptionalString(details?.executorModeSource),
+        }
+      : {}),
+    ...(normalizeOptionalString(payload?.bridgeMode) ||
+    normalizeOptionalString(details?.bridgeMode)
+      ? {
+          bridgeMode:
+            normalizeOptionalString(payload?.bridgeMode) ||
+            normalizeOptionalString(details?.bridgeMode),
+        }
+      : {}),
+    ...(normalizeOptionalString(payload?.bridgeModeSource) ||
+    normalizeOptionalString(details?.bridgeModeSource)
+      ? {
+          bridgeModeSource:
+            normalizeOptionalString(payload?.bridgeModeSource) ||
+            normalizeOptionalString(details?.bridgeModeSource),
+        }
+      : {}),
+    ...(normalizeOptionalString(details?.executorCommand)
+      ? { executorCommand: normalizeOptionalString(details?.executorCommand) }
+      : {}),
+    ...(normalizeOptionalString(details?.origin)
+      ? { origin: normalizeOptionalString(details?.origin) }
+      : {}),
+    ...(typeof details?.stepIndex === 'number' && details.stepIndex > 0
+      ? { stepIndex: details.stepIndex }
+      : {}),
+    ...(typeof details?.totalSteps === 'number' && details.totalSteps > 0
+      ? { totalSteps: details.totalSteps }
+      : {}),
+    ...(normalizeOptionalString(details?.currentStep)
+      ? { currentStep: normalizeOptionalString(details?.currentStep) }
+      : {}),
+    ...(normalizeOptionalString(details?.currentSubtask)
+      ? { currentSubtask: normalizeOptionalString(details?.currentSubtask) }
+      : {}),
+    ...(normalizeOptionalString(details?.currentAction)
+      ? { currentAction: normalizeOptionalString(details?.currentAction) }
+      : {}),
+    ...(normalizeOptionalString(details?.currentCommand)
+      ? { currentCommand: normalizeOptionalString(details?.currentCommand) }
+      : {}),
+    ...(normalizeOptionalString(details?.currentTargetPath)
+      ? { currentTargetPath: normalizeOptionalString(details?.currentTargetPath) }
+      : {}),
+    ...(normalizeOptionalStringArray(details?.createdPaths).length > 0
+      ? { createdPaths: normalizeOptionalStringArray(details?.createdPaths) }
+      : {}),
+    ...(normalizeOptionalStringArray(details?.touchedPaths).length > 0
+      ? { touchedPaths: normalizeOptionalStringArray(details?.touchedPaths) }
+      : {}),
+    ...(normalizeOptionalString(details?.stdout)
+      ? { stdout: normalizeOptionalString(details?.stdout) }
+      : {}),
+    ...(normalizeOptionalString(details?.stderr)
+      ? { stderr: normalizeOptionalString(details?.stderr) }
+      : {}),
+    ...(normalizeOptionalString(details?.lastProgressAt)
+      ? { lastProgressAt: normalizeOptionalString(details?.lastProgressAt) }
+      : {}),
+    ...(normalizeOptionalString(details?.lastMaterialProgressAt)
+      ? { lastMaterialProgressAt: normalizeOptionalString(details?.lastMaterialProgressAt) }
+      : {}),
+    ...(typeof details?.hasMaterialProgress === 'boolean'
+      ? { hasMaterialProgress: details.hasMaterialProgress }
+      : {}),
+    ...(normalizeOptionalString(details?.materialState)
+      ? { materialState: normalizeOptionalString(details?.materialState) }
+      : {}),
+    ...(normalizeOptionalString(details?.strategy)
+      ? { strategy: normalizeOptionalString(details?.strategy) }
+      : {}),
+    ...(normalizeOptionalString(details?.brainStrategy)
+      ? { brainStrategy: normalizeOptionalString(details?.brainStrategy) }
+      : {}),
+    ...(normalizeOptionalString(details?.reasoningLayer)
+      ? { reasoningLayer: normalizeOptionalString(details?.reasoningLayer) }
+      : {}),
+    ...(normalizeOptionalString(details?.materializationLayer)
+      ? { materializationLayer: normalizeOptionalString(details?.materializationLayer) }
+      : {}),
+    ...(normalizeOptionalString(details?.materializationPlanSource)
+      ? {
+          materializationPlanSource: normalizeOptionalString(
+            details?.materializationPlanSource,
+          ),
+        }
+      : {}),
+    ...(normalizeValidationResults(details?.validationResults).length > 0
+      ? { validationResults: normalizeValidationResults(details?.validationResults) }
+      : {}),
+    ...(normalizeOptionalString(details?.appliedReuseMode)
+      ? { appliedReuseMode: normalizeOptionalString(details?.appliedReuseMode) }
+      : {}),
+    ...(normalizeOptionalString(details?.reusedStyleFromArtifactId)
+      ? {
+          reusedStyleFromArtifactId: normalizeOptionalString(
+            details?.reusedStyleFromArtifactId,
+          ),
+        }
+      : {}),
+    ...(normalizeOptionalString(details?.reusedStructureFromArtifactId)
+      ? {
+          reusedStructureFromArtifactId: normalizeOptionalString(
+            details?.reusedStructureFromArtifactId,
+          ),
+        }
+      : {}),
+    ...(normalizeOptionalStringArray(details?.reuseAppliedFields).length > 0
+      ? { reuseAppliedFields: normalizeOptionalStringArray(details?.reuseAppliedFields) }
+      : {}),
+    ...(normalizeOptionalString(details?.acceptedAt)
+      ? { acceptedAt: normalizeOptionalString(details?.acceptedAt) }
+      : {}),
+    ...(normalizeOptionalString(details?.attemptScope)
+      ? {
+          attemptScope: normalizeOptionalString(
+            details?.attemptScope,
+          ) as ExecutorFailureContext['attemptScope'],
+        }
+      : {}),
+    ...(normalizeOptionalString(details?.fingerprint)
+      ? { fingerprint: normalizeOptionalString(details?.fingerprint) }
+      : {}),
+    ...(typeof details?.isRecoveryAttempt === 'boolean'
+      ? { isRecoveryAttempt: details.isRecoveryAttempt }
+      : {}),
+    ...(typeof details?.repeatedFailureCount === 'number' &&
+    details.repeatedFailureCount > 0
+      ? { repeatedFailureCount: details.repeatedFailureCount }
+      : {}),
+    ...(normalizeOptionalString(details?.lastAttemptScope)
+      ? {
+          lastAttemptScope: normalizeOptionalString(
+            details?.lastAttemptScope,
+          ) as ExecutorFailureContext['lastAttemptScope'],
+        }
+      : {}),
+    ...(normalizeOptionalStringArray(details?.blockedRecoveryModes).length > 0
+      ? { blockedRecoveryModes: normalizeOptionalStringArray(details?.blockedRecoveryModes) }
+      : {}),
+    ...(details?.lastFailure && typeof details.lastFailure === 'object'
+      ? { lastFailure: extractExecutorFailureContext({ details: details.lastFailure }) || undefined }
+      : {}),
+    ...(Array.isArray(details?.recentFailures)
+      ? {
+          recentFailures: details.recentFailures
+            .map((entry) => extractExecutorFailureContext({ details: entry }))
+            .filter((entry): entry is ExecutorFailureContext => Boolean(entry)),
+        }
+      : {}),
+  }
+
+  return Object.keys(context).length > 0 ? context : null
+}
+
+const extractExecutorProgressSnapshot = (raw: unknown): ExecutorFailureContext | null => {
+  if (!raw || typeof raw !== 'object') {
+    return null
+  }
+
+  const payload = raw as {
+    stepIndex?: number
+    totalSteps?: number
+    title?: string
+    subtask?: string
+    action?: string
+    command?: string
+    targetPath?: string
+    createdPaths?: string[]
+    touchedPaths?: string[]
+    stdoutPreview?: string
+    stderrPreview?: string
+    emittedAt?: string
+  }
+
+  const snapshot: ExecutorFailureContext = {
+    ...(typeof payload.stepIndex === 'number' && payload.stepIndex > 0
+      ? { stepIndex: payload.stepIndex }
+      : {}),
+    ...(typeof payload.totalSteps === 'number' && payload.totalSteps > 0
+      ? { totalSteps: payload.totalSteps }
+      : {}),
+    ...(normalizeOptionalString(payload.title)
+      ? { currentStep: normalizeOptionalString(payload.title) }
+      : {}),
+    ...(normalizeOptionalString(payload.subtask) || normalizeOptionalString(payload.title)
+      ? {
+          currentSubtask:
+            normalizeOptionalString(payload.subtask) ||
+            normalizeOptionalString(payload.title),
+        }
+      : {}),
+    ...(normalizeOptionalString(payload.action)
+      ? { currentAction: normalizeOptionalString(payload.action) }
+      : {}),
+    ...(normalizeOptionalString(payload.command)
+      ? { currentCommand: normalizeOptionalString(payload.command) }
+      : {}),
+    ...(normalizeOptionalString(payload.targetPath)
+      ? { currentTargetPath: normalizeOptionalString(payload.targetPath) }
+      : {}),
+    ...(normalizeOptionalStringArray(payload.createdPaths).length > 0
+      ? { createdPaths: normalizeOptionalStringArray(payload.createdPaths) }
+      : {}),
+    ...(normalizeOptionalStringArray(payload.touchedPaths).length > 0
+      ? { touchedPaths: normalizeOptionalStringArray(payload.touchedPaths) }
+      : {}),
+    ...(normalizeOptionalString(payload.stdoutPreview)
+      ? { stdout: normalizeOptionalString(payload.stdoutPreview) }
+      : {}),
+    ...(normalizeOptionalString(payload.stderrPreview)
+      ? { stderr: normalizeOptionalString(payload.stderrPreview) }
+      : {}),
+    ...(normalizeOptionalString(payload.emittedAt)
+      ? { lastProgressAt: normalizeOptionalString(payload.emittedAt) }
+      : {}),
+  }
+
+  return Object.keys(snapshot).length > 0 ? snapshot : null
+}
+
+const buildParticipationResolvedDecisions = (
+  userParticipationMode: UserParticipationMode,
+): ResolvedDecisionRecord[] => {
+  if (userParticipationMode !== 'brain-decides-missing') {
+    return []
+  }
+
+  return [
+    {
+      key: 'technical-defaults',
+      status: 'delegated',
+      source: 'system',
+      summary: 'Defaults técnicos razonables delegados al Cerebro.',
+    },
+    {
+      key: 'placeholder-content',
+      status: 'delegated',
+      source: 'system',
+      summary: 'Contenido placeholder permitido sin reconsulta.',
+    },
+    {
+      key: 'provisional-assets',
+      status: 'delegated',
+      source: 'system',
+      summary: 'Assets provisionales y stock permitidos mientras sean editables.',
+    },
+    {
+      key: 'local-scaffold-work',
+      status: 'delegated',
+      source: 'system',
+      summary: 'Scaffold local, rutas, hooks y componentes base permitidos.',
+    },
+    {
+      key: 'local-branch-work',
+      status: 'delegated',
+      source: 'system',
+      summary: 'Trabajo sobre rama local permitido sin aprobación adicional.',
+    },
+    {
+      key: 'local-commit-work',
+      status: 'delegated',
+      source: 'system',
+      summary: 'Commit local permitido sin aprobación adicional.',
+    },
+    {
+      key: 'readme-env-example',
+      status: 'delegated',
+      source: 'system',
+      summary: 'README y .env.example provisionales permitidos.',
+    },
+  ]
+}
+
+const extractApprovalRequest = (
+  payload?: {
+    approvalRequest?: ApprovalRequestContract
+    question?: string
+    approvalReason?: string
+    reason?: string
+  } | null,
+): ApprovalRequestContract | null => {
+  if (payload?.approvalRequest && typeof payload.approvalRequest === 'object') {
+    return payload.approvalRequest
+  }
+
+  const question = normalizeOptionalString(payload?.question)
+  const reason =
+    normalizeOptionalString(payload?.approvalReason) ||
+    normalizeOptionalString(payload?.reason)
+
+  if (!question && !reason) {
+    return null
+  }
+
+  return {
+    decisionKey: 'legacy-approval',
+    question,
+    reason,
+    allowFreeAnswer: false,
+    allowBrainDefault: false,
+    nextExpectedAction: 'user-approval',
+    responseMode: 'binary',
+  }
+}
+
+const resolveApprovalInteractionMode = (
+  approvalRequest?: ApprovalRequestContract | null,
+): 'binary' | 'options' | 'free-answer' | 'mixed' => {
+  if (approvalRequest?.responseMode) {
+    return approvalRequest.responseMode
+  }
+
+  const hasOptions =
+    Array.isArray(approvalRequest?.options) && approvalRequest.options.length > 0
+  const allowFreeAnswer = approvalRequest?.allowFreeAnswer === true
+
+  if (hasOptions && allowFreeAnswer) {
+    return 'mixed'
+  }
+
+  if (hasOptions) {
+    return 'options'
+  }
+
+  if (allowFreeAnswer) {
+    return 'free-answer'
+  }
+
+  return 'binary'
+}
+
+const resolveApprovalMessage = (
+  payload?: {
+    approvalRequest?: ApprovalRequestContract
+    question?: string
+    approvalReason?: string
+    reason?: string
+  } | null,
+) =>
+  extractApprovalRequest(payload)?.question ||
+  extractApprovalRequest(payload)?.reason ||
+  DEFAULT_APPROVAL_MESSAGE
+
+const resolveApprovalReason = (
+  payload?: {
+    approvalRequest?: ApprovalRequestContract
+    approvalReason?: string
+    reason?: string
+  } | null,
+) =>
+  extractApprovalRequest(payload)?.reason ||
+  normalizeOptionalString(payload?.approvalReason) ||
+  normalizeOptionalString(payload?.reason)
+
+const buildPersistibleProjectApprovalPolicy = ({
+  source,
+  approvalRequest,
+}: {
+  source: 'planner' | 'executor' | ''
+  approvalRequest?: ApprovalRequestContract | null
+}): ProjectApprovalPolicy | null => {
+  if (source !== 'executor' || !approvalRequest) {
+    return null
+  }
+
+  const decisionKey = normalizeOptionalString(approvalRequest.decisionKey)
+  const responseMode = resolveApprovalInteractionMode(approvalRequest)
+  const hasOptions =
+    Array.isArray(approvalRequest.options) && approvalRequest.options.length > 0
+
+  if (
+    !decisionKey ||
+    decisionKey === 'legacy-approval' ||
+    responseMode !== 'binary' ||
+    approvalRequest.allowFreeAnswer === true ||
+    hasOptions
+  ) {
+    return null
+  }
+
+  return {
+    scope: 'repeatable-executor-approval',
+    source: 'executor',
+    decisionKey,
+    responseMode: 'binary',
+  }
+}
+
+const matchesProjectApprovalPolicy = ({
+  policy,
+  source,
+  payload,
+}: {
+  policy: ProjectApprovalPolicy | null
+  source: 'planner' | 'executor'
+  payload?: {
+    approvalRequest?: ApprovalRequestContract
+    question?: string
+    approvalReason?: string
+    reason?: string
+  } | null
+}) => {
+  if (!policy || policy.source !== source) {
+    return false
+  }
+
+  const approvalRequest = extractApprovalRequest(payload)
+
+  if (!approvalRequest) {
+    return false
+  }
+
+  const decisionKey = normalizeOptionalString(approvalRequest.decisionKey)
+  const responseMode = resolveApprovalInteractionMode(approvalRequest)
+
+  return (
+    policy.scope === 'repeatable-executor-approval' &&
+    decisionKey !== '' &&
+    decisionKey === policy.decisionKey &&
+    responseMode === policy.responseMode
+  )
+}
+
+const normalizeSessionEvent = (event: string) => {
+  if (event === 'Session created') {
+    return 'Sesión creada'
+  }
+
+  if (event === 'Planner loaded initial goal') {
+    return 'El planificador cargó el objetivo inicial'
+  }
+
+  if (event === 'Approval checkpoint opened') {
+    return 'Se abrió el punto de aprobación'
+  }
+
+  return event
+}
+
+const getStoredProjectPolicy = (): ProjectApprovalPolicy | null => {
+  try {
+    const storedPolicy = localStorage.getItem(PROJECT_POLICY_KEY)
+
+    if (!storedPolicy || storedPolicy === 'true') {
+      return null
+    }
+
+    const parsedPolicy = sanitizePersistedValue(JSON.parse(storedPolicy))
+
+    return parsedPolicy &&
+      parsedPolicy.scope === 'repeatable-executor-approval' &&
+      parsedPolicy.source === 'executor' &&
+      typeof parsedPolicy.decisionKey === 'string' &&
+      parsedPolicy.decisionKey.trim() &&
+      parsedPolicy.responseMode === 'binary'
+      ? {
+          scope: 'repeatable-executor-approval',
+          source: 'executor',
+          decisionKey: parsedPolicy.decisionKey.trim(),
+          responseMode: 'binary',
+        }
+      : null
+  } catch {
+    return null
+  }
+}
+
+const getStoredUserParticipationMode = (): UserParticipationMode => {
+  try {
+    const storedMode = localStorage.getItem(USER_PARTICIPATION_MODE_KEY)
+
+    return storedMode === 'user-will-contribute' ||
+      storedMode === 'brain-decides-missing'
+      ? storedMode
+      : DEFAULT_USER_PARTICIPATION_MODE
+  } catch {
+    return DEFAULT_USER_PARTICIPATION_MODE
+  }
+}
+
+const getStoredResolvedDecisions = (): ResolvedDecisionRecord[] => {
+  try {
+    const rawValue = localStorage.getItem(RESOLVED_DECISIONS_KEY)
+
+    if (!rawValue) {
+      return DEFAULT_RESOLVED_DECISIONS
+    }
+
+    const parsedValue = sanitizePersistedValue(JSON.parse(rawValue))
+
+    if (!Array.isArray(parsedValue)) {
+      return DEFAULT_RESOLVED_DECISIONS
+    }
+
+    return parsedValue
+      .map((record) => {
+        const normalizedKey = normalizeResolvedDecisionKey(record?.key)
+
+        if (!normalizedKey) {
+          return null
+        }
+
+        return {
+          key: normalizedKey,
+          status:
+            record?.status === 'delegated' ||
+            record?.status === 'approved' ||
+            record?.status === 'rejected' ||
+            record?.status === 'resolved'
+              ? record.status
+              : 'resolved',
+          source:
+            record?.source === 'system' ||
+            record?.source === 'user' ||
+            record?.source === 'planner' ||
+            record?.source === 'executor'
+              ? record.source
+              : 'system',
+          ...(normalizeOptionalString(record?.summary)
+            ? { summary: normalizeOptionalString(record.summary) }
+            : {}),
+          ...(record?.responseMode
+            ? { responseMode: record.responseMode }
+            : {}),
+          ...(normalizeOptionalString(record?.selectedOption)
+            ? { selectedOption: normalizeOptionalString(record.selectedOption) }
+            : {}),
+          ...(normalizeOptionalString(record?.freeAnswer)
+            ? { freeAnswer: normalizeOptionalString(record.freeAnswer) }
+            : {}),
+          ...(normalizeApprovalFamilyKey(record?.approvalFamily)
+            ? { approvalFamily: normalizeApprovalFamilyKey(record.approvalFamily) }
+            : {}),
+          ...(normalizeOptionalString(record?.updatedAt)
+            ? { updatedAt: normalizeOptionalString(record.updatedAt) }
+            : {}),
+        } satisfies ResolvedDecisionRecord
+      })
+      .filter((record): record is ResolvedDecisionRecord => record !== null)
+  } catch {
+    return DEFAULT_RESOLVED_DECISIONS
+  }
+}
+
+const getStoredBrainCostMode = (): BrainCostMode => {
+  try {
+    return normalizeBrainCostMode(localStorage.getItem(BRAIN_COST_MODE_KEY))
+  } catch {
+    return DEFAULT_BRAIN_COST_MODE
+  }
+}
+
+const getStoredSessionEvents = () => {
+  try {
+    const storedEvents = localStorage.getItem(SESSION_EVENTS_KEY)
+
+    if (!storedEvents) {
+      return DEFAULT_SESSION_EVENTS
+    }
+
+    const parsedEvents = sanitizePersistedValue(JSON.parse(storedEvents))
+
+    return Array.isArray(parsedEvents) &&
+      parsedEvents.every((item) => typeof item === 'string')
+      ? parsedEvents.map((item) => normalizeSessionEvent(item))
+      : DEFAULT_SESSION_EVENTS
+  } catch {
+    return DEFAULT_SESSION_EVENTS
+  }
+}
+
+const getStoredSessionSnapshot = (projectPolicyAllowed: boolean) => {
+  const fallbackSnapshot = {
+    sessionStatus: projectPolicyAllowed
+      ? READY_WITH_PROJECT_RULE_STATUS
+      : DEFAULT_SESSION_STATUS,
+    currentStep: projectPolicyAllowed
+      ? READY_WITH_PROJECT_RULE_STEP
+      : DEFAULT_CURRENT_STEP,
+    plannerInstruction: DEFAULT_PLANNER_INSTRUCTION,
+    executorResult: DEFAULT_EXECUTOR_RESULT,
+    executorRequestState: DEFAULT_EXECUTOR_REQUEST_STATE,
+    lastRunSummary: DEFAULT_LAST_RUN_SUMMARY,
+  }
+
+  try {
+    const storedSnapshot = localStorage.getItem(SESSION_SNAPSHOT_KEY)
+
+    if (!storedSnapshot) {
+      return fallbackSnapshot
+    }
+
+    const parsedSnapshot = sanitizePersistedValue(JSON.parse(storedSnapshot))
+    const hasValidLastRunSummary =
+      typeof parsedSnapshot?.lastRunSummary?.objective === 'string' &&
+      typeof parsedSnapshot?.lastRunSummary?.instruction === 'string' &&
+      typeof parsedSnapshot?.lastRunSummary?.result === 'string' &&
+      typeof parsedSnapshot?.lastRunSummary?.context === 'string' &&
+      typeof parsedSnapshot?.lastRunSummary?.workspacePath === 'string' &&
+      typeof parsedSnapshot?.lastRunSummary?.approval === 'string' &&
+      typeof parsedSnapshot?.lastRunSummary?.finalStatus === 'string'
+
+    return {
+      sessionStatus:
+        typeof parsedSnapshot?.sessionStatus === 'string'
+          ? parsedSnapshot.sessionStatus
+          : fallbackSnapshot.sessionStatus,
+      currentStep:
+        typeof parsedSnapshot?.currentStep === 'string'
+          ? parsedSnapshot.currentStep
+          : fallbackSnapshot.currentStep,
+      plannerInstruction:
+        typeof parsedSnapshot?.plannerInstruction === 'string'
+          ? parsedSnapshot.plannerInstruction
+          : fallbackSnapshot.plannerInstruction,
+      executorResult:
+        typeof parsedSnapshot?.executorResult === 'string'
+          ? parsedSnapshot.executorResult
+          : fallbackSnapshot.executorResult,
+      executorRequestState:
+        parsedSnapshot?.executorRequestState === 'running' ||
+        parsedSnapshot?.executorRequestState === 'success' ||
+        parsedSnapshot?.executorRequestState === 'error' ||
+        parsedSnapshot?.executorRequestState === 'idle'
+          ? parsedSnapshot.executorRequestState
+          : fallbackSnapshot.executorRequestState,
+      lastRunSummary: hasValidLastRunSummary
+        ? parsedSnapshot.lastRunSummary
+        : fallbackSnapshot.lastRunSummary,
+    }
+  } catch {
+    return fallbackSnapshot
+  }
+}
+
+const getStoredWorkspacePath = () => {
+  try {
+    const storedWorkspacePath = localStorage.getItem(WORKSPACE_PATH_KEY)
+
+    if (typeof storedWorkspacePath !== 'string') {
+      return DEFAULT_WORKSPACE_PATH
+    }
+
+    const normalizedStoredWorkspacePath = repairMojibakeText(
+      storedWorkspacePath,
+    ).trim()
+    const lowerStoredWorkspacePath =
+      normalizedStoredWorkspacePath.toLocaleLowerCase()
+
+    if (
+      !normalizedStoredWorkspacePath ||
+      lowerStoredWorkspacePath === LEGACY_DEFAULT_WORKSPACE_PATH.toLocaleLowerCase()
+    ) {
+      return DEFAULT_WORKSPACE_PATH
+    }
+
+    return normalizedStoredWorkspacePath
+  } catch {
+    return DEFAULT_WORKSPACE_PATH
+  }
+}
+
+const getStoredFlowConsoleState = () => {
+  try {
+    const storedConsoleState = localStorage.getItem(FLOW_CONSOLE_STATE_KEY)
+
+    if (!storedConsoleState) {
+      return {
+        open: false,
+        pinned: false,
+      }
+    }
+
+    const parsedConsoleState = sanitizePersistedValue(JSON.parse(storedConsoleState))
+
+    return {
+      open: parsedConsoleState?.open === true,
+      pinned: parsedConsoleState?.pinned === true,
+    }
+  } catch {
+    return {
+      open: false,
+      pinned: false,
+    }
+  }
+}
+
+const getStoredFlowMessages = () => {
+  try {
+    const storedFlowMessages = localStorage.getItem(FLOW_MESSAGES_KEY)
+
+    if (!storedFlowMessages) {
+      return DEFAULT_FLOW_MESSAGES
+    }
+
+    const parsedFlowMessages = sanitizePersistedValue(JSON.parse(storedFlowMessages))
+
+    return Array.isArray(parsedFlowMessages) &&
+      parsedFlowMessages.every(
+        (item) =>
+          typeof item?.id === 'number' &&
+          typeof item?.source === 'string' &&
+          typeof item?.title === 'string' &&
+          typeof item?.content === 'string',
+      )
+      ? parsedFlowMessages
+      : DEFAULT_FLOW_MESSAGES
+  } catch {
+    return DEFAULT_FLOW_MESSAGES
+  }
+}
+
+function App() {
+  const persistedFlowMessages = getStoredFlowMessages()
+  const skipProjectPolicyPersistenceRef = useRef(false)
+  const skipSessionEventsPersistenceRef = useRef(false)
+  const flowMessageIdRef = useRef(
+    persistedFlowMessages.at(-1)?.id || 0,
+  )
+  const appRootRef = useRef<HTMLElement | null>(null)
+  const activeExecutionRequestIdRef = useRef('')
+  const activeExecutionRunIdRef = useRef('')
+  const executionRunSummariesRef = useRef<ExecutionRunSummary[]>([])
+  const pendingExecutionCompletionResolversRef = useRef<
+    Record<string, (payload: ExecutionCompletePayload) => void>
+  >({})
+  const manualExecutionClosureRef = useRef<{
+    requestId: string
+    settled: boolean
+  }>({
+    requestId: '',
+    settled: false,
+  })
+  const executionContextInputRef = useRef<HTMLTextAreaElement | null>(null)
+  const flowActivityContainerRef = useRef<HTMLDivElement | null>(null)
+  const flowConversationContainerRef = useRef<HTMLDivElement | null>(null)
+  const flowTimelineContainerRef = useRef<HTMLDivElement | null>(null)
+  const platform = window.aiOrchestrator?.platform ?? 'No disponible'
+  const persistedProjectPolicy = getStoredProjectPolicy()
+  const persistedResolvedDecisions = getStoredResolvedDecisions()
+  const persistedSessionSnapshot = getStoredSessionSnapshot(
+    Boolean(persistedProjectPolicy),
+  )
+  const persistedWorkspacePath = getStoredWorkspacePath()
+  const persistedUserParticipationMode = getStoredUserParticipationMode()
+  const persistedBrainCostMode = getStoredBrainCostMode()
+  const persistedFlowConsoleState = getStoredFlowConsoleState()
+  const [projectApprovalPolicy, setProjectApprovalPolicy] = useState<
+    ProjectApprovalPolicy | null
+  >(
+    () => persistedProjectPolicy,
+  )
+  const projectPolicyAllowed = projectApprovalPolicy !== null
+  const [decisionPending, setDecisionPending] = useState(false)
+  const [approvalMessage, setApprovalMessage] = useState('')
+  const [activeApprovalRequest, setActiveApprovalRequest] =
+    useState<ApprovalRequestContract | null>(null)
+  const [approvalSelectedOption, setApprovalSelectedOption] = useState('')
+  const [approvalFreeAnswer, setApprovalFreeAnswer] = useState('')
+  const [pendingInstruction, setPendingInstruction] = useState('')
+  const [pendingExecutionInstruction, setPendingExecutionInstruction] =
+    useState('')
+  const [approvalSource, setApprovalSource] = useState<
+    'planner' | 'executor' | ''
+  >('')
+  const [sessionStatus, setSessionStatus] = useState(
+    () => persistedSessionSnapshot.sessionStatus,
+  )
+  const [currentStep, setCurrentStep] = useState(
+    () => persistedSessionSnapshot.currentStep,
+  )
+  const [isRunning, setIsRunning] = useState(false)
+  const [isTestingConnection, setIsTestingConnection] = useState(false)
+  const [isPlanning, setIsPlanning] = useState(false)
+  const [isExecutingTask, setIsExecutingTask] = useState(false)
+  const [isAutoFlowRunning, setIsAutoFlowRunning] = useState(false)
+  const [autoFlowIteration, setAutoFlowIteration] = useState(0)
+  const [autoFlowAwaitingApproval, setAutoFlowAwaitingApproval] = useState<
+    'planner' | 'executor' | ''
+  >('')
+  const [goalInput, setGoalInput] = useState(DEFAULT_GOAL_INPUT)
+  const [workspacePath, setWorkspacePath] = useState(() => persistedWorkspacePath)
+  const [executionContextInput, setExecutionContextInput] = useState(
+    DEFAULT_EXECUTION_CONTEXT_INPUT,
+  )
+  const [userParticipationMode, setUserParticipationMode] =
+    useState<UserParticipationMode>(() => persistedUserParticipationMode)
+  const [brainCostMode, setBrainCostMode] = useState<BrainCostMode>(
+    () => persistedBrainCostMode,
+  )
+  const [resolvedDecisions, setResolvedDecisions] = useState<
+    ResolvedDecisionRecord[]
+  >(() => persistedResolvedDecisions)
+  const [isFlowConsoleOpen, setIsFlowConsoleOpen] = useState(
+    () => persistedFlowConsoleState.open,
+  )
+  const [isFlowConsolePinnedOpen, setIsFlowConsolePinnedOpen] = useState(
+    () => persistedFlowConsoleState.pinned,
+  )
+  const [plannerInstruction, setPlannerInstruction] = useState(
+    () => persistedSessionSnapshot.plannerInstruction,
+  )
+  const [plannerExecutionMetadata, setPlannerExecutionMetadata] =
+    useState<PlannerExecutionMetadata>(EMPTY_PLANNER_EXECUTION_METADATA)
+  const [lastObservedExecutionMode, setLastObservedExecutionMode] = useState('')
+  const [executorResult, setExecutorResult] = useState(
+    () => persistedSessionSnapshot.executorResult,
+  )
+  const [lastExecutorSnapshot, setLastExecutorSnapshot] =
+    useState<ExecutorFailureContext | null>(null)
+  const [executorRequestState, setExecutorRequestState] = useState<
+    'idle' | 'running' | 'success' | 'error'
+  >(() => persistedSessionSnapshot.executorRequestState)
+  const [lastBrainRoutingDecision, setLastBrainRoutingDecision] =
+    useState<BrainRoutingDecision | null>(null)
+  const [lastRunSummary, setLastRunSummary] = useState(
+    () => persistedSessionSnapshot.lastRunSummary,
+  )
+  const [sessionEvents, setSessionEvents] = useState(() => getStoredSessionEvents())
+  const [runtimeStatus, setRuntimeStatus] = useState(DEFAULT_RUNTIME_STATUS)
+  const [flowMessages, setFlowMessages] = useState(() => persistedFlowMessages)
+  const [executionRunSummaries, setExecutionRunSummaries] = useState<
+    ExecutionRunSummary[]
+  >([])
+  const [reusableArtifactFilters, setReusableArtifactFilters] = useState({
+    sector: '',
+    visualStyle: '',
+    layoutVariant: '',
+    heroStyle: '',
+    tags: '',
+  })
+  const [reusableArtifacts, setReusableArtifacts] = useState<
+    ReusableArtifactRecord[]
+  >([])
+  const [isLoadingReusableArtifacts, setIsLoadingReusableArtifacts] =
+    useState(false)
+  const [reusableArtifactError, setReusableArtifactError] = useState('')
+  const [selectedReusableArtifact, setSelectedReusableArtifact] =
+    useState<ReusableArtifactRecord | null>(null)
+  const [manualReuseMode, setManualReuseMode] = useState<ManualReuseMode>('auto')
+  const [activeSection, setActiveSection] = useState<AppSectionKey>('inicio')
+  const [selectedRunSummary, setSelectedRunSummary] =
+    useState<ExecutionRunSummary | null>(null)
+  const [detailReusableArtifact, setDetailReusableArtifact] =
+    useState<ReusableArtifactRecord | null>(null)
+  const [isFinalResponseOpen, setIsFinalResponseOpen] = useState(false)
+  const [experienceMode, setExperienceMode] =
+    useState<ExperienceMode>('guided')
+  const [activeWizardStep, setActiveWizardStep] =
+    useState<WizardStepKey>('goal')
+
+  useEffect(() => {
+    executionRunSummariesRef.current = executionRunSummaries
+  }, [executionRunSummaries])
+
+  useEffect(() => {
+    const rootElement = appRootRef.current
+
+    if (!rootElement) {
+      return
+    }
+
+    const textWalker = document.createTreeWalker(
+      rootElement,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode(node) {
+          const parentElement = node.parentElement
+
+          if (!parentElement) {
+            return NodeFilter.FILTER_REJECT
+          }
+
+          if (parentElement.tagName === 'TEXTAREA') {
+            return NodeFilter.FILTER_REJECT
+          }
+
+          return NodeFilter.FILTER_ACCEPT
+        },
+      },
+    )
+
+    const textNodesToRepair: Text[] = []
+    let currentTextNode = textWalker.nextNode()
+
+    while (currentTextNode) {
+      textNodesToRepair.push(currentTextNode as Text)
+      currentTextNode = textWalker.nextNode()
+    }
+
+    textNodesToRepair.forEach((textNode) => {
+      const nextValue = repairMojibakeText(textNode.nodeValue || '')
+
+      if (nextValue && nextValue !== textNode.nodeValue) {
+        textNode.nodeValue = nextValue
+      }
+    })
+
+    rootElement
+      .querySelectorAll<HTMLElement>('input[placeholder], textarea[placeholder], [title]')
+      .forEach((element) => {
+        const currentPlaceholder = element.getAttribute('placeholder')
+        const currentTitle = element.getAttribute('title')
+
+        if (currentPlaceholder) {
+          const nextPlaceholder = repairMojibakeText(currentPlaceholder)
+          if (nextPlaceholder !== currentPlaceholder) {
+            element.setAttribute('placeholder', nextPlaceholder)
+          }
+        }
+
+        if (currentTitle) {
+          const nextTitle = repairMojibakeText(currentTitle)
+          if (nextTitle !== currentTitle) {
+            element.setAttribute('title', nextTitle)
+          }
+        }
+      })
+  })
+
+  const loadReusableArtifacts = useCallback(async () => {
+    setIsLoadingReusableArtifacts(true)
+    setReusableArtifactError('')
+
+    try {
+      const response = await window.aiOrchestrator?.listReusableArtifacts?.({
+        ...(reusableArtifactFilters.sector.trim()
+          ? { sector: reusableArtifactFilters.sector.trim() }
+          : {}),
+        ...(reusableArtifactFilters.visualStyle.trim()
+          ? { visualStyle: reusableArtifactFilters.visualStyle.trim() }
+          : {}),
+        ...(reusableArtifactFilters.layoutVariant.trim()
+          ? { layoutVariant: reusableArtifactFilters.layoutVariant.trim() }
+          : {}),
+        ...(reusableArtifactFilters.heroStyle.trim()
+          ? { heroStyle: reusableArtifactFilters.heroStyle.trim() }
+          : {}),
+        ...(reusableArtifactFilters.tags.trim()
+          ? {
+              tags: reusableArtifactFilters.tags
+                .split(',')
+                .map((tag) => tag.trim())
+                .filter(Boolean),
+            }
+          : {}),
+        limit: 18,
+      })
+
+      const normalizedArtifacts = Array.isArray(response?.artifacts)
+        ? response.artifacts
+            .map((artifact) => normalizeReusableArtifactRecord(artifact))
+            .filter((artifact): artifact is ReusableArtifactRecord => Boolean(artifact))
+        : []
+
+      setReusableArtifacts(normalizedArtifacts)
+    } catch (error) {
+      setReusableArtifactError(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo cargar la memoria reusable.',
+      )
+      setReusableArtifacts([])
+    } finally {
+      setIsLoadingReusableArtifacts(false)
+    }
+  }, [
+    reusableArtifactFilters.heroStyle,
+    reusableArtifactFilters.layoutVariant,
+    reusableArtifactFilters.sector,
+    reusableArtifactFilters.tags,
+    reusableArtifactFilters.visualStyle,
+  ])
+
+  useEffect(() => {
+    void loadReusableArtifacts()
+  }, [loadReusableArtifacts])
+
+  const humanApprovalsBadge = decisionPending
+    ? 'Aprobación manual requerida'
+    : projectPolicyAllowed
+      ? 'Regla del proyecto activa'
+      : 'Sin aprobación pendiente'
+
+  const plannerBadge = isPlanning ? 'Planificación en curso' : 'Plan activo cargado'
+
+  const executorBadge = isExecutingTask
+    ? 'Ejecutando instrucción actual'
+    : decisionPending && approvalSource === 'executor'
+      ? 'Esperando aprobación'
+      : 'Listo para ejecutar'
+  const executorRequestStateLabel =
+    executorRequestState === 'running'
+      ? 'Ejecutando'
+      : executorRequestState === 'success'
+        ? 'Completado'
+        : executorRequestState === 'error'
+          ? 'Con error'
+          : 'En espera'
+  const plannerNeedsUserClarification = isUserClarificationPlannerResponse(
+    plannerExecutionMetadata,
+  )
+
+  const canExecuteInstruction =
+    plannerInstruction.trim() !== '' &&
+    plannerInstruction !== DEFAULT_PLANNER_INSTRUCTION &&
+    !plannerNeedsUserClarification
+
+  const visiblePendingInstruction =
+    approvalSource === 'executor'
+      ? pendingExecutionInstruction
+      : pendingInstruction
+  const activeApprovalInteractionMode = resolveApprovalInteractionMode(
+    activeApprovalRequest,
+  )
+  const visibleApprovalOptions = Array.isArray(activeApprovalRequest?.options)
+    ? activeApprovalRequest.options
+    : []
+  const approvalResponseRequiresOption =
+    activeApprovalInteractionMode === 'options' ||
+    activeApprovalInteractionMode === 'mixed'
+  const persistibleProjectApprovalPolicy = buildPersistibleProjectApprovalPolicy({
+    source: approvalSource,
+    approvalRequest: activeApprovalRequest,
+  })
+  const canPersistCurrentApprovalRule = Boolean(persistibleProjectApprovalPolicy)
+  const canSendRichApprovalResponse =
+    decisionPending &&
+    (activeApprovalInteractionMode === 'binary'
+      ? true
+      : activeApprovalInteractionMode === 'options'
+        ? approvalSelectedOption.trim() !== ''
+        : activeApprovalInteractionMode === 'free-answer'
+          ? approvalFreeAnswer.trim() !== ''
+          : approvalSelectedOption.trim() !== '' || approvalFreeAnswer.trim() !== '')
+  const currentExecutionContextSummary = executionContextInput.trim()
+    ? executionContextInput.trim()
+    : 'Sin contexto adicional'
+  const userParticipationSummary =
+    userParticipationMode === 'user-will-contribute'
+      ? 'El usuario va a aportar definiciones, recursos o contenidos cuando haga falta.'
+      : userParticipationMode === 'brain-decides-missing'
+        ? 'El Cerebro debe decidir faltantes menores y avanzar solo salvo bloqueos críticos.'
+        : 'Todavía no se definió si el usuario va a aportar insumos durante el proceso.'
+  const plannerProjectState: PlannerProjectState = {
+    ...(userParticipationMode ? { userParticipationMode } : {}),
+    resolvedDecisions: mergeResolvedDecisionRecords(
+      buildParticipationResolvedDecisions(userParticipationMode),
+      resolvedDecisions,
+    ),
+  }
+  const currentWorkspaceSummary = workspacePath.trim()
+    ? workspacePath.trim()
+    : 'Sin espacio de trabajo definido'
+  const workspaceStatusLabel = workspacePath.trim()
+    ? 'Espacio de trabajo definido'
+    : 'Espacio de trabajo no definido'
+  const manualReusablePreferencePayload = buildManualReusablePreferencePayload({
+    mode: manualReuseMode,
+    selectedArtifact: selectedReusableArtifact,
+  })
+  const effectivePlannerExecutionMetadata =
+    applyManualReusablePreferenceToPlannerExecutionMetadata({
+      metadata: plannerExecutionMetadata,
+      mode: manualReuseMode,
+      selectedArtifact: selectedReusableArtifact,
+    })
+  const resolvePlannerExecutionMetadata = (
+    payload?: PlannerDecisionResponse | null,
+  ) =>
+    applyManualReusablePreferenceToPlannerExecutionMetadata({
+      metadata: extractPlannerExecutionMetadata(payload),
+      mode: manualReuseMode,
+      selectedArtifact: selectedReusableArtifact,
+    })
+  const manualReuseModeLabel = getManualReuseModeLabel(manualReuseMode)
+  const selectedReusableArtifactSummary = selectedReusableArtifact
+    ? [
+        selectedReusableArtifact.sectorLabel || selectedReusableArtifact.sector,
+        selectedReusableArtifact.visualStyle,
+        selectedReusableArtifact.layoutVariant,
+        selectedReusableArtifact.heroStyle,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : 'Todavía no hay un artefacto reusable seleccionado manualmente.'
+  const selectedReusableArtifactTags = selectedReusableArtifact?.tags?.join(', ') || ''
+  const activeBrainSelectedProvider = getBrainProviderLabel(
+    lastBrainRoutingDecision?.selectedProvider,
+  )
+  const activeBrainResolvedProvider = getBrainProviderLabel(
+    lastBrainRoutingDecision?.resolvedProvider ||
+      lastBrainRoutingDecision?.selectedProvider,
+  )
+  const activeBrainFallbackProvider = getBrainProviderLabel(
+    lastBrainRoutingDecision?.fallbackProvider,
+  )
+  const activeBrainFallbackUsed = lastBrainRoutingDecision?.fallbackUsed === true
+  const activeBrainRoutingReason = summarizeInlineText(
+    lastBrainRoutingDecision?.reason,
+    180,
+  )
+  const activeBrainRoutingMode =
+    getBrainRoutingModeLabel(lastBrainRoutingDecision?.routingMode) ||
+    'Sin decisión registrada'
+  const activeBrainProblemNature =
+    getBrainProblemNatureLabel(lastBrainRoutingDecision?.problemNature)
+  const activeBrainRoutingConfidence =
+    typeof lastBrainRoutingDecision?.confidence === 'number'
+      ? `${Math.round(lastBrainRoutingDecision.confidence * 100)}%`
+      : 'No disponible'
+  const activeReuseFoundCount = Math.max(
+    effectivePlannerExecutionMetadata.reusableArtifactsFound,
+    effectivePlannerExecutionMetadata.reusableArtifactLookup?.foundCount || 0,
+  )
+  const activeContextHubStatus = effectivePlannerExecutionMetadata.contextHubStatus
+  const activeContextHubLabel = activeContextHubStatus?.available
+    ? 'Context Hub disponible'
+    : 'Context Hub no disponible'
+  const activeContextHubDetail = activeContextHubStatus?.available
+    ? [
+        activeContextHubStatus.title
+          ? `Pack: ${activeContextHubStatus.title}`
+          : activeContextHubStatus.slug || activeContextHubStatus.id
+            ? `Pack: ${
+                activeContextHubStatus.title ||
+                activeContextHubStatus.slug ||
+                activeContextHubStatus.id
+              }`
+            : '',
+        Number.isInteger(activeContextHubStatus.itemsCount)
+          ? `Items: ${activeContextHubStatus.itemsCount}`
+          : '',
+        Number.isFinite(activeContextHubStatus.estimatedTokens)
+          ? `Tokens estimados: ${activeContextHubStatus.estimatedTokens}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' · ') || 'JEFE consultó MEMORIA externa antes de planificar.'
+    : [
+        'JEFE continúa sin memoria externa.',
+        activeContextHubStatus?.reason ? `Motivo: ${activeContextHubStatus.reason}` : '',
+      ]
+        .filter(Boolean)
+        .join(' ')
+  const activeContextHubEndpointLabel =
+    activeContextHubStatus?.endpoint || '/v1/packs/suggested'
+  const activeContextHubUiDetail = [activeContextHubDetail, `Endpoint: ${activeContextHubEndpointLabel}`]
+    .filter(Boolean)
+    .join(' · ')
+  const activeReuseModeLabelLegacy =
+    effectivePlannerExecutionMetadata.reuseMode === 'reuse-style-and-structure'
+      ? 'Reutilizar estilo y estructura'
+      : effectivePlannerExecutionMetadata.reuseMode === 'reuse-style'
+        ? 'Reutilizar estilo'
+        : effectivePlannerExecutionMetadata.reuseMode === 'reuse-structure'
+          ? 'Reutilizar estructura'
+          : effectivePlannerExecutionMetadata.reuseMode === 'inspiration-only'
+            ? 'Solo inspiración'
+            : 'Sin reutilización'
+  const activeReuseArtifactIdsLegacy =
+    effectivePlannerExecutionMetadata.reusedArtifactIds.length > 0
+      ? effectivePlannerExecutionMetadata.reusedArtifactIds
+      : (effectivePlannerExecutionMetadata.reusableArtifactLookup?.matches || [])
+          .slice(0, 2)
+          .map((match) => match.id)
+  const activeReuseDetailLabelLegacy =
+    summarizeInlineText(
+      effectivePlannerExecutionMetadata.reuseReason ||
+        (activeReuseFoundCount > 0
+          ? `Se detectaron ${activeReuseFoundCount} artefacto(s) reutilizables.`
+          : 'No se detectaron artefactos reutilizables para este objetivo.'),
+      180,
+    )
+  const hasAppliedReusableContext =
+    effectivePlannerExecutionMetadata.reuseDecision === true &&
+    normalizeOptionalString(effectivePlannerExecutionMetadata.reuseMode).toLocaleLowerCase() !==
+      'none'
+  const activeReuseModeLabel = getReuseModeLabel(effectivePlannerExecutionMetadata.reuseMode)
+  const activeAppliedReuseArtifactIds = hasAppliedReusableContext
+    ? effectivePlannerExecutionMetadata.reusedArtifactIds
+    : []
+  const activeReuseSuggestionIds = (effectivePlannerExecutionMetadata.reusableArtifactLookup?.matches ||
+    [])
+    .slice(0, 2)
+    .map((match) => match.id)
+  const activeReuseDetailLabel = summarizeInlineText(
+    hasAppliedReusableContext
+      ? effectivePlannerExecutionMetadata.reuseReason ||
+          `Se aplico memoria reusable en modo ${effectivePlannerExecutionMetadata.reuseMode}.`
+      : activeReuseFoundCount > 0
+        ? `Se detectaron ${activeReuseFoundCount} artefacto(s) como referencia, pero no se aplico reutilizacion.`
+        : 'No se detectaron artefactos reutilizables para este objetivo.',
+    180,
+  )
+  const activeReuseArtifactSummary = hasAppliedReusableContext
+    ? activeAppliedReuseArtifactIds.join(', ') || 'Sin artefactos asociados'
+    : activeReuseSuggestionIds.length > 0
+      ? `Sugerencias encontradas: ${activeReuseSuggestionIds.join(', ')}`
+      : 'Sin sugerencias encontradas'
+  const activeReuseArtifactsPanelLabel = hasAppliedReusableContext
+    ? 'Artefactos aplicados'
+    : 'Referencias disponibles'
+  void [activeReuseModeLabelLegacy, activeReuseArtifactIdsLegacy, activeReuseDetailLabelLegacy]
+  const activeReuseManualSummary =
+    manualReuseMode === 'auto'
+      ? 'Búsqueda automática'
+      : selectedReusableArtifact?.id
+        ? `${manualReuseModeLabel} desde ${selectedReusableArtifact.id}`
+        : manualReuseMode === 'none'
+          ? 'No reutilizar'
+          : `${manualReuseModeLabel} sin artefacto seleccionado`
+  const resolvedExecutionModeForUi =
+    inferExecutionModeFromResultText(executorResult) ||
+    inferExecutionModeFromSnapshot(lastExecutorSnapshot) ||
+    normalizeOptionalString(lastObservedExecutionMode) ||
+    normalizeOptionalString(plannerExecutionMetadata.executionMode)
+  const activeExecutionModeLabel = getExecutionModeLabel(resolvedExecutionModeForUi)
+  const activeDecisionKeyLabel =
+    getDecisionKeyLabel(plannerExecutionMetadata.decisionKey)
+  const activePlannerStrategyLabel =
+    getPlannerStrategyLabel(plannerExecutionMetadata.strategy)
+  const latestExecutionRunSummary = executionRunSummaries[0] || null
+  const runtimeExecutorModeLabel = formatExecutorRuntimeModeLabel(
+    runtimeStatus.executorMode,
+    runtimeStatus.bridgeMode,
+  )
+  const runtimeExecutorModeDetail = formatExecutorRuntimeModeDetail({
+    executorModeSource: runtimeStatus.executorModeSource,
+    bridgeMode: runtimeStatus.bridgeMode,
+    bridgeModeSource: runtimeStatus.bridgeModeSource,
+  })
+  const latestExecutorModeValue =
+    normalizeOptionalString(lastExecutorSnapshot?.executorMode) ||
+    normalizeOptionalString(latestExecutionRunSummary?.latestExecutorMode) ||
+    normalizeOptionalString(runtimeStatus.executorMode)
+  const latestBridgeModeValue =
+    normalizeOptionalString(lastExecutorSnapshot?.bridgeMode) ||
+    normalizeOptionalString(latestExecutionRunSummary?.latestBridgeMode) ||
+    normalizeOptionalString(runtimeStatus.bridgeMode)
+  const latestExecutorModeSource =
+    normalizeOptionalString(lastExecutorSnapshot?.executorModeSource) ||
+    normalizeOptionalString(runtimeStatus.executorModeSource)
+  const latestBridgeModeSource =
+    normalizeOptionalString(lastExecutorSnapshot?.bridgeModeSource) ||
+    normalizeOptionalString(runtimeStatus.bridgeModeSource)
+  const latestExecutorCommand =
+    normalizeOptionalString(lastExecutorSnapshot?.executorCommand) || ''
+  const activeExecutorRuntimeLabel = formatExecutorRuntimeModeLabel(
+    latestExecutorModeValue,
+    latestBridgeModeValue,
+  )
+  const activeExecutorRuntimeDetail = formatExecutorRuntimeModeDetail({
+    executorModeSource: latestExecutorModeSource,
+    bridgeMode: latestBridgeModeValue,
+    bridgeModeSource: latestBridgeModeSource,
+    executorCommand: latestExecutorCommand,
+  })
+  const fastRouteDetected = isLocalFastRouteExecution({
+    strategy: lastExecutorSnapshot?.strategy,
+    materializationPlanSource: lastExecutorSnapshot?.materializationPlanSource,
+    materialState: lastExecutorSnapshot?.materialState,
+    executionMode: resolvedExecutionModeForUi,
+    decisionKey: plannerExecutionMetadata.decisionKey,
+  })
+  const latestMaterializationStrategy =
+    normalizeOptionalString(lastExecutorSnapshot?.strategy) ||
+    (fastRouteDetected ? 'local-deterministic-materialization' : '')
+  const latestReasoningLayer =
+    normalizeOptionalString(lastExecutorSnapshot?.reasoningLayer) ||
+    (fastRouteDetected ? 'local-rules' : '')
+  const latestMaterializationLayer =
+    normalizeOptionalString(lastExecutorSnapshot?.materializationLayer) ||
+    (fastRouteDetected ? 'local-deterministic' : '')
+  const latestMaterializationPlanSource = normalizeOptionalString(
+    lastExecutorSnapshot?.materializationPlanSource,
+  )
+  const latestBrainStrategy = normalizeOptionalString(lastExecutorSnapshot?.brainStrategy)
+  const latestValidationResults = normalizeValidationResults(lastExecutorSnapshot?.validationResults)
+  const inferValidationEntryKind = (
+    entry: ExecutorValidationResult,
+  ): 'file' | 'folder' | '' => {
+    if (entry.expectedKind === 'file' || entry.expectedKind === 'folder') {
+      return entry.expectedKind
+    }
+
+    const normalizedTargetPath = normalizeOptionalString(entry.targetPath).replace(/\\/g, '/')
+
+    if (!normalizedTargetPath) {
+      return ''
+    }
+
+    const lastTargetSegment = normalizedTargetPath.split('/').filter(Boolean).at(-1) || ''
+    return lastTargetSegment.includes('.') ? 'file' : 'folder'
+  }
+  const latestValidationOkCount = latestValidationResults.filter((entry) => entry.ok !== false).length
+  const latestValidatedFolderCount = latestValidationResults.filter(
+    (entry) => entry.ok !== false && inferValidationEntryKind(entry) === 'folder',
+  ).length
+  const latestValidatedFileCount = latestValidationResults.filter(
+    (entry) => entry.ok !== false && inferValidationEntryKind(entry) === 'file',
+  ).length
+  const contextualExecutorModeCardLabel = fastRouteDetected
+    ? 'Modo de ejecucion'
+    : 'Modo del executor'
+  const contextualExecutorModeLabel = fastRouteDetected
+    ? 'Ruta rapida local'
+    : activeExecutorRuntimeLabel
+  const contextualExecutorModeDetail = fastRouteDetected
+    ? [
+        latestReasoningLayer ? `Cerebro: ${latestReasoningLayer}` : '',
+        latestMaterializationLayer ? `Materializacion: ${latestMaterializationLayer}` : '',
+        latestBrainStrategy ? `Plantilla: ${latestBrainStrategy}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ') || 'Ruta rapida resuelta en el proceso local'
+    : activeExecutorRuntimeDetail
+  const contextualConnectionLabel = fastRouteDetected
+    ? 'Resuelta localmente'
+    : runtimeStatus.connection
+  const contextualConnectionDetail = fastRouteDetected
+    ? 'Electron materializo la salida sin bridge ni Codex.'
+    : `${runtimeStatus.platform} · Electron ${runtimeStatus.electron}`
+  void contextualConnectionDetail
+  const contextualRuntimeCardLabel = fastRouteDetected
+    ? 'Materializacion'
+    : 'Runtime del executor'
+  const contextualRuntimeLabel = fastRouteDetected
+    ? latestMaterializationLayer || 'local-deterministic'
+    : runtimeExecutorModeLabel
+  const contextualRuntimeDetail = fastRouteDetected
+    ? latestMaterializationPlanSource || latestMaterializationStrategy || 'Sin fuente reportada'
+    : runtimeExecutorModeDetail
+  const visibleExecutionRunSummaries = executionRunSummaries.slice(0, 3)
+  const shouldShowLatestExecutionRunSummaryInOperationalReading =
+    Boolean(latestExecutionRunSummary) &&
+    !decisionPending &&
+    !plannerNeedsUserClarification &&
+    executorRequestState !== 'idle'
+  const latestCreatedArtifacts = normalizeOptionalStringArray(lastExecutorSnapshot?.createdPaths)
+  const latestTouchedArtifactsRaw = normalizeOptionalStringArray(lastExecutorSnapshot?.touchedPaths)
+  const latestTouchedArtifacts = mergeUniqueStringValues(
+    latestCreatedArtifacts,
+    lastExecutorSnapshot?.touchedPaths,
+    12,
+  )
+  const latestCurrentTargetPath = normalizeOptionalString(lastExecutorSnapshot?.currentTargetPath)
+  const latestAllowedTargetPaths = normalizeOptionalStringArray(
+    plannerExecutionMetadata.executionScope?.allowedTargetPaths,
+  )
+  const latestBlockedTargetPaths = normalizeOptionalStringArray(
+    plannerExecutionMetadata.executionScope?.blockedTargetPaths,
+  )
+  const latestScopeSuccessCriteria = normalizeOptionalStringArray(
+    plannerExecutionMetadata.executionScope?.successCriteria,
+  )
+  const latestContinuationAnchor = summarizeContinuationAnchor(
+    plannerExecutionMetadata.executionScope?.continuationAnchor,
+  )
+  const latestExecutionScopeSummary = summarizeExecutionScope(
+    plannerExecutionMetadata.executionScope,
+  )
+  const latestAppliedReuseMode =
+    normalizeOptionalString(lastExecutorSnapshot?.appliedReuseMode) ||
+    normalizeOptionalString(plannerExecutionMetadata.reuseMode) ||
+    'none'
+  const latestReuseAppliedFields = normalizeOptionalStringArray(
+    lastExecutorSnapshot?.reuseAppliedFields,
+  )
+  const latestReusedStyleArtifactId = normalizeOptionalString(
+    lastExecutorSnapshot?.reusedStyleFromArtifactId,
+  )
+  const latestReusedStructureArtifactId = normalizeOptionalString(
+    lastExecutorSnapshot?.reusedStructureFromArtifactId,
+  )
+  const latestAppliedReuseArtifactIds = [
+    latestReusedStyleArtifactId,
+    latestReusedStructureArtifactId,
+  ].filter(Boolean)
+  const latestAppliedReuseModeLabel = getReuseModeLabel(latestAppliedReuseMode)
+  const visibleFinalTextResponse =
+    shouldShowLatestExecutionRunSummaryInOperationalReading &&
+    latestExecutionRunSummary?.status === 'success' &&
+    latestTouchedArtifacts.length === 0
+      ? normalizeOptionalString(lastRunSummary.result) ||
+        normalizeOptionalString(executorResult)
+      : ''
+  const shouldShowVisibleFinalTextResponse =
+    Boolean(visibleFinalTextResponse) &&
+    visibleFinalTextResponse !== DEFAULT_LAST_RUN_TEXT &&
+    visibleFinalTextResponse !== DEFAULT_EXECUTOR_RESULT
+  const resultStatusPresentation = deriveResultStatusPresentation({
+    runStatus: latestExecutionRunSummary?.status,
+    requestState: executorRequestState,
+    sessionStatus,
+    finalStatus: lastRunSummary.finalStatus,
+  })
+  const resultHumanText = shouldShowVisibleFinalTextResponse
+    ? visibleFinalTextResponse
+    : normalizeOptionalString(lastRunSummary.result) ||
+      normalizeOptionalString(executorResult) ||
+      'No hay un resultado visible consolidado.'
+  const resultHumanSummary = summarizeInlineText(resultHumanText, 180)
+  const resultPrimaryAffectedPath = derivePrimaryAffectedPath({
+    createdPaths: latestCreatedArtifacts,
+    touchedPaths: latestTouchedArtifactsRaw,
+    currentTargetPath: latestCurrentTargetPath,
+  })
+  const resultPrimaryAffectedPathLabel = formatWorkspaceRelativePath(
+    resultPrimaryAffectedPath,
+    workspacePath,
+  )
+  const resultCurrentTargetPathLabel = formatWorkspaceRelativePath(
+    latestCurrentTargetPath,
+    workspacePath,
+  )
+  const resultCreatedPaths = latestCreatedArtifacts.map((pathValue) =>
+    formatWorkspaceRelativePath(pathValue, workspacePath),
+  )
+  const resultTouchedPaths = latestTouchedArtifactsRaw.map((pathValue) =>
+    formatWorkspaceRelativePath(pathValue, workspacePath),
+  )
+  const resultAllowedPaths = latestAllowedTargetPaths.map((pathValue) =>
+    formatWorkspaceRelativePath(pathValue, workspacePath),
+  )
+  const resultBlockedPaths = latestBlockedTargetPaths.map((pathValue) =>
+    formatWorkspaceRelativePath(pathValue, workspacePath),
+  )
+  const resultValidationItems = latestValidationResults.map((entry, index) => ({
+    key: `${index}-${entry.type || 'validation'}-${entry.targetPath || 'target'}`,
+    ok: entry.ok !== false,
+    label:
+      formatWorkspaceRelativePath(entry.targetPath, workspacePath) ||
+      'Ruta no reportada',
+    detail: [
+      normalizeOptionalString(entry.type) || 'validación',
+      normalizeOptionalString(entry.expectedKind),
+    ]
+      .filter(Boolean)
+      .join(' Â· '),
+  }))
+  const inferredValidationCount = latestValidatedFolderCount + latestValidatedFileCount
+  const inferredValidationSummaryParts = [
+    latestValidatedFolderCount > 0 ? `${latestValidatedFolderCount} carpeta(s)` : '',
+    latestValidatedFileCount > 0 ? `${latestValidatedFileCount} archivo(s)` : '',
+  ].filter(Boolean)
+  const resultValidationSummaryText =
+    latestValidationResults.length > 0
+      ? inferredValidationCount > 0
+        ? `${inferredValidationSummaryParts.join(' y ')} validados.`
+        : `${latestValidationResults.length} validación(es) reportadas.`
+      : 'La corrida no devolvió validaciones estructuradas.'
+  const resultScopeRespected =
+    resultBlockedPaths.length > 0 &&
+    resultBlockedPaths.every((pathValue) => {
+      const comparableBlockedPath = buildComparablePath(pathValue, workspacePath)
+
+      if (!comparableBlockedPath) {
+        return true
+      }
+
+      return ![...latestCreatedArtifacts, ...latestTouchedArtifactsRaw].some(
+        (artifactPath) =>
+          buildComparablePath(artifactPath, workspacePath) === comparableBlockedPath,
+      )
+    })
+  const resultCodexLabel = fastRouteDetected
+    ? 'No requerido'
+    : latestBridgeModeValue.toLocaleLowerCase() === 'codex' ||
+        activeExecutorRuntimeLabel === 'Real (Codex)'
+      ? 'Usado'
+      : latestBridgeModeValue && latestBridgeModeValue.toLocaleLowerCase() !== 'unknown'
+        ? 'No requerido'
+        : 'No disponible'
+  const resultBridgeLabel = fastRouteDetected
+    ? 'No usado'
+    : latestBridgeModeValue && latestBridgeModeValue.toLocaleLowerCase() !== 'unknown'
+      ? latestBridgeModeValue.toLocaleLowerCase() === 'codex'
+        ? 'Codex'
+        : latestBridgeModeValue
+      : 'No disponible'
+  const resultSuggestedActions = [
+    resultPrimaryAffectedPathLabel
+      ? {
+          title: 'Abrir carpeta',
+          detail: `Revisar ${resultPrimaryAffectedPathLabel} para continuar sobre la salida generada.`,
+        }
+      : null,
+    [...resultCreatedPaths, ...resultTouchedPaths].some((pathValue) =>
+      pathValue.toLocaleLowerCase().endsWith('index.html'),
+    )
+      ? {
+          title: 'Abrir index.html en el navegador',
+          detail: 'Sirve para validar rápido el resultado visual y el copy final.',
+        }
+      : null,
+    resultStatusPresentation.label === 'Ejecución completada'
+      ? {
+          title: 'Guardar como reusable',
+          detail: 'Si el cierre te sirve como base, conviene registrarlo como memoria reutilizable.',
+        }
+      : null,
+    resultStatusPresentation.label === 'Ejecución completada'
+      ? {
+          title: 'Crear variante reutilizando estilo',
+          detail: 'Buena opción para iterar una nueva versión sin perder la identidad visual.',
+        }
+      : null,
+    resultStatusPresentation.label === 'Ejecución completada'
+      ? {
+          title: 'Crear variante reutilizando estructura',
+          detail: 'Útil cuando la composición ya funciona y querés cambiar rubro o contenido.',
+        }
+      : null,
+    {
+      title: 'Revisar consola técnica',
+      detail: 'Usá el panel avanzado o la consola del flujo si querés inspeccionar detalle técnico.',
+    },
+  ].filter((item): item is { title: string; detail: string } => item !== null)
+  const resultScopeSummaryLabel =
+    latestExecutionScopeSummary || 'Sin alcance restringido para resumir'
+  const resultReusableSummaryLabel =
+    latestAppliedReuseMode.toLocaleLowerCase() === 'none'
+      ? 'Sin reutilización aplicada'
+      : latestAppliedReuseArtifactIds.length > 0
+        ? latestAppliedReuseArtifactIds.join(', ')
+        : 'Sin artefacto reportado'
+  const latestHumanDecision = [...resolvedDecisions]
+    .filter(
+      (record) =>
+        Boolean(normalizeOptionalString(record.selectedOption)) ||
+        Boolean(normalizeOptionalString(record.freeAnswer)) ||
+        record.status === 'approved' ||
+        record.status === 'rejected',
+    )
+    .sort((leftRecord, rightRecord) =>
+      resolveLatestDecisionTimestamp(rightRecord).localeCompare(
+        resolveLatestDecisionTimestamp(leftRecord),
+      ),
+    )[0]
+  const latestHumanDecisionSummary = latestHumanDecision
+    ? [
+        getResolvedDecisionStatusLabel(latestHumanDecision),
+        normalizeOptionalString(latestHumanDecision.selectedOption),
+        normalizeOptionalString(latestHumanDecision.freeAnswer),
+        normalizeOptionalString(latestHumanDecision.summary),
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : 'Todavía no hay una respuesta humana relevante registrada'
+  const activeApprovalStatusLabel = decisionPending
+    ? `Pendiente desde ${approvalSource === 'executor' ? 'el Ejecutor' : 'el Planificador'}`
+    : projectPolicyAllowed
+      ? 'Hay una aprobación persistente vigente para el proyecto'
+      : 'No hay una aprobación vigente en este momento'
+  const recentApprovalRecords = [...resolvedDecisions]
+    .filter(
+      (record) =>
+        record.status === 'approved' ||
+        record.status === 'rejected' ||
+        Boolean(normalizeOptionalString(record.selectedOption)) ||
+        Boolean(normalizeOptionalString(record.freeAnswer)),
+    )
+    .sort((leftRecord, rightRecord) =>
+      resolveLatestDecisionTimestamp(rightRecord).localeCompare(
+        resolveLatestDecisionTimestamp(leftRecord),
+      ),
+    )
+    .slice(0, 5)
+  const activeApprovalDetailLabel = decisionPending
+    ? summarizeInlineText(approvalMessage || visiblePendingInstruction, 180)
+    : latestHumanDecisionSummary
+  const activeOperationalE2eScenarioLabel =
+    shouldShowLatestExecutionRunSummaryInOperationalReading && latestExecutionRunSummary
+      ? latestExecutionRunSummary.scenarioLabel
+      : 'Sin corrida registrada'
+  const activeOperationalE2eStatusLabel =
+    shouldShowLatestExecutionRunSummaryInOperationalReading && latestExecutionRunSummary
+      ? getExecutionRunStatusLabel(latestExecutionRunSummary.status)
+      : decisionPending
+        ? 'Esperando aprobación'
+        : plannerNeedsUserClarification
+          ? 'Consulta al usuario'
+          : 'Todavía no hay un cierre para mostrar'
+  const activeWizardStepIndex = GUIDED_WIZARD_STEPS.findIndex(
+    (step) => step.key === activeWizardStep,
+  )
+  const activeWizardStepConfig =
+    GUIDED_WIZARD_STEPS[activeWizardStepIndex] || GUIDED_WIZARD_STEPS[0]
+  const reusableWizardArtifacts = reusableArtifacts.slice(0, 3)
+  const hasWizardPlan =
+    plannerInstruction.trim() !== '' &&
+    plannerInstruction !== DEFAULT_PLANNER_INSTRUCTION
+  const wizardCanShowResult =
+    shouldShowVisibleFinalTextResponse ||
+    Boolean(latestExecutionRunSummary) ||
+    executorRequestState === 'success' ||
+    executorRequestState === 'error'
+  const activeSectionConfig =
+    APP_NAV_SECTIONS.find((section) => section.key === activeSection) ||
+    APP_NAV_SECTIONS[0]
+  const flowModeLabel = isAutoFlowRunning
+    ? 'Flujo automático'
+    : 'Operación manual'
+  const flowStageLabel = decisionPending
+    ? 'Esperando aprobación'
+    : isPlanning
+      ? 'Planificando'
+      : isExecutingTask
+        ? 'Ejecutando'
+        : sessionStatus.toLocaleLowerCase().includes('error')
+          ? 'Error'
+          : 'Listo'
+  const flowApprovalPendingLabel = decisionPending ? 'Sí' : 'No'
+  const flowApprovalSourceLabel =
+    approvalSource === 'planner'
+      ? 'Planificador'
+      : approvalSource === 'executor'
+        ? 'Ejecutor'
+        : 'No aplica'
+  const hasLastExecutorSnapshot =
+    lastExecutorSnapshot !== null &&
+    Object.values(lastExecutorSnapshot).some((value) =>
+      Array.isArray(value) ? value.length > 0 : Boolean(value),
+    )
+  const isShowingPreExecutionPlanState =
+    !decisionPending &&
+    !plannerNeedsUserClarification &&
+    !isPlanning &&
+    !isExecutingTask &&
+    executorRequestState === 'idle' &&
+    !hasLastExecutorSnapshot &&
+    executorResult === DEFAULT_EXECUTOR_RESULT
+  const visibleCurrentStepLabel = decisionPending
+    ? 'El Cerebro necesita una decision humana antes de seguir'
+    : plannerNeedsUserClarification
+      ? 'El Cerebro necesita una nueva definición antes de ejecutar'
+      : isShowingPreExecutionPlanState
+        ? buildPlannedCurrentStepLabel({
+            plannerInstruction,
+            executionMode: plannerExecutionMetadata.executionMode,
+          })
+        : currentStep
+  const liveActivityEvents = [...sessionEvents].slice(-6).reverse()
+  const latestFlowMessage = flowMessages.at(-1)
+  const flowExecutionFinished =
+    sessionStatus.toLocaleLowerCase().includes('error') ||
+    sessionStatus.toLocaleLowerCase().includes('complet') ||
+    executorRequestState === 'success' ||
+    executorRequestState === 'error'
+  const flowExecutionStageIndex =
+    flowExecutionFinished
+      ? 4
+      : latestFlowMessage?.source === 'codex'
+        ? 3
+        : latestFlowMessage?.source === 'executor' ||
+            isExecutingTask ||
+            executorRequestState === 'running'
+          ? 2
+          : latestFlowMessage?.source === 'planificador' || isPlanning
+            ? 1
+            : 0
+  const flowExecutionStages = [
+    'Objetivo',
+    'Planificador',
+    'Ejecutor',
+    'Codex',
+    'Resultado',
+  ]
+  const flowExecutionStageStates = flowExecutionStages.map((stage, index) => {
+    if (fastRouteDetected && stage === 'Codex') {
+      return 'not-required' as const
+    }
+
+    if (!flowExecutionFinished && index === flowExecutionStageIndex) {
+      return 'active' as const
+    }
+
+    if (
+      (flowExecutionFinished && index <= flowExecutionStageIndex) ||
+      (!flowExecutionFinished && index < flowExecutionStageIndex)
+    ) {
+      return 'completed' as const
+    }
+
+    return 'pending' as const
+  })
+  const flowExecutionHeaderLabel = flowExecutionFinished
+    ? sessionStatus.toLocaleLowerCase().includes('error') ||
+      executorRequestState === 'error'
+      ? 'Finalizada con error'
+      : fastRouteDetected
+        ? 'Finalizada · ruta rapida local'
+        : 'Finalizada'
+    : flowExecutionStages[flowExecutionStageIndex]
+  const normalizedGoalInput = goalInput.trim() || 'Sin objetivo definido'
+
+  const handleWizardBack = () => {
+    if (activeWizardStepIndex <= 0) {
+      return
+    }
+
+    setActiveWizardStep(GUIDED_WIZARD_STEPS[activeWizardStepIndex - 1].key)
+  }
+
+  const handleWizardNext = () => {
+    if (activeWizardStep === 'goal') {
+      setActiveWizardStep('context')
+      return
+    }
+
+    if (activeWizardStep === 'context') {
+      setActiveWizardStep('brain')
+      return
+    }
+
+    if (activeWizardStep === 'brain') {
+      setActiveWizardStep('memory')
+      return
+    }
+
+    if (activeWizardStep === 'execution' && wizardCanShowResult) {
+      setActiveWizardStep('result')
+    }
+  }
+
+  const handleWizardGeneratePlan = async () => {
+    await handleGenerateNextStep()
+    setActiveWizardStep('plan')
+  }
+
+  const handleWizardExecute = async () => {
+    setActiveWizardStep('execution')
+    await handleExecuteCurrentInstruction()
+  }
+
+  const handleWizardStartOver = () => {
+    setActiveWizardStep('goal')
+  }
+
+  useEffect(() => {
+    if (
+      decisionPending ||
+      isExecutingTask ||
+      executorRequestState === 'running'
+    ) {
+      setActiveWizardStep('execution')
+    }
+  }, [decisionPending, executorRequestState, isExecutingTask])
+  const getExecutionRunScenarioTone = (
+    scenarioLabel: ExecutionRunSummary['scenarioLabel'],
+  ) => {
+    if (scenarioLabel === 'Caso feliz base') {
+      return 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100'
+    }
+
+    if (
+      scenarioLabel === 'Falla recuperable' ||
+      scenarioLabel === 'Recovery exitoso'
+    ) {
+      return 'border-amber-300/20 bg-amber-300/10 text-amber-100'
+    }
+
+    if (scenarioLabel === 'Bloqueo por repeticion equivalente') {
+      return 'border-rose-300/20 bg-rose-300/10 text-rose-100'
+    }
+
+    if (scenarioLabel === 'Corrida fallida') {
+      return 'border-red-300/20 bg-red-300/10 text-red-100'
+    }
+
+    return 'border-sky-300/20 bg-sky-300/10 text-sky-100'
+  }
+  function getExecutionRunStatusLabel(status: ExecutionRunSummary['status']) {
+    if (status === 'approval-pending') {
+      return 'Esperando aprobación'
+    }
+
+    if (status === 'recovery-pending') {
+      return 'Recuperación pendiente'
+    }
+
+    if (status === 'success') {
+      return 'Completada'
+    }
+
+    if (status === 'error') {
+      return 'Cerrada con error'
+    }
+
+    return 'En curso'
+  }
+  const formatExecutorError = (response?: {
+    error?: string
+    failureType?: string
+    details?: ExecutorFailureContext & {
+      exitCode?: number
+    }
+  }) => {
+    const lines = [`Error: ${response?.error || 'Falló la ejecución del ejecutor'}`]
+
+    const failureContext = extractExecutorFailureContext(response)
+
+    if (normalizeOptionalString(response?.failureType)) {
+      lines.push(`Tipo de fallo: ${normalizeOptionalString(response?.failureType)}`)
+    }
+
+    if (typeof response?.details?.exitCode === 'number') {
+      lines.push(`Código de salida: ${response.details.exitCode}`)
+    }
+
+    if (failureContext?.currentSubtask || failureContext?.currentStep) {
+      lines.push(
+        `Subtarea: ${failureContext.currentSubtask || failureContext.currentStep}`,
+      )
+    }
+
+    if (failureContext?.currentAction) {
+      lines.push(`Accion: ${failureContext.currentAction}`)
+    }
+
+    if (failureContext?.currentTargetPath) {
+      lines.push(`Archivo o ruta: ${failureContext.currentTargetPath}`)
+    }
+
+    if (failureContext?.currentCommand) {
+      lines.push(`Comando: ${failureContext.currentCommand.slice(0, 220)}`)
+    }
+
+    if (Array.isArray(failureContext?.createdPaths) && failureContext.createdPaths.length > 0) {
+      lines.push(
+        `Avances parciales: ${failureContext.createdPaths.slice(0, 6).join(', ')}`,
+      )
+    }
+
+    if (Array.isArray(failureContext?.touchedPaths) && failureContext.touchedPaths.length > 0) {
+      lines.push(
+        `Archivos tocados: ${failureContext.touchedPaths.slice(0, 6).join(', ')}`,
+      )
+    }
+
+    if (failureContext?.stderr) {
+      lines.push(`stderr: ${failureContext.stderr.slice(0, 220)}`)
+    }
+
+    if (failureContext?.stdout) {
+      lines.push(`stdout: ${failureContext.stdout.slice(0, 220)}`)
+    }
+
+    return lines.join('\n')
+  }
+  const formatStructuredContent = (value: unknown) => {
+    try {
+      return JSON.stringify(value, null, 2)
+    } catch {
+      return String(value)
+    }
+  }
+  const addFlowMessage = (message: ExecutorTraceEntry) => {
+    flowMessageIdRef.current += 1
+    setFlowMessages((currentMessages) => [
+      ...currentMessages,
+      {
+        id: flowMessageIdRef.current,
+        ...message,
+      },
+    ])
+  }
+  const addFlowMessages = (messages?: ExecutorTraceEntry[]) => {
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return
+    }
+
+    setFlowMessages((currentMessages) => [
+      ...currentMessages,
+      ...messages.map((message) => {
+        flowMessageIdRef.current += 1
+
+        return {
+          id: flowMessageIdRef.current,
+          ...message,
+        }
+      }),
+    ])
+  }
+  const addDiagnosticFlowMessage = (
+    title: string,
+    content: string,
+    status: 'info' | 'success' | 'warning' | 'error' = 'info',
+    raw?: string,
+  ) => {
+    addFlowMessage({
+      source: 'orquestador',
+      title,
+      content,
+      status,
+      ...(raw ? { raw } : {}),
+    })
+  }
+  const debugRendererLog = (label: string, details?: unknown) => {
+    if (details === undefined) {
+      console.log(`[renderer-debug] ${label}`)
+      return
+    }
+
+    console.log(`[renderer-debug] ${label}`, details)
+  }
+  const parseStructuredRaw = (raw?: string) => {
+    if (!raw) {
+      return undefined
+    }
+
+    try {
+      return JSON.parse(raw)
+    } catch {
+      return undefined
+    }
+  }
+  const safelyAddExecutorTrace = (trace: unknown) => {
+    if (!Array.isArray(trace)) {
+      addDiagnosticFlowMessage(
+        'Diagnóstico de trace',
+        'La respuesta del ejecutor no trajo una traza en formato de arreglo.',
+        'warning',
+        formatStructuredContent(trace),
+      )
+      return
+    }
+
+    addFlowMessages(trace as ExecutorTraceEntry[])
+    addDiagnosticFlowMessage(
+      'Diagnóstico de trace',
+      `Se procesaron ${trace.length} mensaje(s) de traza devueltos por el ejecutor.`,
+      'info',
+    )
+  }
+  const mergeExecutorSnapshots = (
+    currentSnapshot: ExecutorFailureContext | null,
+    nextSnapshot: ExecutorFailureContext | null,
+  ): ExecutorFailureContext | null => {
+    if (!nextSnapshot) {
+      return currentSnapshot
+    }
+
+    return {
+      ...(currentSnapshot || {}),
+      ...nextSnapshot,
+      ...(Array.isArray(nextSnapshot.createdPaths)
+        ? { createdPaths: nextSnapshot.createdPaths }
+        : {}),
+      ...(Array.isArray(nextSnapshot.touchedPaths)
+        ? { touchedPaths: nextSnapshot.touchedPaths }
+        : {}),
+    }
+  }
+  const updateLastExecutorSnapshot = (nextSnapshot: ExecutorFailureContext | null) => {
+    if (!nextSnapshot) {
+      return
+    }
+
+    setLastExecutorSnapshot((currentSnapshot) =>
+      mergeExecutorSnapshots(currentSnapshot, nextSnapshot),
+    )
+  }
+  const updateLastRunSummary = (
+    summary: Partial<typeof DEFAULT_LAST_RUN_SUMMARY>,
+  ) => {
+    setLastRunSummary((currentSummary) => ({
+      ...currentSummary,
+      context: currentExecutionContextSummary,
+      workspacePath: currentWorkspaceSummary,
+      ...summary,
+    }))
+  }
+  const clearVisibleExecutionRuntimeState = ({
+    requestState = 'idle',
+    result = DEFAULT_EXECUTOR_RESULT,
+  }: {
+    requestState?: 'idle' | 'running' | 'success' | 'error'
+    result?: string
+  } = {}) => {
+    // Cuando entra un nuevo plan, approval o ask-user, la UI tiene que dejar
+    // de narrar la ejecución anterior como si siguiera vigente.
+    setLastObservedExecutionMode('')
+    setLastExecutorSnapshot(null)
+    setExecutorRequestState(requestState)
+    setExecutorResult(result)
+  }
+  const syncBrainRoutingDecision = (
+    decision?: BrainRoutingDecision | null,
+  ) => {
+    setLastBrainRoutingDecision(
+      decision && typeof decision === 'object' ? decision : null,
+    )
+  }
+  const upsertExecutionRunSummary = (
+    runId: string,
+    updater: (currentSummary: ExecutionRunSummary | null) => ExecutionRunSummary,
+  ) => {
+    if (!runId) {
+      return
+    }
+
+    setExecutionRunSummaries((currentSummaries) => {
+      const summaryIndex = currentSummaries.findIndex((summary) => summary.runId === runId)
+      const currentSummary = summaryIndex >= 0 ? currentSummaries[summaryIndex] : null
+      const nextSummary = buildExecutionRunSummary(updater(currentSummary))
+      const nextSummaries =
+        summaryIndex >= 0
+          ? currentSummaries.map((summary, index) =>
+              index === summaryIndex ? nextSummary : summary,
+            )
+          : [nextSummary, ...currentSummaries].slice(0, 6)
+
+      executionRunSummariesRef.current = nextSummaries
+      return nextSummaries
+    })
+  }
+  const updateActiveExecutionRunSummary = (
+    updater: (currentSummary: ExecutionRunSummary) => ExecutionRunSummary,
+  ) => {
+    const activeRunId = activeExecutionRunIdRef.current
+
+    if (!activeRunId) {
+      return
+    }
+
+    upsertExecutionRunSummary(activeRunId, (currentSummary) => {
+      if (!currentSummary) {
+        return buildExecutionRunSummary({
+          runId: activeRunId,
+          latestRequestId: '',
+          requestIds: [],
+          objectiveSummary: 'No disponible',
+          instructionSummary: 'No disponible',
+          approvalsOpened: 0,
+          recoveries: 0,
+          repeatedFailureCount: 0,
+          latestFailureType: '',
+          finalFailureType: '',
+          hasMaterialProgress: false,
+          createdPaths: [],
+          touchedPaths: [],
+          latestRecoveryMode: '',
+          latestExecutorMode: '',
+          latestBridgeMode: '',
+          latestDecisionKey: '',
+          latestAttemptScope: '',
+          latestExecutionScope: '',
+          blockedRecoveryModes: [],
+          continuationAnchor: '',
+          status: 'running',
+          updatedAtLabel: new Date().toLocaleTimeString(),
+        })
+      }
+
+      return updater(currentSummary)
+    })
+  }
+  const startOrContinueExecutionRun = ({
+    requestId,
+    instruction,
+    executionMetadata,
+  }: {
+    requestId: string
+    instruction: string
+    executionMetadata: PlannerExecutionMetadata
+  }) => {
+    const activeRunId = activeExecutionRunIdRef.current
+    const activeSummary = executionRunSummariesRef.current.find(
+      (summary) => summary.runId === activeRunId,
+    )
+    const shouldCreateNewRun =
+      !activeSummary ||
+      activeSummary.status === 'success' ||
+      activeSummary.status === 'error'
+    const runId = shouldCreateNewRun
+      ? `run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      : activeRunId
+
+    activeExecutionRunIdRef.current = runId
+    upsertExecutionRunSummary(runId, (currentSummary) => {
+      const requestIds = currentSummary
+        ? currentSummary.requestIds.includes(requestId)
+          ? currentSummary.requestIds
+          : [...currentSummary.requestIds, requestId]
+        : [requestId]
+      const latestDecisionKey = normalizeOptionalString(executionMetadata.decisionKey)
+      const latestRecoveryMode = latestDecisionKey.startsWith('recover-')
+        ? latestDecisionKey
+        : currentSummary?.latestRecoveryMode || ''
+      const latestExecutionScope =
+        summarizeExecutionScope(executionMetadata.executionScope) ||
+        currentSummary?.latestExecutionScope ||
+        ''
+      const continuationAnchor =
+        summarizeContinuationAnchor(executionMetadata.executionScope?.continuationAnchor) ||
+        currentSummary?.continuationAnchor ||
+        ''
+
+      return {
+        runId,
+        latestRequestId: requestId,
+        requestIds,
+        objectiveSummary:
+          summarizeInlineText(goalInput, 160) ||
+          currentSummary?.objectiveSummary ||
+          'No disponible',
+        instructionSummary: summarizeInlineText(instruction, 160),
+        approvalsOpened: currentSummary?.approvalsOpened || 0,
+        recoveries: currentSummary?.recoveries || 0,
+        repeatedFailureCount: currentSummary?.repeatedFailureCount || 0,
+        latestFailureType: currentSummary?.latestFailureType || '',
+        finalFailureType: '',
+        hasMaterialProgress: currentSummary?.hasMaterialProgress || false,
+        createdPaths: currentSummary?.createdPaths || [],
+        touchedPaths: currentSummary?.touchedPaths || [],
+        latestRecoveryMode,
+        latestExecutorMode: currentSummary?.latestExecutorMode || '',
+        latestBridgeMode: currentSummary?.latestBridgeMode || '',
+        latestDecisionKey,
+        latestAttemptScope: '',
+        latestExecutionScope,
+        blockedRecoveryModes: currentSummary?.blockedRecoveryModes || [],
+        continuationAnchor,
+        status: 'running',
+        updatedAtLabel: new Date().toLocaleTimeString(),
+      }
+    })
+  }
+  const recordPlannerExecutionSummary = (executionMetadata: PlannerExecutionMetadata) => {
+    if (!activeExecutionRunIdRef.current) {
+      return
+    }
+
+    const decisionKey = normalizeOptionalString(executionMetadata.decisionKey)
+    const isRecoveryDecision =
+      decisionKey === 'recover-single-target' ||
+      decisionKey === 'recover-single-subtask' ||
+      decisionKey === 'recover-and-continue'
+
+    updateActiveExecutionRunSummary((currentSummary) => ({
+      ...currentSummary,
+      recoveries:
+        isRecoveryDecision && currentSummary.latestDecisionKey !== decisionKey
+          ? currentSummary.recoveries + 1
+          : currentSummary.recoveries,
+      latestRecoveryMode:
+        isRecoveryDecision ? decisionKey : currentSummary.latestRecoveryMode,
+      latestDecisionKey: decisionKey || currentSummary.latestDecisionKey,
+      latestExecutionScope:
+        summarizeExecutionScope(executionMetadata.executionScope) ||
+        currentSummary.latestExecutionScope,
+      continuationAnchor:
+        summarizeContinuationAnchor(executionMetadata.executionScope?.continuationAnchor) ||
+        currentSummary.continuationAnchor,
+      status: isRecoveryDecision ? 'recovery-pending' : currentSummary.status,
+      updatedAtLabel: new Date().toLocaleTimeString(),
+    }))
+  }
+  const recordApprovalOpenedOnActiveRun = () => {
+    updateActiveExecutionRunSummary((currentSummary) => ({
+      ...currentSummary,
+      approvalsOpened: currentSummary.approvalsOpened + 1,
+      status: 'approval-pending',
+      updatedAtLabel: new Date().toLocaleTimeString(),
+    }))
+  }
+  const recordExecutionSnapshotOnActiveRun = (snapshot: ExecutorFailureContext | null) => {
+    if (!snapshot) {
+      return
+    }
+
+    updateActiveExecutionRunSummary((currentSummary) => ({
+      ...currentSummary,
+      hasMaterialProgress:
+        currentSummary.hasMaterialProgress ||
+        snapshot.hasMaterialProgress === true ||
+        Boolean(
+          normalizeOptionalString(snapshot.currentTargetPath) ||
+            normalizeOptionalStringArray(snapshot.createdPaths).length > 0 ||
+            normalizeOptionalStringArray(snapshot.touchedPaths).length > 0,
+        ),
+      createdPaths: mergeUniqueStringValues(currentSummary.createdPaths, snapshot.createdPaths),
+      touchedPaths: mergeUniqueStringValues(currentSummary.touchedPaths, snapshot.touchedPaths),
+      latestExecutorMode:
+        normalizeOptionalString(snapshot.executorMode) ||
+        currentSummary.latestExecutorMode,
+      latestBridgeMode:
+        normalizeOptionalString(snapshot.bridgeMode) ||
+        currentSummary.latestBridgeMode,
+      latestAttemptScope:
+        normalizeOptionalString(snapshot.attemptScope) ||
+        normalizeOptionalString(snapshot.lastAttemptScope) ||
+        currentSummary.latestAttemptScope,
+      repeatedFailureCount:
+        typeof snapshot.repeatedFailureCount === 'number' &&
+        snapshot.repeatedFailureCount > 0
+          ? snapshot.repeatedFailureCount
+          : currentSummary.repeatedFailureCount,
+      blockedRecoveryModes:
+        normalizeOptionalStringArray(snapshot.blockedRecoveryModes).length > 0
+          ? normalizeOptionalStringArray(snapshot.blockedRecoveryModes)
+          : currentSummary.blockedRecoveryModes,
+      latestFailureType:
+        normalizeOptionalString(snapshot.failureType) || currentSummary.latestFailureType,
+      updatedAtLabel: new Date().toLocaleTimeString(),
+    }))
+  }
+  const finalizeActiveExecutionRun = ({
+    status,
+    failureType,
+    failureContext,
+  }: {
+    status: ExecutionRunSummary['status']
+    failureType?: string
+    failureContext?: ExecutorFailureContext | null
+  }) => {
+    updateActiveExecutionRunSummary((currentSummary) => ({
+      ...currentSummary,
+      status,
+      latestFailureType:
+        normalizeOptionalString(failureType) ||
+        normalizeOptionalString(failureContext?.failureType) ||
+        currentSummary.latestFailureType,
+      finalFailureType:
+        status === 'error'
+          ? normalizeOptionalString(failureType) ||
+            normalizeOptionalString(failureContext?.failureType) ||
+            currentSummary.finalFailureType
+          : '',
+      hasMaterialProgress:
+        currentSummary.hasMaterialProgress || failureContext?.hasMaterialProgress === true,
+      createdPaths: mergeUniqueStringValues(currentSummary.createdPaths, failureContext?.createdPaths),
+      touchedPaths: mergeUniqueStringValues(currentSummary.touchedPaths, failureContext?.touchedPaths),
+      latestExecutorMode:
+        normalizeOptionalString(failureContext?.executorMode) ||
+        currentSummary.latestExecutorMode,
+      latestBridgeMode:
+        normalizeOptionalString(failureContext?.bridgeMode) ||
+        currentSummary.latestBridgeMode,
+      latestAttemptScope:
+        normalizeOptionalString(failureContext?.attemptScope) ||
+        normalizeOptionalString(failureContext?.lastAttemptScope) ||
+        currentSummary.latestAttemptScope,
+      repeatedFailureCount:
+        typeof failureContext?.repeatedFailureCount === 'number' &&
+        failureContext.repeatedFailureCount > 0
+          ? failureContext.repeatedFailureCount
+          : currentSummary.repeatedFailureCount,
+      blockedRecoveryModes:
+        normalizeOptionalStringArray(failureContext?.blockedRecoveryModes).length > 0
+          ? normalizeOptionalStringArray(failureContext?.blockedRecoveryModes)
+          : currentSummary.blockedRecoveryModes,
+      updatedAtLabel: new Date().toLocaleTimeString(),
+    }))
+
+    if (status === 'success' || status === 'error') {
+      activeExecutionRunIdRef.current = ''
+    }
+  }
+
+  const getCurrentExecutionContextValue = () => {
+    const liveTextareaValue = executionContextInputRef.current?.value
+
+    if (typeof liveTextareaValue === 'string') {
+      return liveTextareaValue.trim()
+    }
+
+    return executionContextInput.trim()
+  }
+  const openApprovalCheckpoint = ({
+    source,
+    instruction,
+    payload,
+    autoFlowSource = '',
+  }: {
+    source: 'planner' | 'executor'
+    instruction: string
+    payload?: {
+      approvalRequest?: ApprovalRequestContract
+      approvalReason?: string
+      reason?: string
+      question?: string
+    } | null
+    autoFlowSource?: 'planner' | 'executor' | ''
+  }) => {
+    // Todo approval entra por el mismo checkpoint para que los caminos manual,
+    // auto-flow y executor usen un único estado visible y persistible.
+    const approvalRequest = extractApprovalRequest(payload)
+    recordApprovalOpenedOnActiveRun()
+
+    if (source === 'executor') {
+      setPendingExecutionInstruction(instruction)
+      setPendingInstruction('')
+    } else {
+      setPendingInstruction(instruction)
+      setPendingExecutionInstruction('')
+    }
+
+    setApprovalMessage(resolveApprovalMessage(payload))
+    setApprovalSource(source)
+    setActiveApprovalRequest(approvalRequest)
+    setApprovalSelectedOption('')
+    setApprovalFreeAnswer('')
+    if (autoFlowSource) {
+      setAutoFlowAwaitingApproval(autoFlowSource)
+    }
+    setDecisionPending(true)
+  }
+  const resetApprovalInteractionState = () => {
+    setApprovalMessage('')
+    setActiveApprovalRequest(null)
+    setApprovalSelectedOption('')
+    setApprovalFreeAnswer('')
+  }
+  const buildApprovalResponseFeedback = ({
+    type,
+    approvalMode,
+  }: {
+    type: 'approval-granted' | 'approval-rejected'
+    approvalMode: 'once' | 'project-rule'
+  }) => {
+    const approvalInstruction =
+      approvalSource === 'executor'
+        ? pendingExecutionInstruction.trim()
+        : pendingInstruction.trim()
+
+    return buildPlannerFeedbackPayload({
+      type,
+      source: approvalSource || 'planner',
+      approvalMode,
+      instruction: approvalInstruction,
+      approvalReason:
+        activeApprovalRequest?.reason || approvalMessage || DEFAULT_APPROVAL_MESSAGE,
+      approvalRequestDecisionKey: activeApprovalRequest?.decisionKey,
+      responseMode: activeApprovalInteractionMode,
+      ...(approvalSelectedOption.trim()
+        ? { selectedOption: approvalSelectedOption.trim() }
+        : {}),
+      ...(approvalFreeAnswer.trim()
+        ? { freeAnswer: approvalFreeAnswer.trim() }
+        : {}),
+    })
+  }
+  const rememberCurrentApprovalDecision = (
+    decisionType: 'approval-granted' | 'approval-rejected',
+  ) => {
+    const decisionKey = normalizeResolvedDecisionKey(activeApprovalRequest?.decisionKey)
+    const approvalFamily = deriveApprovalEquivalenceFamily(
+      activeApprovalRequest?.decisionKey,
+      activeApprovalRequest?.reason,
+      activeApprovalRequest?.question,
+      approvalMessage,
+      pendingInstruction,
+      pendingExecutionInstruction,
+    )
+
+    if ((!decisionKey || decisionKey === 'legacy-approval') && !approvalFamily) {
+      return
+    }
+
+    const sharedDecisionPayload = {
+      status: (decisionType === 'approval-rejected' ? 'rejected' : 'approved') as const,
+      source: (approvalSource || 'planner') as ResolvedDecisionRecord['source'],
+      summary:
+        activeApprovalRequest?.reason || approvalMessage || DEFAULT_APPROVAL_MESSAGE,
+      responseMode: activeApprovalInteractionMode,
+      ...(approvalFamily ? { approvalFamily } : {}),
+      updatedAt: new Date().toISOString(),
+      ...(approvalSelectedOption.trim()
+        ? { selectedOption: approvalSelectedOption.trim() }
+        : {}),
+      ...(approvalFreeAnswer.trim()
+        ? { freeAnswer: approvalFreeAnswer.trim() }
+        : {}),
+    }
+
+    const decisionsToPersist: ResolvedDecisionRecord[] = []
+
+    if (decisionKey && decisionKey !== 'legacy-approval') {
+      decisionsToPersist.push({
+        key: decisionKey,
+        ...sharedDecisionPayload,
+      })
+    }
+
+    if (approvalFamily) {
+      decisionsToPersist.push({
+        key: `approval-family:${approvalFamily}`,
+        ...sharedDecisionPayload,
+      })
+    }
+
+    if (decisionsToPersist.length === 0) {
+      return
+    }
+
+    setResolvedDecisions((currentDecisions) =>
+      mergeResolvedDecisionRecords(currentDecisions, decisionsToPersist),
+    )
+  }
+  const resetManualExecutionPendingState = () => {
+    setDecisionPending(false)
+    resetApprovalInteractionState()
+    setPendingInstruction('')
+    setPendingExecutionInstruction('')
+    setApprovalSource('')
+  }
+
+  const persistSessionSnapshotNow = ({
+    nextSessionStatus,
+    nextCurrentStep,
+    nextPlannerInstruction,
+    nextExecutorResult,
+    nextExecutorRequestState,
+    nextLastRunSummary,
+  }: {
+    nextSessionStatus: string
+    nextCurrentStep: string
+    nextPlannerInstruction: string
+    nextExecutorResult: string
+    nextExecutorRequestState: 'idle' | 'running' | 'success' | 'error'
+    nextLastRunSummary: typeof DEFAULT_LAST_RUN_SUMMARY
+  }) => {
+    try {
+      localStorage.setItem(
+        SESSION_SNAPSHOT_KEY,
+        JSON.stringify({
+          sessionStatus: nextSessionStatus,
+          currentStep: nextCurrentStep,
+          plannerInstruction: nextPlannerInstruction,
+          executorResult: nextExecutorResult,
+          executorRequestState: nextExecutorRequestState,
+          lastRunSummary: nextLastRunSummary,
+        }),
+      )
+    } catch {
+      // Ignora errores de persistencia local para no romper la sesión.
+    }
+  }
+
+  const persistFlowConsoleStateNow = ({
+    open,
+    pinned,
+  }: {
+    open: boolean
+    pinned: boolean
+  }) => {
+    try {
+      localStorage.setItem(
+        FLOW_CONSOLE_STATE_KEY,
+        JSON.stringify({
+          open,
+          pinned,
+        }),
+      )
+    } catch {
+      // Ignora errores de persistencia local para no romper la sesión.
+    }
+  }
+
+  const setFlowConsoleVisibility = ({
+    open,
+    pinned,
+  }: {
+    open: boolean
+    pinned: boolean
+  }) => {
+    setIsFlowConsolePinnedOpen(pinned)
+    setIsFlowConsoleOpen(open)
+    persistFlowConsoleStateNow({ open, pinned })
+  }
+
+  const applyExecutionClosureState = ({
+    instruction,
+    result,
+    approval,
+    finalStatus,
+    currentStepLabel,
+    sessionStatusLabel,
+    requestState = 'success',
+  }: {
+    instruction: string
+    result: string
+    approval: string
+    finalStatus: string
+    currentStepLabel: string
+    sessionStatusLabel: string
+    requestState?: 'success' | 'error'
+  }) => {
+    const nextLastRunSummary = {
+      ...lastRunSummary,
+      objective: normalizedGoalInput,
+      instruction,
+      result,
+      context: currentExecutionContextSummary,
+      workspacePath: currentWorkspaceSummary,
+      approval,
+      finalStatus,
+    }
+    const nextExecutorRequestState = requestState || 'success'
+
+    debugRendererLog('applyExecutionClosureState', {
+      instruction,
+      result,
+      approval,
+      finalStatus,
+      currentStepLabel,
+      sessionStatusLabel,
+      requestState: nextExecutorRequestState,
+    })
+    addDiagnosticFlowMessage(
+      'Diagnóstico de cierre manual',
+      'El cierre de ejecución se aplicó realmente en la UI.',
+      nextExecutorRequestState === 'error' ? 'error' : 'success',
+      formatStructuredContent({
+        instruction,
+        result,
+        approval,
+        finalStatus,
+        currentStepLabel,
+        sessionStatusLabel,
+        requestState: nextExecutorRequestState,
+      }),
+    )
+
+    setExecutorRequestState(nextExecutorRequestState)
+    setExecutorResult(result)
+    setSessionStatus(sessionStatusLabel)
+    setCurrentStep(currentStepLabel)
+    setLastRunSummary(nextLastRunSummary)
+    persistSessionSnapshotNow({
+      nextSessionStatus: sessionStatusLabel,
+      nextCurrentStep: currentStepLabel,
+      nextPlannerInstruction: plannerInstruction,
+      nextExecutorResult: result,
+      nextExecutorRequestState,
+      nextLastRunSummary,
+    })
+  }
+  const closeManualExecutionState = ({
+    requestId,
+    source,
+    instruction,
+    result,
+    approval,
+    finalStatus,
+    currentStepLabel,
+    sessionStatusLabel,
+    requestState = 'success',
+    resetPendingState = true,
+  }: {
+    requestId: string
+    source: 'return' | 'event' | 'completion-event'
+    instruction: string
+    result: string
+    approval: string
+    finalStatus: string
+    currentStepLabel: string
+    sessionStatusLabel: string
+    requestState?: 'success' | 'error'
+    resetPendingState?: boolean
+  }) => {
+    if (!requestId || manualExecutionClosureRef.current.requestId !== requestId) {
+      addDiagnosticFlowMessage(
+        'Diagnóstico de cierre manual',
+        'El renderer descartó un cierre porque el requestId no coincide con la ejecución activa.',
+        'warning',
+        formatStructuredContent({
+          requestId,
+          activeRequestId: manualExecutionClosureRef.current.requestId,
+          source,
+        }),
+      )
+      debugRendererLog('closeManualExecutionState:requestId-mismatch', {
+        requestId,
+        activeRequestId: manualExecutionClosureRef.current.requestId,
+        source,
+      })
+      return false
+    }
+
+    if (manualExecutionClosureRef.current.settled) {
+      addDiagnosticFlowMessage(
+        'Diagnóstico de cierre manual',
+        `Se ignoró un cierre duplicado de la ejecución manual desde ${source}.`,
+        'warning',
+        formatStructuredContent({ requestId, source }),
+      )
+      debugRendererLog('closeManualExecutionState:already-settled', {
+        requestId,
+        source,
+      })
+      return false
+    }
+
+    addDiagnosticFlowMessage(
+      'Diagnóstico de cierre manual',
+      'El renderer está por aplicar el cierre manual de la ejecución.',
+      requestState === 'error' ? 'error' : 'info',
+      formatStructuredContent({
+        requestId,
+        source,
+        instruction,
+        result,
+        approval,
+        finalStatus,
+        currentStepLabel,
+        sessionStatusLabel,
+        requestState,
+        resetPendingState,
+      }),
+    )
+    debugRendererLog('closeManualExecutionState:before-apply', {
+      requestId,
+      source,
+      requestState,
+      finalStatus,
+    })
+
+    manualExecutionClosureRef.current = {
+      requestId,
+      settled: true,
+    }
+
+    if (resetPendingState) {
+      resetManualExecutionPendingState()
+    }
+    applyExecutionClosureState({
+      instruction,
+      result,
+      approval,
+      finalStatus,
+      currentStepLabel,
+      sessionStatusLabel,
+      requestState,
+    })
+    finalizeActiveExecutionRun({
+      status: requestState === 'error' ? 'error' : 'success',
+      failureType: requestState === 'error' ? lastExecutorSnapshot?.failureType : '',
+      failureContext: lastExecutorSnapshot,
+    })
+    setIsExecutingTask(false)
+    addDiagnosticFlowMessage(
+      'Diagnóstico de cierre manual',
+      `El renderer cerró la ejecución manual usando ${source}.`,
+      requestState === 'error' ? 'error' : 'success',
+      formatStructuredContent({
+        requestId,
+        source,
+        requestState,
+        finalStatus,
+      }),
+    )
+    debugRendererLog('closeManualExecutionState:completed', {
+      requestId,
+      source,
+      requestState,
+      finalStatus,
+    })
+
+    return true
+  }
+  const releaseManualExecutionTracking = (requestId: string) => {
+    if (!requestId) {
+      return
+    }
+
+    if (activeExecutionRequestIdRef.current === requestId) {
+      activeExecutionRequestIdRef.current = ''
+    }
+
+    if (manualExecutionClosureRef.current.requestId === requestId) {
+      manualExecutionClosureRef.current = {
+        requestId: '',
+        settled: true,
+      }
+    }
+  }
+  const closeManualExecutionFromCompletionPayload = (
+    payload: ExecutionCompletePayload,
+  ) => {
+    const requestId =
+      typeof payload?.requestId === 'string' ? payload.requestId : ''
+
+    if (!requestId) {
+      return false
+    }
+
+    const fallbackInstruction = payload.instruction || plannerInstruction
+    const fallbackResult =
+      payload.error ||
+      payload.result ||
+      payload.resultPreview ||
+      'La ejecución manual terminó sin un resultado detallado.'
+    const failureContext = extractExecutorFailureContext(payload)
+
+    addDiagnosticFlowMessage(
+      'Diagnóstico de cierre dedicado',
+      'La UI recibió un evento final dedicado y evaluará el cierre manual.',
+      payload?.ok === false ? 'warning' : 'info',
+      formatStructuredContent(payload),
+    )
+    debugRendererLog('execution-complete:received', {
+      requestId,
+      ok: payload?.ok,
+      approvalRequired: payload?.approvalRequired,
+      error: payload?.error,
+    })
+    updateLastExecutorSnapshot(failureContext)
+    recordExecutionSnapshotOnActiveRun(failureContext)
+
+    if (payload?.approvalRequired) {
+      if (
+        matchesProjectApprovalPolicy({
+          policy: projectApprovalPolicy,
+          source: 'executor',
+          payload,
+        })
+      ) {
+        releaseManualExecutionTracking(requestId)
+        void replanManualFlow(
+          buildPlannerFeedbackPayload({
+            type: 'approval-granted',
+            source: 'executor',
+            approvalMode: 'project-rule',
+            instruction: fallbackInstruction,
+            approvalReason: payload.approvalReason,
+            resultPreview: payload.resultPreview,
+          }),
+          true,
+        )
+        return true
+      }
+
+      releaseManualExecutionTracking(requestId)
+      finalizeActiveExecutionRun({
+        status: 'approval-pending',
+        failureType: payload.failureType,
+        failureContext,
+      })
+      openApprovalCheckpoint({
+        source: 'executor',
+        instruction: fallbackInstruction,
+        payload: {
+          approvalReason:
+            payload.approvalReason ||
+            'El ejecutor pidió aprobación manual antes de completar la ejecución.',
+        },
+      })
+      setIsExecutingTask(false)
+      setExecutorRequestState('running')
+      setSessionStatus('Esperando aprobación para continuar')
+      setCurrentStep('El Cerebro espera una decision humana antes de seguir')
+      return true
+    }
+
+    if (payload?.ok === false) {
+      finalizeActiveExecutionRun({
+        status: 'recovery-pending',
+        failureType: payload.failureType,
+        failureContext,
+      })
+      releaseManualExecutionTracking(requestId)
+      void replanManualFlow(
+        buildPlannerFeedbackPayload({
+          type: 'execution-error',
+          source: 'executor',
+          instruction: fallbackInstruction,
+          error: fallbackResult,
+          resultPreview: payload.resultPreview,
+          executorFailureContext: extractExecutorFailureContext(payload) || undefined,
+        }),
+      )
+      return true
+    }
+
+    finalizeActiveExecutionRun({
+      status: 'success',
+      failureType: payload.failureType,
+      failureContext,
+    })
+    const wasClosed = closeManualExecutionState({
+      requestId,
+      source: 'completion-event',
+      instruction: fallbackInstruction,
+      result: payload.result || payload.resultPreview || fallbackResult,
+      approval: 'No requerida',
+      finalStatus: 'Ejecucion completada',
+      currentStepLabel: 'La instruccion actual ya fue ejecutada',
+      sessionStatusLabel: 'Ejecucion completada',
+      requestState: 'success',
+    })
+
+    if (wasClosed) {
+      setSessionEvents((currentEvents) => [
+        ...currentEvents,
+        'La UI cerró la ejecución manual con el evento final dedicado',
+      ])
+    }
+
+    return wasClosed
+  }
+  const waitForExecutionCompletion = (requestId: string) => {
+    return new Promise<ExecutionCompletePayload>((resolve) => {
+      pendingExecutionCompletionResolversRef.current[requestId] = resolve
+    })
+  }
+
+  const clearPendingExecutionCompletion = (requestId: string) => {
+    if (!requestId) {
+      return
+    }
+
+    delete pendingExecutionCompletionResolversRef.current[requestId]
+  }
+  const finalizeAutoFlowCompletion = (
+    iteration: number,
+    instruction: string,
+    result: string,
+    approval: string,
+  ) => {
+    setDecisionPending(false)
+    resetApprovalInteractionState()
+    setPendingInstruction('')
+    setPendingExecutionInstruction('')
+    setApprovalSource('')
+    setAutoFlowAwaitingApproval('')
+    setAutoFlowIteration(0)
+    setSessionStatus(AUTO_FLOW_COMPLETED_STATUS)
+    setCurrentStep(`El objetivo quedó completado en la iteración ${iteration}`)
+    updateLastRunSummary({
+      objective: normalizedGoalInput,
+      instruction,
+      result,
+      approval,
+      finalStatus: AUTO_FLOW_COMPLETED_STATUS,
+    })
+    setSessionEvents((currentEvents) => [
+      ...currentEvents,
+      'El flujo automático completó el objetivo',
+    ])
+  }
+
+  useEffect(() => {
+    if (skipProjectPolicyPersistenceRef.current) {
+      skipProjectPolicyPersistenceRef.current = false
+      return
+    }
+
+    try {
+      if (projectApprovalPolicy) {
+        localStorage.setItem(
+          PROJECT_POLICY_KEY,
+          JSON.stringify(projectApprovalPolicy),
+        )
+      } else {
+        localStorage.removeItem(PROJECT_POLICY_KEY)
+      }
+    } catch {
+      // Ignora errores de persistencia local para no romper la sesión.
+    }
+  }, [projectApprovalPolicy])
+
+  useEffect(() => {
+    if (skipSessionEventsPersistenceRef.current) {
+      skipSessionEventsPersistenceRef.current = false
+      return
+    }
+
+    try {
+      localStorage.setItem(SESSION_EVENTS_KEY, JSON.stringify(sessionEvents))
+    } catch {
+      // Ignora errores de persistencia local para no romper la sesión.
+    }
+  }, [sessionEvents])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        SESSION_SNAPSHOT_KEY,
+        JSON.stringify({
+          sessionStatus,
+          currentStep,
+          plannerInstruction,
+          executorResult,
+          executorRequestState,
+          lastRunSummary,
+        }),
+      )
+    } catch {
+      // Ignora errores de persistencia local para no romper la sesión.
+    }
+  }, [
+    currentStep,
+    executorResult,
+    executorRequestState,
+    lastRunSummary,
+    plannerInstruction,
+    sessionStatus,
+  ])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(WORKSPACE_PATH_KEY, workspacePath)
+    } catch {
+      // Ignora errores de persistencia local para no romper la sesión.
+    }
+  }, [workspacePath])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(BRAIN_COST_MODE_KEY, brainCostMode)
+    } catch {
+      // Ignora errores de persistencia local para no romper la sesión.
+    }
+  }, [brainCostMode])
+
+  useEffect(() => {
+    try {
+      if (userParticipationMode) {
+        localStorage.setItem(USER_PARTICIPATION_MODE_KEY, userParticipationMode)
+      } else {
+        localStorage.removeItem(USER_PARTICIPATION_MODE_KEY)
+      }
+    } catch {
+      // Ignora errores de persistencia local para no romper la sesión.
+    }
+  }, [userParticipationMode])
+
+  useEffect(() => {
+    try {
+      if (resolvedDecisions.length > 0) {
+        localStorage.setItem(
+          RESOLVED_DECISIONS_KEY,
+          JSON.stringify(resolvedDecisions),
+        )
+      } else {
+        localStorage.removeItem(RESOLVED_DECISIONS_KEY)
+      }
+    } catch {
+      // Ignora errores de persistencia local para no romper la sesión.
+    }
+  }, [resolvedDecisions])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(FLOW_MESSAGES_KEY, JSON.stringify(flowMessages))
+    } catch {
+      // Ignora errores de persistencia local para no romper la sesión.
+    }
+  }, [flowMessages])
+
+  useEffect(() => {
+    persistFlowConsoleStateNow({
+      open: isFlowConsoleOpen,
+      pinned: isFlowConsolePinnedOpen,
+    })
+  }, [isFlowConsoleOpen, isFlowConsolePinnedOpen])
+
+  // Los listeners de Electron deben suscribirse una sola vez, pero aun asi
+  // leer siempre el estado vivo del renderer para no perder cierres ni trazas.
+  const handleExecutionEvent = useEffectEvent((payload: ExecutionEventPayload) => {
+    if (!payload || typeof payload !== 'object') {
+      return
+    }
+
+    if (
+      !payload.requestId ||
+      !activeExecutionRequestIdRef.current ||
+      payload.requestId !== activeExecutionRequestIdRef.current
+    ) {
+      return
+    }
+
+    flowMessageIdRef.current += 1
+    setFlowMessages((currentMessages) => [
+      ...currentMessages,
+      {
+        id: flowMessageIdRef.current,
+        source: payload.source,
+        title: payload.title,
+        content: payload.content,
+        status: payload.status,
+        ...(payload.raw ? { raw: payload.raw } : {}),
+      },
+    ])
+    const parsedRaw = parseStructuredRaw(payload.raw)
+    const progressSnapshot = extractExecutorProgressSnapshot(parsedRaw)
+    updateLastExecutorSnapshot(progressSnapshot)
+    recordExecutionSnapshotOnActiveRun(progressSnapshot)
+
+    if (isFastRouteExecutionTitle(payload.title)) {
+      setLastObservedExecutionMode('local-fast')
+    } else if (
+      payload.source === 'executor' &&
+      normalizeOptionalString(lastObservedExecutionMode).toLocaleLowerCase() !==
+        'local-fast'
+    ) {
+      setLastObservedExecutionMode('executor')
+    }
+
+    if (
+      payload.title !== 'Main devolvió respuesta final al renderer' &&
+      payload.title !== 'Main devolvió error final al renderer' &&
+      payload.title !== 'Main terminó por timeout'
+    ) {
+      return
+    }
+
+    addDiagnosticFlowMessage(
+      'Diagnóstico de ejecución manual',
+      'El renderer recibió un evento final desde Electron.',
+      payload.title === 'Main devolvió respuesta final al renderer' ? 'info' : 'warning',
+      formatStructuredContent({
+        requestId: payload.requestId,
+        title: payload.title,
+        parsedRaw,
+      }),
+    )
+    debugRendererLog('execution-event:final-event', {
+      requestId: payload.requestId,
+      title: payload.title,
+      parsedRaw,
+    })
+    addDiagnosticFlowMessage(
+      'Diagnóstico de ejecución manual',
+      'El renderer conserva este evento solo como traza; el cierre real queda en el evento de cierre dedicado.',
+      'info',
+      formatStructuredContent({
+        requestId: payload.requestId,
+        title: payload.title,
+        parsedRaw,
+      }),
+    )
+  })
+
+  useEffect(() => {
+    const unsubscribe = window.aiOrchestrator?.onExecutionEvent?.((payload) => {
+      handleExecutionEvent(payload)
+    })
+
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe()
+      }
+    }
+  }, [])
+
+  const handleExecutionCompleteEvent = useEffectEvent(
+    (payload: ExecutionCompletePayload) => {
+      if (!payload || typeof payload !== 'object') {
+        return
+      }
+
+      if (payload.requestId) {
+        const resolvePendingExecution =
+          pendingExecutionCompletionResolversRef.current[payload.requestId]
+
+        if (typeof resolvePendingExecution === 'function') {
+          delete pendingExecutionCompletionResolversRef.current[payload.requestId]
+          resolvePendingExecution(payload)
+        }
+      }
+
+      if (
+        !payload.requestId ||
+        !activeExecutionRequestIdRef.current ||
+        payload.requestId !== activeExecutionRequestIdRef.current
+      ) {
+        return
+      }
+
+      addDiagnosticFlowMessage(
+        'Diagnóstico de cierre dedicado',
+        'La UI recibió el evento final dedicado de Electron.',
+        payload.ok === false ? 'warning' : 'info',
+        formatStructuredContent(payload),
+      )
+      const failureContext = extractExecutorFailureContext(payload)
+      updateLastExecutorSnapshot(failureContext)
+      recordExecutionSnapshotOnActiveRun(failureContext)
+      if (payload.ok === true) {
+        window.setTimeout(() => {
+          void loadReusableArtifacts()
+        }, 0)
+      }
+
+      if (!normalizeOptionalString(lastObservedExecutionMode)) {
+        const traceMentionsFastRoute = Array.isArray(payload.trace)
+          ? payload.trace.some((entry) => isFastRouteExecutionTitle(entry?.title))
+          : false
+        const payloadIndicatesFastRoute = isLocalFastRouteExecution({
+          strategy: payload.details?.strategy,
+          materializationPlanSource: payload.details?.materializationPlanSource,
+          materialState: payload.details?.materialState,
+        })
+
+        setLastObservedExecutionMode(
+          traceMentionsFastRoute || payloadIndicatesFastRoute ? 'local-fast' : 'executor',
+        )
+      }
+
+      const wasClosed = closeManualExecutionFromCompletionPayload(payload)
+
+      addDiagnosticFlowMessage(
+        'Diagnóstico de cierre dedicado',
+        `El cierre manual devolvió ${wasClosed ? 'true' : 'false'} desde el evento final dedicado.`,
+        wasClosed ? 'success' : 'warning',
+        formatStructuredContent({
+          requestId: payload.requestId,
+          wasClosed,
+          ok: payload.ok,
+          approvalRequired: payload.approvalRequired,
+        }),
+      )
+      debugRendererLog('execution-complete:close-result', {
+        requestId: payload.requestId,
+        wasClosed,
+        ok: payload.ok,
+        approvalRequired: payload.approvalRequired,
+      })
+    },
+  )
+
+  useEffect(() => {
+    const unsubscribe = window.aiOrchestrator?.onExecutionComplete?.((payload) => {
+      handleExecutionCompleteEvent(payload)
+    })
+
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe()
+      }
+    }
+  }, [])
+  useEffect(() => {
+    if (!isFlowConsoleOpen) {
+      return
+    }
+
+    const animationFrameId = window.requestAnimationFrame(() => {
+      flowActivityContainerRef.current?.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      })
+      flowConversationContainerRef.current?.scrollTo({
+        top: flowConversationContainerRef.current.scrollHeight,
+        behavior: 'smooth',
+      })
+      flowTimelineContainerRef.current?.scrollTo({
+        top: flowTimelineContainerRef.current.scrollHeight,
+        behavior: 'smooth',
+      })
+    })
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId)
+    }
+  }, [flowMessages, isFlowConsoleOpen, sessionEvents])
+
+  useEffect(() => {
+    if (!isFlowConsolePinnedOpen || isFlowConsoleOpen) {
+      return
+    }
+
+    setIsFlowConsoleOpen(true)
+  }, [isFlowConsoleOpen, isFlowConsolePinnedOpen])
+
+  const replanManualFlow = async (
+    previousExecutionResult: string,
+    approvedByProjectRule = projectPolicyAllowed,
+  ) => {
+    // Este camino existe para devolverle al Cerebro el contexto más reciente
+    // (approval, rechazo o falla) sin reiniciar la sesión ni perder el hilo
+    // operativo que ya vio el usuario en pantalla.
+    const currentExecutionContext = getCurrentExecutionContextValue()
+
+    setFlowConsoleVisibility({ open: true, pinned: true })
+    setIsPlanning(true)
+    setIsExecutingTask(false)
+    setDecisionPending(false)
+    resetApprovalInteractionState()
+    setPendingInstruction('')
+    setPendingExecutionInstruction('')
+    setApprovalSource('')
+    setSessionStatus('El Cerebro está reevaluando la ejecución')
+    setCurrentStep('El Mensajero devolvió contexto al Cerebro para replanificar')
+    setSessionEvents((currentEvents) => [
+      ...currentEvents,
+      'El Mensajero devolvió contexto al Cerebro para replanificar',
+    ])
+    addFlowMessage({
+      source: 'orquestador',
+      title: 'Reenvio al Cerebro',
+      content:
+        'El Mensajero devolvió una aprobación o un error al planificador para que redecida antes de seguir.',
+      raw: previousExecutionResult,
+      status: 'info',
+    })
+    addFlowMessage({
+      source: 'orquestador',
+      title: 'Datos enviados al planificador',
+      content: 'Se envió una nueva consulta al Cerebro con el contexto actualizado.',
+      raw: formatStructuredContent({
+        goal: goalInput,
+        context: currentExecutionContext || undefined,
+        workspacePath: workspacePath.trim() || undefined,
+        userParticipationMode: userParticipationMode || undefined,
+        projectState: plannerProjectState,
+        costMode: brainCostMode,
+        previousExecutionResult,
+        manualReusablePreference: manualReusablePreferencePayload || undefined,
+      }),
+      status: 'info',
+    })
+
+    try {
+      const response = await window.aiOrchestrator?.planTask?.({
+        goal: goalInput,
+        context: currentExecutionContext || undefined,
+        workspacePath: workspacePath.trim() || undefined,
+        userParticipationMode: userParticipationMode || undefined,
+        projectState: plannerProjectState,
+        costMode: brainCostMode,
+        previousExecutionResult,
+        manualReusablePreference: manualReusablePreferencePayload || undefined,
+      })
+
+      if (!response?.ok || !response.instruction) {
+        addFlowMessage({
+          source: 'planificador',
+          title: 'Respuesta invalida del planificador',
+          content: 'El Cerebro no devolvió una instrucción utilizable después de reevaluar.',
+          raw: formatStructuredContent(response),
+          status: 'error',
+        })
+        setExecutorRequestState('error')
+        setExecutorResult(
+          'La replanificación no devolvió una instrucción utilizable para continuar.',
+        )
+        setSessionStatus('Bloqueo real en la replanificación')
+        setCurrentStep('El Cerebro no pudo definir una accion ejecutable')
+        updateLastRunSummary({
+          objective: normalizedGoalInput,
+          instruction: instructionToExecute,
+          result:
+            'La replanificación no devolvió una instrucción utilizable para continuar.',
+          approval: approvedByProjectRule
+            ? 'Autoaprobada por regla del proyecto'
+            : 'No requerida',
+          finalStatus: 'Bloqueo real en la replanificación',
+        })
+        return
+      }
+
+      const nextExecutionMetadata = resolvePlannerExecutionMetadata(response)
+      syncBrainRoutingDecision(response.brainRoutingDecision)
+      setPlannerExecutionMetadata(nextExecutionMetadata)
+      setLastObservedExecutionMode('')
+      recordPlannerExecutionSummary(nextExecutionMetadata)
+      addFlowMessage({
+        source: 'planificador',
+        title: 'Respuesta del planificador',
+        content: response.instruction,
+        raw: formatStructuredContent(response),
+        status: response.approvalRequired ? 'warning' : 'success',
+      })
+
+      if (response.approvalRequired) {
+        if (approvedByProjectRule) {
+          await replanManualFlow(
+            buildPlannerFeedbackPayload({
+              type: 'approval-granted',
+              source: 'planner',
+              approvalMode: 'project-rule',
+              instruction: response.instruction,
+              approvalReason: resolveApprovalReason(response),
+            }),
+            true,
+          )
+          return
+        }
+
+        openApprovalCheckpoint({
+          source: 'planner',
+          instruction: response.instruction,
+          payload: response,
+          planCompletion: response.completed === true,
+        })
+        clearVisibleExecutionRuntimeState()
+        setSessionStatus('Esperando aprobación para continuar')
+        setCurrentStep('El Cerebro necesita una decision humana antes de seguir')
+        updateLastRunSummary({
+          objective: normalizedGoalInput,
+          instruction: response.instruction,
+          result: 'Pendiente de aprobación',
+          approval: 'Manual requerida',
+          finalStatus: 'Esperando aprobación para continuar',
+        })
+        return
+      }
+
+      setPlannerInstruction(response.instruction)
+      setCurrentStep(response.instruction)
+      if (isUserClarificationPlannerResponse(response)) {
+        clearVisibleExecutionRuntimeState()
+        setSessionStatus('Esperando una nueva definición del usuario')
+        setCurrentStep('El Cerebro necesita una nueva definición antes de ejecutar')
+        updateLastRunSummary({
+          objective: normalizedGoalInput,
+          instruction: response.instruction,
+          result: response.instruction,
+          approval: approvedByProjectRule
+            ? 'Autoaprobada por regla del proyecto'
+            : 'No requerida',
+          finalStatus: 'Esperando una nueva definición del usuario',
+        })
+        addFlowMessage({
+          source: 'orquestador',
+          title: 'Decisión del orquestador',
+          content:
+            'La replanificación dejó una consulta pendiente para el usuario y no se ejecutará automáticamente.',
+          status: 'warning',
+        })
+        return
+      }
+
+      clearVisibleExecutionRuntimeState()
+      setSessionStatus('El Cerebro definio una nueva accion')
+      updateLastRunSummary({
+        objective: normalizedGoalInput,
+        instruction: response.instruction,
+        result: 'Pendiente de ejecución',
+        approval: approvedByProjectRule
+          ? 'Autoaprobada por regla del proyecto'
+          : 'No requerida',
+        finalStatus: 'Plan reconfigurado',
+      })
+
+      if (response.completed) {
+        clearVisibleExecutionRuntimeState({
+          requestState: 'success',
+          result: response.instruction,
+        })
+        setSessionStatus('Ejecucion completada')
+        setCurrentStep('El Cerebro cerró la corrida sin necesitar otra ejecución')
+        updateLastRunSummary({
+          objective: normalizedGoalInput,
+          instruction: response.instruction,
+          result: response.instruction,
+          approval: approvedByProjectRule
+            ? 'Autoaprobada por regla del proyecto'
+            : 'No requerida',
+          finalStatus: 'Ejecucion completada',
+        })
+        return
+      }
+
+      await handleExecuteCurrentInstruction(
+        response.instruction,
+        resolvePlannerExecutionMetadata(response),
+      )
+    } catch {
+      setExecutorRequestState('error')
+      setExecutorResult('La replanificación encontró un error inesperado.')
+      setSessionStatus('Bloqueo real en la replanificación')
+      setCurrentStep('El Cerebro no pudo continuar con la reevaluacion')
+    } finally {
+      setIsPlanning(false)
+    }
+  }
+
+  const runAutoFlowLoop = async (
+    startIteration: number,
+    initialInstruction?: string,
+    initialPreviousExecutionResult?: string,
+  ) => {
+    let iteration = startIteration
+    let nextInstruction = normalizeOptionalString(initialInstruction)
+    let previousExecutionResult = normalizeOptionalString(initialPreviousExecutionResult)
+    let currentPlannerExecutionMetadata = plannerExecutionMetadata
+
+    try {
+      while (iteration <= 3) {
+        setAutoFlowIteration(iteration)
+        setSessionStatus(`Flujo automático en iteración ${iteration}`)
+        setCurrentStep(`Preparando la iteración ${iteration} del flujo automático`)
+        setSessionEvents((currentEvents) => [
+          ...currentEvents,
+          `Se inició la iteración ${iteration} del flujo automático`,
+        ])
+
+        let instructionToExecute = nextInstruction
+        let plannerMarkedCompleted = false
+
+        if (!instructionToExecute) {
+          setIsPlanning(true)
+          setCurrentStep(`Planificando ${`Iteración ${iteration}`.toLocaleLowerCase()}`)
+          setSessionEvents((currentEvents) => [
+            ...currentEvents,
+            'Se envió un objetivo al planificador local',
+          ])
+          addFlowMessage({
+            source: 'operador',
+            title: `Objetivo de iteración ${iteration}`,
+            content: normalizedGoalInput,
+            status: 'info',
+          })
+          addFlowMessage({
+            source: 'orquestador',
+            title: 'Datos enviados al planificador',
+            content: `Se preparó el pedido de planificación para la iteración ${iteration}.`,
+            raw: formatStructuredContent({
+              goal: goalInput,
+              context: executionContextInput.trim() || undefined,
+              workspacePath: workspacePath.trim() || undefined,
+              userParticipationMode: userParticipationMode || undefined,
+              projectState: plannerProjectState,
+              costMode: brainCostMode,
+              iteration,
+              previousExecutionResult: previousExecutionResult || undefined,
+              manualReusablePreference:
+                manualReusablePreferencePayload || undefined,
+            }),
+            status: 'info',
+          })
+
+          if (previousExecutionResult) {
+            setSessionEvents((currentEvents) => [
+              ...currentEvents,
+              'El planificador recibió el resultado anterior del ejecutor',
+            ])
+          }
+
+          const planResponse = await window.aiOrchestrator?.planTask?.({
+            goal: goalInput,
+            context: executionContextInput.trim() || undefined,
+            workspacePath: workspacePath.trim() || undefined,
+            userParticipationMode: userParticipationMode || undefined,
+            projectState: plannerProjectState,
+            costMode: brainCostMode,
+            iteration,
+            previousExecutionResult: previousExecutionResult || undefined,
+            manualReusablePreference: manualReusablePreferencePayload || undefined,
+          })
+
+          if (!planResponse?.ok || !planResponse.instruction) {
+            addFlowMessage({
+              source: 'planificador',
+              title: 'Respuesta inválida del planificador',
+              content: 'El planificador no devolvió una instrucción utilizable.',
+              raw: formatStructuredContent(planResponse),
+              status: 'error',
+            })
+            setSessionStatus('Error al generar el plan')
+            setSessionEvents((currentEvents) => [
+              ...currentEvents,
+              'Falló el flujo automático en la etapa de planificación',
+            ])
+            return
+          }
+
+          instructionToExecute = planResponse.instruction
+          currentPlannerExecutionMetadata =
+            resolvePlannerExecutionMetadata(planResponse)
+          syncBrainRoutingDecision(planResponse.brainRoutingDecision)
+          setPlannerExecutionMetadata(currentPlannerExecutionMetadata)
+          setLastObservedExecutionMode('')
+          recordPlannerExecutionSummary(currentPlannerExecutionMetadata)
+          plannerMarkedCompleted = planResponse.completed === true
+          addFlowMessage({
+            source: 'planificador',
+            title: 'Respuesta del planificador',
+            content: planResponse.instruction,
+            raw: formatStructuredContent(planResponse),
+            status: planResponse.approvalRequired ? 'warning' : 'success',
+          })
+
+          if (planResponse.approvalRequired) {
+            if (
+              matchesProjectApprovalPolicy({
+                policy: projectApprovalPolicy,
+                source: 'planner',
+                payload: planResponse,
+              })
+            ) {
+              setDecisionPending(false)
+              setApprovalMessage('')
+              setPendingInstruction('')
+              setApprovalSource('')
+              setPlannerInstruction(planResponse.instruction)
+              setCurrentStep(planResponse.iterationLabel || planResponse.instruction)
+              setSessionStatus(
+                plannerMarkedCompleted
+                  ? AUTO_FLOW_COMPLETED_STATUS
+                  : 'Plan autoaprobado por regla del proyecto',
+              )
+              updateLastRunSummary({
+                objective: normalizedGoalInput,
+                instruction: planResponse.instruction,
+                result: plannerMarkedCompleted
+                  ? 'El planificador indicó que el objetivo ya quedó cumplido'
+                  : 'Pendiente de ejecución',
+                approval: 'Autoaprobada por regla del proyecto',
+                finalStatus: plannerMarkedCompleted
+                  ? AUTO_FLOW_COMPLETED_STATUS
+                  : 'Plan autoaprobado por regla del proyecto',
+              })
+              setSessionEvents((currentEvents) => [
+                ...currentEvents,
+                'El planificador detectó una tarea sensible',
+                'La regla del proyecto aprobó automáticamente la instrucción',
+                'El flujo automático continuó con autoaprobación del planificador',
+              ])
+              addFlowMessage({
+                source: 'orquestador',
+                title: 'Decisión del orquestador',
+                content: 'La instrucción del planificador quedó autoaprobada por la política del proyecto.',
+                status: 'success',
+              })
+              previousExecutionResult = buildPlannerFeedbackPayload({
+                type: 'approval-granted',
+                source: 'planner',
+                approvalMode: 'project-rule',
+                instruction: planResponse.instruction,
+                approvalReason: resolveApprovalReason(planResponse),
+              })
+              nextInstruction = ''
+              iteration += 1
+              setIsPlanning(false)
+              continue
+            } else {
+              openApprovalCheckpoint({
+                source: 'planner',
+                instruction: planResponse.instruction,
+                payload: planResponse,
+                autoFlowSource: 'planner',
+              })
+              clearVisibleExecutionRuntimeState()
+              setSessionStatus('Esperando aprobación para continuar')
+              setCurrentStep(`El flujo automático quedó pausado en la iteración ${iteration}`)
+              updateLastRunSummary({
+                objective: normalizedGoalInput,
+                instruction: planResponse.instruction,
+                result: 'Pendiente de aprobación',
+                approval: 'Manual requerida',
+                finalStatus: 'Esperando aprobación para continuar',
+              })
+              setSessionEvents((currentEvents) => [
+                ...currentEvents,
+                'El planificador pidió aprobación manual',
+                'El flujo automático quedó esperando aprobación del planificador',
+              ])
+              addFlowMessage({
+                source: 'orquestador',
+                title: 'Decisión del orquestador',
+                content: 'El flujo quedó pausado hasta recibir aprobación manual del planificador.',
+                status: 'warning',
+              })
+              return
+            }
+          } else {
+            setDecisionPending(false)
+            setApprovalMessage('')
+            setPendingInstruction('')
+            setPendingExecutionInstruction('')
+            setApprovalSource('')
+            setAutoFlowAwaitingApproval('')
+            setPlannerInstruction(planResponse.instruction)
+            setCurrentStep(planResponse.iterationLabel || planResponse.instruction)
+            setSessionStatus(
+              plannerMarkedCompleted
+                ? AUTO_FLOW_COMPLETED_STATUS
+                : `Flujo automático en iteración ${iteration}`,
+            )
+            updateLastRunSummary({
+              objective: normalizedGoalInput,
+              instruction: planResponse.instruction,
+              result: plannerMarkedCompleted
+                ? 'El planificador indicó que el objetivo ya quedó cumplido'
+                : 'Pendiente de ejecución',
+              approval: 'No requerida',
+              finalStatus: plannerMarkedCompleted
+                ? AUTO_FLOW_COMPLETED_STATUS
+                : 'Plan generado',
+            })
+            setSessionEvents((currentEvents) => [
+              ...currentEvents,
+              'El planificador devolvió una instrucción',
+            ])
+            addFlowMessage({
+              source: 'orquestador',
+              title: 'Decisión del orquestador',
+              content: 'La instrucción del planificador quedó lista para ejecutar en esta iteración.',
+              status: 'success',
+            })
+          }
+          if (isUserClarificationPlannerResponse(planResponse)) {
+            setIsAutoFlowRunning(false)
+            clearVisibleExecutionRuntimeState()
+            setSessionStatus('Esperando una nueva definición del usuario')
+            setCurrentStep(
+              `El flujo automático quedó esperando una nueva definición en la iteración ${iteration}`,
+            )
+            updateLastRunSummary({
+              objective: normalizedGoalInput,
+              instruction: planResponse.instruction,
+              result: planResponse.instruction,
+              approval: 'No requerida',
+              finalStatus: 'Esperando una nueva definición del usuario',
+            })
+            setSessionEvents((currentEvents) => [
+              ...currentEvents,
+              'El planificador devolvió una consulta para el usuario',
+              'El flujo automático quedó esperando una nueva definición',
+            ])
+            addFlowMessage({
+              source: 'orquestador',
+              title: 'Decisión del orquestador',
+              content:
+                'El flujo automático se detuvo porque el planificador necesita una nueva definición del usuario.',
+              status: 'warning',
+            })
+            return
+          }
+        } else {
+          setPlannerInstruction(instructionToExecute)
+          setCurrentStep(instructionToExecute)
+          addFlowMessage({
+            source: 'orquestador',
+            title: 'Reanudación del flujo',
+            content: 'Se reutilizó una instrucción pendiente para continuar la iteración actual.',
+            raw: formatStructuredContent({
+              instruction: instructionToExecute,
+            }),
+            status: 'info',
+          })
+        }
+
+        clearVisibleExecutionRuntimeState({ requestState: 'running' })
+        setIsExecutingTask(true)
+        setCurrentStep(`Ejecutando la iteración ${iteration}`)
+        setSessionEvents((currentEvents) => [
+          ...currentEvents,
+          'Se envió una instrucción al ejecutor local',
+        ])
+        addFlowMessage({
+          source: 'executor',
+          title: 'Datos enviados al ejecutor',
+          content: 'Se envió una instrucción al ejecutor con contexto y espacio de trabajo.',
+          raw: formatStructuredContent({
+            instruction: instructionToExecute,
+            context: executionContextInput.trim() || undefined,
+            workspacePath: workspacePath.trim() || undefined,
+            businessSector:
+              currentPlannerExecutionMetadata.businessSector || undefined,
+            businessSectorLabel:
+              currentPlannerExecutionMetadata.businessSectorLabel || undefined,
+            creativeDirection:
+              currentPlannerExecutionMetadata.creativeDirection || undefined,
+            executionScope:
+              currentPlannerExecutionMetadata.executionScope || undefined,
+          }),
+          status: 'info',
+        })
+
+        const executionRequestId = `auto-${iteration}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+        const completionPromise = waitForExecutionCompletion(executionRequestId)
+        const executePayload = {
+          instruction: instructionToExecute,
+          context: executionContextInput.trim() || undefined,
+          workspacePath: workspacePath.trim() || undefined,
+          requestId: executionRequestId,
+          ...(currentPlannerExecutionMetadata.decisionKey
+            ? { decisionKey: currentPlannerExecutionMetadata.decisionKey }
+            : {}),
+          ...(currentPlannerExecutionMetadata.businessSector
+            ? { businessSector: currentPlannerExecutionMetadata.businessSector }
+            : {}),
+          ...(currentPlannerExecutionMetadata.businessSectorLabel
+            ? {
+                businessSectorLabel:
+                  currentPlannerExecutionMetadata.businessSectorLabel,
+              }
+            : {}),
+          ...(currentPlannerExecutionMetadata.creativeDirection
+            ? {
+                creativeDirection:
+                  currentPlannerExecutionMetadata.creativeDirection,
+              }
+            : {}),
+          ...(currentPlannerExecutionMetadata.reusableArtifactLookup
+            ? {
+                reusableArtifactLookup:
+                  currentPlannerExecutionMetadata.reusableArtifactLookup,
+              }
+            : {}),
+          ...(currentPlannerExecutionMetadata.reusableArtifactsFound > 0
+            ? {
+                reusableArtifactsFound:
+                  currentPlannerExecutionMetadata.reusableArtifactsFound,
+              }
+            : {}),
+          ...(currentPlannerExecutionMetadata.reuseDecision
+            ? {
+                reuseDecision: currentPlannerExecutionMetadata.reuseDecision,
+              }
+            : {}),
+          ...(currentPlannerExecutionMetadata.reuseReason
+            ? {
+                reuseReason: currentPlannerExecutionMetadata.reuseReason,
+              }
+            : {}),
+          ...(currentPlannerExecutionMetadata.reusedArtifactIds.length > 0
+            ? {
+                reusedArtifactIds:
+                  currentPlannerExecutionMetadata.reusedArtifactIds,
+              }
+            : {}),
+          ...(currentPlannerExecutionMetadata.reuseMode &&
+          currentPlannerExecutionMetadata.reuseMode !== 'none'
+            ? {
+                reuseMode: currentPlannerExecutionMetadata.reuseMode,
+              }
+            : {}),
+          ...(currentPlannerExecutionMetadata.executionScope
+            ? {
+                executionScope: currentPlannerExecutionMetadata.executionScope,
+              }
+            : {}),
+        }
+        startOrContinueExecutionRun({
+          requestId: executionRequestId,
+          instruction: instructionToExecute,
+          executionMetadata: currentPlannerExecutionMetadata,
+        })
+        const executeAck = await window.aiOrchestrator?.executeTask?.(executePayload)
+        if (!executeAck?.ok || executeAck?.accepted !== true) {
+          const failureContext = extractExecutorFailureContext(executeAck)
+          updateLastExecutorSnapshot(failureContext)
+          recordExecutionSnapshotOnActiveRun(failureContext)
+          finalizeActiveExecutionRun({
+            status: 'recovery-pending',
+            failureType: executeAck?.failureType,
+            failureContext,
+          })
+          clearPendingExecutionCompletion(executionRequestId)
+          const executorErrorMessage = executeAck?.error
+            ? `Error: ${executeAck.error}`
+            : 'Error: El ejecutor no aceptó iniciar la ejecución automática.'
+        addFlowMessage({
+          source: 'orquestador',
+          title: 'Decisión del orquestador',
+          content: 'La ejecución automática no pudo iniciarse.',
+          raw: executorErrorMessage,
+          status: 'error',
+        })
+        setExecutorRequestState('error')
+        setExecutorResult(executorErrorMessage)
+        setSessionStatus('Error en el flujo automático')
+        updateLastRunSummary({
+          objective: normalizedGoalInput,
+          instruction: instructionToExecute,
+          result: executorErrorMessage,
+          approval: 'No requerida',
+          finalStatus: 'Error en el flujo automático',
+        })
+        setSessionEvents((currentEvents) => [
+          ...currentEvents,
+          'Falló el flujo automático en la etapa de ejecución',
+        ])
+          previousExecutionResult = buildPlannerFeedbackPayload({
+            type: 'execution-error',
+            source: 'executor',
+            instruction: instructionToExecute,
+            error: executorErrorMessage,
+            executorFailureContext: failureContext || undefined,
+          })
+          nextInstruction = ''
+          iteration += 1
+          continue
+        }
+        addFlowMessage({
+          source: 'orquestador',
+          title: 'Acuse del ejecutor',
+          content:
+            'La ejecución automática fue aceptada y queda a la espera del resultado final por evento.',
+          raw: formatStructuredContent({
+            requestId: executionRequestId,
+            responseRequestId: executeAck?.requestId,
+            accepted: executeAck?.accepted,
+          }),
+          status: 'info',
+        })
+        const executeResponse = await completionPromise
+
+        if (!executeResponse?.ok) {
+          const failureContext = extractExecutorFailureContext(executeResponse)
+          updateLastExecutorSnapshot(failureContext)
+          recordExecutionSnapshotOnActiveRun(failureContext)
+          finalizeActiveExecutionRun({
+            status: 'recovery-pending',
+            failureType: executeResponse?.failureType,
+            failureContext,
+          })
+          const executorErrorMessage = formatExecutorError(executeResponse)
+          addFlowMessage({
+            source: 'orquestador',
+            title: 'Decisión del orquestador',
+            content: 'La ejecución automática terminó con error.',
+            raw: executorErrorMessage,
+            status: 'error',
+          })
+          setExecutorRequestState('error')
+          setExecutorResult(executorErrorMessage)
+          setSessionStatus('Error en el flujo automático')
+          updateLastRunSummary({
+            objective: normalizedGoalInput,
+            instruction: instructionToExecute,
+            result: executorErrorMessage,
+            approval: 'No requerida',
+            finalStatus: 'Error en el flujo automático',
+          })
+          setSessionEvents((currentEvents) => [
+            ...currentEvents,
+            'Falló el flujo automático en la etapa de ejecución',
+          ])
+          previousExecutionResult = buildPlannerFeedbackPayload({
+            type: 'execution-error',
+            source: 'executor',
+            instruction: executeResponse.instruction || instructionToExecute,
+            error: executorErrorMessage,
+            resultPreview: executeResponse.resultPreview,
+            executorFailureContext: failureContext || undefined,
+          })
+          nextInstruction = ''
+          iteration += 1
+          continue
+        }
+
+        if (executeResponse.approvalRequired) {
+          if (
+            matchesProjectApprovalPolicy({
+              policy: projectApprovalPolicy,
+              source: 'executor',
+              payload: executeResponse,
+            })
+          ) {
+            const autoApprovedResult =
+              executeResponse.resultPreview ||
+              'La ejecución sensible fue aprobada automáticamente por la regla del proyecto'
+            setDecisionPending(false)
+            setApprovalMessage('')
+            setPendingExecutionInstruction('')
+            setApprovalSource('')
+            setAutoFlowAwaitingApproval('')
+            setExecutorRequestState('success')
+            setExecutorResult(autoApprovedResult)
+            setSessionStatus('Ejecución autoaprobada por regla del proyecto')
+          setCurrentStep(
+            'La instrucción sensible quedó aprobada para ejecutarse',
+          )
+            updateLastRunSummary({
+              objective: normalizedGoalInput,
+              instruction: executeResponse.instruction || instructionToExecute,
+              result: autoApprovedResult,
+              approval: 'Autoaprobada por regla del proyecto',
+              finalStatus: 'Ejecución autoaprobada por regla del proyecto',
+            })
+            setSessionEvents((currentEvents) => [
+              ...currentEvents,
+              'El ejecutor detectó una tarea sensible',
+              'La regla del proyecto aprobó automáticamente la ejecución',
+              'El flujo automático continuó con autoaprobación del ejecutor',
+            ])
+            addFlowMessage({
+              source: 'orquestador',
+              title: 'Decisión del orquestador',
+              content: 'La respuesta del ejecutor quedó autoaprobada y el flujo siguió.',
+              status: 'success',
+            })
+            finalizeActiveExecutionRun({
+              status: 'success',
+              failureType: executeResponse.failureType,
+              failureContext: extractExecutorFailureContext(executeResponse),
+            })
+            previousExecutionResult = buildPlannerFeedbackPayload({
+              type: 'approval-granted',
+              source: 'executor',
+              approvalMode: 'project-rule',
+              instruction: executeResponse.instruction || instructionToExecute,
+              approvalReason: executeResponse.approvalReason,
+              resultPreview: executeResponse.resultPreview,
+            })
+            nextInstruction = ''
+            iteration += 1
+            continue
+          } else {
+            openApprovalCheckpoint({
+              source: 'executor',
+              instruction: executeResponse.instruction || instructionToExecute,
+              payload: executeResponse,
+              autoFlowSource: 'executor',
+            })
+            finalizeActiveExecutionRun({
+              status: 'approval-pending',
+              failureType: executeResponse.failureType,
+              failureContext: extractExecutorFailureContext(executeResponse),
+            })
+            setExecutorRequestState('success')
+            setSessionStatus('Esperando aprobación para ejecutar')
+            setCurrentStep(`El flujo automático quedó pausado en la iteración ${iteration}`)
+            updateLastRunSummary({
+              objective: normalizedGoalInput,
+              instruction: executeResponse.instruction || instructionToExecute,
+              result: 'Pendiente de aprobación',
+              approval: 'Manual requerida',
+              finalStatus: 'Esperando aprobación para ejecutar',
+            })
+            setSessionEvents((currentEvents) => [
+              ...currentEvents,
+              'El ejecutor pidió aprobación manual',
+              'El flujo automático quedó esperando aprobación del ejecutor',
+            ])
+            addFlowMessage({
+              source: 'orquestador',
+              title: 'Decisión del orquestador',
+              content: 'El flujo quedó pausado hasta recibir aprobación manual del ejecutor.',
+              status: 'warning',
+            })
+            return
+          }
+        } else if (executeResponse.result) {
+          finalizeActiveExecutionRun({
+            status: 'success',
+            failureType: executeResponse.failureType,
+            failureContext: extractExecutorFailureContext(executeResponse),
+          })
+          setDecisionPending(false)
+          setApprovalMessage('')
+          setPendingExecutionInstruction('')
+          setApprovalSource('')
+          setAutoFlowAwaitingApproval('')
+          setExecutorRequestState('success')
+          setExecutorResult(executeResponse.result)
+          setSessionStatus(`Flujo automático en iteración ${iteration}`)
+          setCurrentStep('La instrucción actual ya fue ejecutada')
+          updateLastRunSummary({
+            objective: normalizedGoalInput,
+            instruction: executeResponse.instruction || instructionToExecute,
+            result: executeResponse.result,
+            approval: 'No requerida',
+            finalStatus: 'Ejecución completada',
+          })
+          setSessionEvents((currentEvents) => [
+            ...currentEvents,
+            'El ejecutor completó la instrucción',
+          ])
+          addFlowMessage({
+            source: 'orquestador',
+            title: 'Decisión del orquestador',
+            content: 'La ejecución terminó correctamente y el flujo puede continuar.',
+            status: 'success',
+          })
+          previousExecutionResult = executeResponse.result
+        } else {
+          finalizeActiveExecutionRun({
+            status: 'error',
+            failureType: executeResponse.failureType,
+            failureContext: extractExecutorFailureContext(executeResponse),
+          })
+          addFlowMessage({
+            source: 'orquestador',
+            title: 'Decisión del orquestador',
+            content: 'La ejecución no devolvió un resultado utilizable.',
+            status: 'error',
+          })
+          setExecutorRequestState('error')
+          setSessionStatus('Error en el flujo automático')
+          setSessionEvents((currentEvents) => [
+            ...currentEvents,
+            'Falló el flujo automático en la etapa de ejecución',
+          ])
+          return
+        }
+
+        iteration += 1
+        nextInstruction = ''
+      }
+
+      if (
+        previousExecutionResult.startsWith(ORCHESTRATOR_PLANNER_FEEDBACK_PREFIX)
+      ) {
+        setExecutorRequestState('error')
+        setSessionStatus('Bloqueo real en el flujo automatico')
+        setCurrentStep('El Cerebro no pudo cerrar la corrida dentro del limite previsto')
+        updateLastRunSummary({
+          objective: normalizedGoalInput,
+          instruction: plannerInstruction,
+          result:
+            'El flujo automatico llego al limite de iteraciones sin una resolucion final.',
+          approval: projectPolicyAllowed
+            ? 'Autoaprobada por regla del proyecto'
+            : 'No requerida',
+          finalStatus: 'Bloqueo real en el flujo automatico',
+        })
+        return
+      }
+
+      finalizeAutoFlowCompletion(
+        3,
+        plannerInstruction,
+        executorResult,
+        projectPolicyAllowed
+          ? 'Autoaprobada por regla del proyecto'
+          : 'No requerida',
+      )
+    } catch {
+      setExecutorRequestState('error')
+      setSessionStatus('Error en el flujo automático')
+      setSessionEvents((currentEvents) => [
+        ...currentEvents,
+        'Falló el flujo automático en la etapa de ejecución',
+      ])
+    } finally {
+      setFlowConsoleVisibility({ open: true, pinned: true })
+      setIsPlanning(false)
+      setIsExecutingTask(false)
+      setIsAutoFlowRunning(false)
+    }
+  }
+
+  const handleApproveOnce = async () => {
+    const shouldResumeAutoFlow = autoFlowAwaitingApproval === approvalSource
+    const approvalFeedback = buildApprovalResponseFeedback({
+      type: 'approval-granted',
+      approvalMode: 'once',
+    })
+
+    rememberCurrentApprovalDecision('approval-granted')
+    setDecisionPending(false)
+    setProjectApprovalPolicy(null)
+    resetApprovalInteractionState()
+    setPendingInstruction('')
+    setPendingExecutionInstruction('')
+    setApprovalSource('')
+    setAutoFlowAwaitingApproval('')
+    setSessionStatus('El Mensajero devolvió la respuesta al Cerebro')
+    setCurrentStep('El Cerebro está reevaluando la siguiente acción')
+    setSessionEvents((currentEvents) => [
+      ...currentEvents,
+      'Se envio una respuesta humana al Cerebro',
+      'El Mensajero devolvió la respuesta al Cerebro',
+    ])
+
+    if (shouldResumeAutoFlow) {
+      setIsAutoFlowRunning(true)
+      await runAutoFlowLoop(autoFlowIteration || 1, undefined, approvalFeedback)
+      return
+    }
+
+    setIsAutoFlowRunning(false)
+    await replanManualFlow(approvalFeedback, false)
+    return
+  }
+  const handleAllowForProject = async () => {
+    if (!persistibleProjectApprovalPolicy) {
+      await handleApproveOnce()
+      return
+    }
+
+    const shouldResumeAutoFlow = autoFlowAwaitingApproval === approvalSource
+    const approvalFeedback = buildApprovalResponseFeedback({
+      type: 'approval-granted',
+      approvalMode: 'project-rule',
+    })
+
+    rememberCurrentApprovalDecision('approval-granted')
+    setDecisionPending(false)
+    setProjectApprovalPolicy(persistibleProjectApprovalPolicy)
+    resetApprovalInteractionState()
+    setPendingInstruction('')
+    setPendingExecutionInstruction('')
+    setApprovalSource('')
+    setAutoFlowAwaitingApproval('')
+    setSessionStatus('El Mensajero devolvió la aprobación persistente al Cerebro')
+    setCurrentStep('El Cerebro está reevaluando con la regla del proyecto')
+    setSessionEvents((currentEvents) => [
+      ...currentEvents,
+      'Se guardó una regla de aprobación para este proyecto',
+      'El Mensajero devolvió la aprobación al Cerebro',
+    ])
+
+    if (shouldResumeAutoFlow) {
+      setIsAutoFlowRunning(true)
+      await runAutoFlowLoop(autoFlowIteration || 1, undefined, approvalFeedback)
+      return
+    }
+
+    setIsAutoFlowRunning(false)
+    await replanManualFlow(approvalFeedback, true)
+    return
+  }
+  const handleRunMockCycle = () => {
+    setIsRunning(true)
+    setSessionStatus('Ciclo de prueba en ejecución')
+    setCurrentStep('El planificador está preparando la ejecución')
+    setSessionEvents((currentEvents) => [...currentEvents, 'Se inició el ciclo de prueba'])
+
+    window.setTimeout(() => {
+      setCurrentStep('El ejecutor está aplicando la acción aprobada')
+      setSessionEvents((currentEvents) => [
+        ...currentEvents,
+        'El ejecutor recibió la instrucción aprobada',
+      ])
+    }, 800)
+
+    window.setTimeout(() => {
+      setCurrentStep('La ejecución terminó correctamente')
+      setSessionStatus('En espera después del ciclo de prueba')
+      setSessionEvents((currentEvents) => [
+        ...currentEvents,
+        'Se completó el ciclo de prueba',
+      ])
+      setIsRunning(false)
+    }, 1600)
+  }
+
+  const handleRejectApproval = async () => {
+    const shouldResumeAutoFlow = autoFlowAwaitingApproval === approvalSource
+    const rejectionFeedback = buildApprovalResponseFeedback({
+      type: 'approval-rejected',
+      approvalMode: 'once',
+    })
+
+    rememberCurrentApprovalDecision('approval-rejected')
+    setDecisionPending(false)
+    setProjectApprovalPolicy(null)
+    resetApprovalInteractionState()
+    setPendingInstruction('')
+    setPendingExecutionInstruction('')
+    setApprovalSource('')
+    setAutoFlowAwaitingApproval('')
+    setSessionStatus('El Mensajero devolvió el rechazo al Cerebro')
+    setCurrentStep('El Cerebro está reevaluando después del rechazo')
+    setSessionEvents((currentEvents) => [
+      ...currentEvents,
+      'Se rechazo la propuesta actual',
+      'El Mensajero devolvió el rechazo al Cerebro',
+    ])
+
+    if (shouldResumeAutoFlow) {
+      setIsAutoFlowRunning(true)
+      await runAutoFlowLoop(autoFlowIteration || 1, undefined, rejectionFeedback)
+      return
+    }
+
+    setIsAutoFlowRunning(false)
+    await replanManualFlow(rejectionFeedback, false)
+  }
+
+  const handleResetSessionMemory = () => {
+    skipProjectPolicyPersistenceRef.current = true
+    skipSessionEventsPersistenceRef.current = true
+
+    try {
+      localStorage.removeItem(PROJECT_POLICY_KEY)
+      localStorage.removeItem(SESSION_EVENTS_KEY)
+      localStorage.removeItem(WORKSPACE_PATH_KEY)
+      localStorage.removeItem(USER_PARTICIPATION_MODE_KEY)
+      localStorage.removeItem(RESOLVED_DECISIONS_KEY)
+      localStorage.removeItem(BRAIN_COST_MODE_KEY)
+      localStorage.removeItem(FLOW_MESSAGES_KEY)
+    } catch {
+      // Ignora errores de persistencia local para no romper el reset.
+    }
+
+    setDecisionPending(false)
+    setApprovalMessage('')
+    setPendingInstruction('')
+    setPendingExecutionInstruction('')
+    setApprovalSource('')
+    setSessionStatus(DEFAULT_SESSION_STATUS)
+    setCurrentStep(DEFAULT_CURRENT_STEP)
+    setProjectApprovalPolicy(null)
+    setIsRunning(false)
+    setIsTestingConnection(false)
+    setIsPlanning(false)
+    setIsExecutingTask(false)
+    setIsAutoFlowRunning(false)
+    setAutoFlowIteration(0)
+    setAutoFlowAwaitingApproval('')
+    setGoalInput(DEFAULT_GOAL_INPUT)
+    setWorkspacePath(DEFAULT_WORKSPACE_PATH)
+    setExecutionContextInput(DEFAULT_EXECUTION_CONTEXT_INPUT)
+    setUserParticipationMode(DEFAULT_USER_PARTICIPATION_MODE)
+    setBrainCostMode(DEFAULT_BRAIN_COST_MODE)
+    setResolvedDecisions(DEFAULT_RESOLVED_DECISIONS)
+    try {
+      localStorage.removeItem(FLOW_CONSOLE_STATE_KEY)
+    } catch {
+      // Ignora errores de persistencia local para no romper la sesión.
+    }
+    setFlowConsoleVisibility({ open: false, pinned: false })
+    setPlannerInstruction(DEFAULT_PLANNER_INSTRUCTION)
+    setPlannerExecutionMetadata(EMPTY_PLANNER_EXECUTION_METADATA)
+    setLastObservedExecutionMode('')
+    setExecutorResult(DEFAULT_EXECUTOR_RESULT)
+    setLastExecutorSnapshot(null)
+    setExecutorRequestState('idle')
+    setLastBrainRoutingDecision(null)
+    setLastRunSummary(DEFAULT_LAST_RUN_SUMMARY)
+    activeExecutionRunIdRef.current = ''
+    executionRunSummariesRef.current = []
+    flowMessageIdRef.current = 0
+    setFlowMessages(DEFAULT_FLOW_MESSAGES)
+    setExecutionRunSummaries([])
+    setSessionEvents(DEFAULT_SESSION_EVENTS)
+    setRuntimeStatus(DEFAULT_RUNTIME_STATUS)
+  }
+
+  const handleTestLocalConnection = async () => {
+    const minWait = new Promise((resolve) => {
+      window.setTimeout(resolve, 800)
+    })
+
+    setIsTestingConnection(true)
+    setRuntimeStatus((currentStatus) => ({
+      ...currentStatus,
+      connection: 'Probando conexión local...',
+    }))
+    setSessionEvents((currentEvents) =>
+      currentEvents.at(-1) === 'Se inició la prueba de conexión local'
+        ? currentEvents
+        : [...currentEvents, 'Se inició la prueba de conexión local'],
+    )
+
+    try {
+      const response = await window.aiOrchestrator?.getRuntimeStatus?.()
+      await minWait
+
+      if (!response?.ok) {
+        setRuntimeStatus({
+          connection: 'Error al consultar el entorno local',
+          platform: 'No disponible',
+          electron: 'No disponible',
+          node: 'No disponible',
+          executorMode: 'unknown',
+          executorModeSource: '',
+          bridgeMode: 'unknown',
+          bridgeModeSource: '',
+        })
+        setSessionEvents((currentEvents) =>
+          currentEvents.at(-1) === 'Falló la prueba de conexión local'
+            ? currentEvents
+            : [...currentEvents, 'Falló la prueba de conexión local'],
+        )
+        return
+      }
+
+      setRuntimeStatus({
+        connection: 'Conexión local verificada',
+        platform: response.platform,
+        electron: response.electron,
+        node: response.node,
+        executorMode: response.executorMode,
+        executorModeSource: response.executorModeSource,
+        bridgeMode: response.bridgeMode,
+        bridgeModeSource: response.bridgeModeSource,
+      })
+      setSessionEvents((currentEvents) =>
+        currentEvents.at(-1) === 'La conexión local fue verificada'
+          ? currentEvents
+          : [...currentEvents, 'La conexión local fue verificada'],
+      )
+    } catch {
+      await minWait
+      setRuntimeStatus({
+        connection: 'Error al consultar el entorno local',
+        platform: 'No disponible',
+        electron: 'No disponible',
+        node: 'No disponible',
+        executorMode: 'unknown',
+        executorModeSource: '',
+        bridgeMode: 'unknown',
+        bridgeModeSource: '',
+      })
+      setSessionEvents((currentEvents) =>
+        currentEvents.at(-1) === 'Falló la prueba de conexión local'
+          ? currentEvents
+          : [...currentEvents, 'Falló la prueba de conexión local'],
+      )
+    } finally {
+      setIsTestingConnection(false)
+    }
+  }
+
+  const handleGenerateNextStep = async () => {
+    setIsPlanning(true)
+    setSessionEvents((currentEvents) => [
+      ...currentEvents,
+      'Se envió un objetivo al planificador local',
+    ])
+    addFlowMessage({
+      source: 'operador',
+      title: 'Objetivo actual',
+      content: normalizedGoalInput,
+      status: 'info',
+    })
+    addFlowMessage({
+      source: 'orquestador',
+      title: 'Datos enviados al planificador',
+      content: 'Se envió el objetivo actual al planificador.',
+      raw: formatStructuredContent({
+        goal: goalInput,
+        context: getCurrentExecutionContextValue() || undefined,
+        workspacePath: workspacePath.trim() || undefined,
+        userParticipationMode: userParticipationMode || undefined,
+        projectState: plannerProjectState,
+        costMode: brainCostMode,
+        manualReusablePreference: manualReusablePreferencePayload || undefined,
+      }),
+      status: 'info',
+    })
+
+    try {
+      const response = await window.aiOrchestrator?.planTask?.({
+        goal: goalInput,
+        context: getCurrentExecutionContextValue() || undefined,
+        workspacePath: workspacePath.trim() || undefined,
+        userParticipationMode: userParticipationMode || undefined,
+        projectState: plannerProjectState,
+        costMode: brainCostMode,
+        manualReusablePreference: manualReusablePreferencePayload || undefined,
+      })
+
+      if (!response?.ok || !response.instruction) {
+        addFlowMessage({
+          source: 'planificador',
+          title: 'Respuesta inválida del planificador',
+          content: 'El planificador no devolvió una instrucción utilizable.',
+          raw: formatStructuredContent(response),
+          status: 'error',
+        })
+        setSessionStatus('Error al generar el plan')
+        setSessionEvents((currentEvents) => [
+          ...currentEvents,
+          'Falló la generación del plan',
+        ])
+        return
+      }
+
+      addFlowMessage({
+        source: 'planificador',
+        title: 'Respuesta del planificador',
+        content: response.instruction,
+        raw: formatStructuredContent(response),
+        status: response.approvalRequired ? 'warning' : 'success',
+      })
+      const nextExecutionMetadata = resolvePlannerExecutionMetadata(response)
+      syncBrainRoutingDecision(response.brainRoutingDecision)
+      setPlannerExecutionMetadata(nextExecutionMetadata)
+      setLastObservedExecutionMode('')
+      recordPlannerExecutionSummary(nextExecutionMetadata)
+
+      if (response.approvalRequired) {
+        if (
+          matchesProjectApprovalPolicy({
+            policy: projectApprovalPolicy,
+            source: 'planner',
+            payload: response,
+          })
+        ) {
+          await replanManualFlow(
+            buildPlannerFeedbackPayload({
+              type: 'approval-granted',
+              source: 'planner',
+              approvalMode: 'project-rule',
+              instruction: response.instruction,
+              approvalReason: resolveApprovalReason(response),
+            }),
+            true,
+          )
+          return
+          setDecisionPending(false)
+          setApprovalMessage('')
+          setPendingInstruction('')
+          setApprovalSource('')
+          setPlannerInstruction(response.instruction)
+          setCurrentStep(response.instruction)
+          setSessionStatus('Plan autoaprobado por regla del proyecto')
+          updateLastRunSummary({
+            objective: normalizedGoalInput,
+            instruction: response.instruction,
+            result: 'Pendiente de ejecución',
+            approval: 'Autoaprobada por regla del proyecto',
+            finalStatus: 'Plan autoaprobado por regla del proyecto',
+          })
+          setSessionEvents((currentEvents) => [
+            ...currentEvents,
+            'El planificador detectó una tarea sensible',
+            'La regla del proyecto aprobó automáticamente la instrucción',
+          ])
+          addFlowMessage({
+            source: 'orquestador',
+            title: 'Decisión del orquestador',
+            content: 'La instrucción del planificador quedó autoaprobada por la política del proyecto.',
+            status: 'success',
+          })
+          return
+        }
+
+        openApprovalCheckpoint({
+          source: 'planner',
+          instruction: response.instruction,
+          payload: response,
+        })
+        clearVisibleExecutionRuntimeState()
+        setSessionStatus('Esperando aprobación para continuar')
+        setCurrentStep('El Cerebro necesita una decision humana antes de seguir')
+        updateLastRunSummary({
+          objective: normalizedGoalInput,
+          instruction: response.instruction,
+          result: 'Pendiente de aprobación',
+          approval: 'Manual requerida',
+          finalStatus: 'Esperando aprobación para continuar',
+        })
+        setSessionEvents((currentEvents) => [
+          ...currentEvents,
+          'El planificador pidió aprobación manual',
+        ])
+        addFlowMessage({
+          source: 'orquestador',
+          title: 'Decisión del orquestador',
+          content: 'La instrucción del planificador quedó pendiente de aprobación manual.',
+          status: 'warning',
+        })
+        return
+      }
+
+      setDecisionPending(false)
+      setApprovalMessage('')
+      setPendingInstruction('')
+      setPendingExecutionInstruction('')
+      setApprovalSource('')
+      setPlannerInstruction(response.instruction)
+      setCurrentStep(response.instruction)
+      if (isUserClarificationPlannerResponse(response)) {
+        clearVisibleExecutionRuntimeState()
+        setSessionStatus('Esperando una nueva definición del usuario')
+        setCurrentStep('El Cerebro necesita una nueva definición antes de ejecutar')
+        updateLastRunSummary({
+          objective: normalizedGoalInput,
+          instruction: response.instruction,
+          result: response.instruction,
+          approval: 'No requerida',
+          finalStatus: 'Esperando una nueva definición del usuario',
+        })
+        setSessionEvents((currentEvents) => [
+          ...currentEvents,
+          'El planificador devolvió una consulta para el usuario',
+        ])
+        addFlowMessage({
+          source: 'orquestador',
+          title: 'Decisión del orquestador',
+          content:
+            'La respuesta del planificador requiere una nueva definición del usuario antes de ejecutar.',
+          status: 'warning',
+        })
+        return
+      }
+
+      clearVisibleExecutionRuntimeState()
+      setSessionStatus('Plan generado')
+      updateLastRunSummary({
+        objective: normalizedGoalInput,
+        instruction: response.instruction,
+        result: 'Pendiente de ejecución',
+        approval: 'No requerida',
+        finalStatus: 'Plan generado',
+      })
+      setSessionEvents((currentEvents) => [
+        ...currentEvents,
+        'El planificador devolvió una instrucción',
+      ])
+      addFlowMessage({
+        source: 'orquestador',
+        title: 'Decisión del orquestador',
+        content: 'La instrucción quedó disponible para ejecución manual.',
+        status: 'success',
+      })
+    } catch {
+      addFlowMessage({
+        source: 'orquestador',
+        title: 'Decisión del orquestador',
+        content: 'La planificación terminó con error.',
+        status: 'error',
+      })
+      setSessionStatus('Error al generar el plan')
+      setSessionEvents((currentEvents) => [
+        ...currentEvents,
+        'Falló la generación del plan',
+      ])
+    } finally {
+      setIsPlanning(false)
+    }
+  }
+
+  const handleExecuteCurrentInstruction = async (
+    overrideInstruction?: string,
+    overridePlannerExecutionMetadata?: PlannerExecutionMetadata,
+  ) => {
+    let finalExecutionClosure: {
+      requestId: string
+      source: 'return' | 'event'
+      instruction: string
+      result: string
+      approval: string
+      finalStatus: string
+      currentStepLabel: string
+      sessionStatusLabel: string
+    } | null = null
+    const requestId = `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    activeExecutionRequestIdRef.current = requestId
+    manualExecutionClosureRef.current = {
+      requestId,
+      settled: false,
+    }
+    const currentExecutionContext = getCurrentExecutionContextValue()
+    const instructionToExecute =
+      normalizeOptionalString(overrideInstruction) || plannerInstruction
+    const executionMetadata =
+      overridePlannerExecutionMetadata || plannerExecutionMetadata
+    const executorPayload = {
+      instruction: instructionToExecute,
+      context: currentExecutionContext || undefined,
+      workspacePath: workspacePath.trim() || undefined,
+      requestId,
+      ...(executionMetadata.decisionKey
+        ? { decisionKey: executionMetadata.decisionKey }
+        : {}),
+      ...(executionMetadata.businessSector
+        ? { businessSector: executionMetadata.businessSector }
+        : {}),
+      ...(executionMetadata.businessSectorLabel
+        ? { businessSectorLabel: executionMetadata.businessSectorLabel }
+        : {}),
+      ...(executionMetadata.creativeDirection
+        ? { creativeDirection: executionMetadata.creativeDirection }
+        : {}),
+      ...(executionMetadata.reusableArtifactLookup
+        ? { reusableArtifactLookup: executionMetadata.reusableArtifactLookup }
+        : {}),
+      ...(executionMetadata.reusableArtifactsFound > 0
+        ? { reusableArtifactsFound: executionMetadata.reusableArtifactsFound }
+        : {}),
+      ...(executionMetadata.reuseDecision
+        ? { reuseDecision: executionMetadata.reuseDecision }
+        : {}),
+      ...(executionMetadata.reuseReason
+        ? { reuseReason: executionMetadata.reuseReason }
+        : {}),
+      ...(executionMetadata.reusedArtifactIds.length > 0
+        ? { reusedArtifactIds: executionMetadata.reusedArtifactIds }
+        : {}),
+      ...(executionMetadata.reuseMode && executionMetadata.reuseMode !== 'none'
+        ? { reuseMode: executionMetadata.reuseMode }
+        : {}),
+      ...(executionMetadata.executionScope
+        ? { executionScope: executionMetadata.executionScope }
+        : {}),
+    }
+    startOrContinueExecutionRun({
+      requestId,
+      instruction: instructionToExecute,
+      executionMetadata,
+    })
+
+    setFlowConsoleVisibility({ open: true, pinned: true })
+    clearVisibleExecutionRuntimeState({ requestState: 'running' })
+    setIsExecutingTask(true)
+    setSessionEvents((currentEvents) => [
+      ...currentEvents,
+      'Se envió una instrucción al ejecutor local',
+    ])
+    addFlowMessage({
+      source: 'executor',
+      title: 'Datos enviados al ejecutor',
+      content: currentExecutionContext
+        ? 'Se envió una instrucción manual al ejecutor con contexto y espacio de trabajo.'
+        : 'Se envió una instrucción manual al ejecutor sin contexto adicional y con espacio de trabajo.',
+      raw: formatStructuredContent(executorPayload),
+      status: 'info',
+    })
+
+    try {
+      addDiagnosticFlowMessage(
+        'Diagnóstico de ejecución manual',
+        'La UI está por invocar la ejecución con los datos preparados.',
+        'info',
+        formatStructuredContent({ requestId }),
+      )
+      debugRendererLog('handleExecuteCurrentInstruction:before-await', {
+        requestId,
+        executorPayload,
+      })
+      const response = await window.aiOrchestrator?.executeTask?.(executorPayload)
+      addDiagnosticFlowMessage(
+        'Diagnóstico de ejecución manual',
+        'La ejecución devolvió una respuesta a la UI.',
+        'info',
+        formatStructuredContent({
+          requestId,
+          responseRequestId: response?.requestId,
+          ok: response?.ok,
+          error: response?.error,
+          result: response?.result,
+          approvalRequired: response?.approvalRequired,
+          hasResult: typeof response?.result === 'string',
+          hasTrace: Array.isArray(response?.trace),
+          traceLength: Array.isArray(response?.trace) ? response.trace.length : 0,
+        }),
+      )
+
+      debugRendererLog('handleExecuteCurrentInstruction:after-await', {
+        requestId,
+        responseRequestId: response?.requestId,
+        ok: response?.ok,
+        accepted: response?.accepted,
+        error: response?.error,
+        result: response?.result,
+      })
+
+      if (!response?.ok || response?.accepted === false) {
+        const failureContext = extractExecutorFailureContext(response)
+        updateLastExecutorSnapshot(failureContext)
+        recordExecutionSnapshotOnActiveRun(failureContext)
+        finalizeActiveExecutionRun({
+          status: 'recovery-pending',
+          failureType: response?.failureType,
+          failureContext,
+        })
+        const executorErrorMessage =
+          response?.error || 'El ejecutor no aceptó iniciar la ejecución manual.'
+        addDiagnosticFlowMessage(
+          'Diagnóstico de ejecución manual',
+          'La UI recibió un rechazo o un acuse inválido al iniciar la ejecución manual.',
+          'error',
+          formatStructuredContent({
+            requestId,
+            responseRequestId: response?.requestId,
+            accepted: response?.accepted,
+            error: response?.error,
+          }),
+        )
+        addFlowMessage({
+          source: 'orquestador',
+          title: 'Decisión del orquestador',
+          content: 'La ejecución manual no pudo iniciarse correctamente.',
+          raw: executorErrorMessage,
+          status: 'error',
+        })
+        releaseManualExecutionTracking(requestId)
+        setSessionEvents((currentEvents) => [
+          ...currentEvents,
+          'Falló el inicio de la ejecución de la instrucción',
+        ])
+        await replanManualFlow(
+          buildPlannerFeedbackPayload({
+            type: 'execution-error',
+            source: 'executor',
+            instruction: instructionToExecute,
+            error: executorErrorMessage,
+            executorFailureContext: failureContext || undefined,
+          }),
+        )
+        return
+      }
+
+      if (response?.accepted === true) {
+        addDiagnosticFlowMessage(
+          'Diagnóstico de ejecución manual',
+          'La UI recibió el acuse de inicio y espera el evento final dedicado para cerrar la ejecución.',
+          'info',
+          formatStructuredContent({
+            requestId,
+            responseRequestId: response?.requestId,
+            accepted: response?.accepted,
+          }),
+        )
+        addFlowMessage({
+          source: 'orquestador',
+          title: 'Decisión del orquestador',
+          content: 'La ejecución manual fue aceptada y queda a la espera del resultado final por evento.',
+          status: 'info',
+        })
+        setSessionEvents((currentEvents) => [
+          ...currentEvents,
+          'El ejecutor aceptó iniciar la ejecución',
+        ])
+        return
+      }
+
+      try {
+        safelyAddExecutorTrace(response?.trace)
+      } catch (traceProcessingError) {
+        const traceProcessingMessage =
+          traceProcessingError instanceof Error
+            ? traceProcessingError.stack || traceProcessingError.message
+            : String(traceProcessingError)
+        addDiagnosticFlowMessage(
+          'Error procesando trace',
+          'Falló el procesamiento de la traza devuelta por el ejecutor.',
+          'error',
+          formatStructuredContent({
+            requestId,
+            traceProcessingMessage,
+          }),
+        )
+      }
+
+      if (!response?.ok) {
+        updateLastExecutorSnapshot(extractExecutorFailureContext(response))
+        const executorErrorMessage = formatExecutorError(response)
+        addDiagnosticFlowMessage(
+          'Diagnóstico de ejecución manual',
+          'La UI entró en la rama de error de la ejecución manual.',
+          'error',
+          formatStructuredContent({
+            requestId,
+            responseRequestId: response?.requestId,
+          }),
+        )
+        addFlowMessage({
+          source: 'orquestador',
+          title: 'Decisión del orquestador',
+          content:
+            response?.error === 'Timeout esperando respuesta del executor'
+              ? 'La ejecución manual terminó por timeout esperando al ejecutor.'
+              : 'La ejecución manual terminó con error.',
+          raw: executorErrorMessage,
+          status: 'error',
+        })
+        addDiagnosticFlowMessage(
+          'Diagnóstico de cierre manual',
+          'La UI va a cerrar manualmente la ejecución desde la rama de error.',
+          'error',
+          formatStructuredContent({
+            requestId,
+            responseRequestId: response?.requestId,
+            source: 'return',
+            requestState: 'error',
+            result: executorErrorMessage,
+          }),
+        )
+        const wasClosed = closeManualExecutionState({
+          requestId,
+          source: 'return',
+          instruction: plannerInstruction,
+          result: executorErrorMessage,
+          approval: 'No requerida',
+          finalStatus: 'Error al ejecutar la instrucción',
+          currentStepLabel: 'La ejecución manual terminó con error',
+          sessionStatusLabel: 'Error al ejecutar la instrucción',
+          requestState: 'error',
+        })
+        addDiagnosticFlowMessage(
+          'Diagnóstico de cierre manual',
+          `El cierre manual devolvió ${wasClosed ? 'true' : 'false'} en la rama de error.`,
+          wasClosed ? 'success' : 'warning',
+          formatStructuredContent({
+            requestId,
+            responseRequestId: response?.requestId,
+            wasClosed,
+          }),
+        )
+        debugRendererLog('handleExecuteCurrentInstruction:error-close-result', {
+          requestId,
+          wasClosed,
+        })
+        setSessionEvents((currentEvents) => [
+          ...currentEvents,
+          'Falló la ejecución de la instrucción',
+        ])
+        return
+      }
+
+      if (response.approvalRequired) {
+        addDiagnosticFlowMessage(
+          'Diagnóstico de ejecución manual',
+          'La UI entró en la rama de aprobación requerida del ejecutor.',
+          'warning',
+          formatStructuredContent({
+            requestId,
+            responseRequestId: response?.requestId,
+          }),
+        )
+        if (
+          matchesProjectApprovalPolicy({
+            policy: projectApprovalPolicy,
+            source: 'executor',
+            payload: response,
+          })
+        ) {
+          const autoApprovedResult =
+            response.resultPreview ||
+            'La ejecución sensible fue aprobada automáticamente por la regla del proyecto'
+          finalExecutionClosure = {
+            requestId,
+            source: 'return',
+            instruction: response.instruction || plannerInstruction,
+            result: autoApprovedResult,
+            approval: 'Autoaprobada por regla del proyecto',
+            finalStatus: 'Ejecución autoaprobada por regla del proyecto',
+            currentStepLabel: 'La instrucción sensible quedó aprobada para ejecutarse',
+            sessionStatusLabel: 'Ejecución autoaprobada por regla del proyecto',
+          }
+          addDiagnosticFlowMessage(
+            'Diagnóstico de cierre manual',
+            'La UI va a cerrar manualmente la ejecución desde la rama de autoaprobación.',
+            'info',
+            formatStructuredContent(finalExecutionClosure),
+          )
+          const wasClosed = closeManualExecutionState(finalExecutionClosure)
+          addDiagnosticFlowMessage(
+            'Diagnóstico de cierre manual',
+            `El cierre manual devolvió ${wasClosed ? 'true' : 'false'} en la rama de autoaprobación.`,
+            wasClosed ? 'success' : 'warning',
+            formatStructuredContent({
+              requestId,
+              responseRequestId: response?.requestId,
+              wasClosed,
+            }),
+          )
+          debugRendererLog('handleExecuteCurrentInstruction:auto-approved-close-result', {
+            requestId,
+            wasClosed,
+          })
+          setSessionEvents((currentEvents) => [
+            ...currentEvents,
+            'El ejecutor detectó una tarea sensible',
+            'La regla del proyecto aprobó automáticamente la ejecución',
+          ])
+          addFlowMessage({
+            source: 'orquestador',
+            title: 'Decisión del orquestador',
+            content: 'La respuesta del ejecutor quedó autoaprobada.',
+            status: 'success',
+          })
+          return
+        }
+
+        openApprovalCheckpoint({
+          source: 'executor',
+          instruction: response.instruction || plannerInstruction,
+          payload: response,
+        })
+        addDiagnosticFlowMessage(
+          'Diagnóstico de cierre manual',
+          'La UI va a cerrar manualmente la ejecución desde la rama de aprobación requerida.',
+          'warning',
+          formatStructuredContent({
+            requestId,
+            responseRequestId: response?.requestId,
+            source: 'return',
+            resetPendingState: false,
+          }),
+        )
+        const wasClosed = closeManualExecutionState({
+          requestId,
+          source: 'return',
+          instruction: response.instruction || plannerInstruction,
+          result: 'Pendiente de aprobación',
+          approval: 'Manual requerida',
+          finalStatus: 'Esperando aprobación para ejecutar',
+          currentStepLabel: currentStep,
+          sessionStatusLabel: 'Esperando aprobación para ejecutar',
+          resetPendingState: false,
+        })
+        addDiagnosticFlowMessage(
+          'Diagnóstico de cierre manual',
+          `El cierre manual devolvió ${wasClosed ? 'true' : 'false'} en la rama de aprobación requerida.`,
+          wasClosed ? 'success' : 'warning',
+          formatStructuredContent({
+            requestId,
+            responseRequestId: response?.requestId,
+            wasClosed,
+          }),
+        )
+        debugRendererLog('handleExecuteCurrentInstruction:approval-close-result', {
+          requestId,
+          wasClosed,
+        })
+        setSessionEvents((currentEvents) => [
+          ...currentEvents,
+          'El ejecutor pidió aprobación manual',
+        ])
+        addFlowMessage({
+          source: 'orquestador',
+          title: 'Decisión del orquestador',
+          content: 'La respuesta del ejecutor quedó pendiente de aprobación manual.',
+          status: 'warning',
+        })
+        return
+      }
+
+      if (!response.result) {
+        const missingResultMessage =
+          'El ejecutor no devolvió un resultado utilizable para cerrar la ejecución.'
+        addDiagnosticFlowMessage(
+          'Diagnóstico de ejecución manual',
+          'La UI detectó una respuesta sin result utilizable.',
+          'error',
+          formatStructuredContent({
+            requestId,
+            response,
+          }),
+        )
+        addFlowMessage({
+          source: 'orquestador',
+          title: 'Decisión del orquestador',
+          content: 'La ejecución manual no devolvió un resultado utilizable.',
+          status: 'error',
+        })
+        addDiagnosticFlowMessage(
+          'Diagnóstico de cierre manual',
+          'La UI va a cerrar manualmente la ejecución por una respuesta sin resultado utilizable.',
+          'error',
+          formatStructuredContent({
+            requestId,
+            responseRequestId: response?.requestId,
+            source: 'return',
+            requestState: 'error',
+            result: missingResultMessage,
+          }),
+        )
+        const wasClosed = closeManualExecutionState({
+          requestId,
+          source: 'return',
+          instruction: response.instruction || plannerInstruction,
+          result: missingResultMessage,
+          approval: 'No requerida',
+          finalStatus: 'Error al ejecutar la instrucción',
+          currentStepLabel: 'La ejecución manual terminó con error',
+          sessionStatusLabel: 'Error al ejecutar la instrucción',
+          requestState: 'error',
+        })
+        debugRendererLog('handleExecuteCurrentInstruction:missing-result-close-result', {
+          requestId,
+          wasClosed,
+        })
+        addDiagnosticFlowMessage(
+          'Diagnóstico de cierre manual',
+          `El cierre manual devolvió ${wasClosed ? 'true' : 'false'} por una respuesta sin resultado utilizable.`,
+          wasClosed ? 'success' : 'warning',
+          formatStructuredContent({
+            requestId,
+            responseRequestId: response?.requestId,
+            wasClosed,
+          }),
+        )
+        setSessionEvents((currentEvents) => [
+          ...currentEvents,
+          'Falló la ejecución de la instrucción',
+        ])
+        return
+      }
+
+      addDiagnosticFlowMessage(
+        'Diagnóstico de ejecución manual',
+        'La UI entró en la rama de éxito de la ejecución manual.',
+        'success',
+        formatStructuredContent({
+          requestId,
+          responseRequestId: response.requestId,
+          instruction: response.instruction || plannerInstruction,
+          result: response.result,
+        }),
+      )
+      finalExecutionClosure = {
+        requestId,
+        source: 'return',
+        instruction: response.instruction || plannerInstruction,
+        result: response.result,
+        approval: 'No requerida',
+        finalStatus: 'Ejecución completada',
+        currentStepLabel: 'La instrucción actual ya fue ejecutada',
+        sessionStatusLabel: 'Ejecución completada',
+      }
+      addDiagnosticFlowMessage(
+        'Diagnóstico de cierre manual',
+        'La UI va a cerrar manualmente la ejecución desde la rama de éxito.',
+        'success',
+        formatStructuredContent(finalExecutionClosure),
+      )
+      const wasClosed = closeManualExecutionState(finalExecutionClosure)
+      addDiagnosticFlowMessage(
+        'Diagnóstico de cierre manual',
+        `El cierre manual devolvió ${wasClosed ? 'true' : 'false'} en la rama de éxito.`,
+        wasClosed ? 'success' : 'warning',
+        formatStructuredContent({
+          requestId,
+          responseRequestId: response?.requestId,
+          wasClosed,
+        }),
+      )
+      debugRendererLog('handleExecuteCurrentInstruction:success-close-result', {
+        requestId,
+        wasClosed,
+      })
+      setSessionEvents((currentEvents) => [
+        ...currentEvents,
+        'El ejecutor completó la instrucción',
+      ])
+      addFlowMessage({
+        source: 'orquestador',
+        title: 'Decisión del orquestador',
+        content: 'La ejecución manual terminó correctamente.',
+        status: 'success',
+      })
+    } catch (processingError) {
+      const processingErrorMessage =
+        processingError instanceof Error
+          ? processingError.stack || processingError.message
+          : String(processingError)
+      addDiagnosticFlowMessage(
+        'Excepción procesando respuesta del ejecutor',
+        'La UI encontró una excepción durante el procesamiento posterior a la respuesta de ejecución.',
+        'error',
+        formatStructuredContent({
+          requestId,
+          processingErrorMessage,
+        }),
+      )
+      addFlowMessage({
+        source: 'orquestador',
+        title: 'Decisión del orquestador',
+        content: 'La ejecución manual terminó con error.',
+        status: 'error',
+      })
+      debugRendererLog('handleExecuteCurrentInstruction:catch-branch', {
+        requestId,
+        error:
+          processingError instanceof Error
+            ? processingError.message
+            : String(processingError),
+      })
+      addDiagnosticFlowMessage(
+        'Diagnóstico de cierre manual',
+        'La UI va a cerrar manualmente la ejecución desde la rama de excepción.',
+        'error',
+        formatStructuredContent({
+          requestId,
+          source: 'return',
+          requestState: 'error',
+          error:
+            processingError instanceof Error
+              ? processingError.message
+              : String(processingError),
+        }),
+      )
+      closeManualExecutionState({
+        requestId,
+        source: 'return',
+        instruction: plannerInstruction,
+        result: `La UI encontró un error procesando la respuesta del ejecutor: ${processingError instanceof Error ? processingError.message : String(processingError)}`,
+        approval: 'No requerida',
+        finalStatus: 'Error al ejecutar la instrucción',
+        currentStepLabel: 'La ejecución manual terminó con error',
+        sessionStatusLabel: 'Error al ejecutar la instrucción',
+        requestState: 'error',
+      })
+      setSessionEvents((currentEvents) => [
+        ...currentEvents,
+        'Falló la ejecución de la instrucción',
+      ])
+    } finally {
+      setFlowConsoleVisibility({ open: true, pinned: true })
+      if (finalExecutionClosure) {
+        addDiagnosticFlowMessage(
+          'Diagnóstico de cierre manual',
+          'La UI volvió a intentar el cierre manual desde el bloque final.',
+          'info',
+          formatStructuredContent(finalExecutionClosure),
+        )
+        const wasClosed = closeManualExecutionState(finalExecutionClosure)
+        addDiagnosticFlowMessage(
+          'Diagnóstico de cierre manual',
+          `El cierre manual devolvió ${wasClosed ? 'true' : 'false'} desde el bloque final.`,
+          wasClosed ? 'success' : 'warning',
+          formatStructuredContent({
+            requestId,
+            wasClosed,
+          }),
+        )
+        debugRendererLog('handleExecuteCurrentInstruction:finally-close-result', {
+          requestId,
+          wasClosed,
+        })
+      }
+      if (manualExecutionClosureRef.current.requestId === requestId) {
+        setIsExecutingTask((currentValue) =>
+          manualExecutionClosureRef.current.settled ? false : currentValue,
+        )
+      }
+      debugRendererLog('handleExecuteCurrentInstruction:finally', {
+        requestId,
+        settled:
+          manualExecutionClosureRef.current.requestId === requestId
+            ? manualExecutionClosureRef.current.settled
+            : undefined,
+      })
+    }
+  }
+
+  const handleAutoFlow = async () => {
+    setFlowConsoleVisibility({ open: true, pinned: true })
+    setIsAutoFlowRunning(true)
+    setAutoFlowIteration(0)
+    setSessionEvents((currentEvents) => [
+      ...currentEvents,
+      'Se inició el flujo automático',
+    ])
+    await runAutoFlowLoop(1)
+  }
+
+  const useLegacySingleScreenLayout = false
+
+  return useLegacySingleScreenLayout ? (
+    <main className="min-h-screen w-full bg-transparent text-slate-100">
+      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-6 py-8 sm:px-8 lg:px-12">
+        <header className="border-b border-white/10 pb-8">
+          <div className="inline-flex rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.24em] text-sky-200">
+            ORQUESTADOR DE IA LOCAL
+          </div>
+          <div className="mt-6 max-w-3xl">
+            <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+              Centro de control
+            </h1>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
+              Coordiná planificador, ejecutor y aprobaciones desde un único entorno
+              local pensado para un control operativo claro y deliberado.
+            </p>
+          </div>
+        </header>
+
+        <section className="grid gap-4 py-8 md:grid-cols-3">
+          <article className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_12px_40px_rgba(0,0,0,0.22)] backdrop-blur">
+            <div className="text-lg font-semibold text-white">Planificador</div>
+            <p className="mt-3 text-sm leading-6 text-slate-300">
+              Desarma el objetivo en pasos controlados, dependencias y puntos
+              de aprobación antes de empezar a ejecutar.
+            </p>
+            <div className="mt-6 inline-flex rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-200">
+              {plannerBadge}
+            </div>
+          </article>
+
+          <article className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_12px_40px_rgba(0,0,0,0.22)] backdrop-blur">
+            <div className="text-lg font-semibold text-white">Ejecutor</div>
+            <p className="mt-3 text-sm leading-6 text-slate-300">
+              Aplica los pasos aprobados en secuencia y mantiene la sesión
+              alineada con el alcance actual de trabajo.
+            </p>
+            <div className="mt-6 inline-flex rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-xs font-medium text-amber-200">
+              {executorBadge}
+            </div>
+          </article>
+
+          <article className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_12px_40px_rgba(0,0,0,0.22)] backdrop-blur">
+            <div className="text-lg font-semibold text-white">
+              Aprobaciones humanas
+            </div>
+            <p className="mt-3 text-sm leading-6 text-slate-300">
+              Frena acciones sensibles para que los cambios importantes solo
+              avancen con una decisión explícita del operador.
+            </p>
+            <div className="mt-6 inline-flex rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-xs font-medium text-sky-200">
+              {humanApprovalsBadge}
+            </div>
+          </article>
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-slate-950/40 p-6 shadow-[0_18px_50px_rgba(0,0,0,0.28)]">
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="space-y-1">
+                <div className="text-lg font-semibold text-white">
+                  Sesión actual
+                </div>
+                <p className="text-sm text-slate-400">
+                  Estado operativo en vivo del entorno local activo.
+                </p>
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleRunMockCycle}
+                  disabled={decisionPending || isRunning}
+                  className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                >
+                  {isRunning ? 'Ejecutando...' : 'Correr ciclo de prueba'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleTestLocalConnection}
+                  disabled={isTestingConnection}
+                  className="rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm font-medium text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                >
+                  {isTestingConnection ? 'Probando...' : 'Probar conexión local'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAutoFlow}
+                  disabled={
+                    isAutoFlowRunning ||
+                    isPlanning ||
+                    isExecutingTask ||
+                    decisionPending
+                  }
+                  className="rounded-xl border border-violet-300/20 bg-violet-300/10 px-4 py-3 text-sm font-medium text-violet-100 transition hover:bg-violet-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                >
+                  {isAutoFlowRunning
+                    ? 'Procesando flujo...'
+                    : 'Iniciar flujo automático'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetSessionMemory}
+                  disabled={isRunning}
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                >
+                  Reiniciar memoria de la sesión
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFlowConsoleVisibility({ open: true, pinned: true })
+                  }}
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                >
+                  Reabrir eventos
+                </button>
+              </div>
+            </div>
+            <div className="grid gap-3">
+              <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Objetivo
+                </div>
+                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                      Esto es lo que queda frenado hasta que le devolvamos tu respuesta al Cerebro.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 max-h-40 overflow-y-auto rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm leading-6 text-slate-100">
+                  Preparar el entorno local del orquestador para flujos guiados
+                  de ejecución
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-lg font-semibold text-white">
+                      Resumen E2E de corridas
+                    </div>
+                    <div className="mt-1 text-sm text-slate-400">
+                      Lectura compacta para validar caso feliz, falla recuperable y bloqueo por repetición.
+                    </div>
+                  </div>
+                  <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">
+                    {visibleExecutionRunSummaries.length} corrida(s)
+                  </div>
+                </div>
+                {latestExecutionRunSummary ? (
+                  <>
+                    <div className="mt-4 rounded-2xl border border-sky-300/20 bg-sky-300/8 px-4 py-4">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${getExecutionRunScenarioTone(
+                                latestExecutionRunSummary.scenarioLabel,
+                              )}`}
+                            >
+                              {latestExecutionRunSummary.scenarioLabel}
+                            </span>
+                            <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+                              {getExecutionRunStatusLabel(latestExecutionRunSummary.status)}
+                            </span>
+                          </div>
+                          <div className="text-sm font-medium text-white">
+                            {latestExecutionRunSummary.objectiveSummary}
+                          </div>
+                          <div className="text-xs leading-5 text-slate-300">
+                            Último requestId: {latestExecutionRunSummary.latestRequestId}
+                          </div>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[360px]">
+                          <div className="rounded-xl border border-white/8 bg-slate-950/50 px-3 py-3 text-sm text-slate-100">
+                            <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                              Aprobaciones abiertas
+                            </div>
+                            <div className="mt-1 font-medium">
+                              {latestExecutionRunSummary.approvalsOpened}
+                            </div>
+                          </div>
+                          <div className="rounded-xl border border-white/8 bg-slate-950/50 px-3 py-3 text-sm text-slate-100">
+                            <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                              Reintentos / recuperaciones
+                            </div>
+                            <div className="mt-1 font-medium">
+                              {latestExecutionRunSummary.recoveries}
+                            </div>
+                          </div>
+                          <div className="rounded-xl border border-white/8 bg-slate-950/50 px-3 py-3 text-sm text-slate-100">
+                            <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                              Fallos repetidos
+                            </div>
+                            <div className="mt-1 font-medium">
+                              {latestExecutionRunSummary.repeatedFailureCount || 0}
+                            </div>
+                          </div>
+                          <div className="rounded-xl border border-white/8 bg-slate-950/50 px-3 py-3 text-sm text-slate-100">
+                            <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                              Progreso material
+                            </div>
+                            <div className="mt-1 font-medium">
+                              {latestExecutionRunSummary.hasMaterialProgress ? 'Sí' : 'No'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-4 grid gap-3 xl:grid-cols-3">
+                      {visibleExecutionRunSummaries.map((summary) => (
+                        <article
+                          key={summary.runId}
+                          className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-white">
+                                {summary.objectiveSummary}
+                              </div>
+                              <div className="mt-1 text-xs leading-5 text-slate-400">
+                                {summary.updatedAtLabel} · {summary.latestRequestId}
+                              </div>
+                            </div>
+                            <span
+                              className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${getExecutionRunScenarioTone(
+                                summary.scenarioLabel,
+                              )}`}
+                            >
+                              {summary.scenarioLabel}
+                            </span>
+                          </div>
+                          <div className="mt-4 space-y-2 text-sm leading-6 text-slate-200">
+                            <div>
+                              <span className="text-slate-500">Instrucción:</span>{' '}
+                              {summary.instructionSummary}
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Aprobaciones abiertas:</span>{' '}
+                              {summary.approvalsOpened}
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Reintentos / recuperaciones:</span>{' '}
+                              {summary.recoveries}
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Tipo de fallo final:</span>{' '}
+                              {getTechnicalDiagnosticLabel(
+                                summary.finalFailureType,
+                                'No falló al cierre',
+                              )}
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Modo de recuperación:</span>{' '}
+                              {getTechnicalDiagnosticLabel(
+                                summary.latestRecoveryMode,
+                                'No aplicado',
+                              )}
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Alcance del intento / alcance de ejecución:</span>{' '}
+                              {getTechnicalDiagnosticLabel(
+                                summary.latestAttemptScope,
+                                'No reportado',
+                              )}{' '}
+                              /{' '}
+                              {getTechnicalDiagnosticLabel(
+                                summary.latestExecutionScope,
+                                'No definido',
+                              )}
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Modos bloqueados:</span>{' '}
+                              {summary.blockedRecoveryModes.length > 0
+                                ? summary.blockedRecoveryModes
+                                    .map((value) =>
+                                      getTechnicalDiagnosticLabel(value, value),
+                                    )
+                                    .join(', ')
+                                : 'Ninguno'}
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Punto de continuidad:</span>{' '}
+                              {summary.continuationAnchor || 'No disponible'}
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Archivos creados / tocados:</span>{' '}
+                              {mergeUniqueStringValues(
+                                summary.createdPaths,
+                                summary.touchedPaths,
+                                12,
+                              ).join(', ') || 'Ninguno'}
+                            </div>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                    Todavía no hay corridas ejecutadas para resumir.
+                  </div>
+                )}
+              </div>
+              <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                <label
+                  htmlFor="goal-input"
+                  className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                >
+                  Objetivo actual
+                </label>
+                <textarea
+                  id="goal-input"
+                  value={goalInput}
+                  onChange={(event) => setGoalInput(event.target.value)}
+                  rows={3}
+                  className="mt-3 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
+                />
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                  <button
+                    id="generate-next-step-button"
+                    type="button"
+                    onClick={handleGenerateNextStep}
+                    disabled={isPlanning}
+                    className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                  >
+                    {isPlanning ? 'Generando...' : 'Generar siguiente paso'}
+                  </button>
+                  <button
+                    id="execute-current-instruction-button"
+                    type="button"
+                    onClick={handleExecuteCurrentInstruction}
+                    disabled={!canExecuteInstruction || isExecutingTask}
+                    className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                  >
+                    {isExecutingTask
+                      ? 'Ejecutando...'
+                      : 'Ejecutar instrucción actual'}
+                  </button>
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Participación del usuario
+                    </div>
+                    <div className="mt-2 text-sm leading-6 text-slate-100">
+                      ¿Vas a aportar definiciones, recursos o contenidos durante este proceso, o querés que el Cerebro decida todo lo faltante?
+                    </div>
+                    <div className="mt-2 text-xs leading-5 text-slate-400">
+                      Si no elegís nada todavía, el sistema mantiene el comportamiento actual.
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => setUserParticipationMode('user-will-contribute')}
+                      className={`rounded-xl border px-4 py-3 text-sm font-medium transition ${
+                        userParticipationMode === 'user-will-contribute'
+                          ? 'border-sky-300/40 bg-sky-300/15 text-sky-100'
+                          : 'border-white/10 bg-slate-950/50 text-slate-200 hover:bg-white/10'
+                      }`}
+                    >
+                      Sí, voy a aportar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUserParticipationMode('brain-decides-missing')}
+                      className={`rounded-xl border px-4 py-3 text-sm font-medium transition ${
+                        userParticipationMode === 'brain-decides-missing'
+                          ? 'border-emerald-300/40 bg-emerald-300/15 text-emerald-100'
+                          : 'border-white/10 bg-slate-950/50 text-slate-200 hover:bg-white/10'
+                      }`}
+                    >
+                      No, decidí vos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUserParticipationMode(DEFAULT_USER_PARTICIPATION_MODE)}
+                      className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm font-medium text-slate-300 transition hover:bg-white/10"
+                    >
+                      Sin definir
+                    </button>
+                  </div>
+                  <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-300">
+                    {userParticipationSummary}
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Enrutamiento del Cerebro
+                    </div>
+                    <div className="mt-2 text-sm leading-6 text-slate-100">
+                      Elegí cuánto ahorro o calidad prioriza el orquestador al decidir entre OpenAI y reglas locales.
+                    </div>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    {BRAIN_COST_MODE_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setBrainCostMode(option.value)}
+                        className={`rounded-xl border px-4 py-3 text-left transition ${
+                          brainCostMode === option.value
+                            ? 'border-sky-300/40 bg-sky-300/15 text-sky-100'
+                            : 'border-white/10 bg-slate-950/50 text-slate-200 hover:bg-white/10'
+                        }`}
+                      >
+                        <div className="text-sm font-medium">{option.label}</div>
+                        <div className="mt-1 text-xs leading-5 text-slate-400">
+                          {option.description}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Modo / criterio
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-100">
+                        {getBrainCostModeLabel(brainCostMode)} / {activeBrainRoutingMode}
+                      </div>
+                      <div className="mt-2 text-xs leading-5 text-slate-400">
+                        Naturaleza: {activeBrainProblemNature}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Proveedor elegido / usado
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-100">
+                        {`${activeBrainSelectedProvider} -> ${activeBrainResolvedProvider}`}
+                      </div>
+                      <div className="mt-2 text-xs leading-5 text-slate-400">
+                        {activeBrainFallbackUsed
+                          ? `Respaldo aplicado hacia ${activeBrainResolvedProvider}`
+                          : 'Sin respaldo en la última decisión'} · Confianza: {activeBrainRoutingConfidence}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Respaldo declarado
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-100">
+                        {activeBrainFallbackProvider}
+                      </div>
+                      <div className="mt-2 text-xs leading-5 text-slate-400">
+                        {normalizeOptionalString(lastBrainRoutingDecision?.fallbackReason)
+                          ? summarizeInlineText(lastBrainRoutingDecision?.fallbackReason, 140)
+                          : 'No hubo motivo de respaldo registrado'}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Complejidad / ambigüedad
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-100">
+                        {getBrainRoutingSeverityLabel(lastBrainRoutingDecision?.complexity)} /{' '}
+                        {getBrainRoutingSeverityLabel(lastBrainRoutingDecision?.ambiguity)}
+                      </div>
+                      <div className="mt-2 text-xs leading-5 text-slate-400">
+                        Riesgo: {getBrainRoutingSeverityLabel(lastBrainRoutingDecision?.risk)} · Impacto:{' '}
+                        {getBrainRoutingSeverityLabel(lastBrainRoutingDecision?.impact)}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Ruta planificada / clave técnica
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-100">
+                        {activeExecutionModeLabel} / {activeDecisionKeyLabel}
+                      </div>
+                      <div className="mt-2 text-xs leading-5 text-slate-400">
+                        Estrategia: {activePlannerStrategyLabel}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 md:col-span-2 xl:col-span-1">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Motivo resumido
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-100">
+                        {activeBrainRoutingReason}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 md:col-span-2 xl:col-span-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Memoria reutilizable
+                      </div>
+                      <div
+                        id="planner-active-reuse-summary"
+                        className="mt-2 text-sm leading-6 text-slate-100"
+                      >
+                        {activeReuseModeLabel} / {activeReuseFoundCount} coincidencia(s)
+                      </div>
+                      <div className="mt-2 text-xs leading-5 text-slate-400">
+                        {activeReuseDetailLabel}
+                      </div>
+                      <div className="mt-2 text-xs leading-5 text-slate-400">
+                        Selección manual: {activeReuseManualSummary}
+                      </div>
+                      <div className="mt-2 text-xs leading-5 text-slate-500">
+                        {activeReuseSuggestionIds.length > 0 || activeAppliedReuseArtifactIds.length > 0
+                          ? activeReuseArtifactSummary
+                          : 'Todavía no hay artefactos considerados en esta decisión.'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Lectura operativa de la corrida
+                    </div>
+                    <div className="mt-2 text-sm leading-6 text-slate-100">
+                      Resume el camino real que siguió el sistema, la última decisión humana relevante y los artefactos detectados sin tener que abrir la consola técnica.
+                    </div>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Ruta / siguiente acción
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-100">
+                        {activeExecutionModeLabel}
+                      </div>
+                      <div className="mt-2 text-xs leading-5 text-slate-400">
+                        {getNextExpectedActionLabel(
+                          plannerExecutionMetadata.nextExpectedAction,
+                        )}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Aprobación / respuesta humana
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-100">
+                        {activeApprovalStatusLabel}
+                      </div>
+                      <div className="mt-2 text-xs leading-5 text-slate-400">
+                        {activeApprovalDetailLabel}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Resultado E2E
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-100">
+                        {activeOperationalE2eScenarioLabel}
+                      </div>
+                      <div className="mt-2 text-xs leading-5 text-slate-400">
+                        {activeOperationalE2eStatusLabel}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Archivos / carpetas tocados
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-100">
+                        {latestTouchedArtifacts.length > 0
+                          ? `${latestTouchedArtifacts.length} ruta(s) registradas`
+                          : 'Sin rutas registradas'}
+                      </div>
+                      <div className="mt-2 whitespace-pre-wrap break-words text-xs leading-5 text-slate-400">
+                        {latestTouchedArtifacts.join('\n') ||
+                          'Todavía no hay rutas creadas o tocadas visibles.'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {shouldShowVisibleFinalTextResponse ? (
+                <div className="rounded-xl border border-emerald-300/20 bg-emerald-300/8 px-4 py-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-200/90">
+                    Respuesta final
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-200">
+                    Esta corrida no dejó archivos ni carpetas. El resultado principal es textual.
+                  </div>
+                  <div className="mt-4 whitespace-pre-wrap break-words rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-white">
+                    {visibleFinalTextResponse}
+                  </div>
+                </div>
+              ) : null}
+              <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                <label
+                  htmlFor="execution-context-input"
+                  className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                >
+                  Contexto adicional para el ejecutor
+                </label>
+                <textarea
+                  id="execution-context-input"
+                  ref={executionContextInputRef}
+                  value={executionContextInput}
+                  onChange={(event) => setExecutionContextInput(event.target.value)}
+                  rows={3}
+                  className="mt-3 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
+                />
+              </div>
+              <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                <div className="text-lg font-semibold text-white">
+                  Espacio de trabajo de destino
+                </div>
+                <div className="mt-4 grid gap-3">
+                  <div>
+                    <label
+                      htmlFor="workspace-path"
+                      className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                    >
+                      Espacio de trabajo de destino
+                    </label>
+                    <textarea
+                      id="workspace-path"
+                      value={workspacePath}
+                      onChange={(event) => setWorkspacePath(event.target.value)}
+                      rows={2}
+                      className="mt-3 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
+                    />
+                  </div>
+                  <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Estado
+                    </div>
+                    <div className="mt-2 text-sm leading-6 text-slate-100">
+                      {workspaceStatusLabel}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div
+                id="reusable-memory-section"
+                className="rounded-xl border border-white/8 bg-white/5 px-4 py-4"
+              >
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                    <div>
+                      <div className="text-lg font-semibold text-white">
+                        Memoria reutilizable
+                      </div>
+                      <div className="mt-1 text-sm text-slate-400">
+                        Explorá artefactos reutilizables, filtrá por estilo o estructura y fijá una selección manual antes de planificar una web nueva.
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm text-slate-100 xl:max-w-md">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Selección actual
+                      </div>
+                      <div className="mt-2">{manualReuseModeLabel}</div>
+                      <div
+                        id="manual-reuse-selection-summary"
+                        className="mt-2 text-xs leading-5 text-slate-400"
+                      >
+                        {selectedReusableArtifactSummary}
+                      </div>
+                      <div className="mt-2 text-xs leading-5 text-slate-500">
+                        {selectedReusableArtifactTags || 'Sin etiquetas destacadas'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                      <div>
+                        <label
+                          htmlFor="reusable-filter-sector"
+                          className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                        >
+                          Rubro
+                        </label>
+                        <input
+                          id="reusable-filter-sector"
+                          value={reusableArtifactFilters.sector}
+                          onChange={(event) =>
+                            setReusableArtifactFilters((currentValue) => ({
+                              ...currentValue,
+                              sector: event.target.value,
+                            }))
+                          }
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
+                          placeholder="odontología, moda..."
+                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="reusable-filter-visual-style"
+                          className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                        >
+                          Estilo visual
+                        </label>
+                        <input
+                          id="reusable-filter-visual-style"
+                          value={reusableArtifactFilters.visualStyle}
+                          onChange={(event) =>
+                            setReusableArtifactFilters((currentValue) => ({
+                              ...currentValue,
+                              visualStyle: event.target.value,
+                            }))
+                          }
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
+                          placeholder="claridad, premium..."
+                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="reusable-filter-layout"
+                          className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                        >
+                          Estructura
+                        </label>
+                        <input
+                          id="reusable-filter-layout"
+                          value={reusableArtifactFilters.layoutVariant}
+                          onChange={(event) =>
+                            setReusableArtifactFilters((currentValue) => ({
+                              ...currentValue,
+                              layoutVariant: event.target.value,
+                            }))
+                          }
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
+                          placeholder="institucional, editorial..."
+                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="reusable-filter-hero"
+                          className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                        >
+                          Apertura principal
+                        </label>
+                        <input
+                          id="reusable-filter-hero"
+                          value={reusableArtifactFilters.heroStyle}
+                          onChange={(event) =>
+                            setReusableArtifactFilters((currentValue) => ({
+                              ...currentValue,
+                              heroStyle: event.target.value,
+                            }))
+                          }
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
+                          placeholder="informativo, inmersivo..."
+                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="reusable-filter-tags"
+                          className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                        >
+                          Tags
+                        </label>
+                        <input
+                          id="reusable-filter-tags"
+                          value={reusableArtifactFilters.tags}
+                          onChange={(event) =>
+                            setReusableArtifactFilters((currentValue) => ({
+                              ...currentValue,
+                              tags: event.target.value,
+                            }))
+                          }
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
+                          placeholder="premium, editorial..."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                      <label
+                        htmlFor="manual-reuse-mode"
+                        className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                      >
+                        Reutilización manual
+                      </label>
+                      <select
+                        id="manual-reuse-mode"
+                        value={manualReuseMode}
+                        onChange={(event) =>
+                          setManualReuseMode(event.target.value as ManualReuseMode)
+                        }
+                        className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition focus:border-sky-300/40"
+                      >
+                        <option value="auto">Búsqueda automática</option>
+                        <option value="none">No reutilizar</option>
+                        <option value="inspiration-only">Usar solo inspiración</option>
+                        <option value="reuse-style">Reutilizar estilo</option>
+                        <option value="reuse-structure">Reutilizar estructura</option>
+                        <option value="reuse-style-and-structure">
+                          Reutilizar estilo y estructura
+                        </option>
+                      </select>
+                      <div className="mt-3 text-xs leading-5 text-slate-400">
+                        {manualReusablePreferencePayload
+                          ? manualReusablePreferencePayload.artifactId
+                            ? `El planificador va a priorizar ${manualReuseModeLabel.toLocaleLowerCase()} desde ${manualReusablePreferencePayload.artifactId}.`
+                            : 'El planificador va a ignorar la memoria reutilizable por decisión manual.'
+                          : 'Sin selección manual: se mantiene la búsqueda automática.'}
+                      </div>
+                      <button
+                        id="clear-reusable-artifact-selection"
+                        type="button"
+                        onClick={() => {
+                          setSelectedReusableArtifact(null)
+                          setManualReuseMode('auto')
+                        }}
+                        className="mt-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                      >
+                        Limpiar selección
+                      </button>
+                    </div>
+                  </div>
+
+                  <div
+                    id="reusable-artifact-list"
+                    className="grid gap-3 xl:grid-cols-2"
+                  >
+                    {isLoadingReusableArtifacts ? (
+                      <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm text-slate-300 xl:col-span-2">
+                        Cargando artefactos reutilizables...
+                      </div>
+                    ) : reusableArtifactError ? (
+                      <div className="rounded-xl border border-red-300/20 bg-red-300/10 px-4 py-4 text-sm text-red-100 xl:col-span-2">
+                        {reusableArtifactError}
+                      </div>
+                    ) : reusableArtifacts.length === 0 ? (
+                      <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm text-slate-300 xl:col-span-2">
+                        No hay artefactos que coincidan con esos filtros.
+                      </div>
+                    ) : (
+                      reusableArtifacts.map((artifact) => {
+                        const isSelected = selectedReusableArtifact?.id === artifact.id
+                        const preview = buildReusableArtifactPreviewModel(artifact)
+                        const visibleColors = Object.values(artifact.colors || {}).slice(0, 4)
+                        const badgeValues = [
+                          artifact.sectorLabel || artifact.sector,
+                          getVisualStyleLabel(artifact.visualStyle),
+                          getLayoutVariantLabel(artifact.layoutVariant),
+                          getHeroStyleLabel(artifact.heroStyle),
+                        ].filter(Boolean)
+                        const realPreviewSrc =
+                          artifact.preview?.status === 'generated'
+                            ? buildLocalFileUrl(artifact.preview.imagePath)
+                            : ''
+
+                        return (
+                          <article
+                            key={artifact.id}
+                            data-reusable-artifact-card={artifact.id}
+                            className={`rounded-2xl border px-4 py-4 ${
+                              isSelected
+                                ? 'border-sky-300/30 bg-sky-300/10'
+                                : 'border-white/8 bg-slate-950/50'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="text-sm font-semibold text-white">
+                                  {artifact.sectorLabel || artifact.sector || artifact.id}
+                                </div>
+                                <div className="mt-1 text-xs leading-5 text-slate-400">
+                                  {artifact.id}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                data-reusable-artifact-select={artifact.id}
+                                onClick={() => {
+                                  setSelectedReusableArtifact(artifact)
+                                  setManualReuseMode((currentValue) =>
+                                    currentValue === 'auto'
+                                      ? 'reuse-style-and-structure'
+                                      : currentValue,
+                                  )
+                                }}
+                                className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                                  isSelected
+                                    ? 'border-sky-300/40 bg-sky-300/15 text-sky-100'
+                                    : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
+                                }`}
+                              >
+                                {isSelected ? 'Seleccionado' : 'Usar este artefacto'}
+                              </button>
+                            </div>
+
+                            <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/70 p-3">
+                              <div
+                                data-reusable-artifact-preview={artifact.id}
+                                className="overflow-hidden rounded-2xl border border-white/10"
+                                style={{
+                                  background: preview.background,
+                                  color: preview.text,
+                                }}
+                              >
+                                {realPreviewSrc ? (
+                                  <div className="relative">
+                                    <img
+                                      src={realPreviewSrc}
+                                      alt={`Vista previa real de ${artifact.sectorLabel || artifact.sector || artifact.id}`}
+                                      className="h-56 w-full object-cover"
+                                    />
+                                    <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 p-3">
+                                      <span className="rounded-full border border-emerald-300/30 bg-slate-950/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-200">
+                                        Vista previa real
+                                      </span>
+                                      <span
+                                        className="rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]"
+                                        style={{
+                                          borderColor: `${preview.accent}66`,
+                                          backgroundColor: 'rgba(2, 6, 23, 0.72)',
+                                          color: preview.text,
+                                        }}
+                                      >
+                                        {preview.heroLabel}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1.3fr)_120px]">
+                                    <div className="min-w-0">
+                                      <div
+                                        className="text-[10px] font-semibold uppercase tracking-[0.24em]"
+                                        style={{ color: preview.muted }}
+                                      >
+                                        {preview.heroLabel}
+                                      </div>
+                                      <div
+                                        className="mt-2 text-xl leading-tight"
+                                        style={{ fontFamily: preview.headingFont }}
+                                      >
+                                        {preview.previewHeading}
+                                      </div>
+                                      <div
+                                        className="mt-2 max-w-sm text-xs leading-5"
+                                        style={{
+                                          color: preview.muted,
+                                          fontFamily: preview.bodyFont,
+                                        }}
+                                      >
+                                        {preview.previewBody}
+                                      </div>
+                                      <div className="mt-4 flex flex-wrap gap-2">
+                                        {badgeValues.slice(0, 4).map((badgeValue) => (
+                                          <span
+                                            key={`${artifact.id}-${badgeValue}`}
+                                            className="rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
+                                            style={{
+                                              borderColor: `${preview.accent}55`,
+                                              backgroundColor: preview.surface,
+                                              color: preview.text,
+                                            }}
+                                          >
+                                            {badgeValue}
+                                          </span>
+                                        ))}
+                                      </div>
+                                      <div
+                                        className="mt-4 inline-flex items-center rounded-full px-3 py-1.5 text-[11px] font-semibold"
+                                        style={{
+                                          backgroundColor: preview.accent,
+                                          color: '#020617',
+                                          fontFamily: preview.bodyFont,
+                                        }}
+                                      >
+                                        {preview.previewCta}
+                                      </div>
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                      <div
+                                        className="rounded-2xl border p-3"
+                                        style={{
+                                          borderColor: `${preview.accentStrong}55`,
+                                          backgroundColor: preview.surface,
+                                        }}
+                                      >
+                                        <div
+                                          className="text-[10px] font-semibold uppercase tracking-[0.2em]"
+                                          style={{ color: preview.muted }}
+                                        >
+                                          Estructura
+                                        </div>
+                                        <div
+                                          className="mt-2 text-sm leading-5"
+                                          style={{ fontFamily: preview.headingFont }}
+                                        >
+                                          {preview.layoutLabel}
+                                        </div>
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div
+                                          className="rounded-xl border px-3 py-4"
+                                          style={{
+                                            borderColor: `${preview.accent}44`,
+                                            backgroundColor: preview.surface,
+                                          }}
+                                        >
+                                          <div
+                                            className="h-2 rounded-full"
+                                            style={{ backgroundColor: preview.accent }}
+                                          />
+                                          <div
+                                            className="mt-3 h-2 rounded-full"
+                                            style={{ backgroundColor: `${preview.text}33` }}
+                                          />
+                                          <div
+                                            className="mt-2 h-2 w-4/5 rounded-full"
+                                            style={{ backgroundColor: `${preview.text}22` }}
+                                          />
+                                        </div>
+                                        <div
+                                          className="rounded-xl border px-3 py-4"
+                                          style={{
+                                            borderColor: `${preview.accentStrong}44`,
+                                            backgroundColor: preview.surface,
+                                          }}
+                                        >
+                                          <div
+                                            className="h-8 rounded-lg"
+                                            style={{ backgroundColor: `${preview.accentStrong}33` }}
+                                          />
+                                          <div
+                                            className="mt-2 h-2 rounded-full"
+                                            style={{ backgroundColor: `${preview.text}33` }}
+                                          />
+                                          <div
+                                            className="mt-2 h-2 w-3/4 rounded-full"
+                                            style={{ backgroundColor: `${preview.text}22` }}
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="mt-4 grid gap-3 md:grid-cols-2">
+                              <div className="rounded-xl border border-white/8 bg-white/5 px-3 py-3 text-sm text-slate-100">
+                                <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                                  Estilo / estructura
+                                </div>
+                                <div className="mt-2 leading-6">
+                                  {getVisualStyleLabel(artifact.visualStyle) ||
+                                    'Sin estilo visual'}{' '}
+                                  ·{' '}
+                                  {getLayoutVariantLabel(artifact.layoutVariant) ||
+                                    'Sin estructura'}
+                                </div>
+                                <div className="mt-1 text-xs leading-5 text-slate-400">
+                                  Apertura principal:{' '}
+                                  {getHeroStyleLabel(artifact.heroStyle) ||
+                                    'Sin apertura principal'}
+                                </div>
+                              </div>
+                              <div className="rounded-xl border border-white/8 bg-white/5 px-3 py-3 text-sm text-slate-100">
+                                <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                                  Llamados a la acción
+                                </div>
+                                <div className="mt-2 leading-6">
+                                  {artifact.primaryCta || 'Sin acción principal'}
+                                </div>
+                                <div className="mt-1 text-xs leading-5 text-slate-400">
+                                  {artifact.secondaryCta || 'Sin acción secundaria'}
+                                </div>
+                              </div>
+                              <div className="rounded-xl border border-white/8 bg-white/5 px-3 py-3 text-sm text-slate-100">
+                                <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                                  Tipografías
+                                </div>
+                                <div className="mt-2 leading-6">
+                                  {artifact.typography?.headingFamily || 'Sin tipografía principal'}
+                                </div>
+                                <div className="mt-1 text-xs leading-5 text-slate-400">
+                                  {artifact.typography?.bodyFamily || 'Sin tipografía secundaria'}
+                                </div>
+                              </div>
+                              <div className="rounded-xl border border-white/8 bg-white/5 px-3 py-3 text-sm text-slate-100">
+                                <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                                  Colores
+                                </div>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {visibleColors.length > 0 ? (
+                                    visibleColors.map((colorValue) => (
+                                      <span
+                                        key={`${artifact.id}-${colorValue}`}
+                                        title={colorValue}
+                                        className="h-6 w-6 rounded-full border border-white/10"
+                                        style={{ backgroundColor: colorValue }}
+                                      />
+                                    ))
+                                  ) : (
+                                    <span className="text-xs leading-5 text-slate-400">
+                                      Sin paleta registrada
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 text-xs leading-5 text-slate-400">
+                              {artifact.tags && artifact.tags.length > 0
+                                ? `Etiquetas: ${artifact.tags.join(', ')}`
+                                : 'Sin etiquetas registradas'}
+                            </div>
+                            <div className="mt-2 text-xs leading-5 text-slate-400">
+                              {artifact.preview?.status === 'generated'
+                                ? 'Vista previa real disponible'
+                                : artifact.preview?.status === 'failed'
+                                  ? `Vista previa real no disponible: ${artifact.preview.errorMessage || 'la captura falló'}`
+                                  : artifact.preview?.status === 'unavailable'
+                                    ? 'Vista previa real no disponible para este artefacto'
+                                    : 'Vista previa sintética generada a partir de los datos del artefacto'}
+                            </div>
+                            <div className="mt-2 text-xs leading-5 text-slate-500">
+                              {artifact.localPath || 'Sin ruta local asociada'}
+                            </div>
+                          </article>
+                        )
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Última instrucción del planificador
+                    </div>
+                    <div className="mt-2 text-sm leading-6 text-slate-100">
+                      {plannerInstruction}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Último resultado del ejecutor
+                </div>
+                <div className="mt-2 text-sm leading-6 text-slate-100">
+                  {executorResult}
+                </div>
+              </div>
+              {hasLastExecutorSnapshot ? (
+                <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Último estado útil del ejecutor
+                  </div>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Subtarea
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-100">
+                        {lastExecutorSnapshot?.currentSubtask ||
+                          lastExecutorSnapshot?.currentStep ||
+                          'No disponible'}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Accion
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-100">
+                        {lastExecutorSnapshot?.currentAction || 'No disponible'}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Comando
+                      </div>
+                      <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-100">
+                        {lastExecutorSnapshot?.currentCommand || 'No disponible'}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Ruta objetivo
+                      </div>
+                      <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-100">
+                        {lastExecutorSnapshot?.currentTargetPath || 'No disponible'}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Archivos creados o tocados
+                      </div>
+                      <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-100">
+                        {[
+                          ...(lastExecutorSnapshot?.createdPaths || []),
+                          ...(lastExecutorSnapshot?.touchedPaths || []),
+                        ]
+                          .filter((value, index, array) => array.indexOf(value) === index)
+                          .slice(0, 10)
+                          .join('\n') || 'No disponible'}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Tipo de fallo
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-100">
+                        {lastExecutorSnapshot?.failureType || 'Sin clasificar'}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 md:col-span-2">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Salida parcial
+                      </div>
+                      <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-100">
+                        {lastExecutorSnapshot?.stderr ||
+                          lastExecutorSnapshot?.stdout ||
+                          'No disponible'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Estado del ejecutor
+                </div>
+                <div className="mt-2 text-sm leading-6 text-slate-100">
+                  {executorRequestStateLabel}
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Paso actual
+                </div>
+                <div className="mt-2 text-sm leading-6 text-slate-100">
+                  {visibleCurrentStepLabel}
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                <div className="text-lg font-semibold text-white">
+                  Estado del flujo
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Modo
+                    </div>
+                    <div className="mt-2 text-sm leading-6 text-slate-100">
+                      {flowModeLabel}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Etapa actual
+                    </div>
+                    <div className="mt-2 text-sm leading-6 text-slate-100">
+                      {flowStageLabel}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Aprobación pendiente
+                    </div>
+                    <div className="mt-2 text-sm leading-6 text-slate-100">
+                      {flowApprovalPendingLabel}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Origen de aprobación
+                    </div>
+                    <div className="mt-2 text-sm leading-6 text-slate-100">
+                      {flowApprovalSourceLabel}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                <div className="text-lg font-semibold text-white">
+                  Última corrida
+                </div>
+                <div className="mt-4 grid auto-rows-fr gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                  <div className="min-w-0 rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Objetivo
+                    </div>
+                    <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-100">
+                      {lastRunSummary.objective}
+                    </div>
+                  </div>
+                  <div className="min-w-0 rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Instrucción
+                    </div>
+                    <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-100">
+                      {lastRunSummary.instruction}
+                    </div>
+                  </div>
+                  <div className="min-w-0 rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Resultado
+                    </div>
+                    <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-100">
+                      {lastRunSummary.result}
+                    </div>
+                  </div>
+                  <div className="min-w-0 rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Contexto
+                    </div>
+                    <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-100">
+                      {lastRunSummary.context}
+                    </div>
+                  </div>
+                  <div className="min-w-0 rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Espacio de trabajo
+                    </div>
+                    <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-100">
+                      {lastRunSummary.workspacePath}
+                    </div>
+                  </div>
+                  <div className="min-w-0 rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Aprobación
+                    </div>
+                    <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-100">
+                      {lastRunSummary.approval}
+                    </div>
+                  </div>
+                  <div className="min-w-0 rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Estado final
+                    </div>
+                    <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-100">
+                      {lastRunSummary.finalStatus}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Estado
+                  </div>
+                  <div className="mt-3">
+                    <span className="inline-flex w-fit rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-xs font-medium text-amber-200">
+                      {sessionStatus}
+                    </span>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Política del proyecto
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-100">
+                    {projectPolicyAllowed
+                      ? 'Permitido para este proyecto'
+                      : 'Todavía no hay una aprobación persistente'}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Plataforma
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-100">
+                    {platform}
+                  </div>
+                </div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-4">
+                <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Conexión local
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-100">
+                    {runtimeStatus.connection}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Plataforma
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-100">
+                    {runtimeStatus.platform}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Electron
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-100">
+                    {runtimeStatus.electron}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Node
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-100">
+                    {runtimeStatus.node}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {isFlowConsoleOpen ? (
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/72 px-4 py-4 backdrop-blur-sm sm:px-6">
+            <div className="flex max-h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-slate-950/95 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+              <div className="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-6">
+                <div>
+                  <div className="text-lg font-semibold text-white">
+                    Consola del flujo
+                  </div>
+                  <div className="mt-1 text-sm text-slate-400">
+                    Seguimiento en vivo del planificador, el orquestador, el puente local y Codex.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFlowConsoleVisibility({ open: false, pinned: false })
+                  }}
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                >
+                  Cerrar
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-auto p-5 sm:p-6">
+                <div className="rounded-2xl border border-white/8 bg-white/5 px-4 py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-lg font-semibold text-white">
+                      Barra de ejecución
+                    </div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      {flowExecutionFinished
+                        ? `Etapa actual: ${flowExecutionHeaderLabel}`
+                        : `Etapa activa: ${flowExecutionHeaderLabel}`}
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-2 md:grid-cols-5">
+                    {flowExecutionStages.map((stage, index) => {
+                      const stageState = flowExecutionStageStates[index]
+
+                      return (
+                        <div
+                          key={stage}
+                          className={`rounded-xl border px-4 py-3 text-sm font-medium transition ${
+                            stageState === 'active'
+                              ? 'border-sky-300/40 bg-sky-300/15 text-sky-100'
+                              : stageState === 'completed'
+                                ? 'border-emerald-300/30 bg-emerald-300/10 text-emerald-100'
+                                : stageState === 'not-required'
+                                  ? 'border-white/10 bg-white/[0.03] text-slate-300'
+                                  : 'border-white/8 bg-slate-950/50 text-slate-300'
+                          }`}
+                        >
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.18em]">
+                            {stage}
+                          </div>
+                          <div className="mt-2 text-xs leading-5">
+                            {stageState === 'active'
+                              ? 'Activa'
+                              : stageState === 'completed'
+                                ? 'Completada'
+                                : stageState === 'not-required'
+                                  ? 'No requerido'
+                                  : 'En espera'}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="mt-4 rounded-2xl border border-white/8 bg-white/5 px-4 py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-lg font-semibold text-white">
+                      Resumen compacto de la corrida
+                    </div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Prueba integral
+                    </div>
+                  </div>
+                  {latestExecutionRunSummary ? (
+                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          id de corrida / escenario
+                        </div>
+                        <div className="mt-2 text-sm leading-6 text-slate-100">
+                          {latestExecutionRunSummary.latestRequestId}
+                        </div>
+                        <div className="mt-2">
+                          <span
+                            className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${getExecutionRunScenarioTone(
+                              latestExecutionRunSummary.scenarioLabel,
+                            )}`}
+                          >
+                            {latestExecutionRunSummary.scenarioLabel}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          objetivo / estado
+                        </div>
+                        <div className="mt-2 text-sm leading-6 text-slate-100">
+                          {latestExecutionRunSummary.objectiveSummary}
+                        </div>
+                        <div className="mt-2 text-xs leading-5 text-slate-400">
+                          {getExecutionRunStatusLabel(latestExecutionRunSummary.status)}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Reintentos / fallos repetidos
+                        </div>
+                        <div className="mt-2 text-sm leading-6 text-slate-100">
+                          {latestExecutionRunSummary.recoveries} /{' '}
+                          {latestExecutionRunSummary.repeatedFailureCount || 0}
+                        </div>
+                        <div className="mt-2 text-xs leading-5 text-slate-400">
+                          {getTechnicalDiagnosticLabel(
+                            latestExecutionRunSummary.latestRecoveryMode,
+                            'Sin recuperación aplicada',
+                          )}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          progreso / rutas
+                        </div>
+                        <div className="mt-2 text-sm leading-6 text-slate-100">
+                          {latestExecutionRunSummary.hasMaterialProgress
+                            ? 'Material real detectado'
+                            : 'Sin progreso material'}
+                        </div>
+                        <div className="mt-2 text-xs leading-5 text-slate-400">
+                          {mergeUniqueStringValues(
+                            latestExecutionRunSummary.createdPaths,
+                            latestExecutionRunSummary.touchedPaths,
+                            6,
+                          ).join(', ') || 'Sin archivos registrados'}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-4 rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                      La consola todavía no tiene una corrida ejecutada para resumir.
+                    </div>
+                  )}
+                </div>
+                <div className="grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
+                  <div
+                    ref={flowActivityContainerRef}
+                    className="min-h-0 overflow-auto rounded-2xl border border-white/8 bg-white/5 px-4 py-4"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-lg font-semibold text-white">
+                        Actividad en vivo
+                      </div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Últimos 6 eventos
+                      </div>
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      {liveActivityEvents.map((event, index) => (
+                        <div
+                          key={`modal-live-${sessionEvents.length - index}-${event}`}
+                          className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${
+                            index === 0
+                              ? 'border-sky-300/30 bg-sky-300/10 shadow-[0_0_0_1px_rgba(125,211,252,0.08)]'
+                              : 'border-white/8 bg-slate-950/50'
+                          }`}
+                        >
+                          <span className="inline-flex min-w-12 justify-center rounded-full border border-sky-300/20 bg-sky-300/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-100">
+                            {index === 0 ? 'Ahora' : `Hace ${index}`}
+                          </span>
+                          <span className="text-sm leading-6 text-slate-100">
+                            {event}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div
+                    ref={flowConversationContainerRef}
+                    className="min-h-0 overflow-auto rounded-2xl border border-white/8 bg-white/5 px-4 py-4"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-lg font-semibold text-white">
+                        Conversación interna del sistema
+                      </div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Flujo técnico completo
+                      </div>
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      {flowMessages.length === 0 ? (
+                        <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                          Todavía no hay mensajes internos registrados en esta sesión.
+                        </div>
+                      ) : (
+                        flowMessages.map((message, index) => (
+                          <div
+                            key={`modal-${message.id}-${index}`}
+                            className={`rounded-xl border px-4 py-4 ${
+                              message.id === latestFlowMessage?.id
+                                ? 'border-sky-300/30 bg-sky-300/10 shadow-[0_0_0_1px_rgba(125,211,252,0.08)]'
+                                : 'border-white/8 bg-slate-950/50'
+                            }`}
+                          >
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="flex items-center gap-3">
+                                <span className="inline-flex rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-100">
+                                  {message.source}
+                                </span>
+                                <div className="text-sm font-medium text-white">
+                                  {message.title}
+                                </div>
+                              </div>
+                              <span className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                                {message.status || 'info'}
+                              </span>
+                            </div>
+                            <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-100">
+                              {message.content}
+                            </div>
+                            {message.raw ? (
+                              <pre className="mt-3 max-h-56 overflow-auto rounded-xl border border-white/8 bg-slate-950/80 px-4 py-3 text-xs leading-5 text-slate-300">
+                                {message.raw}
+                              </pre>
+                            ) : null}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div
+                  ref={flowTimelineContainerRef}
+                  className="mt-4 rounded-2xl border border-white/8 bg-white/5 px-4 py-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-lg font-semibold text-white">
+                      Línea de tiempo de la sesión
+                    </div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Historial completo
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {sessionEvents.map((event, index) => (
+                      <div
+                        key={`modal-timeline-${index + 1}-${event}`}
+                        className={`flex items-start gap-4 rounded-xl border px-4 py-3 ${
+                          index === sessionEvents.length - 1
+                            ? 'border-sky-300/30 bg-sky-300/10 shadow-[0_0_0_1px_rgba(125,211,252,0.08)]'
+                            : 'border-white/8 bg-slate-950/50'
+                        }`}
+                      >
+                        <span className="mt-2 h-2.5 w-2.5 flex-none rounded-full bg-sky-300" />
+                        <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                          <span className="text-sm text-slate-100">{event}</span>
+                          <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                            {`Evento ${String(index + 1).padStart(2, '0')}`}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {decisionPending && visiblePendingInstruction ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/72 px-4 py-6 backdrop-blur-sm sm:px-6">
+            <div className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-amber-400/20 bg-slate-950/95 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+              <div className="border-b border-white/10 px-5 py-5 sm:px-6">
+                <div className="inline-flex rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-amber-200">
+                    Aprobación requerida
+                </div>
+                <h2 className="mt-4 text-xl font-semibold text-white sm:text-2xl">
+                  Hace falta tu decisión para esta tarea
+                </h2>
+                <div className="mt-4 rounded-2xl border border-sky-300/15 bg-sky-300/8 px-4 py-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-200/80">
+                    Pregunta del Cerebro
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-slate-100">
+                    {approvalMessage || DEFAULT_APPROVAL_MESSAGE}
+                  </p>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+                <div className="space-y-5">
+                  {visibleApprovalOptions.length > 0 ? (
+                    <section className="space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            Opciones sugeridas
+                          </div>
+                          <p className="mt-1 text-xs leading-5 text-slate-400">
+                            Elegí la alternativa que mejor represente tu decisión.
+                          </p>
+                        </div>
+                        <div className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-slate-400">
+                          {visibleApprovalOptions.length} opciones
+                        </div>
+                      </div>
+                      <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                        {visibleApprovalOptions.map((option) => (
+                          <label
+                            key={option.key}
+                            className={`flex cursor-pointer gap-3 rounded-2xl border px-4 py-3 transition ${
+                              approvalSelectedOption === option.key
+                                ? 'border-sky-300/40 bg-sky-300/10 shadow-[0_8px_24px_rgba(56,189,248,0.12)]'
+                                : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="approval-option"
+                              value={option.key}
+                              checked={approvalSelectedOption === option.key}
+                              onChange={(event) =>
+                                setApprovalSelectedOption(event.target.value)
+                              }
+                              className="mt-1 h-4 w-4 flex-none border-white/20 bg-slate-950 text-sky-300"
+                            />
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium text-white">
+                                {option.label}
+                              </div>
+                              {option.description ? (
+                                <div className="mt-1 text-xs leading-5 text-slate-400">
+                                  {option.description}
+                                </div>
+                              ) : null}
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+                  {activeApprovalRequest?.allowFreeAnswer ? (
+                    <section className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            Respuesta libre
+                          </div>
+                          <p className="mt-1 text-xs leading-5 text-slate-400">
+                            {approvalResponseRequiresOption &&
+                            activeApprovalInteractionMode === 'mixed'
+                              ? 'Podés complementar la opción elegida con contexto o escribir una respuesta propia.'
+                              : approvalResponseRequiresOption
+                                ? 'Si lo necesitás, agregá una aclaración breve además de la opción.'
+                                : 'Respondé con el criterio o la definición que querés reenviar al Cerebro.'}
+                          </p>
+                        </div>
+                        <div className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-slate-400">
+                          Opcional
+                        </div>
+                      </div>
+                      <textarea
+                        value={approvalFreeAnswer}
+                        onChange={(event) => setApprovalFreeAnswer(event.target.value)}
+                        placeholder="Escribí acá la decisión, el criterio o la aclaración que querés reenviar al Cerebro."
+                        className="min-h-[140px] w-full resize-y rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-500 focus:border-sky-300/40 focus:bg-slate-900"
+                      />
+                    </section>
+                  ) : null}
+                  <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          {approvalSource === 'executor'
+                            ? 'Ejecución pendiente'
+                            : 'Instrucción pendiente'}
+                        </div>
+                        <div className="mt-2 text-sm leading-6 text-slate-100">
+                          {visiblePendingInstruction}
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </div>
+              <div className="border-t border-white/10 bg-slate-950/95 px-5 py-4 sm:px-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                  <button
+                    type="button"
+                    onClick={handleApproveOnce}
+                    disabled={!canSendRichApprovalResponse}
+                    className="rounded-xl border border-amber-200/20 bg-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {activeApprovalInteractionMode === 'binary'
+                      ? 'Aprobar una vez'
+                      : 'Enviar respuesta al Cerebro'}
+                  </button>
+                  {activeApprovalInteractionMode === 'binary' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleRejectApproval}
+                        className="rounded-xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm font-medium text-rose-50 transition hover:bg-rose-300/15"
+                      >
+                        Rechazar
+                      </button>
+                      {canPersistCurrentApprovalRule ? (
+                        <button
+                          type="button"
+                          onClick={handleAllowForProject}
+                          className="rounded-xl border border-amber-300/30 bg-amber-200/10 px-4 py-3 text-sm font-medium text-amber-50 transition hover:bg-amber-200/15"
+                        >
+                          Permitir siempre para este proyecto
+                        </button>
+                      ) : null}
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleRejectApproval}
+                      className="rounded-xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm font-medium text-rose-50 transition hover:bg-rose-300/15"
+                    >
+                      Cancelar y devolver rechazo al Cerebro
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </main>
+  ) : (
+    <main
+      ref={appRootRef}
+      className={joinClasses(
+        'w-full bg-transparent text-slate-100',
+        experienceMode === 'guided'
+          ? 'h-screen overflow-hidden'
+          : 'min-h-screen',
+      )}
+    >
+      <div
+        className={joinClasses(
+          'mx-auto flex w-full max-w-[1600px] flex-col px-4 py-6 sm:px-6 lg:px-8',
+          experienceMode === 'guided'
+            ? 'h-full overflow-hidden'
+            : 'min-h-screen',
+        )}
+      >
+        <div className="mb-3 rounded-3xl border border-white/10 bg-slate-950/50 px-4 py-2.5 shadow-[0_18px_50px_rgba(0,0,0,0.28)] sm:px-5">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                Experiencia principal
+              </div>
+              <div className="mt-1 text-base font-semibold text-white">
+                {experienceMode === 'guided'
+                  ? 'Flujo guiado paso a paso'
+                  : 'Panel avanzado'}
+              </div>
+              <p className="mt-1 text-xs leading-4 text-slate-400">
+                {experienceMode === 'guided'
+                  ? 'La app te lleva por un recorrido compacto, con foco en completar un paso y seguir.'
+                  : 'La vista avanzada conserva el tablero reorganizado para inspecci\u00f3n y diagn\u00f3stico.'}
+              </p>
+            </div>
+            <div className="inline-flex rounded-2xl border border-white/10 bg-white/[0.04] p-1">
+              <button
+                type="button"
+                onClick={() => setExperienceMode('guided')}
+                className={joinClasses(
+                  'rounded-xl px-4 py-2 text-sm font-medium transition',
+                  experienceMode === 'guided'
+                    ? 'bg-sky-300/15 text-sky-100'
+                    : 'text-slate-300 hover:bg-white/5',
+                )}
+              >
+                Flujo guiado
+              </button>
+              <button
+                type="button"
+                onClick={() => setExperienceMode('advanced')}
+                className={joinClasses(
+                  'rounded-xl px-4 py-2 text-sm font-medium transition',
+                  experienceMode === 'advanced'
+                    ? 'bg-sky-300/15 text-sky-100'
+                    : 'text-slate-300 hover:bg-white/5',
+                )}
+              >
+                Panel avanzado
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {experienceMode === 'guided' ? (
+          <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_240px]">
+            <section className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-white/10 bg-slate-950/60 p-3 shadow-[0_18px_50px_rgba(0,0,0,0.28)] sm:p-4">
+              <div className="flex flex-col gap-2 border-b border-white/8 pb-3">
+                <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-200/80">
+                      Paso {activeWizardStepIndex + 1} de {GUIDED_WIZARD_STEPS.length}
+                    </div>
+                    <div className="mt-1 text-lg font-semibold text-white sm:text-xl">
+                      {activeWizardStepConfig.label}
+                    </div>
+                    <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-400">
+                      {activeWizardStepConfig.description}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-[11px] font-medium text-emerald-100">
+                      <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-200/80">
+                        Planificador
+                      </span>
+                      <span>{plannerBadge}</span>
+                    </div>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-[11px] font-medium text-amber-100">
+                      <span className="text-[10px] uppercase tracking-[0.18em] text-amber-200/80">
+                        Ejecutor
+                      </span>
+                      <span>{executorRequestStateLabel}</span>
+                    </div>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-slate-200">
+                      <span className="text-[10px] uppercase tracking-[0.18em] text-slate-400">
+                        Reuse
+                      </span>
+                      <span>{activeReuseModeLabel}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid gap-2 md:grid-cols-7">
+                  {GUIDED_WIZARD_STEPS.map((step, index) => {
+                    const isActive = step.key === activeWizardStep
+                    const isCompleted = index < activeWizardStepIndex
+
+                    return (
+                      <button
+                        key={step.key}
+                        type="button"
+                        onClick={() => setActiveWizardStep(step.key)}
+                        className={joinClasses(
+                          'rounded-xl border px-2 py-1.5 text-left transition',
+                          isActive
+                            ? 'border-sky-300/35 bg-sky-300/12 text-white'
+                            : isCompleted
+                              ? 'border-emerald-300/25 bg-emerald-300/8 text-emerald-100'
+                              : 'border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]',
+                        )}
+                      >
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em]">
+                          {String(index + 1).padStart(2, '0')}
+                        </div>
+                        <div className="mt-0.5 text-xs font-medium leading-4 sm:text-sm">
+                          {step.label}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="mt-3 min-h-0 flex-1 overflow-auto pr-1">
+                {activeWizardStep === 'goal' ? (
+                  <div className="grid h-full gap-4">
+                    <div className="flex h-full min-h-[360px] flex-col rounded-3xl border border-white/8 bg-white/[0.03] p-4 sm:p-5">
+                      <label
+                        htmlFor="guided-goal-input"
+                        className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                      >
+                        Objetivo actual
+                      </label>
+                      <textarea
+                        id="guided-goal-input"
+                        value={goalInput}
+                        onChange={(event) => setGoalInput(event.target.value)}
+                        rows={8}
+                        className="mt-3 min-h-[220px] w-full flex-1 rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-4 text-sm leading-7 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
+                        placeholder="Escribí qué querés que la app resuelva."
+                      />
+                      <div className="mt-3 text-sm leading-6 text-slate-400">
+                        El objetivo es la entrada principal del flujo. Si está claro,
+                        el resto del recorrido se vuelve mucho más corto.
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {activeWizardStep === 'context' ? (
+                  <div className="grid h-full gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+                    <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
+                      <label
+                        htmlFor="guided-context-input"
+                        className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                      >
+                        Contexto adicional
+                      </label>
+                      <textarea
+                        id="guided-context-input"
+                        ref={executionContextInputRef}
+                        value={executionContextInput}
+                        onChange={(event) => setExecutionContextInput(event.target.value)}
+                        rows={10}
+                        className="mt-4 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-4 text-sm leading-7 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
+                        placeholder="Sumá restricciones, referencias, alcance o contexto operativo."
+                      />
+                    </article>
+                    <div className="space-y-4">
+                      <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Participación del usuario
+                        </div>
+                        <div className="mt-4 grid gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setUserParticipationMode('user-will-contribute')}
+                            className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
+                              userParticipationMode === 'user-will-contribute'
+                                ? 'border-sky-300/40 bg-sky-300/15 text-sky-100'
+                                : 'border-white/10 bg-slate-950/50 text-slate-200 hover:bg-white/10'
+                            }`}
+                          >
+                            Sí, voy a aportar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setUserParticipationMode('brain-decides-missing')}
+                            className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
+                              userParticipationMode === 'brain-decides-missing'
+                                ? 'border-emerald-300/40 bg-emerald-300/15 text-emerald-100'
+                                : 'border-white/10 bg-slate-950/50 text-slate-200 hover:bg-white/10'
+                            }`}
+                          >
+                            No, decidí vos
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setUserParticipationMode(DEFAULT_USER_PARTICIPATION_MODE)}
+                            className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-left text-sm font-medium text-slate-300 transition hover:bg-white/10"
+                          >
+                            Sin definir
+                          </button>
+                        </div>
+                        <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                          {userParticipationSummary}
+                        </div>
+                      </article>
+                      <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Espacio de trabajo
+                        </div>
+                        <textarea
+                          id="guided-workspace-path"
+                          value={workspacePath}
+                          onChange={(event) => setWorkspacePath(event.target.value)}
+                          rows={3}
+                          className="mt-4 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
+                        />
+                        <div className="mt-3 text-sm text-slate-400">
+                          {workspaceStatusLabel}
+                        </div>
+                      </article>
+                    </div>
+                  </div>
+                ) : null}
+
+                {activeWizardStep === 'brain' ? (
+                  <div className="grid h-full gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+                    <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Modo / criterio
+                      </div>
+                      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                        {BRAIN_COST_MODE_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setBrainCostMode(option.value)}
+                            className={`rounded-2xl border px-4 py-4 text-left transition ${
+                              brainCostMode === option.value
+                                ? 'border-sky-300/40 bg-sky-300/15 text-sky-100'
+                                : 'border-white/10 bg-slate-950/50 text-slate-200 hover:bg-white/10'
+                            }`}
+                          >
+                            <div className="text-sm font-medium">{option.label}</div>
+                            <div className="mt-1 text-xs leading-5 text-slate-400">
+                              {option.description}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </article>
+                    <div className="space-y-4">
+                      <MetricCard
+                        label="Modo activo"
+                        value={getBrainCostModeLabel(brainCostMode)}
+                        detail={activeBrainRoutingMode}
+                        tone="sky"
+                      />
+                      <MetricCard
+                        label="Proveedor"
+                        value={`${activeBrainSelectedProvider} -> ${activeBrainResolvedProvider}`}
+                        detail={`Confianza: ${activeBrainRoutingConfidence}`}
+                      />
+                      <MetricCard
+                        label="Naturaleza"
+                        value={activeBrainProblemNature}
+                        detail={activeBrainRoutingReason}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+
+                {activeWizardStep === 'memory' ? (
+                  <div className="grid h-full gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+                    <div className="space-y-4">
+                      <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
+                        <label
+                          htmlFor="guided-reuse-mode"
+                          className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                        >
+                          Modo reusable
+                        </label>
+                        <select
+                          id="guided-reuse-mode"
+                          value={manualReuseMode}
+                          onChange={(event) =>
+                            setManualReuseMode(event.target.value as ManualReuseMode)
+                          }
+                          className="mt-4 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition focus:border-sky-300/40"
+                        >
+                          <option value="auto">Búsqueda automática</option>
+                          <option value="none">No reutilizar</option>
+                          <option value="inspiration-only">Usar solo inspiración</option>
+                          <option value="reuse-style">Reutilizar estilo</option>
+                          <option value="reuse-structure">Reutilizar estructura</option>
+                          <option value="reuse-style-and-structure">
+                            Reutilizar estilo y estructura
+                          </option>
+                        </select>
+                        <div className="mt-4 text-sm leading-6 text-slate-300">
+                          {manualReusablePreferencePayload
+                            ? manualReusablePreferencePayload.artifactId
+                              ? `El planificador va a priorizar ${manualReuseModeLabel.toLocaleLowerCase()} desde ${manualReusablePreferencePayload.artifactId}.`
+                              : 'La corrida va a seguir sin reutilización por decisión manual.'
+                            : 'Si no elegís nada, la app sigue con búsqueda automática.'}
+                        </div>
+                      </article>
+
+                      <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              Artefactos sugeridos
+                            </div>
+                            <div className="mt-2 text-sm text-slate-400">
+                              Elegí uno si querés orientar el plan. Si no, seguí igual.
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setExperienceMode('advanced')}
+                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                          >
+                            Ver panel avanzado
+                          </button>
+                        </div>
+                        <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                          {isLoadingReusableArtifacts ? (
+                            <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm text-slate-300 lg:col-span-3">
+                              Cargando artefactos reutilizables...
+                            </div>
+                          ) : reusableArtifactError ? (
+                            <div className="rounded-2xl border border-red-300/20 bg-red-300/10 px-4 py-4 text-sm text-red-100 lg:col-span-3">
+                              {reusableArtifactError}
+                            </div>
+                          ) : reusableWizardArtifacts.length === 0 ? (
+                            <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm text-slate-300 lg:col-span-3">
+                              No hay artefactos listos para sugerir en esta vista compacta.
+                            </div>
+                          ) : (
+                            reusableWizardArtifacts.map((artifact) => {
+                              const preview = buildReusableArtifactPreviewModel(artifact)
+                              const isSelected = selectedReusableArtifact?.id === artifact.id
+
+                              return (
+                                <article
+                                  key={artifact.id}
+                                  data-reusable-artifact-card={artifact.id}
+                                  className={joinClasses(
+                                    'rounded-2xl border p-4',
+                                    isSelected
+                                      ? 'border-sky-300/30 bg-sky-300/10'
+                                      : 'border-white/8 bg-slate-950/50',
+                                  )}
+                                >
+                                  <div
+                                    data-reusable-artifact-preview={artifact.id}
+                                    className="rounded-2xl border border-white/10 p-4"
+                                    style={{
+                                      background: preview.background,
+                                      color: preview.text,
+                                    }}
+                                  >
+                                    <div className="text-[10px] font-semibold uppercase tracking-[0.24em]">
+                                      {preview.heroLabel}
+                                    </div>
+                                    <div className="mt-2 text-lg font-semibold">
+                                      {artifact.sectorLabel || artifact.sector || artifact.id}
+                                    </div>
+                                    <div className="mt-2 text-xs leading-5">
+                                      {preview.previewBody}
+                                    </div>
+                                  </div>
+                                  <div className="mt-4 flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      data-reusable-artifact-select={artifact.id}
+                                      onClick={() => {
+                                        setSelectedReusableArtifact(artifact)
+                                        setManualReuseMode((currentValue) =>
+                                          currentValue === 'auto'
+                                            ? 'reuse-style-and-structure'
+                                            : currentValue,
+                                        )
+                                      }}
+                                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                                    >
+                                      {isSelected ? 'Seleccionado' : 'Usar este artefacto'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setDetailReusableArtifact(artifact)}
+                                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                                    >
+                                      Ver detalle
+                                    </button>
+                                  </div>
+                                </article>
+                              )
+                            })
+                          )}
+                        </div>
+                      </article>
+                    </div>
+                    <div className="space-y-4">
+                      <MetricCard
+                        label="Selección actual"
+                        value={manualReuseModeLabel}
+                        detail={selectedReusableArtifactSummary}
+                        tone={manualReuseMode === 'auto' ? 'default' : 'sky'}
+                      />
+                      <MetricCard
+                        label="Memoria reutilizable"
+                        value={`${activeReuseModeLabel} / ${activeReuseFoundCount} coincidencia(s)`}
+                        detail={activeReuseDetailLabel}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+
+                {activeWizardStep === 'plan' ? (
+                  <div className="grid h-full gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+                    <div className="space-y-4">
+                      <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              Plan generado
+                            </div>
+                            <div className="mt-2 text-sm text-slate-400">
+                              Revisá la instrucción y ejecutá cuando te cierre.
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleWizardGeneratePlan}
+                            disabled={isPlanning}
+                            className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                          >
+                            {isPlanning ? 'Generando...' : 'Generar plan'}
+                          </button>
+                        </div>
+                        <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-7 text-slate-100">
+                          {hasWizardPlan
+                            ? plannerInstruction
+                            : 'Todavía no generaste un plan en esta corrida.'}
+                        </div>
+                      </article>
+                      <div className="grid gap-3 lg:grid-cols-2">
+                        <MetricCard
+                          label="Ruta planificada"
+                          value={activeExecutionModeLabel}
+                          detail={activePlannerStrategyLabel}
+                          tone="sky"
+                        />
+                        <MetricCard
+                          label="MEMORIA externa"
+                          value={activeContextHubLabel}
+                          detail={activeContextHubUiDetail}
+                          tone={activeContextHubStatus?.available ? 'emerald' : 'amber'}
+                        />
+                        <MetricCard
+                          label="Motivo resumido"
+                          value={plannerExecutionMetadata.reason || 'No disponible'}
+                        />
+                        <MetricCard
+                          label="Siguiente acción"
+                          value={
+                            plannerExecutionMetadata.nextExpectedAction || 'No disponible'
+                          }
+                        />
+                        <MetricCard
+                          label="Memoria reusable aplicada"
+                          value={activeReuseModeLabel}
+                          detail={activeReuseArtifactSummary}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <MetricCard
+                        label="decisionKey"
+                        value={activeDecisionKeyLabel}
+                      />
+                      <MetricCard
+                        label="Tareas previstas"
+                        value={
+                          effectivePlannerExecutionMetadata.tasks.length > 0
+                            ? `${effectivePlannerExecutionMetadata.tasks.length} paso(s)`
+                            : 'Sin tareas estructuradas'
+                        }
+                        detail={
+                          effectivePlannerExecutionMetadata.tasks[0]?.title ||
+                          effectivePlannerExecutionMetadata.tasks[0]?.operation ||
+                          'No disponible'
+                        }
+                      />
+                    </div>
+                  </div>
+                ) : null}
+
+                {activeWizardStep === 'execution' ? (
+                  <div className="grid h-full gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+                    <div className="space-y-4">
+                      <div className="grid gap-3 md:grid-cols-4">
+                        <MetricCard
+                          label="Estado"
+                          value={executorRequestStateLabel}
+                          detail={activeOperationalE2eStatusLabel}
+                          tone="amber"
+                        />
+                        <MetricCard
+                          label="Etapa"
+                          value={flowStageLabel}
+                          detail={flowModeLabel}
+                        />
+                        <MetricCard
+                          label="Paso actual"
+                          value={visibleCurrentStepLabel}
+                        />
+                        <MetricCard
+                          label={contextualExecutorModeCardLabel}
+                          value={contextualExecutorModeLabel}
+                          detail={contextualExecutorModeDetail}
+                        />
+                      </div>
+
+                      {decisionPending ? (
+                        <article className="rounded-3xl border border-amber-300/25 bg-amber-300/10 p-5">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100">
+                            Bloqueo por aprobación
+                          </div>
+                          <div className="mt-3 text-sm leading-6 text-amber-50">
+                            Hay una decisión humana pendiente. El modal de aprobación
+                            ya quedó abierto para resolverla sin perder el flujo.
+                          </div>
+                        </article>
+                      ) : null}
+
+                      <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Resultado del ejecutor
+                        </div>
+                        <div className="mt-4 whitespace-pre-wrap break-words rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-7 text-slate-100">
+                          {executorResult}
+                        </div>
+                      </article>
+                    </div>
+                    <div className="space-y-4">
+                      <MetricCard
+                        label="Conexión local"
+                        value={contextualConnectionLabel}
+                        detail={`${runtimeStatus.platform} · Electron ${runtimeStatus.electron}`}
+                        tone="emerald"
+                      />
+                      <MetricCard
+                        label={contextualRuntimeCardLabel}
+                        value={contextualRuntimeLabel}
+                        detail={contextualRuntimeDetail}
+                      />
+                      {fastRouteDetected ? (
+                        <>
+                          <MetricCard
+                            label="Codex"
+                            value="No requerido"
+                            detail="La resolución se cerró por ruta rápida local."
+                          />
+                          <MetricCard
+                            label="Bridge"
+                            value="No usado"
+                            detail="No hizo falta puente para esta ejecución."
+                          />
+                        </>
+                      ) : null}
+                      <MetricCard
+                        label="Resultado listo"
+                        value={wizardCanShowResult ? 'Sí' : 'Todavía no'}
+                        detail={
+                          wizardCanShowResult
+                            ? 'Ya podés pasar al resultado.'
+                            : 'Esperá a que cierre la ejecución.'
+                        }
+                      />
+                    </div>
+                  </div>
+                ) : null}
+
+                {activeWizardStep === 'result' ? (
+                  <div className="grid h-full gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+                    <div className="space-y-4">
+                      <ResultSectionCard
+                        title="Cierre"
+                        description="Lectura humana del resultado y estado final de la corrida."
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <ResultStatusBadge
+                              label={resultStatusPresentation.label}
+                              tone={resultStatusPresentation.tone}
+                            />
+                            <div className="text-sm leading-6 text-slate-300">
+                              {resultStatusPresentation.detail}
+                            </div>
+                          </div>
+                          {shouldShowVisibleFinalTextResponse ? (
+                            <button
+                              type="button"
+                              onClick={() => setIsFinalResponseOpen(true)}
+                              className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                            >
+                              Ver resultado completo
+                            </button>
+                          ) : null}
+                        </div>
+                        <div className="mt-4 whitespace-pre-wrap break-words rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-7 text-slate-100">
+                          {resultHumanText}
+                        </div>
+                        <div className="mt-4">
+                          <ResultKeyValueGrid
+                            items={[
+                              {
+                                label: 'Resumen corto',
+                                value: resultHumanSummary,
+                              },
+                              {
+                                label: 'Último requestId',
+                                value:
+                                  latestExecutionRunSummary?.latestRequestId ||
+                                  'Sin corrida registrada',
+                              },
+                              {
+                                label: 'Escenario',
+                                value:
+                                  latestExecutionRunSummary?.scenarioLabel ||
+                                  activeOperationalE2eScenarioLabel,
+                              },
+                              {
+                                label: 'Workspace',
+                                value: currentWorkspaceSummary,
+                              },
+                            ]}
+                          />
+                        </div>
+                      </ResultSectionCard>
+
+                      <ResultSectionCard
+                        title="Archivos"
+                        description="Resumen de carpeta principal, archivos creados, archivos tocados y alcance activo."
+                      >
+                        <ResultKeyValueGrid
+                          items={[
+                            {
+                              label: 'Carpeta principal',
+                              value: resultPrimaryAffectedPathLabel || 'No disponible',
+                            },
+                            {
+                              label: 'Target actual',
+                              value: resultCurrentTargetPathLabel || 'No disponible',
+                            },
+                            {
+                              label: 'Paths creados',
+                              value:
+                                resultCreatedPaths.length > 0
+                                  ? `${resultCreatedPaths.length} ruta(s)`
+                                  : 'Sin paths creados',
+                            },
+                            {
+                              label: 'Paths tocados',
+                              value:
+                                resultTouchedPaths.length > 0
+                                  ? `${resultTouchedPaths.length} ruta(s)`
+                                  : 'Sin paths tocados',
+                            },
+                          ]}
+                        />
+                        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                          <div className="space-y-2">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              createdPaths
+                            </div>
+                            <div className="grid gap-2">
+                              {resultCreatedPaths.length > 0 ? (
+                                resultCreatedPaths.map((artifactPath) => (
+                                  <div
+                                    key={`created-${artifactPath}`}
+                                    className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
+                                  >
+                                    {artifactPath}
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                                  No se reportaron rutas creadas.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              touchedPaths
+                            </div>
+                            <div className="grid gap-2">
+                              {resultTouchedPaths.length > 0 ? (
+                                resultTouchedPaths.map((artifactPath) => (
+                                  <div
+                                    key={`touched-${artifactPath}`}
+                                    className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
+                                  >
+                                    {artifactPath}
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                                  No se reportaron rutas tocadas.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </ResultSectionCard>
+
+                      <ResultSectionCard
+                        title="Validaciones"
+                        description="Chequeos reportados por la ejecución para confirmar la salida material."
+                      >
+                        <div className="flex flex-wrap items-center gap-3">
+                          <ResultStatusBadge
+                            label={
+                              latestValidationResults.length > 0
+                                ? `${latestValidationOkCount}/${latestValidationResults.length} OK`
+                                : 'Sin validaciones'
+                            }
+                            tone={
+                              latestValidationResults.length > 0 &&
+                              latestValidationOkCount === latestValidationResults.length
+                                ? 'emerald'
+                                : latestValidationResults.length > 0
+                                  ? 'amber'
+                                  : 'default'
+                            }
+                          />
+                          <div className="text-sm leading-6 text-slate-300">
+                            {resultValidationSummaryText}
+                          </div>
+                        </div>
+                        <div className="mt-4 grid gap-2">
+                          {resultValidationItems.length > 0 ? (
+                            resultValidationItems.map((item) => (
+                              <div
+                                key={item.key}
+                                className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3"
+                              >
+                                <div className="min-w-0">
+                                  <div className="text-sm font-medium leading-6 text-slate-100">
+                                    {item.label}
+                                  </div>
+                                  <div className="text-xs leading-5 text-slate-400">
+                                    {item.detail || 'Validación reportada'}
+                                  </div>
+                                </div>
+                                <ResultStatusBadge
+                                  label={item.ok ? 'OK' : 'Fallo'}
+                                  tone={item.ok ? 'emerald' : 'rose'}
+                                />
+                              </div>
+                            ))
+                          ) : (
+                            <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                              No hay validaciones disponibles para mostrar.
+                            </div>
+                          )}
+                        </div>
+                      </ResultSectionCard>
+
+                      <ResultSectionCard
+                        title="Reusable y scope"
+                        description="Aplicación real de memoria reusable y restricciones respetadas por la corrida."
+                      >
+                        <ResultKeyValueGrid
+                          items={[
+                            {
+                              label: 'Reusable',
+                              value: latestAppliedReuseModeLabel,
+                              detail:
+                                latestAppliedReuseMode.toLocaleLowerCase() === 'none'
+                                  ? 'No se aplicó memoria reusable en esta corrida.'
+                                  : resultReusableSummaryLabel,
+                            },
+                            {
+                              label: 'Campos aplicados',
+                              value:
+                                latestReuseAppliedFields.length > 0
+                                  ? latestReuseAppliedFields.join(', ')
+                                  : 'Sin campos reportados',
+                            },
+                            {
+                              label: 'Scope',
+                              value: resultScopeSummaryLabel,
+                              detail:
+                                latestContinuationAnchor || 'Sin continuation anchor reportado',
+                            },
+                            {
+                              label: 'Archivos bloqueados respetados',
+                              value:
+                                resultBlockedPaths.length > 0
+                                  ? resultScopeRespected
+                                    ? 'Sí'
+                                    : 'Revisar'
+                                  : 'No aplica',
+                              detail:
+                                resultBlockedPaths.length > 0
+                                  ? resultScopeRespected
+                                    ? 'Los paths bloqueados no aparecen en touchedPaths ni createdPaths.'
+                                    : 'Hay paths bloqueados que requieren revisión técnica.'
+                                  : 'La corrida no definió archivos bloqueados.',
+                            },
+                          ]}
+                        />
+                        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                          <div className="space-y-2">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              allowedTargetPaths
+                            </div>
+                            <div className="grid gap-2">
+                              {resultAllowedPaths.length > 0 ? (
+                                resultAllowedPaths.map((pathValue) => (
+                                  <div
+                                    key={`allowed-${pathValue}`}
+                                    className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
+                                  >
+                                    {pathValue}
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                                  No se informaron archivos permitidos explícitamente.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              blockedTargetPaths
+                            </div>
+                            <div className="grid gap-2">
+                              {resultBlockedPaths.length > 0 ? (
+                                resultBlockedPaths.map((pathValue) => (
+                                  <div
+                                    key={`blocked-${pathValue}`}
+                                    className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
+                                  >
+                                    {pathValue}
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                                  No se informaron paths bloqueados.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        {latestScopeSuccessCriteria.length > 0 ? (
+                          <div className="mt-4 space-y-2">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              successCriteria
+                            </div>
+                            <div className="grid gap-2">
+                              {latestScopeSuccessCriteria.map((criterion) => (
+                                <div
+                                  key={criterion}
+                                  className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
+                                >
+                                  {criterion}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                      </ResultSectionCard>
+                    </div>
+                    <div className="space-y-4">
+                      <MetricCard
+                        label="Estado final"
+                        value={resultStatusPresentation.label}
+                        detail={resultStatusPresentation.detail}
+                        tone={resultStatusPresentation.tone}
+                      />
+                      <MetricCard
+                        label="Modo de ejecución"
+                        value={fastRouteDetected ? 'Ruta rápida local' : activeExecutionModeLabel}
+                        detail={
+                          fastRouteDetected
+                            ? 'Codex: No requerido · Bridge: No usado'
+                            : activePlannerStrategyLabel
+                        }
+                      />
+                      <MetricCard
+                        label="Capas"
+                        value={latestReasoningLayer || 'No disponible'}
+                        detail={[
+                          latestMaterializationLayer
+                            ? `Materialización: ${latestMaterializationLayer}`
+                            : '',
+                          latestMaterializationPlanSource
+                            ? `Fuente: ${latestMaterializationPlanSource}`
+                            : '',
+                          latestBrainStrategy ? `Plantilla: ${latestBrainStrategy}` : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' · ') || 'Sin capas reportadas'}
+                      />
+                      <MetricCard
+                        label="Bridge"
+                        value={resultBridgeLabel}
+                        detail={
+                          fastRouteDetected
+                            ? 'La salida se resolvió completamente en local.'
+                            : activeExecutorRuntimeDetail
+                        }
+                      />
+                      <MetricCard
+                        label="Codex"
+                        value={resultCodexLabel}
+                        detail={
+                          fastRouteDetected
+                            ? 'No participó en esta corrida.'
+                            : latestBridgeModeValue.toLocaleLowerCase() === 'codex'
+                              ? 'El bridge ejecutó la corrida real con Codex.'
+                              : 'No hay evidencia de participación obligatoria de Codex.'
+                        }
+                      />
+                      <MetricCard
+                        label="Validaciones"
+                        value={
+                          latestValidationResults.length > 0
+                            ? `${latestValidationOkCount}/${latestValidationResults.length} OK`
+                            : 'Sin validaciones reportadas'
+                        }
+                        detail={
+                          latestValidationResults.length > 0
+                            ? resultValidationSummaryText
+                            : 'No hubo validaciones estructuradas para resumir.'
+                        }
+                      />
+                      <MetricCard
+                        label="Reusable"
+                        value={latestAppliedReuseModeLabel}
+                        detail={resultReusableSummaryLabel}
+                      />
+                      <ResultSectionCard
+                        title="Acciones sugeridas"
+                        description="Siguientes pasos rápidos para revisar o iterar esta salida."
+                      >
+                        <div className="grid gap-2">
+                          {resultSuggestedActions.map((action) => (
+                            <div
+                              key={action.title}
+                              className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3"
+                            >
+                              <div className="text-sm font-medium leading-6 text-slate-100">
+                                {action.title}
+                              </div>
+                              <div className="text-xs leading-5 text-slate-400">
+                                {action.detail}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-4 grid gap-2">
+                          <button
+                            type="button"
+                            onClick={handleWizardStartOver}
+                            className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                          >
+                            Volver al objetivo
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setExperienceMode('advanced')}
+                            className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                          >
+                            Abrir panel avanzado
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsFlowConsoleOpen(true)}
+                            className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                          >
+                            Abrir consola técnica
+                          </button>
+                        </div>
+                      </ResultSectionCard>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="mt-6 flex flex-col gap-3 border-t border-white/8 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm leading-6 text-slate-400">
+                  {activeWizardStep === 'plan'
+                    ? 'Cuando el plan te cierre, ejecutalo desde acá.'
+                    : activeWizardStep === 'execution'
+                      ? 'Si aparece una aprobación, el flujo queda claramente bloqueado hasta resolverla.'
+                      : activeWizardStep === 'result'
+                        ? 'Podés volver al objetivo o abrir el panel avanzado para seguir mirando detalle.'
+                        : 'Completá este paso y seguí al próximo.'}
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {activeWizardStep !== 'goal' ? (
+                    <button
+                      type="button"
+                      onClick={handleWizardBack}
+                      className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                    >
+                      Atrás
+                    </button>
+                  ) : null}
+
+                  {activeWizardStep === 'goal' ||
+                  activeWizardStep === 'context' ||
+                  activeWizardStep === 'brain' ? (
+                    <button
+                      type="button"
+                      onClick={handleWizardNext}
+                      disabled={activeWizardStep === 'goal' && !goalInput.trim()}
+                      className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                    >
+                      Siguiente
+                    </button>
+                  ) : null}
+
+                  {activeWizardStep === 'memory' ? (
+                    <button
+                      type="button"
+                      onClick={handleWizardGeneratePlan}
+                      disabled={isPlanning || !goalInput.trim()}
+                      className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                    >
+                      {isPlanning ? 'Generando...' : 'Generar plan'}
+                    </button>
+                  ) : null}
+
+                  {activeWizardStep === 'plan' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleWizardGeneratePlan}
+                        disabled={isPlanning || !goalInput.trim()}
+                        className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
+                      >
+                        {isPlanning ? 'Generando...' : 'Regenerar plan'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleWizardExecute}
+                        disabled={!canExecuteInstruction || isExecutingTask}
+                        className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                      >
+                        {isExecutingTask ? 'Ejecutando...' : 'Ejecutar'}
+                      </button>
+                    </>
+                  ) : null}
+
+                  {activeWizardStep === 'execution' ? (
+                    <button
+                      type="button"
+                      onClick={handleWizardNext}
+                      disabled={!wizardCanShowResult}
+                      className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                    >
+                      Ver resultado
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            </section>
+
+            <aside className="min-h-0 space-y-3 overflow-auto pr-1">
+              <article className="rounded-3xl border border-white/10 bg-slate-950/60 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.28)]">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Resumen del flujo
+                </div>
+                <div className="mt-3 space-y-2">
+                  <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2.5">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Objetivo
+                    </div>
+                    <div className="mt-1 text-sm font-medium leading-5 text-slate-100">
+                      {normalizedGoalInput}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2.5">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Criterio
+                    </div>
+                    <div className="mt-1 text-sm font-medium leading-5 text-slate-100">
+                      {getBrainCostModeLabel(brainCostMode)}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2.5">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Reuse
+                    </div>
+                    <div className="mt-1 text-sm font-medium leading-5 text-slate-100">
+                      {manualReuseModeLabel}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-sky-300/20 bg-sky-300/8 px-3 py-2.5">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-200/80">
+                      Estado
+                    </div>
+                    <div className="mt-1 text-sm font-medium leading-5 text-sky-50">
+                      {sessionStatus}
+                    </div>
+                  </div>
+                </div>
+              </article>
+
+              <article className="rounded-3xl border border-white/10 bg-slate-950/60 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.28)]">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Herramientas aparte
+                </div>
+                <div className="mt-3 grid gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFlowConsoleVisibility({ open: true, pinned: true })}
+                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                  >
+                    Abrir consola técnica
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRunSummary(latestExecutionRunSummary)}
+                    disabled={!latestExecutionRunSummary}
+                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
+                  >
+                    Ver última corrida
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetSessionMemory}
+                    disabled={isRunning}
+                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
+                  >
+                    Reiniciar memoria de la sesión
+                  </button>
+                </div>
+              </article>
+            </aside>
+          </div>
+        ) : null}
+
+        {experienceMode === 'advanced' ? (
+          <>
+        <header className="rounded-3xl border border-white/10 bg-slate-950/50 px-5 py-6 shadow-[0_18px_50px_rgba(0,0,0,0.28)] sm:px-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="inline-flex rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.24em] text-sky-200">
+                ORQUESTADOR DE IA LOCAL
+              </div>
+              <h1 className="mt-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                Centro de control
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
+                La app ahora se recorre por secciones, con un dashboard inicial
+                mÃ¡s limpio y detalles largos llevados a modales cuando realmente
+                hacen falta.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
+                label="Estado general"
+                value={sessionStatus}
+                detail={visibleCurrentStepLabel}
+                tone="sky"
+              />
+              <MetricCard
+                label="Planificador"
+                value={plannerBadge}
+                detail={`${activeExecutionModeLabel} / ${activePlannerStrategyLabel}`}
+                tone="emerald"
+              />
+              <MetricCard
+                label="Ejecutor"
+                value={executorBadge}
+                detail={executorRequestStateLabel}
+                tone="amber"
+              />
+              <MetricCard
+                label="Aprobaciones"
+                value={humanApprovalsBadge}
+                detail={activeApprovalStatusLabel}
+              />
+            </div>
+          </div>
+        </header>
+
+        <div className="mt-6 grid flex-1 gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
+          <aside
+            id="app-sidebar-nav"
+            className="h-fit rounded-3xl border border-white/10 bg-slate-950/60 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.28)] xl:sticky xl:top-6"
+          >
+            <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                Vista activa
+              </div>
+              <div className="mt-2 text-lg font-semibold text-white">
+                {activeSectionConfig.label}
+              </div>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                {activeSectionConfig.description}
+              </p>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {APP_NAV_SECTIONS.map((section) => {
+                const badge =
+                  section.key === 'aprobaciones'
+                    ? decisionPending
+                      ? 'Pendiente'
+                      : recentApprovalRecords.length > 0
+                        ? String(recentApprovalRecords.length)
+                        : undefined
+                    : section.key === 'memoria'
+                      ? manualReuseMode !== 'auto'
+                        ? manualReuseModeLabel
+                        : activeReuseFoundCount > 0
+                          ? String(activeReuseFoundCount)
+                          : undefined
+                      : section.key === 'corridas'
+                        ? executionRunSummaries.length > 0
+                          ? String(executionRunSummaries.length)
+                          : undefined
+                        : section.key === 'consola'
+                          ? String(liveActivityEvents.length)
+                          : undefined
+
+                return (
+                  <div key={section.key} data-nav-section={section.key}>
+                    <SidebarSectionButton
+                      active={activeSection === section.key}
+                      label={section.label}
+                      description={section.description}
+                      badge={badge}
+                      onClick={() => setActiveSection(section.key)}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Acciones rÃ¡pidas
+              </div>
+              <div className="mt-3 grid gap-2">
+                <button
+                  type="button"
+                  onClick={handleGenerateNextStep}
+                  disabled={isPlanning}
+                  className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                >
+                  {isPlanning ? 'Generando...' : 'Generar siguiente paso'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteCurrentInstruction}
+                  disabled={!canExecuteInstruction || isExecutingTask}
+                  className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                >
+                  {isExecutingTask ? 'Ejecutando...' : 'Ejecutar instrucciÃ³n'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFlowConsoleVisibility({ open: true, pinned: true })
+                    setActiveSection('consola')
+                  }}
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                >
+                  Abrir consola tÃ©cnica
+                </button>
+              </div>
+            </div>
+          </aside>
+
+          <section
+            id="main-section-panel"
+            data-active-section={activeSection}
+            className="min-w-0 rounded-3xl border border-white/10 bg-slate-950/60 p-5 shadow-[0_18px_50px_rgba(0,0,0,0.28)] sm:p-6"
+          >
+            {activeSection === 'inicio' ? (
+              <div className="space-y-6">
+                <SectionHeader
+                  eyebrow="Inicio"
+                  title="Resumen operativo"
+                  description="Un punto de entrada corto para entender el estado general, la Ãºltima corrida y las acciones que mueven el flujo."
+                  actions={
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleRunMockCycle}
+                        disabled={decisionPending || isRunning}
+                        className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                      >
+                        {isRunning ? 'Ejecutando...' : 'Correr ciclo de prueba'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleTestLocalConnection}
+                        disabled={isTestingConnection}
+                        className="rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm font-medium text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                      >
+                        {isTestingConnection ? 'Probando...' : 'Probar conexiÃ³n local'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAutoFlow}
+                        disabled={
+                          isAutoFlowRunning ||
+                          isPlanning ||
+                          isExecutingTask ||
+                          decisionPending
+                        }
+                        className="rounded-xl border border-violet-300/20 bg-violet-300/10 px-4 py-3 text-sm font-medium text-violet-100 transition hover:bg-violet-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                      >
+                        {isAutoFlowRunning
+                          ? 'Procesando flujo...'
+                          : 'Iniciar flujo automÃ¡tico'}
+                      </button>
+                    </>
+                  }
+                />
+
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <MetricCard
+                    label="Objetivo actual"
+                    value={normalizedGoalInput}
+                    detail={currentExecutionContextSummary}
+                    tone="sky"
+                  />
+                  <MetricCard
+                    label="Ruta activa"
+                    value={`${activeExecutionModeLabel} / ${activePlannerStrategyLabel}`}
+                    detail={activeDecisionKeyLabel}
+                    tone="emerald"
+                  />
+                  <MetricCard
+                    label="Memoria reutilizable"
+                    value={`${activeReuseModeLabel} / ${activeReuseFoundCount} coincidencia(s)`}
+                    detail={activeReuseDetailLabel}
+                  />
+                  <MetricCard
+                    label="Flujo"
+                    value={flowStageLabel}
+                    detail={`${flowModeLabel} · ${flowApprovalPendingLabel}`}
+                    tone={decisionPending ? 'amber' : 'default'}
+                  />
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
+                  <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-lg font-semibold text-white">
+                          Ãšltima corrida
+                        </div>
+                        <p className="mt-1 text-sm text-slate-400">
+                          Lectura compacta del Ãºltimo cierre operativo.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveSection('corridas')}
+                        className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                      >
+                        Ver corridas
+                      </button>
+                    </div>
+                    {latestExecutionRunSummary ? (
+                      <div className="mt-4 rounded-2xl border border-sky-300/20 bg-sky-300/8 p-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${getExecutionRunScenarioTone(
+                              latestExecutionRunSummary.scenarioLabel,
+                            )}`}
+                          >
+                            {latestExecutionRunSummary.scenarioLabel}
+                          </span>
+                          <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+                            {getExecutionRunStatusLabel(latestExecutionRunSummary.status)}
+                          </span>
+                        </div>
+                        <div className="mt-3 text-base font-medium text-white">
+                          {latestExecutionRunSummary.objectiveSummary}
+                        </div>
+                        <div className="mt-3 text-sm leading-6 text-slate-200">
+                          {latestExecutionRunSummary.instructionSummary}
+                        </div>
+                        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                          <MetricCard
+                            label="Aprobaciones"
+                            value={String(latestExecutionRunSummary.approvalsOpened)}
+                          />
+                          <MetricCard
+                            label="Recuperaciones"
+                            value={String(latestExecutionRunSummary.recoveries)}
+                          />
+                          <MetricCard
+                            label="Progreso material"
+                            value={
+                              latestExecutionRunSummary.hasMaterialProgress ? 'SÃ­' : 'No'
+                            }
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRunSummary(latestExecutionRunSummary)}
+                          className="mt-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                        >
+                          Ver detalle de la corrida
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                        TodavÃ­a no hay corridas ejecutadas para resumir.
+                      </div>
+                    )}
+                  </article>
+
+                  <div className="space-y-4">
+                    <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                      <div className="text-lg font-semibold text-white">
+                        Acciones rÃ¡pidas
+                      </div>
+                      <div className="mt-4 grid gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setActiveSection('objetivo')}
+                          className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                        >
+                          Revisar objetivo y contexto
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveSection('planificacion')}
+                          className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                        >
+                          Inspeccionar la planificaciÃ³n
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveSection('memoria')}
+                          className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                        >
+                          Revisar memoria reutilizable
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleResetSessionMemory}
+                          disabled={isRunning}
+                          className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
+                        >
+                          Reiniciar memoria de la sesiÃ³n
+                        </button>
+                      </div>
+                    </article>
+
+                    <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                      <div className="text-lg font-semibold text-white">
+                        Respuesta final visible
+                      </div>
+                      <div className="mt-3 text-sm leading-6 text-slate-300">
+                        {shouldShowVisibleFinalTextResponse
+                          ? summarizeInlineText(visibleFinalTextResponse, 180)
+                          : 'TodavÃ­a no hay una respuesta final visible para mostrar acÃ¡.'}
+                      </div>
+                      {shouldShowVisibleFinalTextResponse ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsFinalResponseOpen(true)}
+                          className="mt-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                        >
+                          Abrir respuesta completa
+                        </button>
+                      ) : null}
+                    </article>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {activeSection === 'objetivo' ? (
+              <div className="space-y-6">
+                <SectionHeader
+                  eyebrow="Objetivo y contexto"
+                  title="DefiniciÃ³n de trabajo"
+                  description="Objetivo, contexto adicional, participaciÃ³n del usuario y criterio del Cerebro en una sola vista consistente."
+                  actions={
+                    <button
+                      type="button"
+                      onClick={handleGenerateNextStep}
+                      disabled={isPlanning}
+                      className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                    >
+                      {isPlanning ? 'Generando...' : 'Actualizar planificaciÃ³n'}
+                    </button>
+                  }
+                />
+
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+                  <div className="space-y-4">
+                    <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                      <label
+                        htmlFor="goal-input"
+                        className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                      >
+                        Objetivo actual
+                      </label>
+                      <textarea
+                        id="goal-input"
+                        value={goalInput}
+                        onChange={(event) => setGoalInput(event.target.value)}
+                        rows={5}
+                        className="mt-3 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
+                      />
+                    </article>
+
+                    <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                      <label
+                        htmlFor="execution-context-input"
+                        className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                      >
+                        Contexto adicional
+                      </label>
+                      <textarea
+                        id="execution-context-input"
+                        ref={executionContextInputRef}
+                        value={executionContextInput}
+                        onChange={(event) => setExecutionContextInput(event.target.value)}
+                        rows={8}
+                        className="mt-3 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
+                        placeholder="Definiciones, restricciones, notas de alcance o material que el Cerebro deba tener presente."
+                      />
+                    </article>
+
+                    <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                      <label
+                        htmlFor="workspace-path"
+                        className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                      >
+                        Espacio de trabajo de destino
+                      </label>
+                      <textarea
+                        id="workspace-path"
+                        value={workspacePath}
+                        onChange={(event) => setWorkspacePath(event.target.value)}
+                        rows={2}
+                        className="mt-3 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
+                      />
+                      <div className="mt-3 text-sm text-slate-400">
+                        {workspaceStatusLabel}
+                      </div>
+                    </article>
+                  </div>
+
+                  <div className="space-y-4">
+                    <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        ParticipaciÃ³n del usuario
+                      </div>
+                      <div className="mt-3 grid gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setUserParticipationMode('user-will-contribute')}
+                          className={`rounded-xl border px-4 py-3 text-left text-sm font-medium transition ${
+                            userParticipationMode === 'user-will-contribute'
+                              ? 'border-sky-300/40 bg-sky-300/15 text-sky-100'
+                              : 'border-white/10 bg-slate-950/50 text-slate-200 hover:bg-white/10'
+                          }`}
+                        >
+                          SÃ­, voy a aportar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setUserParticipationMode('brain-decides-missing')}
+                          className={`rounded-xl border px-4 py-3 text-left text-sm font-medium transition ${
+                            userParticipationMode === 'brain-decides-missing'
+                              ? 'border-emerald-300/40 bg-emerald-300/15 text-emerald-100'
+                              : 'border-white/10 bg-slate-950/50 text-slate-200 hover:bg-white/10'
+                          }`}
+                        >
+                          No, decidÃ­ vos
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setUserParticipationMode(DEFAULT_USER_PARTICIPATION_MODE)}
+                          className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3 text-left text-sm font-medium text-slate-300 transition hover:bg-white/10"
+                        >
+                          Sin definir
+                        </button>
+                      </div>
+                      <div className="mt-3 rounded-xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-300">
+                        {userParticipationSummary}
+                      </div>
+                    </article>
+
+                    <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Modo / criterio del Cerebro
+                      </div>
+                      <div className="mt-3 grid gap-2">
+                        {BRAIN_COST_MODE_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setBrainCostMode(option.value)}
+                            className={`rounded-xl border px-4 py-3 text-left transition ${
+                              brainCostMode === option.value
+                                ? 'border-sky-300/40 bg-sky-300/15 text-sky-100'
+                                : 'border-white/10 bg-slate-950/50 text-slate-200 hover:bg-white/10'
+                            }`}
+                          >
+                            <div className="text-sm font-medium">{option.label}</div>
+                            <div className="mt-1 text-xs leading-5 text-slate-400">
+                              {option.description}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </article>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <MetricCard
+                        label="Modo activo"
+                        value={getBrainCostModeLabel(brainCostMode)}
+                        detail={activeBrainRoutingMode}
+                      />
+                      <MetricCard
+                        label="Naturaleza"
+                        value={activeBrainProblemNature}
+                        detail={`Confianza: ${activeBrainRoutingConfidence}`}
+                      />
+                      <MetricCard
+                        label="Proveedor"
+                        value={`${activeBrainSelectedProvider} -> ${activeBrainResolvedProvider}`}
+                        detail={
+                          activeBrainFallbackUsed
+                            ? `Respaldo hacia ${activeBrainResolvedProvider}`
+                            : 'Sin respaldo en la Ãºltima decisiÃ³n'
+                        }
+                      />
+                      <MetricCard
+                        label="Motivo resumido"
+                        value={activeBrainRoutingReason}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {activeSection === 'planificacion' ? (
+              <div className="space-y-6">
+                <SectionHeader
+                  eyebrow="PlanificaciÃ³n"
+                  title="Ruta y decisiÃ³n del planificador"
+                  description="La instrucciÃ³n visible, la estrategia y la reutilizaciÃ³n se leen juntas para entender por quÃ© la app quiere avanzar por este camino."
+                  actions={
+                    <>
+                      <button
+                        id="generate-next-step-button"
+                        type="button"
+                        onClick={handleGenerateNextStep}
+                        disabled={isPlanning}
+                        className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                      >
+                        {isPlanning ? 'Generando...' : 'Generar siguiente paso'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveSection('memoria')}
+                        className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                      >
+                        Revisar memoria reusable
+                      </button>
+                    </>
+                  }
+                />
+
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                  <MetricCard
+                    label="Ruta planificada"
+                    value={activeExecutionModeLabel}
+                    detail={plannerExecutionMetadata.executionScope || 'Sin alcance definido'}
+                    tone="sky"
+                  />
+                  <MetricCard
+                    label="Estrategia"
+                    value={activePlannerStrategyLabel}
+                    detail={plannerExecutionMetadata.businessSectorLabel || 'Sin rubro declarado'}
+                  />
+                  <MetricCard
+                    label="decisionKey"
+                    value={activeDecisionKeyLabel}
+                  />
+                  <MetricCard
+                    label="Memoria reutilizable"
+                    value={activeReuseModeLabel}
+                    detail={activeReuseDetailLabel}
+                    tone={
+                      hasAppliedReusableContext
+                        ? 'emerald'
+                        : activeReuseSuggestionIds.length > 0
+                          ? 'sky'
+                          : 'default'
+                    }
+                  />
+                  <MetricCard
+                    label="Siguiente acciÃ³n"
+                    value={
+                      plannerExecutionMetadata.nextExpectedAction || 'No disponible'
+                    }
+                  />
+                </div>
+
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
+                  <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Ãšltima instrucciÃ³n del planificador
+                    </div>
+                    <div className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-slate-100">
+                      {plannerInstruction}
+                    </div>
+                  </article>
+
+                  <div className="space-y-4">
+                    <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Motivo resumido
+                      </div>
+                      <div className="mt-3 text-sm leading-6 text-slate-100">
+                        {plannerExecutionMetadata.reason || 'No disponible'}
+                      </div>
+                    </article>
+
+                    <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        {activeReuseArtifactsPanelLabel}
+                      </div>
+                      <div className="mt-3 text-sm leading-6 text-slate-100">
+                        {activeReuseArtifactSummary}
+                      </div>
+                    </article>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                    <div className="text-lg font-semibold text-white">
+                      Tareas previstas
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      {effectivePlannerExecutionMetadata.tasks.length > 0 ? (
+                        effectivePlannerExecutionMetadata.tasks.map((task, index) => (
+                          <div
+                            key={`planner-task-${task.step || index}-${task.title || task.operation || index}`}
+                            className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-3"
+                          >
+                            <div className="text-sm font-medium text-white">
+                              {task.step ? `Paso ${task.step}` : `Paso ${index + 1}`}{' '}
+                              {task.title || task.operation || 'AcciÃ³n sin tÃ­tulo'}
+                            </div>
+                            <div className="mt-2 text-xs leading-5 text-slate-400">
+                              {task.targetPath || 'Sin ruta objetivo declarada'}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                          El planner no dejÃ³ una lista estructurada de tareas en esta decisiÃ³n.
+                        </div>
+                      )}
+                    </div>
+                  </article>
+
+                  <div className="space-y-4">
+                    <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                      <div className="text-lg font-semibold text-white">
+                        DirecciÃ³n creativa
+                      </div>
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        <MetricCard
+                          label="Rubro"
+                          value={
+                            plannerExecutionMetadata.businessSectorLabel ||
+                            plannerExecutionMetadata.businessSector ||
+                            'No definido'
+                          }
+                        />
+                        <MetricCard
+                          label="Visual"
+                          value={
+                            plannerExecutionMetadata.creativeDirection?.visualStyle ||
+                            'No definido'
+                          }
+                        />
+                        <MetricCard
+                          label="Hero"
+                          value={
+                            plannerExecutionMetadata.creativeDirection?.heroStyle ||
+                            'No definido'
+                          }
+                        />
+                        <MetricCard
+                          label="Estructura"
+                          value={
+                            plannerExecutionMetadata.creativeDirection?.layoutVariant ||
+                            'No definido'
+                          }
+                        />
+                      </div>
+                    </article>
+
+                    <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                      <div className="text-lg font-semibold text-white">
+                        Supuestos
+                      </div>
+                      <div className="mt-4 space-y-2">
+                        {effectivePlannerExecutionMetadata.assumptions.length > 0 ? (
+                          effectivePlannerExecutionMetadata.assumptions.map(
+                            (assumption, index) => (
+                              <div
+                                key={`planner-assumption-${index + 1}`}
+                                className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
+                              >
+                                {assumption}
+                              </div>
+                            ),
+                          )
+                        ) : (
+                          <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                            No hay supuestos explÃ­citos registrados.
+                          </div>
+                        )}
+                      </div>
+                    </article>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {activeSection === 'ejecucion' ? (
+              <div className="space-y-6">
+                <SectionHeader
+                  eyebrow="EjecuciÃ³n"
+                  title="AcciÃ³n manual y resultado"
+                  description="La instrucciÃ³n aprobada, el estado del ejecutor y la salida visible quedan separados del resto para que ejecutar sea mÃ¡s simple."
+                  actions={
+                    <>
+                      <button
+                        id="execute-current-instruction-button"
+                        type="button"
+                        onClick={handleExecuteCurrentInstruction}
+                        disabled={!canExecuteInstruction || isExecutingTask}
+                        className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                      >
+                        {isExecutingTask ? 'Ejecutando...' : 'Ejecutar instrucciÃ³n actual'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveSection('planificacion')}
+                        className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                      >
+                        Volver a la planificaciÃ³n
+                      </button>
+                    </>
+                  }
+                />
+
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <MetricCard
+                    label="Estado del ejecutor"
+                    value={executorRequestStateLabel}
+                    detail={activeOperationalE2eStatusLabel}
+                    tone="amber"
+                  />
+                  <MetricCard
+                    label="Paso actual"
+                    value={visibleCurrentStepLabel}
+                    detail={flowStageLabel}
+                  />
+                  <MetricCard
+                    label="Modo de ejecuciÃ³n"
+                    value={activeExecutionModeLabel}
+                    detail={plannerExecutionMetadata.executionScope || 'Sin alcance definido'}
+                  />
+                  <MetricCard
+                    label="ConexiÃ³n local"
+                    value={contextualConnectionLabel}
+                    detail={`${runtimeStatus.platform} · Electron ${runtimeStatus.electron}`}
+                    tone="emerald"
+                  />
+                </div>
+
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+                  <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                    <div className="text-lg font-semibold text-white">
+                      InstrucciÃ³n lista para ejecutar
+                    </div>
+                    <div className="mt-4 whitespace-pre-wrap break-words rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-7 text-slate-100">
+                      {plannerInstruction}
+                    </div>
+                  </article>
+
+                  <div className="space-y-4">
+                    <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                      <div className="text-lg font-semibold text-white">
+                        Resultado visible
+                      </div>
+                      <div className="mt-3 text-sm leading-6 text-slate-300">
+                        {shouldShowVisibleFinalTextResponse
+                          ? summarizeInlineText(visibleFinalTextResponse, 220)
+                          : executorResult}
+                      </div>
+                      {shouldShowVisibleFinalTextResponse ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsFinalResponseOpen(true)}
+                          className="mt-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                        >
+                          Abrir respuesta final
+                        </button>
+                      ) : null}
+                    </article>
+
+                    <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                      <div className="text-lg font-semibold text-white">
+                        Ãšltimo resultado del ejecutor
+                      </div>
+                      <div className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">
+                        {executorResult}
+                      </div>
+                    </article>
+                  </div>
+                </div>
+
+                {hasLastExecutorSnapshot ? (
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <MetricCard
+                      label="AcciÃ³n"
+                      value={lastExecutorSnapshot?.currentAction || 'No disponible'}
+                    />
+                    <MetricCard
+                      label="Comando"
+                      value={lastExecutorSnapshot?.currentCommand || 'No disponible'}
+                    />
+                    <MetricCard
+                      label="Ruta objetivo"
+                      value={lastExecutorSnapshot?.currentTargetPath || 'No disponible'}
+                    />
+                    <MetricCard
+                      label="Tipo de fallo"
+                      value={lastExecutorSnapshot?.failureType || 'Sin clasificar'}
+                    />
+                  </div>
+                ) : null}
+
+                {latestTouchedArtifacts.length > 0 ? (
+                  <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                    <div className="text-lg font-semibold text-white">
+                      Archivos creados o tocados
+                    </div>
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                      {latestTouchedArtifacts.map((artifactPath) => (
+                        <div
+                          key={artifactPath}
+                          className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
+                        >
+                          {artifactPath}
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+                ) : null}
+              </div>
+            ) : null}
+
+            {activeSection === 'aprobaciones' ? (
+              <div className="space-y-6">
+                <SectionHeader
+                  eyebrow="Aprobaciones"
+                  title="IntervenciÃ³n humana"
+                  description="La aprobaciÃ³n operativa vive en modal. Esta vista resume el estado, la Ãºltima respuesta humana y el historial corto."
+                />
+
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <MetricCard
+                    label="Estado"
+                    value={activeApprovalStatusLabel}
+                    detail={flowApprovalSourceLabel}
+                    tone={decisionPending ? 'amber' : 'default'}
+                  />
+                  <MetricCard
+                    label="Modalidad"
+                    value={activeApprovalInteractionMode}
+                    detail={`${visibleApprovalOptions.length} opcion(es) sugerida(s)`}
+                  />
+                  <MetricCard
+                    label="Ãšltima respuesta humana"
+                    value={latestHumanDecisionSummary}
+                  />
+                  <MetricCard
+                    label="PolÃ­tica del proyecto"
+                    value={
+                      projectPolicyAllowed
+                        ? 'Permitir siempre para este proyecto'
+                        : 'Sin regla persistente'
+                    }
+                  />
+                </div>
+
+                <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                  <div className="text-lg font-semibold text-white">
+                    Approval pendiente
+                  </div>
+                  <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-200">
+                    {decisionPending
+                      ? approvalMessage || visiblePendingInstruction || DEFAULT_APPROVAL_MESSAGE
+                      : 'No hay una aprobaciÃ³n abierta ahora mismo. Cuando aparezca, se muestra en modal para no cargar la pantalla principal.'}
+                  </div>
+                </article>
+
+                <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                  <div className="text-lg font-semibold text-white">
+                    Historial corto
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {recentApprovalRecords.length > 0 ? (
+                      recentApprovalRecords.map((record) => (
+                        <div
+                          key={`${record.key}-${record.updatedAt || record.status}`}
+                          className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4"
+                        >
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="text-sm font-medium text-white">
+                              {record.key}
+                            </div>
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              {getResolvedDecisionStatusLabel(record)}
+                            </span>
+                          </div>
+                          <div className="mt-2 text-sm leading-6 text-slate-300">
+                            {[
+                              normalizeOptionalString(record.selectedOption),
+                              normalizeOptionalString(record.freeAnswer),
+                              normalizeOptionalString(record.summary),
+                            ]
+                              .filter(Boolean)
+                              .join(' · ') || 'Sin detalle adicional'}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                        TodavÃ­a no hay approvals o rechazos para mostrar.
+                      </div>
+                    )}
+                  </div>
+                </article>
+              </div>
+            ) : null}
+
+            {activeSection === 'memoria' ? (
+              <div className="space-y-6" id="reusable-memory-section">
+                <SectionHeader
+                  eyebrow="Memoria reutilizable"
+                  title="CatÃ¡logo, filtros y selecciÃ³n manual"
+                  description="La memoria reusable queda ordenada en su propia vista, con preview, filtros y detalle expandido."
+                  actions={
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void loadReusableArtifacts()
+                      }}
+                      className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                    >
+                      Recargar catÃ¡logo
+                    </button>
+                  }
+                />
+
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <MetricCard
+                    label="SelecciÃ³n actual"
+                    value={manualReuseModeLabel}
+                    detail={selectedReusableArtifactSummary}
+                    tone={manualReuseMode === 'auto' ? 'default' : 'sky'}
+                  />
+                  <MetricCard
+                    label="Memoria reutilizable"
+                    value={`${activeReuseModeLabel} / ${activeReuseFoundCount} coincidencia(s)`}
+                    detail={activeReuseDetailLabel}
+                  />
+                  <MetricCard
+                    label={activeReuseArtifactsPanelLabel}
+                    value={activeReuseArtifactSummary}
+                  />
+                  <MetricCard
+                    label="Modo manual"
+                    value={activeReuseManualSummary}
+                    detail={selectedReusableArtifactTags || 'Sin etiquetas destacadas'}
+                  />
+                </div>
+
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+                  <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                      <div>
+                        <label
+                          htmlFor="reusable-filter-sector"
+                          className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                        >
+                          Rubro
+                        </label>
+                        <input
+                          id="reusable-filter-sector"
+                          value={reusableArtifactFilters.sector}
+                          onChange={(event) =>
+                            setReusableArtifactFilters((currentValue) => ({
+                              ...currentValue,
+                              sector: event.target.value,
+                            }))
+                          }
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
+                          placeholder="odontologÃ­a, moda..."
+                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="reusable-filter-visual-style"
+                          className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                        >
+                          Estilo visual
+                        </label>
+                        <input
+                          id="reusable-filter-visual-style"
+                          value={reusableArtifactFilters.visualStyle}
+                          onChange={(event) =>
+                            setReusableArtifactFilters((currentValue) => ({
+                              ...currentValue,
+                              visualStyle: event.target.value,
+                            }))
+                          }
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
+                          placeholder="claridad, premium..."
+                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="reusable-filter-layout"
+                          className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                        >
+                          Estructura
+                        </label>
+                        <input
+                          id="reusable-filter-layout"
+                          value={reusableArtifactFilters.layoutVariant}
+                          onChange={(event) =>
+                            setReusableArtifactFilters((currentValue) => ({
+                              ...currentValue,
+                              layoutVariant: event.target.value,
+                            }))
+                          }
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
+                          placeholder="institucional, editorial..."
+                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="reusable-filter-hero"
+                          className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                        >
+                          Apertura principal
+                        </label>
+                        <input
+                          id="reusable-filter-hero"
+                          value={reusableArtifactFilters.heroStyle}
+                          onChange={(event) =>
+                            setReusableArtifactFilters((currentValue) => ({
+                              ...currentValue,
+                              heroStyle: event.target.value,
+                            }))
+                          }
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
+                          placeholder="informativo, inmersivo..."
+                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="reusable-filter-tags"
+                          className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                        >
+                          Tags
+                        </label>
+                        <input
+                          id="reusable-filter-tags"
+                          value={reusableArtifactFilters.tags}
+                          onChange={(event) =>
+                            setReusableArtifactFilters((currentValue) => ({
+                              ...currentValue,
+                              tags: event.target.value,
+                            }))
+                          }
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
+                          placeholder="premium, editorial..."
+                        />
+                      </div>
+                    </div>
+                  </article>
+
+                  <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                    <label
+                      htmlFor="manual-reuse-mode"
+                      className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                    >
+                      ReutilizaciÃ³n manual
+                    </label>
+                    <select
+                      id="manual-reuse-mode"
+                      value={manualReuseMode}
+                      onChange={(event) =>
+                        setManualReuseMode(event.target.value as ManualReuseMode)
+                      }
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition focus:border-sky-300/40"
+                    >
+                      <option value="auto">BÃºsqueda automÃ¡tica</option>
+                      <option value="none">No reutilizar</option>
+                      <option value="inspiration-only">Usar solo inspiraciÃ³n</option>
+                      <option value="reuse-style">Reutilizar estilo</option>
+                      <option value="reuse-structure">Reutilizar estructura</option>
+                      <option value="reuse-style-and-structure">
+                        Reutilizar estilo y estructura
+                      </option>
+                    </select>
+                    <div
+                      id="manual-reuse-selection-summary"
+                      className="mt-3 text-xs leading-5 text-slate-400"
+                    >
+                      {manualReusablePreferencePayload
+                        ? manualReusablePreferencePayload.artifactId
+                          ? `El planificador va a priorizar ${manualReuseModeLabel.toLocaleLowerCase()} desde ${manualReusablePreferencePayload.artifactId}.`
+                          : 'El planificador va a ignorar la memoria reutilizable por decisiÃ³n manual.'
+                        : 'Sin selecciÃ³n manual: se mantiene la bÃºsqueda automÃ¡tica.'}
+                    </div>
+                    <button
+                      id="clear-reusable-artifact-selection"
+                      type="button"
+                      onClick={() => {
+                        setSelectedReusableArtifact(null)
+                        setManualReuseMode('auto')
+                      }}
+                      className="mt-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                    >
+                      Limpiar selecciÃ³n
+                    </button>
+                  </article>
+                </div>
+
+                <div
+                  id="reusable-artifact-list"
+                  className="grid gap-3 xl:grid-cols-2"
+                >
+                  {isLoadingReusableArtifacts ? (
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm text-slate-300 xl:col-span-2">
+                      Cargando artefactos reutilizables...
+                    </div>
+                  ) : reusableArtifactError ? (
+                    <div className="rounded-xl border border-red-300/20 bg-red-300/10 px-4 py-4 text-sm text-red-100 xl:col-span-2">
+                      {reusableArtifactError}
+                    </div>
+                  ) : reusableArtifacts.length === 0 ? (
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm text-slate-300 xl:col-span-2">
+                      No hay artefactos que coincidan con esos filtros.
+                    </div>
+                  ) : (
+                    reusableArtifacts.map((artifact) => {
+                      const isSelected = selectedReusableArtifact?.id === artifact.id
+                      const preview = buildReusableArtifactPreviewModel(artifact)
+                      const realPreviewSrc =
+                        artifact.preview?.status === 'generated'
+                          ? buildLocalFileUrl(artifact.preview.imagePath)
+                          : ''
+                      const visibleColors = Object.values(artifact.colors || {}).slice(
+                        0,
+                        4,
+                      )
+
+                      return (
+                        <article
+                          key={artifact.id}
+                          data-reusable-artifact-card={artifact.id}
+                          className={`rounded-2xl border px-4 py-4 ${
+                            isSelected
+                              ? 'border-sky-300/30 bg-sky-300/10'
+                              : 'border-white/8 bg-white/[0.03]'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-white">
+                                {artifact.sectorLabel || artifact.sector || artifact.id}
+                              </div>
+                              <div className="mt-1 text-xs leading-5 text-slate-400">
+                                {artifact.id}
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                data-reusable-artifact-select={artifact.id}
+                                onClick={() => {
+                                  setSelectedReusableArtifact(artifact)
+                                  setManualReuseMode((currentValue) =>
+                                    currentValue === 'auto'
+                                      ? 'reuse-style-and-structure'
+                                      : currentValue,
+                                  )
+                                }}
+                                className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                                  isSelected
+                                    ? 'border-sky-300/40 bg-sky-300/15 text-sky-100'
+                                    : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
+                                }`}
+                              >
+                                {isSelected ? 'Seleccionado' : 'Usar este artefacto'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDetailReusableArtifact(artifact)}
+                                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                              >
+                                Ver detalle
+                              </button>
+                            </div>
+                          </div>
+
+                          <div
+                            data-reusable-artifact-preview={artifact.id}
+                            className="mt-4 overflow-hidden rounded-2xl border border-white/10"
+                            style={{
+                              background: preview.background,
+                              color: preview.text,
+                            }}
+                          >
+                            {realPreviewSrc ? (
+                              <img
+                                src={realPreviewSrc}
+                                alt={`Vista previa real de ${artifact.sectorLabel || artifact.sector || artifact.id}`}
+                                className="h-48 w-full object-cover"
+                              />
+                            ) : (
+                              <div className="p-4">
+                                <div
+                                  className="text-[10px] font-semibold uppercase tracking-[0.24em]"
+                                  style={{ color: preview.muted }}
+                                >
+                                  {preview.heroLabel}
+                                </div>
+                                <div
+                                  className="mt-2 text-xl leading-tight"
+                                  style={{ fontFamily: preview.headingFont }}
+                                >
+                                  {preview.previewHeading}
+                                </div>
+                                <div
+                                  className="mt-2 text-xs leading-5"
+                                  style={{ color: preview.muted }}
+                                >
+                                  {preview.previewBody}
+                                </div>
+                                <div
+                                  className="mt-4 inline-flex rounded-full border px-3 py-1 text-xs font-medium"
+                                  style={{
+                                    borderColor: `${preview.accent}66`,
+                                    color: preview.text,
+                                    backgroundColor: preview.surface,
+                                  }}
+                                >
+                                  {preview.previewCta}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {[
+                              artifact.sectorLabel || artifact.sector,
+                              getVisualStyleLabel(artifact.visualStyle),
+                              getLayoutVariantLabel(artifact.layoutVariant),
+                              getHeroStyleLabel(artifact.heroStyle),
+                            ]
+                              .filter(Boolean)
+                              .map((badgeValue) => (
+                                <span
+                                  key={`${artifact.id}-${badgeValue}`}
+                                  className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300"
+                                >
+                                  {badgeValue}
+                                </span>
+                              ))}
+                          </div>
+
+                          {visibleColors.length > 0 ? (
+                            <div className="mt-4 flex items-center gap-2">
+                              {visibleColors.map((colorValue, index) => (
+                                <span
+                                  key={`${artifact.id}-color-${index + 1}`}
+                                  className="h-6 w-6 rounded-full border border-white/10"
+                                  style={{ backgroundColor: colorValue }}
+                                />
+                              ))}
+                            </div>
+                          ) : null}
+                        </article>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {activeSection === 'corridas' ? (
+              <div className="space-y-6">
+                <SectionHeader
+                  eyebrow="Corridas"
+                  title="Resumen E2E e historial"
+                  description="La lectura de corridas queda separada para comparar estados, errores, recuperaciones y archivos tocados sin pelearse con el resto de la app."
+                />
+
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <MetricCard
+                    label="Corridas visibles"
+                    value={String(visibleExecutionRunSummaries.length)}
+                    tone="sky"
+                  />
+                  <MetricCard
+                    label="Escenario activo"
+                    value={activeOperationalE2eScenarioLabel}
+                    detail={activeOperationalE2eStatusLabel}
+                  />
+                  <MetricCard
+                    label="Archivos tocados"
+                    value={String(latestTouchedArtifacts.length)}
+                    detail={
+                      latestTouchedArtifacts.slice(0, 2).join(', ') ||
+                      'Sin archivos registrados'
+                    }
+                  />
+                  <MetricCard
+                    label="Ãšltimo requestId"
+                    value={
+                      latestExecutionRunSummary?.latestRequestId || 'Sin corrida registrada'
+                    }
+                  />
+                </div>
+
+                <div className="grid gap-3 xl:grid-cols-3">
+                  {visibleExecutionRunSummaries.length > 0 ? (
+                    visibleExecutionRunSummaries.map((summary) => (
+                      <article
+                        key={summary.runId}
+                        className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-white">
+                              {summary.objectiveSummary}
+                            </div>
+                            <div className="mt-1 text-xs leading-5 text-slate-400">
+                              {summary.updatedAtLabel} · {summary.latestRequestId}
+                            </div>
+                          </div>
+                          <span
+                            className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${getExecutionRunScenarioTone(
+                              summary.scenarioLabel,
+                            )}`}
+                          >
+                            {summary.scenarioLabel}
+                          </span>
+                        </div>
+                        <div className="mt-4 space-y-2 text-sm leading-6 text-slate-200">
+                          <div>
+                            <span className="text-slate-500">Estado:</span>{' '}
+                            {getExecutionRunStatusLabel(summary.status)}
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Recuperaciones:</span>{' '}
+                            {summary.recoveries}
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Archivos:</span>{' '}
+                            {mergeUniqueStringValues(
+                              summary.createdPaths,
+                              summary.touchedPaths,
+                              6,
+                            ).join(', ') || 'Ninguno'}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRunSummary(summary)}
+                          className="mt-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                        >
+                          Ver detalle
+                        </button>
+                      </article>
+                    ))
+                  ) : (
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300 xl:col-span-3">
+                      TodavÃ­a no hay corridas ejecutadas para resumir.
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {activeSection === 'consola' ? (
+              <div className="space-y-6">
+                <SectionHeader
+                  eyebrow="Consola tÃ©cnica"
+                  title="Timeline, eventos y conversaciÃ³n interna"
+                  description="La consola completa abre en modal. Esta vista deja una lectura resumida y navegable del lado tÃ©cnico."
+                  actions={
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFlowConsoleVisibility({ open: true, pinned: true })
+                      }}
+                      className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                    >
+                      Abrir consola completa
+                    </button>
+                  }
+                />
+
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <MetricCard label="Modo" value={flowModeLabel} />
+                  <MetricCard label="Etapa" value={flowStageLabel} />
+                  <MetricCard label="AprobaciÃ³n pendiente" value={flowApprovalPendingLabel} />
+                  <MetricCard label="Origen" value={flowApprovalSourceLabel} />
+                </div>
+
+                <div className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
+                  <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-lg font-semibold text-white">
+                        Actividad en vivo
+                      </div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Ãšltimos 6 eventos
+                      </div>
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      {liveActivityEvents.map((event, index) => (
+                        <div
+                          key={`live-${sessionEvents.length - index}-${event}`}
+                          className={`rounded-xl border px-4 py-3 text-sm leading-6 ${
+                            index === 0
+                              ? 'border-sky-300/30 bg-sky-300/10 text-sky-50'
+                              : 'border-white/8 bg-slate-950/50 text-slate-200'
+                          }`}
+                        >
+                          {event}
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+
+                  <div className="space-y-4">
+                    <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                      <div className="text-lg font-semibold text-white">
+                        ConversaciÃ³n interna
+                      </div>
+                      {latestFlowMessage ? (
+                        <div className="mt-4 rounded-2xl border border-sky-300/20 bg-sky-300/8 px-4 py-4">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-3">
+                              <span className="inline-flex rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-100">
+                                {latestFlowMessage.source}
+                              </span>
+                              <div className="text-sm font-medium text-white">
+                                {latestFlowMessage.title}
+                              </div>
+                            </div>
+                            <span className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                              {latestFlowMessage.status || 'info'}
+                            </span>
+                          </div>
+                          <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-100">
+                            {latestFlowMessage.content}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-4 rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                          TodavÃ­a no hay mensajes internos registrados.
+                        </div>
+                      )}
+                    </article>
+
+                    <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                      <div className="text-lg font-semibold text-white">
+                        Timeline de la sesiÃ³n
+                      </div>
+                      <div className="mt-4 space-y-3">
+                        {sessionEvents.slice(-8).map((event, index, array) => (
+                          <div
+                            key={`timeline-${index + 1}-${event}`}
+                            className={`flex items-start gap-4 rounded-xl border px-4 py-3 ${
+                              index === array.length - 1
+                                ? 'border-sky-300/30 bg-sky-300/10'
+                                : 'border-white/8 bg-slate-950/50'
+                            }`}
+                          >
+                            <span className="mt-2 h-2.5 w-2.5 flex-none rounded-full bg-sky-300" />
+                            <span className="text-sm leading-6 text-slate-100">
+                              {event}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </article>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </section>
+        </div>
+
+          </>
+        ) : null}
+
+        <DetailDialog
+          open={Boolean(selectedRunSummary)}
+          title="Detalle de la corrida"
+          description="Resumen operativo y tÃ©cnico de una corrida puntual."
+          onClose={() => setSelectedRunSummary(null)}
+        >
+          {selectedRunSummary ? (
+            <div className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <MetricCard
+                  label="Escenario"
+                  value={selectedRunSummary.scenarioLabel}
+                  detail={getExecutionRunStatusLabel(selectedRunSummary.status)}
+                />
+                <MetricCard
+                  label="Aprobaciones"
+                  value={String(selectedRunSummary.approvalsOpened)}
+                />
+                <MetricCard
+                  label="Recuperaciones"
+                  value={String(selectedRunSummary.recoveries)}
+                />
+                <MetricCard
+                  label="Fallos repetidos"
+                  value={String(selectedRunSummary.repeatedFailureCount || 0)}
+                />
+              </div>
+              <div className="grid gap-4 xl:grid-cols-2">
+                <article className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Objetivo
+                  </div>
+                  <div className="mt-3 text-sm leading-6 text-slate-100">
+                    {selectedRunSummary.objectiveSummary}
+                  </div>
+                </article>
+                <article className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    InstrucciÃ³n
+                  </div>
+                  <div className="mt-3 text-sm leading-6 text-slate-100">
+                    {selectedRunSummary.instructionSummary}
+                  </div>
+                </article>
+                <article className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Tipos de fallo
+                  </div>
+                  <div className="mt-3 text-sm leading-6 text-slate-100">
+                    {getTechnicalDiagnosticLabel(
+                      selectedRunSummary.finalFailureType,
+                      'No fallÃ³ al cierre',
+                    )}{' '}
+                    /{' '}
+                    {getTechnicalDiagnosticLabel(
+                      selectedRunSummary.latestFailureType,
+                      'Sin fallo registrado',
+                    )}
+                  </div>
+                </article>
+                <article className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Modos bloqueados
+                  </div>
+                  <div className="mt-3 text-sm leading-6 text-slate-100">
+                    {selectedRunSummary.blockedRecoveryModes.length > 0
+                      ? selectedRunSummary.blockedRecoveryModes.join(', ')
+                      : 'Ninguno'}
+                  </div>
+                </article>
+              </div>
+              <article className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Archivos creados / tocados
+                </div>
+                <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-100">
+                  {mergeUniqueStringValues(
+                    selectedRunSummary.createdPaths,
+                    selectedRunSummary.touchedPaths,
+                    20,
+                  ).join('\n') || 'Ninguno'}
+                </div>
+              </article>
+            </div>
+          ) : null}
+        </DetailDialog>
+
+        <DetailDialog
+          open={Boolean(detailReusableArtifact)}
+          title={
+            detailReusableArtifact?.sectorLabel ||
+            detailReusableArtifact?.sector ||
+            'Artefacto reusable'
+          }
+          description={detailReusableArtifact?.id}
+          onClose={() => setDetailReusableArtifact(null)}
+          maxWidthClassName="max-w-5xl"
+        >
+          {detailReusableArtifact ? (
+            <div className="space-y-4">
+              {(() => {
+                const preview = buildReusableArtifactPreviewModel(detailReusableArtifact)
+                const realPreviewSrc =
+                  detailReusableArtifact.preview?.status === 'generated'
+                    ? buildLocalFileUrl(detailReusableArtifact.preview.imagePath)
+                    : ''
+                const colorEntries = Object.entries(detailReusableArtifact.colors || {})
+
+                return (
+                  <>
+                    <div
+                      className="overflow-hidden rounded-3xl border border-white/10"
+                      style={{
+                        background: preview.background,
+                        color: preview.text,
+                      }}
+                    >
+                      {realPreviewSrc ? (
+                        <img
+                          src={realPreviewSrc}
+                          alt={`Vista previa de ${detailReusableArtifact.sectorLabel || detailReusableArtifact.sector || detailReusableArtifact.id}`}
+                          className="h-[360px] w-full object-cover"
+                        />
+                      ) : (
+                        <div className="grid gap-4 p-6 lg:grid-cols-[minmax(0,1.1fr)_260px]">
+                          <div className="min-w-0">
+                            <div
+                              className="text-[11px] font-semibold uppercase tracking-[0.24em]"
+                              style={{ color: preview.muted }}
+                            >
+                              {preview.heroLabel}
+                            </div>
+                            <div
+                              className="mt-3 text-3xl leading-tight"
+                              style={{ fontFamily: preview.headingFont }}
+                            >
+                              {preview.previewHeading}
+                            </div>
+                            <div
+                              className="mt-3 max-w-xl text-sm leading-7"
+                              style={{ color: preview.muted }}
+                            >
+                              {preview.previewBody}
+                            </div>
+                            <div
+                              className="mt-5 inline-flex rounded-full border px-4 py-2 text-sm font-medium"
+                              style={{
+                                borderColor: `${preview.accent}66`,
+                                backgroundColor: preview.surface,
+                                color: preview.text,
+                              }}
+                            >
+                              {preview.previewCta}
+                            </div>
+                          </div>
+                          <div
+                            className="rounded-3xl border p-4"
+                            style={{
+                              borderColor: `${preview.accent}33`,
+                              backgroundColor: preview.surface,
+                            }}
+                          >
+                            <div className="text-sm font-medium text-white">
+                              {preview.layoutLabel}
+                            </div>
+                            <div className="mt-3 space-y-2 text-sm leading-6">
+                              {(detailReusableArtifact.tags || []).slice(0, 6).map((tag) => (
+                                <div key={`${detailReusableArtifact.id}-${tag}`}>{tag}</div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+                      <div className="space-y-4">
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <MetricCard
+                            label="Estilo visual"
+                            value={getVisualStyleLabel(detailReusableArtifact.visualStyle)}
+                          />
+                          <MetricCard
+                            label="Estructura"
+                            value={getLayoutVariantLabel(detailReusableArtifact.layoutVariant)}
+                          />
+                          <MetricCard
+                            label="Hero"
+                            value={getHeroStyleLabel(detailReusableArtifact.heroStyle)}
+                          />
+                          <MetricCard
+                            label="CTA principal"
+                            value={detailReusableArtifact.primaryCta || 'No definido'}
+                          />
+                        </div>
+                        <article className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            Tags
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {(detailReusableArtifact.tags || []).length > 0 ? (
+                              (detailReusableArtifact.tags || []).map((tag) => (
+                                <span
+                                  key={`${detailReusableArtifact.id}-tag-${tag}`}
+                                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200"
+                                >
+                                  {tag}
+                                </span>
+                              ))
+                            ) : (
+                              <div className="text-sm text-slate-400">
+                                Sin tags registradas.
+                              </div>
+                            )}
+                          </div>
+                        </article>
+                      </div>
+
+                      <div className="space-y-4">
+                        <article className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            Paleta
+                          </div>
+                          <div className="mt-3 grid gap-2">
+                            {colorEntries.length > 0 ? (
+                              colorEntries.map(([colorKey, colorValue]) => (
+                                <div
+                                  key={`${detailReusableArtifact.id}-${colorKey}`}
+                                  className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2"
+                                >
+                                  <div className="text-sm text-slate-200">{colorKey}</div>
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className="h-5 w-5 rounded-full border border-white/10"
+                                      style={{ backgroundColor: colorValue }}
+                                    />
+                                    <span className="text-xs text-slate-400">
+                                      {colorValue}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-sm text-slate-400">
+                                Sin paleta registrada.
+                              </div>
+                            )}
+                          </div>
+                        </article>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedReusableArtifact(detailReusableArtifact)
+                            setManualReuseMode((currentValue) =>
+                              currentValue === 'auto'
+                                ? 'reuse-style-and-structure'
+                                : currentValue,
+                            )
+                            setDetailReusableArtifact(null)
+                          }}
+                          className="w-full rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15"
+                        >
+                          Usar este artefacto
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )
+              })()}
+            </div>
+          ) : null}
+        </DetailDialog>
+
+        <DetailDialog
+          open={isFinalResponseOpen}
+          title="Respuesta final visible"
+          description="Detalle completo de la respuesta larga generada por la app."
+          onClose={() => setIsFinalResponseOpen(false)}
+          maxWidthClassName="max-w-3xl"
+        >
+          <div className="whitespace-pre-wrap break-words rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-7 text-slate-100">
+            {visibleFinalTextResponse}
+          </div>
+        </DetailDialog>
+
+        <DetailDialog
+          open={isFlowConsoleOpen}
+          title="Consola del flujo"
+          description="Seguimiento en vivo del planificador, el orquestador, el puente local y Codex."
+          onClose={() => {
+            setFlowConsoleVisibility({ open: false, pinned: false })
+          }}
+          maxWidthClassName="max-w-7xl"
+        >
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-white/8 bg-white/5 px-4 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-lg font-semibold text-white">
+                  Barra de ejecuciÃ³n
+                </div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  {flowExecutionFinished
+                    ? `Etapa actual: ${flowExecutionHeaderLabel}`
+                    : `Etapa activa: ${flowExecutionHeaderLabel}`}
+                </div>
+              </div>
+              <div className="mt-4 grid gap-2 md:grid-cols-5">
+                {flowExecutionStages.map((stage, index) => {
+                  const stageState = flowExecutionStageStates[index]
+
+                  return (
+                    <div
+                      key={stage}
+                      className={`rounded-xl border px-4 py-3 text-sm font-medium transition ${
+                        stageState === 'active'
+                          ? 'border-sky-300/40 bg-sky-300/15 text-sky-100'
+                          : stageState === 'completed'
+                            ? 'border-emerald-300/30 bg-emerald-300/10 text-emerald-100'
+                            : stageState === 'not-required'
+                              ? 'border-white/10 bg-white/[0.03] text-slate-300'
+                              : 'border-white/8 bg-slate-950/50 text-slate-300'
+                      }`}
+                    >
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em]">
+                        {stage}
+                      </div>
+                      <div className="mt-2 text-xs leading-5">
+                        {stageState === 'active'
+                          ? 'Activa'
+                          : stageState === 'completed'
+                            ? 'Completada'
+                            : stageState === 'not-required'
+                              ? 'No requerido'
+                              : 'En espera'}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
+              <div
+                ref={flowActivityContainerRef}
+                className="min-h-0 overflow-auto rounded-2xl border border-white/8 bg-white/5 px-4 py-4"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-lg font-semibold text-white">Actividad en vivo</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Ãšltimos 6 eventos
+                  </div>
+                </div>
+                <div className="mt-4 space-y-2">
+                  {liveActivityEvents.map((event, index) => (
+                    <div
+                      key={`modal-live-${sessionEvents.length - index}-${event}`}
+                      className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${
+                        index === 0
+                          ? 'border-sky-300/30 bg-sky-300/10 shadow-[0_0_0_1px_rgba(125,211,252,0.08)]'
+                          : 'border-white/8 bg-slate-950/50'
+                      }`}
+                    >
+                      <span className="inline-flex min-w-12 justify-center rounded-full border border-sky-300/20 bg-sky-300/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-100">
+                        {index === 0 ? 'Ahora' : `Hace ${index}`}
+                      </span>
+                      <span className="text-sm leading-6 text-slate-100">{event}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div
+                ref={flowConversationContainerRef}
+                className="min-h-0 overflow-auto rounded-2xl border border-white/8 bg-white/5 px-4 py-4"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-lg font-semibold text-white">
+                    ConversaciÃ³n interna del sistema
+                  </div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Flujo tÃ©cnico completo
+                  </div>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {flowMessages.length === 0 ? (
+                    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                      TodavÃ­a no hay mensajes internos registrados en esta sesiÃ³n.
+                    </div>
+                  ) : (
+                    flowMessages.map((message, index) => (
+                      <div
+                        key={`modal-${message.id}-${index}`}
+                        className={`rounded-xl border px-4 py-4 ${
+                          message.id === latestFlowMessage?.id
+                            ? 'border-sky-300/30 bg-sky-300/10 shadow-[0_0_0_1px_rgba(125,211,252,0.08)]'
+                            : 'border-white/8 bg-slate-950/50'
+                        }`}
+                      >
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex items-center gap-3">
+                            <span className="inline-flex rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-100">
+                              {message.source}
+                            </span>
+                            <div className="text-sm font-medium text-white">
+                              {message.title}
+                            </div>
+                          </div>
+                          <span className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                            {message.status || 'info'}
+                          </span>
+                        </div>
+                        <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-100">
+                          {message.content}
+                        </div>
+                        {message.raw ? (
+                          <pre className="mt-3 max-h-56 overflow-auto rounded-xl border border-white/8 bg-slate-950/80 px-4 py-3 text-xs leading-5 text-slate-300">
+                            {message.raw}
+                          </pre>
+                        ) : null}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div
+              ref={flowTimelineContainerRef}
+              className="rounded-2xl border border-white/8 bg-white/5 px-4 py-4"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-lg font-semibold text-white">
+                  LÃ­nea de tiempo de la sesiÃ³n
+                </div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Historial completo
+                </div>
+              </div>
+              <div className="mt-4 space-y-3">
+                {sessionEvents.map((event, index) => (
+                  <div
+                    key={`modal-timeline-${index + 1}-${event}`}
+                    className={`flex items-start gap-4 rounded-xl border px-4 py-3 ${
+                      index === sessionEvents.length - 1
+                        ? 'border-sky-300/30 bg-sky-300/10 shadow-[0_0_0_1px_rgba(125,211,252,0.08)]'
+                        : 'border-white/8 bg-slate-950/50'
+                    }`}
+                  >
+                    <span className="mt-2 h-2.5 w-2.5 flex-none rounded-full bg-sky-300" />
+                    <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="text-sm text-slate-100">{event}</span>
+                      <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                        {`Evento ${String(index + 1).padStart(2, '0')}`}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </DetailDialog>
+
+        <DetailDialog
+          open={decisionPending && Boolean(visiblePendingInstruction)}
+          title="AprobaciÃ³n requerida"
+          description="Hace falta tu decisiÃ³n para esta tarea."
+          onClose={() => {}}
+          maxWidthClassName="max-w-3xl"
+        >
+          <div className="space-y-5">
+            <div className="rounded-2xl border border-sky-300/15 bg-sky-300/8 px-4 py-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-200/80">
+                Pregunta del Cerebro
+              </div>
+              <p className="mt-2 text-sm leading-6 text-slate-100">
+                {approvalMessage || DEFAULT_APPROVAL_MESSAGE}
+              </p>
+            </div>
+            {visibleApprovalOptions.length > 0 ? (
+              <section className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Opciones sugeridas
+                    </div>
+                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                      ElegÃ­ la alternativa que mejor represente tu decisiÃ³n.
+                    </p>
+                  </div>
+                  <div className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-slate-400">
+                    {visibleApprovalOptions.length} opciones
+                  </div>
+                </div>
+                <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                  {visibleApprovalOptions.map((option) => (
+                    <label
+                      key={option.key}
+                      className={`flex cursor-pointer gap-3 rounded-2xl border px-4 py-3 transition ${
+                        approvalSelectedOption === option.key
+                          ? 'border-sky-300/40 bg-sky-300/10 shadow-[0_8px_24px_rgba(56,189,248,0.12)]'
+                          : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="approval-option"
+                        value={option.key}
+                        checked={approvalSelectedOption === option.key}
+                        onChange={(event) =>
+                          setApprovalSelectedOption(event.target.value)
+                        }
+                        className="mt-1 h-4 w-4 flex-none border-white/20 bg-slate-950 text-sky-300"
+                      />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-white">
+                          {option.label}
+                        </div>
+                        {option.description ? (
+                          <div className="mt-1 text-xs leading-5 text-slate-400">
+                            {option.description}
+                          </div>
+                        ) : null}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+            {activeApprovalRequest?.allowFreeAnswer ? (
+              <section className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Respuesta libre
+                    </div>
+                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                      {approvalResponseRequiresOption &&
+                      activeApprovalInteractionMode === 'mixed'
+                        ? 'PodÃ©s complementar la opciÃ³n elegida con contexto o escribir una respuesta propia.'
+                        : approvalResponseRequiresOption
+                          ? 'Si lo necesitÃ¡s, agregÃ¡ una aclaraciÃ³n breve ademÃ¡s de la opciÃ³n.'
+                          : 'RespondÃ© con el criterio o la definiciÃ³n que querÃ©s reenviar al Cerebro.'}
+                    </p>
+                  </div>
+                  <div className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-slate-400">
+                    Opcional
+                  </div>
+                </div>
+                <textarea
+                  value={approvalFreeAnswer}
+                  onChange={(event) => setApprovalFreeAnswer(event.target.value)}
+                  placeholder="EscribÃ­ acÃ¡ la decisiÃ³n, el criterio o la aclaraciÃ³n que querÃ©s reenviar al Cerebro."
+                  className="min-h-[140px] w-full resize-y rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-500 focus:border-sky-300/40 focus:bg-slate-900"
+                />
+              </section>
+            ) : null}
+            <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                {approvalSource === 'executor'
+                  ? 'EjecuciÃ³n pendiente'
+                  : 'InstrucciÃ³n pendiente'}
+              </div>
+              <div className="mt-2 text-sm leading-6 text-slate-100">
+                {visiblePendingInstruction}
+              </div>
+            </section>
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <button
+                type="button"
+                onClick={handleApproveOnce}
+                disabled={!canSendRichApprovalResponse}
+                className="rounded-xl border border-amber-200/20 bg-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {activeApprovalInteractionMode === 'binary'
+                  ? 'Aprobar una vez'
+                  : 'Enviar respuesta al Cerebro'}
+              </button>
+              {activeApprovalInteractionMode === 'binary' ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleRejectApproval}
+                    className="rounded-xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm font-medium text-rose-50 transition hover:bg-rose-300/15"
+                  >
+                    Rechazar
+                  </button>
+                  {canPersistCurrentApprovalRule ? (
+                    <button
+                      type="button"
+                      onClick={handleAllowForProject}
+                      className="rounded-xl border border-amber-300/30 bg-amber-200/10 px-4 py-3 text-sm font-medium text-amber-50 transition hover:bg-amber-200/15"
+                    >
+                      Permitir siempre para este proyecto
+                    </button>
+                  ) : null}
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleRejectApproval}
+                  className="rounded-xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm font-medium text-rose-50 transition hover:bg-rose-300/15"
+                >
+                  Cancelar y devolver rechazo al Cerebro
+                </button>
+              )}
+            </div>
+          </div>
+        </DetailDialog>
+      </div>
+    </main>
+  )
+}
+
+export default App
+
+
+
+
