@@ -6260,6 +6260,652 @@ function buildAnalysisProposalInstruction({
   }, sin modificar archivos ni ejecutar cambios en esta iteración. Objetivo de referencia: ${normalizedGoal}`
 }
 
+function detectProductArchitecturePlanningIntent(goal, context) {
+  const combinedText = [goal, context]
+    .filter((value) => typeof value === 'string' && value.trim())
+    .join(' ')
+  const normalizedText = normalizeSectorDetectionText(combinedText)
+
+  if (!normalizedText) {
+    return {
+      matches: false,
+      productTypeHint: 'unknown',
+      complexityScore: 0,
+      explicitSystemIntent: false,
+      explicitDomainIntent: false,
+    }
+  }
+
+  const directProductTypeMap = [
+    { key: 'ecommerce', pattern: /\b(?:ecommerce|tienda online|tienda en linea)\b/u },
+    { key: 'crm', pattern: /\bcrm\b/u },
+    { key: 'erp', pattern: /\berp\b/u },
+    { key: 'marketplace', pattern: /\bmarketplace\b/u },
+    { key: 'saas', pattern: /\bsaas\b/u },
+    {
+      key: 'internal-tool',
+      pattern:
+        /\b(?:herramienta interna|tool interna|tool interno|gestion interna|operacion interna)\b/u,
+    },
+  ]
+  const directProductType =
+    directProductTypeMap.find(({ pattern }) => pattern.test(normalizedText))?.key ||
+    'unknown'
+  const explicitSystemIntent =
+    /\b(?:hacer|crear|armar|construir|desarrollar|montar|preparar|generar)\b/u.test(
+      normalizedText,
+    ) &&
+    /\b(?:sistema|plataforma|app|aplicacion|solucion|producto)\b/u.test(
+      normalizedText,
+    )
+  const explicitDomainIntent =
+    /\b(?:sistema|plataforma|app|aplicacion|crm|erp|marketplace|ecommerce|saas|herramienta|solucion)\s+para\b/u.test(
+      normalizedText,
+    )
+  const complexitySignals = [
+    /\busuarios\b/u,
+    /\broles\b/u,
+    /\bpermisos\b/u,
+    /\bbackoffice\b/u,
+    /\bpanel administrativo\b/u,
+    /\bdashboard(?: operativo)?\b/u,
+    /\bcarrito\b/u,
+    /\bcheckout\b/u,
+    /\bpagos\b/u,
+    /\bmercado pago\b/u,
+    /\bbase de datos\b/u,
+    /\bautenticacion\b/u,
+    /\breportes\b/u,
+    /\bintegraciones?\b/u,
+    /\bordenes\b/u,
+    /\bpedidos\b/u,
+    /\binventario\b/u,
+    /\balumnos\b/u,
+    /\bfamilias\b/u,
+    /\bcursos\b/u,
+    /\bcomunicaciones\b/u,
+    /\bseguimiento\b/u,
+    /\bturnos\b/u,
+    /\bclinicas?\b/u,
+    /\bescuelas?\b/u,
+    /\bdespachantes?\b/u,
+    /\baduana\b/u,
+  ]
+  const complexityScore = complexitySignals.reduce(
+    (score, pattern) => (pattern.test(normalizedText) ? score + 1 : score),
+    0,
+  )
+  const looksLikeInstitutionalWebOnly =
+    /\b(?:web institucional|sitio institucional|landing|one page|home page|index\.html|styles\.css|script\.js|hero|paleta|tipografia)\b/u.test(
+      normalizedText,
+    ) &&
+    !/\b(?:usuarios|roles|backoffice|panel administrativo|carrito|checkout|pagos|reportes|base de datos|autenticacion|integraciones?)\b/u.test(
+      normalizedText,
+    )
+  const matches =
+    !looksLikeInstitutionalWebOnly &&
+    (directProductType !== 'unknown' ||
+      explicitDomainIntent ||
+      (explicitSystemIntent && complexityScore >= 1) ||
+      complexityScore >= 3)
+
+  return {
+    matches,
+    productTypeHint: directProductType,
+    complexityScore,
+    explicitSystemIntent,
+    explicitDomainIntent,
+  }
+}
+
+function pushUniquePlannerValues(target, values, maxItems = 12) {
+  if (!Array.isArray(target) || !Array.isArray(values)) {
+    return target
+  }
+
+  const knownValues = new Set(
+    target
+      .filter((value) => typeof value === 'string' && value.trim())
+      .map((value) => value.trim().toLocaleLowerCase()),
+  )
+
+  for (const value of values) {
+    if (typeof value !== 'string' || !value.trim()) {
+      continue
+    }
+
+    const normalizedValue = value.trim().toLocaleLowerCase()
+
+    if (knownValues.has(normalizedValue)) {
+      continue
+    }
+
+    target.push(value.trim())
+    knownValues.add(normalizedValue)
+
+    if (target.length >= maxItems) {
+      break
+    }
+  }
+
+  return target
+}
+
+function extractProductArchitectureDomainLabel(goal, context, productType) {
+  const extractionPatterns = [
+    /\b(?:ecommerce|crm|erp|marketplace|saas|sistema|plataforma|app|aplicacion|herramienta|solucion)\s+para\s+(.+?)(?=\s+(?:con|que|preparad[oa]|orientad[oa]|pensad[oa]|sin|no|y\b)|[.,;:]|$)/iu,
+    /\bpara\s+(una?|el|la)\s+(.+?)(?=\s+(?:con|que|preparad[oa]|orientad[oa]|pensad[oa]|sin|no|y\b)|[.,;:]|$)/iu,
+  ]
+
+  for (const text of [goal, context]) {
+    if (typeof text !== 'string' || !text.trim()) {
+      continue
+    }
+
+    for (const pattern of extractionPatterns) {
+      const match = text.match(pattern)
+      const extractedLabel = sanitizeBusinessSectorLabel(match?.[2] || match?.[1] || '')
+
+      if (extractedLabel) {
+        return stripLeadingSpanishArticle(extractedLabel)
+      }
+    }
+  }
+
+  const explicitBusinessLabel = extractExplicitBusinessLabelFromPlanningText(goal, context)
+
+  if (explicitBusinessLabel) {
+    return explicitBusinessLabel
+  }
+
+  if (productType === 'ecommerce') {
+    return 'comercio online'
+  }
+
+  if (productType === 'crm') {
+    return 'gestion comercial o relacional'
+  }
+
+  if (productType === 'erp') {
+    return 'operacion interna del negocio'
+  }
+
+  return ''
+}
+
+function buildProductArchitecturePlan({
+  goal,
+  context,
+  contextHubPack,
+  intent,
+}) {
+  const combinedText = [goal, context]
+    .filter((value) => typeof value === 'string' && value.trim())
+    .join(' ')
+  const normalizedText = normalizeSectorDetectionText(combinedText)
+  const productType =
+    intent?.productTypeHint && intent.productTypeHint !== 'unknown'
+      ? intent.productTypeHint
+      : /\bcarrito\b|\bcheckout\b|\bmercado pago\b|\bpagos\b/u.test(normalizedText)
+        ? 'ecommerce'
+        : /\bcrm\b/u.test(normalizedText)
+          ? 'crm'
+          : /\berp\b/u.test(normalizedText)
+            ? 'erp'
+            : /\bmarketplace\b/u.test(normalizedText)
+              ? 'marketplace'
+              : /\bsaas\b/u.test(normalizedText)
+                ? 'saas'
+                : /\b(?:gestion interna|herramienta interna|operacion interna)\b/u.test(
+                      normalizedText,
+                    )
+                  ? 'internal-tool'
+                  : /\b(?:sistema|plataforma|app|aplicacion|solucion)\b/u.test(
+                        normalizedText,
+                      )
+                    ? 'business-system'
+                    : 'unknown'
+  const domain = extractProductArchitectureDomainLabel(goal, context, productType)
+  const users = []
+  const roles = []
+  const coreModules = []
+  const dataEntities = []
+  const keyFlows = []
+  const integrations = []
+  const criticalRisks = []
+  const approvalRequiredFor = []
+  const safeFirstDelivery = []
+  const outOfScopeForFirstIteration = []
+  const phases = []
+
+  pushUniquePlannerValues(
+    criticalRisks,
+    [
+      'Evitar intentar construir todo el sistema en una sola corrida.',
+      'Separar claramente maqueta visual, prototipo funcional local y sistema real con integraciones.',
+    ],
+    14,
+  )
+  pushUniquePlannerValues(
+    outOfScopeForFirstIteration,
+    [
+      'Produccion completa con integraciones reales, secretos y despliegue final.',
+      'Automatizaciones irreversibles o migraciones sin aprobacion humana.',
+    ],
+    12,
+  )
+
+  switch (productType) {
+    case 'ecommerce':
+      pushUniquePlannerValues(users, ['cliente final', 'operador comercial', 'administrador'])
+      pushUniquePlannerValues(roles, ['cliente', 'catalog-admin', 'admin'])
+      pushUniquePlannerValues(
+        coreModules,
+        ['catalogo', 'productos', 'carrito', 'checkout', 'ordenes', 'backoffice'],
+      )
+      pushUniquePlannerValues(
+        dataEntities,
+        ['producto', 'categoria', 'carrito', 'orden', 'cliente'],
+      )
+      pushUniquePlannerValues(
+        keyFlows,
+        [
+          'Explorar catalogo y ver detalle de producto.',
+          'Agregar productos al carrito y revisar totales.',
+          'Iniciar checkout y registrar una orden.',
+          'Gestionar productos y ordenes desde backoffice.',
+        ],
+      )
+      pushUniquePlannerValues(safeFirstDelivery, [
+        'Catalogo navegable con productos de muestra y carrito local.',
+        'Backoffice minimo para alta y edicion de productos sin pagos reales.',
+        'Checkout simulado o preparado para futura integracion.',
+      ])
+      break
+    case 'crm':
+      pushUniquePlannerValues(
+        users,
+        ['administrador', 'equipo operativo', 'usuario final del seguimiento'],
+      )
+      pushUniquePlannerValues(roles, ['admin', 'operador', 'supervisor'])
+      pushUniquePlannerValues(
+        coreModules,
+        ['contactos', 'seguimiento', 'comunicaciones', 'reportes', 'configuracion'],
+      )
+      pushUniquePlannerValues(
+        dataEntities,
+        ['contacto', 'cuenta', 'interaccion', 'seguimiento', 'reporte'],
+      )
+      pushUniquePlannerValues(
+        keyFlows,
+        [
+          'Registrar y actualizar entidades principales.',
+          'Seguir historial y proximos pasos por caso o cuenta.',
+          'Emitir reportes operativos y de gestion.',
+        ],
+      )
+      pushUniquePlannerValues(safeFirstDelivery, [
+        'CRUD inicial de entidades nucleares con permisos basicos.',
+        'Vista operativa de seguimiento y estado.',
+        'Reportes basicos sin automatizaciones externas.',
+      ])
+      break
+    case 'erp':
+      pushUniquePlannerValues(users, ['administrador', 'operador interno', 'responsable de area'])
+      pushUniquePlannerValues(roles, ['admin', 'operador', 'supervisor'])
+      pushUniquePlannerValues(
+        coreModules,
+        ['maestros', 'operaciones', 'reportes', 'auditoria', 'configuracion'],
+      )
+      pushUniquePlannerValues(
+        dataEntities,
+        ['cliente', 'proveedor', 'operacion', 'documento', 'reporte'],
+      )
+      pushUniquePlannerValues(
+        keyFlows,
+        [
+          'Registrar operaciones y estados por area.',
+          'Relacionar documentos y trazabilidad operativa.',
+          'Consolidar reportes y auditoria por proceso.',
+        ],
+      )
+      pushUniquePlannerValues(safeFirstDelivery, [
+        'Modulo operativo acotado con trazabilidad basica.',
+        'Maestros y permisos iniciales.',
+        'Reportes internos sin integraciones criticas.',
+      ])
+      break
+    case 'marketplace':
+      pushUniquePlannerValues(
+        users,
+        ['comprador', 'vendedor', 'operador de marketplace', 'administrador'],
+      )
+      pushUniquePlannerValues(roles, ['buyer', 'seller', 'operator', 'admin'])
+      pushUniquePlannerValues(
+        coreModules,
+        ['catalogo', 'publicaciones', 'carrito o solicitud', 'ordenes', 'moderacion'],
+      )
+      pushUniquePlannerValues(
+        dataEntities,
+        ['usuario', 'publicacion', 'orden', 'pago', 'comision'],
+      )
+      pushUniquePlannerValues(
+        keyFlows,
+        [
+          'Publicar y moderar oferta o inventario.',
+          'Descubrir, comparar y convertir una compra o solicitud.',
+          'Gestionar ordenes, comisiones y estados.',
+        ],
+      )
+      pushUniquePlannerValues(safeFirstDelivery, [
+        'Onboarding basico de vendedores y compradores.',
+        'Catalogo o listado con publicaciones de muestra.',
+        'Flujo acotado de solicitud o compra sin dinero real.',
+      ])
+      break
+    case 'saas':
+      pushUniquePlannerValues(users, ['administrador de cuenta', 'miembro del equipo', 'owner'])
+      pushUniquePlannerValues(roles, ['owner', 'admin', 'member'])
+      pushUniquePlannerValues(
+        coreModules,
+        ['auth', 'workspace', 'panel operativo', 'configuracion', 'reportes'],
+      )
+      pushUniquePlannerValues(
+        dataEntities,
+        ['workspace', 'usuario', 'rol', 'configuracion', 'evento'],
+      )
+      pushUniquePlannerValues(
+        keyFlows,
+        [
+          'Crear workspace y alta de usuarios.',
+          'Operar funcionalidades nucleares por rol.',
+          'Revisar actividad y metricas basicas.',
+        ],
+      )
+      pushUniquePlannerValues(safeFirstDelivery, [
+        'Workspace unico con usuarios y roles basicos.',
+        'Modulo principal funcional sin billing ni integraciones reales.',
+        'Panel operativo inicial con datos de ejemplo.',
+      ])
+      break
+    case 'internal-tool':
+      pushUniquePlannerValues(users, ['equipo interno', 'responsable operativo', 'administrador'])
+      pushUniquePlannerValues(roles, ['operador', 'supervisor', 'admin'])
+      pushUniquePlannerValues(
+        coreModules,
+        ['panel operativo', 'gestion de casos', 'reportes', 'configuracion'],
+      )
+      pushUniquePlannerValues(
+        dataEntities,
+        ['caso', 'estado', 'usuario', 'reporte'],
+      )
+      pushUniquePlannerValues(
+        keyFlows,
+        [
+          'Registrar y actualizar trabajo interno.',
+          'Asignar responsables y estados.',
+          'Visualizar reportes y pendientes.',
+        ],
+      )
+      pushUniquePlannerValues(safeFirstDelivery, [
+        'Panel operativo con datos y estados basicos.',
+        'Permisos simples por rol.',
+        'Reportes iniciales sin integraciones externas.',
+      ])
+      break
+    default:
+      pushUniquePlannerValues(users, ['administrador', 'operador principal', 'usuario final'])
+      pushUniquePlannerValues(roles, ['admin', 'operador', 'viewer'])
+      pushUniquePlannerValues(
+        coreModules,
+        ['usuarios y roles', 'operacion principal', 'reportes', 'configuracion'],
+      )
+      pushUniquePlannerValues(
+        dataEntities,
+        ['usuario', 'rol', 'entidad principal', 'evento'],
+      )
+      pushUniquePlannerValues(
+        keyFlows,
+        [
+          'Alta y gestion de entidades principales.',
+          'Operacion del flujo critico principal.',
+          'Seguimiento operativo y reportes.',
+        ],
+      )
+      pushUniquePlannerValues(safeFirstDelivery, [
+        'MVP acotado del flujo principal con permisos basicos.',
+        'Datos de ejemplo y reportes iniciales.',
+      ])
+      break
+  }
+
+  if (/\bescuelas?\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(users, ['administrador escolar', 'docente', 'preceptor o directivo', 'familia o alumno'])
+    pushUniquePlannerValues(roles, ['admin', 'docente', 'preceptor', 'familia'])
+    pushUniquePlannerValues(
+      coreModules,
+      ['alumnos', 'familias', 'cursos', 'comunicaciones', 'seguimiento', 'reportes'],
+    )
+    pushUniquePlannerValues(
+      dataEntities,
+      ['alumno', 'familia', 'curso', 'comunicacion', 'seguimiento'],
+    )
+    pushUniquePlannerValues(
+      criticalRisks,
+      ['Hay datos sensibles de menores o informacion educativa que requieren permisos y resguardo reforzados.'],
+      14,
+    )
+    pushUniquePlannerValues(
+      approvalRequiredFor,
+      ['Definir tratamiento de datos sensibles, permisos finos y auditoria.'],
+      12,
+    )
+  }
+
+  if (/\bclinicas?\b|\bsalud\b|\bturnos\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(users, ['recepcion', 'profesional', 'administrador', 'paciente'])
+    pushUniquePlannerValues(roles, ['admin', 'profesional', 'recepcion', 'paciente'])
+    pushUniquePlannerValues(
+      criticalRisks,
+      ['Hay datos personales o de salud que requieren seguridad y permisos estrictos.'],
+      14,
+    )
+    pushUniquePlannerValues(
+      approvalRequiredFor,
+      ['Definir alcance de datos sensibles, autenticacion real y politicas de acceso.'],
+      12,
+    )
+  }
+
+  if (/\bdespachantes?\b|\baduana\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(
+      criticalRisks,
+      ['Los procesos aduaneros suelen exigir trazabilidad documental, auditoria y validacion humana de reglas.'],
+      14,
+    )
+    pushUniquePlannerValues(
+      approvalRequiredFor,
+      ['Definir reglas operativas criticas, auditoria y fuentes oficiales antes de automatizar.'],
+      12,
+    )
+  }
+
+  if (/\busuarios\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(users, ['usuarios autenticados'])
+  }
+
+  if (/\broles\b|\bpermisos\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(roles, ['admin', 'operador', 'viewer'])
+    pushUniquePlannerValues(coreModules, ['roles y permisos'])
+  }
+
+  if (/\bbackoffice\b|\bpanel administrativo\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(coreModules, ['backoffice'])
+  }
+
+  if (/\bdashboard(?: operativo)?\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(coreModules, ['dashboard operativo'])
+  }
+
+  if (/\breportes\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(coreModules, ['reportes'])
+  }
+
+  if (/\bmercado pago\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(integrations, ['Mercado Pago'])
+    pushUniquePlannerValues(
+      criticalRisks,
+      ['Mercado Pago requiere credenciales, webhooks y validacion humana antes de pasar a integracion real.'],
+      14,
+    )
+    pushUniquePlannerValues(
+      approvalRequiredFor,
+      ['Credenciales reales, webhooks y paso a pagos reales.'],
+      12,
+    )
+  } else if (/\bpagos\b|\bcheckout\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(integrations, ['pasarela de pagos'])
+    pushUniquePlannerValues(
+      criticalRisks,
+      ['Los pagos reales requieren credenciales, conciliacion y webhooks con aprobacion humana.'],
+      14,
+    )
+    pushUniquePlannerValues(
+      approvalRequiredFor,
+      ['Seleccion de pasarela, credenciales y webhooks de pagos.'],
+      12,
+    )
+  }
+
+  if (/\bautenticacion\b|\blogin\b|\busuarios\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(
+      approvalRequiredFor,
+      ['Autenticacion real, gestion de sesiones y politicas de acceso.'],
+      12,
+    )
+  }
+
+  if (/\bbase de datos\b|\bdatos\b|\breportes\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(
+      approvalRequiredFor,
+      ['Base de datos real, migraciones y politicas de respaldo.'],
+      12,
+    )
+  }
+
+  if (/\bwebhooks?\b|\bintegraciones?\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(
+      approvalRequiredFor,
+      ['Integraciones externas, webhooks y manejo de secretos.'],
+      12,
+    )
+  }
+
+  if (!approvalRequiredFor.length) {
+    pushUniquePlannerValues(
+      approvalRequiredFor,
+      ['Cualquier credencial real, despliegue productivo o integracion critica.'],
+      12,
+    )
+  }
+
+  pushUniquePlannerValues(phases, [
+    'Fase 1: descubrir alcance, dominio, actores y flujo critico principal.',
+    'Fase 2: definir MVP seguro con modulos y datos minimos.',
+    'Fase 3: implementar prototipo funcional local con auth y persistencia acotadas.',
+    'Fase 4: integrar capacidades criticas aprobadas y endurecer seguridad, auditoria y despliegue.',
+  ])
+
+  if (!safeFirstDelivery.length) {
+    pushUniquePlannerValues(safeFirstDelivery, [
+      'MVP local del flujo principal con datos de ejemplo y permisos basicos.',
+    ])
+  }
+
+  const suggestedArchitecture = {
+    frontend:
+      productType === 'ecommerce' || productType === 'marketplace'
+        ? 'Frontend web con experiencia de catalogo/backoffice separada por roles.'
+        : 'Frontend web modular con vistas por rol y foco en el flujo principal.',
+    backend:
+      'Backend con API por modulos de dominio, validaciones de permisos y servicios desacoplados para integraciones futuras.',
+    database:
+      'Base relacional para entidades transaccionales, relaciones fuertes y trazabilidad operativa.',
+    auth:
+      /\bautenticacion\b|\busuarios\b|\broles\b/u.test(normalizedText)
+        ? 'Autenticacion con roles y permisos por modulo; sesiones seguras o proveedor dedicado cuando se apruebe.'
+        : 'Definir autenticacion simple al principio y endurecerla antes de abrir acceso real.',
+    payments:
+      /\bpagos\b|\bcheckout\b|\bmercado pago\b/u.test(normalizedText)
+        ? 'Mantener pagos desacoplados y simulados en primeras fases; integrar pasarela real solo con aprobacion humana.'
+        : 'No aplicar por ahora salvo que el flujo comercial lo exija.',
+    storage:
+      'Storage para adjuntos o assets solo si el dominio lo necesita, con politicas claras de acceso y retencion.',
+  }
+  const contextHubAvailable = contextHubPack?.available === true
+  const productLabel = productType === 'unknown' ? 'sistema complejo' : productType
+  const domainLabel = domain || 'dominio a precisar'
+
+  return {
+    tasks: [
+      {
+        step: 1,
+        title: `Clasificar el tipo de producto (${productLabel}) y delimitar el dominio funcional inicial (${domainLabel}).`,
+      },
+      {
+        step: 2,
+        title: 'Identificar usuarios, roles y permisos esperados antes de pensar integraciones o despliegue.',
+      },
+      {
+        step: 3,
+        title: 'Proponer modulos principales y flujos criticos que den una primera entrega segura y no ficticia.',
+      },
+      {
+        step: 4,
+        title: 'Listar entidades de datos, dependencias tecnicas e integraciones externas potenciales.',
+      },
+      {
+        step: 5,
+        title: contextHubAvailable
+          ? 'Cruzar la arquitectura propuesta con MEMORIA externa disponible solo como contexto auxiliar.'
+          : 'Mantener la arquitectura autocontenida y usar MEMORIA externa solo si aparece disponible luego.',
+      },
+      {
+        step: 6,
+        title: 'Detectar riesgos, aprobaciones humanas futuras y limites de esta iteracion antes de cualquier materializacion.',
+      },
+      {
+        step: 7,
+        title: 'Definir fases de implementacion y una primera entrega segura sin crear archivos ni ejecutar cambios todavia.',
+      },
+    ],
+    assumptions: [
+      'Esta iteracion es solo de arquitectura de producto; no corresponde crear archivos ni materializar cambios.',
+      'El objetivo describe un sistema suficientemente amplio como para requerir fases y una primera entrega segura.',
+      'Pagos reales, autenticacion real, base de datos real, migraciones, deploy, webhooks, credenciales y datos sensibles requieren aprobacion humana especifica.',
+      'MEMORIA externa puede enriquecer el contexto, pero el plan debe ser util incluso si no esta disponible.',
+    ],
+    instruction:
+      'Analizar el producto solicitado y generar una arquitectura inicial dinamica, identificando dominio, usuarios, modulos, entidades de datos, integraciones, riesgos, aprobaciones necesarias, fases de implementacion y primera entrega segura, sin crear archivos ni ejecutar cambios todavia.',
+    productArchitecture: {
+      productType,
+      domain: domainLabel,
+      users,
+      roles,
+      coreModules,
+      dataEntities,
+      keyFlows,
+      integrations,
+      criticalRisks,
+      approvalRequiredFor,
+      suggestedArchitecture,
+      phases,
+      safeFirstDelivery,
+      outOfScopeForFirstIteration,
+    },
+  }
+}
+
 const ORCHESTRATOR_PLANNER_FEEDBACK_PREFIX = '__orchestrator_feedback__:'
 
 function parseOrchestratorPlannerFeedback(previousExecutionResult) {
@@ -6708,6 +7354,7 @@ function buildBrainDecisionContract({
   reuseReason,
   reusedArtifactIds,
   reuseMode,
+  productArchitecture,
   finalResult,
 }) {
   const resolvedRequiresApproval = requiresApproval === true
@@ -6762,6 +7409,9 @@ function buildBrainDecisionContract({
       nextExpectedAction ||
       resolvedApprovalRequest?.nextExpectedAction ||
       (completed === true ? 'final-result' : 'execute-plan'),
+    ...(productArchitecture && typeof productArchitecture === 'object'
+      ? { productArchitecture }
+      : {}),
     ...(finalResult && typeof finalResult === 'object'
       ? { finalResult }
       : {}),
@@ -9474,6 +10124,10 @@ async function buildLocalStrategicBrainDecision({
       : []
   const localGoalDescriptor = detectBrainAtomicOperationDescriptor(goal)
   const analysisProposalIntent = detectAnalysisProposalPlanningIntent(goal, context)
+  const productArchitectureIntent = detectProductArchitecturePlanningIntent(
+    goal,
+    context,
+  )
   const scopedFileEditIntent = detectScopedExistingFileEditIntent({
     goal,
     context,
@@ -9690,6 +10344,40 @@ async function buildLocalStrategicBrainDecision({
         'La ejecucion anterior fallo, pero aparecio un bloqueo critico nuevo y real. El Cerebro solo puede volver a preguntar por ese bloqueo antes de continuar.',
       question:
         'Aparecio un bloqueo critico nuevo tras la falla del executor. Necesito esa definicion humana para continuar sin riesgo.',
+    })
+  }
+
+  if (
+    productArchitectureIntent.matches &&
+    !scopedFileEditIntent &&
+    !localGoalDescriptor &&
+    !looksLikeWebBaseGoal &&
+    compositeSteps.length < 2 &&
+    (!previousExecutionResult ||
+      iteration === 1 ||
+      approvalAlreadyGranted ||
+      hasRecoverableExecutionError)
+  ) {
+    const productArchitecturePlan = buildProductArchitecturePlan({
+      goal,
+      context,
+      contextHubPack,
+      intent: productArchitectureIntent,
+    })
+
+    return buildBrainDecisionContract({
+      decisionKey: 'product-architecture-plan',
+      strategy: 'product-architecture-plan',
+      executionMode: 'planner-only',
+      reason:
+        'El objetivo describe un producto o sistema complejo con modulos, datos y riesgos suficientes como para necesitar una arquitectura previa antes de ejecutar cambios.',
+      tasks: productArchitecturePlan.tasks,
+      requiresApproval: false,
+      assumptions: productArchitecturePlan.assumptions,
+      instruction: productArchitecturePlan.instruction,
+      completed: false,
+      nextExpectedAction: 'review-product-architecture',
+      productArchitecture: productArchitecturePlan.productArchitecture,
     })
   }
 
@@ -10591,8 +11279,10 @@ Roles:
 Tu tarea es devolver una decision estructurada y operativa.
 
 Reglas:
-- Elegí entre estrategias compatibles con el sistema: fast-local, fast-composite, executor, web-scaffold-base, ask-user.
+- Elegí entre estrategias compatibles con el sistema: fast-local, fast-composite, executor, web-scaffold-base, product-architecture-plan, ask-user.
 - Usá web-scaffold-base para webs institucionales o creativas cuando corresponda.
+- Usá product-architecture-plan cuando el objetivo implique un sistema o producto complejo (por ejemplo ecommerce, CRM, ERP, marketplace, SaaS o plataforma con usuarios, roles, backoffice, datos e integraciones) y todavía haga falta definir arquitectura antes de ejecutar.
+- Si devolvés product-architecture-plan, usá executionMode="planner-only", nextExpectedAction="review-product-architecture", requiresApproval=false y describí fases, riesgos, integraciones y primera entrega segura sin crear archivos.
 - Si hace falta una decisión humana real, devolvé requiresApproval=true y un approvalRequest estructurado.
 - Si llega feedback de error recuperable, replanificá.
 - Si el pedido es simple y determinístico, podés devolver fast-local o fast-composite.
@@ -10753,6 +11443,40 @@ function buildOpenAIBrainSchema() {
       reuseReason: { type: 'string' },
       reusedArtifactIds: { type: 'array', items: { type: 'string' } },
       reuseMode: { type: 'string' },
+      productArchitecture: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          productType: { type: 'string' },
+          domain: { type: 'string' },
+          users: { type: 'array', items: { type: 'string' } },
+          roles: { type: 'array', items: { type: 'string' } },
+          coreModules: { type: 'array', items: { type: 'string' } },
+          dataEntities: { type: 'array', items: { type: 'string' } },
+          keyFlows: { type: 'array', items: { type: 'string' } },
+          integrations: { type: 'array', items: { type: 'string' } },
+          criticalRisks: { type: 'array', items: { type: 'string' } },
+          approvalRequiredFor: { type: 'array', items: { type: 'string' } },
+          suggestedArchitecture: {
+            type: 'object',
+            additionalProperties: true,
+            properties: {
+              frontend: { type: 'string' },
+              backend: { type: 'string' },
+              database: { type: 'string' },
+              auth: { type: 'string' },
+              payments: { type: 'string' },
+              storage: { type: 'string' },
+            },
+          },
+          phases: { type: 'array', items: { type: 'string' } },
+          safeFirstDelivery: { type: 'array', items: { type: 'string' } },
+          outOfScopeForFirstIteration: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+        },
+      },
     },
     required: [
       'decisionKey',
@@ -10992,6 +11716,11 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
       typeof rawDecision?.reuseMode === 'string' && rawDecision.reuseMode.trim()
         ? rawDecision.reuseMode.trim()
         : fallbackDecision.reuseMode,
+    productArchitecture:
+      rawDecision?.productArchitecture &&
+      typeof rawDecision.productArchitecture === 'object'
+        ? rawDecision.productArchitecture
+        : fallbackDecision.productArchitecture,
   })
   const equivalentApprovalRejected =
     normalizedDecision.requiresApproval === true &&
@@ -13105,6 +13834,7 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       reuseReason: brainDecision.reuseReason,
       reusedArtifactIds: brainDecision.reusedArtifactIds,
       reuseMode: brainDecision.reuseMode,
+      productArchitecture: brainDecision.productArchitecture,
       executionScope: brainDecision.executionScope,
       decisionKey: brainDecision.decisionKey,
       reason: brainDecision.reason,
@@ -13140,6 +13870,7 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
     reuseReason: brainDecision.reuseReason,
     reusedArtifactIds: brainDecision.reusedArtifactIds,
     reuseMode: brainDecision.reuseMode,
+    productArchitecture: brainDecision.productArchitecture,
     executionScope: brainDecision.executionScope,
     decisionKey: brainDecision.decisionKey,
     reason: brainDecision.reason,

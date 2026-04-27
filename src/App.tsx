@@ -2377,6 +2377,30 @@ const isUserClarificationPlannerResponse = (value: {
   )
 }
 
+const isReviewOnlyPlannerResponse = (value: {
+  nextExpectedAction?: string
+  executionMode?: string
+  strategy?: string
+  decisionKey?: string
+}) => {
+  const normalizedNextExpectedAction = normalizeOptionalString(
+    value.nextExpectedAction,
+  ).toLocaleLowerCase()
+  const normalizedExecutionMode = normalizeOptionalString(
+    value.executionMode,
+  ).toLocaleLowerCase()
+  const normalizedStrategy = normalizeOptionalString(value.strategy).toLocaleLowerCase()
+  const normalizedDecisionKey = normalizeOptionalString(value.decisionKey).toLocaleLowerCase()
+
+  return (
+    normalizedExecutionMode === 'planner-only' ||
+    normalizedNextExpectedAction === 'review-product-architecture' ||
+    normalizedNextExpectedAction === 'review-plan' ||
+    normalizedStrategy === 'product-architecture-plan' ||
+    normalizedDecisionKey === 'product-architecture-plan'
+  )
+}
+
 const isFastRouteExecutionTitle = (value: unknown) => {
   const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
 
@@ -3654,10 +3678,22 @@ function App() {
       ? 'Regla del proyecto activa'
       : 'Sin aprobación pendiente'
 
-  const plannerBadge = isPlanning ? 'Planificación en curso' : 'Plan activo cargado'
+  const plannerNeedsUserClarification = isUserClarificationPlannerResponse(
+    plannerExecutionMetadata,
+  )
+  const plannerIsReviewOnly = isReviewOnlyPlannerResponse(plannerExecutionMetadata)
+  const plannerReviewStatusLabel = plannerIsReviewOnly
+    ? 'Plan en revision'
+    : 'Plan activo cargado'
+  const plannerReviewHelperText = plannerIsReviewOnly
+    ? 'Este plan no ejecuta cambios todavia; primero requiere revision manual.'
+    : 'La instruccion actual puede pasar a ejecucion manual cuando corresponda.'
+  const plannerBadge = isPlanning ? 'Planificación en curso' : plannerReviewStatusLabel
 
   const executorBadge = isExecutingTask
     ? 'Ejecutando instrucción actual'
+    : plannerIsReviewOnly
+      ? 'En revisión manual'
     : decisionPending && approvalSource === 'executor'
       ? 'Esperando aprobación'
       : 'Listo para ejecutar'
@@ -3668,15 +3704,14 @@ function App() {
         ? 'Completado'
         : executorRequestState === 'error'
           ? 'Con error'
-          : 'En espera'
-  const plannerNeedsUserClarification = isUserClarificationPlannerResponse(
-    plannerExecutionMetadata,
-  )
-
+          : plannerIsReviewOnly
+            ? 'En revisión'
+            : 'En espera'
   const canExecuteInstruction =
     plannerInstruction.trim() !== '' &&
     plannerInstruction !== DEFAULT_PLANNER_INSTRUCTION &&
-    !plannerNeedsUserClarification
+    !plannerNeedsUserClarification &&
+    !plannerIsReviewOnly
 
   const visiblePendingInstruction =
     approvalSource === 'executor'
@@ -6008,6 +6043,29 @@ function App() {
         return
       }
 
+      if (isReviewOnlyPlannerResponse(response)) {
+        clearVisibleExecutionRuntimeState()
+        setSessionStatus('Plan listo para revision')
+        setCurrentStep('El Cerebro devolvio una arquitectura para revisar antes de ejecutar')
+        updateLastRunSummary({
+          objective: normalizedGoalInput,
+          instruction: response.instruction,
+          result: response.instruction,
+          approval: approvedByProjectRule
+            ? 'Autoaprobada por regla del proyecto'
+            : 'No requerida',
+          finalStatus: 'Plan listo para revision',
+        })
+        addFlowMessage({
+          source: 'orquestador',
+          title: 'Decision del orquestador',
+          content:
+            'La replanificacion devolvio un plan solo para revision y no se ejecutara automaticamente.',
+          status: 'warning',
+        })
+        return
+      }
+
       clearVisibleExecutionRuntimeState()
       setSessionStatus('El Cerebro definio una nueva accion')
       updateLastRunSummary({
@@ -6302,6 +6360,35 @@ function App() {
               title: 'Decisión del orquestador',
               content:
                 'El flujo automático se detuvo porque el planificador necesita una nueva definición del usuario.',
+              status: 'warning',
+            })
+            return
+          }
+
+          if (isReviewOnlyPlannerResponse(planResponse)) {
+            setIsAutoFlowRunning(false)
+            clearVisibleExecutionRuntimeState()
+            setSessionStatus('Plan listo para revision')
+            setCurrentStep(
+              `El flujo automatico quedo detenido en la iteracion ${iteration} para revisar la arquitectura propuesta`,
+            )
+            updateLastRunSummary({
+              objective: normalizedGoalInput,
+              instruction: planResponse.instruction,
+              result: planResponse.instruction,
+              approval: 'No requerida',
+              finalStatus: 'Plan listo para revision',
+            })
+            setSessionEvents((currentEvents) => [
+              ...currentEvents,
+              'El planificador devolvio un plan solo para revision',
+              'El flujo automatico quedo detenido hasta revision manual',
+            ])
+            addFlowMessage({
+              source: 'orquestador',
+              title: 'Decision del orquestador',
+              content:
+                'El flujo automatico se detuvo porque el planificador devolvio una arquitectura para revisar antes de ejecutar.',
               status: 'warning',
             })
             return
@@ -7138,6 +7225,31 @@ function App() {
         return
       }
 
+      if (isReviewOnlyPlannerResponse(response)) {
+        clearVisibleExecutionRuntimeState()
+        setSessionStatus('Plan listo para revision')
+        setCurrentStep('El Cerebro devolvio una arquitectura para revisar antes de ejecutar')
+        updateLastRunSummary({
+          objective: normalizedGoalInput,
+          instruction: response.instruction,
+          result: response.instruction,
+          approval: 'No requerida',
+          finalStatus: 'Plan listo para revision',
+        })
+        setSessionEvents((currentEvents) => [
+          ...currentEvents,
+          'El planificador devolvio un plan solo para revision',
+        ])
+        addFlowMessage({
+          source: 'orquestador',
+          title: 'Decision del orquestador',
+          content:
+            'La respuesta del planificador quedo lista para revision y no se ejecutara automaticamente.',
+          status: 'warning',
+        })
+        return
+      }
+
       clearVisibleExecutionRuntimeState()
       setSessionStatus('Plan generado')
       updateLastRunSummary({
@@ -7199,6 +7311,28 @@ function App() {
       normalizeOptionalString(overrideInstruction) || plannerInstruction
     const executionMetadata =
       overridePlannerExecutionMetadata || plannerExecutionMetadata
+
+    if (isReviewOnlyPlannerResponse(executionMetadata)) {
+      clearVisibleExecutionRuntimeState()
+      setSessionStatus('Plan listo para revisión')
+      setCurrentStep('El plan actual requiere revisión manual antes de cualquier ejecución')
+      updateLastRunSummary({
+        objective: normalizedGoalInput,
+        instruction: instructionToExecute,
+        result: instructionToExecute,
+        approval: 'No requerida',
+        finalStatus: 'Plan listo para revisión',
+      })
+      addFlowMessage({
+        source: 'orquestador',
+        title: 'Decisión del orquestador',
+        content:
+          'La instrucción actual es solo de revisión y no se puede ejecutar materialmente todavía.',
+        status: 'warning',
+      })
+      return
+    }
+
     const executorPayload = {
       instruction: instructionToExecute,
       context: currentExecutionContext || undefined,
@@ -8121,17 +8255,23 @@ function App() {
                   >
                     {isPlanning ? 'Generando...' : 'Generar siguiente paso'}
                   </button>
-                  <button
-                    id="execute-current-instruction-button"
-                    type="button"
-                    onClick={handleExecuteCurrentInstruction}
-                    disabled={!canExecuteInstruction || isExecutingTask}
-                    className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-                  >
-                    {isExecutingTask
-                      ? 'Ejecutando...'
-                      : 'Ejecutar instrucción actual'}
-                  </button>
+                  {plannerIsReviewOnly ? (
+                    <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200">
+                      Plan en revisión
+                    </div>
+                  ) : (
+                    <button
+                      id="execute-current-instruction-button"
+                      type="button"
+                      onClick={handleExecuteCurrentInstruction}
+                      disabled={!canExecuteInstruction || isExecutingTask}
+                      className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                    >
+                      {isExecutingTask
+                        ? 'Ejecutando...'
+                        : 'Ejecutar instrucción actual'}
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
@@ -10071,10 +10211,10 @@ function App() {
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              Plan generado
+                              {plannerIsReviewOnly ? 'Plan en revisión' : 'Plan generado'}
                             </div>
                             <div className="mt-2 text-sm text-slate-400">
-                              Revisá la instrucción y ejecutá cuando te cierre.
+                              {plannerReviewHelperText}
                             </div>
                           </div>
                           <button
@@ -10644,7 +10784,9 @@ function App() {
               <div className="mt-6 flex flex-col gap-3 border-t border-white/8 pt-5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-sm leading-6 text-slate-400">
                   {activeWizardStep === 'plan'
-                    ? 'Cuando el plan te cierre, ejecutalo desde acá.'
+                    ? plannerIsReviewOnly
+                      ? 'Este plan quedó en revisión y no ejecuta cambios todavía.'
+                      : 'Cuando el plan te cierre, ejecutalo desde acá.'
                     : activeWizardStep === 'execution'
                       ? 'Si aparece una aprobación, el flujo queda claramente bloqueado hasta resolverla.'
                       : activeWizardStep === 'result'
@@ -10696,14 +10838,20 @@ function App() {
                       >
                         {isPlanning ? 'Generando...' : 'Regenerar plan'}
                       </button>
-                      <button
-                        type="button"
-                        onClick={handleWizardExecute}
-                        disabled={!canExecuteInstruction || isExecutingTask}
-                        className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-                      >
-                        {isExecutingTask ? 'Ejecutando...' : 'Ejecutar'}
-                      </button>
+                      {plannerIsReviewOnly ? (
+                        <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200">
+                          Revisar arquitectura
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleWizardExecute}
+                          disabled={!canExecuteInstruction || isExecutingTask}
+                          className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                        >
+                          {isExecutingTask ? 'Ejecutando...' : 'Ejecutar'}
+                        </button>
+                      )}
                     </>
                   ) : null}
 
@@ -10908,9 +11056,15 @@ function App() {
                 >
                   {isPlanning ? 'Generando...' : 'Generar siguiente paso'}
                 </button>
+                {plannerIsReviewOnly ? (
+                  <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200">
+                    Plan en revisión
+                  </div>
+                ) : null}
                 <button
                   type="button"
                   onClick={handleExecuteCurrentInstruction}
+                  hidden={plannerIsReviewOnly}
                   disabled={!canExecuteInstruction || isExecutingTask}
                   className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
                 >
@@ -10951,6 +11105,11 @@ function App() {
                       >
                         {isRunning ? 'Ejecutando...' : 'Correr ciclo de prueba'}
                       </button>
+                      {plannerIsReviewOnly ? (
+                        <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200">
+                          Revisar arquitectura
+                        </div>
+                      ) : null}
                       <button
                         type="button"
                         onClick={handleTestLocalConnection}
@@ -11378,6 +11537,11 @@ function App() {
                     <div className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-slate-100">
                       {plannerInstruction}
                     </div>
+                    {plannerIsReviewOnly ? (
+                      <div className="mt-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm leading-6 text-slate-200">
+                        {plannerReviewHelperText}
+                      </div>
+                    ) : null}
                   </article>
 
                   <div className="space-y-4">
@@ -11508,6 +11672,7 @@ function App() {
                         id="execute-current-instruction-button"
                         type="button"
                         onClick={handleExecuteCurrentInstruction}
+                        hidden={plannerIsReviewOnly}
                         disabled={!canExecuteInstruction || isExecutingTask}
                         className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
                       >
