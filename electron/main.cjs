@@ -98,6 +98,7 @@ const {
 } = require('./local-deterministic-executor.cjs')
 const {
   buildUnavailableContextHubPack,
+  emitContextHubEvent,
   fetchSuggestedContextHubPack,
 } = require('./context-hub-client.cjs')
 
@@ -284,6 +285,156 @@ function summarizeContextHubPackForLog(contextHubPack) {
       Number.isFinite(metadata.estimatedTokens) && metadata.estimatedTokens >= 0
         ? metadata.estimatedTokens
         : undefined,
+  }
+}
+
+function summarizeContextHubEventResultForLog(eventResult) {
+  if (!eventResult || typeof eventResult !== 'object') {
+    return {
+      ok: false,
+      endpoint: '/v1/events',
+      eventType: 'unknown',
+      reason: 'unavailable',
+    }
+  }
+
+  return {
+    ok: eventResult.ok === true,
+    endpoint:
+      typeof eventResult.endpoint === 'string' && eventResult.endpoint.trim()
+        ? eventResult.endpoint.trim()
+        : '/v1/events',
+    eventType:
+      typeof eventResult.eventType === 'string' && eventResult.eventType.trim()
+        ? eventResult.eventType.trim()
+        : 'unknown',
+    ...(Number.isInteger(eventResult.statusCode)
+      ? { statusCode: eventResult.statusCode }
+      : {}),
+    ...(typeof eventResult.reason === 'string' && eventResult.reason.trim()
+      ? { reason: eventResult.reason.trim() }
+      : {}),
+  }
+}
+
+function buildPlanningFinishedEventPayload({
+  goal,
+  context,
+  instruction,
+  workspacePath,
+  brainDecision,
+  contextHubStatus,
+}) {
+  return {
+    type: 'planning_finished',
+    source: 'ai-orchestrator',
+    sourceApp: 'ai-orchestrator',
+    sourceProject: 'ai-orchestrator',
+    timestamp: new Date().toISOString(),
+    goal,
+    contextPreview: buildOutputPreview(context || '', 220),
+    sourceWorkspacePath: workspacePath || '',
+    decision: {
+      decisionKey: brainDecision?.decisionKey || '',
+      strategy: brainDecision?.strategy || '',
+      executionMode: brainDecision?.executionMode || '',
+      nextExpectedAction: brainDecision?.nextExpectedAction || '',
+      requiresApproval: brainDecision?.requiresApproval === true,
+      approvalRequired: brainDecision?.requiresApproval === true,
+    },
+    instructionPreview: buildOutputPreview(instruction || '', 220),
+    tasksCount: Array.isArray(brainDecision?.tasks) ? brainDecision.tasks.length : 0,
+    reuse: {
+      reuseMode:
+        typeof brainDecision?.reuseMode === 'string' && brainDecision.reuseMode.trim()
+          ? brainDecision.reuseMode.trim()
+          : 'none',
+      reuseDecision: brainDecision?.reuseDecision === true,
+      reusedArtifactIds: Array.isArray(brainDecision?.reusedArtifactIds)
+        ? brainDecision.reusedArtifactIds
+            .filter((artifactId) => typeof artifactId === 'string' && artifactId.trim())
+            .map((artifactId) => artifactId.trim())
+        : [],
+    },
+    contextHub: {
+      available: contextHubStatus?.available === true,
+      ...(typeof contextHubStatus?.id === 'string' && contextHubStatus.id.trim()
+        ? { id: contextHubStatus.id.trim() }
+        : {}),
+      ...(typeof contextHubStatus?.slug === 'string' && contextHubStatus.slug.trim()
+        ? { slug: contextHubStatus.slug.trim() }
+        : {}),
+      ...(typeof contextHubStatus?.title === 'string' && contextHubStatus.title.trim()
+        ? { title: contextHubStatus.title.trim() }
+        : {}),
+      ...(Number.isInteger(contextHubStatus?.itemsCount) &&
+      contextHubStatus.itemsCount >= 0
+        ? { itemsCount: contextHubStatus.itemsCount }
+        : {}),
+      ...(Number.isFinite(contextHubStatus?.estimatedTokens) &&
+      contextHubStatus.estimatedTokens >= 0
+        ? { estimatedTokens: contextHubStatus.estimatedTokens }
+        : {}),
+      ...(typeof contextHubStatus?.reason === 'string' && contextHubStatus.reason.trim()
+        ? { reason: contextHubStatus.reason.trim() }
+        : {}),
+    },
+  }
+}
+
+function buildPlanningFinishedEventLogSummary({
+  eventPayload,
+  contextHubStatus,
+  eventResult,
+}) {
+  return {
+    type:
+      typeof eventPayload?.type === 'string' && eventPayload.type.trim()
+        ? eventPayload.type.trim()
+        : 'planning_finished',
+    decisionKey:
+      typeof eventPayload?.decision?.decisionKey === 'string' &&
+      eventPayload.decision.decisionKey.trim()
+        ? eventPayload.decision.decisionKey.trim()
+        : undefined,
+    strategy:
+      typeof eventPayload?.decision?.strategy === 'string' &&
+      eventPayload.decision.strategy.trim()
+        ? eventPayload.decision.strategy.trim()
+        : undefined,
+    executionMode:
+      typeof eventPayload?.decision?.executionMode === 'string' &&
+      eventPayload.decision.executionMode.trim()
+        ? eventPayload.decision.executionMode.trim()
+        : undefined,
+    nextExpectedAction:
+      typeof eventPayload?.decision?.nextExpectedAction === 'string' &&
+      eventPayload.decision.nextExpectedAction.trim()
+        ? eventPayload.decision.nextExpectedAction.trim()
+        : undefined,
+    requiresApproval: eventPayload?.decision?.requiresApproval === true,
+    tasksCount:
+      Number.isInteger(eventPayload?.tasksCount) && eventPayload.tasksCount >= 0
+        ? eventPayload.tasksCount
+        : 0,
+    contextHubAvailable: contextHubStatus?.available === true,
+    ...(typeof contextHubStatus?.id === 'string' && contextHubStatus.id.trim()
+      ? { contextHubId: contextHubStatus.id.trim() }
+      : {}),
+    ...(typeof contextHubStatus?.slug === 'string' && contextHubStatus.slug.trim()
+      ? { contextHubSlug: contextHubStatus.slug.trim() }
+      : {}),
+    ...(typeof contextHubStatus?.title === 'string' && contextHubStatus.title.trim()
+      ? { contextHubTitle: contextHubStatus.title.trim() }
+      : {}),
+    ...(Number.isInteger(contextHubStatus?.itemsCount) && contextHubStatus.itemsCount >= 0
+      ? { contextHubItemsCount: contextHubStatus.itemsCount }
+      : {}),
+    ...(Number.isFinite(contextHubStatus?.estimatedTokens) &&
+    contextHubStatus.estimatedTokens >= 0
+      ? { contextHubEstimatedTokens: contextHubStatus.estimatedTokens }
+      : {}),
+    ...summarizeContextHubEventResultForLog(eventResult),
   }
 }
 
@@ -12385,6 +12536,30 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
     requiresApproval: brainDecision.requiresApproval === true,
     tasksCount: Array.isArray(brainDecision.tasks) ? brainDecision.tasks.length : 0,
   })
+
+  const planningFinishedEventPayload = buildPlanningFinishedEventPayload({
+    goal,
+    context,
+    instruction:
+      instruction ||
+      brainDecision.question ||
+      (completed
+        ? 'Confirmar el cierre de una acción sensible antes de finalizar el objetivo'
+        : 'Revisar el impacto del cambio antes de continuar con la ejecución'),
+    workspacePath,
+    brainDecision,
+    contextHubStatus,
+  })
+  const contextHubEventResult = await emitContextHubEvent(planningFinishedEventPayload)
+
+  debugMainLog(
+    'plan-task:context-hub-event',
+    buildPlanningFinishedEventLogSummary({
+      eventPayload: planningFinishedEventPayload,
+      contextHubStatus,
+      eventResult: contextHubEventResult,
+    }),
+  )
 
   if (brainDecision.requiresApproval === true) {
     return {

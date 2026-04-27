@@ -1,5 +1,6 @@
 const DEFAULT_CONTEXT_HUB_API_URL = 'http://localhost:3710'
 const SUGGESTED_CONTEXT_HUB_ENDPOINT = '/v1/packs/suggested'
+const CONTEXT_HUB_EVENTS_ENDPOINT = '/v1/events'
 const CONTEXT_HUB_TIMEOUT_MS = 1200
 
 function buildUnavailableContextHubPack(reason = 'unavailable') {
@@ -208,10 +209,110 @@ async function fetchSuggestedContextHubPack() {
   }
 }
 
+async function emitContextHubEvent(eventPayload) {
+  let requestUrl = ''
+
+  try {
+    requestUrl = new URL(
+      CONTEXT_HUB_EVENTS_ENDPOINT,
+      resolveContextHubApiUrl(),
+    ).toString()
+  } catch {
+    return {
+      ok: false,
+      endpoint: CONTEXT_HUB_EVENTS_ENDPOINT,
+      eventType:
+        typeof eventPayload?.type === 'string' ? eventPayload.type : 'unknown',
+      reason: 'error',
+    }
+  }
+
+  const abortController = new AbortController()
+  const timeoutId = setTimeout(() => abortController.abort(), CONTEXT_HUB_TIMEOUT_MS)
+
+  try {
+    const response = await fetch(requestUrl, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(eventPayload && typeof eventPayload === 'object' ? eventPayload : {}),
+      signal: abortController.signal,
+    })
+
+    const responseText = await response.text()
+    let parsedPayload = null
+
+    try {
+      parsedPayload = responseText ? JSON.parse(responseText) : null
+    } catch {
+      parsedPayload = null
+    }
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        endpoint: CONTEXT_HUB_EVENTS_ENDPOINT,
+        eventType:
+          typeof eventPayload?.type === 'string' ? eventPayload.type : 'unknown',
+        statusCode: response.status,
+        reason: 'error',
+      }
+    }
+
+    if (
+      parsedPayload &&
+      typeof parsedPayload === 'object' &&
+      Object.prototype.hasOwnProperty.call(parsedPayload, 'ok') &&
+      parsedPayload.ok !== true
+    ) {
+      return {
+        ok: false,
+        endpoint: CONTEXT_HUB_EVENTS_ENDPOINT,
+        eventType:
+          typeof eventPayload?.type === 'string' ? eventPayload.type : 'unknown',
+        statusCode: response.status,
+        reason: 'error',
+      }
+    }
+
+    return {
+      ok: true,
+      endpoint: CONTEXT_HUB_EVENTS_ENDPOINT,
+      eventType:
+        typeof eventPayload?.type === 'string' ? eventPayload.type : 'unknown',
+      statusCode: response.status,
+    }
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      return {
+        ok: false,
+        endpoint: CONTEXT_HUB_EVENTS_ENDPOINT,
+        eventType:
+          typeof eventPayload?.type === 'string' ? eventPayload.type : 'unknown',
+        reason: 'timeout',
+      }
+    }
+
+    return {
+      ok: false,
+      endpoint: CONTEXT_HUB_EVENTS_ENDPOINT,
+      eventType:
+        typeof eventPayload?.type === 'string' ? eventPayload.type : 'unknown',
+      reason: 'unavailable',
+    }
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
 module.exports = {
   DEFAULT_CONTEXT_HUB_API_URL,
   SUGGESTED_CONTEXT_HUB_ENDPOINT,
+  CONTEXT_HUB_EVENTS_ENDPOINT,
   CONTEXT_HUB_TIMEOUT_MS,
   buildUnavailableContextHubPack,
+  emitContextHubEvent,
   fetchSuggestedContextHubPack,
 }
