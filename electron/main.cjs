@@ -94,6 +94,7 @@ const {
 const {
   LOCAL_MATERIALIZATION_PLAN_VERSION,
   buildLocalMaterializationTask,
+  buildGenericSafeFirstDeliveryMaterializationPlan,
   runLocalDeterministicTask,
 } = require('./local-deterministic-executor.cjs')
 const {
@@ -1143,6 +1144,97 @@ function extractLocalMaterializationPlan(value) {
   return null
 }
 
+function buildDerivedLocalMaterializationPlan({
+  decisionKey,
+  instruction,
+  executionScope,
+  businessSector,
+  businessSectorLabel,
+}) {
+  return buildGenericSafeFirstDeliveryMaterializationPlan({
+    decisionKey,
+    instruction,
+    executionScope,
+    businessSector,
+    businessSectorLabel,
+  })
+}
+
+function buildMaterializeSafeFirstDeliveryLocalPlanSkipReason({
+  executionScope,
+  instruction,
+}) {
+  const allowedTargetPaths = summarizeUniqueExecutorStrings(
+    executionScope?.allowedTargetPaths,
+    12,
+  )
+
+  if (allowedTargetPaths.length === 0) {
+    return 'missing-allowed-target-paths'
+  }
+
+  const normalizedInstruction =
+    typeof instruction === 'string' ? instruction.toLocaleLowerCase() : ''
+  const normalizedAllowedPaths = allowedTargetPaths.map((entry) =>
+    entry.toLocaleLowerCase(),
+  )
+  const expectedBasenames = ['index.html', 'styles.css', 'script.js', 'mock-data.json']
+  const missingBasenames = expectedBasenames.filter(
+    (basename) =>
+      !normalizedAllowedPaths.some(
+        (entry) => entry.endsWith(`\\${basename}`) || entry.endsWith(`/${basename}`),
+      ),
+  )
+
+  if (
+    missingBasenames.length > 0 &&
+    !missingBasenames.every((basename) => normalizedInstruction.includes(basename))
+  ) {
+    return `invalid-allowed-target-paths:${missingBasenames.join(',')}`
+  }
+
+  return 'task-build-failed'
+}
+
+function buildMaterializeSafeFirstDeliveryLocalFailureResponse({
+  requestId,
+  instruction,
+  decisionKey,
+  executionScope,
+  reason,
+}) {
+  const allowedTargetPaths = summarizeUniqueExecutorStrings(
+    executionScope?.allowedTargetPaths,
+    12,
+  )
+
+  return {
+    ok: false,
+    ...(requestId ? { requestId } : {}),
+    instruction,
+    error:
+      'No se pudo preparar la materializacion segura local porque el alcance permitido es invalido o incompleto.',
+    resultPreview:
+      'La materializacion segura local no pudo iniciarse por un alcance permitido invalido.',
+    failureType: 'invalid_local_safe_first_delivery_scope',
+    reasoningLayer: 'local-rules',
+    materializationLayer: 'local-deterministic',
+    details: {
+      decisionKey,
+      strategy: decisionKey,
+      executionMode: 'executor',
+      currentAction: 'build-local-materialization-plan',
+      currentTargetPath: allowedTargetPaths[0] || undefined,
+      createdPaths: [],
+      touchedPaths: [],
+      hasMaterialProgress: false,
+      materialState: 'local-deterministic-plan-invalid',
+      allowedTargetPaths,
+      errorMessage: reason,
+    },
+  }
+}
+
 function buildLocalDeterministicTaskFromPlan({
   plan,
   workspacePath,
@@ -1442,6 +1534,13 @@ function summarizeUniqueExecutorStrings(entries, limit = 4) {
   return uniqueEntries
 }
 
+function isMaterializeSafeFirstDeliveryDecisionKey(value) {
+  return (
+    typeof value === 'string' &&
+    value.trim().toLocaleLowerCase() === 'materialize-safe-first-delivery-plan'
+  )
+}
+
 function normalizeExecutorContinuationAnchor(value) {
   if (!value || typeof value !== 'object') {
     return null
@@ -1473,9 +1572,9 @@ function normalizeExecutorExecutionScope(value) {
   }
 
   const objectiveScope = normalizeExecutorObjectiveScope(value.objectiveScope)
-  const allowedTargetPaths = summarizeUniqueExecutorStrings(value.allowedTargetPaths, 4)
-  const blockedTargetPaths = summarizeUniqueExecutorStrings(value.blockedTargetPaths, 4)
-  const successCriteria = summarizeUniqueExecutorStrings(value.successCriteria, 4)
+  const allowedTargetPaths = summarizeUniqueExecutorStrings(value.allowedTargetPaths, 12)
+  const blockedTargetPaths = summarizeUniqueExecutorStrings(value.blockedTargetPaths, 8)
+  const successCriteria = summarizeUniqueExecutorStrings(value.successCriteria, 8)
   const continuationAnchor = normalizeExecutorContinuationAnchor(value.continuationAnchor)
   const enforceNarrowScope = value.enforceNarrowScope === true
 
@@ -14801,6 +14900,20 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
     payload?.materializationPlan && typeof payload.materializationPlan === 'object'
       ? payload.materializationPlan
       : null
+  const requiresLocalSafeFirstDeliveryMaterialization =
+    isMaterializeSafeFirstDeliveryDecisionKey(decisionKey)
+  const derivedMaterializationPlan =
+    materializationPlan ||
+    !executionScope ||
+    !requiresLocalSafeFirstDeliveryMaterialization
+      ? null
+      : buildDerivedLocalMaterializationPlan({
+          decisionKey,
+          instruction,
+          executionScope,
+          businessSector,
+          businessSectorLabel,
+        })
   debugMainLog('execute-task:handler-enter', {
     requestId: requestId || undefined,
     decisionKey: decisionKey || undefined,
@@ -14811,6 +14924,12 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
     creativeProfile: creativeDirection?.profileKey || undefined,
     reuseMode: reuseMode || undefined,
     objectiveScope: executionScope?.objectiveScope || undefined,
+    allowedTargetPathsCount: executionScope?.allowedTargetPaths?.length || 0,
+    materializationPlanSource: materializationPlan
+      ? 'renderer-payload'
+      : derivedMaterializationPlan
+        ? 'derived-local-rules'
+        : undefined,
   })
 
   if (!instruction) {
@@ -14826,9 +14945,69 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
 
   void (async () => {
     try {
-      const fastTask =
-        buildLocalDeterministicTaskFromPlan({
-          plan: materializationPlan,
+      let forcedLocalTask = null
+
+      if (requiresLocalSafeFirstDeliveryMaterialization) {
+        debugMainLog('materialize-safe-first-delivery:local-plan-attempt', {
+          requestId: requestId || undefined,
+          decisionKey,
+          allowedTargetPathsCount: executionScope?.allowedTargetPaths?.length || 0,
+          hasRendererPlan: materializationPlan !== null,
+        })
+
+        if (!materializationPlan && !derivedMaterializationPlan) {
+          const reason = buildMaterializeSafeFirstDeliveryLocalPlanSkipReason({
+            executionScope,
+            instruction,
+          })
+          debugMainLog('materialize-safe-first-delivery:local-plan-skipped', {
+            requestId: requestId || undefined,
+            decisionKey,
+            reason,
+            allowedTargetPaths: executionScope?.allowedTargetPaths || [],
+          })
+          const localFailureResponse = buildExecuteTaskCompletionPayload(
+            enrichExecutorFailureResponseWithHistory({
+              response: buildMaterializeSafeFirstDeliveryLocalFailureResponse({
+                requestId,
+                instruction,
+                decisionKey,
+                executionScope,
+                reason,
+              }),
+              requestId,
+              instruction,
+              workspacePath,
+              businessSector,
+              businessSectorLabel,
+              decisionKey,
+            }),
+            requestId,
+          )
+          emitExecutionFailedEventBestEffort({
+            finalResponse: localFailureResponse,
+            requestId,
+            instruction,
+            workspacePath,
+            decisionKey,
+          })
+          debugMainLog('execute-task:before-fast-route-completion-event', {
+            requestId: requestId || localFailureResponse?.requestId,
+            ok: false,
+            operation: 'materialize-safe-first-delivery-plan',
+            targetPath: executionScope?.allowedTargetPaths?.[0] || undefined,
+          })
+          emitExecutionCompleteEvent(webContents, localFailureResponse)
+          debugMainLog('execute-task:fast-route-completion-event-emitted', {
+            requestId: requestId || localFailureResponse?.requestId,
+            ok: false,
+            operation: 'materialize-safe-first-delivery-plan',
+          })
+          return
+        }
+
+        forcedLocalTask = buildLocalDeterministicTaskFromPlan({
+          plan: materializationPlan || derivedMaterializationPlan,
           workspacePath,
           requestId,
           instruction,
@@ -14841,8 +15020,79 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
           reuseReason,
           reusedArtifactIds,
           reuseMode,
-          materializationPlanSource: materializationPlan ? 'renderer-payload' : '',
-        }) ||
+          materializationPlanSource: materializationPlan
+            ? 'renderer-payload'
+            : derivedMaterializationPlan
+              ? 'derived-local-rules'
+              : '',
+        })
+
+        if (!forcedLocalTask) {
+          const reason = buildMaterializeSafeFirstDeliveryLocalPlanSkipReason({
+            executionScope,
+            instruction,
+          })
+          debugMainLog('materialize-safe-first-delivery:local-plan-skipped', {
+            requestId: requestId || undefined,
+            decisionKey,
+            reason,
+            allowedTargetPaths: executionScope?.allowedTargetPaths || [],
+          })
+          const localFailureResponse = buildExecuteTaskCompletionPayload(
+            enrichExecutorFailureResponseWithHistory({
+              response: buildMaterializeSafeFirstDeliveryLocalFailureResponse({
+                requestId,
+                instruction,
+                decisionKey,
+                executionScope,
+                reason,
+              }),
+              requestId,
+              instruction,
+              workspacePath,
+              businessSector,
+              businessSectorLabel,
+              decisionKey,
+            }),
+            requestId,
+          )
+          emitExecutionFailedEventBestEffort({
+            finalResponse: localFailureResponse,
+            requestId,
+            instruction,
+            workspacePath,
+            decisionKey,
+          })
+          debugMainLog('execute-task:before-fast-route-completion-event', {
+            requestId: requestId || localFailureResponse?.requestId,
+            ok: false,
+            operation: 'materialize-safe-first-delivery-plan',
+            targetPath: executionScope?.allowedTargetPaths?.[0] || undefined,
+          })
+          emitExecutionCompleteEvent(webContents, localFailureResponse)
+          debugMainLog('execute-task:fast-route-completion-event-emitted', {
+            requestId: requestId || localFailureResponse?.requestId,
+            ok: false,
+            operation: 'materialize-safe-first-delivery-plan',
+          })
+          return
+        }
+
+        debugMainLog('materialize-safe-first-delivery:local-plan-built', {
+          requestId: requestId || undefined,
+          decisionKey,
+          operationsCount: Array.isArray(forcedLocalTask.operations)
+            ? forcedLocalTask.operations.length
+            : 0,
+          validationsCount: Array.isArray(forcedLocalTask.validations)
+            ? forcedLocalTask.validations.length
+            : 0,
+          targetPath: forcedLocalTask.relativeTargetPath || undefined,
+        })
+      }
+
+      const fastTask =
+        forcedLocalTask ||
         detectWebScaffoldBaseLocalTask({
           instruction,
           context,
