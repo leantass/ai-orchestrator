@@ -6358,6 +6358,130 @@ function detectProductArchitecturePlanningIntent(goal, context) {
   }
 }
 
+function detectSafeFirstDeliveryPlanningIntent(goal, context) {
+  const combinedText = [goal, context]
+    .filter((value) => typeof value === 'string' && value.trim())
+    .join(' ')
+  const normalizedText = normalizeSectorDetectionText(combinedText)
+
+  if (!normalizedText) {
+    return {
+      matches: false,
+      productTypeHint: 'unknown',
+      explicitPhaseIntent: false,
+      exclusionScore: 0,
+      localPrototypeScore: 0,
+      derivativeSignal: false,
+    }
+  }
+
+  const directProductTypeMap = [
+    { key: 'ecommerce', pattern: /\b(?:ecommerce|tienda online|tienda en linea)\b/u },
+    { key: 'crm', pattern: /\bcrm\b/u },
+    { key: 'erp', pattern: /\berp\b/u },
+    { key: 'marketplace', pattern: /\bmarketplace\b/u },
+    { key: 'saas', pattern: /\bsaas\b/u },
+    {
+      key: 'internal-tool',
+      pattern:
+        /\b(?:herramienta interna|tool interna|tool interno|gestion interna|operacion interna)\b/u,
+    },
+  ]
+  const directProductType =
+    directProductTypeMap.find(({ pattern }) => pattern.test(normalizedText))?.key ||
+    (/catalogo|carrito|checkout|mercado pago|productos|backoffice/u.test(normalizedText)
+      ? 'ecommerce'
+      : /alumnos|familias|cursos|comunicaciones|seguimiento/u.test(normalizedText)
+        ? 'crm'
+        : /turnos|clinicas?|salud/u.test(normalizedText)
+          ? 'business-system'
+          : 'unknown')
+  const explicitPhaseIntent =
+    /\b(?:primera entrega segura|primera fase segura|safe first delivery|safe-first-delivery|base navegable inicial|prototipo funcional local|version inicial acotada|entrega inicial acotada|planificar una primera entrega segura|planificar la primera entrega segura|preparar la primera entrega segura|preparar la primera fase segura)\b/u.test(
+      normalizedText,
+    )
+  const derivativeSignal =
+    /\b(?:derivad[oa] desde arquitectura|derivado desde arquitectura|arquitectura de producto|no reanalizar toda la arquitectura|primera entrega segura priorizada)\b/u.test(
+      normalizedText,
+    )
+  const exclusionSignals = [
+    /\bsin pagos reales\b/u,
+    /\bsin credenciales\b/u,
+    /\bsin secretos\b/u,
+    /\bsin webhooks?\b/u,
+    /\bsin deploy\b/u,
+    /\bsin migraciones\b/u,
+    /\bsin auth real\b/u,
+    /\bsin autenticacion real\b/u,
+    /\bsin base de datos real\b/u,
+    /\bsin persistencia real\b/u,
+    /\bsin integraciones sensibles\b/u,
+    /\bsin datos sensibles reales\b/u,
+    /\bsin callbacks? externos reales\b/u,
+  ]
+  const exclusionScore = exclusionSignals.reduce(
+    (score, pattern) => (pattern.test(normalizedText) ? score + 1 : score),
+    0,
+  )
+  const localPrototypeSignals = [
+    /\bmock\b/u,
+    /\bsimulad[oa]\b/u,
+    /\blocal\b/u,
+    /\bdatos de muestra\b/u,
+    /\bbase navegable\b/u,
+    /\bprototipo\b/u,
+    /\bpanel operativo inicial\b/u,
+    /\bbackoffice mock\b/u,
+  ]
+  const localPrototypeScore = localPrototypeSignals.reduce(
+    (score, pattern) => (pattern.test(normalizedText) ? score + 1 : score),
+    0,
+  )
+  const complexitySignals = [
+    /\bcatalogo\b/u,
+    /\bproductos\b/u,
+    /\bcarrito\b/u,
+    /\bcheckout\b/u,
+    /\bbackoffice\b/u,
+    /\bpanel administrativo\b/u,
+    /\bpanel operativo\b/u,
+    /\breportes\b/u,
+    /\busuarios\b/u,
+    /\broles\b/u,
+    /\bpermisos\b/u,
+    /\balumnos\b/u,
+    /\bfamilias\b/u,
+    /\bcursos\b/u,
+    /\bcomunicaciones\b/u,
+    /\bseguimiento\b/u,
+  ]
+  const complexityScore = complexitySignals.reduce(
+    (score, pattern) => (pattern.test(normalizedText) ? score + 1 : score),
+    0,
+  )
+  const looksLikeInstitutionalWebOnly =
+    /\b(?:web institucional|sitio institucional|landing|one page|home page|index\.html|styles\.css|script\.js|hero|paleta|tipografia)\b/u.test(
+      normalizedText,
+    ) &&
+    !/\b(?:usuarios|roles|backoffice|panel administrativo|carrito|checkout|pagos|reportes|base de datos|autenticacion|integraciones?)\b/u.test(
+      normalizedText,
+    )
+  const matches =
+    !looksLikeInstitutionalWebOnly &&
+    ((explicitPhaseIntent && (exclusionScore >= 2 || localPrototypeScore >= 1)) ||
+      (derivativeSignal && (explicitPhaseIntent || exclusionScore >= 3)) ||
+      (explicitPhaseIntent && complexityScore >= 2))
+
+  return {
+    matches,
+    productTypeHint: directProductType,
+    explicitPhaseIntent,
+    exclusionScore,
+    localPrototypeScore,
+    derivativeSignal,
+  }
+}
+
 function pushUniquePlannerValues(target, values, maxItems = 12) {
   if (!Array.isArray(target) || !Array.isArray(values)) {
     return target
@@ -6431,6 +6555,280 @@ function extractProductArchitectureDomainLabel(goal, context, productType) {
   }
 
   return ''
+}
+
+function buildSafeFirstDeliveryPlan({
+  goal,
+  context,
+  contextHubPack,
+  intent,
+}) {
+  const combinedText = [goal, context]
+    .filter((value) => typeof value === 'string' && value.trim())
+    .join(' ')
+  const normalizedText = normalizeSectorDetectionText(combinedText)
+  const productType =
+    intent?.productTypeHint && intent.productTypeHint !== 'unknown'
+      ? intent.productTypeHint
+      : /\bcarrito\b|\bcheckout\b|\bmercado pago\b|\bpagos\b|\bcatalogo\b|\bproductos\b/u.test(
+            normalizedText,
+          )
+        ? 'ecommerce'
+        : /\bcrm\b|\balumnos\b|\bfamilias\b|\bcursos\b|\bcomunicaciones\b|\bseguimiento\b/u.test(
+              normalizedText,
+            )
+          ? 'crm'
+          : /\berp\b|\baduana\b|\bdespachantes?\b/u.test(normalizedText)
+            ? 'erp'
+            : /\bmarketplace\b/u.test(normalizedText)
+              ? 'marketplace'
+              : /\bsaas\b/u.test(normalizedText)
+                ? 'saas'
+                : /\b(?:gestion interna|herramienta interna|operacion interna)\b/u.test(
+                      normalizedText,
+                    )
+                  ? 'internal-tool'
+                  : /\bturnos\b|\bclinicas?\b|\bsalud\b|\bsistema\b|\bplataforma\b|\bapp\b/u.test(
+                        normalizedText,
+                      )
+                    ? 'business-system'
+                    : 'unknown'
+  const contextHubAvailable = contextHubPack?.available === true
+  const domain = extractProductArchitectureDomainLabel(goal, context, productType)
+  const domainLabel = domain || 'dominio a precisar'
+  const scope = []
+  const modules = []
+  const mockData = []
+  const screens = []
+  const localBehavior = []
+  const explicitExclusions = []
+  const approvalRequiredLater = []
+  const successCriteria = []
+
+  pushUniquePlannerValues(scope, [
+    `Delimitar una primera entrega segura y revisable para ${domainLabel}.`,
+    'Materializar solo un recorte local del flujo principal sin integraciones reales.',
+    'Priorizar navegacion funcional, datos de muestra y estados simulados por sobre completitud total.',
+  ])
+  pushUniquePlannerValues(mockData, [
+    'Datos de muestra consistentes para recorrer el flujo principal sin usar informacion sensible real.',
+    'Estados y transiciones mock que permitan revisar el comportamiento esperado antes de integrar servicios reales.',
+  ])
+  pushUniquePlannerValues(localBehavior, [
+    'Navegacion local entre modulos priorizados con datos de ejemplo.',
+    'Estados simulados o memoria temporal para validar el flujo sin dependencias externas.',
+    'Fallback explicito a mocks cuando una capacidad requiera credenciales, servicios externos o infraestructura real.',
+  ])
+  pushUniquePlannerValues(explicitExclusions, [
+    'Pagos reales o cobros efectivos.',
+    'Credenciales, secretos o configuraciones productivas.',
+    'Webhooks, callbacks o integraciones externas reales.',
+    'Deploy o publicacion productiva.',
+    'Migraciones o persistencia real irreversible.',
+    'Autenticacion real y manejo definitivo de sesiones sin aprobacion.',
+    'Base de datos real y datos sensibles reales.',
+  ])
+  pushUniquePlannerValues(approvalRequiredLater, [
+    'Credenciales reales, secretos y configuraciones productivas.',
+    'Autenticacion real, permisos finos y politicas de acceso definitivas.',
+    'Base de datos real, migraciones y respaldo operativo.',
+    'Integraciones criticas, webhooks y despliegue.',
+  ])
+  pushUniquePlannerValues(successCriteria, [
+    'El alcance de la primera entrega queda acotado y entendible para el usuario.',
+    'Los modulos priorizados pueden revisarse con datos de muestra y sin integraciones reales.',
+    'Quedan explicitados los limites, exclusiones y aprobaciones futuras antes de cualquier ejecucion.',
+    'El resultado prepara un proximo plan materializable, pero no ejecuta cambios automaticamente.',
+  ])
+
+  switch (productType) {
+    case 'ecommerce':
+      pushUniquePlannerValues(scope, [
+        'Base navegable del catalogo comercial con seleccion local y panel interno inicial.',
+      ])
+      pushUniquePlannerValues(modules, [
+        'catalogo',
+        'productos',
+        'carrito local',
+        'checkout simulado',
+        'backoffice mock',
+        'ordenes mock',
+      ])
+      pushUniquePlannerValues(mockData, [
+        'Productos, categorias y precios de muestra.',
+        'Ordenes simuladas y estados de compra mock.',
+      ])
+      pushUniquePlannerValues(screens, [
+        'Inicio o catalogo principal.',
+        'Detalle de producto.',
+        'Carrito local.',
+        'Checkout simulado.',
+        'Backoffice inicial de productos.',
+      ])
+      pushUniquePlannerValues(localBehavior, [
+        'Agregar y quitar productos en un carrito local simple.',
+        'Calcular subtotal y resumen de compra sin cobrar dinero real.',
+        'Generar una orden simulada visible en backoffice o resumen local.',
+      ])
+      pushUniquePlannerValues(approvalRequiredLater, [
+        'Pasarela real de pagos, credenciales y webhooks de checkout.',
+      ])
+      break
+    case 'crm':
+      pushUniquePlannerValues(scope, [
+        'Panel operativo inicial con entidades nucleares, seguimiento basico y vistas mock.',
+      ])
+      pushUniquePlannerValues(modules, [
+        'entidades principales',
+        'seguimiento',
+        'comunicaciones mock',
+        'reportes basicos',
+        'panel operativo inicial',
+      ])
+      pushUniquePlannerValues(mockData, [
+        'Contactos, cuentas o registros principales de muestra.',
+        'Historiales y reportes mock sin datos sensibles reales.',
+      ])
+      pushUniquePlannerValues(screens, [
+        'Listado principal.',
+        'Detalle o ficha operativa.',
+        'Panel de seguimiento.',
+        'Reporte inicial.',
+      ])
+      pushUniquePlannerValues(localBehavior, [
+        'Alta, edicion y consulta mock de entidades nucleares.',
+        'Seguimiento local de estados y proximos pasos.',
+        'Reportes basicos calculados con datos de muestra.',
+      ])
+      pushUniquePlannerValues(approvalRequiredLater, [
+        'Datos sensibles reales, auditoria y permisos finos por rol.',
+      ])
+      break
+    case 'erp':
+      pushUniquePlannerValues(scope, [
+        'Modulo operativo inicial con trazabilidad basica y panel de estados.',
+      ])
+      pushUniquePlannerValues(modules, [
+        'maestros minimos',
+        'operacion principal',
+        'reportes internos',
+        'auditoria mock',
+      ])
+      pushUniquePlannerValues(mockData, [
+        'Operaciones y documentos de muestra.',
+        'Estados operativos simulados para validar trazabilidad.',
+      ])
+      pushUniquePlannerValues(screens, [
+        'Panel operativo inicial.',
+        'Detalle de operacion.',
+        'Reporte basico.',
+      ])
+      pushUniquePlannerValues(localBehavior, [
+        'Registrar operaciones mock y transiciones de estado locales.',
+        'Relacionar entidades y documentos sin integraciones criticas.',
+      ])
+      pushUniquePlannerValues(approvalRequiredLater, [
+        'Reglas operativas criticas, auditoria definitiva y fuentes externas.',
+      ])
+      break
+    default:
+      pushUniquePlannerValues(scope, [
+        'Estructura navegable inicial del flujo principal del producto.',
+      ])
+      pushUniquePlannerValues(modules, [
+        'modulo principal',
+        'panel operativo inicial',
+        'reportes o estados basicos',
+      ])
+      pushUniquePlannerValues(mockData, [
+        'Entidades y estados de ejemplo para el flujo principal.',
+      ])
+      pushUniquePlannerValues(screens, [
+        'Vista principal.',
+        'Detalle del flujo principal.',
+        'Panel operativo o administrativo inicial.',
+      ])
+      pushUniquePlannerValues(localBehavior, [
+        'Recorrer el flujo principal con estados mock y datos de muestra.',
+      ])
+      break
+  }
+
+  if (/\busuarios\b|\broles\b|\bpermisos\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(modules, ['usuarios y roles'])
+    pushUniquePlannerValues(screens, ['Vista inicial de permisos o accesos mock'])
+  }
+
+  if (/\breportes\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(modules, ['reportes'])
+    pushUniquePlannerValues(screens, ['Reporte inicial'])
+  }
+
+  if (/\bbackoffice\b|\bpanel administrativo\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(modules, ['backoffice mock'])
+  }
+
+  if (/\bdatos sensibles\b|\bmenores\b|\bsalud\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(approvalRequiredLater, [
+      'Tratamiento de datos sensibles reales y politicas de resguardo.',
+    ])
+    pushUniquePlannerValues(explicitExclusions, [
+      'Uso de datos sensibles reales o informacion productiva.',
+    ])
+  }
+
+  return {
+    tasks: [
+      {
+        step: 1,
+        title: 'Delimitar el alcance exacto de la primera entrega segura y registrar sus exclusiones obligatorias.',
+      },
+      {
+        step: 2,
+        title: 'Definir la estructura navegable inicial y las pantallas prioritarias del flujo principal.',
+      },
+      {
+        step: 3,
+        title: 'Seleccionar los modulos mock o iniciales que si entran en esta fase local y revisable.',
+      },
+      {
+        step: 4,
+        title: 'Preparar datos de muestra, estados simulados y comportamiento local suficiente para validar el recorrido end-to-end.',
+      },
+      {
+        step: 5,
+        title: contextHubAvailable
+          ? 'Cruzar el alcance propuesto con MEMORIA externa solo como apoyo contextual, sin depender de ella para definir la primera fase.'
+          : 'Mantener el plan autocontenido y usar MEMORIA externa solo si luego aparece disponible como apoyo contextual.',
+      },
+      {
+        step: 6,
+        title: 'Dejar explicitamente fuera de alcance pagos reales, credenciales, webhooks, deploy, migraciones, auth real, base de datos real e integraciones sensibles.',
+      },
+      {
+        step: 7,
+        title: 'Devolver un plan concreto y revisable para la primera entrega segura, listo para una futura ejecucion manual y acotada.',
+      },
+    ],
+    assumptions: [
+      'Esta iteracion sigue siendo de planificacion; no corresponde crear archivos ni ejecutar cambios automaticamente.',
+      'La primera entrega segura debe validar el flujo principal con mocks, datos de muestra y comportamiento local.',
+      'Todo lo que requiera credenciales, infraestructura real, datos sensibles o integraciones criticas queda fuera de alcance hasta nueva aprobacion.',
+      'El objetivo no es construir el sistema completo, sino preparar una base segura y revisable para la siguiente fase.',
+    ],
+    instruction:
+      'Preparar un plan concreto, acotado y revisable para materializar solo la primera entrega segura del producto, definiendo alcance, modulos mock, datos de muestra, pantallas, comportamiento local, exclusiones explicitas y criterios de exito, sin crear archivos ni ejecutar cambios todavia.',
+    safeFirstDeliveryPlan: {
+      scope,
+      modules,
+      mockData,
+      screens,
+      localBehavior,
+      explicitExclusions,
+      approvalRequiredLater,
+      successCriteria,
+    },
+  }
 }
 
 function buildProductArchitecturePlan({
@@ -7355,6 +7753,7 @@ function buildBrainDecisionContract({
   reusedArtifactIds,
   reuseMode,
   productArchitecture,
+  safeFirstDeliveryPlan,
   finalResult,
 }) {
   const resolvedRequiresApproval = requiresApproval === true
@@ -7411,6 +7810,9 @@ function buildBrainDecisionContract({
       (completed === true ? 'final-result' : 'execute-plan'),
     ...(productArchitecture && typeof productArchitecture === 'object'
       ? { productArchitecture }
+      : {}),
+    ...(safeFirstDeliveryPlan && typeof safeFirstDeliveryPlan === 'object'
+      ? { safeFirstDeliveryPlan }
       : {}),
     ...(finalResult && typeof finalResult === 'object'
       ? { finalResult }
@@ -10124,6 +10526,7 @@ async function buildLocalStrategicBrainDecision({
       : []
   const localGoalDescriptor = detectBrainAtomicOperationDescriptor(goal)
   const analysisProposalIntent = detectAnalysisProposalPlanningIntent(goal, context)
+  const safeFirstDeliveryIntent = detectSafeFirstDeliveryPlanningIntent(goal, context)
   const productArchitectureIntent = detectProductArchitecturePlanningIntent(
     goal,
     context,
@@ -10344,6 +10747,40 @@ async function buildLocalStrategicBrainDecision({
         'La ejecucion anterior fallo, pero aparecio un bloqueo critico nuevo y real. El Cerebro solo puede volver a preguntar por ese bloqueo antes de continuar.',
       question:
         'Aparecio un bloqueo critico nuevo tras la falla del executor. Necesito esa definicion humana para continuar sin riesgo.',
+    })
+  }
+
+  if (
+    safeFirstDeliveryIntent.matches &&
+    !scopedFileEditIntent &&
+    !localGoalDescriptor &&
+    !looksLikeWebBaseGoal &&
+    compositeSteps.length < 2 &&
+    (!previousExecutionResult ||
+      iteration === 1 ||
+      approvalAlreadyGranted ||
+      hasRecoverableExecutionError)
+  ) {
+    const safeFirstDeliveryPlan = buildSafeFirstDeliveryPlan({
+      goal,
+      context,
+      contextHubPack,
+      intent: safeFirstDeliveryIntent,
+    })
+
+    return buildBrainDecisionContract({
+      decisionKey: 'safe-first-delivery-plan',
+      strategy: 'safe-first-delivery-plan',
+      executionMode: 'planner-only',
+      reason:
+        'El objetivo ya describe una primera fase segura, local y acotada de un producto complejo, así que conviene devolver un plan revisable antes de cualquier materialización.',
+      tasks: safeFirstDeliveryPlan.tasks,
+      requiresApproval: false,
+      assumptions: safeFirstDeliveryPlan.assumptions,
+      instruction: safeFirstDeliveryPlan.instruction,
+      completed: false,
+      nextExpectedAction: 'review-safe-first-delivery',
+      safeFirstDeliveryPlan: safeFirstDeliveryPlan.safeFirstDeliveryPlan,
     })
   }
 
@@ -11279,10 +11716,11 @@ Roles:
 Tu tarea es devolver una decision estructurada y operativa.
 
 Reglas:
-- Elegí entre estrategias compatibles con el sistema: fast-local, fast-composite, executor, web-scaffold-base, product-architecture-plan, ask-user.
+- Elegí entre estrategias compatibles con el sistema: fast-local, fast-composite, executor, web-scaffold-base, product-architecture-plan, safe-first-delivery-plan, ask-user.
 - Usá web-scaffold-base para webs institucionales o creativas cuando corresponda.
 - Usá product-architecture-plan cuando el objetivo implique un sistema o producto complejo (por ejemplo ecommerce, CRM, ERP, marketplace, SaaS o plataforma con usuarios, roles, backoffice, datos e integraciones) y todavía haga falta definir arquitectura antes de ejecutar.
 - Si devolvés product-architecture-plan, usá executionMode="planner-only", nextExpectedAction="review-product-architecture", requiresApproval=false y describí fases, riesgos, integraciones y primera entrega segura sin crear archivos.
+- Usá safe-first-delivery-plan cuando el objetivo ya pida una primera entrega segura o una primera fase local/mock derivada de una arquitectura previa; en ese caso usá executionMode="planner-only", nextExpectedAction="review-safe-first-delivery", requiresApproval=false y dejá explícitamente fuera pagos reales, credenciales, webhooks, deploy, migraciones, auth real, base de datos real e integraciones sensibles.
 - Si hace falta una decisión humana real, devolvé requiresApproval=true y un approvalRequest estructurado.
 - Si llega feedback de error recuperable, replanificá.
 - Si el pedido es simple y determinístico, podés devolver fast-local o fast-composite.
@@ -11475,6 +11913,20 @@ function buildOpenAIBrainSchema() {
             type: 'array',
             items: { type: 'string' },
           },
+        },
+      },
+      safeFirstDeliveryPlan: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          scope: { type: 'array', items: { type: 'string' } },
+          modules: { type: 'array', items: { type: 'string' } },
+          mockData: { type: 'array', items: { type: 'string' } },
+          screens: { type: 'array', items: { type: 'string' } },
+          localBehavior: { type: 'array', items: { type: 'string' } },
+          explicitExclusions: { type: 'array', items: { type: 'string' } },
+          approvalRequiredLater: { type: 'array', items: { type: 'string' } },
+          successCriteria: { type: 'array', items: { type: 'string' } },
         },
       },
     },
@@ -11721,6 +12173,11 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
       typeof rawDecision.productArchitecture === 'object'
         ? rawDecision.productArchitecture
         : fallbackDecision.productArchitecture,
+    safeFirstDeliveryPlan:
+      rawDecision?.safeFirstDeliveryPlan &&
+      typeof rawDecision.safeFirstDeliveryPlan === 'object'
+        ? rawDecision.safeFirstDeliveryPlan
+        : fallbackDecision.safeFirstDeliveryPlan,
   })
   const equivalentApprovalRejected =
     normalizedDecision.requiresApproval === true &&
@@ -13835,6 +14292,7 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       reusedArtifactIds: brainDecision.reusedArtifactIds,
       reuseMode: brainDecision.reuseMode,
       productArchitecture: brainDecision.productArchitecture,
+      safeFirstDeliveryPlan: brainDecision.safeFirstDeliveryPlan,
       executionScope: brainDecision.executionScope,
       decisionKey: brainDecision.decisionKey,
       reason: brainDecision.reason,
@@ -13871,6 +14329,7 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
     reusedArtifactIds: brainDecision.reusedArtifactIds,
     reuseMode: brainDecision.reuseMode,
     productArchitecture: brainDecision.productArchitecture,
+    safeFirstDeliveryPlan: brainDecision.safeFirstDeliveryPlan,
     executionScope: brainDecision.executionScope,
     decisionKey: brainDecision.decisionKey,
     reason: brainDecision.reason,
