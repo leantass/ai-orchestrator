@@ -6482,6 +6482,77 @@ function detectSafeFirstDeliveryPlanningIntent(goal, context) {
   }
 }
 
+function detectMaterializeSafeFirstDeliveryPlanningIntent(goal, context) {
+  const combinedText = [goal, context]
+    .filter((value) => typeof value === 'string' && value.trim())
+    .join(' ')
+  const normalizedText = normalizeSectorDetectionText(combinedText)
+
+  if (!normalizedText) {
+    return {
+      matches: false,
+      productTypeHint: 'unknown',
+      explicitMaterializationIntent: false,
+      explicitSafetyIntent: false,
+      explicitLocalScope: false,
+    }
+  }
+
+  const directProductTypeMap = [
+    { key: 'ecommerce', pattern: /\b(?:ecommerce|tienda online|tienda en linea)\b/u },
+    { key: 'crm', pattern: /\bcrm\b/u },
+    { key: 'erp', pattern: /\berp\b/u },
+    { key: 'marketplace', pattern: /\bmarketplace\b/u },
+    { key: 'saas', pattern: /\bsaas\b/u },
+    {
+      key: 'internal-tool',
+      pattern:
+        /\b(?:herramienta interna|tool interna|tool interno|gestion interna|operacion interna)\b/u,
+    },
+  ]
+  const directProductType =
+    directProductTypeMap.find(({ pattern }) => pattern.test(normalizedText))?.key ||
+    (/catalogo|carrito|checkout|mercado pago|productos|backoffice/u.test(normalizedText)
+      ? 'ecommerce'
+      : /alumnos|familias|cursos|comunicaciones|seguimiento/u.test(normalizedText)
+        ? 'crm'
+        : /turnos|clinicas?|salud/u.test(normalizedText)
+          ? 'business-system'
+          : 'unknown')
+  const explicitMaterializationIntent =
+    /\b(?:materializar|materializacion segura|materialización segura|preparar materializacion segura|preparar materialización segura|materializar primera entrega|materializar primera fase|plan materializable|plan ejecutable acotado)\b/u.test(
+      normalizedText,
+    )
+  const explicitSafetyIntent =
+    /\b(?:primera entrega segura|primera fase segura|safe first delivery|safe-first-delivery|sin pagos reales|sin credenciales|sin webhooks?|sin deploy|sin migraciones|sin auth real|sin autenticacion real|sin base de datos real|sin datos sensibles reales|sin integraciones externas reales)\b/u.test(
+      normalizedText,
+    )
+  const explicitLocalScope =
+    /\b(?:archivos locales|carpeta nueva|dentro del workspace|frontend navegable|datos mock|datos de muestra|checkout simulado|backoffice mock|carrito local)\b/u.test(
+      normalizedText,
+    )
+  const looksLikeInstitutionalWebOnly =
+    /\b(?:web institucional|sitio institucional|landing|one page|home page|index\.html|styles\.css|script\.js|hero|paleta|tipografia)\b/u.test(
+      normalizedText,
+    ) &&
+    !/\b(?:usuarios|roles|backoffice|panel administrativo|carrito|checkout|pagos|reportes|base de datos|autenticacion|integraciones?)\b/u.test(
+      normalizedText,
+    )
+  const matches =
+    !looksLikeInstitutionalWebOnly &&
+    explicitMaterializationIntent &&
+    explicitSafetyIntent &&
+    explicitLocalScope
+
+  return {
+    matches,
+    productTypeHint: directProductType,
+    explicitMaterializationIntent,
+    explicitSafetyIntent,
+    explicitLocalScope,
+  }
+}
+
 function pushUniquePlannerValues(target, values, maxItems = 12) {
   if (!Array.isArray(target) || !Array.isArray(values)) {
     return target
@@ -6828,6 +6899,304 @@ function buildSafeFirstDeliveryPlan({
       approvalRequiredLater,
       successCriteria,
     },
+  }
+}
+
+function buildMaterializeSafeFirstDeliveryFolderName(productType, domain, sourceText = '') {
+  const normalizedProductType =
+    typeof productType === 'string' ? productType.trim().toLocaleLowerCase() : ''
+  const normalizedSourceText = normalizeSectorDetectionText(sourceText)
+  const blockedActorSlugs = new Set([
+    'usuario',
+    'usuarios',
+    'user',
+    'users',
+    'cliente',
+    'clientes',
+    'admin',
+    'administrador',
+    'administradores',
+    'operador',
+    'operadores',
+    'rol',
+    'roles',
+    'member',
+    'members',
+    'owner',
+    'owners',
+    'viewer',
+    'viewers',
+  ])
+  const isMeaningfulFolderSlug = (value) => {
+    const normalizedSlug =
+      typeof value === 'string' ? value.trim().toLocaleLowerCase() : ''
+
+    if (!normalizedSlug) {
+      return false
+    }
+
+    const slugTokens = normalizedSlug.split('-').filter(Boolean)
+
+    if (slugTokens.length === 0) {
+      return false
+    }
+
+    if (slugTokens.every((token) => blockedActorSlugs.has(token))) {
+      return false
+    }
+
+    if (blockedActorSlugs.has(slugTokens[0]) && slugTokens.length <= 2) {
+      return false
+    }
+
+    return true
+  }
+  const productTypeFolderSlugMap = {
+    ecommerce: 'ecommerce',
+    crm: 'crm',
+    erp: 'erp',
+    marketplace: 'marketplace',
+    saas: 'saas',
+  }
+  const productTypeSlug = productTypeFolderSlugMap[normalizedProductType] || ''
+  const domainSlug = slugifyBusinessSector(domain || '')
+  const moduleCandidateMap = [
+    { slug: 'catalogo', pattern: /\bcatalogo\b|\bproductos\b/u },
+    { slug: 'alumnos', pattern: /\balumnos\b|\bcursos\b|\bfamilias\b/u },
+    { slug: 'ordenes', pattern: /\bordenes\b|\bpedidos\b/u },
+    { slug: 'reportes', pattern: /\breportes\b/u },
+    { slug: 'turnos-clinica', pattern: /\bturnos\b|\bclinicas?\b|\bsalud\b/u },
+    { slug: 'backoffice', pattern: /\bbackoffice\b|\bpanel administrativo\b/u },
+  ]
+  const moduleSlug =
+    moduleCandidateMap.find(({ pattern }) => pattern.test(normalizedSourceText))?.slug || ''
+  const folderSlug =
+    (productTypeSlug && isMeaningfulFolderSlug(productTypeSlug)
+      ? productTypeSlug
+      : '') ||
+    (domainSlug && isMeaningfulFolderSlug(domainSlug) ? domainSlug : '') ||
+    (moduleSlug && isMeaningfulFolderSlug(moduleSlug) ? moduleSlug : '') ||
+    'producto'
+
+  return `safe-first-delivery-${folderSlug}`
+}
+
+function buildMaterializeSafeFirstDeliveryPlan({
+  goal,
+  context,
+  workspacePath,
+  contextHubPack,
+  intent,
+}) {
+  const combinedText = [goal, context]
+    .filter((value) => typeof value === 'string' && value.trim())
+    .join(' ')
+  const normalizedText = normalizeSectorDetectionText(combinedText)
+  const productType =
+    intent?.productTypeHint && intent.productTypeHint !== 'unknown'
+      ? intent.productTypeHint
+      : /\bcarrito\b|\bcheckout\b|\bmercado pago\b|\bpagos\b|\bcatalogo\b|\bproductos\b/u.test(
+            normalizedText,
+          )
+        ? 'ecommerce'
+        : /\bcrm\b|\balumnos\b|\bfamilias\b|\bcursos\b|\bcomunicaciones\b|\bseguimiento\b/u.test(
+              normalizedText,
+            )
+          ? 'crm'
+          : /\berp\b|\baduana\b|\bdespachantes?\b/u.test(normalizedText)
+            ? 'erp'
+            : /\bmarketplace\b/u.test(normalizedText)
+              ? 'marketplace'
+              : /\bsaas\b/u.test(normalizedText)
+                ? 'saas'
+                : /\b(?:gestion interna|herramienta interna|operacion interna)\b/u.test(
+                      normalizedText,
+                    )
+                  ? 'internal-tool'
+                  : /\bturnos\b|\bclinicas?\b|\bsalud\b|\bsistema\b|\bplataforma\b|\bapp\b/u.test(
+                        normalizedText,
+                      )
+                    ? 'business-system'
+                    : 'unknown'
+  const contextHubAvailable = contextHubPack?.available === true
+  const domain = extractProductArchitectureDomainLabel(goal, context, productType)
+  const domainLabel = domain || 'dominio a precisar'
+  const targetFolderName = buildMaterializeSafeFirstDeliveryFolderName(
+    productType,
+    domainLabel,
+    combinedText,
+  )
+  const allowedTargetPaths = [
+    targetFolderName,
+    path.join(targetFolderName, 'index.html'),
+    path.join(targetFolderName, 'styles.css'),
+    path.join(targetFolderName, 'script.js'),
+    path.join(targetFolderName, 'mock-data.json'),
+  ]
+  const successCriteria = summarizeUniqueExecutorStrings(
+    [
+      `Materializar solo la carpeta "${targetFolderName}" y sus archivos locales permitidos.`,
+      'Entregar una experiencia navegable con datos mock editables para el flujo principal.',
+      'Mantener fuera de alcance pagos reales, credenciales, webhooks, deploy, migraciones, auth real, base de datos real e integraciones externas reales.',
+      workspacePath
+        ? `Resolver todo dentro del workspace configurado: ${workspacePath}.`
+        : 'Resolver todo dentro del workspace activo del proyecto.',
+    ],
+    4,
+  )
+  const executionScope = normalizeExecutorExecutionScope({
+    allowedTargetPaths,
+    successCriteria,
+    enforceNarrowScope: true,
+  })
+  const scopeHighlights = []
+  const moduleHighlights = []
+  const screenHighlights = []
+  const mockDataHighlights = []
+  const localBehaviorHighlights = []
+  const exclusionHighlights = []
+
+  if (productType === 'ecommerce') {
+    pushUniquePlannerValues(scopeHighlights, [
+      'Base navegable con catalogo, detalle de producto, carrito local, checkout simulado y backoffice mock inicial.',
+    ])
+    pushUniquePlannerValues(moduleHighlights, [
+      'catalogo',
+      'detalle de producto',
+      'carrito local',
+      'checkout simulado',
+      'backoffice mock',
+    ])
+    pushUniquePlannerValues(screenHighlights, [
+      'catalogo principal',
+      'detalle de producto',
+      'carrito local',
+      'checkout simulado',
+      'panel mock de productos',
+    ])
+    pushUniquePlannerValues(mockDataHighlights, [
+      'productos, categorias, precios y estados de orden mock editables',
+    ])
+    pushUniquePlannerValues(localBehaviorHighlights, [
+      'navegacion entre catalogo, carrito y checkout simulado',
+      'edicion local de productos mock desde backoffice inicial',
+    ])
+  } else if (productType === 'crm') {
+    pushUniquePlannerValues(scopeHighlights, [
+      'Panel operativo inicial con entidades principales, seguimiento basico y reportes mock.',
+    ])
+    pushUniquePlannerValues(moduleHighlights, [
+      'entidades principales',
+      'seguimiento',
+      'panel operativo inicial',
+      'reportes mock',
+    ])
+    pushUniquePlannerValues(screenHighlights, [
+      'listado principal',
+      'detalle operativo',
+      'seguimiento',
+      'reporte inicial',
+    ])
+    pushUniquePlannerValues(mockDataHighlights, [
+      'entidades, estados y reportes mock editables sin datos sensibles reales',
+    ])
+    pushUniquePlannerValues(localBehaviorHighlights, [
+      'alta, consulta y actualizacion local de entidades mock',
+      'seguimiento local de estados y proximos pasos',
+    ])
+  } else {
+    pushUniquePlannerValues(scopeHighlights, [
+      `Primera version navegable del flujo principal para ${domainLabel}.`,
+    ])
+    pushUniquePlannerValues(moduleHighlights, [
+      'flujo principal',
+      'panel operativo inicial',
+      'datos mock editables',
+    ])
+    pushUniquePlannerValues(screenHighlights, [
+      'vista principal',
+      'detalle principal',
+      'panel operativo inicial',
+    ])
+    pushUniquePlannerValues(mockDataHighlights, [
+      'entidades y estados mock editables para recorrer la experiencia',
+    ])
+    pushUniquePlannerValues(localBehaviorHighlights, [
+      'navegacion local completa sin dependencias externas reales',
+    ])
+  }
+
+  pushUniquePlannerValues(exclusionHighlights, [
+    'pagos reales',
+    'credenciales reales',
+    'webhooks reales',
+    'deploy',
+    'migraciones',
+    'auth real',
+    'base de datos real',
+    'integraciones externas reales',
+    'datos sensibles reales',
+  ])
+
+  const instructionLines = [
+    `Materializar una primera entrega segura y acotada dentro de "${targetFolderName}" en el workspace local.`,
+    `Usar solo los archivos permitidos: ${allowedTargetPaths
+      .slice(1)
+      .map((entry) => `"${entry}"`)
+      .join(', ')}.`,
+    scopeHighlights.length > 0
+      ? `Alcance funcional: ${scopeHighlights.join(' | ')}`
+      : '',
+    moduleHighlights.length > 0
+      ? `Modulos a cubrir: ${moduleHighlights.join(' | ')}`
+      : '',
+    screenHighlights.length > 0
+      ? `Pantallas o vistas: ${screenHighlights.join(' | ')}`
+      : '',
+    mockDataHighlights.length > 0
+      ? `Datos mock requeridos: ${mockDataHighlights.join(' | ')}`
+      : '',
+    localBehaviorHighlights.length > 0
+      ? `Comportamiento local esperado: ${localBehaviorHighlights.join(' | ')}`
+      : '',
+    `Excluir explícitamente: ${exclusionHighlights.join(' | ')}.`,
+    'Usar datos mock editables, comportamiento local y cero conexiones externas reales.',
+    `allowedTargetPaths: ${allowedTargetPaths.join(', ')}`,
+    `successCriteria: ${successCriteria.join(' | ')}`,
+  ].filter(Boolean)
+
+  return {
+    tasks: [
+      {
+        step: 1,
+        title: `Preparar la carpeta "${targetFolderName}" y definir solo los archivos locales permitidos.`,
+        operation: 'create-folder',
+        targetPath: targetFolderName,
+      },
+      {
+        step: 2,
+        title: 'Materializar una interfaz navegable inicial con vistas, flujo principal y datos mock editables.',
+        operation: 'create-or-edit-files',
+        targetPath: targetFolderName,
+      },
+      {
+        step: 3,
+        title: 'Validar que todo siga local, mock y acotado, sin tocar integraciones reales ni salir del scope permitido.',
+        operation: 'validate-scope',
+        targetPath: targetFolderName,
+      },
+    ],
+    assumptions: [
+      'Esta iteracion prepara un plan ejecutable posterior, pero la UI no debe ejecutarlo automaticamente.',
+      `Toda la materializacion queda acotada a "${targetFolderName}" y a los archivos declarados en allowedTargetPaths.`,
+      'La primera entrega debe usar datos mock editables, frontend navegable y comportamiento local sin servicios externos reales.',
+      'Pagos reales, credenciales, webhooks, deploy, migraciones, auth real, base de datos real y datos sensibles reales quedan fuera de alcance.',
+      contextHubAvailable
+        ? 'MEMORIA externa puede usarse como apoyo contextual, pero no para ampliar el alcance ni salir del workspace.'
+        : 'El plan debe ser util aun sin MEMORIA externa disponible.',
+    ],
+    instruction: instructionLines.join('\n'),
+    executionScope,
   }
 }
 
@@ -10526,6 +10895,8 @@ async function buildLocalStrategicBrainDecision({
       : []
   const localGoalDescriptor = detectBrainAtomicOperationDescriptor(goal)
   const analysisProposalIntent = detectAnalysisProposalPlanningIntent(goal, context)
+  const materializeSafeFirstDeliveryIntent =
+    detectMaterializeSafeFirstDeliveryPlanningIntent(goal, context)
   const safeFirstDeliveryIntent = detectSafeFirstDeliveryPlanningIntent(goal, context)
   const productArchitectureIntent = detectProductArchitecturePlanningIntent(
     goal,
@@ -10747,6 +11118,41 @@ async function buildLocalStrategicBrainDecision({
         'La ejecucion anterior fallo, pero aparecio un bloqueo critico nuevo y real. El Cerebro solo puede volver a preguntar por ese bloqueo antes de continuar.',
       question:
         'Aparecio un bloqueo critico nuevo tras la falla del executor. Necesito esa definicion humana para continuar sin riesgo.',
+    })
+  }
+
+  if (
+    materializeSafeFirstDeliveryIntent.matches &&
+    !scopedFileEditIntent &&
+    !localGoalDescriptor &&
+    !looksLikeWebBaseGoal &&
+    compositeSteps.length < 2 &&
+    (!previousExecutionResult ||
+      iteration === 1 ||
+      approvalAlreadyGranted ||
+      hasRecoverableExecutionError)
+  ) {
+    const materializeSafeFirstDeliveryPlan = buildMaterializeSafeFirstDeliveryPlan({
+      goal,
+      context,
+      workspacePath,
+      contextHubPack,
+      intent: materializeSafeFirstDeliveryIntent,
+    })
+
+    return buildBrainDecisionContract({
+      decisionKey: 'materialize-safe-first-delivery-plan',
+      strategy: 'materialize-safe-first-delivery-plan',
+      executionMode: 'executor',
+      reason:
+        'El objetivo ya pide materializar una primera entrega segura y acotada, así que el Cerebro puede devolver un plan ejecutable posterior con scope estrictamente local y revisable.',
+      tasks: materializeSafeFirstDeliveryPlan.tasks,
+      requiresApproval: false,
+      assumptions: materializeSafeFirstDeliveryPlan.assumptions,
+      instruction: materializeSafeFirstDeliveryPlan.instruction,
+      completed: false,
+      nextExpectedAction: 'execute-plan',
+      executionScope: materializeSafeFirstDeliveryPlan.executionScope,
     })
   }
 
@@ -11716,11 +12122,12 @@ Roles:
 Tu tarea es devolver una decision estructurada y operativa.
 
 Reglas:
-- Elegí entre estrategias compatibles con el sistema: fast-local, fast-composite, executor, web-scaffold-base, product-architecture-plan, safe-first-delivery-plan, ask-user.
+- Elegí entre estrategias compatibles con el sistema: fast-local, fast-composite, executor, web-scaffold-base, product-architecture-plan, safe-first-delivery-plan, materialize-safe-first-delivery-plan, ask-user.
 - Usá web-scaffold-base para webs institucionales o creativas cuando corresponda.
 - Usá product-architecture-plan cuando el objetivo implique un sistema o producto complejo (por ejemplo ecommerce, CRM, ERP, marketplace, SaaS o plataforma con usuarios, roles, backoffice, datos e integraciones) y todavía haga falta definir arquitectura antes de ejecutar.
 - Si devolvés product-architecture-plan, usá executionMode="planner-only", nextExpectedAction="review-product-architecture", requiresApproval=false y describí fases, riesgos, integraciones y primera entrega segura sin crear archivos.
 - Usá safe-first-delivery-plan cuando el objetivo ya pida una primera entrega segura o una primera fase local/mock derivada de una arquitectura previa; en ese caso usá executionMode="planner-only", nextExpectedAction="review-safe-first-delivery", requiresApproval=false y dejá explícitamente fuera pagos reales, credenciales, webhooks, deploy, migraciones, auth real, base de datos real e integraciones sensibles.
+- Usá materialize-safe-first-delivery-plan cuando el objetivo ya pida materializar esa primera entrega segura con archivos locales acotados; en ese caso usá executionMode="executor", nextExpectedAction="execute-plan", requiresApproval=false, fijá una carpeta destino segura dentro del workspace y limitá el alcance a archivos mock locales sin pagos reales, credenciales, webhooks, deploy, migraciones, auth real, base de datos real ni integraciones externas reales.
 - Si hace falta una decisión humana real, devolvé requiresApproval=true y un approvalRequest estructurado.
 - Si llega feedback de error recuperable, replanificá.
 - Si el pedido es simple y determinístico, podés devolver fast-local o fast-composite.

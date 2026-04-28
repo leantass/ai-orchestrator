@@ -2038,10 +2038,20 @@ function ProductArchitectureCard({
 function SafeFirstDeliveryPlanCard({
   plan,
   compact = false,
+  reviewOnly = false,
+  onPrepareMaterialization,
 }: {
   plan: SafeFirstDeliveryPlanContract
   compact?: boolean
+  reviewOnly?: boolean
+  onPrepareMaterialization?: (() => void) | null
 }) {
+  const canPrepareMaterialization =
+    reviewOnly &&
+    typeof onPrepareMaterialization === 'function' &&
+    (normalizeOptionalStringArray(plan.scope).length > 0 ||
+      normalizeOptionalStringArray(plan.modules).length > 0 ||
+      normalizeOptionalStringArray(plan.screens).length > 0)
   const scopeSummary =
     normalizeOptionalStringArray(plan.scope)[0] || 'Sin datos definidos'
   const moduleSummary =
@@ -2059,10 +2069,26 @@ function SafeFirstDeliveryPlanCard({
           <div className="mt-2 text-sm leading-6 text-slate-400">
             Este bloque resume la primera fase segura propuesta por el Cerebro y no ejecuta cambios todavía.
           </div>
+          {canPrepareMaterialization ? (
+            <div className="mt-2 text-xs leading-5 text-slate-500">
+              Esto genera un plan ejecutable acotado; no ejecuta cambios todavía.
+            </div>
+          ) : null}
         </div>
-        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-          Revisión manual
-        </span>
+        <div className="flex flex-wrap gap-2">
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
+            Revisión manual
+          </span>
+          {canPrepareMaterialization ? (
+            <button
+              type="button"
+              onClick={onPrepareMaterialization || undefined}
+              className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-medium text-emerald-100 transition hover:bg-emerald-300/15"
+            >
+              Preparar materialización segura
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -2214,6 +2240,81 @@ const buildSafeFirstDeliveryPlanningPrompt = ({
   return {
     goal: planningGoal,
     context: planningContextLines.join('\n'),
+  }
+}
+
+const buildSafeFirstDeliveryMaterializationPrompt = ({
+  plan,
+  originalGoal,
+  originalContext,
+}: {
+  plan: SafeFirstDeliveryPlanContract
+  originalGoal: string
+  originalContext: string
+}) => {
+  const scopeItems = normalizeOptionalStringArray(plan.scope)
+    .map(sanitizeSafeFirstDeliveryText)
+    .filter(Boolean)
+  const moduleItems = normalizeOptionalStringArray(plan.modules)
+    .map(sanitizeSafeFirstDeliveryText)
+    .filter(Boolean)
+  const mockDataItems = normalizeOptionalStringArray(plan.mockData)
+    .map(sanitizeSafeFirstDeliveryText)
+    .filter(Boolean)
+  const screenItems = normalizeOptionalStringArray(plan.screens)
+    .map(sanitizeSafeFirstDeliveryText)
+    .filter(Boolean)
+  const behaviorItems = normalizeOptionalStringArray(plan.localBehavior)
+    .map(sanitizeSafeFirstDeliveryText)
+    .filter(Boolean)
+  const exclusionItems = normalizeOptionalStringArray(plan.explicitExclusions)
+    .map(sanitizeSafeFirstDeliveryText)
+    .filter(Boolean)
+  const successCriteriaItems = normalizeOptionalStringArray(plan.successCriteria)
+    .map(sanitizeSafeFirstDeliveryText)
+    .filter(Boolean)
+  const scopeSummary =
+    scopeItems.length > 0
+      ? scopeItems.join('; ')
+      : 'una primera entrega segura y navegable del flujo principal'
+  const materializationGoal = [
+    'Materializar una primera entrega segura y acotada del objetivo actual dentro de una carpeta nueva del workspace.',
+    scopeSummary,
+    'No devolver otro safe-first-delivery-plan ni otro product-architecture-plan; devolver un plan materializable, acotado y revisable antes de ejecutar.',
+  ].join(' ')
+  const materializationContextLines = [
+    `Objetivo original: ${sanitizeSafeFirstDeliveryText(originalGoal) || 'No definido'}.`,
+    moduleItems.length > 0
+      ? `Modulos que si entran: ${moduleItems.join(' | ')}.`
+      : '',
+    screenItems.length > 0
+      ? `Pantallas o vistas prioritarias: ${screenItems.join(' | ')}.`
+      : '',
+    mockDataItems.length > 0
+      ? `Datos mock obligatorios: ${mockDataItems.join(' | ')}.`
+      : '',
+    behaviorItems.length > 0
+      ? `Comportamiento local esperado: ${behaviorItems.join(' | ')}.`
+      : '',
+    exclusionItems.length > 0
+      ? `Exclusiones obligatorias: ${exclusionItems.join(' | ')}.`
+      : '',
+    successCriteriaItems.length > 0
+      ? `Criterios de exito: ${successCriteriaItems.join(' | ')}.`
+      : '',
+    'La materializacion debe quedar acotada a archivos locales dentro del workspace, con frontend navegable, datos mock editables y sin conexiones externas reales.',
+    'No usar pagos reales, credenciales reales, webhooks reales, deploy, migraciones, auth real, base de datos real, datos sensibles reales ni integraciones externas reales.',
+    'El siguiente resultado debe ser un plan ejecutable y acotado, con carpeta destino y archivos permitidos claros, pero sin ejecutar cambios automaticamente.',
+    normalizeOptionalString(originalContext)
+      ? `Contexto previo del operador: ${sanitizeSafeFirstDeliveryText(
+          normalizeOptionalString(originalContext),
+        )}.`
+      : '',
+  ].filter(Boolean)
+
+  return {
+    goal: materializationGoal,
+    context: materializationContextLines.join('\n'),
   }
 }
 
@@ -2957,6 +3058,10 @@ const getDecisionKeyLabel = (value: unknown) => {
     return 'Recuperación y continuidad'
   }
 
+  if (normalizedValue === 'materialize-safe-first-delivery-plan') {
+    return 'Materialización segura de primera entrega'
+  }
+
   return normalizeOptionalString(value).replace(/-/g, ' ')
 }
 
@@ -2981,6 +3086,10 @@ const getPlannerStrategyLabel = (value: unknown) => {
 
   if (normalizedValue === 'web-scaffold-base') {
     return 'Base web local'
+  }
+
+  if (normalizedValue === 'materialize-safe-first-delivery-plan') {
+    return 'Materialización segura de primera entrega'
   }
 
   return normalizeOptionalString(value).replace(/-/g, ' ')
@@ -8036,6 +8145,37 @@ function App() {
     })
   }
 
+  const handlePrepareSafeMaterializationPlan = async () => {
+    if (!plannerIsReviewOnly || !activeSafeFirstDeliveryPlan) {
+      return
+    }
+
+    const preparedPlanningPrompt = buildSafeFirstDeliveryMaterializationPrompt({
+      plan: activeSafeFirstDeliveryPlan,
+      originalGoal: goalInput,
+      originalContext: getCurrentExecutionContextValue(),
+    })
+
+    clearVisibleExecutionRuntimeState()
+    setSessionStatus('Preparando materialización segura')
+    setCurrentStep(
+      'El orquestador esta preparando un plan materializable y acotado para la primera entrega segura',
+    )
+    setSessionEvents((currentEvents) => [
+      ...currentEvents,
+      'Se preparo una nueva planificacion para materializar la primera entrega segura',
+    ])
+
+    await handleGenerateNextStep({
+      goal: preparedPlanningPrompt.goal,
+      context: preparedPlanningPrompt.context,
+      sourceLabel: 'Materialización segura preparada',
+      sendContent:
+        'Se envio al planificador una solicitud acotada para preparar la materializacion segura de la primera entrega sin ejecutar cambios todavia.',
+      persistPreparedInputs: true,
+    })
+  }
+
   const handleExecuteCurrentInstruction = async (
     overrideInstruction?: string,
     overridePlannerExecutionMetadata?: PlannerExecutionMetadata,
@@ -11027,6 +11167,12 @@ function App() {
                         <SafeFirstDeliveryPlanCard
                           plan={activeSafeFirstDeliveryPlan}
                           compact
+                          reviewOnly={plannerIsReviewOnly}
+                          onPrepareMaterialization={
+                            plannerIsReviewOnly
+                              ? handlePrepareSafeMaterializationPlan
+                              : null
+                          }
                         />
                       ) : null}
                     </div>
@@ -12343,7 +12489,13 @@ function App() {
                   />
                 ) : null}
                 {activeSafeFirstDeliveryPlan ? (
-                  <SafeFirstDeliveryPlanCard plan={activeSafeFirstDeliveryPlan} />
+                  <SafeFirstDeliveryPlanCard
+                    plan={activeSafeFirstDeliveryPlan}
+                    reviewOnly={plannerIsReviewOnly}
+                    onPrepareMaterialization={
+                      plannerIsReviewOnly ? handlePrepareSafeMaterializationPlan : null
+                    }
+                  />
                 ) : null}
 
                 <div className="grid gap-4 xl:grid-cols-2">
