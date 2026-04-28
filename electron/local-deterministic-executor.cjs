@@ -582,6 +582,10 @@ function buildModuleCollectionKey(moduleLabel) {
     return 'operacion'
   }
 
+  if (/\b(?:dashboard|inicio|home|panel de control)\b/u.test(normalizedLabel)) {
+    return 'operacion'
+  }
+
   if (/\balumnos?\b/u.test(normalizedLabel)) {
     return 'alumnos'
   }
@@ -606,11 +610,198 @@ function buildModuleCollectionKey(moduleLabel) {
     return 'reportes'
   }
 
-  if (/\busuarios?\b|\broles?\b|\bpermisos?\b/u.test(normalizedLabel)) {
+  if (/\bobservaciones?\b/u.test(normalizedLabel)) {
+    return 'observaciones'
+  }
+
+  if (/\bvencimientos?\b/u.test(normalizedLabel)) {
+    return 'vencimientos'
+  }
+
+  if (/\bdocumentos?\b/u.test(normalizedLabel)) {
+    return 'documentos'
+  }
+
+  if (/\bpublicaciones?\b/u.test(normalizedLabel)) {
+    return 'publicaciones'
+  }
+
+  if (/\bcomentarios?\b/u.test(normalizedLabel)) {
+    return 'comentarios'
+  }
+
+  if (/\bperfiles?\b/u.test(normalizedLabel)) {
+    return 'perfiles'
+  }
+
+  if (/\bgrupos?\b/u.test(normalizedLabel)) {
+    return 'grupos'
+  }
+
+  if (/\bnotificaciones?\b/u.test(normalizedLabel)) {
+    return 'notificaciones'
+  }
+
+  if (/\balertas?\b/u.test(normalizedLabel)) {
+    return 'alertas'
+  }
+
+  if (/\bsensores?\b/u.test(normalizedLabel)) {
+    return 'sensores'
+  }
+
+  if (/\bzonas?\b/u.test(normalizedLabel)) {
+    return 'zonas'
+  }
+
+  if (/\boperadores?\b/u.test(normalizedLabel)) {
+    return 'operadores'
+  }
+
+  if (/\beventos?\b/u.test(normalizedLabel)) {
+    return 'eventos'
+  }
+
+  if (/\bresponsables?\b/u.test(normalizedLabel)) {
+    return 'responsables'
+  }
+
+  if (/\baccesos?\b|\bpermisos?\b|\bautenticacion\b|\blogin\b/u.test(normalizedLabel)) {
     return 'accesos'
   }
 
+  if (/\busuarios?\b/u.test(normalizedLabel)) {
+    return 'usuarios'
+  }
+
+  if (/\broles?\b/u.test(normalizedLabel)) {
+    return 'roles'
+  }
+
   return slugifySafeFirstDeliveryValue(moduleLabel) || 'resumen'
+}
+
+function buildSafeFirstDeliveryCollectionSpecs({ modules, entities, mockCollections }) {
+  const specs = []
+  const seenKeys = new Set()
+  const prioritizedSources = [
+    Array.isArray(mockCollections) ? mockCollections : [],
+    Array.isArray(entities) ? entities : [],
+    Array.isArray(modules) ? modules : [],
+  ]
+
+  prioritizedSources.forEach((entries) => {
+    entries.forEach((entry) => {
+      if (typeof entry !== 'string' || !entry.trim()) {
+        return
+      }
+
+      const rawLabel = entry.trim()
+      const collectionKey = buildModuleCollectionKey(rawLabel)
+
+      if (!collectionKey || collectionKey === 'resumen' || seenKeys.has(collectionKey)) {
+        return
+      }
+
+      seenKeys.add(collectionKey)
+      specs.push({
+        key: collectionKey,
+        label: toTitleCaseLabel(rawLabel),
+      })
+    })
+  })
+
+  return specs
+}
+
+function buildSafeFirstDeliveryStateSamples(stateHints, fallbackStates) {
+  const normalizedHints = Array.isArray(stateHints)
+    ? stateHints.filter((entry) => typeof entry === 'string' && entry.trim())
+    : []
+
+  const resolvedStates = []
+  pushUniqueSafeFirstDeliveryValues(resolvedStates, normalizedHints, 3)
+  pushUniqueSafeFirstDeliveryValues(
+    resolvedStates,
+    Array.isArray(fallbackStates) ? fallbackStates : [],
+    3,
+  )
+
+  return resolvedStates.slice(0, 3)
+}
+
+function buildSafeFirstDeliveryCollectionFieldHints(collectionKey) {
+  const normalizedKey = normalizeSafeFirstDeliveryText(collectionKey)
+
+  if (
+    /\bperfiles?\b|\busuarios?\b|\bresponsables?\b|\boperadores?\b|\broles?\b/u.test(
+      normalizedKey,
+    )
+  ) {
+    return {
+      extraFields: (index) => ({
+        rol:
+          index === 0
+            ? 'coordinacion mock'
+            : index === 1
+              ? 'operacion mock'
+              : 'revision mock',
+      }),
+    }
+  }
+
+  if (/\bpublicaciones?\b|\bcomentarios?\b|\bobservaciones?\b/u.test(normalizedKey)) {
+    return {
+      extraFields: (index) => ({
+        detalle:
+          index === 0
+            ? 'Entrada mock preparada para revisar el flujo colaborativo local.'
+            : index === 1
+              ? 'Contenido local para validar cambios de estado y revision.'
+              : 'Registro mock listo para pruebas internas sin datos reales.',
+      }),
+    }
+  }
+
+  if (/\bgrupos?\b|\bzonas?\b|\bcursos?\b/u.test(normalizedKey)) {
+    return {
+      extraFields: () => ({
+        categoria: 'organizacion mock',
+      }),
+    }
+  }
+
+  if (/\bnotificaciones?\b|\bcomunicaciones?\b/u.test(normalizedKey)) {
+    return {
+      extraFields: () => ({
+        canal: 'bandeja local',
+      }),
+    }
+  }
+
+  if (/\balertas?\b/u.test(normalizedKey)) {
+    return {
+      extraFields: (index) => ({
+        severidad: index === 0 ? 'alta' : index === 1 ? 'media' : 'baja',
+      }),
+    }
+  }
+
+  if (
+    /\bsensores?\b|\baccesos?\b|\beventos?\b|\bdocumentos?\b|\bvencimientos?\b/u.test(
+      normalizedKey,
+    )
+  ) {
+    return {
+      extraFields: () => ({
+        actualizado: new Date().toISOString().slice(0, 10),
+      }),
+    }
+  }
+
+  return {
+    extraFields: () => ({}),
+  }
 }
 
 function buildSafeFirstDeliveryModules({ modules, screens, localBehavior }) {
@@ -637,15 +828,43 @@ function buildSafeFirstDeliveryModules({ modules, screens, localBehavior }) {
   })
 }
 
-function buildSafeFirstDeliveryGenericRecords(title, count = 3) {
-  const normalizedTitle = normalizeSafeFirstDeliveryText(title)
+function buildSafeFirstDeliveryGenericRecords({
+  collectionKey,
+  label,
+  domain,
+  stateHints,
+  count = 3,
+}) {
+  const normalizedTitle = normalizeSafeFirstDeliveryText(label || collectionKey)
+  const normalizedCollectionKey = normalizeSafeFirstDeliveryText(collectionKey || '')
+  const domainLabel = domain && domain.trim() ? domain.trim() : 'el dominio actual'
+  const defaultStates = buildSafeFirstDeliveryStateSamples(stateHints, [
+    'listo para demo',
+    'en revision',
+    'pendiente',
+  ])
+  const requestStates = buildSafeFirstDeliveryStateSamples(stateHints, [
+    'nueva',
+    'en revision',
+    'resuelta mock',
+  ])
+  const statusStates = buildSafeFirstDeliveryStateSamples(stateHints, [
+    'habilitada',
+    'en revision',
+    'aprobada mock',
+  ])
+  const reportStates = buildSafeFirstDeliveryStateSamples(stateHints, [
+    'listo para revision',
+    'borrador',
+    'revisado mock',
+  ])
 
-  if (/\bsolicitudes?\b/u.test(normalizedTitle)) {
+  if (/\bsolicitudes?\b/u.test(normalizedTitle) || normalizedCollectionKey === 'solicitudes') {
     return [
       {
         id: 'sol-1',
         nombre: 'Solicitud de acceso de proveedor',
-        estado: 'nueva',
+        estado: requestStates[0] || 'nueva',
         prioridad: 'alta',
         responsable: 'Mesa operativa mock',
         resumen: 'Ingreso inicial para revisar el circuito de atencion.',
@@ -653,7 +872,7 @@ function buildSafeFirstDeliveryGenericRecords(title, count = 3) {
       {
         id: 'sol-2',
         nombre: 'Solicitud de actualizacion de datos',
-        estado: 'en revision',
+        estado: requestStates[1] || 'en revision',
         prioridad: 'media',
         responsable: 'Analista mock',
         resumen: 'Caso intermedio para validar cambios de estado locales.',
@@ -661,7 +880,7 @@ function buildSafeFirstDeliveryGenericRecords(title, count = 3) {
       {
         id: 'sol-3',
         nombre: 'Solicitud de cierre administrativo',
-        estado: 'resuelta mock',
+        estado: requestStates[2] || 'resuelta mock',
         prioridad: 'baja',
         responsable: 'Backoffice mock',
         resumen: 'Ejemplo resuelto para revisar historial y reportes.',
@@ -669,76 +888,94 @@ function buildSafeFirstDeliveryGenericRecords(title, count = 3) {
     ]
   }
 
-  if (/\bestados?\b/u.test(normalizedTitle)) {
+  if (/\bestados?\b/u.test(normalizedTitle) || normalizedCollectionKey === 'estados') {
     return [
       {
         id: 'est-1',
         nombre: 'Bandeja inicial',
-        estado: 'habilitada',
+        estado: statusStates[0] || 'habilitada',
         responsable: 'Operacion mock',
         resumen: 'Estado inicial para ordenar el flujo local.',
       },
       {
         id: 'est-2',
         nombre: 'Seguimiento interno',
-        estado: 'en revision',
+        estado: statusStates[1] || 'en revision',
         responsable: 'Equipo mock',
         resumen: 'Permite probar cambios de estado sin integraciones reales.',
       },
       {
         id: 'est-3',
         nombre: 'Cierre operativo',
-        estado: 'listo para demo',
+        estado: statusStates[2] || 'aprobada mock',
         responsable: 'Supervisor mock',
         resumen: 'Referencia final para revisar aprobaciones futuras.',
       },
     ]
   }
 
-  if (/\breportes?\b/u.test(normalizedTitle)) {
+  if (/\breportes?\b/u.test(normalizedTitle) || normalizedCollectionKey === 'reportes') {
     return [
       {
         id: 'rep-1',
         nombre: 'Reporte de pendientes',
-        estado: 'listo para revision',
+        estado: reportStates[0] || 'listo para revision',
         indicador: '12 items abiertos',
         resumen: 'Vista resumida del backlog operativo local.',
       },
       {
         id: 'rep-2',
         nombre: 'Reporte de estados activos',
-        estado: 'borrador',
+        estado: reportStates[1] || 'borrador',
         indicador: '4 estados con actividad',
         resumen: 'Permite validar tarjetas y filtros del tablero.',
       },
     ]
   }
 
-  if (/\boperaci|\bpanel\b/u.test(normalizedTitle)) {
+  if (
+    /\boperaci|\bpanel\b/u.test(normalizedTitle) ||
+    normalizedCollectionKey === 'operacion'
+  ) {
     return [
       {
         id: 'op-1',
         nombre: 'Panel operativo inicial',
-        estado: 'listo para demo',
+        estado: defaultStates[0] || 'listo para demo',
         responsable: 'Coordinacion mock',
         resumen: 'Entrada principal para revisar el flujo local del sistema.',
       },
       {
         id: 'op-2',
         nombre: 'Revision de pendientes',
-        estado: 'en revision',
+        estado: defaultStates[1] || 'en revision',
         responsable: 'Analista mock',
         resumen: 'Lista de trabajo preparada para pruebas de accion local.',
       },
     ]
   }
 
+  const fieldHints = buildSafeFirstDeliveryCollectionFieldHints(collectionKey || label)
+  const itemSlug = slugifySafeFirstDeliveryValue(collectionKey || label) || 'item'
+  const itemLabel = toTitleCaseLabel(label || collectionKey || 'Item')
+  const normalizedSubject =
+    normalizeSafeFirstDeliveryText(label || collectionKey).replace(/-/g, ' ') || domainLabel
+
   return Array.from({ length: count }, (_entry, index) => ({
-    id: `${slugifySafeFirstDeliveryValue(title) || 'item'}-${index + 1}`,
-    nombre: `${toTitleCaseLabel(title)} ${index + 1}`,
-    estado: index === 0 ? 'listo para demo' : index === 1 ? 'en revision' : 'pendiente',
-    responsable: index === 0 ? 'Equipo mock' : index === 1 ? 'Operacion mock' : 'Revision manual',
-    resumen: `Dato mock preparado para ${title.toLocaleLowerCase()}.`,
+    id: `${itemSlug}-${index + 1}`,
+    nombre: `${itemLabel} ${index + 1}`,
+    estado:
+      defaultStates[index] ||
+      defaultStates[defaultStates.length - 1] ||
+      'pendiente',
+    responsable:
+      index === 0
+        ? 'Equipo operativo mock'
+        : index === 1
+          ? 'Operacion mock'
+          : 'Revision manual',
+    resumen: `Dato mock preparado para ${normalizedSubject} dentro de ${domainLabel}.`,
+    ...fieldHints.extraFields(index),
   }))
 }
 
@@ -749,6 +986,7 @@ function buildSafeFirstDeliveryMockCollections({
   modules,
   entities,
   mockCollections,
+  stateHints,
 }) {
   const normalizedText = normalizeSafeFirstDeliveryText(sourceText)
   const normalizedDomain = normalizeSafeFirstDeliveryText(domain)
@@ -913,11 +1151,18 @@ function buildSafeFirstDeliveryMockCollections({
     return collections
   }
 
-  ;[...moduleLabels, ...entityLabels, ...collectionLabels].forEach((label) => {
-    const collectionKey = buildModuleCollectionKey(label)
-
-    if (!collections[collectionKey]) {
-      collections[collectionKey] = buildSafeFirstDeliveryGenericRecords(label)
+  buildSafeFirstDeliveryCollectionSpecs({
+    modules: moduleLabels,
+    entities: entityLabels,
+    mockCollections: collectionLabels,
+  }).forEach(({ key, label }) => {
+    if (!collections[key]) {
+      collections[key] = buildSafeFirstDeliveryGenericRecords({
+        collectionKey: key,
+        label,
+        domain,
+        stateHints,
+      })
     }
   })
 
@@ -1026,6 +1271,7 @@ function buildSafeFirstDeliveryMockData({
     modules: normalizedModules,
     entities: normalizedEntities,
     mockCollections: normalizedMockCollections,
+    stateHints: normalizedStateHints,
   })
   const interactionMode =
     resolvedProductType === 'ecommerce' && Array.isArray(collections.productos)
