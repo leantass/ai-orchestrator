@@ -804,6 +804,274 @@ function buildSafeFirstDeliveryCollectionFieldHints(collectionKey) {
   }
 }
 
+function buildSafeFirstDeliveryDynamicActionLabel(actionType, collectionKey) {
+  const normalizedCollectionKey = normalizeSafeFirstDeliveryText(collectionKey)
+  const collectionLabel = toTitleCaseLabel(collectionKey || 'registro')
+
+  switch (actionType) {
+    case 'select-detail':
+      return 'Ver detalle'
+    case 'cycle-selected-state':
+      if (normalizedCollectionKey === 'sensores') {
+        return 'Cambiar estado de sensor'
+      }
+      if (normalizedCollectionKey === 'documentos') {
+        return 'Cambiar estado documental'
+      }
+      return 'Cambiar estado'
+    case 'mark-review':
+      if (normalizedCollectionKey === 'alertas') {
+        return 'Marcar alerta revisada'
+      }
+      if (normalizedCollectionKey === 'notificaciones') {
+        return 'Marcar notificacion revisada'
+      }
+      if (normalizedCollectionKey === 'vencimientos') {
+        return 'Marcar vencimiento revisado'
+      }
+      return 'Marcar revisado'
+    case 'review-record':
+      return normalizedCollectionKey === 'reportes'
+        ? 'Revisar reporte mock'
+        : 'Revisar registro mock'
+    case 'register-note':
+      if (normalizedCollectionKey === 'comentarios') {
+        return 'Registrar comentario mock'
+      }
+      if (normalizedCollectionKey === 'observaciones') {
+        return 'Registrar observacion mock'
+      }
+      if (normalizedCollectionKey === 'notificaciones') {
+        return 'Registrar notificacion mock'
+      }
+      return 'Registrar actividad local'
+    case 'create-entry':
+      if (normalizedCollectionKey === 'publicaciones') {
+        return 'Crear publicacion mock'
+      }
+      if (normalizedCollectionKey === 'eventos') {
+        return 'Registrar evento mock'
+      }
+      if (normalizedCollectionKey === 'operacion') {
+        return 'Registrar actividad local'
+      }
+      return `Crear ${collectionLabel.toLocaleLowerCase()} mock`
+    case 'mark-followup':
+      return 'Marcar seguimiento'
+    default:
+      return 'Accion local'
+  }
+}
+
+function isSafeFirstDeliveryActionRelevantToCollection(actionLabel, collectionKey) {
+  const normalizedAction = normalizeSafeFirstDeliveryText(actionLabel)
+  const normalizedCollection = normalizeSafeFirstDeliveryText(collectionKey)
+
+  if (!normalizedAction || !normalizedCollection) {
+    return false
+  }
+
+  if (normalizedCollection === 'operacion') {
+    return true
+  }
+
+  if (normalizedAction.includes(normalizedCollection)) {
+    return true
+  }
+
+  const synonymMap = {
+    publicaciones: ['actividad', 'muro', 'post', 'publicar', 'publicacion'],
+    comentarios: ['comentario', 'respuesta', 'actividad', 'comentar'],
+    notificaciones: ['notificacion', 'aviso', 'actividad', 'notificar'],
+    alertas: ['alerta', 'incidente', 'revision'],
+    sensores: ['sensor', 'estado', 'dispositivo'],
+    eventos: ['evento', 'actividad', 'registro'],
+    operadores: ['operador', 'responsable', 'asignacion'],
+    documentos: ['documento', 'expediente', 'archivo'],
+    vencimientos: ['vencimiento', 'plazo', 'revision'],
+    observaciones: ['observacion', 'nota', 'comentario'],
+    responsables: ['responsable', 'asignacion'],
+    solicitudes: ['solicitud', 'pedido', 'caso'],
+    estados: ['estado', 'revision'],
+    reportes: ['reporte', 'resumen', 'revision'],
+  }
+  const synonyms = Array.isArray(synonymMap[normalizedCollection])
+    ? synonymMap[normalizedCollection]
+    : []
+
+  return synonyms.some((entry) => normalizedAction.includes(entry))
+}
+
+function inferSafeFirstDeliveryDynamicActionType(actionLabel, collectionKey) {
+  const normalizedAction = normalizeSafeFirstDeliveryText(actionLabel)
+  const normalizedCollection = normalizeSafeFirstDeliveryText(collectionKey)
+
+  if (/\b(?:detalle|abrir|consultar|ver)\b/u.test(normalizedAction)) {
+    return 'select-detail'
+  }
+
+  if (/\bseguimiento\b/u.test(normalizedAction)) {
+    return 'mark-followup'
+  }
+
+  if (/\bestado|cambiar|mover\b/u.test(normalizedAction)) {
+    return 'cycle-selected-state'
+  }
+
+  if (/\breporte\b/u.test(normalizedAction) && normalizedCollection === 'reportes') {
+    return 'review-record'
+  }
+
+  if (/\brevis|valid|aprobar|marcar\b/u.test(normalizedAction)) {
+    return 'mark-review'
+  }
+
+  if (/\bobserv|coment|nota|comunic\b/u.test(normalizedAction)) {
+    return 'register-note'
+  }
+
+  if (/\bregistr|crear|public|evento|actividad|asign\b/u.test(normalizedAction)) {
+    return 'create-entry'
+  }
+
+  return ''
+}
+
+function dedupeSafeFirstDeliveryActionDescriptors(actions) {
+  const deduped = []
+  const seenTypes = new Set()
+
+  for (const action of Array.isArray(actions) ? actions : []) {
+    if (!action || typeof action !== 'object' || !action.type || !action.label) {
+      continue
+    }
+
+    if (seenTypes.has(action.type)) {
+      continue
+    }
+
+    seenTypes.add(action.type)
+    deduped.push({
+      type: action.type,
+      label: action.label,
+      ...(action.secondary === true ? { secondary: true } : {}),
+    })
+  }
+
+  return deduped
+}
+
+function buildSafeFirstDeliveryDynamicActionProfiles({
+  interactionMode,
+  collections,
+  localActions,
+  stateHints,
+}) {
+  if (interactionMode !== 'generic' || !collections || typeof collections !== 'object') {
+    return null
+  }
+
+  const normalizedLocalActions = Array.isArray(localActions)
+    ? localActions.filter((entry) => typeof entry === 'string' && entry.trim())
+    : []
+  const hasStateHints = Array.isArray(stateHints) && stateHints.some((entry) => typeof entry === 'string' && entry.trim())
+  const recordActionsByCollection = {}
+  const globalActionsByCollection = {}
+
+  Object.keys(collections).forEach((collectionKey) => {
+    const normalizedCollectionKey = normalizeSafeFirstDeliveryText(collectionKey)
+    const recordActions = [{ type: 'select-detail', label: 'Ver detalle' }]
+    const globalActions = []
+
+    normalizedLocalActions.forEach((entry) => {
+      if (!isSafeFirstDeliveryActionRelevantToCollection(entry, collectionKey)) {
+        return
+      }
+
+      const actionType = inferSafeFirstDeliveryDynamicActionType(entry, collectionKey)
+
+      if (!actionType) {
+        return
+      }
+
+      const actionDescriptor = { type: actionType, label: entry.trim() }
+
+      if (actionType === 'create-entry' || actionType === 'register-note') {
+        globalActions.push(actionDescriptor)
+      } else {
+        recordActions.push(actionDescriptor)
+      }
+    })
+
+    if (
+      hasStateHints &&
+      !recordActions.some((action) => action.type === 'cycle-selected-state')
+    ) {
+      recordActions.push({
+        type: 'cycle-selected-state',
+        label: buildSafeFirstDeliveryDynamicActionLabel(
+          'cycle-selected-state',
+          collectionKey,
+        ),
+      })
+    }
+
+    if (
+      normalizedCollectionKey === 'reportes' &&
+      !recordActions.some((action) => action.type === 'review-record')
+    ) {
+      recordActions.push({
+        type: 'review-record',
+        label: buildSafeFirstDeliveryDynamicActionLabel('review-record', collectionKey),
+      })
+    }
+
+    if (
+      ['alertas', 'notificaciones', 'vencimientos'].includes(normalizedCollectionKey) &&
+      !recordActions.some((action) => action.type === 'mark-review')
+    ) {
+      recordActions.push({
+        type: 'mark-review',
+        label: buildSafeFirstDeliveryDynamicActionLabel('mark-review', collectionKey),
+      })
+    }
+
+    if (
+      ['comentarios', 'observaciones', 'notificaciones'].includes(
+        normalizedCollectionKey,
+      ) &&
+      !globalActions.some((action) => action.type === 'register-note')
+    ) {
+      globalActions.push({
+        type: 'register-note',
+        label: buildSafeFirstDeliveryDynamicActionLabel('register-note', collectionKey),
+      })
+    }
+
+    if (
+      ['publicaciones', 'eventos', 'solicitudes', 'operacion'].includes(
+        normalizedCollectionKey,
+      ) &&
+      !globalActions.some((action) => action.type === 'create-entry')
+    ) {
+      globalActions.push({
+        type: 'create-entry',
+        label: buildSafeFirstDeliveryDynamicActionLabel('create-entry', collectionKey),
+      })
+    }
+
+    recordActionsByCollection[collectionKey] =
+      dedupeSafeFirstDeliveryActionDescriptors(recordActions)
+    globalActionsByCollection[collectionKey] =
+      dedupeSafeFirstDeliveryActionDescriptors(globalActions)
+  })
+
+  return {
+    recordActionsByCollection,
+    globalActionsByCollection,
+  }
+}
+
 function buildSafeFirstDeliveryModules({ modules, screens, localBehavior }) {
   const normalizedModules = Array.isArray(modules) ? modules : []
   const normalizedScreens = Array.isArray(screens) ? screens : []
@@ -1283,6 +1551,12 @@ function buildSafeFirstDeliveryMockData({
             Array.isArray(collections.comunicaciones))
         ? 'school-crm'
         : 'generic'
+  const dynamicActionProfiles = buildSafeFirstDeliveryDynamicActionProfiles({
+    interactionMode,
+    collections,
+    localActions: normalizedBehavior,
+    stateHints: normalizedStateHints,
+  })
 
   return {
     meta: {
@@ -1302,6 +1576,14 @@ function buildSafeFirstDeliveryMockData({
       approvalThemes: normalizedApprovalThemes,
       explicitExclusions: normalizedExclusions,
       successCriteria: normalizedSuccessCriteria,
+      ...(dynamicActionProfiles?.recordActionsByCollection &&
+      Object.keys(dynamicActionProfiles.recordActionsByCollection).length > 0
+        ? { dynamicActionSets: dynamicActionProfiles.recordActionsByCollection }
+        : {}),
+      ...(dynamicActionProfiles?.globalActionsByCollection &&
+      Object.keys(dynamicActionProfiles.globalActionsByCollection).length > 0
+        ? { dynamicGlobalActions: dynamicActionProfiles.globalActionsByCollection }
+        : {}),
     },
     modules: buildSafeFirstDeliveryModules({
       modules: normalizedModules,
@@ -2360,6 +2642,39 @@ function updateFilterControls(module) {
   statusFilter.value = currentValue;
 }
 
+function getDynamicActionSets() {
+  const dynamicActionSets = state.data?.meta?.dynamicActionSets;
+  return dynamicActionSets && typeof dynamicActionSets === 'object' ? dynamicActionSets : {};
+}
+
+function getDynamicGlobalActions() {
+  const dynamicGlobalActions = state.data?.meta?.dynamicGlobalActions;
+  return dynamicGlobalActions && typeof dynamicGlobalActions === 'object'
+    ? dynamicGlobalActions
+    : {};
+}
+
+function dedupeActionSet(actions) {
+  const deduped = [];
+  const seen = new Set();
+
+  (Array.isArray(actions) ? actions : []).forEach((action) => {
+    if (!action || typeof action !== 'object' || !action.type || !action.label) {
+      return;
+    }
+
+    const key = action.type;
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    deduped.push(action);
+  });
+
+  return deduped;
+}
+
 function buildActionButtons(actions, module, record, className = '') {
   const toolbar = document.createElement('div');
   toolbar.className = className ? 'toolbar ' + className : 'toolbar';
@@ -2382,12 +2697,42 @@ function buildActionButtons(actions, module, record, className = '') {
 
 function resolveActionSet(collectionKey) {
   const actionSets = MODE.actionSets || {};
-  return Array.isArray(actionSets[collectionKey]) ? actionSets[collectionKey] : actionSets.default || [];
+  const baseActions = Array.isArray(actionSets[collectionKey])
+    ? actionSets[collectionKey]
+    : actionSets.default || [];
+
+  if (MODE.kind !== 'generic') {
+    return baseActions;
+  }
+
+  const dynamicActionSets = getDynamicActionSets();
+  const dynamicActions = Array.isArray(dynamicActionSets[collectionKey])
+    ? dynamicActionSets[collectionKey]
+    : [];
+
+  return dedupeActionSet([
+    ...dynamicActions,
+    ...baseActions,
+  ]);
 }
 
 function resolveGlobalActions(collectionKey) {
   const globalActions = MODE.globalActions || {};
-  return Array.isArray(globalActions[collectionKey]) ? globalActions[collectionKey] : [];
+  const baseActions = Array.isArray(globalActions[collectionKey]) ? globalActions[collectionKey] : [];
+
+  if (MODE.kind !== 'generic') {
+    return baseActions;
+  }
+
+  const dynamicGlobalActions = getDynamicGlobalActions();
+  const dynamicActions = Array.isArray(dynamicGlobalActions[collectionKey])
+    ? dynamicGlobalActions[collectionKey]
+    : [];
+
+  return dedupeActionSet([
+    ...dynamicActions,
+    ...baseActions,
+  ]);
 }
 
 function renderRecordCard(module, record, isSelected) {
@@ -2935,19 +3280,44 @@ function buildLocalEntry(collectionKey, referenceRecord) {
       };
     }
 
+    const singularLabel = toDisplayLabel(targetKey || 'registro');
+    const normalizedTargetKey = normalizeText(targetKey);
+    const stateSequence = resolveStateSequence(targetKey, 'create-entry');
+    const stateValue =
+      Array.isArray(stateSequence) && stateSequence.length > 0
+        ? stateSequence[0]
+        : targetKey === 'solicitudes'
+          ? 'nueva'
+          : 'listo para demo';
+    const defaultSummary =
+      normalizedTargetKey === 'eventos'
+        ? 'Evento mock generado localmente para revisar el tablero operativo.'
+        : normalizedTargetKey === 'publicaciones'
+          ? 'Publicacion mock creada localmente para revisar actividad y estados.'
+          : normalizedTargetKey === 'documentos'
+            ? 'Documento mock generado localmente para revisar el circuito documental.'
+            : 'Alta local generada para revisar el comportamiento del sistema.';
+    const logMessage =
+      normalizedTargetKey === 'solicitudes'
+        ? genericTemplate.requestLogMessage || 'Se creo una solicitud mock local.'
+        : normalizedTargetKey === 'eventos'
+          ? 'Se registro un evento mock local.'
+          : normalizedTargetKey === 'publicaciones'
+            ? 'Se creo una publicacion mock local.'
+            : normalizedTargetKey === 'documentos'
+              ? 'Se creo un documento mock local.'
+              : genericTemplate.defaultLogMessage || 'Se creo un registro mock local.';
+
     return {
       key: targetKey,
       record: {
         id: (targetKey.slice(0, 3) || 'reg') + '-local-' + nowSuffix,
-        nombre: 'Registro local ' + nowSuffix,
-        estado: targetKey === 'solicitudes' ? 'nueva' : 'listo para demo',
+        nombre: singularLabel + ' local ' + nowSuffix,
+        estado: stateValue,
         responsable: genericTemplate.responsible || 'Equipo operativo mock',
-        resumen: 'Alta local generada para revisar el comportamiento del sistema.',
+        resumen: defaultSummary,
       },
-      logMessage:
-        targetKey === 'solicitudes'
-          ? genericTemplate.requestLogMessage || 'Se creo una solicitud mock local.'
-          : genericTemplate.defaultLogMessage || 'Se creo un registro mock local.',
+      logMessage,
     };
   }
 
