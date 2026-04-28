@@ -2787,6 +2787,21 @@ const derivePrimaryAffectedPath = ({
     : firstAffectedPath
 }
 
+const isSafeFirstDeliveryMaterializationDecision = (value: unknown) =>
+  normalizeOptionalString(value).toLocaleLowerCase() ===
+  'materialize-safe-first-delivery-plan'
+
+const parseMaterializationExecutionStats = (value: string) => {
+  const normalizedValue = normalizeOptionalString(value)
+  const operationsMatch = normalizedValue.match(/Operaciones aplicadas:\s*(\d+)/i)
+  const validationsMatch = normalizedValue.match(/Validaciones:\s*(\d+)/i)
+
+  return {
+    operationsCount: operationsMatch ? Number(operationsMatch[1]) || 0 : 0,
+    validationsCount: validationsMatch ? Number(validationsMatch[1]) || 0 : 0,
+  }
+}
+
 const deriveResultStatusPresentation = ({
   runStatus,
   requestState,
@@ -5039,6 +5054,68 @@ function App() {
       : latestAppliedReuseArtifactIds.length > 0
         ? latestAppliedReuseArtifactIds.join(', ')
         : 'Sin artefacto reportado'
+  const resultIsSafeFirstDeliveryMaterialization =
+    resultStatusPresentation.label === 'Ejecución completada' &&
+    (isSafeFirstDeliveryMaterializationDecision(plannerExecutionMetadata.decisionKey) ||
+      isSafeFirstDeliveryMaterializationDecision(plannerExecutionMetadata.strategy) ||
+      isSafeFirstDeliveryMaterializationDecision(latestBrainStrategy))
+  const resultMaterializationFilePaths = mergeUniqueStringValues(
+    latestCreatedArtifacts.filter((pathValue) => isLikelyFilePath(pathValue)),
+    latestTouchedArtifactsRaw.filter((pathValue) => isLikelyFilePath(pathValue)),
+    12,
+  )
+  const resultMaterializationFileLabels = mergeUniqueStringValues(
+    resultMaterializationFilePaths.map((pathValue) => getPathLeafName(pathValue)),
+    latestAllowedTargetPaths
+      .filter((pathValue) => isLikelyFilePath(pathValue))
+      .map((pathValue) => getPathLeafName(pathValue)),
+    8,
+  )
+  const resultMaterializationFolderLabel =
+    resultPrimaryAffectedPathLabel ||
+    formatWorkspaceRelativePath(
+      latestAllowedTargetPaths.find((pathValue) => !isLikelyFilePath(pathValue)),
+      workspacePath,
+    ) ||
+    'No disponible'
+  const resultMaterializationIndexPathLabel =
+    formatWorkspaceRelativePath(
+      [
+        ...resultMaterializationFilePaths,
+        ...latestAllowedTargetPaths.filter((pathValue) => isLikelyFilePath(pathValue)),
+      ].find((pathValue) => getPathLeafName(pathValue).toLocaleLowerCase() === 'index.html'),
+      workspacePath,
+    ) || 'No disponible'
+  const resultMaterializationStats = parseMaterializationExecutionStats(resultHumanText)
+  const resultMaterializationOperationsLabel =
+    resultMaterializationStats.operationsCount > 0
+      ? `${resultMaterializationStats.operationsCount} operación(es)`
+      : 'No reportadas'
+  const resultMaterializationValidationsLabel =
+    resultMaterializationStats.validationsCount > 0
+      ? `${resultMaterializationStats.validationsCount} validación(es)`
+      : latestValidationResults.length > 0
+        ? `${latestValidationResults.length} validación(es)`
+        : 'No reportadas'
+  const resultMaterializationEngineLabel = latestMaterializationLayer || 'No disponible'
+  const resultMaterializationBridgeDetail =
+    latestMaterializationLayer === 'local-deterministic' || fastRouteDetected
+      ? 'No se requirió bridge ni Codex para materializar esta entrega segura.'
+      : 'La corrida no informó una resolución completamente local.'
+  const resultMaterializationLimits = [
+    'Datos mock editables.',
+    'Sin backend real.',
+    'Sin autenticación real.',
+    'Sin pagos reales.',
+    'Sin deploy.',
+  ]
+  const resultMaterializationSuggestedNextSteps = [
+    resultMaterializationIndexPathLabel !== 'No disponible'
+      ? `Abrir ${resultMaterializationIndexPathLabel} en el navegador para revisar la interfaz.`
+      : 'Abrir el index.html generado para revisar la interfaz.',
+    'Validar las acciones locales y el log de actividad de la entrega mock.',
+    'Recién después definir la siguiente fase o una nueva materialización más profunda.',
+  ]
   const latestHumanDecision = [...resolvedDecisions]
     .filter(
       (record) =>
@@ -11287,9 +11364,109 @@ function App() {
                 {activeWizardStep === 'result' ? (
                   <div className="grid h-full gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
                     <div className="space-y-4">
+                      {resultIsSafeFirstDeliveryMaterialization ? (
+                        <ResultSectionCard
+                          title="Primera entrega segura generada"
+                          description="Resumen corto de la materialización segura para revisar rápido qué se creó, cómo abrirlo y cuáles son sus límites."
+                        >
+                          <ResultKeyValueGrid
+                            items={[
+                              {
+                                label: 'Carpeta creada',
+                                value: resultMaterializationFolderLabel,
+                              },
+                              {
+                                label: 'Motor usado',
+                                value: resultMaterializationEngineLabel,
+                                detail: resultMaterializationBridgeDetail,
+                              },
+                              {
+                                label: 'Codex / bridge',
+                                value:
+                                  latestMaterializationLayer === 'local-deterministic' ||
+                                  fastRouteDetected
+                                    ? 'No requeridos'
+                                    : 'No disponible',
+                              },
+                              {
+                                label: 'Operaciones',
+                                value: resultMaterializationOperationsLabel,
+                              },
+                              {
+                                label: 'Validaciones',
+                                value: resultMaterializationValidationsLabel,
+                              },
+                              {
+                                label: 'Cómo probar',
+                                value:
+                                  resultMaterializationIndexPathLabel !== 'No disponible'
+                                    ? `Abrir ${resultMaterializationIndexPathLabel}`
+                                    : 'Abrir el index.html generado',
+                              },
+                            ]}
+                          />
+                          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                            <div className="space-y-2">
+                              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                Archivos generados
+                              </div>
+                              <div className="grid gap-2">
+                                {resultMaterializationFileLabels.length > 0 ? (
+                                  resultMaterializationFileLabels.map((fileLabel) => (
+                                    <div
+                                      key={`safe-delivery-file-${fileLabel}`}
+                                      className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
+                                    >
+                                      {fileLabel}
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                                    No hay archivos reportados para resumir.
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                Límites del mock
+                              </div>
+                              <div className="grid gap-2">
+                                {resultMaterializationLimits.map((limitLabel) => (
+                                  <div
+                                    key={`safe-delivery-limit-${limitLabel}`}
+                                    className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
+                                  >
+                                    {limitLabel}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-4 space-y-2">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              Próximo paso sugerido
+                            </div>
+                            <div className="grid gap-2">
+                              {resultMaterializationSuggestedNextSteps.map((stepLabel) => (
+                                <div
+                                  key={`safe-delivery-next-step-${stepLabel}`}
+                                  className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
+                                >
+                                  {stepLabel}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </ResultSectionCard>
+                      ) : null}
                       <ResultSectionCard
-                        title="Cierre"
-                        description="Lectura humana del resultado y estado final de la corrida."
+                        title={resultIsSafeFirstDeliveryMaterialization ? 'Cierre técnico' : 'Cierre'}
+                        description={
+                          resultIsSafeFirstDeliveryMaterialization
+                            ? 'Detalle humano y técnico del cierre, por si necesitás inspeccionar la corrida completa.'
+                            : 'Lectura humana del resultado y estado final de la corrida.'
+                        }
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div className="flex flex-wrap items-center gap-3">
