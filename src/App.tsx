@@ -196,6 +196,19 @@ type SafeFirstDeliveryPlanContract = {
   successCriteria?: string[]
 }
 
+type SafeFirstDeliveryMaterializationContract = {
+  domainLabel?: string
+  productType?: string
+  modules?: string[]
+  screens?: string[]
+  entities?: string[]
+  mockCollections?: string[]
+  localActions?: string[]
+  stateHints?: string[]
+  approvalThemes?: string[]
+  explicitExclusions?: string[]
+}
+
 type PlannerExecutionMetadata = {
   decisionKey: string
   businessSector: string
@@ -222,6 +235,7 @@ type PlannerExecutionMetadata = {
   contextHubStatus: ContextHubStatusSummary | null
   productArchitecture: ProductArchitectureContract | null
   safeFirstDeliveryPlan: SafeFirstDeliveryPlanContract | null
+  safeFirstDeliveryMaterialization: SafeFirstDeliveryMaterializationContract | null
 }
 
 type ContextHubStatusSummary = {
@@ -403,6 +417,7 @@ type PlannerDecisionResponse = {
   contextHubStatus?: ContextHubStatusSummary | null
   productArchitecture?: ProductArchitectureContract | null
   safeFirstDeliveryPlan?: SafeFirstDeliveryPlanContract | null
+  safeFirstDeliveryMaterialization?: SafeFirstDeliveryMaterializationContract | null
   brainRoutingDecision?: BrainRoutingDecision
   tasks?: unknown[]
   assumptions?: string[]
@@ -495,6 +510,7 @@ declare global {
         reusedArtifactIds?: string[]
         reuseMode?: string
         executionScope?: ExecutorExecutionScope
+        safeFirstDeliveryMaterialization?: SafeFirstDeliveryMaterializationContract
       }) => Promise<{
         ok: boolean
         accepted?: boolean
@@ -589,6 +605,7 @@ const EMPTY_PLANNER_EXECUTION_METADATA: PlannerExecutionMetadata = {
   contextHubStatus: null,
   productArchitecture: null,
   safeFirstDeliveryPlan: null,
+  safeFirstDeliveryMaterialization: null,
 }
 const BRAIN_COST_MODE_OPTIONS: Array<{
   value: BrainCostMode
@@ -936,6 +953,54 @@ const normalizeSafeFirstDeliveryPlanContract = (
   return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
 }
 
+const normalizeSafeFirstDeliveryMaterializationContract = (
+  value: unknown,
+): SafeFirstDeliveryMaterializationContract | null => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const contract = value as SafeFirstDeliveryMaterializationContract
+  const normalizedValue: SafeFirstDeliveryMaterializationContract = {
+    ...(normalizeOptionalString(contract.domainLabel)
+      ? { domainLabel: normalizeOptionalString(contract.domainLabel) }
+      : {}),
+    ...(normalizeOptionalString(contract.productType)
+      ? { productType: normalizeOptionalString(contract.productType) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.modules).length > 0
+      ? { modules: normalizeOptionalStringArray(contract.modules) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.screens).length > 0
+      ? { screens: normalizeOptionalStringArray(contract.screens) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.entities).length > 0
+      ? { entities: normalizeOptionalStringArray(contract.entities) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.mockCollections).length > 0
+      ? { mockCollections: normalizeOptionalStringArray(contract.mockCollections) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.localActions).length > 0
+      ? { localActions: normalizeOptionalStringArray(contract.localActions) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.stateHints).length > 0
+      ? { stateHints: normalizeOptionalStringArray(contract.stateHints) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.approvalThemes).length > 0
+      ? { approvalThemes: normalizeOptionalStringArray(contract.approvalThemes) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.explicitExclusions).length > 0
+      ? {
+          explicitExclusions: normalizeOptionalStringArray(
+            contract.explicitExclusions,
+          ),
+        }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
 const extractPlannerExecutionMetadata = (payload?: {
   decisionKey?: string
   businessSector?: string
@@ -955,6 +1020,7 @@ const extractPlannerExecutionMetadata = (payload?: {
   contextHubStatus?: ContextHubStatusSummary | null
   productArchitecture?: ProductArchitectureContract | null
   safeFirstDeliveryPlan?: SafeFirstDeliveryPlanContract | null
+  safeFirstDeliveryMaterialization?: SafeFirstDeliveryMaterializationContract | null
   tasks?: unknown[]
   assumptions?: string[]
 } | null): PlannerExecutionMetadata => ({
@@ -1117,6 +1183,10 @@ const extractPlannerExecutionMetadata = (payload?: {
   safeFirstDeliveryPlan: normalizeSafeFirstDeliveryPlanContract(
     payload?.safeFirstDeliveryPlan,
   ),
+  safeFirstDeliveryMaterialization:
+    normalizeSafeFirstDeliveryMaterializationContract(
+      payload?.safeFirstDeliveryMaterialization,
+    ),
   tasks: Array.isArray(payload?.tasks)
     ? payload.tasks
         .map((task) =>
@@ -7382,6 +7452,12 @@ function App() {
                 executionScope: currentPlannerExecutionMetadata.executionScope,
               }
             : {}),
+          ...(currentPlannerExecutionMetadata.safeFirstDeliveryMaterialization
+            ? {
+                safeFirstDeliveryMaterialization:
+                  currentPlannerExecutionMetadata.safeFirstDeliveryMaterialization,
+              }
+            : {}),
         }
         startOrContinueExecutionRun({
           requestId: executionRequestId,
@@ -8337,6 +8413,12 @@ function App() {
         : {}),
       ...(executionMetadata.executionScope
         ? { executionScope: executionMetadata.executionScope }
+        : {}),
+      ...(executionMetadata.safeFirstDeliveryMaterialization
+        ? {
+            safeFirstDeliveryMaterialization:
+              executionMetadata.safeFirstDeliveryMaterialization,
+          }
         : {}),
     }
     startOrContinueExecutionRun({

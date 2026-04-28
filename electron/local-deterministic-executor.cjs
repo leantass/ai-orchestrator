@@ -508,6 +508,53 @@ function buildSafeFirstDeliveryPathSet(executionScope, instruction) {
   }
 }
 
+function normalizeSafeFirstDeliveryMaterializationContract(value) {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const normalizedValue = {}
+  const domainLabel =
+    typeof value.domainLabel === 'string' && value.domainLabel.trim()
+      ? value.domainLabel.trim()
+      : ''
+  const productType =
+    typeof value.productType === 'string' && value.productType.trim()
+      ? value.productType.trim()
+      : ''
+
+  if (domainLabel) {
+    normalizedValue.domainLabel = domainLabel
+  }
+
+  if (productType) {
+    normalizedValue.productType = productType
+  }
+
+  ;[
+    'modules',
+    'screens',
+    'entities',
+    'mockCollections',
+    'localActions',
+    'stateHints',
+    'approvalThemes',
+    'explicitExclusions',
+  ].forEach((key) => {
+    const values = Array.isArray(value[key])
+      ? value[key]
+          .filter((entry) => typeof entry === 'string' && entry.trim())
+          .map((entry) => entry.trim())
+      : []
+
+    if (values.length > 0) {
+      normalizedValue[key] = values
+    }
+  })
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
 function buildModuleCollectionKey(moduleLabel) {
   const normalizedLabel = normalizeSafeFirstDeliveryText(moduleLabel)
 
@@ -700,10 +747,14 @@ function buildSafeFirstDeliveryMockCollections({
   domain,
   sourceText,
   modules,
+  entities,
+  mockCollections,
 }) {
   const normalizedText = normalizeSafeFirstDeliveryText(sourceText)
   const normalizedDomain = normalizeSafeFirstDeliveryText(domain)
   const moduleLabels = Array.isArray(modules) ? modules : []
+  const entityLabels = Array.isArray(entities) ? entities : []
+  const collectionLabels = Array.isArray(mockCollections) ? mockCollections : []
   const collections = {}
 
   if (productType === 'ecommerce') {
@@ -862,11 +913,11 @@ function buildSafeFirstDeliveryMockCollections({
     return collections
   }
 
-  moduleLabels.forEach((moduleLabel) => {
-    const collectionKey = buildModuleCollectionKey(moduleLabel)
+  ;[...moduleLabels, ...entityLabels, ...collectionLabels].forEach((label) => {
+    const collectionKey = buildModuleCollectionKey(label)
 
     if (!collections[collectionKey]) {
-      collections[collectionKey] = buildSafeFirstDeliveryGenericRecords(moduleLabel)
+      collections[collectionKey] = buildSafeFirstDeliveryGenericRecords(label)
     }
   })
 
@@ -894,33 +945,92 @@ function buildSafeFirstDeliveryMockData({
   mockDataHints,
   explicitExclusions,
   successCriteria,
+  safeFirstDeliveryMaterialization,
 }) {
-  const normalizedModules = Array.isArray(modules) ? modules : []
-  const normalizedScreens = Array.isArray(screens) ? screens : []
+  const normalizedMaterialization =
+    normalizeSafeFirstDeliveryMaterializationContract(
+      safeFirstDeliveryMaterialization,
+    )
+  const resolvedProductType =
+    typeof normalizedMaterialization?.productType === 'string' &&
+    normalizedMaterialization.productType.trim()
+      ? normalizedMaterialization.productType.trim()
+      : productType
+  const resolvedDomain =
+    typeof normalizedMaterialization?.domainLabel === 'string' &&
+    normalizedMaterialization.domainLabel.trim()
+      ? normalizedMaterialization.domainLabel.trim()
+      : domain
+  const normalizedModules =
+    Array.isArray(normalizedMaterialization?.modules) &&
+    normalizedMaterialization.modules.length > 0
+      ? normalizedMaterialization.modules
+      : Array.isArray(modules)
+        ? modules
+        : []
+  const normalizedScreens =
+    Array.isArray(normalizedMaterialization?.screens) &&
+    normalizedMaterialization.screens.length > 0
+      ? normalizedMaterialization.screens
+      : Array.isArray(screens)
+        ? screens
+        : []
   const normalizedScope = Array.isArray(scope) ? scope : []
-  const normalizedBehavior = Array.isArray(localBehavior) ? localBehavior : []
+  const normalizedBehavior =
+    Array.isArray(normalizedMaterialization?.localActions) &&
+    normalizedMaterialization.localActions.length > 0
+      ? normalizedMaterialization.localActions
+      : Array.isArray(localBehavior)
+        ? localBehavior
+        : []
   const normalizedMockDataHints = Array.isArray(mockDataHints) ? mockDataHints : []
-  const normalizedExclusions = Array.isArray(explicitExclusions) ? explicitExclusions : []
+  const normalizedExclusions =
+    Array.isArray(normalizedMaterialization?.explicitExclusions) &&
+    normalizedMaterialization.explicitExclusions.length > 0
+      ? normalizedMaterialization.explicitExclusions
+      : Array.isArray(explicitExclusions)
+        ? explicitExclusions
+        : []
   const normalizedSuccessCriteria = Array.isArray(successCriteria) ? successCriteria : []
+  const normalizedEntities = Array.isArray(normalizedMaterialization?.entities)
+    ? normalizedMaterialization.entities
+    : []
+  const normalizedMockCollections = Array.isArray(
+    normalizedMaterialization?.mockCollections,
+  )
+    ? normalizedMaterialization.mockCollections
+    : []
+  const normalizedStateHints = Array.isArray(normalizedMaterialization?.stateHints)
+    ? normalizedMaterialization.stateHints
+    : []
+  const normalizedApprovalThemes = Array.isArray(
+    normalizedMaterialization?.approvalThemes,
+  )
+    ? normalizedMaterialization.approvalThemes
+    : []
   const sourceText = [
-    productType,
-    domain,
+    resolvedProductType,
+    resolvedDomain,
     ...normalizedModules,
     ...normalizedScreens,
     ...normalizedScope,
     ...normalizedBehavior,
     ...normalizedMockDataHints,
+    ...normalizedEntities,
+    ...normalizedMockCollections,
   ].join(' ')
   const collections = buildSafeFirstDeliveryMockCollections({
-    productType,
-    domain,
+    productType: resolvedProductType,
+    domain: resolvedDomain,
     sourceText,
     modules: normalizedModules,
+    entities: normalizedEntities,
+    mockCollections: normalizedMockCollections,
   })
   const interactionMode =
-    productType === 'ecommerce' && Array.isArray(collections.productos)
+    resolvedProductType === 'ecommerce' && Array.isArray(collections.productos)
       ? 'ecommerce'
-      : productType === 'crm' &&
+      : resolvedProductType === 'crm' &&
           (Array.isArray(collections.alumnos) ||
             Array.isArray(collections.familias) ||
             Array.isArray(collections.cursos) ||
@@ -931,14 +1041,19 @@ function buildSafeFirstDeliveryMockData({
   return {
     meta: {
       generatedAt: new Date().toISOString(),
-      productType,
-      productLabel: buildSafeFirstDeliveryProductLabel(productType),
+      productType: resolvedProductType,
+      productLabel: buildSafeFirstDeliveryProductLabel(resolvedProductType),
       interactionMode,
-      domain,
+      domain: resolvedDomain,
       scope: normalizedScope,
       screens: normalizedScreens,
       mockDataHints: normalizedMockDataHints,
       localBehavior: normalizedBehavior,
+      localActions: normalizedBehavior,
+      entities: normalizedEntities,
+      mockCollections: normalizedMockCollections,
+      stateHints: normalizedStateHints,
+      approvalThemes: normalizedApprovalThemes,
       explicitExclusions: normalizedExclusions,
       successCriteria: normalizedSuccessCriteria,
     },
@@ -1630,6 +1745,30 @@ function buildSafeFirstDeliveryRuntimeModeConfig(interactionMode) {
           alumnos: [{ type: 'register-note', label: 'Registrar comunicacion mock' }],
           operacion: [{ type: 'create-entry', label: 'Registrar seguimiento mock' }],
         },
+        noteCollectionKey: 'comunicaciones',
+        entryTemplates: {
+          followup: {
+            key: 'seguimientos',
+            idPrefix: 'seg-local-',
+            namePrefix: 'Seguimiento local ',
+            responsible: 'Equipo escolar mock',
+            state: 'pendiente',
+            nextStepWithReferencePrefix: 'Revisar accion asociada a ',
+            nextStepFallback: 'Revisar accion pendiente en la bandeja local',
+            summary: 'Seguimiento generado localmente sin datos sensibles reales.',
+            logMessage: 'Se registro un seguimiento mock local.',
+          },
+          note: {
+            key: 'comunicaciones',
+            idPrefix: 'com-local-',
+            namePrefix: 'Comunicacion local ',
+            channel: 'nota interna mock',
+            state: 'registrada mock',
+            fallbackRecipient: 'Comunidad educativa mock',
+            summary: 'Comunicacion generada localmente para revisar el flujo interno.',
+            logMessage: 'Se registro una comunicacion mock local.',
+          },
+        },
       }
     default:
       return {
@@ -1688,6 +1827,24 @@ function buildSafeFirstDeliveryRuntimeModeConfig(interactionMode) {
         globalActions: {
           solicitudes: [{ type: 'create-entry', label: 'Crear solicitud mock' }],
           operacion: [{ type: 'create-entry', label: 'Crear registro mock' }],
+        },
+        noteCollectionKey: 'observaciones',
+        entryTemplates: {
+          note: {
+            key: 'observaciones',
+            idPrefix: 'obs-local-',
+            namePrefix: 'Observacion local ',
+            state: 'registrada mock',
+            responsible: 'Equipo operativo mock',
+            fallbackRecipient: 'Bandeja operativa mock',
+            summary: 'Observacion generada localmente para revisar el flujo interno.',
+            logMessage: 'Se registro una observacion mock local.',
+          },
+          generic: {
+            responsible: 'Equipo operativo mock',
+            requestLogMessage: 'Se creo una solicitud mock local.',
+            defaultLogMessage: 'Se creo un registro mock local.',
+          },
         },
       }
   }
@@ -2187,7 +2344,14 @@ function renderStaticLists() {
 function buildFutureApprovals(meta) {
   const approvals = [];
   const explicitExclusions = Array.isArray(meta.explicitExclusions) ? meta.explicitExclusions : [];
+  const approvalThemes = Array.isArray(meta.approvalThemes) ? meta.approvalThemes : [];
   const approvalHints = Array.isArray(MODE.approvalHints) ? MODE.approvalHints : [];
+
+  approvalThemes.forEach((entry) => {
+    if (entry && !approvals.includes(entry)) {
+      approvals.push(entry);
+    }
+  });
 
   approvalHints.forEach((entry) => {
     if (entry && !approvals.includes(entry)) {
@@ -2244,6 +2408,12 @@ function buildFutureApprovals(meta) {
 
 function resolveStateSequence(collectionKey, actionType) {
   const sequences = MODE.stateSequences || {};
+  const metaStateHints = Array.isArray(state.data?.meta?.stateHints)
+    ? state.data.meta.stateHints.filter((entry) => typeof entry === 'string' && entry.trim())
+    : [];
+  const fallbackSequence = metaStateHints.length > 0
+    ? metaStateHints
+    : ['listo para demo', 'en revision', 'aprobado mock'];
   const reviewTargets = Array.isArray(sequences.reviewTargets) ? sequences.reviewTargets : [];
   const primaryTargets = Array.isArray(sequences.primaryTargets) ? sequences.primaryTargets : [];
   const statusTargets = Array.isArray(sequences.statusTargets) ? sequences.statusTargets : [];
@@ -2253,7 +2423,7 @@ function resolveStateSequence(collectionKey, actionType) {
   if (actionType === 'mark-review' || actionType === 'review-record' || reviewTargets.includes(collectionKey)) {
     return Array.isArray(sequences.review) && sequences.review.length > 0
       ? sequences.review
-      : ['listo para demo', 'en revision', 'aprobado mock'];
+      : fallbackSequence;
   }
 
   if (
@@ -2262,7 +2432,7 @@ function resolveStateSequence(collectionKey, actionType) {
   ) {
     return Array.isArray(sequences.followup) && sequences.followup.length > 0
       ? sequences.followup
-      : ['listo para demo', 'en revision', 'aprobado mock'];
+      : fallbackSequence;
   }
 
   if (
@@ -2272,24 +2442,24 @@ function resolveStateSequence(collectionKey, actionType) {
   ) {
     return Array.isArray(sequences.note) && sequences.note.length > 0
       ? sequences.note
-      : ['listo para demo', 'en revision', 'aprobado mock'];
+      : fallbackSequence;
   }
 
   if (primaryTargets.includes(collectionKey)) {
     return Array.isArray(sequences.primary) && sequences.primary.length > 0
       ? sequences.primary
-      : ['listo para demo', 'en revision', 'aprobado mock'];
+      : fallbackSequence;
   }
 
   if (statusTargets.includes(collectionKey)) {
     return Array.isArray(sequences.status) && sequences.status.length > 0
       ? sequences.status
-      : ['listo para demo', 'en revision', 'aprobado mock'];
+      : fallbackSequence;
   }
 
   return Array.isArray(sequences.default) && sequences.default.length > 0
     ? sequences.default
-    : ['listo para demo', 'en revision', 'aprobado mock'];
+    : fallbackSequence;
 }
 
 function cycleRecordState(record, collectionKey, actionType, messagePrefix) {
@@ -2452,58 +2622,86 @@ function cyclePrimaryRecordState() {
 
 function buildLocalEntry(collectionKey, referenceRecord) {
   const nowSuffix = Date.now().toString().slice(-5);
+  const entryTemplates = MODE.entryTemplates || {};
+  const followupTemplate = entryTemplates.followup || {};
+  const noteTemplate = entryTemplates.note || {};
+  const genericTemplate = entryTemplates.generic || {};
 
   if (MODE.kind === 'school-crm') {
     if (collectionKey === 'operacion' || collectionKey === 'seguimientos') {
       return {
-        key: 'seguimientos',
+        key: followupTemplate.key || 'seguimientos',
         record: {
-          id: 'seg-local-' + nowSuffix,
-          nombre: 'Seguimiento local ' + nowSuffix,
-          responsable: 'Equipo escolar mock',
-          estado: 'pendiente',
+          id: (followupTemplate.idPrefix || 'seg-local-') + nowSuffix,
+          nombre: (followupTemplate.namePrefix || 'Seguimiento local ') + nowSuffix,
+          responsable: followupTemplate.responsible || 'Equipo mock',
+          estado: followupTemplate.state || 'pendiente',
           proximoPaso:
             referenceRecord && referenceRecord.nombre
-              ? 'Revisar accion asociada a ' + referenceRecord.nombre
-              : 'Revisar accion pendiente en la bandeja local',
-          resumen: 'Seguimiento generado localmente sin datos sensibles reales.',
+              ? (followupTemplate.nextStepWithReferencePrefix || 'Revisar accion asociada a ') +
+                referenceRecord.nombre
+              : followupTemplate.nextStepFallback || 'Revisar accion pendiente en la bandeja local',
+          resumen:
+            followupTemplate.summary ||
+            'Seguimiento generado localmente para revisar el flujo interno.',
         },
-        logMessage: 'Se registro un seguimiento mock local.',
+        logMessage: followupTemplate.logMessage || 'Se registro un seguimiento mock local.',
       };
     }
 
     return {
-      key: 'comunicaciones',
+      key: noteTemplate.key || MODE.noteCollectionKey || 'observaciones',
       record: {
-        id: 'com-local-' + nowSuffix,
-        nombre: 'Comunicacion local ' + nowSuffix,
-        canal: 'nota interna mock',
-        estado: 'registrada mock',
+        id: (noteTemplate.idPrefix || 'note-local-') + nowSuffix,
+        nombre: (noteTemplate.namePrefix || 'Nota local ') + nowSuffix,
+        canal: noteTemplate.channel || 'nota interna mock',
+        estado: noteTemplate.state || 'registrada mock',
         destinatario:
           referenceRecord && referenceRecord.nombre
             ? referenceRecord.nombre
-            : 'Comunidad educativa mock',
-        resumen: 'Comunicacion generada localmente para revisar el flujo interno.',
+            : noteTemplate.fallbackRecipient || 'Equipo destinatario mock',
+        resumen:
+          noteTemplate.summary || 'Nota generada localmente para revisar el flujo interno.',
       },
-      logMessage: 'Se registro una comunicacion mock local.',
+      logMessage: noteTemplate.logMessage || 'Se registro una nota mock local.',
     };
   }
 
   if (MODE.kind === 'generic') {
     const targetKey = collectionKey && collectionKey !== 'operacion' ? collectionKey : 'solicitudes';
+    if (targetKey === (noteTemplate.key || MODE.noteCollectionKey || 'observaciones')) {
+      return {
+        key: noteTemplate.key || MODE.noteCollectionKey || 'observaciones',
+        record: {
+          id: (noteTemplate.idPrefix || 'obs-local-') + nowSuffix,
+          nombre: (noteTemplate.namePrefix || 'Observacion local ') + nowSuffix,
+          estado: noteTemplate.state || 'registrada mock',
+          responsable: noteTemplate.responsible || 'Equipo operativo mock',
+          destinatario:
+            referenceRecord && referenceRecord.nombre
+              ? referenceRecord.nombre
+              : noteTemplate.fallbackRecipient || 'Bandeja operativa mock',
+          resumen:
+            noteTemplate.summary ||
+            'Observacion generada localmente para revisar el flujo interno.',
+        },
+        logMessage: noteTemplate.logMessage || 'Se registro una observacion mock local.',
+      };
+    }
+
     return {
       key: targetKey,
       record: {
         id: (targetKey.slice(0, 3) || 'reg') + '-local-' + nowSuffix,
         nombre: 'Registro local ' + nowSuffix,
         estado: targetKey === 'solicitudes' ? 'nueva' : 'listo para demo',
-        responsable: 'Equipo mock',
+        responsable: genericTemplate.responsible || 'Equipo operativo mock',
         resumen: 'Alta local generada para revisar el comportamiento del sistema.',
       },
       logMessage:
         targetKey === 'solicitudes'
-          ? 'Se creo una solicitud mock local.'
-          : 'Se creo un registro mock local.',
+          ? genericTemplate.requestLogMessage || 'Se creo una solicitud mock local.'
+          : genericTemplate.defaultLogMessage || 'Se creo un registro mock local.',
     };
   }
 
@@ -2570,7 +2768,10 @@ function performAction(actionType, module, record) {
       );
       break;
     case 'register-note': {
-      const creation = buildLocalEntry('comunicaciones', workingRecord);
+      const creation = buildLocalEntry(
+        MODE.noteCollectionKey || workingModule.collectionKey,
+        workingRecord,
+      );
       if (creation) {
         const targetCollection = getCollection(creation.key);
         targetCollection.unshift(creation.record);
@@ -2697,6 +2898,7 @@ function buildGenericSafeFirstDeliveryMaterializationPlan({
   executionScope,
   businessSector,
   businessSectorLabel,
+  safeFirstDeliveryMaterialization,
 }) {
   if (
     typeof decisionKey !== 'string' ||
@@ -2723,48 +2925,78 @@ function buildGenericSafeFirstDeliveryMaterializationPlan({
   ]
     .filter((entry) => typeof entry === 'string' && entry.trim())
     .join(' ')
-  const productType = detectSafeFirstDeliveryProductType(combinedText)
-  const domain = inferSafeFirstDeliveryDomain({
+  const normalizedMaterialization =
+    normalizeSafeFirstDeliveryMaterializationContract(
+      safeFirstDeliveryMaterialization,
+    )
+  const inferredProductType = detectSafeFirstDeliveryProductType(combinedText)
+  const productType =
+    typeof normalizedMaterialization?.productType === 'string' &&
+    normalizedMaterialization.productType.trim()
+      ? normalizedMaterialization.productType.trim()
+      : inferredProductType
+  const inferredDomain = inferSafeFirstDeliveryDomain({
     instruction,
     businessSector,
     businessSectorLabel,
     productType,
   })
+  const domain =
+    typeof normalizedMaterialization?.domainLabel === 'string' &&
+    normalizedMaterialization.domainLabel.trim()
+      ? normalizedMaterialization.domainLabel.trim()
+      : inferredDomain
   const scope = extractPlannerList(instruction, ['alcance funcional', 'alcance'], [
     `Primera entrega segura y navegable para ${domain}.`,
   ])
-  const modules = extractPlannerList(instruction, ['modulos a cubrir', 'modulos'], [
-    'modulo principal',
-    'panel operativo inicial',
-  ])
-  const screens = extractPlannerList(instruction, ['pantallas o vistas', 'pantallas', 'vistas'], [
-    'vista principal',
-    'panel operativo inicial',
-  ])
+  const modules =
+    Array.isArray(normalizedMaterialization?.modules) &&
+    normalizedMaterialization.modules.length > 0
+      ? normalizedMaterialization.modules
+      : extractPlannerList(instruction, ['modulos a cubrir', 'modulos'], [
+          'modulo principal',
+          'panel operativo inicial',
+        ])
+  const screens =
+    Array.isArray(normalizedMaterialization?.screens) &&
+    normalizedMaterialization.screens.length > 0
+      ? normalizedMaterialization.screens
+      : extractPlannerList(instruction, ['pantallas o vistas', 'pantallas', 'vistas'], [
+          'vista principal',
+          'panel operativo inicial',
+        ])
   const mockDataHints = extractPlannerList(
     instruction,
     ['datos mock requeridos', 'datos mock', 'datos de muestra'],
     ['Datos de ejemplo consistentes para recorrer el flujo principal.'],
   )
-  const localBehavior = extractPlannerList(
-    instruction,
-    ['comportamiento local esperado', 'comportamiento local'],
-    ['Navegacion local entre vistas priorizadas con estado temporal.'],
-  )
-  const explicitExclusions = extractPlannerList(
-    instruction,
-    ['excluir explicitamente', 'exclusiones explicitas', 'exclusiones'],
-    [
-      'Pagos reales.',
-      'Credenciales reales.',
-      'Webhooks reales.',
-      'Deploy.',
-      'Migraciones.',
-      'Auth real.',
-      'Base de datos real.',
-      'Integraciones externas reales.',
-    ],
-  )
+  const localBehavior =
+    Array.isArray(normalizedMaterialization?.localActions) &&
+    normalizedMaterialization.localActions.length > 0
+      ? normalizedMaterialization.localActions
+      : extractPlannerList(
+          instruction,
+          ['comportamiento local esperado', 'comportamiento local'],
+          ['Navegacion local entre vistas priorizadas con estado temporal.'],
+        )
+  const explicitExclusions =
+    Array.isArray(normalizedMaterialization?.explicitExclusions) &&
+    normalizedMaterialization.explicitExclusions.length > 0
+      ? normalizedMaterialization.explicitExclusions
+      : extractPlannerList(
+          instruction,
+          ['excluir explicitamente', 'exclusiones explicitas', 'exclusiones'],
+          [
+            'Pagos reales.',
+            'Credenciales reales.',
+            'Webhooks reales.',
+            'Deploy.',
+            'Migraciones.',
+            'Auth real.',
+            'Base de datos real.',
+            'Integraciones externas reales.',
+          ],
+        )
   const successCriteria = extractPlannerList(
     instruction,
     ['successcriteria', 'success criteria', 'criterios de exito'],
@@ -2780,6 +3012,7 @@ function buildGenericSafeFirstDeliveryMaterializationPlan({
     mockDataHints,
     explicitExclusions,
     successCriteria,
+    safeFirstDeliveryMaterialization: normalizedMaterialization,
   })
   const indexContent = buildSafeFirstDeliveryIndexHtml()
   const stylesContent = buildSafeFirstDeliveryStylesCss()

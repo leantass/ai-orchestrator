@@ -1150,6 +1150,7 @@ function buildDerivedLocalMaterializationPlan({
   executionScope,
   businessSector,
   businessSectorLabel,
+  safeFirstDeliveryMaterialization,
 }) {
   return buildGenericSafeFirstDeliveryMaterializationPlan({
     decisionKey,
@@ -1157,6 +1158,7 @@ function buildDerivedLocalMaterializationPlan({
     executionScope,
     businessSector,
     businessSectorLabel,
+    safeFirstDeliveryMaterialization,
   })
 }
 
@@ -7168,6 +7170,237 @@ function buildMaterializeSafeFirstDeliveryFolderName(productType, domain, source
   return `safe-first-delivery-${folderSlug}`
 }
 
+function inferSafeFirstDeliveryMaterializationCollectionKey(label) {
+  const normalizedLabel = normalizeSectorDetectionText(label)
+
+  if (!normalizedLabel) {
+    return ''
+  }
+
+  if (/\b(?:catalogo|productos?|detalle de producto|detalle principal)\b/u.test(normalizedLabel)) {
+    return 'productos'
+  }
+
+  if (/\bcarrito\b/u.test(normalizedLabel)) {
+    return 'carrito'
+  }
+
+  if (/\b(?:checkout|ordenes?|pedidos?)\b/u.test(normalizedLabel)) {
+    return 'ordenes'
+  }
+
+  if (/\b(?:backoffice|panel administrativo|panel operativo|operacion)\b/u.test(normalizedLabel)) {
+    return 'operacion'
+  }
+
+  if (/\balumnos?\b/u.test(normalizedLabel)) {
+    return 'alumnos'
+  }
+
+  if (/\bfamilias?\b/u.test(normalizedLabel)) {
+    return 'familias'
+  }
+
+  if (/\bcursos?\b/u.test(normalizedLabel)) {
+    return 'cursos'
+  }
+
+  if (/\bcomunicaciones?\b/u.test(normalizedLabel)) {
+    return 'comunicaciones'
+  }
+
+  if (/\bseguimiento\b/u.test(normalizedLabel)) {
+    return 'seguimientos'
+  }
+
+  if (/\breportes?\b/u.test(normalizedLabel)) {
+    return 'reportes'
+  }
+
+  if (/\bsolicitudes?\b/u.test(normalizedLabel)) {
+    return 'solicitudes'
+  }
+
+  if (/\bestados?\b/u.test(normalizedLabel)) {
+    return 'estados'
+  }
+
+  if (/\busuarios?\b|\broles?\b|\bpermisos?\b/u.test(normalizedLabel)) {
+    return 'accesos'
+  }
+
+  return ''
+}
+
+function inferSafeFirstDeliveryMaterializationEntityName(label) {
+  const normalizedLabel = normalizeSectorDetectionText(label)
+
+  if (!normalizedLabel) {
+    return ''
+  }
+
+  if (/\b(?:catalogo|productos?|detalle de producto|detalle principal)\b/u.test(normalizedLabel)) {
+    return 'producto'
+  }
+
+  if (/\bcarrito\b/u.test(normalizedLabel)) {
+    return 'carrito'
+  }
+
+  if (/\b(?:checkout|ordenes?|pedidos?)\b/u.test(normalizedLabel)) {
+    return 'orden'
+  }
+
+  if (/\b(?:backoffice|panel administrativo|panel operativo|operacion)\b/u.test(normalizedLabel)) {
+    return 'operacion'
+  }
+
+  if (/\balumnos?\b/u.test(normalizedLabel)) {
+    return 'alumno'
+  }
+
+  if (/\bfamilias?\b/u.test(normalizedLabel)) {
+    return 'familia'
+  }
+
+  if (/\bcursos?\b/u.test(normalizedLabel)) {
+    return 'curso'
+  }
+
+  if (/\bcomunicaciones?\b/u.test(normalizedLabel)) {
+    return 'comunicacion'
+  }
+
+  if (/\bseguimiento\b/u.test(normalizedLabel)) {
+    return 'seguimiento'
+  }
+
+  if (/\breportes?\b/u.test(normalizedLabel)) {
+    return 'reporte'
+  }
+
+  if (/\bsolicitudes?\b/u.test(normalizedLabel)) {
+    return 'solicitud'
+  }
+
+  if (/\bestados?\b/u.test(normalizedLabel)) {
+    return 'estado'
+  }
+
+  if (/\busuarios?\b/u.test(normalizedLabel)) {
+    return 'usuario'
+  }
+
+  if (/\broles?\b/u.test(normalizedLabel)) {
+    return 'rol'
+  }
+
+  return ''
+}
+
+function buildSafeFirstDeliveryMaterializationStateHints({
+  productType,
+  isSchoolCrm,
+  isRequestTrackingSystem,
+}) {
+  if (productType === 'ecommerce') {
+    return ['borrador', 'publicado', 'simulada', 'en revision']
+  }
+
+  if (productType === 'crm' && isSchoolCrm) {
+    return ['regular', 'alerta', 'pendiente', 'en curso', 'listo para revision']
+  }
+
+  if (isRequestTrackingSystem) {
+    return ['nueva', 'en revision', 'resuelta mock', 'habilitada']
+  }
+
+  return ['listo para demo', 'en revision', 'aprobado mock']
+}
+
+function buildSafeFirstDeliveryMaterializationApprovalThemes({
+  productType,
+  isSchoolCrm,
+}) {
+  if (productType === 'ecommerce') {
+    return [
+      'pasarela de pagos',
+      'credenciales reales',
+      'webhooks y conciliacion',
+      'persistencia real',
+      'autenticacion real',
+      'deploy',
+    ]
+  }
+
+  if (productType === 'crm' && isSchoolCrm) {
+    return [
+      'autenticacion y permisos',
+      'datos sensibles reales',
+      'auditoria y trazabilidad',
+      'persistencia real',
+      'integraciones institucionales',
+      'cumplimiento normativo o institucional',
+    ]
+  }
+
+  return [
+    'autenticacion real',
+    'permisos',
+    'persistencia real',
+    'auditoria',
+    'integraciones externas',
+    'datos productivos',
+  ]
+}
+
+function buildSafeFirstDeliveryMaterializationContract({
+  domainLabel,
+  productType,
+  modules,
+  screens,
+  localActions,
+  explicitExclusions,
+  approvalThemes,
+  stateHints,
+  mockDataHints,
+}) {
+  const normalizedModules = summarizeUniqueExecutorStrings(modules, 12)
+  const normalizedScreens = summarizeUniqueExecutorStrings(screens, 12)
+  const normalizedLocalActions = summarizeUniqueExecutorStrings(localActions, 12)
+  const normalizedExclusions = summarizeUniqueExecutorStrings(explicitExclusions, 12)
+  const normalizedApprovalThemes = summarizeUniqueExecutorStrings(approvalThemes, 12)
+  const normalizedStateHints = summarizeUniqueExecutorStrings(stateHints, 10)
+  const normalizedMockDataHints = summarizeUniqueExecutorStrings(mockDataHints, 12)
+  const entities = summarizeUniqueExecutorStrings(
+    [
+      ...normalizedModules.map(inferSafeFirstDeliveryMaterializationEntityName),
+      ...normalizedMockDataHints.map(inferSafeFirstDeliveryMaterializationEntityName),
+    ].filter(Boolean),
+    12,
+  )
+  const mockCollections = summarizeUniqueExecutorStrings(
+    [
+      ...normalizedModules.map(inferSafeFirstDeliveryMaterializationCollectionKey),
+      ...normalizedMockDataHints.map(inferSafeFirstDeliveryMaterializationCollectionKey),
+    ].filter(Boolean),
+    12,
+  )
+
+  return {
+    domainLabel: domainLabel || 'dominio a precisar',
+    productType: productType || 'unknown',
+    modules: normalizedModules,
+    screens: normalizedScreens,
+    entities,
+    mockCollections,
+    localActions: normalizedLocalActions,
+    stateHints: normalizedStateHints,
+    approvalThemes: normalizedApprovalThemes,
+    explicitExclusions: normalizedExclusions,
+  }
+}
+
 function buildMaterializeSafeFirstDeliveryPlan({
   goal,
   context,
@@ -7388,6 +7621,25 @@ function buildMaterializeSafeFirstDeliveryPlan({
     'integraciones externas reales',
     'datos sensibles reales',
   ])
+  const approvalThemes = buildSafeFirstDeliveryMaterializationApprovalThemes({
+    productType,
+    isSchoolCrm,
+  })
+  const safeFirstDeliveryMaterialization = buildSafeFirstDeliveryMaterializationContract({
+    domainLabel,
+    productType,
+    modules: moduleHighlights,
+    screens: screenHighlights,
+    localActions: localBehaviorHighlights,
+    explicitExclusions: exclusionHighlights,
+    approvalThemes,
+    stateHints: buildSafeFirstDeliveryMaterializationStateHints({
+      productType,
+      isSchoolCrm,
+      isRequestTrackingSystem,
+    }),
+    mockDataHints: mockDataHighlights,
+  })
 
   const instructionLines = [
     `Materializar una primera entrega segura y acotada dentro de "${targetFolderName}" en el workspace local.`,
@@ -7448,6 +7700,7 @@ function buildMaterializeSafeFirstDeliveryPlan({
     ],
     instruction: instructionLines.join('\n'),
     executionScope,
+    safeFirstDeliveryMaterialization,
   }
 }
 
@@ -8374,6 +8627,7 @@ function buildBrainDecisionContract({
   reuseMode,
   productArchitecture,
   safeFirstDeliveryPlan,
+  safeFirstDeliveryMaterialization,
   finalResult,
 }) {
   const resolvedRequiresApproval = requiresApproval === true
@@ -8433,6 +8687,10 @@ function buildBrainDecisionContract({
       : {}),
     ...(safeFirstDeliveryPlan && typeof safeFirstDeliveryPlan === 'object'
       ? { safeFirstDeliveryPlan }
+      : {}),
+    ...(safeFirstDeliveryMaterialization &&
+    typeof safeFirstDeliveryMaterialization === 'object'
+      ? { safeFirstDeliveryMaterialization }
       : {}),
     ...(finalResult && typeof finalResult === 'object'
       ? { finalResult }
@@ -11404,6 +11662,8 @@ async function buildLocalStrategicBrainDecision({
       completed: false,
       nextExpectedAction: 'execute-plan',
       executionScope: materializeSafeFirstDeliveryPlan.executionScope,
+      safeFirstDeliveryMaterialization:
+        materializeSafeFirstDeliveryPlan.safeFirstDeliveryMaterialization,
     })
   }
 
@@ -12587,6 +12847,22 @@ function buildOpenAIBrainSchema() {
           successCriteria: { type: 'array', items: { type: 'string' } },
         },
       },
+      safeFirstDeliveryMaterialization: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          domainLabel: { type: 'string' },
+          productType: { type: 'string' },
+          modules: { type: 'array', items: { type: 'string' } },
+          screens: { type: 'array', items: { type: 'string' } },
+          entities: { type: 'array', items: { type: 'string' } },
+          mockCollections: { type: 'array', items: { type: 'string' } },
+          localActions: { type: 'array', items: { type: 'string' } },
+          stateHints: { type: 'array', items: { type: 'string' } },
+          approvalThemes: { type: 'array', items: { type: 'string' } },
+          explicitExclusions: { type: 'array', items: { type: 'string' } },
+        },
+      },
     },
     required: [
       'decisionKey',
@@ -12836,6 +13112,11 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
       typeof rawDecision.safeFirstDeliveryPlan === 'object'
         ? rawDecision.safeFirstDeliveryPlan
         : fallbackDecision.safeFirstDeliveryPlan,
+    safeFirstDeliveryMaterialization:
+      rawDecision?.safeFirstDeliveryMaterialization &&
+      typeof rawDecision.safeFirstDeliveryMaterialization === 'object'
+        ? rawDecision.safeFirstDeliveryMaterialization
+        : fallbackDecision.safeFirstDeliveryMaterialization,
   })
   const equivalentApprovalRejected =
     normalizedDecision.requiresApproval === true &&
@@ -14951,6 +15232,7 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       reuseMode: brainDecision.reuseMode,
       productArchitecture: brainDecision.productArchitecture,
       safeFirstDeliveryPlan: brainDecision.safeFirstDeliveryPlan,
+      safeFirstDeliveryMaterialization: brainDecision.safeFirstDeliveryMaterialization,
       executionScope: brainDecision.executionScope,
       decisionKey: brainDecision.decisionKey,
       reason: brainDecision.reason,
@@ -14988,6 +15270,7 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
     reuseMode: brainDecision.reuseMode,
     productArchitecture: brainDecision.productArchitecture,
     safeFirstDeliveryPlan: brainDecision.safeFirstDeliveryPlan,
+    safeFirstDeliveryMaterialization: brainDecision.safeFirstDeliveryMaterialization,
     executionScope: brainDecision.executionScope,
     decisionKey: brainDecision.decisionKey,
     reason: brainDecision.reason,
@@ -15048,6 +15331,11 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
   const reuseMode =
     typeof payload?.reuseMode === 'string' ? payload.reuseMode.trim() : 'none'
   const executionScope = normalizeExecutorExecutionScope(payload?.executionScope)
+  const safeFirstDeliveryMaterialization =
+    payload?.safeFirstDeliveryMaterialization &&
+    typeof payload.safeFirstDeliveryMaterialization === 'object'
+      ? payload.safeFirstDeliveryMaterialization
+      : null
   const materializationPlan =
     payload?.materializationPlan && typeof payload.materializationPlan === 'object'
       ? payload.materializationPlan
@@ -15058,13 +15346,14 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
     materializationPlan ||
     !executionScope ||
     !requiresLocalSafeFirstDeliveryMaterialization
-      ? null
+        ? null
       : buildDerivedLocalMaterializationPlan({
           decisionKey,
           instruction,
           executionScope,
           businessSector,
           businessSectorLabel,
+          safeFirstDeliveryMaterialization,
         })
   debugMainLog('execute-task:handler-enter', {
     requestId: requestId || undefined,
@@ -15077,6 +15366,7 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
     reuseMode: reuseMode || undefined,
     objectiveScope: executionScope?.objectiveScope || undefined,
     allowedTargetPathsCount: executionScope?.allowedTargetPaths?.length || 0,
+    hasSafeFirstDeliveryMaterialization: safeFirstDeliveryMaterialization !== null,
     materializationPlanSource: materializationPlan
       ? 'renderer-payload'
       : derivedMaterializationPlan
