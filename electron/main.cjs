@@ -6743,6 +6743,267 @@ function extractProductArchitectureDomainLabel(goal, context, productType) {
   return ''
 }
 
+function detectSafeFirstDeliveryRequestTrackingIntent(normalizedText) {
+  if (typeof normalizedText !== 'string' || !normalizedText.trim()) {
+    return false
+  }
+
+  if (
+    /\bsolicitudes?\b|\btickets?\b|\bmesa de ayuda\b|\bhelpdesk\b/u.test(
+      normalizedText,
+    )
+  ) {
+    return true
+  }
+
+  return (
+    /\bestados?\b/u.test(normalizedText) &&
+    /\boperativ|\bintern[ao]|\bgestion\b|\bobservaciones?\b|\bresponsables?\b/u.test(
+      normalizedText,
+    )
+  )
+}
+
+function buildDynamicSafeDeliveryPlanParts(sourceText) {
+  const normalizedText = normalizeSectorDetectionText(sourceText)
+  const modules = []
+  const mockData = []
+  const screens = []
+  const localBehavior = []
+
+  if (!normalizedText) {
+    return { modules, mockData, screens, localBehavior }
+  }
+
+  const definitions = [
+    {
+      label: 'perfiles',
+      patterns: [/\bperfiles?\b/u],
+      mockData: 'Perfiles mock para explorar relaciones y actividad local.',
+      screen: 'perfiles',
+      behavior: 'Revisar perfiles mock y su actividad local.',
+    },
+    {
+      label: 'publicaciones',
+      patterns: [/\bpublicaciones?\b/u],
+      mockData: 'Publicaciones mock con estados visibles y contenido de ejemplo.',
+      screen: 'publicaciones',
+      behavior: 'Consultar publicaciones mock y registrar una publicacion simulada.',
+    },
+    {
+      label: 'comentarios',
+      patterns: [/\bcomentarios?\b/u],
+      mockData: 'Comentarios mock asociados a publicaciones o conversaciones internas.',
+      screen: 'comentarios',
+      behavior: 'Registrar comentario mock y revisar conversaciones simuladas.',
+    },
+    {
+      label: 'grupos',
+      patterns: [/\bgrupos?\b/u],
+      mockData: 'Grupos mock con participantes y estado inicial de actividad.',
+      screen: 'grupos',
+      behavior: 'Revisar grupos mock y su actividad inicial.',
+    },
+    {
+      label: 'notificaciones',
+      patterns: [/\bnotificaciones?\b/u],
+      mockData: 'Notificaciones mock con estados de lectura o revision.',
+      screen: 'notificaciones',
+      behavior: 'Marcar notificacion como revisada y validar actividad local.',
+    },
+    {
+      label: 'accesos',
+      patterns: [/\baccesos?\b/u],
+      mockData: 'Accesos mock con estado de ingreso y responsable local.',
+      screen: 'accesos',
+      behavior: 'Revisar accesos mock y su trazabilidad local.',
+    },
+    {
+      label: 'alertas',
+      patterns: [/\balertas?\b/u],
+      mockData: 'Alertas mock con severidad y estado de revision local.',
+      screen: 'alertas',
+      behavior: 'Marcar alerta revisada y validar seguimiento local.',
+    },
+    {
+      label: 'sensores',
+      patterns: [/\bsensores?\b/u],
+      mockData: 'Sensores mock con estado operativo y ultimo evento local.',
+      screen: 'sensores',
+      behavior: 'Cambiar estado de sensor y revisar eventos mock asociados.',
+    },
+    {
+      label: 'zonas',
+      patterns: [/\bzonas?\b/u],
+      mockData: 'Zonas mock para distribuir alertas, accesos o cobertura local.',
+      screen: 'zonas',
+      behavior: 'Revisar zonas mock y su cobertura inicial.',
+    },
+    {
+      label: 'operadores',
+      patterns: [/\boperadores?\b/u],
+      mockData: 'Operadores mock asignados a eventos o revisiones locales.',
+      screen: 'operadores',
+      behavior: 'Asignar operador mock y revisar su carga local.',
+    },
+    {
+      label: 'eventos',
+      patterns: [/\beventos?\b/u],
+      mockData: 'Eventos mock con estado, responsable y detalle de muestra.',
+      screen: 'eventos',
+      behavior: 'Registrar evento mock y revisar su detalle local.',
+    },
+    {
+      label: 'documentos',
+      patterns: [/\bdocumentos?\b/u],
+      mockData: 'Documentos mock con estado, responsable y vencimiento de muestra.',
+      screen: 'documentos',
+      behavior: 'Revisar documentos mock y cambiar su estado documental.',
+    },
+    {
+      label: 'operaciones',
+      patterns: [/\boperaciones?\b/u],
+      mockData: 'Operaciones mock con estados y responsables de ejemplo.',
+      screen: 'operaciones',
+      behavior: 'Consultar operaciones mock y su avance local.',
+    },
+    {
+      label: 'vencimientos',
+      patterns: [/\bvencimientos?\b/u],
+      mockData: 'Vencimientos mock con prioridad y estado de revision.',
+      screen: 'vencimientos',
+      behavior: 'Marcar vencimiento revisado y registrar seguimiento local.',
+    },
+    {
+      label: 'observaciones',
+      patterns: [/\bobservaciones?\b/u],
+      mockData: 'Observaciones mock vinculadas al flujo principal del sistema.',
+      screen: 'observaciones',
+      behavior: 'Registrar observacion mock y revisar anotaciones locales.',
+    },
+    {
+      label: 'responsables',
+      patterns: [/\bresponsables?\b/u],
+      mockData: 'Responsables mock asociados a tareas, documentos o solicitudes.',
+      screen: 'responsables',
+      behavior: 'Revisar responsables mock y su asignacion inicial.',
+    },
+    {
+      label: 'rutas',
+      patterns: [/\brutas?\b/u],
+      mockData: 'Rutas mock con puntos de control y estado de recorrido.',
+      screen: 'rutas',
+      behavior: 'Consultar rutas mock y revisar su seguimiento local.',
+    },
+    {
+      label: 'ubicaciones',
+      patterns: [/\bubicaciones?\b/u],
+      mockData: 'Ubicaciones mock con referencias y estado operativo.',
+      screen: 'ubicaciones',
+      behavior: 'Revisar ubicaciones mock y su relacion con el flujo principal.',
+    },
+    {
+      label: 'turnos',
+      patterns: [/\bturnos?\b/u],
+      mockData: 'Turnos mock con estados, responsables y agenda local.',
+      screen: 'turnos',
+      behavior: 'Consultar turnos mock y cambiar su estado local.',
+    },
+    {
+      label: 'pacientes',
+      patterns: [/\bpacientes?\b/u],
+      mockData: 'Pacientes mock sin datos sensibles reales.',
+      screen: 'pacientes',
+      behavior: 'Revisar pacientes mock y su seguimiento local.',
+    },
+    {
+      label: 'profesionales',
+      patterns: [/\bprofesionales?\b/u],
+      mockData: 'Profesionales mock con disponibilidad y estado local.',
+      screen: 'profesionales',
+      behavior: 'Revisar profesionales mock y su agenda inicial.',
+    },
+    {
+      label: 'ordenes',
+      patterns: [/\bordenes?\b/u],
+      mockData: 'Ordenes mock con estado, responsable y resumen operativo.',
+      screen: 'ordenes',
+      behavior: 'Consultar ordenes mock y revisar su estado local.',
+    },
+    {
+      label: 'stock',
+      patterns: [/\bstock\b/u],
+      mockData: 'Stock mock con cantidades y estado de disponibilidad.',
+      screen: 'stock',
+      behavior: 'Revisar stock mock y sus cambios locales.',
+    },
+    {
+      label: 'solicitudes',
+      patterns: [/\bsolicitudes?\b|\btickets?\b|\bmesa de ayuda\b|\bhelpdesk\b/u],
+      mockData: 'Solicitudes mock con historial, estado y responsables de ejemplo.',
+      screen: 'detalle de solicitud',
+      behavior: 'Consultar solicitudes mock y su historial local.',
+    },
+    {
+      label: 'estados',
+      patterns: [/\bestados?\b/u],
+      mockData: 'Estados mock para validar transiciones del flujo principal.',
+      screen: 'estado de seguimiento',
+      behavior: 'Cambiar estados mock sin depender de servicios externos.',
+    },
+    {
+      label: 'reportes',
+      patterns: [/\breportes?\b/u],
+      mockData: 'Reportes mock para revisar actividad, alertas o resultados del flujo principal.',
+      screen: 'reportes',
+      behavior: 'Revisar reportes mock y proximos pasos del flujo local.',
+    },
+  ]
+
+  definitions.forEach((definition) => {
+    if (!definition.patterns.some((pattern) => pattern.test(normalizedText))) {
+      return
+    }
+
+    pushUniquePlannerValues(modules, [definition.label])
+    pushUniquePlannerValues(mockData, [definition.mockData])
+    pushUniquePlannerValues(screens, [definition.screen])
+    pushUniquePlannerValues(localBehavior, [definition.behavior])
+  })
+
+  if (
+    /\bpublicaciones?\b|\bcomentarios?\b|\bgrupos?\b|\bnotificaciones?\b/u.test(
+      normalizedText,
+    )
+  ) {
+    pushUniquePlannerValues(screens, ['inicio o feed'])
+    pushUniquePlannerValues(localBehavior, [
+      'Revisar actividad local, publicaciones y grupos mock desde una vista inicial.',
+    ])
+  }
+
+  if (/\balertas?\b|\bsensores?\b|\beventos?\b|\baccesos?\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(screens, ['panel de monitoreo'])
+    pushUniquePlannerValues(localBehavior, [
+      'Revisar alertas, accesos o eventos mock desde un tablero inicial de monitoreo.',
+    ])
+  }
+
+  if (/\bdocumentos?\b|\bvencimientos?\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(screens, ['panel documental'])
+    pushUniquePlannerValues(localBehavior, [
+      'Registrar observaciones mock y revisar vencimientos o estados documentales.',
+    ])
+  }
+
+  return {
+    modules,
+    mockData,
+    screens,
+    localBehavior,
+  }
+}
+
 function buildSafeFirstDeliveryPlan({
   goal,
   context,
@@ -6782,6 +7043,8 @@ function buildSafeFirstDeliveryPlan({
   const contextHubAvailable = contextHubPack?.available === true
   const domain = extractProductArchitectureDomainLabel(goal, context, productType)
   const domainLabel = domain || 'dominio a precisar'
+  const dynamicPlanParts = buildDynamicSafeDeliveryPlanParts(combinedText)
+  const hasExplicitDynamicModules = dynamicPlanParts.modules.length > 0
   const isSchoolCrm =
     productType === 'crm' &&
     /\bescuel|\balumnos?\b|\bfamilias?\b|\bcursos?\b|\bcomunicaciones?\b|\bseguimiento\b|\breportes?\b/u.test(
@@ -6789,7 +7052,7 @@ function buildSafeFirstDeliveryPlan({
     )
   const isRequestTrackingSystem =
     productType !== 'ecommerce' &&
-    /\bsolicitudes?\b|\bestados?\b|\breportes?\b/u.test(normalizedText)
+    detectSafeFirstDeliveryRequestTrackingIntent(normalizedText)
   const scope = []
   const modules = []
   const mockData = []
@@ -6909,6 +7172,25 @@ function buildSafeFirstDeliveryPlan({
         break
       }
 
+      if (hasExplicitDynamicModules) {
+        pushUniquePlannerValues(scope, [
+          `Panel operativo inicial de ${domainLabel} con entidades explicitamente mencionadas en el objetivo.`,
+        ])
+        pushUniquePlannerValues(modules, dynamicPlanParts.modules)
+        pushUniquePlannerValues(mockData, dynamicPlanParts.mockData)
+        pushUniquePlannerValues(screens, dynamicPlanParts.screens)
+        pushUniquePlannerValues(localBehavior, dynamicPlanParts.localBehavior)
+        pushUniquePlannerValues(modules, ['panel operativo inicial'])
+        pushUniquePlannerValues(screens, ['panel operativo inicial'])
+        pushUniquePlannerValues(localBehavior, [
+          'Revisar el flujo principal con entidades mock y seguimiento local sin integraciones reales.',
+        ])
+        pushUniquePlannerValues(approvalRequiredLater, [
+          'Datos sensibles reales, auditoria y permisos finos por rol.',
+        ])
+        break
+      }
+
       pushUniquePlannerValues(scope, [
         'Panel operativo inicial con entidades nucleares, seguimiento basico y vistas mock.',
       ])
@@ -6969,7 +7251,14 @@ function buildSafeFirstDeliveryPlan({
       pushUniquePlannerValues(scope, [
         'Estructura navegable inicial del flujo principal del producto.',
       ])
-      if (isRequestTrackingSystem) {
+      if (hasExplicitDynamicModules) {
+        pushUniquePlannerValues(modules, dynamicPlanParts.modules)
+        pushUniquePlannerValues(mockData, dynamicPlanParts.mockData)
+        pushUniquePlannerValues(screens, dynamicPlanParts.screens)
+        pushUniquePlannerValues(localBehavior, dynamicPlanParts.localBehavior)
+        pushUniquePlannerValues(modules, ['panel operativo'])
+        pushUniquePlannerValues(screens, ['panel operativo inicial'])
+      } else if (isRequestTrackingSystem) {
         pushUniquePlannerValues(modules, [
           'solicitudes',
           'estados',
