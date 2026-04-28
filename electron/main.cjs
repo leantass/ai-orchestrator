@@ -7494,6 +7494,7 @@ function buildMaterializeSafeFirstDeliveryFolderName({
     ...(Array.isArray(mockCollections) ? mockCollections : []),
   ]
   const structuredText = normalizeSectorDetectionText(structuredLabels.join(' '))
+  const combinedStructuredSlug = normalizeFolderSlugCandidate(structuredLabels.join(' '))
   const moduleSlug =
     moduleCandidateMap.find(({ pattern }) =>
       pattern.test(structuredText) || pattern.test(normalizedSourceText),
@@ -7509,6 +7510,9 @@ function buildMaterializeSafeFirstDeliveryFolderName({
       ? productTypeSlug
       : '') ||
     (domainSlug && isMeaningfulFolderSlug(domainSlug) ? domainSlug : '') ||
+    (combinedStructuredSlug && isMeaningfulFolderSlug(combinedStructuredSlug)
+      ? combinedStructuredSlug
+      : '') ||
     (prioritizedStructuredSlug && isMeaningfulFolderSlug(prioritizedStructuredSlug)
       ? prioritizedStructuredSlug
       : '') ||
@@ -7540,6 +7544,94 @@ function inferSafeFirstDeliveryMaterializationCollectionKey(label) {
 
   if (/\b(?:backoffice|panel administrativo|panel operativo|operacion)\b/u.test(normalizedLabel)) {
     return 'operacion'
+  }
+
+  if (/\bperfiles?\b/u.test(normalizedLabel)) {
+    return 'perfiles'
+  }
+
+  if (/\bpublicaciones?\b/u.test(normalizedLabel)) {
+    return 'publicaciones'
+  }
+
+  if (/\bcomentarios?\b/u.test(normalizedLabel)) {
+    return 'comentarios'
+  }
+
+  if (/\bgrupos?\b/u.test(normalizedLabel)) {
+    return 'grupos'
+  }
+
+  if (/\bnotificaciones?\b/u.test(normalizedLabel)) {
+    return 'notificaciones'
+  }
+
+  if (/\baccesos?\b/u.test(normalizedLabel)) {
+    return 'accesos'
+  }
+
+  if (/\balertas?\b/u.test(normalizedLabel)) {
+    return 'alertas'
+  }
+
+  if (/\bsensores?\b/u.test(normalizedLabel)) {
+    return 'sensores'
+  }
+
+  if (/\bzonas?\b/u.test(normalizedLabel)) {
+    return 'zonas'
+  }
+
+  if (/\boperadores?\b/u.test(normalizedLabel)) {
+    return 'operadores'
+  }
+
+  if (/\beventos?\b/u.test(normalizedLabel)) {
+    return 'eventos'
+  }
+
+  if (/\bdocumentos?\b/u.test(normalizedLabel)) {
+    return 'documentos'
+  }
+
+  if (/\boperaciones?\b/u.test(normalizedLabel)) {
+    return 'operaciones'
+  }
+
+  if (/\bvencimientos?\b/u.test(normalizedLabel)) {
+    return 'vencimientos'
+  }
+
+  if (/\bobservaciones?\b/u.test(normalizedLabel)) {
+    return 'observaciones'
+  }
+
+  if (/\bresponsables?\b/u.test(normalizedLabel)) {
+    return 'responsables'
+  }
+
+  if (/\brutas?\b/u.test(normalizedLabel)) {
+    return 'rutas'
+  }
+
+  if (/\bubicaciones?\b/u.test(normalizedLabel)) {
+    return 'ubicaciones'
+  }
+
+  if (/\bturnos?\b/u.test(normalizedLabel)) {
+    return 'turnos'
+  }
+
+  if (/\bpacientes?\b/u.test(normalizedLabel)) {
+    return 'pacientes'
+  }
+
+  if (/\bprofesionales?\b/u.test(normalizedLabel)) {
+    return 'profesionales'
+  }
+
+  if (/\bstock\b/u.test(normalizedLabel)) {
+    return 'stock'
   }
 
   if (/\balumnos?\b/u.test(normalizedLabel)) {
@@ -7602,6 +7694,94 @@ function inferSafeFirstDeliveryMaterializationEntityName(label) {
 
   if (/\b(?:backoffice|panel administrativo|panel operativo|operacion)\b/u.test(normalizedLabel)) {
     return 'operacion'
+  }
+
+  if (/\bperfiles?\b/u.test(normalizedLabel)) {
+    return 'perfil'
+  }
+
+  if (/\bpublicaciones?\b/u.test(normalizedLabel)) {
+    return 'publicacion'
+  }
+
+  if (/\bcomentarios?\b/u.test(normalizedLabel)) {
+    return 'comentario'
+  }
+
+  if (/\bgrupos?\b/u.test(normalizedLabel)) {
+    return 'grupo'
+  }
+
+  if (/\bnotificaciones?\b/u.test(normalizedLabel)) {
+    return 'notificacion'
+  }
+
+  if (/\baccesos?\b/u.test(normalizedLabel)) {
+    return 'acceso'
+  }
+
+  if (/\balertas?\b/u.test(normalizedLabel)) {
+    return 'alerta'
+  }
+
+  if (/\bsensores?\b/u.test(normalizedLabel)) {
+    return 'sensor'
+  }
+
+  if (/\bzonas?\b/u.test(normalizedLabel)) {
+    return 'zona'
+  }
+
+  if (/\boperadores?\b/u.test(normalizedLabel)) {
+    return 'operador'
+  }
+
+  if (/\beventos?\b/u.test(normalizedLabel)) {
+    return 'evento'
+  }
+
+  if (/\bdocumentos?\b/u.test(normalizedLabel)) {
+    return 'documento'
+  }
+
+  if (/\boperaciones?\b/u.test(normalizedLabel)) {
+    return 'operacion'
+  }
+
+  if (/\bvencimientos?\b/u.test(normalizedLabel)) {
+    return 'vencimiento'
+  }
+
+  if (/\bobservaciones?\b/u.test(normalizedLabel)) {
+    return 'observacion'
+  }
+
+  if (/\bresponsables?\b/u.test(normalizedLabel)) {
+    return 'responsable'
+  }
+
+  if (/\brutas?\b/u.test(normalizedLabel)) {
+    return 'ruta'
+  }
+
+  if (/\bubicaciones?\b/u.test(normalizedLabel)) {
+    return 'ubicacion'
+  }
+
+  if (/\bturnos?\b/u.test(normalizedLabel)) {
+    return 'turno'
+  }
+
+  if (/\bpacientes?\b/u.test(normalizedLabel)) {
+    return 'paciente'
+  }
+
+  if (/\bprofesionales?\b/u.test(normalizedLabel)) {
+    return 'profesional'
+  }
+
+  if (/\bstock\b/u.test(normalizedLabel)) {
+    return 'stock'
   }
 
   if (/\balumnos?\b/u.test(normalizedLabel)) {
@@ -7721,17 +7901,19 @@ function buildSafeFirstDeliveryMaterializationContract({
   const normalizedApprovalThemes = summarizeUniqueExecutorStrings(approvalThemes, 12)
   const normalizedStateHints = summarizeUniqueExecutorStrings(stateHints, 10)
   const normalizedMockDataHints = summarizeUniqueExecutorStrings(mockDataHints, 12)
+  const entityInferenceSources =
+    normalizedModules.length > 0 ? normalizedModules : normalizedMockDataHints
   const entities = summarizeUniqueExecutorStrings(
     [
-      ...normalizedModules.map(inferSafeFirstDeliveryMaterializationEntityName),
-      ...normalizedMockDataHints.map(inferSafeFirstDeliveryMaterializationEntityName),
+      ...entityInferenceSources.map(inferSafeFirstDeliveryMaterializationEntityName),
     ].filter(Boolean),
     12,
   )
+  const collectionInferenceSources =
+    normalizedModules.length > 0 ? normalizedModules : normalizedMockDataHints
   const mockCollections = summarizeUniqueExecutorStrings(
     [
-      ...normalizedModules.map(inferSafeFirstDeliveryMaterializationCollectionKey),
-      ...normalizedMockDataHints.map(inferSafeFirstDeliveryMaterializationCollectionKey),
+      ...collectionInferenceSources.map(inferSafeFirstDeliveryMaterializationCollectionKey),
     ].filter(Boolean),
     12,
   )
@@ -7790,6 +7972,8 @@ function buildMaterializeSafeFirstDeliveryPlan({
   const contextHubAvailable = contextHubPack?.available === true
   const domain = extractProductArchitectureDomainLabel(goal, context, productType)
   const domainLabel = domain || 'dominio a precisar'
+  const dynamicPlanParts = buildDynamicSafeDeliveryPlanParts(combinedText)
+  const hasExplicitDynamicModules = dynamicPlanParts.modules.length > 0
   const isSchoolCrm =
     productType === 'crm' &&
     /\bescuel|\balumnos?\b|\bfamilias?\b|\bcursos?\b|\bcomunicaciones?\b|\bseguimiento\b|\breportes?\b/u.test(
@@ -7797,38 +7981,7 @@ function buildMaterializeSafeFirstDeliveryPlan({
     )
   const isRequestTrackingSystem =
     productType !== 'ecommerce' &&
-    /\bsolicitudes?\b|\bestados?\b|\breportes?\b/u.test(normalizedText)
-  const targetFolderName = buildMaterializeSafeFirstDeliveryFolderName({
-    productType,
-    domain: domainLabel,
-    modules: moduleHighlights,
-    entities: safeFirstDeliveryMaterialization?.entities,
-    mockCollections: safeFirstDeliveryMaterialization?.mockCollections,
-    sourceText: combinedText,
-  })
-  const allowedTargetPaths = [
-    targetFolderName,
-    path.join(targetFolderName, 'index.html'),
-    path.join(targetFolderName, 'styles.css'),
-    path.join(targetFolderName, 'script.js'),
-    path.join(targetFolderName, 'mock-data.json'),
-  ]
-  const successCriteria = summarizeUniqueExecutorStrings(
-    [
-      `Materializar solo la carpeta "${targetFolderName}" y sus archivos locales permitidos.`,
-      'Entregar una experiencia navegable con datos mock editables para el flujo principal.',
-      'Mantener fuera de alcance pagos reales, credenciales, webhooks, deploy, migraciones, auth real, base de datos real e integraciones externas reales.',
-      workspacePath
-        ? `Resolver todo dentro del workspace configurado: ${workspacePath}.`
-        : 'Resolver todo dentro del workspace activo del proyecto.',
-    ],
-    4,
-  )
-  const executionScope = normalizeExecutorExecutionScope({
-    allowedTargetPaths,
-    successCriteria,
-    enforceNarrowScope: true,
-  })
+    detectSafeFirstDeliveryRequestTrackingIntent(normalizedText)
   const scopeHighlights = []
   const moduleHighlights = []
   const screenHighlights = []
@@ -7893,34 +8046,62 @@ function buildMaterializeSafeFirstDeliveryPlan({
         'revisar reportes mock sin datos sensibles reales',
       ])
     } else {
-      pushUniquePlannerValues(scopeHighlights, [
-        'Panel operativo inicial con entidades principales, seguimiento basico y reportes mock.',
-      ])
-      pushUniquePlannerValues(moduleHighlights, [
-        'entidades principales',
-        'seguimiento',
-        'panel operativo inicial',
-        'reportes mock',
-      ])
-      pushUniquePlannerValues(screenHighlights, [
-        'listado principal',
-        'detalle operativo',
-        'seguimiento',
-        'reporte inicial',
-      ])
-      pushUniquePlannerValues(mockDataHighlights, [
-        'entidades, estados y reportes mock editables sin datos sensibles reales',
-      ])
-      pushUniquePlannerValues(localBehaviorHighlights, [
-        'alta, consulta y actualizacion local de entidades mock',
-        'seguimiento local de estados y proximos pasos',
-      ])
+      if (hasExplicitDynamicModules) {
+        pushUniquePlannerValues(scopeHighlights, [
+          `Primera version navegable de ${domainLabel} con entidades explicitamente mencionadas en el objetivo.`,
+        ])
+        pushUniquePlannerValues(moduleHighlights, dynamicPlanParts.modules)
+        pushUniquePlannerValues(screenHighlights, dynamicPlanParts.screens)
+        pushUniquePlannerValues(mockDataHighlights, dynamicPlanParts.mockData)
+        pushUniquePlannerValues(localBehaviorHighlights, dynamicPlanParts.localBehavior)
+        pushUniquePlannerValues(moduleHighlights, ['panel operativo inicial'])
+        pushUniquePlannerValues(screenHighlights, ['panel operativo inicial'])
+        pushUniquePlannerValues(localBehaviorHighlights, [
+          'Revisar el flujo principal con entidades mock y actividad local sin integraciones reales.',
+        ])
+      } else {
+        pushUniquePlannerValues(scopeHighlights, [
+          'Panel operativo inicial con entidades principales, seguimiento basico y reportes mock.',
+        ])
+        pushUniquePlannerValues(moduleHighlights, [
+          'entidades principales',
+          'seguimiento',
+          'panel operativo inicial',
+          'reportes mock',
+        ])
+        pushUniquePlannerValues(screenHighlights, [
+          'listado principal',
+          'detalle operativo',
+          'seguimiento',
+          'reporte inicial',
+        ])
+        pushUniquePlannerValues(mockDataHighlights, [
+          'entidades, estados y reportes mock editables sin datos sensibles reales',
+        ])
+        pushUniquePlannerValues(localBehaviorHighlights, [
+          'alta, consulta y actualizacion local de entidades mock',
+          'seguimiento local de estados y proximos pasos',
+        ])
+      }
     }
   } else {
-    pushUniquePlannerValues(scopeHighlights, [
-      `Primera version navegable del flujo principal para ${domainLabel}.`,
-    ])
-    if (isRequestTrackingSystem) {
+    if (hasExplicitDynamicModules) {
+      pushUniquePlannerValues(scopeHighlights, [
+        `Primera version navegable del flujo principal para ${domainLabel}.`,
+      ])
+      pushUniquePlannerValues(moduleHighlights, dynamicPlanParts.modules)
+      pushUniquePlannerValues(screenHighlights, dynamicPlanParts.screens)
+      pushUniquePlannerValues(mockDataHighlights, dynamicPlanParts.mockData)
+      pushUniquePlannerValues(localBehaviorHighlights, dynamicPlanParts.localBehavior)
+      pushUniquePlannerValues(moduleHighlights, ['panel operativo'])
+      pushUniquePlannerValues(screenHighlights, ['panel operativo inicial'])
+      pushUniquePlannerValues(localBehaviorHighlights, [
+        'Revisar el flujo principal con entidades mock y actividad local sin integraciones reales.',
+      ])
+    } else if (isRequestTrackingSystem) {
+      pushUniquePlannerValues(scopeHighlights, [
+        `Primera version navegable del flujo principal para ${domainLabel}.`,
+      ])
       pushUniquePlannerValues(moduleHighlights, [
         'solicitudes',
         'estados',
@@ -7941,6 +8122,9 @@ function buildMaterializeSafeFirstDeliveryPlan({
         'revisar reportes mock y proximos pasos del panel operativo',
       ])
     } else {
+      pushUniquePlannerValues(scopeHighlights, [
+        `Primera version navegable del flujo principal para ${domainLabel}.`,
+      ])
       pushUniquePlannerValues(moduleHighlights, [
         'entidades principales',
         'seguimiento',
@@ -7991,6 +8175,37 @@ function buildMaterializeSafeFirstDeliveryPlan({
       isRequestTrackingSystem,
     }),
     mockDataHints: mockDataHighlights,
+  })
+  const targetFolderName = buildMaterializeSafeFirstDeliveryFolderName({
+    productType,
+    domain,
+    modules: moduleHighlights,
+    entities: safeFirstDeliveryMaterialization.entities,
+    mockCollections: safeFirstDeliveryMaterialization.mockCollections,
+    sourceText: combinedText,
+  })
+  const allowedTargetPaths = [
+    targetFolderName,
+    path.join(targetFolderName, 'index.html'),
+    path.join(targetFolderName, 'styles.css'),
+    path.join(targetFolderName, 'script.js'),
+    path.join(targetFolderName, 'mock-data.json'),
+  ]
+  const successCriteria = summarizeUniqueExecutorStrings(
+    [
+      `Materializar solo la carpeta "${targetFolderName}" y sus archivos locales permitidos.`,
+      'Entregar una experiencia navegable con datos mock editables para el flujo principal.',
+      'Mantener fuera de alcance pagos reales, credenciales, webhooks, deploy, migraciones, auth real, base de datos real e integraciones externas reales.',
+      workspacePath
+        ? `Resolver todo dentro del workspace configurado: ${workspacePath}.`
+        : 'Resolver todo dentro del workspace activo del proyecto.',
+    ],
+    4,
+  )
+  const executionScope = normalizeExecutorExecutionScope({
+    allowedTargetPaths,
+    successCriteria,
+    enforceNarrowScope: true,
   })
 
   const instructionLines = [
