@@ -327,7 +327,7 @@ function detectSafeFirstDeliveryProductType(sourceText) {
   const normalizedText = normalizeSafeFirstDeliveryText(sourceText)
 
   if (
-    /\b(?:ecommerce|tienda online|comercio online|catalogo|carrito|checkout|mercado pago|productos?)\b/u.test(
+    /\b(?:ecommerce|tienda online|comercio online|catalogo|carrito|checkout|mercado pago|productos)\b/u.test(
       normalizedText,
     )
   ) {
@@ -335,7 +335,7 @@ function detectSafeFirstDeliveryProductType(sourceText) {
   }
 
   if (
-    /\b(?:crm|alumnos?|familias?|cursos?|comunicaciones?|seguimiento|reportes?)\b/u.test(
+    /\b(?:crm|alumnos?|familias?|cursos?|comunicaciones?|escuelas?)\b/u.test(
       normalizedText,
     )
   ) {
@@ -407,6 +407,16 @@ function inferSafeFirstDeliveryDomain({
     case 'ecommerce':
       return 'comercio online'
     case 'crm':
+      if (
+        /\bescuel|\balumnos?\b|\bfamilias?\b|\bcursos?\b|\bcomunicaciones?\b/u.test(
+          normalizeSafeFirstDeliveryText(
+            [instruction, businessSector, businessSectorLabel].join(' '),
+          ),
+        )
+      ) {
+        return 'gestion escolar'
+      }
+
       return 'gestion operativa'
     case 'erp':
       return 'operacion interna'
@@ -799,12 +809,23 @@ function buildSafeFirstDeliveryMockData({
     sourceText,
     modules: normalizedModules,
   })
+  const interactionMode =
+    productType === 'ecommerce' && Array.isArray(collections.productos)
+      ? 'ecommerce'
+      : productType === 'crm' &&
+          (Array.isArray(collections.alumnos) ||
+            Array.isArray(collections.familias) ||
+            Array.isArray(collections.cursos) ||
+            Array.isArray(collections.comunicaciones))
+        ? 'school-crm'
+        : 'generic'
 
   return {
     meta: {
       generatedAt: new Date().toISOString(),
       productType,
       productLabel: buildSafeFirstDeliveryProductLabel(productType),
+      interactionMode,
       domain,
       scope: normalizedScope,
       screens: normalizedScreens,
@@ -820,6 +841,39 @@ function buildSafeFirstDeliveryMockData({
     }),
     collections,
   }
+}
+
+function detectSafeFirstDeliveryInteractionMode(mockDataObject) {
+  const meta = mockDataObject?.meta && typeof mockDataObject.meta === 'object'
+    ? mockDataObject.meta
+    : {}
+  const collections =
+    mockDataObject?.collections && typeof mockDataObject.collections === 'object'
+      ? mockDataObject.collections
+      : {}
+  const explicitMode =
+    typeof meta.interactionMode === 'string' && meta.interactionMode.trim()
+      ? meta.interactionMode.trim()
+      : ''
+
+  if (explicitMode === 'ecommerce' || explicitMode === 'school-crm' || explicitMode === 'generic') {
+    return explicitMode
+  }
+
+  if (Array.isArray(collections.productos) || Array.isArray(collections.ordenes)) {
+    return 'ecommerce'
+  }
+
+  if (
+    Array.isArray(collections.alumnos) ||
+    Array.isArray(collections.familias) ||
+    Array.isArray(collections.cursos) ||
+    Array.isArray(collections.comunicaciones)
+  ) {
+    return 'school-crm'
+  }
+
+  return 'generic'
 }
 
 function buildSafeFirstDeliveryIndexHtml() {
@@ -1165,105 +1219,25 @@ body {
 
 function buildSafeFirstDeliveryScriptJs(mockDataObject) {
   const serializedFallbackData = JSON.stringify(mockDataObject, null, 2)
-
-  return `const fallbackData = ${serializedFallbackData};
-
-const state = {
-  data: fallbackData,
-  activeModuleId: fallbackData.modules[0]?.id || '',
-  cartItems: [],
-  localLog: ['Base mock local lista para revision.'],
-};
-
+  const interactionMode = detectSafeFirstDeliveryInteractionMode(mockDataObject)
+  const supportsEcommerceFlow = interactionMode === 'ecommerce'
+  const detailFallbackLabel =
+    interactionMode === 'school-crm' ? 'crm escolar' : 'solucion'
+  const stateExtras = supportsEcommerceFlow ? "  cartItems: [],\n" : ''
+  const formatterSnippet = supportsEcommerceFlow
+    ? `
 const currencyFormatter = new Intl.NumberFormat('es-AR', {
   style: 'currency',
   currency: 'ARS',
   maximumFractionDigits: 0,
 });
-
-async function loadLocalData() {
-  try {
-    const response = await fetch('./mock-data.json', { cache: 'no-store' });
-
-    if (!response.ok) {
-      throw new Error('No se pudo leer mock-data.json');
-    }
-
-    const payload = await response.json();
-
-    if (payload && typeof payload === 'object') {
-      state.data = payload;
-      state.activeModuleId = payload.modules?.[0]?.id || state.activeModuleId;
-      state.localLog.unshift('Se cargo mock-data.json como fuente principal.');
-    }
-  } catch (error) {
-    state.localLog.unshift('Se uso la base embedida porque mock-data.json no pudo cargarse por apertura local.');
-  }
-}
-
-function getCollection(collectionKey) {
-  const collections = state.data?.collections && typeof state.data.collections === 'object'
-    ? state.data.collections
-    : {};
-
-  return Array.isArray(collections[collectionKey]) ? collections[collectionKey] : [];
-}
-
-function updateTitle() {
-  const meta = state.data.meta || {};
-  const titleNode = document.getElementById('app-title');
-  const subtitleNode = document.getElementById('app-subtitle');
-  const summaryNode = document.getElementById('plan-summary');
-
-  titleNode.textContent = 'Primera entrega segura de ' + (meta.domain || meta.productLabel || 'producto');
-  subtitleNode.textContent =
-    'Este mock local representa una primera fase navegable de ' +
-    (meta.productLabel || 'producto') +
-    ' y funciona sin pagos reales, credenciales ni integraciones externas.';
-  summaryNode.textContent =
-    (meta.scope?.[0] || 'Se priorizo un flujo principal revisable con datos mock.') +
-    ' Todo queda acotado a archivos locales.';
-}
-
-function renderList(nodeId, values, fallbackText) {
-  const node = document.getElementById(nodeId);
-  node.innerHTML = '';
-  const entries = Array.isArray(values) ? values.filter(Boolean) : [];
-
-  if (entries.length === 0) {
-    const li = document.createElement('li');
-    li.textContent = fallbackText;
-    node.appendChild(li);
-    return;
-  }
-
-  entries.forEach((value) => {
-    const li = document.createElement('li');
-    li.textContent = value;
-    node.appendChild(li);
-  });
-}
-
-function renderModuleNav() {
-  const container = document.getElementById('module-nav');
-  const modules = Array.isArray(state.data.modules) ? state.data.modules : [];
-  container.innerHTML = '';
-
-  modules.forEach((module) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'module-button';
-    button.textContent = module.title;
-    button.setAttribute('aria-current', state.activeModuleId === module.id ? 'true' : 'false');
-    button.addEventListener('click', () => {
-      state.activeModuleId = module.id;
-      renderModuleNav();
-      renderActiveModule();
-    });
-    container.appendChild(button);
-  });
-}
-
+`
+    : ''
+  const metaValueFormatterSnippet = supportsEcommerceFlow
+    ? "    span.textContent = key + ': ' + (typeof value === 'number' && key === 'precio' ? currencyFormatter.format(value) : String(value));"
+    : "    span.textContent = key + ': ' + String(value);"
+  const modeSpecificHelpers = supportsEcommerceFlow
+    ? `
 function addCartItem(product) {
   const existingItem = state.cartItems.find((item) => item.id === product.id);
 
@@ -1313,6 +1287,333 @@ function simulateCheckout() {
   renderDatasetOverview();
 }
 
+function renderCartPanel(container) {
+  const panel = document.createElement('div');
+  panel.className = 'card';
+  const title = document.createElement('h3');
+  title.textContent = 'Carrito local';
+  panel.appendChild(title);
+
+  if (state.cartItems.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'empty-state';
+    empty.textContent = 'Todavia no hay productos en el carrito local.';
+    panel.appendChild(empty);
+    container.appendChild(panel);
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'record-grid';
+
+  state.cartItems.forEach((item) => {
+    list.appendChild(
+      renderRecordCard(item, {
+        primaryLabel: 'Quitar',
+        onPrimaryAction: () => removeCartItem(item.id),
+      }),
+    );
+  });
+
+  panel.appendChild(list);
+  const total = document.createElement('p');
+  total.className = 'status-inline';
+  total.textContent =
+    'Subtotal local: ' +
+    currencyFormatter.format(
+      state.cartItems.reduce((sum, item) => sum + item.precio * item.cantidad, 0),
+    );
+  panel.appendChild(total);
+  container.appendChild(panel);
+}
+`
+    : `
+function viewRecordDetail(record) {
+  state.localLog.unshift('Se abrio el detalle mock de "' + (record.nombre || record.id) + '".');
+  renderDatasetOverview();
+}
+
+function toggleCollectionRecordState(collectionKey, record) {
+  const currentState = String(record.estado || '').toLocaleLowerCase();
+
+  if (collectionKey === 'seguimientos') {
+    record.estado =
+      currentState === 'pendiente'
+        ? 'en curso'
+        : currentState === 'en curso'
+          ? 'resuelto mock'
+          : 'pendiente';
+    state.localLog.unshift('Se actualizo el seguimiento local de "' + (record.nombre || record.id) + '".');
+  } else if (collectionKey === 'comunicaciones') {
+    record.estado =
+      currentState === 'borrador' ? 'registrada mock' : currentState === 'registrada mock' ? 'en seguimiento' : 'borrador';
+    state.localLog.unshift('Se registro una comunicacion mock para "' + (record.nombre || record.id) + '".');
+  } else if (collectionKey === 'reportes') {
+    record.estado =
+      currentState === 'listo para revision' ? 'revisado mock' : 'listo para revision';
+    state.localLog.unshift('Se reviso el reporte mock "' + (record.nombre || record.id) + '".');
+  } else {
+    record.estado =
+      currentState === 'listo para demo'
+        ? 'en revision'
+        : currentState === 'en revision'
+          ? 'aprobado mock'
+          : 'listo para demo';
+    state.localLog.unshift('Se actualizo el estado local de "' + (record.nombre || record.id) + '".');
+  }
+
+  renderActiveModule();
+  renderDatasetOverview();
+}
+
+function resolvePrimaryAction(collectionKey) {
+  switch (collectionKey) {
+    case 'alumnos':
+    case 'familias':
+    case 'cursos':
+    case 'solicitudes':
+    case 'entidades':
+      return {
+        label: 'Ver detalle',
+        run: (record) => viewRecordDetail(record),
+      };
+    case 'comunicaciones':
+      return {
+        label: 'Registrar comunicacion mock',
+        run: (record) => toggleCollectionRecordState(collectionKey, record),
+      };
+    case 'seguimientos':
+      return {
+        label: 'Marcar seguimiento',
+        run: (record) => toggleCollectionRecordState(collectionKey, record),
+      };
+    case 'reportes':
+      return {
+        label: 'Revisar reporte mock',
+        run: (record) => toggleCollectionRecordState(collectionKey, record),
+      };
+    default:
+      return {
+        label: 'Actualizar estado',
+        run: (record) => toggleCollectionRecordState(collectionKey, record),
+      };
+  }
+}
+`
+  const recordRenderingSnippet = supportsEcommerceFlow
+    ? `
+    records.forEach((record) => {
+      if (activeModule.collectionKey === 'productos') {
+        recordsGrid.appendChild(
+          renderRecordCard(record, {
+            primaryLabel: 'Agregar al carrito',
+            onPrimaryAction: addCartItem,
+          }),
+        );
+        return;
+      }
+
+      recordsGrid.appendChild(renderRecordCard(record));
+    });
+`
+    : `
+    const action = resolvePrimaryAction(activeModule.collectionKey);
+    records.forEach((record) => {
+      recordsGrid.appendChild(
+        renderRecordCard(record, {
+          primaryLabel: action.label,
+          onPrimaryAction: () => action.run(record),
+        }),
+      );
+    });
+`
+  const postRecordsSnippet = supportsEcommerceFlow
+    ? `
+  if (activeModule.collectionKey === 'carrito' || activeModule.collectionKey === 'productos') {
+    renderCartPanel(container);
+  }
+
+  if (activeModule.collectionKey === 'ordenes') {
+    const toolbar = document.createElement('div');
+    toolbar.className = 'toolbar';
+    const simulateButton = document.createElement('button');
+    simulateButton.type = 'button';
+    simulateButton.className = 'button';
+    simulateButton.textContent = 'Simular checkout';
+    simulateButton.addEventListener('click', simulateCheckout);
+    toolbar.appendChild(simulateButton);
+    container.appendChild(toolbar);
+  } else {
+    const toolbar = document.createElement('div');
+    toolbar.className = 'toolbar';
+    const updateButton = document.createElement('button');
+    updateButton.type = 'button';
+    updateButton.className = 'button secondary';
+    updateButton.textContent = 'Actualizar estado mock';
+    updateButton.addEventListener('click', () => toggleFirstRecordState(activeModule.collectionKey));
+    toolbar.appendChild(updateButton);
+    container.appendChild(toolbar);
+  }
+`
+    : `
+  const toolbar = document.createElement('div');
+  toolbar.className = 'toolbar';
+  const updateButton = document.createElement('button');
+  updateButton.type = 'button';
+  updateButton.className = 'button secondary';
+  updateButton.textContent = 'Actualizar estado mock';
+  updateButton.addEventListener('click', () => {
+    const collection = getCollection(activeModule.collectionKey);
+    if (collection.length > 0) {
+      toggleCollectionRecordState(activeModule.collectionKey, collection[0]);
+    } else {
+      state.localLog.unshift('No hay registros mock para actualizar en este modulo.');
+      renderDatasetOverview();
+    }
+  });
+  toolbar.appendChild(updateButton);
+  container.appendChild(toolbar);
+`
+  const cartPanelSnippet = supportsEcommerceFlow
+    ? `
+function renderCartPanel(container) {
+  const panel = document.createElement('div');
+  panel.className = 'card';
+  const title = document.createElement('h3');
+  title.textContent = 'Carrito local';
+  panel.appendChild(title);
+
+  if (state.cartItems.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'empty-state';
+    empty.textContent = 'Todavia no hay productos en el carrito local.';
+    panel.appendChild(empty);
+    container.appendChild(panel);
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'record-grid';
+
+  state.cartItems.forEach((item) => {
+    list.appendChild(
+      renderRecordCard(item, {
+        primaryLabel: 'Quitar',
+        onPrimaryAction: () => removeCartItem(item.id),
+      }),
+    );
+  });
+
+  panel.appendChild(list);
+  const total = document.createElement('p');
+  total.className = 'status-inline';
+  total.textContent =
+    'Subtotal local: ' +
+    currencyFormatter.format(
+      state.cartItems.reduce((sum, item) => sum + item.precio * item.cantidad, 0),
+    );
+  panel.appendChild(total);
+  container.appendChild(panel);
+}
+`
+    : ''
+
+  return `const fallbackData = ${serializedFallbackData};
+
+const state = {
+  data: fallbackData,
+  activeModuleId: fallbackData.modules[0]?.id || '',
+${stateExtras}  currentRecordId: '',
+  localLog: ['Base mock local lista para revision.'],
+};
+
+${formatterSnippet}
+
+async function loadLocalData() {
+  try {
+    const response = await fetch('./mock-data.json', { cache: 'no-store' });
+
+    if (!response.ok) {
+      throw new Error('No se pudo leer mock-data.json');
+    }
+
+    const payload = await response.json();
+
+    if (payload && typeof payload === 'object') {
+      state.data = payload;
+      state.activeModuleId = payload.modules?.[0]?.id || state.activeModuleId;
+      state.localLog.unshift('Se cargo mock-data.json como fuente principal.');
+    }
+  } catch (error) {
+    state.localLog.unshift('Se uso la base embedida porque mock-data.json no pudo cargarse por apertura local.');
+  }
+}
+
+function getCollection(collectionKey) {
+  const collections = state.data?.collections && typeof state.data.collections === 'object'
+    ? state.data.collections
+    : {};
+
+  return Array.isArray(collections[collectionKey]) ? collections[collectionKey] : [];
+}
+
+function updateTitle() {
+  const meta = state.data.meta || {};
+  const titleNode = document.getElementById('app-title');
+  const subtitleNode = document.getElementById('app-subtitle');
+  const summaryNode = document.getElementById('plan-summary');
+
+  titleNode.textContent = 'Primera entrega segura de ' + (meta.domain || meta.productLabel || 'sistema');
+  subtitleNode.textContent =
+    'Este mock local representa una primera fase navegable de ' +
+    (meta.productLabel || '${detailFallbackLabel}') +
+    ' y funciona sin pagos reales, credenciales ni integraciones externas.';
+  summaryNode.textContent =
+    (meta.scope?.[0] || 'Se priorizo un flujo principal revisable con datos mock.') +
+    ' Todo queda acotado a archivos locales.';
+}
+
+function renderList(nodeId, values, fallbackText) {
+  const node = document.getElementById(nodeId);
+  node.innerHTML = '';
+  const entries = Array.isArray(values) ? values.filter(Boolean) : [];
+
+  if (entries.length === 0) {
+    const li = document.createElement('li');
+    li.textContent = fallbackText;
+    node.appendChild(li);
+    return;
+  }
+
+  entries.forEach((value) => {
+    const li = document.createElement('li');
+    li.textContent = value;
+    node.appendChild(li);
+  });
+}
+
+function renderModuleNav() {
+  const container = document.getElementById('module-nav');
+  const modules = Array.isArray(state.data.modules) ? state.data.modules : [];
+  container.innerHTML = '';
+
+  modules.forEach((module) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'module-button';
+    button.textContent = module.title;
+    button.setAttribute('aria-current', state.activeModuleId === module.id ? 'true' : 'false');
+    button.addEventListener('click', () => {
+      state.activeModuleId = module.id;
+      renderModuleNav();
+      renderActiveModule();
+    });
+    container.appendChild(button);
+  });
+}
+
+${modeSpecificHelpers}
+
 function toggleFirstRecordState(collectionKey) {
   const collection = getCollection(collectionKey);
 
@@ -1355,9 +1656,7 @@ function renderRecordCard(record, options = {}) {
 
     const span = document.createElement('span');
     span.className = 'tag';
-    span.textContent = key + ': ' + (typeof value === 'number' && key === 'precio'
-      ? currencyFormatter.format(value)
-      : String(value));
+${metaValueFormatterSnippet}
     meta.appendChild(span);
   });
   card.appendChild(meta);
@@ -1377,45 +1676,7 @@ function renderRecordCard(record, options = {}) {
   return card;
 }
 
-function renderCartPanel(container) {
-  const panel = document.createElement('div');
-  panel.className = 'card';
-  const title = document.createElement('h3');
-  title.textContent = 'Carrito local';
-  panel.appendChild(title);
-
-  if (state.cartItems.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'empty-state';
-    empty.textContent = 'Todavia no hay productos en el carrito local.';
-    panel.appendChild(empty);
-    container.appendChild(panel);
-    return;
-  }
-
-  const list = document.createElement('div');
-  list.className = 'record-grid';
-
-  state.cartItems.forEach((item) => {
-    list.appendChild(
-      renderRecordCard(item, {
-        primaryLabel: 'Quitar',
-        onPrimaryAction: () => removeCartItem(item.id),
-      }),
-    );
-  });
-
-  panel.appendChild(list);
-  const total = document.createElement('p');
-  total.className = 'status-inline';
-  total.textContent =
-    'Subtotal local: ' +
-    currencyFormatter.format(
-      state.cartItems.reduce((sum, item) => sum + item.precio * item.cantidad, 0),
-    );
-  panel.appendChild(total);
-  container.appendChild(panel);
-}
+${cartPanelSnippet}
 
 function renderActiveModule() {
   const container = document.getElementById('module-content');
@@ -1434,7 +1695,7 @@ function renderActiveModule() {
 
   const headerStats = document.createElement('div');
   headerStats.className = 'callout-grid';
-  [activeModule.screen, activeModule.collectionKey, state.data.meta?.productLabel || 'producto'].forEach((value, index) => {
+  [activeModule.screen, activeModule.collectionKey, state.data.meta?.productLabel || 'sistema'].forEach((value, index) => {
     const card = document.createElement('div');
     card.className = 'card';
     const title = document.createElement('h3');
@@ -1465,48 +1726,12 @@ function renderActiveModule() {
     empty.textContent = 'Este modulo se apoya en estados locales y no necesita una coleccion propia para la demo.';
     container.appendChild(empty);
   } else {
-    records.forEach((record) => {
-      if (activeModule.collectionKey === 'productos') {
-        recordsGrid.appendChild(
-          renderRecordCard(record, {
-            primaryLabel: 'Agregar al carrito',
-            onPrimaryAction: addCartItem,
-          }),
-        );
-        return;
-      }
-
-      recordsGrid.appendChild(renderRecordCard(record));
-    });
+${recordRenderingSnippet}
 
     container.appendChild(recordsGrid);
   }
 
-  if (activeModule.collectionKey === 'carrito' || activeModule.collectionKey === 'productos') {
-    renderCartPanel(container);
-  }
-
-  if (activeModule.collectionKey === 'ordenes') {
-    const toolbar = document.createElement('div');
-    toolbar.className = 'toolbar';
-    const simulateButton = document.createElement('button');
-    simulateButton.type = 'button';
-    simulateButton.className = 'button';
-    simulateButton.textContent = 'Simular checkout';
-    simulateButton.addEventListener('click', simulateCheckout);
-    toolbar.appendChild(simulateButton);
-    container.appendChild(toolbar);
-  } else {
-    const toolbar = document.createElement('div');
-    toolbar.className = 'toolbar';
-    const updateButton = document.createElement('button');
-    updateButton.type = 'button';
-    updateButton.className = 'button secondary';
-    updateButton.textContent = 'Actualizar estado mock';
-    updateButton.addEventListener('click', () => toggleFirstRecordState(activeModule.collectionKey));
-    toolbar.appendChild(updateButton);
-    container.appendChild(toolbar);
-  }
+${postRecordsSnippet}
 }
 
 function renderDatasetOverview() {

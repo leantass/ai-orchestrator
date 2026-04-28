@@ -6686,6 +6686,12 @@ function pushUniquePlannerValues(target, values, maxItems = 12) {
 }
 
 function extractProductArchitectureDomainLabel(goal, context, productType) {
+  const normalizedSourceText = normalizeSectorDetectionText(
+    [goal, context]
+      .filter((value) => typeof value === 'string' && value.trim())
+      .join(' '),
+  )
+
   const extractionPatterns = [
     /\b(?:ecommerce|crm|erp|marketplace|saas|sistema|plataforma|app|aplicacion|herramienta|solucion)\s+para\s+(.+?)(?=\s+(?:con|que|preparad[oa]|orientad[oa]|pensad[oa]|sin|no|y\b)|[.,;:]|$)/iu,
     /\bpara\s+(una?|el|la)\s+(.+?)(?=\s+(?:con|que|preparad[oa]|orientad[oa]|pensad[oa]|sin|no|y\b)|[.,;:]|$)/iu,
@@ -6717,6 +6723,14 @@ function extractProductArchitectureDomainLabel(goal, context, productType) {
   }
 
   if (productType === 'crm') {
+    if (
+      /\bescuel|\balumnos?\b|\bfamilias?\b|\bcursos?\b|\bdocentes?\b|\bpreceptores?\b/u.test(
+        normalizedSourceText,
+      )
+    ) {
+      return 'gestion escolar'
+    }
+
     return 'gestion comercial o relacional'
   }
 
@@ -6766,6 +6780,14 @@ function buildSafeFirstDeliveryPlan({
   const contextHubAvailable = contextHubPack?.available === true
   const domain = extractProductArchitectureDomainLabel(goal, context, productType)
   const domainLabel = domain || 'dominio a precisar'
+  const isSchoolCrm =
+    productType === 'crm' &&
+    /\bescuel|\balumnos?\b|\bfamilias?\b|\bcursos?\b|\bcomunicaciones?\b|\bseguimiento\b|\breportes?\b/u.test(
+      normalizedText,
+    )
+  const isRequestTrackingSystem =
+    productType !== 'ecommerce' &&
+    /\bsolicitudes?\b|\bestados?\b|\breportes?\b/u.test(normalizedText)
   const scope = []
   const modules = []
   const mockData = []
@@ -6845,6 +6867,46 @@ function buildSafeFirstDeliveryPlan({
       ])
       break
     case 'crm':
+      if (isSchoolCrm) {
+        pushUniquePlannerValues(scope, [
+          'Panel operativo inicial para gestion escolar con seguimiento academico y comunicaciones mock.',
+        ])
+        pushUniquePlannerValues(modules, [
+          'alumnos',
+          'familias',
+          'cursos',
+          'comunicaciones',
+          'seguimiento',
+          'reportes',
+          'panel operativo',
+        ])
+        pushUniquePlannerValues(mockData, [
+          'Alumnos mock, familias mock, cursos mock y comunicaciones mock sin datos sensibles reales.',
+          'Seguimientos y reportes mock para revisar alertas, estados y proximos pasos.',
+        ])
+        pushUniquePlannerValues(screens, [
+          'dashboard operativo',
+          'alumnos',
+          'familias',
+          'cursos',
+          'comunicaciones',
+          'seguimiento',
+          'reportes',
+        ])
+        pushUniquePlannerValues(localBehavior, [
+          'Consultar alumnos mock y revisar su estado academico u operativo.',
+          'Ver familias o responsables mock asociados a cada alumno.',
+          'Revisar cursos mock y su composicion inicial.',
+          'Registrar comunicacion simulada y dejar trazabilidad local.',
+          'Actualizar seguimiento local de alertas, compromisos o proximos pasos.',
+          'Revisar reportes mock sin usar datos sensibles reales.',
+        ])
+        pushUniquePlannerValues(approvalRequiredLater, [
+          'Datos sensibles reales, permisos escolares finos, auditoria y resguardo institucional.',
+        ])
+        break
+      }
+
       pushUniquePlannerValues(scope, [
         'Panel operativo inicial con entidades nucleares, seguimiento basico y vistas mock.',
       ])
@@ -6905,22 +6967,48 @@ function buildSafeFirstDeliveryPlan({
       pushUniquePlannerValues(scope, [
         'Estructura navegable inicial del flujo principal del producto.',
       ])
-      pushUniquePlannerValues(modules, [
-        'modulo principal',
-        'panel operativo inicial',
-        'reportes o estados basicos',
-      ])
-      pushUniquePlannerValues(mockData, [
-        'Entidades y estados de ejemplo para el flujo principal.',
-      ])
-      pushUniquePlannerValues(screens, [
-        'Vista principal.',
-        'Detalle del flujo principal.',
-        'Panel operativo o administrativo inicial.',
-      ])
-      pushUniquePlannerValues(localBehavior, [
-        'Recorrer el flujo principal con estados mock y datos de muestra.',
-      ])
+      if (isRequestTrackingSystem) {
+        pushUniquePlannerValues(modules, [
+          'solicitudes',
+          'estados',
+          'reportes',
+          'panel operativo',
+        ])
+        pushUniquePlannerValues(mockData, [
+          'Solicitudes mock, estados mock y reportes mock para revisar el flujo principal.',
+        ])
+        pushUniquePlannerValues(screens, [
+          'panel principal',
+          'detalle de solicitud',
+          'estado de seguimiento',
+          'reportes',
+        ])
+        pushUniquePlannerValues(localBehavior, [
+          'Consultar solicitudes mock y su historial local.',
+          'Cambiar estados mock sin depender de servicios externos.',
+          'Revisar reportes mock y proximos pasos del panel operativo.',
+        ])
+      } else {
+        pushUniquePlannerValues(modules, [
+          'entidades principales',
+          'seguimiento',
+          'reportes',
+          'panel operativo',
+        ])
+        pushUniquePlannerValues(mockData, [
+          'Entidades y estados de ejemplo para el flujo principal.',
+        ])
+        pushUniquePlannerValues(screens, [
+          'vista principal',
+          'detalle del flujo principal',
+          'panel operativo inicial',
+          'reportes',
+        ])
+        pushUniquePlannerValues(localBehavior, [
+          'Recorrer el flujo principal con estados mock y datos de muestra.',
+          'Actualizar seguimiento local y revisar reportes basicos.',
+        ])
+      }
       break
   }
 
@@ -7120,6 +7208,14 @@ function buildMaterializeSafeFirstDeliveryPlan({
   const contextHubAvailable = contextHubPack?.available === true
   const domain = extractProductArchitectureDomainLabel(goal, context, productType)
   const domainLabel = domain || 'dominio a precisar'
+  const isSchoolCrm =
+    productType === 'crm' &&
+    /\bescuel|\balumnos?\b|\bfamilias?\b|\bcursos?\b|\bcomunicaciones?\b|\bseguimiento\b|\breportes?\b/u.test(
+      normalizedText,
+    )
+  const isRequestTrackingSystem =
+    productType !== 'ecommerce' &&
+    /\bsolicitudes?\b|\bestados?\b|\breportes?\b/u.test(normalizedText)
   const targetFolderName = buildMaterializeSafeFirstDeliveryFolderName(
     productType,
     domainLabel,
@@ -7181,48 +7277,104 @@ function buildMaterializeSafeFirstDeliveryPlan({
       'edicion local de productos mock desde backoffice inicial',
     ])
   } else if (productType === 'crm') {
-    pushUniquePlannerValues(scopeHighlights, [
-      'Panel operativo inicial con entidades principales, seguimiento basico y reportes mock.',
-    ])
-    pushUniquePlannerValues(moduleHighlights, [
-      'entidades principales',
-      'seguimiento',
-      'panel operativo inicial',
-      'reportes mock',
-    ])
-    pushUniquePlannerValues(screenHighlights, [
-      'listado principal',
-      'detalle operativo',
-      'seguimiento',
-      'reporte inicial',
-    ])
-    pushUniquePlannerValues(mockDataHighlights, [
-      'entidades, estados y reportes mock editables sin datos sensibles reales',
-    ])
-    pushUniquePlannerValues(localBehaviorHighlights, [
-      'alta, consulta y actualizacion local de entidades mock',
-      'seguimiento local de estados y proximos pasos',
-    ])
+    if (isSchoolCrm) {
+      pushUniquePlannerValues(scopeHighlights, [
+        'Panel operativo inicial para gestion escolar con alumnos, familias, cursos, comunicaciones, seguimiento y reportes mock.',
+      ])
+      pushUniquePlannerValues(moduleHighlights, [
+        'alumnos',
+        'familias',
+        'cursos',
+        'comunicaciones',
+        'seguimiento',
+        'reportes',
+        'panel operativo',
+      ])
+      pushUniquePlannerValues(screenHighlights, [
+        'dashboard operativo',
+        'alumnos',
+        'familias',
+        'cursos',
+        'comunicaciones',
+        'seguimiento',
+        'reportes',
+      ])
+      pushUniquePlannerValues(mockDataHighlights, [
+        'alumnos mock, familias mock, cursos mock, comunicaciones mock, seguimientos mock y reportes mock editables',
+      ])
+      pushUniquePlannerValues(localBehaviorHighlights, [
+        'consultar alumnos mock y revisar familias o responsables asociados',
+        'registrar comunicacion simulada y actualizar seguimiento local',
+        'revisar reportes mock sin datos sensibles reales',
+      ])
+    } else {
+      pushUniquePlannerValues(scopeHighlights, [
+        'Panel operativo inicial con entidades principales, seguimiento basico y reportes mock.',
+      ])
+      pushUniquePlannerValues(moduleHighlights, [
+        'entidades principales',
+        'seguimiento',
+        'panel operativo inicial',
+        'reportes mock',
+      ])
+      pushUniquePlannerValues(screenHighlights, [
+        'listado principal',
+        'detalle operativo',
+        'seguimiento',
+        'reporte inicial',
+      ])
+      pushUniquePlannerValues(mockDataHighlights, [
+        'entidades, estados y reportes mock editables sin datos sensibles reales',
+      ])
+      pushUniquePlannerValues(localBehaviorHighlights, [
+        'alta, consulta y actualizacion local de entidades mock',
+        'seguimiento local de estados y proximos pasos',
+      ])
+    }
   } else {
     pushUniquePlannerValues(scopeHighlights, [
       `Primera version navegable del flujo principal para ${domainLabel}.`,
     ])
-    pushUniquePlannerValues(moduleHighlights, [
-      'flujo principal',
-      'panel operativo inicial',
-      'datos mock editables',
-    ])
-    pushUniquePlannerValues(screenHighlights, [
-      'vista principal',
-      'detalle principal',
-      'panel operativo inicial',
-    ])
-    pushUniquePlannerValues(mockDataHighlights, [
-      'entidades y estados mock editables para recorrer la experiencia',
-    ])
-    pushUniquePlannerValues(localBehaviorHighlights, [
-      'navegacion local completa sin dependencias externas reales',
-    ])
+    if (isRequestTrackingSystem) {
+      pushUniquePlannerValues(moduleHighlights, [
+        'solicitudes',
+        'estados',
+        'reportes',
+        'panel operativo',
+      ])
+      pushUniquePlannerValues(screenHighlights, [
+        'panel principal',
+        'detalle de solicitud',
+        'estado de seguimiento',
+        'reportes',
+      ])
+      pushUniquePlannerValues(mockDataHighlights, [
+        'solicitudes mock, estados mock y reportes mock editables',
+      ])
+      pushUniquePlannerValues(localBehaviorHighlights, [
+        'consultar solicitudes mock y cambiar su estado local',
+        'revisar reportes mock y proximos pasos del panel operativo',
+      ])
+    } else {
+      pushUniquePlannerValues(moduleHighlights, [
+        'entidades principales',
+        'seguimiento',
+        'reportes',
+        'panel operativo',
+      ])
+      pushUniquePlannerValues(screenHighlights, [
+        'vista principal',
+        'detalle principal',
+        'panel operativo inicial',
+        'reportes',
+      ])
+      pushUniquePlannerValues(mockDataHighlights, [
+        'entidades y estados mock editables para recorrer la experiencia',
+      ])
+      pushUniquePlannerValues(localBehaviorHighlights, [
+        'navegacion local completa sin dependencias externas reales',
+      ])
+    }
   }
 
   pushUniquePlannerValues(exclusionHighlights, [
