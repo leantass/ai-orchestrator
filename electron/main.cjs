@@ -7091,7 +7091,14 @@ function buildSafeFirstDeliveryPlan({
   }
 }
 
-function buildMaterializeSafeFirstDeliveryFolderName(productType, domain, sourceText = '') {
+function buildMaterializeSafeFirstDeliveryFolderName({
+  productType,
+  domain,
+  modules = [],
+  entities = [],
+  mockCollections = [],
+  sourceText = '',
+}) {
   const normalizedProductType =
     typeof productType === 'string' ? productType.trim().toLocaleLowerCase() : ''
   const normalizedSourceText = normalizeSectorDetectionText(sourceText)
@@ -7148,7 +7155,42 @@ function buildMaterializeSafeFirstDeliveryFolderName(productType, domain, source
     saas: 'saas',
   }
   const productTypeSlug = productTypeFolderSlugMap[normalizedProductType] || ''
-  const domainSlug = slugifyBusinessSector(domain || '')
+  const normalizeFolderSlugCandidate = (value) => {
+    const rawSlug = slugifyBusinessSector(value || '')
+
+    if (!rawSlug) {
+      return ''
+    }
+
+    const normalizedSlug = rawSlug
+      .replace(/\b(?:app|aplicacion|plataforma|sistema|gestion|para|de|del|la|el)\b/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '')
+
+    if (!normalizedSlug) {
+      return ''
+    }
+
+    const normalizationRules = [
+      { pattern: /\b(?:social|red-social|comunidades?|comunidad-barrial)\b/u, slug: 'social' },
+      { pattern: /\b(?:seguridad|alertas|accesos|sensores|monitoreo-de-seguridad)\b/u, slug: 'seguridad' },
+      { pattern: /\b(?:documental|documentos|vencimientos)\b/u, slug: 'documental' },
+      { pattern: /\b(?:solicitudes|tickets|mesa-de-ayuda|helpdesk)\b/u, slug: 'solicitudes' },
+      { pattern: /\b(?:navegacion|rutas|ubicaciones)\b/u, slug: 'navegacion' },
+      { pattern: /\b(?:turnos|agenda)\b/u, slug: 'turnos' },
+      { pattern: /\b(?:logistica|envios|entregas)\b/u, slug: 'logistica' },
+      { pattern: /\b(?:monitoreo|observabilidad)\b/u, slug: 'monitoreo' },
+      { pattern: /\b(?:gestion-escolar|escuelas|alumnos|familias|cursos)\b/u, slug: 'gestion-escolar' },
+      { pattern: /\b(?:documental|documentos|observaciones|reportes)\b/u, slug: 'documental' },
+      { pattern: /\b(?:comercio-online|tienda-online|catalogo|checkout)\b/u, slug: 'ecommerce' },
+    ]
+
+    return (
+      normalizationRules.find(({ pattern }) => pattern.test(normalizedSlug))?.slug ||
+      normalizedSlug
+    )
+  }
+  const domainSlug = normalizeFolderSlugCandidate(domain || '')
   const moduleCandidateMap = [
     { slug: 'catalogo', pattern: /\bcatalogo\b|\bproductos\b/u },
     { slug: 'alumnos', pattern: /\balumnos\b|\bcursos\b|\bfamilias\b/u },
@@ -7157,14 +7199,32 @@ function buildMaterializeSafeFirstDeliveryFolderName(productType, domain, source
     { slug: 'turnos-clinica', pattern: /\bturnos\b|\bclinicas?\b|\bsalud\b/u },
     { slug: 'backoffice', pattern: /\bbackoffice\b|\bpanel administrativo\b/u },
   ]
+  const structuredLabels = [
+    ...(Array.isArray(modules) ? modules : []),
+    ...(Array.isArray(entities) ? entities : []),
+    ...(Array.isArray(mockCollections) ? mockCollections : []),
+  ]
+  const structuredText = normalizeSectorDetectionText(structuredLabels.join(' '))
   const moduleSlug =
-    moduleCandidateMap.find(({ pattern }) => pattern.test(normalizedSourceText))?.slug || ''
+    moduleCandidateMap.find(({ pattern }) =>
+      pattern.test(structuredText) || pattern.test(normalizedSourceText),
+    )?.slug || ''
+  const structuredSlugCandidates = structuredLabels
+    .map((entry) => normalizeFolderSlugCandidate(entry))
+    .filter(Boolean)
+  const prioritizedStructuredSlug =
+    structuredSlugCandidates.find((entry) => isMeaningfulFolderSlug(entry)) || ''
+  const sourceTextSlug = normalizeFolderSlugCandidate(sourceText)
   const folderSlug =
     (productTypeSlug && isMeaningfulFolderSlug(productTypeSlug)
       ? productTypeSlug
       : '') ||
     (domainSlug && isMeaningfulFolderSlug(domainSlug) ? domainSlug : '') ||
+    (prioritizedStructuredSlug && isMeaningfulFolderSlug(prioritizedStructuredSlug)
+      ? prioritizedStructuredSlug
+      : '') ||
     (moduleSlug && isMeaningfulFolderSlug(moduleSlug) ? moduleSlug : '') ||
+    (sourceTextSlug && isMeaningfulFolderSlug(sourceTextSlug) ? sourceTextSlug : '') ||
     'producto'
 
   return `safe-first-delivery-${folderSlug}`
@@ -7449,11 +7509,14 @@ function buildMaterializeSafeFirstDeliveryPlan({
   const isRequestTrackingSystem =
     productType !== 'ecommerce' &&
     /\bsolicitudes?\b|\bestados?\b|\breportes?\b/u.test(normalizedText)
-  const targetFolderName = buildMaterializeSafeFirstDeliveryFolderName(
+  const targetFolderName = buildMaterializeSafeFirstDeliveryFolderName({
     productType,
-    domainLabel,
-    combinedText,
-  )
+    domain: domainLabel,
+    modules: moduleHighlights,
+    entities: safeFirstDeliveryMaterialization?.entities,
+    mockCollections: safeFirstDeliveryMaterialization?.mockCollections,
+    sourceText: combinedText,
+  })
   const allowedTargetPaths = [
     targetFolderName,
     path.join(targetFolderName, 'index.html'),
