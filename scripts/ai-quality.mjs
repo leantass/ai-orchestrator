@@ -52,6 +52,12 @@ const buildRelevantBasenames = new Set([
   'tsconfig.app.json',
   'tsconfig.node.json',
 ])
+const plannerSmokeRelevantFiles = new Set([
+  'electron/main.cjs',
+  'scripts/ai-planner-smoke.mjs',
+  'package.json',
+  'package-lock.json',
+])
 
 function printUsage() {
   console.log('Uso: node scripts/ai-quality.mjs [--scope=all|changed] [--changed]')
@@ -219,6 +225,14 @@ function shouldRunBuild(changedFiles) {
   })
 }
 
+function shouldRunPlannerSmoke(scope, changedFiles) {
+  if (scope === 'all') {
+    return true
+  }
+
+  return changedFiles.some((filePath) => plannerSmokeRelevantFiles.has(filePath))
+}
+
 function scheduleChecks(scope, changedFiles) {
   const checks = []
   const addCheck = (id, label, command, args) => {
@@ -244,6 +258,12 @@ function scheduleChecks(scope, changedFiles) {
     )
     addCheck('lint', 'Correr lint del proyecto', npmCommand, ['run', 'lint'])
     addCheck('build', 'Correr build del proyecto', npmCommand, ['run', 'build'])
+    addCheck(
+      'planner-smoke',
+      'Correr planner smoke del proyecto',
+      npmCommand,
+      ['run', 'ai-planner-smoke'],
+    )
 
     return checks
   }
@@ -272,6 +292,15 @@ function scheduleChecks(scope, changedFiles) {
 
   if (shouldRunBuild(changedFiles)) {
     addCheck('build', 'Correr build del proyecto', npmCommand, ['run', 'build'])
+  }
+
+  if (shouldRunPlannerSmoke(scope, changedFiles)) {
+    addCheck(
+      'planner-smoke',
+      'Correr planner smoke del proyecto',
+      npmCommand,
+      ['run', 'ai-planner-smoke'],
+    )
   }
 
   return checks
