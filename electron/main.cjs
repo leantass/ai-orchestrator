@@ -7114,6 +7114,263 @@ function detectSafeFirstDeliveryModuleFamily(modules) {
   return bestFamily
 }
 
+function inferDomainUnderstandingProductKind({
+  normalizedText,
+  productTypeHint,
+  moduleFamily,
+}) {
+  if (moduleFamily?.productType) {
+    return moduleFamily.productType
+  }
+
+  if (typeof productTypeHint === 'string' && productTypeHint.trim() && productTypeHint !== 'unknown') {
+    return productTypeHint.trim()
+  }
+
+  if (
+    /\bcarrito\b|\bcheckout\b|\bmercado pago\b|\bpagos\b|\bcatalogo\b|\bproductos\b/u.test(
+      normalizedText,
+    )
+  ) {
+    return 'ecommerce'
+  }
+
+  if (/\bcrm\b|\balumnos\b|\bfamilias\b|\bcursos\b|\bcomunicaciones\b|\bseguimiento\b/u.test(normalizedText)) {
+    return 'crm'
+  }
+
+  if (/\berp\b|\baduana\b|\bdespachantes?\b/u.test(normalizedText)) {
+    return 'erp'
+  }
+
+  if (/\bmarketplace\b/u.test(normalizedText)) {
+    return 'marketplace'
+  }
+
+  if (/\bsaas\b/u.test(normalizedText)) {
+    return 'saas'
+  }
+
+  if (/\b(?:gestion interna|herramienta interna|operacion interna)\b/u.test(normalizedText)) {
+    return 'internal-tool'
+  }
+
+  if (/\bturnos\b|\bclinicas?\b|\bsalud\b|\bsistema\b|\bplataforma\b|\bapp\b/u.test(normalizedText)) {
+    return 'business-system'
+  }
+
+  return 'unknown'
+}
+
+function buildDomainUnderstanding({
+  goal,
+  context,
+  productTypeHint,
+}) {
+  const combinedText = [goal, context]
+    .filter((value) => typeof value === 'string' && value.trim())
+    .join(' ')
+  const normalizedText = normalizeSectorDetectionText(combinedText)
+  const dynamicPlanParts = buildDynamicSafeDeliveryPlanParts(combinedText)
+  const explicitModuleFamily = detectSafeFirstDeliveryModuleFamily(
+    dynamicPlanParts.modules,
+  )
+  const productKind = inferDomainUnderstandingProductKind({
+    normalizedText,
+    productTypeHint,
+    moduleFamily: explicitModuleFamily,
+  })
+  const isSchoolCrm =
+    explicitModuleFamily?.key === 'school-crm' ||
+    (productKind === 'crm' &&
+      /\bescuel|\balumnos?\b|\bfamilias?\b|\bcursos?\b|\bcomunicaciones?\b|\bseguimiento\b/u.test(
+        normalizedText,
+      ))
+  const isRequestTrackingSystem =
+    explicitModuleFamily?.key === 'request-tracking' ||
+    (!explicitModuleFamily &&
+      productKind !== 'ecommerce' &&
+      detectSafeFirstDeliveryRequestTrackingIntent(normalizedText))
+  const resolvedFamilyKey = isSchoolCrm
+    ? 'school-crm'
+    : explicitModuleFamily?.key || (productKind === 'ecommerce' ? 'ecommerce' : '')
+  const domainLabel =
+    (resolvedFamilyKey === 'school-crm' ? 'gestion escolar' : '') ||
+    explicitModuleFamily?.domainLabel ||
+    extractProductArchitectureDomainLabel(goal, context, productKind)
+  const distinctiveDynamicModules = dynamicPlanParts.modules.filter((entry) => {
+    const normalizedEntry = normalizeSectorDetectionText(entry)
+
+    return !['reportes', 'estados', 'panel operativo'].includes(normalizedEntry)
+  })
+  const fallbackModules =
+    distinctiveDynamicModules.length > 0
+      ? []
+      : resolvedFamilyKey === 'ecommerce'
+        ? ['catalogo', 'productos', 'carrito local', 'checkout simulado', 'ordenes', 'reportes']
+        : resolvedFamilyKey === 'school-crm'
+          ? ['alumnos', 'familias', 'cursos', 'comunicaciones', 'seguimiento', 'reportes']
+          : explicitModuleFamily?.matches || []
+  const primaryModules = summarizeUniqueExecutorStrings(
+    [
+      ...dynamicPlanParts.modules,
+      ...fallbackModules,
+      /\breportes?\b/u.test(normalizedText) ? 'reportes' : '',
+    ].filter(Boolean),
+    12,
+  )
+  const primaryEntities = summarizeUniqueExecutorStrings(
+    primaryModules
+      .map((entry) => inferSafeFirstDeliveryMaterializationEntityName(entry))
+      .filter(Boolean),
+    12,
+  )
+  const secondaryEntities = summarizeUniqueExecutorStrings(
+    primaryModules
+      .filter((entry) =>
+        ['reportes', 'estados', 'seguimiento', 'notificaciones'].includes(
+          normalizeSectorDetectionText(entry),
+        ),
+      )
+      .map((entry) => inferSafeFirstDeliveryMaterializationEntityName(entry))
+      .filter(Boolean),
+    8,
+  )
+  const explicitIntentLabel = [goal, context]
+    .filter((value) => typeof value === 'string' && value.trim())
+    .flatMap((value) =>
+      [
+        /\b(gestionar\s+[^.;:\n]+)/iu,
+        /\b(monitorear\s+[^.;:\n]+)/iu,
+        /\b(coordinar\s+[^.;:\n]+)/iu,
+        /\b(organizar\s+[^.;:\n]+)/iu,
+      ]
+        .map((pattern) => value.match(pattern)?.[1] || '')
+        .filter(Boolean),
+    )[0]
+  const intentFallbackByFamily = {
+    ecommerce: 'gestionar catalogo, carrito y ordenes mock',
+    'school-crm': 'gestionar seguimiento escolar y comunicaciones',
+    social: 'gestionar comunidad, perfiles e interacciones',
+    security: 'monitorear accesos, alertas y eventos',
+    documental: 'gestionar documentos, responsables y vencimientos',
+    'request-tracking': 'gestionar solicitudes y estados operativos',
+  }
+  const intentLabel =
+    sanitizeBusinessSectorLabel(explicitIntentLabel || '') ||
+    intentFallbackByFamily[resolvedFamilyKey] ||
+    (productKind === 'business-system'
+      ? 'gestionar el flujo principal del sistema'
+      : productKind === 'internal-tool'
+        ? 'gestionar la operacion interna principal'
+        : productKind === 'crm'
+          ? 'gestionar seguimiento y relaciones operativas'
+          : '')
+  const roles = []
+  const coreFlows = summarizeUniqueExecutorStrings(
+    dynamicPlanParts.localBehavior.length > 0
+      ? dynamicPlanParts.localBehavior
+      : [
+          primaryModules.length > 0
+            ? `Revisar ${primaryModules[0]} mock y su detalle local.`
+            : 'Revisar entidades mock del flujo principal.',
+          'Cambiar estados mock sin depender de servicios externos.',
+          'Revisar reportes o actividad local del flujo principal.',
+        ],
+    10,
+  )
+  const localActions = summarizeUniqueExecutorStrings(
+    dynamicPlanParts.localBehavior.length > 0
+      ? dynamicPlanParts.localBehavior
+      : coreFlows,
+    10,
+  )
+  const riskThemes = []
+  const explicitExclusions = summarizeUniqueExecutorStrings(
+    [
+      'pagos reales',
+      'credenciales reales',
+      'auth real',
+      'base de datos real',
+      'integraciones externas reales',
+      'deploy',
+    ],
+    12,
+  )
+
+  if (resolvedFamilyKey === 'social') {
+    pushUniquePlannerValues(roles, ['administrador', 'moderador', 'miembro'])
+  } else if (resolvedFamilyKey === 'security') {
+    pushUniquePlannerValues(roles, ['administrador', 'operador', 'supervisor'])
+  } else if (resolvedFamilyKey === 'documental') {
+    pushUniquePlannerValues(roles, ['administrador', 'responsable', 'operador'])
+  } else if (resolvedFamilyKey === 'school-crm') {
+    pushUniquePlannerValues(roles, ['administrador', 'docente', 'familia'])
+  } else if (productKind === 'ecommerce') {
+    pushUniquePlannerValues(roles, ['cliente', 'operador comercial', 'administrador'])
+  } else {
+    pushUniquePlannerValues(roles, ['administrador', 'operador', 'usuario final'])
+  }
+
+  if (/\bpagos?\b|\bcheckout\b|\bmercado pago\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(riskThemes, ['pagos'])
+  }
+
+  if (
+    /\bdatos sensibles\b|\bmenores\b|\bsalud\b|\bpacientes?\b|\balumnos?\b|\bfamilias?\b/u.test(
+      normalizedText,
+    )
+  ) {
+    pushUniquePlannerValues(riskThemes, ['datos sensibles'])
+    pushUniquePlannerValues(explicitExclusions, ['datos sensibles reales'])
+  }
+
+  if (/\bautenticacion\b|\blogin\b|\baccesos?\b|\bpermisos?\b|\broles?\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(riskThemes, ['auth y permisos'])
+  }
+
+  if (/\bwebhooks?\b|\bintegraciones?\b|\bcallbacks?\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(riskThemes, ['integraciones externas'])
+  }
+
+  if (detectSafeFirstDeliverySecurityMonitoringIntent(normalizedText)) {
+    pushUniquePlannerValues(riskThemes, ['seguridad y monitoreo'])
+  }
+
+  if (/\bturnos?\b|\bagenda\b|\breservas?\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(riskThemes, ['agenda real'])
+  }
+
+  return {
+    ...(domainLabel ? { domainLabel } : {}),
+    ...(intentLabel ? { intentLabel } : {}),
+    productKind: productKind || 'unknown',
+    primaryModules,
+    primaryEntities,
+    secondaryEntities,
+    roles,
+    coreFlows,
+    stateModel: summarizeUniqueExecutorStrings(
+      buildSafeFirstDeliveryMaterializationStateHints({
+        productType: productKind,
+        isSchoolCrm,
+        isRequestTrackingSystem,
+      }),
+      10,
+    ),
+    localActions,
+    riskThemes,
+    approvalThemes: summarizeUniqueExecutorStrings(
+      buildSafeFirstDeliveryMaterializationApprovalThemes({
+        productType: productKind,
+        isSchoolCrm,
+      }),
+      10,
+    ),
+    explicitExclusions,
+  }
+}
+
 function buildSafeFirstDeliveryPlan({
   goal,
   context,
@@ -9275,6 +9532,61 @@ function buildBrainApprovalRequest({
   }
 }
 
+function normalizeDomainUnderstandingContract(value) {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const normalizedValue = {
+    ...(typeof value.domainLabel === 'string' && value.domainLabel.trim()
+      ? { domainLabel: value.domainLabel.trim() }
+      : {}),
+    ...(typeof value.intentLabel === 'string' && value.intentLabel.trim()
+      ? { intentLabel: value.intentLabel.trim() }
+      : {}),
+    ...(typeof value.productKind === 'string' && value.productKind.trim()
+      ? { productKind: value.productKind.trim() }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.primaryModules, 12).length > 0
+      ? { primaryModules: summarizeUniqueExecutorStrings(value.primaryModules, 12) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.primaryEntities, 12).length > 0
+      ? { primaryEntities: summarizeUniqueExecutorStrings(value.primaryEntities, 12) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.secondaryEntities, 12).length > 0
+      ? { secondaryEntities: summarizeUniqueExecutorStrings(value.secondaryEntities, 12) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.roles, 10).length > 0
+      ? { roles: summarizeUniqueExecutorStrings(value.roles, 10) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.coreFlows, 12).length > 0
+      ? { coreFlows: summarizeUniqueExecutorStrings(value.coreFlows, 12) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.stateModel, 10).length > 0
+      ? { stateModel: summarizeUniqueExecutorStrings(value.stateModel, 10) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.localActions, 12).length > 0
+      ? { localActions: summarizeUniqueExecutorStrings(value.localActions, 12) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.riskThemes, 10).length > 0
+      ? { riskThemes: summarizeUniqueExecutorStrings(value.riskThemes, 10) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.approvalThemes, 10).length > 0
+      ? { approvalThemes: summarizeUniqueExecutorStrings(value.approvalThemes, 10) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.explicitExclusions, 12).length > 0
+      ? {
+          explicitExclusions: summarizeUniqueExecutorStrings(
+            value.explicitExclusions,
+            12,
+          ),
+        }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
 function buildBrainDecisionContract({
   decisionKey,
   strategy,
@@ -9301,6 +9613,7 @@ function buildBrainDecisionContract({
   productArchitecture,
   safeFirstDeliveryPlan,
   safeFirstDeliveryMaterialization,
+  domainUnderstanding,
   finalResult,
 }) {
   const resolvedRequiresApproval = requiresApproval === true
@@ -9364,6 +9677,9 @@ function buildBrainDecisionContract({
     ...(safeFirstDeliveryMaterialization &&
     typeof safeFirstDeliveryMaterialization === 'object'
       ? { safeFirstDeliveryMaterialization }
+      : {}),
+    ...(normalizeDomainUnderstandingContract(domainUnderstanding)
+      ? { domainUnderstanding: normalizeDomainUnderstandingContract(domainUnderstanding) }
       : {}),
     ...(finalResult && typeof finalResult === 'object'
       ? { finalResult }
@@ -12098,6 +12414,19 @@ async function buildLocalStrategicBrainDecision({
     context,
     sectorConfig: webScaffoldSector || null,
   })
+  const domainUnderstanding = buildDomainUnderstanding({
+    goal,
+    context,
+    productTypeHint:
+      materializeSafeFirstDeliveryIntent.productTypeHint ||
+      safeFirstDeliveryIntent.productTypeHint ||
+      productArchitectureIntent.productTypeHint,
+  })
+  const buildDecision = (payload) =>
+    buildBrainDecisionContract({
+      ...payload,
+      domainUnderstanding,
+    })
   const reusablePlanningContext =
     providedReusablePlanningContext && typeof providedReusablePlanningContext === 'object'
       ? providedReusablePlanningContext
@@ -12229,7 +12558,7 @@ async function buildLocalStrategicBrainDecision({
       .filter(Boolean)
       .join('. ')
 
-    return buildBrainDecisionContract({
+    return buildDecision({
       decisionKey: 'approval-response-rejected',
       strategy: 'ask-user',
       executionMode: 'ask-user',
@@ -12322,7 +12651,7 @@ async function buildLocalStrategicBrainDecision({
       intent: materializeSafeFirstDeliveryIntent,
     })
 
-    return buildBrainDecisionContract({
+    return buildDecision({
       decisionKey: 'materialize-safe-first-delivery-plan',
       strategy: 'materialize-safe-first-delivery-plan',
       executionMode: 'executor',
@@ -12358,7 +12687,7 @@ async function buildLocalStrategicBrainDecision({
       intent: safeFirstDeliveryIntent,
     })
 
-    return buildBrainDecisionContract({
+    return buildDecision({
       decisionKey: 'safe-first-delivery-plan',
       strategy: 'safe-first-delivery-plan',
       executionMode: 'planner-only',
@@ -12392,7 +12721,7 @@ async function buildLocalStrategicBrainDecision({
       intent: productArchitectureIntent,
     })
 
-    return buildBrainDecisionContract({
+    return buildDecision({
       decisionKey: 'product-architecture-plan',
       strategy: 'product-architecture-plan',
       executionMode: 'planner-only',
@@ -12421,7 +12750,7 @@ async function buildLocalStrategicBrainDecision({
   ) {
     const contextHubAvailable = contextHubPack?.available === true
 
-    return buildBrainDecisionContract({
+    return buildDecision({
       decisionKey: 'analysis-proposal-plan',
       strategy: 'executor',
       executionMode: 'executor',
@@ -12477,7 +12806,7 @@ async function buildLocalStrategicBrainDecision({
       approvalAlreadyGranted ||
       hasRecoverableExecutionError)
   ) {
-    return buildBrainDecisionContract({
+    return buildDecision({
       decisionKey: 'edit-single-existing-file',
       strategy: 'executor',
       executionMode: 'executor',
@@ -12516,7 +12845,7 @@ async function buildLocalStrategicBrainDecision({
       reusablePlanningContext,
     })
 
-    return buildBrainDecisionContract({
+    return buildDecision({
       ...webDecision,
       requiresApproval: effectiveRequiresApproval,
       approvalRequest: approvalRequestForDecision,
@@ -12537,7 +12866,7 @@ async function buildLocalStrategicBrainDecision({
       approvalAlreadyGranted ||
       hasRecoverableExecutionError)
   ) {
-    return buildBrainDecisionContract({
+    return buildDecision({
       decisionKey: 'fast-composite',
       strategy: 'fast-composite',
       executionMode: 'local-fast-composite',
@@ -12578,7 +12907,7 @@ async function buildLocalStrategicBrainDecision({
       approvalAlreadyGranted ||
       hasRecoverableExecutionError)
   ) {
-    return buildBrainDecisionContract({
+    return buildDecision({
       decisionKey: 'fast-local',
       strategy: 'fast-local',
       executionMode: 'local-fast',
@@ -12637,7 +12966,7 @@ async function buildLocalStrategicBrainDecision({
     reusablePlanningContext,
   })
 
-  return buildBrainDecisionContract({
+    return buildDecision({
     decisionKey: 'executor-general',
     strategy: 'executor',
     executionMode: 'executor',
@@ -13536,6 +13865,25 @@ function buildOpenAIBrainSchema() {
           explicitExclusions: { type: 'array', items: { type: 'string' } },
         },
       },
+      domainUnderstanding: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          domainLabel: { type: 'string' },
+          intentLabel: { type: 'string' },
+          productKind: { type: 'string' },
+          primaryModules: { type: 'array', items: { type: 'string' } },
+          primaryEntities: { type: 'array', items: { type: 'string' } },
+          secondaryEntities: { type: 'array', items: { type: 'string' } },
+          roles: { type: 'array', items: { type: 'string' } },
+          coreFlows: { type: 'array', items: { type: 'string' } },
+          stateModel: { type: 'array', items: { type: 'string' } },
+          localActions: { type: 'array', items: { type: 'string' } },
+          riskThemes: { type: 'array', items: { type: 'string' } },
+          approvalThemes: { type: 'array', items: { type: 'string' } },
+          explicitExclusions: { type: 'array', items: { type: 'string' } },
+        },
+      },
     },
     required: [
       'decisionKey',
@@ -13790,6 +14138,11 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
       typeof rawDecision.safeFirstDeliveryMaterialization === 'object'
         ? rawDecision.safeFirstDeliveryMaterialization
         : fallbackDecision.safeFirstDeliveryMaterialization,
+    domainUnderstanding:
+      rawDecision?.domainUnderstanding &&
+      typeof rawDecision.domainUnderstanding === 'object'
+        ? rawDecision.domainUnderstanding
+        : fallbackDecision.domainUnderstanding,
   })
   const equivalentApprovalRejected =
     normalizedDecision.requiresApproval === true &&

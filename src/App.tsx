@@ -209,6 +209,22 @@ type SafeFirstDeliveryMaterializationContract = {
   explicitExclusions?: string[]
 }
 
+type DomainUnderstandingContract = {
+  domainLabel?: string
+  intentLabel?: string
+  productKind?: string
+  primaryModules?: string[]
+  primaryEntities?: string[]
+  secondaryEntities?: string[]
+  roles?: string[]
+  coreFlows?: string[]
+  stateModel?: string[]
+  localActions?: string[]
+  riskThemes?: string[]
+  approvalThemes?: string[]
+  explicitExclusions?: string[]
+}
+
 type PlannerExecutionMetadata = {
   decisionKey: string
   businessSector: string
@@ -236,6 +252,7 @@ type PlannerExecutionMetadata = {
   productArchitecture: ProductArchitectureContract | null
   safeFirstDeliveryPlan: SafeFirstDeliveryPlanContract | null
   safeFirstDeliveryMaterialization: SafeFirstDeliveryMaterializationContract | null
+  domainUnderstanding: DomainUnderstandingContract | null
 }
 
 type PlannerRequestSnapshot = {
@@ -425,6 +442,7 @@ type PlannerDecisionResponse = {
   productArchitecture?: ProductArchitectureContract | null
   safeFirstDeliveryPlan?: SafeFirstDeliveryPlanContract | null
   safeFirstDeliveryMaterialization?: SafeFirstDeliveryMaterializationContract | null
+  domainUnderstanding?: DomainUnderstandingContract | null
   brainRoutingDecision?: BrainRoutingDecision
   tasks?: unknown[]
   assumptions?: string[]
@@ -613,6 +631,7 @@ const EMPTY_PLANNER_EXECUTION_METADATA: PlannerExecutionMetadata = {
   productArchitecture: null,
   safeFirstDeliveryPlan: null,
   safeFirstDeliveryMaterialization: null,
+  domainUnderstanding: null,
 }
 
 const buildSafeFirstDeliveryReviewMetadata = ({
@@ -636,6 +655,7 @@ const buildSafeFirstDeliveryReviewMetadata = ({
   reuseMode: baseMetadata.reuseMode,
   contextHubStatus: baseMetadata.contextHubStatus,
   productArchitecture: baseMetadata.productArchitecture,
+  domainUnderstanding: baseMetadata.domainUnderstanding,
   decisionKey: 'safe-first-delivery-plan',
   strategy: 'safe-first-delivery-plan',
   executionMode: 'planner-only',
@@ -1036,6 +1056,67 @@ const normalizeSafeFirstDeliveryMaterializationContract = (
   return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
 }
 
+const normalizeDomainUnderstandingContract = (
+  value: unknown,
+): DomainUnderstandingContract | null => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const contract = value as DomainUnderstandingContract
+  const normalizedValue: DomainUnderstandingContract = {
+    ...(normalizeOptionalString(contract.domainLabel)
+      ? { domainLabel: normalizeOptionalString(contract.domainLabel) }
+      : {}),
+    ...(normalizeOptionalString(contract.intentLabel)
+      ? { intentLabel: normalizeOptionalString(contract.intentLabel) }
+      : {}),
+    ...(normalizeOptionalString(contract.productKind)
+      ? { productKind: normalizeOptionalString(contract.productKind) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.primaryModules).length > 0
+      ? { primaryModules: normalizeOptionalStringArray(contract.primaryModules) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.primaryEntities).length > 0
+      ? { primaryEntities: normalizeOptionalStringArray(contract.primaryEntities) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.secondaryEntities).length > 0
+      ? {
+          secondaryEntities: normalizeOptionalStringArray(
+            contract.secondaryEntities,
+          ),
+        }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.roles).length > 0
+      ? { roles: normalizeOptionalStringArray(contract.roles) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.coreFlows).length > 0
+      ? { coreFlows: normalizeOptionalStringArray(contract.coreFlows) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.stateModel).length > 0
+      ? { stateModel: normalizeOptionalStringArray(contract.stateModel) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.localActions).length > 0
+      ? { localActions: normalizeOptionalStringArray(contract.localActions) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.riskThemes).length > 0
+      ? { riskThemes: normalizeOptionalStringArray(contract.riskThemes) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.approvalThemes).length > 0
+      ? { approvalThemes: normalizeOptionalStringArray(contract.approvalThemes) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.explicitExclusions).length > 0
+      ? {
+          explicitExclusions: normalizeOptionalStringArray(
+            contract.explicitExclusions,
+          ),
+        }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
 const extractPlannerExecutionMetadata = (payload?: {
   decisionKey?: string
   businessSector?: string
@@ -1056,6 +1137,7 @@ const extractPlannerExecutionMetadata = (payload?: {
   productArchitecture?: ProductArchitectureContract | null
   safeFirstDeliveryPlan?: SafeFirstDeliveryPlanContract | null
   safeFirstDeliveryMaterialization?: SafeFirstDeliveryMaterializationContract | null
+  domainUnderstanding?: DomainUnderstandingContract | null
   tasks?: unknown[]
   assumptions?: string[]
 } | null): PlannerExecutionMetadata => ({
@@ -1222,6 +1304,9 @@ const extractPlannerExecutionMetadata = (payload?: {
     normalizeSafeFirstDeliveryMaterializationContract(
       payload?.safeFirstDeliveryMaterialization,
     ),
+  domainUnderstanding: normalizeDomainUnderstandingContract(
+    payload?.domainUnderstanding,
+  ),
   tasks: Array.isArray(payload?.tasks)
     ? payload.tasks
         .map((task) =>
