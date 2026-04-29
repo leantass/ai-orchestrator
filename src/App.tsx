@@ -238,6 +238,13 @@ type PlannerExecutionMetadata = {
   safeFirstDeliveryMaterialization: SafeFirstDeliveryMaterializationContract | null
 }
 
+type PlannerRequestSnapshot = {
+  goal: string
+  context: string
+  decisionKey: string
+  safeFirstDeliveryPlanFingerprint: string
+}
+
 type ContextHubStatusSummary = {
   source: 'context-hub'
   endpoint: string
@@ -607,6 +614,34 @@ const EMPTY_PLANNER_EXECUTION_METADATA: PlannerExecutionMetadata = {
   safeFirstDeliveryPlan: null,
   safeFirstDeliveryMaterialization: null,
 }
+
+const buildSafeFirstDeliveryReviewMetadata = ({
+  baseMetadata,
+  plan,
+}: {
+  baseMetadata: PlannerExecutionMetadata
+  plan: SafeFirstDeliveryPlanContract
+}): PlannerExecutionMetadata => ({
+  ...EMPTY_PLANNER_EXECUTION_METADATA,
+  businessSector: baseMetadata.businessSector,
+  businessSectorLabel: baseMetadata.businessSectorLabel,
+  creativeDirection: baseMetadata.creativeDirection,
+  reason: baseMetadata.reason,
+  assumptions: baseMetadata.assumptions,
+  reusableArtifactLookup: baseMetadata.reusableArtifactLookup,
+  reusableArtifactsFound: baseMetadata.reusableArtifactsFound,
+  reuseDecision: baseMetadata.reuseDecision,
+  reuseReason: baseMetadata.reuseReason,
+  reusedArtifactIds: baseMetadata.reusedArtifactIds,
+  reuseMode: baseMetadata.reuseMode,
+  contextHubStatus: baseMetadata.contextHubStatus,
+  productArchitecture: baseMetadata.productArchitecture,
+  decisionKey: 'safe-first-delivery-plan',
+  strategy: 'safe-first-delivery-plan',
+  executionMode: 'planner-only',
+  nextExpectedAction: 'review-safe-first-delivery',
+  safeFirstDeliveryPlan: plan,
+})
 const BRAIN_COST_MODE_OPTIONS: Array<{
   value: BrainCostMode
   label: string
@@ -2244,6 +2279,85 @@ const sanitizeSafeFirstDeliveryText = (value: string) =>
     .replace(/base\s+de\s+datos\s+real/gi, 'persistencia real')
     .replace(/\s+/g, ' ')
     .trim()
+
+const buildSafeFirstDeliveryPlanFingerprint = (
+  plan?: SafeFirstDeliveryPlanContract | null,
+) => {
+  if (!plan) {
+    return ''
+  }
+
+  return [
+    normalizeOptionalStringArray(plan.scope).join('|'),
+    normalizeOptionalStringArray(plan.modules).join('|'),
+    normalizeOptionalStringArray(plan.mockData).join('|'),
+    normalizeOptionalStringArray(plan.screens).join('|'),
+    normalizeOptionalStringArray(plan.localBehavior).join('|'),
+    normalizeOptionalStringArray(plan.explicitExclusions).join('|'),
+    normalizeOptionalStringArray(plan.successCriteria).join('|'),
+  ].join('::')
+}
+
+const SAFE_FIRST_DELIVERY_GENERIC_MODULE_LABELS = new Set([
+  'panel operativo',
+  'panel operativo inicial',
+  'reportes',
+  'reportes mock',
+  'seguimiento',
+  'estados',
+  'entidades principales',
+  'comunicaciones mock',
+])
+
+const extractDistinctiveSafeFirstDeliveryModules = (
+  modules?: string[] | null,
+) =>
+  normalizeOptionalStringArray(modules).filter(
+    (value) =>
+      value &&
+      !SAFE_FIRST_DELIVERY_GENERIC_MODULE_LABELS.has(
+        value.trim().toLocaleLowerCase(),
+      ),
+  )
+
+const buildMaterializationPlanCoherenceIssue = ({
+  sourcePlan,
+  metadata,
+}: {
+  sourcePlan: SafeFirstDeliveryPlanContract
+  metadata: PlannerExecutionMetadata
+}) => {
+  const materializationDecisionDetected =
+    isSafeFirstDeliveryMaterializationDecision(metadata.decisionKey) ||
+    isSafeFirstDeliveryMaterializationDecision(metadata.strategy)
+
+  if (!materializationDecisionDetected) {
+    return 'El planificador no devolvió un materialize-safe-first-delivery-plan válido.'
+  }
+
+  const sourceDistinctiveModules = extractDistinctiveSafeFirstDeliveryModules(
+    sourcePlan.modules,
+  )
+  const responseDistinctiveModules = extractDistinctiveSafeFirstDeliveryModules(
+    metadata.safeFirstDeliveryMaterialization?.modules ||
+      metadata.safeFirstDeliveryPlan?.modules ||
+      [],
+  )
+
+  if (
+    sourceDistinctiveModules.length > 0 &&
+    responseDistinctiveModules.length > 0 &&
+    !sourceDistinctiveModules.some((moduleName) =>
+      responseDistinctiveModules.includes(moduleName),
+    )
+  ) {
+    return `El plan materializable devuelto no coincide con el plan fuente activo. Fuente: ${sourceDistinctiveModules.join(
+      ', ',
+    )}. Devuelto: ${responseDistinctiveModules.join(', ')}.`
+  }
+
+  return ''
+}
 
 const buildSafeFirstDeliveryPlanningPrompt = ({
   architecture,
@@ -4353,6 +4467,13 @@ function App() {
   const [executionContextInput, setExecutionContextInput] = useState(
     DEFAULT_EXECUTION_CONTEXT_INPUT,
   )
+  const [plannerRequestSnapshot, setPlannerRequestSnapshot] =
+    useState<PlannerRequestSnapshot>({
+      goal: '',
+      context: '',
+      decisionKey: '',
+      safeFirstDeliveryPlanFingerprint: '',
+    })
   const [userParticipationMode, setUserParticipationMode] =
     useState<UserParticipationMode>(() => persistedUserParticipationMode)
   const [brainCostMode, setBrainCostMode] = useState<BrainCostMode>(
@@ -5647,6 +5768,30 @@ function App() {
     setExecutorRequestState(requestState)
     setExecutorResult(result)
   }
+  const resetPlannerMaterializationAttemptState = ({
+    fallbackMetadata,
+    fallbackSnapshot,
+  }: {
+    fallbackMetadata: PlannerExecutionMetadata
+    fallbackSnapshot?: PlannerRequestSnapshot | null
+  }) => {
+    setDecisionPending(false)
+    setApprovalMessage('')
+    setPendingInstruction('')
+    setPendingExecutionInstruction('')
+    setApprovalSource('')
+    setPlannerInstruction(DEFAULT_PLANNER_INSTRUCTION)
+    setPlannerExecutionMetadata(fallbackMetadata)
+    setPlannerRequestSnapshot(
+      fallbackSnapshot || {
+        goal: '',
+        context: '',
+        decisionKey: '',
+        safeFirstDeliveryPlanFingerprint: '',
+      },
+    )
+    clearVisibleExecutionRuntimeState()
+  }
   const syncBrainRoutingDecision = (
     decision?: BrainRoutingDecision | null,
   ) => {
@@ -6928,6 +7073,14 @@ function App() {
       const nextExecutionMetadata = resolvePlannerExecutionMetadata(response)
       syncBrainRoutingDecision(response.brainRoutingDecision)
       setPlannerExecutionMetadata(nextExecutionMetadata)
+      setPlannerRequestSnapshot({
+        goal: plannerGoal,
+        context: plannerContext,
+        decisionKey: nextExecutionMetadata.decisionKey,
+        safeFirstDeliveryPlanFingerprint: buildSafeFirstDeliveryPlanFingerprint(
+          nextExecutionMetadata.safeFirstDeliveryPlan,
+        ),
+      })
       setLastObservedExecutionMode('')
       recordPlannerExecutionSummary(nextExecutionMetadata)
       addFlowMessage({
@@ -7160,6 +7313,14 @@ function App() {
             resolvePlannerExecutionMetadata(planResponse)
           syncBrainRoutingDecision(planResponse.brainRoutingDecision)
           setPlannerExecutionMetadata(currentPlannerExecutionMetadata)
+          setPlannerRequestSnapshot({
+            goal: goalInput,
+            context: executionContextInput.trim(),
+            decisionKey: currentPlannerExecutionMetadata.decisionKey,
+            safeFirstDeliveryPlanFingerprint: buildSafeFirstDeliveryPlanFingerprint(
+              currentPlannerExecutionMetadata.safeFirstDeliveryPlan,
+            ),
+          })
           setLastObservedExecutionMode('')
           recordPlannerExecutionSummary(currentPlannerExecutionMetadata)
           plannerMarkedCompleted = planResponse.completed === true
@@ -7919,6 +8080,12 @@ function App() {
     setFlowConsoleVisibility({ open: false, pinned: false })
     setPlannerInstruction(DEFAULT_PLANNER_INSTRUCTION)
     setPlannerExecutionMetadata(EMPTY_PLANNER_EXECUTION_METADATA)
+    setPlannerRequestSnapshot({
+      goal: '',
+      context: '',
+      decisionKey: '',
+      safeFirstDeliveryPlanFingerprint: '',
+    })
     setLastObservedExecutionMode('')
     setExecutorResult(DEFAULT_EXECUTOR_RESULT)
     setLastExecutorSnapshot(null)
@@ -8016,6 +8183,11 @@ function App() {
     sourceLabel?: string
     sendContent?: string
     persistPreparedInputs?: boolean
+    onPlanningFailure?: () => void
+    validateResponse?: (
+      response: PlannerDecisionResponse,
+      metadata: PlannerExecutionMetadata,
+    ) => string
   }) => {
     const plannerGoal = normalizeOptionalString(options?.goal) || goalInput
     const plannerContext =
@@ -8069,6 +8241,7 @@ function App() {
       })
 
       if (!response?.ok || !response.instruction) {
+        options?.onPlanningFailure?.()
         addFlowMessage({
           source: 'planificador',
           title: 'Respuesta inválida del planificador',
@@ -8092,8 +8265,50 @@ function App() {
         status: response.approvalRequired ? 'warning' : 'success',
       })
       const nextExecutionMetadata = resolvePlannerExecutionMetadata(response)
+      const validationIssue = options?.validateResponse?.(
+        response,
+        nextExecutionMetadata,
+      )
+
+      if (validationIssue) {
+        options?.onPlanningFailure?.()
+        debugRendererLog('materialization-plan:rejected-as-incoherent', {
+          validationIssue,
+          decisionKey: nextExecutionMetadata.decisionKey,
+          strategy: nextExecutionMetadata.strategy,
+          sourceModules: activeSafeFirstDeliveryPlan?.modules || [],
+          returnedModules:
+            nextExecutionMetadata.safeFirstDeliveryMaterialization?.modules ||
+            nextExecutionMetadata.safeFirstDeliveryPlan?.modules ||
+            [],
+        })
+        addFlowMessage({
+          source: 'orquestador',
+          title: 'Decisión del orquestador',
+          content: validationIssue,
+          status: 'error',
+        })
+        setSessionStatus('Error al generar el plan')
+        setCurrentStep(
+          'El orquestador rechazó el plan devuelto por inconsistencia con la primera entrega segura activa',
+        )
+        setSessionEvents((currentEvents) => [
+          ...currentEvents,
+          'Se rechazó un plan materializable incoherente con la primera entrega activa',
+        ])
+        return
+      }
+
       syncBrainRoutingDecision(response.brainRoutingDecision)
       setPlannerExecutionMetadata(nextExecutionMetadata)
+      setPlannerRequestSnapshot({
+        goal: plannerGoal,
+        context: plannerContext,
+        decisionKey: nextExecutionMetadata.decisionKey,
+        safeFirstDeliveryPlanFingerprint: buildSafeFirstDeliveryPlanFingerprint(
+          nextExecutionMetadata.safeFirstDeliveryPlan,
+        ),
+      })
       setLastObservedExecutionMode('')
       recordPlannerExecutionSummary(nextExecutionMetadata)
 
@@ -8251,6 +8466,7 @@ function App() {
         status: 'success',
       })
     } catch {
+      options?.onPlanningFailure?.()
       addFlowMessage({
         source: 'orquestador',
         title: 'Decisión del orquestador',
@@ -8300,13 +8516,52 @@ function App() {
 
   const handlePrepareSafeMaterializationPlan = async () => {
     if (!plannerIsReviewOnly || !activeSafeFirstDeliveryPlan) {
+      resetPlannerMaterializationAttemptState({
+        fallbackMetadata: EMPTY_PLANNER_EXECUTION_METADATA,
+        fallbackSnapshot: null,
+      })
+      setSessionStatus('Error al generar el plan')
+      setCurrentStep(
+        'No hay una primera entrega segura activa y valida para preparar la materializacion',
+      )
+      addFlowMessage({
+        source: 'orquestador',
+        title: 'Decisión del orquestador',
+        content:
+          'No hay una primera entrega segura activa y válida para preparar la materialización.',
+        status: 'error',
+      })
       return
+    }
+
+    const activeSafeFirstDeliveryPlanFingerprint =
+      buildSafeFirstDeliveryPlanFingerprint(activeSafeFirstDeliveryPlan)
+    const snapshotMatchesActiveSafePlan =
+      activeSafeFirstDeliveryPlanFingerprint !== '' &&
+      plannerRequestSnapshot.safeFirstDeliveryPlanFingerprint !== '' &&
+      plannerRequestSnapshot.safeFirstDeliveryPlanFingerprint ===
+        activeSafeFirstDeliveryPlanFingerprint
+    const stableOriginalGoal = snapshotMatchesActiveSafePlan
+      ? plannerRequestSnapshot.goal
+      : ''
+    const stableOriginalContext = snapshotMatchesActiveSafePlan
+      ? plannerRequestSnapshot.context
+      : ''
+    const safePlanReviewMetadata = buildSafeFirstDeliveryReviewMetadata({
+      baseMetadata: effectivePlannerExecutionMetadata,
+      plan: activeSafeFirstDeliveryPlan,
+    })
+    const safePlanReviewSnapshot: PlannerRequestSnapshot = {
+      goal: stableOriginalGoal,
+      context: stableOriginalContext,
+      decisionKey: 'safe-first-delivery-plan',
+      safeFirstDeliveryPlanFingerprint: activeSafeFirstDeliveryPlanFingerprint,
     }
 
     const preparedPlanningPrompt = buildSafeFirstDeliveryMaterializationPrompt({
       plan: activeSafeFirstDeliveryPlan,
-      originalGoal: goalInput,
-      originalContext: getCurrentExecutionContextValue(),
+      originalGoal: stableOriginalGoal,
+      originalContext: stableOriginalContext,
     })
 
     clearVisibleExecutionRuntimeState()
@@ -8318,6 +8573,10 @@ function App() {
       ...currentEvents,
       'Se preparo una nueva planificacion para materializar la primera entrega segura',
     ])
+    resetPlannerMaterializationAttemptState({
+      fallbackMetadata: safePlanReviewMetadata,
+      fallbackSnapshot: safePlanReviewSnapshot,
+    })
 
     await handleGenerateNextStep({
       goal: preparedPlanningPrompt.goal,
@@ -8325,7 +8584,17 @@ function App() {
       sourceLabel: 'Materialización segura preparada',
       sendContent:
         'Se envio al planificador una solicitud acotada para preparar la materializacion segura de la primera entrega sin ejecutar cambios todavia.',
-      persistPreparedInputs: true,
+      onPlanningFailure: () => {
+        resetPlannerMaterializationAttemptState({
+          fallbackMetadata: safePlanReviewMetadata,
+          fallbackSnapshot: safePlanReviewSnapshot,
+        })
+      },
+      validateResponse: (_response, metadata) =>
+        buildMaterializationPlanCoherenceIssue({
+          sourcePlan: activeSafeFirstDeliveryPlan,
+          metadata,
+        }),
     })
   }
 
