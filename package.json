@@ -17,6 +17,7 @@
     "desktop:codex:stable": "npm run build && cross-env AI_ORCHESTRATOR_EXECUTOR_MODE=command AI_ORCHESTRATOR_BRIDGE_MODE=codex electron .",
     "executor:bridge": "node ./executor-bridge/executor-bridge.cjs",
     "ai-quality": "node scripts/ai-quality.mjs",
+    "ai-planner-smoke": "node scripts/ai-planner-smoke.mjs",
     "lint": "eslint .",
     "preview": "vite preview --config vite.config.ts --configLoader native"
   },

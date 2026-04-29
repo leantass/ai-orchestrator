@@ -6923,6 +6923,41 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
       behavior: 'Consultar turnos mock y cambiar su estado local.',
     },
     {
+      label: 'canchas',
+      patterns: [/\bcanchas?\b/u],
+      mockData: 'Canchas mock con estado, superficie y disponibilidad inicial.',
+      screen: 'canchas',
+      behavior: 'Revisar canchas mock y su disponibilidad local.',
+    },
+    {
+      label: 'horarios',
+      patterns: [/\bhorarios?\b/u],
+      mockData: 'Horarios mock con franjas disponibles y bloqueos simulados.',
+      screen: 'horarios',
+      behavior: 'Consultar horarios mock y su disponibilidad local.',
+    },
+    {
+      label: 'reservas',
+      patterns: [/\breservas?\b/u],
+      mockData: 'Reservas mock con estado, cliente y cancha asociada.',
+      screen: 'reservas',
+      behavior: 'Registrar reserva mock y revisar su estado local.',
+    },
+    {
+      label: 'clientes',
+      patterns: [/\bclientes?\b/u],
+      mockData: 'Clientes mock vinculados a reservas y horarios.',
+      screen: 'clientes',
+      behavior: 'Revisar clientes mock asociados al flujo de reservas.',
+    },
+    {
+      label: 'disponibilidad',
+      patterns: [/\bdisponibilidad\b/u],
+      mockData: 'Disponibilidad mock por cancha, horario y estado local.',
+      screen: 'disponibilidad',
+      behavior: 'Validar disponibilidad mock antes de confirmar una reserva local.',
+    },
+    {
       label: 'pacientes',
       patterns: [/\bpacientes?\b/u],
       mockData: 'Pacientes mock sin datos sensibles reales.',
@@ -7067,6 +7102,13 @@ function detectSafeFirstDeliveryModuleFamily(modules) {
       productType: 'business-system',
       minimumScore: 2,
       matches: ['documentos', 'operaciones', 'vencimientos', 'observaciones', 'responsables'],
+    },
+    {
+      key: 'reservas',
+      domainLabel: 'reservas y disponibilidad',
+      productType: 'business-system',
+      minimumScore: 2,
+      matches: ['canchas', 'horarios', 'reservas', 'clientes', 'disponibilidad'],
     },
     {
       key: 'request-tracking',
@@ -7255,6 +7297,7 @@ function buildDomainUnderstanding({
     social: 'gestionar comunidad, perfiles e interacciones',
     security: 'monitorear accesos, alertas y eventos',
     documental: 'gestionar documentos, responsables y vencimientos',
+    reservas: 'gestionar reservas y disponibilidad',
     'request-tracking': 'gestionar solicitudes y estados operativos',
   }
   const intentLabel =
@@ -7305,6 +7348,8 @@ function buildDomainUnderstanding({
     pushUniquePlannerValues(roles, ['administrador', 'operador', 'supervisor'])
   } else if (resolvedFamilyKey === 'documental') {
     pushUniquePlannerValues(roles, ['administrador', 'responsable', 'operador'])
+  } else if (resolvedFamilyKey === 'reservas') {
+    pushUniquePlannerValues(roles, ['administrador', 'cliente', 'operador'])
   } else if (resolvedFamilyKey === 'school-crm') {
     pushUniquePlannerValues(roles, ['administrador', 'docente', 'familia'])
   } else if (productKind === 'ecommerce') {
@@ -8027,6 +8072,7 @@ function buildMaterializeSafeFirstDeliveryFolderName({
       { pattern: /\b(?:social|red-social|comunidades?|comunidad-barrial)\b/u, slug: 'social' },
       { pattern: /\b(?:seguridad|alertas|accesos|sensores|monitoreo-de-seguridad)\b/u, slug: 'seguridad' },
       { pattern: /\b(?:documental|documentos|vencimientos)\b/u, slug: 'documental' },
+      { pattern: /\b(?:reservas|canchas|horarios|disponibilidad)\b/u, slug: 'reservas' },
       { pattern: /\b(?:solicitudes|tickets|mesa-de-ayuda|helpdesk)\b/u, slug: 'solicitudes' },
       { pattern: /\b(?:navegacion|rutas|ubicaciones)\b/u, slug: 'navegacion' },
       { pattern: /\b(?:turnos|agenda)\b/u, slug: 'turnos' },
@@ -8047,6 +8093,7 @@ function buildMaterializeSafeFirstDeliveryFolderName({
     { slug: 'catalogo', pattern: /\bcatalogo\b|\bproductos\b/u },
     { slug: 'alumnos', pattern: /\balumnos\b|\bcursos\b|\bfamilias\b/u },
     { slug: 'ordenes', pattern: /\bordenes\b|\bpedidos\b/u },
+    { slug: 'reservas', pattern: /\breservas?\b|\bcanchas?\b|\bhorarios?\b|\bdisponibilidad\b/u },
     { slug: 'reportes', pattern: /\breportes\b/u },
     { slug: 'turnos-clinica', pattern: /\bturnos\b|\bclinicas?\b|\bsalud\b/u },
     { slug: 'backoffice', pattern: /\bbackoffice\b|\bpanel administrativo\b/u },
@@ -8183,6 +8230,26 @@ function inferSafeFirstDeliveryMaterializationCollectionKey(label) {
 
   if (/\bturnos?\b/u.test(normalizedLabel)) {
     return 'turnos'
+  }
+
+  if (/\bcanchas?\b/u.test(normalizedLabel)) {
+    return 'canchas'
+  }
+
+  if (/\bhorarios?\b/u.test(normalizedLabel)) {
+    return 'horarios'
+  }
+
+  if (/\breservas?\b/u.test(normalizedLabel)) {
+    return 'reservas'
+  }
+
+  if (/\bclientes?\b/u.test(normalizedLabel)) {
+    return 'clientes'
+  }
+
+  if (/\bdisponibilidad\b/u.test(normalizedLabel)) {
+    return 'disponibilidad'
   }
 
   if (/\bpacientes?\b/u.test(normalizedLabel)) {
@@ -8333,6 +8400,26 @@ function inferSafeFirstDeliveryMaterializationEntityName(label) {
 
   if (/\bturnos?\b/u.test(normalizedLabel)) {
     return 'turno'
+  }
+
+  if (/\bcanchas?\b/u.test(normalizedLabel)) {
+    return 'cancha'
+  }
+
+  if (/\bhorarios?\b/u.test(normalizedLabel)) {
+    return 'horario'
+  }
+
+  if (/\breservas?\b/u.test(normalizedLabel)) {
+    return 'reserva'
+  }
+
+  if (/\bclientes?\b/u.test(normalizedLabel)) {
+    return 'cliente'
+  }
+
+  if (/\bdisponibilidad\b/u.test(normalizedLabel)) {
+    return 'disponibilidad'
   }
 
   if (/\bpacientes?\b/u.test(normalizedLabel)) {
