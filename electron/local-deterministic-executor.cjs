@@ -1639,14 +1639,22 @@ function buildSafeFirstDeliveryIndexHtml() {
   <body>
     <div class="shell">
       <header class="hero">
-        <div>
+        <div class="hero-main">
           <p class="eyebrow">Primera entrega local mock</p>
           <h1 id="app-title">Cargando plan seguro...</h1>
           <p id="app-subtitle" class="subtitle"></p>
+          <div id="app-highlights" class="hero-highlights" aria-label="Resumen del prototipo"></div>
         </div>
-        <div class="hero-note">
-          <span class="badge">Sin integraciones reales</span>
-          <span class="badge">Datos mock editables</span>
+        <div class="hero-side">
+          <div class="hero-note">
+            <span class="badge badge-neutral">Sin integraciones reales</span>
+            <span class="badge badge-neutral">Datos mock editables</span>
+          </div>
+          <section class="hero-status" aria-label="Alcance seguro">
+            <p class="eyebrow hero-kicker">Alcance seguro</p>
+            <h2 id="hero-safety-title">Demo local lista</h2>
+            <p id="hero-safety-copy" class="panel-copy"></p>
+          </section>
         </div>
       </header>
 
@@ -1657,6 +1665,7 @@ function buildSafeFirstDeliveryIndexHtml() {
               <h2>Recorrido principal</h2>
               <p id="plan-summary" class="panel-copy"></p>
             </div>
+            <div id="app-stats" class="stats-grid" aria-label="Indicadores del mock"></div>
             <nav id="module-nav" class="module-nav" aria-label="Modulos principales"></nav>
             <div class="toolbar workspace-toolbar">
               <label class="field">
@@ -1755,14 +1764,22 @@ function buildSafeFirstDeliveryStylesCss() {
   color-scheme: light;
   --bg: #f4efe7;
   --panel: rgba(255, 255, 255, 0.88);
+  --panel-strong: rgba(255, 255, 255, 0.94);
   --panel-border: rgba(40, 53, 71, 0.12);
+  --panel-border-strong: rgba(40, 53, 71, 0.18);
   --ink: #142033;
   --muted: #566276;
   --accent: #b35c2e;
   --accent-soft: #f8dfd0;
+  --accent-deep: #8f4620;
   --success: #1f7a50;
+  --success-soft: rgba(31, 122, 80, 0.12);
   --warning: #a64b2a;
+  --warning-soft: rgba(166, 75, 42, 0.12);
+  --info: #275ea3;
+  --info-soft: rgba(39, 94, 163, 0.12);
   --shadow: 0 22px 50px rgba(18, 27, 38, 0.12);
+  --shadow-soft: 0 16px 34px rgba(18, 27, 38, 0.08);
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
 
@@ -1786,11 +1803,26 @@ body {
 }
 
 .hero {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.75fr);
   gap: 24px;
-  align-items: flex-start;
+  align-items: stretch;
   margin-bottom: 24px;
+}
+
+.hero-main {
+  padding: 28px;
+  border-radius: 30px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(248, 239, 229, 0.96)),
+    rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(179, 92, 46, 0.14);
+  box-shadow: var(--shadow);
+}
+
+.hero-side {
+  display: grid;
+  gap: 14px;
 }
 
 .eyebrow {
@@ -1801,10 +1833,14 @@ body {
   color: var(--accent);
 }
 
+.hero-kicker {
+  margin-bottom: 10px;
+}
+
 .hero h1 {
   margin: 0;
   font-size: clamp(2rem, 4vw, 3.3rem);
-  line-height: 1;
+  line-height: 1.02;
 }
 
 .subtitle {
@@ -1814,21 +1850,69 @@ body {
   line-height: 1.6;
 }
 
+.hero-highlights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.hero-chip {
+  min-width: 150px;
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(20, 32, 51, 0.05);
+  border: 1px solid rgba(20, 32, 51, 0.08);
+  box-shadow: var(--shadow-soft);
+}
+
+.hero-chip-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.hero-chip-value {
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
 .hero-note {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  justify-content: flex-end;
+}
+
+.hero-status {
+  border-radius: 24px;
+  padding: 20px;
+  border: 1px solid rgba(179, 92, 46, 0.14);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-soft);
+}
+
+.hero-status h2 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
 }
 
 .badge {
   display: inline-flex;
   align-items: center;
+  gap: 8px;
   padding: 10px 14px;
   border-radius: 999px;
   background: rgba(20, 32, 51, 0.08);
   color: var(--ink);
   font-size: 0.92rem;
+}
+
+.badge-neutral {
+  background: rgba(20, 32, 51, 0.08);
 }
 
 .layout {
@@ -1880,27 +1964,83 @@ body {
   line-height: 1.5;
 }
 
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.stat-card {
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(20, 32, 51, 0.08);
+  box-shadow: var(--shadow-soft);
+}
+
+.stat-label {
+  margin: 0;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.stat-value {
+  margin: 8px 0 4px;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.stat-copy {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .module-nav {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 10px;
   margin-bottom: 18px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
 }
 
 .module-button {
   border: 0;
-  border-radius: 999px;
-  padding: 10px 16px;
+  border-radius: 18px;
+  min-width: max-content;
+  padding: 12px 16px;
   background: rgba(20, 32, 51, 0.07);
   color: var(--ink);
   cursor: pointer;
-  transition: transform 180ms ease, background 180ms ease;
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  transition:
+    transform 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .module-button:hover,
 .module-button[aria-current="true"] {
   background: var(--accent-soft);
   transform: translateY(-1px);
+  box-shadow: var(--shadow-soft);
+}
+
+.module-button-title {
+  font-weight: 600;
+}
+
+.module-button-meta {
+  font-size: 0.78rem;
+  color: var(--muted);
 }
 
 .module-content {
@@ -1948,7 +2088,7 @@ body {
 }
 
 .workspace-panel {
-  border: 1px solid rgba(20, 32, 51, 0.1);
+  border: 1px solid rgba(20, 32, 51, 0.09);
   border-radius: 22px;
   padding: 18px;
   background: rgba(255, 255, 255, 0.9);
@@ -1985,15 +2125,23 @@ body {
 
 .card,
 .record-card {
-  border: 1px solid rgba(20, 32, 51, 0.1);
+  border: 1px solid rgba(20, 32, 51, 0.09);
   border-radius: 18px;
   padding: 16px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--panel-strong);
+  box-shadow: var(--shadow-soft);
+}
+
+.record-card {
+  display: grid;
+  gap: 12px;
+  cursor: pointer;
 }
 
 .record-card.is-selected {
-  border-color: rgba(179, 92, 46, 0.44);
-  box-shadow: 0 18px 36px rgba(179, 92, 46, 0.14);
+  border-color: rgba(179, 92, 46, 0.42);
+  box-shadow: 0 20px 40px rgba(179, 92, 46, 0.16);
+  transform: translateY(-1px);
 }
 
 .record-card h3,
@@ -2002,8 +2150,31 @@ body {
   font-size: 1rem;
 }
 
+.record-card-header,
+.detail-hero-head,
+.card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.card-kicker {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
 .muted {
   color: var(--muted);
+}
+
+.record-summary,
+.detail-summary-copy {
+  margin: 0;
+  line-height: 1.5;
 }
 
 .record-meta,
@@ -2022,6 +2193,41 @@ body {
   background: rgba(179, 92, 46, 0.12);
   color: var(--accent);
   font-size: 0.85rem;
+}
+
+.tag.subtle {
+  background: rgba(20, 32, 51, 0.06);
+  color: var(--ink);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-badge.tone-positive {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.status-badge.tone-warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.status-badge.tone-info {
+  background: var(--info-soft);
+  color: var(--info);
+}
+
+.status-badge.tone-neutral {
+  background: rgba(20, 32, 51, 0.08);
+  color: var(--ink);
 }
 
 .bullet-list {
@@ -2055,11 +2261,13 @@ body {
   background: var(--ink);
   color: white;
   font: inherit;
+  box-shadow: 0 10px 24px rgba(20, 32, 51, 0.12);
 }
 
 .button.secondary {
   background: rgba(20, 32, 51, 0.08);
   color: var(--ink);
+  box-shadow: none;
 }
 
 .status-inline {
@@ -2090,6 +2298,20 @@ body {
   text-align: right;
 }
 
+.detail-hero-card {
+  display: grid;
+  gap: 12px;
+}
+
+.action-group {
+  display: grid;
+  gap: 10px;
+}
+
+.action-group + .action-group {
+  margin-top: 4px;
+}
+
 .activity-list {
   list-style: none;
   margin: 0;
@@ -2099,10 +2321,29 @@ body {
 }
 
 .activity-item {
-  padding: 12px 14px;
+  padding: 13px 14px;
   border-radius: 16px;
   background: rgba(20, 32, 51, 0.05);
+  color: var(--ink);
+  display: grid;
+  gap: 6px;
+}
+
+.activity-item.is-latest {
+  background: rgba(179, 92, 46, 0.09);
+  border: 1px solid rgba(179, 92, 46, 0.18);
+}
+
+.activity-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   color: var(--muted);
+}
+
+.activity-copy {
+  color: var(--muted);
+  line-height: 1.45;
 }
 
 .empty-state {
@@ -2118,14 +2359,60 @@ body {
   }
 
   .hero {
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
 
-  .hero-note {
-    justify-content: flex-start;
+  .hero-main {
+    padding: 24px;
   }
 
   .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .detail-row {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .detail-row span {
+    text-align: left;
+  }
+}
+
+@media (max-width: 640px) {
+  .shell {
+    width: min(100%, calc(100% - 24px));
+    padding: 18px 0 28px;
+  }
+
+  .hero-main,
+  .hero-status,
+  .panel,
+  .workspace-panel {
+    border-radius: 22px;
+  }
+
+  .hero-note,
+  .hero-highlights,
+  .toolbar {
+    gap: 8px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .module-nav {
+    margin-inline: -2px;
+    padding-inline: 2px;
+  }
+
+  .record-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -2421,7 +2708,11 @@ function logAction(message) {
     return;
   }
 
-  state.localLog.unshift(message);
+  const timeLabel = new Date().toLocaleTimeString('es-AR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  state.localLog.unshift(timeLabel + ' - ' + message);
   state.localLog = state.localLog.slice(0, 14);
 }
 
@@ -2543,11 +2834,158 @@ function getSelectedRecord(module) {
   return records.find((record) => record.id === state.selectedRecordId) || null;
 }
 
+function getAllCollections() {
+  return state.data?.collections && typeof state.data.collections === 'object'
+    ? state.data.collections
+    : {};
+}
+
+function countAllMockRecords() {
+  return Object.values(getAllCollections()).reduce((total, value) => {
+    return total + (Array.isArray(value) ? value.length : 0);
+  }, 0);
+}
+
+function inferStatusTone(value) {
+  const normalizedValue = normalizeText(value);
+
+  if (
+    /aprobad|activo|publicad|regular|al dia|resuelt|revisad|confirmad|habilitad|simulad/.test(
+      normalizedValue,
+    )
+  ) {
+    return 'positive';
+  }
+
+  if (/alerta|pendiente|borrador|nueva|revision|seguimiento|requiere/.test(normalizedValue)) {
+    return 'warning';
+  }
+
+  if (/listo|demo|curso|registrad|proceso/.test(normalizedValue)) {
+    return 'info';
+  }
+
+  return 'neutral';
+}
+
+function createStatusBadge(value) {
+  const badge = document.createElement('span');
+  badge.className = 'status-badge tone-' + inferStatusTone(value);
+  badge.textContent = String(value || 'Sin estado');
+  return badge;
+}
+
+function createTag(value, className = '') {
+  const tag = document.createElement('span');
+  tag.className = className ? 'tag ' + className : 'tag';
+  tag.textContent = value;
+  return tag;
+}
+
+function renderHeroHighlights(meta) {
+  const container = document.getElementById('app-highlights');
+
+  if (!container) {
+    return;
+  }
+
+  const modules = getModules();
+  const chips = [
+    {
+      label: 'Dominio',
+      value: meta.domain || meta.productLabel || MODE.fallbackLabel,
+    },
+    {
+      label: 'Modo',
+      value: 'Local / mock',
+    },
+    {
+      label: 'Modulos',
+      value: String(modules.length),
+    },
+    {
+      label: 'Registros mock',
+      value: String(countAllMockRecords()),
+    },
+  ];
+
+  container.innerHTML = '';
+  chips.forEach((chip) => {
+    const article = document.createElement('article');
+    article.className = 'hero-chip';
+    article.innerHTML =
+      '<span class="hero-chip-label">' +
+      chip.label +
+      '</span><strong class="hero-chip-value">' +
+      chip.value +
+      '</strong>';
+    container.appendChild(article);
+  });
+}
+
+function renderAppStats(meta) {
+  const container = document.getElementById('app-stats');
+
+  if (!container) {
+    return;
+  }
+
+  const collections = getAllCollections();
+  const exclusions = Array.isArray(meta.explicitExclusions) ? meta.explicitExclusions : [];
+  const localActions = Array.isArray(meta.localActions)
+    ? meta.localActions
+    : Array.isArray(meta.localBehavior)
+      ? meta.localBehavior
+      : [];
+  const stats = [
+    {
+      label: 'Colecciones',
+      value: String(Object.keys(collections).length),
+      copy: 'Fuentes mock activas para recorrer el flujo.',
+    },
+    {
+      label: 'Registros',
+      value: String(countAllMockRecords()),
+      copy: 'Casos locales listos para filtros, detalle y acciones.',
+    },
+    {
+      label: 'Acciones',
+      value: String(localActions.length),
+      copy: 'Interacciones simuladas disponibles en esta demo.',
+    },
+    {
+      label: 'Exclusiones',
+      value: String(exclusions.length),
+      copy: 'Limites explicitados para mantener el alcance seguro.',
+    },
+  ];
+
+  container.innerHTML = '';
+  stats.forEach((stat) => {
+    const card = document.createElement('article');
+    card.className = 'stat-card';
+    card.innerHTML =
+      '<p class="stat-label">' +
+      stat.label +
+      '</p><p class="stat-value">' +
+      stat.value +
+      '</p><p class="stat-copy">' +
+      stat.copy +
+      '</p>';
+    container.appendChild(card);
+  });
+}
+
 function updateTitle() {
   const meta = state.data.meta || {};
   const titleNode = document.getElementById('app-title');
   const subtitleNode = document.getElementById('app-subtitle');
   const summaryNode = document.getElementById('plan-summary');
+  const safetyTitleNode = document.getElementById('hero-safety-title');
+  const safetyCopyNode = document.getElementById('hero-safety-copy');
+  const modules = getModules();
+  const exclusions = Array.isArray(meta.explicitExclusions) ? meta.explicitExclusions : [];
+  const totalRecords = countAllMockRecords();
 
   titleNode.textContent =
     'Primera entrega segura de ' + (meta.domain || meta.productLabel || MODE.fallbackLabel);
@@ -2562,6 +3000,17 @@ function updateTitle() {
       ? meta.scope[0]
       : 'Se priorizo un flujo principal navegable con datos mock editables.') +
     ' Todo queda acotado a archivos locales.';
+  safetyTitleNode.textContent = 'Demo local segura y revisable';
+  safetyCopyNode.textContent =
+    'Incluye ' +
+    modules.length +
+    ' modulo(s), ' +
+    totalRecords +
+    ' registro(s) mock y ' +
+    exclusions.length +
+    ' exclusion(es) explicitas para mantener el alcance controlado.';
+  renderHeroHighlights(meta);
+  renderAppStats(meta);
 }
 
 function renderList(nodeId, values, fallbackText) {
@@ -2589,10 +3038,16 @@ function renderModuleNav() {
   container.innerHTML = '';
 
   modules.forEach((module) => {
+    const moduleRecordCount = getModuleRecords(module.collectionKey).length;
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'module-button';
-    button.textContent = module.title;
+    button.innerHTML =
+      '<span class="module-button-title">' +
+      module.title +
+      '</span><span class="module-button-meta">' +
+      moduleRecordCount +
+      ' registro(s) mock</span>';
     button.setAttribute('aria-current', state.activeModuleId === module.id ? 'true' : 'false');
     button.addEventListener('click', () => {
       state.activeModuleId = module.id;
@@ -2743,13 +3198,19 @@ function renderRecordCard(module, record, isSelected) {
     refreshView();
   });
 
+  const header = document.createElement('div');
+  header.className = 'record-card-header';
   const title = document.createElement('h3');
   title.textContent = record.nombre || record.id || 'Registro mock';
-  card.appendChild(title);
+  header.appendChild(title);
+  if (record.estado) {
+    header.appendChild(createStatusBadge(record.estado));
+  }
+  card.appendChild(header);
 
   if (record.resumen) {
     const summary = document.createElement('p');
-    summary.className = 'muted';
+    summary.className = 'record-summary muted';
     summary.textContent = record.resumen;
     card.appendChild(summary);
   }
@@ -2794,13 +3255,26 @@ function renderDetailPanel(module, record) {
     'Vista: ' + (module.screen || module.title) + '. Fuente: ' + module.collectionKey + '.';
 
   const headerCard = document.createElement('div');
-  headerCard.className = 'card';
+  headerCard.className = 'card detail-hero-card';
   headerCard.innerHTML =
-    '<h3>' +
+    '<p class="card-kicker">' +
+    (module.title || 'Modulo') +
+    '</p>' +
+    '<div class="detail-hero-head"><div><h3>' +
     (record.nombre || record.id || 'Registro mock') +
-    '</h3><p class="muted">' +
+    '</h3><p class="detail-summary-copy muted">' +
     (record.resumen || module.summary || 'Detalle local listo para revision manual.') +
-    '</p>';
+    '</p></div></div>';
+  if (record.estado) {
+    headerCard.querySelector('.detail-hero-head').appendChild(createStatusBadge(record.estado));
+  }
+  const metaRow = document.createElement('div');
+  metaRow.className = 'card-meta';
+  metaRow.appendChild(createTag('Fuente: ' + module.collectionKey, 'subtle'));
+  if (record.id) {
+    metaRow.appendChild(createTag('ID: ' + record.id, 'subtle'));
+  }
+  headerCard.appendChild(metaRow);
   container.appendChild(headerCard);
 
   const detailList = document.createElement('div');
@@ -2833,7 +3307,7 @@ function renderActionPanel(module, record) {
   const intro = document.createElement('div');
   intro.className = 'card';
   intro.innerHTML =
-    '<h3>Acciones disponibles</h3><p class="muted">Estas acciones solo actualizan datos mock locales dentro de esta demo segura.</p>';
+    '<p class="card-kicker">Interaccion segura</p><h3>Acciones disponibles</h3><p class="muted">Estas acciones solo actualizan datos mock locales dentro de esta demo segura.</p>';
   container.appendChild(intro);
 
   summaryNode.textContent =
@@ -2844,7 +3318,12 @@ function renderActionPanel(module, record) {
   if (record) {
     const recordActions = resolveActionSet(module.collectionKey);
     if (recordActions.length > 0) {
-      container.appendChild(buildActionButtons(recordActions, module, record));
+      const block = document.createElement('div');
+      block.className = 'card action-group';
+      block.innerHTML =
+        '<h3>Acciones sobre el registro</h3><p class="muted">Sirven para revisar, editar estado o registrar movimientos locales sobre el item seleccionado.</p>';
+      block.appendChild(buildActionButtons(recordActions, module, record));
+      container.appendChild(block);
     }
   } else {
     const empty = document.createElement('div');
@@ -2856,7 +3335,7 @@ function renderActionPanel(module, record) {
   const globalActions = resolveGlobalActions(module.collectionKey);
   if (globalActions.length > 0) {
     const block = document.createElement('div');
-    block.className = 'card';
+    block.className = 'card action-group';
     block.innerHTML =
       '<h3>Acciones del modulo</h3><p class="muted">Sirven para registrar avances o recrear pasos del flujo local sin salir del alcance permitido.</p>';
     block.appendChild(buildActionButtons(globalActions, module, null, 'secondary-actions'));
@@ -2871,22 +3350,31 @@ function renderDatasetOverview() {
 
   Object.entries(collections).forEach(([key, value]) => {
     const count = Array.isArray(value) ? value.length : 0;
+    const firstState =
+      Array.isArray(value) && value.find((record) => record && typeof record.estado === 'string')
+        ? value.find((record) => record && typeof record.estado === 'string').estado
+        : '';
     const card = document.createElement('div');
-    card.className = 'card';
-    const title = document.createElement('h3');
-    title.textContent = toDisplayLabel(key);
-    const detail = document.createElement('p');
-    detail.className = 'muted';
-    detail.textContent = count + ' registro(s) mock disponibles.';
-    card.appendChild(title);
-    card.appendChild(detail);
+    card.className = 'stat-card';
+    card.innerHTML =
+      '<p class="card-kicker">Coleccion mock</p><h3>' +
+      toDisplayLabel(key) +
+      '</h3><p class="stat-value">' +
+      count +
+      '</p><p class="stat-copy">registro(s) listos para revisar en esta entrega local.</p>';
+    if (firstState) {
+      const meta = document.createElement('div');
+      meta.className = 'card-meta';
+      meta.appendChild(createStatusBadge(firstState));
+      card.appendChild(meta);
+    }
     container.appendChild(card);
   });
 
   const stateCard = document.createElement('div');
-  stateCard.className = 'card';
+  stateCard.className = 'stat-card';
   stateCard.innerHTML =
-    '<h3>Estado local</h3><p class="muted">' +
+    '<p class="card-kicker">Ultimo movimiento</p><h3>Estado local</h3><p class="stat-copy">' +
     (state.localLog[0] || 'Sin eventos locales todavia.') +
     '</p>';
   container.appendChild(stateCard);
@@ -2907,8 +3395,13 @@ function renderActivityLog() {
 
   entries.forEach((entry) => {
     const item = document.createElement('li');
-    item.className = 'activity-item';
-    item.textContent = entry;
+    item.className = 'activity-item' + (entry === entries[0] ? ' is-latest' : '');
+    item.innerHTML =
+      '<span class="activity-label">' +
+      (entry === entries[0] ? 'Ultima accion' : 'Actividad local') +
+      '</span><span class="activity-copy">' +
+      entry +
+      '</span>';
     container.appendChild(item);
   });
 }
