@@ -8446,10 +8446,161 @@ function buildSafeFirstDeliveryMaterializationApprovalThemes({
   ]
 }
 
+function buildSafeFirstDeliveryMaterializationPartsFromDomainUnderstanding(
+  domainUnderstanding,
+) {
+  const normalizedDomainUnderstanding = normalizeDomainUnderstandingContract(domainUnderstanding)
+
+  if (!normalizedDomainUnderstanding) {
+    return {
+      modules: [],
+      entities: [],
+      mockCollections: [],
+      screens: [],
+      localActions: [],
+      stateHints: [],
+      approvalThemes: [],
+      explicitExclusions: [],
+      scopeHighlights: [],
+      mockDataHints: [],
+    }
+  }
+
+  const primaryModules = summarizeUniqueExecutorStrings(
+    normalizedDomainUnderstanding.primaryModules,
+    12,
+  )
+  const distinctiveModules = primaryModules.filter((entry) => {
+    const normalizedEntry = normalizeSectorDetectionText(entry)
+
+    return ![
+      'reportes',
+      'estados',
+      'panel operativo',
+      'panel operativo inicial',
+      'panel documental',
+      'panel de monitoreo',
+    ].includes(normalizedEntry)
+  })
+  const modules =
+    distinctiveModules.length > 0
+      ? summarizeUniqueExecutorStrings(primaryModules, 12)
+      : []
+  const moduleFamily = detectSafeFirstDeliveryModuleFamily(modules)
+  const entities = summarizeUniqueExecutorStrings(
+    [
+      ...summarizeUniqueExecutorStrings(normalizedDomainUnderstanding.primaryEntities, 12),
+      ...summarizeUniqueExecutorStrings(normalizedDomainUnderstanding.secondaryEntities, 12),
+      ...modules.map(inferSafeFirstDeliveryMaterializationEntityName),
+    ].filter(Boolean),
+    12,
+  )
+  const mockCollections = summarizeUniqueExecutorStrings(
+    [
+      ...modules.map(inferSafeFirstDeliveryMaterializationCollectionKey),
+      ...entities.map(inferSafeFirstDeliveryMaterializationCollectionKey),
+    ].filter(Boolean),
+    12,
+  )
+  const screens = summarizeUniqueExecutorStrings(
+    [
+      ...modules,
+      moduleFamily?.key === 'social'
+        ? 'inicio o feed'
+        : moduleFamily?.key === 'security'
+          ? 'panel de monitoreo'
+          : moduleFamily?.key === 'documental'
+            ? 'panel documental'
+            : 'panel operativo inicial',
+    ].filter(Boolean),
+    12,
+  )
+  const localActions = summarizeUniqueExecutorStrings(
+    [
+      ...summarizeUniqueExecutorStrings(normalizedDomainUnderstanding.localActions, 12),
+      ...summarizeUniqueExecutorStrings(normalizedDomainUnderstanding.coreFlows, 12),
+    ],
+    12,
+  )
+  const stateHints = summarizeUniqueExecutorStrings(
+    normalizedDomainUnderstanding.stateModel,
+    10,
+  )
+  const approvalThemes = summarizeUniqueExecutorStrings(
+    [
+      ...summarizeUniqueExecutorStrings(normalizedDomainUnderstanding.approvalThemes, 10),
+      ...summarizeUniqueExecutorStrings(normalizedDomainUnderstanding.riskThemes, 10),
+    ],
+    12,
+  )
+  const explicitExclusions = summarizeUniqueExecutorStrings(
+    normalizedDomainUnderstanding.explicitExclusions,
+    12,
+  )
+  const scopeHighlights = summarizeUniqueExecutorStrings(
+    [
+      sanitizeBusinessSectorLabel(normalizedDomainUnderstanding.intentLabel || '')
+        ? `Primera version navegable del flujo principal para ${sanitizeBusinessSectorLabel(
+            normalizedDomainUnderstanding.intentLabel,
+          )}.`
+        : '',
+      sanitizeBusinessSectorLabel(normalizedDomainUnderstanding.domainLabel || '')
+        ? `Primera version navegable del flujo principal para ${sanitizeBusinessSectorLabel(
+            normalizedDomainUnderstanding.domainLabel,
+          )}.`
+        : '',
+    ].filter(Boolean),
+    4,
+  )
+  const mockDataHints = summarizeUniqueExecutorStrings(
+    [
+      ...modules.map((entry) => {
+        const normalizedEntry = normalizeSectorDetectionText(entry)
+
+        if (normalizedEntry === 'reportes') {
+          return 'Reportes mock para revisar actividad, estados o resultados del flujo principal.'
+        }
+
+        if (normalizedEntry === 'estados') {
+          return 'Estados mock para validar transiciones del flujo principal.'
+        }
+
+        return `${toTitleCaseWords(entry)} mock para recorrer el flujo principal de forma local.`
+      }),
+      ...entities.map(
+        (entry) =>
+          `${toTitleCaseWords(entry)} mock para revisar el flujo principal sin datos reales.`,
+      ),
+    ],
+    12,
+  )
+
+  if (stateHints.length > 0) {
+    pushUniquePlannerValues(mockDataHints, [
+      `Estados simulados de referencia para validar transiciones como ${stateHints.join(', ')}.`,
+    ])
+  }
+
+  return {
+    modules,
+    entities,
+    mockCollections,
+    screens,
+    localActions,
+    stateHints,
+    approvalThemes,
+    explicitExclusions,
+    scopeHighlights,
+    mockDataHints,
+  }
+}
+
 function buildSafeFirstDeliveryMaterializationContract({
   domainLabel,
   productType,
   modules,
+  entities,
+  mockCollections,
   screens,
   localActions,
   explicitExclusions,
@@ -8458,6 +8609,8 @@ function buildSafeFirstDeliveryMaterializationContract({
   mockDataHints,
 }) {
   const normalizedModules = summarizeUniqueExecutorStrings(modules, 12)
+  const normalizedEntities = summarizeUniqueExecutorStrings(entities, 12)
+  const normalizedMockCollections = summarizeUniqueExecutorStrings(mockCollections, 12)
   const normalizedScreens = summarizeUniqueExecutorStrings(screens, 12)
   const normalizedLocalActions = summarizeUniqueExecutorStrings(localActions, 12)
   const normalizedExclusions = summarizeUniqueExecutorStrings(explicitExclusions, 12)
@@ -8466,7 +8619,7 @@ function buildSafeFirstDeliveryMaterializationContract({
   const normalizedMockDataHints = summarizeUniqueExecutorStrings(mockDataHints, 12)
   const entityInferenceSources =
     normalizedModules.length > 0 ? normalizedModules : normalizedMockDataHints
-  const entities = summarizeUniqueExecutorStrings(
+  const inferredEntities = summarizeUniqueExecutorStrings(
     [
       ...entityInferenceSources.map(inferSafeFirstDeliveryMaterializationEntityName),
     ].filter(Boolean),
@@ -8474,20 +8627,26 @@ function buildSafeFirstDeliveryMaterializationContract({
   )
   const collectionInferenceSources =
     normalizedModules.length > 0 ? normalizedModules : normalizedMockDataHints
-  const mockCollections = summarizeUniqueExecutorStrings(
+  const inferredMockCollections = summarizeUniqueExecutorStrings(
     [
       ...collectionInferenceSources.map(inferSafeFirstDeliveryMaterializationCollectionKey),
     ].filter(Boolean),
     12,
   )
+  const resolvedEntities =
+    normalizedEntities.length > 0 ? normalizedEntities : inferredEntities
+  const resolvedMockCollections =
+    normalizedMockCollections.length > 0
+      ? normalizedMockCollections
+      : inferredMockCollections
 
   return {
     domainLabel: domainLabel || 'dominio a precisar',
     productType: productType || 'unknown',
     modules: normalizedModules,
     screens: normalizedScreens,
-    entities,
-    mockCollections,
+    entities: resolvedEntities,
+    mockCollections: resolvedMockCollections,
     localActions: normalizedLocalActions,
     stateHints: normalizedStateHints,
     approvalThemes: normalizedApprovalThemes,
@@ -8501,15 +8660,25 @@ function buildMaterializeSafeFirstDeliveryPlan({
   workspacePath,
   contextHubPack,
   intent,
+  domainUnderstanding,
 }) {
   const combinedText = [goal, context]
     .filter((value) => typeof value === 'string' && value.trim())
     .join(' ')
   const normalizedText = normalizeSectorDetectionText(combinedText)
   const dynamicPlanParts = buildDynamicSafeDeliveryPlanParts(combinedText)
+  const normalizedDomainUnderstanding = normalizeDomainUnderstandingContract(domainUnderstanding)
+  const domainUnderstandingMaterializationParts =
+    buildSafeFirstDeliveryMaterializationPartsFromDomainUnderstanding(
+      normalizedDomainUnderstanding,
+    )
+  const hasUsefulDomainUnderstandingModules =
+    domainUnderstandingMaterializationParts.modules.length > 0
   const hasExplicitDynamicModules = dynamicPlanParts.modules.length > 0
   const explicitModuleFamily = detectSafeFirstDeliveryModuleFamily(
-    dynamicPlanParts.modules,
+    hasUsefulDomainUnderstandingModules
+      ? domainUnderstandingMaterializationParts.modules
+      : dynamicPlanParts.modules,
   )
   const inferredProductType =
     intent?.productTypeHint && intent.productTypeHint !== 'unknown'
@@ -8537,14 +8706,21 @@ function buildMaterializeSafeFirstDeliveryPlan({
                       )
                     ? 'business-system'
                     : 'unknown'
-  const productType = explicitModuleFamily?.productType || inferredProductType
+  const productType =
+    normalizedDomainUnderstanding?.productKind &&
+    normalizedDomainUnderstanding.productKind !== 'unknown'
+      ? normalizedDomainUnderstanding.productKind
+      : explicitModuleFamily?.productType || inferredProductType
   const contextHubAvailable = contextHubPack?.available === true
   const inferredDomain = extractProductArchitectureDomainLabel(
     goal,
     context,
     inferredProductType,
   )
-  const domain = explicitModuleFamily?.domainLabel || inferredDomain
+  const domain =
+    sanitizeBusinessSectorLabel(normalizedDomainUnderstanding?.domainLabel || '') ||
+    explicitModuleFamily?.domainLabel ||
+    inferredDomain
   const domainLabel = domain || 'dominio a precisar'
   const isSchoolCrm =
     explicitModuleFamily?.key === 'school-crm' ||
@@ -8619,6 +8795,28 @@ function buildMaterializeSafeFirstDeliveryPlan({
       'consultar alumnos mock y revisar familias o responsables asociados',
       'registrar comunicacion simulada y actualizar seguimiento local',
       'revisar reportes mock sin datos sensibles reales',
+    ])
+  } else if (hasUsefulDomainUnderstandingModules) {
+    pushUniquePlannerValues(
+      scopeHighlights,
+      domainUnderstandingMaterializationParts.scopeHighlights.length > 0
+        ? domainUnderstandingMaterializationParts.scopeHighlights
+        : [`Primera version navegable del flujo principal para ${domainLabel}.`],
+    )
+    pushUniquePlannerValues(moduleHighlights, domainUnderstandingMaterializationParts.modules)
+    pushUniquePlannerValues(screenHighlights, domainUnderstandingMaterializationParts.screens)
+    pushUniquePlannerValues(
+      mockDataHighlights,
+      domainUnderstandingMaterializationParts.mockDataHints,
+    )
+    pushUniquePlannerValues(
+      localBehaviorHighlights,
+      domainUnderstandingMaterializationParts.localActions,
+    )
+    pushUniquePlannerValues(moduleHighlights, ['panel operativo'])
+    pushUniquePlannerValues(screenHighlights, ['panel operativo inicial'])
+    pushUniquePlannerValues(localBehaviorHighlights, [
+      'Revisar el flujo principal con entidades mock y actividad local sin integraciones reales.',
     ])
   } else if (hasExplicitDynamicModules) {
     pushUniquePlannerValues(scopeHighlights, [
@@ -8716,32 +8914,76 @@ function buildMaterializeSafeFirstDeliveryPlan({
     'integraciones externas reales',
     'datos sensibles reales',
   ])
-  const approvalThemes = buildSafeFirstDeliveryMaterializationApprovalThemes({
-    productType,
-    isSchoolCrm,
-  })
+  pushUniquePlannerValues(
+    exclusionHighlights,
+    domainUnderstandingMaterializationParts.explicitExclusions,
+  )
+  const approvalThemes = hasUsefulDomainUnderstandingModules
+    ? summarizeUniqueExecutorStrings(
+        [
+          ...domainUnderstandingMaterializationParts.approvalThemes,
+          ...buildSafeFirstDeliveryMaterializationApprovalThemes({
+            productType,
+            isSchoolCrm,
+          }),
+        ],
+        12,
+      )
+    : buildSafeFirstDeliveryMaterializationApprovalThemes({
+        productType,
+        isSchoolCrm,
+      })
+  const stateHints = hasUsefulDomainUnderstandingModules
+    ? summarizeUniqueExecutorStrings(
+        [
+          ...domainUnderstandingMaterializationParts.stateHints,
+          ...buildSafeFirstDeliveryMaterializationStateHints({
+            productType,
+            isSchoolCrm,
+            isRequestTrackingSystem,
+          }),
+        ],
+        10,
+      )
+    : buildSafeFirstDeliveryMaterializationStateHints({
+        productType,
+        isSchoolCrm,
+        isRequestTrackingSystem,
+      })
   const safeFirstDeliveryMaterialization = buildSafeFirstDeliveryMaterializationContract({
     domainLabel,
     productType,
     modules: moduleHighlights,
+    entities: domainUnderstandingMaterializationParts.entities,
+    mockCollections: domainUnderstandingMaterializationParts.mockCollections,
     screens: screenHighlights,
     localActions: localBehaviorHighlights,
     explicitExclusions: exclusionHighlights,
     approvalThemes,
-    stateHints: buildSafeFirstDeliveryMaterializationStateHints({
-      productType,
-      isSchoolCrm,
-      isRequestTrackingSystem,
-    }),
+    stateHints,
     mockDataHints: mockDataHighlights,
   })
   const targetFolderName = buildMaterializeSafeFirstDeliveryFolderName({
-    productType,
-    domain,
-    modules: moduleHighlights,
+    productType:
+      normalizedDomainUnderstanding?.productKind &&
+      normalizedDomainUnderstanding.productKind !== 'unknown'
+        ? normalizedDomainUnderstanding.productKind
+        : productType,
+    domain:
+      sanitizeBusinessSectorLabel(normalizedDomainUnderstanding?.domainLabel || '') || domain,
+    modules:
+      hasUsefulDomainUnderstandingModules
+        ? domainUnderstandingMaterializationParts.modules
+        : moduleHighlights,
     entities: safeFirstDeliveryMaterialization.entities,
     mockCollections: safeFirstDeliveryMaterialization.mockCollections,
-    sourceText: combinedText,
+    sourceText: [
+      sanitizeBusinessSectorLabel(normalizedDomainUnderstanding?.domainLabel || ''),
+      sanitizeBusinessSectorLabel(normalizedDomainUnderstanding?.intentLabel || ''),
+      combinedText,
+    ]
+      .filter(Boolean)
+      .join(' '),
   })
   const allowedTargetPaths = [
     targetFolderName,
@@ -12845,6 +13087,7 @@ async function buildLocalStrategicBrainDecision({
       workspacePath,
       contextHubPack,
       intent: materializeSafeFirstDeliveryIntent,
+      domainUnderstanding,
     })
 
     return buildDecision({
