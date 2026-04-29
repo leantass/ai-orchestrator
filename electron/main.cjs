@@ -6748,19 +6748,8 @@ function detectSafeFirstDeliveryRequestTrackingIntent(normalizedText) {
     return false
   }
 
-  if (
-    /\bsolicitudes?\b|\btickets?\b|\bmesa de ayuda\b|\bhelpdesk\b/u.test(
-      normalizedText,
-    )
-  ) {
-    return true
-  }
-
-  return (
-    /\bestados?\b/u.test(normalizedText) &&
-    /\boperativ|\bintern[ao]|\bgestion\b|\bobservaciones?\b|\bresponsables?\b/u.test(
-      normalizedText,
-    )
+  return /\b(?:solicitudes?|tickets?|mesa de ayuda|helpdesk|mesa de entrada|tramites?|requerimientos?|solicitudes?\s+documentales?|solicitudes?\s+operativas?|pedidos?\s+documentales?|pedidos?\s+operativos?|pedidos?\s+internos?)\b/u.test(
+    normalizedText,
   )
 }
 
@@ -6908,7 +6897,7 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
     {
       label: 'responsables',
       patterns: [/\bresponsables?\b/u],
-      mockData: 'Responsables mock asociados a tareas, documentos o solicitudes.',
+      mockData: 'Responsables mock asociados a tareas, documentos u operaciones.',
       screen: 'responsables',
       behavior: 'Revisar responsables mock y su asignacion inicial.',
     },
@@ -6963,7 +6952,9 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
     },
     {
       label: 'solicitudes',
-      patterns: [/\bsolicitudes?\b|\btickets?\b|\bmesa de ayuda\b|\bhelpdesk\b/u],
+      patterns: [
+        /\b(?:solicitudes?|tickets?|mesa de ayuda|helpdesk|mesa de entrada|tramites?|requerimientos?|solicitudes?\s+documentales?|solicitudes?\s+operativas?|pedidos?\s+documentales?|pedidos?\s+operativos?|pedidos?\s+internos?)\b/u,
+      ],
       mockData: 'Solicitudes mock con historial, estado y responsables de ejemplo.',
       screen: 'detalle de solicitud',
       behavior: 'Consultar solicitudes mock y su historial local.',
@@ -7082,6 +7073,7 @@ function detectSafeFirstDeliveryModuleFamily(modules) {
       domainLabel: 'gestion operativa de solicitudes',
       productType: 'business-system',
       minimumScore: 2,
+      requiredMatches: ['solicitudes'],
       matches: ['solicitudes', 'estados', 'observaciones'],
     },
   ]
@@ -7096,8 +7088,14 @@ function detectSafeFirstDeliveryModuleFamily(modules) {
           : currentScore,
       0,
     )
+    const requiredMatches = Array.isArray(familyDefinition.requiredMatches)
+      ? familyDefinition.requiredMatches
+      : []
+    const hasRequiredMatches = requiredMatches.every((entry) =>
+      normalizedModules.includes(normalizeSectorDetectionText(entry)),
+    )
 
-    if (score <= 0) {
+    if (score <= 0 || !hasRequiredMatches) {
       return
     }
 
