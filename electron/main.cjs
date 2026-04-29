@@ -9072,18 +9072,144 @@ function buildMaterializeSafeFirstDeliveryPlan({
   }
 }
 
+function buildProductArchitecturePartsFromDomainUnderstanding(domainUnderstanding) {
+  const normalizedDomainUnderstanding = normalizeDomainUnderstandingContract(domainUnderstanding)
+
+  if (!normalizedDomainUnderstanding) {
+    return {
+      users: [],
+      roles: [],
+      coreModules: [],
+      dataEntities: [],
+      keyFlows: [],
+      criticalRisks: [],
+      approvalRequiredFor: [],
+      safeFirstDelivery: [],
+      outOfScopeForFirstIteration: [],
+    }
+  }
+
+  const roles = summarizeUniqueExecutorStrings(normalizedDomainUnderstanding.roles, 10)
+  const users = summarizeUniqueExecutorStrings(
+    [
+      ...roles,
+      ...(roles.length > 0 ? ['administrador'] : []),
+    ],
+    10,
+  )
+  const coreModules = summarizeUniqueExecutorStrings(
+    normalizedDomainUnderstanding.primaryModules,
+    12,
+  )
+  const dataEntities = summarizeUniqueExecutorStrings(
+    [
+      ...summarizeUniqueExecutorStrings(normalizedDomainUnderstanding.primaryEntities, 12),
+      ...summarizeUniqueExecutorStrings(normalizedDomainUnderstanding.secondaryEntities, 12),
+    ],
+    12,
+  )
+  const keyFlows = summarizeUniqueExecutorStrings(
+    [
+      ...summarizeUniqueExecutorStrings(normalizedDomainUnderstanding.coreFlows, 10),
+      ...summarizeUniqueExecutorStrings(normalizedDomainUnderstanding.localActions, 10),
+    ],
+    12,
+  )
+  const criticalRisks = summarizeUniqueExecutorStrings(
+    [
+      ...summarizeUniqueExecutorStrings(normalizedDomainUnderstanding.riskThemes, 10).map(
+        (theme) => `Tema critico a validar: ${theme}.`,
+      ),
+    ],
+    12,
+  )
+  const approvalRequiredFor = summarizeUniqueExecutorStrings(
+    [
+      ...summarizeUniqueExecutorStrings(normalizedDomainUnderstanding.approvalThemes, 10).map(
+        (theme) => `Definir ${theme} antes de pasar a capacidades reales.`,
+      ),
+      ...summarizeUniqueExecutorStrings(normalizedDomainUnderstanding.riskThemes, 10).map(
+        (theme) => `Acordar alcance, controles y aprobaciones para ${theme}.`,
+      ),
+    ],
+    12,
+  )
+  const safeFirstDelivery = []
+  const outOfScopeForFirstIteration = summarizeUniqueExecutorStrings(
+    normalizedDomainUnderstanding.explicitExclusions,
+    12,
+  )
+  const stateModel = summarizeUniqueExecutorStrings(
+    normalizedDomainUnderstanding.stateModel,
+    10,
+  )
+  const normalizedDomainLabel = sanitizeBusinessSectorLabel(
+    normalizedDomainUnderstanding.domainLabel || '',
+  )
+  const normalizedIntentLabel = sanitizeBusinessSectorLabel(
+    normalizedDomainUnderstanding.intentLabel || '',
+  )
+
+  if (normalizedDomainLabel) {
+    pushUniquePlannerValues(safeFirstDelivery, [
+      `Primera entrega segura local y mock de ${normalizedDomainLabel} con modulos principales revisables.`,
+    ])
+  }
+
+  if (coreModules.length > 0) {
+    pushUniquePlannerValues(safeFirstDelivery, [
+      `Modulos iniciales priorizados: ${coreModules.join(', ')}.`,
+    ])
+  }
+
+  if (normalizedIntentLabel) {
+    pushUniquePlannerValues(safeFirstDelivery, [
+      `Recorte inicial enfocado en ${normalizedIntentLabel} sin integraciones reales.`,
+    ])
+  }
+
+  if (keyFlows.length > 0) {
+    pushUniquePlannerValues(safeFirstDelivery, [
+      `Flujos iniciales revisables: ${keyFlows.slice(0, 3).join(' | ')}.`,
+    ])
+  }
+
+  if (stateModel.length > 0) {
+    pushUniquePlannerValues(safeFirstDelivery, [
+      `Estados simulados de referencia: ${stateModel.join(', ')}.`,
+    ])
+  }
+
+  return {
+    users,
+    roles,
+    coreModules,
+    dataEntities,
+    keyFlows,
+    criticalRisks,
+    approvalRequiredFor,
+    safeFirstDelivery,
+    outOfScopeForFirstIteration,
+  }
+}
+
 function buildProductArchitecturePlan({
   goal,
   context,
   contextHubPack,
   intent,
+  domainUnderstanding,
 }) {
   const combinedText = [goal, context]
     .filter((value) => typeof value === 'string' && value.trim())
     .join(' ')
   const normalizedText = normalizeSectorDetectionText(combinedText)
+  const normalizedDomainUnderstanding = normalizeDomainUnderstandingContract(domainUnderstanding)
   const productType =
-    intent?.productTypeHint && intent.productTypeHint !== 'unknown'
+    normalizedDomainUnderstanding?.productKind &&
+    normalizedDomainUnderstanding.productKind !== 'unknown'
+      ? normalizedDomainUnderstanding.productKind
+      : intent?.productTypeHint && intent.productTypeHint !== 'unknown'
       ? intent.productTypeHint
       : /\bcarrito\b|\bcheckout\b|\bmercado pago\b|\bpagos\b/u.test(normalizedText)
         ? 'ecommerce'
@@ -9104,7 +9230,13 @@ function buildProductArchitecturePlan({
                       )
                     ? 'business-system'
                     : 'unknown'
-  const domain = extractProductArchitectureDomainLabel(goal, context, productType)
+  const domain =
+    sanitizeBusinessSectorLabel(normalizedDomainUnderstanding?.domainLabel || '') ||
+    extractProductArchitectureDomainLabel(goal, context, productType)
+  const domainUnderstandingArchitectureParts =
+    buildProductArchitecturePartsFromDomainUnderstanding(normalizedDomainUnderstanding)
+  const hasUsefulDomainUnderstandingModules =
+    domainUnderstandingArchitectureParts.coreModules.length > 0
   const users = []
   const roles = []
   const coreModules = []
@@ -9293,30 +9425,71 @@ function buildProductArchitecturePlan({
       ])
       break
     default:
-      pushUniquePlannerValues(users, ['administrador', 'operador principal', 'usuario final'])
-      pushUniquePlannerValues(roles, ['admin', 'operador', 'viewer'])
-      pushUniquePlannerValues(
-        coreModules,
-        ['usuarios y roles', 'operacion principal', 'reportes', 'configuracion'],
-      )
-      pushUniquePlannerValues(
-        dataEntities,
-        ['usuario', 'rol', 'entidad principal', 'evento'],
-      )
-      pushUniquePlannerValues(
-        keyFlows,
-        [
-          'Alta y gestion de entidades principales.',
-          'Operacion del flujo critico principal.',
-          'Seguimiento operativo y reportes.',
-        ],
-      )
-      pushUniquePlannerValues(safeFirstDelivery, [
-        'MVP acotado del flujo principal con permisos basicos.',
-        'Datos de ejemplo y reportes iniciales.',
-      ])
+      if (hasUsefulDomainUnderstandingModules) {
+        pushUniquePlannerValues(
+          users,
+          domainUnderstandingArchitectureParts.users.length > 0
+            ? domainUnderstandingArchitectureParts.users
+            : ['administrador', 'operador principal', 'usuario final'],
+        )
+        pushUniquePlannerValues(
+          roles,
+          domainUnderstandingArchitectureParts.roles.length > 0
+            ? domainUnderstandingArchitectureParts.roles
+            : ['admin', 'operador', 'viewer'],
+        )
+        pushUniquePlannerValues(coreModules, domainUnderstandingArchitectureParts.coreModules)
+        pushUniquePlannerValues(dataEntities, domainUnderstandingArchitectureParts.dataEntities)
+        pushUniquePlannerValues(keyFlows, domainUnderstandingArchitectureParts.keyFlows)
+        pushUniquePlannerValues(
+          safeFirstDelivery,
+          domainUnderstandingArchitectureParts.safeFirstDelivery,
+        )
+        pushUniquePlannerValues(coreModules, ['panel operativo', 'reportes'])
+      } else {
+        pushUniquePlannerValues(users, ['administrador', 'operador principal', 'usuario final'])
+        pushUniquePlannerValues(roles, ['admin', 'operador', 'viewer'])
+        pushUniquePlannerValues(
+          coreModules,
+          ['usuarios y roles', 'operacion principal', 'reportes', 'configuracion'],
+        )
+        pushUniquePlannerValues(
+          dataEntities,
+          ['usuario', 'rol', 'entidad principal', 'evento'],
+        )
+        pushUniquePlannerValues(
+          keyFlows,
+          [
+            'Alta y gestion de entidades principales.',
+            'Operacion del flujo critico principal.',
+            'Seguimiento operativo y reportes.',
+          ],
+        )
+        pushUniquePlannerValues(safeFirstDelivery, [
+          'MVP acotado del flujo principal con permisos basicos.',
+          'Datos de ejemplo y reportes iniciales.',
+        ])
+      }
       break
   }
+
+  pushUniquePlannerValues(users, domainUnderstandingArchitectureParts.users)
+  pushUniquePlannerValues(roles, domainUnderstandingArchitectureParts.roles)
+  pushUniquePlannerValues(coreModules, domainUnderstandingArchitectureParts.coreModules)
+  pushUniquePlannerValues(dataEntities, domainUnderstandingArchitectureParts.dataEntities)
+  pushUniquePlannerValues(keyFlows, domainUnderstandingArchitectureParts.keyFlows)
+  pushUniquePlannerValues(criticalRisks, domainUnderstandingArchitectureParts.criticalRisks, 14)
+  pushUniquePlannerValues(
+    approvalRequiredFor,
+    domainUnderstandingArchitectureParts.approvalRequiredFor,
+    12,
+  )
+  pushUniquePlannerValues(safeFirstDelivery, domainUnderstandingArchitectureParts.safeFirstDelivery)
+  pushUniquePlannerValues(
+    outOfScopeForFirstIteration,
+    domainUnderstandingArchitectureParts.outOfScopeForFirstIteration,
+    12,
+  )
 
   if (/\bescuelas?\b/u.test(normalizedText)) {
     pushUniquePlannerValues(users, ['administrador escolar', 'docente', 'preceptor o directivo', 'familia o alumno'])
@@ -13159,6 +13332,7 @@ async function buildLocalStrategicBrainDecision({
       context,
       contextHubPack,
       intent: productArchitectureIntent,
+      domainUnderstanding,
     })
 
     return buildDecision({
