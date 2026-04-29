@@ -7215,6 +7215,7 @@ function buildDomainUnderstanding({
     [
       ...dynamicPlanParts.modules,
       ...fallbackModules,
+      resolvedFamilyKey === 'security' ? 'reportes' : '',
       /\breportes?\b/u.test(normalizedText) ? 'reportes' : '',
     ].filter(Boolean),
     12,
@@ -7371,11 +7372,158 @@ function buildDomainUnderstanding({
   }
 }
 
+function buildSafeFirstDeliveryPlanPartsFromDomainUnderstanding(domainUnderstanding) {
+  const normalizedDomainUnderstanding = normalizeDomainUnderstandingContract(domainUnderstanding)
+
+  if (!normalizedDomainUnderstanding) {
+    return {
+      modules: [],
+      mockData: [],
+      screens: [],
+      localBehavior: [],
+      explicitExclusions: [],
+      approvalRequiredLater: [],
+    }
+  }
+
+  const primaryModules = summarizeUniqueExecutorStrings(
+    normalizedDomainUnderstanding.primaryModules,
+    12,
+  )
+  const primaryEntities = summarizeUniqueExecutorStrings(
+    normalizedDomainUnderstanding.primaryEntities,
+    12,
+  )
+  const secondaryEntities = summarizeUniqueExecutorStrings(
+    normalizedDomainUnderstanding.secondaryEntities,
+    12,
+  )
+  const stateModel = summarizeUniqueExecutorStrings(normalizedDomainUnderstanding.stateModel, 10)
+  const mergedBehavior = summarizeUniqueExecutorStrings(
+    [
+      ...summarizeUniqueExecutorStrings(normalizedDomainUnderstanding.localActions, 10),
+      ...summarizeUniqueExecutorStrings(normalizedDomainUnderstanding.coreFlows, 10),
+    ],
+    10,
+  )
+  const explicitExclusions = summarizeUniqueExecutorStrings(
+    normalizedDomainUnderstanding.explicitExclusions,
+    12,
+  )
+  const approvalThemes = summarizeUniqueExecutorStrings(
+    [
+      ...summarizeUniqueExecutorStrings(normalizedDomainUnderstanding.approvalThemes, 10),
+      ...summarizeUniqueExecutorStrings(normalizedDomainUnderstanding.riskThemes, 10),
+    ],
+    12,
+  )
+  const moduleFamily = detectSafeFirstDeliveryModuleFamily(primaryModules)
+  const distinctiveModules = primaryModules.filter((entry) => {
+    const normalizedEntry = normalizeSectorDetectionText(entry)
+
+    return ![
+      'reportes',
+      'estados',
+      'panel operativo',
+      'panel operativo inicial',
+      'panel documental',
+      'panel de monitoreo',
+    ].includes(normalizedEntry)
+  })
+  const modules =
+    distinctiveModules.length > 0
+      ? summarizeUniqueExecutorStrings(
+          [
+            ...primaryModules,
+            moduleFamily?.key === 'security' ? 'reportes' : '',
+          ].filter(Boolean),
+          12,
+        )
+      : []
+  const mockData = []
+  const screens = []
+  const localBehavior = []
+
+  if (modules.length > 0) {
+    for (const moduleLabel of modules) {
+      const normalizedModuleLabel = normalizeSectorDetectionText(moduleLabel)
+
+      if (normalizedModuleLabel === 'reportes') {
+        pushUniquePlannerValues(mockData, [
+          'Reportes mock para revisar actividad, estados o resultados del flujo principal.',
+        ])
+        continue
+      }
+
+      if (normalizedModuleLabel === 'estados') {
+        pushUniquePlannerValues(mockData, [
+          'Estados mock para validar transiciones del flujo principal.',
+        ])
+        continue
+      }
+
+      pushUniquePlannerValues(mockData, [
+        `${toTitleCaseWords(moduleLabel)} mock para recorrer el flujo principal de forma local.`,
+      ])
+    }
+
+    pushUniquePlannerValues(screens, modules)
+    pushUniquePlannerValues(screens, [
+      moduleFamily?.key === 'social'
+        ? 'inicio o feed'
+        : moduleFamily?.key === 'security'
+          ? 'panel de monitoreo'
+          : moduleFamily?.key === 'documental'
+            ? 'panel documental'
+            : 'panel operativo inicial',
+    ])
+  }
+
+  if (primaryEntities.length > 0 || secondaryEntities.length > 0) {
+    const entityLabels = summarizeUniqueExecutorStrings(
+      [...primaryEntities, ...secondaryEntities],
+      10,
+    )
+
+    for (const entityLabel of entityLabels) {
+      pushUniquePlannerValues(mockData, [
+        `${toTitleCaseWords(entityLabel)} mock para revisar el flujo principal sin datos reales.`,
+      ])
+    }
+  }
+
+  if (stateModel.length > 0) {
+    pushUniquePlannerValues(mockData, [
+      `Estados simulados de referencia para validar transiciones como ${stateModel.join(', ')}.`,
+    ])
+  }
+
+  pushUniquePlannerValues(localBehavior, mergedBehavior)
+
+  if (stateModel.length > 0) {
+    pushUniquePlannerValues(localBehavior, [
+      `Cambiar estados mock como ${stateModel.join(', ')} sin depender de servicios externos.`,
+    ])
+  }
+
+  return {
+    modules,
+    mockData,
+    screens,
+    localBehavior,
+    explicitExclusions,
+    approvalRequiredLater: approvalThemes.map(
+      (theme) => `Validar ${theme} antes de pasar de mocks locales a capacidades reales.`,
+    ),
+  }
+}
+
 function buildSafeFirstDeliveryPlan({
   goal,
   context,
   contextHubPack,
   intent,
+  domainUnderstanding,
 }) {
   const combinedText = [goal, context]
     .filter((value) => typeof value === 'string' && value.trim())
@@ -7409,8 +7557,19 @@ function buildSafeFirstDeliveryPlan({
                     : 'unknown'
   const contextHubAvailable = contextHubPack?.available === true
   const domain = extractProductArchitectureDomainLabel(goal, context, productType)
-  const domainLabel = domain || 'dominio a precisar'
+  const normalizedDomainUnderstanding = normalizeDomainUnderstandingContract(domainUnderstanding)
+  const domainLabel =
+    sanitizeBusinessSectorLabel(normalizedDomainUnderstanding?.domainLabel || '') ||
+    domain ||
+    'dominio a precisar'
+  const domainIntentLabel = sanitizeBusinessSectorLabel(
+    normalizedDomainUnderstanding?.intentLabel || '',
+  )
   const dynamicPlanParts = buildDynamicSafeDeliveryPlanParts(combinedText)
+  const domainUnderstandingPlanParts =
+    buildSafeFirstDeliveryPlanPartsFromDomainUnderstanding(normalizedDomainUnderstanding)
+  const hasUsefulDomainUnderstandingModules =
+    domainUnderstandingPlanParts.modules.length > 0
   const hasExplicitDynamicModules = dynamicPlanParts.modules.length > 0
   const isSchoolCrm =
     productType === 'crm' &&
@@ -7434,6 +7593,11 @@ function buildSafeFirstDeliveryPlan({
     'Materializar solo un recorte local del flujo principal sin integraciones reales.',
     'Priorizar navegacion funcional, datos de muestra y estados simulados por sobre completitud total.',
   ])
+  if (domainIntentLabel) {
+    pushUniquePlannerValues(scope, [
+      `Priorizar el flujo principal de ${domainIntentLabel} dentro de esta primera entrega segura.`,
+    ])
+  }
   pushUniquePlannerValues(mockData, [
     'Datos de muestra consistentes para recorrer el flujo principal sin usar informacion sensible real.',
     'Estados y transiciones mock que permitan revisar el comportamiento esperado antes de integrar servicios reales.',
@@ -7458,6 +7622,11 @@ function buildSafeFirstDeliveryPlan({
     'Base de datos real, migraciones y respaldo operativo.',
     'Integraciones criticas, webhooks y despliegue.',
   ])
+  pushUniquePlannerValues(explicitExclusions, domainUnderstandingPlanParts.explicitExclusions)
+  pushUniquePlannerValues(
+    approvalRequiredLater,
+    domainUnderstandingPlanParts.approvalRequiredLater,
+  )
   pushUniquePlannerValues(successCriteria, [
     'El alcance de la primera entrega queda acotado y entendible para el usuario.',
     'Los modulos priorizados pueden revisarse con datos de muestra y sin integraciones reales.',
@@ -7543,10 +7712,30 @@ function buildSafeFirstDeliveryPlan({
         pushUniquePlannerValues(scope, [
           `Panel operativo inicial de ${domainLabel} con entidades explicitamente mencionadas en el objetivo.`,
         ])
-        pushUniquePlannerValues(modules, dynamicPlanParts.modules)
-        pushUniquePlannerValues(mockData, dynamicPlanParts.mockData)
-        pushUniquePlannerValues(screens, dynamicPlanParts.screens)
-        pushUniquePlannerValues(localBehavior, dynamicPlanParts.localBehavior)
+        pushUniquePlannerValues(
+          modules,
+          hasUsefulDomainUnderstandingModules
+            ? domainUnderstandingPlanParts.modules
+            : dynamicPlanParts.modules,
+        )
+        pushUniquePlannerValues(
+          mockData,
+          hasUsefulDomainUnderstandingModules
+            ? domainUnderstandingPlanParts.mockData
+            : dynamicPlanParts.mockData,
+        )
+        pushUniquePlannerValues(
+          screens,
+          hasUsefulDomainUnderstandingModules
+            ? domainUnderstandingPlanParts.screens
+            : dynamicPlanParts.screens,
+        )
+        pushUniquePlannerValues(
+          localBehavior,
+          hasUsefulDomainUnderstandingModules
+            ? domainUnderstandingPlanParts.localBehavior
+            : dynamicPlanParts.localBehavior,
+        )
         pushUniquePlannerValues(modules, ['panel operativo inicial'])
         pushUniquePlannerValues(screens, ['panel operativo inicial'])
         pushUniquePlannerValues(localBehavior, [
@@ -7618,7 +7807,14 @@ function buildSafeFirstDeliveryPlan({
       pushUniquePlannerValues(scope, [
         'Estructura navegable inicial del flujo principal del producto.',
       ])
-      if (hasExplicitDynamicModules) {
+      if (hasUsefulDomainUnderstandingModules) {
+        pushUniquePlannerValues(modules, domainUnderstandingPlanParts.modules)
+        pushUniquePlannerValues(mockData, domainUnderstandingPlanParts.mockData)
+        pushUniquePlannerValues(screens, domainUnderstandingPlanParts.screens)
+        pushUniquePlannerValues(localBehavior, domainUnderstandingPlanParts.localBehavior)
+        pushUniquePlannerValues(modules, ['panel operativo'])
+        pushUniquePlannerValues(screens, ['panel operativo inicial'])
+      } else if (hasExplicitDynamicModules) {
         pushUniquePlannerValues(modules, dynamicPlanParts.modules)
         pushUniquePlannerValues(mockData, dynamicPlanParts.mockData)
         pushUniquePlannerValues(screens, dynamicPlanParts.screens)
@@ -12685,6 +12881,7 @@ async function buildLocalStrategicBrainDecision({
       context,
       contextHubPack,
       intent: safeFirstDeliveryIntent,
+      domainUnderstanding,
     })
 
     return buildDecision({
