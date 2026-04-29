@@ -6764,12 +6764,34 @@ function detectSafeFirstDeliveryRequestTrackingIntent(normalizedText) {
   )
 }
 
+function detectSafeFirstDeliverySecurityMonitoringIntent(normalizedText) {
+  if (typeof normalizedText !== 'string' || !normalizedText.trim()) {
+    return false
+  }
+
+  if (
+    /\bseguridad\b|\bmonitoreo\b|\bsensores?\b|\baccesos?\b|\boperadores?\b|\bzonas?\b/u.test(
+      normalizedText,
+    )
+  ) {
+    return true
+  }
+
+  if (/\balertas?\s+vecinales?\b|\bdenuncias?\b|\bemergencias?\b/u.test(normalizedText)) {
+    return true
+  }
+
+  return /\beventos?\s+de\s+seguridad\b/u.test(normalizedText)
+}
+
 function buildDynamicSafeDeliveryPlanParts(sourceText) {
   const normalizedText = normalizeSectorDetectionText(sourceText)
   const modules = []
   const mockData = []
   const screens = []
   const localBehavior = []
+  const hasSecurityMonitoringIntent =
+    detectSafeFirstDeliverySecurityMonitoringIntent(normalizedText)
 
   if (!normalizedText) {
     return { modules, mockData, screens, localBehavior }
@@ -6813,7 +6835,7 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
     },
     {
       label: 'accesos',
-      patterns: [/\baccesos?\b/u],
+      patterns: hasSecurityMonitoringIntent ? [/\baccesos?\b/u] : [],
       mockData: 'Accesos mock con estado de ingreso y responsable local.',
       screen: 'accesos',
       behavior: 'Revisar accesos mock y su trazabilidad local.',
@@ -6827,28 +6849,30 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
     },
     {
       label: 'sensores',
-      patterns: [/\bsensores?\b/u],
+      patterns: hasSecurityMonitoringIntent ? [/\bsensores?\b/u] : [],
       mockData: 'Sensores mock con estado operativo y ultimo evento local.',
       screen: 'sensores',
       behavior: 'Cambiar estado de sensor y revisar eventos mock asociados.',
     },
     {
       label: 'zonas',
-      patterns: [/\bzonas?\b/u],
+      patterns: hasSecurityMonitoringIntent ? [/\bzonas?\b/u] : [],
       mockData: 'Zonas mock para distribuir alertas, accesos o cobertura local.',
       screen: 'zonas',
       behavior: 'Revisar zonas mock y su cobertura inicial.',
     },
     {
       label: 'operadores',
-      patterns: [/\boperadores?\b/u],
+      patterns: hasSecurityMonitoringIntent ? [/\boperadores?\b/u] : [],
       mockData: 'Operadores mock asignados a eventos o revisiones locales.',
       screen: 'operadores',
       behavior: 'Asignar operador mock y revisar su carga local.',
     },
     {
       label: 'eventos',
-      patterns: [/\beventos?\b/u],
+      patterns: hasSecurityMonitoringIntent
+        ? [/\beventos?\b|\beventos?\s+de\s+seguridad\b/u]
+        : [/\beventos?\s+de\s+seguridad\b/u],
       mockData: 'Eventos mock con estado, responsable y detalle de muestra.',
       screen: 'eventos',
       behavior: 'Registrar evento mock y revisar su detalle local.',
@@ -6954,7 +6978,7 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
     {
       label: 'reportes',
       patterns: [/\breportes?\b/u],
-      mockData: 'Reportes mock para revisar actividad, alertas o resultados del flujo principal.',
+      mockData: 'Reportes mock para revisar actividad, estados o resultados del flujo principal.',
       screen: 'reportes',
       behavior: 'Revisar reportes mock y proximos pasos del flujo local.',
     },
@@ -6982,7 +7006,11 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
     ])
   }
 
-  if (/\balertas?\b|\bsensores?\b|\beventos?\b|\baccesos?\b/u.test(normalizedText)) {
+  const securityMonitoringModuleCount = modules.filter((entry) =>
+    ['accesos', 'alertas', 'sensores', 'zonas', 'operadores', 'eventos'].includes(entry),
+  ).length
+
+  if (hasSecurityMonitoringIntent && securityMonitoringModuleCount >= 2) {
     pushUniquePlannerValues(screens, ['panel de monitoreo'])
     pushUniquePlannerValues(localBehavior, [
       'Revisar alertas, accesos o eventos mock desde un tablero inicial de monitoreo.',
@@ -7389,7 +7417,7 @@ function buildSafeFirstDeliveryPlan({
 
   if (/\busuarios\b|\broles\b|\bpermisos\b/u.test(normalizedText)) {
     pushUniquePlannerValues(modules, ['usuarios y roles'])
-    pushUniquePlannerValues(screens, ['Vista inicial de permisos o accesos mock'])
+    pushUniquePlannerValues(screens, ['Vista inicial de permisos mock'])
   }
 
   if (/\breportes\b/u.test(normalizedText)) {
