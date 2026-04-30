@@ -1224,6 +1224,38 @@ function buildMaterializeFrontendProjectLocalPlanSkipReason({
   })
 }
 
+function buildMaterializeFullstackLocalPlanSkipReason({
+  executionScope,
+  instruction,
+  plan,
+}) {
+  return buildMaterializeSafeFirstDeliveryLocalPlanSkipReason({
+    executionScope,
+    instruction,
+    plan,
+    expectedBasenames: [
+      'README.md',
+      'package.json',
+      'index.html',
+      'main.js',
+      'styles.css',
+      'mock-data.js',
+      'App.js',
+      'server.js',
+      'health.js',
+      'appointments.js',
+      'response.js',
+      'domain.js',
+      'contracts.js',
+      'schema.sql',
+      'seed-local.sql',
+      'seed-local.js',
+      'architecture.md',
+      'local-runbook.md',
+    ],
+  })
+}
+
 function buildMaterializeSafeFirstDeliveryLocalFailureResponse({
   requestId,
   instruction,
@@ -1284,6 +1316,45 @@ function buildMaterializeFrontendProjectLocalFailureResponse({
     resultPreview:
       'La materializacion frontend local no pudo iniciarse por un alcance permitido invalido o porque el plan excede los targets permitidos.',
     failureType: 'invalid_local_frontend_project_scope',
+    reasoningLayer: 'local-rules',
+    materializationLayer: 'local-deterministic',
+    details: {
+      decisionKey,
+      strategy: decisionKey,
+      executionMode: 'executor',
+      currentAction: 'build-local-materialization-plan',
+      currentTargetPath: allowedTargetPaths[0] || undefined,
+      createdPaths: [],
+      touchedPaths: [],
+      hasMaterialProgress: false,
+      materialState: 'local-deterministic-plan-invalid',
+      allowedTargetPaths,
+      errorMessage: reason,
+    },
+  }
+}
+
+function buildMaterializeFullstackLocalFailureResponse({
+  requestId,
+  instruction,
+  decisionKey,
+  executionScope,
+  reason,
+}) {
+  const allowedTargetPaths = summarizeUniqueExecutorStrings(
+    executionScope?.allowedTargetPaths,
+    24,
+  )
+
+  return {
+    ok: false,
+    ...(requestId ? { requestId } : {}),
+    instruction,
+    error:
+      'No se pudo preparar la materializacion fullstack local porque el alcance permitido es invalido o el plan excede los targets permitidos.',
+    resultPreview:
+      'La materializacion fullstack local no pudo iniciarse por un alcance permitido invalido o porque el plan excede los targets permitidos.',
+    failureType: 'invalid_local_fullstack_local_scope',
     reasoningLayer: 'local-rules',
     materializationLayer: 'local-deterministic',
     details: {
@@ -1663,6 +1734,13 @@ function isMaterializeFrontendProjectDecisionKey(value) {
   )
 }
 
+function isMaterializeFullstackLocalDecisionKey(value) {
+  return (
+    typeof value === 'string' &&
+    value.trim().toLocaleLowerCase() === 'materialize-fullstack-local-plan'
+  )
+}
+
 function normalizeExecutorContinuationAnchor(value) {
   if (!value || typeof value !== 'object') {
     return null
@@ -1694,7 +1772,7 @@ function normalizeExecutorExecutionScope(value) {
   }
 
   const objectiveScope = normalizeExecutorObjectiveScope(value.objectiveScope)
-  const allowedTargetPaths = summarizeUniqueExecutorStrings(value.allowedTargetPaths, 12)
+  const allowedTargetPaths = summarizeUniqueExecutorStrings(value.allowedTargetPaths, 48)
   const blockedTargetPaths = summarizeUniqueExecutorStrings(value.blockedTargetPaths, 8)
   const successCriteria = summarizeUniqueExecutorStrings(value.successCriteria, 8)
   const continuationAnchor = normalizeExecutorContinuationAnchor(value.continuationAnchor)
@@ -6632,6 +6710,15 @@ function detectSafeFirstDeliveryPlanningIntent(goal, context) {
       normalizedText.includes('package.json') &&
       normalizedText.includes('index.html') &&
       normalizedText.includes('readme.md'))
+  const explicitFullstackLocalPhaseIntent =
+    normalizedText.includes('deliverylevel: fullstack-local') ||
+    normalizedText.includes('accion requerida: materializar fullstack-local') ||
+    normalizedText.includes('materialize-fullstack-local-plan') ||
+    normalizedText.includes('no devolver materialize-fullstack-local-plan') ||
+    (normalizedText.includes('fullstack-local') &&
+      normalizedText.includes('frontend/package.json') &&
+      normalizedText.includes('backend/package.json') &&
+      normalizedText.includes('database/schema.sql'))
   const derivativeSignal =
     /\b(?:derivad[oa] desde arquitectura|derivado desde arquitectura|arquitectura de producto|no reanalizar toda la arquitectura|primera entrega segura priorizada)\b/u.test(
       normalizedText,
@@ -6701,6 +6788,7 @@ function detectSafeFirstDeliveryPlanningIntent(goal, context) {
   const matches =
     !looksLikeInstitutionalWebOnly &&
     !explicitFrontendProjectPhaseIntent &&
+    !explicitFullstackLocalPhaseIntent &&
     ((explicitPhaseIntent && (exclusionScore >= 2 || localPrototypeScore >= 1)) ||
       (derivativeSignal && (explicitPhaseIntent || exclusionScore >= 3)) ||
       (explicitPhaseIntent && complexityScore >= 2))
@@ -6710,6 +6798,7 @@ function detectSafeFirstDeliveryPlanningIntent(goal, context) {
     productTypeHint: directProductType,
     explicitPhaseIntent,
     explicitFrontendProjectPhaseIntent,
+    explicitFullstackLocalPhaseIntent,
     exclusionScore,
     localPrototypeScore,
     derivativeSignal,
@@ -6768,6 +6857,17 @@ function detectMaterializeSafeFirstDeliveryPlanningIntent(goal, context) {
       normalizedText.includes('package.json') &&
       normalizedText.includes('index.html') &&
       normalizedText.includes('readme.md'))
+  const explicitFullstackLocalPhaseIntent =
+    normalizedText.includes('deliverylevel: fullstack-local') ||
+    normalizedText.includes('accion requerida: materializar fullstack-local') ||
+    normalizedText.includes('materialize-fullstack-local-plan') ||
+    normalizedText.includes('sourcestrategy: scalable-delivery-plan') ||
+    normalizedText.includes('sourcenextexpectedaction: review-scalable-delivery') ||
+    normalizedText.includes('no devolver materialize-safe-first-delivery-plan') ||
+    (normalizedText.includes('fullstack-local') &&
+      normalizedText.includes('frontend/package.json') &&
+      normalizedText.includes('backend/package.json') &&
+      normalizedText.includes('database/schema.sql'))
   const explicitSafetyIntent =
     /\b(?:primera entrega segura|primera fase segura|safe first delivery|safe-first-delivery|sin pagos reales|sin credenciales|sin webhooks?|sin deploy|sin migraciones|sin auth real|sin autenticacion real|sin base de datos real|sin datos sensibles reales|sin integraciones externas reales)\b/u.test(
       normalizedText,
@@ -6786,6 +6886,7 @@ function detectMaterializeSafeFirstDeliveryPlanningIntent(goal, context) {
   const matches =
     !looksLikeInstitutionalWebOnly &&
     !explicitFrontendProjectPhaseIntent &&
+    !explicitFullstackLocalPhaseIntent &&
     explicitMaterializationIntent &&
     explicitSafetyIntent &&
     explicitLocalScope
@@ -6795,6 +6896,7 @@ function detectMaterializeSafeFirstDeliveryPlanningIntent(goal, context) {
     productTypeHint: directProductType,
     explicitMaterializationIntent,
     explicitFrontendProjectPhaseIntent,
+    explicitFullstackLocalPhaseIntent,
     explicitSafetyIntent,
     explicitLocalScope,
   }
@@ -6977,6 +7079,51 @@ function detectFrontendProjectMaterializationPlanningIntent(goal, context) {
 
   return {
     matches: wantsMaterialization || mentionsStaticFrontendTargets,
+    explicitSignals,
+  }
+}
+
+function detectFullstackLocalMaterializationPlanningIntent(goal, context) {
+  const rawTexts = [goal, context].filter(
+    (value) => typeof value === 'string' && value.trim(),
+  )
+  const combinedText = rawTexts.join(' ')
+  const normalizedText = normalizeSectorDetectionText(combinedText)
+
+  if (!normalizedText) {
+    return {
+      matches: false,
+      explicitSignals: [],
+    }
+  }
+
+  const explicitSignals = [
+    /\bmaterializ(?:ar|acion)\b/u.test(normalizedText) ? 'materializar' : '',
+    /\bpreparar\b/u.test(normalizedText) ? 'preparar' : '',
+    /\bfullstack-local\b/u.test(normalizedText) ? 'fullstack-local' : '',
+    /\bmaterialize-fullstack-local-plan\b/u.test(normalizedText)
+      ? 'materialize-fullstack-local-plan'
+      : '',
+    /\bfrontend\/package\.json\b/u.test(normalizedText) ? 'frontend/package.json' : '',
+    /\bbackend\/package\.json\b/u.test(normalizedText) ? 'backend/package.json' : '',
+    /\bdatabase\/schema\.sql\b/u.test(normalizedText) ? 'database/schema.sql' : '',
+    /\bdocs\/architecture\.md\b/u.test(normalizedText) ? 'docs/architecture.md' : '',
+  ].filter(Boolean)
+  const wantsMaterialization =
+    normalizedText.includes('materializar fullstack-local') ||
+    normalizedText.includes('materializacion fullstack-local') ||
+    normalizedText.includes('materialize-fullstack-local-plan') ||
+    (normalizedText.includes('fullstack-local') &&
+      normalizedText.includes('materializar')) ||
+    (normalizedText.includes('fullstack-local') &&
+      normalizedText.includes('preparar materializacion'))
+  const mentionsStaticFullstackTargets =
+    normalizedText.includes('frontend/package.json') &&
+    normalizedText.includes('backend/package.json') &&
+    normalizedText.includes('database/schema.sql')
+
+  return {
+    matches: wantsMaterialization || mentionsStaticFullstackTargets,
     explicitSignals,
   }
 }
@@ -11534,6 +11681,832 @@ rootElement.innerHTML = renderApp(appData)
   }
 }
 
+function buildFullstackLocalMaterializationPlan({
+  goal,
+  context,
+  workspacePath,
+  domainUnderstanding,
+  scalableDeliveryPlan,
+}) {
+  const normalizedDomainUnderstanding = normalizeDomainUnderstandingContract(domainUnderstanding)
+  const normalizedScalablePlan =
+    normalizeScalableDeliveryPlanContract(scalableDeliveryPlan)
+  const domainLabel =
+    sanitizeBusinessSectorLabel(normalizedDomainUnderstanding?.domainLabel || '') ||
+    extractProductArchitectureDomainLabel(goal, context, '') ||
+    'sistema fullstack local'
+  const normalizedDomainText = normalizeSectorDetectionText(
+    [goal, context, domainLabel].filter(Boolean).join(' '),
+  )
+  const explicitRootPathCandidates = splitPlannerContextValues(
+    extractPlannerContextLineValue(
+      [goal, context],
+      ['allowedRootPaths', 'rootPath objetivo', 'carpeta objetivo', 'rootPath'],
+    ),
+  )
+    .map((entry) => entry.replace(/^['"]+|['".]+$/g, '').replace(/[\\/]+$/g, ''))
+    .filter(Boolean)
+  const rootFolder =
+    explicitRootPathCandidates[0] ||
+    summarizeUniqueExecutorStrings(normalizedScalablePlan?.allowedRootPaths, 1)[0] ||
+    `fullstack-local-${slugifyBusinessSector(domainLabel) || 'workspace-local'}`
+  const frontendFolder = path.join(rootFolder, 'frontend')
+  const frontendSrcFolder = path.join(frontendFolder, 'src')
+  const frontendComponentsFolder = path.join(frontendSrcFolder, 'components')
+  const backendFolder = path.join(rootFolder, 'backend')
+  const backendSrcFolder = path.join(backendFolder, 'src')
+  const backendRoutesFolder = path.join(backendSrcFolder, 'routes')
+  const backendModulesFolder = path.join(backendSrcFolder, 'modules')
+  const backendLibFolder = path.join(backendSrcFolder, 'lib')
+  const sharedFolder = path.join(rootFolder, 'shared')
+  const sharedContractsFolder = path.join(sharedFolder, 'contracts')
+  const sharedTypesFolder = path.join(sharedFolder, 'types')
+  const databaseFolder = path.join(rootFolder, 'database')
+  const databaseSeedsFolder = path.join(databaseFolder, 'seeds')
+  const scriptsFolder = path.join(rootFolder, 'scripts')
+  const docsFolder = path.join(rootFolder, 'docs')
+  const rootReadmePath = path.join(rootFolder, 'README.md')
+  const rootPackageJsonPath = path.join(rootFolder, 'package.json')
+  const frontendPackageJsonPath = path.join(frontendFolder, 'package.json')
+  const frontendIndexHtmlPath = path.join(frontendFolder, 'index.html')
+  const frontendMainJsPath = path.join(frontendSrcFolder, 'main.js')
+  const frontendStylesPath = path.join(frontendSrcFolder, 'styles.css')
+  const frontendMockDataPath = path.join(frontendSrcFolder, 'mock-data.js')
+  const frontendAppComponentPath = path.join(frontendComponentsFolder, 'App.js')
+  const backendPackageJsonPath = path.join(backendFolder, 'package.json')
+  const backendServerPath = path.join(backendSrcFolder, 'server.js')
+  const backendHealthRoutePath = path.join(backendRoutesFolder, 'health.js')
+  const backendAppointmentsPath = path.join(backendModulesFolder, 'appointments.js')
+  const backendResponseLibPath = path.join(backendLibFolder, 'response.js')
+  const sharedDomainPath = path.join(sharedContractsFolder, 'domain.js')
+  const sharedContractsPath = path.join(sharedTypesFolder, 'contracts.js')
+  const databaseReadmePath = path.join(databaseFolder, 'README.md')
+  const databaseSchemaPath = path.join(databaseFolder, 'schema.sql')
+  const databaseSeedPath = path.join(databaseSeedsFolder, 'seed-local.sql')
+  const scriptsReadmePath = path.join(scriptsFolder, 'README.md')
+  const scriptsSeedPath = path.join(scriptsFolder, 'seed-local.js')
+  const docsArchitecturePath = path.join(docsFolder, 'architecture.md')
+  const docsRunbookPath = path.join(docsFolder, 'local-runbook.md')
+  const allowedTargetPaths = [
+    rootFolder,
+    frontendFolder,
+    frontendSrcFolder,
+    frontendComponentsFolder,
+    backendFolder,
+    backendSrcFolder,
+    backendRoutesFolder,
+    backendModulesFolder,
+    backendLibFolder,
+    sharedFolder,
+    sharedContractsFolder,
+    sharedTypesFolder,
+    databaseFolder,
+    databaseSeedsFolder,
+    scriptsFolder,
+    docsFolder,
+    rootReadmePath,
+    rootPackageJsonPath,
+    frontendPackageJsonPath,
+    frontendIndexHtmlPath,
+    frontendMainJsPath,
+    frontendStylesPath,
+    frontendMockDataPath,
+    frontendAppComponentPath,
+    backendPackageJsonPath,
+    backendServerPath,
+    backendHealthRoutePath,
+    backendAppointmentsPath,
+    backendResponseLibPath,
+    sharedDomainPath,
+    sharedContractsPath,
+    databaseReadmePath,
+    databaseSchemaPath,
+    databaseSeedPath,
+    scriptsReadmePath,
+    scriptsSeedPath,
+    docsArchitecturePath,
+    docsRunbookPath,
+  ]
+  const modules = summarizeUniqueExecutorStrings(
+    normalizedScalablePlan?.modules ||
+      normalizedDomainUnderstanding?.primaryModules || [
+        'frontend local',
+        'backend local',
+        'shared contracts',
+        'database local revisable',
+        'scripts operativos',
+        'documentacion',
+      ],
+    12,
+  )
+  const detectedPrimaryEntities = summarizeUniqueExecutorStrings(
+    normalizedDomainUnderstanding?.primaryEntities,
+    8,
+  )
+  const medicalDomainDetected =
+    normalizedDomainText.includes('turnos') ||
+    normalizedDomainText.includes('medic') ||
+    normalizedDomainText.includes('salud') ||
+    normalizedDomainText.includes('clinica')
+  const domainEntities =
+    detectedPrimaryEntities.length > 0
+      ? detectedPrimaryEntities
+      : medicalDomainDetected
+        ? ['pacientes', 'profesionales', 'turnos', 'disponibilidad', 'especialidades']
+        : ['usuarios', 'entidades principales', 'agenda', 'estados']
+  const appointmentStatuses = medicalDomainDetected
+    ? ['pendiente', 'confirmado', 'en atencion', 'cancelado']
+    : ['pendiente', 'confirmado', 'resuelto']
+  const packageName =
+    slugifyBusinessSector(path.basename(rootFolder)) ||
+    slugifyBusinessSector(domainLabel) ||
+    'fullstack-local'
+  const appTitle =
+    sanitizeBusinessSectorLabel(domainLabel) || 'Sistema Fullstack Local'
+  const successCriteria = summarizeUniqueExecutorStrings(
+    [
+      `Materializar solo "${rootFolder}" y su estructura fullstack permitida dentro del workspace.`,
+      'Entregar un scaffold fullstack local, estático y revisable sin instalar dependencias.',
+      'Mantener fuera de alcance deploy, credenciales, backend real activo, base de datos real, Docker e integraciones externas.',
+      workspacePath
+        ? `Resolver todo dentro del workspace configurado: ${workspacePath}.`
+        : 'Resolver todo dentro del workspace activo.',
+    ],
+    8,
+  )
+  const executionScope = normalizeExecutorExecutionScope({
+    allowedTargetPaths,
+    successCriteria,
+    enforceNarrowScope: true,
+  })
+  const domainContractsObject = {
+    deliveryLevel: 'fullstack-local',
+    domainLabel: appTitle,
+    modules,
+    entities: domainEntities,
+    appointmentStatuses,
+    installRequired: false,
+    activeServices: false,
+  }
+  const frontendMockDataObject = {
+    overview: {
+      name: appTitle,
+      mode: 'local-static-review',
+      deliveryLevel: 'fullstack-local',
+    },
+    highlights: summarizeUniqueExecutorStrings(
+      [
+        ...domainEntities,
+        'Sin backend real activo',
+        'Sin base de datos real',
+        'Sin npm install',
+      ],
+      12,
+    ),
+    routes: [
+      { id: 'overview', label: 'Resumen', path: '#resumen' },
+      { id: 'appointments', label: 'Turnos', path: '#turnos' },
+      { id: 'team', label: 'Equipo', path: '#equipo' },
+    ],
+    stats: medicalDomainDetected
+      ? [
+          { label: 'Turnos del dia', value: 18 },
+          { label: 'Profesionales activos', value: 7 },
+          { label: 'Especialidades', value: 4 },
+        ]
+      : [
+          { label: 'Entidades activas', value: 12 },
+          { label: 'Flujos mock', value: 4 },
+          { label: 'Estados definidos', value: appointmentStatuses.length },
+        ],
+    appointments: medicalDomainDetected
+      ? [
+          {
+            id: 'T-001',
+            patient: 'Lucia Perez',
+            professional: 'Dra. Ana Gomez',
+            specialty: 'Clinica medica',
+            slot: '2026-05-02 09:30',
+            status: 'confirmado',
+          },
+          {
+            id: 'T-002',
+            patient: 'Martin Suarez',
+            professional: 'Dr. Pablo Ruiz',
+            specialty: 'Pediatria',
+            slot: '2026-05-02 10:15',
+            status: 'pendiente',
+          },
+        ]
+      : [
+          {
+            id: 'ITEM-001',
+            owner: 'Equipo local',
+            category: 'Flujo principal',
+            slot: '2026-05-02 09:30',
+            status: 'confirmado',
+          },
+        ],
+  }
+  const rootPackageJsonContent = `${JSON.stringify(
+    {
+      name: packageName,
+      private: true,
+      version: '0.0.0',
+      description:
+        'Scaffold fullstack local y revisable generado por JEFE sin instalar dependencias.',
+      workspaces: ['frontend', 'backend'],
+      scripts: {
+        review: 'echo "Revisar estructura fullstack local sin instalar dependencias"',
+      },
+    },
+    null,
+    2,
+  )}\n`
+  const frontendPackageJsonContent = `${JSON.stringify(
+    {
+      name: `${packageName}-frontend`,
+      private: true,
+      version: '0.0.0',
+      description: 'Frontend local estatico y revisable del scaffold fullstack.',
+      scripts: {
+        review: 'echo "Abrir frontend/index.html localmente para revisar la base visual"',
+      },
+    },
+    null,
+    2,
+  )}\n`
+  const backendPackageJsonContent = `${JSON.stringify(
+    {
+      name: `${packageName}-backend`,
+      private: true,
+      version: '0.0.0',
+      description: 'Backend local revisable sin ejecucion automatica ni dependencias instaladas.',
+      scripts: {
+        review: 'echo "Revisar backend/src sin levantar servicios"',
+      },
+    },
+    null,
+    2,
+  )}\n`
+  const frontendIndexHtmlContent = `<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${appTitle}</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
+`
+  const rootReadmeContent = `# ${appTitle}
+
+Scaffold fullstack local y revisable generado por JEFE.
+
+## Alcance
+
+- Sin npm install
+- Sin node_modules
+- Sin backend real activo
+- Sin base de datos real activa
+- Sin Docker
+- Sin deploy
+- Sin integraciones externas
+
+## Capas incluidas
+
+- frontend/
+- backend/
+- shared/
+- database/
+- scripts/
+- docs/
+
+## Como revisar
+
+1. Abrir \`frontend/index.html\` para revisar la base visual local.
+2. Inspeccionar \`backend/src/\` y \`shared/\` como contratos de referencia.
+3. Revisar \`database/schema.sql\` y \`database/seeds/seed-local.sql\` como diseno editable.
+4. Confirmar en \`docs/\` los limites antes de pensar en una fase ejecutable real.
+`
+  const frontendStylesContent = `:root {
+  color-scheme: light;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: #f4f7fb;
+  color: #112031;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top, rgba(37, 99, 235, 0.14), transparent 35%),
+    linear-gradient(180deg, #f9fbff 0%, #eef4fb 100%);
+}
+
+.app-shell {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0 48px;
+}
+
+.hero,
+.panel {
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
+}
+
+.hero {
+  padding: 28px;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+}
+
+.hero p,
+.panel p {
+  color: #425466;
+  line-height: 1.7;
+}
+
+.chip-row,
+.stats-grid,
+.panel-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.chip {
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #0f3d68;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.grid {
+  margin-top: 24px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.panel {
+  padding: 20px;
+}
+
+.panel h2 {
+  margin: 0 0 12px;
+  font-size: 1.05rem;
+}
+
+.panel ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #425466;
+  line-height: 1.6;
+}
+
+.stat {
+  min-width: 150px;
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.04);
+  padding: 16px;
+}
+
+.stat strong {
+  display: block;
+  font-size: 1.5rem;
+}
+`
+  const frontendMockDataContent = `export const fullstackPlan = ${JSON.stringify(
+    frontendMockDataObject,
+    null,
+    2,
+  )}
+`
+  const frontendAppComponentContent = `export function renderApp(fullstackPlan) {
+  const routes = Array.isArray(fullstackPlan?.routes) ? fullstackPlan.routes : []
+  const highlights = Array.isArray(fullstackPlan?.highlights) ? fullstackPlan.highlights : []
+  const stats = Array.isArray(fullstackPlan?.stats) ? fullstackPlan.stats : []
+  const appointments = Array.isArray(fullstackPlan?.appointments)
+    ? fullstackPlan.appointments
+    : []
+
+  return \`
+    <main class="app-shell">
+      <section class="hero">
+        <span class="chip">Fullstack local</span>
+        <h1>${appTitle}</h1>
+        <p>
+          Base revisable con frontend, backend, shared y database modelados
+          como scaffold local, sin instalar dependencias ni levantar servicios.
+        </p>
+        <div class="chip-row">
+          \${routes.map((route) => \`<span class="chip">\${route.label}</span>\`).join('')}
+        </div>
+      </section>
+
+      <div class="grid">
+        <section class="panel">
+          <h2>Metricas mock</h2>
+          <div class="stats-grid">
+            \${stats
+              .map(
+                (stat) => \`<div class="stat"><span>\${stat.label}</span><strong>\${stat.value}</strong></div>\`,
+              )
+              .join('')}
+          </div>
+        </section>
+        <section class="panel">
+          <h2>Capas incluidas</h2>
+          <ul>
+            <li>frontend estatico y revisable</li>
+            <li>backend de referencia sin ejecucion automatica</li>
+            <li>shared contracts entre capas</li>
+            <li>database local como esquema editable</li>
+          </ul>
+        </section>
+        <section class="panel">
+          <h2>Restricciones activas</h2>
+          <ul>
+            \${highlights.map((item) => \`<li>\${item}</li>\`).join('')}
+          </ul>
+        </section>
+        <section class="panel">
+          <h2>Agenda mock</h2>
+          <ul>
+            \${appointments
+              .map((item) => \`<li>\${item.slot} - \${item.status} - \${item.patient || item.owner}</li>\`)
+              .join('')}
+          </ul>
+        </section>
+      </div>
+    </main>
+  \`
+}
+`
+  const frontendMainJsContent = `import { renderApp } from './components/App.js'
+import { fullstackPlan } from './mock-data.js'
+
+const rootElement = document.getElementById('app')
+
+if (!rootElement) {
+  throw new Error('No se encontro el contenedor #app para renderizar el scaffold.')
+}
+
+rootElement.innerHTML = renderApp(fullstackPlan)
+`
+  const backendResponseLibContent = `function buildResponse(status, payload) {
+  return {
+    status,
+    ok: status >= 200 && status < 300,
+    payload,
+  }
+}
+
+function ok(payload) {
+  return buildResponse(200, payload)
+}
+
+module.exports = {
+  buildResponse,
+  ok,
+}
+`
+  const backendHealthRouteContent = `const { ok } = require('../lib/response')
+
+function healthRoute() {
+  return ok({
+    service: 'fullstack-local-backend',
+    mode: 'review-only',
+    activeServer: false,
+  })
+}
+
+module.exports = {
+  healthRoute,
+}
+`
+  const backendAppointmentsContent = `const appointmentStatuses = ${JSON.stringify(
+    appointmentStatuses,
+    null,
+    2,
+  )}
+
+function listMockAppointments() {
+  return [
+    {
+      id: 'APT-001',
+      patient: '${medicalDomainDetected ? 'Lucia Perez' : 'Entidad local'}',
+      professional: '${medicalDomainDetected ? 'Dra. Ana Gomez' : 'Equipo local'}',
+      status: appointmentStatuses[1] || appointmentStatuses[0],
+      slot: '2026-05-02T09:30:00',
+    },
+  ]
+}
+
+module.exports = {
+  appointmentStatuses,
+  listMockAppointments,
+}
+`
+  const backendServerContent = `const { healthRoute } = require('./routes/health')
+const { listMockAppointments } = require('./modules/appointments')
+
+function createServerManifest() {
+  return {
+    kind: 'fullstack-local',
+    activeServer: false,
+    routes: ['GET /health'],
+    sampleData: listMockAppointments(),
+    health: healthRoute(),
+  }
+}
+
+module.exports = {
+  createServerManifest,
+}
+`
+  const sharedDomainContent = `const domainContracts = ${JSON.stringify(
+    domainContractsObject,
+    null,
+    2,
+  )}
+
+module.exports = {
+  domainContracts,
+}
+`
+  const sharedContractsContent = `const { domainContracts } = require('../contracts/domain')
+
+const sharedContracts = {
+  entities: domainContracts.entities,
+  statuses: domainContracts.appointmentStatuses,
+  modules: domainContracts.modules,
+}
+
+module.exports = {
+  sharedContracts,
+}
+`
+  const databaseReadmeContent = `# Database local
+
+Esta carpeta queda como diseno revisable.
+
+- No se creo una base de datos real.
+- No se ejecutaron migraciones.
+- No se levantaron servicios locales.
+- \`schema.sql\` y \`seeds/seed-local.sql\` son solo referencias editables.
+`
+  const databaseSchemaContent = `-- Esquema local revisable para ${appTitle}
+-- No ejecutar automaticamente sin una aprobacion posterior.
+
+create table professionals (
+  id integer primary key,
+  full_name text not null,
+  specialty text not null,
+  active integer not null default 1
+);
+
+create table patients (
+  id integer primary key,
+  full_name text not null,
+  document_id text,
+  active integer not null default 1
+);
+
+create table appointments (
+  id integer primary key,
+  patient_id integer not null,
+  professional_id integer not null,
+  scheduled_at text not null,
+  status text not null,
+  notes text,
+  foreign key (patient_id) references patients(id),
+  foreign key (professional_id) references professionals(id)
+);
+
+create table availability_slots (
+  id integer primary key,
+  professional_id integer not null,
+  slot_start text not null,
+  slot_end text not null,
+  status text not null,
+  foreign key (professional_id) references professionals(id)
+);
+`
+  const databaseSeedContent = `-- Seed local de referencia. No ejecutar automaticamente.
+
+insert into professionals (id, full_name, specialty, active) values
+  (1, 'Dra. Ana Gomez', 'Clinica medica', 1),
+  (2, 'Dr. Pablo Ruiz', 'Pediatria', 1);
+
+insert into patients (id, full_name, document_id, active) values
+  (1, 'Lucia Perez', '30111222', 1),
+  (2, 'Martin Suarez', '33444555', 1);
+
+insert into appointments (id, patient_id, professional_id, scheduled_at, status, notes) values
+  (1, 1, 1, '2026-05-02T09:30:00', 'confirmado', 'Control general'),
+  (2, 2, 2, '2026-05-02T10:15:00', 'pendiente', 'Primera consulta');
+`
+  const scriptsReadmeContent = `# Scripts locales
+
+Estos scripts quedan como referencia y no se ejecutaron automaticamente.
+
+- seed-local.js describe como transformar el seed en un paso manual futuro.
+- Cualquier ejecucion real requiere aprobacion posterior.
+`
+  const scriptsSeedContent = `const seedManifest = {
+  mode: 'review-only',
+  databaseActive: false,
+  seedFile: '../database/seeds/seed-local.sql',
+  nextStep: 'Revisar schema.sql y aprobar una fase posterior antes de ejecutar seeds reales.',
+}
+
+module.exports = {
+  seedManifest,
+}
+`
+  const docsArchitectureContent = `# Arquitectura local propuesta
+
+## Capas
+
+- frontend/: base visual local y revisable
+- backend/: modulos y rutas de referencia sin servidor activo
+- shared/: contratos y tipos compartidos
+- database/: esquema y seed local solo como diseno
+- scripts/: ayudas operativas futuras sin ejecucion
+- docs/: alcance, limites y runbook manual
+
+## Dominio sugerido
+
+- Entidades: ${domainEntities.join(', ')}
+- Modulos: ${modules.join(', ')}
+- Estados principales: ${appointmentStatuses.join(', ')}
+
+## Limites
+
+- Sin npm install
+- Sin node_modules
+- Sin backend real activo
+- Sin base de datos real activa
+- Sin Docker ni servicios externos
+`
+  const docsRunbookContent = `# Local runbook
+
+## Estado actual
+
+Este scaffold solo materializa archivos locales revisables.
+
+## No ejecutado
+
+- No instalar dependencias
+- No levantar frontend
+- No levantar backend
+- No crear ni migrar una base de datos real
+- No usar datos reales
+
+## Siguiente fase posible con aprobacion
+
+1. Revisar package.json raiz, frontend y backend.
+2. Confirmar contratos compartidos y schema.sql.
+3. Aprobar una fase ejecutable futura para instalar dependencias y levantar servicios locales.
+`
+  const instructionLines = [
+    `Materializar un scaffold fullstack local y revisable dentro de "${rootFolder}" en el workspace activo.`,
+    `Usar solo archivos y carpetas permitidos dentro de ${rootFolder}.`,
+    modules.length > 0 ? `Modulos principales: ${modules.join(' | ')}.` : '',
+    'La salida debe ser estática, revisable y local, sin npm install, sin node_modules, sin levantar frontend ni backend y sin crear una base real.',
+    'Excluir explícitamente deploy, credenciales, auth real, integraciones externas, Docker y pagos reales.',
+    `allowedTargetPaths: ${allowedTargetPaths.join(', ')}`,
+    `successCriteria: ${successCriteria.join(' | ')}`,
+  ].filter(Boolean)
+
+  return {
+    tasks: [
+      {
+        step: 1,
+        title: `Preparar la carpeta "${rootFolder}" y las capas frontend, backend, shared, database, scripts y docs.`,
+        operation: 'create-folder',
+        targetPath: rootFolder,
+      },
+      {
+        step: 2,
+        title: 'Materializar archivos base revisables para frontend, backend, shared y database local.',
+        operation: 'create-or-edit-files',
+        targetPath: rootFolder,
+      },
+      {
+        step: 3,
+        title: 'Validar que todo el scaffold haya quedado dentro del scope permitido y sin servicios activos.',
+        operation: 'validate-scope',
+        targetPath: rootFolder,
+      },
+    ],
+    assumptions: [
+      'La segunda fase fullstack-local materializa un scaffold local, pero no instala dependencias ni ejecuta servicios.',
+      'Todo el scaffold debe quedar dentro de una carpeta nueva y acotada del workspace.',
+      'Backend real, base de datos real activa, deploy, Docker, credenciales e integraciones externas quedan fuera de alcance.',
+    ],
+    instruction: instructionLines.join('\n'),
+    executionScope,
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      summary: `Scaffold fullstack local creado en "${rootFolder}".`,
+      strategy: 'materialize-fullstack-local-plan',
+      reasoningLayer: 'local-rules',
+      materializationLayer: 'local-deterministic',
+      operations: [
+        { type: 'create-folder', targetPath: rootFolder },
+        { type: 'create-folder', targetPath: frontendFolder },
+        { type: 'create-folder', targetPath: frontendSrcFolder },
+        { type: 'create-folder', targetPath: frontendComponentsFolder },
+        { type: 'create-folder', targetPath: backendFolder },
+        { type: 'create-folder', targetPath: backendSrcFolder },
+        { type: 'create-folder', targetPath: backendRoutesFolder },
+        { type: 'create-folder', targetPath: backendModulesFolder },
+        { type: 'create-folder', targetPath: backendLibFolder },
+        { type: 'create-folder', targetPath: sharedFolder },
+        { type: 'create-folder', targetPath: sharedContractsFolder },
+        { type: 'create-folder', targetPath: sharedTypesFolder },
+        { type: 'create-folder', targetPath: databaseFolder },
+        { type: 'create-folder', targetPath: databaseSeedsFolder },
+        { type: 'create-folder', targetPath: scriptsFolder },
+        { type: 'create-folder', targetPath: docsFolder },
+        { type: 'replace-file', targetPath: rootReadmePath, nextContent: rootReadmeContent },
+        { type: 'replace-file', targetPath: rootPackageJsonPath, nextContent: rootPackageJsonContent },
+        { type: 'replace-file', targetPath: frontendPackageJsonPath, nextContent: frontendPackageJsonContent },
+        { type: 'replace-file', targetPath: frontendIndexHtmlPath, nextContent: frontendIndexHtmlContent },
+        { type: 'replace-file', targetPath: frontendMainJsPath, nextContent: frontendMainJsContent },
+        { type: 'replace-file', targetPath: frontendStylesPath, nextContent: frontendStylesContent },
+        { type: 'replace-file', targetPath: frontendMockDataPath, nextContent: frontendMockDataContent },
+        { type: 'replace-file', targetPath: frontendAppComponentPath, nextContent: frontendAppComponentContent },
+        { type: 'replace-file', targetPath: backendPackageJsonPath, nextContent: backendPackageJsonContent },
+        { type: 'replace-file', targetPath: backendServerPath, nextContent: backendServerContent },
+        { type: 'replace-file', targetPath: backendHealthRoutePath, nextContent: backendHealthRouteContent },
+        { type: 'replace-file', targetPath: backendAppointmentsPath, nextContent: backendAppointmentsContent },
+        { type: 'replace-file', targetPath: backendResponseLibPath, nextContent: backendResponseLibContent },
+        { type: 'replace-file', targetPath: sharedDomainPath, nextContent: sharedDomainContent },
+        { type: 'replace-file', targetPath: sharedContractsPath, nextContent: sharedContractsContent },
+        { type: 'replace-file', targetPath: databaseReadmePath, nextContent: databaseReadmeContent },
+        { type: 'replace-file', targetPath: databaseSchemaPath, nextContent: databaseSchemaContent },
+        { type: 'replace-file', targetPath: databaseSeedPath, nextContent: databaseSeedContent },
+        { type: 'replace-file', targetPath: scriptsReadmePath, nextContent: scriptsReadmeContent },
+        { type: 'replace-file', targetPath: scriptsSeedPath, nextContent: scriptsSeedContent },
+        { type: 'replace-file', targetPath: docsArchitecturePath, nextContent: docsArchitectureContent },
+        { type: 'replace-file', targetPath: docsRunbookPath, nextContent: docsRunbookContent },
+      ],
+      validations: [
+        { type: 'exists', targetPath: rootFolder, expectedKind: 'folder' },
+        { type: 'exists', targetPath: rootReadmePath, expectedKind: 'file' },
+        { type: 'exists', targetPath: rootPackageJsonPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: frontendFolder, expectedKind: 'folder' },
+        { type: 'exists', targetPath: frontendPackageJsonPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: frontendIndexHtmlPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: frontendMainJsPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: frontendStylesPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: frontendMockDataPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: frontendAppComponentPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: backendFolder, expectedKind: 'folder' },
+        { type: 'exists', targetPath: backendPackageJsonPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: backendServerPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: backendHealthRoutePath, expectedKind: 'file' },
+        { type: 'exists', targetPath: backendAppointmentsPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: backendResponseLibPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: sharedDomainPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: sharedContractsPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: databaseReadmePath, expectedKind: 'file' },
+        { type: 'exists', targetPath: databaseSchemaPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: databaseSeedPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: scriptsReadmePath, expectedKind: 'file' },
+        { type: 'exists', targetPath: scriptsSeedPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: docsArchitecturePath, expectedKind: 'file' },
+        { type: 'exists', targetPath: docsRunbookPath, expectedKind: 'file' },
+        { type: 'file-contains', targetPath: frontendIndexHtmlPath, expectedText: './src/main.js' },
+        { type: 'file-contains', targetPath: backendServerPath, expectedText: 'fullstack-local' },
+        { type: 'file-contains', targetPath: databaseSchemaPath, expectedText: 'create table appointments' },
+        { type: 'file-contains', targetPath: docsRunbookPath, expectedText: 'No instalar dependencias' },
+      ],
+    },
+  }
+}
+
 function normalizeDomainUnderstandingContract(value) {
   if (!value || typeof value !== 'object') {
     return null
@@ -14488,6 +15461,8 @@ async function buildLocalStrategicBrainDecision({
     detectMaterializeSafeFirstDeliveryPlanningIntent(goal, context)
   const frontendProjectMaterializationIntent =
     detectFrontendProjectMaterializationPlanningIntent(goal, context)
+  const fullstackLocalMaterializationIntent =
+    detectFullstackLocalMaterializationPlanningIntent(goal, context)
   const safeFirstDeliveryIntent = detectSafeFirstDeliveryPlanningIntent(goal, context)
   const scalableDeliveryIntent = detectScalableDeliveryPlanningIntent(goal, context)
   const productArchitectureIntent = detectProductArchitecturePlanningIntent(
@@ -14724,6 +15699,53 @@ async function buildLocalStrategicBrainDecision({
         'La ejecucion anterior fallo, pero aparecio un bloqueo critico nuevo y real. El Cerebro solo puede volver a preguntar por ese bloqueo antes de continuar.',
       question:
         'Aparecio un bloqueo critico nuevo tras la falla del executor. Necesito esa definicion humana para continuar sin riesgo.',
+    })
+  }
+
+  if (
+    fullstackLocalMaterializationIntent.matches &&
+    !safeFirstDeliveryIntent.matches &&
+    !scopedFileEditIntent &&
+    !localGoalDescriptor &&
+    !looksLikeWebBaseGoal &&
+    compositeSteps.length < 2 &&
+    (!previousExecutionResult ||
+      iteration === 1 ||
+      approvalAlreadyGranted ||
+      hasRecoverableExecutionError)
+  ) {
+    const scalableDeliveryPlan = buildScalableDeliveryPlan({
+      goal,
+      context,
+      workspacePath,
+      deliveryLevel: 'fullstack-local',
+      domainUnderstanding,
+      reason:
+        'El objetivo ya pide materializar un fullstack-local revisado, asi que conviene devolver una segunda fase ejecutable con scope local estricto y sin instalar dependencias ni levantar servicios.',
+    })
+    const fullstackLocalMaterializationPlan = buildFullstackLocalMaterializationPlan({
+      goal,
+      context,
+      workspacePath,
+      domainUnderstanding,
+      scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
+    })
+
+    return buildDecision({
+      decisionKey: 'materialize-fullstack-local-plan',
+      strategy: 'materialize-fullstack-local-plan',
+      executionMode: 'executor',
+      reason:
+        'El objetivo ya pide materializar el fullstack-local revisado y el Cerebro puede devolver un materializationPlan local, estructurado y revisable para el executor deterministico.',
+      tasks: fullstackLocalMaterializationPlan.tasks,
+      requiresApproval: false,
+      assumptions: fullstackLocalMaterializationPlan.assumptions,
+      instruction: fullstackLocalMaterializationPlan.instruction,
+      completed: false,
+      nextExpectedAction: 'execute-plan',
+      executionScope: fullstackLocalMaterializationPlan.executionScope,
+      scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
+      materializationPlan: fullstackLocalMaterializationPlan.materializationPlan,
     })
   }
 
@@ -15831,7 +16853,7 @@ Roles:
 Tu tarea es devolver una decision estructurada y operativa.
 
 Reglas:
-- Elegí entre estrategias compatibles con el sistema: fast-local, fast-composite, executor, web-scaffold-base, product-architecture-plan, safe-first-delivery-plan, materialize-safe-first-delivery-plan, scalable-delivery-plan, materialize-frontend-project-plan, ask-user.
+- Elegí entre estrategias compatibles con el sistema: fast-local, fast-composite, executor, web-scaffold-base, product-architecture-plan, safe-first-delivery-plan, materialize-safe-first-delivery-plan, scalable-delivery-plan, materialize-frontend-project-plan, materialize-fullstack-local-plan, ask-user.
 - Usá web-scaffold-base para webs institucionales o creativas cuando corresponda.
 - Usá product-architecture-plan cuando el objetivo implique un sistema o producto complejo (por ejemplo ecommerce, CRM, ERP, marketplace, SaaS o plataforma con usuarios, roles, backoffice, datos e integraciones) y todavía haga falta definir arquitectura antes de ejecutar.
 - Si devolvés product-architecture-plan, usá executionMode="planner-only", nextExpectedAction="review-product-architecture", requiresApproval=false y describí fases, riesgos, integraciones y primera entrega segura sin crear archivos.
@@ -15839,6 +16861,7 @@ Reglas:
 - Usá materialize-safe-first-delivery-plan cuando el objetivo ya pida materializar esa primera entrega segura con archivos locales acotados; en ese caso usá executionMode="executor", nextExpectedAction="execute-plan", requiresApproval=false, fijá una carpeta destino segura dentro del workspace y limitá el alcance a archivos mock locales sin pagos reales, credenciales, webhooks, deploy, migraciones, auth real, base de datos real ni integraciones externas reales.
 - Usá scalable-delivery-plan cuando el usuario pida explícitamente una entrega más grande y local, por ejemplo frontend real con estructura de proyecto, fullstack local con backend y base de datos local, monorepo local con apps/packages/workers o infraestructura local con Docker/Redis/cron/Postgres. En ese caso usá executionMode="planner-only", nextExpectedAction="review-scalable-delivery", requiresApproval=false, devolvé scalableDeliveryPlan completo y no crees archivos todavía.
 - Usá materialize-frontend-project-plan solo cuando el objetivo ya pida materializar un frontend-project revisado. En ese caso usá executionMode="executor", nextExpectedAction="execute-plan", requiresApproval=false, devolvé executionScope y materializationPlan acotados a una carpeta nueva del workspace con package.json, index.html, README.md y src/ estático, sin npm install, sin node_modules, sin bundler, sin backend real, sin base de datos real ni integraciones externas.
+- Usá materialize-fullstack-local-plan solo cuando el objetivo ya pida materializar un fullstack-local revisado. En ese caso usá executionMode="executor", nextExpectedAction="execute-plan", requiresApproval=false, devolvé executionScope y materializationPlan acotados a una carpeta nueva del workspace con frontend/, backend/, shared/, database/, scripts/ y docs/, sin npm install, sin node_modules, sin levantar servicios, sin base de datos real activa, sin Docker ni integraciones externas.
 - Si el pedido es ambiguo o no pide explícitamente un proyecto grande, mantenete en web-scaffold-base o safe-first-delivery-plan antes de escalar.
 - Si hace falta una decisión humana real, devolvé requiresApproval=true y un approvalRequest estructurado.
 - Si llega feedback de error recuperable, replanificá.
@@ -18650,6 +19673,8 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
     isMaterializeSafeFirstDeliveryDecisionKey(decisionKey)
   const requiresLocalFrontendProjectMaterialization =
     isMaterializeFrontendProjectDecisionKey(decisionKey)
+  const requiresLocalFullstackLocalMaterialization =
+    isMaterializeFullstackLocalDecisionKey(decisionKey)
   const derivedMaterializationPlan =
     materializationPlan ||
     !executionScope ||
@@ -18699,18 +19724,25 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
 
       if (
         requiresLocalSafeFirstDeliveryMaterialization ||
-        requiresLocalFrontendProjectMaterialization
+        requiresLocalFrontendProjectMaterialization ||
+        requiresLocalFullstackLocalMaterialization
       ) {
-        const localPlanOperationLabel = requiresLocalFrontendProjectMaterialization
-          ? 'materialize-frontend-project-plan'
-          : 'materialize-safe-first-delivery-plan'
-        const localPlanSkipReason = requiresLocalFrontendProjectMaterialization
-          ? buildMaterializeFrontendProjectLocalPlanSkipReason
-          : buildMaterializeSafeFirstDeliveryLocalPlanSkipReason
+        const localPlanOperationLabel = requiresLocalFullstackLocalMaterialization
+          ? 'materialize-fullstack-local-plan'
+          : requiresLocalFrontendProjectMaterialization
+            ? 'materialize-frontend-project-plan'
+            : 'materialize-safe-first-delivery-plan'
+        const localPlanSkipReason = requiresLocalFullstackLocalMaterialization
+          ? buildMaterializeFullstackLocalPlanSkipReason
+          : requiresLocalFrontendProjectMaterialization
+            ? buildMaterializeFrontendProjectLocalPlanSkipReason
+            : buildMaterializeSafeFirstDeliveryLocalPlanSkipReason
         const localPlanFailureResponseBuilder =
-          requiresLocalFrontendProjectMaterialization
-            ? buildMaterializeFrontendProjectLocalFailureResponse
-            : buildMaterializeSafeFirstDeliveryLocalFailureResponse
+          requiresLocalFullstackLocalMaterialization
+            ? buildMaterializeFullstackLocalFailureResponse
+            : requiresLocalFrontendProjectMaterialization
+              ? buildMaterializeFrontendProjectLocalFailureResponse
+              : buildMaterializeSafeFirstDeliveryLocalFailureResponse
         const resolvedMaterializationPlan =
           materializationPlan || derivedMaterializationPlan
 

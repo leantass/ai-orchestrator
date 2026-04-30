@@ -255,6 +255,14 @@ const frontendProjectMaterializationCase = {
   context: '',
 }
 
+const fullstackLocalMaterializationCase = {
+  id: 'fullstack-local-materialization',
+  label: 'Materializacion fullstack local',
+  goal:
+    'Hacer un sistema fullstack local para turnos medicos con frontend, backend y base de datos local.',
+  context: '',
+}
+
 function printUsage() {
   console.log('Uso: node scripts/ai-planner-smoke.mjs [--verbose] [--list] [--case=<id>]')
 }
@@ -997,6 +1005,53 @@ function buildFrontendProjectMaterializationPrompt({ goal, scalablePlan }) {
   }
 }
 
+function buildFullstackLocalMaterializationPrompt({ goal, scalablePlan }) {
+  const allowedRootPaths = summarizeUniqueStrings(scalablePlan?.allowedRootPaths, 8)
+  const targetStructure = summarizeUniqueStrings(scalablePlan?.targetStructure, 16)
+  const directories = summarizeUniqueStrings(scalablePlan?.directories, 24)
+  const filesToCreate = Array.isArray(scalablePlan?.filesToCreate)
+    ? scalablePlan.filesToCreate
+        .map((entry) => (entry && typeof entry === 'object' ? String(entry.path || '').trim() : ''))
+        .filter(Boolean)
+        .slice(0, 24)
+    : []
+  const localOnlyConstraints = summarizeUniqueStrings(
+    scalablePlan?.localOnlyConstraints,
+    16,
+  )
+  const explicitExclusions = summarizeUniqueStrings(
+    scalablePlan?.explicitExclusions,
+    16,
+  )
+
+  return {
+    goal: `Materializar fullstack-local revisado para "${goal}".`,
+    context: [
+      'deliveryLevel: fullstack-local.',
+      'accion requerida: materializar fullstack-local.',
+      allowedRootPaths.length > 0
+        ? `allowedRootPaths: ${allowedRootPaths.join(', ')}`
+        : '',
+      targetStructure.length > 0
+        ? `targetStructure: ${targetStructure.join(', ')}`
+        : '',
+      directories.length > 0 ? `directories: ${directories.join(', ')}` : '',
+      filesToCreate.length > 0 ? `filesToCreate: ${filesToCreate.join(', ')}` : '',
+      localOnlyConstraints.length > 0
+        ? `localOnlyConstraints: ${localOnlyConstraints.join(' | ')}`
+        : '',
+      explicitExclusions.length > 0
+        ? `explicitExclusions: ${explicitExclusions.join(' | ')}`
+        : '',
+      'Archivos requeridos: README.md, package.json, frontend/package.json, frontend/index.html, frontend/src/main.js, frontend/src/styles.css, frontend/src/mock-data.js, frontend/src/components/App.js, backend/package.json, backend/src/server.js, backend/src/routes/health.js, backend/src/modules/appointments.js, backend/src/lib/response.js, shared/contracts/domain.js, shared/types/contracts.js, database/README.md, database/schema.sql, database/seeds/seed-local.sql, scripts/README.md, scripts/seed-local.js, docs/architecture.md, docs/local-runbook.md.',
+      'Devolver un materialize-fullstack-local-plan ejecutable por el executor local deterministico.',
+      'No instalar dependencias, no crear node_modules, no crear .env real y no levantar servicios.',
+    ]
+      .filter(Boolean)
+      .join('\n'),
+  }
+}
+
 async function runFrontendProjectMaterializationValidation() {
   const reusablePlanningContext = {
     reusableArtifactLookup: {
@@ -1153,6 +1208,184 @@ async function runFrontendProjectMaterializationValidation() {
   }
 }
 
+async function runFullstackLocalMaterializationValidation() {
+  const reusablePlanningContext = {
+    reusableArtifactLookup: {
+      executed: false,
+      foundCount: 0,
+      matches: [],
+    },
+    reusableArtifactsFound: 0,
+    reuseDecision: false,
+    reuseReason: '',
+    reusedArtifactIds: [],
+    reuseMode: 'none',
+    creativeDirection: null,
+  }
+  const phaseOneDecision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: fullstackLocalMaterializationCase.goal,
+    context: fullstackLocalMaterializationCase.context,
+    workspacePath: 'C:/tmp/ai-planner-smoke-workspace',
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+  const scalablePlan =
+    phaseOneDecision?.scalableDeliveryPlan &&
+    typeof phaseOneDecision.scalableDeliveryPlan === 'object'
+      ? phaseOneDecision.scalableDeliveryPlan
+      : null
+  const prompt = buildFullstackLocalMaterializationPrompt({
+    goal: fullstackLocalMaterializationCase.goal,
+    scalablePlan,
+  })
+  const phaseTwoDecision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: prompt.goal,
+    context: prompt.context,
+    workspacePath: 'C:/tmp/ai-planner-smoke-workspace',
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  const failures = []
+  const strategy = String(phaseTwoDecision?.strategy || '').trim()
+  const executionMode = String(phaseTwoDecision?.executionMode || '').trim()
+  const nextExpectedAction = String(phaseTwoDecision?.nextExpectedAction || '').trim()
+  const phaseTwoScalablePlan =
+    phaseTwoDecision?.scalableDeliveryPlan &&
+    typeof phaseTwoDecision.scalableDeliveryPlan === 'object'
+      ? phaseTwoDecision.scalableDeliveryPlan
+      : null
+  const executionScope =
+    phaseTwoDecision?.executionScope && typeof phaseTwoDecision.executionScope === 'object'
+      ? phaseTwoDecision.executionScope
+      : null
+  const materializationPlan =
+    phaseTwoDecision?.materializationPlan &&
+    typeof phaseTwoDecision.materializationPlan === 'object'
+      ? phaseTwoDecision.materializationPlan
+      : null
+  const allowedTargetPaths = summarizeUniqueStrings(
+    executionScope?.allowedTargetPaths,
+    40,
+  )
+
+  if (String(phaseOneDecision?.strategy || '').trim() !== 'scalable-delivery-plan') {
+    failures.push('La fase 1 no devolvio scalable-delivery-plan para el caso fullstack-local.')
+  }
+
+  if (strategy !== 'materialize-fullstack-local-plan') {
+    failures.push(
+      `Estrategia incorrecta en fase 2. Esperado: materialize-fullstack-local-plan. Recibido: ${strategy || '(vacia)'}.`,
+    )
+  }
+
+  if (executionMode !== 'executor') {
+    failures.push(`executionMode incorrecto en fase 2. Esperado: executor. Recibido: ${executionMode || '(vacio)'}.`)
+  }
+
+  if (nextExpectedAction !== 'execute-plan') {
+    failures.push(
+      `nextExpectedAction incorrecto en fase 2. Esperado: execute-plan. Recibido: ${nextExpectedAction || '(vacio)'}.`,
+    )
+  }
+
+  if (String(phaseTwoScalablePlan?.deliveryLevel || '').trim() !== 'fullstack-local') {
+    failures.push('deliveryLevel incorrecto en fase 2 para scalableDeliveryPlan.')
+  }
+
+  if (!materializationPlan) {
+    failures.push('materializationPlan ausente en fase 2.')
+  } else {
+    if (String(materializationPlan.strategy || '').trim() !== 'materialize-fullstack-local-plan') {
+      failures.push('materializationPlan.strategy incorrecto.')
+    }
+
+    if (!Array.isArray(materializationPlan.operations) || materializationPlan.operations.length < 20) {
+      failures.push('materializationPlan.operations deberia incluir la estructura minima del fullstack local.')
+    }
+
+    if (!Array.isArray(materializationPlan.validations) || materializationPlan.validations.length < 16) {
+      failures.push('materializationPlan.validations deberia validar la estructura minima del fullstack local.')
+    }
+  }
+
+  const expectedTargets = [
+    'README.md',
+    'package.json',
+    'frontend/package.json',
+    'frontend/index.html',
+    'frontend/src/main.js',
+    'frontend/src/styles.css',
+    'frontend/src/mock-data.js',
+    'frontend/src/components/App.js',
+    'backend/package.json',
+    'backend/src/server.js',
+    'backend/src/routes/health.js',
+    'backend/src/modules/appointments.js',
+    'backend/src/lib/response.js',
+    'shared/contracts/domain.js',
+    'shared/types/contracts.js',
+    'database/README.md',
+    'database/schema.sql',
+    'database/seeds/seed-local.sql',
+    'scripts/README.md',
+    'scripts/seed-local.js',
+    'docs/architecture.md',
+    'docs/local-runbook.md',
+  ]
+
+  if (allowedTargetPaths.length === 0) {
+    failures.push('allowedTargetPaths vacio en fase 2.')
+  } else {
+    expectedTargets.forEach((token) => {
+      if (!allowedTargetPaths.some((targetPath) => normalizePathForComparison(targetPath).endsWith(token))) {
+        failures.push(`allowedTargetPaths no incluye ${token}.`)
+      }
+    })
+
+    ;['frontend/', 'backend/', 'shared/', 'database/', 'scripts/', 'docs/'].forEach((token) => {
+      const normalizedToken = normalizePathForComparison(token)
+      if (!allowedTargetPaths.some((targetPath) => normalizePathForComparison(targetPath).includes(normalizedToken))) {
+        failures.push(`allowedTargetPaths no incluye ${token}.`)
+      }
+    })
+
+    if (allowedTargetPaths.some((targetPath) => /node_modules|\.env$/i.test(targetPath))) {
+      failures.push('allowedTargetPaths no deberia incluir node_modules ni .env reales.')
+    }
+  }
+
+  return {
+    testCase: fullstackLocalMaterializationCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction,
+    scalablePlan: phaseTwoScalablePlan,
+  }
+}
+
 async function main() {
   const { verbose, listOnly, caseId } = parseArgs(process.argv.slice(2))
 
@@ -1191,6 +1424,7 @@ async function main() {
   }
 
   let frontendMaterializationResult = null
+  let fullstackMaterializationResult = null
   if (!caseId) {
     console.log('Frontend Project Materialization Check')
     console.log('=====================================')
@@ -1198,15 +1432,24 @@ async function main() {
       await runFrontendProjectMaterializationValidation()
     printScalableValidationResult(frontendMaterializationResult)
     console.log('-----------------')
+
+    console.log('Fullstack Local Materialization Check')
+    console.log('====================================')
+    fullstackMaterializationResult =
+      await runFullstackLocalMaterializationValidation()
+    printScalableValidationResult(fullstackMaterializationResult)
+    console.log('-----------------')
   }
 
   const failedScalableResults = scalableResults.filter((result) => !result.ok)
   const frontendMaterializationFailed = frontendMaterializationResult?.ok === false
+  const fullstackMaterializationFailed = fullstackMaterializationResult?.ok === false
 
   if (
     failedResults.length === 0 &&
     failedScalableResults.length === 0 &&
-    !frontendMaterializationFailed
+    !frontendMaterializationFailed &&
+    !fullstackMaterializationFailed
   ) {
     console.log(`OK. ${passedCount}/${results.length} casos pasaron.`)
     if (scalableResults.length > 0) {
@@ -1214,6 +1457,9 @@ async function main() {
     }
     if (frontendMaterializationResult) {
       console.log('OK. 1/1 check de materializacion frontend-project paso.')
+    }
+    if (fullstackMaterializationResult) {
+      console.log('OK. 1/1 check de materializacion fullstack-local paso.')
     }
     return
   }
@@ -1236,6 +1482,14 @@ async function main() {
     console.log(
       `- ${frontendMaterializationResult.testCase.id}: ${
         frontendMaterializationResult.failures[0] || 'sin detalle'
+      }`,
+    )
+  }
+  if (fullstackMaterializationFailed) {
+    console.log('check de materializacion fullstack-local fallido:')
+    console.log(
+      `- ${fullstackMaterializationResult.testCase.id}: ${
+        fullstackMaterializationResult.failures[0] || 'sin detalle'
       }`,
     )
   }

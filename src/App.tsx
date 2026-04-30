@@ -2499,9 +2499,13 @@ function ScalableDeliveryPlanCard({
   const typeLabel = getScalableDeliveryPlanTypeLabel(normalizedDeliveryLevel)
   const reviewStateLabel = reviewOnly ? 'No ejecuta todavÃ­a' : 'Plan informado'
   const nextActionLabel = getNextExpectedActionLabel(nextExpectedAction)
-  const canPrepareMaterialization =
+  const canPrepareFrontendMaterialization =
     reviewOnly &&
     normalizedDeliveryLevel.toLocaleLowerCase() === 'frontend-project' &&
+    typeof onPrepareMaterialization === 'function'
+  const canPrepareFullstackMaterialization =
+    reviewOnly &&
+    normalizedDeliveryLevel.toLocaleLowerCase() === 'fullstack-local' &&
     typeof onPrepareMaterialization === 'function'
   const fileEntries = Array.isArray(plan.filesToCreate)
     ? plan.filesToCreate
@@ -2544,13 +2548,22 @@ function ScalableDeliveryPlanCard({
           <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-medium text-amber-100">
             No ejecuta todavÃ­a
           </span>
-          {canPrepareMaterialization ? (
+          {canPrepareFrontendMaterialization ? (
             <button
               type="button"
               onClick={onPrepareMaterialization || undefined}
               className="rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-1 text-xs font-medium text-sky-100 transition hover:bg-sky-300/15"
             >
               Preparar materializaciÃ³n frontend
+            </button>
+          ) : null}
+          {canPrepareFullstackMaterialization ? (
+            <button
+              type="button"
+              onClick={onPrepareMaterialization || undefined}
+              className="rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-1 text-xs font-medium text-sky-100 transition hover:bg-sky-300/15"
+            >
+              Preparar materializacion fullstack local
             </button>
           ) : null}
         </div>
@@ -2968,6 +2981,60 @@ const buildFrontendProjectMaterializationCoherenceIssue = ({
   return ''
 }
 
+const buildFullstackLocalMaterializationCoherenceIssue = ({
+  sourcePlan,
+  metadata,
+}: {
+  sourcePlan: ScalableDeliveryPlanContract
+  metadata: PlannerExecutionMetadata
+}) => {
+  const materializationDecisionDetected =
+    normalizeOptionalString(metadata.decisionKey).toLocaleLowerCase() ===
+      'materialize-fullstack-local-plan' ||
+    normalizeOptionalString(metadata.strategy).toLocaleLowerCase() ===
+      'materialize-fullstack-local-plan'
+
+  if (!materializationDecisionDetected) {
+    return 'El planificador no devolvio un materialize-fullstack-local-plan valido.'
+  }
+
+  if (
+    normalizeOptionalString(metadata.executionMode).toLocaleLowerCase() !== 'executor'
+  ) {
+    return 'El plan materializable fullstack no quedo marcado para executor.'
+  }
+
+  if (
+    normalizeOptionalString(metadata.nextExpectedAction).toLocaleLowerCase() !==
+    'execute-plan'
+  ) {
+    return 'El plan materializable fullstack no quedo listo para execute-plan.'
+  }
+
+  if (!metadata.executionScope?.allowedTargetPaths?.length) {
+    return 'El plan materializable fullstack no devolvio allowedTargetPaths.'
+  }
+
+  if (!metadata.materializationPlan) {
+    return 'El plan materializable fullstack no devolvio materializationPlan.'
+  }
+
+  const sourceRootPath = normalizeOptionalStringArray(sourcePlan.allowedRootPaths)[0]
+  const returnedRootPath =
+    normalizeOptionalStringArray(metadata.executionScope?.allowedTargetPaths)[0]
+
+  if (
+    sourceRootPath &&
+    returnedRootPath &&
+    normalizeOptionalString(sourceRootPath).toLocaleLowerCase() !==
+      normalizeOptionalString(returnedRootPath).toLocaleLowerCase()
+  ) {
+    return `El root permitido del plan materializable no coincide con el plan fullstack activo. Fuente: ${sourceRootPath}. Devuelto: ${returnedRootPath}.`
+  }
+
+  return ''
+}
+
 const buildFrontendProjectMaterializationPrompt = ({
   plan,
   originalGoal,
@@ -3025,6 +3092,71 @@ const buildFrontendProjectMaterializationPrompt = ({
         : '',
       'Materializar solo: package.json, index.html, README.md, src/main.js, src/styles.css, src/mock-data.js y src/components/App.js.',
       'Sin npm install, sin node_modules, sin backend real, sin base de datos real, sin deploy y sin integraciones externas.',
+      `Usar la carpeta objetivo ${targetRoot} como raiz del scaffold.`,
+    ]
+      .filter(Boolean)
+      .join('\n'),
+  }
+}
+
+const buildFullstackLocalMaterializationPrompt = ({
+  plan,
+  originalGoal,
+  originalContext,
+}: {
+  plan: ScalableDeliveryPlanContract
+  originalGoal: string
+  originalContext: string
+}) => {
+  const allowedRootPaths = normalizeOptionalStringArray(plan.allowedRootPaths)
+  const targetStructure = normalizeOptionalStringArray(plan.targetStructure)
+  const directories = normalizeOptionalStringArray(plan.directories)
+  const filesToCreate = Array.isArray(plan.filesToCreate)
+    ? plan.filesToCreate
+        .map((entry) => normalizeOptionalString(entry.path))
+        .filter(Boolean)
+    : []
+  const constraints = normalizeOptionalStringArray(plan.localOnlyConstraints)
+  const exclusions = normalizeOptionalStringArray(plan.explicitExclusions)
+  const successCriteria = normalizeOptionalStringArray(plan.successCriteria)
+  const targetRoot =
+    allowedRootPaths[0] ||
+    normalizeOptionalString(targetStructure[0]).replace(/[\\/]+$/g, '') ||
+    'fullstack-local'
+
+  return {
+    goal: [
+      'Preparar la materializacion controlada de un fullstack-local local y revisable dentro de una carpeta nueva del workspace.',
+      'No devolver otro scalable-delivery-plan.',
+      'No devolver materialize-safe-first-delivery-plan.',
+      'No devolver materialize-frontend-project-plan.',
+      'Devolver un materialize-fullstack-local-plan ejecutable por el executor local deterministico.',
+    ].join(' '),
+    context: [
+      `Objetivo original: ${normalizeOptionalString(originalGoal) || 'No definido'}.`,
+      normalizeOptionalString(originalContext)
+        ? `Contexto previo del operador: ${normalizeOptionalString(originalContext)}.`
+        : '',
+      'sourceStrategy: scalable-delivery-plan.',
+      'sourceNextExpectedAction: review-scalable-delivery.',
+      'deliveryLevel: fullstack-local.',
+      'accion requerida: materializar fullstack-local.',
+      'modo esperado: scaffold fullstack local, estatico y revisable.',
+      `allowedRootPaths: ${allowedRootPaths.join(', ') || targetRoot}.`,
+      targetStructure.length > 0
+        ? `targetStructure: ${targetStructure.join(' | ')}.`
+        : '',
+      directories.length > 0 ? `directories: ${directories.join(' | ')}.` : '',
+      filesToCreate.length > 0 ? `filesToCreate: ${filesToCreate.join(' | ')}.` : '',
+      constraints.length > 0
+        ? `localOnlyConstraints: ${constraints.join(' | ')}.`
+        : '',
+      exclusions.length > 0 ? `explicitExclusions: ${exclusions.join(' | ')}.` : '',
+      successCriteria.length > 0
+        ? `successCriteria: ${successCriteria.join(' | ')}.`
+        : '',
+      'Materializar solo un scaffold local con README.md, package.json raiz, frontend/, backend/, shared/, database/, scripts/ y docs/.',
+      'Sin npm install, sin node_modules, sin backend real activo, sin base de datos real activa, sin Docker, sin deploy y sin integraciones externas.',
       `Usar la carpeta objetivo ${targetRoot} como raiz del scaffold.`,
     ]
       .filter(Boolean)
@@ -9369,6 +9501,70 @@ function App() {
     })
   }
 
+  const handlePrepareFullstackLocalMaterializationPlan = async () => {
+    if (!plannerIsReviewOnly || !activeScalableDeliveryPlan) {
+      setSessionStatus('Error al generar el plan')
+      setCurrentStep(
+        'No hay un scalableDeliveryPlan activo y valido para preparar la materializacion fullstack local',
+      )
+      addFlowMessage({
+        source: 'orquestador',
+        title: 'Decision del orquestador',
+        content:
+          'No hay un scalableDeliveryPlan activo y valido para preparar la materializacion fullstack local.',
+        status: 'error',
+      })
+      return
+    }
+
+    if (
+      normalizeOptionalString(activeScalableDeliveryPlan.deliveryLevel).toLocaleLowerCase() !==
+      'fullstack-local'
+    ) {
+      setSessionStatus('Plan escalable todavia no materializable')
+      setCurrentStep(
+        'La materializacion fullstack local solo esta disponible para deliveryLevel fullstack-local',
+      )
+      addFlowMessage({
+        source: 'orquestador',
+        title: 'Decision del orquestador',
+        content:
+          'La materializacion fullstack local controlada solo esta disponible para deliveryLevel fullstack-local.',
+        status: 'warning',
+      })
+      return
+    }
+
+    const preparedPlanningPrompt = buildFullstackLocalMaterializationPrompt({
+      plan: activeScalableDeliveryPlan,
+      originalGoal: goalInput,
+      originalContext: getCurrentExecutionContextValue(),
+    })
+
+    clearVisibleExecutionRuntimeState()
+    setSessionStatus('Preparando materializacion fullstack local')
+    setCurrentStep(
+      'El orquestador esta preparando un scaffold fullstack local, revisable y materializable por el executor deterministico',
+    )
+    setSessionEvents((currentEvents) => [
+      ...currentEvents,
+      'Se preparo una nueva planificacion para materializar un fullstack-local local',
+    ])
+
+    await handleGenerateNextStep({
+      goal: preparedPlanningPrompt.goal,
+      context: preparedPlanningPrompt.context,
+      sourceLabel: 'Materializacion fullstack local preparada',
+      sendContent:
+        'Se envio al planificador una solicitud controlada para preparar la materializacion local de un fullstack-local sin instalar dependencias ni ejecutar servicios.',
+      validateResponse: (_response, metadata) =>
+        buildFullstackLocalMaterializationCoherenceIssue({
+          sourcePlan: activeScalableDeliveryPlan,
+          metadata,
+        }),
+    })
+  }
+
   const handleExecuteCurrentInstruction = async (
     overrideInstruction?: string,
     overridePlannerExecutionMetadata?: PlannerExecutionMetadata,
@@ -12408,7 +12604,11 @@ function App() {
                           }
                           onPrepareMaterialization={
                             plannerIsReviewOnly
-                              ? handlePrepareFrontendProjectMaterializationPlan
+                              ? normalizeOptionalString(
+                                    activeScalableDeliveryPlan.deliveryLevel,
+                                  ).toLocaleLowerCase() === 'fullstack-local'
+                                ? handlePrepareFullstackLocalMaterializationPlan
+                                : handlePrepareFrontendProjectMaterializationPlan
                               : null
                           }
                         />
@@ -13861,7 +14061,11 @@ function App() {
                     }
                     onPrepareMaterialization={
                       plannerIsReviewOnly
-                        ? handlePrepareFrontendProjectMaterializationPlan
+                        ? normalizeOptionalString(
+                              activeScalableDeliveryPlan.deliveryLevel,
+                            ).toLocaleLowerCase() === 'fullstack-local'
+                          ? handlePrepareFullstackLocalMaterializationPlan
+                          : handlePrepareFrontendProjectMaterializationPlan
                         : null
                     }
                   />
