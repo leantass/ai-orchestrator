@@ -10747,6 +10747,7 @@ function buildScalableDeliveryPlan({
       break
     case 'fullstack-local':
       pushUniquePlannerValues(targetStructure, [
+        `${rootFolder}/`,
         `${rootFolder}/frontend/`,
         `${rootFolder}/backend/`,
         `${rootFolder}/shared/`,
@@ -10755,6 +10756,7 @@ function buildScalableDeliveryPlan({
         `${rootFolder}/docs/`,
       ])
       pushUniquePlannerValues(allowedRootPaths, [
+        rootFolder,
         `${rootFolder}/frontend`,
         `${rootFolder}/backend`,
         `${rootFolder}/shared`,
@@ -10762,25 +10764,68 @@ function buildScalableDeliveryPlan({
         `${rootFolder}/scripts`,
         `${rootFolder}/docs`,
       ])
-      pushUniquePlannerValues(directories, [
-        `${rootFolder}/frontend/src`,
-        `${rootFolder}/backend/src`,
-        `${rootFolder}/shared/contracts`,
-        `${rootFolder}/database/migrations`,
-        `${rootFolder}/database/seeds`,
-        `${rootFolder}/scripts`,
-        `${rootFolder}/docs`,
+      pushUniquePlannerValues(
+        directories,
+        [
+          `${rootFolder}/frontend`,
+          `${rootFolder}/backend`,
+          `${rootFolder}/shared`,
+          `${rootFolder}/database`,
+          `${rootFolder}/scripts`,
+          `${rootFolder}/docs`,
+          `${rootFolder}/frontend/public`,
+          `${rootFolder}/frontend/src`,
+          `${rootFolder}/frontend/src/routes`,
+          `${rootFolder}/frontend/src/features`,
+          `${rootFolder}/backend/src`,
+          `${rootFolder}/backend/src/routes`,
+          `${rootFolder}/backend/src/modules`,
+          `${rootFolder}/backend/src/lib`,
+          `${rootFolder}/shared/contracts`,
+          `${rootFolder}/shared/types`,
+          `${rootFolder}/database/migrations`,
+          `${rootFolder}/database/seeds`,
+        ],
+        24,
+      )
+      pushUniquePlannerValues(modules, [
+        'frontend local',
+        'backend local',
+        'shared contracts',
+        'database local revisable',
+        'scripts operativos',
+        'documentacion',
       ])
-      pushUniquePlannerValues(modules, ['frontend', 'backend', 'shared contracts', 'database local'])
+      pushUniquePlannerValues(modules, normalizedDomainUnderstanding?.primaryEntities || [])
       filesToCreate.push(
+        {
+          path: `${rootFolder}/README.md`,
+          purpose: 'Documentar alcance fullstack local, límites de ejecución y próximos pasos sujetos a revisión.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/package.json`,
+          purpose: 'Describir scripts raíz, workspaces o comandos locales esperados sin instalar dependencias todavía.',
+          required: true,
+        },
         {
           path: `${rootFolder}/frontend/package.json`,
           purpose: 'Definir el frontend local sin instalar dependencias todavía.',
           required: true,
         },
         {
-          path: `${rootFolder}/frontend/src/App.tsx`,
-          purpose: 'Entrada funcional del frontend local.',
+          path: `${rootFolder}/frontend/src/main.js`,
+          purpose: 'Punto de entrada propuesto para el frontend local y su shell inicial.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/frontend/src/routes/index.js`,
+          purpose: 'Definir navegación revisable del flujo principal en el frontend local.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/frontend/src/features/appointments.js`,
+          purpose: 'Representar el flujo principal del dominio desde la capa frontend sin backend real todavía.',
           required: true,
         },
         {
@@ -10790,33 +10835,79 @@ function buildScalableDeliveryPlan({
         },
         {
           path: `${rootFolder}/backend/src/server.js`,
-          purpose: 'Servidor local inicial desacoplado de infraestructura productiva.',
+          purpose: 'Servidor local inicial desacoplado de infraestructura productiva y sin levantarse automáticamente.',
           required: true,
         },
         {
-          path: `${rootFolder}/shared/contracts/domain.ts`,
+          path: `${rootFolder}/backend/src/routes/health.js`,
+          purpose: 'Definir una ruta local mínima revisable para el backend sin dejar servicios activos todavía.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/backend/src/modules/appointments.js`,
+          purpose: 'Separar el dominio principal del backend local en módulos revisables.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/shared/contracts/domain.js`,
           purpose: 'Modelos compartidos entre frontend y backend local.',
           required: true,
         },
         {
-          path: `${rootFolder}/database/schema.local.sql`,
-          purpose: 'Esquema local revisable sin tocar bases productivas.',
+          path: `${rootFolder}/shared/types/contracts.js`,
+          purpose: 'Centralizar contratos o tipos simples compartidos entre capas locales.',
           required: true,
         },
         {
-          path: `${rootFolder}/database/seeds/seed.local.json`,
-          purpose: 'Semillas locales de ejemplo y no sensibles.',
+          path: `${rootFolder}/database/schema.sql`,
+          purpose: 'Esquema local revisable sin tocar bases productivas ni crear un servicio activo.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/database/README.md`,
+          purpose: 'Aclarar que la database local queda como diseño revisable hasta aprobar una fase ejecutable.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/scripts/seed-local.js`,
+          purpose: 'Proponer un punto de entrada para semillas locales futuras sin ejecutarlas ahora.',
           required: true,
         },
         {
           path: `${rootFolder}/docs/architecture.md`,
-          purpose: 'Explicar la estructura fullstack local y sus límites.',
+          purpose: 'Explicar la estructura fullstack local, capas, módulos y límites.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/docs/local-runbook.md`,
+          purpose: 'Dejar documentados pasos manuales futuros para instalación, arranque y datos de prueba bajo aprobación.',
           required: true,
         },
       )
+      pushUniquePlannerValues(localOnlyConstraints, [
+        'El frontend, backend, shared, database, scripts y docs quedan solo como diseño estructurado dentro del workspace local.',
+        'No corresponde instalar dependencias automáticamente ni crear node_modules en esta fase planner-only.',
+        'No corresponde levantar frontend, backend, colas ni servidores automáticamente en esta iteración.',
+        'La database local queda como esquema o documentación revisable, no como servicio activo ni base productiva.',
+        'Migraciones reales, seeds ejecutables y conexiones persistentes requieren una fase posterior aprobada.',
+      ])
+      pushUniquePlannerValues(explicitExclusions, [
+        'Backend real en ejecución o expuesto fuera del entorno local.',
+        'Base de datos real productiva, replicación o credenciales sensibles.',
+        'Docker, contenedores, workers activos o cron ejecutándose automáticamente.',
+      ])
       pushUniquePlannerValues(approvalRequiredLater, [
         'Instalar dependencias locales del frontend y backend.',
-        'Crear y ejecutar base de datos local, migraciones y seeds.',
+        'Levantar manualmente el frontend local y el backend local para pruebas interactivas.',
+        'Crear o migrar una base de datos local real y ejecutar seeds o migraciones.',
+        'Configurar auth real, sesiones o permisos persistentes.',
+        'Integrar servicios externos, notificaciones o datos reales.',
+        'Usar datos reales o sensibles dentro del entorno local.',
+      ])
+      pushUniquePlannerValues(successCriteria, [
+        'El plan separa con claridad frontend, backend, shared, database, scripts y docs dentro de un root fullstack local.',
+        'Los filesToCreate proponen artefactos revisables para cada capa sin materializarlos todavía.',
+        'No se devuelve materializationPlan ejecutable ni nextExpectedAction de ejecución para fullstack-local en esta fase.',
       ])
       break
     case 'monorepo-local':

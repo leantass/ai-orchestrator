@@ -183,6 +183,50 @@ const scalableValidationCases = [
       'Hacer un sistema fullstack local para turnos médicos con frontend, backend y base de datos local.',
     context: '',
     expectedDeliveryLevel: 'fullstack-local',
+    expectedTargetStructureTokens: [
+      'frontend/',
+      'backend/',
+      'shared/',
+      'database/',
+      'scripts/',
+      'docs/',
+    ],
+    expectedDirectoryTokens: [
+      'frontend/src',
+      'backend/src',
+      'shared/contracts',
+      'database/migrations',
+      'scripts',
+      'docs',
+    ],
+    expectedFileTokens: [
+      'README.md',
+      'package.json',
+      'frontend/package.json',
+      'frontend/src/main.js',
+      'backend/package.json',
+      'backend/src/server.js',
+      'shared/contracts/domain.js',
+      'database/schema.sql',
+      'scripts/seed-local.js',
+      'docs/architecture.md',
+      'docs/local-runbook.md',
+    ],
+    expectedLocalConstraintTokens: [
+      'workspace local',
+      'No corresponde instalar dependencias',
+      'No corresponde levantar frontend',
+      'database local queda como esquema o documentación revisable',
+      'Migraciones reales',
+    ],
+    expectedApprovalTokens: [
+      'Instalar dependencias locales del frontend y backend',
+      'Levantar manualmente el frontend local y el backend local',
+      'Crear o migrar una base de datos local real',
+      'Configurar auth real',
+      'Integrar servicios externos',
+      'Usar datos reales',
+    ],
   },
   {
     id: 'monorepo-local',
@@ -734,6 +778,10 @@ async function runScalableValidationCase(testCase) {
     decision?.scalableDeliveryPlan && typeof decision.scalableDeliveryPlan === 'object'
       ? decision.scalableDeliveryPlan
       : null
+  const materializationPlan =
+    decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+      ? decision.materializationPlan
+      : null
 
   if (Array.isArray(testCase.acceptedStrategies) && !testCase.acceptedStrategies.includes(strategy)) {
     failures.push(
@@ -760,6 +808,10 @@ async function runScalableValidationCase(testCase) {
       )
     }
 
+    if (materializationPlan) {
+      failures.push('No deberia haber materializationPlan ejecutable en scalable-delivery-plan.')
+    }
+
     if (!scalablePlan) {
       failures.push('scalableDeliveryPlan ausente.')
     } else {
@@ -780,10 +832,67 @@ async function runScalableValidationCase(testCase) {
       }
 
       if (
+        Array.isArray(testCase.expectedTargetStructureTokens) &&
+        testCase.expectedTargetStructureTokens.length > 0
+      ) {
+        const targetStructure = summarizeUniqueStrings(scalablePlan.targetStructure, 24)
+        testCase.expectedTargetStructureTokens.forEach((token) => {
+          const normalizedToken = normalizePathForComparison(token)
+          if (!targetStructure.some((entry) => normalizePathForComparison(entry).includes(normalizedToken))) {
+            failures.push(`targetStructure no incluye ${token}.`)
+          }
+        })
+      }
+
+      if (
+        Array.isArray(testCase.expectedDirectoryTokens) &&
+        testCase.expectedDirectoryTokens.length > 0
+      ) {
+        const directories = summarizeUniqueStrings(scalablePlan.directories, 32)
+        testCase.expectedDirectoryTokens.forEach((token) => {
+          const normalizedToken = normalizePathForComparison(token)
+          if (!directories.some((entry) => normalizePathForComparison(entry).includes(normalizedToken))) {
+            failures.push(`directories no incluye ${token}.`)
+          }
+        })
+      }
+
+      if (Array.isArray(testCase.expectedFileTokens) && testCase.expectedFileTokens.length > 0) {
+        const filePaths = Array.isArray(scalablePlan.filesToCreate)
+          ? scalablePlan.filesToCreate
+              .map((entry) =>
+                entry && typeof entry === 'object' ? String(entry.path || '').trim() : '',
+              )
+              .filter(Boolean)
+          : []
+        testCase.expectedFileTokens.forEach((token) => {
+          const normalizedToken = normalizePathForComparison(token)
+          if (!filePaths.some((entry) => normalizePathForComparison(entry).includes(normalizedToken))) {
+            failures.push(`filesToCreate no incluye ${token}.`)
+          }
+        })
+      }
+
+      if (
         !Array.isArray(scalablePlan.localOnlyConstraints) ||
         scalablePlan.localOnlyConstraints.length === 0
       ) {
         failures.push('localOnlyConstraints vacío.')
+      }
+
+      if (
+        Array.isArray(testCase.expectedLocalConstraintTokens) &&
+        testCase.expectedLocalConstraintTokens.length > 0
+      ) {
+        const localOnlyConstraints = summarizeUniqueStrings(
+          scalablePlan.localOnlyConstraints,
+          24,
+        )
+        testCase.expectedLocalConstraintTokens.forEach((token) => {
+          if (!localOnlyConstraints.some((entry) => entry.includes(token))) {
+            failures.push(`localOnlyConstraints no incluye "${token}".`)
+          }
+        })
       }
 
       if (
@@ -800,6 +909,18 @@ async function runScalableValidationCase(testCase) {
         ) {
           failures.push('approvalRequiredLater debería tener entradas para este caso.')
         }
+      }
+
+      if (Array.isArray(testCase.expectedApprovalTokens) && testCase.expectedApprovalTokens.length > 0) {
+        const approvalRequiredLater = summarizeUniqueStrings(
+          scalablePlan.approvalRequiredLater,
+          24,
+        )
+        testCase.expectedApprovalTokens.forEach((token) => {
+          if (!approvalRequiredLater.some((entry) => entry.includes(token))) {
+            failures.push(`approvalRequiredLater no incluye "${token}".`)
+          }
+        })
       }
     }
   }
