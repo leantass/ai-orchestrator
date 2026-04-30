@@ -9,31 +9,283 @@ const currentFilePath = fileURLToPath(import.meta.url)
 const repoRoot = path.resolve(path.dirname(currentFilePath), '..')
 const mainFilePath = path.join(repoRoot, 'electron', 'main.cjs')
 const mainSource = fs.readFileSync(mainFilePath, 'utf8')
+const requiredPlannerFunctions = [
+  'buildDomainUnderstanding',
+  'buildProductArchitecturePlan',
+  'buildSafeFirstDeliveryPlan',
+  'buildMaterializeSafeFirstDeliveryPlan',
+]
 
-function sliceBetween(source, startMarker, endMarker) {
-  const start = source.indexOf(startMarker)
-  const end = source.indexOf(endMarker, start)
+const activeCases = [
+  {
+    id: 'social-barrial',
+    label: 'App social barrial',
+    goal:
+      'Hacer una app social para comunidades barriales con perfiles, publicaciones, comentarios, grupos, notificaciones y reportes.',
+    context:
+      'Quiero validar una primera entrega segura local y mock para una app social barrial. Revisar perfiles, publicaciones, comentarios, grupos, notificaciones, reportes, busqueda, filtro por estado, detalle seleccionado, acciones locales y log de actividad.',
+    mustInclude: ['perfiles', 'publicaciones', 'comentarios', 'grupos', 'notificaciones', 'reportes'],
+    mustExclude: [
+      'accesos',
+      'alertas',
+      'sensores',
+      'zonas',
+      'operadores',
+      'alumnos',
+      'familias',
+      'cursos',
+      'productos',
+      'carrito',
+      'checkout',
+      'documentos',
+      'vencimientos',
+    ],
+    folderAnyOf: ['safe-first-delivery-social'],
+  },
+  {
+    id: 'documental-puro',
+    label: 'Sistema documental puro',
+    goal:
+      'Hacer un sistema documental para gestionar documentos, operaciones, vencimientos, observaciones, responsables y reportes.',
+    context:
+      'Quiero validar una primera entrega segura local y mock para un sistema documental. Revisar documentos, operaciones, vencimientos, observaciones, responsables, reportes, busqueda, filtro por estado, detalle seleccionado, acciones locales y log de actividad.',
+    mustInclude: ['documentos', 'operaciones', 'vencimientos', 'observaciones', 'responsables', 'reportes'],
+    mustExclude: [
+      'accesos',
+      'solicitudes',
+      'sensores',
+      'zonas',
+      'operadores',
+      'carrito',
+      'checkout',
+      'alumnos',
+      'familias',
+    ],
+    folderAnyOf: ['safe-first-delivery-documental'],
+  },
+  {
+    id: 'seguridad',
+    label: 'Sistema de seguridad',
+    goal:
+      'Hacer un sistema de seguridad para monitorear accesos, alertas, sensores, zonas, operadores y eventos.',
+    context:
+      'Quiero validar una primera entrega segura local y mock para seguridad y monitoreo. Revisar accesos, alertas, sensores, zonas, operadores, eventos, busqueda, filtro por estado, detalle seleccionado y log de actividad.',
+    mustInclude: ['accesos', 'alertas', 'sensores', 'zonas', 'operadores', 'eventos', 'reportes'],
+    mustExclude: [
+      'perfiles',
+      'publicaciones',
+      'documentos',
+      'vencimientos',
+      'productos',
+      'carrito',
+      'checkout',
+      'alumnos',
+      'familias',
+      'cursos',
+    ],
+    mustMention: ['panel de monitoreo'],
+    folderAnyOf: ['safe-first-delivery-seguridad'],
+  },
+  {
+    id: 'ecommerce',
+    label: 'Ecommerce',
+    goal: 'Hacer un ecommerce con productos, carrito, ordenes, checkout simulado y reportes.',
+    context:
+      'Quiero validar una primera entrega segura local y mock para ecommerce con catalogo, productos, carrito, checkout simulado, ordenes y reportes.',
+    mustInclude: ['productos', 'carrito', 'checkout simulado', 'ordenes', 'reportes'],
+    folderAnyOf: ['safe-first-delivery-ecommerce'],
+  },
+  {
+    id: 'crm-escolar',
+    label: 'CRM escolar',
+    goal:
+      'Hacer un CRM para escuelas con alumnos, familias, cursos, comunicaciones, seguimiento y reportes.',
+    context:
+      'Quiero validar una primera entrega segura local y mock para un CRM escolar con alumnos, familias, cursos, comunicaciones, seguimiento y reportes.',
+    mustInclude: ['alumnos', 'familias', 'cursos', 'comunicaciones', 'seguimiento', 'reportes'],
+    folderAnyOf: ['safe-first-delivery-crm'],
+  },
+  {
+    id: 'solicitudes-operativas',
+    label: 'Solicitudes operativas',
+    goal:
+      'Hacer un sistema interno para gestionar solicitudes operativas, revisar estados, registrar observaciones y generar reportes simples.',
+    context:
+      'Quiero validar una primera entrega segura local y mock para solicitudes operativas con estados, observaciones, reportes, busqueda, detalle seleccionado y acciones locales.',
+    mustInclude: ['solicitudes', 'estados', 'observaciones', 'reportes'],
+    folderAnyOf: ['safe-first-delivery-solicitudes'],
+  },
+  {
+    id: 'reservas-canchas',
+    label: 'Reservas de canchas',
+    goal:
+      'Hacer un sistema de reservas de canchas para gestionar canchas, horarios, reservas, clientes, disponibilidad y reportes.',
+    context:
+      'Quiero validar una primera entrega segura local y mock para reservas de canchas con disponibilidad, horarios, reservas, clientes, reportes y acciones locales.',
+    mustInclude: ['canchas', 'horarios', 'reservas', 'clientes', 'disponibilidad', 'reportes'],
+    mustExclude: [
+      'ecommerce',
+      'checkout',
+      'alumnos',
+      'familias',
+      'accesos',
+      'sensores',
+      'documentos',
+      'perfiles',
+    ],
+    folderAnyOf: ['safe-first-delivery-reservas', 'safe-first-delivery-canchas'],
+  },
+]
 
-  if (start === -1 || end === -1) {
+const candidateCases = [
+  {
+    id: 'turnos-medicos',
+    reason:
+      'Hoy detecta turnos, disponibilidad, pacientes y profesionales, pero todavia no preserva especialidades y el folder cae en safe-first-delivery-negocio.',
+  },
+  {
+    id: 'logistica-entregas',
+    reason:
+      'Hoy solo conserva rutas, estados y reportes; faltan envios, entregas, choferes y vehiculos, y el folder cae en safe-first-delivery-negocio.',
+  },
+  {
+    id: 'navegacion-rutas',
+    reason:
+      'Hoy conserva rutas, ubicaciones y reportes, pero todavia no preserva puntos de interes ni vehiculos, y el folder cae en safe-first-delivery-negocio.',
+  },
+]
+
+function printUsage() {
+  console.log('Uso: node scripts/ai-planner-smoke.mjs [--verbose] [--list] [--case=<id>]')
+}
+
+function parseArgs(argv) {
+  let verbose = false
+  let listOnly = false
+  let caseId = ''
+
+  for (const arg of argv) {
+    if (arg === '--verbose') {
+      verbose = true
+      continue
+    }
+
+    if (arg === '--list') {
+      listOnly = true
+      continue
+    }
+
+    if (arg.startsWith('--case=')) {
+      caseId = arg.slice('--case='.length).trim()
+      continue
+    }
+
+    if (arg === '--help' || arg === '-h') {
+      printUsage()
+      process.exit(0)
+    }
+  }
+
+  return {
+    verbose,
+    listOnly,
+    caseId,
+  }
+}
+
+function normalizeText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase()
+    .trim()
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function normalizePathForComparison(value) {
+  return String(value || '').replace(/\\/g, '/')
+}
+
+function summarizeUniqueStrings(entries, limit = 12) {
+  const values = []
+  const seen = new Set()
+
+  ;(Array.isArray(entries) ? entries : []).forEach((entry) => {
+    if (typeof entry !== 'string' || !entry.trim()) {
+      return
+    }
+
+    const value = entry.trim()
+    if (seen.has(value)) {
+      return
+    }
+
+    seen.add(value)
+    values.push(value)
+  })
+
+  return values.slice(0, limit)
+}
+
+function buildAllowedTargetPathsExpectation(folderName) {
+  return [
+    folderName,
+    `${folderName}/index.html`,
+    `${folderName}/styles.css`,
+    `${folderName}/script.js`,
+    `${folderName}/mock-data.json`,
+  ]
+}
+
+function listHasToken(entries, token) {
+  const normalizedToken = normalizeText(token)
+
+  return entries.some((entry) => {
+    const normalizedEntry = normalizeText(entry)
+    return (
+      normalizedEntry === normalizedToken ||
+      normalizedEntry.includes(normalizedToken) ||
+      new RegExp(`\\b${escapeRegExp(normalizedToken)}\\b`, 'u').test(normalizedEntry)
+    )
+  })
+}
+
+function formatList(entries) {
+  return Array.isArray(entries) && entries.length > 0 ? entries.join(', ') : '(vacio)'
+}
+
+function extractSegment({ name, startMarker, endMarker }) {
+  const start = mainSource.indexOf(startMarker)
+  if (start === -1) {
     throw new Error(
-      `No pude extraer el segmento entre ${JSON.stringify(startMarker)} y ${JSON.stringify(endMarker)}.`,
+      `[ai-planner-smoke] No se encontro el anchor inicial de ${name}: ${JSON.stringify(startMarker)}.`,
     )
   }
 
-  return source.slice(start, end)
+  const end = mainSource.indexOf(endMarker, start)
+  if (end === -1) {
+    throw new Error(
+      `[ai-planner-smoke] No se encontro el anchor final de ${name}: ${JSON.stringify(endMarker)}.`,
+    )
+  }
+
+  return mainSource.slice(start, end)
 }
 
 function loadPlannerTestingSurface() {
-  const segmentA = sliceBetween(
-    mainSource,
-    'function normalizeExecutorAttemptScope(',
-    'function buildBrainDecisionContract(',
-  )
-  const segmentB = sliceBetween(
-    mainSource,
-    'function extractExplicitBusinessLabelFromPlanningText(',
-    'function buildReusablePreserveDirective(',
-  )
+  const segmentA = extractSegment({
+    name: 'segmento base de planner',
+    startMarker: 'function normalizeExecutorAttemptScope(',
+    endMarker: 'function buildBrainDecisionContract(',
+  })
+  const segmentB = extractSegment({
+    name: 'segmento de helpers de planner',
+    startMarker: 'function extractExplicitBusinessLabelFromPlanningText(',
+    endMarker: 'function buildReusablePreserveDirective(',
+  })
   const harness = `
 ${segmentA}
 ${segmentB}
@@ -60,278 +312,372 @@ module.exports = {
   }
 
   vm.createContext(sandbox)
-  vm.runInContext(harness, sandbox, {
-    filename: 'ai-planner-smoke-harness.cjs',
-  })
 
-  return sandbox.module.exports
-}
-
-const {
-  buildDomainUnderstanding,
-  buildProductArchitecturePlan,
-  buildSafeFirstDeliveryPlan,
-  buildMaterializeSafeFirstDeliveryPlan,
-} = loadPlannerTestingSurface()
-
-function normalizeText(value) {
-  return String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLocaleLowerCase()
-    .trim()
-}
-
-function listHasToken(entries, token) {
-  const normalizedToken = normalizeText(token)
-
-  return entries.some((entry) => {
-    const normalizedEntry = normalizeText(entry)
-    return (
-      normalizedEntry === normalizedToken ||
-      normalizedEntry.includes(normalizedToken) ||
-      new RegExp(`\\b${normalizedToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'u').test(
-        normalizedEntry,
-      )
+  try {
+    vm.runInContext(harness, sandbox, {
+      filename: 'ai-planner-smoke-harness.cjs',
+    })
+  } catch (error) {
+    throw new Error(
+      `[ai-planner-smoke] No se pudo ejecutar el harness del planner extraido desde electron/main.cjs: ${error.message}`,
     )
-  })
+  }
+
+  const exported = sandbox.module.exports || {}
+  const missing = requiredPlannerFunctions.filter((name) => typeof exported[name] !== 'function')
+
+  if (missing.length > 0) {
+    throw new Error(
+      `[ai-planner-smoke] El harness se cargo pero faltan funciones requeridas: ${missing.join(', ')}.`,
+    )
+  }
+
+  return exported
 }
 
-function normalizePathForComparison(value) {
-  return String(value || '').replace(/\\/g, '/')
+const plannerApi = loadPlannerTestingSurface()
+
+function toStringArray(value, limit = 20) {
+  return summarizeUniqueStrings(value, limit)
 }
 
-function buildAllowedTargetPathsExpectation(folderName) {
-  return [
-    folderName,
-    `${folderName}/index.html`,
-    `${folderName}/styles.css`,
-    `${folderName}/script.js`,
-    `${folderName}/mock-data.json`,
-  ]
-}
-
-const cases = [
-  {
-    key: 'app-social',
-    label: 'App social barrial',
-    goal:
-      'Hacer una app social para comunidades barriales con perfiles, publicaciones, comentarios, grupos, notificaciones y reportes.',
-    context:
-      'Quiero validar una primera entrega segura local y mock para una app social barrial. Revisar perfiles, publicaciones, comentarios, grupos, notificaciones, reportes, búsqueda, filtro por estado, detalle seleccionado, acciones locales y log de actividad.',
-    mustInclude: ['perfiles', 'publicaciones', 'comentarios', 'grupos', 'notificaciones', 'reportes'],
-    mustExclude: ['accesos', 'alertas', 'sensores', 'zonas', 'operadores', 'alumnos', 'familias', 'carrito', 'checkout'],
-    folderAnyOf: ['safe-first-delivery-social'],
-  },
-  {
-    key: 'documental',
-    label: 'Sistema documental puro',
-    goal:
-      'Hacer un sistema documental para gestionar documentos, operaciones, vencimientos, observaciones, responsables y reportes.',
-    context:
-      'Quiero validar una primera entrega segura local y mock para un sistema documental. Revisar documentos, operaciones, vencimientos, observaciones, responsables, reportes, búsqueda, filtro por estado, detalle seleccionado, acciones locales y log de actividad.',
-    mustInclude: ['documentos', 'operaciones', 'vencimientos', 'observaciones', 'responsables', 'reportes'],
-    mustExclude: ['accesos', 'solicitudes', 'carrito', 'checkout', 'alumnos', 'familias'],
-    folderAnyOf: ['safe-first-delivery-documental'],
-  },
-  {
-    key: 'seguridad',
-    label: 'Sistema de seguridad',
-    goal:
-      'Hacer un sistema de seguridad para monitorear accesos, alertas, sensores, zonas, operadores y eventos.',
-    context:
-      'Quiero validar una primera entrega segura local y mock para seguridad y monitoreo. Revisar accesos, alertas, sensores, zonas, operadores, eventos, búsqueda, filtro por estado, detalle seleccionado y log de actividad.',
-    mustInclude: ['accesos', 'alertas', 'sensores', 'zonas', 'operadores', 'eventos', 'reportes'],
-    folderAnyOf: ['safe-first-delivery-seguridad'],
-    mustMention: ['panel de monitoreo'],
-  },
-  {
-    key: 'ecommerce',
-    label: 'Ecommerce',
-    goal: 'Hacer un ecommerce con productos, carrito, órdenes, checkout simulado y reportes.',
-    context:
-      'Quiero validar una primera entrega segura local y mock para ecommerce con catálogo, productos, carrito, checkout simulado, órdenes y reportes.',
-    mustInclude: ['productos', 'carrito', 'checkout simulado', 'ordenes', 'reportes'],
-    folderAnyOf: ['safe-first-delivery-ecommerce'],
-  },
-  {
-    key: 'crm-escolar',
-    label: 'CRM escolar',
-    goal:
-      'Hacer un CRM para escuelas con alumnos, familias, cursos, comunicaciones, seguimiento y reportes.',
-    context:
-      'Quiero validar una primera entrega segura local y mock para un CRM escolar con alumnos, familias, cursos, comunicaciones, seguimiento y reportes.',
-    mustInclude: ['alumnos', 'familias', 'cursos', 'comunicaciones', 'seguimiento', 'reportes'],
-    folderAnyOf: ['safe-first-delivery-crm'],
-  },
-  {
-    key: 'solicitudes',
-    label: 'Solicitudes operativas',
-    goal:
-      'Hacer un sistema interno para gestionar solicitudes operativas, revisar estados, registrar observaciones y generar reportes simples.',
-    context:
-      'Quiero validar una primera entrega segura local y mock para solicitudes operativas con estados, observaciones, reportes, búsqueda, detalle seleccionado y acciones locales.',
-    mustInclude: ['solicitudes', 'estados', 'observaciones', 'reportes'],
-    folderAnyOf: ['safe-first-delivery-solicitudes'],
-  },
-  {
-    key: 'reservas-canchas',
-    label: 'Reservas de canchas',
-    goal:
-      'Hacer un sistema de reservas de canchas para gestionar canchas, horarios, reservas, clientes, disponibilidad y reportes.',
-    context:
-      'Quiero validar una primera entrega segura local y mock para reservas de canchas con disponibilidad, horarios, reservas, clientes, reportes y acciones locales.',
-    mustInclude: ['canchas', 'horarios', 'reservas', 'clientes', 'disponibilidad', 'reportes'],
-    mustExclude: ['ecommerce', 'checkout', 'alumnos', 'familias', 'accesos', 'sensores', 'documentos', 'perfiles'],
-    folderAnyOf: ['safe-first-delivery-reservas', 'safe-first-delivery-canchas'],
-  },
-]
-
-function runCase(testCase) {
-  const domainUnderstanding = buildDomainUnderstanding({
+function buildCaseStructures(testCase) {
+  const domainUnderstanding = plannerApi.buildDomainUnderstanding({
     goal: testCase.goal,
     context: testCase.context,
   })
-  const productArchitecturePlan = buildProductArchitecturePlan({
+  const productArchitecturePlan = plannerApi.buildProductArchitecturePlan({
     goal: testCase.goal,
     context: testCase.context,
     domainUnderstanding,
   })
-  const safeFirstDeliveryPlan = buildSafeFirstDeliveryPlan({
+  const safeFirstDeliveryPlan = plannerApi.buildSafeFirstDeliveryPlan({
     goal: testCase.goal,
     context: testCase.context,
     domainUnderstanding,
   })
-  const materializePlan = buildMaterializeSafeFirstDeliveryPlan({
+  const materializePlan = plannerApi.buildMaterializeSafeFirstDeliveryPlan({
     goal: testCase.goal,
     context: testCase.context,
     domainUnderstanding,
     workspacePath: 'C:/tmp/ai-planner-smoke-workspace',
   })
 
-  const architecture = productArchitecturePlan?.productArchitecture || {}
-  const safe = safeFirstDeliveryPlan?.safeFirstDeliveryPlan || {}
-  const materialization = materializePlan?.safeFirstDeliveryMaterialization || {}
+  const domainModules = toStringArray(domainUnderstanding?.primaryModules)
+  const architectureModules = toStringArray(productArchitecturePlan?.productArchitecture?.coreModules)
+  const safeModules = toStringArray(safeFirstDeliveryPlan?.safeFirstDeliveryPlan?.modules)
+  const materializeModules = toStringArray(materializePlan?.safeFirstDeliveryMaterialization?.modules)
+  const materializeCollections = toStringArray(
+    materializePlan?.safeFirstDeliveryMaterialization?.mockCollections,
+  )
   const allowedTargetPaths = Array.isArray(materializePlan?.executionScope?.allowedTargetPaths)
     ? materializePlan.executionScope.allowedTargetPaths
     : []
   const folderName = allowedTargetPaths[0] || ''
   const aggregatedModules = [
-    ...(domainUnderstanding?.primaryModules || []),
-    ...(architecture.coreModules || []),
-    ...(safe.modules || []),
-    ...(materialization.modules || []),
+    ...domainModules,
+    ...architectureModules,
+    ...safeModules,
+    ...materializeModules,
   ]
   const aggregatedTexts = [
-    ...(architecture.keyFlows || []),
-    ...(safe.screens || []),
-    ...(safe.localBehavior || []),
-    ...(materialization.screens || []),
-    ...(materialization.localActions || []),
+    ...toStringArray(productArchitecturePlan?.productArchitecture?.keyFlows, 24),
+    ...toStringArray(safeFirstDeliveryPlan?.safeFirstDeliveryPlan?.screens, 24),
+    ...toStringArray(safeFirstDeliveryPlan?.safeFirstDeliveryPlan?.localBehavior, 24),
+    ...toStringArray(materializePlan?.safeFirstDeliveryMaterialization?.screens, 24),
+    ...toStringArray(materializePlan?.safeFirstDeliveryMaterialization?.localActions, 24),
   ]
+
+  return {
+    domainUnderstanding,
+    productArchitecturePlan,
+    safeFirstDeliveryPlan,
+    materializePlan,
+    domainModules,
+    architectureModules,
+    safeModules,
+    materializeModules,
+    materializeCollections,
+    allowedTargetPaths,
+    folderName,
+    aggregatedModules,
+    aggregatedTexts,
+  }
+}
+
+function summarizeDomainUnderstanding(domainUnderstanding) {
+  return {
+    domainLabel: domainUnderstanding?.domainLabel || '',
+    intentLabel: domainUnderstanding?.intentLabel || '',
+    productKind: domainUnderstanding?.productKind || '',
+    primaryModules: toStringArray(domainUnderstanding?.primaryModules),
+    primaryEntities: toStringArray(domainUnderstanding?.primaryEntities),
+    secondaryEntities: toStringArray(domainUnderstanding?.secondaryEntities),
+    roles: toStringArray(domainUnderstanding?.roles),
+    coreFlows: toStringArray(domainUnderstanding?.coreFlows),
+    stateModel: toStringArray(domainUnderstanding?.stateModel),
+    localActions: toStringArray(domainUnderstanding?.localActions),
+  }
+}
+
+function summarizeProductArchitecture(productArchitecturePlan) {
+  const architecture = productArchitecturePlan?.productArchitecture || {}
+
+  return {
+    productType: architecture.productType || '',
+    domain: architecture.domain || '',
+    coreModules: toStringArray(architecture.coreModules),
+    dataEntities: toStringArray(architecture.dataEntities),
+    keyFlows: toStringArray(architecture.keyFlows),
+    roles: toStringArray(architecture.roles),
+    users: toStringArray(architecture.users),
+  }
+}
+
+function summarizeSafeFirstDeliveryPlan(safeFirstDeliveryPlan) {
+  const plan = safeFirstDeliveryPlan?.safeFirstDeliveryPlan || {}
+
+  return {
+    modules: toStringArray(plan.modules),
+    screens: toStringArray(plan.screens),
+    localBehavior: toStringArray(plan.localBehavior),
+    mockData: toStringArray(plan.mockData),
+    explicitExclusions: toStringArray(plan.explicitExclusions),
+  }
+}
+
+function summarizeMaterialization(materializePlan) {
+  const materialization = materializePlan?.safeFirstDeliveryMaterialization || {}
+
+  return {
+    modules: toStringArray(materialization.modules),
+    entities: toStringArray(materialization.entities),
+    mockCollections: toStringArray(materialization.mockCollections),
+    screens: toStringArray(materialization.screens),
+    localActions: toStringArray(materialization.localActions),
+    stateHints: toStringArray(materialization.stateHints),
+    approvalThemes: toStringArray(materialization.approvalThemes),
+    explicitExclusions: toStringArray(materialization.explicitExclusions),
+  }
+}
+
+function runCase(testCase) {
+  const structures = buildCaseStructures(testCase)
   const failures = []
+  const missingExpectedModules = []
+  const forbiddenModulesFound = []
+  const missingMentions = []
+  const expectedAllowedTargetPaths = buildAllowedTargetPathsExpectation(structures.folderName)
+  const normalizedAllowed = structures.allowedTargetPaths.map(normalizePathForComparison)
+  const normalizedExpectedAllowed = expectedAllowedTargetPaths.map(normalizePathForComparison)
 
-  if (!domainUnderstanding || !Array.isArray(domainUnderstanding.primaryModules)) {
-    failures.push('No se pudo construir domainUnderstanding con primaryModules.')
+  if (!structures.domainUnderstanding || typeof structures.domainUnderstanding !== 'object') {
+    failures.push('domainUnderstanding ausente.')
+  } else {
+    if (!String(structures.domainUnderstanding.domainLabel || '').trim()) {
+      failures.push('domainUnderstanding pobre: falta domainLabel.')
+    }
+
+    if (structures.domainModules.length === 0) {
+      failures.push('domainUnderstanding pobre: primaryModules vacio.')
+    }
   }
 
-  if (!architecture || !Array.isArray(architecture.coreModules)) {
-    failures.push('No se pudo construir productArchitecture con coreModules.')
+  if (structures.architectureModules.length === 0) {
+    failures.push('productArchitecture incoherente: coreModules vacio.')
   }
 
-  if (!safe || !Array.isArray(safe.modules)) {
-    failures.push('No se pudo construir safeFirstDeliveryPlan con modules.')
+  if (structures.safeModules.length === 0) {
+    failures.push('safeFirstDeliveryPlan incoherente: modules vacio.')
   }
 
-  if (!materialization || !Array.isArray(materialization.modules)) {
-    failures.push('No se pudo construir safeFirstDeliveryMaterialization con modules.')
+  if (structures.materializeModules.length === 0) {
+    failures.push('safeFirstDeliveryMaterialization incoherente: modules vacio.')
   }
 
   for (const expected of testCase.mustInclude || []) {
-    if (!listHasToken(aggregatedModules, expected)) {
-      failures.push(`Falta incluir "${expected}" en los módulos agregados.`)
+    if (!listHasToken(structures.aggregatedModules, expected)) {
+      missingExpectedModules.push(expected)
     }
   }
 
   for (const forbidden of testCase.mustExclude || []) {
-    if (listHasToken(aggregatedModules, forbidden)) {
-      failures.push(`No debía incluir "${forbidden}" en los módulos agregados.`)
+    if (listHasToken(structures.aggregatedModules, forbidden)) {
+      forbiddenModulesFound.push(forbidden)
     }
   }
 
   for (const expectedText of testCase.mustMention || []) {
-    if (!listHasToken(aggregatedTexts, expectedText)) {
-      failures.push(`Falta una señal textual compatible con "${expectedText}".`)
+    if (!listHasToken(structures.aggregatedTexts, expectedText)) {
+      missingMentions.push(expectedText)
     }
   }
 
-  if (!testCase.folderAnyOf.some((entry) => normalizePathForComparison(entry) === normalizePathForComparison(folderName))) {
+  if (
+    !testCase.folderAnyOf.some(
+      (entry) => normalizePathForComparison(entry) === normalizePathForComparison(structures.folderName),
+    )
+  ) {
     failures.push(
-      `Folder inesperado. Esperado alguno de ${testCase.folderAnyOf.join(', ')}. Recibido: ${folderName || '(vacío)'}.`,
+      `Folder incorrecto. Esperado: ${testCase.folderAnyOf.join(', ')}. Recibido: ${
+        structures.folderName || '(vacio)'
+      }.`,
     )
   }
-
-  const expectedAllowedTargetPaths = buildAllowedTargetPathsExpectation(folderName)
-  const normalizedAllowed = allowedTargetPaths.map(normalizePathForComparison)
-  const normalizedExpectedAllowed = expectedAllowedTargetPaths.map(normalizePathForComparison)
 
   if (
     normalizedAllowed.length !== normalizedExpectedAllowed.length ||
     normalizedAllowed.some((entry, index) => entry !== normalizedExpectedAllowed[index])
   ) {
     failures.push(
-      `allowedTargetPaths inesperados. Esperado: ${normalizedExpectedAllowed.join(' | ')}. Recibido: ${normalizedAllowed.join(' | ') || '(vacío)'}.`,
+      `allowedTargetPaths incorrectos. Esperado: ${normalizedExpectedAllowed.join(' | ')}. Recibido: ${
+        normalizedAllowed.join(' | ') || '(vacio)'
+      }.`,
     )
   }
 
+  if (missingExpectedModules.length > 0) {
+    failures.push(`Modulos esperados faltantes: ${missingExpectedModules.join(', ')}.`)
+  }
+
+  if (forbiddenModulesFound.length > 0) {
+    failures.push(`Modulos prohibidos encontrados: ${forbiddenModulesFound.join(', ')}.`)
+  }
+
+  if (missingMentions.length > 0) {
+    failures.push(`Senales textuales faltantes: ${missingMentions.join(', ')}.`)
+  }
+
   return {
-    case: testCase,
+    testCase,
     ok: failures.length === 0,
     failures,
-    summary: {
-      domainLabel: domainUnderstanding?.domainLabel || '',
-      productKind: domainUnderstanding?.productKind || '',
-      folderName,
-      domainModules: domainUnderstanding?.primaryModules || [],
-      architectureModules: architecture.coreModules || [],
-      safeModules: safe.modules || [],
-      materializeModules: materialization.modules || [],
+    missingExpectedModules,
+    forbiddenModulesFound,
+    missingMentions,
+    summaries: {
+      domainUnderstanding: summarizeDomainUnderstanding(structures.domainUnderstanding),
+      productArchitecture: summarizeProductArchitecture(structures.productArchitecturePlan),
+      safeFirstDeliveryPlan: summarizeSafeFirstDeliveryPlan(structures.safeFirstDeliveryPlan),
+      safeFirstDeliveryMaterialization: summarizeMaterialization(structures.materializePlan),
     },
+    folderName: structures.folderName,
+    allowedTargetPaths: structures.allowedTargetPaths,
+    materializeCollections: structures.materializeCollections,
   }
 }
 
-const results = cases.map(runCase)
-let failedCount = 0
+function printList() {
+  console.log('AI Planner Smoke - Casos activos')
+  activeCases.forEach((testCase) => {
+    console.log(`- ${testCase.id}`)
+  })
 
-console.log('AI Planner Smoke')
-console.log('=================')
-
-for (const result of results) {
-  const { case: testCase, ok, failures, summary } = result
-  console.log(`${ok ? 'PASS' : 'FAIL'} ${testCase.label}`)
-  console.log(`- folder: ${summary.folderName || '(vacío)'}`)
-  console.log(`- domain: ${summary.domainLabel || '(sin domainLabel)'}`)
-  console.log(`- productKind: ${summary.productKind || '(sin productKind)'}`)
-  console.log(`- domain modules: ${summary.domainModules.join(', ') || '(vacío)'}`)
-  console.log(`- architecture modules: ${summary.architectureModules.join(', ') || '(vacío)'}`)
-  console.log(`- safe modules: ${summary.safeModules.join(', ') || '(vacío)'}`)
-  console.log(`- materialize modules: ${summary.materializeModules.join(', ') || '(vacío)'}`)
-
-  if (!ok) {
-    failedCount += 1
-    failures.forEach((failure) => {
-      console.log(`  expected/actual: ${failure}`)
+  if (candidateCases.length > 0) {
+    console.log('')
+    console.log('AI Planner Smoke - Casos evaluados pero no incorporados')
+    candidateCases.forEach((testCase) => {
+      console.log(`- ${testCase.id}: ${testCase.reason}`)
     })
   }
 }
 
-console.log('-----------------')
-console.log(
-  failedCount === 0
-    ? `OK. ${results.length}/${results.length} casos pasaron.`
-    : `FAIL. ${failedCount}/${results.length} casos fallaron.`,
-)
+function printCompactResult(result) {
+  const {
+    testCase,
+    ok,
+    summaries,
+    folderName,
+    materializeCollections,
+    failures,
+  } = result
 
-if (failedCount > 0) {
+  console.log(`${ok ? 'PASS' : 'FAIL'} ${testCase.id} | ${testCase.label}`)
+  console.log(`- objetivo: ${testCase.goal}`)
+  console.log(`- dominio detectado: ${summaries.domainUnderstanding.domainLabel || '(sin domainLabel)'}`)
+  console.log(`- folder esperado: ${testCase.folderAnyOf.join(' | ')}`)
+  console.log(`- folder recibido: ${folderName || '(vacio)'}`)
+  console.log(`- modulos principales: ${formatList(summaries.safeFirstDeliveryPlan.modules)}`)
+  console.log(`- colecciones materializadas: ${formatList(materializeCollections)}`)
+  console.log(`- resultado: ${ok ? 'OK' : 'FALLO'}`)
+
+  if (!ok) {
+    failures.forEach((failure) => console.log(`  - ${failure}`))
+  }
+}
+
+function printVerboseResult(result) {
+  printCompactResult(result)
+  console.log('  domainUnderstanding:')
+  console.log(`    ${JSON.stringify(result.summaries.domainUnderstanding)}`)
+  console.log('  productArchitecture:')
+  console.log(`    ${JSON.stringify(result.summaries.productArchitecture)}`)
+  console.log('  safeFirstDeliveryPlan:')
+  console.log(`    ${JSON.stringify(result.summaries.safeFirstDeliveryPlan)}`)
+  console.log('  safeFirstDeliveryMaterialization:')
+  console.log(`    ${JSON.stringify(result.summaries.safeFirstDeliveryMaterialization)}`)
+  console.log(`  allowedTargetPaths: ${result.allowedTargetPaths.join(' | ') || '(vacio)'}`)
+}
+
+function resolveCases(caseId) {
+  if (!caseId) {
+    return activeCases
+  }
+
+  const selected = activeCases.find((testCase) => testCase.id === caseId)
+  if (selected) {
+    return [selected]
+  }
+
+  const pending = candidateCases.find((testCase) => testCase.id === caseId)
+  if (pending) {
+    console.error(
+      `[ai-planner-smoke] El caso "${caseId}" fue evaluado, pero todavia no esta incorporado al smoke activo: ${pending.reason}`,
+    )
+    process.exit(1)
+  }
+
+  console.error(`[ai-planner-smoke] No existe un caso con id "${caseId}". Usa --list para ver los disponibles.`)
   process.exit(1)
 }
+
+function main() {
+  const { verbose, listOnly, caseId } = parseArgs(process.argv.slice(2))
+
+  if (listOnly) {
+    printList()
+    return
+  }
+
+  const casesToRun = resolveCases(caseId)
+  const results = casesToRun.map(runCase)
+  const passedCount = results.filter((result) => result.ok).length
+  const failedResults = results.filter((result) => !result.ok)
+
+  console.log('AI Planner Smoke')
+  console.log('=================')
+
+  results.forEach((result) => {
+    if (verbose) {
+      printVerboseResult(result)
+    } else {
+      printCompactResult(result)
+    }
+  })
+
+  console.log('-----------------')
+
+  if (failedResults.length === 0) {
+    console.log(`OK. ${passedCount}/${results.length} casos pasaron.`)
+    return
+  }
+
+  console.log(`FALLO. ${passedCount}/${results.length} casos pasaron.`)
+  console.log('casos fallidos:')
+  failedResults.forEach((result) => {
+    console.log(`- ${result.testCase.id}: ${result.failures[0] || 'sin detalle'}`)
+  })
+  process.exit(1)
+}
+
+main()
