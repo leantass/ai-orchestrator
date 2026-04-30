@@ -6621,6 +6621,17 @@ function detectSafeFirstDeliveryPlanningIntent(goal, context) {
     /\b(?:primera entrega segura|primera fase segura|safe first delivery|safe-first-delivery|base navegable inicial|prototipo funcional local|version inicial acotada|entrega inicial acotada|planificar una primera entrega segura|planificar la primera entrega segura|preparar la primera entrega segura|preparar la primera fase segura)\b/u.test(
       normalizedText,
     )
+  const explicitFrontendProjectPhaseIntent =
+    normalizedText.includes('deliverylevel: frontend-project') ||
+    normalizedText.includes('accion requerida: materializar frontend-project') ||
+    normalizedText.includes('materialize-frontend-project-plan') ||
+    normalizedText.includes('sourcestrategy: scalable-delivery-plan') ||
+    normalizedText.includes('sourcenextexpectedaction: review-scalable-delivery') ||
+    normalizedText.includes('no devolver materialize-safe-first-delivery-plan') ||
+    (normalizedText.includes('frontend-project') &&
+      normalizedText.includes('package.json') &&
+      normalizedText.includes('index.html') &&
+      normalizedText.includes('readme.md'))
   const derivativeSignal =
     /\b(?:derivad[oa] desde arquitectura|derivado desde arquitectura|arquitectura de producto|no reanalizar toda la arquitectura|primera entrega segura priorizada)\b/u.test(
       normalizedText,
@@ -6689,6 +6700,7 @@ function detectSafeFirstDeliveryPlanningIntent(goal, context) {
     )
   const matches =
     !looksLikeInstitutionalWebOnly &&
+    !explicitFrontendProjectPhaseIntent &&
     ((explicitPhaseIntent && (exclusionScore >= 2 || localPrototypeScore >= 1)) ||
       (derivativeSignal && (explicitPhaseIntent || exclusionScore >= 3)) ||
       (explicitPhaseIntent && complexityScore >= 2))
@@ -6697,6 +6709,7 @@ function detectSafeFirstDeliveryPlanningIntent(goal, context) {
     matches,
     productTypeHint: directProductType,
     explicitPhaseIntent,
+    explicitFrontendProjectPhaseIntent,
     exclusionScore,
     localPrototypeScore,
     derivativeSignal,
@@ -6744,6 +6757,17 @@ function detectMaterializeSafeFirstDeliveryPlanningIntent(goal, context) {
     /\b(?:materializar|materializacion segura|materialización segura|preparar materializacion segura|preparar materialización segura|materializar primera entrega|materializar primera fase|plan materializable|plan ejecutable acotado)\b/u.test(
       normalizedText,
     )
+  const explicitFrontendProjectPhaseIntent =
+    normalizedText.includes('deliverylevel: frontend-project') ||
+    normalizedText.includes('accion requerida: materializar frontend-project') ||
+    normalizedText.includes('materialize-frontend-project-plan') ||
+    normalizedText.includes('sourceStrategy: scalable-delivery-plan') ||
+    normalizedText.includes('sourceNextExpectedAction: review-scalable-delivery') ||
+    normalizedText.includes('no devolver materialize-safe-first-delivery-plan') ||
+    (normalizedText.includes('frontend-project') &&
+      normalizedText.includes('package.json') &&
+      normalizedText.includes('index.html') &&
+      normalizedText.includes('readme.md'))
   const explicitSafetyIntent =
     /\b(?:primera entrega segura|primera fase segura|safe first delivery|safe-first-delivery|sin pagos reales|sin credenciales|sin webhooks?|sin deploy|sin migraciones|sin auth real|sin autenticacion real|sin base de datos real|sin datos sensibles reales|sin integraciones externas reales)\b/u.test(
       normalizedText,
@@ -6761,6 +6785,7 @@ function detectMaterializeSafeFirstDeliveryPlanningIntent(goal, context) {
     )
   const matches =
     !looksLikeInstitutionalWebOnly &&
+    !explicitFrontendProjectPhaseIntent &&
     explicitMaterializationIntent &&
     explicitSafetyIntent &&
     explicitLocalScope
@@ -6769,6 +6794,7 @@ function detectMaterializeSafeFirstDeliveryPlanningIntent(goal, context) {
     matches,
     productTypeHint: directProductType,
     explicitMaterializationIntent,
+    explicitFrontendProjectPhaseIntent,
     explicitSafetyIntent,
     explicitLocalScope,
   }
@@ -14612,7 +14638,6 @@ async function buildLocalStrategicBrainDecision({
 
   if (
     frontendProjectMaterializationIntent.matches &&
-    !materializeSafeFirstDeliveryIntent.matches &&
     !safeFirstDeliveryIntent.matches &&
     !scopedFileEditIntent &&
     !localGoalDescriptor &&

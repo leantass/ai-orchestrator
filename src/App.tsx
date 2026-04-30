@@ -2997,6 +2997,7 @@ const buildFrontendProjectMaterializationPrompt = ({
     goal: [
       'Preparar la materializacion controlada de un frontend-project local y revisable dentro de una carpeta nueva del workspace.',
       'No devolver otro scalable-delivery-plan.',
+      'No devolver materialize-safe-first-delivery-plan.',
       'Devolver un materialize-frontend-project-plan ejecutable por el executor local deterministico.',
     ].join(' '),
     context: [
@@ -3004,6 +3005,8 @@ const buildFrontendProjectMaterializationPrompt = ({
       normalizeOptionalString(originalContext)
         ? `Contexto previo del operador: ${normalizeOptionalString(originalContext)}.`
         : '',
+      'sourceStrategy: scalable-delivery-plan.',
+      'sourceNextExpectedAction: review-scalable-delivery.',
       'deliveryLevel: frontend-project.',
       'accion requerida: materializar frontend-project.',
       'modo esperado: scaffold frontend local, estatico y revisable.',
