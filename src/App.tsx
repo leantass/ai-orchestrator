@@ -2468,6 +2468,189 @@ function SafeFirstDeliveryPlanCard({
   )
 }
 
+function ScalableDeliveryPlanCard({
+  plan,
+  compact = false,
+  reviewOnly = false,
+  nextExpectedAction,
+}: {
+  plan: ScalableDeliveryPlanContract
+  compact?: boolean
+  reviewOnly?: boolean
+  nextExpectedAction?: string
+}) {
+  const normalizedDeliveryLevel = normalizeOptionalString(plan.deliveryLevel)
+  const planReason =
+    normalizeOptionalString(plan.reason) || 'Sin motivo resumido disponible.'
+  const typeLabel = getScalableDeliveryPlanTypeLabel(normalizedDeliveryLevel)
+  const reviewStateLabel = reviewOnly ? 'No ejecuta todavÃ­a' : 'Plan informado'
+  const nextActionLabel = getNextExpectedActionLabel(nextExpectedAction)
+  const fileEntries = Array.isArray(plan.filesToCreate)
+    ? plan.filesToCreate
+        .map((entry) =>
+          entry && typeof entry === 'object'
+            ? {
+                path: normalizeOptionalString(entry.path),
+                purpose: normalizeOptionalString(entry.purpose),
+                required: entry.required !== false,
+              }
+            : null,
+        )
+        .filter(
+          (
+            entry,
+          ): entry is { path: string; purpose: string; required: boolean } =>
+            Boolean(entry?.path || entry?.purpose),
+        )
+    : []
+  const visibleFileEntries = compact ? fileEntries.slice(0, 4) : fileEntries
+
+  return (
+    <article className="rounded-3xl border border-sky-300/15 bg-sky-300/[0.06] p-5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Plan escalable
+          </div>
+          <div className="mt-2 text-sm leading-6 text-slate-400">
+            Este bloque resume una entrega local mÃ¡s grande que la primera entrega segura y queda en revisiÃ³n; no ejecuta cambios todavÃ­a.
+          </div>
+          <div className="mt-2 text-xs leading-5 text-slate-500">
+            {getScalableDeliverySummary(plan)}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
+            Plan revisable
+          </span>
+          <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-medium text-amber-100">
+            No ejecuta todavÃ­a
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="Nivel de entrega"
+          value={getDeliveryLevelLabel(normalizedDeliveryLevel)}
+          tone={getDeliveryLevelTone(normalizedDeliveryLevel)}
+        />
+        <MetricCard
+          label="Tipo de plan"
+          value={typeLabel}
+          detail="Salida planner-only para revisar antes de materializar."
+          tone="sky"
+        />
+        <MetricCard
+          label="Estado"
+          value={reviewStateLabel}
+          detail="JEFE no deberÃ­a ejecutar archivos grandes desde este paso."
+          tone="amber"
+        />
+        <MetricCard
+          label="Siguiente acciÃ³n"
+          value={nextActionLabel}
+          detail={normalizeOptionalString(nextExpectedAction) || 'Sin clave declarada'}
+        />
+      </div>
+
+      <div className="mt-4 grid gap-3 xl:grid-cols-2">
+        <ProductArchitectureGroup
+          title="Estructura propuesta"
+          items={plan.targetStructure}
+          compact={compact}
+          tone="emerald"
+        />
+        <ProductArchitectureGroup
+          title="Directorios principales"
+          items={plan.directories}
+          compact={compact}
+          tone="sky"
+        />
+        <ProductArchitectureGroup
+          title="MÃ³dulos principales"
+          items={plan.modules}
+          compact={compact}
+        />
+        <ProductArchitectureGroup
+          title="Roots permitidos"
+          items={plan.allowedRootPaths}
+          compact={compact}
+        />
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/40 px-4 py-4">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+          RazÃ³n del nivel elegido
+        </div>
+        <div className="mt-3 text-sm leading-6 text-slate-100">{planReason}</div>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+          Archivos propuestos
+        </div>
+        <div className="mt-3 grid gap-3 xl:grid-cols-2">
+          {visibleFileEntries.length > 0 ? (
+            visibleFileEntries.map((entry) => (
+              <div
+                key={`${entry.path || entry.purpose}-${entry.required ? 'required' : 'optional'}`}
+                className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3"
+              >
+                <div className="text-sm font-medium leading-6 text-slate-100">
+                  {entry.path || 'Ruta no declarada'}
+                </div>
+                <div className="mt-2 text-xs leading-5 text-slate-400">
+                  {entry.purpose || 'Sin propÃ³sito declarado'}
+                </div>
+                <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  {entry.required ? 'Requerido' : 'Opcional'}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300 xl:col-span-2">
+              El planner no dejÃ³ archivos propuestos estructurados para este nivel.
+            </div>
+          )}
+        </div>
+        {compact && fileEntries.length > visibleFileEntries.length ? (
+          <div className="mt-3 text-xs leading-5 text-slate-500">
+            +{fileEntries.length - visibleFileEntries.length} archivo(s) mÃ¡s en la propuesta completa.
+          </div>
+        ) : null}
+      </div>
+
+      <div className="mt-4 grid gap-3 xl:grid-cols-2">
+        <ProductArchitectureGroup
+          title="Restricciones locales"
+          items={plan.localOnlyConstraints}
+          compact={compact}
+          tone="amber"
+        />
+        <ProductArchitectureGroup
+          title="Exclusiones explÃ­citas"
+          items={plan.explicitExclusions}
+          compact={compact}
+          tone="rose"
+        />
+        <ProductArchitectureGroup
+          title="Aprobaciones futuras"
+          items={plan.approvalRequiredLater}
+          compact={compact}
+          tone="amber"
+        />
+        <ProductArchitectureGroup
+          title="Criterios de Ã©xito"
+          items={plan.successCriteria}
+          compact={compact}
+          tone="emerald"
+        />
+      </div>
+    </article>
+  )
+}
+
 const sanitizeSafeFirstDeliveryText = (value: string) =>
   normalizeOptionalString(value)
     .replace(/ecommerce/gi, 'experiencia comercial')
@@ -3379,11 +3562,31 @@ const getBrainProblemNatureLabel = (value: unknown) => {
     return 'Pedido trivial local'
   }
 
+  if (normalizedValue === 'review-safe-first-delivery') {
+    return 'Revisar primera entrega segura'
+  }
+
+  if (normalizedValue === 'review-scalable-delivery') {
+    return 'Revisar plan escalable'
+  }
+
+  if (normalizedValue === 'review-product-architecture') {
+    return 'Revisar arquitectura propuesta'
+  }
+
+  if (normalizedValue === 'scalable-delivery-plan') {
+    return 'Plan escalable local'
+  }
+
   return normalizeOptionalString(value).replace(/-/g, ' ')
 }
 
 const getExecutionModeLabel = (value: unknown) => {
   const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (normalizedValue === 'planner-only') {
+    return 'Plan revisable'
+  }
 
   if (normalizedValue === 'local-fast' || normalizedValue === 'local_fast') {
     return 'Ruta rápida local'
@@ -3417,6 +3620,10 @@ const getNextExpectedActionLabel = (value: unknown) => {
 
   if (normalizedValue === 'user-clarification') {
     return 'Esperar una nueva definición del usuario'
+  }
+
+  if (normalizedValue === 'scalable-delivery-plan') {
+    return 'Plan escalable local'
   }
 
   return normalizeOptionalString(value).replace(/-/g, ' ')
@@ -3496,6 +3703,93 @@ const getPlannerStrategyLabel = (value: unknown) => {
   }
 
   return normalizeOptionalString(value).replace(/-/g, ' ')
+}
+
+const DELIVERY_LEVEL_LABELS: Record<string, string> = {
+  'safe-first-delivery': 'Primera entrega segura',
+  'frontend-project': 'Frontend project',
+  'fullstack-local': 'Fullstack local',
+  'monorepo-local': 'Monorepo local',
+  'infra-local-plan': 'Infra local plan',
+}
+
+const getDeliveryLevelLabel = (value: unknown) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (!normalizedValue) {
+    return 'No definido'
+  }
+
+  return (
+    DELIVERY_LEVEL_LABELS[normalizedValue] ||
+    normalizeOptionalString(value).replace(/-/g, ' ')
+  )
+}
+
+const getDeliveryLevelTone = (
+  value: unknown,
+): 'default' | 'sky' | 'emerald' | 'amber' | 'rose' => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (normalizedValue === 'infra-local-plan') {
+    return 'amber'
+  }
+
+  if (normalizedValue === 'fullstack-local') {
+    return 'emerald'
+  }
+
+  if (
+    normalizedValue === 'frontend-project' ||
+    normalizedValue === 'monorepo-local'
+  ) {
+    return 'sky'
+  }
+
+  return 'default'
+}
+
+const getScalableDeliveryPlanTypeLabel = (value: unknown) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (!normalizedValue) {
+    return 'Plan escalable local'
+  }
+
+  if (normalizedValue === 'frontend-project') {
+    return 'Proyecto frontend local'
+  }
+
+  if (normalizedValue === 'fullstack-local') {
+    return 'Proyecto fullstack local'
+  }
+
+  if (normalizedValue === 'monorepo-local') {
+    return 'Monorepo local'
+  }
+
+  if (normalizedValue === 'infra-local-plan') {
+    return 'Infraestructura local planificada'
+  }
+
+  return 'Plan escalable local'
+}
+
+const getScalableDeliverySummary = (plan?: ScalableDeliveryPlanContract | null) => {
+  if (!plan) {
+    return 'JEFE detectÃ³ una entrega escalable y la dejÃ³ en revisiÃ³n manual.'
+  }
+
+  const firstStructureEntry = normalizeOptionalStringArray(plan.targetStructure)[0]
+  const firstDirectoryEntry = normalizeOptionalStringArray(plan.directories)[0]
+  const firstFileEntry = normalizeOptionalString(plan.filesToCreate?.[0]?.path)
+
+  return (
+    firstStructureEntry ||
+    firstDirectoryEntry ||
+    firstFileEntry ||
+    'JEFE detectÃ³ una entrega escalable y la dejÃ³ en revisiÃ³n manual.'
+  )
 }
 
 const getTechnicalDiagnosticLabel = (value: unknown, fallback = 'No disponible') => {
@@ -3584,10 +3878,13 @@ const isReviewOnlyPlannerResponse = (value: {
   return (
     normalizedExecutionMode === 'planner-only' ||
     normalizedNextExpectedAction === 'review-safe-first-delivery' ||
+    normalizedNextExpectedAction === 'review-scalable-delivery' ||
     normalizedNextExpectedAction === 'review-product-architecture' ||
     normalizedNextExpectedAction === 'review-plan' ||
     normalizedStrategy === 'safe-first-delivery-plan' ||
     normalizedDecisionKey === 'safe-first-delivery-plan' ||
+    normalizedStrategy === 'scalable-delivery-plan' ||
+    normalizedDecisionKey === 'scalable-delivery-plan' ||
     normalizedStrategy === 'product-architecture-plan' ||
     normalizedDecisionKey === 'product-architecture-plan'
   )
@@ -4889,19 +5186,40 @@ function App() {
     normalizeOptionalString(
       plannerExecutionMetadata.nextExpectedAction,
     ).toLocaleLowerCase() === 'review-safe-first-delivery'
+  const plannerScalableDeliveryLevel = normalizeOptionalString(
+    plannerExecutionMetadata.scalableDeliveryPlan?.deliveryLevel,
+  ).toLocaleLowerCase()
+  const plannerHasDedicatedScalableDeliveryLevel =
+    plannerScalableDeliveryLevel !== '' &&
+    plannerScalableDeliveryLevel !== 'safe-first-delivery'
+  const plannerIsScalableDeliveryReview =
+    normalizeOptionalString(plannerExecutionMetadata.decisionKey).toLocaleLowerCase() ===
+      'scalable-delivery-plan' ||
+    normalizeOptionalString(plannerExecutionMetadata.strategy).toLocaleLowerCase() ===
+      'scalable-delivery-plan' ||
+    normalizeOptionalString(
+      plannerExecutionMetadata.nextExpectedAction,
+    ).toLocaleLowerCase() === 'review-scalable-delivery' ||
+    plannerHasDedicatedScalableDeliveryLevel
   const plannerReviewStatusLabel = plannerIsReviewOnly
     ? plannerIsSafeFirstDeliveryReview
       ? 'Primera entrega en revision'
-      : 'Plan en revision'
+      : plannerIsScalableDeliveryReview
+        ? 'Plan escalable en revision'
+        : 'Plan en revision'
     : 'Plan activo cargado'
   const plannerReviewHelperText = plannerIsReviewOnly
     ? plannerIsSafeFirstDeliveryReview
       ? 'Este plan define una primera fase segura y no ejecuta cambios todavia.'
-      : 'Este plan no ejecuta cambios todavia; primero requiere revision manual.'
+      : plannerIsScalableDeliveryReview
+        ? 'JEFE detecto una entrega escalable y por ahora solo devuelve un plan revisable; no ejecuta cambios todavia.'
+        : 'Este plan no ejecuta cambios todavia; primero requiere revision manual.'
     : 'La instruccion actual puede pasar a ejecucion manual cuando corresponda.'
   const plannerReviewActionLabel = plannerIsSafeFirstDeliveryReview
     ? 'Revisar primera entrega segura'
-    : 'Revisar arquitectura'
+    : plannerIsScalableDeliveryReview
+      ? 'Revisar plan escalable'
+      : 'Revisar arquitectura'
   const plannerBadge = isPlanning ? 'Planificación en curso' : plannerReviewStatusLabel
 
   const executorBadge = isExecutingTask
@@ -4997,6 +5315,15 @@ function App() {
   const activeProductArchitecture = effectivePlannerExecutionMetadata.productArchitecture
   const activeSafeFirstDeliveryPlan =
     effectivePlannerExecutionMetadata.safeFirstDeliveryPlan
+  const activeScalableDeliveryPlan =
+    effectivePlannerExecutionMetadata.scalableDeliveryPlan
+  const activeScalableDeliveryLevel = normalizeOptionalString(
+    activeScalableDeliveryPlan?.deliveryLevel,
+  ).toLocaleLowerCase()
+  const shouldShowScalableDeliveryPlan =
+    plannerIsScalableDeliveryReview &&
+    activeScalableDeliveryLevel !== '' &&
+    activeScalableDeliveryLevel !== 'safe-first-delivery'
   const manualReuseModeLabel = getManualReuseModeLabel(manualReuseMode)
   const selectedReusableArtifactSummary = selectedReusableArtifact
     ? [
@@ -9820,7 +10147,7 @@ function App() {
                   </button>
                   {plannerIsReviewOnly ? (
                     <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200">
-                      Plan en revisión
+                      {plannerReviewStatusLabel}
                     </div>
                   ) : (
                     <button
@@ -11774,7 +12101,9 @@ function App() {
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              {plannerIsReviewOnly ? 'Plan en revisión' : 'Plan generado'}
+                              {plannerIsReviewOnly
+                                ? plannerReviewStatusLabel
+                                : 'Plan generado'}
                             </div>
                             <div className="mt-2 text-sm text-slate-400">
                               {plannerReviewHelperText}
@@ -11814,7 +12143,10 @@ function App() {
                         />
                         <MetricCard
                           label="Siguiente acción"
-                          value={
+                          value={getNextExpectedActionLabel(
+                            plannerExecutionMetadata.nextExpectedAction,
+                          )}
+                          detail={
                             plannerExecutionMetadata.nextExpectedAction || 'No disponible'
                           }
                         />
@@ -11845,6 +12177,16 @@ function App() {
                             plannerIsReviewOnly
                               ? handlePrepareSafeMaterializationPlan
                               : null
+                          }
+                        />
+                      ) : null}
+                      {shouldShowScalableDeliveryPlan && activeScalableDeliveryPlan ? (
+                        <ScalableDeliveryPlanCard
+                          plan={activeScalableDeliveryPlan}
+                          compact
+                          reviewOnly={plannerIsReviewOnly}
+                          nextExpectedAction={
+                            plannerExecutionMetadata.nextExpectedAction
                           }
                         />
                       ) : null}
@@ -12759,7 +13101,7 @@ function App() {
                 </button>
                 {plannerIsReviewOnly ? (
                   <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200">
-                    Plan en revisión
+                    {plannerReviewStatusLabel}
                   </div>
                 ) : null}
                 <button
@@ -13222,12 +13564,15 @@ function App() {
                           : 'default'
                     }
                   />
-                  <MetricCard
-                    label="Siguiente acciÃ³n"
-                    value={
-                      plannerExecutionMetadata.nextExpectedAction || 'No disponible'
-                    }
-                  />
+                        <MetricCard
+                          label="Siguiente acciÃ³n"
+                          value={getNextExpectedActionLabel(
+                            plannerExecutionMetadata.nextExpectedAction,
+                          )}
+                          detail={
+                            plannerExecutionMetadata.nextExpectedAction || 'No disponible'
+                          }
+                        />
                 </div>
 
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
@@ -13281,6 +13626,15 @@ function App() {
                     reviewOnly={plannerIsReviewOnly}
                     onPrepareMaterialization={
                       plannerIsReviewOnly ? handlePrepareSafeMaterializationPlan : null
+                    }
+                  />
+                ) : null}
+                {shouldShowScalableDeliveryPlan && activeScalableDeliveryPlan ? (
+                  <ScalableDeliveryPlanCard
+                    plan={activeScalableDeliveryPlan}
+                    reviewOnly={plannerIsReviewOnly}
+                    nextExpectedAction={
+                      plannerExecutionMetadata.nextExpectedAction
                     }
                   />
                 ) : null}
