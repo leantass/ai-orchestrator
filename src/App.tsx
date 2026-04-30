@@ -225,6 +225,31 @@ type DomainUnderstandingContract = {
   explicitExclusions?: string[]
 }
 
+type ScalableDeliveryPlanFileContract = {
+  path?: string
+  purpose?: string
+  required?: boolean
+}
+
+type ScalableDeliveryPlanContract = {
+  deliveryLevel?:
+    | 'safe-first-delivery'
+    | 'frontend-project'
+    | 'fullstack-local'
+    | 'monorepo-local'
+    | 'infra-local-plan'
+  reason?: string
+  targetStructure?: string[]
+  allowedRootPaths?: string[]
+  modules?: string[]
+  directories?: string[]
+  filesToCreate?: ScalableDeliveryPlanFileContract[]
+  localOnlyConstraints?: string[]
+  explicitExclusions?: string[]
+  approvalRequiredLater?: string[]
+  successCriteria?: string[]
+}
+
 type PlannerExecutionMetadata = {
   decisionKey: string
   businessSector: string
@@ -253,6 +278,7 @@ type PlannerExecutionMetadata = {
   safeFirstDeliveryPlan: SafeFirstDeliveryPlanContract | null
   safeFirstDeliveryMaterialization: SafeFirstDeliveryMaterializationContract | null
   domainUnderstanding: DomainUnderstandingContract | null
+  scalableDeliveryPlan: ScalableDeliveryPlanContract | null
 }
 
 type PlannerRequestSnapshot = {
@@ -443,6 +469,7 @@ type PlannerDecisionResponse = {
   safeFirstDeliveryPlan?: SafeFirstDeliveryPlanContract | null
   safeFirstDeliveryMaterialization?: SafeFirstDeliveryMaterializationContract | null
   domainUnderstanding?: DomainUnderstandingContract | null
+  scalableDeliveryPlan?: ScalableDeliveryPlanContract | null
   brainRoutingDecision?: BrainRoutingDecision
   tasks?: unknown[]
   assumptions?: string[]
@@ -632,6 +659,7 @@ const EMPTY_PLANNER_EXECUTION_METADATA: PlannerExecutionMetadata = {
   safeFirstDeliveryPlan: null,
   safeFirstDeliveryMaterialization: null,
   domainUnderstanding: null,
+  scalableDeliveryPlan: null,
 }
 
 const buildSafeFirstDeliveryReviewMetadata = ({
@@ -656,6 +684,7 @@ const buildSafeFirstDeliveryReviewMetadata = ({
   contextHubStatus: baseMetadata.contextHubStatus,
   productArchitecture: baseMetadata.productArchitecture,
   domainUnderstanding: baseMetadata.domainUnderstanding,
+  scalableDeliveryPlan: baseMetadata.scalableDeliveryPlan,
   decisionKey: 'safe-first-delivery-plan',
   strategy: 'safe-first-delivery-plan',
   executionMode: 'planner-only',
@@ -1056,6 +1085,92 @@ const normalizeSafeFirstDeliveryMaterializationContract = (
   return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
 }
 
+const normalizeScalableDeliveryPlanContract = (
+  value: unknown,
+): ScalableDeliveryPlanContract | null => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const contract = value as ScalableDeliveryPlanContract
+  const normalizedFilesToCreate = Array.isArray(contract.filesToCreate)
+    ? contract.filesToCreate
+        .map((entry) =>
+          entry && typeof entry === 'object'
+            ? {
+                ...(normalizeOptionalString(entry.path)
+                  ? { path: normalizeOptionalString(entry.path) }
+                  : {}),
+                ...(normalizeOptionalString(entry.purpose)
+                  ? { purpose: normalizeOptionalString(entry.purpose) }
+                  : {}),
+                ...(typeof entry.required === 'boolean'
+                  ? { required: entry.required }
+                  : {}),
+              }
+            : null,
+        )
+        .filter(
+          (
+            entry,
+          ): entry is ScalableDeliveryPlanFileContract =>
+            Boolean(entry) && Object.keys(entry).length > 0,
+        )
+    : []
+
+  const normalizedValue: ScalableDeliveryPlanContract = {
+    ...(normalizeOptionalString(contract.deliveryLevel)
+      ? {
+          deliveryLevel: normalizeOptionalString(
+            contract.deliveryLevel,
+          ) as ScalableDeliveryPlanContract['deliveryLevel'],
+        }
+      : {}),
+    ...(normalizeOptionalString(contract.reason)
+      ? { reason: normalizeOptionalString(contract.reason) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.targetStructure).length > 0
+      ? { targetStructure: normalizeOptionalStringArray(contract.targetStructure) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.allowedRootPaths).length > 0
+      ? { allowedRootPaths: normalizeOptionalStringArray(contract.allowedRootPaths) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.modules).length > 0
+      ? { modules: normalizeOptionalStringArray(contract.modules) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.directories).length > 0
+      ? { directories: normalizeOptionalStringArray(contract.directories) }
+      : {}),
+    ...(normalizedFilesToCreate.length > 0 ? { filesToCreate: normalizedFilesToCreate } : {}),
+    ...(normalizeOptionalStringArray(contract.localOnlyConstraints).length > 0
+      ? {
+          localOnlyConstraints: normalizeOptionalStringArray(
+            contract.localOnlyConstraints,
+          ),
+        }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.explicitExclusions).length > 0
+      ? {
+          explicitExclusions: normalizeOptionalStringArray(
+            contract.explicitExclusions,
+          ),
+        }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.approvalRequiredLater).length > 0
+      ? {
+          approvalRequiredLater: normalizeOptionalStringArray(
+            contract.approvalRequiredLater,
+          ),
+        }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.successCriteria).length > 0
+      ? { successCriteria: normalizeOptionalStringArray(contract.successCriteria) }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
 const normalizeDomainUnderstandingContract = (
   value: unknown,
 ): DomainUnderstandingContract | null => {
@@ -1138,6 +1253,7 @@ const extractPlannerExecutionMetadata = (payload?: {
   safeFirstDeliveryPlan?: SafeFirstDeliveryPlanContract | null
   safeFirstDeliveryMaterialization?: SafeFirstDeliveryMaterializationContract | null
   domainUnderstanding?: DomainUnderstandingContract | null
+  scalableDeliveryPlan?: ScalableDeliveryPlanContract | null
   tasks?: unknown[]
   assumptions?: string[]
 } | null): PlannerExecutionMetadata => ({
@@ -1306,6 +1422,9 @@ const extractPlannerExecutionMetadata = (payload?: {
     ),
   domainUnderstanding: normalizeDomainUnderstandingContract(
     payload?.domainUnderstanding,
+  ),
+  scalableDeliveryPlan: normalizeScalableDeliveryPlanContract(
+    payload?.scalableDeliveryPlan,
   ),
   tasks: Array.isArray(payload?.tasks)
     ? payload.tasks

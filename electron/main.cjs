@@ -6654,6 +6654,139 @@ function detectMaterializeSafeFirstDeliveryPlanningIntent(goal, context) {
   }
 }
 
+function detectScalableDeliveryPlanningIntent(goal, context) {
+  const combinedText = [goal, context]
+    .filter((value) => typeof value === 'string' && value.trim())
+    .join(' ')
+  const normalizedText = normalizeSectorDetectionText(combinedText)
+
+  if (!normalizedText) {
+    return {
+      matches: false,
+      deliveryLevel: 'safe-first-delivery',
+      productTypeHint: 'unknown',
+      explicitSignals: [],
+      requiresSensitiveReview: false,
+    }
+  }
+
+  const directProductTypeMap = [
+    { key: 'ecommerce', pattern: /\b(?:ecommerce|tienda online|tienda en linea)\b/u },
+    { key: 'crm', pattern: /\bcrm\b/u },
+    { key: 'erp', pattern: /\berp\b/u },
+    { key: 'marketplace', pattern: /\bmarketplace\b/u },
+    { key: 'saas', pattern: /\bsaas\b/u },
+    {
+      key: 'internal-tool',
+      pattern:
+        /\b(?:herramienta interna|tool interna|tool interno|gestion interna|operacion interna)\b/u,
+    },
+  ]
+  const directProductType =
+    directProductTypeMap.find(({ pattern }) => pattern.test(normalizedText))?.key ||
+    (/catalogo|carrito|checkout|mercado pago|productos|backoffice/u.test(normalizedText)
+      ? 'ecommerce'
+      : /alumnos|familias|cursos|comunicaciones|seguimiento/u.test(normalizedText)
+        ? 'crm'
+        : /turnos|clinicas?|salud/u.test(normalizedText)
+          ? 'business-system'
+          : 'unknown')
+  const explicitSafeFirstIntent =
+    /\b(?:primera entrega segura|primera fase segura|safe first delivery|safe-first-delivery|mock local acotado|version inicial acotada)\b/u.test(
+      normalizedText,
+    )
+  const frontendSignals = [
+    /\breact\b/u.test(normalizedText) ? 'react' : '',
+    /\bfrontend real\b/u.test(normalizedText) ? 'frontend real' : '',
+    /\bapp frontend\b/u.test(normalizedText) ? 'app frontend' : '',
+    /\bcomponentes?\b/u.test(normalizedText) ? 'componentes' : '',
+    /\brutas?\b/u.test(normalizedText) ? 'rutas' : '',
+    /\bmocks?\b/u.test(normalizedText) ? 'mocks' : '',
+    /\bestructura de proyecto\b/u.test(normalizedText)
+      ? 'estructura de proyecto'
+      : '',
+    /\bpackage\.json\b/u.test(normalizedText) ? 'package.json' : '',
+    /\bsrc\/\b/u.test(normalizedText) ? 'src/' : '',
+  ].filter(Boolean)
+  const fullstackSignals = [
+    /\bfullstack\b/u.test(normalizedText) ? 'fullstack' : '',
+    /\bfrontend\b/u.test(normalizedText) ? 'frontend' : '',
+    /\bbackend\b/u.test(normalizedText) ? 'backend' : '',
+    /\bapi\b/u.test(normalizedText) ? 'api' : '',
+    /\bbase de datos local\b/u.test(normalizedText)
+      ? 'base de datos local'
+      : '',
+    /\bdb local\b/u.test(normalizedText) ? 'db local' : '',
+    /\bshared\b/u.test(normalizedText) ? 'shared' : '',
+  ].filter(Boolean)
+  const monorepoSignals = [
+    /\bmonorepo\b/u.test(normalizedText) ? 'monorepo' : '',
+    /\bapps\/\b/u.test(normalizedText) ? 'apps/' : '',
+    /\bpackages\/\b/u.test(normalizedText) ? 'packages/' : '',
+    /\bpaquetes compartidos\b/u.test(normalizedText)
+      ? 'paquetes compartidos'
+      : '',
+    /\bworkers?\b/u.test(normalizedText) ? 'workers' : '',
+    /\bservices?\b/u.test(normalizedText) ? 'services' : '',
+    /\bdocumentacion\b/u.test(normalizedText) ? 'documentacion' : '',
+  ].filter(Boolean)
+  const infraSignals = [
+    /\bdocker\b/u.test(normalizedText) ? 'docker' : '',
+    /\bredis\b/u.test(normalizedText) ? 'redis' : '',
+    /\bbullmq\b/u.test(normalizedText) ? 'bullmq' : '',
+    /\bcron\b/u.test(normalizedText) ? 'cron' : '',
+    /\bpostgres(?:ql)?\b/u.test(normalizedText) ? 'postgres' : '',
+    /\bmigraciones?\b/u.test(normalizedText) ? 'migraciones' : '',
+    /\bseed(?:s|ers)?\b/u.test(normalizedText) ? 'seeds' : '',
+    /\.env\.example\b/u.test(normalizedText) ? '.env.example' : '',
+  ].filter(Boolean)
+
+  const matchesInfraPlan =
+    infraSignals.length >= 2 &&
+    (infraSignals.includes('docker') ||
+      infraSignals.includes('postgres') ||
+      infraSignals.includes('redis'))
+  const matchesMonorepoPlan =
+    monorepoSignals.includes('monorepo') ||
+    (monorepoSignals.some((signal) => signal === 'apps/' || signal === 'packages/') &&
+      monorepoSignals.some((signal) => signal === 'workers' || signal === 'services'))
+  const matchesFullstackPlan =
+    fullstackSignals.includes('fullstack') ||
+    ((fullstackSignals.includes('frontend') || fullstackSignals.includes('api')) &&
+      fullstackSignals.includes('backend') &&
+      (fullstackSignals.includes('base de datos local') ||
+        fullstackSignals.includes('db local')))
+  const matchesFrontendPlan =
+    (frontendSignals.includes('react') || frontendSignals.includes('frontend real')) &&
+    frontendSignals.length >= 3
+
+  const deliveryLevel = matchesInfraPlan
+    ? 'infra-local-plan'
+    : matchesMonorepoPlan
+      ? 'monorepo-local'
+      : matchesFullstackPlan
+        ? 'fullstack-local'
+        : matchesFrontendPlan
+          ? 'frontend-project'
+          : 'safe-first-delivery'
+  const explicitSignals =
+    deliveryLevel === 'infra-local-plan'
+      ? infraSignals
+      : deliveryLevel === 'monorepo-local'
+        ? monorepoSignals
+        : deliveryLevel === 'fullstack-local'
+          ? fullstackSignals
+          : frontendSignals
+
+  return {
+    matches: !explicitSafeFirstIntent && deliveryLevel !== 'safe-first-delivery',
+    deliveryLevel,
+    productTypeHint: directProductType,
+    explicitSignals,
+    requiresSensitiveReview: deliveryLevel === 'infra-local-plan',
+  }
+}
+
 function pushUniquePlannerValues(target, values, maxItems = 12) {
   if (!Array.isArray(target) || !Array.isArray(values)) {
     return target
@@ -10230,6 +10363,469 @@ function buildBrainApprovalRequest({
   }
 }
 
+function buildScalableDeliveryPlan({
+  goal,
+  context,
+  workspacePath,
+  deliveryLevel,
+  domainUnderstanding,
+  reason,
+  safeFirstDeliveryPlan,
+}) {
+  const normalizedDeliveryLevel =
+    typeof deliveryLevel === 'string' && deliveryLevel.trim()
+      ? deliveryLevel.trim()
+      : 'safe-first-delivery'
+  const normalizedDomainUnderstanding = normalizeDomainUnderstandingContract(domainUnderstanding)
+  const architectureParts =
+    buildProductArchitecturePartsFromDomainUnderstanding(normalizedDomainUnderstanding)
+  const safePlan =
+    safeFirstDeliveryPlan && typeof safeFirstDeliveryPlan === 'object'
+      ? safeFirstDeliveryPlan
+      : null
+  const domainLabel =
+    sanitizeBusinessSectorLabel(normalizedDomainUnderstanding?.domainLabel || '') ||
+    extractProductArchitectureDomainLabel(goal, context, '') ||
+    'proyecto local'
+  const rootFolder =
+    normalizedDeliveryLevel === 'safe-first-delivery'
+      ? buildMaterializeSafeFirstDeliveryFolderName({
+          productType: normalizedDomainUnderstanding?.productKind || '',
+          domain: domainLabel,
+          modules:
+            safePlan?.modules ||
+            architectureParts.coreModules ||
+            normalizedDomainUnderstanding?.primaryModules ||
+            [],
+          entities:
+            architectureParts.dataEntities || normalizedDomainUnderstanding?.primaryEntities || [],
+          mockCollections: [],
+          sourceText: [goal, context, domainLabel].filter(Boolean).join(' '),
+        })
+      : `${normalizedDeliveryLevel}-${slugifyBusinessSector(domainLabel) || 'workspace-local'}`
+  const targetStructure = []
+  const allowedRootPaths = []
+  const modules = []
+  const directories = []
+  const filesToCreate = []
+  const localOnlyConstraints = []
+  const explicitExclusions = []
+  const approvalRequiredLater = []
+  const successCriteria = []
+
+  pushUniquePlannerValues(modules, architectureParts.coreModules)
+  pushUniquePlannerValues(modules, normalizedDomainUnderstanding?.primaryModules || [])
+  pushUniquePlannerValues(explicitExclusions, normalizedDomainUnderstanding?.explicitExclusions || [])
+  pushUniquePlannerValues(explicitExclusions, [
+    'Deploy o publicacion remota.',
+    'Credenciales, secretos o configuraciones productivas.',
+    'Integraciones externas reales.',
+    'Pagos reales o cobros efectivos.',
+    'Autenticacion real, permisos definitivos y datos sensibles reales.',
+    'Instalar dependencias automaticamente.',
+    'Cambios sobre GitHub remoto, bridge o launcher.',
+  ])
+  pushUniquePlannerValues(localOnlyConstraints, [
+    workspacePath
+      ? `Todo debe quedar delimitado al workspace local configurado: ${workspacePath}.`
+      : 'Todo debe quedar delimitado al workspace local activo.',
+    'No corresponde ejecutar npm install ni descargar dependencias en esta iteracion.',
+    'No corresponde levantar servicios reales, contenedores ni infraestructura automaticamente.',
+    'La salida debe quedar como plan revisable y local antes de cualquier materializacion grande.',
+  ])
+  pushUniquePlannerValues(successCriteria, [
+    `El plan deja explicitado el deliveryLevel ${normalizedDeliveryLevel}.`,
+    'La estructura objetivo queda acotada a roots, directorios y archivos revisables antes de ejecutar.',
+    'Se preservan restricciones locales, exclusiones explicitas y aprobaciones futuras.',
+    'No se crean proyectos grandes reales ni se instala infraestructura en esta iteracion.',
+  ])
+
+  switch (normalizedDeliveryLevel) {
+    case 'frontend-project':
+      pushUniquePlannerValues(targetStructure, [
+        `${rootFolder}/`,
+        `${rootFolder}/src/`,
+        `${rootFolder}/src/components/`,
+        `${rootFolder}/src/routes/`,
+        `${rootFolder}/src/styles/`,
+        `${rootFolder}/mock-data/`,
+        `${rootFolder}/README.md`,
+      ])
+      pushUniquePlannerValues(allowedRootPaths, [rootFolder])
+      pushUniquePlannerValues(directories, [
+        `${rootFolder}/src`,
+        `${rootFolder}/src/components`,
+        `${rootFolder}/src/routes`,
+        `${rootFolder}/src/styles`,
+        `${rootFolder}/mock-data`,
+        `${rootFolder}/public`,
+      ])
+      pushUniquePlannerValues(modules, ['routing', 'componentes', 'mocks', 'layout base'])
+      filesToCreate.push(
+        {
+          path: `${rootFolder}/package.json`,
+          purpose: 'Definir el proyecto frontend local y sus scripts sin instalar dependencias todavía.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/src/main.tsx`,
+          purpose: 'Punto de entrada del frontend local.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/src/App.tsx`,
+          purpose: 'Composición inicial del frontend y shell de navegación.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/src/routes/index.tsx`,
+          purpose: 'Definir rutas locales revisables para el flujo principal.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/mock-data/mock-data.json`,
+          purpose: 'Datos mock para validar el recorrido sin backend real.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/README.md`,
+          purpose: 'Documentar alcance local, scripts esperados y límites de la primera materialización grande.',
+          required: true,
+        },
+      )
+      pushUniquePlannerValues(approvalRequiredLater, [
+        'Instalar dependencias del framework y levantar el frontend local real.',
+      ])
+      break
+    case 'fullstack-local':
+      pushUniquePlannerValues(targetStructure, [
+        `${rootFolder}/frontend/`,
+        `${rootFolder}/backend/`,
+        `${rootFolder}/shared/`,
+        `${rootFolder}/database/`,
+        `${rootFolder}/scripts/`,
+        `${rootFolder}/docs/`,
+      ])
+      pushUniquePlannerValues(allowedRootPaths, [
+        `${rootFolder}/frontend`,
+        `${rootFolder}/backend`,
+        `${rootFolder}/shared`,
+        `${rootFolder}/database`,
+        `${rootFolder}/scripts`,
+        `${rootFolder}/docs`,
+      ])
+      pushUniquePlannerValues(directories, [
+        `${rootFolder}/frontend/src`,
+        `${rootFolder}/backend/src`,
+        `${rootFolder}/shared/contracts`,
+        `${rootFolder}/database/migrations`,
+        `${rootFolder}/database/seeds`,
+        `${rootFolder}/scripts`,
+        `${rootFolder}/docs`,
+      ])
+      pushUniquePlannerValues(modules, ['frontend', 'backend', 'shared contracts', 'database local'])
+      filesToCreate.push(
+        {
+          path: `${rootFolder}/frontend/package.json`,
+          purpose: 'Definir el frontend local sin instalar dependencias todavía.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/frontend/src/App.tsx`,
+          purpose: 'Entrada funcional del frontend local.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/backend/package.json`,
+          purpose: 'Definir el backend local y sus scripts, sin ejecución todavía.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/backend/src/server.js`,
+          purpose: 'Servidor local inicial desacoplado de infraestructura productiva.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/shared/contracts/domain.ts`,
+          purpose: 'Modelos compartidos entre frontend y backend local.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/database/schema.local.sql`,
+          purpose: 'Esquema local revisable sin tocar bases productivas.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/database/seeds/seed.local.json`,
+          purpose: 'Semillas locales de ejemplo y no sensibles.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/docs/architecture.md`,
+          purpose: 'Explicar la estructura fullstack local y sus límites.',
+          required: true,
+        },
+      )
+      pushUniquePlannerValues(approvalRequiredLater, [
+        'Instalar dependencias locales del frontend y backend.',
+        'Crear y ejecutar base de datos local, migraciones y seeds.',
+      ])
+      break
+    case 'monorepo-local':
+      pushUniquePlannerValues(targetStructure, [
+        `${rootFolder}/apps/`,
+        `${rootFolder}/packages/`,
+        `${rootFolder}/services/`,
+        `${rootFolder}/workers/`,
+        `${rootFolder}/docs/`,
+        `${rootFolder}/infra-local/`,
+      ])
+      pushUniquePlannerValues(allowedRootPaths, [
+        `${rootFolder}/apps`,
+        `${rootFolder}/packages`,
+        `${rootFolder}/services`,
+        `${rootFolder}/workers`,
+        `${rootFolder}/docs`,
+        `${rootFolder}/infra-local`,
+      ])
+      pushUniquePlannerValues(directories, [
+        `${rootFolder}/apps/web`,
+        `${rootFolder}/apps/api`,
+        `${rootFolder}/packages/shared`,
+        `${rootFolder}/services`,
+        `${rootFolder}/workers`,
+        `${rootFolder}/docs`,
+        `${rootFolder}/infra-local`,
+      ])
+      pushUniquePlannerValues(modules, ['apps', 'packages', 'services', 'workers', 'docs'])
+      filesToCreate.push(
+        {
+          path: `${rootFolder}/package.json`,
+          purpose: 'Raíz del monorepo local, todavía sin instalar dependencias.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/apps/web/package.json`,
+          purpose: 'Definir la app web local dentro del monorepo.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/apps/api/package.json`,
+          purpose: 'Definir la API local dentro del monorepo.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/packages/shared/index.ts`,
+          purpose: 'Exponer contratos o utilidades compartidas del monorepo local.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/workers/README.md`,
+          purpose: 'Documentar workers locales sin ponerlos a correr todavía.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/docs/architecture.md`,
+          purpose: 'Documentar arquitectura, límites y secuencia de materialización.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/infra-local/README.md`,
+          purpose: 'Dejar la infraestructura local solo como plan revisable.',
+          required: true,
+        },
+      )
+      pushUniquePlannerValues(approvalRequiredLater, [
+        'Instalar dependencias workspace y levantar varias apps o servicios locales.',
+      ])
+      break
+    case 'infra-local-plan':
+      pushUniquePlannerValues(targetStructure, [
+        `${rootFolder}/infra-local/`,
+        `${rootFolder}/database-local/`,
+        `${rootFolder}/scripts/`,
+        `${rootFolder}/docs/`,
+      ])
+      pushUniquePlannerValues(allowedRootPaths, [
+        `${rootFolder}/infra-local`,
+        `${rootFolder}/database-local`,
+        `${rootFolder}/scripts`,
+        `${rootFolder}/docs`,
+      ])
+      pushUniquePlannerValues(directories, [
+        `${rootFolder}/infra-local/docker`,
+        `${rootFolder}/infra-local/redis`,
+        `${rootFolder}/infra-local/queues`,
+        `${rootFolder}/database-local/migrations`,
+        `${rootFolder}/database-local/seeds`,
+        `${rootFolder}/scripts`,
+        `${rootFolder}/docs`,
+      ])
+      pushUniquePlannerValues(modules, [
+        'docker local',
+        'redis local',
+        'workers',
+        'cron',
+        'postgres local',
+        'migraciones',
+        'seeders',
+      ])
+      filesToCreate.push(
+        {
+          path: `${rootFolder}/infra-local/docker/docker-compose.local.yml`,
+          purpose: 'Describir la topología local de Docker sin levantarla todavía.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/infra-local/.env.example`,
+          purpose: 'Definir variables de entorno de ejemplo sin secretos reales.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/database-local/migrations/001-initial.sql`,
+          purpose: 'Primer borrador de migración local, todavía sin ejecutar.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/database-local/seeds/seed.local.sql`,
+          purpose: 'Semilla local de ejemplo y no productiva.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/scripts/ops-local.md`,
+          purpose: 'Secuencia manual para levantar la infraestructura local con aprobación.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/docs/infra-local-plan.md`,
+          purpose: 'Documentar riesgos, límites y pasos previos antes de ejecutar infraestructura sensible.',
+          required: true,
+        },
+      )
+      pushUniquePlannerValues(localOnlyConstraints, [
+        'Cualquier paso que levante Docker, Redis, Postgres, cron o colas queda fuera de esta iteracion.',
+      ])
+      pushUniquePlannerValues(approvalRequiredLater, [
+        'Instalar dependencias de infraestructura local.',
+        'Levantar contenedores o servicios locales sensibles.',
+        'Ejecutar migraciones, seeds, cron o workers reales en la máquina local.',
+      ])
+      break
+    default:
+      pushUniquePlannerValues(targetStructure, [
+        `${rootFolder}/`,
+        `${rootFolder}/index.html`,
+        `${rootFolder}/styles.css`,
+        `${rootFolder}/script.js`,
+        `${rootFolder}/mock-data.json`,
+      ])
+      pushUniquePlannerValues(allowedRootPaths, [rootFolder])
+      pushUniquePlannerValues(directories, [rootFolder])
+      pushUniquePlannerValues(
+        modules,
+        safePlan?.modules ||
+          architectureParts.coreModules ||
+          normalizedDomainUnderstanding?.primaryModules ||
+          ['panel operativo'],
+      )
+      filesToCreate.push(
+        {
+          path: `${rootFolder}/index.html`,
+          purpose: 'Pantalla inicial navegable de la primera entrega segura.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/styles.css`,
+          purpose: 'Estilos base locales y editables.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/script.js`,
+          purpose: 'Interacciones locales mínimas sin servicios reales.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/mock-data.json`,
+          purpose: 'Datos de muestra para validar el flujo principal.',
+          required: true,
+        },
+      )
+      pushUniquePlannerValues(localOnlyConstraints, [
+        'La primera iteracion queda acotada a una carpeta local y cuatro archivos base.',
+      ])
+      break
+  }
+
+  return {
+    reason:
+      typeof reason === 'string' && reason.trim()
+        ? reason.trim()
+        : `El objetivo requiere un plan revisable de nivel ${normalizedDeliveryLevel} antes de cualquier materializacion grande.`,
+    tasks: [
+      {
+        step: 1,
+        title: `Confirmar que el deliveryLevel correcto para esta iteracion es ${normalizedDeliveryLevel}.`,
+      },
+      {
+        step: 2,
+        title: 'Definir la estructura objetivo, los roots permitidos y los directorios base del proyecto local.',
+      },
+      {
+        step: 3,
+        title: 'Mapear modulos principales y paquetes o carpetas que entran en esta fase revisable.',
+      },
+      {
+        step: 4,
+        title: 'Listar archivos a crear y documentar su proposito antes de ejecutar materializacion real.',
+      },
+      {
+        step: 5,
+        title: 'Explicitar restricciones locales, exclusiones y aprobaciones futuras para evitar infraestructura o integraciones reales.',
+      },
+      {
+        step: 6,
+        title: 'Devolver un plan claro y revisable, sin crear todavía un proyecto grande real.',
+      },
+    ],
+    assumptions: [
+      'Esta iteracion es planner-only y no debe ejecutar una materializacion grande.',
+      'El objetivo ahora es dejar lista la arquitectura del delivery level, no instalar dependencias ni correr infraestructura.',
+      'Todo lo sensible queda local, revisable y pendiente de una aprobacion futura antes de ejecutar.',
+    ],
+    instruction:
+      `Preparar un plan revisable de nivel ${normalizedDeliveryLevel} para ${domainLabel}, detallando estructura objetivo, roots permitidos, modulos, directorios, archivos a crear, restricciones locales, exclusiones explicitas, aprobaciones futuras y criterios de exito, sin crear archivos ni ejecutar materializacion grande todavia.`,
+    scalableDeliveryPlan: {
+      deliveryLevel: normalizedDeliveryLevel,
+      reason:
+        typeof reason === 'string' && reason.trim()
+          ? reason.trim()
+          : `Plan de materializacion escalable en nivel ${normalizedDeliveryLevel}.`,
+      targetStructure,
+      allowedRootPaths,
+      modules: summarizeUniqueExecutorStrings(modules, 20),
+      directories: summarizeUniqueExecutorStrings(directories, 20),
+      filesToCreate: filesToCreate
+        .filter(
+          (entry) =>
+            entry &&
+            typeof entry.path === 'string' &&
+            entry.path.trim() &&
+            typeof entry.purpose === 'string' &&
+            entry.purpose.trim(),
+        )
+        .map((entry) => ({
+          path: entry.path.trim(),
+          purpose: entry.purpose.trim(),
+          required: entry.required !== false,
+        })),
+      localOnlyConstraints: summarizeUniqueExecutorStrings(localOnlyConstraints, 16),
+      explicitExclusions: summarizeUniqueExecutorStrings(explicitExclusions, 16),
+      approvalRequiredLater: summarizeUniqueExecutorStrings(approvalRequiredLater, 16),
+      successCriteria: summarizeUniqueExecutorStrings(successCriteria, 16),
+    },
+  }
+}
+
 function normalizeDomainUnderstandingContract(value) {
   if (!value || typeof value !== 'object') {
     return null
@@ -10285,6 +10881,83 @@ function normalizeDomainUnderstandingContract(value) {
   return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
 }
 
+function normalizeScalableDeliveryPlanContract(value) {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const normalizedFilesToCreate = Array.isArray(value.filesToCreate)
+    ? value.filesToCreate
+        .map((entry) =>
+          entry && typeof entry === 'object'
+            ? {
+                ...(typeof entry.path === 'string' && entry.path.trim()
+                  ? { path: entry.path.trim() }
+                  : {}),
+                ...(typeof entry.purpose === 'string' && entry.purpose.trim()
+                  ? { purpose: entry.purpose.trim() }
+                  : {}),
+                ...(typeof entry.required === 'boolean'
+                  ? { required: entry.required }
+                  : {}),
+              }
+            : null,
+        )
+        .filter((entry) => entry && Object.keys(entry).length > 0)
+    : []
+
+  const normalizedValue = {
+    ...(typeof value.deliveryLevel === 'string' && value.deliveryLevel.trim()
+      ? { deliveryLevel: value.deliveryLevel.trim() }
+      : {}),
+    ...(typeof value.reason === 'string' && value.reason.trim()
+      ? { reason: value.reason.trim() }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.targetStructure, 20).length > 0
+      ? { targetStructure: summarizeUniqueExecutorStrings(value.targetStructure, 20) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.allowedRootPaths, 20).length > 0
+      ? { allowedRootPaths: summarizeUniqueExecutorStrings(value.allowedRootPaths, 20) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.modules, 20).length > 0
+      ? { modules: summarizeUniqueExecutorStrings(value.modules, 20) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.directories, 20).length > 0
+      ? { directories: summarizeUniqueExecutorStrings(value.directories, 20) }
+      : {}),
+    ...(normalizedFilesToCreate.length > 0 ? { filesToCreate: normalizedFilesToCreate } : {}),
+    ...(summarizeUniqueExecutorStrings(value.localOnlyConstraints, 16).length > 0
+      ? {
+          localOnlyConstraints: summarizeUniqueExecutorStrings(
+            value.localOnlyConstraints,
+            16,
+          ),
+        }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.explicitExclusions, 16).length > 0
+      ? {
+          explicitExclusions: summarizeUniqueExecutorStrings(
+            value.explicitExclusions,
+            16,
+          ),
+        }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.approvalRequiredLater, 16).length > 0
+      ? {
+          approvalRequiredLater: summarizeUniqueExecutorStrings(
+            value.approvalRequiredLater,
+            16,
+          ),
+        }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.successCriteria, 16).length > 0
+      ? { successCriteria: summarizeUniqueExecutorStrings(value.successCriteria, 16) }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
 function buildBrainDecisionContract({
   decisionKey,
   strategy,
@@ -10312,6 +10985,7 @@ function buildBrainDecisionContract({
   safeFirstDeliveryPlan,
   safeFirstDeliveryMaterialization,
   domainUnderstanding,
+  scalableDeliveryPlan,
   finalResult,
 }) {
   const resolvedRequiresApproval = requiresApproval === true
@@ -10378,6 +11052,13 @@ function buildBrainDecisionContract({
       : {}),
     ...(normalizeDomainUnderstandingContract(domainUnderstanding)
       ? { domainUnderstanding: normalizeDomainUnderstandingContract(domainUnderstanding) }
+      : {}),
+    ...(normalizeScalableDeliveryPlanContract(scalableDeliveryPlan)
+      ? {
+          scalableDeliveryPlan: normalizeScalableDeliveryPlanContract(
+            scalableDeliveryPlan,
+          ),
+        }
       : {}),
     ...(finalResult && typeof finalResult === 'object'
       ? { finalResult }
@@ -13094,6 +13775,7 @@ async function buildLocalStrategicBrainDecision({
   const materializeSafeFirstDeliveryIntent =
     detectMaterializeSafeFirstDeliveryPlanningIntent(goal, context)
   const safeFirstDeliveryIntent = detectSafeFirstDeliveryPlanningIntent(goal, context)
+  const scalableDeliveryIntent = detectScalableDeliveryPlanningIntent(goal, context)
   const productArchitectureIntent = detectProductArchitecturePlanningIntent(
     goal,
     context,
@@ -13116,6 +13798,7 @@ async function buildLocalStrategicBrainDecision({
     goal,
     context,
     productTypeHint:
+      scalableDeliveryIntent.productTypeHint ||
       materializeSafeFirstDeliveryIntent.productTypeHint ||
       safeFirstDeliveryIntent.productTypeHint ||
       productArchitectureIntent.productTypeHint,
@@ -13331,6 +14014,46 @@ async function buildLocalStrategicBrainDecision({
   }
 
   if (
+    scalableDeliveryIntent.matches &&
+    !materializeSafeFirstDeliveryIntent.matches &&
+    !safeFirstDeliveryIntent.matches &&
+    !scopedFileEditIntent &&
+    !localGoalDescriptor &&
+    !looksLikeWebBaseGoal &&
+    compositeSteps.length < 2 &&
+    (!previousExecutionResult ||
+      iteration === 1 ||
+      approvalAlreadyGranted ||
+      hasRecoverableExecutionError)
+  ) {
+    const scalableDeliveryPlan = buildScalableDeliveryPlan({
+      goal,
+      context,
+      workspacePath,
+      deliveryLevel: scalableDeliveryIntent.deliveryLevel,
+      domainUnderstanding,
+      reason:
+        scalableDeliveryIntent.deliveryLevel === 'infra-local-plan'
+          ? 'El objetivo pide infraestructura local sensible y conviene devolver primero un plan escalable, local y revisable antes de tocar Docker, Redis, cron o base de datos.'
+          : `El objetivo pide explícitamente una entrega más grande de nivel ${scalableDeliveryIntent.deliveryLevel}, así que conviene devolver primero un plan estructurado y revisable antes de materializar.`,
+    })
+
+    return buildDecision({
+      decisionKey: 'scalable-delivery-plan',
+      strategy: 'scalable-delivery-plan',
+      executionMode: 'planner-only',
+      reason: scalableDeliveryPlan.reason,
+      tasks: scalableDeliveryPlan.tasks,
+      requiresApproval: false,
+      assumptions: scalableDeliveryPlan.assumptions,
+      instruction: scalableDeliveryPlan.instruction,
+      completed: false,
+      nextExpectedAction: 'review-scalable-delivery',
+      scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
+    })
+  }
+
+  if (
     materializeSafeFirstDeliveryIntent.matches &&
     !scopedFileEditIntent &&
     !localGoalDescriptor &&
@@ -13386,6 +14109,16 @@ async function buildLocalStrategicBrainDecision({
       intent: safeFirstDeliveryIntent,
       domainUnderstanding,
     })
+    const scalableDeliveryPlan = buildScalableDeliveryPlan({
+      goal,
+      context,
+      workspacePath,
+      deliveryLevel: 'safe-first-delivery',
+      domainUnderstanding,
+      reason:
+        'El objetivo pide una primera entrega segura y conviene dejar explícito que el delivery level sigue siendo safe-first-delivery antes de escalar.',
+      safeFirstDeliveryPlan: safeFirstDeliveryPlan.safeFirstDeliveryPlan,
+    })
 
     return buildDecision({
       decisionKey: 'safe-first-delivery-plan',
@@ -13400,6 +14133,7 @@ async function buildLocalStrategicBrainDecision({
       completed: false,
       nextExpectedAction: 'review-safe-first-delivery',
       safeFirstDeliveryPlan: safeFirstDeliveryPlan.safeFirstDeliveryPlan,
+      scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
     })
   }
 
@@ -14336,12 +15070,14 @@ Roles:
 Tu tarea es devolver una decision estructurada y operativa.
 
 Reglas:
-- Elegí entre estrategias compatibles con el sistema: fast-local, fast-composite, executor, web-scaffold-base, product-architecture-plan, safe-first-delivery-plan, materialize-safe-first-delivery-plan, ask-user.
+- Elegí entre estrategias compatibles con el sistema: fast-local, fast-composite, executor, web-scaffold-base, product-architecture-plan, safe-first-delivery-plan, materialize-safe-first-delivery-plan, scalable-delivery-plan, ask-user.
 - Usá web-scaffold-base para webs institucionales o creativas cuando corresponda.
 - Usá product-architecture-plan cuando el objetivo implique un sistema o producto complejo (por ejemplo ecommerce, CRM, ERP, marketplace, SaaS o plataforma con usuarios, roles, backoffice, datos e integraciones) y todavía haga falta definir arquitectura antes de ejecutar.
 - Si devolvés product-architecture-plan, usá executionMode="planner-only", nextExpectedAction="review-product-architecture", requiresApproval=false y describí fases, riesgos, integraciones y primera entrega segura sin crear archivos.
 - Usá safe-first-delivery-plan cuando el objetivo ya pida una primera entrega segura o una primera fase local/mock derivada de una arquitectura previa; en ese caso usá executionMode="planner-only", nextExpectedAction="review-safe-first-delivery", requiresApproval=false y dejá explícitamente fuera pagos reales, credenciales, webhooks, deploy, migraciones, auth real, base de datos real e integraciones sensibles.
 - Usá materialize-safe-first-delivery-plan cuando el objetivo ya pida materializar esa primera entrega segura con archivos locales acotados; en ese caso usá executionMode="executor", nextExpectedAction="execute-plan", requiresApproval=false, fijá una carpeta destino segura dentro del workspace y limitá el alcance a archivos mock locales sin pagos reales, credenciales, webhooks, deploy, migraciones, auth real, base de datos real ni integraciones externas reales.
+- Usá scalable-delivery-plan cuando el usuario pida explícitamente una entrega más grande y local, por ejemplo frontend real con estructura de proyecto, fullstack local con backend y base de datos local, monorepo local con apps/packages/workers o infraestructura local con Docker/Redis/cron/Postgres. En ese caso usá executionMode="planner-only", nextExpectedAction="review-scalable-delivery", requiresApproval=false, devolvé scalableDeliveryPlan completo y no crees archivos todavía.
+- Si el pedido es ambiguo o no pide explícitamente un proyecto grande, mantenete en web-scaffold-base o safe-first-delivery-plan antes de escalar.
 - Si hace falta una decisión humana real, devolvé requiresApproval=true y un approvalRequest estructurado.
 - Si llega feedback de error recuperable, replanificá.
 - Si el pedido es simple y determinístico, podés devolver fast-local o fast-composite.
@@ -14564,6 +15300,34 @@ function buildOpenAIBrainSchema() {
           stateHints: { type: 'array', items: { type: 'string' } },
           approvalThemes: { type: 'array', items: { type: 'string' } },
           explicitExclusions: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      scalableDeliveryPlan: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          deliveryLevel: { type: 'string' },
+          reason: { type: 'string' },
+          targetStructure: { type: 'array', items: { type: 'string' } },
+          allowedRootPaths: { type: 'array', items: { type: 'string' } },
+          modules: { type: 'array', items: { type: 'string' } },
+          directories: { type: 'array', items: { type: 'string' } },
+          filesToCreate: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: true,
+              properties: {
+                path: { type: 'string' },
+                purpose: { type: 'string' },
+                required: { type: 'boolean' },
+              },
+            },
+          },
+          localOnlyConstraints: { type: 'array', items: { type: 'string' } },
+          explicitExclusions: { type: 'array', items: { type: 'string' } },
+          approvalRequiredLater: { type: 'array', items: { type: 'string' } },
+          successCriteria: { type: 'array', items: { type: 'string' } },
         },
       },
       domainUnderstanding: {
@@ -14839,6 +15603,11 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
       typeof rawDecision.safeFirstDeliveryMaterialization === 'object'
         ? rawDecision.safeFirstDeliveryMaterialization
         : fallbackDecision.safeFirstDeliveryMaterialization,
+    scalableDeliveryPlan:
+      rawDecision?.scalableDeliveryPlan &&
+      typeof rawDecision.scalableDeliveryPlan === 'object'
+        ? rawDecision.scalableDeliveryPlan
+        : fallbackDecision.scalableDeliveryPlan,
     domainUnderstanding:
       rawDecision?.domainUnderstanding &&
       typeof rawDecision.domainUnderstanding === 'object'

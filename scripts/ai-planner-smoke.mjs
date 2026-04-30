@@ -14,6 +14,7 @@ const requiredPlannerFunctions = [
   'buildProductArchitecturePlan',
   'buildSafeFirstDeliveryPlan',
   'buildMaterializeSafeFirstDeliveryPlan',
+  'buildLocalStrategicBrainDecision',
 ]
 
 const activeCases = [
@@ -155,6 +156,50 @@ const candidateCases = [
   },
 ]
 
+const scalableValidationCases = [
+  {
+    id: 'landing-relojeria',
+    label: 'Pedido chico',
+    goal: 'Hacer una landing para una relojería premium.',
+    context: '',
+    acceptedStrategies: ['web-scaffold-base', 'safe-first-delivery-plan'],
+    rejectedStrategies: ['scalable-delivery-plan'],
+  },
+  {
+    id: 'frontend-project',
+    label: 'Frontend project',
+    goal:
+      'Hacer una app React completa para reservas de canchas con componentes, rutas, mocks y estructura de proyecto.',
+    context: '',
+    expectedDeliveryLevel: 'frontend-project',
+  },
+  {
+    id: 'fullstack-local',
+    label: 'Fullstack local',
+    goal:
+      'Hacer un sistema fullstack local para turnos médicos con frontend, backend y base de datos local.',
+    context: '',
+    expectedDeliveryLevel: 'fullstack-local',
+  },
+  {
+    id: 'monorepo-local',
+    label: 'Monorepo local',
+    goal:
+      'Hacer un monorepo local con app web, API, workers, paquetes compartidos y documentación.',
+    context: '',
+    expectedDeliveryLevel: 'monorepo-local',
+  },
+  {
+    id: 'infra-local-plan',
+    label: 'Infra local',
+    goal:
+      'Hacer una base local con Docker, Redis, BullMQ, cron y Postgres para un sistema de reservas.',
+    context: '',
+    expectedDeliveryLevel: 'infra-local-plan',
+    mustRequireApprovalLater: true,
+  },
+]
+
 function printUsage() {
   console.log('Uso: node scripts/ai-planner-smoke.mjs [--verbose] [--list] [--case=<id>]')
 }
@@ -276,24 +321,19 @@ function extractSegment({ name, startMarker, endMarker }) {
 }
 
 function loadPlannerTestingSurface() {
-  const segmentA = extractSegment({
-    name: 'segmento base de planner',
+  const plannerSurface = extractSegment({
+    name: 'superficie local de planner',
     startMarker: 'function normalizeExecutorAttemptScope(',
-    endMarker: 'function buildBrainDecisionContract(',
-  })
-  const segmentB = extractSegment({
-    name: 'segmento de helpers de planner',
-    startMarker: 'function extractExplicitBusinessLabelFromPlanningText(',
-    endMarker: 'function buildReusablePreserveDirective(',
+    endMarker: 'function buildOpenAIBrainInputPayload(input) {',
   })
   const harness = `
-${segmentA}
-${segmentB}
+${plannerSurface}
 module.exports = {
   buildDomainUnderstanding,
   buildProductArchitecturePlan,
   buildSafeFirstDeliveryPlan,
   buildMaterializeSafeFirstDeliveryPlan,
+  buildLocalStrategicBrainDecision,
 };
 `
 
@@ -641,7 +681,142 @@ function resolveCases(caseId) {
   process.exit(1)
 }
 
-function main() {
+async function runScalableValidationCase(testCase) {
+  const reusablePlanningContext = {
+    reusableArtifactLookup: {
+      executed: false,
+      foundCount: 0,
+      matches: [],
+    },
+    reusableArtifactsFound: 0,
+    reuseDecision: false,
+    reuseReason: '',
+    reusedArtifactIds: [],
+    reuseMode: 'none',
+    creativeDirection: null,
+  }
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: testCase.goal,
+    context: testCase.context,
+    workspacePath: 'C:/tmp/ai-planner-smoke-workspace',
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  const failures = []
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const nextExpectedAction = String(decision?.nextExpectedAction || '').trim()
+  const scalablePlan =
+    decision?.scalableDeliveryPlan && typeof decision.scalableDeliveryPlan === 'object'
+      ? decision.scalableDeliveryPlan
+      : null
+
+  if (Array.isArray(testCase.acceptedStrategies) && !testCase.acceptedStrategies.includes(strategy)) {
+    failures.push(
+      `Estrategia inesperada. Esperado: ${testCase.acceptedStrategies.join(' | ')}. Recibido: ${strategy || '(vacia)'}.`,
+    )
+  }
+
+  if (Array.isArray(testCase.rejectedStrategies) && testCase.rejectedStrategies.includes(strategy)) {
+    failures.push(`La estrategia no debía escalar. Recibido: ${strategy}.`)
+  }
+
+  if (testCase.expectedDeliveryLevel) {
+    if (strategy !== 'scalable-delivery-plan') {
+      failures.push(`Estrategia incorrecta. Esperado: scalable-delivery-plan. Recibido: ${strategy || '(vacia)'}.`)
+    }
+
+    if (executionMode !== 'planner-only') {
+      failures.push(`executionMode incorrecto. Esperado: planner-only. Recibido: ${executionMode || '(vacio)'}.`)
+    }
+
+    if (nextExpectedAction !== 'review-scalable-delivery') {
+      failures.push(
+        `nextExpectedAction incorrecto. Esperado: review-scalable-delivery. Recibido: ${nextExpectedAction || '(vacio)'}.`,
+      )
+    }
+
+    if (!scalablePlan) {
+      failures.push('scalableDeliveryPlan ausente.')
+    } else {
+      if (String(scalablePlan.deliveryLevel || '').trim() !== testCase.expectedDeliveryLevel) {
+        failures.push(
+          `deliveryLevel incorrecto. Esperado: ${testCase.expectedDeliveryLevel}. Recibido: ${
+            scalablePlan.deliveryLevel || '(vacio)'
+          }.`,
+        )
+      }
+
+      if (!Array.isArray(scalablePlan.allowedRootPaths) || scalablePlan.allowedRootPaths.length === 0) {
+        failures.push('allowedRootPaths vacío.')
+      }
+
+      if (!Array.isArray(scalablePlan.filesToCreate) || scalablePlan.filesToCreate.length === 0) {
+        failures.push('filesToCreate vacío.')
+      }
+
+      if (
+        !Array.isArray(scalablePlan.localOnlyConstraints) ||
+        scalablePlan.localOnlyConstraints.length === 0
+      ) {
+        failures.push('localOnlyConstraints vacío.')
+      }
+
+      if (
+        !Array.isArray(scalablePlan.successCriteria) ||
+        scalablePlan.successCriteria.length === 0
+      ) {
+        failures.push('successCriteria vacío.')
+      }
+
+      if (testCase.mustRequireApprovalLater) {
+        if (
+          !Array.isArray(scalablePlan.approvalRequiredLater) ||
+          scalablePlan.approvalRequiredLater.length === 0
+        ) {
+          failures.push('approvalRequiredLater debería tener entradas para este caso.')
+        }
+      }
+    }
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction,
+    scalablePlan,
+  }
+}
+
+function printScalableValidationResult(result) {
+  console.log(`${result.ok ? 'PASS' : 'FAIL'} ${result.testCase.id} | ${result.testCase.label}`)
+  console.log(`- objetivo: ${result.testCase.goal}`)
+  console.log(`- estrategia: ${result.strategy || '(vacia)'}`)
+  console.log(`- executionMode: ${result.executionMode || '(vacio)'}`)
+  console.log(
+    `- deliveryLevel: ${result.scalablePlan?.deliveryLevel || '(no aplica)'}`,
+  )
+
+  if (!result.ok) {
+    result.failures.forEach((failure) => console.log(`  - ${failure}`))
+  }
+}
+
+async function main() {
   const { verbose, listOnly, caseId } = parseArgs(process.argv.slice(2))
 
   if (listOnly) {
@@ -667,8 +842,24 @@ function main() {
 
   console.log('-----------------')
 
-  if (failedResults.length === 0) {
+  let scalableResults = []
+  if (!caseId) {
+    console.log('Scalable Delivery Checks')
+    console.log('=======================')
+    scalableResults = await Promise.all(
+      scalableValidationCases.map(runScalableValidationCase),
+    )
+    scalableResults.forEach(printScalableValidationResult)
+    console.log('-----------------')
+  }
+
+  const failedScalableResults = scalableResults.filter((result) => !result.ok)
+
+  if (failedResults.length === 0 && failedScalableResults.length === 0) {
     console.log(`OK. ${passedCount}/${results.length} casos pasaron.`)
+    if (scalableResults.length > 0) {
+      console.log(`OK. ${scalableResults.length}/${scalableResults.length} checks escalables pasaron.`)
+    }
     return
   }
 
@@ -677,7 +868,14 @@ function main() {
   failedResults.forEach((result) => {
     console.log(`- ${result.testCase.id}: ${result.failures[0] || 'sin detalle'}`)
   })
+
+  if (failedScalableResults.length > 0) {
+    console.log('checks escalables fallidos:')
+    failedScalableResults.forEach((result) => {
+      console.log(`- ${result.testCase.id}: ${result.failures[0] || 'sin detalle'}`)
+    })
+  }
   process.exit(1)
 }
 
-main()
+await main()
