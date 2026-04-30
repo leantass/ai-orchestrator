@@ -9,6 +9,9 @@ const currentFilePath = fileURLToPath(import.meta.url)
 const repoRoot = path.resolve(path.dirname(currentFilePath), '..')
 const mainFilePath = path.join(repoRoot, 'electron', 'main.cjs')
 const mainSource = fs.readFileSync(mainFilePath, 'utf8')
+const { LOCAL_MATERIALIZATION_PLAN_VERSION } = require(
+  path.join(repoRoot, 'electron', 'local-deterministic-executor.cjs'),
+)
 const requiredPlannerFunctions = [
   'buildDomainUnderstanding',
   'buildProductArchitecturePlan',
@@ -200,6 +203,14 @@ const scalableValidationCases = [
   },
 ]
 
+const frontendProjectMaterializationCase = {
+  id: 'frontend-project-materialization',
+  label: 'Materializacion frontend project',
+  goal:
+    'Hacer una app React completa para reservas de canchas con componentes, rutas, mocks y estructura de proyecto.',
+  context: '',
+}
+
 function printUsage() {
   console.log('Uso: node scripts/ai-planner-smoke.mjs [--verbose] [--list] [--case=<id>]')
 }
@@ -344,7 +355,9 @@ module.exports = {
     console,
     process,
     Buffer,
+    fs,
     path,
+    LOCAL_MATERIALIZATION_PLAN_VERSION,
     setTimeout,
     clearTimeout,
     setInterval,
@@ -816,6 +829,209 @@ function printScalableValidationResult(result) {
   }
 }
 
+function buildFrontendProjectMaterializationPrompt({ goal, scalablePlan }) {
+  const allowedRootPaths = summarizeUniqueStrings(scalablePlan?.allowedRootPaths, 6)
+  const targetStructure = summarizeUniqueStrings(scalablePlan?.targetStructure, 12)
+  const directories = summarizeUniqueStrings(scalablePlan?.directories, 12)
+  const filesToCreate = Array.isArray(scalablePlan?.filesToCreate)
+    ? scalablePlan.filesToCreate
+        .map((entry) => (entry && typeof entry === 'object' ? String(entry.path || '').trim() : ''))
+        .filter(Boolean)
+        .slice(0, 12)
+    : []
+  const localOnlyConstraints = summarizeUniqueStrings(
+    scalablePlan?.localOnlyConstraints,
+    12,
+  )
+  const explicitExclusions = summarizeUniqueStrings(
+    scalablePlan?.explicitExclusions,
+    12,
+  )
+
+  return {
+    goal: `Materializar frontend-project revisado para "${goal}".`,
+    context: [
+      'deliveryLevel: frontend-project.',
+      'accion requerida: materializar frontend-project.',
+      allowedRootPaths.length > 0
+        ? `allowedRootPaths: ${allowedRootPaths.join(', ')}`
+        : '',
+      targetStructure.length > 0
+        ? `targetStructure: ${targetStructure.join(', ')}`
+        : '',
+      directories.length > 0 ? `directories: ${directories.join(', ')}` : '',
+      filesToCreate.length > 0 ? `filesToCreate: ${filesToCreate.join(', ')}` : '',
+      localOnlyConstraints.length > 0
+        ? `localOnlyConstraints: ${localOnlyConstraints.join(' | ')}`
+        : '',
+      explicitExclusions.length > 0
+        ? `explicitExclusions: ${explicitExclusions.join(' | ')}`
+        : '',
+      'Archivos requeridos: package.json, index.html, README.md, src/main.js, src/styles.css, src/mock-data.js, src/components/App.js.',
+      'Devolver un materialize-frontend-project-plan ejecutable por el executor local deterministico.',
+      'No instalar dependencias ni crear node_modules.',
+    ]
+      .filter(Boolean)
+      .join('\n'),
+  }
+}
+
+async function runFrontendProjectMaterializationValidation() {
+  const reusablePlanningContext = {
+    reusableArtifactLookup: {
+      executed: false,
+      foundCount: 0,
+      matches: [],
+    },
+    reusableArtifactsFound: 0,
+    reuseDecision: false,
+    reuseReason: '',
+    reusedArtifactIds: [],
+    reuseMode: 'none',
+    creativeDirection: null,
+  }
+  const phaseOneDecision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: frontendProjectMaterializationCase.goal,
+    context: frontendProjectMaterializationCase.context,
+    workspacePath: 'C:/tmp/ai-planner-smoke-workspace',
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+  const scalablePlan =
+    phaseOneDecision?.scalableDeliveryPlan &&
+    typeof phaseOneDecision.scalableDeliveryPlan === 'object'
+      ? phaseOneDecision.scalableDeliveryPlan
+      : null
+  const prompt = buildFrontendProjectMaterializationPrompt({
+    goal: frontendProjectMaterializationCase.goal,
+    scalablePlan,
+  })
+  const phaseTwoDecision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: prompt.goal,
+    context: prompt.context,
+    workspacePath: 'C:/tmp/ai-planner-smoke-workspace',
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  const failures = []
+  const strategy = String(phaseTwoDecision?.strategy || '').trim()
+  const executionMode = String(phaseTwoDecision?.executionMode || '').trim()
+  const nextExpectedAction = String(phaseTwoDecision?.nextExpectedAction || '').trim()
+  const phaseTwoScalablePlan =
+    phaseTwoDecision?.scalableDeliveryPlan &&
+    typeof phaseTwoDecision.scalableDeliveryPlan === 'object'
+      ? phaseTwoDecision.scalableDeliveryPlan
+      : null
+  const executionScope =
+    phaseTwoDecision?.executionScope && typeof phaseTwoDecision.executionScope === 'object'
+      ? phaseTwoDecision.executionScope
+      : null
+  const materializationPlan =
+    phaseTwoDecision?.materializationPlan &&
+    typeof phaseTwoDecision.materializationPlan === 'object'
+      ? phaseTwoDecision.materializationPlan
+      : null
+  const allowedTargetPaths = summarizeUniqueStrings(
+    executionScope?.allowedTargetPaths,
+    20,
+  )
+
+  if (String(phaseOneDecision?.strategy || '').trim() !== 'scalable-delivery-plan') {
+    failures.push('La fase 1 no devolvio scalable-delivery-plan para el caso frontend-project.')
+  }
+
+  if (strategy !== 'materialize-frontend-project-plan') {
+    failures.push(
+      `Estrategia incorrecta en fase 2. Esperado: materialize-frontend-project-plan. Recibido: ${strategy || '(vacia)'}.`,
+    )
+  }
+
+  if (executionMode !== 'executor') {
+    failures.push(`executionMode incorrecto en fase 2. Esperado: executor. Recibido: ${executionMode || '(vacio)'}.`)
+  }
+
+  if (nextExpectedAction !== 'execute-plan') {
+    failures.push(
+      `nextExpectedAction incorrecto en fase 2. Esperado: execute-plan. Recibido: ${nextExpectedAction || '(vacio)'}.`,
+    )
+  }
+
+  if (String(phaseTwoScalablePlan?.deliveryLevel || '').trim() !== 'frontend-project') {
+    failures.push('deliveryLevel incorrecto en fase 2 para scalableDeliveryPlan.')
+  }
+
+  if (!materializationPlan) {
+    failures.push('materializationPlan ausente en fase 2.')
+  } else {
+    if (String(materializationPlan.strategy || '').trim() !== 'materialize-frontend-project-plan') {
+      failures.push('materializationPlan.strategy incorrecto.')
+    }
+
+    if (!Array.isArray(materializationPlan.operations) || materializationPlan.operations.length < 8) {
+      failures.push('materializationPlan.operations deberia incluir la estructura minima del frontend.')
+    }
+
+    if (!Array.isArray(materializationPlan.validations) || materializationPlan.validations.length < 8) {
+      failures.push('materializationPlan.validations deberia validar la estructura minima del frontend.')
+    }
+  }
+
+  const expectedTargets = [
+    'package.json',
+    'index.html',
+    'README.md',
+    'src/main.js',
+    'src/styles.css',
+    'src/mock-data.js',
+    'src/components/App.js',
+  ]
+
+  if (allowedTargetPaths.length === 0) {
+    failures.push('allowedTargetPaths vacio en fase 2.')
+  } else {
+    expectedTargets.forEach((token) => {
+      if (!allowedTargetPaths.some((targetPath) => normalizePathForComparison(targetPath).endsWith(token))) {
+        failures.push(`allowedTargetPaths no incluye ${token}.`)
+      }
+    })
+
+    if (allowedTargetPaths.some((targetPath) => /node_modules/i.test(targetPath))) {
+      failures.push('allowedTargetPaths no deberia incluir node_modules.')
+    }
+  }
+
+  return {
+    testCase: frontendProjectMaterializationCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction,
+    scalablePlan: phaseTwoScalablePlan,
+  }
+}
+
 async function main() {
   const { verbose, listOnly, caseId } = parseArgs(process.argv.slice(2))
 
@@ -853,12 +1069,30 @@ async function main() {
     console.log('-----------------')
   }
 
-  const failedScalableResults = scalableResults.filter((result) => !result.ok)
+  let frontendMaterializationResult = null
+  if (!caseId) {
+    console.log('Frontend Project Materialization Check')
+    console.log('=====================================')
+    frontendMaterializationResult =
+      await runFrontendProjectMaterializationValidation()
+    printScalableValidationResult(frontendMaterializationResult)
+    console.log('-----------------')
+  }
 
-  if (failedResults.length === 0 && failedScalableResults.length === 0) {
+  const failedScalableResults = scalableResults.filter((result) => !result.ok)
+  const frontendMaterializationFailed = frontendMaterializationResult?.ok === false
+
+  if (
+    failedResults.length === 0 &&
+    failedScalableResults.length === 0 &&
+    !frontendMaterializationFailed
+  ) {
     console.log(`OK. ${passedCount}/${results.length} casos pasaron.`)
     if (scalableResults.length > 0) {
       console.log(`OK. ${scalableResults.length}/${scalableResults.length} checks escalables pasaron.`)
+    }
+    if (frontendMaterializationResult) {
+      console.log('OK. 1/1 check de materializacion frontend-project paso.')
     }
     return
   }
@@ -874,6 +1108,15 @@ async function main() {
     failedScalableResults.forEach((result) => {
       console.log(`- ${result.testCase.id}: ${result.failures[0] || 'sin detalle'}`)
     })
+  }
+
+  if (frontendMaterializationFailed) {
+    console.log('check de materializacion frontend-project fallido:')
+    console.log(
+      `- ${frontendMaterializationResult.testCase.id}: ${
+        frontendMaterializationResult.failures[0] || 'sin detalle'
+      }`,
+    )
   }
   process.exit(1)
 }

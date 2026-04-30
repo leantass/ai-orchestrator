@@ -250,6 +250,8 @@ type ScalableDeliveryPlanContract = {
   successCriteria?: string[]
 }
 
+type MaterializationPlanContract = Record<string, unknown>
+
 type PlannerExecutionMetadata = {
   decisionKey: string
   businessSector: string
@@ -279,6 +281,7 @@ type PlannerExecutionMetadata = {
   safeFirstDeliveryMaterialization: SafeFirstDeliveryMaterializationContract | null
   domainUnderstanding: DomainUnderstandingContract | null
   scalableDeliveryPlan: ScalableDeliveryPlanContract | null
+  materializationPlan: MaterializationPlanContract | null
 }
 
 type PlannerRequestSnapshot = {
@@ -470,6 +473,7 @@ type PlannerDecisionResponse = {
   safeFirstDeliveryMaterialization?: SafeFirstDeliveryMaterializationContract | null
   domainUnderstanding?: DomainUnderstandingContract | null
   scalableDeliveryPlan?: ScalableDeliveryPlanContract | null
+  materializationPlan?: MaterializationPlanContract | null
   brainRoutingDecision?: BrainRoutingDecision
   tasks?: unknown[]
   assumptions?: string[]
@@ -563,6 +567,7 @@ declare global {
         reuseMode?: string
         executionScope?: ExecutorExecutionScope
         safeFirstDeliveryMaterialization?: SafeFirstDeliveryMaterializationContract
+        materializationPlan?: MaterializationPlanContract
       }) => Promise<{
         ok: boolean
         accepted?: boolean
@@ -660,6 +665,7 @@ const EMPTY_PLANNER_EXECUTION_METADATA: PlannerExecutionMetadata = {
   safeFirstDeliveryMaterialization: null,
   domainUnderstanding: null,
   scalableDeliveryPlan: null,
+  materializationPlan: null,
 }
 
 const buildSafeFirstDeliveryReviewMetadata = ({
@@ -685,6 +691,7 @@ const buildSafeFirstDeliveryReviewMetadata = ({
   productArchitecture: baseMetadata.productArchitecture,
   domainUnderstanding: baseMetadata.domainUnderstanding,
   scalableDeliveryPlan: baseMetadata.scalableDeliveryPlan,
+  materializationPlan: baseMetadata.materializationPlan,
   decisionKey: 'safe-first-delivery-plan',
   strategy: 'safe-first-delivery-plan',
   executionMode: 'planner-only',
@@ -1254,6 +1261,7 @@ const extractPlannerExecutionMetadata = (payload?: {
   safeFirstDeliveryMaterialization?: SafeFirstDeliveryMaterializationContract | null
   domainUnderstanding?: DomainUnderstandingContract | null
   scalableDeliveryPlan?: ScalableDeliveryPlanContract | null
+  materializationPlan?: MaterializationPlanContract | null
   tasks?: unknown[]
   assumptions?: string[]
 } | null): PlannerExecutionMetadata => ({
@@ -1426,6 +1434,10 @@ const extractPlannerExecutionMetadata = (payload?: {
   scalableDeliveryPlan: normalizeScalableDeliveryPlanContract(
     payload?.scalableDeliveryPlan,
   ),
+  materializationPlan:
+    payload?.materializationPlan && typeof payload.materializationPlan === 'object'
+      ? payload.materializationPlan
+      : null,
   tasks: Array.isArray(payload?.tasks)
     ? payload.tasks
         .map((task) =>
@@ -2473,11 +2485,13 @@ function ScalableDeliveryPlanCard({
   compact = false,
   reviewOnly = false,
   nextExpectedAction,
+  onPrepareMaterialization,
 }: {
   plan: ScalableDeliveryPlanContract
   compact?: boolean
   reviewOnly?: boolean
   nextExpectedAction?: string
+  onPrepareMaterialization?: (() => void) | null
 }) {
   const normalizedDeliveryLevel = normalizeOptionalString(plan.deliveryLevel)
   const planReason =
@@ -2485,6 +2499,10 @@ function ScalableDeliveryPlanCard({
   const typeLabel = getScalableDeliveryPlanTypeLabel(normalizedDeliveryLevel)
   const reviewStateLabel = reviewOnly ? 'No ejecuta todavÃ­a' : 'Plan informado'
   const nextActionLabel = getNextExpectedActionLabel(nextExpectedAction)
+  const canPrepareMaterialization =
+    reviewOnly &&
+    normalizedDeliveryLevel.toLocaleLowerCase() === 'frontend-project' &&
+    typeof onPrepareMaterialization === 'function'
   const fileEntries = Array.isArray(plan.filesToCreate)
     ? plan.filesToCreate
         .map((entry) =>
@@ -2526,6 +2544,15 @@ function ScalableDeliveryPlanCard({
           <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-medium text-amber-100">
             No ejecuta todavÃ­a
           </span>
+          {canPrepareMaterialization ? (
+            <button
+              type="button"
+              onClick={onPrepareMaterialization || undefined}
+              className="rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-1 text-xs font-medium text-sky-100 transition hover:bg-sky-300/15"
+            >
+              Preparar materializaciÃ³n frontend
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -2886,6 +2913,119 @@ const buildSafeFirstDeliveryMaterializationPrompt = ({
   return {
     goal: materializationGoal,
     context: materializationContextLines.join('\n'),
+  }
+}
+
+const buildFrontendProjectMaterializationCoherenceIssue = ({
+  sourcePlan,
+  metadata,
+}: {
+  sourcePlan: ScalableDeliveryPlanContract
+  metadata: PlannerExecutionMetadata
+}) => {
+  const materializationDecisionDetected =
+    isFrontendProjectMaterializationDecision(metadata.decisionKey) ||
+    isFrontendProjectMaterializationDecision(metadata.strategy)
+
+  if (!materializationDecisionDetected) {
+    return 'El planificador no devolvio un materialize-frontend-project-plan valido.'
+  }
+
+  if (
+    normalizeOptionalString(metadata.executionMode).toLocaleLowerCase() !== 'executor'
+  ) {
+    return 'El plan materializable frontend no quedo marcado para executor.'
+  }
+
+  if (
+    normalizeOptionalString(metadata.nextExpectedAction).toLocaleLowerCase() !==
+    'execute-plan'
+  ) {
+    return 'El plan materializable frontend no quedo listo para execute-plan.'
+  }
+
+  if (!metadata.executionScope?.allowedTargetPaths?.length) {
+    return 'El plan materializable frontend no devolvio allowedTargetPaths.'
+  }
+
+  if (!metadata.materializationPlan) {
+    return 'El plan materializable frontend no devolvio materializationPlan.'
+  }
+
+  const sourceRootPath = normalizeOptionalStringArray(sourcePlan.allowedRootPaths)[0]
+  const returnedRootPath =
+    normalizeOptionalStringArray(metadata.executionScope?.allowedTargetPaths)[0]
+
+  if (
+    sourceRootPath &&
+    returnedRootPath &&
+    normalizeOptionalString(sourceRootPath).toLocaleLowerCase() !==
+      normalizeOptionalString(returnedRootPath).toLocaleLowerCase()
+  ) {
+    return `El root permitido del plan materializable no coincide con el plan frontend activo. Fuente: ${sourceRootPath}. Devuelto: ${returnedRootPath}.`
+  }
+
+  return ''
+}
+
+const buildFrontendProjectMaterializationPrompt = ({
+  plan,
+  originalGoal,
+  originalContext,
+}: {
+  plan: ScalableDeliveryPlanContract
+  originalGoal: string
+  originalContext: string
+}) => {
+  const allowedRootPaths = normalizeOptionalStringArray(plan.allowedRootPaths)
+  const targetStructure = normalizeOptionalStringArray(plan.targetStructure)
+  const directories = normalizeOptionalStringArray(plan.directories)
+  const filesToCreate = Array.isArray(plan.filesToCreate)
+    ? plan.filesToCreate
+        .map((entry) => normalizeOptionalString(entry.path))
+        .filter(Boolean)
+    : []
+  const constraints = normalizeOptionalStringArray(plan.localOnlyConstraints)
+  const exclusions = normalizeOptionalStringArray(plan.explicitExclusions)
+  const successCriteria = normalizeOptionalStringArray(plan.successCriteria)
+  const targetRoot =
+    allowedRootPaths[0] ||
+    normalizeOptionalString(targetStructure[0]).replace(/[\\/]+$/g, '') ||
+    'frontend-project-local'
+
+  return {
+    goal: [
+      'Preparar la materializacion controlada de un frontend-project local y revisable dentro de una carpeta nueva del workspace.',
+      'No devolver otro scalable-delivery-plan.',
+      'Devolver un materialize-frontend-project-plan ejecutable por el executor local deterministico.',
+    ].join(' '),
+    context: [
+      `Objetivo original: ${normalizeOptionalString(originalGoal) || 'No definido'}.`,
+      normalizeOptionalString(originalContext)
+        ? `Contexto previo del operador: ${normalizeOptionalString(originalContext)}.`
+        : '',
+      'deliveryLevel: frontend-project.',
+      'accion requerida: materializar frontend-project.',
+      'modo esperado: scaffold frontend local, estatico y revisable.',
+      `allowedRootPaths: ${allowedRootPaths.join(', ') || targetRoot}.`,
+      targetStructure.length > 0
+        ? `targetStructure: ${targetStructure.join(' | ')}.`
+        : '',
+      directories.length > 0 ? `directories: ${directories.join(' | ')}.` : '',
+      filesToCreate.length > 0 ? `filesToCreate: ${filesToCreate.join(' | ')}.` : '',
+      constraints.length > 0
+        ? `localOnlyConstraints: ${constraints.join(' | ')}.`
+        : '',
+      exclusions.length > 0 ? `explicitExclusions: ${exclusions.join(' | ')}.` : '',
+      successCriteria.length > 0
+        ? `successCriteria: ${successCriteria.join(' | ')}.`
+        : '',
+      'Materializar solo: package.json, index.html, README.md, src/main.js, src/styles.css, src/mock-data.js y src/components/App.js.',
+      'Sin npm install, sin node_modules, sin backend real, sin base de datos real, sin deploy y sin integraciones externas.',
+      `Usar la carpeta objetivo ${targetRoot} como raiz del scaffold.`,
+    ]
+      .filter(Boolean)
+      .join('\n'),
   }
 }
 
@@ -3362,6 +3502,10 @@ const isSafeFirstDeliveryMaterializationDecision = (value: unknown) =>
   normalizeOptionalString(value).toLocaleLowerCase() ===
   'materialize-safe-first-delivery-plan'
 
+const isFrontendProjectMaterializationDecision = (value: unknown) =>
+  normalizeOptionalString(value).toLocaleLowerCase() ===
+  'materialize-frontend-project-plan'
+
 const parseMaterializationExecutionStats = (value: string) => {
   const normalizedValue = normalizeOptionalString(value)
   const operationsMatch = normalizedValue.match(/Operaciones aplicadas:\s*(\d+)/i)
@@ -3624,6 +3768,10 @@ const getNextExpectedActionLabel = (value: unknown) => {
 
   if (normalizedValue === 'scalable-delivery-plan') {
     return 'Plan escalable local'
+  }
+
+  if (normalizedValue === 'materialize-frontend-project-plan') {
+    return 'Materializacion controlada de frontend project'
   }
 
   return normalizeOptionalString(value).replace(/-/g, ' ')
@@ -9154,6 +9302,70 @@ function App() {
     })
   }
 
+  const handlePrepareFrontendProjectMaterializationPlan = async () => {
+    if (!plannerIsReviewOnly || !activeScalableDeliveryPlan) {
+      setSessionStatus('Error al generar el plan')
+      setCurrentStep(
+        'No hay un scalableDeliveryPlan activo y valido para preparar la materializacion frontend',
+      )
+      addFlowMessage({
+        source: 'orquestador',
+        title: 'DecisiÃ³n del orquestador',
+        content:
+          'No hay un scalableDeliveryPlan activo y vÃ¡lido para preparar la materializaciÃ³n frontend.',
+        status: 'error',
+      })
+      return
+    }
+
+    if (
+      normalizeOptionalString(activeScalableDeliveryPlan.deliveryLevel).toLocaleLowerCase() !==
+      'frontend-project'
+    ) {
+      setSessionStatus('Plan escalable todavÃ­a no materializable')
+      setCurrentStep(
+        'La materializacion frontend solo estÃ¡ disponible para deliveryLevel frontend-project',
+      )
+      addFlowMessage({
+        source: 'orquestador',
+        title: 'DecisiÃ³n del orquestador',
+        content:
+          'La materializaciÃ³n frontend controlada solo estÃ¡ disponible para deliveryLevel frontend-project.',
+        status: 'warning',
+      })
+      return
+    }
+
+    const preparedPlanningPrompt = buildFrontendProjectMaterializationPrompt({
+      plan: activeScalableDeliveryPlan,
+      originalGoal: goalInput,
+      originalContext: getCurrentExecutionContextValue(),
+    })
+
+    clearVisibleExecutionRuntimeState()
+    setSessionStatus('Preparando materializaciÃ³n frontend')
+    setCurrentStep(
+      'El orquestador esta preparando un scaffold frontend local, revisable y materializable por el executor deterministico',
+    )
+    setSessionEvents((currentEvents) => [
+      ...currentEvents,
+      'Se preparo una nueva planificacion para materializar un frontend-project local',
+    ])
+
+    await handleGenerateNextStep({
+      goal: preparedPlanningPrompt.goal,
+      context: preparedPlanningPrompt.context,
+      sourceLabel: 'MaterializaciÃ³n frontend preparada',
+      sendContent:
+        'Se enviÃ³ al planificador una solicitud controlada para preparar la materializaciÃ³n local de un frontend-project sin instalar dependencias ni ejecutar el proyecto.',
+      validateResponse: (_response, metadata) =>
+        buildFrontendProjectMaterializationCoherenceIssue({
+          sourcePlan: activeScalableDeliveryPlan,
+          metadata,
+        }),
+    })
+  }
+
   const handleExecuteCurrentInstruction = async (
     overrideInstruction?: string,
     overridePlannerExecutionMetadata?: PlannerExecutionMetadata,
@@ -9244,6 +9456,9 @@ function App() {
             safeFirstDeliveryMaterialization:
               executionMetadata.safeFirstDeliveryMaterialization,
           }
+        : {}),
+      ...(executionMetadata.materializationPlan
+        ? { materializationPlan: executionMetadata.materializationPlan }
         : {}),
     }
     startOrContinueExecutionRun({
@@ -12188,6 +12403,11 @@ function App() {
                           nextExpectedAction={
                             plannerExecutionMetadata.nextExpectedAction
                           }
+                          onPrepareMaterialization={
+                            plannerIsReviewOnly
+                              ? handlePrepareFrontendProjectMaterializationPlan
+                              : null
+                          }
                         />
                       ) : null}
                     </div>
@@ -13635,6 +13855,11 @@ function App() {
                     reviewOnly={plannerIsReviewOnly}
                     nextExpectedAction={
                       plannerExecutionMetadata.nextExpectedAction
+                    }
+                    onPrepareMaterialization={
+                      plannerIsReviewOnly
+                        ? handlePrepareFrontendProjectMaterializationPlan
+                        : null
                     }
                   />
                 ) : null}

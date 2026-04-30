@@ -1165,6 +1165,8 @@ function buildDerivedLocalMaterializationPlan({
 function buildMaterializeSafeFirstDeliveryLocalPlanSkipReason({
   executionScope,
   instruction,
+  plan,
+  expectedBasenames = ['index.html', 'styles.css', 'script.js', 'mock-data.json'],
 }) {
   const allowedTargetPaths = summarizeUniqueExecutorStrings(
     executionScope?.allowedTargetPaths,
@@ -1180,7 +1182,6 @@ function buildMaterializeSafeFirstDeliveryLocalPlanSkipReason({
   const normalizedAllowedPaths = allowedTargetPaths.map((entry) =>
     entry.toLocaleLowerCase(),
   )
-  const expectedBasenames = ['index.html', 'styles.css', 'script.js', 'mock-data.json']
   const missingBasenames = expectedBasenames.filter(
     (basename) =>
       !normalizedAllowedPaths.some(
@@ -1195,7 +1196,32 @@ function buildMaterializeSafeFirstDeliveryLocalPlanSkipReason({
     return `invalid-allowed-target-paths:${missingBasenames.join(',')}`
   }
 
+  if (plan && !isMaterializationPlanWithinAllowedTargetPaths(plan, allowedTargetPaths)) {
+    return 'plan-target-outside-allowed-paths'
+  }
+
   return 'task-build-failed'
+}
+
+function buildMaterializeFrontendProjectLocalPlanSkipReason({
+  executionScope,
+  instruction,
+  plan,
+}) {
+  return buildMaterializeSafeFirstDeliveryLocalPlanSkipReason({
+    executionScope,
+    instruction,
+    plan,
+    expectedBasenames: [
+      'package.json',
+      'index.html',
+      'README.md',
+      'main.js',
+      'styles.css',
+      'mock-data.js',
+      'App.js',
+    ],
+  })
 }
 
 function buildMaterializeSafeFirstDeliveryLocalFailureResponse({
@@ -1235,6 +1261,93 @@ function buildMaterializeSafeFirstDeliveryLocalFailureResponse({
       errorMessage: reason,
     },
   }
+}
+
+function buildMaterializeFrontendProjectLocalFailureResponse({
+  requestId,
+  instruction,
+  decisionKey,
+  executionScope,
+  reason,
+}) {
+  const allowedTargetPaths = summarizeUniqueExecutorStrings(
+    executionScope?.allowedTargetPaths,
+    12,
+  )
+
+  return {
+    ok: false,
+    ...(requestId ? { requestId } : {}),
+    instruction,
+    error:
+      'No se pudo preparar la materializacion frontend local porque el alcance permitido es invalido o el plan excede los targets permitidos.',
+    resultPreview:
+      'La materializacion frontend local no pudo iniciarse por un alcance permitido invalido o porque el plan excede los targets permitidos.',
+    failureType: 'invalid_local_frontend_project_scope',
+    reasoningLayer: 'local-rules',
+    materializationLayer: 'local-deterministic',
+    details: {
+      decisionKey,
+      strategy: decisionKey,
+      executionMode: 'executor',
+      currentAction: 'build-local-materialization-plan',
+      currentTargetPath: allowedTargetPaths[0] || undefined,
+      createdPaths: [],
+      touchedPaths: [],
+      hasMaterialProgress: false,
+      materialState: 'local-deterministic-plan-invalid',
+      allowedTargetPaths,
+      errorMessage: reason,
+    },
+  }
+}
+
+function extractMaterializationPlanTargetPaths(plan) {
+  if (!plan || typeof plan !== 'object') {
+    return []
+  }
+
+  const targetPaths = []
+
+  for (const operation of Array.isArray(plan.operations) ? plan.operations : []) {
+    if (typeof operation?.targetPath === 'string' && operation.targetPath.trim()) {
+      targetPaths.push(operation.targetPath.trim())
+    }
+  }
+
+  for (const validation of Array.isArray(plan.validations) ? plan.validations : []) {
+    if (typeof validation?.targetPath === 'string' && validation.targetPath.trim()) {
+      targetPaths.push(validation.targetPath.trim())
+    }
+  }
+
+  return summarizeUniqueExecutorStrings(targetPaths, 64)
+}
+
+function isMaterializationPlanWithinAllowedTargetPaths(plan, allowedTargetPaths) {
+  const normalizedAllowedTargetPaths = summarizeUniqueExecutorStrings(
+    allowedTargetPaths,
+    32,
+  ).map((entry) => entry.replace(/\\/g, '/').toLocaleLowerCase())
+
+  if (normalizedAllowedTargetPaths.length === 0) {
+    return false
+  }
+
+  const normalizedPlanTargets = extractMaterializationPlanTargetPaths(plan).map((entry) =>
+    entry.replace(/\\/g, '/').toLocaleLowerCase(),
+  )
+
+  if (normalizedPlanTargets.length === 0) {
+    return false
+  }
+
+  return normalizedPlanTargets.every((targetPath) =>
+    normalizedAllowedTargetPaths.some(
+      (allowedPath) =>
+        targetPath === allowedPath || targetPath.startsWith(`${allowedPath}/`),
+    ),
+  )
 }
 
 function buildLocalDeterministicTaskFromPlan({
@@ -1540,6 +1653,13 @@ function isMaterializeSafeFirstDeliveryDecisionKey(value) {
   return (
     typeof value === 'string' &&
     value.trim().toLocaleLowerCase() === 'materialize-safe-first-delivery-plan'
+  )
+}
+
+function isMaterializeFrontendProjectDecisionKey(value) {
+  return (
+    typeof value === 'string' &&
+    value.trim().toLocaleLowerCase() === 'materialize-frontend-project-plan'
   )
 }
 
@@ -6787,6 +6907,54 @@ function detectScalableDeliveryPlanningIntent(goal, context) {
   }
 }
 
+function detectFrontendProjectMaterializationPlanningIntent(goal, context) {
+  const rawTexts = [goal, context].filter(
+    (value) => typeof value === 'string' && value.trim(),
+  )
+  const combinedText = rawTexts.join(' ')
+  const normalizedText = normalizeSectorDetectionText(combinedText)
+
+  if (!normalizedText) {
+    return {
+      matches: false,
+      explicitSignals: [],
+    }
+  }
+
+  const explicitSignals = [
+    /\bmaterializ(?:ar|acion)\b/u.test(normalizedText) ? 'materializar' : '',
+    /\bpreparar\b/u.test(normalizedText) ? 'preparar' : '',
+    /\bfrontend-project\b/u.test(normalizedText) ? 'frontend-project' : '',
+    /\bmaterialize-frontend-project-plan\b/u.test(normalizedText)
+      ? 'materialize-frontend-project-plan'
+      : '',
+    /\bpackage\.json\b/u.test(normalizedText) ? 'package.json' : '',
+    /\bindex\.html\b/u.test(normalizedText) ? 'index.html' : '',
+    /\breadme\.md\b/u.test(normalizedText) ? 'README.md' : '',
+    /\bsrc\/main\.(?:js|jsx)\b/u.test(normalizedText) ? 'src/main.js' : '',
+    /\bsrc\/components\/app\.(?:js|jsx)\b/u.test(normalizedText)
+      ? 'src/components/App.js'
+      : '',
+  ].filter(Boolean)
+  const wantsMaterialization =
+    normalizedText.includes('materializar frontend-project') ||
+    normalizedText.includes('materializacion frontend-project') ||
+    normalizedText.includes('materialize-frontend-project-plan') ||
+    (normalizedText.includes('frontend-project') &&
+      normalizedText.includes('materializar')) ||
+    (normalizedText.includes('frontend-project') &&
+      normalizedText.includes('preparar materializacion'))
+  const mentionsStaticFrontendTargets =
+    normalizedText.includes('package.json') &&
+    normalizedText.includes('index.html') &&
+    normalizedText.includes('src/main')
+
+  return {
+    matches: wantsMaterialization || mentionsStaticFrontendTargets,
+    explicitSignals,
+  }
+}
+
 function pushUniquePlannerValues(target, values, maxItems = 12) {
   if (!Array.isArray(target) || !Array.isArray(values)) {
     return target
@@ -10363,6 +10531,60 @@ function buildBrainApprovalRequest({
   }
 }
 
+function extractPlannerContextLineValue(texts, labels) {
+  if (!Array.isArray(texts) || !Array.isArray(labels) || labels.length === 0) {
+    return ''
+  }
+
+  const normalizedLabels = labels
+    .filter((label) => typeof label === 'string' && label.trim())
+    .map((label) => normalizeSectorDetectionText(label))
+    .filter(Boolean)
+
+  for (const text of texts) {
+    if (typeof text !== 'string' || !text.trim()) {
+      continue
+    }
+
+    const lines = text.split(/\r?\n/u)
+
+    for (const rawLine of lines) {
+      const line = typeof rawLine === 'string' ? rawLine.trim() : ''
+
+      if (!line) {
+        continue
+      }
+
+      const normalizedLine = normalizeSectorDetectionText(line)
+
+      for (const label of normalizedLabels) {
+        if (!normalizedLine.startsWith(`${label}:`)) {
+          continue
+        }
+
+        const separatorIndex = line.indexOf(':')
+
+        if (separatorIndex >= 0) {
+          return line.slice(separatorIndex + 1).trim()
+        }
+      }
+    }
+  }
+
+  return ''
+}
+
+function splitPlannerContextValues(value) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return []
+  }
+
+  return value
+    .split(/\s*(?:\||,|;)\s*/u)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+}
+
 function buildScalableDeliveryPlan({
   goal,
   context,
@@ -10826,6 +11048,375 @@ function buildScalableDeliveryPlan({
   }
 }
 
+function buildFrontendProjectMaterializationPlan({
+  goal,
+  context,
+  workspacePath,
+  domainUnderstanding,
+  scalableDeliveryPlan,
+}) {
+  const normalizedDomainUnderstanding = normalizeDomainUnderstandingContract(domainUnderstanding)
+  const normalizedScalablePlan =
+    normalizeScalableDeliveryPlanContract(scalableDeliveryPlan)
+  const domainLabel =
+    sanitizeBusinessSectorLabel(normalizedDomainUnderstanding?.domainLabel || '') ||
+    extractProductArchitectureDomainLabel(goal, context, '') ||
+    'proyecto frontend local'
+  const explicitRootPathCandidates = splitPlannerContextValues(
+    extractPlannerContextLineValue(
+      [goal, context],
+      ['allowedRootPaths', 'rootPath objetivo', 'carpeta objetivo', 'rootPath'],
+    ),
+  )
+    .map((entry) => entry.replace(/^['"]+|['".]+$/g, '').replace(/[\\/]+$/g, ''))
+    .filter(Boolean)
+  const rootFolder =
+    explicitRootPathCandidates[0] ||
+    summarizeUniqueExecutorStrings(normalizedScalablePlan?.allowedRootPaths, 1)[0] ||
+    `frontend-project-${slugifyBusinessSector(domainLabel) || 'workspace-local'}`
+  const srcFolder = path.join(rootFolder, 'src')
+  const componentsFolder = path.join(srcFolder, 'components')
+  const packageJsonPath = path.join(rootFolder, 'package.json')
+  const indexHtmlPath = path.join(rootFolder, 'index.html')
+  const readmePath = path.join(rootFolder, 'README.md')
+  const mainJsPath = path.join(srcFolder, 'main.js')
+  const stylesPath = path.join(srcFolder, 'styles.css')
+  const mockDataPath = path.join(srcFolder, 'mock-data.js')
+  const appComponentPath = path.join(componentsFolder, 'App.js')
+  const allowedTargetPaths = [
+    rootFolder,
+    srcFolder,
+    componentsFolder,
+    packageJsonPath,
+    indexHtmlPath,
+    readmePath,
+    mainJsPath,
+    stylesPath,
+    mockDataPath,
+    appComponentPath,
+  ]
+  const modules = summarizeUniqueExecutorStrings(
+    normalizedScalablePlan?.modules ||
+      normalizedDomainUnderstanding?.primaryModules || [
+        'routing',
+        'componentes',
+        'mocks',
+        'layout base',
+      ],
+    10,
+  )
+  const successCriteria = summarizeUniqueExecutorStrings(
+    [
+      `Materializar solo "${rootFolder}" y sus archivos frontend permitidos dentro del workspace.`,
+      'Entregar un scaffold frontend local, estático y revisable sin instalar dependencias.',
+      'Mantener fuera de alcance deploy, credenciales, backend real, base de datos real, integraciones externas y pagos reales.',
+      workspacePath
+        ? `Resolver todo dentro del workspace configurado: ${workspacePath}.`
+        : 'Resolver todo dentro del workspace activo.',
+    ],
+    6,
+  )
+  const executionScope = normalizeExecutorExecutionScope({
+    allowedTargetPaths,
+    successCriteria,
+    enforceNarrowScope: true,
+  })
+  const packageName =
+    slugifyBusinessSector(path.basename(rootFolder)) ||
+    slugifyBusinessSector(domainLabel) ||
+    'frontend-project-local'
+  const appTitle =
+    sanitizeBusinessSectorLabel(domainLabel) || 'Proyecto Frontend Local'
+  const mockDataObject = {
+    meta: {
+      name: appTitle,
+      deliveryLevel: 'frontend-project',
+      mode: 'local-static-review',
+      installRequired: false,
+    },
+    modules,
+    routes: [
+      { id: 'inicio', label: 'Inicio', path: '#' },
+      { id: 'reservas', label: 'Reservas', path: '#reservas' },
+      { id: 'mock', label: 'Mocks', path: '#mock' },
+    ],
+    highlights: summarizeUniqueExecutorStrings(
+      [
+        ...modules,
+        'Sin backend real',
+        'Sin base de datos real',
+        'Sin npm install',
+      ],
+      12,
+    ),
+  }
+  const packageJsonContent = `${JSON.stringify(
+    {
+      name: packageName,
+      private: true,
+      version: '0.0.0',
+      description:
+        'Scaffold frontend local y revisable generado por JEFE sin instalar dependencias.',
+      scripts: {
+        review: 'echo "Abrir index.html localmente para revisar el scaffold"',
+      },
+    },
+    null,
+    2,
+  )}\n`
+  const indexHtmlContent = `<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${appTitle}</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
+`
+  const readmeContent = `# ${appTitle}
+
+Scaffold frontend local y revisable generado por JEFE.
+
+## Alcance
+
+- Sin npm install
+- Sin node_modules
+- Sin backend real
+- Sin base de datos real
+- Sin deploy
+- Sin integraciones externas
+
+## Como revisar
+
+1. Abrir \`index.html\` localmente.
+2. Revisar la estructura en \`src/\`.
+3. Ajustar componentes, mocks y estilos antes de pensar en una instalacion real.
+`
+  const stylesContent = `:root {
+  color-scheme: light;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: #f5f7fb;
+  color: #102034;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top, rgba(14, 165, 233, 0.14), transparent 38%),
+    linear-gradient(180deg, #f8fbff 0%, #edf3fb 100%);
+}
+
+.app-shell {
+  width: min(1100px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0 48px;
+}
+
+.hero,
+.panel {
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
+}
+
+.hero {
+  padding: 28px;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.2rem);
+}
+
+.hero p {
+  margin: 14px 0 0;
+  max-width: 720px;
+  line-height: 1.7;
+  color: #425466;
+}
+
+.chip-row,
+.panel-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.chip {
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #0f3d68;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.grid {
+  margin-top: 24px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.panel {
+  padding: 20px;
+}
+
+.panel h2 {
+  margin: 0 0 12px;
+  font-size: 1.05rem;
+}
+
+.panel ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #425466;
+  line-height: 1.6;
+}
+`
+  const mockDataContent = `export const appData = ${JSON.stringify(mockDataObject, null, 2)}
+`
+  const appComponentContent = `export function renderApp(appData) {
+  const highlights = Array.isArray(appData?.highlights) ? appData.highlights : []
+  const routes = Array.isArray(appData?.routes) ? appData.routes : []
+  const modules = Array.isArray(appData?.modules) ? appData.modules : []
+
+  return \`
+    <main class="app-shell">
+      <section class="hero">
+        <span class="chip">Frontend project</span>
+        <h1>${appTitle}</h1>
+        <p>
+          Base local y revisable para avanzar con componentes, mocks y estructura
+          de proyecto sin instalar dependencias ni ejecutar un bundler.
+        </p>
+      </section>
+
+      <div class="grid">
+        <section class="panel">
+          <h2>Rutas sugeridas</h2>
+          <div class="chip-row">
+            \${routes.map((route) => \`<span class="chip">\${route.label}</span>\`).join('')}
+          </div>
+        </section>
+        <section class="panel">
+          <h2>Módulos priorizados</h2>
+          <ul>
+            \${modules.map((moduleName) => \`<li>\${moduleName}</li>\`).join('')}
+          </ul>
+        </section>
+        <section class="panel">
+          <h2>Restricciones activas</h2>
+          <ul>
+            \${highlights.map((item) => \`<li>\${item}</li>\`).join('')}
+          </ul>
+        </section>
+      </div>
+    </main>
+  \`
+}
+`
+  const mainJsContent = `import { renderApp } from './components/App.js'
+import { appData } from './mock-data.js'
+
+const rootElement = document.getElementById('app')
+
+if (!rootElement) {
+  throw new Error('No se encontro el contenedor #app para renderizar el scaffold.')
+}
+
+rootElement.innerHTML = renderApp(appData)
+`
+  const instructionLines = [
+    `Materializar un scaffold frontend local y revisable dentro de "${rootFolder}" en el workspace activo.`,
+    `Usar solo los archivos permitidos: ${allowedTargetPaths
+      .slice(1)
+      .map((entry) => `"${entry}"`)
+      .join(', ')}.`,
+    modules.length > 0 ? `Modulos principales: ${modules.join(' | ')}.` : '',
+    'La salida debe ser estática, revisable y local, sin npm install, sin node_modules y sin ejecutar el proyecto.',
+    'Excluir explícitamente deploy, credenciales, backend real, base de datos real, pagos reales e integraciones externas.',
+    `allowedTargetPaths: ${allowedTargetPaths.join(', ')}`,
+    `successCriteria: ${successCriteria.join(' | ')}`,
+  ].filter(Boolean)
+
+  return {
+    tasks: [
+      {
+        step: 1,
+        title: `Preparar la carpeta "${rootFolder}" y la estructura base de src/components.`,
+        operation: 'create-folder',
+        targetPath: rootFolder,
+      },
+      {
+        step: 2,
+        title: 'Materializar package.json, index.html, README.md y el scaffold estatico del frontend local.',
+        operation: 'create-or-edit-files',
+        targetPath: rootFolder,
+      },
+      {
+        step: 3,
+        title: 'Validar que todo haya quedado local, revisable y dentro de los allowedTargetPaths.',
+        operation: 'validate-scope',
+        targetPath: rootFolder,
+      },
+    ],
+    assumptions: [
+      'La segunda fase sigue siendo controlada: materializa archivos locales, pero no instala dependencias ni ejecuta el proyecto.',
+      'Todo el scaffold debe quedar dentro de una carpeta nueva y acotada del workspace.',
+      'Backend real, base de datos real, deploy, credenciales e integraciones externas quedan fuera de alcance.',
+    ],
+    instruction: instructionLines.join('\n'),
+    executionScope,
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'frontend-project-materialization',
+      summary: `Scaffold frontend local creado en "${rootFolder}".`,
+      strategy: 'materialize-frontend-project-plan',
+      reasoningLayer: 'local-rules',
+      materializationLayer: 'local-deterministic',
+      operations: [
+        { type: 'create-folder', targetPath: rootFolder },
+        { type: 'create-folder', targetPath: srcFolder },
+        { type: 'create-folder', targetPath: componentsFolder },
+        { type: 'replace-file', targetPath: packageJsonPath, nextContent: packageJsonContent },
+        { type: 'replace-file', targetPath: indexHtmlPath, nextContent: indexHtmlContent },
+        { type: 'replace-file', targetPath: readmePath, nextContent: readmeContent },
+        { type: 'replace-file', targetPath: mainJsPath, nextContent: mainJsContent },
+        { type: 'replace-file', targetPath: stylesPath, nextContent: stylesContent },
+        { type: 'replace-file', targetPath: mockDataPath, nextContent: mockDataContent },
+        { type: 'replace-file', targetPath: appComponentPath, nextContent: appComponentContent },
+      ],
+      validations: [
+        { type: 'exists', targetPath: rootFolder, expectedKind: 'folder' },
+        { type: 'exists', targetPath: packageJsonPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: indexHtmlPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: readmePath, expectedKind: 'file' },
+        { type: 'exists', targetPath: srcFolder, expectedKind: 'folder' },
+        { type: 'exists', targetPath: mainJsPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: stylesPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: mockDataPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: componentsFolder, expectedKind: 'folder' },
+        { type: 'exists', targetPath: appComponentPath, expectedKind: 'file' },
+        { type: 'file-contains', targetPath: indexHtmlPath, expectedText: './src/main.js' },
+        { type: 'file-contains', targetPath: mainJsPath, expectedText: "./components/App.js" },
+        { type: 'file-contains', targetPath: mockDataPath, expectedText: 'deliveryLevel' },
+      ],
+    },
+  }
+}
+
 function normalizeDomainUnderstandingContract(value) {
   if (!value || typeof value !== 'object') {
     return null
@@ -10986,6 +11577,7 @@ function buildBrainDecisionContract({
   safeFirstDeliveryMaterialization,
   domainUnderstanding,
   scalableDeliveryPlan,
+  materializationPlan,
   finalResult,
 }) {
   const resolvedRequiresApproval = requiresApproval === true
@@ -11059,6 +11651,9 @@ function buildBrainDecisionContract({
             scalableDeliveryPlan,
           ),
         }
+      : {}),
+    ...(materializationPlan && typeof materializationPlan === 'object'
+      ? { materializationPlan }
       : {}),
     ...(finalResult && typeof finalResult === 'object'
       ? { finalResult }
@@ -13774,6 +14369,8 @@ async function buildLocalStrategicBrainDecision({
   const analysisProposalIntent = detectAnalysisProposalPlanningIntent(goal, context)
   const materializeSafeFirstDeliveryIntent =
     detectMaterializeSafeFirstDeliveryPlanningIntent(goal, context)
+  const frontendProjectMaterializationIntent =
+    detectFrontendProjectMaterializationPlanningIntent(goal, context)
   const safeFirstDeliveryIntent = detectSafeFirstDeliveryPlanningIntent(goal, context)
   const scalableDeliveryIntent = detectScalableDeliveryPlanningIntent(goal, context)
   const productArchitectureIntent = detectProductArchitecturePlanningIntent(
@@ -14010,6 +14607,54 @@ async function buildLocalStrategicBrainDecision({
         'La ejecucion anterior fallo, pero aparecio un bloqueo critico nuevo y real. El Cerebro solo puede volver a preguntar por ese bloqueo antes de continuar.',
       question:
         'Aparecio un bloqueo critico nuevo tras la falla del executor. Necesito esa definicion humana para continuar sin riesgo.',
+    })
+  }
+
+  if (
+    frontendProjectMaterializationIntent.matches &&
+    !materializeSafeFirstDeliveryIntent.matches &&
+    !safeFirstDeliveryIntent.matches &&
+    !scopedFileEditIntent &&
+    !localGoalDescriptor &&
+    !looksLikeWebBaseGoal &&
+    compositeSteps.length < 2 &&
+    (!previousExecutionResult ||
+      iteration === 1 ||
+      approvalAlreadyGranted ||
+      hasRecoverableExecutionError)
+  ) {
+    const scalableDeliveryPlan = buildScalableDeliveryPlan({
+      goal,
+      context,
+      workspacePath,
+      deliveryLevel: 'frontend-project',
+      domainUnderstanding,
+      reason:
+        'El objetivo ya pide materializar un frontend-project revisado, así que conviene devolver una segunda fase ejecutable con scope local estricto y sin instalar dependencias.',
+    })
+    const frontendProjectMaterializationPlan = buildFrontendProjectMaterializationPlan({
+      goal,
+      context,
+      workspacePath,
+      domainUnderstanding,
+      scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
+    })
+
+    return buildDecision({
+      decisionKey: 'materialize-frontend-project-plan',
+      strategy: 'materialize-frontend-project-plan',
+      executionMode: 'executor',
+      reason:
+        'El objetivo ya pide materializar el frontend-project revisado y el Cerebro puede devolver un materializationPlan local, estático y revisable para el executor determinístico.',
+      tasks: frontendProjectMaterializationPlan.tasks,
+      requiresApproval: false,
+      assumptions: frontendProjectMaterializationPlan.assumptions,
+      instruction: frontendProjectMaterializationPlan.instruction,
+      completed: false,
+      nextExpectedAction: 'execute-plan',
+      executionScope: frontendProjectMaterializationPlan.executionScope,
+      scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
+      materializationPlan: frontendProjectMaterializationPlan.materializationPlan,
     })
   }
 
@@ -15070,13 +15715,14 @@ Roles:
 Tu tarea es devolver una decision estructurada y operativa.
 
 Reglas:
-- Elegí entre estrategias compatibles con el sistema: fast-local, fast-composite, executor, web-scaffold-base, product-architecture-plan, safe-first-delivery-plan, materialize-safe-first-delivery-plan, scalable-delivery-plan, ask-user.
+- Elegí entre estrategias compatibles con el sistema: fast-local, fast-composite, executor, web-scaffold-base, product-architecture-plan, safe-first-delivery-plan, materialize-safe-first-delivery-plan, scalable-delivery-plan, materialize-frontend-project-plan, ask-user.
 - Usá web-scaffold-base para webs institucionales o creativas cuando corresponda.
 - Usá product-architecture-plan cuando el objetivo implique un sistema o producto complejo (por ejemplo ecommerce, CRM, ERP, marketplace, SaaS o plataforma con usuarios, roles, backoffice, datos e integraciones) y todavía haga falta definir arquitectura antes de ejecutar.
 - Si devolvés product-architecture-plan, usá executionMode="planner-only", nextExpectedAction="review-product-architecture", requiresApproval=false y describí fases, riesgos, integraciones y primera entrega segura sin crear archivos.
 - Usá safe-first-delivery-plan cuando el objetivo ya pida una primera entrega segura o una primera fase local/mock derivada de una arquitectura previa; en ese caso usá executionMode="planner-only", nextExpectedAction="review-safe-first-delivery", requiresApproval=false y dejá explícitamente fuera pagos reales, credenciales, webhooks, deploy, migraciones, auth real, base de datos real e integraciones sensibles.
 - Usá materialize-safe-first-delivery-plan cuando el objetivo ya pida materializar esa primera entrega segura con archivos locales acotados; en ese caso usá executionMode="executor", nextExpectedAction="execute-plan", requiresApproval=false, fijá una carpeta destino segura dentro del workspace y limitá el alcance a archivos mock locales sin pagos reales, credenciales, webhooks, deploy, migraciones, auth real, base de datos real ni integraciones externas reales.
 - Usá scalable-delivery-plan cuando el usuario pida explícitamente una entrega más grande y local, por ejemplo frontend real con estructura de proyecto, fullstack local con backend y base de datos local, monorepo local con apps/packages/workers o infraestructura local con Docker/Redis/cron/Postgres. En ese caso usá executionMode="planner-only", nextExpectedAction="review-scalable-delivery", requiresApproval=false, devolvé scalableDeliveryPlan completo y no crees archivos todavía.
+- Usá materialize-frontend-project-plan solo cuando el objetivo ya pida materializar un frontend-project revisado. En ese caso usá executionMode="executor", nextExpectedAction="execute-plan", requiresApproval=false, devolvé executionScope y materializationPlan acotados a una carpeta nueva del workspace con package.json, index.html, README.md y src/ estático, sin npm install, sin node_modules, sin bundler, sin backend real, sin base de datos real ni integraciones externas.
 - Si el pedido es ambiguo o no pide explícitamente un proyecto grande, mantenete en web-scaffold-base o safe-first-delivery-plan antes de escalar.
 - Si hace falta una decisión humana real, devolvé requiresApproval=true y un approvalRequest estructurado.
 - Si llega feedback de error recuperable, replanificá.
@@ -15328,6 +15974,43 @@ function buildOpenAIBrainSchema() {
           explicitExclusions: { type: 'array', items: { type: 'string' } },
           approvalRequiredLater: { type: 'array', items: { type: 'string' } },
           successCriteria: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      materializationPlan: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          version: { type: 'string' },
+          kind: { type: 'string' },
+          summary: { type: 'string' },
+          strategy: { type: 'string' },
+          reasoningLayer: { type: 'string' },
+          materializationLayer: { type: 'string' },
+          operations: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: true,
+              properties: {
+                type: { type: 'string' },
+                targetPath: { type: 'string' },
+                nextContent: { type: 'string' },
+              },
+            },
+          },
+          validations: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: true,
+              properties: {
+                type: { type: 'string' },
+                targetPath: { type: 'string' },
+                expectedKind: { type: 'string' },
+                expectedText: { type: 'string' },
+              },
+            },
+          },
         },
       },
       domainUnderstanding: {
@@ -15608,6 +16291,11 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
       typeof rawDecision.scalableDeliveryPlan === 'object'
         ? rawDecision.scalableDeliveryPlan
         : fallbackDecision.scalableDeliveryPlan,
+    materializationPlan:
+      rawDecision?.materializationPlan &&
+      typeof rawDecision.materializationPlan === 'object'
+        ? rawDecision.materializationPlan
+        : fallbackDecision.materializationPlan,
     domainUnderstanding:
       rawDecision?.domainUnderstanding &&
       typeof rawDecision.domainUnderstanding === 'object'
@@ -17737,6 +18425,9 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       question: brainDecision.question,
       approvalRequest: brainDecision.approvalRequest,
       nextExpectedAction: brainDecision.nextExpectedAction,
+      domainUnderstanding: brainDecision.domainUnderstanding,
+      scalableDeliveryPlan: brainDecision.scalableDeliveryPlan,
+      materializationPlan: brainDecision.materializationPlan,
       contextHubStatus,
       brainRoutingDecision,
       brainPrimaryAdapter,
@@ -17775,6 +18466,9 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
     question: brainDecision.question,
     approvalRequest: brainDecision.approvalRequest,
     nextExpectedAction: brainDecision.nextExpectedAction,
+    domainUnderstanding: brainDecision.domainUnderstanding,
+    scalableDeliveryPlan: brainDecision.scalableDeliveryPlan,
+    materializationPlan: brainDecision.materializationPlan,
     contextHubStatus,
     brainRoutingDecision,
     brainPrimaryAdapter,
@@ -17838,6 +18532,8 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
       : null
   const requiresLocalSafeFirstDeliveryMaterialization =
     isMaterializeSafeFirstDeliveryDecisionKey(decisionKey)
+  const requiresLocalFrontendProjectMaterialization =
+    isMaterializeFrontendProjectDecisionKey(decisionKey)
   const derivedMaterializationPlan =
     materializationPlan ||
     !executionScope ||
@@ -17885,7 +18581,23 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
     try {
       let forcedLocalTask = null
 
-      if (requiresLocalSafeFirstDeliveryMaterialization) {
+      if (
+        requiresLocalSafeFirstDeliveryMaterialization ||
+        requiresLocalFrontendProjectMaterialization
+      ) {
+        const localPlanOperationLabel = requiresLocalFrontendProjectMaterialization
+          ? 'materialize-frontend-project-plan'
+          : 'materialize-safe-first-delivery-plan'
+        const localPlanSkipReason = requiresLocalFrontendProjectMaterialization
+          ? buildMaterializeFrontendProjectLocalPlanSkipReason
+          : buildMaterializeSafeFirstDeliveryLocalPlanSkipReason
+        const localPlanFailureResponseBuilder =
+          requiresLocalFrontendProjectMaterialization
+            ? buildMaterializeFrontendProjectLocalFailureResponse
+            : buildMaterializeSafeFirstDeliveryLocalFailureResponse
+        const resolvedMaterializationPlan =
+          materializationPlan || derivedMaterializationPlan
+
         debugMainLog('materialize-safe-first-delivery:local-plan-attempt', {
           requestId: requestId || undefined,
           decisionKey,
@@ -17893,10 +18605,11 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
           hasRendererPlan: materializationPlan !== null,
         })
 
-        if (!materializationPlan && !derivedMaterializationPlan) {
-          const reason = buildMaterializeSafeFirstDeliveryLocalPlanSkipReason({
+        if (!resolvedMaterializationPlan) {
+          const reason = localPlanSkipReason({
             executionScope,
             instruction,
+            plan: resolvedMaterializationPlan,
           })
           debugMainLog('materialize-safe-first-delivery:local-plan-skipped', {
             requestId: requestId || undefined,
@@ -17906,7 +18619,7 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
           })
           const localFailureResponse = buildExecuteTaskCompletionPayload(
             enrichExecutorFailureResponseWithHistory({
-              response: buildMaterializeSafeFirstDeliveryLocalFailureResponse({
+              response: localPlanFailureResponseBuilder({
                 requestId,
                 instruction,
                 decisionKey,
@@ -17932,23 +18645,24 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
           debugMainLog('execute-task:before-fast-route-completion-event', {
             requestId: requestId || localFailureResponse?.requestId,
             ok: false,
-            operation: 'materialize-safe-first-delivery-plan',
+            operation: localPlanOperationLabel,
             targetPath: executionScope?.allowedTargetPaths?.[0] || undefined,
           })
           emitExecutionCompleteEvent(webContents, localFailureResponse)
           debugMainLog('execute-task:fast-route-completion-event-emitted', {
             requestId: requestId || localFailureResponse?.requestId,
             ok: false,
-            operation: 'materialize-safe-first-delivery-plan',
+            operation: localPlanOperationLabel,
           })
           return
         }
 
         forcedLocalTask = buildLocalDeterministicTaskFromPlan({
-          plan: materializationPlan || derivedMaterializationPlan,
+          plan: resolvedMaterializationPlan,
           workspacePath,
           requestId,
           instruction,
+          brainStrategy: decisionKey,
           businessSector,
           businessSectorLabel,
           creativeDirection,
@@ -17966,9 +18680,10 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
         })
 
         if (!forcedLocalTask) {
-          const reason = buildMaterializeSafeFirstDeliveryLocalPlanSkipReason({
+          const reason = localPlanSkipReason({
             executionScope,
             instruction,
+            plan: resolvedMaterializationPlan,
           })
           debugMainLog('materialize-safe-first-delivery:local-plan-skipped', {
             requestId: requestId || undefined,
@@ -17978,7 +18693,7 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
           })
           const localFailureResponse = buildExecuteTaskCompletionPayload(
             enrichExecutorFailureResponseWithHistory({
-              response: buildMaterializeSafeFirstDeliveryLocalFailureResponse({
+              response: localPlanFailureResponseBuilder({
                 requestId,
                 instruction,
                 decisionKey,
@@ -18004,14 +18719,14 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
           debugMainLog('execute-task:before-fast-route-completion-event', {
             requestId: requestId || localFailureResponse?.requestId,
             ok: false,
-            operation: 'materialize-safe-first-delivery-plan',
+            operation: localPlanOperationLabel,
             targetPath: executionScope?.allowedTargetPaths?.[0] || undefined,
           })
           emitExecutionCompleteEvent(webContents, localFailureResponse)
           debugMainLog('execute-task:fast-route-completion-event-emitted', {
             requestId: requestId || localFailureResponse?.requestId,
             ok: false,
-            operation: 'materialize-safe-first-delivery-plan',
+            operation: localPlanOperationLabel,
           })
           return
         }
