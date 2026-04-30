@@ -5001,8 +5001,8 @@ function App() {
   const activeReuseArtifactSummary = hasAppliedReusableContext
     ? activeAppliedReuseArtifactIds.join(', ') || 'Sin artefactos asociados'
     : activeReuseSuggestionIds.length > 0
-      ? `Sugerencias encontradas: ${activeReuseSuggestionIds.join(', ')}`
-      : 'Sin sugerencias encontradas'
+      ? `Referencias disponibles: ${activeReuseSuggestionIds.join(', ')}`
+      : 'Sin referencias disponibles'
   const activeReuseArtifactsPanelLabel = hasAppliedReusableContext
     ? 'Artefactos aplicados'
     : 'Referencias disponibles'
@@ -5126,7 +5126,6 @@ function App() {
   const contextualConnectionDetail = fastRouteDetected
     ? 'Electron materializo la salida sin bridge ni Codex.'
     : `${runtimeStatus.platform} · Electron ${runtimeStatus.electron}`
-  void contextualConnectionDetail
   const contextualRuntimeCardLabel = fastRouteDetected
     ? 'Materializacion'
     : 'Runtime del executor'
@@ -5165,10 +5164,6 @@ function App() {
   const latestExecutionScopeSummary = summarizeExecutionScope(
     plannerExecutionMetadata.executionScope,
   )
-  const latestAppliedReuseMode =
-    normalizeOptionalString(lastExecutorSnapshot?.appliedReuseMode) ||
-    normalizeOptionalString(plannerExecutionMetadata.reuseMode) ||
-    'none'
   const latestReuseAppliedFields = normalizeOptionalStringArray(
     lastExecutorSnapshot?.reuseAppliedFields,
   )
@@ -5182,7 +5177,27 @@ function App() {
     latestReusedStyleArtifactId,
     latestReusedStructureArtifactId,
   ].filter(Boolean)
-  const latestAppliedReuseModeLabel = getReuseModeLabel(latestAppliedReuseMode)
+  const latestAppliedReuseModeRaw = normalizeOptionalString(
+    lastExecutorSnapshot?.appliedReuseMode,
+  )
+  const plannerRequestedReuseMode = normalizeOptionalString(
+    plannerExecutionMetadata.reuseMode,
+  )
+  const latestReuseApplied =
+    (latestAppliedReuseModeRaw &&
+      latestAppliedReuseModeRaw.toLocaleLowerCase() !== 'none') ||
+    latestAppliedReuseArtifactIds.length > 0 ||
+    latestReuseAppliedFields.length > 0
+  const latestAppliedReuseMode = latestReuseApplied
+    ? latestAppliedReuseModeRaw || plannerRequestedReuseMode || 'none'
+    : 'none'
+  const latestAppliedReuseModeLabel = latestReuseApplied
+    ? getReuseModeLabel(latestAppliedReuseMode)
+    : 'Sin reutilización aplicada'
+  const latestReusableReferenceSummary =
+    activeReuseSuggestionIds.length > 0
+      ? activeReuseSuggestionIds.join(', ')
+      : 'Sin referencias disponibles'
   const visibleFinalTextResponse =
     shouldShowLatestExecutionRunSummaryInOperationalReading &&
     latestExecutionRunSummary?.status === 'success' &&
@@ -5325,11 +5340,21 @@ function App() {
   const resultScopeSummaryLabel =
     latestExecutionScopeSummary || 'Sin alcance restringido para resumir'
   const resultReusableSummaryLabel =
-    latestAppliedReuseMode.toLocaleLowerCase() === 'none'
+    !latestReuseApplied
       ? 'Sin reutilización aplicada'
       : latestAppliedReuseArtifactIds.length > 0
         ? latestAppliedReuseArtifactIds.join(', ')
-        : 'Sin artefacto reportado'
+        : latestReuseAppliedFields.length > 0
+          ? latestReuseAppliedFields.join(', ')
+          : 'Sin artefacto reportado'
+  const resultReusableSupportLabel = latestReuseApplied
+    ? 'Campos aplicados'
+    : 'Referencias disponibles'
+  const resultReusableSupportValue = latestReuseApplied
+    ? latestReuseAppliedFields.length > 0
+      ? latestReuseAppliedFields.join(', ')
+      : 'Sin campos reportados'
+    : latestReusableReferenceSummary
   const resultIsSafeFirstDeliveryMaterialization =
     resultStatusPresentation.label === 'Ejecución completada' &&
     (isSafeFirstDeliveryMaterializationDecision(plannerExecutionMetadata.decisionKey) ||
@@ -5376,7 +5401,7 @@ function App() {
   const resultMaterializationEngineLabel = latestMaterializationLayer || 'No disponible'
   const resultMaterializationBridgeDetail =
     latestMaterializationLayer === 'local-deterministic' || fastRouteDetected
-      ? 'No se requirió bridge ni Codex para materializar esta entrega segura.'
+      ? 'No se usó bridge y Codex no fue requerido para materializar esta salida.'
       : 'La corrida no informó una resolución completamente local.'
   const resultMaterializationLimits = [
     'Datos mock editables.',
@@ -9182,6 +9207,22 @@ function App() {
           result: response.result,
         }),
       )
+      const responseSnapshot = extractExecutorFailureContext(response)
+      updateLastExecutorSnapshot(responseSnapshot)
+      recordExecutionSnapshotOnActiveRun(responseSnapshot)
+      const responseIndicatesFastRoute =
+        (Array.isArray(response.trace) &&
+          response.trace.some((entry) => isFastRouteExecutionTitle(entry?.title))) ||
+        isLocalFastRouteExecution({
+          strategy: response.details?.strategy,
+          materializationPlanSource: response.details?.materializationPlanSource,
+          materialState: response.details?.materialState,
+          executionMode: inferExecutionModeFromSnapshot(responseSnapshot),
+          decisionKey: response.details?.decisionKey,
+        })
+      setLastObservedExecutionMode(
+        responseIndicatesFastRoute ? 'local-fast' : 'executor',
+      )
       finalExecutionClosure = {
         requestId,
         source: 'return',
@@ -11762,7 +11803,7 @@ function App() {
                       <MetricCard
                         label="Conexión local"
                         value={contextualConnectionLabel}
-                        detail={`${runtimeStatus.platform} · Electron ${runtimeStatus.electron}`}
+                        detail={contextualConnectionDetail}
                         tone="emerald"
                       />
                       <MetricCard
@@ -11950,6 +11991,23 @@ function App() {
                                 label: 'Workspace',
                                 value: currentWorkspaceSummary,
                               },
+                              {
+                                label: 'Modo de ejecución',
+                                value: fastRouteDetected
+                                  ? 'Ruta rápida local'
+                                  : activeExecutionModeLabel,
+                                detail: fastRouteDetected
+                                  ? 'Codex: No requerido · Bridge: No usado'
+                                  : activePlannerStrategyLabel,
+                              },
+                              {
+                                label: 'Materialización',
+                                value: latestMaterializationLayer || 'No disponible',
+                                detail:
+                                  latestMaterializationPlanSource ||
+                                  latestMaterializationStrategy ||
+                                  'Sin fuente reportada',
+                              },
                             ]}
                           />
                         </div>
@@ -12094,16 +12152,13 @@ function App() {
                               label: 'Reusable',
                               value: latestAppliedReuseModeLabel,
                               detail:
-                                latestAppliedReuseMode.toLocaleLowerCase() === 'none'
+                                !latestReuseApplied
                                   ? 'No se aplicó memoria reusable en esta corrida.'
                                   : resultReusableSummaryLabel,
                             },
                             {
-                              label: 'Campos aplicados',
-                              value:
-                                latestReuseAppliedFields.length > 0
-                                  ? latestReuseAppliedFields.join(', ')
-                                  : 'Sin campos reportados',
+                              label: resultReusableSupportLabel,
+                              value: resultReusableSupportValue,
                             },
                             {
                               label: 'Scope',
@@ -13249,13 +13304,13 @@ function App() {
                   />
                   <MetricCard
                     label="Modo de ejecuciÃ³n"
-                    value={activeExecutionModeLabel}
-                    detail={plannerExecutionMetadata.executionScope || 'Sin alcance definido'}
+                    value={contextualExecutorModeLabel}
+                    detail={contextualExecutorModeDetail}
                   />
                   <MetricCard
                     label="ConexiÃ³n local"
                     value={contextualConnectionLabel}
-                    detail={`${runtimeStatus.platform} · Electron ${runtimeStatus.electron}`}
+                    detail={contextualConnectionDetail}
                     tone="emerald"
                   />
                 </div>
