@@ -175,6 +175,15 @@ const scalableValidationCases = [
       'Hacer una app React completa para reservas de canchas con componentes, rutas, mocks y estructura de proyecto.',
     context: '',
     expectedDeliveryLevel: 'frontend-project',
+    expectProjectBlueprint: true,
+    expectedBlueprintRoles: ['cliente', 'operador local'],
+    expectedBlueprintModules: ['frontend shell', 'componentes', 'mocks locales'],
+    expectedStackProfile: {
+      frontend: 'react-ready-static',
+      backend: 'none',
+      database: 'mock-data',
+      apiStyle: 'none/local-mock',
+    },
   },
   {
     id: 'fullstack-local',
@@ -183,6 +192,7 @@ const scalableValidationCases = [
       'Hacer un sistema fullstack local para turnos médicos con frontend, backend y base de datos local.',
     context: '',
     expectedDeliveryLevel: 'fullstack-local',
+    expectProjectBlueprint: true,
     expectedTargetStructureTokens: [
       'frontend/',
       'backend/',
@@ -227,6 +237,36 @@ const scalableValidationCases = [
       'Integrar servicios externos',
       'Usar datos reales',
     ],
+    expectedBlueprintRoles: ['pacientes', 'profesionales', 'operador interno'],
+    expectedBlueprintModules: [
+      'frontend local',
+      'backend local',
+      'shared contracts',
+      'database design',
+      'scripts locales',
+      'documentacion',
+    ],
+    expectedBlueprintEntities: [
+      'pacientes',
+      'profesionales',
+      'turnos',
+      'especialidades',
+      'disponibilidad',
+    ],
+    expectedPhaseTokens: [
+      'blueprint-fullstack',
+      'scaffold-fullstack-local',
+      'habilitacion-local-real',
+    ],
+    expectedStackProfile: {
+      frontend: 'react-ready-static',
+      backend: 'node-express-style',
+      database: 'sql-local-design',
+      apiStyle: 'rest',
+      auth: 'deferred',
+      testing: 'manual-smoke-first',
+      packageManager: 'npm-deferred',
+    },
   },
   {
     id: 'monorepo-local',
@@ -235,6 +275,34 @@ const scalableValidationCases = [
       'Hacer un monorepo local con app web, API, workers, paquetes compartidos y documentación.',
     context: '',
     expectedDeliveryLevel: 'monorepo-local',
+    expectProjectBlueprint: true,
+    expectedTargetStructureTokens: [
+      'apps/',
+      'apps/web/',
+      'apps/api/',
+      'packages/',
+      'services/workers/',
+      'docs/',
+      'infra-local/',
+    ],
+    expectedFileTokens: [
+      'package.json',
+      'apps/web/package.json',
+      'apps/api/package.json',
+      'services/workers/package.json',
+      'packages/shared/package.json',
+      'packages/ui/package.json',
+      'docs/architecture.md',
+      'docs/local-runbook.md',
+    ],
+    expectedBlueprintModules: [
+      'apps web',
+      'api service',
+      'workers',
+      'shared contracts',
+      'ui package',
+    ],
+    expectedPhaseTokens: ['blueprint-monorepo', 'workspaces-futuros'],
   },
   {
     id: 'infra-local-plan',
@@ -244,6 +312,8 @@ const scalableValidationCases = [
     context: '',
     expectedDeliveryLevel: 'infra-local-plan',
     mustRequireApprovalLater: true,
+    expectProjectBlueprint: true,
+    expectedPhaseTokens: ['plan-infra-local', 'aprobacion-sensible'],
   },
 ]
 
@@ -566,6 +636,51 @@ function summarizeMaterialization(materializePlan) {
   }
 }
 
+function summarizeProjectBlueprint(projectBlueprint) {
+  return {
+    productType: projectBlueprint?.productType || '',
+    domain: projectBlueprint?.domain || '',
+    intent: projectBlueprint?.intent || '',
+    deliveryLevel: projectBlueprint?.deliveryLevel || '',
+    confidence: projectBlueprint?.confidence || '',
+    roles: toStringArray(projectBlueprint?.roles, 24),
+    modules: toStringArray(projectBlueprint?.modules, 24),
+    entities: toStringArray(projectBlueprint?.entities, 24),
+    coreFlows: toStringArray(projectBlueprint?.coreFlows, 24),
+    assumptions: toStringArray(projectBlueprint?.assumptions, 24),
+    delegatedDecisions: toStringArray(projectBlueprint?.delegatedDecisions, 24),
+    approvalRequiredLater: toStringArray(projectBlueprint?.approvalRequiredLater, 24),
+    successCriteria: toStringArray(projectBlueprint?.successCriteria, 24),
+    phasePlan: Array.isArray(projectBlueprint?.phasePlan)
+      ? projectBlueprint.phasePlan.map((entry) => ({
+          phase: typeof entry?.phase === 'string' ? entry.phase : '',
+          goal: typeof entry?.goal === 'string' ? entry.goal : '',
+          deliveryLevel:
+            typeof entry?.deliveryLevel === 'string' ? entry.deliveryLevel : '',
+          executableNow: entry?.executableNow === true,
+          approvalRequired: entry?.approvalRequired === true,
+        }))
+      : [],
+    stackProfile:
+      projectBlueprint?.stackProfile && typeof projectBlueprint.stackProfile === 'object'
+        ? projectBlueprint.stackProfile
+        : null,
+  }
+}
+
+function summarizeQuestionPolicy(questionPolicy) {
+  return {
+    mode: questionPolicy?.mode || '',
+    blockingQuestions: toStringArray(questionPolicy?.blockingQuestions, 12),
+    optionalQuestions: toStringArray(questionPolicy?.optionalQuestions, 12),
+    delegatedDecisions: toStringArray(questionPolicy?.delegatedDecisions, 24),
+    shouldAskBeforePlanning: questionPolicy?.shouldAskBeforePlanning === true,
+    shouldAskBeforeMaterialization:
+      questionPolicy?.shouldAskBeforeMaterialization === true,
+    reason: questionPolicy?.reason || '',
+  }
+}
+
 function runCase(testCase) {
   const structures = buildCaseStructures(testCase)
   const failures = []
@@ -786,6 +901,14 @@ async function runScalableValidationCase(testCase) {
     decision?.scalableDeliveryPlan && typeof decision.scalableDeliveryPlan === 'object'
       ? decision.scalableDeliveryPlan
       : null
+  const projectBlueprint =
+    decision?.projectBlueprint && typeof decision.projectBlueprint === 'object'
+      ? decision.projectBlueprint
+      : null
+  const questionPolicy =
+    decision?.questionPolicy && typeof decision.questionPolicy === 'object'
+      ? decision.questionPolicy
+      : null
   const materializationPlan =
     decision?.materializationPlan && typeof decision.materializationPlan === 'object'
       ? decision.materializationPlan
@@ -931,6 +1054,90 @@ async function runScalableValidationCase(testCase) {
         })
       }
     }
+
+    if (testCase.expectProjectBlueprint) {
+      if (!projectBlueprint) {
+        failures.push('projectBlueprint ausente.')
+      } else {
+        if (String(projectBlueprint.deliveryLevel || '').trim() !== testCase.expectedDeliveryLevel) {
+          failures.push(
+            `projectBlueprint.deliveryLevel incorrecto. Esperado: ${testCase.expectedDeliveryLevel}. Recibido: ${
+              projectBlueprint.deliveryLevel || '(vacio)'
+            }.`,
+          )
+        }
+
+        const blueprintSummary = summarizeProjectBlueprint(projectBlueprint)
+
+        if (!blueprintSummary.stackProfile || typeof blueprintSummary.stackProfile !== 'object') {
+          failures.push('projectBlueprint.stackProfile ausente.')
+        }
+
+        if (blueprintSummary.roles.length === 0) {
+          failures.push('projectBlueprint.roles vacio.')
+        }
+
+        if (blueprintSummary.modules.length === 0) {
+          failures.push('projectBlueprint.modules vacio.')
+        }
+
+        if (blueprintSummary.phasePlan.length === 0) {
+          failures.push('projectBlueprint.phasePlan vacio.')
+        }
+
+        ;(testCase.expectedBlueprintRoles || []).forEach((token) => {
+          if (!listHasToken(blueprintSummary.roles, token)) {
+            failures.push(`projectBlueprint.roles no incluye ${token}.`)
+          }
+        })
+
+        ;(testCase.expectedBlueprintModules || []).forEach((token) => {
+          if (!listHasToken(blueprintSummary.modules, token)) {
+            failures.push(`projectBlueprint.modules no incluye ${token}.`)
+          }
+        })
+
+        ;(testCase.expectedBlueprintEntities || []).forEach((token) => {
+          if (!listHasToken(blueprintSummary.entities, token)) {
+            failures.push(`projectBlueprint.entities no incluye ${token}.`)
+          }
+        })
+
+        ;(testCase.expectedPhaseTokens || []).forEach((token) => {
+          if (
+            !blueprintSummary.phasePlan.some((entry) =>
+              normalizeText(entry.phase).includes(normalizeText(token)),
+            )
+          ) {
+            failures.push(`projectBlueprint.phasePlan no incluye ${token}.`)
+          }
+        })
+
+        if (testCase.expectedStackProfile && blueprintSummary.stackProfile) {
+          Object.entries(testCase.expectedStackProfile).forEach(([key, expectedValue]) => {
+            if (String(blueprintSummary.stackProfile[key] || '').trim() !== expectedValue) {
+              failures.push(
+                `projectBlueprint.stackProfile.${key} incorrecto. Esperado: ${expectedValue}. Recibido: ${
+                  blueprintSummary.stackProfile[key] || '(vacio)'
+                }.`,
+              )
+            }
+          })
+        }
+      }
+    }
+
+    if (!questionPolicy) {
+      failures.push('questionPolicy ausente.')
+    } else {
+      const questionPolicySummary = summarizeQuestionPolicy(questionPolicy)
+      if (!String(questionPolicySummary.mode || '').trim()) {
+        failures.push('questionPolicy.mode vacio.')
+      }
+      if (!String(questionPolicySummary.reason || '').trim()) {
+        failures.push('questionPolicy.reason vacio.')
+      }
+    }
   }
 
   return {
@@ -941,6 +1148,8 @@ async function runScalableValidationCase(testCase) {
     executionMode,
     nextExpectedAction,
     scalablePlan,
+    projectBlueprint,
+    questionPolicy,
   }
 }
 
@@ -955,6 +1164,238 @@ function printScalableValidationResult(result) {
 
   if (!result.ok) {
     result.failures.forEach((failure) => console.log(`  - ${failure}`))
+  }
+}
+
+async function runQuestionPolicyLowRiskValidation() {
+  const reusablePlanningContext = {
+    reusableArtifactLookup: {
+      executed: false,
+      foundCount: 0,
+      matches: [],
+    },
+    reusableArtifactsFound: 0,
+    reuseDecision: false,
+    reuseReason: '',
+    reusedArtifactIds: [],
+    reuseMode: 'none',
+    creativeDirection: null,
+  }
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: 'Hacer un sistema de turnos medicos con frontend, backend y agenda local revisable.',
+    context:
+      'Quiero una base local de demo. Si faltan detalles menores, el cerebro debe decidirlos sin preguntar salvo bloqueos reales.',
+    workspacePath: 'C:/tmp/ai-planner-smoke-workspace',
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: 'brain-decides-missing',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  const failures = []
+  const questionPolicy =
+    decision?.questionPolicy && typeof decision.questionPolicy === 'object'
+      ? decision.questionPolicy
+      : null
+  const projectBlueprint =
+    decision?.projectBlueprint && typeof decision.projectBlueprint === 'object'
+      ? decision.projectBlueprint
+      : null
+  const summary = summarizeQuestionPolicy(questionPolicy)
+
+  if (!questionPolicy) {
+    failures.push('questionPolicy ausente.')
+  } else {
+    if (summary.mode !== 'brain-decides-missing') {
+      failures.push(
+        `questionPolicy.mode incorrecto. Esperado: brain-decides-missing. Recibido: ${summary.mode || '(vacio)'}.`,
+      )
+    }
+    if (summary.blockingQuestions.length > 0) {
+      failures.push(
+        'questionPolicy no deberia abrir blockingQuestions para faltantes menores delegados.',
+      )
+    }
+    if (summary.optionalQuestions.length > 0) {
+      failures.push(
+        'questionPolicy no deberia abrir optionalQuestions cuando el cerebro decide faltantes menores.',
+      )
+    }
+    if (summary.delegatedDecisions.length === 0) {
+      failures.push('questionPolicy.delegatedDecisions deberia registrar decisiones delegadas.')
+    }
+    if (summary.shouldAskBeforePlanning) {
+      failures.push('questionPolicy.shouldAskBeforePlanning deberia ser false.')
+    }
+    if (summary.shouldAskBeforeMaterialization) {
+      failures.push('questionPolicy.shouldAskBeforeMaterialization deberia ser false.')
+    }
+  }
+
+  if (!projectBlueprint) {
+    failures.push('projectBlueprint ausente en el caso brain-decides-missing.')
+  } else if (toStringArray(projectBlueprint.delegatedDecisions, 24).length === 0) {
+    failures.push(
+      'projectBlueprint.delegatedDecisions deberia reflejar la delegacion del usuario.',
+    )
+  }
+
+  return {
+    testCase: {
+      id: 'question-policy-brain-decides-low-risk',
+      label: 'Question policy brain-decides-missing low risk',
+      goal: 'Hacer un sistema de turnos medicos con base local revisable.',
+    },
+    ok: failures.length === 0,
+    failures,
+    strategy: String(decision?.strategy || '').trim(),
+    executionMode: String(decision?.executionMode || '').trim(),
+    nextExpectedAction: String(decision?.nextExpectedAction || '').trim(),
+    scalablePlan:
+      decision?.scalableDeliveryPlan && typeof decision.scalableDeliveryPlan === 'object'
+        ? decision.scalableDeliveryPlan
+        : null,
+    projectBlueprint,
+    questionPolicy,
+  }
+}
+
+async function runQuestionPolicySensitiveRiskValidation() {
+  const reusablePlanningContext = {
+    reusableArtifactLookup: {
+      executed: false,
+      foundCount: 0,
+      matches: [],
+    },
+    reusableArtifactsFound: 0,
+    reuseDecision: false,
+    reuseReason: '',
+    reusedArtifactIds: [],
+    reuseMode: 'none',
+    creativeDirection: null,
+  }
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal:
+      'Hacer un sistema de turnos medicos con pagos reales, auth real, datos sensibles y deploy productivo.',
+    context:
+      'Quiero que JEFE decida faltantes menores sin preguntar, pero si aparece un riesgo sensible real tiene que conservar el bloqueo antes de materializar.',
+    workspacePath: 'C:/tmp/ai-planner-smoke-workspace',
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: 'brain-decides-missing',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  const failures = []
+  const questionPolicy =
+    decision?.questionPolicy && typeof decision.questionPolicy === 'object'
+      ? decision.questionPolicy
+      : null
+  const projectBlueprint =
+    decision?.projectBlueprint && typeof decision.projectBlueprint === 'object'
+      ? decision.projectBlueprint
+      : null
+  const summary = summarizeQuestionPolicy(questionPolicy)
+
+  if (!questionPolicy) {
+    failures.push('questionPolicy ausente.')
+  } else {
+    if (summary.mode !== 'brain-decides-missing') {
+      failures.push(
+        `questionPolicy.mode incorrecto. Esperado: brain-decides-missing. Recibido: ${summary.mode || '(vacio)'}.`,
+      )
+    }
+    if (summary.blockingQuestions.length === 0) {
+      failures.push(
+        'questionPolicy deberia conservar blockingQuestions cuando hay riesgos sensibles reales.',
+      )
+    }
+    if (summary.delegatedDecisions.length === 0) {
+      failures.push('questionPolicy.delegatedDecisions deberia registrar decisiones delegadas.')
+    }
+    if (summary.shouldAskBeforePlanning) {
+      failures.push('questionPolicy.shouldAskBeforePlanning deberia seguir false.')
+    }
+    if (!summary.shouldAskBeforeMaterialization) {
+      failures.push(
+        'questionPolicy.shouldAskBeforeMaterialization deberia ser true con riesgos sensibles reales.',
+      )
+    }
+    if (!String(summary.reason || '').trim()) {
+      failures.push('questionPolicy.reason vacio.')
+    } else {
+      const normalizedReason = normalizeText(summary.reason)
+      if (
+        !normalizedReason.includes(normalizeText('faltantes menores')) ||
+        !(
+          normalizedReason.includes(normalizeText('riesgos sensibles')) ||
+          normalizedReason.includes(normalizeText('aprobaciones')) ||
+          normalizedReason.includes(normalizeText('materializar'))
+        )
+      ) {
+        failures.push(
+          'questionPolicy.reason deberia explicar delegacion de faltantes menores y bloqueo ante riesgos sensibles.',
+        )
+      }
+    }
+  }
+
+  if (!projectBlueprint) {
+    failures.push('projectBlueprint ausente en el caso sensible brain-decides-missing.')
+  } else {
+    if (String(projectBlueprint.riskLevel || '').trim() !== 'high') {
+      failures.push(
+        `projectBlueprint.riskLevel incorrecto. Esperado: high. Recibido: ${
+          projectBlueprint.riskLevel || '(vacio)'
+        }.`,
+      )
+    }
+    if (toStringArray(projectBlueprint.approvalRequiredLater, 24).length === 0) {
+      failures.push(
+        'projectBlueprint.approvalRequiredLater deberia reflejar aprobaciones futuras para el caso sensible.',
+      )
+    }
+    if (toStringArray(projectBlueprint.blockingQuestions, 24).length === 0) {
+      failures.push(
+        'projectBlueprint.blockingQuestions deberia reflejar los bloqueos sensibles del questionPolicy.',
+      )
+    }
+  }
+
+  return {
+    testCase: {
+      id: 'question-policy-brain-decides-sensitive',
+      label: 'Question policy brain-decides-missing sensitive risk',
+      goal:
+        'Hacer un sistema de turnos medicos con pagos reales, auth real, datos sensibles y deploy productivo.',
+    },
+    ok: failures.length === 0,
+    failures,
+    strategy: String(decision?.strategy || '').trim(),
+    executionMode: String(decision?.executionMode || '').trim(),
+    nextExpectedAction: String(decision?.nextExpectedAction || '').trim(),
+    scalablePlan:
+      decision?.scalableDeliveryPlan && typeof decision.scalableDeliveryPlan === 'object'
+        ? decision.scalableDeliveryPlan
+        : null,
+    projectBlueprint,
+    questionPolicy,
   }
 }
 
@@ -1413,6 +1854,7 @@ async function main() {
   console.log('-----------------')
 
   let scalableResults = []
+  let questionPolicyResults = []
   if (!caseId) {
     console.log('Scalable Delivery Checks')
     console.log('=======================')
@@ -1420,6 +1862,15 @@ async function main() {
       scalableValidationCases.map(runScalableValidationCase),
     )
     scalableResults.forEach(printScalableValidationResult)
+    console.log('-----------------')
+
+    console.log('Question Policy Check')
+    console.log('=====================')
+    questionPolicyResults = await Promise.all([
+      runQuestionPolicyLowRiskValidation(),
+      runQuestionPolicySensitiveRiskValidation(),
+    ])
+    questionPolicyResults.forEach(printScalableValidationResult)
     console.log('-----------------')
   }
 
@@ -1442,18 +1893,25 @@ async function main() {
   }
 
   const failedScalableResults = scalableResults.filter((result) => !result.ok)
+  const failedQuestionPolicyResults = questionPolicyResults.filter((result) => !result.ok)
   const frontendMaterializationFailed = frontendMaterializationResult?.ok === false
   const fullstackMaterializationFailed = fullstackMaterializationResult?.ok === false
 
   if (
     failedResults.length === 0 &&
     failedScalableResults.length === 0 &&
+    failedQuestionPolicyResults.length === 0 &&
     !frontendMaterializationFailed &&
     !fullstackMaterializationFailed
   ) {
     console.log(`OK. ${passedCount}/${results.length} casos pasaron.`)
     if (scalableResults.length > 0) {
       console.log(`OK. ${scalableResults.length}/${scalableResults.length} checks escalables pasaron.`)
+    }
+    if (questionPolicyResults.length > 0) {
+      console.log(
+        `OK. ${questionPolicyResults.length}/${questionPolicyResults.length} checks de questionPolicy pasaron.`,
+      )
     }
     if (frontendMaterializationResult) {
       console.log('OK. 1/1 check de materializacion frontend-project paso.')
@@ -1473,6 +1931,13 @@ async function main() {
   if (failedScalableResults.length > 0) {
     console.log('checks escalables fallidos:')
     failedScalableResults.forEach((result) => {
+      console.log(`- ${result.testCase.id}: ${result.failures[0] || 'sin detalle'}`)
+    })
+  }
+
+  if (failedQuestionPolicyResults.length > 0) {
+    console.log('checks de questionPolicy fallidos:')
+    failedQuestionPolicyResults.forEach((result) => {
       console.log(`- ${result.testCase.id}: ${result.failures[0] || 'sin detalle'}`)
     })
   }

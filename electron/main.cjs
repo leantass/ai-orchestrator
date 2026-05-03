@@ -10758,6 +10758,1047 @@ function splitPlannerContextValues(value) {
     .filter(Boolean)
 }
 
+function buildScalableProjectRootFolderName({
+  deliveryLevel,
+  goal,
+  context,
+  domainUnderstanding,
+  fallbackDomainLabel,
+}) {
+  const normalizedDeliveryLevel =
+    typeof deliveryLevel === 'string' && deliveryLevel.trim()
+      ? deliveryLevel.trim()
+      : 'safe-first-delivery'
+  const normalizedDomainUnderstanding = normalizeDomainUnderstandingContract(domainUnderstanding)
+  const combinedText = normalizeSectorDetectionText(
+    [goal, context, normalizedDomainUnderstanding?.domainLabel, fallbackDomainLabel]
+      .filter((value) => typeof value === 'string' && value.trim())
+      .join(' '),
+  )
+
+  if (
+    normalizedDeliveryLevel === 'fullstack-local' &&
+    (/\bturnos?\b/u.test(combinedText) &&
+      /\b(?:medic(?:o|a|os|as)?|salud|clinic(?:a|as)?|pacientes?|profesionales?)\b/u.test(
+        combinedText,
+      ))
+  ) {
+    return 'fullstack-local-turnos-medicos'
+  }
+
+  if (
+    normalizedDeliveryLevel === 'frontend-project' &&
+    /\breservas?\b/u.test(combinedText) &&
+    /\bcanchas?\b/u.test(combinedText)
+  ) {
+    return 'frontend-project-reservas-canchas'
+  }
+
+  if (
+    normalizedDeliveryLevel === 'frontend-project' &&
+    /\breloj/i.test(combinedText)
+  ) {
+    return 'frontend-project-relojeria-premium'
+  }
+
+  if (
+    normalizedDeliveryLevel === 'monorepo-local' &&
+    /\bworkers?\b/u.test(combinedText) &&
+    /\bapi\b/u.test(combinedText)
+  ) {
+    return 'monorepo-local-plataforma'
+  }
+
+  const domainLabel =
+    sanitizeBusinessSectorLabel(normalizedDomainUnderstanding?.domainLabel || '') ||
+    sanitizeBusinessSectorLabel(fallbackDomainLabel || '') ||
+    ''
+  const domainSlug = slugifyBusinessSector(domainLabel)
+
+  return `${normalizedDeliveryLevel}-${domainSlug || 'workspace-local'}`
+}
+
+function detectBlueprintDataSensitivity(goal, context, domainUnderstanding) {
+  const normalizedText = normalizeSectorDetectionText(
+    [goal, context, domainUnderstanding?.domainLabel, ...(domainUnderstanding?.primaryEntities || [])]
+      .filter((value) => typeof value === 'string' && value.trim())
+      .join(' '),
+  )
+
+  if (
+    /\b(?:salud|medic|pacientes?|dni|documentos?|historias? clinicas?|tarjetas?)\b/u.test(
+      normalizedText,
+    )
+  ) {
+    return 'high'
+  }
+
+  if (
+    /\b(?:alumnos?|familias?|pagos?|facturacion|facturación|clientes?|usuarios?)\b/u.test(
+      normalizedText,
+    )
+  ) {
+    return 'medium'
+  }
+
+  if (normalizedText) {
+    return 'low'
+  }
+
+  return 'none'
+}
+
+function detectStackPreference(text, candidates) {
+  const normalizedText = normalizeSectorDetectionText(text)
+
+  for (const candidate of candidates) {
+    if (candidate.pattern.test(normalizedText)) {
+      return candidate.value
+    }
+  }
+
+  return ''
+}
+
+function buildStackProfile({
+  goal,
+  context,
+  deliveryLevel,
+  domainUnderstanding,
+}) {
+  const normalizedDeliveryLevel =
+    typeof deliveryLevel === 'string' && deliveryLevel.trim()
+      ? deliveryLevel.trim()
+      : 'safe-first-delivery'
+  const combinedText = [goal, context, domainUnderstanding?.domainLabel]
+    .filter((value) => typeof value === 'string' && value.trim())
+    .join(' ')
+  const normalizedText = normalizeSectorDetectionText(combinedText)
+  const frontendPreference = detectStackPreference(combinedText, [
+    { pattern: /\bnext(?:\.js|js)?\b/u, value: 'nextjs-app-router-plan' },
+    { pattern: /\breact\b/u, value: 'react-ready-static' },
+    { pattern: /\bvue\b/u, value: 'vue-local-plan' },
+    { pattern: /\bangular\b/u, value: 'angular-local-plan' },
+    { pattern: /\bsvelte\b/u, value: 'svelte-local-plan' },
+    { pattern: /\bastro\b/u, value: 'astro-local-plan' },
+  ])
+  const backendPreference = detectStackPreference(combinedText, [
+    { pattern: /\bfastapi\b/u, value: 'fastapi-style' },
+    { pattern: /\bdjango\b/u, value: 'django-style' },
+    { pattern: /\blaravel\b|\bphp\b/u, value: 'laravel-style' },
+    { pattern: /\b\.net\b|\bdotnet\b|\bc#\b/u, value: 'dotnet-webapi-style' },
+    { pattern: /\bspring\b|\bjava\b/u, value: 'spring-style' },
+    { pattern: /\bexpress\b/u, value: 'node-express-style' },
+  ])
+  const databasePreference = detectStackPreference(combinedText, [
+    { pattern: /\bpostgres(?:ql)?\b/u, value: 'postgres-ready-local-design' },
+    { pattern: /\bsqlite\b/u, value: 'sqlite-local-design' },
+    { pattern: /\bmysql\b/u, value: 'mysql-ready-local-design' },
+    { pattern: /\bmongo(?:db)?\b/u, value: 'mongo-ready-local-design' },
+    { pattern: /\bredis\b/u, value: 'redis-local-plan' },
+  ])
+  const packageManagerPreference = detectStackPreference(combinedText, [
+    { pattern: /\bpnpm\b/u, value: 'pnpm-deferred' },
+    { pattern: /\byarn\b/u, value: 'yarn-deferred' },
+    { pattern: /\bbun\b/u, value: 'bun-deferred' },
+    { pattern: /\bcomposer\b/u, value: 'composer-deferred' },
+    { pattern: /\bpip\b/u, value: 'pip-deferred' },
+    { pattern: /\bdotnet\b|\b\.net\b/u, value: 'dotnet-cli-deferred' },
+  ])
+
+  if (normalizedDeliveryLevel === 'infra-local-plan') {
+    return {
+      frontend: frontendPreference || 'none',
+      backend: backendPreference || 'service-runtime-deferred',
+      database: databasePreference || 'postgres-local-plan',
+      apiStyle: 'runtime-plan',
+      auth: 'deferred',
+      styling: 'n/a',
+      testing: 'manual-safety-review',
+      packageManager: packageManagerPreference || 'deferred',
+      runtime: 'local-infra-plan',
+    }
+  }
+
+  if (normalizedDeliveryLevel === 'monorepo-local') {
+    return {
+      frontend: frontendPreference || 'app-web',
+      backend: backendPreference || 'api-service',
+      database: databasePreference || 'local-design',
+      apiStyle: 'rest',
+      auth: normalizedText.includes('auth real') ? 'approval-required' : 'deferred',
+      styling:
+        frontendPreference && frontendPreference.includes('nextjs')
+          ? 'component-system-plan'
+          : 'css-modular-simple',
+      testing: 'manual-smoke-first',
+      packageManager: packageManagerPreference || 'workspace-deferred',
+      runtime: 'multi-service-local-plan',
+    }
+  }
+
+  if (normalizedDeliveryLevel === 'fullstack-local') {
+    return {
+      frontend: frontendPreference || 'react-ready-static',
+      backend: backendPreference || 'node-express-style',
+      database:
+        databasePreference ||
+        (/\bbase de datos\b|\bsql\b/u.test(normalizedText)
+          ? 'sql-local-design'
+          : 'mock-data'),
+      apiStyle: /\bgraphql\b/u.test(normalizedText) ? 'graphql' : 'rest',
+      auth: normalizedText.includes('auth real') ? 'approval-required' : 'deferred',
+      styling:
+        frontendPreference && frontendPreference.includes('vue')
+          ? 'component-css-plan'
+          : 'css-modular-simple',
+      testing: 'manual-smoke-first',
+      packageManager: packageManagerPreference || 'npm-deferred',
+      runtime:
+        backendPreference === 'fastapi-style'
+          ? 'python-local-plan'
+          : backendPreference === 'laravel-style'
+            ? 'php-local-plan'
+            : backendPreference === 'dotnet-webapi-style'
+              ? 'dotnet-local-plan'
+              : backendPreference === 'spring-style'
+                ? 'jvm-local-plan'
+                : 'node-local-plan',
+    }
+  }
+
+  if (normalizedDeliveryLevel === 'frontend-project') {
+    return {
+      frontend: frontendPreference || 'react-ready-static',
+      backend: 'none',
+      database: 'mock-data',
+      apiStyle: 'none/local-mock',
+      auth: 'deferred',
+      styling:
+        frontendPreference === 'nextjs-app-router-plan'
+          ? 'component-system-plan'
+          : 'css-modular-simple',
+      testing: 'manual-smoke-first',
+      packageManager: packageManagerPreference || 'none-yet',
+      runtime: 'static-local-review',
+    }
+  }
+
+  return {
+    frontend: frontendPreference || 'vanilla-js-static',
+    backend: 'none',
+    database: 'mock-data',
+    apiStyle: 'none/local-mock',
+    auth: 'deferred',
+    styling: 'css-simple',
+    testing: 'manual-smoke-first',
+    packageManager: 'none-yet',
+    runtime: 'static-local-review',
+  }
+}
+
+function buildBlueprintRoles({
+  goal,
+  context,
+  deliveryLevel,
+  domainUnderstanding,
+  productArchitecture,
+}) {
+  const roles = []
+  pushUniquePlannerValues(roles, productArchitecture?.roles || [], 12)
+  pushUniquePlannerValues(roles, domainUnderstanding?.roles || [], 12)
+  const normalizedText = normalizeSectorDetectionText(
+    [
+      goal,
+      context,
+      ...(domainUnderstanding?.primaryEntities || []),
+      ...(domainUnderstanding?.primaryModules || []),
+    ]
+      .filter((value) => typeof value === 'string' && value.trim())
+      .join(' '),
+  )
+
+  if (
+    deliveryLevel === 'fullstack-local' &&
+    /\bturnos?\b|\bmedic[ao]s?\b|\bsalud\b/u.test(normalizedText)
+  ) {
+    pushUniquePlannerValues(roles, ['pacientes', 'profesionales', 'operador interno'], 12)
+  }
+
+  if (deliveryLevel === 'frontend-project' && /\breservas?\b|\bcanchas?\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(roles, ['cliente', 'operador local'], 12)
+  }
+
+  if (roles.length === 0) {
+    if (deliveryLevel === 'monorepo-local') {
+      pushUniquePlannerValues(roles, ['administrador', 'operador interno', 'equipo tecnico'], 12)
+    } else if (deliveryLevel === 'fullstack-local') {
+      pushUniquePlannerValues(roles, ['administrador', 'operador', 'usuario final'], 12)
+    } else if (deliveryLevel === 'frontend-project') {
+      pushUniquePlannerValues(roles, ['usuario final', 'operador'], 12)
+    } else {
+      pushUniquePlannerValues(roles, ['administrador', 'operador'], 12)
+    }
+  }
+
+  return summarizeUniqueExecutorStrings(roles, 12)
+}
+
+function buildBlueprintModules({
+  deliveryLevel,
+  goal,
+  context,
+  domainUnderstanding,
+  productArchitecture,
+  scalableDeliveryPlan,
+}) {
+  const modules = []
+  pushUniquePlannerValues(modules, scalableDeliveryPlan?.modules || [], 16)
+  pushUniquePlannerValues(modules, productArchitecture?.coreModules || [], 16)
+  pushUniquePlannerValues(modules, domainUnderstanding?.primaryModules || [], 16)
+  const normalizedText = normalizeSectorDetectionText([goal, context].join(' '))
+
+  if (deliveryLevel === 'fullstack-local') {
+    pushUniquePlannerValues(
+      modules,
+      [
+        'frontend local',
+        'backend local',
+        'shared contracts',
+        'database local',
+        'database design',
+        'scripts',
+        'scripts locales',
+        'docs',
+      ],
+      16,
+    )
+  } else if (deliveryLevel === 'monorepo-local') {
+    pushUniquePlannerValues(
+      modules,
+      ['apps web', 'api service', 'workers', 'shared contracts', 'ui package', 'docs'],
+      16,
+    )
+  } else if (deliveryLevel === 'frontend-project') {
+    pushUniquePlannerValues(
+      modules,
+      ['frontend shell', 'routing', 'componentes', 'mocks', 'mocks locales', 'layout base'],
+      16,
+    )
+  } else if (deliveryLevel === 'infra-local-plan') {
+    pushUniquePlannerValues(
+      modules,
+      ['docker local', 'postgres local', 'redis local', 'workers', 'cron', 'runbook'],
+      16,
+    )
+  }
+
+  if (deliveryLevel === 'frontend-project' && /\breservas?\b|\bcanchas?\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(modules, ['agenda local', 'disponibilidad'], 16)
+  }
+
+  return summarizeUniqueExecutorStrings(modules, 16)
+}
+
+function buildBlueprintEntities({
+  goal,
+  context,
+  deliveryLevel,
+  domainUnderstanding,
+  productArchitecture,
+}) {
+  const entities = []
+  pushUniquePlannerValues(entities, productArchitecture?.dataEntities || [], 16)
+  pushUniquePlannerValues(entities, domainUnderstanding?.primaryEntities || [], 16)
+  pushUniquePlannerValues(entities, domainUnderstanding?.secondaryEntities || [], 16)
+
+  const normalizedText = normalizeSectorDetectionText(
+    [goal, context, ...(domainUnderstanding?.primaryEntities || [])]
+      .filter((value) => typeof value === 'string' && value.trim())
+      .join(' '),
+  )
+
+  if (deliveryLevel === 'fullstack-local' && /\bturnos?\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(
+      entities,
+      ['pacientes', 'profesionales', 'especialidades', 'turnos', 'disponibilidad'],
+      16,
+    )
+  }
+
+  if (deliveryLevel === 'frontend-project' && /\breservas?\b/u.test(normalizedText)) {
+    pushUniquePlannerValues(entities, ['reservas', 'canchas', 'horarios', 'clientes'], 16)
+  }
+
+  if (deliveryLevel === 'monorepo-local' && entities.length === 0) {
+    pushUniquePlannerValues(
+      entities,
+      ['usuarios', 'contratos compartidos', 'jobs', 'eventos internos'],
+      16,
+    )
+  }
+
+  return summarizeUniqueExecutorStrings(entities, 16)
+}
+
+function buildBlueprintCoreFlows({
+  deliveryLevel,
+  domainUnderstanding,
+  productArchitecture,
+}) {
+  const flows = []
+  pushUniquePlannerValues(flows, productArchitecture?.keyFlows || [], 16)
+  pushUniquePlannerValues(flows, domainUnderstanding?.coreFlows || [], 16)
+  pushUniquePlannerValues(flows, domainUnderstanding?.localActions || [], 16)
+
+  if (deliveryLevel === 'fullstack-local') {
+    pushUniquePlannerValues(
+      flows,
+      [
+        'revisar flujo principal desde frontend hasta backend mock',
+        'validar contratos compartidos entre capas',
+        'revisar schema local y seed como diseño editable',
+      ],
+      16,
+    )
+  } else if (deliveryLevel === 'frontend-project') {
+    pushUniquePlannerValues(
+      flows,
+      ['navegacion local del flujo principal', 'revision de componentes y mocks', 'validacion de estados base'],
+      16,
+    )
+  } else if (deliveryLevel === 'monorepo-local') {
+    pushUniquePlannerValues(
+      flows,
+      [
+        'coordinar apps y packages sin instalar workspaces',
+        'delimitar responsabilidades entre web, api y workers',
+        'documentar runbook local antes de materializar',
+      ],
+      16,
+    )
+  }
+
+  return summarizeUniqueExecutorStrings(flows, 16)
+}
+
+function buildBlueprintIntegrations({ goal, context, deliveryLevel }) {
+  const normalizedText = normalizeSectorDetectionText([goal, context].join(' '))
+  const integrations = []
+  const pushIntegration = ({
+    name,
+    type,
+    requiredNow = false,
+    approvalRequired = true,
+    reason,
+  }) => {
+    if (
+      !name ||
+      integrations.some(
+        (entry) => normalizeSectorDetectionText(entry.name) === normalizeSectorDetectionText(name),
+      )
+    ) {
+      return
+    }
+
+    integrations.push({
+      name,
+      type,
+      requiredNow,
+      approvalRequired,
+      reason,
+    })
+  }
+
+  if (/\bmercado pago\b|\bstripe\b|\bpagos?\b/u.test(normalizedText)) {
+    pushIntegration({
+      name: 'pasarela de pagos',
+      type: 'payments',
+      requiredNow: false,
+      approvalRequired: true,
+      reason: 'Los cobros reales quedan fuera de alcance en las fases locales iniciales.',
+    })
+  }
+
+  if (/\bemail\b|\bcorreo\b|\bnotificaciones?\b/u.test(normalizedText)) {
+    pushIntegration({
+      name: 'notificaciones',
+      type: 'communication',
+      requiredNow: false,
+      approvalRequired: true,
+      reason: 'Las notificaciones reales pueden definirse después del scaffold local.',
+    })
+  }
+
+  if (/\bredis\b|\bbullmq\b|\bcron\b/u.test(normalizedText)) {
+    pushIntegration({
+      name: 'procesamiento asincrono local',
+      type: 'runtime',
+      requiredNow: deliveryLevel === 'infra-local-plan',
+      approvalRequired: true,
+      reason:
+        deliveryLevel === 'infra-local-plan'
+          ? 'La infraestructura local sensible requiere revisión antes de ejecutar.'
+          : 'Las colas y cron quedan para una fase posterior aprobada.',
+    })
+  }
+
+  if (/\bauth\b|\blogin\b|\bpermisos?\b/u.test(normalizedText)) {
+    pushIntegration({
+      name: 'auth y permisos',
+      type: 'security',
+      requiredNow: false,
+      approvalRequired: true,
+      reason: 'La autenticación real y los permisos finos quedan diferidos.',
+    })
+  }
+
+  if (/\bwebhooks?\b|\bintegraciones?\b|\bapi externa\b/u.test(normalizedText)) {
+    pushIntegration({
+      name: 'integraciones externas',
+      type: 'external-service',
+      requiredNow: false,
+      approvalRequired: true,
+      reason: 'Las integraciones externas reales no entran en el alcance local inicial.',
+    })
+  }
+
+  return integrations.slice(0, 8)
+}
+
+function buildProjectBlueprintPhasePlan({
+  deliveryLevel,
+  stackProfile,
+  questionPolicy,
+}) {
+  const phases = []
+
+  if (deliveryLevel === 'safe-first-delivery') {
+    phases.push(
+      {
+        phase: 'alineacion-segura',
+        goal: 'Cerrar una primera entrega acotada, local y revisable.',
+        deliveryLevel: 'safe-first-delivery',
+        executableNow: false,
+        approvalRequired: false,
+      },
+      {
+        phase: 'materializacion-segura',
+        goal: 'Preparar una materialización acotada con mocks y sin integraciones reales.',
+        deliveryLevel: 'safe-first-delivery',
+        executableNow: true,
+        approvalRequired: false,
+      },
+    )
+  } else if (deliveryLevel === 'frontend-project') {
+    phases.push(
+      {
+        phase: 'blueprint-frontend',
+        goal: 'Revisar arquitectura visual, módulos y límites del frontend local.',
+        deliveryLevel: 'frontend-project',
+        executableNow: false,
+        approvalRequired: false,
+      },
+      {
+        phase: 'scaffold-frontend-local',
+        goal: `Materializar un scaffold ${stackProfile.frontend} sin instalar dependencias.`,
+        deliveryLevel: 'frontend-project',
+        executableNow: true,
+        approvalRequired: false,
+      },
+      {
+        phase: 'habilitacion-framework',
+        goal: 'Instalar dependencias y preparar un entorno de desarrollo real cuando haya aprobación.',
+        deliveryLevel: 'frontend-project',
+        executableNow: false,
+        approvalRequired: true,
+      },
+    )
+  } else if (deliveryLevel === 'fullstack-local') {
+    phases.push(
+      {
+        phase: 'blueprint-fullstack',
+        goal: 'Separar frontend, backend, shared y database como diseño local revisable.',
+        deliveryLevel: 'fullstack-local',
+        executableNow: false,
+        approvalRequired: questionPolicy.shouldAskBeforePlanning === true,
+      },
+      {
+        phase: 'scaffold-fullstack-local',
+        goal: 'Materializar el scaffold fullstack local sin instalar dependencias ni levantar servicios.',
+        deliveryLevel: 'fullstack-local',
+        executableNow: true,
+        approvalRequired: false,
+      },
+      {
+        phase: 'habilitacion-local-real',
+        goal: 'Instalar dependencias, levantar servicios locales y conectar una base local bajo aprobación.',
+        deliveryLevel: 'fullstack-local',
+        executableNow: false,
+        approvalRequired: true,
+      },
+    )
+  } else if (deliveryLevel === 'monorepo-local') {
+    phases.push(
+      {
+        phase: 'blueprint-monorepo',
+        goal: 'Definir apps, packages, servicios y límites del monorepo local.',
+        deliveryLevel: 'monorepo-local',
+        executableNow: false,
+        approvalRequired: false,
+      },
+      {
+        phase: 'workspaces-futuros',
+        goal: 'Preparar una futura materialización de workspaces reales solo cuando se apruebe.',
+        deliveryLevel: 'monorepo-local',
+        executableNow: false,
+        approvalRequired: true,
+      },
+    )
+  } else if (deliveryLevel === 'infra-local-plan') {
+    phases.push(
+      {
+        phase: 'plan-infra-local',
+        goal: 'Documentar runtime, base local, colas y Docker como plan revisable.',
+        deliveryLevel: 'infra-local-plan',
+        executableNow: false,
+        approvalRequired: false,
+      },
+      {
+        phase: 'aprobacion-sensible',
+        goal: 'Validar si se puede tocar infraestructura local sensible o servicios activos.',
+        deliveryLevel: 'infra-local-plan',
+        executableNow: false,
+        approvalRequired: true,
+      },
+    )
+  }
+
+  return phases
+}
+
+function buildQuestionPolicy({
+  goal,
+  context,
+  deliveryLevel,
+  domainUnderstanding,
+  userParticipationMode,
+  dataSensitivity,
+  integrations,
+}) {
+  const normalizedMode = normalizeUserParticipationMode(userParticipationMode)
+  const combinedText = normalizeSectorDetectionText([goal, context].join(' '))
+  const blockingQuestions = []
+  const optionalQuestions = []
+  const delegatedDecisions = []
+  const externalIntegrationsDetected = integrations.some(
+    (integration) => integration.approvalRequired === true,
+  )
+  const asksForProduction =
+    /\bproduccion\b|\bproducción\b|\bproductiv[ao]\b/u.test(combinedText)
+  const asksForRealAuth = /\bauth real\b|\blogin real\b|\bpermisos reales\b/u.test(combinedText)
+  const asksForRealPayments =
+    /\bpagos?\s+reales?\b|\bcobros?\s+reales?\b|\bmercado pago\b|\bstripe\b/u.test(combinedText)
+  const asksForSensitiveRealData =
+    /\bdatos?\s+sensibles?\s+reales?\b|\bdatos?\s+medic[oa]s?\s+reales?\b|\bdatos?\s+clinic[oa]s?\s+reales?\b/u.test(
+      combinedText,
+    )
+  const asksForRealExternalData =
+    /\bdatos reales\b|\bintegraciones?\s+externas?\s+reales?\b/u.test(combinedText)
+  const asksForMandatoryExternalIntegrations =
+    /\bintegraciones?\s+externas?\s+obligatorias?\b|\bapi(?:s)?\s+externas?\s+obligatorias?\b/u.test(
+      combinedText,
+    )
+  const asksForCredentialsOrSecrets =
+    /\bcredenciales?\b|\bsecretos?\b|\bapi keys?\b|\btokens?\b/u.test(combinedText)
+  const asksForDeploy =
+    /\bdeploy\b|\bpublica(?:r|ción|cion)\b|\blive\b|\bgo live\b/u.test(combinedText)
+  const asksForRealDatabase =
+    /\bbase de datos real\b|\bbase real productiva\b|\bbase productiva\b|\bdatos productivos\b/u.test(
+      combinedText,
+    )
+  const asksForRealMigrations =
+    /\bmigraciones?\s+reales?\b|\bmigrar\b|\bmigracion productiva\b|\bmigración productiva\b/u.test(
+      combinedText,
+    )
+  const asksForRealCosts =
+    /\bcostos?\s+reales?\b|\bcosto real\b|\bbilling real\b|\bgasto real\b/u.test(
+      combinedText,
+    )
+  const asksForDestructiveActions =
+    /\bacciones?\s+destructivas?\b|\bdestruir\b|\bborrar datos\b|\beliminar datos\b/u.test(
+      combinedText,
+    )
+  const asksForRealInfrastructure =
+    /\binfraestructura real\b|\binfra real\b|\bdocker real\b|\bkubernetes\b|\bredis real\b|\bpostgres(?:ql)? real\b|\bcola real\b|\bcron real\b/u.test(
+      combinedText,
+    )
+
+  if (asksForRealPayments) {
+    pushUniquePlannerValues(blockingQuestions, [
+      '¿Querés cobros reales ahora o preferís dejar pagos como aprobación futura y seguir con mocks locales?',
+    ])
+  }
+
+  if (asksForRealAuth) {
+    pushUniquePlannerValues(blockingQuestions, [
+      '¿La autenticación real y los permisos finos son obligatorios ahora o pueden quedar diferidos para una fase posterior?',
+    ])
+  }
+
+  if (asksForSensitiveRealData) {
+    pushUniquePlannerValues(blockingQuestions, [
+      '¿Se deben usar datos sensibles reales ahora o preferís seguir con datos mock/locales hasta aprobar una fase más controlada?',
+    ])
+  }
+
+  if (asksForCredentialsOrSecrets) {
+    pushUniquePlannerValues(blockingQuestions, [
+      '¿Hay que usar credenciales o secretos reales en esta fase, o deben quedar fuera hasta una aprobación explícita?',
+    ])
+  }
+
+  if (deliveryLevel === 'infra-local-plan' || asksForProduction || asksForDeploy) {
+    pushUniquePlannerValues(blockingQuestions, [
+      '¿Esto debe quedar solo como plan local revisable o querés habilitar una fase sensible de infraestructura, deploy o producción más adelante?',
+    ])
+  }
+
+  if (
+    externalIntegrationsDetected &&
+    (asksForRealExternalData || asksForMandatoryExternalIntegrations)
+  ) {
+    pushUniquePlannerValues(blockingQuestions, [
+      '¿Qué integración externa es realmente obligatoria en esta fase y cuál puede quedar diferida?',
+    ])
+  }
+
+  if (asksForRealDatabase || asksForRealMigrations) {
+    pushUniquePlannerValues(blockingQuestions, [
+      '¿La base de datos real, productiva o sus migraciones deben tocarse ahora, o preferís mantener solo diseño local revisable en esta fase?',
+    ])
+  }
+
+  if (asksForRealCosts) {
+    pushUniquePlannerValues(blockingQuestions, [
+      '¿Está aprobado asumir costos reales en esta fase o el plan debe seguir en modo local sin gasto operativo?',
+    ])
+  }
+
+  if (asksForDestructiveActions) {
+    pushUniquePlannerValues(blockingQuestions, [
+      '¿Existe aprobación explícita para cualquier acción destructiva real o el plan debe evitarla por completo en esta fase?',
+    ])
+  }
+
+  if (asksForRealInfrastructure) {
+    pushUniquePlannerValues(blockingQuestions, [
+      '¿La infraestructura real debe ejecutarse ahora o preferís mantenerla como propuesta/aprobación futura dentro del plan?',
+    ])
+  }
+
+  const normalizedBlockingQuestions = summarizeUniqueExecutorStrings(blockingQuestions, 10)
+  const hasSensitiveBlockingQuestions = normalizedBlockingQuestions.length > 0
+
+  if (normalizedMode === 'brain-decides-missing') {
+    pushUniquePlannerValues(
+      delegatedDecisions,
+      [
+        'stack local recomendado',
+        'estructura modular inicial',
+        'naming interno de carpetas y archivos',
+        'flujo principal de demo local',
+      ],
+      12,
+    )
+
+    if (dataSensitivity === 'high') {
+      pushUniquePlannerValues(
+        delegatedDecisions,
+        [
+          'modelo inicial de roles y permisos en modo local',
+          'supuestos de datos sensibles en ambiente de demo local',
+        ],
+        12,
+      )
+    }
+
+    return {
+      mode: 'brain-decides-missing',
+      blockingQuestions: normalizedBlockingQuestions,
+      optionalQuestions: [],
+      delegatedDecisions: summarizeUniqueExecutorStrings(delegatedDecisions, 12),
+      shouldAskBeforePlanning: false,
+      shouldAskBeforeMaterialization: hasSensitiveBlockingQuestions,
+      reason:
+        hasSensitiveBlockingQuestions
+          ? 'El usuario delegó faltantes menores al Cerebro; JEFE puede decidir defaults razonables para eso, pero debe conservar preguntas o aprobaciones cuando aparecen riesgos sensibles reales antes de materializar.'
+          : 'El usuario delegó faltantes menores al Cerebro; JEFE puede decidir defaults razonables sin abrir preguntas mientras no aparezcan riesgos sensibles reales.',
+    }
+  }
+
+  if (deliveryLevel === 'fullstack-local' || deliveryLevel === 'monorepo-local') {
+    optionalQuestions.push(
+      '¿Lo van a usar usuarios internos, usuarios externos o ambos en la fase futura?',
+    )
+    optionalQuestions.push(
+      '¿Querés optimizar la base para demo local o dejarla orientada a una evolución futura más productiva?',
+    )
+  }
+
+  if (deliveryLevel === 'frontend-project') {
+    optionalQuestions.push(
+      '¿Querés una base más react-ready o preferís una estructura estática simple para revisar sin instalar nada?',
+    )
+  }
+
+  return {
+    mode: normalizedMode === 'user-will-contribute' ? 'user-will-contribute' : 'ask-only-if-blocking',
+    blockingQuestions: normalizedBlockingQuestions,
+    optionalQuestions: summarizeUniqueExecutorStrings(optionalQuestions, 6),
+    delegatedDecisions: summarizeUniqueExecutorStrings(delegatedDecisions, 12),
+    shouldAskBeforePlanning: normalizedBlockingQuestions.length > 0,
+    shouldAskBeforeMaterialization:
+      normalizedBlockingQuestions.length > 0 &&
+      (deliveryLevel === 'fullstack-local' || deliveryLevel === 'infra-local-plan'),
+    reason:
+      normalizedBlockingQuestions.length > 0
+        ? 'Solo conviene abrir preguntas antes de planificar o materializar si falta una definición que cambia riesgo, arquitectura o exposición.'
+        : 'No hay bloqueos críticos detectados; el Cerebro puede seguir con decisiones razonables y dejar el resto como aclaraciones opcionales.',
+  }
+}
+
+function buildProjectBlueprint({
+  goal,
+  context,
+  deliveryLevel,
+  domainUnderstanding,
+  scalableDeliveryPlan,
+  productArchitecture,
+  userParticipationMode,
+  costMode,
+  questionPolicy,
+}) {
+  const normalizedDomainUnderstanding = normalizeDomainUnderstandingContract(domainUnderstanding)
+  const normalizedScalablePlan = normalizeScalableDeliveryPlanContract(scalableDeliveryPlan)
+  const normalizedParticipationMode = normalizeUserParticipationMode(
+    userParticipationMode,
+  )
+  const normalizedDeliveryLevel =
+    typeof deliveryLevel === 'string' && deliveryLevel.trim()
+      ? deliveryLevel.trim()
+      : normalizedScalablePlan?.deliveryLevel || 'safe-first-delivery'
+  const domain = sanitizeBusinessSectorLabel(normalizedDomainUnderstanding?.domainLabel || '') ||
+    sanitizeBusinessSectorLabel(productArchitecture?.domain || '') ||
+    extractProductArchitectureDomainLabel(goal, context, normalizedDomainUnderstanding?.productKind || '') ||
+    'proyecto local'
+  const intent =
+    sanitizeBusinessSectorLabel(normalizedDomainUnderstanding?.intentLabel || '') ||
+    summarizeUniqueExecutorStrings(normalizedDomainUnderstanding?.coreFlows, 1)[0] ||
+    'validar una base local revisable'
+  const stackProfile = buildStackProfile({
+    goal,
+    context,
+    deliveryLevel: normalizedDeliveryLevel,
+    domainUnderstanding: normalizedDomainUnderstanding,
+  })
+  const roles = buildBlueprintRoles({
+    goal,
+    context,
+    deliveryLevel: normalizedDeliveryLevel,
+    domainUnderstanding: normalizedDomainUnderstanding,
+    productArchitecture,
+  })
+  const modules = buildBlueprintModules({
+    deliveryLevel: normalizedDeliveryLevel,
+    goal,
+    context,
+    domainUnderstanding: normalizedDomainUnderstanding,
+    productArchitecture,
+    scalableDeliveryPlan: normalizedScalablePlan,
+  })
+  const entities = buildBlueprintEntities({
+    goal,
+    context,
+    deliveryLevel: normalizedDeliveryLevel,
+    domainUnderstanding: normalizedDomainUnderstanding,
+    productArchitecture,
+  })
+  const coreFlows = buildBlueprintCoreFlows({
+    deliveryLevel: normalizedDeliveryLevel,
+    domainUnderstanding: normalizedDomainUnderstanding,
+    productArchitecture,
+  })
+  const integrations = buildBlueprintIntegrations({
+    goal,
+    context,
+    deliveryLevel: normalizedDeliveryLevel,
+  })
+  const dataSensitivity = detectBlueprintDataSensitivity(
+    goal,
+    context,
+    normalizedDomainUnderstanding,
+  )
+  const riskLevel =
+    dataSensitivity === 'high' ||
+    integrations.some((integration) => integration.approvalRequired === true) ||
+    normalizedDeliveryLevel === 'infra-local-plan'
+      ? 'high'
+      : dataSensitivity === 'medium' || normalizedDeliveryLevel === 'fullstack-local'
+        ? 'medium'
+        : 'low'
+  const assumptions = summarizeUniqueExecutorStrings(
+    [
+      normalizedDeliveryLevel === 'safe-first-delivery'
+        ? 'Conviene empezar por una base local, chica y revisable antes de escalar.'
+        : `El sistema ya amerita un deliveryLevel ${normalizedDeliveryLevel}, pero sigue acotado a trabajo local.`,
+      normalizedParticipationMode === 'brain-decides-missing'
+        ? 'El usuario delegó decisiones menores al Cerebro y espera defaults razonables.'
+        : 'El usuario puede aportar definiciones si aparece un bloqueo real.',
+      costMode === 'max-quality'
+        ? 'El Cerebro debería priorizar consistencia arquitectónica por sobre costo de razonamiento.'
+        : costMode === 'cheap'
+          ? 'Conviene cuidar costo sin perder honestidad sobre límites y riesgos.'
+          : 'La solución debería balancear criterio profesional, seguridad y velocidad local.',
+    ],
+    8,
+  )
+  const explicitExclusions = summarizeUniqueExecutorStrings(
+    [
+      ...(normalizedScalablePlan?.explicitExclusions || []),
+      ...(normalizedDomainUnderstanding?.explicitExclusions || []),
+      'deploy o publicacion remota',
+      'credenciales reales o secretos',
+      'integraciones externas reales sin aprobacion',
+      'bases productivas o migraciones irreversibles',
+    ],
+    16,
+  )
+  const approvalRequiredLater = summarizeUniqueExecutorStrings(
+    [
+      ...(normalizedScalablePlan?.approvalRequiredLater || []),
+      ...(productArchitecture?.approvalRequiredFor || []),
+      ...(questionPolicy?.blockingQuestions || []).map((question) => `Resolver: ${question}`),
+    ],
+    16,
+  )
+  const confidence =
+    normalizedScalablePlan?.deliveryLevel === normalizedDeliveryLevel &&
+    normalizedDomainUnderstanding?.productKind &&
+    modules.length >= 3
+      ? 'high'
+      : modules.length >= 2 || entities.length >= 2
+        ? 'medium'
+        : 'low'
+  const phasePlan = buildProjectBlueprintPhasePlan({
+    deliveryLevel: normalizedDeliveryLevel,
+    stackProfile,
+    questionPolicy,
+  })
+  const successCriteria = summarizeUniqueExecutorStrings(
+    [
+      normalizedScalablePlan?.deliveryLevel
+        ? `El blueprint y scalableDeliveryPlan quedan alineados en deliveryLevel ${normalizedDeliveryLevel}.`
+        : `El blueprint deja explícito el deliveryLevel ${normalizedDeliveryLevel}.`,
+      'Se define un stack local recomendado sin instalar dependencias ni ejecutar servicios reales.',
+      'Quedan registrados módulos, entidades, riesgos, exclusiones y aprobaciones futuras.',
+      ...(normalizedDeliveryLevel === 'fullstack-local'
+        ? ['El scaffold fullstack separa frontend, backend, shared, database, scripts y docs.']
+        : []),
+      ...(normalizedDeliveryLevel === 'monorepo-local'
+        ? ['El plan monorepo mantiene workspaces y runtime solo como propuesta revisable.']
+        : []),
+    ],
+    12,
+  )
+
+  const resolvedProductType = normalizedDomainUnderstanding?.productKind
+    ? normalizedDomainUnderstanding.productKind
+    : normalizedDeliveryLevel === 'monorepo-local'
+      ? 'platform'
+      : normalizedDeliveryLevel === 'infra-local-plan'
+        ? 'infra-local'
+        : normalizedDeliveryLevel === 'fullstack-local'
+          ? 'business-system'
+          : normalizedDeliveryLevel === 'frontend-project'
+            ? 'frontend-app'
+            : 'unknown'
+
+  return {
+    productType: resolvedProductType,
+    domain,
+    intent,
+    deliveryLevel: normalizedDeliveryLevel,
+    confidence,
+    stackProfile,
+    roles,
+    modules,
+    entities,
+    coreFlows,
+    integrations,
+    dataSensitivity,
+    riskLevel,
+    assumptions,
+    blockingQuestions: questionPolicy?.blockingQuestions || [],
+    delegatedDecisions: questionPolicy?.delegatedDecisions || [],
+    phasePlan,
+    explicitExclusions,
+    approvalRequiredLater,
+    successCriteria,
+  }
+}
+
+function buildPlanningArchitectureBundle({
+  goal,
+  context,
+  deliveryLevel,
+  domainUnderstanding,
+  scalableDeliveryPlan,
+  productArchitecture,
+  userParticipationMode,
+  costMode,
+}) {
+  const provisionalBlueprint = buildProjectBlueprint({
+    goal,
+    context,
+    deliveryLevel,
+    domainUnderstanding,
+    scalableDeliveryPlan,
+    productArchitecture,
+    userParticipationMode,
+    costMode,
+    questionPolicy: {
+      blockingQuestions: [],
+      delegatedDecisions: [],
+    },
+  })
+  const questionPolicy = buildQuestionPolicy({
+    goal,
+    context,
+    deliveryLevel: provisionalBlueprint.deliveryLevel,
+    domainUnderstanding,
+    userParticipationMode,
+    dataSensitivity: provisionalBlueprint.dataSensitivity,
+    integrations: provisionalBlueprint.integrations,
+  })
+  const projectBlueprint = buildProjectBlueprint({
+    goal,
+    context,
+    deliveryLevel: provisionalBlueprint.deliveryLevel,
+    domainUnderstanding,
+    scalableDeliveryPlan,
+    productArchitecture,
+    userParticipationMode,
+    costMode,
+    questionPolicy,
+  })
+
+  return {
+    projectBlueprint,
+    questionPolicy,
+  }
+}
+
 function buildScalableDeliveryPlan({
   goal,
   context,
@@ -10766,6 +11807,7 @@ function buildScalableDeliveryPlan({
   domainUnderstanding,
   reason,
   safeFirstDeliveryPlan,
+  projectBlueprint,
 }) {
   const normalizedDeliveryLevel =
     typeof deliveryLevel === 'string' && deliveryLevel.trim()
@@ -10797,7 +11839,16 @@ function buildScalableDeliveryPlan({
           mockCollections: [],
           sourceText: [goal, context, domainLabel].filter(Boolean).join(' '),
         })
-      : `${normalizedDeliveryLevel}-${slugifyBusinessSector(domainLabel) || 'workspace-local'}`
+      : buildScalableProjectRootFolderName({
+          deliveryLevel: normalizedDeliveryLevel,
+          goal,
+          context,
+          domainUnderstanding: normalizedDomainUnderstanding,
+          fallbackDomainLabel:
+            projectBlueprint?.domain || normalizedDomainUnderstanding?.domainLabel || domainLabel,
+        })
+  const normalizedProjectBlueprint =
+    projectBlueprint && typeof projectBlueprint === 'object' ? projectBlueprint : null
   const targetStructure = []
   const allowedRootPaths = []
   const modules = []
@@ -10808,8 +11859,14 @@ function buildScalableDeliveryPlan({
   const approvalRequiredLater = []
   const successCriteria = []
 
+  pushUniquePlannerValues(modules, normalizedProjectBlueprint?.modules || [], 16)
   pushUniquePlannerValues(modules, architectureParts.coreModules)
   pushUniquePlannerValues(modules, normalizedDomainUnderstanding?.primaryModules || [])
+  pushUniquePlannerValues(
+    explicitExclusions,
+    normalizedProjectBlueprint?.explicitExclusions || [],
+    16,
+  )
   pushUniquePlannerValues(explicitExclusions, normalizedDomainUnderstanding?.explicitExclusions || [])
   pushUniquePlannerValues(explicitExclusions, [
     'Deploy o publicacion remota.',
@@ -10834,6 +11891,16 @@ function buildScalableDeliveryPlan({
     'Se preservan restricciones locales, exclusiones explicitas y aprobaciones futuras.',
     'No se crean proyectos grandes reales ni se instala infraestructura en esta iteracion.',
   ])
+  pushUniquePlannerValues(
+    approvalRequiredLater,
+    normalizedProjectBlueprint?.approvalRequiredLater || [],
+    16,
+  )
+  pushUniquePlannerValues(
+    successCriteria,
+    normalizedProjectBlueprint?.successCriteria || [],
+    16,
+  )
 
   switch (normalizedDeliveryLevel) {
     case 'frontend-project':
@@ -11059,31 +12126,45 @@ function buildScalableDeliveryPlan({
       break
     case 'monorepo-local':
       pushUniquePlannerValues(targetStructure, [
+        `${rootFolder}/`,
         `${rootFolder}/apps/`,
+        `${rootFolder}/apps/web/`,
+        `${rootFolder}/apps/api/`,
         `${rootFolder}/packages/`,
         `${rootFolder}/services/`,
-        `${rootFolder}/workers/`,
+        `${rootFolder}/services/workers/`,
         `${rootFolder}/docs/`,
         `${rootFolder}/infra-local/`,
       ])
       pushUniquePlannerValues(allowedRootPaths, [
+        rootFolder,
         `${rootFolder}/apps`,
         `${rootFolder}/packages`,
         `${rootFolder}/services`,
-        `${rootFolder}/workers`,
         `${rootFolder}/docs`,
         `${rootFolder}/infra-local`,
       ])
       pushUniquePlannerValues(directories, [
         `${rootFolder}/apps/web`,
         `${rootFolder}/apps/api`,
+        `${rootFolder}/services/workers`,
         `${rootFolder}/packages/shared`,
-        `${rootFolder}/services`,
-        `${rootFolder}/workers`,
+        `${rootFolder}/packages/ui`,
         `${rootFolder}/docs`,
         `${rootFolder}/infra-local`,
       ])
-      pushUniquePlannerValues(modules, ['apps', 'packages', 'services', 'workers', 'docs'])
+      pushUniquePlannerValues(
+        modules,
+        normalizedProjectBlueprint?.modules || [
+          'apps web',
+          'api service',
+          'workers',
+          'shared contracts',
+          'ui package',
+          'docs',
+        ],
+        16,
+      )
       filesToCreate.push(
         {
           path: `${rootFolder}/package.json`,
@@ -11101,13 +12182,18 @@ function buildScalableDeliveryPlan({
           required: true,
         },
         {
-          path: `${rootFolder}/packages/shared/index.ts`,
-          purpose: 'Exponer contratos o utilidades compartidas del monorepo local.',
+          path: `${rootFolder}/services/workers/package.json`,
+          purpose: 'Definir el servicio de workers local como propuesta revisable, sin ejecutarlo todavía.',
           required: true,
         },
         {
-          path: `${rootFolder}/workers/README.md`,
-          purpose: 'Documentar workers locales sin ponerlos a correr todavía.',
+          path: `${rootFolder}/packages/shared/package.json`,
+          purpose: 'Definir contratos compartidos dentro del monorepo local.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/packages/ui/package.json`,
+          purpose: 'Reservar un paquete UI compartido sin instalar dependencias todavía.',
           required: true,
         },
         {
@@ -11116,13 +12202,32 @@ function buildScalableDeliveryPlan({
           required: true,
         },
         {
+          path: `${rootFolder}/docs/local-runbook.md`,
+          purpose: 'Describir los pasos manuales futuros para instalar dependencias y habilitar runtimes locales.',
+          required: true,
+        },
+        {
           path: `${rootFolder}/infra-local/README.md`,
           purpose: 'Dejar la infraestructura local solo como plan revisable.',
           required: true,
         },
       )
+      pushUniquePlannerValues(localOnlyConstraints, [
+        'Los workspaces, scripts coordinados y runtimes del monorepo quedan solo como diseño revisable en esta fase planner-only.',
+        'No corresponde instalar dependencias, crear node_modules ni activar múltiples servicios locales todavía.',
+      ])
+      pushUniquePlannerValues(explicitExclusions, [
+        'Workspaces reales activos, pipelines CI/CD, colas en ejecución o infraestructura publicada.',
+      ])
       pushUniquePlannerValues(approvalRequiredLater, [
-        'Instalar dependencias workspace y levantar varias apps o servicios locales.',
+        'Instalar dependencias workspace y configurar workspaces reales.',
+        'Levantar apps web, API y workers locales.',
+        'Configurar base de datos real, colas, workers o Docker local.',
+        'Habilitar CI/CD, repos remotos o infraestructura publicada.',
+      ])
+      pushUniquePlannerValues(successCriteria, [
+        'El monorepo-local sigue en planner-only y no devuelve materializationPlan ejecutable.',
+        'La estructura propuesta separa apps, packages, servicios, documentación e infraestructura local como diseño revisable.',
       ])
       break
     case 'infra-local-plan':
@@ -12639,6 +13744,194 @@ function normalizeScalableDeliveryPlanContract(value) {
   return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
 }
 
+function normalizeProjectBlueprintContract(value) {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const normalizedIntegrations = Array.isArray(value.integrations)
+    ? value.integrations
+        .map((entry) =>
+          entry && typeof entry === 'object'
+            ? {
+                ...(typeof entry.name === 'string' && entry.name.trim()
+                  ? { name: entry.name.trim() }
+                  : {}),
+                ...(typeof entry.type === 'string' && entry.type.trim()
+                  ? { type: entry.type.trim() }
+                  : {}),
+                ...(typeof entry.requiredNow === 'boolean'
+                  ? { requiredNow: entry.requiredNow }
+                  : {}),
+                ...(typeof entry.approvalRequired === 'boolean'
+                  ? { approvalRequired: entry.approvalRequired }
+                  : {}),
+                ...(typeof entry.reason === 'string' && entry.reason.trim()
+                  ? { reason: entry.reason.trim() }
+                  : {}),
+              }
+            : null,
+        )
+        .filter((entry) => entry && Object.keys(entry).length > 0)
+    : []
+  const normalizedPhasePlan = Array.isArray(value.phasePlan)
+    ? value.phasePlan
+        .map((entry) =>
+          entry && typeof entry === 'object'
+            ? {
+                ...(typeof entry.phase === 'string' && entry.phase.trim()
+                  ? { phase: entry.phase.trim() }
+                  : {}),
+                ...(typeof entry.goal === 'string' && entry.goal.trim()
+                  ? { goal: entry.goal.trim() }
+                  : {}),
+                ...(typeof entry.deliveryLevel === 'string' && entry.deliveryLevel.trim()
+                  ? { deliveryLevel: entry.deliveryLevel.trim() }
+                  : {}),
+                ...(typeof entry.executableNow === 'boolean'
+                  ? { executableNow: entry.executableNow }
+                  : {}),
+                ...(typeof entry.approvalRequired === 'boolean'
+                  ? { approvalRequired: entry.approvalRequired }
+                  : {}),
+              }
+            : null,
+        )
+        .filter((entry) => entry && Object.keys(entry).length > 0)
+    : []
+  const stackProfile =
+    value.stackProfile && typeof value.stackProfile === 'object'
+      ? {
+          ...(typeof value.stackProfile.frontend === 'string' &&
+          value.stackProfile.frontend.trim()
+            ? { frontend: value.stackProfile.frontend.trim() }
+            : {}),
+          ...(typeof value.stackProfile.backend === 'string' &&
+          value.stackProfile.backend.trim()
+            ? { backend: value.stackProfile.backend.trim() }
+            : {}),
+          ...(typeof value.stackProfile.database === 'string' &&
+          value.stackProfile.database.trim()
+            ? { database: value.stackProfile.database.trim() }
+            : {}),
+          ...(typeof value.stackProfile.apiStyle === 'string' &&
+          value.stackProfile.apiStyle.trim()
+            ? { apiStyle: value.stackProfile.apiStyle.trim() }
+            : {}),
+          ...(typeof value.stackProfile.auth === 'string' &&
+          value.stackProfile.auth.trim()
+            ? { auth: value.stackProfile.auth.trim() }
+            : {}),
+          ...(typeof value.stackProfile.styling === 'string' &&
+          value.stackProfile.styling.trim()
+            ? { styling: value.stackProfile.styling.trim() }
+            : {}),
+          ...(typeof value.stackProfile.testing === 'string' &&
+          value.stackProfile.testing.trim()
+            ? { testing: value.stackProfile.testing.trim() }
+            : {}),
+          ...(typeof value.stackProfile.packageManager === 'string' &&
+          value.stackProfile.packageManager.trim()
+            ? { packageManager: value.stackProfile.packageManager.trim() }
+            : {}),
+          ...(typeof value.stackProfile.runtime === 'string' &&
+          value.stackProfile.runtime.trim()
+            ? { runtime: value.stackProfile.runtime.trim() }
+            : {}),
+        }
+      : null
+  const normalizedValue = {
+    ...(typeof value.productType === 'string' && value.productType.trim()
+      ? { productType: value.productType.trim() }
+      : {}),
+    ...(typeof value.domain === 'string' && value.domain.trim()
+      ? { domain: value.domain.trim() }
+      : {}),
+    ...(typeof value.intent === 'string' && value.intent.trim()
+      ? { intent: value.intent.trim() }
+      : {}),
+    ...(typeof value.deliveryLevel === 'string' && value.deliveryLevel.trim()
+      ? { deliveryLevel: value.deliveryLevel.trim() }
+      : {}),
+    ...(typeof value.confidence === 'string' && value.confidence.trim()
+      ? { confidence: value.confidence.trim() }
+      : {}),
+    ...(stackProfile && Object.keys(stackProfile).length > 0 ? { stackProfile } : {}),
+    ...(summarizeUniqueExecutorStrings(value.roles, 12).length > 0
+      ? { roles: summarizeUniqueExecutorStrings(value.roles, 12) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.modules, 16).length > 0
+      ? { modules: summarizeUniqueExecutorStrings(value.modules, 16) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.entities, 16).length > 0
+      ? { entities: summarizeUniqueExecutorStrings(value.entities, 16) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.coreFlows, 16).length > 0
+      ? { coreFlows: summarizeUniqueExecutorStrings(value.coreFlows, 16) }
+      : {}),
+    ...(normalizedIntegrations.length > 0 ? { integrations: normalizedIntegrations } : {}),
+    ...(typeof value.dataSensitivity === 'string' && value.dataSensitivity.trim()
+      ? { dataSensitivity: value.dataSensitivity.trim() }
+      : {}),
+    ...(typeof value.riskLevel === 'string' && value.riskLevel.trim()
+      ? { riskLevel: value.riskLevel.trim() }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.assumptions, 12).length > 0
+      ? { assumptions: summarizeUniqueExecutorStrings(value.assumptions, 12) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.blockingQuestions, 8).length > 0
+      ? { blockingQuestions: summarizeUniqueExecutorStrings(value.blockingQuestions, 8) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.delegatedDecisions, 12).length > 0
+      ? { delegatedDecisions: summarizeUniqueExecutorStrings(value.delegatedDecisions, 12) }
+      : {}),
+    ...(normalizedPhasePlan.length > 0 ? { phasePlan: normalizedPhasePlan } : {}),
+    ...(summarizeUniqueExecutorStrings(value.explicitExclusions, 16).length > 0
+      ? { explicitExclusions: summarizeUniqueExecutorStrings(value.explicitExclusions, 16) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.approvalRequiredLater, 16).length > 0
+      ? { approvalRequiredLater: summarizeUniqueExecutorStrings(value.approvalRequiredLater, 16) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.successCriteria, 16).length > 0
+      ? { successCriteria: summarizeUniqueExecutorStrings(value.successCriteria, 16) }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
+function normalizeQuestionPolicyContract(value) {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const normalizedValue = {
+    ...(typeof value.mode === 'string' && value.mode.trim()
+      ? { mode: value.mode.trim() }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.blockingQuestions, 8).length > 0
+      ? { blockingQuestions: summarizeUniqueExecutorStrings(value.blockingQuestions, 8) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.optionalQuestions, 8).length > 0
+      ? { optionalQuestions: summarizeUniqueExecutorStrings(value.optionalQuestions, 8) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.delegatedDecisions, 12).length > 0
+      ? { delegatedDecisions: summarizeUniqueExecutorStrings(value.delegatedDecisions, 12) }
+      : {}),
+    ...(typeof value.shouldAskBeforePlanning === 'boolean'
+      ? { shouldAskBeforePlanning: value.shouldAskBeforePlanning }
+      : {}),
+    ...(typeof value.shouldAskBeforeMaterialization === 'boolean'
+      ? { shouldAskBeforeMaterialization: value.shouldAskBeforeMaterialization }
+      : {}),
+    ...(typeof value.reason === 'string' && value.reason.trim()
+      ? { reason: value.reason.trim() }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
 function buildBrainDecisionContract({
   decisionKey,
   strategy,
@@ -12667,6 +13960,8 @@ function buildBrainDecisionContract({
   safeFirstDeliveryMaterialization,
   domainUnderstanding,
   scalableDeliveryPlan,
+  projectBlueprint,
+  questionPolicy,
   materializationPlan,
   finalResult,
 }) {
@@ -12741,6 +14036,12 @@ function buildBrainDecisionContract({
             scalableDeliveryPlan,
           ),
         }
+      : {}),
+    ...(normalizeProjectBlueprintContract(projectBlueprint)
+      ? { projectBlueprint: normalizeProjectBlueprintContract(projectBlueprint) }
+      : {}),
+    ...(normalizeQuestionPolicyContract(questionPolicy)
+      ? { questionPolicy: normalizeQuestionPolicyContract(questionPolicy) }
       : {}),
     ...(materializationPlan && typeof materializationPlan === 'object'
       ? { materializationPlan }
@@ -15399,6 +16700,7 @@ async function buildLocalStrategicBrainDecision({
   requiresApproval,
   projectState,
   userParticipationMode,
+  costMode,
   manualReusablePreference,
   contextHubPack,
   reusablePlanningContext: providedReusablePlanningContext,
@@ -15497,6 +16799,31 @@ async function buildLocalStrategicBrainDecision({
       ...payload,
       domainUnderstanding,
     })
+  const buildDecisionWithPlanningContracts = (
+    payload,
+    { deliveryLevel, scalableDeliveryPlan, productArchitecture } = {},
+  ) => {
+    const planningContracts = buildPlanningArchitectureBundle({
+      goal,
+      context,
+      deliveryLevel:
+        deliveryLevel ||
+        scalableDeliveryPlan?.deliveryLevel ||
+        'safe-first-delivery',
+      domainUnderstanding,
+      scalableDeliveryPlan,
+      productArchitecture,
+      userParticipationMode: normalizedUserParticipationMode,
+      costMode,
+    })
+
+    return buildBrainDecisionContract({
+      ...payload,
+      domainUnderstanding,
+      projectBlueprint: planningContracts.projectBlueprint,
+      questionPolicy: planningContracts.questionPolicy,
+    })
+  }
   const reusablePlanningContext =
     providedReusablePlanningContext && typeof providedReusablePlanningContext === 'object'
       ? providedReusablePlanningContext
@@ -15731,7 +17058,8 @@ async function buildLocalStrategicBrainDecision({
       scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
     })
 
-    return buildDecision({
+    return buildDecisionWithPlanningContracts(
+      {
       decisionKey: 'materialize-fullstack-local-plan',
       strategy: 'materialize-fullstack-local-plan',
       executionMode: 'executor',
@@ -15746,7 +17074,12 @@ async function buildLocalStrategicBrainDecision({
       executionScope: fullstackLocalMaterializationPlan.executionScope,
       scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
       materializationPlan: fullstackLocalMaterializationPlan.materializationPlan,
-    })
+      },
+      {
+        deliveryLevel: 'fullstack-local',
+        scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
+      },
+    )
   }
 
   if (
@@ -15778,7 +17111,8 @@ async function buildLocalStrategicBrainDecision({
       scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
     })
 
-    return buildDecision({
+    return buildDecisionWithPlanningContracts(
+      {
       decisionKey: 'materialize-frontend-project-plan',
       strategy: 'materialize-frontend-project-plan',
       executionMode: 'executor',
@@ -15793,7 +17127,12 @@ async function buildLocalStrategicBrainDecision({
       executionScope: frontendProjectMaterializationPlan.executionScope,
       scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
       materializationPlan: frontendProjectMaterializationPlan.materializationPlan,
-    })
+      },
+      {
+        deliveryLevel: 'frontend-project',
+        scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
+      },
+    )
   }
 
   if (
@@ -15821,7 +17160,8 @@ async function buildLocalStrategicBrainDecision({
           : `El objetivo pide explícitamente una entrega más grande de nivel ${scalableDeliveryIntent.deliveryLevel}, así que conviene devolver primero un plan estructurado y revisable antes de materializar.`,
     })
 
-    return buildDecision({
+    return buildDecisionWithPlanningContracts(
+      {
       decisionKey: 'scalable-delivery-plan',
       strategy: 'scalable-delivery-plan',
       executionMode: 'planner-only',
@@ -15833,7 +17173,12 @@ async function buildLocalStrategicBrainDecision({
       completed: false,
       nextExpectedAction: 'review-scalable-delivery',
       scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
-    })
+      },
+      {
+        deliveryLevel: scalableDeliveryIntent.deliveryLevel,
+        scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
+      },
+    )
   }
 
   if (
@@ -15903,7 +17248,8 @@ async function buildLocalStrategicBrainDecision({
       safeFirstDeliveryPlan: safeFirstDeliveryPlan.safeFirstDeliveryPlan,
     })
 
-    return buildDecision({
+    return buildDecisionWithPlanningContracts(
+      {
       decisionKey: 'safe-first-delivery-plan',
       strategy: 'safe-first-delivery-plan',
       executionMode: 'planner-only',
@@ -15917,7 +17263,12 @@ async function buildLocalStrategicBrainDecision({
       nextExpectedAction: 'review-safe-first-delivery',
       safeFirstDeliveryPlan: safeFirstDeliveryPlan.safeFirstDeliveryPlan,
       scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
-    })
+      },
+      {
+        deliveryLevel: 'safe-first-delivery',
+        scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
+      },
+    )
   }
 
   if (
@@ -15939,7 +17290,8 @@ async function buildLocalStrategicBrainDecision({
       domainUnderstanding,
     })
 
-    return buildDecision({
+    return buildDecisionWithPlanningContracts(
+      {
       decisionKey: 'product-architecture-plan',
       strategy: 'product-architecture-plan',
       executionMode: 'planner-only',
@@ -15952,7 +17304,15 @@ async function buildLocalStrategicBrainDecision({
       completed: false,
       nextExpectedAction: 'review-product-architecture',
       productArchitecture: productArchitecturePlan.productArchitecture,
-    })
+      },
+      {
+        deliveryLevel:
+          scalableDeliveryIntent.matches && scalableDeliveryIntent.deliveryLevel
+            ? scalableDeliveryIntent.deliveryLevel
+            : 'safe-first-delivery',
+        productArchitecture: productArchitecturePlan.productArchitecture,
+      },
+    )
   }
 
   if (
@@ -16862,6 +18222,9 @@ Reglas:
 - Usá scalable-delivery-plan cuando el usuario pida explícitamente una entrega más grande y local, por ejemplo frontend real con estructura de proyecto, fullstack local con backend y base de datos local, monorepo local con apps/packages/workers o infraestructura local con Docker/Redis/cron/Postgres. En ese caso usá executionMode="planner-only", nextExpectedAction="review-scalable-delivery", requiresApproval=false, devolvé scalableDeliveryPlan completo y no crees archivos todavía.
 - Usá materialize-frontend-project-plan solo cuando el objetivo ya pida materializar un frontend-project revisado. En ese caso usá executionMode="executor", nextExpectedAction="execute-plan", requiresApproval=false, devolvé executionScope y materializationPlan acotados a una carpeta nueva del workspace con package.json, index.html, README.md y src/ estático, sin npm install, sin node_modules, sin bundler, sin backend real, sin base de datos real ni integraciones externas.
 - Usá materialize-fullstack-local-plan solo cuando el objetivo ya pida materializar un fullstack-local revisado. En ese caso usá executionMode="executor", nextExpectedAction="execute-plan", requiresApproval=false, devolvé executionScope y materializationPlan acotados a una carpeta nueva del workspace con frontend/, backend/, shared/, database/, scripts/ y docs/, sin npm install, sin node_modules, sin levantar servicios, sin base de datos real activa, sin Docker ni integraciones externas.
+- Cuando puedas, devolvé también projectBlueprint y questionPolicy alineados con la estrategia elegida.
+- projectBlueprint debe capturar tipo de producto, dominio, intent, deliveryLevel, stackProfile, roles, modules, entities, coreFlows, integrations, riesgos, decisiones delegadas, phasePlan, exclusiones, approvals futuros y successCriteria.
+- questionPolicy debe explicar si conviene preguntar ahora o decidir faltantes con criterio profesional, especialmente cuando userParticipationMode es "brain-decides-missing".
 - Si el pedido es ambiguo o no pide explícitamente un proyecto grande, mantenete en web-scaffold-base o safe-first-delivery-plan antes de escalar.
 - Si hace falta una decisión humana real, devolvé requiresApproval=true y un approvalRequest estructurado.
 - Si llega feedback de error recuperable, replanificá.
@@ -17113,6 +18476,85 @@ function buildOpenAIBrainSchema() {
           explicitExclusions: { type: 'array', items: { type: 'string' } },
           approvalRequiredLater: { type: 'array', items: { type: 'string' } },
           successCriteria: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      projectBlueprint: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          productType: { type: 'string' },
+          domain: { type: 'string' },
+          intent: { type: 'string' },
+          deliveryLevel: { type: 'string' },
+          confidence: { type: 'string' },
+          stackProfile: {
+            type: 'object',
+            additionalProperties: true,
+            properties: {
+              frontend: { type: 'string' },
+              backend: { type: 'string' },
+              database: { type: 'string' },
+              apiStyle: { type: 'string' },
+              auth: { type: 'string' },
+              styling: { type: 'string' },
+              testing: { type: 'string' },
+              packageManager: { type: 'string' },
+              runtime: { type: 'string' },
+            },
+          },
+          roles: { type: 'array', items: { type: 'string' } },
+          modules: { type: 'array', items: { type: 'string' } },
+          entities: { type: 'array', items: { type: 'string' } },
+          coreFlows: { type: 'array', items: { type: 'string' } },
+          integrations: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: true,
+              properties: {
+                name: { type: 'string' },
+                type: { type: 'string' },
+                requiredNow: { type: 'boolean' },
+                approvalRequired: { type: 'boolean' },
+                reason: { type: 'string' },
+              },
+            },
+          },
+          dataSensitivity: { type: 'string' },
+          riskLevel: { type: 'string' },
+          assumptions: { type: 'array', items: { type: 'string' } },
+          blockingQuestions: { type: 'array', items: { type: 'string' } },
+          delegatedDecisions: { type: 'array', items: { type: 'string' } },
+          phasePlan: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: true,
+              properties: {
+                phase: { type: 'string' },
+                goal: { type: 'string' },
+                deliveryLevel: { type: 'string' },
+                executableNow: { type: 'boolean' },
+                approvalRequired: { type: 'boolean' },
+              },
+            },
+          },
+          explicitExclusions: { type: 'array', items: { type: 'string' } },
+          approvalRequiredLater: { type: 'array', items: { type: 'string' } },
+          successCriteria: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      questionPolicy: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          mode: { type: 'string' },
+          blockingQuestions: { type: 'array', items: { type: 'string' } },
+          optionalQuestions: { type: 'array', items: { type: 'string' } },
+          delegatedDecisions: { type: 'array', items: { type: 'string' } },
+          shouldAskBeforePlanning: { type: 'boolean' },
+          shouldAskBeforeMaterialization: { type: 'boolean' },
+          reason: { type: 'string' },
         },
       },
       materializationPlan: {
@@ -17430,6 +18872,14 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
       typeof rawDecision.scalableDeliveryPlan === 'object'
         ? rawDecision.scalableDeliveryPlan
         : fallbackDecision.scalableDeliveryPlan,
+    projectBlueprint:
+      rawDecision?.projectBlueprint && typeof rawDecision.projectBlueprint === 'object'
+        ? rawDecision.projectBlueprint
+        : fallbackDecision.projectBlueprint,
+    questionPolicy:
+      rawDecision?.questionPolicy && typeof rawDecision.questionPolicy === 'object'
+        ? rawDecision.questionPolicy
+        : fallbackDecision.questionPolicy,
     materializationPlan:
       rawDecision?.materializationPlan &&
       typeof rawDecision.materializationPlan === 'object'
@@ -19566,6 +21016,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       nextExpectedAction: brainDecision.nextExpectedAction,
       domainUnderstanding: brainDecision.domainUnderstanding,
       scalableDeliveryPlan: brainDecision.scalableDeliveryPlan,
+      projectBlueprint: brainDecision.projectBlueprint,
+      questionPolicy: brainDecision.questionPolicy,
       materializationPlan: brainDecision.materializationPlan,
       contextHubStatus,
       brainRoutingDecision,
@@ -19607,6 +21059,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
     nextExpectedAction: brainDecision.nextExpectedAction,
     domainUnderstanding: brainDecision.domainUnderstanding,
     scalableDeliveryPlan: brainDecision.scalableDeliveryPlan,
+    projectBlueprint: brainDecision.projectBlueprint,
+    questionPolicy: brainDecision.questionPolicy,
     materializationPlan: brainDecision.materializationPlan,
     contextHubStatus,
     brainRoutingDecision,
