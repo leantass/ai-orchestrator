@@ -184,6 +184,17 @@ const scalableValidationCases = [
       database: 'mock-data',
       apiStyle: 'none/local-mock',
     },
+    expectImplementationRoadmap: true,
+    expectedRoadmapPhaseTokens: [
+      'review-frontend-plan',
+      'materialize-frontend-local',
+      'validate-frontend-files',
+    ],
+    expectedNextActionType: 'prepare-materialization',
+    expectedNextActionStrategy: 'materialize-frontend-project-plan',
+    expectedNextActionSafeToRunNow: true,
+    expectedNextActionRequiresApproval: false,
+    expectValidationPlan: true,
   },
   {
     id: 'fullstack-local',
@@ -267,6 +278,21 @@ const scalableValidationCases = [
       testing: 'manual-smoke-first',
       packageManager: 'npm-deferred',
     },
+    expectImplementationRoadmap: true,
+    expectedRoadmapPhaseTokens: [
+      'blueprint-fullstack',
+      'scaffold-fullstack-local',
+      'frontend-mock-flow',
+      'backend-contracts',
+      'database-design',
+      'validate-fullstack-local',
+      'approve-real-runtime',
+    ],
+    expectedNextActionType: 'prepare-materialization',
+    expectedNextActionStrategy: 'materialize-fullstack-local-plan',
+    expectedNextActionSafeToRunNow: true,
+    expectedNextActionRequiresApproval: false,
+    expectValidationPlan: true,
   },
   {
     id: 'monorepo-local',
@@ -282,8 +308,9 @@ const scalableValidationCases = [
       'apps/api/',
       'packages/',
       'services/workers/',
+      'scripts/',
       'docs/',
-      'infra-local/',
+      'local-runtime/',
     ],
     expectedFileTokens: [
       'package.json',
@@ -291,9 +318,10 @@ const scalableValidationCases = [
       'apps/api/package.json',
       'services/workers/package.json',
       'packages/shared/package.json',
-      'packages/ui/package.json',
       'docs/architecture.md',
       'docs/local-runbook.md',
+      'scripts/README.md',
+      'local-runtime/README.md',
     ],
     expectedBlueprintModules: [
       'apps web',
@@ -303,6 +331,17 @@ const scalableValidationCases = [
       'ui package',
     ],
     expectedPhaseTokens: ['blueprint-monorepo', 'workspaces-futuros'],
+    expectImplementationRoadmap: true,
+    expectedRoadmapPhaseTokens: [
+      'blueprint-monorepo',
+      'package-contracts',
+      'runtime-local-proposal',
+    ],
+    expectedNextActionType: 'review-plan',
+    expectedNextActionStrategy: 'scalable-delivery-plan',
+    expectedNextActionSafeToRunNow: true,
+    expectedNextActionRequiresApproval: false,
+    expectValidationPlan: true,
   },
   {
     id: 'infra-local-plan',
@@ -314,6 +353,13 @@ const scalableValidationCases = [
     mustRequireApprovalLater: true,
     expectProjectBlueprint: true,
     expectedPhaseTokens: ['plan-infra-local', 'aprobacion-sensible'],
+    expectImplementationRoadmap: true,
+    expectedRoadmapPhaseTokens: ['plan-infra-local', 'approval-sensitive-runtime'],
+    expectedNextActionType: 'request-approval',
+    expectedNextActionStrategy: 'scalable-delivery-plan',
+    expectedNextActionSafeToRunNow: false,
+    expectedNextActionRequiresApproval: true,
+    expectValidationPlan: true,
   },
 ]
 
@@ -681,6 +727,92 @@ function summarizeQuestionPolicy(questionPolicy) {
   }
 }
 
+function summarizeImplementationRoadmap(implementationRoadmap) {
+  return {
+    projectSlug: implementationRoadmap?.projectSlug || '',
+    projectType: implementationRoadmap?.projectType || '',
+    domain: implementationRoadmap?.domain || '',
+    deliveryLevel: implementationRoadmap?.deliveryLevel || '',
+    currentPhase: implementationRoadmap?.currentPhase || '',
+    nextRecommendedPhase: implementationRoadmap?.nextRecommendedPhase || '',
+    suggestedNextAction: implementationRoadmap?.suggestedNextAction || '',
+    blockers: toStringArray(implementationRoadmap?.blockers, 24),
+    explicitExclusions: toStringArray(implementationRoadmap?.explicitExclusions, 24),
+    approvalRequiredLater: toStringArray(implementationRoadmap?.approvalRequiredLater, 24),
+    successCriteria: toStringArray(implementationRoadmap?.successCriteria, 24),
+    phases: Array.isArray(implementationRoadmap?.phases)
+      ? implementationRoadmap.phases.map((entry) => ({
+          id: typeof entry?.id === 'string' ? entry.id : '',
+          title: typeof entry?.title === 'string' ? entry.title : '',
+          goal: typeof entry?.goal === 'string' ? entry.goal : '',
+          deliveryLevel:
+            typeof entry?.deliveryLevel === 'string' ? entry.deliveryLevel : '',
+          status: typeof entry?.status === 'string' ? entry.status : '',
+          executableNow: entry?.executableNow === true,
+          approvalRequired: entry?.approvalRequired === true,
+          riskLevel: typeof entry?.riskLevel === 'string' ? entry.riskLevel : '',
+          expectedOutputs: toStringArray(entry?.expectedOutputs, 16),
+          allowedRootPaths: toStringArray(entry?.allowedRootPaths, 8),
+          dependencies: toStringArray(entry?.dependencies, 8),
+          validationStrategy: toStringArray(entry?.validationStrategy, 12),
+        }))
+      : [],
+  }
+}
+
+function summarizeNextActionPlan(nextActionPlan) {
+  return {
+    currentState: nextActionPlan?.currentState || '',
+    recommendedAction: nextActionPlan?.recommendedAction || '',
+    actionType: nextActionPlan?.actionType || '',
+    targetStrategy: nextActionPlan?.targetStrategy || '',
+    targetDeliveryLevel: nextActionPlan?.targetDeliveryLevel || '',
+    reason: nextActionPlan?.reason || '',
+    safeToRunNow: nextActionPlan?.safeToRunNow === true,
+    requiresApproval: nextActionPlan?.requiresApproval === true,
+    userFacingLabel: nextActionPlan?.userFacingLabel || '',
+    technicalLabel: nextActionPlan?.technicalLabel || '',
+    expectedOutcome: nextActionPlan?.expectedOutcome || '',
+  }
+}
+
+function summarizeValidationPlan(validationPlan) {
+  return {
+    scope: validationPlan?.scope || '',
+    level: validationPlan?.level || '',
+    commands: toStringArray(validationPlan?.commands, 24),
+    fileChecks: Array.isArray(validationPlan?.fileChecks)
+      ? validationPlan.fileChecks.map((entry) => ({
+          path: typeof entry?.path === 'string' ? entry.path : '',
+          expectation:
+            typeof entry?.expectation === 'string' ? entry.expectation : '',
+        }))
+      : [],
+    forbiddenPaths: toStringArray(validationPlan?.forbiddenPaths, 24),
+    runtimeChecks: toStringArray(validationPlan?.runtimeChecks, 24),
+    manualChecks: toStringArray(validationPlan?.manualChecks, 24),
+    successCriteria: toStringArray(validationPlan?.successCriteria, 24),
+  }
+}
+
+function summarizePhaseExpansionPlan(phaseExpansionPlan) {
+  return {
+    phaseId: phaseExpansionPlan?.phaseId || '',
+    goal: phaseExpansionPlan?.goal || '',
+    targetFiles: toStringArray(phaseExpansionPlan?.targetFiles, 16),
+    changesExpected: toStringArray(phaseExpansionPlan?.changesExpected, 16),
+    risks: toStringArray(phaseExpansionPlan?.risks, 16),
+    executableNow: phaseExpansionPlan?.executableNow === true,
+    approvalRequired: phaseExpansionPlan?.approvalRequired === true,
+    nextExpectedAction: phaseExpansionPlan?.nextExpectedAction || '',
+    validationPlan:
+      phaseExpansionPlan?.validationPlan &&
+      typeof phaseExpansionPlan.validationPlan === 'object'
+        ? summarizeValidationPlan(phaseExpansionPlan.validationPlan)
+        : null,
+  }
+}
+
 function runCase(testCase) {
   const structures = buildCaseStructures(testCase)
   const failures = []
@@ -908,6 +1040,22 @@ async function runScalableValidationCase(testCase) {
   const questionPolicy =
     decision?.questionPolicy && typeof decision.questionPolicy === 'object'
       ? decision.questionPolicy
+      : null
+  const implementationRoadmap =
+    decision?.implementationRoadmap && typeof decision.implementationRoadmap === 'object'
+      ? decision.implementationRoadmap
+      : null
+  const nextActionPlan =
+    decision?.nextActionPlan && typeof decision.nextActionPlan === 'object'
+      ? decision.nextActionPlan
+      : null
+  const validationPlan =
+    decision?.validationPlan && typeof decision.validationPlan === 'object'
+      ? decision.validationPlan
+      : null
+  const phaseExpansionPlan =
+    decision?.phaseExpansionPlan && typeof decision.phaseExpansionPlan === 'object'
+      ? decision.phaseExpansionPlan
       : null
   const materializationPlan =
     decision?.materializationPlan && typeof decision.materializationPlan === 'object'
@@ -1138,6 +1286,112 @@ async function runScalableValidationCase(testCase) {
         failures.push('questionPolicy.reason vacio.')
       }
     }
+
+    if (testCase.expectImplementationRoadmap) {
+      if (!implementationRoadmap) {
+        failures.push('implementationRoadmap ausente.')
+      } else {
+        const roadmapSummary = summarizeImplementationRoadmap(implementationRoadmap)
+        if (String(roadmapSummary.deliveryLevel || '').trim() !== testCase.expectedDeliveryLevel) {
+          failures.push(
+            `implementationRoadmap.deliveryLevel incorrecto. Esperado: ${testCase.expectedDeliveryLevel}. Recibido: ${
+              roadmapSummary.deliveryLevel || '(vacio)'
+            }.`,
+          )
+        }
+        if (roadmapSummary.phases.length === 0) {
+          failures.push('implementationRoadmap.phases vacio.')
+        }
+        if (!String(roadmapSummary.nextRecommendedPhase || '').trim()) {
+          failures.push('implementationRoadmap.nextRecommendedPhase vacio.')
+        }
+        ;(testCase.expectedRoadmapPhaseTokens || []).forEach((token) => {
+          if (
+            !roadmapSummary.phases.some((entry) =>
+              [entry.id, entry.title]
+                .filter(Boolean)
+                .some((value) => normalizeText(value).includes(normalizeText(token))),
+            )
+          ) {
+            failures.push(`implementationRoadmap.phases no incluye ${token}.`)
+          }
+        })
+      }
+    }
+
+    if (!nextActionPlan) {
+      failures.push('nextActionPlan ausente.')
+    } else {
+      const nextActionSummary = summarizeNextActionPlan(nextActionPlan)
+      if (!String(nextActionSummary.actionType || '').trim()) {
+        failures.push('nextActionPlan.actionType vacio.')
+      }
+      if (
+        testCase.expectedNextActionType &&
+        String(nextActionSummary.actionType || '').trim() !== testCase.expectedNextActionType
+      ) {
+        failures.push(
+          `nextActionPlan.actionType incorrecto. Esperado: ${testCase.expectedNextActionType}. Recibido: ${
+            nextActionSummary.actionType || '(vacio)'
+          }.`,
+        )
+      }
+      if (
+        testCase.expectedNextActionStrategy &&
+        String(nextActionSummary.targetStrategy || '').trim() !==
+          testCase.expectedNextActionStrategy
+      ) {
+        failures.push(
+          `nextActionPlan.targetStrategy incorrecto. Esperado: ${testCase.expectedNextActionStrategy}. Recibido: ${
+            nextActionSummary.targetStrategy || '(vacio)'
+          }.`,
+        )
+      }
+      if (
+        typeof testCase.expectedNextActionSafeToRunNow === 'boolean' &&
+        nextActionSummary.safeToRunNow !== testCase.expectedNextActionSafeToRunNow
+      ) {
+        failures.push(
+          `nextActionPlan.safeToRunNow incorrecto. Esperado: ${testCase.expectedNextActionSafeToRunNow}. Recibido: ${nextActionSummary.safeToRunNow}.`,
+        )
+      }
+      if (
+        typeof testCase.expectedNextActionRequiresApproval === 'boolean' &&
+        nextActionSummary.requiresApproval !==
+          testCase.expectedNextActionRequiresApproval
+      ) {
+        failures.push(
+          `nextActionPlan.requiresApproval incorrecto. Esperado: ${testCase.expectedNextActionRequiresApproval}. Recibido: ${nextActionSummary.requiresApproval}.`,
+        )
+      }
+    }
+
+    if (testCase.expectValidationPlan) {
+      if (!validationPlan) {
+        failures.push('validationPlan ausente.')
+      } else {
+        const validationSummary = summarizeValidationPlan(validationPlan)
+        if (!String(validationSummary.scope || '').trim()) {
+          failures.push('validationPlan.scope vacio.')
+        }
+        if (!String(validationSummary.level || '').trim()) {
+          failures.push('validationPlan.level vacio.')
+        }
+        if (
+          testCase.expectedDeliveryLevel === 'monorepo-local' &&
+          String(nextActionPlan?.targetStrategy || '').trim() ===
+            'materialize-fullstack-local-plan'
+        ) {
+          failures.push(
+            'monorepo-local no deberia recomendar materialize-fullstack-local-plan.',
+          )
+        }
+      }
+    }
+
+    if (phaseExpansionPlan && testCase.expectedDeliveryLevel === 'monorepo-local') {
+      failures.push('monorepo-local no deberia devolver phaseExpansionPlan en esta fase.')
+    }
   }
 
   return {
@@ -1150,6 +1404,10 @@ async function runScalableValidationCase(testCase) {
     scalablePlan,
     projectBlueprint,
     questionPolicy,
+    implementationRoadmap,
+    nextActionPlan,
+    validationPlan,
+    phaseExpansionPlan,
   }
 }
 
@@ -1564,6 +1822,19 @@ async function runFrontendProjectMaterializationValidation() {
     phaseTwoDecision?.executionScope && typeof phaseTwoDecision.executionScope === 'object'
       ? phaseTwoDecision.executionScope
       : null
+  const nextActionPlan =
+    phaseTwoDecision?.nextActionPlan && typeof phaseTwoDecision.nextActionPlan === 'object'
+      ? phaseTwoDecision.nextActionPlan
+      : null
+  const validationPlan =
+    phaseTwoDecision?.validationPlan && typeof phaseTwoDecision.validationPlan === 'object'
+      ? phaseTwoDecision.validationPlan
+      : null
+  const phaseExpansionPlan =
+    phaseTwoDecision?.phaseExpansionPlan &&
+    typeof phaseTwoDecision.phaseExpansionPlan === 'object'
+      ? phaseTwoDecision.phaseExpansionPlan
+      : null
   const materializationPlan =
     phaseTwoDecision?.materializationPlan &&
     typeof phaseTwoDecision.materializationPlan === 'object'
@@ -1611,6 +1882,43 @@ async function runFrontendProjectMaterializationValidation() {
 
     if (!Array.isArray(materializationPlan.validations) || materializationPlan.validations.length < 8) {
       failures.push('materializationPlan.validations deberia validar la estructura minima del frontend.')
+    }
+  }
+
+  if (!nextActionPlan) {
+    failures.push('nextActionPlan ausente en fase 2.')
+  } else {
+    const nextActionSummary = summarizeNextActionPlan(nextActionPlan)
+    if (nextActionSummary.actionType !== 'execute-materialization') {
+      failures.push('nextActionPlan.actionType deberia ser execute-materialization.')
+    }
+    if (nextActionSummary.targetStrategy !== 'materialize-frontend-project-plan') {
+      failures.push(
+        'nextActionPlan.targetStrategy deberia apuntar a materialize-frontend-project-plan.',
+      )
+    }
+    if (!nextActionSummary.safeToRunNow) {
+      failures.push('nextActionPlan.safeToRunNow deberia ser true en fase 2 frontend.')
+    }
+  }
+
+  if (!validationPlan) {
+    failures.push('validationPlan ausente en fase 2 frontend.')
+  } else {
+    const validationSummary = summarizeValidationPlan(validationPlan)
+    ;['node_modules', '.env', 'backend', 'database'].forEach((token) => {
+      if (!validationSummary.forbiddenPaths.some((entry) => entry.includes(token))) {
+        failures.push(`validationPlan.forbiddenPaths no incluye ${token}.`)
+      }
+    })
+  }
+
+  if (!phaseExpansionPlan) {
+    failures.push('phaseExpansionPlan ausente en fase 2 frontend.')
+  } else {
+    const expansionSummary = summarizePhaseExpansionPlan(phaseExpansionPlan)
+    if (!String(expansionSummary.phaseId || '').trim()) {
+      failures.push('phaseExpansionPlan.phaseId vacio en fase 2 frontend.')
     }
   }
 
@@ -1720,6 +2028,19 @@ async function runFullstackLocalMaterializationValidation() {
     phaseTwoDecision?.executionScope && typeof phaseTwoDecision.executionScope === 'object'
       ? phaseTwoDecision.executionScope
       : null
+  const nextActionPlan =
+    phaseTwoDecision?.nextActionPlan && typeof phaseTwoDecision.nextActionPlan === 'object'
+      ? phaseTwoDecision.nextActionPlan
+      : null
+  const validationPlan =
+    phaseTwoDecision?.validationPlan && typeof phaseTwoDecision.validationPlan === 'object'
+      ? phaseTwoDecision.validationPlan
+      : null
+  const phaseExpansionPlan =
+    phaseTwoDecision?.phaseExpansionPlan &&
+    typeof phaseTwoDecision.phaseExpansionPlan === 'object'
+      ? phaseTwoDecision.phaseExpansionPlan
+      : null
   const materializationPlan =
     phaseTwoDecision?.materializationPlan &&
     typeof phaseTwoDecision.materializationPlan === 'object'
@@ -1767,6 +2088,45 @@ async function runFullstackLocalMaterializationValidation() {
 
     if (!Array.isArray(materializationPlan.validations) || materializationPlan.validations.length < 16) {
       failures.push('materializationPlan.validations deberia validar la estructura minima del fullstack local.')
+    }
+  }
+
+  if (!nextActionPlan) {
+    failures.push('nextActionPlan ausente en fase 2 fullstack.')
+  } else {
+    const nextActionSummary = summarizeNextActionPlan(nextActionPlan)
+    if (nextActionSummary.actionType !== 'execute-materialization') {
+      failures.push('nextActionPlan.actionType deberia ser execute-materialization.')
+    }
+    if (nextActionSummary.targetStrategy !== 'materialize-fullstack-local-plan') {
+      failures.push(
+        'nextActionPlan.targetStrategy deberia apuntar a materialize-fullstack-local-plan.',
+      )
+    }
+    if (!nextActionSummary.safeToRunNow) {
+      failures.push('nextActionPlan.safeToRunNow deberia ser true en fase 2 fullstack.')
+    }
+  }
+
+  if (!validationPlan) {
+    failures.push('validationPlan ausente en fase 2 fullstack.')
+  } else {
+    const validationSummary = summarizeValidationPlan(validationPlan)
+    ;['node_modules', '.env', 'docker-compose.yml', 'Dockerfile', 'deploy'].forEach(
+      (token) => {
+        if (!validationSummary.forbiddenPaths.some((entry) => entry.includes(token))) {
+          failures.push(`validationPlan.forbiddenPaths no incluye ${token}.`)
+        }
+      },
+    )
+  }
+
+  if (!phaseExpansionPlan) {
+    failures.push('phaseExpansionPlan ausente en fase 2 fullstack.')
+  } else {
+    const expansionSummary = summarizePhaseExpansionPlan(phaseExpansionPlan)
+    if (!String(expansionSummary.phaseId || '').trim()) {
+      failures.push('phaseExpansionPlan.phaseId vacio en fase 2 fullstack.')
     }
   }
 
