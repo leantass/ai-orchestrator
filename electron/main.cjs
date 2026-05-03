@@ -12294,6 +12294,8 @@ function buildValidationPlan({
   scalableDeliveryPlan,
   materializationPlan,
   implementationRoadmap,
+  projectPhaseExecutionPlan,
+  localProjectManifest,
 }) {
   const normalizedScalablePlan =
     normalizeScalableDeliveryPlanContract(scalableDeliveryPlan)
@@ -12305,6 +12307,10 @@ function buildValidationPlan({
     implementationRoadmap && typeof implementationRoadmap === 'object'
       ? implementationRoadmap
       : null
+  const normalizedProjectPhaseExecutionPlan =
+    normalizeProjectPhaseExecutionPlanContract(projectPhaseExecutionPlan)
+  const normalizedLocalProjectManifest =
+    normalizeLocalProjectManifestContract(localProjectManifest)
   const normalizedDeliveryLevel =
     typeof deliveryLevel === 'string' && deliveryLevel.trim()
       ? deliveryLevel.trim()
@@ -12314,6 +12320,14 @@ function buildValidationPlan({
     normalizedRoadmap?.projectSlug ||
     normalizedDeliveryLevel ||
     'workspace-local'
+
+  if (
+    (strategy === 'prepare-project-phase-plan' ||
+      strategy === 'materialize-project-phase-plan') &&
+    normalizedProjectPhaseExecutionPlan?.validationPlan
+  ) {
+    return normalizedProjectPhaseExecutionPlan.validationPlan
+  }
 
   if (strategy === 'materialize-frontend-project-plan') {
     return {
@@ -12366,6 +12380,7 @@ function buildValidationPlan({
         `node --check ${path.posix.join(rootFolder, 'scripts/seed-local.js')}`,
       ],
       fileChecks: [
+        { path: `${rootFolder}/jefe-project.json`, expectation: 'Debe existir como manifiesto local revisable del proyecto.' },
         { path: `${rootFolder}/frontend`, expectation: 'Debe existir como capa visual local revisable.' },
         { path: `${rootFolder}/backend`, expectation: 'Debe existir como capa backend de referencia sin runtime activo.' },
         { path: `${rootFolder}/shared`, expectation: 'Debe existir con contratos entre capas.' },
@@ -12394,6 +12409,9 @@ function buildValidationPlan({
       manualChecks: [
         'Revisar contratos compartidos y schema.sql como diseño local.',
         'Confirmar ausencia de Docker, deploy y credenciales reales.',
+        normalizedLocalProjectManifest
+          ? `Confirmar que jefe-project.json siga recomendando la fase ${normalizedLocalProjectManifest.nextRecommendedPhase || 'frontend-mock-flow'}.`
+          : 'Confirmar que jefe-project.json exponga fases seguras y la siguiente recomendación.',
       ],
       successCriteria: summarizeUniqueExecutorStrings(
         [
@@ -12466,13 +12484,46 @@ function buildPhaseExpansionPlan({
   strategy,
   scalableDeliveryPlan,
   validationPlan,
+  projectPhaseExecutionPlan,
 }) {
   const normalizedScalablePlan =
     normalizeScalableDeliveryPlanContract(scalableDeliveryPlan)
   const normalizedValidationPlan =
     validationPlan && typeof validationPlan === 'object' ? validationPlan : null
+  const normalizedProjectPhaseExecutionPlan =
+    normalizeProjectPhaseExecutionPlanContract(projectPhaseExecutionPlan)
   const rootFolder =
     summarizeUniqueExecutorStrings(normalizedScalablePlan?.allowedRootPaths, 1)[0] || ''
+
+  if (
+    strategy === 'materialize-project-phase-plan' &&
+    normalizedProjectPhaseExecutionPlan?.phaseId === 'frontend-mock-flow'
+  ) {
+    return {
+      phaseId: 'backend-contracts',
+      goal: 'Preparar contratos de backend y shared sin levantar servidor real ni instalar dependencias.',
+      targetFiles: [
+        `${normalizedProjectPhaseExecutionPlan.projectRoot}/backend/src/modules/appointments.js`,
+        `${normalizedProjectPhaseExecutionPlan.projectRoot}/backend/src/routes/health.js`,
+        `${normalizedProjectPhaseExecutionPlan.projectRoot}/backend/src/lib/response.js`,
+        `${normalizedProjectPhaseExecutionPlan.projectRoot}/shared/contracts/domain.js`,
+        `${normalizedProjectPhaseExecutionPlan.projectRoot}/shared/types/contracts.js`,
+        `${normalizedProjectPhaseExecutionPlan.projectRoot}/docs/architecture.md`,
+      ],
+      changesExpected: [
+        'Refinar contratos del dominio de turnos',
+        'Documentar respuestas mock del backend local',
+        'Mantener todo en JS puro y modo review-only',
+      ],
+      risks: [
+        'Introducir dependencias implícitas con servidor real o puertos si la fase se expande sin control.',
+      ],
+      validationPlan: normalizedValidationPlan,
+      executableNow: false,
+      approvalRequired: false,
+      nextExpectedAction: 'review-project-phase',
+    }
+  }
 
   if (strategy === 'materialize-frontend-project-plan') {
     return {
@@ -12531,10 +12582,13 @@ function buildNextActionPlan({
   requiresApproval,
   scalableDeliveryPlan,
   questionPolicy,
+  projectPhaseExecutionPlan,
 }) {
   const normalizedScalablePlan =
     normalizeScalableDeliveryPlanContract(scalableDeliveryPlan)
   const normalizedQuestionPolicy = normalizeQuestionPolicyContract(questionPolicy)
+  const normalizedProjectPhaseExecutionPlan =
+    normalizeProjectPhaseExecutionPlanContract(projectPhaseExecutionPlan)
   const deliveryLevel = normalizedScalablePlan?.deliveryLevel || ''
   const hasBlockingQuestions =
     Array.isArray(normalizedQuestionPolicy?.blockingQuestions) &&
@@ -12598,6 +12652,58 @@ function buildNextActionPlan({
       technicalLabel: 'execute-fullstack-materialization',
       expectedOutcome:
         'Crear el scaffold fullstack local dentro de los allowedTargetPaths.',
+    }
+  }
+
+  if (strategy === 'prepare-project-phase-plan' && normalizedProjectPhaseExecutionPlan) {
+    return {
+      currentState: `project-phase-review:${normalizedProjectPhaseExecutionPlan.phaseId}`,
+      recommendedAction: normalizedProjectPhaseExecutionPlan.executableNow
+        ? 'Revisar el plan de fase y, si está correcto, preparar su materialización segura.'
+        : 'Revisar la siguiente fase disponible antes de expandir el proyecto local.',
+      actionType: normalizedProjectPhaseExecutionPlan.executableNow
+        ? 'expand-next-phase'
+        : 'review-plan',
+      targetStrategy: normalizedProjectPhaseExecutionPlan.targetStrategy,
+      targetDeliveryLevel:
+        normalizedProjectPhaseExecutionPlan.deliveryLevel || deliveryLevel || 'n/a',
+      reason:
+        normalizedProjectPhaseExecutionPlan.reason ||
+        'Se detectó una continuación segura del proyecto local.',
+      safeToRunNow: normalizedProjectPhaseExecutionPlan.executableNow === true,
+      requiresApproval: normalizedProjectPhaseExecutionPlan.approvalRequired === true,
+      userFacingLabel:
+        normalizedProjectPhaseExecutionPlan.phaseId === 'frontend-mock-flow'
+          ? 'Preparar frontend mock flow'
+          : 'Preparar backend contracts',
+      technicalLabel: `prepare-${normalizedProjectPhaseExecutionPlan.phaseId}`,
+      expectedOutcome:
+        normalizedProjectPhaseExecutionPlan.executableNow === true
+          ? 'Dejar lista una fase materializable y acotada a archivos permitidos.'
+          : 'Dejar la fase propuesta lista para revisión sin ejecución automática.',
+    }
+  }
+
+  if (strategy === 'materialize-project-phase-plan' && normalizedProjectPhaseExecutionPlan) {
+    return {
+      currentState: `project-phase-materialization:${normalizedProjectPhaseExecutionPlan.phaseId}`,
+      recommendedAction: `Ejecutar la materialización controlada de la fase ${normalizedProjectPhaseExecutionPlan.phaseId}.`,
+      actionType: 'execute-materialization',
+      targetStrategy: 'materialize-project-phase-plan',
+      targetDeliveryLevel:
+        normalizedProjectPhaseExecutionPlan.deliveryLevel || deliveryLevel || 'n/a',
+      reason:
+        normalizedProjectPhaseExecutionPlan.reason ||
+        'La fase segura ya quedó delimitada a archivos permitidos del proyecto local.',
+      safeToRunNow: normalizedProjectPhaseExecutionPlan.executableNow === true,
+      requiresApproval: normalizedProjectPhaseExecutionPlan.approvalRequired === true,
+      userFacingLabel:
+        normalizedProjectPhaseExecutionPlan.phaseId === 'frontend-mock-flow'
+          ? 'Materializar frontend mock flow'
+          : `Materializar ${normalizedProjectPhaseExecutionPlan.phaseId}`,
+      technicalLabel: `materialize-${normalizedProjectPhaseExecutionPlan.phaseId}`,
+      expectedOutcome:
+        'Actualizar solo los archivos permitidos de la fase dentro del proyecto ya generado.',
     }
   }
 
@@ -12701,6 +12807,8 @@ function buildPlanningArchitectureBundle({
   userParticipationMode,
   costMode,
   materializationPlan,
+  projectPhaseExecutionPlan,
+  localProjectManifest,
 }) {
   const provisionalBlueprint = buildProjectBlueprint({
     goal,
@@ -12750,11 +12858,14 @@ function buildPlanningArchitectureBundle({
     scalableDeliveryPlan,
     materializationPlan,
     implementationRoadmap,
+    projectPhaseExecutionPlan,
+    localProjectManifest,
   })
   const phaseExpansionPlan = buildPhaseExpansionPlan({
     strategy,
     scalableDeliveryPlan,
     validationPlan,
+    projectPhaseExecutionPlan,
   })
   const nextActionPlan = buildNextActionPlan({
     strategy,
@@ -12762,6 +12873,7 @@ function buildPlanningArchitectureBundle({
     requiresApproval,
     scalableDeliveryPlan,
     questionPolicy,
+    projectPhaseExecutionPlan,
   })
 
   return {
@@ -12771,6 +12883,10 @@ function buildPlanningArchitectureBundle({
     nextActionPlan,
     validationPlan,
     phaseExpansionPlan,
+    projectPhaseExecutionPlan: normalizeProjectPhaseExecutionPlanContract(
+      projectPhaseExecutionPlan,
+    ),
+    localProjectManifest: normalizeLocalProjectManifestContract(localProjectManifest),
   }
 }
 
@@ -13838,6 +13954,7 @@ function buildFullstackLocalMaterializationPlan({
   const scriptsSeedPath = path.join(scriptsFolder, 'seed-local.js')
   const docsArchitecturePath = path.join(docsFolder, 'architecture.md')
   const docsRunbookPath = path.join(docsFolder, 'local-runbook.md')
+  const projectManifestPath = path.join(rootFolder, 'jefe-project.json')
   const allowedTargetPaths = [
     rootFolder,
     frontendFolder,
@@ -13877,6 +13994,7 @@ function buildFullstackLocalMaterializationPlan({
     scriptsSeedPath,
     docsArchitecturePath,
     docsRunbookPath,
+    projectManifestPath,
   ]
   const modules = summarizeUniqueExecutorStrings(
     normalizedScalablePlan?.modules ||
@@ -13930,6 +14048,38 @@ function buildFullstackLocalMaterializationPlan({
     successCriteria,
     enforceNarrowScope: true,
   })
+  const localProjectManifest = buildLocalProjectManifest({
+    rootFolder,
+    domain: appTitle,
+    deliveryLevel: 'fullstack-local',
+    forbiddenPaths: ['node_modules', '.env', 'docker-compose.yml', 'Dockerfile', 'deploy'],
+    scaffoldFiles: [
+      rootReadmePath,
+      rootPackageJsonPath,
+      frontendPackageJsonPath,
+      frontendIndexHtmlPath,
+      frontendMainJsPath,
+      frontendStylesPath,
+      frontendMockDataPath,
+      frontendAppComponentPath,
+      backendPackageJsonPath,
+      backendServerPath,
+      backendHealthRoutePath,
+      backendAppointmentsPath,
+      backendResponseLibPath,
+      sharedDomainPath,
+      sharedContractsPath,
+      databaseReadmePath,
+      databaseSchemaPath,
+      databaseSeedPath,
+      scriptsReadmePath,
+      scriptsSeedPath,
+      docsArchitecturePath,
+      docsRunbookPath,
+    ],
+    nextRecommendedPhase: 'frontend-mock-flow',
+  })
+  const localProjectManifestContent = `${JSON.stringify(localProjectManifest, null, 2)}\n`
   const domainContractsObject = {
     deliveryLevel: 'fullstack-local',
     domainLabel: appTitle,
@@ -14562,6 +14712,7 @@ Este scaffold solo materializa archivos locales revisables.
         { type: 'replace-file', targetPath: scriptsSeedPath, nextContent: scriptsSeedContent },
         { type: 'replace-file', targetPath: docsArchitecturePath, nextContent: docsArchitectureContent },
         { type: 'replace-file', targetPath: docsRunbookPath, nextContent: docsRunbookContent },
+        { type: 'replace-file', targetPath: projectManifestPath, nextContent: localProjectManifestContent },
       ],
       validations: [
         { type: 'exists', targetPath: rootFolder, expectedKind: 'folder' },
@@ -14589,12 +14740,15 @@ Este scaffold solo materializa archivos locales revisables.
         { type: 'exists', targetPath: scriptsSeedPath, expectedKind: 'file' },
         { type: 'exists', targetPath: docsArchitecturePath, expectedKind: 'file' },
         { type: 'exists', targetPath: docsRunbookPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: projectManifestPath, expectedKind: 'file' },
         { type: 'file-contains', targetPath: frontendIndexHtmlPath, expectedText: './src/main.js' },
         { type: 'file-contains', targetPath: backendServerPath, expectedText: 'fullstack-local' },
         { type: 'file-contains', targetPath: databaseSchemaPath, expectedText: 'create table appointments' },
         { type: 'file-contains', targetPath: docsRunbookPath, expectedText: 'No instalar dependencias' },
+        { type: 'file-contains', targetPath: projectManifestPath, expectedText: '"nextRecommendedPhase": "frontend-mock-flow"' },
       ],
     },
+    localProjectManifest,
   }
 }
 
@@ -15172,6 +15326,1118 @@ function normalizePhaseExpansionPlanContract(value) {
   return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
 }
 
+function normalizeProjectPhaseExecutionPlanContract(value) {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const normalizedOperationsPreview = Array.isArray(value.operationsPreview)
+    ? value.operationsPreview
+        .map((entry) =>
+          entry && typeof entry === 'object'
+            ? {
+                ...(typeof entry.type === 'string' && entry.type.trim()
+                  ? { type: entry.type.trim() }
+                  : {}),
+                ...(typeof entry.targetPath === 'string' && entry.targetPath.trim()
+                  ? { targetPath: entry.targetPath.trim() }
+                  : {}),
+                ...(typeof entry.purpose === 'string' && entry.purpose.trim()
+                  ? { purpose: entry.purpose.trim() }
+                  : {}),
+              }
+            : null,
+        )
+        .filter((entry) => entry && Object.keys(entry).length > 0)
+    : []
+
+  const normalizedValidationPlan = normalizeValidationPlanContract(value.validationPlan)
+  const normalizedValue = {
+    ...(typeof value.phaseId === 'string' && value.phaseId.trim()
+      ? { phaseId: value.phaseId.trim() }
+      : {}),
+    ...(typeof value.sourceStrategy === 'string' && value.sourceStrategy.trim()
+      ? { sourceStrategy: value.sourceStrategy.trim() }
+      : {}),
+    ...(typeof value.targetStrategy === 'string' && value.targetStrategy.trim()
+      ? { targetStrategy: value.targetStrategy.trim() }
+      : {}),
+    ...(typeof value.deliveryLevel === 'string' && value.deliveryLevel.trim()
+      ? { deliveryLevel: value.deliveryLevel.trim() }
+      : {}),
+    ...(typeof value.projectRoot === 'string' && value.projectRoot.trim()
+      ? { projectRoot: value.projectRoot.trim() }
+      : {}),
+    ...(typeof value.goal === 'string' && value.goal.trim()
+      ? { goal: value.goal.trim() }
+      : {}),
+    ...(typeof value.reason === 'string' && value.reason.trim()
+      ? { reason: value.reason.trim() }
+      : {}),
+    ...(typeof value.executableNow === 'boolean'
+      ? { executableNow: value.executableNow }
+      : {}),
+    ...(typeof value.approvalRequired === 'boolean'
+      ? { approvalRequired: value.approvalRequired }
+      : {}),
+    ...(typeof value.riskLevel === 'string' && value.riskLevel.trim()
+      ? { riskLevel: value.riskLevel.trim() }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.targetFiles, 12).length > 0
+      ? { targetFiles: summarizeUniqueExecutorStrings(value.targetFiles, 12) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.allowedTargetPaths, 12).length > 0
+      ? {
+          allowedTargetPaths: summarizeUniqueExecutorStrings(
+            value.allowedTargetPaths,
+            12,
+          ),
+        }
+      : {}),
+    ...(normalizedOperationsPreview.length > 0
+      ? { operationsPreview: normalizedOperationsPreview }
+      : {}),
+    ...(normalizedValidationPlan ? { validationPlan: normalizedValidationPlan } : {}),
+    ...(summarizeUniqueExecutorStrings(value.explicitExclusions, 12).length > 0
+      ? {
+          explicitExclusions: summarizeUniqueExecutorStrings(
+            value.explicitExclusions,
+            12,
+          ),
+        }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.successCriteria, 12).length > 0
+      ? { successCriteria: summarizeUniqueExecutorStrings(value.successCriteria, 12) }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
+function normalizeLocalProjectManifestContract(value) {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const normalizedPhases = Array.isArray(value.phases)
+    ? value.phases
+        .map((entry) =>
+          entry && typeof entry === 'object'
+            ? {
+                ...(typeof entry.id === 'string' && entry.id.trim()
+                  ? { id: entry.id.trim() }
+                  : {}),
+                ...(typeof entry.status === 'string' && entry.status.trim()
+                  ? { status: entry.status.trim() }
+                  : {}),
+                ...(typeof entry.createdAt === 'string' && entry.createdAt.trim()
+                  ? { createdAt: entry.createdAt.trim() }
+                  : {}),
+                ...(summarizeUniqueExecutorStrings(entry.files, 20).length > 0
+                  ? { files: summarizeUniqueExecutorStrings(entry.files, 20) }
+                  : {}),
+              }
+            : null,
+        )
+        .filter((entry) => entry && Object.keys(entry).length > 0)
+    : []
+
+  const normalizedValue = {
+    version:
+      Number.isInteger(value.version) && value.version > 0 ? value.version : 1,
+    ...(typeof value.projectType === 'string' && value.projectType.trim()
+      ? { projectType: value.projectType.trim() }
+      : {}),
+    ...(typeof value.domain === 'string' && value.domain.trim()
+      ? { domain: value.domain.trim() }
+      : {}),
+    ...(typeof value.deliveryLevel === 'string' && value.deliveryLevel.trim()
+      ? { deliveryLevel: value.deliveryLevel.trim() }
+      : {}),
+    ...(typeof value.createdBy === 'string' && value.createdBy.trim()
+      ? { createdBy: value.createdBy.trim() }
+      : {}),
+    ...(typeof value.materializationLayer === 'string' &&
+    value.materializationLayer.trim()
+      ? { materializationLayer: value.materializationLayer.trim() }
+      : {}),
+    ...(normalizedPhases.length > 0 ? { phases: normalizedPhases } : {}),
+    ...(summarizeUniqueExecutorStrings(value.forbiddenPaths, 12).length > 0
+      ? { forbiddenPaths: summarizeUniqueExecutorStrings(value.forbiddenPaths, 12) }
+      : {}),
+    ...(typeof value.nextRecommendedPhase === 'string' &&
+    value.nextRecommendedPhase.trim()
+      ? { nextRecommendedPhase: value.nextRecommendedPhase.trim() }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
+function readLocalProjectManifest(manifestPath) {
+  if (typeof manifestPath !== 'string' || !manifestPath.trim()) {
+    return null
+  }
+
+  try {
+    const resolvedManifestPath = path.resolve(manifestPath.trim())
+    const rawManifest = fs.readFileSync(resolvedManifestPath, 'utf8')
+    const parsedManifest = JSON.parse(rawManifest)
+    const normalizedManifest = normalizeLocalProjectManifestContract(parsedManifest)
+
+    if (!normalizedManifest) {
+      return null
+    }
+
+    return {
+      manifest: normalizedManifest,
+      manifestPath: resolvedManifestPath,
+      projectRootResolvedPath: path.dirname(resolvedManifestPath),
+    }
+  } catch {
+    return null
+  }
+}
+
+function inferProjectStateFromWorkspace({ goal, context, workspacePath }) {
+  if (typeof workspacePath !== 'string' || !workspacePath.trim()) {
+    return null
+  }
+
+  const resolvedWorkspacePath = path.resolve(workspacePath.trim())
+  const candidateManifestPaths = []
+  const pushCandidateManifestPath = (candidatePath) => {
+    if (typeof candidatePath !== 'string' || !candidatePath.trim()) {
+      return
+    }
+
+    const resolvedCandidatePath = path.resolve(candidatePath.trim())
+
+    if (!isPathInsideWorkspace(resolvedWorkspacePath, resolvedCandidatePath)) {
+      return
+    }
+
+    if (!candidateManifestPaths.includes(resolvedCandidatePath)) {
+      candidateManifestPaths.push(resolvedCandidatePath)
+    }
+  }
+
+  pushCandidateManifestPath(path.join(resolvedWorkspacePath, 'jefe-project.json'))
+
+  const explicitRootCandidates = splitPlannerContextValues(
+    extractPlannerContextLineValue(
+      [goal, context],
+      [
+        'projectRoot',
+        'rootPath objetivo',
+        'rootPath',
+        'carpeta objetivo',
+        'project root',
+      ],
+    ),
+  )
+    .map((entry) => entry.replace(/^['"]+|['".]+$/g, '').replace(/[\\/]+$/g, ''))
+    .filter(Boolean)
+
+  explicitRootCandidates.forEach((candidatePath) => {
+    pushCandidateManifestPath(path.join(resolvedWorkspacePath, candidatePath, 'jefe-project.json'))
+    pushCandidateManifestPath(path.join(candidatePath, 'jefe-project.json'))
+  })
+
+  const textRootMatches = [goal, context]
+    .filter((value) => typeof value === 'string' && value.trim())
+    .flatMap((value) => value.match(/\b(?:fullstack-local|frontend-project|monorepo-local)-[a-z0-9-]+\b/giu) || [])
+
+  textRootMatches.forEach((candidateFolder) => {
+    pushCandidateManifestPath(
+      path.join(resolvedWorkspacePath, candidateFolder, 'jefe-project.json'),
+    )
+  })
+
+  try {
+    const topLevelEntries = fs
+      .readdirSync(resolvedWorkspacePath, { withFileTypes: true })
+      .filter((entry) => entry && entry.isDirectory && entry.isDirectory())
+      .slice(0, 12)
+
+    topLevelEntries.forEach((entry) => {
+      pushCandidateManifestPath(
+        path.join(resolvedWorkspacePath, entry.name, 'jefe-project.json'),
+      )
+    })
+  } catch {
+    return null
+  }
+
+  for (const manifestPath of candidateManifestPaths) {
+    const loadedManifest = readLocalProjectManifest(manifestPath)
+
+    if (!loadedManifest?.manifest) {
+      continue
+    }
+
+    return {
+      ...loadedManifest,
+      projectRootRelativePath:
+        path.relative(resolvedWorkspacePath, loadedManifest.projectRootResolvedPath) || '.',
+      workspacePath: resolvedWorkspacePath,
+    }
+  }
+
+  return null
+}
+
+function detectProjectPhasePlanningIntent(goal, context) {
+  const rawTexts = [goal, context].filter(
+    (value) => typeof value === 'string' && value.trim(),
+  )
+  const combinedText = rawTexts.join(' ')
+  const normalizedText = normalizeSectorDetectionText(combinedText)
+
+  if (!normalizedText) {
+    return {
+      matches: false,
+      action: 'prepare',
+      phaseId: '',
+      explicitSignals: [],
+    }
+  }
+
+  const phaseIdFromContext =
+    sanitizeBusinessSectorLabel(
+      extractPlannerContextLineValue(rawTexts, ['phaseId', 'phase id', 'fase id']) || '',
+    )
+      .replace(/\s+/g, '-')
+      .toLocaleLowerCase() || ''
+  const knownPhaseIds = ['frontend-mock-flow', 'backend-contracts']
+  const detectedPhaseId =
+    knownPhaseIds.find((phaseId) => normalizedText.includes(phaseId)) ||
+    knownPhaseIds.find((phaseId) => phaseId === phaseIdFromContext) ||
+    ''
+  const wantsMaterialize =
+    normalizedText.includes('materialize-project-phase-plan') ||
+    /\bmaterializ(?:ar|acion|ación)\b/u.test(normalizedText)
+  const wantsPrepare =
+    normalizedText.includes('prepare-project-phase-plan') ||
+    /\bprepar(?:ar|a|ado|ación|acion)\b/u.test(normalizedText) ||
+    /\bcontinuar\b/u.test(normalizedText) ||
+    /\bexpandir\b/u.test(normalizedText) ||
+    /\bsiguiente fase\b/u.test(normalizedText)
+  const referencesProjectPhase =
+    Boolean(detectedPhaseId) &&
+    (/\bfase\b/u.test(normalizedText) ||
+      normalizedText.includes('projectphaseexecutionplan') ||
+      normalizedText.includes('jefe-project') ||
+      normalizedText.includes('proyecto fullstack local') ||
+      normalizedText.includes('proyecto generado') ||
+      normalizedText.includes('continuar el proyecto'))
+
+  return {
+    matches: referencesProjectPhase && (wantsPrepare || wantsMaterialize),
+    action: wantsMaterialize ? 'materialize' : 'prepare',
+    phaseId: detectedPhaseId,
+    explicitSignals: summarizeUniqueExecutorStrings(
+      [
+        wantsPrepare ? 'prepare-phase' : '',
+        wantsMaterialize ? 'materialize-phase' : '',
+        detectedPhaseId,
+      ],
+      6,
+    ),
+  }
+}
+
+function buildLocalProjectManifest({
+  rootFolder,
+  domain,
+  deliveryLevel,
+  forbiddenPaths,
+  scaffoldFiles,
+  nextRecommendedPhase,
+}) {
+  return {
+    version: 1,
+    projectType: deliveryLevel,
+    domain,
+    deliveryLevel,
+    createdBy: 'ai-orchestrator',
+    materializationLayer: 'local-deterministic',
+    phases: [
+      {
+        id: 'fullstack-local-scaffold',
+        status: 'done',
+        createdAt: 'local-deterministic-plan',
+        files: summarizeUniqueExecutorStrings(scaffoldFiles, 40),
+      },
+      {
+        id: 'frontend-mock-flow',
+        status: 'available',
+        createdAt: 'pending-phase-expansion',
+        files: [
+          `${rootFolder}/frontend/src/mock-data.js`,
+          `${rootFolder}/frontend/src/components/App.js`,
+          `${rootFolder}/frontend/src/styles.css`,
+          `${rootFolder}/docs/local-runbook.md`,
+        ],
+      },
+      {
+        id: 'backend-contracts',
+        status: 'available',
+        createdAt: 'pending-phase-expansion',
+        files: [
+          `${rootFolder}/backend/src/modules/appointments.js`,
+          `${rootFolder}/backend/src/routes/health.js`,
+          `${rootFolder}/backend/src/lib/response.js`,
+          `${rootFolder}/shared/contracts/domain.js`,
+          `${rootFolder}/shared/types/contracts.js`,
+          `${rootFolder}/docs/architecture.md`,
+        ],
+      },
+    ],
+    forbiddenPaths: summarizeUniqueExecutorStrings(forbiddenPaths, 12),
+    nextRecommendedPhase: nextRecommendedPhase || 'frontend-mock-flow',
+  }
+}
+
+function buildUpdatedLocalProjectManifestForPhase({
+  existingManifest,
+  projectRoot,
+  phaseId,
+  touchedFiles,
+}) {
+  const normalizedExistingManifest =
+    normalizeLocalProjectManifestContract(existingManifest)
+  const normalizedProjectRoot =
+    typeof projectRoot === 'string' && projectRoot.trim()
+      ? projectRoot.trim().replace(/[\\/]+/g, '/')
+      : ''
+
+  if (
+    !normalizedExistingManifest ||
+    !normalizedProjectRoot ||
+    normalizedExistingManifest.deliveryLevel !== 'fullstack-local'
+  ) {
+    return null
+  }
+
+  const normalizedTouchedFiles = summarizeUniqueExecutorStrings(touchedFiles, 16)
+  const fallbackManifestPath = `${normalizedProjectRoot}/jefe-project.json`
+  const nextRecommendedPhase =
+    phaseId === 'frontend-mock-flow'
+      ? 'backend-contracts'
+      : normalizedExistingManifest.nextRecommendedPhase || ''
+  const updatedPhases = Array.isArray(normalizedExistingManifest.phases)
+    ? normalizedExistingManifest.phases.map((entry) => {
+        if (!entry || typeof entry !== 'object') {
+          return entry
+        }
+
+        if (entry.id === phaseId) {
+          return {
+            ...entry,
+            status: 'done',
+            createdAt: 'local-deterministic-phase-materialization',
+            files:
+              normalizedTouchedFiles.length > 0
+                ? normalizedTouchedFiles
+                : summarizeUniqueExecutorStrings(entry.files, 16),
+          }
+        }
+
+        if (entry.id === nextRecommendedPhase) {
+          return {
+            ...entry,
+            status: 'available',
+          }
+        }
+
+        return entry
+      })
+    : []
+
+  if (!updatedPhases.some((entry) => entry && entry.id === phaseId)) {
+    updatedPhases.push({
+      id: phaseId,
+      status: 'done',
+      createdAt: 'local-deterministic-phase-materialization',
+      files:
+        normalizedTouchedFiles.length > 0
+          ? normalizedTouchedFiles
+          : [fallbackManifestPath],
+    })
+  }
+
+  if (
+    nextRecommendedPhase &&
+    !updatedPhases.some((entry) => entry && entry.id === nextRecommendedPhase)
+  ) {
+    updatedPhases.push({
+      id: nextRecommendedPhase,
+      status: 'available',
+      createdAt: 'pending-phase-expansion',
+      files: [],
+    })
+  }
+
+  return {
+    version:
+      Number.isFinite(normalizedExistingManifest.version) &&
+      normalizedExistingManifest.version > 0
+        ? normalizedExistingManifest.version
+        : 1,
+    projectType:
+      normalizedExistingManifest.projectType ||
+      normalizedExistingManifest.deliveryLevel ||
+      'fullstack-local',
+    domain: normalizedExistingManifest.domain || 'proyecto local',
+    deliveryLevel: normalizedExistingManifest.deliveryLevel || 'fullstack-local',
+    createdBy: normalizedExistingManifest.createdBy || 'ai-orchestrator',
+    materializationLayer:
+      normalizedExistingManifest.materializationLayer || 'local-deterministic',
+    phases: updatedPhases,
+    forbiddenPaths: summarizeUniqueExecutorStrings(
+      normalizedExistingManifest.forbiddenPaths,
+      12,
+    ),
+    nextRecommendedPhase: nextRecommendedPhase || 'backend-contracts',
+  }
+}
+
+function buildProjectPhaseExecutionPlan({
+  strategy,
+  phaseId,
+  inferredProjectState,
+}) {
+  const normalizedManifest = normalizeLocalProjectManifestContract(
+    inferredProjectState?.manifest,
+  )
+  const projectRoot =
+    typeof inferredProjectState?.projectRootRelativePath === 'string' &&
+    inferredProjectState.projectRootRelativePath.trim()
+      ? inferredProjectState.projectRootRelativePath.trim().replace(/[\\/]+/g, '/')
+      : ''
+
+  if (!normalizedManifest || !projectRoot || normalizedManifest.deliveryLevel !== 'fullstack-local') {
+    return null
+  }
+
+  const forbiddenPaths =
+    normalizedManifest.forbiddenPaths && normalizedManifest.forbiddenPaths.length > 0
+      ? normalizedManifest.forbiddenPaths
+      : ['node_modules', '.env', 'docker-compose.yml', 'Dockerfile', 'deploy']
+  const projectDomain = normalizedManifest.domain || 'proyecto local'
+
+  if (phaseId === 'frontend-mock-flow') {
+    const manifestPath = `${projectRoot}/jefe-project.json`
+    const targetFiles = [
+      `${projectRoot}/frontend/src/mock-data.js`,
+      `${projectRoot}/frontend/src/components/App.js`,
+      `${projectRoot}/frontend/src/styles.css`,
+      `${projectRoot}/docs/local-runbook.md`,
+      manifestPath,
+    ]
+    const validationPlan = {
+      scope: `${projectRoot}:frontend-mock-flow`,
+      level: 'medium',
+      commands: [],
+      fileChecks: targetFiles.map((targetPath) => ({
+        path: targetPath,
+        expectation:
+          targetPath.endsWith('local-runbook.md')
+            ? 'Debe reflejar la expansión del flujo mock sin habilitar backend real.'
+            : targetPath.endsWith('jefe-project.json')
+              ? 'Debe actualizar el estado local del proyecto marcando frontend-mock-flow como done y backend-contracts como siguiente fase.'
+              : 'Debe actualizar el flujo mock de turnos manteniendo el scope local.',
+      })),
+      forbiddenPaths,
+      runtimeChecks: [],
+      manualChecks: [
+        'Confirmar que el flujo mock muestre pacientes, profesionales, especialidades y disponibilidad.',
+        'Confirmar que no aparezcan dependencias nuevas ni referencias a backend real.',
+        'Confirmar que jefe-project.json pase frontend-mock-flow a done y nextRecommendedPhase a backend-contracts.',
+      ],
+      successCriteria: [
+        'Actualizar solo frontend/src, docs/local-runbook.md y jefe-project.json dentro del proyecto generado.',
+        'Mantener fuera de alcance backend, database, node_modules, .env, Docker y deploy.',
+      ],
+    }
+
+    return {
+      phaseId,
+      sourceStrategy: strategy === 'materialize-project-phase-plan' ? 'prepare-project-phase-plan' : 'fullstack-local-scaffold',
+      targetStrategy: 'materialize-project-phase-plan',
+      deliveryLevel: 'fullstack-local',
+      projectRoot,
+      goal: `Expandir ${projectDomain} con un frontend mock flow local y revisable.`,
+      reason:
+        'Esta fase mejora la demo local del frontend fullstack sin tocar backend, database ni dependencias reales.',
+      executableNow: true,
+      approvalRequired: false,
+      riskLevel: 'low',
+      targetFiles,
+      allowedTargetPaths: targetFiles,
+      operationsPreview: [
+        {
+          type: 'replace-file',
+          targetPath: `${projectRoot}/frontend/src/mock-data.js`,
+          purpose: 'Ampliar los datos mock de pacientes, profesionales, especialidades, disponibilidad y turnos.',
+        },
+        {
+          type: 'replace-file',
+          targetPath: `${projectRoot}/frontend/src/components/App.js`,
+          purpose: 'Mejorar la UI HTML local del flujo principal sin requerir React instalado.',
+        },
+        {
+          type: 'replace-file',
+          targetPath: `${projectRoot}/frontend/src/styles.css`,
+          purpose: 'Ajustar la jerarquía visual del flujo mock y sus estados.',
+        },
+        {
+          type: 'replace-file',
+          targetPath: `${projectRoot}/docs/local-runbook.md`,
+          purpose: 'Documentar la expansión segura del frontend mock flow.',
+        },
+        {
+          type: 'replace-file',
+          targetPath: manifestPath,
+          purpose: 'Actualizar el manifiesto local para marcar la fase como done y avanzar la siguiente recomendación.',
+        },
+      ],
+      validationPlan,
+      explicitExclusions: [
+        'backend/',
+        'database/',
+        'package.json',
+        'node_modules',
+        '.env',
+        'docker-compose.yml',
+        'Dockerfile',
+        'deploy',
+      ],
+      successCriteria: validationPlan.successCriteria,
+    }
+  }
+
+  if (phaseId === 'backend-contracts') {
+    const targetFiles = [
+      `${projectRoot}/backend/src/modules/appointments.js`,
+      `${projectRoot}/backend/src/routes/health.js`,
+      `${projectRoot}/backend/src/lib/response.js`,
+      `${projectRoot}/shared/contracts/domain.js`,
+      `${projectRoot}/shared/types/contracts.js`,
+      `${projectRoot}/docs/architecture.md`,
+    ]
+    const validationPlan = {
+      scope: `${projectRoot}:backend-contracts`,
+      level: 'medium',
+      commands: [],
+      fileChecks: targetFiles.map((targetPath) => ({
+        path: targetPath,
+        expectation:
+          'Debe seguir siendo JS/documentación revisable sin servidor real, puertos ni dependencias instaladas.',
+      })),
+      forbiddenPaths,
+      runtimeChecks: [],
+      manualChecks: [
+        'Confirmar que no aparezca listen() ni puertos abiertos.',
+        'Confirmar que shared/contracts y backend sigan acotados a contratos locales.',
+      ],
+      successCriteria: [
+        'Dejar backend-contracts listo para revisión sin tocar runtime real.',
+        'Mantener backend y shared en modo JS puro revisable.',
+      ],
+    }
+
+    return {
+      phaseId,
+      sourceStrategy: 'fullstack-local-scaffold',
+      targetStrategy: 'prepare-project-phase-plan',
+      deliveryLevel: 'fullstack-local',
+      projectRoot,
+      goal: `Preparar contratos de backend locales para ${projectDomain} sin levantar servicios.`,
+      reason:
+        'En este bloque solo se prepara la expansión de backend-contracts; todavía no se materializa automáticamente.',
+      executableNow: false,
+      approvalRequired: false,
+      riskLevel: 'medium',
+      targetFiles,
+      allowedTargetPaths: targetFiles,
+      operationsPreview: [
+        {
+          type: 'replace-file',
+          targetPath: `${projectRoot}/backend/src/modules/appointments.js`,
+          purpose: 'Mejorar contratos y funciones puras del dominio de turnos.',
+        },
+        {
+          type: 'replace-file',
+          targetPath: `${projectRoot}/shared/contracts/domain.js`,
+          purpose: 'Alinear contratos compartidos entre frontend y backend revisable.',
+        },
+      ],
+      validationPlan,
+      explicitExclusions: [
+        'listen()',
+        'puertos',
+        'Express real',
+        'database activa',
+        'node_modules',
+        '.env',
+        'deploy',
+      ],
+      successCriteria: validationPlan.successCriteria,
+    }
+  }
+
+  return null
+}
+
+function buildProjectPhaseMaterializationPlan({
+  projectPhaseExecutionPlan,
+  localProjectManifest,
+}) {
+  const normalizedPlan = normalizeProjectPhaseExecutionPlanContract(
+    projectPhaseExecutionPlan,
+  )
+
+  if (!normalizedPlan || normalizedPlan.phaseId !== 'frontend-mock-flow') {
+    return null
+  }
+
+  const projectRoot = normalizedPlan.projectRoot
+  const mockDataPath = `${projectRoot}/frontend/src/mock-data.js`
+  const appPath = `${projectRoot}/frontend/src/components/App.js`
+  const stylesPath = `${projectRoot}/frontend/src/styles.css`
+  const runbookPath = `${projectRoot}/docs/local-runbook.md`
+  const manifestPath = `${projectRoot}/jefe-project.json`
+  const mockDataContent = `export const fullstackPlan = {
+  overview: {
+    name: 'Turnos medicos local',
+    mode: 'frontend-mock-flow',
+    deliveryLevel: 'fullstack-local',
+  },
+  specialties: [
+    'Clinica medica',
+    'Pediatria',
+    'Cardiologia',
+    'Dermatologia',
+  ],
+  professionals: [
+    { id: 'PRO-001', name: 'Dra. Ana Gomez', specialty: 'Clinica medica', status: 'disponible' },
+    { id: 'PRO-002', name: 'Dr. Pablo Ruiz', specialty: 'Pediatria', status: 'consultorio ocupado' },
+    { id: 'PRO-003', name: 'Dra. Marta Diaz', specialty: 'Cardiologia', status: 'disponible' },
+  ],
+  patients: [
+    { id: 'PAC-001', name: 'Lucia Perez', plan: 'Particular', status: 'confirmado' },
+    { id: 'PAC-002', name: 'Martin Suarez', plan: 'Prepaga', status: 'pendiente' },
+    { id: 'PAC-003', name: 'Camila Torres', plan: 'OSDE', status: 'en espera' },
+  ],
+  availability: [
+    { professional: 'Dra. Ana Gomez', slot: '09:30', state: 'libre' },
+    { professional: 'Dr. Pablo Ruiz', slot: '10:15', state: 'reservado' },
+    { professional: 'Dra. Marta Diaz', slot: '11:00', state: 'libre' },
+  ],
+  appointments: [
+    { id: 'APT-001', patient: 'Lucia Perez', professional: 'Dra. Ana Gomez', specialty: 'Clinica medica', slot: '2026-05-03 09:30', status: 'confirmado' },
+    { id: 'APT-002', patient: 'Martin Suarez', professional: 'Dr. Pablo Ruiz', specialty: 'Pediatria', slot: '2026-05-03 10:15', status: 'pendiente' },
+    { id: 'APT-003', patient: 'Camila Torres', professional: 'Dra. Marta Diaz', specialty: 'Cardiologia', slot: '2026-05-03 11:00', status: 'en espera' },
+  ],
+  quickActions: [
+    'Reservar turno mock',
+    'Reprogramar disponibilidad',
+    'Confirmar llegada',
+    'Cancelar sin impacto real',
+  ],
+  summary: {
+    appointmentsToday: 18,
+    activeProfessionals: 7,
+    pendingConfirmations: 5,
+    specialties: 4,
+  },
+}
+`
+  const appContent = `export function renderApp(fullstackPlan) {
+  const specialties = Array.isArray(fullstackPlan?.specialties) ? fullstackPlan.specialties : []
+  const professionals = Array.isArray(fullstackPlan?.professionals) ? fullstackPlan.professionals : []
+  const patients = Array.isArray(fullstackPlan?.patients) ? fullstackPlan.patients : []
+  const availability = Array.isArray(fullstackPlan?.availability) ? fullstackPlan.availability : []
+  const appointments = Array.isArray(fullstackPlan?.appointments) ? fullstackPlan.appointments : []
+  const quickActions = Array.isArray(fullstackPlan?.quickActions) ? fullstackPlan.quickActions : []
+  const summary = fullstackPlan?.summary || {}
+
+  return \`
+    <main class="app-shell phase-shell">
+      <section class="hero phase-hero">
+        <span class="chip">Frontend mock flow</span>
+        <h1>\${fullstackPlan?.overview?.name || 'Turnos medicos local'}</h1>
+        <p>
+          Flujo local y revisable para pacientes, profesionales, especialidades, disponibilidad y turnos,
+          sin backend real ni dependencias instaladas.
+        </p>
+        <div class="chip-row">
+          \${specialties.map((item) => \`<span class="chip chip-secondary">\${item}</span>\`).join('')}
+        </div>
+      </section>
+
+      <section class="summary-grid">
+        <article class="panel stat-panel"><span>Turnos del dia</span><strong>\${summary.appointmentsToday || 0}</strong></article>
+        <article class="panel stat-panel"><span>Profesionales activos</span><strong>\${summary.activeProfessionals || 0}</strong></article>
+        <article class="panel stat-panel"><span>Pendientes</span><strong>\${summary.pendingConfirmations || 0}</strong></article>
+        <article class="panel stat-panel"><span>Especialidades</span><strong>\${summary.specialties || specialties.length}</strong></article>
+      </section>
+
+      <div class="phase-grid">
+        <section class="panel">
+          <h2>Pacientes</h2>
+          <ul class="list-grid">
+            \${patients.map((patient) => \`<li><strong>\${patient.name}</strong><span>\${patient.plan}</span><em>\${patient.status}</em></li>\`).join('')}
+          </ul>
+        </section>
+        <section class="panel">
+          <h2>Profesionales</h2>
+          <ul class="list-grid">
+            \${professionals.map((professional) => \`<li><strong>\${professional.name}</strong><span>\${professional.specialty}</span><em>\${professional.status}</em></li>\`).join('')}
+          </ul>
+        </section>
+        <section class="panel">
+          <h2>Disponibilidad</h2>
+          <ul class="list-grid">
+            \${availability.map((slot) => \`<li><strong>\${slot.professional}</strong><span>\${slot.slot}</span><em>\${slot.state}</em></li>\`).join('')}
+          </ul>
+        </section>
+        <section class="panel">
+          <h2>Acciones mock</h2>
+          <ul class="list-grid">
+            \${quickActions.map((action) => \`<li><strong>\${action}</strong><span>Solo local</span><em>Sin backend real</em></li>\`).join('')}
+          </ul>
+        </section>
+      </div>
+
+      <section class="panel appointment-panel">
+        <h2>Turnos y estados</h2>
+        <div class="appointment-table">
+          \${appointments
+            .map(
+              (appointment) => \`<article class="appointment-card"><div><strong>\${appointment.patient}</strong><span>\${appointment.specialty}</span></div><div><span>\${appointment.professional}</span><em>\${appointment.slot}</em></div><div class="status-pill">\${appointment.status}</div></article>\`,
+            )
+            .join('')}
+        </div>
+      </section>
+    </main>
+  \`
+}
+`
+  const stylesContent = `:root {
+  color-scheme: light;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: #edf4ff;
+  color: #0f172a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(14, 165, 233, 0.18), transparent 32%),
+    radial-gradient(circle at top right, rgba(34, 197, 94, 0.12), transparent 28%),
+    linear-gradient(180deg, #f8fbff 0%, #e9f2ff 100%);
+}
+
+.app-shell {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0 48px;
+}
+
+.hero,
+.panel,
+.stat-panel {
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+}
+
+.phase-hero {
+  padding: 30px;
+}
+
+.phase-hero h1 {
+  margin: 0;
+  font-size: clamp(2.1rem, 4vw, 3.1rem);
+}
+
+.phase-hero p,
+.panel p,
+.panel li span,
+.panel li em {
+  color: #475569;
+}
+
+.chip-row,
+.summary-grid,
+.phase-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.chip-row {
+  margin-top: 18px;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.chip {
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #0f3d68;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.chip-secondary {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.summary-grid {
+  margin-top: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.stat-panel {
+  padding: 18px;
+}
+
+.stat-panel span {
+  display: block;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.stat-panel strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.85rem;
+}
+
+.phase-grid {
+  margin-top: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.panel {
+  padding: 20px;
+}
+
+.panel h2 {
+  margin: 0 0 14px;
+  font-size: 1.05rem;
+}
+
+.list-grid {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+
+.list-grid li,
+.appointment-card {
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.04);
+  padding: 14px;
+}
+
+.list-grid strong,
+.appointment-card strong {
+  display: block;
+  color: #0f172a;
+}
+
+.list-grid span,
+.appointment-card span,
+.appointment-card em {
+  display: block;
+  margin-top: 4px;
+}
+
+.appointment-panel {
+  margin-top: 20px;
+}
+
+.appointment-table {
+  display: grid;
+  gap: 12px;
+}
+
+.appointment-card {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.status-pill {
+  align-self: start;
+  justify-self: start;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0c4a6e;
+  padding: 8px 12px;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    width: min(100% - 20px, 1180px);
+    padding: 20px 0 34px;
+  }
+
+  .phase-hero,
+  .panel,
+  .stat-panel {
+    border-radius: 20px;
+  }
+}
+`
+  const runbookContent = `# Local runbook
+
+## Estado actual
+
+El proyecto sigue en modo local y revisable. Se expandio la fase \`frontend-mock-flow\`.
+
+## Flujo mock agregado
+
+- listado de pacientes
+- profesionales y especialidades
+- disponibilidad visible
+- turnos con estados mock
+- acciones locales sin backend real
+
+## Sigue fuera de alcance
+
+- instalar dependencias
+- levantar frontend
+- levantar backend
+- tocar database real
+- usar auth real o pagos reales
+- desplegar o abrir puertos
+`
+  const updatedLocalProjectManifest = buildUpdatedLocalProjectManifestForPhase({
+    existingManifest: localProjectManifest,
+    projectRoot,
+    phaseId: normalizedPlan.phaseId,
+    touchedFiles: [mockDataPath, appPath, stylesPath, runbookPath, manifestPath],
+  })
+  const updatedLocalProjectManifestContent = updatedLocalProjectManifest
+    ? `${JSON.stringify(updatedLocalProjectManifest, null, 2)}\n`
+    : ''
+
+  return {
+    tasks: [
+      {
+        step: 1,
+        title: `Actualizar la fase "${normalizedPlan.phaseId}" solo dentro de ${normalizedPlan.projectRoot}.`,
+        operation: 'create-or-edit-files',
+        targetPath: normalizedPlan.projectRoot,
+      },
+      {
+        step: 2,
+        title: 'Validar que la expansión quede acotada al frontend mock flow y a su runbook local.',
+        operation: 'validate-scope',
+        targetPath: normalizedPlan.projectRoot,
+      },
+    ],
+    assumptions: [
+      'La expansión sigue siendo local, estática y revisable.',
+      'No se instalan dependencias ni se ejecutan servicios.',
+      'Backend, database y forbidden paths quedan fuera de alcance.',
+    ],
+    instruction: [
+      `Materializar la fase ${normalizedPlan.phaseId} dentro de ${normalizedPlan.projectRoot}.`,
+      `Usar solo estos targetPaths: ${normalizedPlan.allowedTargetPaths.join(', ')}`,
+      'No tocar backend, database, package.json, node_modules, .env, Docker ni deploy.',
+    ].join('\n'),
+    executionScope: normalizeExecutorExecutionScope({
+      allowedTargetPaths: normalizedPlan.allowedTargetPaths,
+      successCriteria: normalizedPlan.successCriteria,
+      enforceNarrowScope: true,
+    }),
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'project-phase-materialization',
+      summary: `Fase ${normalizedPlan.phaseId} actualizada dentro de "${normalizedPlan.projectRoot}".`,
+      strategy: 'materialize-project-phase-plan',
+      reasoningLayer: 'local-rules',
+      materializationLayer: 'local-deterministic',
+      operations: [
+        { type: 'replace-file', targetPath: mockDataPath, nextContent: mockDataContent },
+        { type: 'replace-file', targetPath: appPath, nextContent: appContent },
+        { type: 'replace-file', targetPath: stylesPath, nextContent: stylesContent },
+        { type: 'replace-file', targetPath: runbookPath, nextContent: runbookContent },
+        ...(updatedLocalProjectManifestContent
+          ? [
+              {
+                type: 'replace-file',
+                targetPath: manifestPath,
+                nextContent: updatedLocalProjectManifestContent,
+              },
+            ]
+          : []),
+      ],
+      validations: [
+        { type: 'exists', targetPath: mockDataPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: appPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: stylesPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: runbookPath, expectedKind: 'file' },
+        ...(updatedLocalProjectManifest
+          ? [{ type: 'exists', targetPath: manifestPath, expectedKind: 'file' }]
+          : []),
+        { type: 'file-contains', targetPath: mockDataPath, expectedText: 'specialties' },
+        { type: 'file-contains', targetPath: appPath, expectedText: 'Turnos y estados' },
+        { type: 'file-contains', targetPath: stylesPath, expectedText: '.appointment-card' },
+        { type: 'file-contains', targetPath: runbookPath, expectedText: 'frontend-mock-flow' },
+        ...(updatedLocalProjectManifest
+          ? [
+              {
+                type: 'file-contains',
+                targetPath: manifestPath,
+                expectedText: '"id": "frontend-mock-flow"',
+              },
+              {
+                type: 'file-contains',
+                targetPath: manifestPath,
+                expectedText: '"status": "done"',
+              },
+              {
+                type: 'file-contains',
+                targetPath: manifestPath,
+                expectedText: '"nextRecommendedPhase": "backend-contracts"',
+              },
+              {
+                type: 'file-contains',
+                targetPath: manifestPath,
+                expectedText: '"id": "backend-contracts"',
+              },
+              {
+                type: 'file-contains',
+                targetPath: manifestPath,
+                expectedText: '"status": "available"',
+              },
+            ]
+          : []),
+      ],
+    },
+    localProjectManifest: updatedLocalProjectManifest,
+  }
+}
+
 function buildBrainDecisionContract({
   decisionKey,
   strategy,
@@ -15206,6 +16472,8 @@ function buildBrainDecisionContract({
   nextActionPlan,
   validationPlan,
   phaseExpansionPlan,
+  projectPhaseExecutionPlan,
+  localProjectManifest,
   materializationPlan,
   finalResult,
 }) {
@@ -15302,6 +16570,15 @@ function buildBrainDecisionContract({
       : {}),
     ...(normalizePhaseExpansionPlanContract(phaseExpansionPlan)
       ? { phaseExpansionPlan: normalizePhaseExpansionPlanContract(phaseExpansionPlan) }
+      : {}),
+    ...(normalizeProjectPhaseExecutionPlanContract(projectPhaseExecutionPlan)
+      ? {
+          projectPhaseExecutionPlan:
+            normalizeProjectPhaseExecutionPlanContract(projectPhaseExecutionPlan),
+        }
+      : {}),
+    ...(normalizeLocalProjectManifestContract(localProjectManifest)
+      ? { localProjectManifest: normalizeLocalProjectManifestContract(localProjectManifest) }
       : {}),
     ...(materializationPlan && typeof materializationPlan === 'object'
       ? { materializationPlan }
@@ -18025,6 +19302,7 @@ async function buildLocalStrategicBrainDecision({
     detectFrontendProjectMaterializationPlanningIntent(goal, context)
   const fullstackLocalMaterializationIntent =
     detectFullstackLocalMaterializationPlanningIntent(goal, context)
+  const projectPhaseIntent = detectProjectPhasePlanningIntent(goal, context)
   const safeFirstDeliveryIntent = detectSafeFirstDeliveryPlanningIntent(goal, context)
   const scalableDeliveryIntent = detectScalableDeliveryPlanningIntent(goal, context)
   const productArchitectureIntent = detectProductArchitecturePlanningIntent(
@@ -18054,6 +19332,11 @@ async function buildLocalStrategicBrainDecision({
       safeFirstDeliveryIntent.productTypeHint ||
       productArchitectureIntent.productTypeHint,
   })
+  const inferredProjectState = inferProjectStateFromWorkspace({
+    goal,
+    context,
+    workspacePath,
+  })
   const buildDecision = (payload) =>
     buildBrainDecisionContract({
       ...payload,
@@ -18061,7 +19344,13 @@ async function buildLocalStrategicBrainDecision({
     })
   const buildDecisionWithPlanningContracts = (
     payload,
-    { deliveryLevel, scalableDeliveryPlan, productArchitecture } = {},
+    {
+      deliveryLevel,
+      scalableDeliveryPlan,
+      productArchitecture,
+      projectPhaseExecutionPlan,
+      localProjectManifest,
+    } = {},
   ) => {
     const planningContracts = buildPlanningArchitectureBundle({
       goal,
@@ -18079,6 +19368,8 @@ async function buildLocalStrategicBrainDecision({
       userParticipationMode: normalizedUserParticipationMode,
       costMode,
       materializationPlan: payload?.materializationPlan,
+      projectPhaseExecutionPlan,
+      localProjectManifest,
     })
 
     return buildBrainDecisionContract({
@@ -18090,6 +19381,8 @@ async function buildLocalStrategicBrainDecision({
       nextActionPlan: planningContracts.nextActionPlan,
       validationPlan: planningContracts.validationPlan,
       phaseExpansionPlan: planningContracts.phaseExpansionPlan,
+      projectPhaseExecutionPlan: planningContracts.projectPhaseExecutionPlan,
+      localProjectManifest: planningContracts.localProjectManifest,
     })
   }
   const reusablePlanningContext =
@@ -18298,6 +19591,103 @@ async function buildLocalStrategicBrainDecision({
   }
 
   if (
+    projectPhaseIntent.matches &&
+    inferredProjectState?.manifest &&
+    !safeFirstDeliveryIntent.matches &&
+    !scopedFileEditIntent &&
+    !localGoalDescriptor &&
+    compositeSteps.length < 2
+  ) {
+    const projectPhaseExecutionPlan = buildProjectPhaseExecutionPlan({
+      strategy:
+        projectPhaseIntent.action === 'materialize'
+          ? 'materialize-project-phase-plan'
+          : 'prepare-project-phase-plan',
+      phaseId: projectPhaseIntent.phaseId,
+      inferredProjectState,
+    })
+
+    if (projectPhaseExecutionPlan) {
+      if (projectPhaseIntent.action === 'materialize' && projectPhaseExecutionPlan.executableNow) {
+        const projectPhaseMaterializationPlan = buildProjectPhaseMaterializationPlan({
+          projectPhaseExecutionPlan,
+          localProjectManifest: inferredProjectState.manifest,
+        })
+
+        if (projectPhaseMaterializationPlan) {
+          return buildDecisionWithPlanningContracts(
+            {
+              decisionKey: 'materialize-project-phase-plan',
+              strategy: 'materialize-project-phase-plan',
+              executionMode: 'executor',
+              reason:
+                projectPhaseExecutionPlan.reason ||
+                'El objetivo pide materializar una fase segura del proyecto ya generado.',
+              tasks: projectPhaseMaterializationPlan.tasks,
+              requiresApproval: false,
+              assumptions: projectPhaseMaterializationPlan.assumptions,
+              instruction: projectPhaseMaterializationPlan.instruction,
+              completed: false,
+              nextExpectedAction: 'execute-plan',
+              executionScope: projectPhaseMaterializationPlan.executionScope,
+              materializationPlan: projectPhaseMaterializationPlan.materializationPlan,
+            },
+            {
+              deliveryLevel: projectPhaseExecutionPlan.deliveryLevel,
+              projectPhaseExecutionPlan,
+              localProjectManifest:
+                projectPhaseMaterializationPlan.localProjectManifest ||
+                inferredProjectState.manifest,
+            },
+          )
+        }
+      }
+
+      return buildDecisionWithPlanningContracts(
+        {
+          decisionKey: 'prepare-project-phase-plan',
+          strategy: 'prepare-project-phase-plan',
+          executionMode: 'planner-only',
+          reason:
+            projectPhaseExecutionPlan.reason ||
+            'El objetivo pide preparar una fase segura del proyecto ya generado.',
+          tasks: [
+            {
+              step: 1,
+              title: `Revisar la fase ${projectPhaseExecutionPlan.phaseId} y sus target files permitidos.`,
+              operation: 'review-phase',
+              targetPath: projectPhaseExecutionPlan.projectRoot,
+            },
+            {
+              step: 2,
+              title: 'Confirmar que la expansión siga acotada al proyecto local y sin runtime real.',
+              operation: 'validate-phase-scope',
+              targetPath: projectPhaseExecutionPlan.projectRoot,
+            },
+          ],
+          requiresApproval: false,
+          assumptions: [
+            'La fase se prepara sobre un proyecto local ya generado y con manifiesto revisable.',
+            'Solo se habilitan fases seguras; backend, database real, Docker y deploy siguen fuera de alcance.',
+          ],
+          instruction: [
+            `Preparar la fase ${projectPhaseExecutionPlan.phaseId} del proyecto ${projectPhaseExecutionPlan.projectRoot}.`,
+            `Target strategy: ${projectPhaseExecutionPlan.targetStrategy}.`,
+            `Allowed target paths: ${projectPhaseExecutionPlan.allowedTargetPaths.join(', ')}`,
+          ].join('\n'),
+          completed: false,
+          nextExpectedAction: 'review-project-phase',
+        },
+        {
+          deliveryLevel: projectPhaseExecutionPlan.deliveryLevel,
+          projectPhaseExecutionPlan,
+          localProjectManifest: inferredProjectState.manifest,
+        },
+      )
+    }
+  }
+
+  if (
     fullstackLocalMaterializationIntent.matches &&
     !safeFirstDeliveryIntent.matches &&
     !scopedFileEditIntent &&
@@ -18346,6 +19736,7 @@ async function buildLocalStrategicBrainDecision({
       {
         deliveryLevel: 'fullstack-local',
         scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
+        localProjectManifest: fullstackLocalMaterializationPlan.localProjectManifest,
       },
     )
   }
@@ -19481,7 +20872,7 @@ Roles:
 Tu tarea es devolver una decision estructurada y operativa.
 
 Reglas:
-- Elegí entre estrategias compatibles con el sistema: fast-local, fast-composite, executor, web-scaffold-base, product-architecture-plan, safe-first-delivery-plan, materialize-safe-first-delivery-plan, scalable-delivery-plan, materialize-frontend-project-plan, materialize-fullstack-local-plan, ask-user.
+- Elegí entre estrategias compatibles con el sistema: fast-local, fast-composite, executor, web-scaffold-base, product-architecture-plan, safe-first-delivery-plan, materialize-safe-first-delivery-plan, scalable-delivery-plan, materialize-frontend-project-plan, materialize-fullstack-local-plan, prepare-project-phase-plan, materialize-project-phase-plan, ask-user.
 - Usá web-scaffold-base para webs institucionales o creativas cuando corresponda.
 - Usá product-architecture-plan cuando el objetivo implique un sistema o producto complejo (por ejemplo ecommerce, CRM, ERP, marketplace, SaaS o plataforma con usuarios, roles, backoffice, datos e integraciones) y todavía haga falta definir arquitectura antes de ejecutar.
 - Si devolvés product-architecture-plan, usá executionMode="planner-only", nextExpectedAction="review-product-architecture", requiresApproval=false y describí fases, riesgos, integraciones y primera entrega segura sin crear archivos.
@@ -19490,13 +20881,17 @@ Reglas:
 - Usá scalable-delivery-plan cuando el usuario pida explícitamente una entrega más grande y local, por ejemplo frontend real con estructura de proyecto, fullstack local con backend y base de datos local, monorepo local con apps/packages/workers o infraestructura local con Docker/Redis/cron/Postgres. En ese caso usá executionMode="planner-only", nextExpectedAction="review-scalable-delivery", requiresApproval=false, devolvé scalableDeliveryPlan completo y no crees archivos todavía.
 - Usá materialize-frontend-project-plan solo cuando el objetivo ya pida materializar un frontend-project revisado. En ese caso usá executionMode="executor", nextExpectedAction="execute-plan", requiresApproval=false, devolvé executionScope y materializationPlan acotados a una carpeta nueva del workspace con package.json, index.html, README.md y src/ estático, sin npm install, sin node_modules, sin bundler, sin backend real, sin base de datos real ni integraciones externas.
 - Usá materialize-fullstack-local-plan solo cuando el objetivo ya pida materializar un fullstack-local revisado. En ese caso usá executionMode="executor", nextExpectedAction="execute-plan", requiresApproval=false, devolvé executionScope y materializationPlan acotados a una carpeta nueva del workspace con frontend/, backend/, shared/, database/, scripts/ y docs/, sin npm install, sin node_modules, sin levantar servicios, sin base de datos real activa, sin Docker ni integraciones externas.
-- Cuando puedas, devolvé también projectBlueprint, questionPolicy, implementationRoadmap, nextActionPlan, validationPlan y phaseExpansionPlan alineados con la estrategia elegida.
+- Usá prepare-project-phase-plan cuando el objetivo pida continuar un proyecto local ya generado y preparar una fase segura posterior. En ese caso usá executionMode="planner-only", nextExpectedAction="review-project-phase", requiresApproval=false y devolvé projectPhaseExecutionPlan acotado a archivos permitidos de esa fase.
+- Usá materialize-project-phase-plan solo cuando el objetivo ya pida materializar una fase segura local de un proyecto existente. En ese caso usá executionMode="executor", nextExpectedAction="execute-plan", requiresApproval=false, devolvé executionScope y materializationPlan acotados a los allowedTargetPaths de la fase y nunca habilites backend real, database real, Docker, node_modules ni deploy.
+- Cuando puedas, devolvé también projectBlueprint, questionPolicy, implementationRoadmap, nextActionPlan, validationPlan, phaseExpansionPlan, projectPhaseExecutionPlan y localProjectManifest alineados con la estrategia elegida.
 - projectBlueprint debe capturar tipo de producto, dominio, intent, deliveryLevel, stackProfile, roles, modules, entities, coreFlows, integrations, riesgos, decisiones delegadas, phasePlan, exclusiones, approvals futuros y successCriteria.
 - questionPolicy debe explicar si conviene preguntar ahora o decidir faltantes con criterio profesional, especialmente cuando userParticipationMode es "brain-decides-missing".
 - implementationRoadmap debe ordenar fases, outputs esperados, validaciones, blockers y approvals sin ejecutar nada automáticamente.
 - nextActionPlan debe dejar claro cuál es el siguiente paso correcto, si es seguro correrlo ahora y si requiere aprobación.
 - validationPlan debe explicar cómo validar el plan o la materialización sin instalar dependencias ni levantar servicios reales.
 - phaseExpansionPlan, si aparece, debe ser solo una propuesta de siguiente fase acotada y nunca una ejecución automática implícita.
+- projectPhaseExecutionPlan debe describir solo fases seguras, locales y con allowedTargetPaths estrictos.
+- localProjectManifest, si aparece, debe reflejar un proyecto ya materializado, sus fases disponibles, forbiddenPaths y nextRecommendedPhase sin secretos ni paths fuera del proyecto.
 - Si el pedido es ambiguo o no pide explícitamente un proyecto grande, mantenete en web-scaffold-base o safe-first-delivery-plan antes de escalar.
 - Si hace falta una decisión humana real, devolvé requiresApproval=true y un approvalRequest estructurado.
 - Si llega feedback de error recuperable, replanificá.
@@ -19923,6 +21318,66 @@ function buildOpenAIBrainSchema() {
           nextExpectedAction: { type: 'string' },
         },
       },
+      projectPhaseExecutionPlan: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          phaseId: { type: 'string' },
+          sourceStrategy: { type: 'string' },
+          targetStrategy: { type: 'string' },
+          deliveryLevel: { type: 'string' },
+          projectRoot: { type: 'string' },
+          goal: { type: 'string' },
+          reason: { type: 'string' },
+          executableNow: { type: 'boolean' },
+          approvalRequired: { type: 'boolean' },
+          riskLevel: { type: 'string' },
+          targetFiles: { type: 'array', items: { type: 'string' } },
+          allowedTargetPaths: { type: 'array', items: { type: 'string' } },
+          operationsPreview: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: true,
+              properties: {
+                type: { type: 'string' },
+                targetPath: { type: 'string' },
+                purpose: { type: 'string' },
+              },
+            },
+          },
+          validationPlan: { type: 'object', additionalProperties: true },
+          explicitExclusions: { type: 'array', items: { type: 'string' } },
+          successCriteria: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      localProjectManifest: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          version: { type: 'number' },
+          projectType: { type: 'string' },
+          domain: { type: 'string' },
+          deliveryLevel: { type: 'string' },
+          createdBy: { type: 'string' },
+          materializationLayer: { type: 'string' },
+          nextRecommendedPhase: { type: 'string' },
+          forbiddenPaths: { type: 'array', items: { type: 'string' } },
+          phases: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: true,
+              properties: {
+                id: { type: 'string' },
+                status: { type: 'string' },
+                createdAt: { type: 'string' },
+                files: { type: 'array', items: { type: 'string' } },
+              },
+            },
+          },
+        },
+      },
       materializationPlan: {
         type: 'object',
         additionalProperties: true,
@@ -20264,6 +21719,16 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
       typeof rawDecision.phaseExpansionPlan === 'object'
         ? rawDecision.phaseExpansionPlan
         : fallbackDecision.phaseExpansionPlan,
+    projectPhaseExecutionPlan:
+      rawDecision?.projectPhaseExecutionPlan &&
+      typeof rawDecision.projectPhaseExecutionPlan === 'object'
+        ? rawDecision.projectPhaseExecutionPlan
+        : fallbackDecision.projectPhaseExecutionPlan,
+    localProjectManifest:
+      rawDecision?.localProjectManifest &&
+      typeof rawDecision.localProjectManifest === 'object'
+        ? rawDecision.localProjectManifest
+        : fallbackDecision.localProjectManifest,
     materializationPlan:
       rawDecision?.materializationPlan &&
       typeof rawDecision.materializationPlan === 'object'
@@ -22406,6 +23871,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       nextActionPlan: brainDecision.nextActionPlan,
       validationPlan: brainDecision.validationPlan,
       phaseExpansionPlan: brainDecision.phaseExpansionPlan,
+      projectPhaseExecutionPlan: brainDecision.projectPhaseExecutionPlan,
+      localProjectManifest: brainDecision.localProjectManifest,
       materializationPlan: brainDecision.materializationPlan,
       contextHubStatus,
       brainRoutingDecision,
@@ -22453,6 +23920,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
     nextActionPlan: brainDecision.nextActionPlan,
     validationPlan: brainDecision.validationPlan,
     phaseExpansionPlan: brainDecision.phaseExpansionPlan,
+    projectPhaseExecutionPlan: brainDecision.projectPhaseExecutionPlan,
+    localProjectManifest: brainDecision.localProjectManifest,
     materializationPlan: brainDecision.materializationPlan,
     contextHubStatus,
     brainRoutingDecision,

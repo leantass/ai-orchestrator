@@ -9,7 +9,11 @@ const currentFilePath = fileURLToPath(import.meta.url)
 const repoRoot = path.resolve(path.dirname(currentFilePath), '..')
 const mainFilePath = path.join(repoRoot, 'electron', 'main.cjs')
 const mainSource = fs.readFileSync(mainFilePath, 'utf8')
-const { LOCAL_MATERIALIZATION_PLAN_VERSION } = require(
+const {
+  LOCAL_MATERIALIZATION_PLAN_VERSION,
+  buildLocalMaterializationTask,
+  runLocalDeterministicTask,
+} = require(
   path.join(repoRoot, 'electron', 'local-deterministic-executor.cjs'),
 )
 const requiredPlannerFunctions = [
@@ -378,6 +382,36 @@ const fullstackLocalMaterializationCase = {
     'Hacer un sistema fullstack local para turnos medicos con frontend, backend y base de datos local.',
   context: '',
 }
+
+const phaseExecutionValidationCases = {
+  prepareFrontendMockFlow: {
+    id: 'prepare-frontend-mock-flow',
+    label: 'Preparar frontend mock flow',
+    goal:
+      'Continuar el proyecto fullstack local de turnos medicos y preparar la fase frontend-mock-flow.',
+    context: '',
+  },
+  materializeFrontendMockFlow: {
+    id: 'materialize-frontend-mock-flow',
+    label: 'Materializar frontend mock flow',
+    goal:
+      'Materializar la fase frontend-mock-flow del proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  prepareBackendContracts: {
+    id: 'prepare-backend-contracts',
+    label: 'Preparar backend contracts',
+    goal:
+      'Preparar la fase backend-contracts del proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+}
+
+const smokeExecutionWorkspaceRoot = path.join(
+  process.env.TEMP || 'C:/tmp',
+  'ai-planner-phase-smoke',
+)
+let cachedFullstackPhaseFixturePromise = null
 
 function printUsage() {
   console.log('Uso: node scripts/ai-planner-smoke.mjs [--verbose] [--list] [--case=<id>]')
@@ -810,6 +844,66 @@ function summarizePhaseExpansionPlan(phaseExpansionPlan) {
       typeof phaseExpansionPlan.validationPlan === 'object'
         ? summarizeValidationPlan(phaseExpansionPlan.validationPlan)
         : null,
+  }
+}
+
+function summarizeProjectPhaseExecutionPlan(projectPhaseExecutionPlan) {
+  return {
+    phaseId: projectPhaseExecutionPlan?.phaseId || '',
+    sourceStrategy: projectPhaseExecutionPlan?.sourceStrategy || '',
+    targetStrategy: projectPhaseExecutionPlan?.targetStrategy || '',
+    deliveryLevel: projectPhaseExecutionPlan?.deliveryLevel || '',
+    projectRoot: projectPhaseExecutionPlan?.projectRoot || '',
+    goal: projectPhaseExecutionPlan?.goal || '',
+    reason: projectPhaseExecutionPlan?.reason || '',
+    executableNow: projectPhaseExecutionPlan?.executableNow === true,
+    approvalRequired: projectPhaseExecutionPlan?.approvalRequired === true,
+    riskLevel: projectPhaseExecutionPlan?.riskLevel || '',
+    targetFiles: toStringArray(projectPhaseExecutionPlan?.targetFiles, 24),
+    allowedTargetPaths: toStringArray(
+      projectPhaseExecutionPlan?.allowedTargetPaths,
+      24,
+    ),
+    operationsPreview: Array.isArray(projectPhaseExecutionPlan?.operationsPreview)
+      ? projectPhaseExecutionPlan.operationsPreview.map((entry) => ({
+          type: entry?.type || '',
+          targetPath: entry?.targetPath || '',
+          purpose: entry?.purpose || '',
+        }))
+      : [],
+    validationPlan:
+      projectPhaseExecutionPlan?.validationPlan &&
+      typeof projectPhaseExecutionPlan.validationPlan === 'object'
+        ? summarizeValidationPlan(projectPhaseExecutionPlan.validationPlan)
+        : null,
+    explicitExclusions: toStringArray(
+      projectPhaseExecutionPlan?.explicitExclusions,
+      24,
+    ),
+    successCriteria: toStringArray(projectPhaseExecutionPlan?.successCriteria, 24),
+  }
+}
+
+function summarizeLocalProjectManifest(localProjectManifest) {
+  return {
+    version: Number.isFinite(localProjectManifest?.version)
+      ? localProjectManifest.version
+      : 0,
+    projectType: localProjectManifest?.projectType || '',
+    domain: localProjectManifest?.domain || '',
+    deliveryLevel: localProjectManifest?.deliveryLevel || '',
+    createdBy: localProjectManifest?.createdBy || '',
+    materializationLayer: localProjectManifest?.materializationLayer || '',
+    forbiddenPaths: toStringArray(localProjectManifest?.forbiddenPaths, 24),
+    nextRecommendedPhase: localProjectManifest?.nextRecommendedPhase || '',
+    phases: Array.isArray(localProjectManifest?.phases)
+      ? localProjectManifest.phases.map((entry) => ({
+          id: entry?.id || '',
+          status: entry?.status || '',
+          createdAt: entry?.createdAt || '',
+          files: toStringArray(entry?.files, 24),
+        }))
+      : [],
   }
 }
 
@@ -1751,6 +1845,169 @@ function buildFullstackLocalMaterializationPrompt({ goal, scalablePlan }) {
   }
 }
 
+function buildReusablePlanningContext() {
+  return {
+    reusableArtifactLookup: {
+      executed: false,
+      foundCount: 0,
+      matches: [],
+    },
+    reusableArtifactsFound: 0,
+    reuseDecision: false,
+    reuseReason: '',
+    reusedArtifactIds: [],
+    reuseMode: 'none',
+    creativeDirection: null,
+  }
+}
+
+function ensureCleanDirectory(targetPath) {
+  fs.rmSync(targetPath, { recursive: true, force: true })
+  fs.mkdirSync(targetPath, { recursive: true })
+}
+
+function findManifestPathInsideWorkspace(workspacePath) {
+  if (!workspacePath || !fs.existsSync(workspacePath)) {
+    return ''
+  }
+
+  const directManifestPath = path.join(workspacePath, 'jefe-project.json')
+  if (fs.existsSync(directManifestPath)) {
+    return directManifestPath
+  }
+
+  const entries = fs
+    .readdirSync(workspacePath, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .slice(0, 12)
+
+  for (const entry of entries) {
+    const manifestPath = path.join(workspacePath, entry.name, 'jefe-project.json')
+    if (fs.existsSync(manifestPath)) {
+      return manifestPath
+    }
+  }
+
+  return ''
+}
+
+async function buildPhaseExecutionFixture() {
+  const workspacePath = path.join(smokeExecutionWorkspaceRoot, 'fullstack-project-phase')
+  ensureCleanDirectory(workspacePath)
+
+  const reusablePlanningContext = buildReusablePlanningContext()
+  const phaseOneDecision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: fullstackLocalMaterializationCase.goal,
+    context: fullstackLocalMaterializationCase.context,
+    workspacePath,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+  const scalablePlan =
+    phaseOneDecision?.scalableDeliveryPlan &&
+    typeof phaseOneDecision.scalableDeliveryPlan === 'object'
+      ? phaseOneDecision.scalableDeliveryPlan
+      : null
+  const prompt = buildFullstackLocalMaterializationPrompt({
+    goal: fullstackLocalMaterializationCase.goal,
+    scalablePlan,
+  })
+  const phaseTwoDecision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: prompt.goal,
+    context: prompt.context,
+    workspacePath,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  if (!phaseTwoDecision?.materializationPlan) {
+    throw new Error('No se pudo construir el materializationPlan base de fullstack-local para fases.')
+  }
+
+  const task = buildLocalMaterializationTask({
+    plan: phaseTwoDecision.materializationPlan,
+    workspacePath,
+    requestId: 'smoke-phase-fixture',
+    instruction: phaseTwoDecision.instruction || '',
+    brainStrategy: phaseTwoDecision.strategy || '',
+    businessSector: phaseTwoDecision.businessSector || '',
+    businessSectorLabel: phaseTwoDecision.businessSectorLabel || '',
+    creativeDirection: phaseTwoDecision.creativeDirection || null,
+    reusableArtifactLookup: phaseTwoDecision.reusableArtifactLookup || null,
+    reusableArtifactsFound: phaseTwoDecision.reusableArtifactsFound || 0,
+    reuseDecision: phaseTwoDecision.reuseDecision === true,
+    reuseReason: phaseTwoDecision.reuseReason || '',
+    reusedArtifactIds: Array.isArray(phaseTwoDecision.reusedArtifactIds)
+      ? phaseTwoDecision.reusedArtifactIds
+      : [],
+    reuseMode: phaseTwoDecision.reuseMode || 'none',
+    reuseMaterialization: null,
+    materializationPlanSource: phaseTwoDecision.materializationPlanSource || 'planner',
+  })
+
+  if (!task) {
+    throw new Error('No se pudo construir la tarea local deterministica para el fixture de fases.')
+  }
+
+  const executionResult = await runLocalDeterministicTask(task)
+  if (executionResult?.ok !== true) {
+    throw new Error(
+      executionResult?.error ||
+        'La materializacion del fixture fullstack-local para fases no termino en OK.',
+    )
+  }
+
+  const manifestPath = findManifestPathInsideWorkspace(workspacePath)
+  if (!manifestPath) {
+    throw new Error('No se encontro jefe-project.json dentro del fixture de fases.')
+  }
+
+  const projectRootPath = path.dirname(manifestPath)
+  const projectRootRelativePath = normalizePathForComparison(
+    path.relative(workspacePath, projectRootPath) || '.',
+  )
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+
+  return {
+    workspacePath,
+    manifestPath,
+    manifest,
+    projectRootPath,
+    projectRootRelativePath,
+    phaseOneDecision,
+    phaseTwoDecision,
+    executionResult,
+  }
+}
+
+async function getPhaseExecutionFixture() {
+  if (!cachedFullstackPhaseFixturePromise) {
+    cachedFullstackPhaseFixturePromise = buildPhaseExecutionFixture()
+  }
+
+  return cachedFullstackPhaseFixturePromise
+}
+
 async function runFrontendProjectMaterializationValidation() {
   const reusablePlanningContext = {
     reusableArtifactLookup: {
@@ -1958,19 +2215,7 @@ async function runFrontendProjectMaterializationValidation() {
 }
 
 async function runFullstackLocalMaterializationValidation() {
-  const reusablePlanningContext = {
-    reusableArtifactLookup: {
-      executed: false,
-      foundCount: 0,
-      matches: [],
-    },
-    reusableArtifactsFound: 0,
-    reuseDecision: false,
-    reuseReason: '',
-    reusedArtifactIds: [],
-    reuseMode: 'none',
-    creativeDirection: null,
-  }
+  const reusablePlanningContext = buildReusablePlanningContext()
   const phaseOneDecision = await plannerApi.buildLocalStrategicBrainDecision({
     goal: fullstackLocalMaterializationCase.goal,
     context: fullstackLocalMaterializationCase.context,
@@ -2041,6 +2286,11 @@ async function runFullstackLocalMaterializationValidation() {
     typeof phaseTwoDecision.phaseExpansionPlan === 'object'
       ? phaseTwoDecision.phaseExpansionPlan
       : null
+  const localProjectManifest =
+    phaseTwoDecision?.localProjectManifest &&
+    typeof phaseTwoDecision.localProjectManifest === 'object'
+      ? phaseTwoDecision.localProjectManifest
+      : null
   const materializationPlan =
     phaseTwoDecision?.materializationPlan &&
     typeof phaseTwoDecision.materializationPlan === 'object'
@@ -2089,6 +2339,14 @@ async function runFullstackLocalMaterializationValidation() {
     if (!Array.isArray(materializationPlan.validations) || materializationPlan.validations.length < 16) {
       failures.push('materializationPlan.validations deberia validar la estructura minima del fullstack local.')
     }
+
+    const operationTargets = toStringArray(
+      materializationPlan.operations?.map((entry) => entry?.targetPath || ''),
+      40,
+    )
+    if (!operationTargets.some((targetPath) => normalizePathForComparison(targetPath).endsWith('jefe-project.json'))) {
+      failures.push('materializationPlan.operations deberia incluir jefe-project.json.')
+    }
   }
 
   if (!nextActionPlan) {
@@ -2119,6 +2377,13 @@ async function runFullstackLocalMaterializationValidation() {
         }
       },
     )
+    if (
+      !validationSummary.fileChecks.some((entry) =>
+        normalizePathForComparison(entry.path).endsWith('jefe-project.json'),
+      )
+    ) {
+      failures.push('validationPlan.fileChecks deberia incluir jefe-project.json.')
+    }
   }
 
   if (!phaseExpansionPlan) {
@@ -2128,6 +2393,32 @@ async function runFullstackLocalMaterializationValidation() {
     if (!String(expansionSummary.phaseId || '').trim()) {
       failures.push('phaseExpansionPlan.phaseId vacio en fase 2 fullstack.')
     }
+  }
+
+  if (!localProjectManifest) {
+    failures.push('localProjectManifest ausente en fase 2 fullstack.')
+  } else {
+    const manifestSummary = summarizeLocalProjectManifest(localProjectManifest)
+    if (manifestSummary.deliveryLevel !== 'fullstack-local') {
+      failures.push('localProjectManifest.deliveryLevel incorrecto.')
+    }
+    if (!String(manifestSummary.nextRecommendedPhase || '').trim()) {
+      failures.push('localProjectManifest.nextRecommendedPhase vacio.')
+    }
+    ;['fullstack-local-scaffold', 'frontend-mock-flow', 'backend-contracts'].forEach(
+      (phaseId) => {
+        if (!manifestSummary.phases.some((entry) => entry.id === phaseId)) {
+          failures.push(`localProjectManifest.phases no incluye ${phaseId}.`)
+        }
+      },
+    )
+    ;['node_modules', '.env', 'docker-compose.yml', 'Dockerfile', 'deploy'].forEach(
+      (token) => {
+        if (!manifestSummary.forbiddenPaths.some((entry) => entry.includes(token))) {
+          failures.push(`localProjectManifest.forbiddenPaths no incluye ${token}.`)
+        }
+      },
+    )
   }
 
   const expectedTargets = [
@@ -2153,6 +2444,7 @@ async function runFullstackLocalMaterializationValidation() {
     'scripts/seed-local.js',
     'docs/architecture.md',
     'docs/local-runbook.md',
+    'jefe-project.json',
   ]
 
   if (allowedTargetPaths.length === 0) {
@@ -2184,6 +2476,445 @@ async function runFullstackLocalMaterializationValidation() {
     executionMode,
     nextExpectedAction,
     scalablePlan: phaseTwoScalablePlan,
+  }
+}
+
+async function runPrepareFrontendMockFlowValidation() {
+  const fixture = await getPhaseExecutionFixture()
+  const reusablePlanningContext = buildReusablePlanningContext()
+  const testCase = phaseExecutionValidationCases.prepareFrontendMockFlow
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: testCase.goal,
+    context: testCase.context,
+    workspacePath: fixture.workspacePath,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  const failures = []
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const nextExpectedAction = String(decision?.nextExpectedAction || '').trim()
+  const projectPhaseExecutionPlan =
+    decision?.projectPhaseExecutionPlan &&
+    typeof decision.projectPhaseExecutionPlan === 'object'
+      ? decision.projectPhaseExecutionPlan
+      : null
+  const localProjectManifest =
+    decision?.localProjectManifest &&
+    typeof decision.localProjectManifest === 'object'
+      ? decision.localProjectManifest
+      : null
+  const materializationPlan =
+    decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+      ? decision.materializationPlan
+      : null
+
+  if (strategy !== 'prepare-project-phase-plan') {
+    failures.push(
+      `Estrategia incorrecta. Esperado: prepare-project-phase-plan. Recibido: ${strategy || '(vacia)'}.`,
+    )
+  }
+
+  if (executionMode !== 'planner-only') {
+    failures.push(
+      `executionMode incorrecto. Esperado: planner-only. Recibido: ${executionMode || '(vacio)'}.`,
+    )
+  }
+
+  if (nextExpectedAction !== 'review-project-phase') {
+    failures.push(
+      `nextExpectedAction incorrecto. Esperado: review-project-phase. Recibido: ${nextExpectedAction || '(vacio)'}.`,
+    )
+  }
+
+  if (materializationPlan) {
+    failures.push('No deberia devolver materializationPlan ejecutable en la fase prepare-project-phase-plan.')
+  }
+
+  if (!projectPhaseExecutionPlan) {
+    failures.push('projectPhaseExecutionPlan ausente.')
+  } else {
+    const phaseSummary = summarizeProjectPhaseExecutionPlan(projectPhaseExecutionPlan)
+    if (phaseSummary.phaseId !== 'frontend-mock-flow') {
+      failures.push('projectPhaseExecutionPlan.phaseId deberia ser frontend-mock-flow.')
+    }
+    if (phaseSummary.targetStrategy !== 'materialize-project-phase-plan') {
+      failures.push('projectPhaseExecutionPlan.targetStrategy deberia apuntar a materialize-project-phase-plan.')
+    }
+    if (!phaseSummary.executableNow) {
+      failures.push('projectPhaseExecutionPlan.executableNow deberia ser true para frontend-mock-flow.')
+    }
+    const expectedTargets = [
+      `${fixture.projectRootRelativePath}/frontend/src/mock-data.js`,
+      `${fixture.projectRootRelativePath}/frontend/src/components/App.js`,
+      `${fixture.projectRootRelativePath}/frontend/src/styles.css`,
+      `${fixture.projectRootRelativePath}/docs/local-runbook.md`,
+      `${fixture.projectRootRelativePath}/jefe-project.json`,
+    ].map(normalizePathForComparison)
+    expectedTargets.forEach((targetPath) => {
+      if (
+        !phaseSummary.allowedTargetPaths.some(
+          (entry) => normalizePathForComparison(entry) === targetPath,
+        )
+      ) {
+        failures.push(`projectPhaseExecutionPlan.allowedTargetPaths no incluye ${targetPath}.`)
+      }
+    })
+  }
+
+  if (!localProjectManifest) {
+    failures.push('localProjectManifest ausente en prepare frontend-mock-flow.')
+  } else {
+    const manifestSummary = summarizeLocalProjectManifest(localProjectManifest)
+    if (manifestSummary.nextRecommendedPhase !== 'frontend-mock-flow') {
+      failures.push('localProjectManifest.nextRecommendedPhase deberia seguir apuntando a frontend-mock-flow.')
+    }
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction,
+  }
+}
+
+async function runMaterializeFrontendMockFlowValidation() {
+  const fixture = await getPhaseExecutionFixture()
+  const reusablePlanningContext = buildReusablePlanningContext()
+  const testCase = phaseExecutionValidationCases.materializeFrontendMockFlow
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: testCase.goal,
+    context: testCase.context,
+    workspacePath: fixture.workspacePath,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  const failures = []
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const nextExpectedAction = String(decision?.nextExpectedAction || '').trim()
+  const projectPhaseExecutionPlan =
+    decision?.projectPhaseExecutionPlan &&
+    typeof decision.projectPhaseExecutionPlan === 'object'
+      ? decision.projectPhaseExecutionPlan
+      : null
+  const localProjectManifest =
+    decision?.localProjectManifest &&
+    typeof decision.localProjectManifest === 'object'
+      ? decision.localProjectManifest
+      : null
+  const materializationPlan =
+    decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+      ? decision.materializationPlan
+      : null
+  const executionScope =
+    decision?.executionScope && typeof decision.executionScope === 'object'
+      ? decision.executionScope
+      : null
+  const phaseExpansionPlan =
+    decision?.phaseExpansionPlan && typeof decision.phaseExpansionPlan === 'object'
+      ? decision.phaseExpansionPlan
+      : null
+  const allowedTargetPaths = summarizeUniqueStrings(
+    executionScope?.allowedTargetPaths,
+    24,
+  ).map(normalizePathForComparison)
+
+  if (strategy !== 'materialize-project-phase-plan') {
+    failures.push(
+      `Estrategia incorrecta. Esperado: materialize-project-phase-plan. Recibido: ${strategy || '(vacia)'}.`,
+    )
+  }
+
+  if (executionMode !== 'executor') {
+    failures.push(
+      `executionMode incorrecto. Esperado: executor. Recibido: ${executionMode || '(vacio)'}.`,
+    )
+  }
+
+  if (nextExpectedAction !== 'execute-plan') {
+    failures.push(
+      `nextExpectedAction incorrecto. Esperado: execute-plan. Recibido: ${nextExpectedAction || '(vacio)'}.`,
+    )
+  }
+
+  if (!projectPhaseExecutionPlan) {
+    failures.push('projectPhaseExecutionPlan ausente en materialize frontend-mock-flow.')
+  } else {
+    const phaseSummary = summarizeProjectPhaseExecutionPlan(projectPhaseExecutionPlan)
+    if (phaseSummary.phaseId !== 'frontend-mock-flow') {
+      failures.push('projectPhaseExecutionPlan.phaseId deberia ser frontend-mock-flow.')
+    }
+  }
+
+  if (!materializationPlan) {
+    failures.push('materializationPlan ausente en materialize-project-phase-plan.')
+  } else {
+    if (String(materializationPlan.strategy || '').trim() !== 'materialize-project-phase-plan') {
+      failures.push('materializationPlan.strategy incorrecto para frontend-mock-flow.')
+    }
+
+    const operationTargets = toStringArray(
+      materializationPlan.operations?.map((entry) => entry?.targetPath || ''),
+      24,
+    ).map(normalizePathForComparison)
+    const expectedTargets = [
+      `${fixture.projectRootRelativePath}/frontend/src/mock-data.js`,
+      `${fixture.projectRootRelativePath}/frontend/src/components/App.js`,
+      `${fixture.projectRootRelativePath}/frontend/src/styles.css`,
+      `${fixture.projectRootRelativePath}/docs/local-runbook.md`,
+      `${fixture.projectRootRelativePath}/jefe-project.json`,
+    ].map(normalizePathForComparison)
+
+    expectedTargets.forEach((targetPath) => {
+      if (!operationTargets.includes(targetPath)) {
+        failures.push(`materializationPlan.operations no incluye ${targetPath}.`)
+      }
+    })
+
+    if (operationTargets.some((targetPath) => /backend\/|database\/|node_modules|\.env$/i.test(targetPath))) {
+      failures.push('materializationPlan.operations no deberia tocar backend, database, node_modules ni .env.')
+    }
+  }
+
+  const expectedAllowedTargets = [
+    `${fixture.projectRootRelativePath}/frontend/src/mock-data.js`,
+    `${fixture.projectRootRelativePath}/frontend/src/components/App.js`,
+    `${fixture.projectRootRelativePath}/frontend/src/styles.css`,
+    `${fixture.projectRootRelativePath}/docs/local-runbook.md`,
+    `${fixture.projectRootRelativePath}/jefe-project.json`,
+  ].map(normalizePathForComparison)
+
+  expectedAllowedTargets.forEach((targetPath) => {
+    if (!allowedTargetPaths.includes(targetPath)) {
+      failures.push(`allowedTargetPaths no incluye ${targetPath}.`)
+    }
+  })
+
+  if (allowedTargetPaths.some((targetPath) => /backend\/|database\/|package\.json|node_modules|\.env$/i.test(targetPath))) {
+    failures.push('allowedTargetPaths no deberia incluir backend, database, package.json, node_modules ni .env.')
+  }
+
+  if (!phaseExpansionPlan) {
+    failures.push('phaseExpansionPlan ausente en materialize frontend-mock-flow.')
+  } else {
+    const expansionSummary = summarizePhaseExpansionPlan(phaseExpansionPlan)
+    if (expansionSummary.phaseId !== 'backend-contracts') {
+      failures.push('phaseExpansionPlan deberia proponer backend-contracts como siguiente fase.')
+    }
+    if (expansionSummary.executableNow) {
+      failures.push('phaseExpansionPlan no deberia quedar ejecutable automaticamente para backend-contracts.')
+    }
+  }
+
+  if (!localProjectManifest) {
+    failures.push('localProjectManifest ausente en materialize frontend-mock-flow.')
+  } else {
+    const manifestSummary = summarizeLocalProjectManifest(localProjectManifest)
+    const frontendPhase = manifestSummary.phases.find(
+      (entry) => entry.id === 'frontend-mock-flow',
+    )
+    const backendPhase = manifestSummary.phases.find(
+      (entry) => entry.id === 'backend-contracts',
+    )
+    if (manifestSummary.nextRecommendedPhase !== 'backend-contracts') {
+      failures.push('localProjectManifest.nextRecommendedPhase deberia avanzar a backend-contracts.')
+    }
+    if (!frontendPhase || frontendPhase.status !== 'done') {
+      failures.push('localProjectManifest deberia marcar frontend-mock-flow como done.')
+    }
+    if (!backendPhase || backendPhase.status !== 'available') {
+      failures.push('localProjectManifest deberia mantener backend-contracts como available.')
+    }
+  }
+
+  if (materializationPlan) {
+    const task = buildLocalMaterializationTask({
+      plan: materializationPlan,
+      workspacePath: fixture.workspacePath,
+      requestId: 'smoke-frontend-mock-flow-materialization',
+      instruction: decision?.instruction || '',
+      brainStrategy: decision?.strategy || '',
+      businessSector: decision?.businessSector || '',
+      businessSectorLabel: decision?.businessSectorLabel || '',
+      creativeDirection: decision?.creativeDirection || null,
+      reusableArtifactLookup: decision?.reusableArtifactLookup || null,
+      reusableArtifactsFound: decision?.reusableArtifactsFound || 0,
+      reuseDecision: decision?.reuseDecision === true,
+      reuseReason: decision?.reuseReason || '',
+      reusedArtifactIds: Array.isArray(decision?.reusedArtifactIds)
+        ? decision.reusedArtifactIds
+        : [],
+      reuseMode: decision?.reuseMode || 'none',
+      reuseMaterialization: null,
+      materializationPlanSource: decision?.materializationPlanSource || 'planner',
+    })
+
+    if (!task) {
+      failures.push('No se pudo construir la tarea local deterministica para frontend-mock-flow.')
+    } else {
+      const executionResult = await runLocalDeterministicTask(task)
+      if (executionResult?.ok !== true) {
+        failures.push(
+          executionResult?.error ||
+            'La materializacion local de frontend-mock-flow no termino en OK.',
+        )
+      } else {
+        const touchedPaths = toStringArray(executionResult?.details?.touchedPaths, 24).map(
+          normalizePathForComparison,
+        )
+        const manifestPath = path.join(
+          fixture.workspacePath,
+          fixture.projectRootRelativePath,
+          'jefe-project.json',
+        )
+        const manifestFromDisk = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+        const manifestFromDiskSummary = summarizeLocalProjectManifest(manifestFromDisk)
+        const frontendPhase = manifestFromDiskSummary.phases.find(
+          (entry) => entry.id === 'frontend-mock-flow',
+        )
+        const backendPhase = manifestFromDiskSummary.phases.find(
+          (entry) => entry.id === 'backend-contracts',
+        )
+
+        if (
+          !touchedPaths.some((targetPath) =>
+            targetPath.endsWith(
+              normalizePathForComparison(
+                `${fixture.projectRootRelativePath}/jefe-project.json`,
+              ),
+            ),
+          )
+        ) {
+          failures.push('La ejecucion real de frontend-mock-flow deberia tocar jefe-project.json.')
+        }
+        if (manifestFromDiskSummary.nextRecommendedPhase !== 'backend-contracts') {
+          failures.push(
+            'El jefe-project.json resultante deberia actualizar nextRecommendedPhase a backend-contracts.',
+          )
+        }
+        if (!frontendPhase || frontendPhase.status !== 'done') {
+          failures.push(
+            'El jefe-project.json resultante deberia marcar frontend-mock-flow como done.',
+          )
+        }
+        if (!backendPhase || backendPhase.status !== 'available') {
+          failures.push(
+            'El jefe-project.json resultante deberia mantener backend-contracts como available.',
+          )
+        }
+      }
+    }
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction,
+  }
+}
+
+async function runPrepareBackendContractsValidation() {
+  const fixture = await getPhaseExecutionFixture()
+  const reusablePlanningContext = buildReusablePlanningContext()
+  const testCase = phaseExecutionValidationCases.prepareBackendContracts
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: testCase.goal,
+    context: testCase.context,
+    workspacePath: fixture.workspacePath,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  const failures = []
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const projectPhaseExecutionPlan =
+    decision?.projectPhaseExecutionPlan &&
+    typeof decision.projectPhaseExecutionPlan === 'object'
+      ? decision.projectPhaseExecutionPlan
+      : null
+  const materializationPlan =
+    decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+      ? decision.materializationPlan
+      : null
+
+  if (strategy !== 'prepare-project-phase-plan') {
+    failures.push(
+      `Estrategia incorrecta. Esperado: prepare-project-phase-plan. Recibido: ${strategy || '(vacia)'}.`,
+    )
+  }
+
+  if (executionMode !== 'planner-only') {
+    failures.push(
+      `executionMode incorrecto. Esperado: planner-only. Recibido: ${executionMode || '(vacio)'}.`,
+    )
+  }
+
+  if (materializationPlan) {
+    failures.push('backend-contracts no deberia devolver materializationPlan en este bloque.')
+  }
+
+  if (!projectPhaseExecutionPlan) {
+    failures.push('projectPhaseExecutionPlan ausente en backend-contracts.')
+  } else {
+    const phaseSummary = summarizeProjectPhaseExecutionPlan(projectPhaseExecutionPlan)
+    if (phaseSummary.phaseId !== 'backend-contracts') {
+      failures.push('projectPhaseExecutionPlan.phaseId deberia ser backend-contracts.')
+    }
+    if (phaseSummary.executableNow) {
+      failures.push('backend-contracts deberia seguir planner-only y no ejecutableNow.')
+    }
+    if (phaseSummary.targetStrategy !== 'prepare-project-phase-plan') {
+      failures.push('backend-contracts deberia mantener targetStrategy prepare-project-phase-plan.')
+    }
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction: String(decision?.nextExpectedAction || '').trim(),
   }
 }
 
@@ -2236,6 +2967,7 @@ async function main() {
 
   let frontendMaterializationResult = null
   let fullstackMaterializationResult = null
+  let projectPhaseExecutionResults = []
   if (!caseId) {
     console.log('Frontend Project Materialization Check')
     console.log('=====================================')
@@ -2250,10 +2982,23 @@ async function main() {
       await runFullstackLocalMaterializationValidation()
     printScalableValidationResult(fullstackMaterializationResult)
     console.log('-----------------')
+
+    console.log('Project Phase Execution Checks')
+    console.log('==============================')
+    projectPhaseExecutionResults = [
+      await runPrepareFrontendMockFlowValidation(),
+      await runMaterializeFrontendMockFlowValidation(),
+      await runPrepareBackendContractsValidation(),
+    ]
+    projectPhaseExecutionResults.forEach(printScalableValidationResult)
+    console.log('-----------------')
   }
 
   const failedScalableResults = scalableResults.filter((result) => !result.ok)
   const failedQuestionPolicyResults = questionPolicyResults.filter((result) => !result.ok)
+  const failedProjectPhaseExecutionResults = projectPhaseExecutionResults.filter(
+    (result) => !result.ok,
+  )
   const frontendMaterializationFailed = frontendMaterializationResult?.ok === false
   const fullstackMaterializationFailed = fullstackMaterializationResult?.ok === false
 
@@ -2261,6 +3006,7 @@ async function main() {
     failedResults.length === 0 &&
     failedScalableResults.length === 0 &&
     failedQuestionPolicyResults.length === 0 &&
+    failedProjectPhaseExecutionResults.length === 0 &&
     !frontendMaterializationFailed &&
     !fullstackMaterializationFailed
   ) {
@@ -2278,6 +3024,11 @@ async function main() {
     }
     if (fullstackMaterializationResult) {
       console.log('OK. 1/1 check de materializacion fullstack-local paso.')
+    }
+    if (projectPhaseExecutionResults.length > 0) {
+      console.log(
+        `OK. ${projectPhaseExecutionResults.length}/${projectPhaseExecutionResults.length} checks de project phase execution pasaron.`,
+      )
     }
     return
   }
@@ -2298,6 +3049,13 @@ async function main() {
   if (failedQuestionPolicyResults.length > 0) {
     console.log('checks de questionPolicy fallidos:')
     failedQuestionPolicyResults.forEach((result) => {
+      console.log(`- ${result.testCase.id}: ${result.failures[0] || 'sin detalle'}`)
+    })
+  }
+
+  if (failedProjectPhaseExecutionResults.length > 0) {
+    console.log('checks de project phase execution fallidos:')
+    failedProjectPhaseExecutionResults.forEach((result) => {
       console.log(`- ${result.testCase.id}: ${result.failures[0] || 'sin detalle'}`)
     })
   }

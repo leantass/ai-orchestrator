@@ -389,6 +389,50 @@ type PhaseExpansionPlanContract = {
   nextExpectedAction?: string
 }
 
+type ProjectPhaseExecutionOperationPreviewContract = {
+  type?: string
+  targetPath?: string
+  purpose?: string
+}
+
+type ProjectPhaseExecutionPlanContract = {
+  phaseId?: string
+  sourceStrategy?: string
+  targetStrategy?: string
+  deliveryLevel?: ScalableDeliveryPlanContract['deliveryLevel'] | string
+  projectRoot?: string
+  goal?: string
+  reason?: string
+  executableNow?: boolean
+  approvalRequired?: boolean
+  riskLevel?: 'low' | 'medium' | 'high' | string
+  targetFiles?: string[]
+  allowedTargetPaths?: string[]
+  operationsPreview?: ProjectPhaseExecutionOperationPreviewContract[]
+  validationPlan?: ValidationPlanContract | null
+  explicitExclusions?: string[]
+  successCriteria?: string[]
+}
+
+type LocalProjectManifestPhaseContract = {
+  id?: string
+  status?: string
+  createdAt?: string
+  files?: string[]
+}
+
+type LocalProjectManifestContract = {
+  version?: number
+  projectType?: string
+  domain?: string
+  deliveryLevel?: ScalableDeliveryPlanContract['deliveryLevel'] | string
+  createdBy?: string
+  materializationLayer?: string
+  phases?: LocalProjectManifestPhaseContract[]
+  forbiddenPaths?: string[]
+  nextRecommendedPhase?: string
+}
+
 type MaterializationPlanContract = Record<string, unknown>
 
 type PlannerExecutionMetadata = {
@@ -426,6 +470,8 @@ type PlannerExecutionMetadata = {
   nextActionPlan: NextActionPlanContract | null
   validationPlan: ValidationPlanContract | null
   phaseExpansionPlan: PhaseExpansionPlanContract | null
+  projectPhaseExecutionPlan: ProjectPhaseExecutionPlanContract | null
+  localProjectManifest: LocalProjectManifestContract | null
   materializationPlan: MaterializationPlanContract | null
 }
 
@@ -624,6 +670,8 @@ type PlannerDecisionResponse = {
   nextActionPlan?: NextActionPlanContract | null
   validationPlan?: ValidationPlanContract | null
   phaseExpansionPlan?: PhaseExpansionPlanContract | null
+  projectPhaseExecutionPlan?: ProjectPhaseExecutionPlanContract | null
+  localProjectManifest?: LocalProjectManifestContract | null
   materializationPlan?: MaterializationPlanContract | null
   brainRoutingDecision?: BrainRoutingDecision
   tasks?: unknown[]
@@ -822,6 +870,8 @@ const EMPTY_PLANNER_EXECUTION_METADATA: PlannerExecutionMetadata = {
   nextActionPlan: null,
   validationPlan: null,
   phaseExpansionPlan: null,
+  projectPhaseExecutionPlan: null,
+  localProjectManifest: null,
   materializationPlan: null,
 }
 
@@ -854,6 +904,8 @@ const buildSafeFirstDeliveryReviewMetadata = ({
   nextActionPlan: baseMetadata.nextActionPlan,
   validationPlan: baseMetadata.validationPlan,
   phaseExpansionPlan: baseMetadata.phaseExpansionPlan,
+  projectPhaseExecutionPlan: baseMetadata.projectPhaseExecutionPlan,
+  localProjectManifest: baseMetadata.localProjectManifest,
   materializationPlan: baseMetadata.materializationPlan,
   decisionKey: 'safe-first-delivery-plan',
   strategy: 'safe-first-delivery-plan',
@@ -1851,6 +1903,168 @@ const normalizePhaseExpansionPlanContract = (
   return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
 }
 
+const normalizeProjectPhaseExecutionPlanContract = (
+  value: unknown,
+): ProjectPhaseExecutionPlanContract | null => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const contract = value as ProjectPhaseExecutionPlanContract
+  const normalizedOperationsPreview = Array.isArray(contract.operationsPreview)
+    ? contract.operationsPreview
+        .map((entry) =>
+          entry && typeof entry === 'object'
+            ? {
+                ...(normalizeOptionalString(entry.type)
+                  ? { type: normalizeOptionalString(entry.type) }
+                  : {}),
+                ...(normalizeOptionalString(entry.targetPath)
+                  ? { targetPath: normalizeOptionalString(entry.targetPath) }
+                  : {}),
+                ...(normalizeOptionalString(entry.purpose)
+                  ? { purpose: normalizeOptionalString(entry.purpose) }
+                  : {}),
+              }
+            : null,
+        )
+        .filter(
+          (entry): entry is ProjectPhaseExecutionOperationPreviewContract =>
+            Boolean(entry) && Object.keys(entry).length > 0,
+        )
+    : []
+
+  const normalizedValue: ProjectPhaseExecutionPlanContract = {
+    ...(normalizeOptionalString(contract.phaseId)
+      ? { phaseId: normalizeOptionalString(contract.phaseId) }
+      : {}),
+    ...(normalizeOptionalString(contract.sourceStrategy)
+      ? { sourceStrategy: normalizeOptionalString(contract.sourceStrategy) }
+      : {}),
+    ...(normalizeOptionalString(contract.targetStrategy)
+      ? { targetStrategy: normalizeOptionalString(contract.targetStrategy) }
+      : {}),
+    ...(normalizeOptionalString(contract.deliveryLevel)
+      ? {
+          deliveryLevel: normalizeOptionalString(
+            contract.deliveryLevel,
+          ) as ProjectPhaseExecutionPlanContract['deliveryLevel'],
+        }
+      : {}),
+    ...(normalizeOptionalString(contract.projectRoot)
+      ? { projectRoot: normalizeOptionalString(contract.projectRoot) }
+      : {}),
+    ...(normalizeOptionalString(contract.goal)
+      ? { goal: normalizeOptionalString(contract.goal) }
+      : {}),
+    ...(normalizeOptionalString(contract.reason)
+      ? { reason: normalizeOptionalString(contract.reason) }
+      : {}),
+    ...(typeof contract.executableNow === 'boolean'
+      ? { executableNow: contract.executableNow }
+      : {}),
+    ...(typeof contract.approvalRequired === 'boolean'
+      ? { approvalRequired: contract.approvalRequired }
+      : {}),
+    ...(normalizeOptionalString(contract.riskLevel)
+      ? {
+          riskLevel: normalizeOptionalString(
+            contract.riskLevel,
+          ) as ProjectPhaseExecutionPlanContract['riskLevel'],
+        }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.targetFiles).length > 0
+      ? { targetFiles: normalizeOptionalStringArray(contract.targetFiles) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.allowedTargetPaths).length > 0
+      ? { allowedTargetPaths: normalizeOptionalStringArray(contract.allowedTargetPaths) }
+      : {}),
+    ...(normalizedOperationsPreview.length > 0
+      ? { operationsPreview: normalizedOperationsPreview }
+      : {}),
+    ...(normalizeValidationPlanContract(contract.validationPlan)
+      ? { validationPlan: normalizeValidationPlanContract(contract.validationPlan) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.explicitExclusions).length > 0
+      ? { explicitExclusions: normalizeOptionalStringArray(contract.explicitExclusions) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.successCriteria).length > 0
+      ? { successCriteria: normalizeOptionalStringArray(contract.successCriteria) }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
+const normalizeLocalProjectManifestContract = (
+  value: unknown,
+): LocalProjectManifestContract | null => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const contract = value as LocalProjectManifestContract
+  const normalizedPhases = Array.isArray(contract.phases)
+    ? contract.phases
+        .map((entry) =>
+          entry && typeof entry === 'object'
+            ? {
+                ...(normalizeOptionalString(entry.id)
+                  ? { id: normalizeOptionalString(entry.id) }
+                  : {}),
+                ...(normalizeOptionalString(entry.status)
+                  ? { status: normalizeOptionalString(entry.status) }
+                  : {}),
+                ...(normalizeOptionalString(entry.createdAt)
+                  ? { createdAt: normalizeOptionalString(entry.createdAt) }
+                  : {}),
+                ...(normalizeOptionalStringArray(entry.files).length > 0
+                  ? { files: normalizeOptionalStringArray(entry.files) }
+                  : {}),
+              }
+            : null,
+        )
+        .filter(
+          (entry): entry is LocalProjectManifestPhaseContract =>
+            Boolean(entry) && Object.keys(entry).length > 0,
+        )
+    : []
+
+  const normalizedValue: LocalProjectManifestContract = {
+    ...(typeof contract.version === 'number' && Number.isFinite(contract.version)
+      ? { version: contract.version }
+      : {}),
+    ...(normalizeOptionalString(contract.projectType)
+      ? { projectType: normalizeOptionalString(contract.projectType) }
+      : {}),
+    ...(normalizeOptionalString(contract.domain)
+      ? { domain: normalizeOptionalString(contract.domain) }
+      : {}),
+    ...(normalizeOptionalString(contract.deliveryLevel)
+      ? {
+          deliveryLevel: normalizeOptionalString(
+            contract.deliveryLevel,
+          ) as LocalProjectManifestContract['deliveryLevel'],
+        }
+      : {}),
+    ...(normalizeOptionalString(contract.createdBy)
+      ? { createdBy: normalizeOptionalString(contract.createdBy) }
+      : {}),
+    ...(normalizeOptionalString(contract.materializationLayer)
+      ? { materializationLayer: normalizeOptionalString(contract.materializationLayer) }
+      : {}),
+    ...(normalizedPhases.length > 0 ? { phases: normalizedPhases } : {}),
+    ...(normalizeOptionalStringArray(contract.forbiddenPaths).length > 0
+      ? { forbiddenPaths: normalizeOptionalStringArray(contract.forbiddenPaths) }
+      : {}),
+    ...(normalizeOptionalString(contract.nextRecommendedPhase)
+      ? { nextRecommendedPhase: normalizeOptionalString(contract.nextRecommendedPhase) }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
 const normalizeDomainUnderstandingContract = (
   value: unknown,
 ): DomainUnderstandingContract | null => {
@@ -1940,6 +2154,8 @@ const extractPlannerExecutionMetadata = (payload?: {
   nextActionPlan?: NextActionPlanContract | null
   validationPlan?: ValidationPlanContract | null
   phaseExpansionPlan?: PhaseExpansionPlanContract | null
+  projectPhaseExecutionPlan?: ProjectPhaseExecutionPlanContract | null
+  localProjectManifest?: LocalProjectManifestContract | null
   materializationPlan?: MaterializationPlanContract | null
   tasks?: unknown[]
   assumptions?: string[]
@@ -2122,6 +2338,12 @@ const extractPlannerExecutionMetadata = (payload?: {
   validationPlan: normalizeValidationPlanContract(payload?.validationPlan),
   phaseExpansionPlan: normalizePhaseExpansionPlanContract(
     payload?.phaseExpansionPlan,
+  ),
+  projectPhaseExecutionPlan: normalizeProjectPhaseExecutionPlanContract(
+    payload?.projectPhaseExecutionPlan,
+  ),
+  localProjectManifest: normalizeLocalProjectManifestContract(
+    payload?.localProjectManifest,
   ),
   materializationPlan:
     payload?.materializationPlan && typeof payload.materializationPlan === 'object'
@@ -3858,6 +4080,257 @@ function PhaseExpansionPlanCard({
           compact={compact}
           tone="sky"
         />
+      </div>
+    </article>
+  )
+}
+
+function getManifestPhaseStatusLabel(value?: string) {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (normalizedValue === 'done') {
+    return 'Hecha'
+  }
+
+  if (normalizedValue === 'available') {
+    return 'Disponible'
+  }
+
+  if (normalizedValue === 'blocked') {
+    return 'Bloqueada'
+  }
+
+  return normalizedValue ? normalizedValue : 'Sin estado'
+}
+
+function LocalProjectManifestCard({
+  manifest,
+  compact = false,
+  onPreparePhase,
+}: {
+  manifest: LocalProjectManifestContract
+  compact?: boolean
+  onPreparePhase?: (phaseId: string) => void
+}) {
+  const phases = manifest.phases || []
+  const visiblePhases = compact ? phases.slice(0, 3) : phases
+  const nextRecommendedPhase = normalizeOptionalString(manifest.nextRecommendedPhase)
+
+  return (
+    <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Project phases
+          </div>
+          <div className="mt-2 text-sm leading-6 text-slate-400">
+            Estado local del proyecto materializado y fases seguras que JEFE puede seguir preparando.
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
+            {normalizeOptionalString(manifest.projectType) || 'Proyecto local'}
+          </span>
+          {nextRecommendedPhase ? (
+            <span className="rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-1 text-xs font-medium text-sky-100">
+              Siguiente: {nextRecommendedPhase}
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="Dominio"
+          value={normalizeOptionalString(manifest.domain) || 'Sin dominio'}
+          detail={getDeliveryLevelLabel(manifest.deliveryLevel)}
+          tone="sky"
+        />
+        <MetricCard
+          label="Creado por"
+          value={normalizeOptionalString(manifest.createdBy) || 'Sin origen'}
+          detail={normalizeOptionalString(manifest.materializationLayer) || 'Sin capa'}
+        />
+        <MetricCard
+          label="Fases"
+          value={phases.length > 0 ? `${phases.length} fase(s)` : 'Sin fases'}
+          detail={visiblePhases[0]?.id || 'Sin detalle'}
+        />
+        <MetricCard
+          label="Forbidden paths"
+          value={
+            normalizeOptionalStringArray(manifest.forbiddenPaths).length > 0
+              ? `${normalizeOptionalStringArray(manifest.forbiddenPaths).length} path(s)`
+              : 'Sin restricciones'
+          }
+          detail={normalizeOptionalStringArray(manifest.forbiddenPaths)[0] || 'Sin detalle'}
+          tone="amber"
+        />
+      </div>
+
+      <div className="mt-4 grid gap-3">
+        {visiblePhases.map((phase) => (
+          <article
+            key={phase.id || phase.createdAt}
+            className="rounded-2xl border border-white/8 bg-slate-950/45 px-4 py-4"
+          >
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-sm font-medium leading-6 text-slate-100">
+                  {normalizeOptionalString(phase.id) || 'Fase sin id'}
+                </div>
+                <div className="mt-1 text-xs leading-5 text-slate-400">
+                  {normalizeOptionalString(phase.createdAt) || 'Sin timestamp declarativo'}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
+                  {getManifestPhaseStatusLabel(phase.status)}
+                </span>
+                {onPreparePhase &&
+                normalizeOptionalString(phase.status).toLocaleLowerCase() === 'available' ? (
+                  <button
+                    type="button"
+                    onClick={() => onPreparePhase(normalizeOptionalString(phase.id))}
+                    className="rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-1 text-xs font-medium text-sky-100 transition hover:bg-sky-300/15"
+                  >
+                    Preparar fase
+                  </button>
+                ) : null}
+              </div>
+            </div>
+            <ProductArchitectureGroup
+              title="Archivos"
+              items={phase.files}
+              compact={compact}
+              tone="sky"
+            />
+          </article>
+        ))}
+      </div>
+
+      {compact && phases.length > visiblePhases.length ? (
+        <div className="mt-3 text-xs leading-5 text-slate-500">
+          +{phases.length - visiblePhases.length} fase(s) más en el manifiesto local.
+        </div>
+      ) : null}
+    </article>
+  )
+}
+
+function ProjectPhaseExecutionPlanCard({
+  plan,
+  compact = false,
+  onMaterializePhase,
+}: {
+  plan: ProjectPhaseExecutionPlanContract
+  compact?: boolean
+  onMaterializePhase?: (phaseId: string) => void
+}) {
+  const operationsPreview = plan.operationsPreview || []
+  const visibleOperations = compact ? operationsPreview.slice(0, 3) : operationsPreview
+  const tone: 'default' | 'sky' | 'emerald' | 'amber' | 'rose' = plan.approvalRequired
+    ? 'rose'
+    : plan.executableNow
+      ? 'emerald'
+      : 'amber'
+
+  return (
+    <article className="rounded-3xl border border-sky-300/15 bg-sky-300/[0.05] p-5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Project phase execution
+          </div>
+          <div className="mt-2 text-lg font-semibold text-white">
+            {normalizeOptionalString(plan.phaseId) || 'Fase sin id'}
+          </div>
+          <div className="mt-2 text-sm leading-6 text-slate-300">
+            {normalizeOptionalString(plan.reason) || 'Sin razón declarada.'}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
+            {plan.executableNow ? 'Ejecutable ahora' : 'Planner only'}
+          </span>
+          {onMaterializePhase && plan.executableNow ? (
+            <button
+              type="button"
+              onClick={() => onMaterializePhase(normalizeOptionalString(plan.phaseId))}
+              className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-medium text-emerald-100 transition hover:bg-emerald-300/15"
+            >
+              Materializar fase
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="Project root"
+          value={normalizeOptionalString(plan.projectRoot) || 'Sin root'}
+          detail={getDeliveryLevelLabel(plan.deliveryLevel)}
+          tone="sky"
+        />
+        <MetricCard
+          label="Strategies"
+          value={normalizeOptionalString(plan.sourceStrategy) || 'Sin source'}
+          detail={normalizeOptionalString(plan.targetStrategy) || 'Sin target'}
+        />
+        <MetricCard
+          label="Riesgo"
+          value={getRiskLabel(plan.riskLevel)}
+          detail={normalizeOptionalString(plan.goal) || 'Sin objetivo'}
+          tone={tone}
+        />
+        <MetricCard
+          label="Target files"
+          value={
+            normalizeOptionalStringArray(plan.targetFiles).length > 0
+              ? `${normalizeOptionalStringArray(plan.targetFiles).length} archivo(s)`
+              : 'Sin archivos'
+          }
+          detail={normalizeOptionalStringArray(plan.targetFiles)[0] || 'Sin target'}
+        />
+      </div>
+
+      <div className="mt-4 grid gap-3 xl:grid-cols-2">
+        <ProductArchitectureGroup
+          title="Allowed target paths"
+          items={plan.allowedTargetPaths}
+          compact={compact}
+          tone="emerald"
+        />
+        <ProductArchitectureGroup
+          title="Exclusiones"
+          items={plan.explicitExclusions}
+          compact={compact}
+          tone="amber"
+        />
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/45 px-4 py-4">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+          Preview de operaciones
+        </div>
+        <div className="mt-3 grid gap-3">
+          {visibleOperations.map((operation) => (
+            <div
+              key={`${operation.type || 'op'}-${operation.targetPath || 'path'}`}
+              className="rounded-xl border border-white/8 bg-slate-900/60 px-4 py-3"
+            >
+              <div className="text-sm font-medium leading-6 text-slate-100">
+                {normalizeOptionalString(operation.type) || 'Operación'}
+              </div>
+              <div className="mt-1 text-xs leading-5 text-slate-400">
+                {normalizeOptionalString(operation.targetPath) || 'Sin target path'}
+              </div>
+              <div className="mt-1 text-xs leading-5 text-slate-500">
+                {normalizeOptionalString(operation.purpose) || 'Sin propósito declarado'}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </article>
   )
@@ -7174,6 +7647,10 @@ function App() {
   const activeValidationPlan = effectivePlannerExecutionMetadata.validationPlan
   const activePhaseExpansionPlan =
     effectivePlannerExecutionMetadata.phaseExpansionPlan
+  const activeProjectPhaseExecutionPlan =
+    effectivePlannerExecutionMetadata.projectPhaseExecutionPlan
+  const activeLocalProjectManifest =
+    effectivePlannerExecutionMetadata.localProjectManifest
   const activeScalableDeliveryLevel = normalizeOptionalString(
     activeScalableDeliveryPlan?.deliveryLevel,
   ).toLocaleLowerCase()
@@ -7203,6 +7680,71 @@ function App() {
     Boolean(activePhaseExpansionPlan) &&
     (Boolean(effectivePlannerExecutionMetadata.materializationPlan) ||
       shouldShowImplementationRoadmap)
+  const shouldShowLocalProjectManifest =
+    Boolean(activeLocalProjectManifest) &&
+    normalizeOptionalString(
+      activeLocalProjectManifest?.deliveryLevel,
+    ).toLocaleLowerCase() === 'fullstack-local'
+  const shouldShowProjectPhaseExecutionPlan =
+    Boolean(activeProjectPhaseExecutionPlan) &&
+    normalizeOptionalString(
+      activeProjectPhaseExecutionPlan?.deliveryLevel,
+    ).toLocaleLowerCase() === 'fullstack-local'
+  const activeLocalProjectRoot = (() => {
+    if (normalizeOptionalString(activeProjectPhaseExecutionPlan?.projectRoot)) {
+      return normalizeOptionalString(activeProjectPhaseExecutionPlan?.projectRoot)
+    }
+
+    const executionScopePaths = Array.isArray(
+      effectivePlannerExecutionMetadata.executionScope?.allowedTargetPaths,
+    )
+      ? effectivePlannerExecutionMetadata.executionScope?.allowedTargetPaths || []
+      : []
+    const firstScopePath = normalizeOptionalString(executionScopePaths[0])
+
+    if (firstScopePath) {
+      return firstScopePath.replace(/\\/g, '/').split('/')[0] || firstScopePath
+    }
+
+    return ''
+  })()
+  const buildProjectPhasePrompt = (
+    action: 'prepare' | 'materialize',
+    phaseId: string,
+  ) => {
+    const resolvedPhaseId = normalizeOptionalString(phaseId)
+    const projectRoot = activeLocalProjectRoot
+    const domainLabel =
+      normalizeOptionalString(activeLocalProjectManifest?.domain) ||
+      normalizeOptionalString(activeProjectBlueprint?.domain) ||
+      'proyecto local'
+    const goal =
+      action === 'materialize'
+        ? `Materializar la fase ${resolvedPhaseId} del proyecto fullstack local de ${domainLabel}.`
+        : `Continuar el proyecto fullstack local de ${domainLabel} y preparar la fase ${resolvedPhaseId}.`
+    const contextLines = [
+      'deliveryLevel: fullstack-local.',
+      `phaseId: ${resolvedPhaseId}.`,
+      projectRoot ? `projectRoot: ${projectRoot}.` : '',
+      normalizeOptionalString(activeLocalProjectManifest?.nextRecommendedPhase)
+        ? `nextRecommendedPhase: ${normalizeOptionalString(activeLocalProjectManifest?.nextRecommendedPhase)}.`
+        : '',
+      action === 'materialize' &&
+      Array.isArray(activeProjectPhaseExecutionPlan?.allowedTargetPaths) &&
+      activeProjectPhaseExecutionPlan.allowedTargetPaths.length > 0
+        ? `allowedTargetPaths: ${activeProjectPhaseExecutionPlan.allowedTargetPaths.join(', ')}`
+        : '',
+      'Usar jefe-project.json si existe para entender el estado local del proyecto.',
+      action === 'materialize'
+        ? 'No tocar backend, database, package.json, node_modules, .env, Docker ni deploy.'
+        : 'Solo preparar la fase, no escribir archivos todavía.',
+    ].filter(Boolean)
+
+    return {
+      goal,
+      context: contextLines.join('\n'),
+    }
+  }
   const manualReuseModeLabel = getManualReuseModeLabel(manualReuseMode)
   const selectedReusableArtifactSummary = selectedReusableArtifact
     ? [
@@ -10918,6 +11460,50 @@ function App() {
     }
   }
 
+  const handlePrepareProjectPhase = async (phaseId: string) => {
+    const prompt = buildProjectPhasePrompt('prepare', phaseId)
+
+    clearVisibleExecutionRuntimeState()
+    setSessionStatus('Preparando siguiente fase segura')
+    setCurrentStep(
+      `El orquestador esta preparando la fase ${normalizeOptionalString(phaseId) || 'siguiente'} del proyecto local`,
+    )
+    setSessionEvents((currentEvents) => [
+      ...currentEvents,
+      `Se preparo una planificacion para la fase ${normalizeOptionalString(phaseId) || 'siguiente'}`,
+    ])
+
+    await handleGenerateNextStep({
+      goal: prompt.goal,
+      context: prompt.context,
+      sourceLabel: `Preparar fase ${normalizeOptionalString(phaseId) || 'local'}`,
+      sendContent: `Se envio una solicitud para preparar la fase ${normalizeOptionalString(phaseId) || 'local'} del proyecto existente.`,
+      persistPreparedInputs: true,
+    })
+  }
+
+  const handleMaterializeProjectPhase = async (phaseId: string) => {
+    const prompt = buildProjectPhasePrompt('materialize', phaseId)
+
+    clearVisibleExecutionRuntimeState()
+    setSessionStatus('Preparando materializacion de fase segura')
+    setCurrentStep(
+      `El orquestador esta preparando la materializacion de la fase ${normalizeOptionalString(phaseId) || 'local'}`,
+    )
+    setSessionEvents((currentEvents) => [
+      ...currentEvents,
+      `Se solicito la materializacion de la fase ${normalizeOptionalString(phaseId) || 'local'}`,
+    ])
+
+    await handleGenerateNextStep({
+      goal: prompt.goal,
+      context: prompt.context,
+      sourceLabel: `Materializar fase ${normalizeOptionalString(phaseId) || 'local'}`,
+      sendContent: `Se envio una solicitud para materializar la fase ${normalizeOptionalString(phaseId) || 'local'} del proyecto existente.`,
+      persistPreparedInputs: true,
+    })
+  }
+
   const handlePrepareSafeFirstDeliveryPlan = async () => {
     if (!plannerIsReviewOnly || !activeProductArchitecture) {
       return
@@ -14192,6 +14778,21 @@ function App() {
                           compact
                         />
                       ) : null}
+                      {shouldShowLocalProjectManifest && activeLocalProjectManifest ? (
+                        <LocalProjectManifestCard
+                          manifest={activeLocalProjectManifest}
+                          compact
+                          onPreparePhase={handlePrepareProjectPhase}
+                        />
+                      ) : null}
+                      {shouldShowProjectPhaseExecutionPlan &&
+                      activeProjectPhaseExecutionPlan ? (
+                        <ProjectPhaseExecutionPlanCard
+                          plan={activeProjectPhaseExecutionPlan}
+                          compact
+                          onMaterializePhase={handleMaterializeProjectPhase}
+                        />
+                      ) : null}
                       {shouldShowNextActionPlan && activeNextActionPlan ? (
                         <NextActionPlanCard plan={activeNextActionPlan} />
                       ) : null}
@@ -15686,6 +16287,19 @@ function App() {
                 {shouldShowImplementationRoadmap &&
                 activeImplementationRoadmap ? (
                   <ImplementationRoadmapCard roadmap={activeImplementationRoadmap} />
+                ) : null}
+                {shouldShowLocalProjectManifest && activeLocalProjectManifest ? (
+                  <LocalProjectManifestCard
+                    manifest={activeLocalProjectManifest}
+                    onPreparePhase={handlePrepareProjectPhase}
+                  />
+                ) : null}
+                {shouldShowProjectPhaseExecutionPlan &&
+                activeProjectPhaseExecutionPlan ? (
+                  <ProjectPhaseExecutionPlanCard
+                    plan={activeProjectPhaseExecutionPlan}
+                    onMaterializePhase={handleMaterializeProjectPhase}
+                  />
                 ) : null}
                 {shouldShowNextActionPlan && activeNextActionPlan ? (
                   <NextActionPlanCard plan={activeNextActionPlan} />
