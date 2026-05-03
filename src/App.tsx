@@ -250,6 +250,65 @@ type ScalableDeliveryPlanContract = {
   successCriteria?: string[]
 }
 
+type ProjectBlueprintIntegrationContract = {
+  name?: string
+  type?: string
+  requiredNow?: boolean
+  approvalRequired?: boolean
+  reason?: string
+}
+
+type ProjectBlueprintPhaseContract = {
+  phase?: string
+  goal?: string
+  deliveryLevel?: ScalableDeliveryPlanContract['deliveryLevel'] | string
+  executableNow?: boolean
+  approvalRequired?: boolean
+}
+
+type ProjectBlueprintContract = {
+  productType?: string
+  domain?: string
+  intent?: string
+  deliveryLevel?: ScalableDeliveryPlanContract['deliveryLevel'] | string
+  confidence?: 'low' | 'medium' | 'high' | string
+  stackProfile?: {
+    frontend?: string
+    backend?: string
+    database?: string
+    apiStyle?: string
+    auth?: string
+    styling?: string
+    testing?: string
+    packageManager?: string
+    runtime?: string
+  }
+  roles?: string[]
+  modules?: string[]
+  entities?: string[]
+  coreFlows?: string[]
+  integrations?: ProjectBlueprintIntegrationContract[]
+  dataSensitivity?: 'none' | 'low' | 'medium' | 'high' | string
+  riskLevel?: 'low' | 'medium' | 'high' | string
+  assumptions?: string[]
+  blockingQuestions?: string[]
+  delegatedDecisions?: string[]
+  phasePlan?: ProjectBlueprintPhaseContract[]
+  explicitExclusions?: string[]
+  approvalRequiredLater?: string[]
+  successCriteria?: string[]
+}
+
+type QuestionPolicyContract = {
+  mode?: 'ask-only-if-blocking' | 'brain-decides-missing' | 'user-will-contribute' | string
+  blockingQuestions?: string[]
+  optionalQuestions?: string[]
+  delegatedDecisions?: string[]
+  shouldAskBeforePlanning?: boolean
+  shouldAskBeforeMaterialization?: boolean
+  reason?: string
+}
+
 type MaterializationPlanContract = Record<string, unknown>
 
 type PlannerExecutionMetadata = {
@@ -281,6 +340,8 @@ type PlannerExecutionMetadata = {
   safeFirstDeliveryMaterialization: SafeFirstDeliveryMaterializationContract | null
   domainUnderstanding: DomainUnderstandingContract | null
   scalableDeliveryPlan: ScalableDeliveryPlanContract | null
+  projectBlueprint: ProjectBlueprintContract | null
+  questionPolicy: QuestionPolicyContract | null
   materializationPlan: MaterializationPlanContract | null
 }
 
@@ -473,6 +534,8 @@ type PlannerDecisionResponse = {
   safeFirstDeliveryMaterialization?: SafeFirstDeliveryMaterializationContract | null
   domainUnderstanding?: DomainUnderstandingContract | null
   scalableDeliveryPlan?: ScalableDeliveryPlanContract | null
+  projectBlueprint?: ProjectBlueprintContract | null
+  questionPolicy?: QuestionPolicyContract | null
   materializationPlan?: MaterializationPlanContract | null
   brainRoutingDecision?: BrainRoutingDecision
   tasks?: unknown[]
@@ -665,6 +728,8 @@ const EMPTY_PLANNER_EXECUTION_METADATA: PlannerExecutionMetadata = {
   safeFirstDeliveryMaterialization: null,
   domainUnderstanding: null,
   scalableDeliveryPlan: null,
+  projectBlueprint: null,
+  questionPolicy: null,
   materializationPlan: null,
 }
 
@@ -691,6 +756,8 @@ const buildSafeFirstDeliveryReviewMetadata = ({
   productArchitecture: baseMetadata.productArchitecture,
   domainUnderstanding: baseMetadata.domainUnderstanding,
   scalableDeliveryPlan: baseMetadata.scalableDeliveryPlan,
+  projectBlueprint: baseMetadata.projectBlueprint,
+  questionPolicy: baseMetadata.questionPolicy,
   materializationPlan: baseMetadata.materializationPlan,
   decisionKey: 'safe-first-delivery-plan',
   strategy: 'safe-first-delivery-plan',
@@ -1178,6 +1245,230 @@ const normalizeScalableDeliveryPlanContract = (
   return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
 }
 
+const normalizeProjectBlueprintContract = (
+  value: unknown,
+): ProjectBlueprintContract | null => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const contract = value as ProjectBlueprintContract
+  const normalizedIntegrations = Array.isArray(contract.integrations)
+    ? contract.integrations
+        .map((entry) =>
+          entry && typeof entry === 'object'
+            ? {
+                ...(normalizeOptionalString(entry.name)
+                  ? { name: normalizeOptionalString(entry.name) }
+                  : {}),
+                ...(normalizeOptionalString(entry.type)
+                  ? { type: normalizeOptionalString(entry.type) }
+                  : {}),
+                ...(typeof entry.requiredNow === 'boolean'
+                  ? { requiredNow: entry.requiredNow }
+                  : {}),
+                ...(typeof entry.approvalRequired === 'boolean'
+                  ? { approvalRequired: entry.approvalRequired }
+                  : {}),
+                ...(normalizeOptionalString(entry.reason)
+                  ? { reason: normalizeOptionalString(entry.reason) }
+                  : {}),
+              }
+            : null,
+        )
+        .filter(
+          (entry): entry is ProjectBlueprintIntegrationContract =>
+            Boolean(entry) && Object.keys(entry).length > 0,
+        )
+    : []
+  const normalizedPhasePlan = Array.isArray(contract.phasePlan)
+    ? contract.phasePlan
+        .map((entry) =>
+          entry && typeof entry === 'object'
+            ? {
+                ...(normalizeOptionalString(entry.phase)
+                  ? { phase: normalizeOptionalString(entry.phase) }
+                  : {}),
+                ...(normalizeOptionalString(entry.goal)
+                  ? { goal: normalizeOptionalString(entry.goal) }
+                  : {}),
+                ...(normalizeOptionalString(entry.deliveryLevel)
+                  ? {
+                      deliveryLevel: normalizeOptionalString(
+                        entry.deliveryLevel,
+                      ) as ProjectBlueprintPhaseContract['deliveryLevel'],
+                    }
+                  : {}),
+                ...(typeof entry.executableNow === 'boolean'
+                  ? { executableNow: entry.executableNow }
+                  : {}),
+                ...(typeof entry.approvalRequired === 'boolean'
+                  ? { approvalRequired: entry.approvalRequired }
+                  : {}),
+              }
+            : null,
+        )
+        .filter(
+          (entry): entry is ProjectBlueprintPhaseContract =>
+            Boolean(entry) && Object.keys(entry).length > 0,
+        )
+    : []
+
+  const normalizedValue: ProjectBlueprintContract = {
+    ...(normalizeOptionalString(contract.productType)
+      ? { productType: normalizeOptionalString(contract.productType) }
+      : {}),
+    ...(normalizeOptionalString(contract.domain)
+      ? { domain: normalizeOptionalString(contract.domain) }
+      : {}),
+    ...(normalizeOptionalString(contract.intent)
+      ? { intent: normalizeOptionalString(contract.intent) }
+      : {}),
+    ...(normalizeOptionalString(contract.deliveryLevel)
+      ? {
+          deliveryLevel: normalizeOptionalString(
+            contract.deliveryLevel,
+          ) as ProjectBlueprintContract['deliveryLevel'],
+        }
+      : {}),
+    ...(normalizeOptionalString(contract.confidence)
+      ? {
+          confidence: normalizeOptionalString(
+            contract.confidence,
+          ) as ProjectBlueprintContract['confidence'],
+        }
+      : {}),
+    ...(contract.stackProfile && typeof contract.stackProfile === 'object'
+      ? {
+          stackProfile: {
+            ...(normalizeOptionalString(contract.stackProfile.frontend)
+              ? { frontend: normalizeOptionalString(contract.stackProfile.frontend) }
+              : {}),
+            ...(normalizeOptionalString(contract.stackProfile.backend)
+              ? { backend: normalizeOptionalString(contract.stackProfile.backend) }
+              : {}),
+            ...(normalizeOptionalString(contract.stackProfile.database)
+              ? { database: normalizeOptionalString(contract.stackProfile.database) }
+              : {}),
+            ...(normalizeOptionalString(contract.stackProfile.apiStyle)
+              ? { apiStyle: normalizeOptionalString(contract.stackProfile.apiStyle) }
+              : {}),
+            ...(normalizeOptionalString(contract.stackProfile.auth)
+              ? { auth: normalizeOptionalString(contract.stackProfile.auth) }
+              : {}),
+            ...(normalizeOptionalString(contract.stackProfile.styling)
+              ? { styling: normalizeOptionalString(contract.stackProfile.styling) }
+              : {}),
+            ...(normalizeOptionalString(contract.stackProfile.testing)
+              ? { testing: normalizeOptionalString(contract.stackProfile.testing) }
+              : {}),
+            ...(normalizeOptionalString(contract.stackProfile.packageManager)
+              ? {
+                  packageManager: normalizeOptionalString(
+                    contract.stackProfile.packageManager,
+                  ),
+                }
+              : {}),
+            ...(normalizeOptionalString(contract.stackProfile.runtime)
+              ? { runtime: normalizeOptionalString(contract.stackProfile.runtime) }
+              : {}),
+          },
+        }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.roles).length > 0
+      ? { roles: normalizeOptionalStringArray(contract.roles) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.modules).length > 0
+      ? { modules: normalizeOptionalStringArray(contract.modules) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.entities).length > 0
+      ? { entities: normalizeOptionalStringArray(contract.entities) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.coreFlows).length > 0
+      ? { coreFlows: normalizeOptionalStringArray(contract.coreFlows) }
+      : {}),
+    ...(normalizedIntegrations.length > 0 ? { integrations: normalizedIntegrations } : {}),
+    ...(normalizeOptionalString(contract.dataSensitivity)
+      ? {
+          dataSensitivity: normalizeOptionalString(
+            contract.dataSensitivity,
+          ) as ProjectBlueprintContract['dataSensitivity'],
+        }
+      : {}),
+    ...(normalizeOptionalString(contract.riskLevel)
+      ? {
+          riskLevel: normalizeOptionalString(
+            contract.riskLevel,
+          ) as ProjectBlueprintContract['riskLevel'],
+        }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.assumptions).length > 0
+      ? { assumptions: normalizeOptionalStringArray(contract.assumptions) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.blockingQuestions).length > 0
+      ? { blockingQuestions: normalizeOptionalStringArray(contract.blockingQuestions) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.delegatedDecisions).length > 0
+      ? { delegatedDecisions: normalizeOptionalStringArray(contract.delegatedDecisions) }
+      : {}),
+    ...(normalizedPhasePlan.length > 0 ? { phasePlan: normalizedPhasePlan } : {}),
+    ...(normalizeOptionalStringArray(contract.explicitExclusions).length > 0
+      ? { explicitExclusions: normalizeOptionalStringArray(contract.explicitExclusions) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.approvalRequiredLater).length > 0
+      ? {
+          approvalRequiredLater: normalizeOptionalStringArray(
+            contract.approvalRequiredLater,
+          ),
+        }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.successCriteria).length > 0
+      ? { successCriteria: normalizeOptionalStringArray(contract.successCriteria) }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
+const normalizeQuestionPolicyContract = (
+  value: unknown,
+): QuestionPolicyContract | null => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const contract = value as QuestionPolicyContract
+  const normalizedValue: QuestionPolicyContract = {
+    ...(normalizeOptionalString(contract.mode)
+      ? {
+          mode: normalizeOptionalString(
+            contract.mode,
+          ) as QuestionPolicyContract['mode'],
+        }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.blockingQuestions).length > 0
+      ? { blockingQuestions: normalizeOptionalStringArray(contract.blockingQuestions) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.optionalQuestions).length > 0
+      ? { optionalQuestions: normalizeOptionalStringArray(contract.optionalQuestions) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.delegatedDecisions).length > 0
+      ? { delegatedDecisions: normalizeOptionalStringArray(contract.delegatedDecisions) }
+      : {}),
+    ...(typeof contract.shouldAskBeforePlanning === 'boolean'
+      ? { shouldAskBeforePlanning: contract.shouldAskBeforePlanning }
+      : {}),
+    ...(typeof contract.shouldAskBeforeMaterialization === 'boolean'
+      ? { shouldAskBeforeMaterialization: contract.shouldAskBeforeMaterialization }
+      : {}),
+    ...(normalizeOptionalString(contract.reason)
+      ? { reason: normalizeOptionalString(contract.reason) }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
 const normalizeDomainUnderstandingContract = (
   value: unknown,
 ): DomainUnderstandingContract | null => {
@@ -1261,6 +1552,8 @@ const extractPlannerExecutionMetadata = (payload?: {
   safeFirstDeliveryMaterialization?: SafeFirstDeliveryMaterializationContract | null
   domainUnderstanding?: DomainUnderstandingContract | null
   scalableDeliveryPlan?: ScalableDeliveryPlanContract | null
+  projectBlueprint?: ProjectBlueprintContract | null
+  questionPolicy?: QuestionPolicyContract | null
   materializationPlan?: MaterializationPlanContract | null
   tasks?: unknown[]
   assumptions?: string[]
@@ -1434,6 +1727,8 @@ const extractPlannerExecutionMetadata = (payload?: {
   scalableDeliveryPlan: normalizeScalableDeliveryPlanContract(
     payload?.scalableDeliveryPlan,
   ),
+  projectBlueprint: normalizeProjectBlueprintContract(payload?.projectBlueprint),
+  questionPolicy: normalizeQuestionPolicyContract(payload?.questionPolicy),
   materializationPlan:
     payload?.materializationPlan && typeof payload.materializationPlan === 'object'
       ? payload.materializationPlan
@@ -2497,7 +2792,7 @@ function ScalableDeliveryPlanCard({
   const planReason =
     normalizeOptionalString(plan.reason) || 'Sin motivo resumido disponible.'
   const typeLabel = getScalableDeliveryPlanTypeLabel(normalizedDeliveryLevel)
-  const reviewStateLabel = reviewOnly ? 'No ejecuta todavÃ­a' : 'Plan informado'
+  const reviewStateLabel = reviewOnly ? 'No ejecuta todavía' : 'Plan informado'
   const nextActionLabel = getNextExpectedActionLabel(nextExpectedAction)
   const canPrepareFrontendMaterialization =
     reviewOnly &&
@@ -2535,7 +2830,7 @@ function ScalableDeliveryPlanCard({
             Plan escalable
           </div>
           <div className="mt-2 text-sm leading-6 text-slate-400">
-            Este bloque resume una entrega local mÃ¡s grande que la primera entrega segura y queda en revisiÃ³n; no ejecuta cambios todavÃ­a.
+            Este bloque resume una entrega local más grande que la primera entrega segura y queda en revisión; no ejecuta cambios todavía.
           </div>
           <div className="mt-2 text-xs leading-5 text-slate-500">
             {getScalableDeliverySummary(plan)}
@@ -2546,7 +2841,7 @@ function ScalableDeliveryPlanCard({
             Plan revisable
           </span>
           <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-medium text-amber-100">
-            No ejecuta todavÃ­a
+            No ejecuta todavía
           </span>
           {canPrepareFrontendMaterialization ? (
             <button
@@ -2554,7 +2849,7 @@ function ScalableDeliveryPlanCard({
               onClick={onPrepareMaterialization || undefined}
               className="rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-1 text-xs font-medium text-sky-100 transition hover:bg-sky-300/15"
             >
-              Preparar materializaciÃ³n frontend
+              Preparar materialización frontend
             </button>
           ) : null}
           {canPrepareFullstackMaterialization ? (
@@ -2584,11 +2879,11 @@ function ScalableDeliveryPlanCard({
         <MetricCard
           label="Estado"
           value={reviewStateLabel}
-          detail="JEFE no deberÃ­a ejecutar archivos grandes desde este paso."
+          detail="JEFE no debería ejecutar archivos grandes desde este paso."
           tone="amber"
         />
         <MetricCard
-          label="Siguiente acciÃ³n"
+          label="Siguiente acción"
           value={nextActionLabel}
           detail={normalizeOptionalString(nextExpectedAction) || 'Sin clave declarada'}
         />
@@ -2608,7 +2903,7 @@ function ScalableDeliveryPlanCard({
           tone="sky"
         />
         <ProductArchitectureGroup
-          title="MÃ³dulos principales"
+          title="Módulos principales"
           items={plan.modules}
           compact={compact}
         />
@@ -2621,7 +2916,7 @@ function ScalableDeliveryPlanCard({
 
       <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/40 px-4 py-4">
         <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-          RazÃ³n del nivel elegido
+          Razón del nivel elegido
         </div>
         <div className="mt-3 text-sm leading-6 text-slate-100">{planReason}</div>
       </div>
@@ -2641,7 +2936,7 @@ function ScalableDeliveryPlanCard({
                   {entry.path || 'Ruta no declarada'}
                 </div>
                 <div className="mt-2 text-xs leading-5 text-slate-400">
-                  {entry.purpose || 'Sin propÃ³sito declarado'}
+                  {entry.purpose || 'Sin propósito declarado'}
                 </div>
                 <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                   {entry.required ? 'Requerido' : 'Opcional'}
@@ -2650,13 +2945,13 @@ function ScalableDeliveryPlanCard({
             ))
           ) : (
             <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300 xl:col-span-2">
-              El planner no dejÃ³ archivos propuestos estructurados para este nivel.
+              El planner no dejó archivos propuestos estructurados para este nivel.
             </div>
           )}
         </div>
         {compact && fileEntries.length > visibleFileEntries.length ? (
           <div className="mt-3 text-xs leading-5 text-slate-500">
-            +{fileEntries.length - visibleFileEntries.length} archivo(s) mÃ¡s en la propuesta completa.
+            +{fileEntries.length - visibleFileEntries.length} archivo(s) más en la propuesta completa.
           </div>
         ) : null}
       </div>
@@ -2669,7 +2964,7 @@ function ScalableDeliveryPlanCard({
           tone="amber"
         />
         <ProductArchitectureGroup
-          title="Exclusiones explÃ­citas"
+          title="Exclusiones explícitas"
           items={plan.explicitExclusions}
           compact={compact}
           tone="rose"
@@ -2681,12 +2976,294 @@ function ScalableDeliveryPlanCard({
           tone="amber"
         />
         <ProductArchitectureGroup
-          title="Criterios de Ã©xito"
+          title="Criterios de éxito"
           items={plan.successCriteria}
           compact={compact}
           tone="emerald"
         />
       </div>
+    </article>
+  )
+}
+
+function ProjectBlueprintCard({
+  blueprint,
+  questionPolicy,
+  compact = false,
+}: {
+  blueprint: ProjectBlueprintContract
+  questionPolicy?: QuestionPolicyContract | null
+  compact?: boolean
+}) {
+  const stackProfile = blueprint.stackProfile || null
+  const stackItems = [
+    stackProfile?.frontend
+      ? `Frontend: ${stackProfile.frontend}`
+      : '',
+    stackProfile?.backend ? `Backend: ${stackProfile.backend}` : '',
+    stackProfile?.database ? `Base de datos: ${stackProfile.database}` : '',
+    stackProfile?.apiStyle ? `API: ${stackProfile.apiStyle}` : '',
+    stackProfile?.auth ? `Auth: ${stackProfile.auth}` : '',
+    stackProfile?.styling ? `Styling: ${stackProfile.styling}` : '',
+    stackProfile?.testing ? `Testing: ${stackProfile.testing}` : '',
+    stackProfile?.packageManager
+      ? `Package manager: ${stackProfile.packageManager}`
+      : '',
+    stackProfile?.runtime ? `Runtime: ${stackProfile.runtime}` : '',
+  ].filter(Boolean)
+  const visibleStackItems = compact ? stackItems.slice(0, 5) : stackItems
+  const visibleIntegrations = compact
+    ? (blueprint.integrations || []).slice(0, 3)
+    : blueprint.integrations || []
+  const visiblePhasePlan = compact
+    ? (blueprint.phasePlan || []).slice(0, 3)
+    : blueprint.phasePlan || []
+
+  return (
+    <article className="rounded-3xl border border-emerald-300/15 bg-emerald-300/[0.06] p-5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Blueprint del proyecto
+          </div>
+          <div className="mt-2 text-sm leading-6 text-slate-400">
+            Esta lectura resume el tipo de producto, el stack recomendado, los módulos
+            y las decisiones de arquitectura que JEFE está usando para planificar.
+          </div>
+          <div className="mt-2 text-xs leading-5 text-slate-500">
+            {normalizeOptionalString(blueprint.intent) ||
+              'Sin intención resumida disponible.'}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
+            Arquitectura dinámica
+          </span>
+          <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-medium text-emerald-100">
+            {getDeliveryLevelLabel(blueprint.deliveryLevel)}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="Tipo de producto"
+          value={normalizeOptionalString(blueprint.productType) || 'No definido'}
+          detail={normalizeOptionalString(blueprint.domain) || 'Sin dominio declarado'}
+          tone="emerald"
+        />
+        <MetricCard
+          label="Delivery level"
+          value={getDeliveryLevelLabel(blueprint.deliveryLevel)}
+          detail={getScalableDeliveryPlanTypeLabel(blueprint.deliveryLevel)}
+          tone={getDeliveryLevelTone(blueprint.deliveryLevel)}
+        />
+        <MetricCard
+          label="Confianza"
+          value={getBlueprintConfidenceLabel(blueprint.confidence)}
+          detail={getStackProfileSummary(blueprint)}
+          tone="sky"
+        />
+        <MetricCard
+          label="Riesgo"
+          value={getRiskLabel(blueprint.riskLevel)}
+          detail={`Sensibilidad: ${getSensitivityLabel(blueprint.dataSensitivity)}`}
+          tone={getRiskTone(blueprint.riskLevel)}
+        />
+      </div>
+
+      <div className="mt-4 grid gap-3 xl:grid-cols-2">
+        <ProductArchitectureGroup
+          title="Roles"
+          items={blueprint.roles}
+          compact={compact}
+          tone="sky"
+        />
+        <ProductArchitectureGroup
+          title="Módulos"
+          items={blueprint.modules}
+          compact={compact}
+          tone="emerald"
+        />
+        <ProductArchitectureGroup
+          title="Entidades"
+          items={blueprint.entities}
+          compact={compact}
+        />
+        <ProductArchitectureGroup
+          title="Flujos principales"
+          items={blueprint.coreFlows}
+          compact={compact}
+        />
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+          Stack recomendado
+        </div>
+        <div className="mt-3 grid gap-3 xl:grid-cols-2">
+          {visibleStackItems.length > 0 ? (
+            visibleStackItems.map((item) => (
+              <div
+                key={item}
+                className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-100"
+              >
+                {item}
+              </div>
+            ))
+          ) : (
+            <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300 xl:col-span-2">
+              El Cerebro todavía no dejó un stack profile estructurado.
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 xl:grid-cols-2">
+        <ProductArchitectureGroup
+          title="Supuestos"
+          items={blueprint.assumptions}
+          compact={compact}
+        />
+        <ProductArchitectureGroup
+          title="Decisiones delegadas"
+          items={blueprint.delegatedDecisions || questionPolicy?.delegatedDecisions}
+          compact={compact}
+          tone="emerald"
+        />
+        <ProductArchitectureGroup
+          title="Preguntas bloqueantes"
+          items={blueprint.blockingQuestions || questionPolicy?.blockingQuestions}
+          compact={compact}
+          tone="amber"
+        />
+        <ProductArchitectureGroup
+          title="Aprobaciones futuras"
+          items={blueprint.approvalRequiredLater}
+          compact={compact}
+          tone="rose"
+        />
+      </div>
+
+      <div className="mt-4 grid gap-3 xl:grid-cols-2">
+        <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Política de preguntas
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <MetricCard
+              label="Modo"
+              value={getQuestionPolicyModeLabel(questionPolicy?.mode)}
+              detail={normalizeOptionalString(questionPolicy?.reason) || 'Sin razón declarada'}
+              tone="amber"
+            />
+            <MetricCard
+              label="Antes de planificar"
+              value={questionPolicy?.shouldAskBeforePlanning ? 'Preguntar' : 'Seguir'}
+              detail={
+                questionPolicy?.shouldAskBeforeMaterialization
+                  ? 'También podría frenar antes de materializar'
+                  : 'No hace falta bloquear la materialización por ahora'
+              }
+              tone={questionPolicy?.shouldAskBeforePlanning ? 'amber' : 'emerald'}
+            />
+          </div>
+          {normalizeOptionalStringArray(questionPolicy?.optionalQuestions).length > 0 ? (
+            <div className="mt-4">
+              <ProductArchitectureGroup
+                title="Preguntas opcionales"
+                items={questionPolicy?.optionalQuestions}
+                compact={compact}
+              />
+            </div>
+          ) : null}
+        </article>
+
+        <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Fases propuestas
+          </div>
+          <div className="mt-3 grid gap-3">
+            {visiblePhasePlan.length > 0 ? (
+              visiblePhasePlan.map((phaseEntry) => (
+                <div
+                  key={`${phaseEntry.phase || 'phase'}-${phaseEntry.goal || 'goal'}`}
+                  className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3"
+                >
+                  <div className="text-sm font-medium leading-6 text-slate-100">
+                    {phaseEntry.phase || 'Fase sin nombre'}
+                  </div>
+                  <div className="mt-1 text-xs leading-5 text-slate-400">
+                    {phaseEntry.goal || 'Sin objetivo declarado'}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    <span>{getDeliveryLevelLabel(phaseEntry.deliveryLevel)}</span>
+                    <span>
+                      {phaseEntry.executableNow ? 'ejecutable ahora' : 'no ejecutable todavía'}
+                    </span>
+                    <span>
+                      {phaseEntry.approvalRequired
+                        ? 'requiere aprobación'
+                        : 'sin aprobación previa'}
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                El blueprint todavía no dejó fases estructuradas.
+              </div>
+            )}
+          </div>
+        </article>
+      </div>
+
+      <div className="mt-4 grid gap-3 xl:grid-cols-2">
+        <ProductArchitectureGroup
+          title="Exclusiones explícitas"
+          items={blueprint.explicitExclusions}
+          compact={compact}
+          tone="rose"
+        />
+        <ProductArchitectureGroup
+          title="Criterios de éxito"
+          items={blueprint.successCriteria}
+          compact={compact}
+          tone="emerald"
+        />
+      </div>
+
+      {visibleIntegrations.length > 0 ? (
+        <div className="mt-4 rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Integraciones consideradas
+          </div>
+          <div className="mt-3 grid gap-3 xl:grid-cols-2">
+            {visibleIntegrations.map((integration) => (
+              <div
+                key={`${integration.name || 'integration'}-${integration.type || 'type'}`}
+                className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3"
+              >
+                <div className="text-sm font-medium leading-6 text-slate-100">
+                  {integration.name || 'Integración sin nombre'}
+                </div>
+                <div className="mt-1 text-xs leading-5 text-slate-400">
+                  {integration.reason || 'Sin motivo declarado'}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  <span>{integration.type || 'tipo no declarado'}</span>
+                  <span>{integration.requiredNow ? 'requerida ahora' : 'no requerida ahora'}</span>
+                  <span>
+                    {integration.approvalRequired
+                      ? 'requiere aprobación'
+                      : 'sin aprobación previa'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </article>
   )
 }
@@ -4060,7 +4637,7 @@ const getScalableDeliveryPlanTypeLabel = (value: unknown) => {
 
 const getScalableDeliverySummary = (plan?: ScalableDeliveryPlanContract | null) => {
   if (!plan) {
-    return 'JEFE detectÃ³ una entrega escalable y la dejÃ³ en revisiÃ³n manual.'
+    return 'JEFE detectó una entrega escalable y la dejó en revisión manual.'
   }
 
   const firstStructureEntry = normalizeOptionalStringArray(plan.targetStructure)[0]
@@ -4071,7 +4648,119 @@ const getScalableDeliverySummary = (plan?: ScalableDeliveryPlanContract | null) 
     firstStructureEntry ||
     firstDirectoryEntry ||
     firstFileEntry ||
-    'JEFE detectÃ³ una entrega escalable y la dejÃ³ en revisiÃ³n manual.'
+    'JEFE detectó una entrega escalable y la dejó en revisión manual.'
+  )
+}
+
+const getBlueprintConfidenceLabel = (value: unknown) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (normalizedValue === 'high') {
+    return 'Alta'
+  }
+
+  if (normalizedValue === 'medium') {
+    return 'Media'
+  }
+
+  if (normalizedValue === 'low') {
+    return 'Baja'
+  }
+
+  return normalizeOptionalString(value) || 'No definida'
+}
+
+const getQuestionPolicyModeLabel = (value: unknown) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (normalizedValue === 'brain-decides-missing') {
+    return 'El Cerebro decide faltantes menores'
+  }
+
+  if (normalizedValue === 'user-will-contribute') {
+    return 'El usuario puede aportar definiciones'
+  }
+
+  if (normalizedValue === 'ask-only-if-blocking') {
+    return 'Preguntar solo si bloquea'
+  }
+
+  return normalizeOptionalString(value) || 'No definida'
+}
+
+const getSensitivityLabel = (value: unknown) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (normalizedValue === 'high') {
+    return 'Alta'
+  }
+
+  if (normalizedValue === 'medium') {
+    return 'Media'
+  }
+
+  if (normalizedValue === 'low') {
+    return 'Baja'
+  }
+
+  if (normalizedValue === 'none') {
+    return 'Nula'
+  }
+
+  return normalizeOptionalString(value) || 'No definida'
+}
+
+const getRiskLabel = (value: unknown) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (normalizedValue === 'high') {
+    return 'Alto'
+  }
+
+  if (normalizedValue === 'medium') {
+    return 'Medio'
+  }
+
+  if (normalizedValue === 'low') {
+    return 'Bajo'
+  }
+
+  return normalizeOptionalString(value) || 'No definido'
+}
+
+const getRiskTone = (
+  value: unknown,
+): 'default' | 'sky' | 'emerald' | 'amber' | 'rose' => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (normalizedValue === 'high') {
+    return 'rose'
+  }
+
+  if (normalizedValue === 'medium') {
+    return 'amber'
+  }
+
+  if (normalizedValue === 'low') {
+    return 'emerald'
+  }
+
+  return 'default'
+}
+
+const getStackProfileSummary = (blueprint?: ProjectBlueprintContract | null) => {
+  if (!blueprint?.stackProfile) {
+    return 'Sin stack recomendado'
+  }
+
+  return (
+    [
+      normalizeOptionalString(blueprint.stackProfile.frontend),
+      normalizeOptionalString(blueprint.stackProfile.backend),
+      normalizeOptionalString(blueprint.stackProfile.database),
+    ]
+      .filter(Boolean)
+      .join(' · ') || 'Sin stack recomendado'
   )
 }
 
@@ -5600,6 +6289,8 @@ function App() {
     effectivePlannerExecutionMetadata.safeFirstDeliveryPlan
   const activeScalableDeliveryPlan =
     effectivePlannerExecutionMetadata.scalableDeliveryPlan
+  const activeProjectBlueprint = effectivePlannerExecutionMetadata.projectBlueprint
+  const activeQuestionPolicy = effectivePlannerExecutionMetadata.questionPolicy
   const activeScalableDeliveryLevel = normalizeOptionalString(
     activeScalableDeliveryPlan?.deliveryLevel,
   ).toLocaleLowerCase()
@@ -5607,6 +6298,10 @@ function App() {
     plannerIsScalableDeliveryReview &&
     activeScalableDeliveryLevel !== '' &&
     activeScalableDeliveryLevel !== 'safe-first-delivery'
+  const shouldShowProjectBlueprint =
+    Boolean(activeProjectBlueprint) &&
+    normalizeOptionalString(activeProjectBlueprint?.deliveryLevel).toLocaleLowerCase() !==
+      'safe-first-delivery'
   const manualReuseModeLabel = getManualReuseModeLabel(manualReuseMode)
   const selectedReusableArtifactSummary = selectedReusableArtifact
     ? [
@@ -5986,7 +6681,7 @@ function App() {
       normalizeOptionalString(entry.expectedKind),
     ]
       .filter(Boolean)
-      .join(' Â· '),
+      .join(' · '),
   }))
   const inferredValidationCount = latestValidatedFolderCount + latestValidatedFileCount
   const inferredValidationSummaryParts = [
@@ -9445,9 +10140,9 @@ function App() {
       )
       addFlowMessage({
         source: 'orquestador',
-        title: 'DecisiÃ³n del orquestador',
+        title: 'Decisión del orquestador',
         content:
-          'No hay un scalableDeliveryPlan activo y vÃ¡lido para preparar la materializaciÃ³n frontend.',
+          'No hay un scalableDeliveryPlan activo y válido para preparar la materialización frontend.',
         status: 'error',
       })
       return
@@ -9457,15 +10152,15 @@ function App() {
       normalizeOptionalString(activeScalableDeliveryPlan.deliveryLevel).toLocaleLowerCase() !==
       'frontend-project'
     ) {
-      setSessionStatus('Plan escalable todavÃ­a no materializable')
+      setSessionStatus('Plan escalable todavía no materializable')
       setCurrentStep(
-        'La materializacion frontend solo estÃ¡ disponible para deliveryLevel frontend-project',
+        'La materializacion frontend solo está disponible para deliveryLevel frontend-project',
       )
       addFlowMessage({
         source: 'orquestador',
-        title: 'DecisiÃ³n del orquestador',
+        title: 'Decisión del orquestador',
         content:
-          'La materializaciÃ³n frontend controlada solo estÃ¡ disponible para deliveryLevel frontend-project.',
+          'La materialización frontend controlada solo está disponible para deliveryLevel frontend-project.',
         status: 'warning',
       })
       return
@@ -9478,7 +10173,7 @@ function App() {
     })
 
     clearVisibleExecutionRuntimeState()
-    setSessionStatus('Preparando materializaciÃ³n frontend')
+    setSessionStatus('Preparando materialización frontend')
     setCurrentStep(
       'El orquestador esta preparando un scaffold frontend local, revisable y materializable por el executor deterministico',
     )
@@ -9490,9 +10185,9 @@ function App() {
     await handleGenerateNextStep({
       goal: preparedPlanningPrompt.goal,
       context: preparedPlanningPrompt.context,
-      sourceLabel: 'MaterializaciÃ³n frontend preparada',
+      sourceLabel: 'Materialización frontend preparada',
       sendContent:
-        'Se enviÃ³ al planificador una solicitud controlada para preparar la materializaciÃ³n local de un frontend-project sin instalar dependencias ni ejecutar el proyecto.',
+        'Se envió al planificador una solicitud controlada para preparar la materialización local de un frontend-project sin instalar dependencias ni ejecutar el proyecto.',
       validateResponse: (_response, metadata) =>
         buildFrontendProjectMaterializationCoherenceIssue({
           sourcePlan: activeScalableDeliveryPlan,
@@ -12582,6 +13277,13 @@ function App() {
                           }
                         />
                       ) : null}
+                      {shouldShowProjectBlueprint && activeProjectBlueprint ? (
+                        <ProjectBlueprintCard
+                          blueprint={activeProjectBlueprint}
+                          questionPolicy={activeQuestionPolicy}
+                          compact
+                        />
+                      ) : null}
                       {activeSafeFirstDeliveryPlan ? (
                         <SafeFirstDeliveryPlanCard
                           plan={activeSafeFirstDeliveryPlan}
@@ -13423,7 +14125,7 @@ function App() {
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
                 La app ahora se recorre por secciones, con un dashboard inicial
-                mÃ¡s limpio y detalles largos llevados a modales cuando realmente
+                más limpio y detalles largos llevados a modales cuando realmente
                 hacen falta.
               </p>
             </div>
@@ -13511,7 +14213,7 @@ function App() {
 
             <div className="mt-4 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Acciones rÃ¡pidas
+                Acciones rápidas
               </div>
               <div className="mt-3 grid gap-2">
                 <button
@@ -13534,7 +14236,7 @@ function App() {
                   disabled={!canExecuteInstruction || isExecutingTask}
                   className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
                 >
-                  {isExecutingTask ? 'Ejecutando...' : 'Ejecutar instrucciÃ³n'}
+                  {isExecutingTask ? 'Ejecutando...' : 'Ejecutar instrucción'}
                 </button>
                 <button
                   type="button"
@@ -13544,7 +14246,7 @@ function App() {
                   }}
                   className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
                 >
-                  Abrir consola tÃ©cnica
+                  Abrir consola técnica
                 </button>
               </div>
             </div>
@@ -13560,7 +14262,7 @@ function App() {
                 <SectionHeader
                   eyebrow="Inicio"
                   title="Resumen operativo"
-                  description="Un punto de entrada corto para entender el estado general, la Ãºltima corrida y las acciones que mueven el flujo."
+                  description="Un punto de entrada corto para entender el estado general, la última corrida y las acciones que mueven el flujo."
                   actions={
                     <>
                       <button
@@ -13582,7 +14284,7 @@ function App() {
                         disabled={isTestingConnection}
                         className="rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm font-medium text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
                       >
-                        {isTestingConnection ? 'Probando...' : 'Probar conexiÃ³n local'}
+                        {isTestingConnection ? 'Probando...' : 'Probar conexión local'}
                       </button>
                       <button
                         type="button"
@@ -13597,7 +14299,7 @@ function App() {
                       >
                         {isAutoFlowRunning
                           ? 'Procesando flujo...'
-                          : 'Iniciar flujo automÃ¡tico'}
+                          : 'Iniciar flujo automático'}
                       </button>
                     </>
                   }
@@ -13634,10 +14336,10 @@ function App() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-lg font-semibold text-white">
-                          Ãšltima corrida
+                          Última corrida
                         </div>
                         <p className="mt-1 text-sm text-slate-400">
-                          Lectura compacta del Ãºltimo cierre operativo.
+                          Lectura compacta del último cierre operativo.
                         </p>
                       </div>
                       <button
@@ -13680,7 +14382,7 @@ function App() {
                           <MetricCard
                             label="Progreso material"
                             value={
-                              latestExecutionRunSummary.hasMaterialProgress ? 'SÃ­' : 'No'
+                              latestExecutionRunSummary.hasMaterialProgress ? 'Sí' : 'No'
                             }
                           />
                         </div>
@@ -13694,7 +14396,7 @@ function App() {
                       </div>
                     ) : (
                       <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                        TodavÃ­a no hay corridas ejecutadas para resumir.
+                        Todavía no hay corridas ejecutadas para resumir.
                       </div>
                     )}
                   </article>
@@ -13702,7 +14404,7 @@ function App() {
                   <div className="space-y-4">
                     <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
                       <div className="text-lg font-semibold text-white">
-                        Acciones rÃ¡pidas
+                        Acciones rápidas
                       </div>
                       <div className="mt-4 grid gap-2">
                         <button
@@ -13717,7 +14419,7 @@ function App() {
                           onClick={() => setActiveSection('planificacion')}
                           className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-medium text-slate-200 transition hover:bg-white/10"
                         >
-                          Inspeccionar la planificaciÃ³n
+                          Inspeccionar la planificación
                         </button>
                         <button
                           type="button"
@@ -13732,7 +14434,7 @@ function App() {
                           disabled={isRunning}
                           className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
                         >
-                          Reiniciar memoria de la sesiÃ³n
+                          Reiniciar memoria de la sesión
                         </button>
                       </div>
                     </article>
@@ -13744,7 +14446,7 @@ function App() {
                       <div className="mt-3 text-sm leading-6 text-slate-300">
                         {shouldShowVisibleFinalTextResponse
                           ? summarizeInlineText(visibleFinalTextResponse, 180)
-                          : 'TodavÃ­a no hay una respuesta final visible para mostrar acÃ¡.'}
+                          : 'Todavía no hay una respuesta final visible para mostrar acá.'}
                       </div>
                       {shouldShowVisibleFinalTextResponse ? (
                         <button
@@ -13765,8 +14467,8 @@ function App() {
               <div className="space-y-6">
                 <SectionHeader
                   eyebrow="Objetivo y contexto"
-                  title="DefiniciÃ³n de trabajo"
-                  description="Objetivo, contexto adicional, participaciÃ³n del usuario y criterio del Cerebro en una sola vista consistente."
+                  title="Definición de trabajo"
+                  description="Objetivo, contexto adicional, participación del usuario y criterio del Cerebro en una sola vista consistente."
                   actions={
                     <button
                       type="button"
@@ -13774,7 +14476,7 @@ function App() {
                       disabled={isPlanning}
                       className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
                     >
-                      {isPlanning ? 'Generando...' : 'Actualizar planificaciÃ³n'}
+                      {isPlanning ? 'Generando...' : 'Actualizar planificación'}
                     </button>
                   }
                 />
@@ -13838,7 +14540,7 @@ function App() {
                   <div className="space-y-4">
                     <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        ParticipaciÃ³n del usuario
+                        Participación del usuario
                       </div>
                       <div className="mt-3 grid gap-2">
                         <button
@@ -13850,7 +14552,7 @@ function App() {
                               : 'border-white/10 bg-slate-950/50 text-slate-200 hover:bg-white/10'
                           }`}
                         >
-                          SÃ­, voy a aportar
+                          Sí, voy a aportar
                         </button>
                         <button
                           type="button"
@@ -13861,7 +14563,7 @@ function App() {
                               : 'border-white/10 bg-slate-950/50 text-slate-200 hover:bg-white/10'
                           }`}
                         >
-                          No, decidÃ­ vos
+                          No, decidí vos
                         </button>
                         <button
                           type="button"
@@ -13918,7 +14620,7 @@ function App() {
                         detail={
                           activeBrainFallbackUsed
                             ? `Respaldo hacia ${activeBrainResolvedProvider}`
-                            : 'Sin respaldo en la Ãºltima decisiÃ³n'
+                            : 'Sin respaldo en la Última decisión'
                         }
                       />
                       <MetricCard
@@ -13934,9 +14636,9 @@ function App() {
             {activeSection === 'planificacion' ? (
               <div className="space-y-6">
                 <SectionHeader
-                  eyebrow="PlanificaciÃ³n"
-                  title="Ruta y decisiÃ³n del planificador"
-                  description="La instrucciÃ³n visible, la estrategia y la reutilizaciÃ³n se leen juntas para entender por quÃ© la app quiere avanzar por este camino."
+                  eyebrow="Planificación"
+                  title="Ruta y decisión del planificador"
+                  description="La instrucción visible, la estrategia y la reutilización se leen juntas para entender por qué la app quiere avanzar por este camino."
                   actions={
                     <>
                       <button
@@ -13988,7 +14690,7 @@ function App() {
                     }
                   />
                         <MetricCard
-                          label="Siguiente acciÃ³n"
+                          label="Siguiente acción"
                           value={getNextExpectedActionLabel(
                             plannerExecutionMetadata.nextExpectedAction,
                           )}
@@ -14001,7 +14703,7 @@ function App() {
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
                   <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      Ãšltima instrucciÃ³n del planificador
+                      Última instrucción del planificador
                     </div>
                     <div className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-slate-100">
                       {plannerInstruction}
@@ -14052,6 +14754,12 @@ function App() {
                     }
                   />
                 ) : null}
+                {shouldShowProjectBlueprint && activeProjectBlueprint ? (
+                  <ProjectBlueprintCard
+                    blueprint={activeProjectBlueprint}
+                    questionPolicy={activeQuestionPolicy}
+                  />
+                ) : null}
                 {shouldShowScalableDeliveryPlan && activeScalableDeliveryPlan ? (
                   <ScalableDeliveryPlanCard
                     plan={activeScalableDeliveryPlan}
@@ -14085,7 +14793,7 @@ function App() {
                           >
                             <div className="text-sm font-medium text-white">
                               {task.step ? `Paso ${task.step}` : `Paso ${index + 1}`}{' '}
-                              {task.title || task.operation || 'AcciÃ³n sin tÃ­tulo'}
+                              {task.title || task.operation || 'Acción sin título'}
                             </div>
                             <div className="mt-2 text-xs leading-5 text-slate-400">
                               {task.targetPath || 'Sin ruta objetivo declarada'}
@@ -14094,7 +14802,7 @@ function App() {
                         ))
                       ) : (
                         <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                          El planner no dejÃ³ una lista estructurada de tareas en esta decisiÃ³n.
+                          El planner no dejó una lista estructurada de tareas en esta decisión.
                         </div>
                       )}
                     </div>
@@ -14103,7 +14811,7 @@ function App() {
                   <div className="space-y-4">
                     <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
                       <div className="text-lg font-semibold text-white">
-                        DirecciÃ³n creativa
+                        Dirección creativa
                       </div>
                       <div className="mt-4 grid gap-3 sm:grid-cols-2">
                         <MetricCard
@@ -14156,7 +14864,7 @@ function App() {
                           )
                         ) : (
                           <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                            No hay supuestos explÃ­citos registrados.
+                            No hay supuestos explícitos registrados.
                           </div>
                         )}
                       </div>
@@ -14169,9 +14877,9 @@ function App() {
             {activeSection === 'ejecucion' ? (
               <div className="space-y-6">
                 <SectionHeader
-                  eyebrow="EjecuciÃ³n"
-                  title="AcciÃ³n manual y resultado"
-                  description="La instrucciÃ³n aprobada, el estado del ejecutor y la salida visible quedan separados del resto para que ejecutar sea mÃ¡s simple."
+                  eyebrow="Ejecución"
+                  title="Acción manual y resultado"
+                  description="La instrucción aprobada, el estado del ejecutor y la salida visible quedan separados del resto para que ejecutar sea más simple."
                   actions={
                     <>
                       <button
@@ -14182,14 +14890,14 @@ function App() {
                         disabled={!canExecuteInstruction || isExecutingTask}
                         className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
                       >
-                        {isExecutingTask ? 'Ejecutando...' : 'Ejecutar instrucciÃ³n actual'}
+                        {isExecutingTask ? 'Ejecutando...' : 'Ejecutar instrucción actual'}
                       </button>
                       <button
                         type="button"
                         onClick={() => setActiveSection('planificacion')}
                         className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
                       >
-                        Volver a la planificaciÃ³n
+                        Volver a la planificación
                       </button>
                     </>
                   }
@@ -14208,12 +14916,12 @@ function App() {
                     detail={flowStageLabel}
                   />
                   <MetricCard
-                    label="Modo de ejecuciÃ³n"
+                    label="Modo de ejecución"
                     value={contextualExecutorModeLabel}
                     detail={contextualExecutorModeDetail}
                   />
                   <MetricCard
-                    label="ConexiÃ³n local"
+                    label="Conexión local"
                     value={contextualConnectionLabel}
                     detail={contextualConnectionDetail}
                     tone="emerald"
@@ -14223,7 +14931,7 @@ function App() {
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
                   <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
                     <div className="text-lg font-semibold text-white">
-                      InstrucciÃ³n lista para ejecutar
+                      Instrucción lista para ejecutar
                     </div>
                     <div className="mt-4 whitespace-pre-wrap break-words rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-7 text-slate-100">
                       {plannerInstruction}
@@ -14253,7 +14961,7 @@ function App() {
 
                     <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
                       <div className="text-lg font-semibold text-white">
-                        Ãšltimo resultado del ejecutor
+                        Último resultado del ejecutor
                       </div>
                       <div className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">
                         {executorResult}
@@ -14265,7 +14973,7 @@ function App() {
                 {hasLastExecutorSnapshot ? (
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <MetricCard
-                      label="AcciÃ³n"
+                      label="Acción"
                       value={lastExecutorSnapshot?.currentAction || 'No disponible'}
                     />
                     <MetricCard
@@ -14307,8 +15015,8 @@ function App() {
               <div className="space-y-6">
                 <SectionHeader
                   eyebrow="Aprobaciones"
-                  title="IntervenciÃ³n humana"
-                  description="La aprobaciÃ³n operativa vive en modal. Esta vista resume el estado, la Ãºltima respuesta humana y el historial corto."
+                  title="Intervención humana"
+                  description="La aprobación operativa vive en modal. Esta vista resume el estado, la última respuesta humana y el historial corto."
                 />
 
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -14324,11 +15032,11 @@ function App() {
                     detail={`${visibleApprovalOptions.length} opcion(es) sugerida(s)`}
                   />
                   <MetricCard
-                    label="Ãšltima respuesta humana"
+                    label="Última respuesta humana"
                     value={latestHumanDecisionSummary}
                   />
                   <MetricCard
-                    label="PolÃ­tica del proyecto"
+                    label="Política del proyecto"
                     value={
                       projectPolicyAllowed
                         ? 'Permitir siempre para este proyecto'
@@ -14344,7 +15052,7 @@ function App() {
                   <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-200">
                     {decisionPending
                       ? approvalMessage || visiblePendingInstruction || DEFAULT_APPROVAL_MESSAGE
-                      : 'No hay una aprobaciÃ³n abierta ahora mismo. Cuando aparezca, se muestra en modal para no cargar la pantalla principal.'}
+                      : 'No hay una aprobación abierta ahora mismo. Cuando aparezca, se muestra en modal para no cargar la pantalla principal.'}
                   </div>
                 </article>
 
@@ -14380,7 +15088,7 @@ function App() {
                       ))
                     ) : (
                       <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                        TodavÃ­a no hay approvals o rechazos para mostrar.
+                        Todavía no hay approvals o rechazos para mostrar.
                       </div>
                     )}
                   </div>
@@ -14392,7 +15100,7 @@ function App() {
               <div className="space-y-6" id="reusable-memory-section">
                 <SectionHeader
                   eyebrow="Memoria reutilizable"
-                  title="CatÃ¡logo, filtros y selecciÃ³n manual"
+                  title="Catálogo, filtros y selección manual"
                   description="La memoria reusable queda ordenada en su propia vista, con preview, filtros y detalle expandido."
                   actions={
                     <button
@@ -14402,14 +15110,14 @@ function App() {
                       }}
                       className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
                     >
-                      Recargar catÃ¡logo
+                      Recargar catálogo
                     </button>
                   }
                 />
 
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <MetricCard
-                    label="SelecciÃ³n actual"
+                    label="Selección actual"
                     value={manualReuseModeLabel}
                     detail={selectedReusableArtifactSummary}
                     tone={manualReuseMode === 'auto' ? 'default' : 'sky'}
@@ -14450,7 +15158,7 @@ function App() {
                             }))
                           }
                           className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
-                          placeholder="odontologÃ­a, moda..."
+                          placeholder="odontología, moda..."
                         />
                       </div>
                       <div>
@@ -14541,7 +15249,7 @@ function App() {
                       htmlFor="manual-reuse-mode"
                       className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
                     >
-                      ReutilizaciÃ³n manual
+                      Reutilización manual
                     </label>
                     <select
                       id="manual-reuse-mode"
@@ -14551,9 +15259,9 @@ function App() {
                       }
                       className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition focus:border-sky-300/40"
                     >
-                      <option value="auto">BÃºsqueda automÃ¡tica</option>
+                      <option value="auto">Búsqueda automática</option>
                       <option value="none">No reutilizar</option>
-                      <option value="inspiration-only">Usar solo inspiraciÃ³n</option>
+                      <option value="inspiration-only">Usar solo inspiración</option>
                       <option value="reuse-style">Reutilizar estilo</option>
                       <option value="reuse-structure">Reutilizar estructura</option>
                       <option value="reuse-style-and-structure">
@@ -14567,8 +15275,8 @@ function App() {
                       {manualReusablePreferencePayload
                         ? manualReusablePreferencePayload.artifactId
                           ? `El planificador va a priorizar ${manualReuseModeLabel.toLocaleLowerCase()} desde ${manualReusablePreferencePayload.artifactId}.`
-                          : 'El planificador va a ignorar la memoria reutilizable por decisiÃ³n manual.'
-                        : 'Sin selecciÃ³n manual: se mantiene la bÃºsqueda automÃ¡tica.'}
+                          : 'El planificador va a ignorar la memoria reutilizable por decisión manual.'
+                        : 'Sin selección manual: se mantiene la búsqueda automática.'}
                     </div>
                     <button
                       id="clear-reusable-artifact-selection"
@@ -14579,7 +15287,7 @@ function App() {
                       }}
                       className="mt-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
                     >
-                      Limpiar selecciÃ³n
+                      Limpiar selección
                     </button>
                   </article>
                 </div>
@@ -14775,7 +15483,7 @@ function App() {
                     }
                   />
                   <MetricCard
-                    label="Ãšltimo requestId"
+                    label="Último requestId"
                     value={
                       latestExecutionRunSummary?.latestRequestId || 'Sin corrida registrada'
                     }
@@ -14835,7 +15543,7 @@ function App() {
                     ))
                   ) : (
                     <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300 xl:col-span-3">
-                      TodavÃ­a no hay corridas ejecutadas para resumir.
+                      Todavía no hay corridas ejecutadas para resumir.
                     </div>
                   )}
                 </div>
@@ -14845,9 +15553,9 @@ function App() {
             {activeSection === 'consola' ? (
               <div className="space-y-6">
                 <SectionHeader
-                  eyebrow="Consola tÃ©cnica"
-                  title="Timeline, eventos y conversaciÃ³n interna"
-                  description="La consola completa abre en modal. Esta vista deja una lectura resumida y navegable del lado tÃ©cnico."
+                  eyebrow="Consola técnica"
+                  title="Timeline, eventos y conversación interna"
+                  description="La consola completa abre en modal. Esta vista deja una lectura resumida y navegable del lado técnico."
                   actions={
                     <button
                       type="button"
@@ -14864,7 +15572,7 @@ function App() {
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <MetricCard label="Modo" value={flowModeLabel} />
                   <MetricCard label="Etapa" value={flowStageLabel} />
-                  <MetricCard label="AprobaciÃ³n pendiente" value={flowApprovalPendingLabel} />
+                  <MetricCard label="Aprobación pendiente" value={flowApprovalPendingLabel} />
                   <MetricCard label="Origen" value={flowApprovalSourceLabel} />
                 </div>
 
@@ -14875,7 +15583,7 @@ function App() {
                         Actividad en vivo
                       </div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        Ãšltimos 6 eventos
+                        Últimos 6 eventos
                       </div>
                     </div>
                     <div className="mt-4 space-y-2">
@@ -14897,7 +15605,7 @@ function App() {
                   <div className="space-y-4">
                     <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
                       <div className="text-lg font-semibold text-white">
-                        ConversaciÃ³n interna
+                        Conversación interna
                       </div>
                       {latestFlowMessage ? (
                         <div className="mt-4 rounded-2xl border border-sky-300/20 bg-sky-300/8 px-4 py-4">
@@ -14920,14 +15628,14 @@ function App() {
                         </div>
                       ) : (
                         <div className="mt-4 rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                          TodavÃ­a no hay mensajes internos registrados.
+                          Todavía no hay mensajes internos registrados.
                         </div>
                       )}
                     </article>
 
                     <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
                       <div className="text-lg font-semibold text-white">
-                        Timeline de la sesiÃ³n
+                        Timeline de la sesión
                       </div>
                       <div className="mt-4 space-y-3">
                         {sessionEvents.slice(-8).map((event, index, array) => (
@@ -14960,7 +15668,7 @@ function App() {
         <DetailDialog
           open={Boolean(selectedRunSummary)}
           title="Detalle de la corrida"
-          description="Resumen operativo y tÃ©cnico de una corrida puntual."
+          description="Resumen operativo y técnico de una corrida puntual."
           onClose={() => setSelectedRunSummary(null)}
         >
           {selectedRunSummary ? (
@@ -14995,7 +15703,7 @@ function App() {
                 </article>
                 <article className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    InstrucciÃ³n
+                    Instrucción
                   </div>
                   <div className="mt-3 text-sm leading-6 text-slate-100">
                     {selectedRunSummary.instructionSummary}
@@ -15008,7 +15716,7 @@ function App() {
                   <div className="mt-3 text-sm leading-6 text-slate-100">
                     {getTechnicalDiagnosticLabel(
                       selectedRunSummary.finalFailureType,
-                      'No fallÃ³ al cierre',
+                      'No falló al cierre',
                     )}{' '}
                     /{' '}
                     {getTechnicalDiagnosticLabel(
@@ -15255,7 +15963,7 @@ function App() {
             <div className="rounded-2xl border border-white/8 bg-white/5 px-4 py-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-lg font-semibold text-white">
-                  Barra de ejecuciÃ³n
+                  Barra de ejecución
                 </div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                   {flowExecutionFinished
@@ -15306,7 +16014,7 @@ function App() {
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-lg font-semibold text-white">Actividad en vivo</div>
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Ãšltimos 6 eventos
+                    Últimos 6 eventos
                   </div>
                 </div>
                 <div className="mt-4 space-y-2">
@@ -15333,16 +16041,16 @@ function App() {
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-lg font-semibold text-white">
-                    ConversaciÃ³n interna del sistema
+                    Conversación interna del sistema
                   </div>
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Flujo tÃ©cnico completo
+                    Flujo técnico completo
                   </div>
                 </div>
                 <div className="mt-4 space-y-3">
                   {flowMessages.length === 0 ? (
                     <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                      TodavÃ­a no hay mensajes internos registrados en esta sesiÃ³n.
+                      Todavía no hay mensajes internos registrados en esta sesión.
                     </div>
                   ) : (
                     flowMessages.map((message, index) => (
@@ -15388,7 +16096,7 @@ function App() {
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="text-lg font-semibold text-white">
-                  LÃ­nea de tiempo de la sesiÃ³n
+                  Línea de tiempo de la sesión
                 </div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                   Historial completo
@@ -15420,8 +16128,8 @@ function App() {
 
         <DetailDialog
           open={decisionPending && Boolean(visiblePendingInstruction)}
-          title="AprobaciÃ³n requerida"
-          description="Hace falta tu decisiÃ³n para esta tarea."
+          title="Aprobación requerida"
+          description="Hace falta tu decisión para esta tarea."
           onClose={() => {}}
           maxWidthClassName="max-w-3xl"
         >
@@ -15442,7 +16150,7 @@ function App() {
                       Opciones sugeridas
                     </div>
                     <p className="mt-1 text-xs leading-5 text-slate-400">
-                      ElegÃ­ la alternativa que mejor represente tu decisiÃ³n.
+                      Elegí la alternativa que mejor represente tu decisión.
                     </p>
                   </div>
                   <div className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-slate-400">
@@ -15494,10 +16202,10 @@ function App() {
                     <p className="mt-1 text-xs leading-5 text-slate-400">
                       {approvalResponseRequiresOption &&
                       activeApprovalInteractionMode === 'mixed'
-                        ? 'PodÃ©s complementar la opciÃ³n elegida con contexto o escribir una respuesta propia.'
+                        ? 'Podés complementar la opción elegida con contexto o escribir una respuesta propia.'
                         : approvalResponseRequiresOption
-                          ? 'Si lo necesitÃ¡s, agregÃ¡ una aclaraciÃ³n breve ademÃ¡s de la opciÃ³n.'
-                          : 'RespondÃ© con el criterio o la definiciÃ³n que querÃ©s reenviar al Cerebro.'}
+                          ? 'Si lo necesitás, agregá una aclaración breve además de la opción.'
+                          : 'Respondé con el criterio o la definición que querés reenviar al Cerebro.'}
                     </p>
                   </div>
                   <div className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-slate-400">
@@ -15507,7 +16215,7 @@ function App() {
                 <textarea
                   value={approvalFreeAnswer}
                   onChange={(event) => setApprovalFreeAnswer(event.target.value)}
-                  placeholder="EscribÃ­ acÃ¡ la decisiÃ³n, el criterio o la aclaraciÃ³n que querÃ©s reenviar al Cerebro."
+                  placeholder="Escribí acá la decisión, el criterio o la aclaración que querés reenviar al Cerebro."
                   className="min-h-[140px] w-full resize-y rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-500 focus:border-sky-300/40 focus:bg-slate-900"
                 />
               </section>
@@ -15515,8 +16223,8 @@ function App() {
             <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                 {approvalSource === 'executor'
-                  ? 'EjecuciÃ³n pendiente'
-                  : 'InstrucciÃ³n pendiente'}
+                  ? 'Ejecución pendiente'
+                  : 'Instrucción pendiente'}
               </div>
               <div className="mt-2 text-sm leading-6 text-slate-100">
                 {visiblePendingInstruction}
