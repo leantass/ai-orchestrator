@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
+import { execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 
@@ -403,6 +404,27 @@ const phaseExecutionValidationCases = {
     label: 'Preparar backend contracts',
     goal:
       'Preparar la fase backend-contracts del proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  materializeBackendContractsBlocked: {
+    id: 'materialize-backend-contracts-blocked',
+    label: 'Materializar backend contracts sin frontend previo',
+    goal:
+      'Materializar la fase backend-contracts del proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  materializeBackendContracts: {
+    id: 'materialize-backend-contracts',
+    label: 'Materializar backend contracts',
+    goal:
+      'Materializar la fase backend-contracts del proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  prepareDatabaseDesign: {
+    id: 'prepare-database-design',
+    label: 'Preparar database design',
+    goal:
+      'Preparar la fase database-design del proyecto fullstack local de turnos medicos.',
     context: '',
   },
 }
@@ -859,6 +881,7 @@ function summarizeProjectPhaseExecutionPlan(projectPhaseExecutionPlan) {
     executableNow: projectPhaseExecutionPlan?.executableNow === true,
     approvalRequired: projectPhaseExecutionPlan?.approvalRequired === true,
     riskLevel: projectPhaseExecutionPlan?.riskLevel || '',
+    prerequisitePhaseId: projectPhaseExecutionPlan?.prerequisitePhaseId || '',
     targetFiles: toStringArray(projectPhaseExecutionPlan?.targetFiles, 24),
     allowedTargetPaths: toStringArray(
       projectPhaseExecutionPlan?.allowedTargetPaths,
@@ -880,6 +903,7 @@ function summarizeProjectPhaseExecutionPlan(projectPhaseExecutionPlan) {
       projectPhaseExecutionPlan?.explicitExclusions,
       24,
     ),
+    blockers: toStringArray(projectPhaseExecutionPlan?.blockers, 24),
     successCriteria: toStringArray(projectPhaseExecutionPlan?.successCriteria, 24),
   }
 }
@@ -1891,8 +1915,8 @@ function findManifestPathInsideWorkspace(workspacePath) {
   return ''
 }
 
-async function buildPhaseExecutionFixture() {
-  const workspacePath = path.join(smokeExecutionWorkspaceRoot, 'fullstack-project-phase')
+async function buildPhaseExecutionFixture({ workspaceName = 'fullstack-project-phase' } = {}) {
+  const workspacePath = path.join(smokeExecutionWorkspaceRoot, workspaceName)
   ensureCleanDirectory(workspacePath)
 
   const reusablePlanningContext = buildReusablePlanningContext()
@@ -2405,7 +2429,12 @@ async function runFullstackLocalMaterializationValidation() {
     if (!String(manifestSummary.nextRecommendedPhase || '').trim()) {
       failures.push('localProjectManifest.nextRecommendedPhase vacio.')
     }
-    ;['fullstack-local-scaffold', 'frontend-mock-flow', 'backend-contracts'].forEach(
+    ;[
+      'fullstack-local-scaffold',
+      'frontend-mock-flow',
+      'backend-contracts',
+      'database-design',
+    ].forEach(
       (phaseId) => {
         if (!manifestSummary.phases.some((entry) => entry.id === phaseId)) {
           failures.push(`localProjectManifest.phases no incluye ${phaseId}.`)
@@ -2900,11 +2929,38 @@ async function runPrepareBackendContractsValidation() {
     if (phaseSummary.phaseId !== 'backend-contracts') {
       failures.push('projectPhaseExecutionPlan.phaseId deberia ser backend-contracts.')
     }
-    if (phaseSummary.executableNow) {
-      failures.push('backend-contracts deberia seguir planner-only y no ejecutableNow.')
+    if (!phaseSummary.executableNow) {
+      failures.push('backend-contracts deberia quedar listo para materializacion segura tras la revisión.')
     }
-    if (phaseSummary.targetStrategy !== 'prepare-project-phase-plan') {
-      failures.push('backend-contracts deberia mantener targetStrategy prepare-project-phase-plan.')
+    if (phaseSummary.targetStrategy !== 'materialize-project-phase-plan') {
+      failures.push('backend-contracts deberia apuntar a materialize-project-phase-plan tras la preparación.')
+    }
+    const expectedTargets = [
+      `${fixture.projectRootRelativePath}/backend/src/modules/appointments.js`,
+      `${fixture.projectRootRelativePath}/backend/src/routes/health.js`,
+      `${fixture.projectRootRelativePath}/backend/src/lib/response.js`,
+      `${fixture.projectRootRelativePath}/shared/contracts/domain.js`,
+      `${fixture.projectRootRelativePath}/shared/types/contracts.js`,
+      `${fixture.projectRootRelativePath}/docs/architecture.md`,
+      `${fixture.projectRootRelativePath}/docs/local-runbook.md`,
+      `${fixture.projectRootRelativePath}/jefe-project.json`,
+    ].map(normalizePathForComparison)
+
+    expectedTargets.forEach((targetPath) => {
+      if (
+        !phaseSummary.allowedTargetPaths.some(
+          (entry) => normalizePathForComparison(entry) === targetPath,
+        )
+      ) {
+        failures.push(`projectPhaseExecutionPlan.allowedTargetPaths no incluye ${targetPath}.`)
+      }
+    })
+    if (
+      phaseSummary.allowedTargetPaths.some((entry) =>
+        /frontend\/|database\/|node_modules|\.env$/i.test(entry),
+      )
+    ) {
+      failures.push('backend-contracts no deberia incluir frontend, database, node_modules ni .env en allowedTargetPaths.')
     }
   }
 
@@ -2915,6 +2971,514 @@ async function runPrepareBackendContractsValidation() {
     strategy,
     executionMode,
     nextExpectedAction: String(decision?.nextExpectedAction || '').trim(),
+  }
+}
+
+async function runBlockedBackendContractsMaterializationValidation() {
+  const fixture = await buildPhaseExecutionFixture({
+    workspaceName: 'fullstack-project-phase-backend-blocked',
+  })
+  const reusablePlanningContext = buildReusablePlanningContext()
+  const testCase = phaseExecutionValidationCases.materializeBackendContractsBlocked
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: testCase.goal,
+    context: testCase.context,
+    workspacePath: fixture.workspacePath,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  const failures = []
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const nextExpectedAction = String(decision?.nextExpectedAction || '').trim()
+  const projectPhaseExecutionPlan =
+    decision?.projectPhaseExecutionPlan &&
+    typeof decision.projectPhaseExecutionPlan === 'object'
+      ? decision.projectPhaseExecutionPlan
+      : null
+  const localProjectManifest =
+    decision?.localProjectManifest &&
+    typeof decision.localProjectManifest === 'object'
+      ? decision.localProjectManifest
+      : null
+  const materializationPlan =
+    decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+      ? decision.materializationPlan
+      : null
+  const nextActionPlan =
+    decision?.nextActionPlan && typeof decision.nextActionPlan === 'object'
+      ? decision.nextActionPlan
+      : null
+
+  if (strategy !== 'prepare-project-phase-plan') {
+    failures.push(
+      `Estrategia incorrecta. Esperado: prepare-project-phase-plan. Recibido: ${strategy || '(vacia)'}.`,
+    )
+  }
+
+  if (executionMode !== 'planner-only') {
+    failures.push(
+      `executionMode incorrecto. Esperado: planner-only. Recibido: ${executionMode || '(vacio)'}.`,
+    )
+  }
+
+  if (nextExpectedAction !== 'review-project-phase') {
+    failures.push(
+      `nextExpectedAction incorrecto. Esperado: review-project-phase. Recibido: ${nextExpectedAction || '(vacio)'}.`,
+    )
+  }
+
+  if (materializationPlan) {
+    failures.push('No deberia devolver materializationPlan cuando frontend-mock-flow sigue pendiente.')
+  }
+
+  if (!projectPhaseExecutionPlan) {
+    failures.push('projectPhaseExecutionPlan ausente en backend-contracts bloqueada.')
+  } else {
+    const phaseSummary = summarizeProjectPhaseExecutionPlan(projectPhaseExecutionPlan)
+    if (phaseSummary.phaseId !== 'backend-contracts') {
+      failures.push('projectPhaseExecutionPlan.phaseId deberia ser backend-contracts.')
+    }
+    if (phaseSummary.executableNow) {
+      failures.push('backend-contracts no deberia quedar ejecutableNow si frontend-mock-flow sigue available.')
+    }
+    if (phaseSummary.prerequisitePhaseId !== 'frontend-mock-flow') {
+      failures.push('backend-contracts deberia declarar frontend-mock-flow como prerequisitePhaseId.')
+    }
+    if (
+      !phaseSummary.blockers.some((entry) =>
+        entry.toLocaleLowerCase().includes('frontend-mock-flow'),
+      )
+    ) {
+      failures.push('backend-contracts deberia exponer un blocker claro apuntando a frontend-mock-flow.')
+    }
+  }
+
+  if (!localProjectManifest) {
+    failures.push('localProjectManifest ausente en backend-contracts bloqueada.')
+  } else {
+    const manifestSummary = summarizeLocalProjectManifest(localProjectManifest)
+    if (manifestSummary.nextRecommendedPhase !== 'frontend-mock-flow') {
+      failures.push('localProjectManifest.nextRecommendedPhase deberia seguir apuntando a frontend-mock-flow.')
+    }
+    const frontendPhase = manifestSummary.phases.find(
+      (entry) => entry.id === 'frontend-mock-flow',
+    )
+    const backendPhase = manifestSummary.phases.find(
+      (entry) => entry.id === 'backend-contracts',
+    )
+    if (!frontendPhase || frontendPhase.status !== 'available') {
+      failures.push('frontend-mock-flow deberia seguir available en el caso negativo.')
+    }
+    if (!backendPhase || backendPhase.status !== 'available') {
+      failures.push('backend-contracts deberia seguir available en el caso negativo.')
+    }
+  }
+
+  if (!nextActionPlan) {
+    failures.push('nextActionPlan ausente en backend-contracts bloqueada.')
+  } else {
+    const nextActionSummary = summarizeNextActionPlan(nextActionPlan)
+    if (!nextActionSummary.reason.toLocaleLowerCase().includes('frontend-mock-flow')) {
+      failures.push('nextActionPlan.reason deberia mencionar frontend-mock-flow como prerequisito.')
+    }
+    if (!nextActionSummary.userFacingLabel.toLocaleLowerCase().includes('frontend mock flow')) {
+      failures.push('nextActionPlan.userFacingLabel deberia recomendar completar frontend mock flow.')
+    }
+    if (!nextActionSummary.safeToRunNow) {
+      failures.push('nextActionPlan.safeToRunNow deberia quedar true para permitir ejecutar la fase previa segura.')
+    }
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction,
+  }
+}
+
+async function runMaterializeBackendContractsValidation() {
+  const fixture = await getPhaseExecutionFixture()
+  const reusablePlanningContext = buildReusablePlanningContext()
+  const testCase = phaseExecutionValidationCases.materializeBackendContracts
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: testCase.goal,
+    context: testCase.context,
+    workspacePath: fixture.workspacePath,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  const failures = []
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const nextExpectedAction = String(decision?.nextExpectedAction || '').trim()
+  const projectPhaseExecutionPlan =
+    decision?.projectPhaseExecutionPlan &&
+    typeof decision.projectPhaseExecutionPlan === 'object'
+      ? decision.projectPhaseExecutionPlan
+      : null
+  const localProjectManifest =
+    decision?.localProjectManifest &&
+    typeof decision.localProjectManifest === 'object'
+      ? decision.localProjectManifest
+      : null
+  const materializationPlan =
+    decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+      ? decision.materializationPlan
+      : null
+  const executionScope =
+    decision?.executionScope && typeof decision.executionScope === 'object'
+      ? decision.executionScope
+      : null
+  const phaseExpansionPlan =
+    decision?.phaseExpansionPlan && typeof decision.phaseExpansionPlan === 'object'
+      ? decision.phaseExpansionPlan
+      : null
+  const allowedTargetPaths = summarizeUniqueStrings(
+    executionScope?.allowedTargetPaths,
+    24,
+  ).map(normalizePathForComparison)
+
+  if (strategy !== 'materialize-project-phase-plan') {
+    failures.push(
+      `Estrategia incorrecta. Esperado: materialize-project-phase-plan. Recibido: ${strategy || '(vacia)'}.`,
+    )
+  }
+
+  if (executionMode !== 'executor') {
+    failures.push(
+      `executionMode incorrecto. Esperado: executor. Recibido: ${executionMode || '(vacio)'}.`,
+    )
+  }
+
+  if (nextExpectedAction !== 'execute-plan') {
+    failures.push(
+      `nextExpectedAction incorrecto. Esperado: execute-plan. Recibido: ${nextExpectedAction || '(vacio)'}.`,
+    )
+  }
+
+  if (!projectPhaseExecutionPlan) {
+    failures.push('projectPhaseExecutionPlan ausente en materialize backend-contracts.')
+  } else {
+    const phaseSummary = summarizeProjectPhaseExecutionPlan(projectPhaseExecutionPlan)
+    if (phaseSummary.phaseId !== 'backend-contracts') {
+      failures.push('projectPhaseExecutionPlan.phaseId deberia ser backend-contracts.')
+    }
+    if (!phaseSummary.executableNow) {
+      failures.push('backend-contracts deberia estar marcado como executableNow en la materializacion.')
+    }
+  }
+
+  const expectedTargets = [
+    `${fixture.projectRootRelativePath}/backend/src/modules/appointments.js`,
+    `${fixture.projectRootRelativePath}/backend/src/routes/health.js`,
+    `${fixture.projectRootRelativePath}/backend/src/lib/response.js`,
+    `${fixture.projectRootRelativePath}/shared/contracts/domain.js`,
+    `${fixture.projectRootRelativePath}/shared/types/contracts.js`,
+    `${fixture.projectRootRelativePath}/docs/architecture.md`,
+    `${fixture.projectRootRelativePath}/docs/local-runbook.md`,
+    `${fixture.projectRootRelativePath}/jefe-project.json`,
+  ].map(normalizePathForComparison)
+
+  if (!materializationPlan) {
+    failures.push('materializationPlan ausente en materialize backend-contracts.')
+  } else {
+    if (String(materializationPlan.strategy || '').trim() !== 'materialize-project-phase-plan') {
+      failures.push('materializationPlan.strategy incorrecto para backend-contracts.')
+    }
+
+    const operationTargets = toStringArray(
+      materializationPlan.operations?.map((entry) => entry?.targetPath || ''),
+      24,
+    ).map(normalizePathForComparison)
+
+    expectedTargets.forEach((targetPath) => {
+      if (!operationTargets.includes(targetPath)) {
+        failures.push(`materializationPlan.operations no incluye ${targetPath}.`)
+      }
+    })
+
+    if (
+      operationTargets.some((targetPath) =>
+        /frontend\/|database\/|node_modules|\.env$|docker|deploy/i.test(targetPath),
+      )
+    ) {
+      failures.push('materializationPlan.operations no deberia tocar frontend, database, node_modules, .env, docker ni deploy.')
+    }
+  }
+
+  expectedTargets.forEach((targetPath) => {
+    if (!allowedTargetPaths.includes(targetPath)) {
+      failures.push(`allowedTargetPaths no incluye ${targetPath}.`)
+    }
+  })
+
+  if (
+    allowedTargetPaths.some((targetPath) =>
+      /frontend\/|database\/|node_modules|\.env$|docker|deploy/i.test(targetPath),
+    )
+  ) {
+    failures.push('allowedTargetPaths no deberia incluir frontend, database, node_modules, .env, docker ni deploy.')
+  }
+
+  if (!localProjectManifest) {
+    failures.push('localProjectManifest ausente en materialize backend-contracts.')
+  } else {
+    const manifestSummary = summarizeLocalProjectManifest(localProjectManifest)
+    const backendPhase = manifestSummary.phases.find(
+      (entry) => entry.id === 'backend-contracts',
+    )
+    const databasePhase = manifestSummary.phases.find(
+      (entry) => entry.id === 'database-design',
+    )
+    if (manifestSummary.nextRecommendedPhase !== 'database-design') {
+      failures.push('localProjectManifest.nextRecommendedPhase deberia avanzar a database-design.')
+    }
+    if (!backendPhase || backendPhase.status !== 'done') {
+      failures.push('localProjectManifest deberia marcar backend-contracts como done.')
+    }
+    if (!databasePhase || databasePhase.status !== 'available') {
+      failures.push('localProjectManifest deberia mantener database-design como available.')
+    }
+  }
+
+  if (!phaseExpansionPlan) {
+    failures.push('phaseExpansionPlan ausente en materialize backend-contracts.')
+  } else {
+    const expansionSummary = summarizePhaseExpansionPlan(phaseExpansionPlan)
+    if (expansionSummary.phaseId !== 'database-design') {
+      failures.push('phaseExpansionPlan deberia proponer database-design como siguiente fase.')
+    }
+    if (expansionSummary.executableNow) {
+      failures.push('phaseExpansionPlan no deberia materializar database-design automaticamente.')
+    }
+  }
+
+  if (materializationPlan) {
+    const task = buildLocalMaterializationTask({
+      plan: materializationPlan,
+      workspacePath: fixture.workspacePath,
+      requestId: 'smoke-backend-contracts-materialization',
+      instruction: decision?.instruction || '',
+      brainStrategy: decision?.strategy || '',
+      businessSector: decision?.businessSector || '',
+      businessSectorLabel: decision?.businessSectorLabel || '',
+      creativeDirection: decision?.creativeDirection || null,
+      reusableArtifactLookup: decision?.reusableArtifactLookup || null,
+      reusableArtifactsFound: decision?.reusableArtifactsFound || 0,
+      reuseDecision: decision?.reuseDecision === true,
+      reuseReason: decision?.reuseReason || '',
+      reusedArtifactIds: Array.isArray(decision?.reusedArtifactIds)
+        ? decision.reusedArtifactIds
+        : [],
+      reuseMode: decision?.reuseMode || 'none',
+      reuseMaterialization: null,
+      materializationPlanSource: decision?.materializationPlanSource || 'planner',
+    })
+
+    if (!task) {
+      failures.push('No se pudo construir la tarea local deterministica para backend-contracts.')
+    } else {
+      const backendBefore = {
+        frontendMain: fs.readFileSync(
+          path.join(fixture.projectRootPath, 'frontend', 'src', 'main.js'),
+          'utf8',
+        ),
+        databaseSchema: fs.readFileSync(
+          path.join(fixture.projectRootPath, 'database', 'schema.sql'),
+          'utf8',
+        ),
+      }
+      const executionResult = await runLocalDeterministicTask(task)
+      if (executionResult?.ok !== true) {
+        failures.push(
+          executionResult?.error ||
+            'La materializacion local de backend-contracts no termino en OK.',
+        )
+      } else {
+        const touchedPaths = toStringArray(executionResult?.details?.touchedPaths, 32).map(
+          normalizePathForComparison,
+        )
+        const manifestPath = path.join(
+          fixture.workspacePath,
+          fixture.projectRootRelativePath,
+          'jefe-project.json',
+        )
+        const manifestFromDisk = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+        const manifestFromDiskSummary = summarizeLocalProjectManifest(manifestFromDisk)
+        const backendPhase = manifestFromDiskSummary.phases.find(
+          (entry) => entry.id === 'backend-contracts',
+        )
+        const databasePhase = manifestFromDiskSummary.phases.find(
+          (entry) => entry.id === 'database-design',
+        )
+
+        expectedTargets.forEach((targetPath) => {
+          if (
+            !touchedPaths.some((entry) =>
+              entry.endsWith(normalizePathForComparison(targetPath)),
+            )
+          ) {
+            failures.push(`La ejecucion real de backend-contracts deberia tocar ${targetPath}.`)
+          }
+        })
+
+        if (manifestFromDiskSummary.nextRecommendedPhase !== 'database-design') {
+          failures.push(
+            'El jefe-project.json resultante deberia actualizar nextRecommendedPhase a database-design.',
+          )
+        }
+        if (!backendPhase || backendPhase.status !== 'done') {
+          failures.push(
+            'El jefe-project.json resultante deberia marcar backend-contracts como done.',
+          )
+        }
+        if (!databasePhase || databasePhase.status !== 'available') {
+          failures.push(
+            'El jefe-project.json resultante deberia mantener database-design como available.',
+          )
+        }
+
+        const frontendAfter = fs.readFileSync(
+          path.join(fixture.projectRootPath, 'frontend', 'src', 'main.js'),
+          'utf8',
+        )
+        const databaseAfter = fs.readFileSync(
+          path.join(fixture.projectRootPath, 'database', 'schema.sql'),
+          'utf8',
+        )
+        if (frontendAfter !== backendBefore.frontendMain) {
+          failures.push('backend-contracts no deberia tocar frontend/src/main.js.')
+        }
+        if (databaseAfter !== backendBefore.databaseSchema) {
+          failures.push('backend-contracts no deberia tocar database/schema.sql.')
+        }
+
+        ;[
+          path.join(fixture.projectRootPath, 'backend', 'src', 'modules', 'appointments.js'),
+          path.join(fixture.projectRootPath, 'backend', 'src', 'routes', 'health.js'),
+          path.join(fixture.projectRootPath, 'backend', 'src', 'lib', 'response.js'),
+          path.join(fixture.projectRootPath, 'shared', 'contracts', 'domain.js'),
+          path.join(fixture.projectRootPath, 'shared', 'types', 'contracts.js'),
+        ].forEach((filePath) => {
+          execFileSync(process.execPath, ['--check', filePath], { stdio: 'pipe' })
+        })
+      }
+    }
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction,
+  }
+}
+
+async function runPrepareDatabaseDesignValidation() {
+  const fixture = await getPhaseExecutionFixture()
+  const reusablePlanningContext = buildReusablePlanningContext()
+  const testCase = phaseExecutionValidationCases.prepareDatabaseDesign
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: testCase.goal,
+    context: testCase.context,
+    workspacePath: fixture.workspacePath,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  const failures = []
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const nextExpectedAction = String(decision?.nextExpectedAction || '').trim()
+  const projectPhaseExecutionPlan =
+    decision?.projectPhaseExecutionPlan &&
+    typeof decision.projectPhaseExecutionPlan === 'object'
+      ? decision.projectPhaseExecutionPlan
+      : null
+  const materializationPlan =
+    decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+      ? decision.materializationPlan
+      : null
+
+  if (strategy !== 'prepare-project-phase-plan') {
+    failures.push(
+      `Estrategia incorrecta. Esperado: prepare-project-phase-plan. Recibido: ${strategy || '(vacia)'}.`,
+    )
+  }
+
+  if (executionMode !== 'planner-only') {
+    failures.push(
+      `executionMode incorrecto. Esperado: planner-only. Recibido: ${executionMode || '(vacio)'}.`,
+    )
+  }
+
+  if (nextExpectedAction !== 'review-project-phase') {
+    failures.push(
+      `nextExpectedAction incorrecto. Esperado: review-project-phase. Recibido: ${nextExpectedAction || '(vacio)'}.`,
+    )
+  }
+
+  if (materializationPlan) {
+    failures.push('database-design no deberia devolver materializationPlan en este bloque.')
+  }
+
+  if (!projectPhaseExecutionPlan) {
+    failures.push('projectPhaseExecutionPlan ausente en database-design.')
+  } else {
+    const phaseSummary = summarizeProjectPhaseExecutionPlan(projectPhaseExecutionPlan)
+    if (phaseSummary.phaseId !== 'database-design') {
+      failures.push('projectPhaseExecutionPlan.phaseId deberia ser database-design.')
+    }
+    if (phaseSummary.executableNow) {
+      failures.push('database-design deberia seguir planner-only y no ejecutableNow.')
+    }
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction,
   }
 }
 
@@ -2988,7 +3552,10 @@ async function main() {
     projectPhaseExecutionResults = [
       await runPrepareFrontendMockFlowValidation(),
       await runMaterializeFrontendMockFlowValidation(),
+      await runBlockedBackendContractsMaterializationValidation(),
       await runPrepareBackendContractsValidation(),
+      await runMaterializeBackendContractsValidation(),
+      await runPrepareDatabaseDesignValidation(),
     ]
     projectPhaseExecutionResults.forEach(printScalableValidationResult)
     console.log('-----------------')

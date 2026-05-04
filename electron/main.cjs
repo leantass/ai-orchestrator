@@ -12525,6 +12525,34 @@ function buildPhaseExpansionPlan({
     }
   }
 
+  if (
+    strategy === 'materialize-project-phase-plan' &&
+    normalizedProjectPhaseExecutionPlan?.phaseId === 'backend-contracts'
+  ) {
+    return {
+      phaseId: 'database-design',
+      goal: 'Revisar schema y seeds locales antes de cualquier migración real o base activa.',
+      targetFiles: [
+        `${normalizedProjectPhaseExecutionPlan.projectRoot}/database/schema.sql`,
+        `${normalizedProjectPhaseExecutionPlan.projectRoot}/database/seeds/seed-local.sql`,
+        `${normalizedProjectPhaseExecutionPlan.projectRoot}/database/README.md`,
+        `${normalizedProjectPhaseExecutionPlan.projectRoot}/docs/architecture.md`,
+      ],
+      changesExpected: [
+        'Revisar entidades y relaciones locales',
+        'Alinear el diseño SQL con los contratos backend',
+        'Mantener database en modo diseño revisable',
+      ],
+      risks: [
+        'Confundir diseño local con migraciones o base real si se expande sin aprobación adicional.',
+      ],
+      validationPlan: normalizedValidationPlan,
+      executableNow: false,
+      approvalRequired: false,
+      nextExpectedAction: 'review-project-phase',
+    }
+  }
+
   if (strategy === 'materialize-frontend-project-plan') {
     return {
       phaseId: 'frontend-flow-refinement',
@@ -12583,12 +12611,15 @@ function buildNextActionPlan({
   scalableDeliveryPlan,
   questionPolicy,
   projectPhaseExecutionPlan,
+  localProjectManifest,
 }) {
   const normalizedScalablePlan =
     normalizeScalableDeliveryPlanContract(scalableDeliveryPlan)
   const normalizedQuestionPolicy = normalizeQuestionPolicyContract(questionPolicy)
   const normalizedProjectPhaseExecutionPlan =
     normalizeProjectPhaseExecutionPlanContract(projectPhaseExecutionPlan)
+  const normalizedLocalProjectManifest =
+    normalizeLocalProjectManifestContract(localProjectManifest)
   const deliveryLevel = normalizedScalablePlan?.deliveryLevel || ''
   const hasBlockingQuestions =
     Array.isArray(normalizedQuestionPolicy?.blockingQuestions) &&
@@ -12656,6 +12687,47 @@ function buildNextActionPlan({
   }
 
   if (strategy === 'prepare-project-phase-plan' && normalizedProjectPhaseExecutionPlan) {
+    const phaseBlockers = summarizeUniqueExecutorStrings(
+      normalizedProjectPhaseExecutionPlan.blockers,
+      8,
+    )
+    const prerequisitePhaseId =
+      normalizedProjectPhaseExecutionPlan.prerequisitePhaseId ||
+      normalizedLocalProjectManifest?.nextRecommendedPhase ||
+      ''
+    const prerequisiteIsMaterializableSafePhase =
+      prerequisitePhaseId === 'frontend-mock-flow' ||
+      prerequisitePhaseId === 'backend-contracts'
+
+    if (phaseBlockers.length > 0) {
+      return {
+        currentState: `project-phase-blocked:${normalizedProjectPhaseExecutionPlan.phaseId}`,
+        recommendedAction: prerequisitePhaseId
+          ? `Completar ${prerequisitePhaseId} antes de continuar con ${normalizedProjectPhaseExecutionPlan.phaseId}.`
+          : `Resolver el prerequisito pendiente antes de continuar con ${normalizedProjectPhaseExecutionPlan.phaseId}.`,
+        actionType: prerequisiteIsMaterializableSafePhase
+          ? 'expand-next-phase'
+          : 'review-plan',
+        targetStrategy: prerequisiteIsMaterializableSafePhase
+          ? 'materialize-project-phase-plan'
+          : normalizedProjectPhaseExecutionPlan.targetStrategy,
+        targetDeliveryLevel:
+          normalizedProjectPhaseExecutionPlan.deliveryLevel || deliveryLevel || 'n/a',
+        reason: phaseBlockers.join(' '),
+        safeToRunNow: prerequisiteIsMaterializableSafePhase,
+        requiresApproval: false,
+        userFacingLabel:
+          prerequisitePhaseId === 'frontend-mock-flow'
+            ? 'Completar frontend mock flow'
+            : prerequisitePhaseId === 'backend-contracts'
+              ? 'Completar backend contracts'
+              : 'Resolver prerequisito de fase',
+        technicalLabel: `phase-prerequisite-${normalizedProjectPhaseExecutionPlan.phaseId}`,
+        expectedOutcome:
+          'Desbloquear la siguiente fase del proyecto local sin saltarse el orden declarado.',
+      }
+    }
+
     return {
       currentState: `project-phase-review:${normalizedProjectPhaseExecutionPlan.phaseId}`,
       recommendedAction: normalizedProjectPhaseExecutionPlan.executableNow
@@ -12675,7 +12747,9 @@ function buildNextActionPlan({
       userFacingLabel:
         normalizedProjectPhaseExecutionPlan.phaseId === 'frontend-mock-flow'
           ? 'Preparar frontend mock flow'
-          : 'Preparar backend contracts',
+          : normalizedProjectPhaseExecutionPlan.phaseId === 'backend-contracts'
+            ? 'Preparar backend contracts'
+            : 'Preparar database design',
       technicalLabel: `prepare-${normalizedProjectPhaseExecutionPlan.phaseId}`,
       expectedOutcome:
         normalizedProjectPhaseExecutionPlan.executableNow === true
@@ -12700,7 +12774,9 @@ function buildNextActionPlan({
       userFacingLabel:
         normalizedProjectPhaseExecutionPlan.phaseId === 'frontend-mock-flow'
           ? 'Materializar frontend mock flow'
-          : `Materializar ${normalizedProjectPhaseExecutionPlan.phaseId}`,
+          : normalizedProjectPhaseExecutionPlan.phaseId === 'backend-contracts'
+            ? 'Materializar backend contracts'
+            : `Materializar ${normalizedProjectPhaseExecutionPlan.phaseId}`,
       technicalLabel: `materialize-${normalizedProjectPhaseExecutionPlan.phaseId}`,
       expectedOutcome:
         'Actualizar solo los archivos permitidos de la fase dentro del proyecto ya generado.',
@@ -12874,6 +12950,7 @@ function buildPlanningArchitectureBundle({
     scalableDeliveryPlan,
     questionPolicy,
     projectPhaseExecutionPlan,
+    localProjectManifest,
   })
 
   return {
@@ -15383,6 +15460,10 @@ function normalizeProjectPhaseExecutionPlanContract(value) {
     ...(typeof value.riskLevel === 'string' && value.riskLevel.trim()
       ? { riskLevel: value.riskLevel.trim() }
       : {}),
+    ...(typeof value.prerequisitePhaseId === 'string' &&
+    value.prerequisitePhaseId.trim()
+      ? { prerequisitePhaseId: value.prerequisitePhaseId.trim() }
+      : {}),
     ...(summarizeUniqueExecutorStrings(value.targetFiles, 12).length > 0
       ? { targetFiles: summarizeUniqueExecutorStrings(value.targetFiles, 12) }
       : {}),
@@ -15405,6 +15486,9 @@ function normalizeProjectPhaseExecutionPlanContract(value) {
             12,
           ),
         }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.blockers, 12).length > 0
+      ? { blockers: summarizeUniqueExecutorStrings(value.blockers, 12) }
       : {}),
     ...(summarizeUniqueExecutorStrings(value.successCriteria, 12).length > 0
       ? { successCriteria: summarizeUniqueExecutorStrings(value.successCriteria, 12) }
@@ -15472,6 +15556,113 @@ function normalizeLocalProjectManifestContract(value) {
   }
 
   return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
+function getLocalProjectManifestPhaseEntry(localProjectManifest, phaseId) {
+  const normalizedManifest =
+    normalizeLocalProjectManifestContract(localProjectManifest)
+  const normalizedPhaseId =
+    typeof phaseId === 'string' && phaseId.trim() ? phaseId.trim() : ''
+
+  if (!normalizedManifest || !normalizedPhaseId) {
+    return null
+  }
+
+  return (
+    normalizedManifest.phases.find((entry) => entry && entry.id === normalizedPhaseId) ||
+    null
+  )
+}
+
+function getProjectPhasePrerequisiteBlockers({
+  phaseId,
+  localProjectManifest,
+}) {
+  const normalizedManifest =
+    normalizeLocalProjectManifestContract(localProjectManifest)
+  const normalizedPhaseId =
+    typeof phaseId === 'string' && phaseId.trim() ? phaseId.trim() : ''
+
+  if (!normalizedManifest || !normalizedPhaseId) {
+    return {
+      blockers: [],
+      prerequisitePhaseId: '',
+      nextRecommendedPhase: '',
+    }
+  }
+
+  const getPhaseStatus = (targetPhaseId) =>
+    String(
+      getLocalProjectManifestPhaseEntry(normalizedManifest, targetPhaseId)?.status || '',
+    )
+      .trim()
+      .toLocaleLowerCase()
+  const blockers = []
+  let prerequisitePhaseId = ''
+  const registerBlocker = (targetPhaseId, message) => {
+    if (!prerequisitePhaseId && typeof targetPhaseId === 'string' && targetPhaseId.trim()) {
+      prerequisitePhaseId = targetPhaseId.trim()
+    }
+    if (typeof message === 'string' && message.trim()) {
+      blockers.push(message.trim())
+    }
+  }
+  const scaffoldStatus = getPhaseStatus('fullstack-local-scaffold')
+  const frontendStatus = getPhaseStatus('frontend-mock-flow')
+  const backendStatus = getPhaseStatus('backend-contracts')
+  const requestedPhaseStatus = getPhaseStatus(normalizedPhaseId)
+
+  if (
+    (normalizedPhaseId === 'backend-contracts' ||
+      normalizedPhaseId === 'database-design') &&
+    scaffoldStatus !== 'done'
+  ) {
+    registerBlocker(
+      'fullstack-local-scaffold',
+      'Primero debe completarse fullstack-local-scaffold.',
+    )
+  }
+
+  if (normalizedPhaseId === 'backend-contracts') {
+    if (frontendStatus !== 'done') {
+      registerBlocker(
+        'frontend-mock-flow',
+        'Primero debe completarse frontend-mock-flow.',
+      )
+    }
+
+    if (requestedPhaseStatus === 'done') {
+      registerBlocker(
+        '',
+        'backend-contracts ya está completada y no debería materializarse otra vez en este flujo.',
+      )
+    }
+  }
+
+  if (normalizedPhaseId === 'database-design') {
+    if (frontendStatus !== 'done') {
+      registerBlocker(
+        'frontend-mock-flow',
+        'Primero debe completarse frontend-mock-flow.',
+      )
+    }
+
+    if (backendStatus !== 'done') {
+      registerBlocker(
+        'backend-contracts',
+        'Primero debe completarse backend-contracts.',
+      )
+    }
+  }
+
+  return {
+    blockers: summarizeUniqueExecutorStrings(blockers, 8),
+    prerequisitePhaseId,
+    nextRecommendedPhase:
+      normalizedManifest.nextRecommendedPhase ||
+      prerequisitePhaseId ||
+      '',
+  }
 }
 
 function readLocalProjectManifest(manifestPath) {
@@ -15609,7 +15800,7 @@ function detectProjectPhasePlanningIntent(goal, context) {
     )
       .replace(/\s+/g, '-')
       .toLocaleLowerCase() || ''
-  const knownPhaseIds = ['frontend-mock-flow', 'backend-contracts']
+  const knownPhaseIds = ['frontend-mock-flow', 'backend-contracts', 'database-design']
   const detectedPhaseId =
     knownPhaseIds.find((phaseId) => normalizedText.includes(phaseId)) ||
     knownPhaseIds.find((phaseId) => phaseId === phaseIdFromContext) ||
@@ -15693,6 +15884,17 @@ function buildLocalProjectManifest({
           `${rootFolder}/docs/architecture.md`,
         ],
       },
+      {
+        id: 'database-design',
+        status: 'available',
+        createdAt: 'pending-phase-expansion',
+        files: [
+          `${rootFolder}/database/schema.sql`,
+          `${rootFolder}/database/seeds/seed-local.sql`,
+          `${rootFolder}/database/README.md`,
+          `${rootFolder}/docs/architecture.md`,
+        ],
+      },
     ],
     forbiddenPaths: summarizeUniqueExecutorStrings(forbiddenPaths, 12),
     nextRecommendedPhase: nextRecommendedPhase || 'frontend-mock-flow',
@@ -15722,10 +15924,14 @@ function buildUpdatedLocalProjectManifestForPhase({
 
   const normalizedTouchedFiles = summarizeUniqueExecutorStrings(touchedFiles, 16)
   const fallbackManifestPath = `${normalizedProjectRoot}/jefe-project.json`
+  const nextRecommendedPhaseByPhaseId = {
+    'frontend-mock-flow': 'backend-contracts',
+    'backend-contracts': 'database-design',
+  }
   const nextRecommendedPhase =
-    phaseId === 'frontend-mock-flow'
-      ? 'backend-contracts'
-      : normalizedExistingManifest.nextRecommendedPhase || ''
+    nextRecommendedPhaseByPhaseId[phaseId] ||
+    normalizedExistingManifest.nextRecommendedPhase ||
+    ''
   const updatedPhases = Array.isArray(normalizedExistingManifest.phases)
     ? normalizedExistingManifest.phases.map((entry) => {
         if (!entry || typeof entry !== 'object') {
@@ -15799,7 +16005,10 @@ function buildUpdatedLocalProjectManifestForPhase({
       normalizedExistingManifest.forbiddenPaths,
       12,
     ),
-    nextRecommendedPhase: nextRecommendedPhase || 'backend-contracts',
+    nextRecommendedPhase:
+      nextRecommendedPhase ||
+      normalizedExistingManifest.nextRecommendedPhase ||
+      'backend-contracts',
   }
 }
 
@@ -15919,6 +16128,11 @@ function buildProjectPhaseExecutionPlan({
   }
 
   if (phaseId === 'backend-contracts') {
+    const phasePrerequisiteState = getProjectPhasePrerequisiteBlockers({
+      phaseId,
+      localProjectManifest: normalizedManifest,
+    })
+    const blockedByPrerequisite = phasePrerequisiteState.blockers.length > 0
     const targetFiles = [
       `${projectRoot}/backend/src/modules/appointments.js`,
       `${projectRoot}/backend/src/routes/health.js`,
@@ -15926,6 +16140,8 @@ function buildProjectPhaseExecutionPlan({
       `${projectRoot}/shared/contracts/domain.js`,
       `${projectRoot}/shared/types/contracts.js`,
       `${projectRoot}/docs/architecture.md`,
+      `${projectRoot}/docs/local-runbook.md`,
+      `${projectRoot}/jefe-project.json`,
     ]
     const validationPlan = {
       scope: `${projectRoot}:backend-contracts`,
@@ -15941,25 +16157,33 @@ function buildProjectPhaseExecutionPlan({
       manualChecks: [
         'Confirmar que no aparezca listen() ni puertos abiertos.',
         'Confirmar que shared/contracts y backend sigan acotados a contratos locales.',
+        'Confirmar que docs/local-runbook.md y jefe-project.json reflejen database-design como siguiente fase.',
       ],
       successCriteria: [
-        'Dejar backend-contracts listo para revisión sin tocar runtime real.',
+        'Actualizar solo backend, shared, docs y jefe-project.json sin tocar frontend ni database.',
         'Mantener backend y shared en modo JS puro revisable.',
       ],
     }
 
     return {
       phaseId,
-      sourceStrategy: 'fullstack-local-scaffold',
-      targetStrategy: 'prepare-project-phase-plan',
+      sourceStrategy:
+        strategy === 'materialize-project-phase-plan'
+          ? 'prepare-project-phase-plan'
+          : 'fullstack-local-scaffold',
+      targetStrategy: 'materialize-project-phase-plan',
       deliveryLevel: 'fullstack-local',
       projectRoot,
-      goal: `Preparar contratos de backend locales para ${projectDomain} sin levantar servicios.`,
-      reason:
-        'En este bloque solo se prepara la expansión de backend-contracts; todavía no se materializa automáticamente.',
-      executableNow: false,
+      goal: blockedByPrerequisite
+        ? `Backend-contracts queda bloqueada hasta completar la fase previa de ${projectDomain}.`
+        : `Refinar contratos de backend locales para ${projectDomain} sin levantar servicios.`,
+      reason: blockedByPrerequisite
+        ? `Backend-contracts no puede materializarse todavía. ${phasePrerequisiteState.blockers.join(' ')}`
+        : 'Esta fase mejora contratos backend y shared en JS puro, sin runtime real, dependencias instaladas ni base activa.',
+      executableNow: blockedByPrerequisite ? false : true,
       approvalRequired: false,
       riskLevel: 'medium',
+      prerequisitePhaseId: phasePrerequisiteState.prerequisitePhaseId,
       targetFiles,
       allowedTargetPaths: targetFiles,
       operationsPreview: [
@@ -15973,6 +16197,21 @@ function buildProjectPhaseExecutionPlan({
           targetPath: `${projectRoot}/shared/contracts/domain.js`,
           purpose: 'Alinear contratos compartidos entre frontend y backend revisable.',
         },
+        {
+          type: 'replace-file',
+          targetPath: `${projectRoot}/docs/architecture.md`,
+          purpose: 'Documentar el backend conceptual sin levantar servidor real.',
+        },
+        {
+          type: 'replace-file',
+          targetPath: `${projectRoot}/docs/local-runbook.md`,
+          purpose: 'Explicar cómo revisar backend-contracts sin ejecutar servicios.',
+        },
+        {
+          type: 'replace-file',
+          targetPath: `${projectRoot}/jefe-project.json`,
+          purpose: 'Actualizar el manifiesto local para marcar backend-contracts como done y avanzar a database-design.',
+        },
       ],
       validationPlan,
       explicitExclusions: [
@@ -15984,6 +16223,81 @@ function buildProjectPhaseExecutionPlan({
         '.env',
         'deploy',
       ],
+      blockers: phasePrerequisiteState.blockers,
+      successCriteria: validationPlan.successCriteria,
+    }
+  }
+
+  if (phaseId === 'database-design') {
+    const phasePrerequisiteState = getProjectPhasePrerequisiteBlockers({
+      phaseId,
+      localProjectManifest: normalizedManifest,
+    })
+    const targetFiles = [
+      `${projectRoot}/database/schema.sql`,
+      `${projectRoot}/database/seeds/seed-local.sql`,
+      `${projectRoot}/database/README.md`,
+      `${projectRoot}/docs/architecture.md`,
+    ]
+    const validationPlan = {
+      scope: `${projectRoot}:database-design`,
+      level: 'medium',
+      commands: [],
+      fileChecks: targetFiles.map((targetPath) => ({
+        path: targetPath,
+        expectation:
+          'Debe seguir siendo diseño local revisable sin ejecutar migraciones ni levantar una DB real.',
+      })),
+      forbiddenPaths,
+      runtimeChecks: [],
+      manualChecks: [
+        'Confirmar que schema.sql y seed-local.sql sigan siendo diseño local revisable.',
+        'Confirmar que no se ejecute ninguna migración ni conexión real.',
+      ],
+      successCriteria: [
+        'Dejar database-design listo para revisión sin ejecución automática.',
+        'Mantener database como diseño local y documentado.',
+      ],
+    }
+
+    return {
+      phaseId,
+      sourceStrategy: 'backend-contracts',
+      targetStrategy: 'prepare-project-phase-plan',
+      deliveryLevel: 'fullstack-local',
+      projectRoot,
+      goal: `Preparar el diseño de datos local para ${projectDomain} sin ejecutar base real.`,
+      reason: phasePrerequisiteState.blockers.length > 0
+        ? `Database-design todavía no puede revisarse como siguiente fase. ${phasePrerequisiteState.blockers.join(' ')}`
+        : 'La siguiente fase segura es revisar schema y seeds locales antes de pensar en migraciones reales.',
+      executableNow: false,
+      approvalRequired: false,
+      riskLevel: 'medium',
+      prerequisitePhaseId: phasePrerequisiteState.prerequisitePhaseId,
+      targetFiles,
+      allowedTargetPaths: targetFiles,
+      operationsPreview: [
+        {
+          type: 'review-file',
+          targetPath: `${projectRoot}/database/schema.sql`,
+          purpose: 'Revisar el esquema local de turnos antes de cualquier base real.',
+        },
+        {
+          type: 'review-file',
+          targetPath: `${projectRoot}/database/seeds/seed-local.sql`,
+          purpose: 'Revisar los datos semilla locales sin ejecutar migraciones.',
+        },
+      ],
+      validationPlan,
+      explicitExclusions: [
+        'migraciones reales',
+        'conexion a DB real',
+        'Docker',
+        'deploy',
+        'node_modules',
+        '.env',
+      ],
+      blockers: phasePrerequisiteState.blockers,
       successCriteria: validationPlan.successCriteria,
     }
   }
@@ -15999,7 +16313,554 @@ function buildProjectPhaseMaterializationPlan({
     projectPhaseExecutionPlan,
   )
 
-  if (!normalizedPlan || normalizedPlan.phaseId !== 'frontend-mock-flow') {
+  if (!normalizedPlan) {
+    return null
+  }
+
+  const phasePrerequisiteState = getProjectPhasePrerequisiteBlockers({
+    phaseId: normalizedPlan.phaseId,
+    localProjectManifest,
+  })
+
+  if (
+    normalizedPlan.phaseId !== 'frontend-mock-flow' &&
+    phasePrerequisiteState.blockers.length > 0
+  ) {
+    return null
+  }
+
+  if (normalizedPlan.phaseId === 'backend-contracts') {
+    const projectRoot = normalizedPlan.projectRoot
+    const appointmentsPath = `${projectRoot}/backend/src/modules/appointments.js`
+    const healthRoutePath = `${projectRoot}/backend/src/routes/health.js`
+    const responseLibPath = `${projectRoot}/backend/src/lib/response.js`
+    const sharedDomainPath = `${projectRoot}/shared/contracts/domain.js`
+    const sharedContractsPath = `${projectRoot}/shared/types/contracts.js`
+    const architecturePath = `${projectRoot}/docs/architecture.md`
+    const runbookPath = `${projectRoot}/docs/local-runbook.md`
+    const manifestPath = `${projectRoot}/jefe-project.json`
+    const appointmentsContent = `const { APPOINTMENT_STATUSES, APPOINTMENT_TRANSITIONS } = require('../../../shared/contracts/domain.js')
+
+function normalizeAppointmentRecord(record = {}) {
+  return {
+    id: String(record.id || '').trim(),
+    patientId: String(record.patientId || '').trim(),
+    professionalId: String(record.professionalId || '').trim(),
+    specialtyId: String(record.specialtyId || '').trim(),
+    slotId: String(record.slotId || '').trim(),
+    status: APPOINTMENT_STATUSES.includes(record.status) ? record.status : 'scheduled',
+    notes: Array.isArray(record.notes) ? record.notes.filter(Boolean) : [],
+    createdAt: String(record.createdAt || 'local-contract'),
+    updatedAt: String(record.updatedAt || 'local-contract'),
+  }
+}
+
+function canTransitionAppointmentStatus(currentStatus, nextStatus) {
+  const allowedNextStatuses = APPOINTMENT_TRANSITIONS[currentStatus] || []
+  return allowedNextStatuses.includes(nextStatus)
+}
+
+function transitionAppointmentStatus(record, nextStatus, reason = '') {
+  const normalizedRecord = normalizeAppointmentRecord(record)
+  if (!canTransitionAppointmentStatus(normalizedRecord.status, nextStatus)) {
+    return {
+      ok: false,
+      error: 'invalid-status-transition',
+      currentStatus: normalizedRecord.status,
+      nextStatus,
+      reason,
+    }
+  }
+
+  return {
+    ok: true,
+    appointment: {
+      ...normalizedRecord,
+      status: nextStatus,
+      updatedAt: 'local-contract-transition',
+      notes: reason
+        ? [...normalizedRecord.notes, String(reason).trim()].filter(Boolean)
+        : normalizedRecord.notes,
+    },
+  }
+}
+
+function filterAppointments(records, filters = {}) {
+  const normalizedRecords = Array.isArray(records)
+    ? records.map((record) => normalizeAppointmentRecord(record))
+    : []
+  const normalizedSearch = String(filters.search || '')
+    .trim()
+    .toLocaleLowerCase()
+
+  return normalizedRecords.filter((record) => {
+    if (filters.status && record.status !== filters.status) {
+      return false
+    }
+    if (filters.professionalId && record.professionalId !== filters.professionalId) {
+      return false
+    }
+    if (filters.specialtyId && record.specialtyId !== filters.specialtyId) {
+      return false
+    }
+    if (
+      normalizedSearch &&
+      ![
+        record.id,
+        record.patientId,
+        record.professionalId,
+        record.specialtyId,
+        record.slotId,
+      ]
+        .join(' ')
+        .toLocaleLowerCase()
+        .includes(normalizedSearch)
+    ) {
+      return false
+    }
+    return true
+  })
+}
+
+function buildAppointmentSummary(records) {
+  const normalizedRecords = Array.isArray(records)
+    ? records.map((record) => normalizeAppointmentRecord(record))
+    : []
+
+  return APPOINTMENT_STATUSES.reduce(
+    (accumulator, status) => ({
+      ...accumulator,
+      [status]: normalizedRecords.filter((record) => record.status === status).length,
+    }),
+    {
+      total: normalizedRecords.length,
+    },
+  )
+}
+
+module.exports = {
+  normalizeAppointmentRecord,
+  canTransitionAppointmentStatus,
+  transitionAppointmentStatus,
+  filterAppointments,
+  buildAppointmentSummary,
+}
+`
+    const healthRouteContent = `const { okResponse } = require('../lib/response.js')
+
+function createHealthRouteDefinition() {
+  return {
+    method: 'GET',
+    path: '/health',
+    description:
+      'Ruta conceptual y revisable para exponer el estado del backend local sin levantar Express real.',
+  }
+}
+
+function healthCheckHandler() {
+  return okResponse({
+    service: 'backend-contracts',
+    status: 'ready-for-review',
+    mode: 'local-deterministic',
+    runtime: 'not-started',
+  })
+}
+
+module.exports = {
+  createHealthRouteDefinition,
+  healthCheckHandler,
+}
+`
+    const responseLibContent = `function okResponse(data = {}, meta = {}) {
+  return {
+    ok: true,
+    statusCode: 200,
+    data,
+    meta,
+  }
+}
+
+function errorResponse(code, message, details = {}) {
+  return {
+    ok: false,
+    statusCode: 400,
+    error: {
+      code: String(code || 'unknown-error'),
+      message: String(message || 'Unknown error'),
+      details,
+    },
+  }
+}
+
+function validationError(issues = []) {
+  return {
+    ok: false,
+    statusCode: 422,
+    error: {
+      code: 'validation-error',
+      message: 'Hay campos o transiciones invalidas en el contrato local.',
+      details: {
+        issues: Array.isArray(issues) ? issues.filter(Boolean) : [],
+      },
+    },
+  }
+}
+
+module.exports = {
+  okResponse,
+  errorResponse,
+  validationError,
+}
+`
+    const sharedDomainContent = `const APPOINTMENT_STATUSES = [
+  'scheduled',
+  'confirmed',
+  'checked-in',
+  'completed',
+  'cancelled',
+  'no-show',
+]
+
+const APPOINTMENT_TRANSITIONS = {
+  scheduled: ['confirmed', 'cancelled'],
+  confirmed: ['checked-in', 'cancelled', 'no-show'],
+  'checked-in': ['completed', 'cancelled'],
+  completed: [],
+  cancelled: [],
+  'no-show': [],
+}
+
+const DOMAIN_ENTITY_NAMES = {
+  patient: 'Patient',
+  professional: 'Professional',
+  specialty: 'Specialty',
+  appointment: 'Appointment',
+  availabilitySlot: 'AvailabilitySlot',
+}
+
+function createPatientContract(overrides = {}) {
+  return {
+    id: 'PAT-001',
+    fullName: 'Paciente local',
+    documentNumber: 'DNI-LOCAL',
+    contactPhone: '000-000-000',
+    status: 'active',
+    ...overrides,
+  }
+}
+
+function createProfessionalContract(overrides = {}) {
+  return {
+    id: 'PRO-001',
+    fullName: 'Profesional local',
+    specialtyId: 'SPC-001',
+    status: 'available',
+    ...overrides,
+  }
+}
+
+function createSpecialtyContract(overrides = {}) {
+  return {
+    id: 'SPC-001',
+    name: 'Clinica medica',
+    status: 'active',
+    ...overrides,
+  }
+}
+
+function createAvailabilitySlotContract(overrides = {}) {
+  return {
+    id: 'SLT-001',
+    professionalId: 'PRO-001',
+    startAt: '2026-05-03T09:30:00',
+    endAt: '2026-05-03T10:00:00',
+    state: 'free',
+    ...overrides,
+  }
+}
+
+function createAppointmentContract(overrides = {}) {
+  return {
+    id: 'APT-001',
+    patientId: 'PAT-001',
+    professionalId: 'PRO-001',
+    specialtyId: 'SPC-001',
+    slotId: 'SLT-001',
+    status: 'scheduled',
+    notes: [],
+    ...overrides,
+  }
+}
+
+module.exports = {
+  APPOINTMENT_STATUSES,
+  APPOINTMENT_TRANSITIONS,
+  DOMAIN_ENTITY_NAMES,
+  createPatientContract,
+  createProfessionalContract,
+  createSpecialtyContract,
+  createAvailabilitySlotContract,
+  createAppointmentContract,
+}
+`
+    const sharedContractsContent = `/**
+ * @typedef {Object} PatientRecord
+ * @property {string} id
+ * @property {string} fullName
+ * @property {string} documentNumber
+ * @property {string} contactPhone
+ * @property {string} status
+ */
+
+/**
+ * @typedef {Object} ProfessionalRecord
+ * @property {string} id
+ * @property {string} fullName
+ * @property {string} specialtyId
+ * @property {string} status
+ */
+
+/**
+ * @typedef {Object} SpecialtyRecord
+ * @property {string} id
+ * @property {string} name
+ * @property {string} status
+ */
+
+/**
+ * @typedef {Object} AvailabilitySlotRecord
+ * @property {string} id
+ * @property {string} professionalId
+ * @property {string} startAt
+ * @property {string} endAt
+ * @property {string} state
+ */
+
+/**
+ * @typedef {Object} AppointmentRecord
+ * @property {string} id
+ * @property {string} patientId
+ * @property {string} professionalId
+ * @property {string} specialtyId
+ * @property {string} slotId
+ * @property {string} status
+ * @property {string[]} notes
+ */
+
+const CONTRACT_GROUPS = {
+  patient: ['id', 'fullName', 'documentNumber', 'contactPhone', 'status'],
+  professional: ['id', 'fullName', 'specialtyId', 'status'],
+  specialty: ['id', 'name', 'status'],
+  availabilitySlot: ['id', 'professionalId', 'startAt', 'endAt', 'state'],
+  appointment: ['id', 'patientId', 'professionalId', 'specialtyId', 'slotId', 'status', 'notes'],
+}
+
+module.exports = {
+  CONTRACT_GROUPS,
+}
+`
+    const architectureContent = `# Arquitectura local
+
+## Estado del proyecto
+
+El proyecto sigue en modo local, revisable y sin runtime real.
+
+## Backend contracts
+
+Se materializo la fase \`backend-contracts\` con foco en:
+
+- contratos compartidos del dominio de turnos
+- helpers puros de respuesta
+- handler conceptual de health
+- funciones puras para transiciones y filtros de turnos
+
+## Limites actuales
+
+- no se levanto Express real
+- no hay listen()
+- no se abrieron puertos
+- no se instalo ningun paquete
+- no se conecto ninguna base real
+
+## Siguiente fase segura
+
+La siguiente fase recomendada es \`database-design\`, todavia planner-only.
+`
+    const runbookContent = `# Local runbook
+
+## Estado actual
+
+El proyecto sigue en modo local y revisable. Se materializo la fase \`backend-contracts\`.
+
+## Como revisar backend-contracts
+
+- leer \`backend/src/modules/appointments.js\`
+- revisar \`backend/src/routes/health.js\`
+- revisar \`backend/src/lib/response.js\`
+- contrastar contratos en \`shared/contracts/domain.js\`
+- revisar typedefs y estructuras en \`shared/types/contracts.js\`
+
+## Sigue fuera de alcance
+
+- instalar dependencias
+- levantar frontend
+- levantar backend
+- abrir puertos
+- tocar database real
+- ejecutar migraciones
+- usar auth real o pagos reales
+- desplegar servicios
+
+## Proxima fase segura
+
+La siguiente fase recomendada es \`database-design\`, en modo planner-only.
+`
+    const updatedLocalProjectManifest = buildUpdatedLocalProjectManifestForPhase({
+      existingManifest: localProjectManifest,
+      projectRoot,
+      phaseId: normalizedPlan.phaseId,
+      touchedFiles: [
+        appointmentsPath,
+        healthRoutePath,
+        responseLibPath,
+        sharedDomainPath,
+        sharedContractsPath,
+        architecturePath,
+        runbookPath,
+        manifestPath,
+      ],
+    })
+    const updatedLocalProjectManifestContent = updatedLocalProjectManifest
+      ? `${JSON.stringify(updatedLocalProjectManifest, null, 2)}\n`
+      : ''
+
+    return {
+      tasks: [
+        {
+          step: 1,
+          title: `Actualizar la fase "${normalizedPlan.phaseId}" solo dentro de ${normalizedPlan.projectRoot}.`,
+          operation: 'create-or-edit-files',
+          targetPath: normalizedPlan.projectRoot,
+        },
+        {
+          step: 2,
+          title: 'Validar que la expansión quede acotada a backend, shared, docs y manifest local.',
+          operation: 'validate-scope',
+          targetPath: normalizedPlan.projectRoot,
+        },
+      ],
+      assumptions: [
+        'La expansión sigue siendo local, revisable y sin runtime real.',
+        'No se instalan dependencias ni se ejecutan servicios.',
+        'Frontend, database y forbidden paths quedan fuera de alcance.',
+      ],
+      instruction: [
+        `Materializar la fase ${normalizedPlan.phaseId} dentro de ${normalizedPlan.projectRoot}.`,
+        `Usar solo estos targetPaths: ${normalizedPlan.allowedTargetPaths.join(', ')}`,
+        'No tocar frontend, database, package.json, node_modules, .env, Docker ni deploy.',
+      ].join('\n'),
+      executionScope: normalizeExecutorExecutionScope({
+        allowedTargetPaths: normalizedPlan.allowedTargetPaths,
+        successCriteria: normalizedPlan.successCriteria,
+        enforceNarrowScope: true,
+      }),
+      materializationPlan: {
+        version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+        kind: 'project-phase-materialization',
+        summary: `Fase ${normalizedPlan.phaseId} actualizada dentro de "${normalizedPlan.projectRoot}".`,
+        strategy: 'materialize-project-phase-plan',
+        reasoningLayer: 'local-rules',
+        materializationLayer: 'local-deterministic',
+        operations: [
+          { type: 'replace-file', targetPath: appointmentsPath, nextContent: appointmentsContent },
+          { type: 'replace-file', targetPath: healthRoutePath, nextContent: healthRouteContent },
+          { type: 'replace-file', targetPath: responseLibPath, nextContent: responseLibContent },
+          { type: 'replace-file', targetPath: sharedDomainPath, nextContent: sharedDomainContent },
+          { type: 'replace-file', targetPath: sharedContractsPath, nextContent: sharedContractsContent },
+          { type: 'replace-file', targetPath: architecturePath, nextContent: architectureContent },
+          { type: 'replace-file', targetPath: runbookPath, nextContent: runbookContent },
+          ...(updatedLocalProjectManifestContent
+            ? [
+                {
+                  type: 'replace-file',
+                  targetPath: manifestPath,
+                  nextContent: updatedLocalProjectManifestContent,
+                },
+              ]
+            : []),
+        ],
+        validations: [
+          { type: 'exists', targetPath: appointmentsPath, expectedKind: 'file' },
+          { type: 'exists', targetPath: healthRoutePath, expectedKind: 'file' },
+          { type: 'exists', targetPath: responseLibPath, expectedKind: 'file' },
+          { type: 'exists', targetPath: sharedDomainPath, expectedKind: 'file' },
+          { type: 'exists', targetPath: sharedContractsPath, expectedKind: 'file' },
+          { type: 'exists', targetPath: architecturePath, expectedKind: 'file' },
+          { type: 'exists', targetPath: runbookPath, expectedKind: 'file' },
+          ...(updatedLocalProjectManifest
+            ? [{ type: 'exists', targetPath: manifestPath, expectedKind: 'file' }]
+            : []),
+          {
+            type: 'file-contains',
+            targetPath: appointmentsPath,
+            expectedText: 'canTransitionAppointmentStatus',
+          },
+          {
+            type: 'file-contains',
+            targetPath: healthRoutePath,
+            expectedText: 'healthCheckHandler',
+          },
+          {
+            type: 'file-contains',
+            targetPath: responseLibPath,
+            expectedText: 'okResponse',
+          },
+          {
+            type: 'file-contains',
+            targetPath: sharedDomainPath,
+            expectedText: 'APPOINTMENT_STATUSES',
+          },
+          {
+            type: 'file-contains',
+            targetPath: sharedContractsPath,
+            expectedText: '@typedef {Object} AppointmentRecord',
+          },
+          {
+            type: 'file-contains',
+            targetPath: architecturePath,
+            expectedText: 'database-design',
+          },
+          {
+            type: 'file-contains',
+            targetPath: runbookPath,
+            expectedText: 'backend-contracts',
+          },
+          ...(updatedLocalProjectManifest
+            ? [
+                {
+                  type: 'file-contains',
+                  targetPath: manifestPath,
+                  expectedText: '"id": "backend-contracts"',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: manifestPath,
+                  expectedText: '"nextRecommendedPhase": "database-design"',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: manifestPath,
+                  expectedText: '"id": "database-design"',
+                },
+              ]
+            : []),
+        ],
+      },
+      localProjectManifest: updatedLocalProjectManifest,
+    }
+  }
+
+  if (normalizedPlan.phaseId !== 'frontend-mock-flow') {
     return null
   }
 
@@ -21332,8 +22193,10 @@ function buildOpenAIBrainSchema() {
           executableNow: { type: 'boolean' },
           approvalRequired: { type: 'boolean' },
           riskLevel: { type: 'string' },
+          prerequisitePhaseId: { type: 'string' },
           targetFiles: { type: 'array', items: { type: 'string' } },
           allowedTargetPaths: { type: 'array', items: { type: 'string' } },
+          blockers: { type: 'array', items: { type: 'string' } },
           operationsPreview: {
             type: 'array',
             items: {
