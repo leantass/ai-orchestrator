@@ -12582,6 +12582,33 @@ function buildPhaseExpansionPlan({
     }
   }
 
+  if (
+    strategy === 'materialize-project-phase-plan' &&
+    normalizedProjectPhaseExecutionPlan?.phaseId === 'local-validation'
+  ) {
+    return {
+      phaseId: 'review-and-expand',
+      goal: 'Preparar una revision humana del proyecto local para decidir la siguiente expansion segura.',
+      targetFiles: [
+        `${normalizedProjectPhaseExecutionPlan.projectRoot}/docs/validation-report.md`,
+        `${normalizedProjectPhaseExecutionPlan.projectRoot}/docs/local-runbook.md`,
+        `${normalizedProjectPhaseExecutionPlan.projectRoot}/jefe-project.json`,
+      ],
+      changesExpected: [
+        'Consolidar hallazgos de validacion local',
+        'Elegir la siguiente expansion segura del proyecto',
+        'Mantener la siguiente fase en modo planner-only',
+      ],
+      risks: [
+        'Confundir revision de expansion con ejecucion automatica si la siguiente fase no se mantiene bajo control humano.',
+      ],
+      validationPlan: normalizedValidationPlan,
+      executableNow: false,
+      approvalRequired: false,
+      nextExpectedAction: 'review-project-phase',
+    }
+  }
+
   if (strategy === 'materialize-frontend-project-plan') {
     return {
       phaseId: 'frontend-flow-refinement',
@@ -12726,7 +12753,9 @@ function buildNextActionPlan({
       ''
     const prerequisiteIsMaterializableSafePhase =
       prerequisitePhaseId === 'frontend-mock-flow' ||
-      prerequisitePhaseId === 'backend-contracts'
+      prerequisitePhaseId === 'backend-contracts' ||
+      prerequisitePhaseId === 'database-design' ||
+      prerequisitePhaseId === 'local-validation'
 
     if (phaseBlockers.length > 0) {
       return {
@@ -12750,6 +12779,10 @@ function buildNextActionPlan({
             ? 'Completar frontend mock flow'
             : prerequisitePhaseId === 'backend-contracts'
               ? 'Completar backend contracts'
+              : prerequisitePhaseId === 'database-design'
+                ? 'Completar database design'
+                : prerequisitePhaseId === 'local-validation'
+                  ? 'Completar local validation'
               : 'Resolver prerequisito de fase',
         technicalLabel: `phase-prerequisite-${normalizedProjectPhaseExecutionPlan.phaseId}`,
         expectedOutcome:
@@ -12780,7 +12813,9 @@ function buildNextActionPlan({
             ? 'Preparar backend contracts'
             : normalizedProjectPhaseExecutionPlan.phaseId === 'database-design'
               ? 'Preparar database design'
-              : 'Preparar local validation',
+              : normalizedProjectPhaseExecutionPlan.phaseId === 'local-validation'
+                ? 'Preparar local validation'
+                : 'Preparar review and expand',
       technicalLabel: `prepare-${normalizedProjectPhaseExecutionPlan.phaseId}`,
       expectedOutcome:
         normalizedProjectPhaseExecutionPlan.executableNow === true
@@ -12809,7 +12844,9 @@ function buildNextActionPlan({
             ? 'Materializar backend contracts'
             : normalizedProjectPhaseExecutionPlan.phaseId === 'database-design'
               ? 'Materializar database design'
-            : `Materializar ${normalizedProjectPhaseExecutionPlan.phaseId}`,
+              : normalizedProjectPhaseExecutionPlan.phaseId === 'local-validation'
+                ? 'Materializar local validation'
+                : `Materializar ${normalizedProjectPhaseExecutionPlan.phaseId}`,
       technicalLabel: `materialize-${normalizedProjectPhaseExecutionPlan.phaseId}`,
       expectedOutcome:
         'Actualizar solo los archivos permitidos de la fase dentro del proyecto ya generado.',
@@ -15648,7 +15685,8 @@ function getProjectPhasePrerequisiteBlockers({
   if (
     (normalizedPhaseId === 'backend-contracts' ||
       normalizedPhaseId === 'database-design' ||
-      normalizedPhaseId === 'local-validation') &&
+      normalizedPhaseId === 'local-validation' ||
+      normalizedPhaseId === 'review-and-expand') &&
     scaffoldStatus !== 'done'
   ) {
     registerBlocker(
@@ -15717,6 +15755,46 @@ function getProjectPhasePrerequisiteBlockers({
       registerBlocker(
         'database-design',
         'Primero debe completarse database-design.',
+      )
+    }
+
+    if (requestedPhaseStatus === 'done') {
+      registerBlocker(
+        '',
+        'local-validation ya esta completada y no deberia materializarse otra vez en este flujo.',
+      )
+    }
+  }
+
+  if (normalizedPhaseId === 'review-and-expand') {
+    const databaseStatus = getPhaseStatus('database-design')
+    const localValidationStatus = getPhaseStatus('local-validation')
+
+    if (frontendStatus !== 'done') {
+      registerBlocker(
+        'frontend-mock-flow',
+        'Primero debe completarse frontend-mock-flow.',
+      )
+    }
+
+    if (backendStatus !== 'done') {
+      registerBlocker(
+        'backend-contracts',
+        'Primero debe completarse backend-contracts.',
+      )
+    }
+
+    if (databaseStatus !== 'done') {
+      registerBlocker(
+        'database-design',
+        'Primero debe completarse database-design.',
+      )
+    }
+
+    if (localValidationStatus !== 'done') {
+      registerBlocker(
+        'local-validation',
+        'Primero debe completarse local-validation.',
       )
     }
   }
@@ -15871,6 +15949,7 @@ function detectProjectPhasePlanningIntent(goal, context) {
     'backend-contracts',
     'database-design',
     'local-validation',
+    'review-and-expand',
   ]
   const detectedPhaseId =
     knownPhaseIds.find((phaseId) => normalizedText.includes(phaseId)) ||
@@ -15999,6 +16078,7 @@ function buildUpdatedLocalProjectManifestForPhase({
     'frontend-mock-flow': 'backend-contracts',
     'backend-contracts': 'database-design',
     'database-design': 'local-validation',
+    'local-validation': 'review-and-expand',
   }
   const nextRecommendedPhase =
     nextRecommendedPhaseByPhaseId[phaseId] ||
@@ -16060,6 +16140,12 @@ function buildUpdatedLocalProjectManifestForPhase({
               `${normalizedProjectRoot}/docs/local-runbook.md`,
               fallbackManifestPath,
             ]
+          : nextRecommendedPhase === 'review-and-expand'
+            ? [
+                `${normalizedProjectRoot}/docs/validation-report.md`,
+                `${normalizedProjectRoot}/docs/local-runbook.md`,
+                fallbackManifestPath,
+              ]
           : [],
     })
   }
@@ -16419,41 +16505,197 @@ function buildProjectPhaseExecutionPlan({
       phaseId,
       localProjectManifest: normalizedManifest,
     })
+    const blockedByPrerequisite = phasePrerequisiteState.blockers.length > 0
+    const targetFiles = [
+      `${projectRoot}/docs/validation-report.md`,
+      `${projectRoot}/docs/local-runbook.md`,
+      `${projectRoot}/jefe-project.json`,
+    ]
+    const extendedForbiddenPaths = summarizeUniqueExecutorStrings(
+      [...forbiddenPaths, 'dist', 'build'],
+      16,
+    )
+    const validationPlan = {
+      scope: `${projectRoot}:fullstack-local-project-validation`,
+      level: 'full',
+      commands: [
+        `node --check ${projectRoot}/backend/src/server.js`,
+        `node --check ${projectRoot}/backend/src/routes/health.js`,
+        `node --check ${projectRoot}/backend/src/modules/appointments.js`,
+        `node --check ${projectRoot}/backend/src/lib/response.js`,
+        `node --check ${projectRoot}/shared/contracts/domain.js`,
+        `node --check ${projectRoot}/shared/types/contracts.js`,
+        `node --check ${projectRoot}/scripts/seed-local.js`,
+      ],
+      fileChecks: [
+        {
+          path: `${projectRoot}/frontend/index.html`,
+          expectation: 'Debe existir el entrypoint HTML del frontend local.',
+        },
+        {
+          path: `${projectRoot}/frontend/src/main.js`,
+          expectation: 'Debe mantenerse el flujo principal del frontend local.',
+        },
+        {
+          path: `${projectRoot}/backend/src/server.js`,
+          expectation: 'Debe existir el backend local sin levantar servicios reales.',
+        },
+        {
+          path: `${projectRoot}/backend/src/routes/health.js`,
+          expectation: 'Debe exponer una ruta conceptual revisable sin depender de Express real.',
+        },
+        {
+          path: `${projectRoot}/backend/src/modules/appointments.js`,
+          expectation: 'Debe contener helpers y contratos backend revisables.',
+        },
+        {
+          path: `${projectRoot}/backend/src/lib/response.js`,
+          expectation: 'Debe contener respuestas JSON locales y puras.',
+        },
+        {
+          path: `${projectRoot}/shared/contracts/domain.js`,
+          expectation: 'Debe mantener constantes y contratos del dominio compartido.',
+        },
+        {
+          path: `${projectRoot}/shared/types/contracts.js`,
+          expectation: 'Debe documentar tipos y estructuras esperadas.',
+        },
+        {
+          path: `${projectRoot}/database/schema.sql`,
+          expectation: 'Debe existir el schema local revisable sin una DB real activa.',
+        },
+        {
+          path: `${projectRoot}/database/seeds/seed-local.sql`,
+          expectation: 'Debe existir el seed local revisable sin ejecucion automatica.',
+        },
+        {
+          path: `${projectRoot}/docs/architecture.md`,
+          expectation: 'Debe reflejar la arquitectura local y el alcance actual.',
+        },
+        {
+          path: `${projectRoot}/docs/local-runbook.md`,
+          expectation: 'Debe explicar la revision local y el siguiente paso review-and-expand.',
+        },
+        {
+          path: `${projectRoot}/jefe-project.json`,
+          expectation: 'Debe reflejar el estado final local y recomendar review-and-expand.',
+        },
+      ],
+      forbiddenPaths: extendedForbiddenPaths,
+      runtimeChecks: [],
+      manualChecks: [
+        'Abrir frontend/index.html y revisar el flujo mock local.',
+        'Revisar contratos backend y helpers puros del dominio.',
+        'Revisar schema SQL y seed SQL como artefactos documentales.',
+        'Revisar validation-report.md y confirmar que no afirme ejecuciones no realizadas.',
+      ],
+      successCriteria: [
+        'Actualizar solo docs/validation-report.md, docs/local-runbook.md y jefe-project.json.',
+        'Mantener la validacion en modo local y documental, sin runtime, sin DB real y sin instalar dependencias.',
+      ],
+    }
+
+    return {
+      phaseId,
+      sourceStrategy:
+        strategy === 'materialize-project-phase-plan'
+          ? 'prepare-project-phase-plan'
+          : 'database-design',
+      targetStrategy: 'materialize-project-phase-plan',
+      deliveryLevel: 'fullstack-local',
+      projectRoot,
+      goal: blockedByPrerequisite
+        ? `Local-validation queda bloqueada hasta completar la fase previa de ${projectDomain}.`
+        : `Validar localmente ${projectDomain} sin ejecutar servicios, SQL ni instalar dependencias.`,
+      reason: blockedByPrerequisite
+        ? `Local-validation todavía no puede revisarse como siguiente fase. ${phasePrerequisiteState.blockers.join(' ')}`
+        : 'Esta fase consolida la validacion local del proyecto, documenta limites reales y prepara la revision humana de la siguiente expansion.',
+      executableNow: blockedByPrerequisite ? false : true,
+      approvalRequired: false,
+      riskLevel: 'medium',
+      prerequisitePhaseId: phasePrerequisiteState.prerequisitePhaseId,
+      targetFiles,
+      allowedTargetPaths: targetFiles,
+      operationsPreview: [
+        {
+          type: blockedByPrerequisite ? 'review-file' : 'replace-file',
+          targetPath: `${projectRoot}/docs/validation-report.md`,
+          purpose: 'Consolidar el reporte local de validacion del proyecto sin afirmar ejecuciones no realizadas.',
+        },
+        {
+          type: blockedByPrerequisite ? 'review-file' : 'replace-file',
+          targetPath: `${projectRoot}/docs/local-runbook.md`,
+          purpose: 'Actualizar el runbook local con la fase local-validation y el siguiente paso review-and-expand.',
+        },
+        {
+          type: blockedByPrerequisite ? 'review-file' : 'replace-file',
+          targetPath: `${projectRoot}/jefe-project.json`,
+          purpose: 'Actualizar el manifiesto local para marcar local-validation como done y avanzar a review-and-expand.',
+        },
+      ],
+      validationPlan,
+      explicitExclusions: [
+        'servicios reales',
+        'base real',
+        'frontend',
+        'backend',
+        'shared',
+        'database',
+        'scripts',
+        'deploy',
+        'Docker',
+        'node_modules',
+        '.env',
+        'docker-compose.yml',
+        'Dockerfile',
+        'dist',
+        'build',
+      ],
+      blockers: phasePrerequisiteState.blockers,
+      successCriteria: validationPlan.successCriteria,
+    }
+  }
+
+  if (phaseId === 'review-and-expand') {
+    const phasePrerequisiteState = getProjectPhasePrerequisiteBlockers({
+      phaseId,
+      localProjectManifest: normalizedManifest,
+    })
     const targetFiles = [
       `${projectRoot}/docs/validation-report.md`,
       `${projectRoot}/docs/local-runbook.md`,
       `${projectRoot}/jefe-project.json`,
     ]
     const validationPlan = {
-      scope: `${projectRoot}:local-validation`,
+      scope: `${projectRoot}:review-and-expand`,
       level: 'medium',
       commands: [],
       fileChecks: targetFiles.map((targetPath) => ({
         path: targetPath,
         expectation:
-          'Debe seguir siendo revisión local del proyecto sin ejecutar servicios ni crear runtime nuevo.',
+          'Debe servir como insumo para revision humana y decision de la siguiente expansion segura.',
       })),
       forbiddenPaths,
       runtimeChecks: [],
       manualChecks: [
-        'Confirmar que la revisión siga siendo documental y local.',
-        'Confirmar que no se activen servicios, DB real ni deploy.',
+        'Revisar el reporte local y elegir la siguiente expansion segura.',
+        'Confirmar que cualquier salto a runtime real quede sujeto a aprobacion futura.',
       ],
       successCriteria: [
-        'Dejar local-validation como siguiente fase revisable sin ejecución automática.',
+        'Dejar review-and-expand como fase planner-only sin materializacion automatica.',
       ],
     }
 
     return {
       phaseId,
-      sourceStrategy: 'database-design',
+      sourceStrategy: 'local-validation',
       targetStrategy: 'prepare-project-phase-plan',
       deliveryLevel: 'fullstack-local',
       projectRoot,
-      goal: `Preparar la validación local final de ${projectDomain} sin ejecutar servicios.`,
+      goal: `Preparar una revision humana de ${projectDomain} para decidir la siguiente expansion segura.`,
       reason: phasePrerequisiteState.blockers.length > 0
-        ? `Local-validation todavía no puede revisarse como siguiente fase. ${phasePrerequisiteState.blockers.join(' ')}`
-        : 'La siguiente fase segura es revisar el proyecto local completo antes de pensar en runtime real.',
+        ? `Review-and-expand todavia no puede proponerse como siguiente fase. ${phasePrerequisiteState.blockers.join(' ')}`
+        : 'La siguiente fase segura es revisar el estado local del proyecto y decidir si conviene ampliar frontend, backend o aprobaciones futuras.',
       executableNow: false,
       approvalRequired: false,
       riskLevel: 'medium',
@@ -16463,17 +16705,18 @@ function buildProjectPhaseExecutionPlan({
       operationsPreview: [
         {
           type: 'review-file',
-          targetPath: `${projectRoot}/docs/local-runbook.md`,
-          purpose: 'Revisar el plan local de validación antes de cualquier ejecución real.',
+          targetPath: `${projectRoot}/docs/validation-report.md`,
+          purpose: 'Usar el reporte local como base para decidir la siguiente expansion del proyecto.',
         },
         {
           type: 'review-file',
           targetPath: `${projectRoot}/jefe-project.json`,
-          purpose: 'Confirmar el estado final del proyecto y sus fases disponibles.',
+          purpose: 'Confirmar el estado del proyecto y las fases ya completadas.',
         },
       ],
       validationPlan,
       explicitExclusions: [
+        'materializacion automatica',
         'servicios reales',
         'base real',
         'deploy',
@@ -16511,6 +16754,313 @@ function buildProjectPhaseMaterializationPlan({
     phasePrerequisiteState.blockers.length > 0
   ) {
     return null
+  }
+
+  if (normalizedPlan.phaseId === 'local-validation') {
+    const projectRoot = normalizedPlan.projectRoot
+    const validationReportPath = `${projectRoot}/docs/validation-report.md`
+    const runbookPath = `${projectRoot}/docs/local-runbook.md`
+    const manifestPath = `${projectRoot}/jefe-project.json`
+    const validationReportContent = `# Validacion local del proyecto
+
+## Proyecto
+
+- root: \`${projectRoot}\`
+- deliveryLevel: \`fullstack-local\`
+- dominio: \`${String(localProjectManifest?.domain || 'proyecto local').trim() || 'proyecto local'}\`
+- materializationLayer: \`local-deterministic\`
+
+## Fases revisadas
+
+### fullstack-local-scaffold
+
+- estado: done
+- archivos principales:
+  - frontend/index.html
+  - backend/src/server.js
+  - shared/contracts/domain.js
+  - database/schema.sql
+
+### frontend-mock-flow
+
+- estado: done
+- archivos principales:
+  - frontend/src/mock-data.js
+  - frontend/src/components/App.js
+  - frontend/src/styles.css
+  - docs/local-runbook.md
+
+### backend-contracts
+
+- estado: done
+- archivos principales:
+  - backend/src/modules/appointments.js
+  - backend/src/routes/health.js
+  - backend/src/lib/response.js
+  - shared/contracts/domain.js
+  - shared/types/contracts.js
+
+### database-design
+
+- estado: done
+- archivos principales:
+  - database/schema.sql
+  - database/seeds/seed-local.sql
+  - database/README.md
+  - docs/architecture.md
+
+## Checks de estructura
+
+- frontend existe
+- backend existe
+- shared existe
+- database existe
+- docs existe
+- jefe-project.json existe
+
+## Checks de seguridad
+
+- no node_modules
+- no .env real
+- no Dockerfile
+- no docker-compose.yml
+- no deploy
+- no DB real activa
+- no servidor levantado
+
+## Checks recomendados
+
+- \`node --check backend/src/server.js\`
+- \`node --check backend/src/routes/health.js\`
+- \`node --check backend/src/modules/appointments.js\`
+- \`node --check backend/src/lib/response.js\`
+- \`node --check shared/contracts/domain.js\`
+- \`node --check shared/types/contracts.js\`
+- \`node --check scripts/seed-local.js\`
+
+## Validaciones manuales pendientes
+
+- abrir \`frontend/index.html\`
+- revisar flujo mock
+- revisar contratos backend
+- revisar schema SQL
+- revisar seed SQL
+
+## Riesgos y limites
+
+- no se instalaron dependencias
+- no se levanto backend
+- no se abrio puerto
+- no se ejecuto base de datos
+- no se corrieron migraciones
+- no se ejecutaron seeds
+- no se hizo deploy
+- no se tocaron credenciales
+
+## Proximo paso recomendado
+
+- \`review-and-expand\`
+`
+    const runbookContent = `# Local runbook
+
+## Estado actual
+
+El proyecto sigue en modo local y revisable. Se materializo la fase \`local-validation\`.
+
+## Que valida local-validation
+
+- coherencia basica entre frontend, backend, shared y database
+- presencia de archivos clave del scaffold fullstack-local
+- continuidad entre las fases ya materializadas
+- limites de seguridad del proyecto local
+
+## Que NO valida
+
+- runtime real
+- backend levantado
+- puertos abiertos
+- base real activa
+- migraciones ejecutadas
+- seeds ejecutados
+- deploy
+
+## Como revisar los archivos
+
+- leer \`docs/validation-report.md\`
+- revisar \`jefe-project.json\`
+- abrir \`frontend/index.html\`
+- revisar \`backend/src/routes/health.js\`
+- revisar \`backend/src/modules/appointments.js\`
+- revisar \`database/schema.sql\`
+- revisar \`database/seeds/seed-local.sql\`
+
+## Comandos manuales sugeridos
+
+- \`node --check backend/src/server.js\`
+- \`node --check backend/src/routes/health.js\`
+- \`node --check backend/src/modules/appointments.js\`
+- \`node --check backend/src/lib/response.js\`
+- \`node --check shared/contracts/domain.js\`
+- \`node --check shared/types/contracts.js\`
+- \`node --check scripts/seed-local.js\`
+
+## Sigue fuera de alcance
+
+- instalar dependencias
+- levantar frontend o backend
+- abrir puertos
+- ejecutar SQL
+- crear una DB real
+- correr migraciones
+- correr seeds
+- usar Docker
+- desplegar servicios
+
+## Proxima fase segura
+
+La siguiente fase recomendada es \`review-and-expand\`, en modo planner-only.
+`
+    const updatedLocalProjectManifest = buildUpdatedLocalProjectManifestForPhase({
+      existingManifest: localProjectManifest,
+      projectRoot,
+      phaseId: normalizedPlan.phaseId,
+      touchedFiles: [
+        validationReportPath,
+        runbookPath,
+        manifestPath,
+      ],
+    })
+    const updatedLocalProjectManifestContent = updatedLocalProjectManifest
+      ? `${JSON.stringify(updatedLocalProjectManifest, null, 2)}\n`
+      : ''
+
+    return {
+      tasks: [
+        {
+          step: 1,
+          title: `Actualizar la fase "${normalizedPlan.phaseId}" solo dentro de ${normalizedPlan.projectRoot}.`,
+          operation: 'create-or-edit-files',
+          targetPath: normalizedPlan.projectRoot,
+        },
+        {
+          step: 2,
+          title: 'Validar que la revision quede acotada a docs y manifest local.',
+          operation: 'validate-scope',
+          targetPath: normalizedPlan.projectRoot,
+        },
+      ],
+      assumptions: [
+        'La validacion sigue siendo local y documental.',
+        'No se ejecutan servicios, SQL, seeds ni dependencias.',
+        'Frontend, backend, shared, database y scripts quedan fuera de alcance de escritura.',
+      ],
+      instruction: [
+        `Materializar la fase ${normalizedPlan.phaseId} dentro de ${normalizedPlan.projectRoot}.`,
+        `Usar solo estos targetPaths: ${normalizedPlan.allowedTargetPaths.join(', ')}`,
+        'No tocar frontend, backend, shared, database, scripts, node_modules, .env, Docker ni deploy.',
+      ].join('\n'),
+      executionScope: normalizeExecutorExecutionScope({
+        allowedTargetPaths: normalizedPlan.allowedTargetPaths,
+        successCriteria: normalizedPlan.successCriteria,
+        enforceNarrowScope: true,
+      }),
+      materializationPlan: {
+        version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+        kind: 'project-phase-materialization',
+        summary: `Fase ${normalizedPlan.phaseId} actualizada dentro de "${normalizedPlan.projectRoot}".`,
+        strategy: 'materialize-project-phase-plan',
+        reasoningLayer: 'local-rules',
+        materializationLayer: 'local-deterministic',
+        operations: [
+          {
+            type: 'replace-file',
+            targetPath: validationReportPath,
+            nextContent: validationReportContent,
+          },
+          {
+            type: 'replace-file',
+            targetPath: runbookPath,
+            nextContent: runbookContent,
+          },
+          ...(updatedLocalProjectManifestContent
+            ? [
+                {
+                  type: 'replace-file',
+                  targetPath: manifestPath,
+                  nextContent: updatedLocalProjectManifestContent,
+                },
+              ]
+            : []),
+        ],
+        validations: [
+          { type: 'exists', targetPath: validationReportPath, expectedKind: 'file' },
+          { type: 'exists', targetPath: runbookPath, expectedKind: 'file' },
+          ...(updatedLocalProjectManifest
+            ? [{ type: 'exists', targetPath: manifestPath, expectedKind: 'file' }]
+            : []),
+          {
+            type: 'file-contains',
+            targetPath: validationReportPath,
+            expectedText: 'Validacion local del proyecto',
+          },
+          {
+            type: 'file-contains',
+            targetPath: validationReportPath,
+            expectedText: 'fullstack-local-scaffold',
+          },
+          {
+            type: 'file-contains',
+            targetPath: validationReportPath,
+            expectedText: 'no se ejecuto base de datos',
+          },
+          {
+            type: 'file-contains',
+            targetPath: validationReportPath,
+            expectedText: 'no se levanto backend',
+          },
+          {
+            type: 'file-contains',
+            targetPath: validationReportPath,
+            expectedText: 'no se instalaron dependencias',
+          },
+          {
+            type: 'file-contains',
+            targetPath: validationReportPath,
+            expectedText: 'review-and-expand',
+          },
+          {
+            type: 'file-contains',
+            targetPath: runbookPath,
+            expectedText: 'local-validation',
+          },
+          {
+            type: 'file-contains',
+            targetPath: runbookPath,
+            expectedText: 'review-and-expand',
+          },
+          ...(updatedLocalProjectManifest
+            ? [
+                {
+                  type: 'file-contains',
+                  targetPath: manifestPath,
+                  expectedText: '"id": "local-validation"',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: manifestPath,
+                  expectedText: '"id": "review-and-expand"',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: manifestPath,
+                  expectedText: '"nextRecommendedPhase": "review-and-expand"',
+                },
+              ]
+            : []),
+        ],
+      },
+      localProjectManifest: updatedLocalProjectManifest,
+    }
   }
 
   if (normalizedPlan.phaseId === 'database-design') {
