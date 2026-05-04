@@ -427,6 +427,20 @@ const phaseExecutionValidationCases = {
       'Preparar la fase database-design del proyecto fullstack local de turnos medicos.',
     context: '',
   },
+  materializeDatabaseDesignBlocked: {
+    id: 'materialize-database-design-blocked',
+    label: 'Materializar database design sin backend previo',
+    goal:
+      'Materializar la fase database-design del proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  materializeDatabaseDesign: {
+    id: 'materialize-database-design',
+    label: 'Materializar database design',
+    goal:
+      'Materializar la fase database-design del proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
 }
 
 const smokeExecutionWorkspaceRoot = path.join(
@@ -2032,6 +2046,73 @@ async function getPhaseExecutionFixture() {
   return cachedFullstackPhaseFixturePromise
 }
 
+async function materializePhaseOnFixture({ fixture, phaseId, requestId }) {
+  const reusablePlanningContext = buildReusablePlanningContext()
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: `Materializar la fase ${phaseId} del proyecto fullstack local de turnos medicos.`,
+    context: `phaseId: ${phaseId}`,
+    workspacePath: fixture.workspacePath,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  if (!decision?.materializationPlan) {
+    throw new Error(`No se pudo construir el materializationPlan de ${phaseId}.`)
+  }
+
+  const task = buildLocalMaterializationTask({
+    plan: decision.materializationPlan,
+    workspacePath: fixture.workspacePath,
+    requestId,
+    instruction: decision.instruction || '',
+    brainStrategy: decision.strategy || '',
+    businessSector: decision.businessSector || '',
+    businessSectorLabel: decision.businessSectorLabel || '',
+    creativeDirection: decision.creativeDirection || null,
+    reusableArtifactLookup: decision.reusableArtifactLookup || null,
+    reusableArtifactsFound: decision.reusableArtifactsFound || 0,
+    reuseDecision: decision.reuseDecision === true,
+    reuseReason: decision.reuseReason || '',
+    reusedArtifactIds: Array.isArray(decision.reusedArtifactIds)
+      ? decision.reusedArtifactIds
+      : [],
+    reuseMode: decision.reuseMode || 'none',
+    reuseMaterialization: null,
+    materializationPlanSource: decision.materializationPlanSource || 'planner',
+  })
+
+  if (!task) {
+    throw new Error(`No se pudo construir la tarea local deterministica de ${phaseId}.`)
+  }
+
+  const executionResult = await runLocalDeterministicTask(task)
+  if (executionResult?.ok !== true) {
+    throw new Error(
+      executionResult?.error ||
+        `La materializacion local de ${phaseId} no termino en OK.`,
+    )
+  }
+
+  const manifest = JSON.parse(fs.readFileSync(fixture.manifestPath, 'utf8'))
+
+  return {
+    ...fixture,
+    manifest,
+    lastPhaseDecision: decision,
+    lastPhaseExecutionResult: executionResult,
+  }
+}
+
 async function runFrontendProjectMaterializationValidation() {
   const reusablePlanningContext = {
     reusableArtifactLookup: {
@@ -3403,7 +3484,19 @@ async function runMaterializeBackendContractsValidation() {
 }
 
 async function runPrepareDatabaseDesignValidation() {
-  const fixture = await getPhaseExecutionFixture()
+  let fixture = await buildPhaseExecutionFixture({
+    workspaceName: 'fullstack-project-phase-database-ready',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'frontend-mock-flow',
+    requestId: 'smoke-database-ready-frontend',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'backend-contracts',
+    requestId: 'smoke-database-ready-backend',
+  })
   const reusablePlanningContext = buildReusablePlanningContext()
   const testCase = phaseExecutionValidationCases.prepareDatabaseDesign
   const decision = await plannerApi.buildLocalStrategicBrainDecision({
@@ -3467,8 +3560,446 @@ async function runPrepareDatabaseDesignValidation() {
     if (phaseSummary.phaseId !== 'database-design') {
       failures.push('projectPhaseExecutionPlan.phaseId deberia ser database-design.')
     }
+    if (!phaseSummary.executableNow) {
+      failures.push('database-design deberia quedar executableNow cuando backend-contracts ya está done.')
+    }
+    if (phaseSummary.targetStrategy !== 'materialize-project-phase-plan') {
+      failures.push('database-design deberia apuntar a materialize-project-phase-plan cuando está desbloqueada.')
+    }
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction,
+  }
+}
+
+async function runBlockedDatabaseDesignMaterializationValidation() {
+  let fixture = await buildPhaseExecutionFixture({
+    workspaceName: 'fullstack-project-phase-database-blocked',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'frontend-mock-flow',
+    requestId: 'smoke-database-blocked-frontend',
+  })
+  const reusablePlanningContext = buildReusablePlanningContext()
+  const testCase = phaseExecutionValidationCases.materializeDatabaseDesignBlocked
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: testCase.goal,
+    context: testCase.context,
+    workspacePath: fixture.workspacePath,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  const failures = []
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const nextExpectedAction = String(decision?.nextExpectedAction || '').trim()
+  const projectPhaseExecutionPlan =
+    decision?.projectPhaseExecutionPlan &&
+    typeof decision.projectPhaseExecutionPlan === 'object'
+      ? decision.projectPhaseExecutionPlan
+      : null
+  const materializationPlan =
+    decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+      ? decision.materializationPlan
+      : null
+  const nextActionPlan =
+    decision?.nextActionPlan && typeof decision.nextActionPlan === 'object'
+      ? decision.nextActionPlan
+      : null
+  const localProjectManifest =
+    decision?.localProjectManifest &&
+    typeof decision.localProjectManifest === 'object'
+      ? decision.localProjectManifest
+      : null
+
+  if (strategy !== 'prepare-project-phase-plan') {
+    failures.push(
+      `Estrategia incorrecta. Esperado: prepare-project-phase-plan. Recibido: ${strategy || '(vacia)'}.`,
+    )
+  }
+  if (executionMode !== 'planner-only') {
+    failures.push(
+      `executionMode incorrecto. Esperado: planner-only. Recibido: ${executionMode || '(vacio)'}.`,
+    )
+  }
+  if (nextExpectedAction !== 'review-project-phase') {
+    failures.push(
+      `nextExpectedAction incorrecto. Esperado: review-project-phase. Recibido: ${nextExpectedAction || '(vacio)'}.`,
+    )
+  }
+  if (materializationPlan) {
+    failures.push('database-design no deberia devolver materializationPlan si backend-contracts sigue pendiente.')
+  }
+
+  if (!projectPhaseExecutionPlan) {
+    failures.push('projectPhaseExecutionPlan ausente en database-design bloqueada.')
+  } else {
+    const phaseSummary = summarizeProjectPhaseExecutionPlan(projectPhaseExecutionPlan)
+    if (phaseSummary.phaseId !== 'database-design') {
+      failures.push('projectPhaseExecutionPlan.phaseId deberia ser database-design.')
+    }
     if (phaseSummary.executableNow) {
-      failures.push('database-design deberia seguir planner-only y no ejecutableNow.')
+      failures.push('database-design no deberia quedar executableNow si backend-contracts no está done.')
+    }
+    if (phaseSummary.prerequisitePhaseId !== 'backend-contracts') {
+      failures.push('database-design deberia declarar backend-contracts como prerequisitePhaseId.')
+    }
+    if (
+      !phaseSummary.blockers.some((entry) =>
+        entry.toLocaleLowerCase().includes('backend-contracts'),
+      )
+    ) {
+      failures.push('database-design deberia exponer un blocker claro apuntando a backend-contracts.')
+    }
+  }
+
+  if (!nextActionPlan) {
+    failures.push('nextActionPlan ausente en database-design bloqueada.')
+  } else {
+    const nextActionSummary = summarizeNextActionPlan(nextActionPlan)
+    if (!nextActionSummary.reason.toLocaleLowerCase().includes('backend-contracts')) {
+      failures.push('nextActionPlan.reason deberia mencionar backend-contracts como prerequisito.')
+    }
+    if (!nextActionSummary.userFacingLabel.toLocaleLowerCase().includes('backend contracts')) {
+      failures.push('nextActionPlan.userFacingLabel deberia recomendar completar backend contracts.')
+    }
+  }
+
+  if (!localProjectManifest) {
+    failures.push('localProjectManifest ausente en database-design bloqueada.')
+  } else {
+    const manifestSummary = summarizeLocalProjectManifest(localProjectManifest)
+    if (manifestSummary.nextRecommendedPhase !== 'backend-contracts') {
+      failures.push('localProjectManifest.nextRecommendedPhase deberia seguir apuntando a backend-contracts.')
+    }
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction,
+  }
+}
+
+async function runMaterializeDatabaseDesignValidation() {
+  let fixture = await buildPhaseExecutionFixture({
+    workspaceName: 'fullstack-project-phase-database-materialization',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'frontend-mock-flow',
+    requestId: 'smoke-database-materialization-frontend',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'backend-contracts',
+    requestId: 'smoke-database-materialization-backend',
+  })
+  const reusablePlanningContext = buildReusablePlanningContext()
+  const testCase = phaseExecutionValidationCases.materializeDatabaseDesign
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: testCase.goal,
+    context: testCase.context,
+    workspacePath: fixture.workspacePath,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  const failures = []
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const nextExpectedAction = String(decision?.nextExpectedAction || '').trim()
+  const projectPhaseExecutionPlan =
+    decision?.projectPhaseExecutionPlan &&
+    typeof decision.projectPhaseExecutionPlan === 'object'
+      ? decision.projectPhaseExecutionPlan
+      : null
+  const localProjectManifest =
+    decision?.localProjectManifest &&
+    typeof decision.localProjectManifest === 'object'
+      ? decision.localProjectManifest
+      : null
+  const materializationPlan =
+    decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+      ? decision.materializationPlan
+      : null
+  const executionScope =
+    decision?.executionScope && typeof decision.executionScope === 'object'
+      ? decision.executionScope
+      : null
+  const phaseExpansionPlan =
+    decision?.phaseExpansionPlan && typeof decision.phaseExpansionPlan === 'object'
+      ? decision.phaseExpansionPlan
+      : null
+  const allowedTargetPaths = summarizeUniqueStrings(
+    executionScope?.allowedTargetPaths,
+    24,
+  ).map(normalizePathForComparison)
+
+  if (strategy !== 'materialize-project-phase-plan') {
+    failures.push(
+      `Estrategia incorrecta. Esperado: materialize-project-phase-plan. Recibido: ${strategy || '(vacia)'}.`,
+    )
+  }
+  if (executionMode !== 'executor') {
+    failures.push(
+      `executionMode incorrecto. Esperado: executor. Recibido: ${executionMode || '(vacio)'}.`,
+    )
+  }
+  if (nextExpectedAction !== 'execute-plan') {
+    failures.push(
+      `nextExpectedAction incorrecto. Esperado: execute-plan. Recibido: ${nextExpectedAction || '(vacio)'}.`,
+    )
+  }
+
+  const expectedTargets = [
+    `${fixture.projectRootRelativePath}/database/schema.sql`,
+    `${fixture.projectRootRelativePath}/database/seeds/seed-local.sql`,
+    `${fixture.projectRootRelativePath}/database/README.md`,
+    `${fixture.projectRootRelativePath}/docs/architecture.md`,
+    `${fixture.projectRootRelativePath}/docs/local-runbook.md`,
+    `${fixture.projectRootRelativePath}/jefe-project.json`,
+  ].map(normalizePathForComparison)
+
+  if (!projectPhaseExecutionPlan) {
+    failures.push('projectPhaseExecutionPlan ausente en materialize database-design.')
+  } else {
+    const phaseSummary = summarizeProjectPhaseExecutionPlan(projectPhaseExecutionPlan)
+    if (phaseSummary.phaseId !== 'database-design') {
+      failures.push('projectPhaseExecutionPlan.phaseId deberia ser database-design.')
+    }
+    if (!phaseSummary.executableNow) {
+      failures.push('database-design deberia estar marcado como executableNow en la materializacion.')
+    }
+  }
+
+  if (!materializationPlan) {
+    failures.push('materializationPlan ausente en materialize database-design.')
+  } else {
+    if (String(materializationPlan.strategy || '').trim() !== 'materialize-project-phase-plan') {
+      failures.push('materializationPlan.strategy incorrecto para database-design.')
+    }
+    const operationTargets = toStringArray(
+      materializationPlan.operations?.map((entry) => entry?.targetPath || ''),
+      24,
+    ).map(normalizePathForComparison)
+    expectedTargets.forEach((targetPath) => {
+      if (!operationTargets.includes(targetPath)) {
+        failures.push(`materializationPlan.operations no incluye ${targetPath}.`)
+      }
+    })
+    if (
+      operationTargets.some((targetPath) =>
+        /frontend\/|backend\/|shared\/|scripts\/|node_modules|\.env$|docker|deploy/i.test(
+          targetPath,
+        ),
+      )
+    ) {
+      failures.push('materializationPlan.operations no deberia tocar frontend, backend, shared, scripts, node_modules, .env, docker ni deploy.')
+    }
+  }
+
+  expectedTargets.forEach((targetPath) => {
+    if (!allowedTargetPaths.includes(targetPath)) {
+      failures.push(`allowedTargetPaths no incluye ${targetPath}.`)
+    }
+  })
+  if (
+    allowedTargetPaths.some((targetPath) =>
+      /frontend\/|backend\/|shared\/|scripts\/|node_modules|\.env$|docker|deploy/i.test(
+        targetPath,
+      ),
+    )
+  ) {
+    failures.push('allowedTargetPaths no deberia incluir frontend, backend, shared, scripts, node_modules, .env, docker ni deploy.')
+  }
+
+  if (!localProjectManifest) {
+    failures.push('localProjectManifest ausente en materialize database-design.')
+  } else {
+    const manifestSummary = summarizeLocalProjectManifest(localProjectManifest)
+    const databasePhase = manifestSummary.phases.find(
+      (entry) => entry.id === 'database-design',
+    )
+    const validationPhase = manifestSummary.phases.find(
+      (entry) => entry.id === 'local-validation',
+    )
+    if (manifestSummary.nextRecommendedPhase !== 'local-validation') {
+      failures.push('localProjectManifest.nextRecommendedPhase deberia avanzar a local-validation.')
+    }
+    if (!databasePhase || databasePhase.status !== 'done') {
+      failures.push('localProjectManifest deberia marcar database-design como done.')
+    }
+    if (!validationPhase || validationPhase.status !== 'available') {
+      failures.push('localProjectManifest deberia mantener local-validation como available.')
+    }
+  }
+
+  if (!phaseExpansionPlan) {
+    failures.push('phaseExpansionPlan ausente en materialize database-design.')
+  } else {
+    const expansionSummary = summarizePhaseExpansionPlan(phaseExpansionPlan)
+    if (expansionSummary.phaseId !== 'local-validation') {
+      failures.push('phaseExpansionPlan deberia proponer local-validation como siguiente fase.')
+    }
+    if (expansionSummary.executableNow) {
+      failures.push('phaseExpansionPlan no deberia materializar local-validation automaticamente.')
+    }
+  }
+
+  if (materializationPlan) {
+    const task = buildLocalMaterializationTask({
+      plan: materializationPlan,
+      workspacePath: fixture.workspacePath,
+      requestId: 'smoke-database-design-materialization',
+      instruction: decision?.instruction || '',
+      brainStrategy: decision?.strategy || '',
+      businessSector: decision?.businessSector || '',
+      businessSectorLabel: decision?.businessSectorLabel || '',
+      creativeDirection: decision?.creativeDirection || null,
+      reusableArtifactLookup: decision?.reusableArtifactLookup || null,
+      reusableArtifactsFound: decision?.reusableArtifactsFound || 0,
+      reuseDecision: decision?.reuseDecision === true,
+      reuseReason: decision?.reuseReason || '',
+      reusedArtifactIds: Array.isArray(decision?.reusedArtifactIds)
+        ? decision.reusedArtifactIds
+        : [],
+      reuseMode: decision?.reuseMode || 'none',
+      reuseMaterialization: null,
+      materializationPlanSource: decision?.materializationPlanSource || 'planner',
+    })
+
+    if (!task) {
+      failures.push('No se pudo construir la tarea local deterministica para database-design.')
+    } else {
+      const beforeSnapshot = {
+        frontendMain: fs.readFileSync(
+          path.join(fixture.projectRootPath, 'frontend', 'src', 'main.js'),
+          'utf8',
+        ),
+        backendModule: fs.readFileSync(
+          path.join(fixture.projectRootPath, 'backend', 'src', 'modules', 'appointments.js'),
+          'utf8',
+        ),
+        sharedDomain: fs.readFileSync(
+          path.join(fixture.projectRootPath, 'shared', 'contracts', 'domain.js'),
+          'utf8',
+        ),
+        scriptsReadme: fs.readFileSync(
+          path.join(fixture.projectRootPath, 'scripts', 'README.md'),
+          'utf8',
+        ),
+      }
+      const executionResult = await runLocalDeterministicTask(task)
+      if (executionResult?.ok !== true) {
+        failures.push(
+          executionResult?.error ||
+            'La materializacion local de database-design no termino en OK.',
+        )
+      } else {
+        const touchedPaths = toStringArray(executionResult?.details?.touchedPaths, 32).map(
+          normalizePathForComparison,
+        )
+        const manifestPath = path.join(
+          fixture.workspacePath,
+          fixture.projectRootRelativePath,
+          'jefe-project.json',
+        )
+        const manifestFromDisk = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+        const manifestFromDiskSummary = summarizeLocalProjectManifest(manifestFromDisk)
+        const databasePhase = manifestFromDiskSummary.phases.find(
+          (entry) => entry.id === 'database-design',
+        )
+        const validationPhase = manifestFromDiskSummary.phases.find(
+          (entry) => entry.id === 'local-validation',
+        )
+
+        expectedTargets.forEach((targetPath) => {
+          if (
+            !touchedPaths.some((entry) =>
+              entry.endsWith(normalizePathForComparison(targetPath)),
+            )
+          ) {
+            failures.push(`La ejecucion real de database-design deberia tocar ${targetPath}.`)
+          }
+        })
+
+        if (manifestFromDiskSummary.nextRecommendedPhase !== 'local-validation') {
+          failures.push(
+            'El jefe-project.json resultante deberia actualizar nextRecommendedPhase a local-validation.',
+          )
+        }
+        if (!databasePhase || databasePhase.status !== 'done') {
+          failures.push(
+            'El jefe-project.json resultante deberia marcar database-design como done.',
+          )
+        }
+        if (!validationPhase || validationPhase.status !== 'available') {
+          failures.push(
+            'El jefe-project.json resultante deberia mantener local-validation como available.',
+          )
+        }
+
+        const frontendAfter = fs.readFileSync(
+          path.join(fixture.projectRootPath, 'frontend', 'src', 'main.js'),
+          'utf8',
+        )
+        const backendAfter = fs.readFileSync(
+          path.join(fixture.projectRootPath, 'backend', 'src', 'modules', 'appointments.js'),
+          'utf8',
+        )
+        const sharedAfter = fs.readFileSync(
+          path.join(fixture.projectRootPath, 'shared', 'contracts', 'domain.js'),
+          'utf8',
+        )
+        const scriptsAfter = fs.readFileSync(
+          path.join(fixture.projectRootPath, 'scripts', 'README.md'),
+          'utf8',
+        )
+        if (frontendAfter !== beforeSnapshot.frontendMain) {
+          failures.push('database-design no deberia tocar frontend/src/main.js.')
+        }
+        if (backendAfter !== beforeSnapshot.backendModule) {
+          failures.push('database-design no deberia tocar backend/src/modules/appointments.js.')
+        }
+        if (sharedAfter !== beforeSnapshot.sharedDomain) {
+          failures.push('database-design no deberia tocar shared/contracts/domain.js.')
+        }
+        if (scriptsAfter !== beforeSnapshot.scriptsReadme) {
+          failures.push('database-design no deberia tocar scripts/README.md.')
+        }
+      }
     }
   }
 
@@ -3553,9 +4084,11 @@ async function main() {
       await runPrepareFrontendMockFlowValidation(),
       await runMaterializeFrontendMockFlowValidation(),
       await runBlockedBackendContractsMaterializationValidation(),
+      await runBlockedDatabaseDesignMaterializationValidation(),
       await runPrepareBackendContractsValidation(),
       await runMaterializeBackendContractsValidation(),
       await runPrepareDatabaseDesignValidation(),
+      await runMaterializeDatabaseDesignValidation(),
     ]
     projectPhaseExecutionResults.forEach(printScalableValidationResult)
     console.log('-----------------')

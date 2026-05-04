@@ -12537,6 +12537,8 @@ function buildPhaseExpansionPlan({
         `${normalizedProjectPhaseExecutionPlan.projectRoot}/database/seeds/seed-local.sql`,
         `${normalizedProjectPhaseExecutionPlan.projectRoot}/database/README.md`,
         `${normalizedProjectPhaseExecutionPlan.projectRoot}/docs/architecture.md`,
+        `${normalizedProjectPhaseExecutionPlan.projectRoot}/docs/local-runbook.md`,
+        `${normalizedProjectPhaseExecutionPlan.projectRoot}/jefe-project.json`,
       ],
       changesExpected: [
         'Revisar entidades y relaciones locales',
@@ -12545,6 +12547,33 @@ function buildPhaseExpansionPlan({
       ],
       risks: [
         'Confundir diseño local con migraciones o base real si se expande sin aprobación adicional.',
+      ],
+      validationPlan: normalizedValidationPlan,
+      executableNow: false,
+      approvalRequired: false,
+      nextExpectedAction: 'review-project-phase',
+    }
+  }
+
+  if (
+    strategy === 'materialize-project-phase-plan' &&
+    normalizedProjectPhaseExecutionPlan?.phaseId === 'database-design'
+  ) {
+    return {
+      phaseId: 'local-validation',
+      goal: 'Preparar una revisión local final del proyecto antes de pensar en runtime real o aprobaciones futuras.',
+      targetFiles: [
+        `${normalizedProjectPhaseExecutionPlan.projectRoot}/docs/validation-report.md`,
+        `${normalizedProjectPhaseExecutionPlan.projectRoot}/docs/local-runbook.md`,
+        `${normalizedProjectPhaseExecutionPlan.projectRoot}/jefe-project.json`,
+      ],
+      changesExpected: [
+        'Revisar coherencia entre frontend, backend y database local',
+        'Consolidar checklist de validación local',
+        'Mantener todo en modo documental y planner-only',
+      ],
+      risks: [
+        'Confundir validación local con ejecución real si la fase se expande sin control.',
       ],
       validationPlan: normalizedValidationPlan,
       executableNow: false,
@@ -12749,7 +12778,9 @@ function buildNextActionPlan({
           ? 'Preparar frontend mock flow'
           : normalizedProjectPhaseExecutionPlan.phaseId === 'backend-contracts'
             ? 'Preparar backend contracts'
-            : 'Preparar database design',
+            : normalizedProjectPhaseExecutionPlan.phaseId === 'database-design'
+              ? 'Preparar database design'
+              : 'Preparar local validation',
       technicalLabel: `prepare-${normalizedProjectPhaseExecutionPlan.phaseId}`,
       expectedOutcome:
         normalizedProjectPhaseExecutionPlan.executableNow === true
@@ -12776,6 +12807,8 @@ function buildNextActionPlan({
           ? 'Materializar frontend mock flow'
           : normalizedProjectPhaseExecutionPlan.phaseId === 'backend-contracts'
             ? 'Materializar backend contracts'
+            : normalizedProjectPhaseExecutionPlan.phaseId === 'database-design'
+              ? 'Materializar database design'
             : `Materializar ${normalizedProjectPhaseExecutionPlan.phaseId}`,
       technicalLabel: `materialize-${normalizedProjectPhaseExecutionPlan.phaseId}`,
       expectedOutcome:
@@ -15614,7 +15647,8 @@ function getProjectPhasePrerequisiteBlockers({
 
   if (
     (normalizedPhaseId === 'backend-contracts' ||
-      normalizedPhaseId === 'database-design') &&
+      normalizedPhaseId === 'database-design' ||
+      normalizedPhaseId === 'local-validation') &&
     scaffoldStatus !== 'done'
   ) {
     registerBlocker(
@@ -15651,6 +15685,38 @@ function getProjectPhasePrerequisiteBlockers({
       registerBlocker(
         'backend-contracts',
         'Primero debe completarse backend-contracts.',
+      )
+    }
+
+    if (requestedPhaseStatus === 'done') {
+      registerBlocker(
+        '',
+        'database-design ya está completada y no debería materializarse otra vez en este flujo.',
+      )
+    }
+  }
+
+  if (normalizedPhaseId === 'local-validation') {
+    const databaseStatus = getPhaseStatus('database-design')
+
+    if (frontendStatus !== 'done') {
+      registerBlocker(
+        'frontend-mock-flow',
+        'Primero debe completarse frontend-mock-flow.',
+      )
+    }
+
+    if (backendStatus !== 'done') {
+      registerBlocker(
+        'backend-contracts',
+        'Primero debe completarse backend-contracts.',
+      )
+    }
+
+    if (databaseStatus !== 'done') {
+      registerBlocker(
+        'database-design',
+        'Primero debe completarse database-design.',
       )
     }
   }
@@ -15800,7 +15866,12 @@ function detectProjectPhasePlanningIntent(goal, context) {
     )
       .replace(/\s+/g, '-')
       .toLocaleLowerCase() || ''
-  const knownPhaseIds = ['frontend-mock-flow', 'backend-contracts', 'database-design']
+  const knownPhaseIds = [
+    'frontend-mock-flow',
+    'backend-contracts',
+    'database-design',
+    'local-validation',
+  ]
   const detectedPhaseId =
     knownPhaseIds.find((phaseId) => normalizedText.includes(phaseId)) ||
     knownPhaseIds.find((phaseId) => phaseId === phaseIdFromContext) ||
@@ -15927,6 +15998,7 @@ function buildUpdatedLocalProjectManifestForPhase({
   const nextRecommendedPhaseByPhaseId = {
     'frontend-mock-flow': 'backend-contracts',
     'backend-contracts': 'database-design',
+    'database-design': 'local-validation',
   }
   const nextRecommendedPhase =
     nextRecommendedPhaseByPhaseId[phaseId] ||
@@ -15981,7 +16053,14 @@ function buildUpdatedLocalProjectManifestForPhase({
       id: nextRecommendedPhase,
       status: 'available',
       createdAt: 'pending-phase-expansion',
-      files: [],
+      files:
+        nextRecommendedPhase === 'local-validation'
+          ? [
+              `${normalizedProjectRoot}/docs/validation-report.md`,
+              `${normalizedProjectRoot}/docs/local-runbook.md`,
+              fallbackManifestPath,
+            ]
+          : [],
     })
   }
 
@@ -16233,11 +16312,14 @@ function buildProjectPhaseExecutionPlan({
       phaseId,
       localProjectManifest: normalizedManifest,
     })
+    const blockedByPrerequisite = phasePrerequisiteState.blockers.length > 0
     const targetFiles = [
       `${projectRoot}/database/schema.sql`,
       `${projectRoot}/database/seeds/seed-local.sql`,
       `${projectRoot}/database/README.md`,
       `${projectRoot}/docs/architecture.md`,
+      `${projectRoot}/docs/local-runbook.md`,
+      `${projectRoot}/jefe-project.json`,
     ]
     const validationPlan = {
       scope: `${projectRoot}:database-design`,
@@ -16253,23 +16335,125 @@ function buildProjectPhaseExecutionPlan({
       manualChecks: [
         'Confirmar que schema.sql y seed-local.sql sigan siendo diseño local revisable.',
         'Confirmar que no se ejecute ninguna migración ni conexión real.',
+        'Confirmar que docs/local-runbook.md y jefe-project.json reflejen local-validation como siguiente fase.',
       ],
       successCriteria: [
-        'Dejar database-design listo para revisión sin ejecución automática.',
+        'Actualizar solo database, docs y jefe-project.json sin tocar frontend, backend, shared ni scripts.',
         'Mantener database como diseño local y documentado.',
       ],
     }
 
     return {
       phaseId,
-      sourceStrategy: 'backend-contracts',
+      sourceStrategy:
+        strategy === 'materialize-project-phase-plan'
+          ? 'prepare-project-phase-plan'
+          : 'backend-contracts',
+      targetStrategy: 'materialize-project-phase-plan',
+      deliveryLevel: 'fullstack-local',
+      projectRoot,
+      goal: blockedByPrerequisite
+        ? `Database-design queda bloqueada hasta completar la fase previa de ${projectDomain}.`
+        : `Diseñar la base local de ${projectDomain} sin ejecutar una DB real.`,
+      reason: phasePrerequisiteState.blockers.length > 0
+        ? `Database-design todavía no puede revisarse como siguiente fase. ${phasePrerequisiteState.blockers.join(' ')}`
+        : 'Esta fase materializa schema y seed locales revisables, sin migraciones, sin runtime y sin una base activa.',
+      executableNow: blockedByPrerequisite ? false : true,
+      approvalRequired: false,
+      riskLevel: 'medium',
+      prerequisitePhaseId: phasePrerequisiteState.prerequisitePhaseId,
+      targetFiles,
+      allowedTargetPaths: targetFiles,
+      operationsPreview: [
+        {
+          type: blockedByPrerequisite ? 'review-file' : 'replace-file',
+          targetPath: `${projectRoot}/database/schema.sql`,
+          purpose: 'Definir el esquema local de turnos antes de cualquier base real.',
+        },
+        {
+          type: blockedByPrerequisite ? 'review-file' : 'replace-file',
+          targetPath: `${projectRoot}/database/seeds/seed-local.sql`,
+          purpose: 'Dejar datos semilla locales revisables sin ejecutar migraciones.',
+        },
+        {
+          type: blockedByPrerequisite ? 'review-file' : 'replace-file',
+          targetPath: `${projectRoot}/database/README.md`,
+          purpose: 'Documentar el alcance del diseño local de base sin ejecutar SQL.',
+        },
+        {
+          type: blockedByPrerequisite ? 'review-file' : 'replace-file',
+          targetPath: `${projectRoot}/docs/architecture.md`,
+          purpose: 'Alinear arquitectura y entidades con el diseño SQL local.',
+        },
+        {
+          type: blockedByPrerequisite ? 'review-file' : 'replace-file',
+          targetPath: `${projectRoot}/docs/local-runbook.md`,
+          purpose: 'Explicar cómo revisar database-design sin abrir una DB real.',
+        },
+        {
+          type: blockedByPrerequisite ? 'review-file' : 'replace-file',
+          targetPath: `${projectRoot}/jefe-project.json`,
+          purpose: 'Actualizar el manifiesto local para marcar database-design como done y avanzar a local-validation.',
+        },
+      ],
+      validationPlan,
+      explicitExclusions: [
+        'migraciones reales',
+        'conexion a DB real',
+        'Docker',
+        'deploy',
+        'frontend',
+        'backend',
+        'shared',
+        'scripts',
+        'node_modules',
+        '.env',
+      ],
+      blockers: phasePrerequisiteState.blockers,
+      successCriteria: validationPlan.successCriteria,
+    }
+  }
+
+  if (phaseId === 'local-validation') {
+    const phasePrerequisiteState = getProjectPhasePrerequisiteBlockers({
+      phaseId,
+      localProjectManifest: normalizedManifest,
+    })
+    const targetFiles = [
+      `${projectRoot}/docs/validation-report.md`,
+      `${projectRoot}/docs/local-runbook.md`,
+      `${projectRoot}/jefe-project.json`,
+    ]
+    const validationPlan = {
+      scope: `${projectRoot}:local-validation`,
+      level: 'medium',
+      commands: [],
+      fileChecks: targetFiles.map((targetPath) => ({
+        path: targetPath,
+        expectation:
+          'Debe seguir siendo revisión local del proyecto sin ejecutar servicios ni crear runtime nuevo.',
+      })),
+      forbiddenPaths,
+      runtimeChecks: [],
+      manualChecks: [
+        'Confirmar que la revisión siga siendo documental y local.',
+        'Confirmar que no se activen servicios, DB real ni deploy.',
+      ],
+      successCriteria: [
+        'Dejar local-validation como siguiente fase revisable sin ejecución automática.',
+      ],
+    }
+
+    return {
+      phaseId,
+      sourceStrategy: 'database-design',
       targetStrategy: 'prepare-project-phase-plan',
       deliveryLevel: 'fullstack-local',
       projectRoot,
-      goal: `Preparar el diseño de datos local para ${projectDomain} sin ejecutar base real.`,
+      goal: `Preparar la validación local final de ${projectDomain} sin ejecutar servicios.`,
       reason: phasePrerequisiteState.blockers.length > 0
-        ? `Database-design todavía no puede revisarse como siguiente fase. ${phasePrerequisiteState.blockers.join(' ')}`
-        : 'La siguiente fase segura es revisar schema y seeds locales antes de pensar en migraciones reales.',
+        ? `Local-validation todavía no puede revisarse como siguiente fase. ${phasePrerequisiteState.blockers.join(' ')}`
+        : 'La siguiente fase segura es revisar el proyecto local completo antes de pensar en runtime real.',
       executableNow: false,
       approvalRequired: false,
       riskLevel: 'medium',
@@ -16279,21 +16463,21 @@ function buildProjectPhaseExecutionPlan({
       operationsPreview: [
         {
           type: 'review-file',
-          targetPath: `${projectRoot}/database/schema.sql`,
-          purpose: 'Revisar el esquema local de turnos antes de cualquier base real.',
+          targetPath: `${projectRoot}/docs/local-runbook.md`,
+          purpose: 'Revisar el plan local de validación antes de cualquier ejecución real.',
         },
         {
           type: 'review-file',
-          targetPath: `${projectRoot}/database/seeds/seed-local.sql`,
-          purpose: 'Revisar los datos semilla locales sin ejecutar migraciones.',
+          targetPath: `${projectRoot}/jefe-project.json`,
+          purpose: 'Confirmar el estado final del proyecto y sus fases disponibles.',
         },
       ],
       validationPlan,
       explicitExclusions: [
-        'migraciones reales',
-        'conexion a DB real',
-        'Docker',
+        'servicios reales',
+        'base real',
         'deploy',
+        'Docker',
         'node_modules',
         '.env',
       ],
@@ -16327,6 +16511,388 @@ function buildProjectPhaseMaterializationPlan({
     phasePrerequisiteState.blockers.length > 0
   ) {
     return null
+  }
+
+  if (normalizedPlan.phaseId === 'database-design') {
+    const projectRoot = normalizedPlan.projectRoot
+    const schemaPath = `${projectRoot}/database/schema.sql`
+    const seedPath = `${projectRoot}/database/seeds/seed-local.sql`
+    const databaseReadmePath = `${projectRoot}/database/README.md`
+    const architecturePath = `${projectRoot}/docs/architecture.md`
+    const runbookPath = `${projectRoot}/docs/local-runbook.md`
+    const manifestPath = `${projectRoot}/jefe-project.json`
+    const schemaContent = `-- Database design local y revisable para turnos medicos.
+-- No ejecutar este archivo automaticamente.
+-- Las tablas modelan entidades y relaciones utiles sin depender de una DB real.
+
+CREATE TABLE patients (
+  id TEXT PRIMARY KEY,
+  full_name TEXT NOT NULL,
+  document_number TEXT NOT NULL,
+  contact_phone TEXT,
+  contact_email TEXT,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE professionals (
+  id TEXT PRIMARY KEY,
+  full_name TEXT NOT NULL,
+  license_code TEXT,
+  contact_phone TEXT,
+  contact_email TEXT,
+  status TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE specialties (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE professional_specialties (
+  professional_id TEXT NOT NULL,
+  specialty_id TEXT NOT NULL,
+  primary_flag INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (professional_id, specialty_id),
+  FOREIGN KEY (professional_id) REFERENCES professionals(id),
+  FOREIGN KEY (specialty_id) REFERENCES specialties(id)
+);
+
+CREATE TABLE availability_slots (
+  id TEXT PRIMARY KEY,
+  professional_id TEXT NOT NULL,
+  specialty_id TEXT NOT NULL,
+  slot_date TEXT NOT NULL,
+  start_time TEXT NOT NULL,
+  end_time TEXT NOT NULL,
+  state TEXT NOT NULL,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (professional_id) REFERENCES professionals(id),
+  FOREIGN KEY (specialty_id) REFERENCES specialties(id)
+);
+
+CREATE TABLE appointments (
+  id TEXT PRIMARY KEY,
+  patient_id TEXT NOT NULL,
+  professional_id TEXT NOT NULL,
+  specialty_id TEXT NOT NULL,
+  availability_slot_id TEXT NOT NULL,
+  appointment_date TEXT NOT NULL,
+  status TEXT NOT NULL,
+  reason TEXT,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (patient_id) REFERENCES patients(id),
+  FOREIGN KEY (professional_id) REFERENCES professionals(id),
+  FOREIGN KEY (specialty_id) REFERENCES specialties(id),
+  FOREIGN KEY (availability_slot_id) REFERENCES availability_slots(id)
+);
+
+CREATE TABLE appointment_status_history (
+  id TEXT PRIMARY KEY,
+  appointment_id TEXT NOT NULL,
+  previous_status TEXT,
+  next_status TEXT NOT NULL,
+  changed_at TEXT NOT NULL,
+  changed_by TEXT NOT NULL,
+  change_reason TEXT,
+  FOREIGN KEY (appointment_id) REFERENCES appointments(id)
+);
+
+-- Estados sugeridos y revisables:
+-- appointments.status: scheduled, confirmed, checked-in, completed, cancelled, no-show
+-- availability_slots.state: free, reserved, blocked
+`
+    const seedContent = `-- Seed local y revisable para turnos medicos.
+-- No ejecutar automaticamente.
+
+INSERT INTO specialties (id, name, description, created_at, updated_at) VALUES
+  ('SPC-001', 'Clinica medica', 'Atencion general de consultorio', '2026-05-04T09:00:00', '2026-05-04T09:00:00'),
+  ('SPC-002', 'Pediatria', 'Atencion infantil local', '2026-05-04T09:00:00', '2026-05-04T09:00:00'),
+  ('SPC-003', 'Cardiologia', 'Seguimiento cardiologico revisable', '2026-05-04T09:00:00', '2026-05-04T09:00:00');
+
+INSERT INTO professionals (id, full_name, license_code, contact_phone, contact_email, status, created_at, updated_at) VALUES
+  ('PRO-001', 'Dra. Ana Gomez', 'MN-001', '000-111-222', 'ana.local@example.test', 'available', '2026-05-04T09:05:00', '2026-05-04T09:05:00'),
+  ('PRO-002', 'Dr. Pablo Ruiz', 'MN-002', '000-333-444', 'pablo.local@example.test', 'available', '2026-05-04T09:05:00', '2026-05-04T09:05:00');
+
+INSERT INTO professional_specialties (professional_id, specialty_id, primary_flag, created_at) VALUES
+  ('PRO-001', 'SPC-001', 1, '2026-05-04T09:06:00'),
+  ('PRO-002', 'SPC-002', 1, '2026-05-04T09:06:00'),
+  ('PRO-002', 'SPC-003', 0, '2026-05-04T09:06:00');
+
+INSERT INTO patients (id, full_name, document_number, contact_phone, contact_email, notes, created_at, updated_at) VALUES
+  ('PAT-001', 'Lucia Perez', '30111222', '000-555-111', 'lucia.local@example.test', 'Paciente mock local', '2026-05-04T09:10:00', '2026-05-04T09:10:00'),
+  ('PAT-002', 'Martin Suarez', '28999111', '000-555-222', 'martin.local@example.test', 'Seguimiento pediatrico local', '2026-05-04T09:10:00', '2026-05-04T09:10:00');
+
+INSERT INTO availability_slots (id, professional_id, specialty_id, slot_date, start_time, end_time, state, notes, created_at, updated_at) VALUES
+  ('SLT-001', 'PRO-001', 'SPC-001', '2026-05-05', '09:30', '10:00', 'reserved', 'Turno mock ya reservado', '2026-05-04T09:15:00', '2026-05-04T09:15:00'),
+  ('SLT-002', 'PRO-002', 'SPC-002', '2026-05-05', '10:15', '10:45', 'free', 'Disponible para demo local', '2026-05-04T09:15:00', '2026-05-04T09:15:00'),
+  ('SLT-003', 'PRO-002', 'SPC-003', '2026-05-05', '11:00', '11:30', 'free', 'Disponible para especialidad secundaria', '2026-05-04T09:15:00', '2026-05-04T09:15:00');
+
+INSERT INTO appointments (id, patient_id, professional_id, specialty_id, availability_slot_id, appointment_date, status, reason, notes, created_at, updated_at) VALUES
+  ('APT-001', 'PAT-001', 'PRO-001', 'SPC-001', 'SLT-001', '2026-05-05 09:30', 'confirmed', 'Control clinico general', 'Turno confirmado local', '2026-05-04T09:20:00', '2026-05-04T09:20:00'),
+  ('APT-002', 'PAT-002', 'PRO-002', 'SPC-002', 'SLT-002', '2026-05-05 10:15', 'scheduled', 'Consulta pediatrica', 'Pendiente de confirmacion mock', '2026-05-04T09:20:00', '2026-05-04T09:20:00');
+
+INSERT INTO appointment_status_history (id, appointment_id, previous_status, next_status, changed_at, changed_by, change_reason) VALUES
+  ('HIS-001', 'APT-001', 'scheduled', 'confirmed', '2026-05-04T09:25:00', 'local-seed', 'Confirmacion mock inicial'),
+  ('HIS-002', 'APT-002', NULL, 'scheduled', '2026-05-04T09:25:00', 'local-seed', 'Alta inicial del turno');
+`
+    const databaseReadmeContent = `# Database design local
+
+## Alcance
+
+Esta fase deja un diseño SQL local y revisable para el proyecto de turnos medicos.
+
+## Que se materializo
+
+- \`schema.sql\` con entidades, relaciones y estados de turno
+- \`seeds/seed-local.sql\` con datos mock
+- documentación alineada con backend-contracts
+
+## Lo que no se hizo
+
+- no se ejecuto ninguna base real
+- no se corrieron migraciones
+- no se abrio Postgres
+- no se usaron credenciales
+- no se ejecuto el seed
+
+## Proximo paso seguro
+
+La siguiente fase recomendada es \`local-validation\`, en modo planner-only.
+`
+    const architectureContent = `# Arquitectura local
+
+## Estado del proyecto
+
+El proyecto sigue en modo local, revisable y sin runtime real.
+
+## Backend contracts
+
+La capa backend/shared ya deja contratos y helpers puros para el dominio de turnos.
+
+## Database design
+
+Se materializo la fase \`database-design\` con foco en:
+
+- pacientes
+- profesionales
+- especialidades
+- relación entre profesionales y especialidades
+- disponibilidad
+- turnos
+- historial de cambios de estado
+
+El diseño SQL se deja como referencia local y no se ejecuta automáticamente.
+
+## Relacion con backend contracts
+
+- \`patients\`, \`professionals\` y \`specialties\` reflejan las entidades del dominio compartido
+- \`availability_slots\` y \`appointments\` acompañan el flujo mock y los contratos backend
+- \`appointment_status_history\` acompaña las transiciones definidas en backend-contracts
+
+## Limites actuales
+
+- no se levanto una DB real
+- no se corrieron migraciones
+- no se ejecuto seed
+- no se abrieron puertos
+- no se instalaron dependencias
+
+## Siguiente fase segura
+
+La siguiente fase recomendada es \`local-validation\`, en modo planner-only.
+`
+    const runbookContent = `# Local runbook
+
+## Estado actual
+
+El proyecto sigue en modo local y revisable. Se materializo la fase \`database-design\`.
+
+## Como revisar database-design
+
+- leer \`database/schema.sql\`
+- leer \`database/seeds/seed-local.sql\`
+- revisar \`database/README.md\`
+- contrastar entidades con \`docs/architecture.md\`
+- confirmar el estado del proyecto en \`jefe-project.json\`
+
+## Sigue fuera de alcance
+
+- ejecutar SQL
+- crear una DB real
+- correr migraciones
+- abrir Postgres
+- instalar dependencias
+- levantar frontend o backend
+- desplegar servicios
+
+## Proxima fase segura
+
+La siguiente fase recomendada es \`local-validation\`, en modo planner-only.
+`
+    const updatedLocalProjectManifest = buildUpdatedLocalProjectManifestForPhase({
+      existingManifest: localProjectManifest,
+      projectRoot,
+      phaseId: normalizedPlan.phaseId,
+      touchedFiles: [
+        schemaPath,
+        seedPath,
+        databaseReadmePath,
+        architecturePath,
+        runbookPath,
+        manifestPath,
+      ],
+    })
+    const updatedLocalProjectManifestContent = updatedLocalProjectManifest
+      ? `${JSON.stringify(updatedLocalProjectManifest, null, 2)}\n`
+      : ''
+
+    return {
+      tasks: [
+        {
+          step: 1,
+          title: `Actualizar la fase "${normalizedPlan.phaseId}" solo dentro de ${normalizedPlan.projectRoot}.`,
+          operation: 'create-or-edit-files',
+          targetPath: normalizedPlan.projectRoot,
+        },
+        {
+          step: 2,
+          title: 'Validar que la expansión quede acotada a database, docs y manifest local.',
+          operation: 'validate-scope',
+          targetPath: normalizedPlan.projectRoot,
+        },
+      ],
+      assumptions: [
+        'La expansión sigue siendo local, revisable y sin DB real.',
+        'No se ejecuta SQL ni se instalan dependencias.',
+        'Frontend, backend, shared, scripts y forbidden paths quedan fuera de alcance.',
+      ],
+      instruction: [
+        `Materializar la fase ${normalizedPlan.phaseId} dentro de ${normalizedPlan.projectRoot}.`,
+        `Usar solo estos targetPaths: ${normalizedPlan.allowedTargetPaths.join(', ')}`,
+        'No tocar frontend, backend, shared, scripts, node_modules, .env, Docker ni deploy.',
+      ].join('\n'),
+      executionScope: normalizeExecutorExecutionScope({
+        allowedTargetPaths: normalizedPlan.allowedTargetPaths,
+        successCriteria: normalizedPlan.successCriteria,
+        enforceNarrowScope: true,
+      }),
+      materializationPlan: {
+        version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+        kind: 'project-phase-materialization',
+        summary: `Fase ${normalizedPlan.phaseId} actualizada dentro de "${normalizedPlan.projectRoot}".`,
+        strategy: 'materialize-project-phase-plan',
+        reasoningLayer: 'local-rules',
+        materializationLayer: 'local-deterministic',
+        operations: [
+          { type: 'replace-file', targetPath: schemaPath, nextContent: schemaContent },
+          { type: 'replace-file', targetPath: seedPath, nextContent: seedContent },
+          {
+            type: 'replace-file',
+            targetPath: databaseReadmePath,
+            nextContent: databaseReadmeContent,
+          },
+          { type: 'replace-file', targetPath: architecturePath, nextContent: architectureContent },
+          { type: 'replace-file', targetPath: runbookPath, nextContent: runbookContent },
+          ...(updatedLocalProjectManifestContent
+            ? [
+                {
+                  type: 'replace-file',
+                  targetPath: manifestPath,
+                  nextContent: updatedLocalProjectManifestContent,
+                },
+              ]
+            : []),
+        ],
+        validations: [
+          { type: 'exists', targetPath: schemaPath, expectedKind: 'file' },
+          { type: 'exists', targetPath: seedPath, expectedKind: 'file' },
+          { type: 'exists', targetPath: databaseReadmePath, expectedKind: 'file' },
+          { type: 'exists', targetPath: architecturePath, expectedKind: 'file' },
+          { type: 'exists', targetPath: runbookPath, expectedKind: 'file' },
+          ...(updatedLocalProjectManifest
+            ? [{ type: 'exists', targetPath: manifestPath, expectedKind: 'file' }]
+            : []),
+          { type: 'file-contains', targetPath: schemaPath, expectedText: 'CREATE TABLE patients' },
+          {
+            type: 'file-contains',
+            targetPath: schemaPath,
+            expectedText: 'CREATE TABLE professionals',
+          },
+          {
+            type: 'file-contains',
+            targetPath: schemaPath,
+            expectedText: 'CREATE TABLE appointments',
+          },
+          {
+            type: 'file-contains',
+            targetPath: schemaPath,
+            expectedText: 'CREATE TABLE appointment_status_history',
+          },
+          {
+            type: 'file-contains',
+            targetPath: seedPath,
+            expectedText: 'INSERT INTO patients',
+          },
+          {
+            type: 'file-contains',
+            targetPath: seedPath,
+            expectedText: 'INSERT INTO appointments',
+          },
+          {
+            type: 'file-contains',
+            targetPath: databaseReadmePath,
+            expectedText: 'no se ejecuto ninguna base real',
+          },
+          {
+            type: 'file-contains',
+            targetPath: architecturePath,
+            expectedText: 'Database design',
+          },
+          {
+            type: 'file-contains',
+            targetPath: runbookPath,
+            expectedText: 'local-validation',
+          },
+          ...(updatedLocalProjectManifest
+            ? [
+                {
+                  type: 'file-contains',
+                  targetPath: manifestPath,
+                  expectedText: '"id": "database-design"',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: manifestPath,
+                  expectedText: '"status": "done"',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: manifestPath,
+                  expectedText: '"id": "local-validation"',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: manifestPath,
+                  expectedText: '"nextRecommendedPhase": "local-validation"',
+                },
+              ]
+            : []),
+        ],
+      },
+      localProjectManifest: updatedLocalProjectManifest,
+    }
   }
 
   if (normalizedPlan.phaseId === 'backend-contracts') {
