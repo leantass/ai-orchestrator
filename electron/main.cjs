@@ -16039,17 +16039,260 @@ function normalizeModuleExpansionId(value) {
     return ''
   }
 
-  if (normalizedValue.includes('notificaciones')) {
-    return 'notifications'
-  }
-  if (normalizedValue.includes('notifications')) {
-    return 'notifications'
+  const compactValue = normalizedValue.replace(/\s+/g, ' ')
+  const registryEntry = getModuleExpansionRegistryEntry(compactValue)
+
+  if (registryEntry) {
+    return registryEntry.id
   }
 
-  return normalizedValue.replace(/\s+/g, '-')
+  return compactValue.replace(/\s+/g, '-')
 }
 
-const SUPPORTED_MATERIALIZABLE_MODULE_EXPANSIONS = new Set(['notifications'])
+const MODULE_EXPANSION_REGISTRY = [
+  {
+    id: 'notifications',
+    aliases: ['notificaciones', 'notifications', 'notification', 'notificacion'],
+    title: 'Notificaciones',
+    description:
+      'Agregar un modulo local de notificaciones mock conectado con pacientes y turnos.',
+    expansionType: 'new-domain-module',
+    category: 'communication',
+    capability: 'materializable',
+    safeToPrepare: true,
+    safeToMaterialize: true,
+    requiresApproval: false,
+    blocker: '',
+    riskLevel: 'medium',
+    materializationStrategy: 'materialize-module-expansion-plan',
+    suggestedOrder: 10,
+  },
+  {
+    id: 'reports',
+    aliases: ['reportes', 'reports', 'reporting', 'reporte', 'report'],
+    title: 'Reportes',
+    description:
+      'Agregar reportes operativos mock y metricas locales sin dependencias ni exportacion real.',
+    expansionType: 'new-domain-module',
+    category: 'analytics',
+    capability: 'materializable',
+    safeToPrepare: true,
+    safeToMaterialize: true,
+    requiresApproval: false,
+    blocker: '',
+    riskLevel: 'medium',
+    materializationStrategy: 'materialize-module-expansion-plan',
+    suggestedOrder: 20,
+  },
+  {
+    id: 'inventory',
+    aliases: ['inventory', 'stock', 'inventario'],
+    title: 'Stock',
+    description:
+      'Agregar inventario local con items, movimientos simulados y alertas de stock bajo.',
+    expansionType: 'new-domain-module',
+    category: 'operations',
+    capability: 'materializable',
+    safeToPrepare: true,
+    safeToMaterialize: true,
+    requiresApproval: false,
+    blocker: '',
+    riskLevel: 'medium',
+    materializationStrategy: 'materialize-module-expansion-plan',
+    suggestedOrder: 30,
+  },
+  {
+    id: 'billing',
+    aliases: ['billing', 'facturacion', 'facturación'],
+    title: 'Facturación',
+    description:
+      'Preparar un plan revisable para facturacion sin tocar pagos, impuestos ni runtime real.',
+    expansionType: 'new-domain-module',
+    category: 'business',
+    capability: 'planner-only',
+    safeToPrepare: true,
+    safeToMaterialize: false,
+    requiresApproval: false,
+    blocker:
+      'Todavia no existe un materializador seguro para facturacion y puede involucrar reglas comerciales, pagos e impuestos.',
+    riskLevel: 'high',
+    materializationStrategy: '',
+    suggestedOrder: 40,
+  },
+  {
+    id: 'users-roles',
+    aliases: ['users', 'roles', 'usuarios', 'usuario', 'rol', 'user roles'],
+    title: 'Usuarios y roles',
+    description:
+      'Revisar un modelo local de usuarios y roles sin auth real, passwords ni sesiones.',
+    expansionType: 'backend-contract-extension',
+    category: 'identity',
+    capability: 'planner-only',
+    safeToPrepare: true,
+    safeToMaterialize: false,
+    requiresApproval: false,
+    blocker:
+      'Solo se puede preparar un modelo revisable de usuarios y roles; la autenticacion real sigue fuera del alcance seguro.',
+    riskLevel: 'medium',
+    materializationStrategy: '',
+    suggestedOrder: 50,
+  },
+  {
+    id: 'auth',
+    aliases: ['auth', 'login', 'autenticacion', 'autenticación'],
+    title: 'Autenticación real',
+    description:
+      'Separar una futura autenticacion real como decision sensible con aprobacion.',
+    expansionType: 'approval-required',
+    category: 'security',
+    capability: 'requires-approval',
+    safeToPrepare: true,
+    safeToMaterialize: false,
+    requiresApproval: true,
+    blocker:
+      'Auth real implica credenciales, sesiones y decisiones de seguridad que requieren aprobacion futura.',
+    riskLevel: 'high',
+    materializationStrategy: '',
+    suggestedOrder: 60,
+  },
+  {
+    id: 'payments',
+    aliases: ['payments', 'pagos', 'payment'],
+    title: 'Pagos',
+    description:
+      'Planificar pagos como capacidad futura sin tocar dinero real ni integraciones sensibles.',
+    expansionType: 'approval-required',
+    category: 'financial',
+    capability: 'blocked',
+    safeToPrepare: true,
+    safeToMaterialize: false,
+    requiresApproval: true,
+    blocker:
+      'Pagos reales quedan bloqueados por riesgo financiero y requieren una aprobacion explicita.',
+    riskLevel: 'high',
+    materializationStrategy: '',
+    suggestedOrder: 70,
+  },
+  {
+    id: 'deploy',
+    aliases: ['deploy', 'produccion', 'producción', 'production'],
+    title: 'Deploy y producción',
+    description:
+      'Preparar una salida a produccion como decision posterior y no como materializacion local.',
+    expansionType: 'approval-required',
+    category: 'delivery',
+    capability: 'blocked',
+    safeToPrepare: true,
+    safeToMaterialize: false,
+    requiresApproval: true,
+    blocker:
+      'Deploy y produccion quedan fuera del modo seguro local y requieren aprobacion futura.',
+    riskLevel: 'high',
+    materializationStrategy: '',
+    suggestedOrder: 80,
+  },
+  {
+    id: 'integrations',
+    aliases: [
+      'integrations',
+      'integraciones',
+      'integraciones externas',
+      'integraciones-extrenas',
+      'whatsapp',
+      'apis externas',
+      'api externa',
+    ],
+    title: 'Integraciones externas',
+    description:
+      'Revisar futuras integraciones externas sin tocar APIs reales, webhooks ni credenciales.',
+    expansionType: 'approval-required',
+    category: 'integration',
+    capability: 'requires-approval',
+    safeToPrepare: true,
+    safeToMaterialize: false,
+    requiresApproval: true,
+    blocker:
+      'Las integraciones externas requieren aprobacion porque involucran APIs reales, credenciales o runtime sensible.',
+    riskLevel: 'high',
+    materializationStrategy: '',
+    suggestedOrder: 90,
+  },
+  {
+    id: 'docker',
+    aliases: ['docker', 'infraestructura', 'infra'],
+    title: 'Docker e infraestructura',
+    description:
+      'Mantener Docker e infraestructura como capacidad futura, fuera del flujo local seguro.',
+    expansionType: 'approval-required',
+    category: 'infrastructure',
+    capability: 'blocked',
+    safeToPrepare: true,
+    safeToMaterialize: false,
+    requiresApproval: true,
+    blocker:
+      'Docker e infraestructura quedan bloqueados en este flujo porque todavia no existe un materializador seguro y salen del alcance local y revisable.',
+    riskLevel: 'high',
+    materializationStrategy: '',
+    suggestedOrder: 100,
+  },
+]
+
+const MODULE_EXPANSION_REGISTRY_BY_ID = new Map(
+  MODULE_EXPANSION_REGISTRY.map((entry) => [entry.id, entry]),
+)
+const MODULE_EXPANSION_REGISTRY_ALIASES = (() => {
+  const aliasEntries = []
+
+  for (const entry of MODULE_EXPANSION_REGISTRY) {
+    const rawAliases = [entry.id, ...(Array.isArray(entry.aliases) ? entry.aliases : [])]
+    for (const alias of rawAliases) {
+      const normalizedAlias = normalizeSectorDetectionText(String(alias || ''))
+        .replace(/[^a-z0-9\s-]/g, ' ')
+        .trim()
+        .replace(/\s+/g, ' ')
+      if (normalizedAlias) {
+        aliasEntries.push([normalizedAlias, entry.id])
+      }
+    }
+  }
+
+  aliasEntries.sort((leftEntry, rightEntry) => rightEntry[0].length - leftEntry[0].length)
+  return aliasEntries
+})()
+
+function getModuleExpansionRegistryEntry(moduleId) {
+  const normalizedValue =
+    typeof moduleId === 'string' && moduleId.trim()
+      ? normalizeSectorDetectionText(moduleId)
+          .replace(/[^a-z0-9\s-]/g, ' ')
+          .trim()
+          .replace(/\s+/g, ' ')
+      : ''
+
+  if (!normalizedValue) {
+    return null
+  }
+
+  for (const [alias, canonicalId] of MODULE_EXPANSION_REGISTRY_ALIASES) {
+    if (normalizedValue === alias || normalizedValue.includes(alias)) {
+      return MODULE_EXPANSION_REGISTRY_BY_ID.get(canonicalId) || null
+    }
+  }
+
+  return MODULE_EXPANSION_REGISTRY_BY_ID.get(normalizedValue) || null
+}
+
+function getModuleExpansionRegistryEntries() {
+  return [...MODULE_EXPANSION_REGISTRY].sort(
+    (leftEntry, rightEntry) => leftEntry.suggestedOrder - rightEntry.suggestedOrder,
+  )
+}
+
+const SUPPORTED_MATERIALIZABLE_MODULE_EXPANSIONS = new Set(
+  getModuleExpansionRegistryEntries()
+    .filter((entry) => entry.capability === 'materializable')
+    .map((entry) => entry.id),
+)
 
 function isSupportedMaterializableModuleExpansion(moduleId) {
   const normalizedModuleId = normalizeModuleExpansionId(moduleId)
@@ -16061,6 +16304,7 @@ function isSupportedMaterializableModuleExpansion(moduleId) {
 
 function getUnsupportedModuleExpansionMaterializationBlocker(moduleId, moduleName) {
   const normalizedModuleId = normalizeModuleExpansionId(moduleId)
+  const registryEntry = getModuleExpansionRegistryEntry(normalizedModuleId || moduleId)
   const displayName =
     typeof moduleName === 'string' && moduleName.trim()
       ? moduleName.trim()
@@ -16070,13 +16314,90 @@ function getUnsupportedModuleExpansionMaterializationBlocker(moduleId, moduleNam
     return ''
   }
 
+  if (registryEntry?.blocker) {
+    return registryEntry.blocker
+  }
+
   return `Todavia no existe un materializador seguro para el modulo ${displayName}. Primero hace falta preparar ese soporte o revisarlo manualmente.`
 }
 
 function buildModuleExpansionDisplayName(moduleId) {
-  return moduleId === 'notifications'
-    ? 'Notificaciones'
-    : sanitizeBusinessSectorLabel(moduleId.replace(/-/g, ' ')) || 'Modulo local'
+  const registryEntry = getModuleExpansionRegistryEntry(moduleId)
+  return registryEntry?.title
+    ? registryEntry.title
+    : sanitizeBusinessSectorLabel(String(moduleId || '').replace(/-/g, ' ')) ||
+        'Modulo local'
+}
+
+function buildModuleExpansionTargetPaths({
+  projectRoot,
+  moduleId,
+}) {
+  const normalizedProjectRoot =
+    typeof projectRoot === 'string' && projectRoot.trim()
+      ? projectRoot.trim().replace(/[\\/]+/g, '/')
+      : ''
+  const normalizedModuleId = normalizeModuleExpansionId(moduleId)
+
+  if (!normalizedProjectRoot || !normalizedModuleId) {
+    return []
+  }
+
+  const sharedTargetPaths = [
+    `${normalizedProjectRoot}/frontend/src/mock-data.js`,
+    `${normalizedProjectRoot}/frontend/src/components/App.js`,
+    `${normalizedProjectRoot}/frontend/src/styles.css`,
+    `${normalizedProjectRoot}/shared/contracts/domain.js`,
+    `${normalizedProjectRoot}/shared/types/contracts.js`,
+    `${normalizedProjectRoot}/docs/architecture.md`,
+    `${normalizedProjectRoot}/docs/local-runbook.md`,
+    `${normalizedProjectRoot}/docs/validation-report.md`,
+    `${normalizedProjectRoot}/jefe-project.json`,
+  ]
+  const backendModuleTargets = [
+    `${normalizedProjectRoot}/backend/src/modules/${normalizedModuleId}.js`,
+    `${normalizedProjectRoot}/backend/src/routes/${normalizedModuleId}.js`,
+  ]
+  const databaseTargets = [
+    `${normalizedProjectRoot}/database/schema.sql`,
+    `${normalizedProjectRoot}/database/seeds/seed-local.sql`,
+  ]
+
+  if (
+    normalizedModuleId === 'notifications' ||
+    normalizedModuleId === 'reports' ||
+    normalizedModuleId === 'inventory' ||
+    normalizedModuleId === 'billing' ||
+    normalizedModuleId === 'users-roles'
+  ) {
+    return summarizeUniqueExecutorStrings(
+      [...sharedTargetPaths, ...backendModuleTargets, ...databaseTargets],
+      24,
+    )
+  }
+
+  if (
+    normalizedModuleId === 'auth' ||
+    normalizedModuleId === 'payments' ||
+    normalizedModuleId === 'deploy' ||
+    normalizedModuleId === 'integrations' ||
+    normalizedModuleId === 'docker'
+  ) {
+    return summarizeUniqueExecutorStrings(
+      [
+        `${normalizedProjectRoot}/docs/architecture.md`,
+        `${normalizedProjectRoot}/docs/local-runbook.md`,
+        `${normalizedProjectRoot}/docs/validation-report.md`,
+        `${normalizedProjectRoot}/jefe-project.json`,
+      ],
+      16,
+    )
+  }
+
+  return summarizeUniqueExecutorStrings(
+    [...sharedTargetPaths, ...backendModuleTargets, ...databaseTargets],
+    24,
+  )
 }
 
 function getProjectPhasePrerequisiteBlockers({
@@ -16604,143 +16925,73 @@ function buildReviewAndExpandExpansionOptions({
     return null
   }
 
-  const moduleAlreadyExists =
-    getLocalProjectManifestModuleEntry(normalizedManifest, 'notifications')?.status ===
-    'done'
-  const notificationsCanMaterialize =
-    isSupportedMaterializableModuleExpansion('notifications') && !moduleAlreadyExists
-  const optionFiles = {
-    notifications: [
-      `${projectRoot}/frontend/src/mock-data.js`,
-      `${projectRoot}/frontend/src/components/App.js`,
-      `${projectRoot}/frontend/src/styles.css`,
-      `${projectRoot}/backend/src/modules/notifications.js`,
-      `${projectRoot}/backend/src/routes/notifications.js`,
-      `${projectRoot}/shared/contracts/domain.js`,
-      `${projectRoot}/shared/types/contracts.js`,
-      `${projectRoot}/database/schema.sql`,
-      `${projectRoot}/database/seeds/seed-local.sql`,
-      `${projectRoot}/docs/architecture.md`,
-      `${projectRoot}/docs/local-runbook.md`,
-      `${projectRoot}/docs/validation-report.md`,
-      `${projectRoot}/jefe-project.json`,
-    ],
-    agenda: [
-      `${projectRoot}/frontend/src/mock-data.js`,
-      `${projectRoot}/frontend/src/components/App.js`,
-      `${projectRoot}/frontend/src/styles.css`,
-      `${projectRoot}/docs/local-runbook.md`,
-    ],
-    backendContracts: [
-      `${projectRoot}/backend/src/modules/appointments.js`,
-      `${projectRoot}/backend/src/routes/health.js`,
-      `${projectRoot}/shared/contracts/domain.js`,
-      `${projectRoot}/shared/types/contracts.js`,
-      `${projectRoot}/docs/architecture.md`,
-    ],
-    databaseAudit: [
-      `${projectRoot}/database/schema.sql`,
-      `${projectRoot}/database/seeds/seed-local.sql`,
-      `${projectRoot}/docs/architecture.md`,
-    ],
-  }
+  const options = getModuleExpansionRegistryEntries()
+    .map((entry) => {
+      const existingModule = getLocalProjectManifestModuleEntry(normalizedManifest, entry.id)
+      const existingStatus = String(existingModule?.status || '').trim().toLocaleLowerCase()
+
+      if (existingStatus === 'done') {
+        return null
+      }
+
+      const materializableNow =
+        entry.capability === 'materializable' &&
+        entry.safeToMaterialize === true &&
+        isSupportedMaterializableModuleExpansion(entry.id)
+      const targetFiles = buildModuleExpansionTargetPaths({
+        projectRoot,
+        moduleId: entry.id,
+      })
+      const registryReason =
+        existingStatus === 'blocked'
+          ? `El modulo ${entry.title} figura bloqueado en el manifest y conviene revisarlo antes de volver a expandirlo.`
+          : existingStatus === 'planned' || existingStatus === 'partial'
+            ? `El modulo ${entry.title} ya tiene avance previo y conviene completarlo o revisarlo antes de recrearlo.`
+            : entry.blocker ||
+              (materializableNow
+                ? `Es una expansion segura para seguir creciendo el proyecto local sin activar runtime real.`
+                : `Se puede preparar como plan revisable, pero todavia no tiene una materializacion segura.`)
+
+      return {
+        id: entry.id,
+        label:
+          entry.capability === 'materializable'
+            ? `Agregar ${entry.title}`
+            : entry.title,
+        description: entry.description,
+        expansionType: entry.expansionType,
+        riskLevel: entry.riskLevel,
+        safeToPrepare: entry.safeToPrepare !== false,
+        safeToMaterialize:
+          materializableNow &&
+          existingStatus !== 'blocked' &&
+          existingStatus !== 'planned' &&
+          existingStatus !== 'partial',
+        requiresApproval: entry.requiresApproval === true,
+        targetStrategy:
+          materializableNow &&
+          existingStatus !== 'blocked' &&
+          existingStatus !== 'planned' &&
+          existingStatus !== 'partial'
+            ? 'materialize-module-expansion-plan'
+            : 'prepare-module-expansion-plan',
+        expectedFiles: targetFiles,
+        reason: registryReason,
+      }
+    })
+    .filter(Boolean)
+
+  const recommendedOption =
+    options.find((entry) => entry.safeToMaterialize === true) ||
+    options.find((entry) => entry.safeToPrepare === true && entry.requiresApproval !== true) ||
+    options[0] ||
+    null
 
   return {
     projectRoot,
     currentPhase: 'review-and-expand',
-    recommendedOptionId: moduleAlreadyExists ? 'agenda-availability' : 'notifications',
-    options: [
-      {
-        id: 'notifications',
-        label: 'Nuevo módulo de notificaciones mock',
-        description:
-          'Agregar un módulo local de notificaciones mock conectado con pacientes y turnos.',
-        expansionType: 'new-domain-module',
-        riskLevel: 'medium',
-        safeToPrepare: true,
-        safeToMaterialize: notificationsCanMaterialize,
-        requiresApproval: false,
-        targetStrategy: notificationsCanMaterialize
-          ? 'materialize-module-expansion-plan'
-          : 'prepare-module-expansion-plan',
-        expectedFiles: optionFiles.notifications,
-        reason: moduleAlreadyExists
-          ? 'El proyecto ya contiene notificaciones y conviene revisar una mejora o extensión en vez de recrearlo.'
-          : notificationsCanMaterialize
-            ? 'Es la expansión más coherente después de la validación local porque amplía valor funcional sin activar runtime real.'
-            : 'Todavía no existe un materializador seguro para notificaciones y conviene revisarlo como plan antes de ejecutar.',
-      },
-      {
-        id: 'agenda-availability',
-        label: 'Mejorar agenda y disponibilidad',
-        description:
-          'Refinar el flujo mock de agenda, disponibilidad y estados visibles del frontend local.',
-        expansionType: 'frontend-improvement',
-        riskLevel: 'low',
-        safeToPrepare: true,
-        safeToMaterialize: false,
-        requiresApproval: false,
-        targetStrategy: 'prepare-project-phase-plan',
-        expectedFiles: optionFiles.agenda,
-        reason: 'Permite pulir la experiencia local sin tocar integraciones reales.',
-      },
-      {
-        id: 'appointments-contract-extension',
-        label: 'Extender contratos backend',
-        description:
-          'Ampliar contratos y handlers conceptuales del dominio de turnos sin levantar servicios.',
-        expansionType: 'backend-contract-extension',
-        riskLevel: 'medium',
-        safeToPrepare: true,
-        safeToMaterialize: false,
-        requiresApproval: false,
-        targetStrategy: 'prepare-module-expansion-plan',
-        expectedFiles: optionFiles.backendContracts,
-        reason: 'Sirve para crecer la capa de contratos compartidos antes de cualquier API real.',
-      },
-      {
-        id: 'database-audit-extension',
-        label: 'Extender diseño de base',
-        description:
-          'Agregar auditoría y eventos al diseño SQL local sin ejecutar una DB real.',
-        expansionType: 'database-extension',
-        riskLevel: 'medium',
-        safeToPrepare: true,
-        safeToMaterialize: false,
-        requiresApproval: false,
-        targetStrategy: 'prepare-module-expansion-plan',
-        expectedFiles: optionFiles.databaseAudit,
-        reason: 'Ayuda a preparar crecimiento del dominio conservando todo en modo documental.',
-      },
-      {
-        id: 'auth-real-approval',
-        label: 'Preparar auth real',
-        description:
-          'Separar una futura integración de autenticación real como decisión con aprobación.',
-        expansionType: 'approval-required',
-        riskLevel: 'high',
-        safeToPrepare: true,
-        safeToMaterialize: false,
-        requiresApproval: true,
-        targetStrategy: 'prepare-project-phase-plan',
-        expectedFiles: [`${projectRoot}/docs/architecture.md`, `${projectRoot}/docs/local-runbook.md`],
-        reason: 'Auth real implica dependencias, credenciales y runtime fuera del alcance seguro actual.',
-      },
-      {
-        id: 'dependency-install-approval',
-        label: 'Preparar instalación de dependencias',
-        description:
-          'Dejar explícito el plan de instalación futura sin ejecutar npm install ni abrir runtime.',
-        expansionType: 'approval-required',
-        riskLevel: 'high',
-        safeToPrepare: true,
-        safeToMaterialize: false,
-        requiresApproval: true,
-        targetStrategy: 'prepare-project-phase-plan',
-        expectedFiles: [`${projectRoot}/docs/local-runbook.md`],
-        reason: 'Instalar dependencias cambia el modo de trabajo y requiere aprobación futura.',
-      },
-    ],
+    recommendedOptionId: recommendedOption?.id || '',
+    options,
   }
 }
 
@@ -17561,6 +17812,11 @@ function getModuleExpansionPrerequisiteBlockers({
   const localValidationStatus = getPhaseStatus('local-validation')
   const reviewAndExpandStatus = getPhaseStatus('review-and-expand')
   const blockers = []
+  const existingModuleStatus = String(
+    getLocalProjectManifestModuleEntry(normalizedManifest, normalizedModuleId)?.status || '',
+  )
+    .trim()
+    .toLocaleLowerCase()
 
   if (localValidationStatus !== 'done') {
     blockers.push('Primero debe completarse local-validation.')
@@ -17570,9 +17826,21 @@ function getModuleExpansionPrerequisiteBlockers({
     blockers.push('Primero debe quedar disponible review-and-expand.')
   }
 
-  if (getLocalProjectManifestModuleEntry(normalizedManifest, normalizedModuleId)?.status === 'done') {
+  if (existingModuleStatus === 'done') {
     blockers.push(
       `El modulo ${normalizedModuleId} ya existe en este proyecto y conviene mejorarlo o extenderlo en vez de recrearlo.`,
+    )
+  }
+
+  if (existingModuleStatus === 'planned' || existingModuleStatus === 'partial') {
+    blockers.push(
+      `El modulo ${normalizedModuleId} ya tiene avance previo en este proyecto y conviene completarlo o revisarlo antes de recrearlo.`,
+    )
+  }
+
+  if (existingModuleStatus === 'blocked') {
+    blockers.push(
+      `El modulo ${normalizedModuleId} figura bloqueado en el manifest y conviene revisarlo antes de intentar una nueva materializacion.`,
     )
   }
 
@@ -17612,6 +17880,7 @@ function buildModuleExpansionPlan({
     return null
   }
 
+  const registryEntry = getModuleExpansionRegistryEntry(normalizedModuleId)
   const forbiddenPaths =
     normalizedManifest.forbiddenPaths && normalizedManifest.forbiddenPaths.length > 0
       ? normalizedManifest.forbiddenPaths
@@ -17628,50 +17897,40 @@ function buildModuleExpansionPlan({
       normalizedModuleId,
       normalizedModuleName,
     )
+  const registryBlocker =
+    registryEntry &&
+    registryEntry.safeToMaterialize !== true &&
+    typeof registryEntry.blocker === 'string' &&
+    registryEntry.blocker.trim()
+      ? registryEntry.blocker.trim()
+      : ''
   const combinedBlockers = summarizeUniqueExecutorStrings(
     [
       ...phasePrerequisiteState.blockers,
+      registryBlocker,
       unsupportedMaterializationBlocker,
     ],
     10,
   )
   const blockedFromMaterialization = combinedBlockers.length > 0
   const manifestPath = `${projectRoot}/jefe-project.json`
-  const affectedLayers = ['frontend', 'backend', 'shared', 'database', 'docs', 'manifest']
-  const targetFiles = normalizedModuleId === 'notifications'
-    ? [
-        `${projectRoot}/frontend/src/mock-data.js`,
-        `${projectRoot}/frontend/src/components/App.js`,
-        `${projectRoot}/frontend/src/styles.css`,
-        `${projectRoot}/backend/src/modules/notifications.js`,
-        `${projectRoot}/backend/src/routes/notifications.js`,
-        `${projectRoot}/shared/contracts/domain.js`,
-        `${projectRoot}/shared/types/contracts.js`,
-        `${projectRoot}/database/schema.sql`,
-        `${projectRoot}/database/seeds/seed-local.sql`,
-        `${projectRoot}/docs/architecture.md`,
-        `${projectRoot}/docs/local-runbook.md`,
-        `${projectRoot}/docs/validation-report.md`,
-        manifestPath,
-      ]
-    : [
-        `${projectRoot}/frontend/src/mock-data.js`,
-        `${projectRoot}/frontend/src/components/App.js`,
-        `${projectRoot}/frontend/src/styles.css`,
-        `${projectRoot}/backend/src/modules/${normalizedModuleId}.js`,
-        `${projectRoot}/backend/src/routes/${normalizedModuleId}.js`,
-        `${projectRoot}/shared/contracts/domain.js`,
-        `${projectRoot}/shared/types/contracts.js`,
-        `${projectRoot}/database/schema.sql`,
-        `${projectRoot}/database/seeds/seed-local.sql`,
-        `${projectRoot}/docs/architecture.md`,
-        `${projectRoot}/docs/local-runbook.md`,
-        `${projectRoot}/docs/validation-report.md`,
-        manifestPath,
-      ]
+  const affectedLayers =
+    normalizedModuleId === 'auth' ||
+    normalizedModuleId === 'payments' ||
+    normalizedModuleId === 'deploy' ||
+    normalizedModuleId === 'integrations' ||
+    normalizedModuleId === 'docker'
+      ? ['docs', 'manifest']
+      : normalizedModuleId === 'users-roles'
+        ? ['frontend', 'backend', 'shared', 'docs', 'manifest']
+        : ['frontend', 'backend', 'shared', 'database', 'docs', 'manifest']
+  const targetFiles = buildModuleExpansionTargetPaths({
+    projectRoot,
+    moduleId: normalizedModuleId,
+  })
   const validationPlan = {
     scope: `${projectRoot}:module-expansion:${normalizedModuleId}`,
-    level: materializationSupported ? 'full' : 'medium',
+    level: materializationSupported ? 'full' : registryEntry?.requiresApproval ? 'medium' : 'medium',
     commands: materializationSupported
       ? [
           `node --check ${projectRoot}/backend/src/modules/${normalizedModuleId}.js`,
@@ -17706,8 +17965,14 @@ function buildModuleExpansionPlan({
           'Revisar el frontend mock y confirmar que no use fetch ni backend real.',
           'Revisar el modulo backend nuevo como JS puro sin listen() ni servicios externos.',
           'Revisar schema.sql y seed-local.sql como diseno local no ejecutado.',
-          'Confirmar que validation-report.md refleje que no se enviaron notificaciones reales.',
+          `Confirmar que validation-report.md refleje que el modulo ${normalizedModuleName} no activo runtime real ni integraciones externas.`,
         ]
+      : registryEntry?.requiresApproval
+        ? [
+            'Revisar el alcance sensible y decidir si conviene aprobar un trabajo futuro separado.',
+            'Confirmar que la propuesta quede en modo planner-only y sin tocar runtime, credenciales ni integraciones reales.',
+            'Definir aprobaciones humanas antes de habilitar cualquier capability nueva.',
+          ]
       : [
           'Revisar si conviene implementar un materializador seguro antes de prometer ejecucion.',
           'Confirmar que la propuesta siga en modo planner-only y no habilite runtime real.',
@@ -17718,6 +17983,11 @@ function buildModuleExpansionPlan({
           'Actualizar solo frontend, backend, shared, database, docs y jefe-project.json dentro del proyecto generado.',
           'Mantener package.json, node_modules, .env, Docker, deploy y runtime real fuera de alcance.',
         ]
+      : registryEntry?.requiresApproval
+        ? [
+            'Mantener la expansion como plan revisable sin materializationPlan ejecutable.',
+            'No habilitar runtime real, credenciales, pagos, deploy ni integraciones externas.',
+          ]
       : [
           'Mantener la expansion como plan revisable sin materializationPlan ejecutable.',
           'No prometer runtime real ni creacion automatica de archivos para modulos sin soporte seguro.',
@@ -17729,15 +17999,17 @@ function buildModuleExpansionPlan({
     moduleName: normalizedModuleName,
     projectRoot,
     domain: projectDomain,
-    expansionType: 'new-domain-module',
+    expansionType: registryEntry?.expansionType || 'new-domain-module',
     reason: combinedBlockers.length > 0
       ? combinedBlockers.join(' ')
-      : `Agregar el modulo ${normalizedModuleName} como expansion local y revisable del proyecto ${projectDomain}.`,
-    safeToPrepare: true,
+      : registryEntry?.description ||
+        `Agregar el modulo ${normalizedModuleName} como expansion local y revisable del proyecto ${projectDomain}.`,
+    safeToPrepare:
+      registryEntry ? registryEntry.safeToPrepare !== false : true,
     safeToMaterialize:
       blockedFromMaterialization || !materializationSupported ? false : true,
-    approvalRequired: false,
-    riskLevel: 'medium',
+    approvalRequired: registryEntry?.requiresApproval === true,
+    riskLevel: registryEntry?.riskLevel || 'medium',
     affectedLayers,
     targetFiles,
     allowedTargetPaths: targetFiles,
@@ -17751,36 +18023,60 @@ function buildModuleExpansionPlan({
       20,
     ),
     expectedChanges: [
-      {
-        layer: 'frontend',
-        targetPath: `${projectRoot}/frontend/src/mock-data.js`,
-        purpose: 'Agregar datos mock y vistas locales del nuevo modulo.',
-      },
-      {
-        layer: 'backend',
-        targetPath: `${projectRoot}/backend/src/modules/${normalizedModuleId}.js`,
-        purpose: 'Agregar helpers puros y handlers conceptuales del nuevo modulo.',
-      },
-      {
-        layer: 'shared',
-        targetPath: `${projectRoot}/shared/contracts/domain.js`,
-        purpose: 'Ampliar contratos compartidos y tipos del dominio.',
-      },
-      {
-        layer: 'database',
-        targetPath: `${projectRoot}/database/schema.sql`,
-        purpose: 'Actualizar el diseño SQL local con la nueva entidad o relacion mock.',
-      },
-      {
-        layer: 'docs',
-        targetPath: `${projectRoot}/docs/validation-report.md`,
-        purpose: 'Reflejar la expansion local sin afirmar ejecuciones reales.',
-      },
-      {
-        layer: 'manifest',
-        targetPath: manifestPath,
-        purpose: 'Registrar el modulo agregado y volver a review-and-expand.',
-      },
+      ...(affectedLayers.includes('frontend')
+        ? [
+            {
+              layer: 'frontend',
+              targetPath: `${projectRoot}/frontend/src/mock-data.js`,
+              purpose: 'Agregar datos mock y vistas locales del nuevo modulo.',
+            },
+          ]
+        : []),
+      ...(affectedLayers.includes('backend')
+        ? [
+            {
+              layer: 'backend',
+              targetPath: `${projectRoot}/backend/src/modules/${normalizedModuleId}.js`,
+              purpose: 'Agregar helpers puros y handlers conceptuales del nuevo modulo.',
+            },
+          ]
+        : []),
+      ...(affectedLayers.includes('shared')
+        ? [
+            {
+              layer: 'shared',
+              targetPath: `${projectRoot}/shared/contracts/domain.js`,
+              purpose: 'Ampliar contratos compartidos y tipos del dominio.',
+            },
+          ]
+        : []),
+      ...(affectedLayers.includes('database')
+        ? [
+            {
+              layer: 'database',
+              targetPath: `${projectRoot}/database/schema.sql`,
+              purpose: 'Actualizar el diseño SQL local con la nueva entidad o relacion mock.',
+            },
+          ]
+        : []),
+      ...(affectedLayers.includes('docs')
+        ? [
+            {
+              layer: 'docs',
+              targetPath: `${projectRoot}/docs/validation-report.md`,
+              purpose: 'Reflejar la expansion local sin afirmar ejecuciones reales.',
+            },
+          ]
+        : []),
+      ...(affectedLayers.includes('manifest')
+        ? [
+            {
+              layer: 'manifest',
+              targetPath: manifestPath,
+              purpose: 'Registrar el modulo agregado y volver a review-and-expand.',
+            },
+          ]
+        : []),
     ],
     validationPlan,
     explicitExclusions: [
@@ -17793,6 +18089,9 @@ function buildModuleExpansionPlan({
       'runtime real',
       'servidores',
       'puertos',
+      ...(registryEntry?.requiresApproval
+        ? ['credenciales', 'pagos reales', 'integraciones externas']
+        : []),
     ],
     successCriteria: validationPlan.successCriteria,
     blockers: combinedBlockers,
@@ -20716,6 +21015,1257 @@ function getResolvedDecisionRecord(resolvedDecisionMap, ...decisionKeys) {
   return null
 }
 
+function getModuleExpansionActiveMaterializableIds({
+  localProjectManifest,
+  currentModuleId,
+}) {
+  const normalizedManifest =
+    normalizeLocalProjectManifestContract(localProjectManifest)
+  const activeModuleIds = []
+
+  if (normalizedManifest && Array.isArray(normalizedManifest.modules)) {
+    normalizedManifest.modules.forEach((entry) => {
+      const normalizedModuleId = normalizeModuleExpansionId(entry?.id)
+      const normalizedStatus = String(entry?.status || '')
+        .trim()
+        .toLocaleLowerCase()
+
+      if (
+        normalizedModuleId &&
+        isSupportedMaterializableModuleExpansion(normalizedModuleId) &&
+        (normalizedStatus === 'done' ||
+          normalizedStatus === 'planned' ||
+          normalizedStatus === 'partial')
+      ) {
+        activeModuleIds.push(normalizedModuleId)
+      }
+    })
+  }
+
+  if (currentModuleId && isSupportedMaterializableModuleExpansion(currentModuleId)) {
+    activeModuleIds.push(currentModuleId)
+  }
+
+  return summarizeUniqueExecutorStrings(activeModuleIds, 8)
+}
+
+function buildModuleExpansionMockDataContent(activeModuleIds) {
+  const hasNotifications = activeModuleIds.includes('notifications')
+  const hasReports = activeModuleIds.includes('reports')
+  const hasInventory = activeModuleIds.includes('inventory')
+  const dataset = {
+    overview: {
+      name: 'Turnos medicos local',
+      mode: 'module-expansion',
+      deliveryLevel: 'fullstack-local',
+      modules: activeModuleIds,
+    },
+    specialties: ['Clinica medica', 'Pediatria', 'Cardiologia', 'Dermatologia'],
+    professionals: [
+      { id: 'PRO-001', name: 'Dra. Ana Gomez', specialty: 'Clinica medica', status: 'disponible' },
+      { id: 'PRO-002', name: 'Dr. Pablo Ruiz', specialty: 'Pediatria', status: 'consultorio ocupado' },
+      { id: 'PRO-003', name: 'Dra. Marta Diaz', specialty: 'Cardiologia', status: 'disponible' },
+    ],
+    patients: [
+      { id: 'PAC-001', name: 'Lucia Perez', plan: 'Particular', status: 'confirmado' },
+      { id: 'PAC-002', name: 'Martin Suarez', plan: 'Prepaga', status: 'pendiente' },
+      { id: 'PAC-003', name: 'Camila Torres', plan: 'OSDE', status: 'en espera' },
+    ],
+    availability: [
+      { professional: 'Dra. Ana Gomez', slot: '09:30', state: 'libre' },
+      { professional: 'Dr. Pablo Ruiz', slot: '10:15', state: 'reservado' },
+      { professional: 'Dra. Marta Diaz', slot: '11:00', state: 'libre' },
+    ],
+    appointments: [
+      { id: 'APT-001', patient: 'Lucia Perez', professional: 'Dra. Ana Gomez', specialty: 'Clinica medica', slot: '2026-05-03 09:30', status: 'confirmado' },
+      { id: 'APT-002', patient: 'Martin Suarez', professional: 'Dr. Pablo Ruiz', specialty: 'Pediatria', slot: '2026-05-03 10:15', status: 'pendiente' },
+      { id: 'APT-003', patient: 'Camila Torres', professional: 'Dra. Marta Diaz', specialty: 'Cardiologia', slot: '2026-05-03 11:00', status: 'en espera' },
+    ],
+    notifications: hasNotifications
+      ? [
+          { id: 'NOT-001', appointmentId: 'APT-001', patient: 'Lucia Perez', type: 'appointment-confirmation', status: 'pending', channel: 'email', detail: 'Confirmacion mock previa al turno.' },
+          { id: 'NOT-002', appointmentId: 'APT-002', patient: 'Martin Suarez', type: 'appointment-reminder', status: 'sent-mock', channel: 'sms', detail: 'Recordatorio local enviado de forma simulada.' },
+          { id: 'NOT-003', appointmentId: 'APT-003', patient: 'Camila Torres', type: 'appointment-reschedule', status: 'read', channel: 'dashboard', detail: 'La paciente reviso una reprogramacion mock.' },
+        ]
+      : [],
+    notificationActions: hasNotifications ? ['Marcar como leida', 'Simular envio', 'Revisar detalle'] : [],
+    reports: hasReports
+      ? [
+          { id: 'REP-001', title: 'Resumen diario de turnos', period: 'daily', type: 'appointments-summary', status: 'ready-mock', metric: '18 turnos revisados', detail: 'Cruza confirmados, pendientes y cancelados sin runtime real.' },
+          { id: 'REP-002', title: 'Alertas operativas', period: 'weekly', type: 'notifications-summary', status: 'draft', metric: '3 alertas simuladas', detail: 'Mide recordatorios y fallos mock sin integraciones externas.' },
+        ]
+      : [],
+    reportIndicators: hasReports
+      ? [
+          { label: 'Turnos confirmados', value: 12 },
+          { label: 'Pendientes de revision', value: 4 },
+          { label: 'Alertas mock activas', value: 3 },
+        ]
+      : [],
+    reportActions: hasReports ? ['Revisar periodo', 'Comparar estados', 'Exportar resumen mock'] : [],
+    inventoryItems: hasInventory
+      ? [
+          { id: 'INV-001', name: 'Guantes descartables', category: 'Insumos', currentStock: 28, reorderPoint: 20, status: 'in-stock' },
+          { id: 'INV-002', name: 'Barbijos quirurgicos', category: 'Insumos', currentStock: 8, reorderPoint: 15, status: 'low-stock' },
+          { id: 'INV-003', name: 'Alcohol en gel', category: 'Higiene', currentStock: 0, reorderPoint: 10, status: 'out-of-stock' },
+        ]
+      : [],
+    inventoryMovements: hasInventory
+      ? [
+          { id: 'MOV-001', itemId: 'INV-001', type: 'egress', quantity: 6, detail: 'Consumo simulado de consultorio' },
+          { id: 'MOV-002', itemId: 'INV-002', type: 'adjustment', quantity: -3, detail: 'Ajuste de stock por recuento local' },
+          { id: 'MOV-003', itemId: 'INV-003', type: 'ingress', quantity: 12, detail: 'Reposicion sugerida no ejecutada en sistemas reales' },
+        ]
+      : [],
+    inventoryAlerts: hasInventory ? ['Hay items por debajo del minimo sugerido.', 'Conviene revisar reposicion mock antes de una integracion real.'] : [],
+    inventoryActions: hasInventory ? ['Registrar movimiento mock', 'Marcar reposicion sugerida', 'Revisar stock bajo'] : [],
+    quickActions: ['Reservar turno mock', 'Reprogramar disponibilidad', 'Confirmar llegada', 'Cancelar sin impacto real'],
+    summary: {
+      appointmentsToday: 18,
+      activeProfessionals: 7,
+      notificationsPending: hasNotifications ? 1 : 0,
+      reportsReady: hasReports ? 1 : 0,
+      lowStockItems: hasInventory ? 2 : 0,
+    },
+  }
+
+  return `export const fullstackPlan = ${JSON.stringify(dataset, null, 2)}\n`
+}
+
+function buildModuleExpansionAppContent() {
+  return `function renderList(items = [], formatter) {
+  return items.map((item) => formatter(item)).join('')
+}
+
+function renderChips(items = [], className = 'chip chip-secondary') {
+  return items.map((item) => \`<span class="\${className}">\${item}</span>\`).join('')
+}
+
+export function renderApp(fullstackPlan) {
+  const overview = fullstackPlan?.overview || {}
+  const specialties = Array.isArray(fullstackPlan?.specialties) ? fullstackPlan.specialties : []
+  const patients = Array.isArray(fullstackPlan?.patients) ? fullstackPlan.patients : []
+  const professionals = Array.isArray(fullstackPlan?.professionals) ? fullstackPlan.professionals : []
+  const availability = Array.isArray(fullstackPlan?.availability) ? fullstackPlan.availability : []
+  const appointments = Array.isArray(fullstackPlan?.appointments) ? fullstackPlan.appointments : []
+  const notifications = Array.isArray(fullstackPlan?.notifications) ? fullstackPlan.notifications : []
+  const reports = Array.isArray(fullstackPlan?.reports) ? fullstackPlan.reports : []
+  const inventoryItems = Array.isArray(fullstackPlan?.inventoryItems) ? fullstackPlan.inventoryItems : []
+  const inventoryMovements = Array.isArray(fullstackPlan?.inventoryMovements) ? fullstackPlan.inventoryMovements : []
+  const inventoryAlerts = Array.isArray(fullstackPlan?.inventoryAlerts) ? fullstackPlan.inventoryAlerts : []
+  const summary = fullstackPlan?.summary || {}
+
+  const notificationsSection = notifications.length
+    ? \`<section class="panel notification-panel"><div class="panel-header"><h2>Notificaciones mock</h2><div class="chip-row">\${renderChips(fullstackPlan.notificationActions || [], 'chip chip-action')}</div></div><div class="notification-list">\${renderList(notifications, (item) => \`<article class="notification-card"><div><strong>\${item.patient}</strong><span>\${item.type}</span><p>\${item.detail}</p></div><div><span class="notification-channel">\${item.channel}</span><span class="notification-status notification-status-\${item.status}">\${item.status}</span><em>\${item.appointmentId}</em></div></article>\`)}</div></section>\`
+    : ''
+
+  const reportsSection = reports.length
+    ? \`<section class="panel report-panel"><div class="panel-header"><h2>Reportes operativos mock</h2><div class="chip-row">\${renderChips(fullstackPlan.reportActions || [], 'chip chip-report')}</div></div><div class="notification-list">\${renderList(reports, (item) => \`<article class="report-card"><div><strong>\${item.title}</strong><span>\${item.type}</span><p>\${item.detail}</p></div><div><span class="report-period">\${item.period}</span><span class="notification-status notification-status-\${item.status}">\${item.status}</span><em>\${item.metric}</em></div></article>\`)}</div></section>\`
+    : ''
+
+  const inventorySection = inventoryItems.length
+    ? \`<section class="panel inventory-panel"><div class="panel-header"><h2>Inventario y stock mock</h2><div class="chip-row">\${renderChips(fullstackPlan.inventoryActions || [], 'chip chip-inventory')}</div></div><div class="phase-grid"><section class="panel panel-inner"><h3>Items</h3><ul class="list-grid">\${renderList(inventoryItems, (item) => \`<li><strong>\${item.name}</strong><span>\${item.category}</span><em>\${item.currentStock} unidades · \${item.status}</em></li>\`)}</ul></section><section class="panel panel-inner"><h3>Movimientos</h3><ul class="list-grid">\${renderList(inventoryMovements, (item) => \`<li><strong>\${item.itemId}</strong><span>\${item.type}</span><em>\${item.quantity} · \${item.detail}</em></li>\`)}</ul></section></div><ul class="alert-list">\${renderList(inventoryAlerts, (entry) => \`<li>\${entry}</li>\`)}</ul></section>\`
+    : ''
+
+  return \`<main class="app-shell phase-shell"><section class="hero phase-hero"><span class="chip">Continuidad local</span><h1>\${overview.name || 'Turnos medicos local'}</h1><p>Expansion local del proyecto con modulos revisables, sin backend real, sin dependencias instaladas y sin integraciones externas activas.</p><div class="chip-row">\${renderChips((overview.modules || []).map((entry) => \`Modulo: \${entry}\`))}\${renderChips(specialties)}</div></section><section class="summary-grid"><article class="panel stat-panel"><span>Turnos del dia</span><strong>\${summary.appointmentsToday || 0}</strong></article><article class="panel stat-panel"><span>Profesionales activos</span><strong>\${summary.activeProfessionals || 0}</strong></article><article class="panel stat-panel"><span>Notificaciones pendientes</span><strong>\${summary.notificationsPending || 0}</strong></article><article class="panel stat-panel"><span>Reportes listos</span><strong>\${summary.reportsReady || 0}</strong></article><article class="panel stat-panel"><span>Items con stock bajo</span><strong>\${summary.lowStockItems || 0}</strong></article></section><div class="phase-grid"><section class="panel"><h2>Pacientes</h2><ul class="list-grid">\${renderList(patients, (item) => \`<li><strong>\${item.name}</strong><span>\${item.plan}</span><em>\${item.status}</em></li>\`)}</ul></section><section class="panel"><h2>Profesionales</h2><ul class="list-grid">\${renderList(professionals, (item) => \`<li><strong>\${item.name}</strong><span>\${item.specialty}</span><em>\${item.status}</em></li>\`)}</ul></section><section class="panel"><h2>Disponibilidad</h2><ul class="list-grid">\${renderList(availability, (item) => \`<li><strong>\${item.professional}</strong><span>\${item.slot}</span><em>\${item.state}</em></li>\`)}</ul></section><section class="panel"><h2>Turnos y estados</h2><ul class="list-grid">\${renderList(appointments, (item) => \`<li><strong>\${item.patient}</strong><span>\${item.specialty}</span><em>\${item.status} · \${item.slot}</em></li>\`)}</ul></section></div>\${notificationsSection}\${reportsSection}\${inventorySection}</main>\`
+}
+`
+}
+
+function buildModuleExpansionStylesContent() {
+  return `:root { color-scheme: light; font-family: "Segoe UI", Arial, sans-serif; background: #edf4ff; color: #0f172a; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top left, rgba(14, 165, 233, 0.18), transparent 32%), radial-gradient(circle at top right, rgba(34, 197, 94, 0.12), transparent 28%), linear-gradient(180deg, #f8fbff 0%, #e9f2ff 100%); }
+.app-shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0 48px; }
+.hero, .panel, .stat-panel { border-radius: 24px; border: 1px solid rgba(148, 163, 184, 0.22); background: rgba(255, 255, 255, 0.88); box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08); }
+.phase-hero, .panel, .stat-panel { padding: 20px; }
+.phase-hero h1 { margin: 0; font-size: clamp(2.1rem, 4vw, 3.1rem); }
+.chip-row { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 12px; }
+.chip { border-radius: 999px; background: #dbeafe; color: #0f3d68; padding: 8px 14px; font-size: 0.9rem; font-weight: 700; }
+.chip-secondary { background: #dcfce7; color: #166534; }
+.chip-action { background: #ede9fe; color: #5b21b6; }
+.chip-report { background: #fee2e2; color: #9f1239; }
+.chip-inventory { background: #fef3c7; color: #92400e; }
+.summary-grid, .phase-grid, .notification-list, .list-grid, .alert-list { display: grid; gap: 12px; }
+.summary-grid { margin-top: 18px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.phase-grid { margin-top: 20px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.list-grid, .alert-list { margin: 0; padding: 0; list-style: none; }
+.list-grid li, .notification-card, .report-card { border-radius: 18px; background: rgba(15, 23, 42, 0.04); padding: 14px; }
+.panel-header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.status-pill, .notification-status { align-self: start; justify-self: start; border-radius: 999px; padding: 8px 12px; font-size: 0.84rem; font-weight: 700; }
+.notification-status-pending, .notification-status-draft { background: #e0f2fe; color: #0c4a6e; }
+.notification-status-sent-mock, .notification-status-ready-mock, .notification-status-in-stock { background: #dcfce7; color: #166534; }
+.notification-status-read, .notification-status-reviewed { background: #ede9fe; color: #5b21b6; }
+.notification-status-failed-mock, .notification-status-out-of-stock { background: #fee2e2; color: #991b1b; }
+.notification-status-low-stock { background: #fef3c7; color: #92400e; }
+.notification-channel, .report-period { color: #1d4ed8; font-weight: 700; }
+.alert-list li { border-left: 4px solid #f59e0b; background: rgba(254, 243, 199, 0.45); border-radius: 14px; padding: 12px 14px; }
+@media (max-width: 720px) { .app-shell { width: min(100% - 20px, 1180px); padding: 20px 0 34px; } .hero, .panel, .stat-panel { border-radius: 20px; } }
+`
+}
+
+function buildSupportedModuleBackendModuleContent(moduleId) {
+  if (moduleId === 'notifications') {
+    return `const {
+  NOTIFICATION_STATUSES,
+  NOTIFICATION_TYPES,
+} = require('../../../shared/contracts/domain.js')
+
+function normalizeNotificationRecord(record = {}) {
+  return {
+    id: String(record.id || '').trim(),
+    appointmentId: String(record.appointmentId || '').trim(),
+    patientId: String(record.patientId || '').trim(),
+    type: NOTIFICATION_TYPES.includes(record.type) ? record.type : 'appointment-confirmation',
+    status: NOTIFICATION_STATUSES.includes(record.status) ? record.status : 'pending',
+    channel: String(record.channel || 'dashboard').trim(),
+    detail: String(record.detail || '').trim(),
+  }
+}
+
+function createNotificationDraft(overrides = {}) {
+  return normalizeNotificationRecord({
+    id: 'NOT-LOCAL',
+    appointmentId: 'APT-LOCAL',
+    patientId: 'PAT-LOCAL',
+    type: 'appointment-confirmation',
+    status: 'pending',
+    channel: 'dashboard',
+    detail: 'Borrador local de notificacion.',
+    ...overrides,
+  })
+}
+
+function markNotificationAsRead(record) {
+  return {
+    ...normalizeNotificationRecord(record),
+    status: 'read',
+  }
+}
+
+function simulateNotificationDispatch(record) {
+  const normalizedRecord = normalizeNotificationRecord(record)
+  return {
+    ...normalizedRecord,
+    status: normalizedRecord.status === 'failed-mock' ? 'failed-mock' : 'sent-mock',
+  }
+}
+
+function filterNotificationsByStatus(records, status) {
+  const normalizedRecords = Array.isArray(records) ? records.map((record) => normalizeNotificationRecord(record)) : []
+  return status ? normalizedRecords.filter((record) => record.status === status) : normalizedRecords
+}
+
+function getNotificationSummary(records) {
+  const normalizedRecords = Array.isArray(records) ? records.map((record) => normalizeNotificationRecord(record)) : []
+  return {
+    total: normalizedRecords.length,
+    pending: normalizedRecords.filter((record) => record.status === 'pending').length,
+    sentMock: normalizedRecords.filter((record) => record.status === 'sent-mock').length,
+    read: normalizedRecords.filter((record) => record.status === 'read').length,
+  }
+}
+
+module.exports = {
+  normalizeNotificationRecord,
+  createNotificationDraft,
+  markNotificationAsRead,
+  simulateNotificationDispatch,
+  filterNotificationsByStatus,
+  getNotificationSummary,
+}
+`
+  }
+
+  if (moduleId === 'reports') {
+    return `const {
+  REPORT_PERIODS,
+  REPORT_STATUSES,
+  REPORT_TYPES,
+} = require('../../../shared/contracts/domain.js')
+
+function normalizeReportRecord(record = {}) {
+  return {
+    id: String(record.id || '').trim(),
+    title: String(record.title || 'Reporte local').trim(),
+    type: REPORT_TYPES.includes(record.type) ? record.type : 'appointments-summary',
+    period: REPORT_PERIODS.includes(record.period) ? record.period : 'daily',
+    status: REPORT_STATUSES.includes(record.status) ? record.status : 'draft',
+    metric: String(record.metric || '').trim(),
+    detail: String(record.detail || '').trim(),
+  }
+}
+
+function createReportDraft(overrides = {}) {
+  return normalizeReportRecord({
+    id: 'REP-LOCAL',
+    title: 'Reporte local revisable',
+    type: 'appointments-summary',
+    period: 'daily',
+    status: 'draft',
+    metric: '0',
+    detail: 'Borrador local sin exportacion real.',
+    ...overrides,
+  })
+}
+
+function filterReportsByStatus(records, status) {
+  const normalizedRecords = Array.isArray(records) ? records.map((record) => normalizeReportRecord(record)) : []
+  return status ? normalizedRecords.filter((record) => record.status === status) : normalizedRecords
+}
+
+function summarizeReportsByPeriod(records) {
+  const normalizedRecords = Array.isArray(records) ? records.map((record) => normalizeReportRecord(record)) : []
+  return REPORT_PERIODS.reduce((accumulator, period) => ({
+    ...accumulator,
+    [period]: normalizedRecords.filter((record) => record.period === period).length,
+  }), { total: normalizedRecords.length })
+}
+
+function buildOperationalIndicators(records) {
+  const normalizedRecords = Array.isArray(records) ? records.map((record) => normalizeReportRecord(record)) : []
+  return {
+    ready: normalizedRecords.filter((record) => record.status === 'ready-mock').length,
+    draft: normalizedRecords.filter((record) => record.status === 'draft').length,
+    reviewed: normalizedRecords.filter((record) => record.status === 'reviewed').length,
+  }
+}
+
+function exportReportDescriptor(report = {}) {
+  const normalizedRecord = normalizeReportRecord(report)
+  return {
+    format: 'csv-mock',
+    fileName: \`\${normalizedRecord.id || 'report'}-local.csv\`,
+    note: 'No se genera un archivo real ni una exportacion externa.',
+  }
+}
+
+module.exports = {
+  normalizeReportRecord,
+  createReportDraft,
+  filterReportsByStatus,
+  summarizeReportsByPeriod,
+  buildOperationalIndicators,
+  exportReportDescriptor,
+}
+`
+  }
+
+  if (moduleId === 'inventory') {
+    return `const {
+  INVENTORY_MOVEMENT_TYPES,
+  INVENTORY_STOCK_STATUSES,
+} = require('../../../shared/contracts/domain.js')
+
+function normalizeInventoryItem(record = {}) {
+  return {
+    id: String(record.id || '').trim(),
+    name: String(record.name || '').trim(),
+    category: String(record.category || 'General').trim(),
+    currentStock: Number.isFinite(record.currentStock) ? record.currentStock : 0,
+    reorderPoint: Number.isFinite(record.reorderPoint) ? record.reorderPoint : 0,
+    status: INVENTORY_STOCK_STATUSES.includes(record.status) ? record.status : 'in-stock',
+  }
+}
+
+function normalizeInventoryMovement(record = {}) {
+  return {
+    id: String(record.id || '').trim(),
+    itemId: String(record.itemId || '').trim(),
+    type: INVENTORY_MOVEMENT_TYPES.includes(record.type) ? record.type : 'adjustment',
+    quantity: Number.isFinite(record.quantity) ? record.quantity : 0,
+    detail: String(record.detail || '').trim(),
+  }
+}
+
+function registerInventoryMovement(item, movement) {
+  const normalizedItem = normalizeInventoryItem(item)
+  const normalizedMovement = normalizeInventoryMovement(movement)
+  const nextStock = normalizedMovement.type === 'egress'
+    ? normalizedItem.currentStock - Math.abs(normalizedMovement.quantity)
+    : normalizedItem.currentStock + normalizedMovement.quantity
+
+  return {
+    ...normalizedItem,
+    currentStock: nextStock,
+    status: nextStock <= 0 ? 'out-of-stock' : nextStock <= normalizedItem.reorderPoint ? 'low-stock' : 'in-stock',
+  }
+}
+
+function getLowStockItems(items) {
+  const normalizedItems = Array.isArray(items) ? items.map((item) => normalizeInventoryItem(item)) : []
+  return normalizedItems.filter((item) => item.currentStock <= item.reorderPoint)
+}
+
+function suggestRestock(items) {
+  return getLowStockItems(items).map((item) => ({
+    itemId: item.id,
+    suggestedQuantity: Math.max(item.reorderPoint * 2 - item.currentStock, 1),
+    note: 'Reposicion sugerida local sin integracion real.',
+  }))
+}
+
+function getInventorySummary(items) {
+  const normalizedItems = Array.isArray(items) ? items.map((item) => normalizeInventoryItem(item)) : []
+  return {
+    totalItems: normalizedItems.length,
+    lowStock: normalizedItems.filter((item) => item.status === 'low-stock').length,
+    outOfStock: normalizedItems.filter((item) => item.status === 'out-of-stock').length,
+  }
+}
+
+module.exports = {
+  normalizeInventoryItem,
+  normalizeInventoryMovement,
+  registerInventoryMovement,
+  getLowStockItems,
+  suggestRestock,
+  getInventorySummary,
+}
+`
+  }
+
+  return ''
+}
+
+function buildSupportedModuleBackendRouteContent(moduleId) {
+  if (moduleId === 'notifications') {
+    return `const {
+  createNotificationDraft,
+  filterNotificationsByStatus,
+  getNotificationSummary,
+  markNotificationAsRead,
+  simulateNotificationDispatch,
+} = require('../modules/notifications.js')
+const { okResponse } = require('../lib/response.js')
+
+function createNotificationsRouteDefinition() {
+  return {
+    method: 'GET',
+    path: '/notifications',
+    description: 'Ruta conceptual y revisable para notificaciones mock, sin Express real ni puertos.',
+  }
+}
+
+function listNotificationsHandler(records = [], filters = {}) {
+  return okResponse({
+    items: filterNotificationsByStatus(records, filters.status),
+    summary: getNotificationSummary(records),
+  })
+}
+
+function previewNotificationDraftHandler(overrides = {}) {
+  return okResponse({
+    draft: createNotificationDraft(overrides),
+  })
+}
+
+function simulateNotificationDispatchHandler(record = {}) {
+  return okResponse({
+    notification: simulateNotificationDispatch(record),
+  })
+}
+
+function markNotificationAsReadHandler(record = {}) {
+  return okResponse({
+    notification: markNotificationAsRead(record),
+  })
+}
+
+module.exports = {
+  createNotificationsRouteDefinition,
+  listNotificationsHandler,
+  previewNotificationDraftHandler,
+  simulateNotificationDispatchHandler,
+  markNotificationAsReadHandler,
+}
+`
+  }
+
+  if (moduleId === 'reports') {
+    return `const {
+  buildOperationalIndicators,
+  createReportDraft,
+  exportReportDescriptor,
+  filterReportsByStatus,
+  summarizeReportsByPeriod,
+} = require('../modules/reports.js')
+const { okResponse } = require('../lib/response.js')
+
+function createReportsRouteDefinition() {
+  return {
+    method: 'GET',
+    path: '/reports',
+    description: 'Ruta conceptual y revisable para reportes mock, sin Express real ni exportaciones reales.',
+  }
+}
+
+function listReportsHandler(records = [], filters = {}) {
+  return okResponse({
+    items: filterReportsByStatus(records, filters.status),
+    periods: summarizeReportsByPeriod(records),
+    indicators: buildOperationalIndicators(records),
+  })
+}
+
+function previewReportDraftHandler(overrides = {}) {
+  return okResponse({
+    draft: createReportDraft(overrides),
+  })
+}
+
+function previewReportExportHandler(report = {}) {
+  return okResponse({
+    export: exportReportDescriptor(report),
+  })
+}
+
+module.exports = {
+  createReportsRouteDefinition,
+  listReportsHandler,
+  previewReportDraftHandler,
+  previewReportExportHandler,
+}
+`
+  }
+
+  if (moduleId === 'inventory') {
+    return `const {
+  getInventorySummary,
+  getLowStockItems,
+  normalizeInventoryItem,
+  normalizeInventoryMovement,
+  registerInventoryMovement,
+  suggestRestock,
+} = require('../modules/inventory.js')
+const { okResponse } = require('../lib/response.js')
+
+function createInventoryRouteDefinition() {
+  return {
+    method: 'GET',
+    path: '/inventory',
+    description: 'Ruta conceptual y revisable para stock mock, sin backend real ni integraciones externas.',
+  }
+}
+
+function listInventoryHandler(items = []) {
+  const normalizedItems = Array.isArray(items) ? items.map((item) => normalizeInventoryItem(item)) : []
+  return okResponse({
+    items: normalizedItems,
+    summary: getInventorySummary(normalizedItems),
+    lowStock: getLowStockItems(normalizedItems),
+  })
+}
+
+function simulateInventoryMovementHandler(item = {}, movement = {}) {
+  return okResponse({
+    item: registerInventoryMovement(item, normalizeInventoryMovement(movement)),
+  })
+}
+
+function suggestInventoryRestockHandler(items = []) {
+  return okResponse({
+    suggestions: suggestRestock(items),
+  })
+}
+
+module.exports = {
+  createInventoryRouteDefinition,
+  listInventoryHandler,
+  simulateInventoryMovementHandler,
+  suggestInventoryRestockHandler,
+}
+`
+  }
+
+  return ''
+}
+
+function buildModuleExpansionSharedDomainContent() {
+  return `const APPOINTMENT_STATUSES = ['scheduled', 'confirmed', 'checked-in', 'completed', 'cancelled', 'no-show']
+const APPOINTMENT_TRANSITIONS = {
+  scheduled: ['confirmed', 'cancelled'],
+  confirmed: ['checked-in', 'cancelled', 'no-show'],
+  'checked-in': ['completed', 'cancelled'],
+  completed: [],
+  cancelled: [],
+  'no-show': [],
+}
+const NOTIFICATION_TYPES = ['appointment-confirmation', 'appointment-reminder', 'appointment-reschedule', 'appointment-cancellation']
+const NOTIFICATION_STATUSES = ['pending', 'sent-mock', 'read', 'failed-mock']
+const REPORT_TYPES = ['appointments-summary', 'notifications-summary', 'inventory-alerts', 'operations-overview']
+const REPORT_STATUSES = ['draft', 'ready-mock', 'reviewed']
+const REPORT_PERIODS = ['daily', 'weekly', 'monthly']
+const INVENTORY_MOVEMENT_TYPES = ['ingress', 'egress', 'adjustment']
+const INVENTORY_STOCK_STATUSES = ['in-stock', 'low-stock', 'out-of-stock']
+const DOMAIN_ENTITY_NAMES = {
+  patient: 'Patient',
+  professional: 'Professional',
+  specialty: 'Specialty',
+  appointment: 'Appointment',
+  availabilitySlot: 'AvailabilitySlot',
+  notification: 'Notification',
+  report: 'Report',
+  inventoryItem: 'InventoryItem',
+  inventoryMovement: 'InventoryMovement',
+}
+
+function createPatientContract(overrides = {}) { return { id: 'PAT-001', fullName: 'Paciente local', documentNumber: 'DNI-LOCAL', contactPhone: '000-000-000', status: 'active', ...overrides } }
+function createProfessionalContract(overrides = {}) { return { id: 'PRO-001', fullName: 'Profesional local', specialtyId: 'SPC-001', status: 'available', ...overrides } }
+function createSpecialtyContract(overrides = {}) { return { id: 'SPC-001', name: 'Clinica medica', status: 'active', ...overrides } }
+function createAvailabilitySlotContract(overrides = {}) { return { id: 'SLT-001', professionalId: 'PRO-001', startAt: '2026-05-03T09:30:00', endAt: '2026-05-03T10:00:00', state: 'free', ...overrides } }
+function createAppointmentContract(overrides = {}) { return { id: 'APT-001', patientId: 'PAT-001', professionalId: 'PRO-001', specialtyId: 'SPC-001', slotId: 'SLT-001', status: 'scheduled', notes: [], ...overrides } }
+function createNotificationContract(overrides = {}) { return { id: 'NOT-001', appointmentId: 'APT-001', patientId: 'PAT-001', type: 'appointment-confirmation', status: 'pending', channel: 'dashboard', detail: 'Notificacion mock local', ...overrides } }
+function createReportContract(overrides = {}) { return { id: 'REP-001', title: 'Reporte local', type: 'appointments-summary', period: 'daily', status: 'draft', metric: '0', detail: 'Reporte revisable sin exportacion real', ...overrides } }
+function createInventoryItemContract(overrides = {}) { return { id: 'INV-001', name: 'Insumo local', category: 'General', currentStock: 0, reorderPoint: 0, status: 'in-stock', ...overrides } }
+function createInventoryMovementContract(overrides = {}) { return { id: 'MOV-001', itemId: 'INV-001', type: 'adjustment', quantity: 0, detail: 'Movimiento local revisable', ...overrides } }
+
+module.exports = {
+  APPOINTMENT_STATUSES,
+  APPOINTMENT_TRANSITIONS,
+  NOTIFICATION_TYPES,
+  NOTIFICATION_STATUSES,
+  REPORT_TYPES,
+  REPORT_STATUSES,
+  REPORT_PERIODS,
+  INVENTORY_MOVEMENT_TYPES,
+  INVENTORY_STOCK_STATUSES,
+  DOMAIN_ENTITY_NAMES,
+  createPatientContract,
+  createProfessionalContract,
+  createSpecialtyContract,
+  createAvailabilitySlotContract,
+  createAppointmentContract,
+  createNotificationContract,
+  createReportContract,
+  createInventoryItemContract,
+  createInventoryMovementContract,
+}
+`
+}
+
+function buildModuleExpansionSharedTypesContent() {
+  return `/**
+ * @typedef {Object} PatientRecord
+ * @property {string} id
+ * @property {string} fullName
+ * @property {string} documentNumber
+ * @property {string} contactPhone
+ * @property {string} status
+ */
+/**
+ * @typedef {Object} ProfessionalRecord
+ * @property {string} id
+ * @property {string} fullName
+ * @property {string} specialtyId
+ * @property {string} status
+ */
+/**
+ * @typedef {Object} SpecialtyRecord
+ * @property {string} id
+ * @property {string} name
+ * @property {string} status
+ */
+/**
+ * @typedef {Object} AvailabilitySlotRecord
+ * @property {string} id
+ * @property {string} professionalId
+ * @property {string} startAt
+ * @property {string} endAt
+ * @property {string} state
+ */
+/**
+ * @typedef {Object} AppointmentRecord
+ * @property {string} id
+ * @property {string} patientId
+ * @property {string} professionalId
+ * @property {string} specialtyId
+ * @property {string} slotId
+ * @property {string} status
+ * @property {string[]} notes
+ */
+/**
+ * @typedef {Object} NotificationRecord
+ * @property {string} id
+ * @property {string} appointmentId
+ * @property {string} patientId
+ * @property {string} type
+ * @property {string} status
+ * @property {string} channel
+ * @property {string} detail
+ */
+/**
+ * @typedef {Object} ReportRecord
+ * @property {string} id
+ * @property {string} title
+ * @property {string} type
+ * @property {string} period
+ * @property {string} status
+ * @property {string} metric
+ * @property {string} detail
+ */
+/**
+ * @typedef {Object} InventoryItemRecord
+ * @property {string} id
+ * @property {string} name
+ * @property {string} category
+ * @property {number} currentStock
+ * @property {number} reorderPoint
+ * @property {string} status
+ */
+/**
+ * @typedef {Object} InventoryMovementRecord
+ * @property {string} id
+ * @property {string} itemId
+ * @property {string} type
+ * @property {number} quantity
+ * @property {string} detail
+ */
+
+const CONTRACT_GROUPS = {
+  patient: ['id', 'fullName', 'documentNumber', 'contactPhone', 'status'],
+  professional: ['id', 'fullName', 'specialtyId', 'status'],
+  specialty: ['id', 'name', 'status'],
+  availabilitySlot: ['id', 'professionalId', 'startAt', 'endAt', 'state'],
+  appointment: ['id', 'patientId', 'professionalId', 'specialtyId', 'slotId', 'status', 'notes'],
+  notification: ['id', 'appointmentId', 'patientId', 'type', 'status', 'channel', 'detail'],
+  report: ['id', 'title', 'type', 'period', 'status', 'metric', 'detail'],
+  inventoryItem: ['id', 'name', 'category', 'currentStock', 'reorderPoint', 'status'],
+  inventoryMovement: ['id', 'itemId', 'type', 'quantity', 'detail'],
+}
+
+module.exports = {
+  CONTRACT_GROUPS,
+}
+`
+}
+
+function buildModuleExpansionValidationMarkers(moduleId) {
+  if (moduleId === 'notifications') {
+    return { mockData: '"notifications": [', app: 'Notificaciones mock', module: 'simulateNotificationDispatch', route: 'listNotificationsHandler', sharedDomain: 'NOTIFICATION_TYPES', sharedTypes: '@typedef {Object} NotificationRecord', schema: 'CREATE TABLE notifications', seed: 'INSERT INTO notifications', architecture: 'Modulo de notificaciones mock', validationReport: 'no se enviaron notificaciones reales' }
+  }
+  if (moduleId === 'reports') {
+    return { mockData: '"reports": [', app: 'Reportes operativos mock', module: 'buildOperationalIndicators', route: 'listReportsHandler', sharedDomain: 'REPORT_TYPES', sharedTypes: '@typedef {Object} ReportRecord', schema: 'CREATE TABLE reports_snapshots', seed: 'INSERT INTO reports_snapshots', architecture: 'Modulo de reportes mock', validationReport: 'no se generaron exportaciones reales' }
+  }
+  if (moduleId === 'inventory') {
+    return { mockData: '"inventoryItems": [', app: 'Inventario y stock mock', module: 'suggestRestock', route: 'listInventoryHandler', sharedDomain: 'INVENTORY_MOVEMENT_TYPES', sharedTypes: '@typedef {Object} InventoryItemRecord', schema: 'CREATE TABLE inventory_items', seed: 'INSERT INTO inventory_items', architecture: 'Modulo de inventario y stock mock', validationReport: 'no se sincronizo stock con sistemas reales' }
+  }
+  return null
+}
+
+function buildModuleExpansionSchemaContent(activeModuleIds) {
+  const blocks = []
+  if (activeModuleIds.includes('notifications')) {
+    blocks.push(`CREATE TABLE notifications (
+  id TEXT PRIMARY KEY,
+  appointment_id TEXT NOT NULL,
+  patient_id TEXT NOT NULL,
+  notification_type TEXT NOT NULL,
+  notification_status TEXT NOT NULL,
+  channel TEXT NOT NULL,
+  detail TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (appointment_id) REFERENCES appointments(id),
+  FOREIGN KEY (patient_id) REFERENCES patients(id)
+);`)
+  }
+  if (activeModuleIds.includes('reports')) {
+    blocks.push(`CREATE TABLE reports_snapshots (
+  id TEXT PRIMARY KEY,
+  report_type TEXT NOT NULL,
+  report_period TEXT NOT NULL,
+  report_status TEXT NOT NULL,
+  metric_summary TEXT NOT NULL,
+  detail TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);`)
+  }
+  if (activeModuleIds.includes('inventory')) {
+    blocks.push(`CREATE TABLE inventory_items (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  current_stock INTEGER NOT NULL,
+  reorder_point INTEGER NOT NULL,
+  stock_status TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE inventory_movements (
+  id TEXT PRIMARY KEY,
+  item_id TEXT NOT NULL,
+  movement_type TEXT NOT NULL,
+  quantity INTEGER NOT NULL,
+  detail TEXT,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (item_id) REFERENCES inventory_items(id)
+);`)
+  }
+
+  return `-- Database design local y revisable para turnos medicos.
+-- No ejecutar este archivo automaticamente.
+
+CREATE TABLE patients (
+  id TEXT PRIMARY KEY,
+  full_name TEXT NOT NULL,
+  document_number TEXT NOT NULL,
+  contact_phone TEXT,
+  contact_email TEXT,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE professionals (
+  id TEXT PRIMARY KEY,
+  full_name TEXT NOT NULL,
+  license_code TEXT,
+  contact_phone TEXT,
+  contact_email TEXT,
+  status TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE specialties (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE professional_specialties (
+  professional_id TEXT NOT NULL,
+  specialty_id TEXT NOT NULL,
+  primary_flag INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (professional_id, specialty_id),
+  FOREIGN KEY (professional_id) REFERENCES professionals(id),
+  FOREIGN KEY (specialty_id) REFERENCES specialties(id)
+);
+
+CREATE TABLE availability_slots (
+  id TEXT PRIMARY KEY,
+  professional_id TEXT NOT NULL,
+  specialty_id TEXT NOT NULL,
+  slot_date TEXT NOT NULL,
+  start_time TEXT NOT NULL,
+  end_time TEXT NOT NULL,
+  state TEXT NOT NULL,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (professional_id) REFERENCES professionals(id),
+  FOREIGN KEY (specialty_id) REFERENCES specialties(id)
+);
+
+CREATE TABLE appointments (
+  id TEXT PRIMARY KEY,
+  patient_id TEXT NOT NULL,
+  professional_id TEXT NOT NULL,
+  specialty_id TEXT NOT NULL,
+  availability_slot_id TEXT NOT NULL,
+  appointment_date TEXT NOT NULL,
+  status TEXT NOT NULL,
+  reason TEXT,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (patient_id) REFERENCES patients(id),
+  FOREIGN KEY (professional_id) REFERENCES professionals(id),
+  FOREIGN KEY (specialty_id) REFERENCES specialties(id),
+  FOREIGN KEY (availability_slot_id) REFERENCES availability_slots(id)
+);
+
+CREATE TABLE appointment_status_history (
+  id TEXT PRIMARY KEY,
+  appointment_id TEXT NOT NULL,
+  previous_status TEXT,
+  next_status TEXT NOT NULL,
+  changed_at TEXT NOT NULL,
+  changed_by TEXT NOT NULL,
+  change_reason TEXT,
+  FOREIGN KEY (appointment_id) REFERENCES appointments(id)
+);
+
+${blocks.join('\n\n')}
+`
+}
+
+function buildModuleExpansionSeedContent(activeModuleIds) {
+  const blocks = []
+  if (activeModuleIds.includes('notifications')) {
+    blocks.push(`INSERT INTO notifications (id, appointment_id, patient_id, notification_type, notification_status, channel, detail, created_at, updated_at) VALUES
+  ('NOT-001', 'APT-001', 'PAT-001', 'appointment-confirmation', 'pending', 'email', 'Confirmacion mock previa al turno.', '2026-05-04T10:00:00', '2026-05-04T10:00:00'),
+  ('NOT-002', 'APT-002', 'PAT-002', 'appointment-reminder', 'sent-mock', 'sms', 'Recordatorio local enviado de forma simulada.', '2026-05-04T10:01:00', '2026-05-04T10:01:00');`)
+  }
+  if (activeModuleIds.includes('reports')) {
+    blocks.push(`INSERT INTO reports_snapshots (id, report_type, report_period, report_status, metric_summary, detail, created_at, updated_at) VALUES
+  ('REP-001', 'appointments-summary', 'daily', 'ready-mock', '18 turnos revisados', 'Resumen operativo local sin exportacion real', '2026-05-04T10:05:00', '2026-05-04T10:05:00'),
+  ('REP-002', 'notifications-summary', 'weekly', 'draft', '3 alertas simuladas', 'Reporte de alertas pendiente de revision local', '2026-05-04T10:06:00', '2026-05-04T10:06:00');`)
+  }
+  if (activeModuleIds.includes('inventory')) {
+    blocks.push(`INSERT INTO inventory_items (id, name, category, current_stock, reorder_point, stock_status, created_at, updated_at) VALUES
+  ('INV-001', 'Guantes descartables', 'Insumos', 28, 20, 'in-stock', '2026-05-04T10:10:00', '2026-05-04T10:10:00'),
+  ('INV-002', 'Barbijos quirurgicos', 'Insumos', 8, 15, 'low-stock', '2026-05-04T10:10:00', '2026-05-04T10:10:00'),
+  ('INV-003', 'Alcohol en gel', 'Higiene', 0, 10, 'out-of-stock', '2026-05-04T10:10:00', '2026-05-04T10:10:00');
+
+INSERT INTO inventory_movements (id, item_id, movement_type, quantity, detail, created_at) VALUES
+  ('MOV-001', 'INV-001', 'egress', 6, 'Consumo simulado de consultorio', '2026-05-04T10:11:00'),
+  ('MOV-002', 'INV-002', 'adjustment', -3, 'Ajuste de stock por recuento local', '2026-05-04T10:11:00'),
+  ('MOV-003', 'INV-003', 'ingress', 12, 'Reposicion sugerida no sincronizada con sistemas reales', '2026-05-04T10:11:00');`)
+  }
+
+  return `-- Seed local y revisable para turnos medicos.
+-- No ejecutar automaticamente.
+
+INSERT INTO specialties (id, name, description, created_at, updated_at) VALUES
+  ('SPC-001', 'Clinica medica', 'Atencion general de consultorio', '2026-05-04T09:00:00', '2026-05-04T09:00:00'),
+  ('SPC-002', 'Pediatria', 'Atencion infantil local', '2026-05-04T09:00:00', '2026-05-04T09:00:00'),
+  ('SPC-003', 'Cardiologia', 'Seguimiento cardiologico revisable', '2026-05-04T09:00:00', '2026-05-04T09:00:00');
+
+INSERT INTO professionals (id, full_name, license_code, contact_phone, contact_email, status, created_at, updated_at) VALUES
+  ('PRO-001', 'Dra. Ana Gomez', 'MN-001', '000-111-222', 'ana.local@example.test', 'available', '2026-05-04T09:05:00', '2026-05-04T09:05:00'),
+  ('PRO-002', 'Dr. Pablo Ruiz', 'MN-002', '000-333-444', 'pablo.local@example.test', 'available', '2026-05-04T09:05:00', '2026-05-04T09:05:00');
+
+INSERT INTO professional_specialties (professional_id, specialty_id, primary_flag, created_at) VALUES
+  ('PRO-001', 'SPC-001', 1, '2026-05-04T09:06:00'),
+  ('PRO-002', 'SPC-002', 1, '2026-05-04T09:06:00'),
+  ('PRO-002', 'SPC-003', 0, '2026-05-04T09:06:00');
+
+INSERT INTO patients (id, full_name, document_number, contact_phone, contact_email, notes, created_at, updated_at) VALUES
+  ('PAT-001', 'Lucia Perez', '30111222', '000-555-111', 'lucia.local@example.test', 'Paciente mock local', '2026-05-04T09:10:00', '2026-05-04T09:10:00'),
+  ('PAT-002', 'Martin Suarez', '28999111', '000-555-222', 'martin.local@example.test', 'Seguimiento pediatrico local', '2026-05-04T09:10:00', '2026-05-04T09:10:00');
+
+INSERT INTO availability_slots (id, professional_id, specialty_id, slot_date, start_time, end_time, state, notes, created_at, updated_at) VALUES
+  ('SLT-001', 'PRO-001', 'SPC-001', '2026-05-05', '09:30', '10:00', 'reserved', 'Turno mock ya reservado', '2026-05-04T09:15:00', '2026-05-04T09:15:00'),
+  ('SLT-002', 'PRO-002', 'SPC-002', '2026-05-05', '10:15', '10:45', 'free', 'Disponible para demo local', '2026-05-04T09:15:00', '2026-05-04T09:15:00'),
+  ('SLT-003', 'PRO-002', 'SPC-003', '2026-05-05', '11:00', '11:30', 'free', 'Disponible para especialidad secundaria', '2026-05-04T09:15:00', '2026-05-04T09:15:00');
+
+INSERT INTO appointments (id, patient_id, professional_id, specialty_id, availability_slot_id, appointment_date, status, reason, notes, created_at, updated_at) VALUES
+  ('APT-001', 'PAT-001', 'PRO-001', 'SPC-001', 'SLT-001', '2026-05-05 09:30', 'confirmed', 'Control clinico general', 'Turno confirmado local', '2026-05-04T09:20:00', '2026-05-04T09:20:00'),
+  ('APT-002', 'PAT-002', 'PRO-002', 'SPC-002', 'SLT-002', '2026-05-05 10:15', 'scheduled', 'Consulta pediatrica', 'Pendiente de confirmacion mock', '2026-05-04T09:20:00', '2026-05-04T09:20:00');
+
+INSERT INTO appointment_status_history (id, appointment_id, previous_status, next_status, changed_at, changed_by, change_reason) VALUES
+  ('HIS-001', 'APT-001', 'scheduled', 'confirmed', '2026-05-04T09:25:00', 'local-seed', 'Confirmacion mock inicial'),
+  ('HIS-002', 'APT-002', NULL, 'scheduled', '2026-05-04T09:25:00', 'local-seed', 'Alta inicial del turno');
+
+${blocks.join('\n\n')}
+`
+}
+
+function buildModuleExpansionArchitectureContent(activeModuleIds) {
+  const sections = []
+  if (activeModuleIds.includes('notifications')) { sections.push('## Modulo de notificaciones mock\\n\\n- confirmacion de turno\\n- recordatorio\\n- reprogramacion\\n- cancelacion\\n- estados mock de lectura y envio') }
+  if (activeModuleIds.includes('reports')) { sections.push('## Modulo de reportes mock\\n\\n- resumen por periodo\\n- metricas operativas\\n- alertas revisables\\n- exportacion conceptual sin archivos reales') }
+  if (activeModuleIds.includes('inventory')) { sections.push('## Modulo de inventario y stock mock\\n\\n- items operativos\\n- movimientos simulados\\n- stock bajo\\n- reposicion sugerida sin integraciones reales') }
+  return `# Arquitectura local
+
+## Estado del proyecto
+
+El proyecto sigue en modo local, revisable y sin runtime real.
+
+## Flujo base
+
+- frontend mock flow
+- backend contracts
+- database design
+- local validation
+- review-and-expand
+
+${sections.join('\n\n')}
+
+## Capas afectadas
+
+- frontend local: vistas y estados mock
+- backend local: helpers puros y handlers conceptuales
+- shared: contratos y typedefs compartidos
+- database design: diseño SQL local no ejecutado
+- docs: architecture, runbook y validation report actualizados
+
+## Limites actuales
+
+- no se levanto backend
+- no se abrieron puertos
+- no se ejecuto SQL
+- no se instalaron dependencias
+- no hubo integraciones externas reales
+
+## Siguiente fase segura
+
+La siguiente fase recomendada vuelve a ser \`review-and-expand\`.
+`
+}
+
+function buildModuleExpansionRunbookContent(activeModuleIds) {
+  const moduleLines = []
+  if (activeModuleIds.includes('notifications')) { moduleLines.push('- revisar `backend/src/modules/notifications.js` y `backend/src/routes/notifications.js`') }
+  if (activeModuleIds.includes('reports')) { moduleLines.push('- revisar `backend/src/modules/reports.js` y `backend/src/routes/reports.js`') }
+  if (activeModuleIds.includes('inventory')) { moduleLines.push('- revisar `backend/src/modules/inventory.js` y `backend/src/routes/inventory.js`') }
+  return `# Local runbook
+
+## Estado actual
+
+El proyecto sigue en modo local y revisable. Se materializaron expansiones seguras de modulo para:
+
+${activeModuleIds.map((moduleId) => `- \`${moduleId}\``).join('\n')}
+
+## Como revisar sin servicios reales
+
+- abrir \`frontend/index.html\`
+- revisar \`frontend/src/mock-data.js\`
+- revisar \`frontend/src/components/App.js\`
+- revisar \`shared/contracts/domain.js\`
+- revisar \`shared/types/contracts.js\`
+${moduleLines.join('\n')}
+- revisar \`database/schema.sql\` y \`database/seeds/seed-local.sql\`
+- revisar \`docs/validation-report.md\`
+- revisar \`jefe-project.json\`
+
+## Sigue fuera de alcance
+
+- instalar dependencias
+- levantar frontend o backend
+- abrir puertos
+- ejecutar SQL
+- crear DB real
+- integraciones externas reales
+- deploy
+
+## Proxima fase segura
+
+La siguiente fase recomendada vuelve a ser \`review-and-expand\`.
+`
+}
+
+function buildModuleExpansionValidationReportContent({
+  projectRoot,
+  localProjectManifest,
+  activeModuleIds,
+}) {
+  const domain = String(localProjectManifest?.domain || 'proyecto local').trim() || 'proyecto local'
+  const moduleNotes = []
+  const checkCommands = []
+  const manualChecks = ['- abrir `frontend/index.html`', '- revisar flujo mock de turnos']
+  if (activeModuleIds.includes('notifications')) {
+    moduleNotes.push('- notifications: no se enviaron notificaciones reales')
+    checkCommands.push('- `node --check backend/src/modules/notifications.js`', '- `node --check backend/src/routes/notifications.js`')
+    manualChecks.push('- revisar modulo de notificaciones mock')
+  }
+  if (activeModuleIds.includes('reports')) {
+    moduleNotes.push('- reports: no se generaron exportaciones reales')
+    checkCommands.push('- `node --check backend/src/modules/reports.js`', '- `node --check backend/src/routes/reports.js`')
+    manualChecks.push('- revisar modulo de reportes mock')
+  }
+  if (activeModuleIds.includes('inventory')) {
+    moduleNotes.push('- inventory: no se sincronizo stock con sistemas reales ni proveedores externos')
+    checkCommands.push('- `node --check backend/src/modules/inventory.js`', '- `node --check backend/src/routes/inventory.js`')
+    manualChecks.push('- revisar modulo de inventario y stock mock')
+  }
+  manualChecks.push('- revisar schema SQL', '- revisar seed SQL')
+  return `# Validacion local del proyecto
+
+## Proyecto
+
+- root: \`${projectRoot}\`
+- deliveryLevel: \`fullstack-local\`
+- dominio: \`${domain}\`
+- materializationLayer: \`local-deterministic\`
+
+## Fases revisadas
+
+- fullstack-local-scaffold: done
+- frontend-mock-flow: done
+- backend-contracts: done
+- database-design: done
+- local-validation: done
+
+## Modulos agregados
+
+${activeModuleIds.map((moduleId) => `- ${moduleId}: done`).join('\n')}
+${moduleNotes.join('\n')}
+
+## Checks de seguridad
+
+- no node_modules
+- no .env real
+- no Dockerfile
+- no docker-compose.yml
+- no deploy
+- no DB real activa
+- no servidor levantado
+- no integraciones externas reales
+
+## Checks recomendados
+
+${checkCommands.join('\n')}
+- \`node --check shared/contracts/domain.js\`
+- \`node --check shared/types/contracts.js\`
+- \`node --check backend/src/server.js\`
+- \`node --check backend/src/routes/health.js\`
+- \`node --check backend/src/modules/appointments.js\`
+- \`node --check backend/src/lib/response.js\`
+- \`node --check scripts/seed-local.js\`
+
+## Validaciones manuales pendientes
+
+${manualChecks.join('\n')}
+
+## Riesgos y limites
+
+- no se instalaron dependencias
+- no se levanto backend
+- no se abrio puerto
+- no se ejecuto base de datos
+- no se corrieron migraciones
+- no se ejecutaron seeds
+- no se hizo deploy
+- no se tocaron credenciales
+
+## Proximo paso recomendado
+
+- \`review-and-expand\`
+`
+}
+
+function buildSupportedModuleExpansionMaterializationPlan({
+  normalizedPlan,
+  localProjectManifest,
+}) {
+  if (
+    !normalizedPlan ||
+    !isSupportedMaterializableModuleExpansion(normalizedPlan.moduleId)
+  ) {
+    return null
+  }
+
+  const normalizedModuleId = normalizeModuleExpansionId(normalizedPlan.moduleId)
+  const projectRoot = normalizedPlan.projectRoot
+  const activeModuleIds = getModuleExpansionActiveMaterializableIds({
+    localProjectManifest,
+    currentModuleId: normalizedModuleId,
+  })
+  const backendModuleContent =
+    buildSupportedModuleBackendModuleContent(normalizedModuleId)
+  const backendRouteContent =
+    buildSupportedModuleBackendRouteContent(normalizedModuleId)
+  const moduleMarkers = buildModuleExpansionValidationMarkers(normalizedModuleId)
+
+  if (!backendModuleContent || !backendRouteContent || !moduleMarkers) {
+    return null
+  }
+
+  const mockDataPath = `${projectRoot}/frontend/src/mock-data.js`
+  const appPath = `${projectRoot}/frontend/src/components/App.js`
+  const stylesPath = `${projectRoot}/frontend/src/styles.css`
+  const backendModulePath = `${projectRoot}/backend/src/modules/${normalizedModuleId}.js`
+  const backendRoutePath = `${projectRoot}/backend/src/routes/${normalizedModuleId}.js`
+  const sharedDomainPath = `${projectRoot}/shared/contracts/domain.js`
+  const sharedTypesPath = `${projectRoot}/shared/types/contracts.js`
+  const schemaPath = `${projectRoot}/database/schema.sql`
+  const seedPath = `${projectRoot}/database/seeds/seed-local.sql`
+  const architecturePath = `${projectRoot}/docs/architecture.md`
+  const runbookPath = `${projectRoot}/docs/local-runbook.md`
+  const validationReportPath = `${projectRoot}/docs/validation-report.md`
+  const manifestPath = `${projectRoot}/jefe-project.json`
+  const updatedLocalProjectManifest = buildUpdatedLocalProjectManifestForModule({
+    existingManifest: localProjectManifest,
+    projectRoot,
+    moduleId: normalizedPlan.moduleId,
+    moduleName: normalizedPlan.moduleName,
+    touchedFiles: normalizedPlan.targetFiles,
+    layers: normalizedPlan.affectedLayers,
+  })
+  const updatedLocalProjectManifestContent = updatedLocalProjectManifest
+    ? `${JSON.stringify(updatedLocalProjectManifest, null, 2)}\n`
+    : ''
+
+  return {
+    tasks: [
+      {
+        step: 1,
+        title: `Materializar la expansion del modulo "${normalizedPlan.moduleName}" dentro de ${projectRoot}.`,
+        operation: 'create-or-edit-files',
+        targetPath: projectRoot,
+      },
+      {
+        step: 2,
+        title: 'Validar que la expansion quede acotada a archivos permitidos del proyecto local.',
+        operation: 'validate-scope',
+        targetPath: projectRoot,
+      },
+    ],
+    assumptions: [
+      'La expansion sigue siendo local, revisable y sin runtime real.',
+      'No se ejecutan SQL, seeds ni dependencias.',
+      'Package managers, deploy, Docker y credenciales siguen fuera de alcance.',
+    ],
+    instruction: [
+      `Materializar la expansion del modulo ${normalizedPlan.moduleName} dentro de ${projectRoot}.`,
+      `Usar solo estos targetPaths: ${normalizedPlan.allowedTargetPaths.join(', ')}`,
+      'No tocar package.json, node_modules, .env, Docker, deploy ni runtime real.',
+    ].join('\n'),
+    executionScope: normalizeExecutorExecutionScope({
+      allowedTargetPaths: normalizedPlan.allowedTargetPaths,
+      successCriteria: normalizedPlan.successCriteria,
+      enforceNarrowScope: true,
+    }),
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'module-expansion-materialization',
+      summary: `Expansion del modulo ${normalizedPlan.moduleName} actualizada dentro de "${projectRoot}".`,
+      strategy: 'materialize-module-expansion-plan',
+      reasoningLayer: 'local-rules',
+      materializationLayer: 'local-deterministic',
+      operations: [
+        { type: 'replace-file', targetPath: mockDataPath, nextContent: buildModuleExpansionMockDataContent(activeModuleIds) },
+        { type: 'replace-file', targetPath: appPath, nextContent: buildModuleExpansionAppContent() },
+        { type: 'replace-file', targetPath: stylesPath, nextContent: buildModuleExpansionStylesContent() },
+        { type: 'replace-file', targetPath: backendModulePath, nextContent: backendModuleContent },
+        { type: 'replace-file', targetPath: backendRoutePath, nextContent: backendRouteContent },
+        { type: 'replace-file', targetPath: sharedDomainPath, nextContent: buildModuleExpansionSharedDomainContent() },
+        { type: 'replace-file', targetPath: sharedTypesPath, nextContent: buildModuleExpansionSharedTypesContent() },
+        { type: 'replace-file', targetPath: schemaPath, nextContent: buildModuleExpansionSchemaContent(activeModuleIds) },
+        { type: 'replace-file', targetPath: seedPath, nextContent: buildModuleExpansionSeedContent(activeModuleIds) },
+        { type: 'replace-file', targetPath: architecturePath, nextContent: buildModuleExpansionArchitectureContent(activeModuleIds) },
+        { type: 'replace-file', targetPath: runbookPath, nextContent: buildModuleExpansionRunbookContent(activeModuleIds) },
+        { type: 'replace-file', targetPath: validationReportPath, nextContent: buildModuleExpansionValidationReportContent({ projectRoot, localProjectManifest, activeModuleIds }) },
+        ...(updatedLocalProjectManifestContent
+          ? [{ type: 'replace-file', targetPath: manifestPath, nextContent: updatedLocalProjectManifestContent }]
+          : []),
+      ],
+      validations: [
+        { type: 'exists', targetPath: backendModulePath, expectedKind: 'file' },
+        { type: 'exists', targetPath: backendRoutePath, expectedKind: 'file' },
+        { type: 'exists', targetPath: validationReportPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: manifestPath, expectedKind: 'file' },
+        { type: 'file-contains', targetPath: mockDataPath, expectedText: moduleMarkers.mockData },
+        { type: 'file-contains', targetPath: appPath, expectedText: moduleMarkers.app },
+        { type: 'file-contains', targetPath: backendModulePath, expectedText: moduleMarkers.module },
+        { type: 'file-contains', targetPath: backendRoutePath, expectedText: moduleMarkers.route },
+        { type: 'file-contains', targetPath: sharedDomainPath, expectedText: moduleMarkers.sharedDomain },
+        { type: 'file-contains', targetPath: sharedTypesPath, expectedText: moduleMarkers.sharedTypes },
+        { type: 'file-contains', targetPath: schemaPath, expectedText: moduleMarkers.schema },
+        { type: 'file-contains', targetPath: seedPath, expectedText: moduleMarkers.seed },
+        { type: 'file-contains', targetPath: architecturePath, expectedText: moduleMarkers.architecture },
+        { type: 'file-contains', targetPath: validationReportPath, expectedText: moduleMarkers.validationReport },
+        ...(updatedLocalProjectManifest
+          ? [
+              { type: 'file-contains', targetPath: manifestPath, expectedText: `"id": "${normalizedModuleId}"` },
+              { type: 'file-contains', targetPath: manifestPath, expectedText: `"id": "module-expansion-${normalizedModuleId}"` },
+              { type: 'file-contains', targetPath: manifestPath, expectedText: '"nextRecommendedPhase": "review-and-expand"' },
+            ]
+          : []),
+      ],
+    },
+    localProjectManifest: updatedLocalProjectManifest,
+  }
+}
+
 function buildModuleExpansionMaterializationPlan({
   moduleExpansionPlan,
   localProjectManifest,
@@ -20729,6 +22279,16 @@ function buildModuleExpansionMaterializationPlan({
     !isSupportedMaterializableModuleExpansion(normalizedPlan.moduleId)
   ) {
     return null
+  }
+
+  const supportedModuleMaterializationPlan =
+    buildSupportedModuleExpansionMaterializationPlan({
+      normalizedPlan,
+      localProjectManifest,
+    })
+
+  if (supportedModuleMaterializationPlan) {
+    return supportedModuleMaterializationPlan
   }
 
   const projectRoot = normalizedPlan.projectRoot
