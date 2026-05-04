@@ -11815,13 +11815,17 @@ function buildImplementationRoadmap({
   scalableDeliveryPlan,
   projectBlueprint,
   questionPolicy,
+  moduleExpansionPlan,
 }) {
   const normalizedBlueprint = normalizeProjectBlueprintContract(projectBlueprint)
   const normalizedScalablePlan =
     normalizeScalableDeliveryPlanContract(scalableDeliveryPlan)
   const normalizedQuestionPolicy = normalizeQuestionPolicyContract(questionPolicy)
+  const normalizedModuleExpansionPlan =
+    normalizeModuleExpansionPlanContract(moduleExpansionPlan)
   const normalizedDeliveryLevel =
     normalizedBlueprint?.deliveryLevel ||
+    (normalizedModuleExpansionPlan?.projectRoot ? 'fullstack-local' : '') ||
     normalizedScalablePlan?.deliveryLevel ||
     'safe-first-delivery'
 
@@ -11830,7 +11834,12 @@ function buildImplementationRoadmap({
   }
 
   const rootPaths = summarizeUniqueExecutorStrings(
-    normalizedScalablePlan?.allowedRootPaths || [],
+    [
+      ...(normalizedScalablePlan?.allowedRootPaths || []),
+      ...(normalizedModuleExpansionPlan?.projectRoot
+        ? [normalizedModuleExpansionPlan.projectRoot]
+        : []),
+    ],
     8,
   )
   const projectSlug =
@@ -12233,6 +12242,33 @@ function buildImplementationRoadmap({
     })
   }
 
+  if (normalizedDeliveryLevel === 'fullstack-local' && normalizedModuleExpansionPlan) {
+    pushPhase({
+      id: `module-expansion-${normalizedModuleExpansionPlan.moduleId}`,
+      title: `Expansion de modulo ${normalizedModuleExpansionPlan.moduleName || normalizedModuleExpansionPlan.moduleId}`,
+      goal:
+        normalizedModuleExpansionPlan.reason ||
+        'Ampliar el proyecto local con un modulo nuevo y revisable.',
+      deliveryLevel: 'fullstack-local',
+      status:
+        strategy === 'materialize-module-expansion-plan'
+          ? 'ready'
+          : normalizedModuleExpansionPlan.safeToMaterialize
+            ? 'planned'
+            : 'blocked',
+      executableNow: strategy === 'materialize-module-expansion-plan',
+      approvalRequired: normalizedModuleExpansionPlan.approvalRequired === true,
+      riskLevel: normalizedModuleExpansionPlan.riskLevel || 'medium',
+      expectedOutputs: normalizedModuleExpansionPlan.targetFiles,
+      allowedRootPaths: [normalizedModuleExpansionPlan.projectRoot],
+      dependencies: ['review-and-expand'],
+      validationStrategy: summarizeUniqueExecutorStrings(
+        normalizedModuleExpansionPlan.validationPlan?.commands || [],
+        10,
+      ),
+    })
+  }
+
   const nextRecommendedPhase =
     phases.find((phase) => phase.status === 'ready' || phase.status === 'planned')?.id ||
     phases[0]?.id ||
@@ -12240,18 +12276,25 @@ function buildImplementationRoadmap({
   const suggestedNextAction =
     hasSensitiveBlockingQuestions
       ? 'Resolver bloqueos sensibles antes de habilitar cualquier materialización o runtime real.'
-      : normalizedDeliveryLevel === 'frontend-project'
-        ? 'Revisar el plan frontend y preparar la materialización local controlada.'
-        : normalizedDeliveryLevel === 'fullstack-local'
-          ? 'Revisar el blueprint fullstack y preparar el scaffold local revisable.'
-          : normalizedDeliveryLevel === 'monorepo-local'
-            ? 'Revisar la arquitectura del monorepo y dejar workspaces/runtime como propuesta futura.'
-            : 'Revisar el plan de infraestructura local y separar aprobaciones sensibles.'
+      : strategy === 'materialize-module-expansion-plan'
+        ? 'Revisar la expansión del módulo y decidir si conviene volver a review-and-expand.'
+        : strategy === 'prepare-module-expansion-plan'
+          ? 'Revisar la expansión propuesta del módulo antes de materializarla.'
+          : normalizedDeliveryLevel === 'frontend-project'
+            ? 'Revisar el plan frontend y preparar la materialización local controlada.'
+            : normalizedDeliveryLevel === 'fullstack-local'
+              ? 'Revisar el blueprint fullstack y preparar el scaffold local revisable.'
+              : normalizedDeliveryLevel === 'monorepo-local'
+                ? 'Revisar la arquitectura del monorepo y dejar workspaces/runtime como propuesta futura.'
+                : 'Revisar el plan de infraestructura local y separar aprobaciones sensibles.'
   const currentPhase =
     strategy === 'materialize-frontend-project-plan'
       ? 'materialize-frontend-local'
       : strategy === 'materialize-fullstack-local-plan'
         ? 'scaffold-fullstack-local'
+        : strategy === 'prepare-module-expansion-plan' ||
+            strategy === 'materialize-module-expansion-plan'
+          ? `module-expansion-${normalizedModuleExpansionPlan?.moduleId || 'local'}`
         : phases[0]?.id || ''
 
   return {
@@ -12296,6 +12339,7 @@ function buildValidationPlan({
   implementationRoadmap,
   projectPhaseExecutionPlan,
   localProjectManifest,
+  moduleExpansionPlan,
 }) {
   const normalizedScalablePlan =
     normalizeScalableDeliveryPlanContract(scalableDeliveryPlan)
@@ -12311,6 +12355,8 @@ function buildValidationPlan({
     normalizeProjectPhaseExecutionPlanContract(projectPhaseExecutionPlan)
   const normalizedLocalProjectManifest =
     normalizeLocalProjectManifestContract(localProjectManifest)
+  const normalizedModuleExpansionPlan =
+    normalizeModuleExpansionPlanContract(moduleExpansionPlan)
   const normalizedDeliveryLevel =
     typeof deliveryLevel === 'string' && deliveryLevel.trim()
       ? deliveryLevel.trim()
@@ -12327,6 +12373,14 @@ function buildValidationPlan({
     normalizedProjectPhaseExecutionPlan?.validationPlan
   ) {
     return normalizedProjectPhaseExecutionPlan.validationPlan
+  }
+
+  if (
+    (strategy === 'prepare-module-expansion-plan' ||
+      strategy === 'materialize-module-expansion-plan') &&
+    normalizedModuleExpansionPlan?.validationPlan
+  ) {
+    return normalizedModuleExpansionPlan.validationPlan
   }
 
   if (strategy === 'materialize-frontend-project-plan') {
@@ -12485,6 +12539,7 @@ function buildPhaseExpansionPlan({
   scalableDeliveryPlan,
   validationPlan,
   projectPhaseExecutionPlan,
+  moduleExpansionPlan,
 }) {
   const normalizedScalablePlan =
     normalizeScalableDeliveryPlanContract(scalableDeliveryPlan)
@@ -12492,6 +12547,8 @@ function buildPhaseExpansionPlan({
     validationPlan && typeof validationPlan === 'object' ? validationPlan : null
   const normalizedProjectPhaseExecutionPlan =
     normalizeProjectPhaseExecutionPlanContract(projectPhaseExecutionPlan)
+  const normalizedModuleExpansionPlan =
+    normalizeModuleExpansionPlanContract(moduleExpansionPlan)
   const rootFolder =
     summarizeUniqueExecutorStrings(normalizedScalablePlan?.allowedRootPaths, 1)[0] || ''
 
@@ -12609,6 +12666,33 @@ function buildPhaseExpansionPlan({
     }
   }
 
+  if (
+    strategy === 'materialize-module-expansion-plan' &&
+    normalizedModuleExpansionPlan?.moduleId
+  ) {
+    return {
+      phaseId: 'review-and-expand',
+      goal: 'Volver a revisar el proyecto local para decidir la siguiente expansion segura despues del modulo agregado.',
+      targetFiles: [
+        `${normalizedModuleExpansionPlan.projectRoot}/docs/validation-report.md`,
+        `${normalizedModuleExpansionPlan.projectRoot}/docs/local-runbook.md`,
+        `${normalizedModuleExpansionPlan.projectRoot}/jefe-project.json`,
+      ],
+      changesExpected: [
+        'Revisar la expansion materializada y su alcance local',
+        'Elegir una nueva expansion o una mejora sobre el modulo ya agregado',
+        'Mantener la siguiente decision en modo planner-only',
+      ],
+      risks: [
+        'Confundir una expansion local cerrada con habilitacion de runtime real o dependencias nuevas.',
+      ],
+      validationPlan: normalizedValidationPlan,
+      executableNow: false,
+      approvalRequired: false,
+      nextExpectedAction: 'review-module-expansion',
+    }
+  }
+
   if (strategy === 'materialize-frontend-project-plan') {
     return {
       phaseId: 'frontend-flow-refinement',
@@ -12668,6 +12752,7 @@ function buildNextActionPlan({
   questionPolicy,
   projectPhaseExecutionPlan,
   localProjectManifest,
+  moduleExpansionPlan,
 }) {
   const normalizedScalablePlan =
     normalizeScalableDeliveryPlanContract(scalableDeliveryPlan)
@@ -12676,6 +12761,8 @@ function buildNextActionPlan({
     normalizeProjectPhaseExecutionPlanContract(projectPhaseExecutionPlan)
   const normalizedLocalProjectManifest =
     normalizeLocalProjectManifestContract(localProjectManifest)
+  const normalizedModuleExpansionPlan =
+    normalizeModuleExpansionPlanContract(moduleExpansionPlan)
   const deliveryLevel = normalizedScalablePlan?.deliveryLevel || ''
   const hasBlockingQuestions =
     Array.isArray(normalizedQuestionPolicy?.blockingQuestions) &&
@@ -12853,6 +12940,72 @@ function buildNextActionPlan({
     }
   }
 
+  if (strategy === 'prepare-module-expansion-plan' && normalizedModuleExpansionPlan) {
+    const moduleBlockers = summarizeUniqueExecutorStrings(
+      normalizedModuleExpansionPlan.blockers,
+      8,
+    )
+    return {
+      currentState: `module-expansion-review:${normalizedModuleExpansionPlan.moduleId}`,
+      recommendedAction:
+        moduleBlockers.length > 0
+          ? 'Revisar el bloqueo actual y decidir si conviene extender o mejorar el modulo existente.'
+          : normalizedModuleExpansionPlan.safeToMaterialize
+            ? 'Revisar la expansion del modulo y, si esta correcta, preparar la materializacion segura.'
+            : 'Revisar la expansion del modulo antes de materializarla.',
+      actionType:
+        moduleBlockers.length > 0
+          ? 'review-plan'
+          : normalizedModuleExpansionPlan.safeToMaterialize
+            ? 'expand-next-phase'
+            : 'review-plan',
+      targetStrategy:
+        moduleBlockers.length > 0
+          ? 'prepare-module-expansion-plan'
+          : normalizedModuleExpansionPlan.safeToMaterialize
+            ? 'materialize-module-expansion-plan'
+            : 'prepare-module-expansion-plan',
+      targetDeliveryLevel: 'fullstack-local',
+      reason:
+        moduleBlockers.length > 0
+          ? moduleBlockers.join(' ')
+          : normalizedModuleExpansionPlan.reason ||
+            'Se detecto una expansion segura de modulo para el proyecto local.',
+      safeToRunNow:
+        moduleBlockers.length === 0 &&
+        normalizedModuleExpansionPlan.safeToMaterialize === true,
+      requiresApproval: normalizedModuleExpansionPlan.approvalRequired === true,
+      userFacingLabel:
+        moduleBlockers.length > 0
+          ? 'Revisar bloqueo de modulo'
+          : `Preparar modulo ${normalizedModuleExpansionPlan.moduleName || normalizedModuleExpansionPlan.moduleId}`,
+      technicalLabel: `prepare-module-${normalizedModuleExpansionPlan.moduleId}`,
+      expectedOutcome:
+        moduleBlockers.length > 0
+          ? 'Evitar una materializacion duplicada o fuera de orden.'
+          : 'Dejar lista una expansion de modulo acotada a archivos permitidos.',
+    }
+  }
+
+  if (strategy === 'materialize-module-expansion-plan' && normalizedModuleExpansionPlan) {
+    return {
+      currentState: `module-expansion-materialization:${normalizedModuleExpansionPlan.moduleId}`,
+      recommendedAction: `Ejecutar la materializacion controlada del modulo ${normalizedModuleExpansionPlan.moduleName || normalizedModuleExpansionPlan.moduleId}.`,
+      actionType: 'execute-materialization',
+      targetStrategy: 'materialize-module-expansion-plan',
+      targetDeliveryLevel: 'fullstack-local',
+      reason:
+        normalizedModuleExpansionPlan.reason ||
+        'La expansion del modulo ya quedo delimitada a archivos locales y revisables.',
+      safeToRunNow: normalizedModuleExpansionPlan.safeToMaterialize === true,
+      requiresApproval: normalizedModuleExpansionPlan.approvalRequired === true,
+      userFacingLabel: `Materializar modulo ${normalizedModuleExpansionPlan.moduleName || normalizedModuleExpansionPlan.moduleId}`,
+      technicalLabel: `materialize-module-${normalizedModuleExpansionPlan.moduleId}`,
+      expectedOutcome:
+        'Actualizar solo las capas permitidas del proyecto local y volver a review-and-expand.',
+    }
+  }
+
   if (strategy === 'scalable-delivery-plan' && deliveryLevel === 'frontend-project') {
     return {
       currentState: 'frontend-project-planner-review',
@@ -12955,6 +13108,8 @@ function buildPlanningArchitectureBundle({
   materializationPlan,
   projectPhaseExecutionPlan,
   localProjectManifest,
+  expansionOptions,
+  moduleExpansionPlan,
 }) {
   const provisionalBlueprint = buildProjectBlueprint({
     goal,
@@ -12997,6 +13152,7 @@ function buildPlanningArchitectureBundle({
     scalableDeliveryPlan,
     projectBlueprint,
     questionPolicy,
+    moduleExpansionPlan,
   })
   const validationPlan = buildValidationPlan({
     strategy,
@@ -13006,12 +13162,14 @@ function buildPlanningArchitectureBundle({
     implementationRoadmap,
     projectPhaseExecutionPlan,
     localProjectManifest,
+    moduleExpansionPlan,
   })
   const phaseExpansionPlan = buildPhaseExpansionPlan({
     strategy,
     scalableDeliveryPlan,
     validationPlan,
     projectPhaseExecutionPlan,
+    moduleExpansionPlan,
   })
   const nextActionPlan = buildNextActionPlan({
     strategy,
@@ -13021,6 +13179,7 @@ function buildPlanningArchitectureBundle({
     questionPolicy,
     projectPhaseExecutionPlan,
     localProjectManifest,
+    moduleExpansionPlan,
   })
 
   return {
@@ -13034,6 +13193,8 @@ function buildPlanningArchitectureBundle({
       projectPhaseExecutionPlan,
     ),
     localProjectManifest: normalizeLocalProjectManifestContract(localProjectManifest),
+    expansionOptions: normalizeExpansionOptionsContract(expansionOptions),
+    moduleExpansionPlan: normalizeModuleExpansionPlanContract(moduleExpansionPlan),
   }
 }
 
@@ -15568,6 +15729,176 @@ function normalizeProjectPhaseExecutionPlanContract(value) {
   return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
 }
 
+function normalizeExpansionOptionsContract(value) {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const normalizedOptions = Array.isArray(value.options)
+    ? value.options
+        .map((entry) =>
+          entry && typeof entry === 'object'
+            ? {
+                ...(typeof entry.id === 'string' && entry.id.trim()
+                  ? { id: entry.id.trim() }
+                  : {}),
+                ...(typeof entry.label === 'string' && entry.label.trim()
+                  ? { label: entry.label.trim() }
+                  : {}),
+                ...(typeof entry.description === 'string' && entry.description.trim()
+                  ? { description: entry.description.trim() }
+                  : {}),
+                ...(typeof entry.expansionType === 'string' && entry.expansionType.trim()
+                  ? { expansionType: entry.expansionType.trim() }
+                  : {}),
+                ...(typeof entry.riskLevel === 'string' && entry.riskLevel.trim()
+                  ? { riskLevel: entry.riskLevel.trim() }
+                  : {}),
+                ...(typeof entry.safeToPrepare === 'boolean'
+                  ? { safeToPrepare: entry.safeToPrepare }
+                  : {}),
+                ...(typeof entry.safeToMaterialize === 'boolean'
+                  ? { safeToMaterialize: entry.safeToMaterialize }
+                  : {}),
+                ...(typeof entry.requiresApproval === 'boolean'
+                  ? { requiresApproval: entry.requiresApproval }
+                  : {}),
+                ...(typeof entry.targetStrategy === 'string' &&
+                entry.targetStrategy.trim()
+                  ? { targetStrategy: entry.targetStrategy.trim() }
+                  : {}),
+                ...(summarizeUniqueExecutorStrings(entry.expectedFiles, 16).length > 0
+                  ? {
+                      expectedFiles: summarizeUniqueExecutorStrings(
+                        entry.expectedFiles,
+                        16,
+                      ),
+                    }
+                  : {}),
+                ...(typeof entry.reason === 'string' && entry.reason.trim()
+                  ? { reason: entry.reason.trim() }
+                  : {}),
+              }
+            : null,
+        )
+        .filter((entry) => entry && Object.keys(entry).length > 0)
+    : []
+
+  const normalizedValue = {
+    ...(typeof value.projectRoot === 'string' && value.projectRoot.trim()
+      ? { projectRoot: value.projectRoot.trim() }
+      : {}),
+    ...(typeof value.currentPhase === 'string' && value.currentPhase.trim()
+      ? { currentPhase: value.currentPhase.trim() }
+      : {}),
+    ...(typeof value.recommendedOptionId === 'string' &&
+    value.recommendedOptionId.trim()
+      ? { recommendedOptionId: value.recommendedOptionId.trim() }
+      : {}),
+    ...(normalizedOptions.length > 0 ? { options: normalizedOptions } : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
+function normalizeModuleExpansionPlanContract(value) {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const normalizedExpectedChanges = Array.isArray(value.expectedChanges)
+    ? value.expectedChanges
+        .map((entry) =>
+          entry && typeof entry === 'object'
+            ? {
+                ...(typeof entry.layer === 'string' && entry.layer.trim()
+                  ? { layer: entry.layer.trim() }
+                  : {}),
+                ...(typeof entry.targetPath === 'string' && entry.targetPath.trim()
+                  ? { targetPath: entry.targetPath.trim() }
+                  : {}),
+                ...(typeof entry.purpose === 'string' && entry.purpose.trim()
+                  ? { purpose: entry.purpose.trim() }
+                  : {}),
+              }
+            : null,
+        )
+        .filter((entry) => entry && Object.keys(entry).length > 0)
+    : []
+
+  const normalizedValue = {
+    ...(typeof value.moduleId === 'string' && value.moduleId.trim()
+      ? { moduleId: value.moduleId.trim() }
+      : {}),
+    ...(typeof value.moduleName === 'string' && value.moduleName.trim()
+      ? { moduleName: value.moduleName.trim() }
+      : {}),
+    ...(typeof value.projectRoot === 'string' && value.projectRoot.trim()
+      ? { projectRoot: value.projectRoot.trim() }
+      : {}),
+    ...(typeof value.domain === 'string' && value.domain.trim()
+      ? { domain: value.domain.trim() }
+      : {}),
+    ...(typeof value.expansionType === 'string' && value.expansionType.trim()
+      ? { expansionType: value.expansionType.trim() }
+      : {}),
+    ...(typeof value.reason === 'string' && value.reason.trim()
+      ? { reason: value.reason.trim() }
+      : {}),
+    ...(typeof value.safeToPrepare === 'boolean'
+      ? { safeToPrepare: value.safeToPrepare }
+      : {}),
+    ...(typeof value.safeToMaterialize === 'boolean'
+      ? { safeToMaterialize: value.safeToMaterialize }
+      : {}),
+    ...(typeof value.approvalRequired === 'boolean'
+      ? { approvalRequired: value.approvalRequired }
+      : {}),
+    ...(typeof value.riskLevel === 'string' && value.riskLevel.trim()
+      ? { riskLevel: value.riskLevel.trim() }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.affectedLayers, 12).length > 0
+      ? { affectedLayers: summarizeUniqueExecutorStrings(value.affectedLayers, 12) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.targetFiles, 20).length > 0
+      ? { targetFiles: summarizeUniqueExecutorStrings(value.targetFiles, 20) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.allowedTargetPaths, 20).length > 0
+      ? {
+          allowedTargetPaths: summarizeUniqueExecutorStrings(
+            value.allowedTargetPaths,
+            20,
+          ),
+        }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.forbiddenPaths, 16).length > 0
+      ? { forbiddenPaths: summarizeUniqueExecutorStrings(value.forbiddenPaths, 16) }
+      : {}),
+    ...(normalizedExpectedChanges.length > 0
+      ? { expectedChanges: normalizedExpectedChanges }
+      : {}),
+    ...(normalizeValidationPlanContract(value.validationPlan)
+      ? { validationPlan: normalizeValidationPlanContract(value.validationPlan) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.explicitExclusions, 16).length > 0
+      ? {
+          explicitExclusions: summarizeUniqueExecutorStrings(
+            value.explicitExclusions,
+            16,
+          ),
+        }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.successCriteria, 16).length > 0
+      ? { successCriteria: summarizeUniqueExecutorStrings(value.successCriteria, 16) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.blockers, 12).length > 0
+      ? { blockers: summarizeUniqueExecutorStrings(value.blockers, 12) }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
 function normalizeLocalProjectManifestContract(value) {
   if (!value || typeof value !== 'object') {
     return null
@@ -15586,6 +15917,34 @@ function normalizeLocalProjectManifestContract(value) {
                   : {}),
                 ...(typeof entry.createdAt === 'string' && entry.createdAt.trim()
                   ? { createdAt: entry.createdAt.trim() }
+                  : {}),
+                ...(summarizeUniqueExecutorStrings(entry.files, 20).length > 0
+                  ? { files: summarizeUniqueExecutorStrings(entry.files, 20) }
+                  : {}),
+              }
+            : null,
+        )
+        .filter((entry) => entry && Object.keys(entry).length > 0)
+    : []
+  const normalizedModules = Array.isArray(value.modules)
+    ? value.modules
+        .map((entry) =>
+          entry && typeof entry === 'object'
+            ? {
+                ...(typeof entry.id === 'string' && entry.id.trim()
+                  ? { id: entry.id.trim() }
+                  : {}),
+                ...(typeof entry.name === 'string' && entry.name.trim()
+                  ? { name: entry.name.trim() }
+                  : {}),
+                ...(typeof entry.status === 'string' && entry.status.trim()
+                  ? { status: entry.status.trim() }
+                  : {}),
+                ...(typeof entry.addedAt === 'string' && entry.addedAt.trim()
+                  ? { addedAt: entry.addedAt.trim() }
+                  : {}),
+                ...(summarizeUniqueExecutorStrings(entry.layers, 12).length > 0
+                  ? { layers: summarizeUniqueExecutorStrings(entry.layers, 12) }
                   : {}),
                 ...(summarizeUniqueExecutorStrings(entry.files, 20).length > 0
                   ? { files: summarizeUniqueExecutorStrings(entry.files, 20) }
@@ -15616,6 +15975,7 @@ function normalizeLocalProjectManifestContract(value) {
       ? { materializationLayer: value.materializationLayer.trim() }
       : {}),
     ...(normalizedPhases.length > 0 ? { phases: normalizedPhases } : {}),
+    ...(normalizedModules.length > 0 ? { modules: normalizedModules } : {}),
     ...(summarizeUniqueExecutorStrings(value.forbiddenPaths, 12).length > 0
       ? { forbiddenPaths: summarizeUniqueExecutorStrings(value.forbiddenPaths, 12) }
       : {}),
@@ -15642,6 +16002,81 @@ function getLocalProjectManifestPhaseEntry(localProjectManifest, phaseId) {
     normalizedManifest.phases.find((entry) => entry && entry.id === normalizedPhaseId) ||
     null
   )
+}
+
+function getLocalProjectManifestModuleEntry(localProjectManifest, moduleId) {
+  const normalizedManifest =
+    normalizeLocalProjectManifestContract(localProjectManifest)
+  const normalizedModuleId =
+    typeof moduleId === 'string' && moduleId.trim()
+      ? moduleId.trim().toLocaleLowerCase()
+      : ''
+
+  if (!normalizedManifest || !normalizedModuleId) {
+    return null
+  }
+
+  return (
+    (Array.isArray(normalizedManifest.modules) ? normalizedManifest.modules : []).find(
+      (entry) =>
+        entry &&
+        typeof entry.id === 'string' &&
+        entry.id.trim().toLocaleLowerCase() === normalizedModuleId,
+    ) || null
+  )
+}
+
+function normalizeModuleExpansionId(value) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return ''
+  }
+
+  const normalizedValue = normalizeSectorDetectionText(value)
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .trim()
+
+  if (!normalizedValue) {
+    return ''
+  }
+
+  if (normalizedValue.includes('notificaciones')) {
+    return 'notifications'
+  }
+  if (normalizedValue.includes('notifications')) {
+    return 'notifications'
+  }
+
+  return normalizedValue.replace(/\s+/g, '-')
+}
+
+const SUPPORTED_MATERIALIZABLE_MODULE_EXPANSIONS = new Set(['notifications'])
+
+function isSupportedMaterializableModuleExpansion(moduleId) {
+  const normalizedModuleId = normalizeModuleExpansionId(moduleId)
+  return Boolean(
+    normalizedModuleId &&
+      SUPPORTED_MATERIALIZABLE_MODULE_EXPANSIONS.has(normalizedModuleId),
+  )
+}
+
+function getUnsupportedModuleExpansionMaterializationBlocker(moduleId, moduleName) {
+  const normalizedModuleId = normalizeModuleExpansionId(moduleId)
+  const displayName =
+    typeof moduleName === 'string' && moduleName.trim()
+      ? moduleName.trim()
+      : buildModuleExpansionDisplayName(normalizedModuleId)
+
+  if (!normalizedModuleId || isSupportedMaterializableModuleExpansion(normalizedModuleId)) {
+    return ''
+  }
+
+  return `Todavia no existe un materializador seguro para el modulo ${displayName}. Primero hace falta preparar ese soporte o revisarlo manualmente.`
+}
+
+function buildModuleExpansionDisplayName(moduleId) {
+  return moduleId === 'notifications'
+    ? 'Notificaciones'
+    : sanitizeBusinessSectorLabel(moduleId.replace(/-/g, ' ')) || 'Modulo local'
 }
 
 function getProjectPhasePrerequisiteBlockers({
@@ -15988,6 +16423,92 @@ function detectProjectPhasePlanningIntent(goal, context) {
   }
 }
 
+function detectModuleExpansionPlanningIntent(goal, context) {
+  const rawTexts = [goal, context].filter(
+    (value) => typeof value === 'string' && value.trim(),
+  )
+  const combinedText = rawTexts.join(' ')
+  const normalizedText = normalizeSectorDetectionText(combinedText)
+
+  if (!normalizedText) {
+    return {
+      matches: false,
+      action: 'prepare',
+      moduleId: '',
+      moduleName: '',
+      explicitSignals: [],
+    }
+  }
+
+  const wantsMaterialize =
+    normalizedText.includes('materialize-module-expansion-plan') ||
+    /\bmaterializ(?:ar|acion|ación)\b/u.test(normalizedText)
+  const wantsPrepare =
+    normalizedText.includes('prepare-module-expansion-plan') ||
+    /\bprepar(?:ar|a|acion|ación)\b/u.test(normalizedText) ||
+    /\brevisar\b/u.test(normalizedText)
+  const referencesModuleExpansion =
+    normalizedText.includes('expansion de modulo') ||
+    normalizedText.includes('expansion del modulo') ||
+    normalizedText.includes('module expansion') ||
+    normalizedText.includes('nuevo modulo') ||
+    normalizedText.includes('modulo de notificaciones') ||
+    normalizedText.includes('modulo notificaciones')
+
+  const explicitModuleContext =
+    extractPlannerContextLineValue(rawTexts, ['moduleId', 'module id', 'modulo', 'module']) ||
+    ''
+  let moduleName = ''
+  const regexMatches = [
+    combinedText.match(/expansi[oó]n(?:\s+de|\s+del)?\s+m[oó]dulo(?:\s+de)?\s+([a-z0-9áéíóúñ -]+)/iu),
+    combinedText.match(/m[oó]dulo(?:\s+de)?\s+([a-z0-9áéíóúñ -]+)/iu),
+  ]
+  for (const regexMatch of regexMatches) {
+    if (regexMatch && typeof regexMatch[1] === 'string' && regexMatch[1].trim()) {
+      moduleName = regexMatch[1].trim()
+      break
+    }
+  }
+  if (moduleName) {
+    moduleName = moduleName
+      .replace(
+        /\b(?:para|del?|en)\s+(?:el|la)\s+proyecto\b.*$/iu,
+        '',
+      )
+      .replace(/\b(?:para|del?|en)\s+proyecto\b.*$/iu, '')
+      .trim()
+  }
+  if (!moduleName && explicitModuleContext.trim()) {
+    moduleName = explicitModuleContext.trim()
+  }
+  if (!moduleName && normalizedText.includes('notificaciones')) {
+    moduleName = 'notificaciones'
+  }
+  if (!moduleName && normalizedText.includes('notifications')) {
+    moduleName = 'notifications'
+  }
+
+  const moduleId = normalizeModuleExpansionId(moduleName)
+
+  return {
+    matches:
+      referencesModuleExpansion &&
+      (wantsPrepare || wantsMaterialize) &&
+      Boolean(moduleId),
+    action: wantsMaterialize ? 'materialize' : 'prepare',
+    moduleId,
+    moduleName: buildModuleExpansionDisplayName(moduleId),
+    explicitSignals: summarizeUniqueExecutorStrings(
+      [
+        wantsPrepare ? 'prepare-module' : '',
+        wantsMaterialize ? 'materialize-module' : '',
+        moduleId,
+      ],
+      6,
+    ),
+  }
+}
+
 function buildLocalProjectManifest({
   rootFolder,
   domain,
@@ -16045,9 +16566,290 @@ function buildLocalProjectManifest({
           `${rootFolder}/docs/architecture.md`,
         ],
       },
+      {
+        id: 'local-validation',
+        status: 'available',
+        createdAt: 'pending-phase-expansion',
+        files: [
+          `${rootFolder}/docs/validation-report.md`,
+          `${rootFolder}/docs/local-runbook.md`,
+          `${rootFolder}/jefe-project.json`,
+        ],
+      },
+      {
+        id: 'review-and-expand',
+        status: 'available',
+        createdAt: 'pending-phase-expansion',
+        files: [
+          `${rootFolder}/docs/validation-report.md`,
+          `${rootFolder}/docs/local-runbook.md`,
+          `${rootFolder}/jefe-project.json`,
+        ],
+      },
     ],
+    modules: [],
     forbiddenPaths: summarizeUniqueExecutorStrings(forbiddenPaths, 12),
     nextRecommendedPhase: nextRecommendedPhase || 'frontend-mock-flow',
+  }
+}
+
+function buildReviewAndExpandExpansionOptions({
+  projectRoot,
+  localProjectManifest,
+}) {
+  const normalizedManifest =
+    normalizeLocalProjectManifestContract(localProjectManifest)
+
+  if (!normalizedManifest || !projectRoot) {
+    return null
+  }
+
+  const moduleAlreadyExists =
+    getLocalProjectManifestModuleEntry(normalizedManifest, 'notifications')?.status ===
+    'done'
+  const notificationsCanMaterialize =
+    isSupportedMaterializableModuleExpansion('notifications') && !moduleAlreadyExists
+  const optionFiles = {
+    notifications: [
+      `${projectRoot}/frontend/src/mock-data.js`,
+      `${projectRoot}/frontend/src/components/App.js`,
+      `${projectRoot}/frontend/src/styles.css`,
+      `${projectRoot}/backend/src/modules/notifications.js`,
+      `${projectRoot}/backend/src/routes/notifications.js`,
+      `${projectRoot}/shared/contracts/domain.js`,
+      `${projectRoot}/shared/types/contracts.js`,
+      `${projectRoot}/database/schema.sql`,
+      `${projectRoot}/database/seeds/seed-local.sql`,
+      `${projectRoot}/docs/architecture.md`,
+      `${projectRoot}/docs/local-runbook.md`,
+      `${projectRoot}/docs/validation-report.md`,
+      `${projectRoot}/jefe-project.json`,
+    ],
+    agenda: [
+      `${projectRoot}/frontend/src/mock-data.js`,
+      `${projectRoot}/frontend/src/components/App.js`,
+      `${projectRoot}/frontend/src/styles.css`,
+      `${projectRoot}/docs/local-runbook.md`,
+    ],
+    backendContracts: [
+      `${projectRoot}/backend/src/modules/appointments.js`,
+      `${projectRoot}/backend/src/routes/health.js`,
+      `${projectRoot}/shared/contracts/domain.js`,
+      `${projectRoot}/shared/types/contracts.js`,
+      `${projectRoot}/docs/architecture.md`,
+    ],
+    databaseAudit: [
+      `${projectRoot}/database/schema.sql`,
+      `${projectRoot}/database/seeds/seed-local.sql`,
+      `${projectRoot}/docs/architecture.md`,
+    ],
+  }
+
+  return {
+    projectRoot,
+    currentPhase: 'review-and-expand',
+    recommendedOptionId: moduleAlreadyExists ? 'agenda-availability' : 'notifications',
+    options: [
+      {
+        id: 'notifications',
+        label: 'Nuevo módulo de notificaciones mock',
+        description:
+          'Agregar un módulo local de notificaciones mock conectado con pacientes y turnos.',
+        expansionType: 'new-domain-module',
+        riskLevel: 'medium',
+        safeToPrepare: true,
+        safeToMaterialize: notificationsCanMaterialize,
+        requiresApproval: false,
+        targetStrategy: notificationsCanMaterialize
+          ? 'materialize-module-expansion-plan'
+          : 'prepare-module-expansion-plan',
+        expectedFiles: optionFiles.notifications,
+        reason: moduleAlreadyExists
+          ? 'El proyecto ya contiene notificaciones y conviene revisar una mejora o extensión en vez de recrearlo.'
+          : notificationsCanMaterialize
+            ? 'Es la expansión más coherente después de la validación local porque amplía valor funcional sin activar runtime real.'
+            : 'Todavía no existe un materializador seguro para notificaciones y conviene revisarlo como plan antes de ejecutar.',
+      },
+      {
+        id: 'agenda-availability',
+        label: 'Mejorar agenda y disponibilidad',
+        description:
+          'Refinar el flujo mock de agenda, disponibilidad y estados visibles del frontend local.',
+        expansionType: 'frontend-improvement',
+        riskLevel: 'low',
+        safeToPrepare: true,
+        safeToMaterialize: false,
+        requiresApproval: false,
+        targetStrategy: 'prepare-project-phase-plan',
+        expectedFiles: optionFiles.agenda,
+        reason: 'Permite pulir la experiencia local sin tocar integraciones reales.',
+      },
+      {
+        id: 'appointments-contract-extension',
+        label: 'Extender contratos backend',
+        description:
+          'Ampliar contratos y handlers conceptuales del dominio de turnos sin levantar servicios.',
+        expansionType: 'backend-contract-extension',
+        riskLevel: 'medium',
+        safeToPrepare: true,
+        safeToMaterialize: false,
+        requiresApproval: false,
+        targetStrategy: 'prepare-module-expansion-plan',
+        expectedFiles: optionFiles.backendContracts,
+        reason: 'Sirve para crecer la capa de contratos compartidos antes de cualquier API real.',
+      },
+      {
+        id: 'database-audit-extension',
+        label: 'Extender diseño de base',
+        description:
+          'Agregar auditoría y eventos al diseño SQL local sin ejecutar una DB real.',
+        expansionType: 'database-extension',
+        riskLevel: 'medium',
+        safeToPrepare: true,
+        safeToMaterialize: false,
+        requiresApproval: false,
+        targetStrategy: 'prepare-module-expansion-plan',
+        expectedFiles: optionFiles.databaseAudit,
+        reason: 'Ayuda a preparar crecimiento del dominio conservando todo en modo documental.',
+      },
+      {
+        id: 'auth-real-approval',
+        label: 'Preparar auth real',
+        description:
+          'Separar una futura integración de autenticación real como decisión con aprobación.',
+        expansionType: 'approval-required',
+        riskLevel: 'high',
+        safeToPrepare: true,
+        safeToMaterialize: false,
+        requiresApproval: true,
+        targetStrategy: 'prepare-project-phase-plan',
+        expectedFiles: [`${projectRoot}/docs/architecture.md`, `${projectRoot}/docs/local-runbook.md`],
+        reason: 'Auth real implica dependencias, credenciales y runtime fuera del alcance seguro actual.',
+      },
+      {
+        id: 'dependency-install-approval',
+        label: 'Preparar instalación de dependencias',
+        description:
+          'Dejar explícito el plan de instalación futura sin ejecutar npm install ni abrir runtime.',
+        expansionType: 'approval-required',
+        riskLevel: 'high',
+        safeToPrepare: true,
+        safeToMaterialize: false,
+        requiresApproval: true,
+        targetStrategy: 'prepare-project-phase-plan',
+        expectedFiles: [`${projectRoot}/docs/local-runbook.md`],
+        reason: 'Instalar dependencias cambia el modo de trabajo y requiere aprobación futura.',
+      },
+    ],
+  }
+}
+
+function buildUpdatedLocalProjectManifestForModule({
+  existingManifest,
+  projectRoot,
+  moduleId,
+  moduleName,
+  touchedFiles,
+  layers,
+}) {
+  const normalizedExistingManifest =
+    normalizeLocalProjectManifestContract(existingManifest)
+  const normalizedProjectRoot =
+    typeof projectRoot === 'string' && projectRoot.trim()
+      ? projectRoot.trim().replace(/[\\/]+/g, '/')
+      : ''
+  const normalizedModuleId = normalizeModuleExpansionId(moduleId)
+
+  if (
+    !normalizedExistingManifest ||
+    !normalizedProjectRoot ||
+    !normalizedModuleId ||
+    normalizedExistingManifest.deliveryLevel !== 'fullstack-local'
+  ) {
+    return null
+  }
+
+  const normalizedTouchedFiles = summarizeUniqueExecutorStrings(touchedFiles, 24)
+  const modulePhaseId = `module-expansion-${normalizedModuleId}`
+  const existingModules = Array.isArray(normalizedExistingManifest.modules)
+    ? normalizedExistingManifest.modules
+    : []
+  const updatedModules = existingModules
+    .filter(
+      (entry) =>
+        !(
+          entry &&
+          typeof entry.id === 'string' &&
+          entry.id.trim().toLocaleLowerCase() === normalizedModuleId
+        ),
+    )
+    .concat([
+      {
+        id: normalizedModuleId,
+        name: moduleName || buildModuleExpansionDisplayName(normalizedModuleId),
+        status: 'done',
+        addedAt: 'local-deterministic-module-materialization',
+        layers: summarizeUniqueExecutorStrings(layers, 12),
+        files: normalizedTouchedFiles,
+      },
+    ])
+  const updatedPhases = Array.isArray(normalizedExistingManifest.phases)
+    ? normalizedExistingManifest.phases.map((entry) => {
+        if (!entry || typeof entry !== 'object') {
+          return entry
+        }
+
+        if (entry.id === modulePhaseId) {
+          return {
+            ...entry,
+            status: 'done',
+            createdAt: 'local-deterministic-module-materialization',
+            files: normalizedTouchedFiles,
+          }
+        }
+
+        if (entry.id === 'review-and-expand') {
+          return {
+            ...entry,
+            status: 'available',
+          }
+        }
+
+        return entry
+      })
+    : []
+
+  if (!updatedPhases.some((entry) => entry && entry.id === modulePhaseId)) {
+    updatedPhases.push({
+      id: modulePhaseId,
+      status: 'done',
+      createdAt: 'local-deterministic-module-materialization',
+      files: normalizedTouchedFiles,
+    })
+  }
+
+  return {
+    version:
+      Number.isFinite(normalizedExistingManifest.version) &&
+      normalizedExistingManifest.version > 0
+        ? normalizedExistingManifest.version
+        : 1,
+    projectType:
+      normalizedExistingManifest.projectType ||
+      normalizedExistingManifest.deliveryLevel ||
+      'fullstack-local',
+    domain: normalizedExistingManifest.domain || 'proyecto local',
+    deliveryLevel: normalizedExistingManifest.deliveryLevel || 'fullstack-local',
+    createdBy: normalizedExistingManifest.createdBy || 'ai-orchestrator',
+    materializationLayer:
+      normalizedExistingManifest.materializationLayer || 'local-deterministic',
+    phases: updatedPhases,
+    modules: updatedModules,
+    forbiddenPaths: summarizeUniqueExecutorStrings(
+      normalizedExistingManifest.forbiddenPaths,
+      12,
+    ),
+    nextRecommendedPhase: 'review-and-expand',
   }
 }
 
@@ -16166,6 +16968,9 @@ function buildUpdatedLocalProjectManifestForPhase({
     materializationLayer:
       normalizedExistingManifest.materializationLayer || 'local-deterministic',
     phases: updatedPhases,
+    modules: Array.isArray(normalizedExistingManifest.modules)
+      ? normalizedExistingManifest.modules
+      : [],
     forbiddenPaths: summarizeUniqueExecutorStrings(
       normalizedExistingManifest.forbiddenPaths,
       12,
@@ -16730,6 +17535,268 @@ function buildProjectPhaseExecutionPlan({
   }
 
   return null
+}
+
+function getModuleExpansionPrerequisiteBlockers({
+  moduleId,
+  localProjectManifest,
+}) {
+  const normalizedManifest =
+    normalizeLocalProjectManifestContract(localProjectManifest)
+  const normalizedModuleId = normalizeModuleExpansionId(moduleId)
+
+  if (!normalizedManifest || !normalizedModuleId) {
+    return {
+      blockers: [],
+      nextRecommendedPhase: '',
+    }
+  }
+
+  const getPhaseStatus = (targetPhaseId) =>
+    String(
+      getLocalProjectManifestPhaseEntry(normalizedManifest, targetPhaseId)?.status || '',
+    )
+      .trim()
+      .toLocaleLowerCase()
+  const localValidationStatus = getPhaseStatus('local-validation')
+  const reviewAndExpandStatus = getPhaseStatus('review-and-expand')
+  const blockers = []
+
+  if (localValidationStatus !== 'done') {
+    blockers.push('Primero debe completarse local-validation.')
+  }
+
+  if (localValidationStatus === 'done' && !reviewAndExpandStatus) {
+    blockers.push('Primero debe quedar disponible review-and-expand.')
+  }
+
+  if (getLocalProjectManifestModuleEntry(normalizedManifest, normalizedModuleId)?.status === 'done') {
+    blockers.push(
+      `El modulo ${normalizedModuleId} ya existe en este proyecto y conviene mejorarlo o extenderlo en vez de recrearlo.`,
+    )
+  }
+
+  return {
+    blockers: summarizeUniqueExecutorStrings(blockers, 8),
+    nextRecommendedPhase:
+      normalizedManifest.nextRecommendedPhase || 'review-and-expand',
+  }
+}
+
+function buildModuleExpansionPlan({
+  strategy,
+  moduleId,
+  moduleName,
+  inferredProjectState,
+}) {
+  const normalizedManifest = normalizeLocalProjectManifestContract(
+    inferredProjectState?.manifest,
+  )
+  const projectRoot =
+    typeof inferredProjectState?.projectRootRelativePath === 'string' &&
+    inferredProjectState.projectRootRelativePath.trim()
+      ? inferredProjectState.projectRootRelativePath.trim().replace(/[\\/]+/g, '/')
+      : ''
+  const normalizedModuleId = normalizeModuleExpansionId(moduleId)
+  const normalizedModuleName =
+    typeof moduleName === 'string' && moduleName.trim()
+      ? moduleName.trim()
+      : buildModuleExpansionDisplayName(normalizedModuleId)
+
+  if (
+    !normalizedManifest ||
+    !projectRoot ||
+    normalizedManifest.deliveryLevel !== 'fullstack-local' ||
+    !normalizedModuleId
+  ) {
+    return null
+  }
+
+  const forbiddenPaths =
+    normalizedManifest.forbiddenPaths && normalizedManifest.forbiddenPaths.length > 0
+      ? normalizedManifest.forbiddenPaths
+      : ['node_modules', '.env', 'docker-compose.yml', 'Dockerfile', 'deploy']
+  const projectDomain = normalizedManifest.domain || 'proyecto local'
+  const phasePrerequisiteState = getModuleExpansionPrerequisiteBlockers({
+    moduleId: normalizedModuleId,
+    localProjectManifest: normalizedManifest,
+  })
+  const materializationSupported =
+    isSupportedMaterializableModuleExpansion(normalizedModuleId)
+  const unsupportedMaterializationBlocker =
+    getUnsupportedModuleExpansionMaterializationBlocker(
+      normalizedModuleId,
+      normalizedModuleName,
+    )
+  const combinedBlockers = summarizeUniqueExecutorStrings(
+    [
+      ...phasePrerequisiteState.blockers,
+      unsupportedMaterializationBlocker,
+    ],
+    10,
+  )
+  const blockedFromMaterialization = combinedBlockers.length > 0
+  const manifestPath = `${projectRoot}/jefe-project.json`
+  const affectedLayers = ['frontend', 'backend', 'shared', 'database', 'docs', 'manifest']
+  const targetFiles = normalizedModuleId === 'notifications'
+    ? [
+        `${projectRoot}/frontend/src/mock-data.js`,
+        `${projectRoot}/frontend/src/components/App.js`,
+        `${projectRoot}/frontend/src/styles.css`,
+        `${projectRoot}/backend/src/modules/notifications.js`,
+        `${projectRoot}/backend/src/routes/notifications.js`,
+        `${projectRoot}/shared/contracts/domain.js`,
+        `${projectRoot}/shared/types/contracts.js`,
+        `${projectRoot}/database/schema.sql`,
+        `${projectRoot}/database/seeds/seed-local.sql`,
+        `${projectRoot}/docs/architecture.md`,
+        `${projectRoot}/docs/local-runbook.md`,
+        `${projectRoot}/docs/validation-report.md`,
+        manifestPath,
+      ]
+    : [
+        `${projectRoot}/frontend/src/mock-data.js`,
+        `${projectRoot}/frontend/src/components/App.js`,
+        `${projectRoot}/frontend/src/styles.css`,
+        `${projectRoot}/backend/src/modules/${normalizedModuleId}.js`,
+        `${projectRoot}/backend/src/routes/${normalizedModuleId}.js`,
+        `${projectRoot}/shared/contracts/domain.js`,
+        `${projectRoot}/shared/types/contracts.js`,
+        `${projectRoot}/database/schema.sql`,
+        `${projectRoot}/database/seeds/seed-local.sql`,
+        `${projectRoot}/docs/architecture.md`,
+        `${projectRoot}/docs/local-runbook.md`,
+        `${projectRoot}/docs/validation-report.md`,
+        manifestPath,
+      ]
+  const validationPlan = {
+    scope: `${projectRoot}:module-expansion:${normalizedModuleId}`,
+    level: materializationSupported ? 'full' : 'medium',
+    commands: materializationSupported
+      ? [
+          `node --check ${projectRoot}/backend/src/modules/${normalizedModuleId}.js`,
+          `node --check ${projectRoot}/backend/src/routes/${normalizedModuleId}.js`,
+          `node --check ${projectRoot}/shared/contracts/domain.js`,
+          `node --check ${projectRoot}/shared/types/contracts.js`,
+        ]
+      : [],
+    fileChecks: targetFiles.map((targetPath) => ({
+      path: targetPath,
+      expectation:
+        targetPath.endsWith('jefe-project.json')
+          ? materializationSupported
+            ? 'Debe registrar el modulo agregado y volver a review-and-expand.'
+            : 'Debe servir como referencia de plan sin registrar todavia una materializacion inexistente.'
+          : materializationSupported
+            ? 'Debe ampliar el proyecto local sin activar runtime real ni dependencias nuevas.'
+            : 'Debe quedar como archivo objetivo de un plan revisable, no como cambio ejecutable inmediato.',
+    })),
+    forbiddenPaths: summarizeUniqueExecutorStrings(
+      [
+        ...forbiddenPaths,
+        `${projectRoot}/package.json`,
+        `${projectRoot}/backend/package.json`,
+        `${projectRoot}/frontend/package.json`,
+      ],
+      20,
+    ),
+    runtimeChecks: [],
+    manualChecks: materializationSupported
+      ? [
+          'Revisar el frontend mock y confirmar que no use fetch ni backend real.',
+          'Revisar el modulo backend nuevo como JS puro sin listen() ni servicios externos.',
+          'Revisar schema.sql y seed-local.sql como diseno local no ejecutado.',
+          'Confirmar que validation-report.md refleje que no se enviaron notificaciones reales.',
+        ]
+      : [
+          'Revisar si conviene implementar un materializador seguro antes de prometer ejecucion.',
+          'Confirmar que la propuesta siga en modo planner-only y no habilite runtime real.',
+          'Definir si el modulo nuevo requiere una revision manual o una futura materializacion segura dedicada.',
+        ],
+    successCriteria: materializationSupported
+      ? [
+          'Actualizar solo frontend, backend, shared, database, docs y jefe-project.json dentro del proyecto generado.',
+          'Mantener package.json, node_modules, .env, Docker, deploy y runtime real fuera de alcance.',
+        ]
+      : [
+          'Mantener la expansion como plan revisable sin materializationPlan ejecutable.',
+          'No prometer runtime real ni creacion automatica de archivos para modulos sin soporte seguro.',
+        ],
+  }
+
+  return {
+    moduleId: normalizedModuleId,
+    moduleName: normalizedModuleName,
+    projectRoot,
+    domain: projectDomain,
+    expansionType: 'new-domain-module',
+    reason: combinedBlockers.length > 0
+      ? combinedBlockers.join(' ')
+      : `Agregar el modulo ${normalizedModuleName} como expansion local y revisable del proyecto ${projectDomain}.`,
+    safeToPrepare: true,
+    safeToMaterialize:
+      blockedFromMaterialization || !materializationSupported ? false : true,
+    approvalRequired: false,
+    riskLevel: 'medium',
+    affectedLayers,
+    targetFiles,
+    allowedTargetPaths: targetFiles,
+    forbiddenPaths: summarizeUniqueExecutorStrings(
+      [
+        ...forbiddenPaths,
+        'package.json',
+        'backend/package.json',
+        'frontend/package.json',
+      ],
+      20,
+    ),
+    expectedChanges: [
+      {
+        layer: 'frontend',
+        targetPath: `${projectRoot}/frontend/src/mock-data.js`,
+        purpose: 'Agregar datos mock y vistas locales del nuevo modulo.',
+      },
+      {
+        layer: 'backend',
+        targetPath: `${projectRoot}/backend/src/modules/${normalizedModuleId}.js`,
+        purpose: 'Agregar helpers puros y handlers conceptuales del nuevo modulo.',
+      },
+      {
+        layer: 'shared',
+        targetPath: `${projectRoot}/shared/contracts/domain.js`,
+        purpose: 'Ampliar contratos compartidos y tipos del dominio.',
+      },
+      {
+        layer: 'database',
+        targetPath: `${projectRoot}/database/schema.sql`,
+        purpose: 'Actualizar el diseño SQL local con la nueva entidad o relacion mock.',
+      },
+      {
+        layer: 'docs',
+        targetPath: `${projectRoot}/docs/validation-report.md`,
+        purpose: 'Reflejar la expansion local sin afirmar ejecuciones reales.',
+      },
+      {
+        layer: 'manifest',
+        targetPath: manifestPath,
+        purpose: 'Registrar el modulo agregado y volver a review-and-expand.',
+      },
+    ],
+    validationPlan,
+    explicitExclusions: [
+      'package.json',
+      'node_modules',
+      '.env',
+      'docker-compose.yml',
+      'Dockerfile',
+      'deploy',
+      'runtime real',
+      'servidores',
+      'puertos',
+    ],
+    successCriteria: validationPlan.successCriteria,
+    blockers: combinedBlockers,
+  }
 }
 
 function buildProjectPhaseMaterializationPlan({
@@ -18451,6 +19518,8 @@ function buildBrainDecisionContract({
   phaseExpansionPlan,
   projectPhaseExecutionPlan,
   localProjectManifest,
+  expansionOptions,
+  moduleExpansionPlan,
   materializationPlan,
   finalResult,
 }) {
@@ -18556,6 +19625,12 @@ function buildBrainDecisionContract({
       : {}),
     ...(normalizeLocalProjectManifestContract(localProjectManifest)
       ? { localProjectManifest: normalizeLocalProjectManifestContract(localProjectManifest) }
+      : {}),
+    ...(normalizeExpansionOptionsContract(expansionOptions)
+      ? { expansionOptions: normalizeExpansionOptionsContract(expansionOptions) }
+      : {}),
+    ...(normalizeModuleExpansionPlanContract(moduleExpansionPlan)
+      ? { moduleExpansionPlan: normalizeModuleExpansionPlanContract(moduleExpansionPlan) }
       : {}),
     ...(materializationPlan && typeof materializationPlan === 'object'
       ? { materializationPlan }
@@ -19639,6 +20714,1208 @@ function getResolvedDecisionRecord(resolvedDecisionMap, ...decisionKeys) {
   }
 
   return null
+}
+
+function buildModuleExpansionMaterializationPlan({
+  moduleExpansionPlan,
+  localProjectManifest,
+}) {
+  const normalizedPlan = normalizeModuleExpansionPlanContract(moduleExpansionPlan)
+
+  if (
+    !normalizedPlan ||
+    normalizedPlan.safeToMaterialize !== true ||
+    summarizeUniqueExecutorStrings(normalizedPlan.blockers, 8).length > 0 ||
+    !isSupportedMaterializableModuleExpansion(normalizedPlan.moduleId)
+  ) {
+    return null
+  }
+
+  const projectRoot = normalizedPlan.projectRoot
+  const mockDataPath = `${projectRoot}/frontend/src/mock-data.js`
+  const appPath = `${projectRoot}/frontend/src/components/App.js`
+  const stylesPath = `${projectRoot}/frontend/src/styles.css`
+  const notificationsModulePath = `${projectRoot}/backend/src/modules/notifications.js`
+  const notificationsRoutePath = `${projectRoot}/backend/src/routes/notifications.js`
+  const sharedDomainPath = `${projectRoot}/shared/contracts/domain.js`
+  const sharedTypesPath = `${projectRoot}/shared/types/contracts.js`
+  const schemaPath = `${projectRoot}/database/schema.sql`
+  const seedPath = `${projectRoot}/database/seeds/seed-local.sql`
+  const architecturePath = `${projectRoot}/docs/architecture.md`
+  const runbookPath = `${projectRoot}/docs/local-runbook.md`
+  const validationReportPath = `${projectRoot}/docs/validation-report.md`
+  const manifestPath = `${projectRoot}/jefe-project.json`
+
+  const mockDataContent = `export const fullstackPlan = {
+  overview: {
+    name: 'Turnos medicos local',
+    mode: 'module-expansion-notifications',
+    deliveryLevel: 'fullstack-local',
+  },
+  specialties: [
+    'Clinica medica',
+    'Pediatria',
+    'Cardiologia',
+    'Dermatologia',
+  ],
+  professionals: [
+    { id: 'PRO-001', name: 'Dra. Ana Gomez', specialty: 'Clinica medica', status: 'disponible' },
+    { id: 'PRO-002', name: 'Dr. Pablo Ruiz', specialty: 'Pediatria', status: 'consultorio ocupado' },
+    { id: 'PRO-003', name: 'Dra. Marta Diaz', specialty: 'Cardiologia', status: 'disponible' },
+  ],
+  patients: [
+    { id: 'PAC-001', name: 'Lucia Perez', plan: 'Particular', status: 'confirmado' },
+    { id: 'PAC-002', name: 'Martin Suarez', plan: 'Prepaga', status: 'pendiente' },
+    { id: 'PAC-003', name: 'Camila Torres', plan: 'OSDE', status: 'en espera' },
+  ],
+  availability: [
+    { professional: 'Dra. Ana Gomez', slot: '09:30', state: 'libre' },
+    { professional: 'Dr. Pablo Ruiz', slot: '10:15', state: 'reservado' },
+    { professional: 'Dra. Marta Diaz', slot: '11:00', state: 'libre' },
+  ],
+  appointments: [
+    { id: 'APT-001', patient: 'Lucia Perez', professional: 'Dra. Ana Gomez', specialty: 'Clinica medica', slot: '2026-05-03 09:30', status: 'confirmado' },
+    { id: 'APT-002', patient: 'Martin Suarez', professional: 'Dr. Pablo Ruiz', specialty: 'Pediatria', slot: '2026-05-03 10:15', status: 'pendiente' },
+    { id: 'APT-003', patient: 'Camila Torres', professional: 'Dra. Marta Diaz', specialty: 'Cardiologia', slot: '2026-05-03 11:00', status: 'en espera' },
+  ],
+  notifications: [
+    { id: 'NOT-001', appointmentId: 'APT-001', patient: 'Lucia Perez', type: 'appointment-confirmation', status: 'pending', channel: 'email', detail: 'Confirmacion mock previa al turno.' },
+    { id: 'NOT-002', appointmentId: 'APT-002', patient: 'Martin Suarez', type: 'appointment-reminder', status: 'sent-mock', channel: 'sms', detail: 'Recordatorio local enviado de forma simulada.' },
+    { id: 'NOT-003', appointmentId: 'APT-003', patient: 'Camila Torres', type: 'appointment-reschedule', status: 'read', channel: 'dashboard', detail: 'La paciente reviso una reprogramacion mock.' },
+    { id: 'NOT-004', appointmentId: 'APT-002', patient: 'Martin Suarez', type: 'appointment-cancellation', status: 'failed-mock', channel: 'email', detail: 'Fallo simulado sin servicios externos.' },
+  ],
+  notificationActions: [
+    'Marcar como leida',
+    'Simular envio',
+    'Revisar detalle',
+  ],
+  quickActions: [
+    'Reservar turno mock',
+    'Reprogramar disponibilidad',
+    'Confirmar llegada',
+    'Cancelar sin impacto real',
+  ],
+  summary: {
+    appointmentsToday: 18,
+    activeProfessionals: 7,
+    pendingConfirmations: 5,
+    specialties: 4,
+    notificationsPending: 1,
+    notificationsRead: 1,
+  },
+}
+`
+  const appContent = `export function renderApp(fullstackPlan) {
+  const specialties = Array.isArray(fullstackPlan?.specialties) ? fullstackPlan.specialties : []
+  const professionals = Array.isArray(fullstackPlan?.professionals) ? fullstackPlan.professionals : []
+  const patients = Array.isArray(fullstackPlan?.patients) ? fullstackPlan.patients : []
+  const availability = Array.isArray(fullstackPlan?.availability) ? fullstackPlan.availability : []
+  const appointments = Array.isArray(fullstackPlan?.appointments) ? fullstackPlan.appointments : []
+  const notifications = Array.isArray(fullstackPlan?.notifications) ? fullstackPlan.notifications : []
+  const quickActions = Array.isArray(fullstackPlan?.quickActions) ? fullstackPlan.quickActions : []
+  const notificationActions = Array.isArray(fullstackPlan?.notificationActions)
+    ? fullstackPlan.notificationActions
+    : []
+  const summary = fullstackPlan?.summary || {}
+
+  return \`
+    <main class="app-shell phase-shell">
+      <section class="hero phase-hero">
+        <span class="chip">Module expansion</span>
+        <h1>\${fullstackPlan?.overview?.name || 'Turnos medicos local'}</h1>
+        <p>
+          Expansion local del proyecto con un modulo de notificaciones mock, sin backend real,
+          sin dependencias instaladas y sin envios reales.
+        </p>
+        <div class="chip-row">
+          \${specialties.map((item) => \`<span class="chip chip-secondary">\${item}</span>\`).join('')}
+        </div>
+      </section>
+
+      <section class="summary-grid">
+        <article class="panel stat-panel"><span>Turnos del dia</span><strong>\${summary.appointmentsToday || 0}</strong></article>
+        <article class="panel stat-panel"><span>Profesionales activos</span><strong>\${summary.activeProfessionals || 0}</strong></article>
+        <article class="panel stat-panel"><span>Notificaciones pendientes</span><strong>\${summary.notificationsPending || 0}</strong></article>
+        <article class="panel stat-panel"><span>Notificaciones leidas</span><strong>\${summary.notificationsRead || 0}</strong></article>
+      </section>
+
+      <div class="phase-grid">
+        <section class="panel">
+          <h2>Pacientes</h2>
+          <ul class="list-grid">
+            \${patients.map((patient) => \`<li><strong>\${patient.name}</strong><span>\${patient.plan}</span><em>\${patient.status}</em></li>\`).join('')}
+          </ul>
+        </section>
+        <section class="panel">
+          <h2>Profesionales</h2>
+          <ul class="list-grid">
+            \${professionals.map((professional) => \`<li><strong>\${professional.name}</strong><span>\${professional.specialty}</span><em>\${professional.status}</em></li>\`).join('')}
+          </ul>
+        </section>
+        <section class="panel">
+          <h2>Disponibilidad</h2>
+          <ul class="list-grid">
+            \${availability.map((slot) => \`<li><strong>\${slot.professional}</strong><span>\${slot.slot}</span><em>\${slot.state}</em></li>\`).join('')}
+          </ul>
+        </section>
+        <section class="panel">
+          <h2>Acciones mock</h2>
+          <ul class="list-grid">
+            \${quickActions.map((action) => \`<li><strong>\${action}</strong><span>Solo local</span><em>Sin backend real</em></li>\`).join('')}
+          </ul>
+        </section>
+      </div>
+
+      <section class="panel appointment-panel">
+        <h2>Turnos y estados</h2>
+        <div class="appointment-table">
+          \${appointments
+            .map(
+              (appointment) => \`<article class="appointment-card"><div><strong>\${appointment.patient}</strong><span>\${appointment.specialty}</span></div><div><span>\${appointment.professional}</span><em>\${appointment.slot}</em></div><div class="status-pill">\${appointment.status}</div></article>\`,
+            )
+            .join('')}
+        </div>
+      </section>
+
+      <section class="panel notification-panel">
+        <div class="panel-header">
+          <h2>Notificaciones mock</h2>
+          <div class="chip-row">
+            \${notificationActions.map((action) => \`<span class="chip chip-action">\${action}</span>\`).join('')}
+          </div>
+        </div>
+        <div class="notification-list">
+          \${notifications
+            .map(
+              (notification) => \`<article class="notification-card"><div><strong>\${notification.patient}</strong><span>\${notification.type}</span><p>\${notification.detail}</p></div><div><span class="notification-channel">\${notification.channel}</span><span class="notification-status notification-status-\${notification.status}">\${notification.status}</span><em>\${notification.appointmentId}</em></div></article>\`,
+            )
+            .join('')}
+        </div>
+      </section>
+    </main>
+  \`
+}
+`
+  const stylesContent = `:root {
+  color-scheme: light;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: #edf4ff;
+  color: #0f172a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(14, 165, 233, 0.18), transparent 32%),
+    radial-gradient(circle at top right, rgba(34, 197, 94, 0.12), transparent 28%),
+    linear-gradient(180deg, #f8fbff 0%, #e9f2ff 100%);
+}
+
+.app-shell {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0 48px;
+}
+
+.hero,
+.panel,
+.stat-panel {
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+}
+
+.phase-hero {
+  padding: 30px;
+}
+
+.phase-hero h1 {
+  margin: 0;
+  font-size: clamp(2.1rem, 4vw, 3.1rem);
+}
+
+.phase-hero p,
+.panel p,
+.panel li span,
+.panel li em {
+  color: #475569;
+}
+
+.chip-row,
+.summary-grid,
+.phase-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.chip-row {
+  margin-top: 18px;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.chip {
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #0f3d68;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.chip-secondary {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.chip-action {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.summary-grid {
+  margin-top: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.stat-panel {
+  padding: 18px;
+}
+
+.stat-panel span {
+  display: block;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.stat-panel strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.85rem;
+}
+
+.phase-grid {
+  margin-top: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.panel {
+  padding: 20px;
+}
+
+.panel h2 {
+  margin: 0 0 14px;
+  font-size: 1.05rem;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.list-grid {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+
+.list-grid li,
+.appointment-card,
+.notification-card {
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.04);
+  padding: 14px;
+}
+
+.list-grid strong,
+.appointment-card strong,
+.notification-card strong {
+  display: block;
+  color: #0f172a;
+}
+
+.list-grid span,
+.appointment-card span,
+.appointment-card em,
+.notification-card span,
+.notification-card em {
+  display: block;
+  margin-top: 4px;
+}
+
+.appointment-panel,
+.notification-panel {
+  margin-top: 20px;
+}
+
+.appointment-table,
+.notification-list {
+  display: grid;
+  gap: 12px;
+}
+
+.appointment-card,
+.notification-card {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.status-pill,
+.notification-status {
+  align-self: start;
+  justify-self: start;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.status-pill,
+.notification-status-pending {
+  background: #e0f2fe;
+  color: #0c4a6e;
+}
+
+.notification-status-sent-mock {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.notification-status-read {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.notification-status-failed-mock {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.notification-channel {
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    width: min(100% - 20px, 1180px);
+    padding: 20px 0 34px;
+  }
+
+  .phase-hero,
+  .panel,
+  .stat-panel {
+    border-radius: 20px;
+  }
+}
+`
+  const notificationsModuleContent = `const {
+  NOTIFICATION_STATUSES,
+  NOTIFICATION_TYPES,
+} = require('../../../shared/contracts/domain.js')
+
+function normalizeNotificationRecord(record = {}) {
+  return {
+    id: String(record.id || '').trim(),
+    appointmentId: String(record.appointmentId || '').trim(),
+    patientId: String(record.patientId || '').trim(),
+    type: NOTIFICATION_TYPES.includes(record.type)
+      ? record.type
+      : 'appointment-confirmation',
+    status: NOTIFICATION_STATUSES.includes(record.status)
+      ? record.status
+      : 'pending',
+    channel: String(record.channel || 'dashboard').trim(),
+    detail: String(record.detail || '').trim(),
+    createdAt: String(record.createdAt || 'local-notification'),
+    updatedAt: String(record.updatedAt || 'local-notification'),
+  }
+}
+
+function createNotificationDraft(overrides = {}) {
+  return normalizeNotificationRecord({
+    id: 'NOT-LOCAL',
+    appointmentId: 'APT-LOCAL',
+    patientId: 'PAT-LOCAL',
+    type: 'appointment-confirmation',
+    status: 'pending',
+    channel: 'dashboard',
+    detail: 'Borrador local de notificacion.',
+    ...overrides,
+  })
+}
+
+function markNotificationAsRead(record) {
+  const normalizedRecord = normalizeNotificationRecord(record)
+  return {
+    ...normalizedRecord,
+    status: 'read',
+    updatedAt: 'local-notification-read',
+  }
+}
+
+function simulateNotificationDispatch(record) {
+  const normalizedRecord = normalizeNotificationRecord(record)
+  return {
+    ...normalizedRecord,
+    status: normalizedRecord.status === 'failed-mock' ? 'failed-mock' : 'sent-mock',
+    updatedAt: 'local-notification-dispatch',
+  }
+}
+
+function filterNotificationsByStatus(records, status) {
+  const normalizedRecords = Array.isArray(records)
+    ? records.map((record) => normalizeNotificationRecord(record))
+    : []
+  return status
+    ? normalizedRecords.filter((record) => record.status === status)
+    : normalizedRecords
+}
+
+function getNotificationSummary(records) {
+  const normalizedRecords = Array.isArray(records)
+    ? records.map((record) => normalizeNotificationRecord(record))
+    : []
+  return NOTIFICATION_STATUSES.reduce(
+    (accumulator, status) => ({
+      ...accumulator,
+      [status]: normalizedRecords.filter((record) => record.status === status).length,
+    }),
+    {
+      total: normalizedRecords.length,
+    },
+  )
+}
+
+module.exports = {
+  normalizeNotificationRecord,
+  createNotificationDraft,
+  markNotificationAsRead,
+  simulateNotificationDispatch,
+  filterNotificationsByStatus,
+  getNotificationSummary,
+}
+`
+  const notificationsRouteContent = `const {
+  createNotificationDraft,
+  filterNotificationsByStatus,
+  getNotificationSummary,
+  markNotificationAsRead,
+  simulateNotificationDispatch,
+} = require('../modules/notifications.js')
+const { okResponse } = require('../lib/response.js')
+
+function createNotificationsRouteDefinition() {
+  return {
+    method: 'GET',
+    path: '/notifications',
+    description:
+      'Ruta conceptual y revisable para notificaciones mock, sin Express real ni puertos.',
+  }
+}
+
+function listNotificationsHandler(records = [], filters = {}) {
+  return okResponse({
+    items: filterNotificationsByStatus(records, filters.status),
+    summary: getNotificationSummary(records),
+  })
+}
+
+function previewNotificationDraftHandler(overrides = {}) {
+  return okResponse({
+    draft: createNotificationDraft(overrides),
+  })
+}
+
+function simulateNotificationDispatchHandler(record = {}) {
+  return okResponse({
+    notification: simulateNotificationDispatch(record),
+  })
+}
+
+function markNotificationAsReadHandler(record = {}) {
+  return okResponse({
+    notification: markNotificationAsRead(record),
+  })
+}
+
+module.exports = {
+  createNotificationsRouteDefinition,
+  listNotificationsHandler,
+  previewNotificationDraftHandler,
+  simulateNotificationDispatchHandler,
+  markNotificationAsReadHandler,
+}
+`
+  const sharedDomainContent = `const APPOINTMENT_STATUSES = [
+  'scheduled',
+  'confirmed',
+  'checked-in',
+  'completed',
+  'cancelled',
+  'no-show',
+]
+
+const APPOINTMENT_TRANSITIONS = {
+  scheduled: ['confirmed', 'cancelled'],
+  confirmed: ['checked-in', 'cancelled', 'no-show'],
+  'checked-in': ['completed', 'cancelled'],
+  completed: [],
+  cancelled: [],
+  'no-show': [],
+}
+
+const NOTIFICATION_TYPES = [
+  'appointment-confirmation',
+  'appointment-reminder',
+  'appointment-reschedule',
+  'appointment-cancellation',
+]
+
+const NOTIFICATION_STATUSES = [
+  'pending',
+  'sent-mock',
+  'read',
+  'failed-mock',
+]
+
+const DOMAIN_ENTITY_NAMES = {
+  patient: 'Patient',
+  professional: 'Professional',
+  specialty: 'Specialty',
+  appointment: 'Appointment',
+  availabilitySlot: 'AvailabilitySlot',
+  notification: 'Notification',
+}
+
+function createPatientContract(overrides = {}) {
+  return {
+    id: 'PAT-001',
+    fullName: 'Paciente local',
+    documentNumber: 'DNI-LOCAL',
+    contactPhone: '000-000-000',
+    status: 'active',
+    ...overrides,
+  }
+}
+
+function createProfessionalContract(overrides = {}) {
+  return {
+    id: 'PRO-001',
+    fullName: 'Profesional local',
+    specialtyId: 'SPC-001',
+    status: 'available',
+    ...overrides,
+  }
+}
+
+function createSpecialtyContract(overrides = {}) {
+  return {
+    id: 'SPC-001',
+    name: 'Clinica medica',
+    status: 'active',
+    ...overrides,
+  }
+}
+
+function createAvailabilitySlotContract(overrides = {}) {
+  return {
+    id: 'SLT-001',
+    professionalId: 'PRO-001',
+    startAt: '2026-05-03T09:30:00',
+    endAt: '2026-05-03T10:00:00',
+    state: 'free',
+    ...overrides,
+  }
+}
+
+function createAppointmentContract(overrides = {}) {
+  return {
+    id: 'APT-001',
+    patientId: 'PAT-001',
+    professionalId: 'PRO-001',
+    specialtyId: 'SPC-001',
+    slotId: 'SLT-001',
+    status: 'scheduled',
+    notes: [],
+    ...overrides,
+  }
+}
+
+function createNotificationContract(overrides = {}) {
+  return {
+    id: 'NOT-001',
+    appointmentId: 'APT-001',
+    patientId: 'PAT-001',
+    type: 'appointment-confirmation',
+    status: 'pending',
+    channel: 'dashboard',
+    detail: 'Notificacion mock local',
+    ...overrides,
+  }
+}
+
+module.exports = {
+  APPOINTMENT_STATUSES,
+  APPOINTMENT_TRANSITIONS,
+  NOTIFICATION_TYPES,
+  NOTIFICATION_STATUSES,
+  DOMAIN_ENTITY_NAMES,
+  createPatientContract,
+  createProfessionalContract,
+  createSpecialtyContract,
+  createAvailabilitySlotContract,
+  createAppointmentContract,
+  createNotificationContract,
+}
+`
+  const sharedTypesContent = `/**
+ * @typedef {Object} PatientRecord
+ * @property {string} id
+ * @property {string} fullName
+ * @property {string} documentNumber
+ * @property {string} contactPhone
+ * @property {string} status
+ */
+
+/**
+ * @typedef {Object} ProfessionalRecord
+ * @property {string} id
+ * @property {string} fullName
+ * @property {string} specialtyId
+ * @property {string} status
+ */
+
+/**
+ * @typedef {Object} SpecialtyRecord
+ * @property {string} id
+ * @property {string} name
+ * @property {string} status
+ */
+
+/**
+ * @typedef {Object} AvailabilitySlotRecord
+ * @property {string} id
+ * @property {string} professionalId
+ * @property {string} startAt
+ * @property {string} endAt
+ * @property {string} state
+ */
+
+/**
+ * @typedef {Object} AppointmentRecord
+ * @property {string} id
+ * @property {string} patientId
+ * @property {string} professionalId
+ * @property {string} specialtyId
+ * @property {string} slotId
+ * @property {string} status
+ * @property {string[]} notes
+ */
+
+/**
+ * @typedef {Object} NotificationRecord
+ * @property {string} id
+ * @property {string} appointmentId
+ * @property {string} patientId
+ * @property {string} type
+ * @property {string} status
+ * @property {string} channel
+ * @property {string} detail
+ */
+
+const CONTRACT_GROUPS = {
+  patient: ['id', 'fullName', 'documentNumber', 'contactPhone', 'status'],
+  professional: ['id', 'fullName', 'specialtyId', 'status'],
+  specialty: ['id', 'name', 'status'],
+  availabilitySlot: ['id', 'professionalId', 'startAt', 'endAt', 'state'],
+  appointment: ['id', 'patientId', 'professionalId', 'specialtyId', 'slotId', 'status', 'notes'],
+  notification: ['id', 'appointmentId', 'patientId', 'type', 'status', 'channel', 'detail'],
+}
+
+module.exports = {
+  CONTRACT_GROUPS,
+}
+`
+  const schemaContent = `-- Database design local y revisable para turnos medicos.
+-- No ejecutar este archivo automaticamente.
+
+CREATE TABLE patients (
+  id TEXT PRIMARY KEY,
+  full_name TEXT NOT NULL,
+  document_number TEXT NOT NULL,
+  contact_phone TEXT,
+  contact_email TEXT,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE professionals (
+  id TEXT PRIMARY KEY,
+  full_name TEXT NOT NULL,
+  license_code TEXT,
+  contact_phone TEXT,
+  contact_email TEXT,
+  status TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE specialties (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE professional_specialties (
+  professional_id TEXT NOT NULL,
+  specialty_id TEXT NOT NULL,
+  primary_flag INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (professional_id, specialty_id),
+  FOREIGN KEY (professional_id) REFERENCES professionals(id),
+  FOREIGN KEY (specialty_id) REFERENCES specialties(id)
+);
+
+CREATE TABLE availability_slots (
+  id TEXT PRIMARY KEY,
+  professional_id TEXT NOT NULL,
+  specialty_id TEXT NOT NULL,
+  slot_date TEXT NOT NULL,
+  start_time TEXT NOT NULL,
+  end_time TEXT NOT NULL,
+  state TEXT NOT NULL,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (professional_id) REFERENCES professionals(id),
+  FOREIGN KEY (specialty_id) REFERENCES specialties(id)
+);
+
+CREATE TABLE appointments (
+  id TEXT PRIMARY KEY,
+  patient_id TEXT NOT NULL,
+  professional_id TEXT NOT NULL,
+  specialty_id TEXT NOT NULL,
+  availability_slot_id TEXT NOT NULL,
+  appointment_date TEXT NOT NULL,
+  status TEXT NOT NULL,
+  reason TEXT,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (patient_id) REFERENCES patients(id),
+  FOREIGN KEY (professional_id) REFERENCES professionals(id),
+  FOREIGN KEY (specialty_id) REFERENCES specialties(id),
+  FOREIGN KEY (availability_slot_id) REFERENCES availability_slots(id)
+);
+
+CREATE TABLE appointment_status_history (
+  id TEXT PRIMARY KEY,
+  appointment_id TEXT NOT NULL,
+  previous_status TEXT,
+  next_status TEXT NOT NULL,
+  changed_at TEXT NOT NULL,
+  changed_by TEXT NOT NULL,
+  change_reason TEXT,
+  FOREIGN KEY (appointment_id) REFERENCES appointments(id)
+);
+
+CREATE TABLE notifications (
+  id TEXT PRIMARY KEY,
+  appointment_id TEXT NOT NULL,
+  patient_id TEXT NOT NULL,
+  notification_type TEXT NOT NULL,
+  notification_status TEXT NOT NULL,
+  channel TEXT NOT NULL,
+  detail TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (appointment_id) REFERENCES appointments(id),
+  FOREIGN KEY (patient_id) REFERENCES patients(id)
+);
+`
+  const seedContent = `-- Seed local y revisable para turnos medicos.
+-- No ejecutar automaticamente.
+
+INSERT INTO specialties (id, name, description, created_at, updated_at) VALUES
+  ('SPC-001', 'Clinica medica', 'Atencion general de consultorio', '2026-05-04T09:00:00', '2026-05-04T09:00:00'),
+  ('SPC-002', 'Pediatria', 'Atencion infantil local', '2026-05-04T09:00:00', '2026-05-04T09:00:00'),
+  ('SPC-003', 'Cardiologia', 'Seguimiento cardiologico revisable', '2026-05-04T09:00:00', '2026-05-04T09:00:00');
+
+INSERT INTO professionals (id, full_name, license_code, contact_phone, contact_email, status, created_at, updated_at) VALUES
+  ('PRO-001', 'Dra. Ana Gomez', 'MN-001', '000-111-222', 'ana.local@example.test', 'available', '2026-05-04T09:05:00', '2026-05-04T09:05:00'),
+  ('PRO-002', 'Dr. Pablo Ruiz', 'MN-002', '000-333-444', 'pablo.local@example.test', 'available', '2026-05-04T09:05:00', '2026-05-04T09:05:00');
+
+INSERT INTO professional_specialties (professional_id, specialty_id, primary_flag, created_at) VALUES
+  ('PRO-001', 'SPC-001', 1, '2026-05-04T09:06:00'),
+  ('PRO-002', 'SPC-002', 1, '2026-05-04T09:06:00'),
+  ('PRO-002', 'SPC-003', 0, '2026-05-04T09:06:00');
+
+INSERT INTO patients (id, full_name, document_number, contact_phone, contact_email, notes, created_at, updated_at) VALUES
+  ('PAT-001', 'Lucia Perez', '30111222', '000-555-111', 'lucia.local@example.test', 'Paciente mock local', '2026-05-04T09:10:00', '2026-05-04T09:10:00'),
+  ('PAT-002', 'Martin Suarez', '28999111', '000-555-222', 'martin.local@example.test', 'Seguimiento pediatrico local', '2026-05-04T09:10:00', '2026-05-04T09:10:00');
+
+INSERT INTO availability_slots (id, professional_id, specialty_id, slot_date, start_time, end_time, state, notes, created_at, updated_at) VALUES
+  ('SLT-001', 'PRO-001', 'SPC-001', '2026-05-05', '09:30', '10:00', 'reserved', 'Turno mock ya reservado', '2026-05-04T09:15:00', '2026-05-04T09:15:00'),
+  ('SLT-002', 'PRO-002', 'SPC-002', '2026-05-05', '10:15', '10:45', 'free', 'Disponible para demo local', '2026-05-04T09:15:00', '2026-05-04T09:15:00'),
+  ('SLT-003', 'PRO-002', 'SPC-003', '2026-05-05', '11:00', '11:30', 'free', 'Disponible para especialidad secundaria', '2026-05-04T09:15:00', '2026-05-04T09:15:00');
+
+INSERT INTO appointments (id, patient_id, professional_id, specialty_id, availability_slot_id, appointment_date, status, reason, notes, created_at, updated_at) VALUES
+  ('APT-001', 'PAT-001', 'PRO-001', 'SPC-001', 'SLT-001', '2026-05-05 09:30', 'confirmed', 'Control clinico general', 'Turno confirmado local', '2026-05-04T09:20:00', '2026-05-04T09:20:00'),
+  ('APT-002', 'PAT-002', 'PRO-002', 'SPC-002', 'SLT-002', '2026-05-05 10:15', 'scheduled', 'Consulta pediatrica', 'Pendiente de confirmacion mock', '2026-05-04T09:20:00', '2026-05-04T09:20:00');
+
+INSERT INTO appointment_status_history (id, appointment_id, previous_status, next_status, changed_at, changed_by, change_reason) VALUES
+  ('HIS-001', 'APT-001', 'scheduled', 'confirmed', '2026-05-04T09:25:00', 'local-seed', 'Confirmacion mock inicial'),
+  ('HIS-002', 'APT-002', NULL, 'scheduled', '2026-05-04T09:25:00', 'local-seed', 'Alta inicial del turno');
+
+INSERT INTO notifications (id, appointment_id, patient_id, notification_type, notification_status, channel, detail, created_at, updated_at) VALUES
+  ('NOT-001', 'APT-001', 'PAT-001', 'appointment-confirmation', 'pending', 'email', 'Confirmacion mock previa al turno.', '2026-05-04T10:00:00', '2026-05-04T10:00:00'),
+  ('NOT-002', 'APT-002', 'PAT-002', 'appointment-reminder', 'sent-mock', 'sms', 'Recordatorio local enviado de forma simulada.', '2026-05-04T10:01:00', '2026-05-04T10:01:00'),
+  ('NOT-003', 'APT-002', 'PAT-002', 'appointment-cancellation', 'failed-mock', 'email', 'Fallo simulado sin servicios externos.', '2026-05-04T10:02:00', '2026-05-04T10:02:00');
+`
+  const architectureContent = `# Arquitectura local
+
+## Estado del proyecto
+
+El proyecto sigue en modo local, revisable y sin runtime real.
+
+## Flujo base
+
+- frontend mock flow
+- backend contracts
+- database design
+- local validation
+
+## Modulo de notificaciones mock
+
+Se agrego la expansion \`notifications\` con foco en:
+
+- confirmacion de turno
+- recordatorio
+- reprogramacion
+- cancelacion
+- estados mock de lectura y envio
+
+## Capas afectadas
+
+- frontend local: listado y badges de estado
+- backend local: helpers puros y handlers conceptuales
+- shared: contratos y typedefs de Notification
+- database design: tabla notifications y seeds mock
+- docs: runbook y validation report actualizados
+
+## Limites actuales
+
+- no se enviaron notificaciones reales
+- no se levanto backend
+- no se abrieron puertos
+- no se ejecuto SQL
+- no se instalaron dependencias
+
+## Siguiente fase segura
+
+La siguiente fase recomendada vuelve a ser \`review-and-expand\`.
+`
+  const runbookContent = `# Local runbook
+
+## Estado actual
+
+El proyecto sigue en modo local y revisable. Se materializo una expansion de modulo para \`notifications\`.
+
+## Que se agrego
+
+- datos mock de notificaciones en frontend
+- seccion local de notificaciones mock
+- helpers backend puros para drafts, lectura y envio simulado
+- contratos compartidos de Notification
+- tabla y seed local de notifications
+- docs y manifest actualizados
+
+## Como revisar sin servicios reales
+
+- abrir \`frontend/index.html\`
+- revisar \`frontend/src/mock-data.js\`
+- revisar \`backend/src/modules/notifications.js\`
+- revisar \`backend/src/routes/notifications.js\`
+- revisar \`database/schema.sql\` y \`database/seeds/seed-local.sql\`
+- revisar \`docs/validation-report.md\`
+- revisar \`jefe-project.json\`
+
+## Sigue fuera de alcance
+
+- instalar dependencias
+- levantar frontend o backend
+- abrir puertos
+- ejecutar SQL
+- crear DB real
+- enviar notificaciones reales
+- deploy
+
+## Proxima fase segura
+
+La siguiente fase recomendada vuelve a ser \`review-and-expand\`.
+`
+  const validationReportContent = `# Validacion local del proyecto
+
+## Proyecto
+
+- root: \`${projectRoot}\`
+- deliveryLevel: \`fullstack-local\`
+- dominio: \`${String(localProjectManifest?.domain || 'proyecto local').trim() || 'proyecto local'}\`
+- materializationLayer: \`local-deterministic\`
+
+## Fases revisadas
+
+- fullstack-local-scaffold: done
+- frontend-mock-flow: done
+- backend-contracts: done
+- database-design: done
+- local-validation: done
+
+## Expansion de modulo
+
+- modulo: \`notifications\`
+- estado: done
+- capas: frontend, backend, shared, database, docs, manifest
+- no se enviaron notificaciones reales
+
+## Checks de estructura
+
+- frontend existe
+- backend existe
+- shared existe
+- database existe
+- docs existe
+- jefe-project.json existe
+
+## Checks de seguridad
+
+- no node_modules
+- no .env real
+- no Dockerfile
+- no docker-compose.yml
+- no deploy
+- no DB real activa
+- no servidor levantado
+- no notificaciones reales enviadas
+
+## Checks recomendados
+
+- \`node --check backend/src/modules/notifications.js\`
+- \`node --check backend/src/routes/notifications.js\`
+- \`node --check shared/contracts/domain.js\`
+- \`node --check shared/types/contracts.js\`
+- \`node --check backend/src/server.js\`
+- \`node --check backend/src/routes/health.js\`
+- \`node --check backend/src/modules/appointments.js\`
+- \`node --check backend/src/lib/response.js\`
+- \`node --check scripts/seed-local.js\`
+
+## Validaciones manuales pendientes
+
+- abrir \`frontend/index.html\`
+- revisar flujo mock de turnos
+- revisar modulo de notificaciones mock
+- revisar schema SQL
+- revisar seed SQL
+
+## Riesgos y limites
+
+- no se instalaron dependencias
+- no se levanto backend
+- no se abrio puerto
+- no se ejecuto base de datos
+- no se corrieron migraciones
+- no se ejecutaron seeds
+- no se hizo deploy
+- no se tocaron credenciales
+
+## Proximo paso recomendado
+
+- \`review-and-expand\`
+`
+  const updatedLocalProjectManifest = buildUpdatedLocalProjectManifestForModule({
+    existingManifest: localProjectManifest,
+    projectRoot,
+    moduleId: normalizedPlan.moduleId,
+    moduleName: normalizedPlan.moduleName,
+    touchedFiles: normalizedPlan.targetFiles,
+    layers: normalizedPlan.affectedLayers,
+  })
+  const updatedLocalProjectManifestContent = updatedLocalProjectManifest
+    ? `${JSON.stringify(updatedLocalProjectManifest, null, 2)}\n`
+    : ''
+
+  return {
+    tasks: [
+      {
+        step: 1,
+        title: `Materializar la expansion del modulo "${normalizedPlan.moduleName}" dentro de ${projectRoot}.`,
+        operation: 'create-or-edit-files',
+        targetPath: projectRoot,
+      },
+      {
+        step: 2,
+        title: 'Validar que la expansion quede acotada a archivos permitidos del proyecto local.',
+        operation: 'validate-scope',
+        targetPath: projectRoot,
+      },
+    ],
+    assumptions: [
+      'La expansion sigue siendo local, revisable y sin runtime real.',
+      'No se ejecutan SQL, seeds ni dependencias.',
+      'Package managers, deploy, Docker y credenciales siguen fuera de alcance.',
+    ],
+    instruction: [
+      `Materializar la expansion del modulo ${normalizedPlan.moduleName} dentro de ${projectRoot}.`,
+      `Usar solo estos targetPaths: ${normalizedPlan.allowedTargetPaths.join(', ')}`,
+      'No tocar package.json, node_modules, .env, Docker, deploy ni runtime real.',
+    ].join('\n'),
+    executionScope: normalizeExecutorExecutionScope({
+      allowedTargetPaths: normalizedPlan.allowedTargetPaths,
+      successCriteria: normalizedPlan.successCriteria,
+      enforceNarrowScope: true,
+    }),
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'module-expansion-materialization',
+      summary: `Expansion del modulo ${normalizedPlan.moduleName} actualizada dentro de "${projectRoot}".`,
+      strategy: 'materialize-module-expansion-plan',
+      reasoningLayer: 'local-rules',
+      materializationLayer: 'local-deterministic',
+      operations: [
+        { type: 'replace-file', targetPath: mockDataPath, nextContent: mockDataContent },
+        { type: 'replace-file', targetPath: appPath, nextContent: appContent },
+        { type: 'replace-file', targetPath: stylesPath, nextContent: stylesContent },
+        {
+          type: 'replace-file',
+          targetPath: notificationsModulePath,
+          nextContent: notificationsModuleContent,
+        },
+        {
+          type: 'replace-file',
+          targetPath: notificationsRoutePath,
+          nextContent: notificationsRouteContent,
+        },
+        { type: 'replace-file', targetPath: sharedDomainPath, nextContent: sharedDomainContent },
+        { type: 'replace-file', targetPath: sharedTypesPath, nextContent: sharedTypesContent },
+        { type: 'replace-file', targetPath: schemaPath, nextContent: schemaContent },
+        { type: 'replace-file', targetPath: seedPath, nextContent: seedContent },
+        {
+          type: 'replace-file',
+          targetPath: architecturePath,
+          nextContent: architectureContent,
+        },
+        { type: 'replace-file', targetPath: runbookPath, nextContent: runbookContent },
+        {
+          type: 'replace-file',
+          targetPath: validationReportPath,
+          nextContent: validationReportContent,
+        },
+        ...(updatedLocalProjectManifestContent
+          ? [
+              {
+                type: 'replace-file',
+                targetPath: manifestPath,
+                nextContent: updatedLocalProjectManifestContent,
+              },
+            ]
+          : []),
+      ],
+      validations: [
+        { type: 'exists', targetPath: notificationsModulePath, expectedKind: 'file' },
+        { type: 'exists', targetPath: notificationsRoutePath, expectedKind: 'file' },
+        { type: 'exists', targetPath: validationReportPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: manifestPath, expectedKind: 'file' },
+        {
+          type: 'file-contains',
+          targetPath: mockDataPath,
+          expectedText: 'notifications',
+        },
+        {
+          type: 'file-contains',
+          targetPath: appPath,
+          expectedText: 'Notificaciones mock',
+        },
+        {
+          type: 'file-contains',
+          targetPath: notificationsModulePath,
+          expectedText: 'simulateNotificationDispatch',
+        },
+        {
+          type: 'file-contains',
+          targetPath: notificationsRoutePath,
+          expectedText: 'listNotificationsHandler',
+        },
+        {
+          type: 'file-contains',
+          targetPath: sharedDomainPath,
+          expectedText: 'NOTIFICATION_TYPES',
+        },
+        {
+          type: 'file-contains',
+          targetPath: sharedTypesPath,
+          expectedText: '@typedef {Object} NotificationRecord',
+        },
+        {
+          type: 'file-contains',
+          targetPath: schemaPath,
+          expectedText: 'CREATE TABLE notifications',
+        },
+        {
+          type: 'file-contains',
+          targetPath: seedPath,
+          expectedText: 'INSERT INTO notifications',
+        },
+        {
+          type: 'file-contains',
+          targetPath: architecturePath,
+          expectedText: 'Modulo de notificaciones mock',
+        },
+        {
+          type: 'file-contains',
+          targetPath: validationReportPath,
+          expectedText: 'no se enviaron notificaciones reales',
+        },
+        ...(updatedLocalProjectManifest
+          ? [
+              {
+                type: 'file-contains',
+                targetPath: manifestPath,
+                expectedText: '"id": "notifications"',
+              },
+              {
+                type: 'file-contains',
+                targetPath: manifestPath,
+                expectedText: '"id": "module-expansion-notifications"',
+              },
+              {
+                type: 'file-contains',
+                targetPath: manifestPath,
+                expectedText: '"nextRecommendedPhase": "review-and-expand"',
+              },
+            ]
+          : []),
+      ],
+    },
+    localProjectManifest: updatedLocalProjectManifest,
+  }
 }
 
 function hasRejectedDecision(resolvedDecisionMap, ...decisionKeys) {
@@ -21280,6 +23557,7 @@ async function buildLocalStrategicBrainDecision({
   const fullstackLocalMaterializationIntent =
     detectFullstackLocalMaterializationPlanningIntent(goal, context)
   const projectPhaseIntent = detectProjectPhasePlanningIntent(goal, context)
+  const moduleExpansionIntent = detectModuleExpansionPlanningIntent(goal, context)
   const safeFirstDeliveryIntent = detectSafeFirstDeliveryPlanningIntent(goal, context)
   const scalableDeliveryIntent = detectScalableDeliveryPlanningIntent(goal, context)
   const productArchitectureIntent = detectProductArchitecturePlanningIntent(
@@ -21327,6 +23605,8 @@ async function buildLocalStrategicBrainDecision({
       productArchitecture,
       projectPhaseExecutionPlan,
       localProjectManifest,
+      expansionOptions,
+      moduleExpansionPlan,
     } = {},
   ) => {
     const planningContracts = buildPlanningArchitectureBundle({
@@ -21347,6 +23627,8 @@ async function buildLocalStrategicBrainDecision({
       materializationPlan: payload?.materializationPlan,
       projectPhaseExecutionPlan,
       localProjectManifest,
+      expansionOptions,
+      moduleExpansionPlan,
     })
 
     return buildBrainDecisionContract({
@@ -21360,6 +23642,8 @@ async function buildLocalStrategicBrainDecision({
       phaseExpansionPlan: planningContracts.phaseExpansionPlan,
       projectPhaseExecutionPlan: planningContracts.projectPhaseExecutionPlan,
       localProjectManifest: planningContracts.localProjectManifest,
+      expansionOptions: planningContracts.expansionOptions,
+      moduleExpansionPlan: planningContracts.moduleExpansionPlan,
     })
   }
   const reusablePlanningContext =
@@ -21585,6 +23869,13 @@ async function buildLocalStrategicBrainDecision({
     })
 
     if (projectPhaseExecutionPlan) {
+      const expansionOptions =
+        projectPhaseIntent.phaseId === 'review-and-expand'
+          ? buildReviewAndExpandExpansionOptions({
+              projectRoot: projectPhaseExecutionPlan.projectRoot,
+              localProjectManifest: inferredProjectState.manifest,
+            })
+          : null
       if (projectPhaseIntent.action === 'materialize' && projectPhaseExecutionPlan.executableNow) {
         const projectPhaseMaterializationPlan = buildProjectPhaseMaterializationPlan({
           projectPhaseExecutionPlan,
@@ -21615,6 +23906,7 @@ async function buildLocalStrategicBrainDecision({
               localProjectManifest:
                 projectPhaseMaterializationPlan.localProjectManifest ||
                 inferredProjectState.manifest,
+              expansionOptions,
             },
           )
         }
@@ -21658,6 +23950,114 @@ async function buildLocalStrategicBrainDecision({
         {
           deliveryLevel: projectPhaseExecutionPlan.deliveryLevel,
           projectPhaseExecutionPlan,
+          localProjectManifest: inferredProjectState.manifest,
+          expansionOptions,
+        },
+      )
+    }
+  }
+
+  if (
+    moduleExpansionIntent.matches &&
+    inferredProjectState?.manifest &&
+    !safeFirstDeliveryIntent.matches &&
+    !scopedFileEditIntent &&
+    !localGoalDescriptor &&
+    compositeSteps.length < 2
+  ) {
+    const moduleExpansionPlan = buildModuleExpansionPlan({
+      strategy:
+        moduleExpansionIntent.action === 'materialize'
+          ? 'materialize-module-expansion-plan'
+          : 'prepare-module-expansion-plan',
+      moduleId: moduleExpansionIntent.moduleId,
+      moduleName: moduleExpansionIntent.moduleName,
+      inferredProjectState,
+    })
+
+    if (moduleExpansionPlan) {
+      if (
+        moduleExpansionIntent.action === 'materialize' &&
+        moduleExpansionPlan.safeToMaterialize
+      ) {
+        const moduleExpansionMaterializationPlan =
+          buildModuleExpansionMaterializationPlan({
+            moduleExpansionPlan,
+            localProjectManifest: inferredProjectState.manifest,
+          })
+
+        if (moduleExpansionMaterializationPlan) {
+          return buildDecisionWithPlanningContracts(
+            {
+              decisionKey: 'materialize-module-expansion-plan',
+              strategy: 'materialize-module-expansion-plan',
+              executionMode: 'executor',
+              reason:
+                moduleExpansionPlan.reason ||
+                'El objetivo pide materializar una expansion segura de modulo dentro del proyecto local.',
+              tasks: moduleExpansionMaterializationPlan.tasks,
+              requiresApproval: false,
+              assumptions: moduleExpansionMaterializationPlan.assumptions,
+              instruction: moduleExpansionMaterializationPlan.instruction,
+              completed: false,
+              nextExpectedAction: 'execute-plan',
+              executionScope: moduleExpansionMaterializationPlan.executionScope,
+              materializationPlan:
+                moduleExpansionMaterializationPlan.materializationPlan,
+            },
+            {
+              deliveryLevel: 'fullstack-local',
+              moduleExpansionPlan,
+              localProjectManifest:
+                moduleExpansionMaterializationPlan.localProjectManifest ||
+                inferredProjectState.manifest,
+            },
+          )
+        }
+      }
+
+      return buildDecisionWithPlanningContracts(
+        {
+          decisionKey: 'prepare-module-expansion-plan',
+          strategy: 'prepare-module-expansion-plan',
+          executionMode: 'planner-only',
+          reason:
+            moduleExpansionPlan.reason ||
+            'El objetivo pide preparar una expansion de modulo segura y revisable.',
+          tasks: [
+            {
+              step: 1,
+              title: `Revisar la expansion del modulo ${moduleExpansionPlan.moduleName} y sus capas afectadas.`,
+              operation: 'review-module-expansion',
+              targetPath: moduleExpansionPlan.projectRoot,
+            },
+            {
+              step: 2,
+              title: 'Confirmar que la expansion siga acotada al proyecto local y sin runtime real.',
+              operation: 'validate-module-expansion-scope',
+              targetPath: moduleExpansionPlan.projectRoot,
+            },
+          ],
+          requiresApproval: false,
+          assumptions: [
+            'La expansion de modulo se prepara sobre un proyecto local ya validado.',
+            'Package managers, runtime real, deploy y servicios externos siguen fuera de alcance.',
+          ],
+          instruction: [
+            `Preparar la expansion del modulo ${moduleExpansionPlan.moduleName} en ${moduleExpansionPlan.projectRoot}.`,
+            `Target strategy: ${
+              moduleExpansionPlan.safeToMaterialize
+                ? 'materialize-module-expansion-plan'
+                : 'prepare-module-expansion-plan'
+            }.`,
+            `Allowed target paths: ${moduleExpansionPlan.allowedTargetPaths.join(', ')}`,
+          ].join('\n'),
+          completed: false,
+          nextExpectedAction: 'review-module-expansion',
+        },
+        {
+          deliveryLevel: 'fullstack-local',
+          moduleExpansionPlan,
           localProjectManifest: inferredProjectState.manifest,
         },
       )
@@ -22849,7 +25249,7 @@ Roles:
 Tu tarea es devolver una decision estructurada y operativa.
 
 Reglas:
-- Elegí entre estrategias compatibles con el sistema: fast-local, fast-composite, executor, web-scaffold-base, product-architecture-plan, safe-first-delivery-plan, materialize-safe-first-delivery-plan, scalable-delivery-plan, materialize-frontend-project-plan, materialize-fullstack-local-plan, prepare-project-phase-plan, materialize-project-phase-plan, ask-user.
+- Elegí entre estrategias compatibles con el sistema: fast-local, fast-composite, executor, web-scaffold-base, product-architecture-plan, safe-first-delivery-plan, materialize-safe-first-delivery-plan, scalable-delivery-plan, materialize-frontend-project-plan, materialize-fullstack-local-plan, prepare-project-phase-plan, materialize-project-phase-plan, prepare-module-expansion-plan, materialize-module-expansion-plan, ask-user.
 - Usá web-scaffold-base para webs institucionales o creativas cuando corresponda.
 - Usá product-architecture-plan cuando el objetivo implique un sistema o producto complejo (por ejemplo ecommerce, CRM, ERP, marketplace, SaaS o plataforma con usuarios, roles, backoffice, datos e integraciones) y todavía haga falta definir arquitectura antes de ejecutar.
 - Si devolvés product-architecture-plan, usá executionMode="planner-only", nextExpectedAction="review-product-architecture", requiresApproval=false y describí fases, riesgos, integraciones y primera entrega segura sin crear archivos.
@@ -22860,6 +25260,8 @@ Reglas:
 - Usá materialize-fullstack-local-plan solo cuando el objetivo ya pida materializar un fullstack-local revisado. En ese caso usá executionMode="executor", nextExpectedAction="execute-plan", requiresApproval=false, devolvé executionScope y materializationPlan acotados a una carpeta nueva del workspace con frontend/, backend/, shared/, database/, scripts/ y docs/, sin npm install, sin node_modules, sin levantar servicios, sin base de datos real activa, sin Docker ni integraciones externas.
 - Usá prepare-project-phase-plan cuando el objetivo pida continuar un proyecto local ya generado y preparar una fase segura posterior. En ese caso usá executionMode="planner-only", nextExpectedAction="review-project-phase", requiresApproval=false y devolvé projectPhaseExecutionPlan acotado a archivos permitidos de esa fase.
 - Usá materialize-project-phase-plan solo cuando el objetivo ya pida materializar una fase segura local de un proyecto existente. En ese caso usá executionMode="executor", nextExpectedAction="execute-plan", requiresApproval=false, devolvé executionScope y materializationPlan acotados a los allowedTargetPaths de la fase y nunca habilites backend real, database real, Docker, node_modules ni deploy.
+- Usá prepare-module-expansion-plan cuando el objetivo pida preparar una expansión de módulo sobre un proyecto local ya validado. En ese caso usá executionMode="planner-only", nextExpectedAction="review-module-expansion", requiresApproval=false y devolvé moduleExpansionPlan acotado a los archivos y capas permitidas.
+- Usá materialize-module-expansion-plan solo cuando el objetivo ya pida materializar una expansión segura de módulo. En ese caso usá executionMode="executor", nextExpectedAction="execute-plan", requiresApproval=false, devolvé moduleExpansionPlan + executionScope + materializationPlan y nunca habilites npm install, runtime real, Docker, node_modules, .env ni deploy.
 - Cuando puedas, devolvé también projectBlueprint, questionPolicy, implementationRoadmap, nextActionPlan, validationPlan, phaseExpansionPlan, projectPhaseExecutionPlan y localProjectManifest alineados con la estrategia elegida.
 - projectBlueprint debe capturar tipo de producto, dominio, intent, deliveryLevel, stackProfile, roles, modules, entities, coreFlows, integrations, riesgos, decisiones delegadas, phasePlan, exclusiones, approvals futuros y successCriteria.
 - questionPolicy debe explicar si conviene preguntar ahora o decidir faltantes con criterio profesional, especialmente cuando userParticipationMode es "brain-decides-missing".
@@ -23355,6 +25757,86 @@ function buildOpenAIBrainSchema() {
               },
             },
           },
+          modules: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: true,
+              properties: {
+                id: { type: 'string' },
+                name: { type: 'string' },
+                status: { type: 'string' },
+                addedAt: { type: 'string' },
+                layers: { type: 'array', items: { type: 'string' } },
+                files: { type: 'array', items: { type: 'string' } },
+              },
+            },
+          },
+        },
+      },
+      expansionOptions: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          projectRoot: { type: 'string' },
+          currentPhase: { type: 'string' },
+          recommendedOptionId: { type: 'string' },
+          options: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: true,
+              properties: {
+                id: { type: 'string' },
+                label: { type: 'string' },
+                description: { type: 'string' },
+                expansionType: { type: 'string' },
+                riskLevel: { type: 'string' },
+                safeToPrepare: { type: 'boolean' },
+                safeToMaterialize: { type: 'boolean' },
+                requiresApproval: { type: 'boolean' },
+                targetStrategy: { type: 'string' },
+                expectedFiles: { type: 'array', items: { type: 'string' } },
+                reason: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+      moduleExpansionPlan: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          moduleId: { type: 'string' },
+          moduleName: { type: 'string' },
+          projectRoot: { type: 'string' },
+          domain: { type: 'string' },
+          expansionType: { type: 'string' },
+          reason: { type: 'string' },
+          safeToPrepare: { type: 'boolean' },
+          safeToMaterialize: { type: 'boolean' },
+          approvalRequired: { type: 'boolean' },
+          riskLevel: { type: 'string' },
+          affectedLayers: { type: 'array', items: { type: 'string' } },
+          targetFiles: { type: 'array', items: { type: 'string' } },
+          allowedTargetPaths: { type: 'array', items: { type: 'string' } },
+          forbiddenPaths: { type: 'array', items: { type: 'string' } },
+          blockers: { type: 'array', items: { type: 'string' } },
+          expectedChanges: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: true,
+              properties: {
+                layer: { type: 'string' },
+                targetPath: { type: 'string' },
+                purpose: { type: 'string' },
+              },
+            },
+          },
+          validationPlan: { type: 'object', additionalProperties: true },
+          explicitExclusions: { type: 'array', items: { type: 'string' } },
+          successCriteria: { type: 'array', items: { type: 'string' } },
         },
       },
       materializationPlan: {

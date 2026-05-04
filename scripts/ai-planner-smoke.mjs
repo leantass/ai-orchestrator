@@ -469,6 +469,41 @@ const phaseExecutionValidationCases = {
       'Preparar la fase review-and-expand del proyecto fullstack local de turnos medicos.',
     context: '',
   },
+  prepareModuleExpansion: {
+    id: 'prepare-module-expansion',
+    label: 'Preparar expansion de modulo',
+    goal:
+      'Preparar una expansion de modulo de notificaciones para el proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  prepareUnsupportedModuleExpansion: {
+    id: 'prepare-unsupported-module-expansion',
+    label: 'Preparar expansion de modulo no soportado',
+    goal:
+      'Preparar una expansion de modulo de facturacion para el proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  materializeModuleExpansion: {
+    id: 'materialize-module-expansion',
+    label: 'Materializar expansion de modulo',
+    goal:
+      'Materializar la expansion de modulo de notificaciones para el proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  materializeUnsupportedModuleExpansion: {
+    id: 'materialize-unsupported-module-expansion',
+    label: 'Materializar expansion de modulo no soportado',
+    goal:
+      'Materializar la expansion de modulo de facturacion para el proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  materializeDuplicateModuleExpansion: {
+    id: 'materialize-duplicate-module-expansion',
+    label: 'Materializar expansion duplicada',
+    goal:
+      'Materializar la expansion de modulo de notificaciones para el proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
 }
 
 const smokeExecutionWorkspaceRoot = path.join(
@@ -950,6 +985,63 @@ function summarizeProjectPhaseExecutionPlan(projectPhaseExecutionPlan) {
   }
 }
 
+function summarizeExpansionOptions(expansionOptions) {
+  return {
+    projectRoot: expansionOptions?.projectRoot || '',
+    currentPhase: expansionOptions?.currentPhase || '',
+    recommendedOptionId: expansionOptions?.recommendedOptionId || '',
+    options: Array.isArray(expansionOptions?.options)
+      ? expansionOptions.options.map((entry) => ({
+          id: entry?.id || '',
+          label: entry?.label || '',
+          description: entry?.description || '',
+          expansionType: entry?.expansionType || '',
+          riskLevel: entry?.riskLevel || '',
+          safeToPrepare: entry?.safeToPrepare === true,
+          safeToMaterialize: entry?.safeToMaterialize === true,
+          requiresApproval: entry?.requiresApproval === true,
+          targetStrategy: entry?.targetStrategy || '',
+          expectedFiles: toStringArray(entry?.expectedFiles, 20),
+          reason: entry?.reason || '',
+        }))
+      : [],
+  }
+}
+
+function summarizeModuleExpansionPlan(moduleExpansionPlan) {
+  return {
+    moduleId: moduleExpansionPlan?.moduleId || '',
+    moduleName: moduleExpansionPlan?.moduleName || '',
+    projectRoot: moduleExpansionPlan?.projectRoot || '',
+    domain: moduleExpansionPlan?.domain || '',
+    expansionType: moduleExpansionPlan?.expansionType || '',
+    reason: moduleExpansionPlan?.reason || '',
+    safeToPrepare: moduleExpansionPlan?.safeToPrepare !== false,
+    safeToMaterialize: moduleExpansionPlan?.safeToMaterialize === true,
+    approvalRequired: moduleExpansionPlan?.approvalRequired === true,
+    riskLevel: moduleExpansionPlan?.riskLevel || '',
+    affectedLayers: toStringArray(moduleExpansionPlan?.affectedLayers, 16),
+    targetFiles: toStringArray(moduleExpansionPlan?.targetFiles, 24),
+    allowedTargetPaths: toStringArray(moduleExpansionPlan?.allowedTargetPaths, 24),
+    forbiddenPaths: toStringArray(moduleExpansionPlan?.forbiddenPaths, 24),
+    blockers: toStringArray(moduleExpansionPlan?.blockers, 16),
+    expectedChanges: Array.isArray(moduleExpansionPlan?.expectedChanges)
+      ? moduleExpansionPlan.expectedChanges.map((entry) => ({
+          layer: entry?.layer || '',
+          targetPath: entry?.targetPath || '',
+          purpose: entry?.purpose || '',
+        }))
+      : [],
+    validationPlan:
+      moduleExpansionPlan?.validationPlan &&
+      typeof moduleExpansionPlan.validationPlan === 'object'
+        ? summarizeValidationPlan(moduleExpansionPlan.validationPlan)
+        : null,
+    explicitExclusions: toStringArray(moduleExpansionPlan?.explicitExclusions, 24),
+    successCriteria: toStringArray(moduleExpansionPlan?.successCriteria, 24),
+  }
+}
+
 function summarizeLocalProjectManifest(localProjectManifest) {
   return {
     version: Number.isFinite(localProjectManifest?.version)
@@ -967,6 +1059,16 @@ function summarizeLocalProjectManifest(localProjectManifest) {
           id: entry?.id || '',
           status: entry?.status || '',
           createdAt: entry?.createdAt || '',
+          files: toStringArray(entry?.files, 24),
+        }))
+      : [],
+    modules: Array.isArray(localProjectManifest?.modules)
+      ? localProjectManifest.modules.map((entry) => ({
+          id: entry?.id || '',
+          name: entry?.name || '',
+          status: entry?.status || '',
+          addedAt: entry?.addedAt || '',
+          layers: toStringArray(entry?.layers, 16),
           files: toStringArray(entry?.files, 24),
         }))
       : [],
@@ -2138,6 +2240,77 @@ async function materializePhaseOnFixture({ fixture, phaseId, requestId }) {
     manifest,
     lastPhaseDecision: decision,
     lastPhaseExecutionResult: executionResult,
+  }
+}
+
+async function materializeModuleExpansionOnFixture({
+  fixture,
+  moduleLabel = 'notificaciones',
+  requestId,
+}) {
+  const reusablePlanningContext = buildReusablePlanningContext()
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: `Materializar la expansion de modulo de ${moduleLabel} para el proyecto fullstack local de turnos medicos.`,
+    context: `moduleId: ${moduleLabel}`,
+    workspacePath: fixture.workspacePath,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  if (!decision?.materializationPlan) {
+    throw new Error(`No se pudo construir el materializationPlan del modulo ${moduleLabel}.`)
+  }
+
+  const task = buildLocalMaterializationTask({
+    plan: decision.materializationPlan,
+    workspacePath: fixture.workspacePath,
+    requestId,
+    instruction: decision.instruction || '',
+    brainStrategy: decision.strategy || '',
+    businessSector: decision.businessSector || '',
+    businessSectorLabel: decision.businessSectorLabel || '',
+    creativeDirection: decision.creativeDirection || null,
+    reusableArtifactLookup: decision.reusableArtifactLookup || null,
+    reusableArtifactsFound: decision.reusableArtifactsFound || 0,
+    reuseDecision: decision.reuseDecision === true,
+    reuseReason: decision.reuseReason || '',
+    reusedArtifactIds: Array.isArray(decision.reusedArtifactIds)
+      ? decision.reusedArtifactIds
+      : [],
+    reuseMode: decision.reuseMode || 'none',
+    reuseMaterialization: null,
+    materializationPlanSource: decision.materializationPlanSource || 'planner',
+  })
+
+  if (!task) {
+    throw new Error(`No se pudo construir la tarea local deterministica del modulo ${moduleLabel}.`)
+  }
+
+  const executionResult = await runLocalDeterministicTask(task)
+  if (executionResult?.ok !== true) {
+    throw new Error(
+      executionResult?.error ||
+        `La materializacion local del modulo ${moduleLabel} no termino en OK.`,
+    )
+  }
+
+  const manifest = JSON.parse(fs.readFileSync(fixture.manifestPath, 'utf8'))
+
+  return {
+    ...fixture,
+    manifest,
+    lastModuleDecision: decision,
+    lastModuleExecutionResult: executionResult,
   }
 }
 
@@ -4696,6 +4869,10 @@ async function runPrepareReviewAndExpandValidation() {
     decision?.nextActionPlan && typeof decision.nextActionPlan === 'object'
       ? decision.nextActionPlan
       : null
+  const expansionOptions =
+    decision?.expansionOptions && typeof decision.expansionOptions === 'object'
+      ? decision.expansionOptions
+      : null
 
   if (strategy !== 'prepare-project-phase-plan') {
     failures.push(
@@ -4737,6 +4914,25 @@ async function runPrepareReviewAndExpandValidation() {
     }
   }
 
+  if (!expansionOptions) {
+    failures.push('expansionOptions ausente en review-and-expand.')
+  } else {
+    const optionsSummary = summarizeExpansionOptions(expansionOptions)
+    if (optionsSummary.recommendedOptionId !== 'notifications') {
+      failures.push('review-and-expand deberia recomendar notifications como primera expansion segura.')
+    }
+    if (
+      !optionsSummary.options.some(
+        (entry) =>
+          entry.id === 'notifications' &&
+          entry.safeToMaterialize &&
+          entry.targetStrategy === 'materialize-module-expansion-plan',
+      )
+    ) {
+      failures.push('review-and-expand deberia exponer notifications como opcion materializable segura.')
+    }
+  }
+
   return {
     testCase,
     ok: failures.length === 0,
@@ -4744,6 +4940,675 @@ async function runPrepareReviewAndExpandValidation() {
     strategy,
     executionMode,
     nextExpectedAction,
+  }
+}
+
+async function runPrepareModuleExpansionValidation() {
+  let fixture = await buildPhaseExecutionFixture({
+    workspaceName: 'fullstack-project-module-expansion-ready',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'frontend-mock-flow',
+    requestId: 'smoke-module-expansion-frontend',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'backend-contracts',
+    requestId: 'smoke-module-expansion-backend',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'database-design',
+    requestId: 'smoke-module-expansion-database',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'local-validation',
+    requestId: 'smoke-module-expansion-validation',
+  })
+  const reusablePlanningContext = buildReusablePlanningContext()
+  const testCase = phaseExecutionValidationCases.prepareModuleExpansion
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: testCase.goal,
+    context: testCase.context,
+    workspacePath: fixture.workspacePath,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  const failures = []
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const nextExpectedAction = String(decision?.nextExpectedAction || '').trim()
+  const materializationPlan =
+    decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+      ? decision.materializationPlan
+      : null
+  const moduleExpansionPlan =
+    decision?.moduleExpansionPlan && typeof decision.moduleExpansionPlan === 'object'
+      ? decision.moduleExpansionPlan
+      : null
+
+  if (strategy !== 'prepare-module-expansion-plan') {
+    failures.push(
+      `Estrategia incorrecta. Esperado: prepare-module-expansion-plan. Recibido: ${strategy || '(vacia)'}.`,
+    )
+  }
+  if (executionMode !== 'planner-only') {
+    failures.push(
+      `executionMode incorrecto. Esperado: planner-only. Recibido: ${executionMode || '(vacio)'}.`,
+    )
+  }
+  if (nextExpectedAction !== 'review-module-expansion') {
+    failures.push(
+      `nextExpectedAction incorrecto. Esperado: review-module-expansion. Recibido: ${nextExpectedAction || '(vacio)'}.`,
+    )
+  }
+  if (materializationPlan) {
+    failures.push('prepare-module-expansion-plan no deberia devolver materializationPlan.')
+  }
+  if (!moduleExpansionPlan) {
+    failures.push('moduleExpansionPlan ausente en prepare-module-expansion-plan.')
+  } else {
+    const moduleSummary = summarizeModuleExpansionPlan(moduleExpansionPlan)
+    if (moduleSummary.moduleId !== 'notifications') {
+      failures.push('moduleExpansionPlan.moduleId deberia ser notifications.')
+    }
+    if (!moduleSummary.safeToMaterialize) {
+      failures.push('notifications deberia quedar safeToMaterialize en prepare-module-expansion-plan.')
+    }
+    ;['frontend', 'backend', 'shared', 'database', 'docs', 'manifest'].forEach((layer) => {
+      if (!moduleSummary.affectedLayers.includes(layer)) {
+        failures.push(`moduleExpansionPlan deberia incluir la capa ${layer}.`)
+      }
+    })
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction,
+  }
+}
+
+async function runPrepareUnsupportedModuleExpansionValidation() {
+  let fixture = await buildPhaseExecutionFixture({
+    workspaceName: 'fullstack-project-module-expansion-unsupported-ready',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'frontend-mock-flow',
+    requestId: 'smoke-module-unsupported-frontend',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'backend-contracts',
+    requestId: 'smoke-module-unsupported-backend',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'database-design',
+    requestId: 'smoke-module-unsupported-database',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'local-validation',
+    requestId: 'smoke-module-unsupported-validation',
+  })
+  const reusablePlanningContext = buildReusablePlanningContext()
+  const testCase = phaseExecutionValidationCases.prepareUnsupportedModuleExpansion
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: testCase.goal,
+    context: testCase.context,
+    workspacePath: fixture.workspacePath,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  const failures = []
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const nextExpectedAction = String(decision?.nextExpectedAction || '').trim()
+  const materializationPlan =
+    decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+      ? decision.materializationPlan
+      : null
+  const moduleExpansionPlan =
+    decision?.moduleExpansionPlan && typeof decision.moduleExpansionPlan === 'object'
+      ? decision.moduleExpansionPlan
+      : null
+
+  if (strategy !== 'prepare-module-expansion-plan') {
+    failures.push(
+      `Estrategia incorrecta. Esperado: prepare-module-expansion-plan. Recibido: ${strategy || '(vacia)'}.`,
+    )
+  }
+  if (executionMode !== 'planner-only') {
+    failures.push(
+      `executionMode incorrecto. Esperado: planner-only. Recibido: ${executionMode || '(vacio)'}.`,
+    )
+  }
+  if (nextExpectedAction !== 'review-module-expansion') {
+    failures.push(
+      `nextExpectedAction incorrecto. Esperado: review-module-expansion. Recibido: ${nextExpectedAction || '(vacio)'}.`,
+    )
+  }
+  if (materializationPlan) {
+    failures.push('Un modulo no soportado no deberia devolver materializationPlan.')
+  }
+  if (!moduleExpansionPlan) {
+    failures.push('moduleExpansionPlan ausente en el caso de modulo no soportado.')
+  } else {
+    const moduleSummary = summarizeModuleExpansionPlan(moduleExpansionPlan)
+    if (!['facturacion', 'billing'].includes(moduleSummary.moduleId)) {
+      failures.push('moduleExpansionPlan.moduleId deberia normalizarse como facturacion o billing.')
+    }
+    if (!moduleSummary.safeToPrepare) {
+      failures.push('Un modulo no soportado deberia poder prepararse como plan revisable.')
+    }
+    if (moduleSummary.safeToMaterialize) {
+      failures.push('Un modulo no soportado no deberia quedar materializable.')
+    }
+    if (
+      !moduleSummary.blockers.some(
+        (entry) =>
+          entry.toLocaleLowerCase().includes('materializador seguro') ||
+          entry.toLocaleLowerCase().includes('revisarlo manualmente'),
+      ) &&
+      !moduleSummary.reason.toLocaleLowerCase().includes('materializador seguro')
+    ) {
+      failures.push(
+        'El caso no soportado deberia explicar que todavia no existe un materializador seguro.',
+      )
+    }
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction,
+  }
+}
+
+async function runMaterializeModuleExpansionValidation() {
+  let fixture = await buildPhaseExecutionFixture({
+    workspaceName: 'fullstack-project-module-expansion-materialization',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'frontend-mock-flow',
+    requestId: 'smoke-module-materialization-frontend',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'backend-contracts',
+    requestId: 'smoke-module-materialization-backend',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'database-design',
+    requestId: 'smoke-module-materialization-database',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'local-validation',
+    requestId: 'smoke-module-materialization-validation',
+  })
+  const reusablePlanningContext = buildReusablePlanningContext()
+  const testCase = phaseExecutionValidationCases.materializeModuleExpansion
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: testCase.goal,
+    context: testCase.context,
+    workspacePath: fixture.workspacePath,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  const failures = []
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const nextExpectedAction = String(decision?.nextExpectedAction || '').trim()
+  const materializationPlan =
+    decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+      ? decision.materializationPlan
+      : null
+  const moduleExpansionPlan =
+    decision?.moduleExpansionPlan && typeof decision.moduleExpansionPlan === 'object'
+      ? decision.moduleExpansionPlan
+      : null
+  const localProjectManifest =
+    decision?.localProjectManifest &&
+    typeof decision.localProjectManifest === 'object'
+      ? decision.localProjectManifest
+      : null
+  const executionScope =
+    decision?.executionScope && typeof decision.executionScope === 'object'
+      ? decision.executionScope
+      : null
+  const allowedTargetPaths = summarizeUniqueStrings(
+    executionScope?.allowedTargetPaths,
+    32,
+  ).map(normalizePathForComparison)
+  const expectedTargets = [
+    `${fixture.projectRootRelativePath}/frontend/src/mock-data.js`,
+    `${fixture.projectRootRelativePath}/frontend/src/components/App.js`,
+    `${fixture.projectRootRelativePath}/frontend/src/styles.css`,
+    `${fixture.projectRootRelativePath}/backend/src/modules/notifications.js`,
+    `${fixture.projectRootRelativePath}/backend/src/routes/notifications.js`,
+    `${fixture.projectRootRelativePath}/shared/contracts/domain.js`,
+    `${fixture.projectRootRelativePath}/shared/types/contracts.js`,
+    `${fixture.projectRootRelativePath}/database/schema.sql`,
+    `${fixture.projectRootRelativePath}/database/seeds/seed-local.sql`,
+    `${fixture.projectRootRelativePath}/docs/architecture.md`,
+    `${fixture.projectRootRelativePath}/docs/local-runbook.md`,
+    `${fixture.projectRootRelativePath}/docs/validation-report.md`,
+    `${fixture.projectRootRelativePath}/jefe-project.json`,
+  ].map(normalizePathForComparison)
+
+  if (strategy !== 'materialize-module-expansion-plan') {
+    failures.push(
+      `Estrategia incorrecta. Esperado: materialize-module-expansion-plan. Recibido: ${strategy || '(vacia)'}.`,
+    )
+  }
+  if (executionMode !== 'executor') {
+    failures.push(
+      `executionMode incorrecto. Esperado: executor. Recibido: ${executionMode || '(vacio)'}.`,
+    )
+  }
+  if (nextExpectedAction !== 'execute-plan') {
+    failures.push(
+      `nextExpectedAction incorrecto. Esperado: execute-plan. Recibido: ${nextExpectedAction || '(vacio)'}.`,
+    )
+  }
+  if (!moduleExpansionPlan) {
+    failures.push('moduleExpansionPlan ausente en materialize-module-expansion-plan.')
+  } else {
+    const moduleSummary = summarizeModuleExpansionPlan(moduleExpansionPlan)
+    if (moduleSummary.moduleId !== 'notifications') {
+      failures.push('moduleExpansionPlan.moduleId deberia ser notifications.')
+    }
+    if (!moduleSummary.safeToMaterialize) {
+      failures.push('moduleExpansionPlan deberia quedar materializable en el caso positivo.')
+    }
+  }
+  if (!materializationPlan) {
+    failures.push('materializationPlan ausente en materialize-module-expansion-plan.')
+  }
+  expectedTargets.forEach((targetPath) => {
+    if (!allowedTargetPaths.includes(targetPath)) {
+      failures.push(`allowedTargetPaths no incluye ${targetPath}.`)
+    }
+  })
+  if (
+    allowedTargetPaths.some((targetPath) =>
+      /package\.json$|node_modules|\.env$|docker|deploy/i.test(targetPath),
+    )
+  ) {
+    failures.push('allowedTargetPaths no deberia incluir package.json, node_modules, .env, docker ni deploy.')
+  }
+
+  if (!localProjectManifest) {
+    failures.push('localProjectManifest ausente en materialize-module-expansion-plan.')
+  } else {
+    const manifestSummary = summarizeLocalProjectManifest(localProjectManifest)
+    const moduleEntry = manifestSummary.modules.find((entry) => entry.id === 'notifications')
+    const phaseEntry = manifestSummary.phases.find(
+      (entry) => entry.id === 'module-expansion-notifications',
+    )
+    if (manifestSummary.nextRecommendedPhase !== 'review-and-expand') {
+      failures.push('localProjectManifest.nextRecommendedPhase deberia volver a review-and-expand.')
+    }
+    if (!moduleEntry || moduleEntry.status !== 'done') {
+      failures.push('localProjectManifest deberia registrar notifications como modulo done.')
+    }
+    if (!phaseEntry || phaseEntry.status !== 'done') {
+      failures.push('localProjectManifest deberia registrar module-expansion-notifications como done.')
+    }
+  }
+
+  if (materializationPlan) {
+    const task = buildLocalMaterializationTask({
+      plan: materializationPlan,
+      workspacePath: fixture.workspacePath,
+      requestId: 'smoke-module-expansion-materialization',
+      instruction: decision.instruction || '',
+      brainStrategy: decision.strategy || '',
+      businessSector: decision.businessSector || '',
+      businessSectorLabel: decision.businessSectorLabel || '',
+      creativeDirection: decision.creativeDirection || null,
+      reusableArtifactLookup: decision.reusableArtifactLookup || null,
+      reusableArtifactsFound: decision.reusableArtifactsFound || 0,
+      reuseDecision: decision.reuseDecision === true,
+      reuseReason: decision.reuseReason || '',
+      reusedArtifactIds: Array.isArray(decision.reusedArtifactIds)
+        ? decision.reusedArtifactIds
+        : [],
+      reuseMode: decision.reuseMode || 'none',
+      reuseMaterialization: null,
+      materializationPlanSource: decision.materializationPlanSource || 'planner',
+    })
+
+    if (!task) {
+      failures.push('No se pudo construir la tarea local deterministica del modulo notifications.')
+    } else {
+      const beforeSnapshot = {
+        packageJson: fs.readFileSync(path.join(fixture.projectRootPath, 'package.json'), 'utf8'),
+        scriptsReadme: fs.readFileSync(path.join(fixture.projectRootPath, 'scripts', 'README.md'), 'utf8'),
+      }
+      const executionResult = await runLocalDeterministicTask(task)
+      if (executionResult?.ok !== true) {
+        failures.push(
+          executionResult?.error ||
+            'La materializacion local del modulo notifications no termino en OK.',
+        )
+      } else {
+        const touchedPaths = toStringArray(executionResult?.details?.touchedPaths, 40).map(
+          normalizePathForComparison,
+        )
+        expectedTargets.forEach((targetPath) => {
+          if (!touchedPaths.some((entry) => entry.endsWith(targetPath))) {
+            failures.push(`La ejecucion real del modulo notifications deberia tocar ${targetPath}.`)
+          }
+        })
+
+        const manifestFromDisk = JSON.parse(fs.readFileSync(fixture.manifestPath, 'utf8'))
+        const manifestSummary = summarizeLocalProjectManifest(manifestFromDisk)
+        const moduleEntry = manifestSummary.modules.find((entry) => entry.id === 'notifications')
+        if (!moduleEntry || moduleEntry.status !== 'done') {
+          failures.push('El manifest en disco deberia registrar notifications como done.')
+        }
+        if (manifestSummary.nextRecommendedPhase !== 'review-and-expand') {
+          failures.push('El manifest en disco deberia volver a review-and-expand.')
+        }
+        if (
+          fs.readFileSync(path.join(fixture.projectRootPath, 'package.json'), 'utf8') !==
+          beforeSnapshot.packageJson
+        ) {
+          failures.push('module-expansion-notifications no deberia tocar package.json.')
+        }
+        if (
+          fs.readFileSync(path.join(fixture.projectRootPath, 'scripts', 'README.md'), 'utf8') !==
+          beforeSnapshot.scriptsReadme
+        ) {
+          failures.push('module-expansion-notifications no deberia tocar scripts/README.md.')
+        }
+
+        ;[
+          path.join(fixture.projectRootPath, 'backend', 'src', 'modules', 'notifications.js'),
+          path.join(fixture.projectRootPath, 'backend', 'src', 'routes', 'notifications.js'),
+          path.join(fixture.projectRootPath, 'shared', 'contracts', 'domain.js'),
+          path.join(fixture.projectRootPath, 'shared', 'types', 'contracts.js'),
+          path.join(fixture.projectRootPath, 'backend', 'src', 'server.js'),
+          path.join(fixture.projectRootPath, 'backend', 'src', 'routes', 'health.js'),
+          path.join(fixture.projectRootPath, 'backend', 'src', 'modules', 'appointments.js'),
+          path.join(fixture.projectRootPath, 'backend', 'src', 'lib', 'response.js'),
+          path.join(fixture.projectRootPath, 'scripts', 'seed-local.js'),
+        ].forEach((filePath) => {
+          execFileSync(process.execPath, ['--check', filePath], { stdio: 'pipe' })
+        })
+      }
+    }
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction,
+  }
+}
+
+async function runMaterializeUnsupportedModuleExpansionValidation() {
+  let fixture = await buildPhaseExecutionFixture({
+    workspaceName: 'fullstack-project-module-expansion-unsupported-materialization',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'frontend-mock-flow',
+    requestId: 'smoke-module-unsupported-materialization-frontend',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'backend-contracts',
+    requestId: 'smoke-module-unsupported-materialization-backend',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'database-design',
+    requestId: 'smoke-module-unsupported-materialization-database',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'local-validation',
+    requestId: 'smoke-module-unsupported-materialization-validation',
+  })
+  const reusablePlanningContext = buildReusablePlanningContext()
+  const testCase = phaseExecutionValidationCases.materializeUnsupportedModuleExpansion
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: testCase.goal,
+    context: testCase.context,
+    workspacePath: fixture.workspacePath,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  const failures = []
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const nextExpectedAction = String(decision?.nextExpectedAction || '').trim()
+  const materializationPlan =
+    decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+      ? decision.materializationPlan
+      : null
+  const executionScope =
+    decision?.executionScope && typeof decision.executionScope === 'object'
+      ? decision.executionScope
+      : null
+  const moduleExpansionPlan =
+    decision?.moduleExpansionPlan && typeof decision.moduleExpansionPlan === 'object'
+      ? decision.moduleExpansionPlan
+      : null
+
+  if (strategy !== 'prepare-module-expansion-plan') {
+    failures.push('Materializar un modulo no soportado deberia volver a prepare-module-expansion-plan.')
+  }
+  if (executionMode !== 'planner-only') {
+    failures.push('Materializar un modulo no soportado no deberia caer en executor.')
+  }
+  if (nextExpectedAction !== 'review-module-expansion') {
+    failures.push('Materializar un modulo no soportado deberia volver a review-module-expansion.')
+  }
+  if (materializationPlan) {
+    failures.push('Un modulo no soportado no deberia devolver materializationPlan.')
+  }
+  if (executionScope) {
+    failures.push('Un modulo no soportado no deberia devolver executionScope ejecutable.')
+  }
+  if (!moduleExpansionPlan) {
+    failures.push('moduleExpansionPlan ausente al pedir materializar un modulo no soportado.')
+  } else {
+    const moduleSummary = summarizeModuleExpansionPlan(moduleExpansionPlan)
+    if (moduleSummary.safeToMaterialize) {
+      failures.push('Un modulo no soportado no deberia prometer materializacion inmediata.')
+    }
+    if (
+      !moduleSummary.blockers.some(
+        (entry) =>
+          entry.toLocaleLowerCase().includes('materializador seguro') ||
+          entry.toLocaleLowerCase().includes('revisarlo manualmente'),
+      ) &&
+      !moduleSummary.reason.toLocaleLowerCase().includes('materializador seguro')
+    ) {
+      failures.push(
+        'El fallback de modulo no soportado deberia explicar que falta un materializador seguro.',
+      )
+    }
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction,
+  }
+}
+
+async function runDuplicateModuleExpansionValidation() {
+  let fixture = await buildPhaseExecutionFixture({
+    workspaceName: 'fullstack-project-module-expansion-duplicate',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'frontend-mock-flow',
+    requestId: 'smoke-module-duplicate-frontend',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'backend-contracts',
+    requestId: 'smoke-module-duplicate-backend',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'database-design',
+    requestId: 'smoke-module-duplicate-database',
+  })
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'local-validation',
+    requestId: 'smoke-module-duplicate-validation',
+  })
+  fixture = await materializeModuleExpansionOnFixture({
+    fixture,
+    moduleLabel: 'notificaciones',
+    requestId: 'smoke-module-duplicate-first-materialization',
+  })
+  const reusablePlanningContext = buildReusablePlanningContext()
+  const testCase = phaseExecutionValidationCases.materializeDuplicateModuleExpansion
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: testCase.goal,
+    context: testCase.context,
+    workspacePath: fixture.workspacePath,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  const failures = []
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const moduleExpansionPlan =
+    decision?.moduleExpansionPlan && typeof decision.moduleExpansionPlan === 'object'
+      ? decision.moduleExpansionPlan
+      : null
+  const materializationPlan =
+    decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+      ? decision.materializationPlan
+      : null
+  const nextActionPlan =
+    decision?.nextActionPlan && typeof decision.nextActionPlan === 'object'
+      ? decision.nextActionPlan
+      : null
+
+  if (strategy !== 'prepare-module-expansion-plan') {
+    failures.push('Un modulo duplicado deberia volver a prepare-module-expansion-plan.')
+  }
+  if (executionMode !== 'planner-only') {
+    failures.push('Un modulo duplicado no deberia caer en executor.')
+  }
+  if (materializationPlan) {
+    failures.push('Un modulo duplicado no deberia devolver materializationPlan para recrearse.')
+  }
+  if (!moduleExpansionPlan) {
+    failures.push('moduleExpansionPlan ausente en el caso duplicado.')
+  } else {
+    const moduleSummary = summarizeModuleExpansionPlan(moduleExpansionPlan)
+    if (moduleSummary.safeToMaterialize) {
+      failures.push('Un modulo duplicado no deberia quedar materializable.')
+    }
+    if (
+      !moduleSummary.blockers.some((entry) =>
+        entry.toLocaleLowerCase().includes('ya existe'),
+      )
+    ) {
+      failures.push('El caso duplicado deberia exponer un blocker claro indicando que el modulo ya existe.')
+    }
+  }
+  if (!nextActionPlan) {
+    failures.push('nextActionPlan ausente en el caso duplicado.')
+  } else {
+    const nextActionSummary = summarizeNextActionPlan(nextActionPlan)
+    if (nextActionSummary.actionType !== 'review-plan') {
+      failures.push('El caso duplicado deberia recomendar review-plan.')
+    }
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction: String(decision?.nextExpectedAction || '').trim(),
   }
 }
 
@@ -4827,6 +5692,11 @@ async function main() {
       await runPrepareLocalValidationValidation(),
       await runMaterializeLocalValidationValidation(),
       await runPrepareReviewAndExpandValidation(),
+      await runPrepareModuleExpansionValidation(),
+      await runPrepareUnsupportedModuleExpansionValidation(),
+      await runMaterializeModuleExpansionValidation(),
+      await runMaterializeUnsupportedModuleExpansionValidation(),
+      await runDuplicateModuleExpansionValidation(),
     ]
     projectPhaseExecutionResults.forEach(printScalableValidationResult)
     console.log('-----------------')
