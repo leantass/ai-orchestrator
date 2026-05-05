@@ -40,6 +40,54 @@ const stockGoalCase = {
   context: '',
   projectLabel: 'gestion de stock para comercio',
 }
+const sportsGoalCase = {
+  goal:
+    'Hacer un sistema fullstack local para reservas de canchas con clientes, canchas, reservas, alertas y utileria local.',
+  context: '',
+  projectLabel: 'reservas de canchas',
+}
+const ecommerceGoalCase = {
+  goal:
+    'Hacer un sistema fullstack local para ecommerce de indumentaria con catalogo, clientes, pedidos, reportes y stock local.',
+  context: '',
+  projectLabel: 'ecommerce de indumentaria',
+}
+const documentGoalCase = {
+  goal:
+    'Hacer un sistema fullstack local documental para expedientes, vencimientos, revisiones, responsables y alertas operativas.',
+  context: '',
+  projectLabel: 'sistema documental',
+}
+const schoolGoalCase = {
+  goal:
+    'Hacer un sistema fullstack local escolar con alumnos, familias, cursos, seguimiento academico y reportes locales.',
+  context: '',
+  projectLabel: 'gestion escolar',
+}
+const realEstateGoalCase = {
+  goal:
+    'Hacer un sistema fullstack local para inmobiliaria con propiedades, consultas, visitas, corredores y seguimiento comercial.',
+  context: '',
+  projectLabel: 'inmobiliaria',
+}
+const securityGoalCase = {
+  goal:
+    'Hacer un sistema fullstack local de seguridad con accesos, alertas, sensores, incidentes y rondas operativas.',
+  context: '',
+  projectLabel: 'seguridad y monitoreo',
+}
+const communityGoalCase = {
+  goal:
+    'Hacer un sistema fullstack local para comunidad social con grupos, publicaciones, miembros, moderacion y actividad reciente.',
+  context: '',
+  projectLabel: 'comunidad social',
+}
+const genericOperationsGoalCase = {
+  goal:
+    'Hacer un sistema fullstack local para gestion operativa de solicitudes internas, prioridades, actividad y seguimiento de casos.',
+  context: '',
+  projectLabel: 'gestion operativa generica',
+}
 
 function normalizeText(value) {
   return String(value || '')
@@ -192,6 +240,114 @@ function executeStaticFrontendBundle(projectRootPath) {
     renderedHtml: rootElement.innerHTML,
     windowObject,
   }
+}
+
+function readStaticFrontendArtifacts(projectRootPath) {
+  const frontendRootPath = path.join(projectRootPath, 'frontend')
+  const indexHtmlPath = path.join(frontendRootPath, 'index.html')
+  const mainJsPath = path.join(frontendRootPath, 'src', 'main.js')
+  const mockDataPath = path.join(frontendRootPath, 'src', 'mock-data.js')
+  const appPath = path.join(frontendRootPath, 'src', 'components', 'App.js')
+  const stylesPath = path.join(frontendRootPath, 'src', 'styles.css')
+  const readmePath = path.join(projectRootPath, 'README.md')
+  const runbookPath = path.join(projectRootPath, 'docs', 'local-runbook.md')
+
+  return {
+    frontendRootPath,
+    indexHtmlPath,
+    mainJsPath,
+    mockDataPath,
+    appPath,
+    stylesPath,
+    readmePath,
+    runbookPath,
+    indexHtml: fs.readFileSync(indexHtmlPath, 'utf8'),
+    mainJs: fs.readFileSync(mainJsPath, 'utf8'),
+    mockDataJs: fs.readFileSync(mockDataPath, 'utf8'),
+    appJs: fs.readFileSync(appPath, 'utf8'),
+    stylesCss: fs.readFileSync(stylesPath, 'utf8'),
+    readmeContent: fs.readFileSync(readmePath, 'utf8'),
+    runbookContent: fs.readFileSync(runbookPath, 'utf8'),
+  }
+}
+
+function pushStaticFrontendCompatibilityFailures(failures, frontendArtifacts) {
+  const orderedScripts = extractOrderedStaticScriptSources(frontendArtifacts.indexHtml)
+
+  pushFailure(
+    failures,
+    !frontendArtifacts.indexHtml.includes('type="module"'),
+    'frontend/index.html no debe usar type="module" para file://.',
+  )
+  pushFailure(
+    failures,
+    JSON.stringify(orderedScripts) ===
+      JSON.stringify([
+        './src/mock-data.js',
+        './src/components/App.js',
+        './src/main.js',
+      ]),
+    'frontend/index.html debe cargar mock-data.js, App.js y main.js como scripts clásicos en ese orden.',
+  )
+  pushFailure(
+    failures,
+    !/\bimport\s/.test(frontendArtifacts.mainJs),
+    'frontend/src/main.js no debe usar import en el scaffold fullstack local.',
+  )
+  pushFailure(
+    failures,
+    !/\bexport\s/.test(frontendArtifacts.mainJs),
+    'frontend/src/main.js no debe usar export en el scaffold fullstack local.',
+  )
+  pushFailure(
+    failures,
+    !/\bexport\s/.test(frontendArtifacts.mockDataJs),
+    'frontend/src/mock-data.js no debe usar export en el scaffold fullstack local.',
+  )
+  pushFailure(
+    failures,
+    !/\bexport\s/.test(frontendArtifacts.appJs),
+    'frontend/src/components/App.js no debe usar export en el scaffold fullstack local.',
+  )
+  pushFailure(
+    failures,
+    !/\bfetch\s*\(/.test(
+      `${frontendArtifacts.mainJs}\n${frontendArtifacts.mockDataJs}\n${frontendArtifacts.appJs}`,
+    ),
+    'El frontend estático no debe usar fetch.',
+  )
+  pushFailure(
+    failures,
+    frontendArtifacts.mockDataJs.includes('window.fullstackPlan'),
+    'frontend/src/mock-data.js debe exponer window.fullstackPlan.',
+  )
+  pushFailure(
+    failures,
+    frontendArtifacts.appJs.includes('window.renderApp'),
+    'frontend/src/components/App.js debe exponer window.renderApp.',
+  )
+  pushFailure(
+    failures,
+    frontendArtifacts.mainJs.includes('window.fullstackPlan') &&
+      frontendArtifacts.mainJs.includes('window.renderApp'),
+    'frontend/src/main.js debe usar window.fullstackPlan y window.renderApp.',
+  )
+  pushFailure(
+    failures,
+    frontendArtifacts.stylesCss.includes('.app-shell') ||
+      frontendArtifacts.stylesCss.includes('.hero-grid'),
+    'frontend/src/styles.css debe contener una presentacion rica para la demo local.',
+  )
+  pushFailure(
+    failures,
+    normalizeText(`${frontendArtifacts.readmeContent}\n${frontendArtifacts.runbookContent}`).includes(
+      'frontend/index.html',
+    ) &&
+      normalizeText(`${frontendArtifacts.readmeContent}\n${frontendArtifacts.runbookContent}`).includes(
+        'file://',
+      ),
+    'README y runbook deben explicar que frontend/index.html se abre directo por file://.',
+  )
 }
 
 async function tryVerifyStaticFrontendInBrowser(indexHtmlPath) {
@@ -1078,6 +1234,179 @@ async function runFullstackStaticFileCompatibilityCase() {
   }
 }
 
+async function runDomainRichnessCase({
+  id,
+  label,
+  workspaceName,
+  goalCase,
+  expectedTokens,
+  forbiddenTokens = [],
+  browserValidation = false,
+}) {
+  const failures = []
+  const fixture = await buildFullstackFixture({
+    workspaceName,
+    goal: goalCase.goal,
+    context: goalCase.context,
+    projectLabel: goalCase.projectLabel,
+  })
+  const reviewDecision = await requestReviewExpandDecision(fixture)
+  const frontendArtifacts = readStaticFrontendArtifacts(fixture.projectRootPath)
+  const combinedArtifacts = [
+    frontendArtifacts.indexHtml,
+    frontendArtifacts.mainJs,
+    frontendArtifacts.mockDataJs,
+    frontendArtifacts.appJs,
+    frontendArtifacts.stylesCss,
+    frontendArtifacts.readmeContent,
+    frontendArtifacts.runbookContent,
+  ].join('\n')
+  const normalizedArtifacts = normalizeText(combinedArtifacts)
+
+  pushStaticFrontendCompatibilityFailures(failures, frontendArtifacts)
+  pushFailure(
+    failures,
+    normalizeIdentifier(reviewDecision?.projectContinuationState?.nextRecommendedPhase) ===
+      'frontend-mock-flow',
+    'Después del scaffold debe recomendar frontend-mock-flow.',
+  )
+  pushFailure(
+    failures,
+    !reviewDecision?.runtimeApprovalState,
+    'El scaffold seguro no debe generar runtimeApprovalState activo.',
+  )
+  pushFailure(
+    failures,
+    !reviewDecision?.approvalRequestPlan,
+    'El scaffold seguro no debe generar approvalRequestPlan activo.',
+  )
+  pushFailure(
+    failures,
+    !fs.existsSync(path.join(fixture.projectRootPath, 'node_modules')) &&
+      !fs.existsSync(path.join(fixture.projectRootPath, '.env')) &&
+      !fs.existsSync(path.join(fixture.projectRootPath, 'Dockerfile')) &&
+      !fs.existsSync(path.join(fixture.projectRootPath, 'docker-compose.yml')),
+    'El scaffold multi-dominio no debe crear node_modules, .env, Dockerfile ni docker-compose.yml.',
+  )
+
+  for (const token of expectedTokens) {
+    pushFailure(
+      failures,
+      normalizedArtifacts.includes(normalizeText(token)),
+      `La demo ${label} debe incluir ${token}.`,
+    )
+  }
+
+  for (const token of forbiddenTokens) {
+    pushFailure(
+      failures,
+      !normalizedArtifacts.includes(normalizeText(token)),
+      `La demo ${label} no debe contaminarse con ${token}.`,
+    )
+  }
+
+  try {
+    const simulatedBundle = executeStaticFrontendBundle(fixture.projectRootPath)
+    const renderedText = normalizeText(simulatedBundle.renderedHtml)
+    const serializedPlan = normalizeText(
+      JSON.stringify(simulatedBundle.windowObject?.fullstackPlan || {}),
+    )
+
+    for (const token of expectedTokens.slice(0, 6)) {
+      pushFailure(
+        failures,
+        renderedText.includes(normalizeText(token)) ||
+          serializedPlan.includes(normalizeText(token)),
+        `La demo ${label} debe renderizar o serializar ${token} en el bundle estático.`,
+      )
+    }
+
+    for (const token of forbiddenTokens) {
+      pushFailure(
+        failures,
+        !renderedText.includes(normalizeText(token)) &&
+          !serializedPlan.includes(normalizeText(token)),
+        `La demo ${label} no debe renderizar ${token} en el bundle estático.`,
+      )
+    }
+  } catch (error) {
+    failures.push(
+      `La ejecución simulada del frontend estático de ${label} falló: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    )
+  }
+
+  if (browserValidation) {
+    const browserVerification = await tryVerifyStaticFrontendInBrowser(
+      frontendArtifacts.indexHtmlPath,
+    )
+    if (browserVerification.available && browserVerification.attempted) {
+      pushFailure(
+        failures,
+        browserVerification.ok === true,
+        `La validación opcional en navegador de ${label} no debe arrojar errores: ${[
+          ...(browserVerification.pageErrors || []),
+          ...(browserVerification.consoleErrors || []),
+        ].join(' | ')}`,
+      )
+      const normalizedBodyText = normalizeText(browserVerification.bodyText)
+      for (const token of expectedTokens.slice(0, 4)) {
+        pushFailure(
+          failures,
+          normalizedBodyText.includes(normalizeText(token)),
+          `La validación en navegador de ${label} debe mostrar ${token}.`,
+        )
+      }
+      for (const token of forbiddenTokens) {
+        pushFailure(
+          failures,
+          !normalizedBodyText.includes(normalizeText(token)),
+          `La validación en navegador de ${label} no debe mostrar ${token}.`,
+        )
+      }
+    }
+  }
+
+  return { id, label, failures }
+}
+
+async function runUtf8SurfaceCase() {
+  const failures = []
+  const files = [
+    'electron/main.cjs',
+    'src/App.tsx',
+    'scripts/ai-operator-e2e-smoke.mjs',
+    'docs/operator-demo-flow.md',
+    'docs/release-candidate-checklist.md',
+  ]
+  const suspiciousPatterns = [
+    { re: /\uFFFD/g, label: 'carácter de reemplazo' },
+    { re: /\u00C3/g, label: 'secuencia mojibake C3' },
+    { re: /\u00C2/g, label: 'secuencia mojibake C2' },
+    {
+      re: /[A-Za-zÁÉÍÓÚáéíóúÑñ]+\?[A-Za-zÁÉÍÓÚáéíóúÑñ]+/g,
+      label: 'palabra visible con ? en el medio',
+    },
+  ]
+
+  for (const relativePath of files) {
+    const source = fs.readFileSync(path.join(repoRoot, relativePath), 'utf8')
+    for (const entry of suspiciousPatterns) {
+      if (entry.re.test(source)) {
+        failures.push(`${relativePath} contiene ${entry.label}.`)
+      }
+      entry.re.lastIndex = 0
+    }
+  }
+
+  return {
+    id: 'operator-utf8-surface',
+    label: 'Superficie visible sin mojibake',
+    failures,
+  }
+}
+
 async function runPhaseRecommendationCase({ id, label, phaseStatuses, expectedNextPhase, includePhases = true }) {
   const failures = []
   let fixture = await buildFullstackFixture({
@@ -1573,6 +1902,26 @@ async function runUiHelperSanityCase() {
     /summarizeUniqueStrings\(/.test(appSource),
     'ProjectContinuityCenterCard debe seguir pudiendo resumir listas visibles sin depender de helpers faltantes.',
   )
+  pushFailure(
+    failures,
+    appSource.includes('Preparar materialización fullstack local'),
+    'La UI debe exponer el CTA para preparar materialización fullstack local.',
+  )
+  pushFailure(
+    failures,
+    appSource.includes('Aprobaciones futuras'),
+    'La UI debe distinguir aprobaciones futuras del bloqueo actual.',
+  )
+  pushFailure(
+    failures,
+    appSource.includes('Materializar seguro'),
+    'La UI debe mantener el CTA de materialización segura cuando corresponda.',
+  )
+  pushFailure(
+    failures,
+    !appSource.includes('Resolver aprobación sensible'),
+    'La UI no debe exponer “Resolver aprobación sensible” como texto principal del flujo seguro.',
+  )
 
   return {
     id: 'operator-ui-helper-sanity',
@@ -1588,6 +1937,160 @@ async function main() {
     results.push(await runZeroSystemCase())
     results.push(await runFullstackBaseCase())
     results.push(await runFullstackStaticFileCompatibilityCase())
+    results.push(
+      await runDomainRichnessCase({
+        id: 'operator-domain-veterinary',
+        label: 'Dominio veterinaria rico',
+        workspaceName: 'operator-domain-veterinary',
+        goalCase: veterinaryGoalCase,
+        expectedTokens: [
+          'veterinaria',
+          'clientes',
+          'mascotas',
+          'turnos',
+          'recordatorios',
+          'reportes',
+          'inventario',
+          'veterinarios',
+        ],
+        forbiddenTokens: ['Clínica médica', 'Pediatría', 'pacientes'],
+        browserValidation: true,
+      }),
+    )
+    results.push(
+      await runDomainRichnessCase({
+        id: 'operator-domain-sports',
+        label: 'Dominio reservas y canchas',
+        workspaceName: 'operator-domain-sports',
+        goalCase: sportsGoalCase,
+        expectedTokens: [
+          'reservas',
+          'canchas',
+          'clientes',
+          'utilería',
+          'ocupación',
+          'disponibilidad',
+        ],
+      }),
+    )
+    results.push(
+      await runDomainRichnessCase({
+        id: 'operator-domain-ecommerce',
+        label: 'Dominio ecommerce',
+        workspaceName: 'operator-domain-ecommerce',
+        goalCase: ecommerceGoalCase,
+        expectedTokens: [
+          'ecommerce',
+          'catálogo',
+          'productos',
+          'clientes',
+          'pedidos',
+          'stock',
+          'reportes',
+        ],
+        forbiddenTokens: ['mascotas', 'veterinaria', 'pediatría'],
+      }),
+    )
+    results.push(
+      await runDomainRichnessCase({
+        id: 'operator-domain-documental',
+        label: 'Dominio documental',
+        workspaceName: 'operator-domain-documental',
+        goalCase: documentGoalCase,
+        expectedTokens: [
+          'documental',
+          'expedientes',
+          'vencimientos',
+          'revisiones',
+          'responsables',
+          'documentos',
+        ],
+        forbiddenTokens: ['carrito', 'checkout', 'mascotas'],
+        browserValidation: true,
+      }),
+    )
+    results.push(
+      await runDomainRichnessCase({
+        id: 'operator-domain-school',
+        label: 'Dominio escolar',
+        workspaceName: 'operator-domain-school',
+        goalCase: schoolGoalCase,
+        expectedTokens: [
+          'familias',
+          'alumnos',
+          'seguimiento',
+          'cursos',
+          'escolar',
+          'reportes',
+        ],
+        forbiddenTokens: ['checkout', 'propiedades'],
+      }),
+    )
+    results.push(
+      await runDomainRichnessCase({
+        id: 'operator-domain-real-estate',
+        label: 'Dominio inmobiliaria',
+        workspaceName: 'operator-domain-real-estate',
+        goalCase: realEstateGoalCase,
+        expectedTokens: [
+          'inmobiliaria',
+          'propiedades',
+          'consultas',
+          'visitas',
+          'corredores',
+        ],
+        forbiddenTokens: ['mascotas', 'pacientes', 'pedidos'],
+      }),
+    )
+    results.push(
+      await runDomainRichnessCase({
+        id: 'operator-domain-security',
+        label: 'Dominio seguridad',
+        workspaceName: 'operator-domain-security',
+        goalCase: securityGoalCase,
+        expectedTokens: [
+          'seguridad',
+          'accesos',
+          'alertas',
+          'sensores',
+          'incidentes',
+          'rondas',
+        ],
+        forbiddenTokens: ['checkout', 'mascotas', 'propiedades'],
+      }),
+    )
+    results.push(
+      await runDomainRichnessCase({
+        id: 'operator-domain-community',
+        label: 'Dominio comunidad social',
+        workspaceName: 'operator-domain-community',
+        goalCase: communityGoalCase,
+        expectedTokens: [
+          'comunidad',
+          'grupos',
+          'publicaciones',
+          'miembros',
+          'moderación',
+        ],
+        forbiddenTokens: ['pediatría', 'propiedades', 'pedidos'],
+      }),
+    )
+    results.push(
+      await runDomainRichnessCase({
+        id: 'operator-domain-operations',
+        label: 'Fallback genérico operativo',
+        workspaceName: 'operator-domain-operations',
+        goalCase: genericOperationsGoalCase,
+        expectedTokens: [
+          'operaciones',
+          'solicitudes',
+          'actividad',
+          'prioridades',
+          'casos',
+        ],
+        forbiddenTokens: ['pediatría', 'propiedades', 'checkout'],
+      }),
+    )
     results.push(
       await runPhaseRecommendationCase({
         id: 'operator-no-phases',
@@ -1662,6 +2165,7 @@ async function main() {
     results.push(await runFinalReadinessCase())
     results.push(await runUiContractSanityCase())
     results.push(await runUiHelperSanityCase())
+    results.push(await runUtf8SurfaceCase())
 
     const failedResults = results.filter((result) => result.failures.length > 0)
 

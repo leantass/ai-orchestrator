@@ -1,86 +1,139 @@
 # Flujo de Demo para Operador
 
+## Objetivo
+
+Esta guía sirve para mostrar JEFE como orquestador local seguro: planifica, materializa una demo estática rica, deja continuidad por fases y no ejecuta nada sensible sin aprobación explícita.
+
 ## Escenario recomendado
 
-Usar un pedido simple pero rico en continuidad:
+Usá un pedido que obligue a JEFE a demostrar dominio, continuidad y seguridad:
 
 > Haceme un sistema fullstack local para una veterinaria, con clientes, mascotas, turnos, recordatorios, reportes e inventario básico. Quiero una demo local segura con datos mock, sin instalar dependencias, sin levantar backend real, sin crear base de datos real y sin tocar integraciones externas.
 
+También podés usar otras verticales ya soportadas:
+
+- reservas y canchas
+- ecommerce y catálogo
+- inmobiliaria y propiedades
+- sistema documental y vencimientos
+- gestión escolar y familias
+- seguridad, accesos y sensores
+- comunidad social y grupos
+- gestión operativa genérica
+
 ## Recorrido sugerido
 
-1. Confirmar que JEFE elija un delivery level seguro y devuelva blueprint + roadmap.
-2. Materializar la base `fullstack-local`.
-3. Abrir `frontend/index.html` con doble click y confirmar que la demo estática carga con `file://`, sin servidor ni instalación de dependencias.
-4. Confirmar que la demo muestre una veterinaria real y no una clínica humana genérica:
-   - dashboard
-   - clientes
-   - mascotas
-   - turnos
-   - recordatorios
-   - reportes
-   - inventario
-5. Probar interacción local:
-   - cambiar estado de un turno
-   - buscar un cliente o mascota
-   - seleccionar una ficha
-   - marcar un recordatorio como revisado
-   - filtrar stock bajo
-6. Avanzar las fases base:
-   - `frontend-mock-flow`
-   - `backend-contracts`
-   - `database-design`
-   - `local-validation`
-7. Abrir el centro de continuidad.
-8. Confirmar el próximo paso recomendado.
-9. Preparar `review-and-expand`.
-10. Expandir al menos un módulo seguro:
-   - `notifications`
-   - `reports`
-   - `inventory`
-11. Revisar el estado para demo.
-12. Pedir una acción sensible como `npm install` o runtime local.
-13. Confirmar que JEFE solo prepare la aprobación y no ejecute nada real.
+1. Confirmá que JEFE elija un delivery level seguro y devuelva blueprint, roadmap y siguiente paso.
+2. Revisá el plan escalable y usá el CTA principal para preparar la materialización fullstack local.
+3. Ejecutá la materialización segura.
+4. En el cierre, verificá:
+   - carpeta creada
+   - operaciones aplicadas
+   - validaciones
+   - ruta de `frontend/index.html`
+   - próxima fase segura recomendada
+5. Abrí `frontend/index.html` con doble click.
+6. Confirmá que la demo carga por `file://`, sin servidor, sin `npm install` y sin pantalla blanca.
+7. Recorré la demo y validá que muestre una vertical real, no un scaffold genérico vacío.
 
-## Qué debería mostrar la UI
+## Qué debería mostrar una demo rica
 
-- `Próximo paso recomendado`
-- `Opciones para seguir`
-- `Estado para demo`
-- `Qué ya está construido`
-- `Qué sigue siendo mock`
-- `Aprobaciones pendientes`
-- `Comandos propuestos`
-- `Validaciones obligatorias`
-- `Alternativa segura`
-- `Aprobaciones futuras`
+- header o hero operativo
+- métricas mock visibles
+- navegación local por secciones
+- listas o tablas claras
+- panel de detalle o selección
+- alertas o pendientes
+- actividad reciente
+- mensaje explícito de modo local seguro
+- al menos dos o tres interacciones locales en memoria
+
+## Qué probar dentro de la demo
+
+- cambiar de sección
+- buscar o filtrar
+- seleccionar una entidad
+- cambiar un estado mock
+- marcar un pendiente como revisado
+- detectar stock bajo, alerta o vencimiento según el dominio
+
+## Continuidad esperada después del scaffold
+
+Después de materializar `fullstack-local`, JEFE debería recomendar esta cadena segura:
+
+- `frontend-mock-flow`
+- `backend-contracts`
+- `database-design`
+- `local-validation`
+- `review-and-expand`
+
+El operador no debería ver esas restricciones como bloqueos actuales:
+
+- sin instalar dependencias
+- sin backend real
+- sin DB real
+- sin Docker
+- sin deploy
+
+Eso debe quedar como restricción respetada o aprobación futura, no como algo que impide el flujo seguro.
+
+## Cómo leer readiness
+
+JEFE debería poder decir con claridad si el proyecto está:
+
+- en planificación
+- con scaffold creado
+- con frontend mock listo
+- con backend contracts listos
+- con database design listo
+- con validación local lista
+- listo para demo local segura
+- todavía no listo para producto real
+
+## Cuándo hay una aprobación real
+
+Una aprobación real aparece recién cuando el operador pide salir del modo seguro, por ejemplo:
+
+- `npm install`
+- levantar runtime real
+- conectar DB real
+- correr migraciones o seeds reales
+- Docker
+- deploy
+- auth real
+- pagos reales
+- integraciones externas
+
+En esos casos JEFE tiene que mostrar preview, riesgo, comandos propuestos y validaciones, pero no ejecutar nada todavía.
 
 ## Checklist de demo salió bien
 
 - el wizard no se rompió
-- la continuidad se entendió sin mirar JSON
-- los módulos seguros se ofrecieron como tales
-- los módulos ya hechos no se duplicaron
-- readiness explicó qué falta y qué ya está listo
-- las aprobaciones se vieron como preview, no como ejecución
-- no apareció ningún botón peligroso para runtime real
-- el botón para preparar la materialización fullstack se entendió como CTA principal
+- el plan escalable fue entendible
+- el CTA para preparar materialización se vio como acción principal
+- el scaffold se abrió por `file://`
+- la demo mostró contenido específico del dominio
+- la continuidad recomendó la siguiente fase segura
+- readiness explicó qué ya está listo y qué sigue siendo mock
+- las aprobaciones futuras no aparecieron como bloqueo actual
+- no apareció ningún botón peligroso para ejecutar runtime real
 
 ## Si algo sale mal
 
-1. Revisar `jefe-project.json` para ver fases, módulos y next action.
-2. Correr:
+1. Revisá `jefe-project.json` para ver fases, módulos y `nextRecommendedPhase`.
+2. Revisá `docs/local-runbook.md` dentro del proyecto generado.
+3. Corré:
    - `npm run ai-planner-smoke`
    - `node scripts/ai-release-smoke.mjs`
    - `node scripts/ai-operator-e2e-smoke.mjs`
-3. Verificar que no hayan quedado archivos temporales fuera de `.tmp`.
-4. Confirmar que no se haya creado `.env`, `node_modules`, `Dockerfile` ni `docker-compose.yml`.
+4. Confirmá que no se hayan creado `.env`, `node_modules`, `Dockerfile` ni `docker-compose.yml`.
 
-## Qué NO probar todavía
+## Qué no probar todavía
 
 - `npm install` real
-- dev server de proyectos generados
+- dev server del proyecto generado
 - backend real escuchando puerto
-- DB real
+- base de datos real
 - migraciones o seeds reales
 - Docker real
 - deploy real

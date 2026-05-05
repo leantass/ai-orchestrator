@@ -9184,6 +9184,10 @@ const isFrontendProjectMaterializationDecision = (value: unknown) =>
   normalizeOptionalString(value).toLocaleLowerCase() ===
   'materialize-frontend-project-plan'
 
+const isFullstackLocalMaterializationDecision = (value: unknown) =>
+  normalizeOptionalString(value).toLocaleLowerCase() ===
+  'materialize-fullstack-local-plan'
+
 const parseMaterializationExecutionStats = (value: string) => {
   const normalizedValue = normalizeOptionalString(value)
   const operationsMatch = normalizedValue.match(/Operaciones aplicadas:\s*(\d+)/i)
@@ -12083,6 +12087,20 @@ function App() {
     (isSafeFirstDeliveryMaterializationDecision(plannerExecutionMetadata.decisionKey) ||
       isSafeFirstDeliveryMaterializationDecision(plannerExecutionMetadata.strategy) ||
       isSafeFirstDeliveryMaterializationDecision(latestBrainStrategy))
+  const resultIsFrontendProjectMaterialization =
+    resultStatusPresentation.label === 'Ejecución completada' &&
+    (isFrontendProjectMaterializationDecision(plannerExecutionMetadata.decisionKey) ||
+      isFrontendProjectMaterializationDecision(plannerExecutionMetadata.strategy) ||
+      isFrontendProjectMaterializationDecision(latestBrainStrategy))
+  const resultIsFullstackLocalMaterialization =
+    resultStatusPresentation.label === 'Ejecución completada' &&
+    (isFullstackLocalMaterializationDecision(plannerExecutionMetadata.decisionKey) ||
+      isFullstackLocalMaterializationDecision(plannerExecutionMetadata.strategy) ||
+      isFullstackLocalMaterializationDecision(latestBrainStrategy))
+  const shouldShowLocalMaterializationSummary =
+    resultIsSafeFirstDeliveryMaterialization ||
+    resultIsFrontendProjectMaterialization ||
+    resultIsFullstackLocalMaterialization
   const resultMaterializationFilePaths = mergeUniqueStringValues(
     latestCreatedArtifacts.filter((pathValue) => isLikelyFilePath(pathValue)),
     latestTouchedArtifactsRaw.filter((pathValue) => isLikelyFilePath(pathValue)),
@@ -12127,18 +12145,50 @@ function App() {
       ? 'No se usó bridge y Codex no fue requerido para materializar esta salida.'
       : 'La corrida no informó una resolución completamente local.'
   const resultMaterializationLimits = [
+    'Sin npm install.',
+    'Sin node_modules.',
     'Datos mock editables.',
     'Sin backend real.',
+    'Sin base de datos real.',
     'Sin autenticación real.',
     'Sin pagos reales.',
-    'Sin deploy.',
+    'Sin Docker ni deploy.',
   ]
+  const resultMaterializationReadinessLabel =
+    normalizeOptionalString(activeProjectReadinessState?.operatorSummary) ||
+    normalizeOptionalString(activeProjectReadinessState?.lastValidationSummary) ||
+    'Todavía no hay un resumen de readiness para esta salida.'
+  const resultMaterializationNextPhaseLabel =
+    normalizeOptionalString(activeProjectContinuationState?.nextRecommendedPhase) ||
+    normalizeOptionalString(activeLocalProjectManifest?.nextRecommendedPhase) ||
+    normalizeOptionalString(activeImplementationRoadmap?.nextRecommendedPhase) ||
+    'Sin fase segura declarada'
+  const resultMaterializationSummaryTitle = resultIsSafeFirstDeliveryMaterialization
+    ? 'Primera entrega segura generada'
+    : resultIsFullstackLocalMaterialization
+      ? 'Demo fullstack local generada'
+      : resultIsFrontendProjectMaterialization
+        ? 'Frontend local generado'
+        : 'Entrega local generada'
+  const resultMaterializationSummaryDescription = resultIsSafeFirstDeliveryMaterialization
+    ? 'Resumen corto de la materialización segura para revisar rápido qué se creó, cómo abrirlo y cuáles son sus límites.'
+    : resultIsFullstackLocalMaterialization
+      ? 'Resumen corto del scaffold fullstack local para abrir la demo, revisar lo generado y saber cuál es la siguiente fase segura.'
+      : resultIsFrontendProjectMaterialization
+        ? 'Resumen corto del frontend local generado para abrirlo por file:// y validar la interfaz sin levantar runtime real.'
+        : 'Resumen corto de la salida local materializada.'
   const resultMaterializationSuggestedNextSteps = [
     resultMaterializationIndexPathLabel !== 'No disponible'
       ? `Abrir ${resultMaterializationIndexPathLabel} en el navegador para revisar la interfaz.`
       : 'Abrir el index.html generado para revisar la interfaz.',
+    resultIsFullstackLocalMaterialization
+      ? 'Revisar backend, shared, database y docs como referencia revisable del mismo dominio.'
+      : 'Revisar los archivos creados y confirmar que la salida siga siendo local y mock.',
+    resultMaterializationNextPhaseLabel !== 'Sin fase segura declarada'
+      ? `Preparar la siguiente fase segura: ${resultMaterializationNextPhaseLabel}.`
+      : 'Definir la siguiente fase segura antes de salir del modo local.',
     'Validar las acciones locales y el log de actividad de la entrega mock.',
-    'Recién después definir la siguiente fase o una nueva materialización más profunda.',
+    'Recién después evaluar si hace falta una aprobación futura para runtime real.',
   ]
   const latestHumanDecision = [...resolvedDecisions]
     .filter(
@@ -18993,10 +19043,10 @@ function App() {
                 {activeWizardStep === 'result' ? (
                   <div className="grid h-full gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
                     <div className="space-y-4">
-                      {resultIsSafeFirstDeliveryMaterialization ? (
+                      {shouldShowLocalMaterializationSummary ? (
                         <ResultSectionCard
-                          title="Primera entrega segura generada"
-                          description="Resumen corto de la materialización segura para revisar rápido qué se creó, cómo abrirlo y cuáles son sus límites."
+                          title={resultMaterializationSummaryTitle}
+                          description={resultMaterializationSummaryDescription}
                         >
                           <ResultKeyValueGrid
                             items={[
@@ -19031,6 +19081,27 @@ function App() {
                                   resultMaterializationIndexPathLabel !== 'No disponible'
                                     ? `Abrir ${resultMaterializationIndexPathLabel}`
                                     : 'Abrir el index.html generado',
+                                detail:
+                                  resultIsFrontendProjectMaterialization ||
+                                  resultIsFullstackLocalMaterialization
+                                    ? 'Se abre por file://, sin servidor ni npm install.'
+                                    : 'Salida local y revisable dentro del workspace.',
+                              },
+                              {
+                                label: 'Próxima fase segura',
+                                value: resultMaterializationNextPhaseLabel,
+                                detail:
+                                  normalizeOptionalString(
+                                    activeProjectContinuationState?.operatorMessage,
+                                  ) || 'Sin mensaje adicional.',
+                              },
+                              {
+                                label: 'Readiness actual',
+                                value:
+                                  getProjectReadinessLevelLabel(
+                                    activeProjectReadinessState?.readinessLevel,
+                                  ) || 'Sin estado',
+                                detail: resultMaterializationReadinessLabel,
                               },
                             ]}
                           />
@@ -19090,9 +19161,9 @@ function App() {
                         </ResultSectionCard>
                       ) : null}
                       <ResultSectionCard
-                        title={resultIsSafeFirstDeliveryMaterialization ? 'Cierre técnico' : 'Cierre'}
+                        title={shouldShowLocalMaterializationSummary ? 'Cierre técnico' : 'Cierre'}
                         description={
-                          resultIsSafeFirstDeliveryMaterialization
+                          shouldShowLocalMaterializationSummary
                             ? 'Detalle humano y técnico del cierre, por si necesitás inspeccionar la corrida completa.'
                             : 'Lectura humana del resultado y estado final de la corrida.'
                         }

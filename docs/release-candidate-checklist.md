@@ -2,119 +2,136 @@
 
 ## Objetivo
 
-Esta guía sirve para demostrar JEFE como plataforma local de programación automatizada sin salir del modo seguro.
+Esta guía sirve para validar JEFE como plataforma local de programación automatizada en modo seguro: planifica, materializa demos ricas por `file://`, deja continuidad útil y mantiene las acciones sensibles fuera de ejecución.
 
 ## Escenario 1: pedir un sistema desde cero
 
-1. Pedir un sistema nuevo, por ejemplo:
-   `Haceme un sistema para turnos de veterinaria.`
-2. Confirmar que JEFE devuelva:
+1. Pedí un sistema nuevo, por ejemplo:
+   - `Haceme un sistema fullstack local para una veterinaria...`
+   - `Haceme un sistema fullstack local para reservas de canchas...`
+   - `Haceme un sistema fullstack local para ecommerce...`
+2. Confirmá que JEFE devuelva:
    - delivery level razonable
    - blueprint
    - roadmap
    - siguiente paso seguro
-3. Verificar que la UI muestre continuidad y readiness en modo planificación.
+3. Verificá que no prometa runtime real ni `npm install`.
 
-## Escenario 2: avanzar las fases base
+## Escenario 2: materializar un fullstack-local rico
 
-1. Materializar `fullstack-local`.
-2. Abrir `frontend/index.html` con doble click para confirmar que la demo estática local levanta con `file://`, sin servidor y sin `npm install`.
-3. Confirmar que la primera demo local no sea solo un scaffold mínimo y muestre, según el dominio:
-   - secciones navegables
-   - métricas mock
-   - detalle lateral o ficha seleccionada
-   - interacciones client-side locales
-   - mensajes claros de modo seguro
-4. Para veterinaria, confirmar específicamente:
-   - clientes y dueños
-   - mascotas
-   - turnos
-   - recordatorios
-   - reportes
-   - inventario básico
-   - ausencia de términos de clínica humana como concepto principal
-5. Preparar y materializar:
+1. Prepará la materialización fullstack local.
+2. Ejecutá la materialización segura.
+3. Verificá que el cierre muestre:
+   - carpeta creada
+   - operaciones aplicadas
+   - validaciones
+   - ruta de `frontend/index.html`
+   - próxima fase segura
+   - readiness actual
+4. Confirmá que el proyecto generado incluya:
+   - `frontend/`
+   - `backend/`
+   - `shared/`
+   - `database/`
+   - `docs/`
+   - `jefe-project.json`
+
+## Escenario 3: abrir la demo estática
+
+1. Abrí `frontend/index.html` con doble click.
+2. Confirmá que la demo carga por `file://`.
+3. Confirmá que:
+   - no usa servidor
+   - no requiere `npm install`
+   - no deja pantalla blanca
+   - muestra navegación, métricas, listas, detalle y actividad
+
+## Escenario 4: validar que la demo sea rica y del dominio correcto
+
+Para cualquier vertical, la demo debería incluir:
+
+- secciones navegables
+- métricas mock
+- alertas o pendientes
+- detalle de entidad seleccionada
+- al menos dos o tres interacciones locales en memoria
+
+Para veterinaria, confirmar específicamente:
+
+- clientes o dueños
+- mascotas
+- turnos
+- recordatorios
+- reportes
+- inventario básico
+- veterinarios o profesionales veterinarios
+- ausencia de “Clínica médica”, “Pediatría” y “pacientes” como concepto principal
+
+## Escenario 5: avanzar continuidad por fases
+
+1. Después del scaffold, confirmar que la siguiente fase recomendada sea `frontend-mock-flow`.
+2. Luego preparar y materializar, cuando corresponda:
    - `frontend-mock-flow`
    - `backend-contracts`
    - `database-design`
    - `local-validation`
-6. Confirmar en `jefe-project.json`:
+3. Verificar en `jefe-project.json`:
    - fases registradas
    - `nextRecommendedPhase`
    - `nextRecommendedAction`
    - `readinessLevel`
 
-## Escenario 3: expandir módulos seguros
+## Escenario 6: interpretar readiness
 
-1. Preparar `review-and-expand`.
-2. Elegir un módulo seguro:
-   - `notifications`
-   - `reports`
-   - `inventory`
-3. Preparar el plan del módulo.
-4. Materializarlo solo si JEFE lo marca como seguro.
-5. Confirmar que el manifest no duplique módulos ya hechos.
-
-## Escenario 4: ver bloqueos y aprobaciones
-
-1. Pedir acciones sensibles, por ejemplo:
-   - `npm install`
-   - runtime local
-   - DB real
-   - auth real
-   - deploy
-   - Docker
-   - integraciones externas
-2. Confirmar que JEFE:
-   - no ejecute nada real
-   - devuelva un paquete de aprobación
-   - muestre el preview controlado con comandos propuestos
-   - muestre riesgo, alternativa segura y alcance
-   - mantenga todo en planner-only o bloqueado
-3. Revisar también `docs/runtime-approval-flow.md` para interpretar el preview, la frase sugerida de aprobación y las validaciones obligatorias.
-
-## Escenario 5: interpretar readiness
-
-1. Abrir el centro de continuidad.
-2. Revisar:
+1. Abrí el centro de continuidad.
+2. Revisá:
    - `Estado para demo`
    - `Qué ya está construido`
    - `Qué sigue siendo mock`
-   - `Requiere aprobación`
-   - `Bloqueado por seguridad`
-   - `Guía rápida para probar`
-3. Confirmar que JEFE explique:
-   - si está listo para demo local segura
+   - `Próxima fase segura`
+   - `Aprobaciones futuras`
+3. Confirmá que JEFE explique:
+   - si la demo local segura ya está lista
    - qué sigue siendo mock
    - qué falta para producto real
-   - cuál es el próximo paso recomendado
 
-## Qué NO probar todavía
+## Escenario 7: revisar aprobaciones futuras sin bloquear el flujo seguro
 
-- no correr `npm install`
-- no levantar runtime real
-- no abrir backend real
-- no abrir puertos manualmente
-- no crear DB real
-- no ejecutar SQL
-- no correr migraciones
-- no correr seeds
-- no crear Dockerfile real
-- no crear docker-compose real
-- no hacer deploy
-- no configurar auth real
-- no tocar pagos reales
-- no integrar APIs externas reales
-- no crear `.env` real
+1. Pedí acciones sensibles, por ejemplo:
+   - `npm install`
+   - runtime local real
+   - DB real
+   - Docker
+   - deploy
+   - auth real
+   - pagos reales
+   - integraciones externas
+2. Confirmá que JEFE:
+   - no ejecute nada real
+   - devuelva preview y aprobación controlada
+   - muestre riesgo, comandos propuestos y validaciones
+   - no convierta esas aprobaciones futuras en bloqueo del scaffold seguro actual
 
-## Criterio de demo segura
+## Qué no debería pasar nunca
 
-La demo se considera segura cuando:
+- `type="module"` en `frontend/index.html`
+- `import` o `export` en el frontend estático generado
+- `fetch` en la demo estática
+- creación de `node_modules`
+- creación de `.env`
+- creación de `Dockerfile`
+- creación de `docker-compose.yml`
+- backend real escuchando puerto
+- base de datos real
+- deploy real
 
-- el proyecto está materializado solo con archivos locales revisables
-- las fases base están completas
-- la validación local está cerrada
-- los módulos seguros agregados siguen en mock
-- las acciones sensibles aparecen como aprobables o bloqueadas
-- las aprobaciones sensibles quedan en preview y no como ejecuciones reales
-- no se ejecutó nada real fuera del modo local seguro
+## Criterio de demo local segura
+
+La demo se considera lista para mostrar cuando:
+
+- abre por `file://`
+- el dominio visible es coherente
+- la interacción local funciona en memoria
+- las fases base avanzan sin tocar runtime real
+- readiness lo explica con honestidad
+- las acciones sensibles quedan como aprobación futura o bloqueo explícito, nunca como ejecución real

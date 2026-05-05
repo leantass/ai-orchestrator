@@ -14080,6 +14080,14 @@ function detectFullstackLocalDemoArchetype({
   }
 
   if (
+    /\binmobiliari|\bpropiedades?\b|\balquiler(?:es)?\b|\bventas? inmobiliarias?\b|\btasaciones?\b|\bvisitas?\b|\bconsultas?\b|\bcorredor(?:a)?\b/u.test(
+      combinedText,
+    )
+  ) {
+    return 'real-estate'
+  }
+
+  if (
     /\bescuel|\balumnos?\b|\bfamilias?\b|\bcursos?\b|\bcomunicaciones?\b|\bboletines?\b/u.test(
       combinedText,
     )
@@ -14093,6 +14101,22 @@ function detectFullstackLocalDemoArchetype({
     )
   ) {
     return 'document-management'
+  }
+
+  if (
+    /\bseguridad\b|\bmonitoreo\b|\baccesos?\b|\balertas?\b|\bsensores?\b|\bzonas?\b|\bguardias?\b|\bincidentes?\b/u.test(
+      combinedText,
+    )
+  ) {
+    return 'security-monitoring'
+  }
+
+  if (
+    /\bcomunidad\b|\bsocial\b|\bpublicaciones?\b|\bgrupos?\b|\bcomentarios?\b|\bmiembros?\b|\bmoderacion\b|\bfeed\b/u.test(
+      combinedText,
+    )
+  ) {
+    return 'community-social'
   }
 
   if (
@@ -14135,6 +14159,7 @@ function buildFullstackLocalDemoBase({
   activity = [],
   views = [],
   quickActions = [],
+  interactionHighlights = [],
   statusOptions = {},
   domainEntities = [],
   modules = [],
@@ -14168,6 +14193,7 @@ function buildFullstackLocalDemoBase({
     activity,
     views,
     quickActions,
+    interactionHighlights,
     statusOptions,
     domainEntities,
     modules,
@@ -14759,6 +14785,7 @@ function buildTemplateFullstackLocalDemoData({
   datasets,
   views,
   quickActions,
+  interactionHighlights,
   statusOptions,
   domainEntities,
   modules,
@@ -14777,6 +14804,7 @@ function buildTemplateFullstackLocalDemoData({
     team,
     views,
     quickActions,
+    interactionHighlights,
     statusOptions,
     domainEntities,
     modules,
@@ -15366,19 +15394,19 @@ function buildDocumentManagementFullstackLocalDemoData({
     appTitle,
     archetype: 'document-management',
     heroKicker: 'Gestión documental local',
-    subtitle: 'Demo local segura para documentos, responsables, vencimientos y reportes.',
-    domainSummary: 'Sirve para mostrar circuitos documentales sin ejecutar integraciones ni runtime real.',
+    subtitle: 'Demo local segura para documentos, responsables, revisiones, vencimientos y reportes.',
+    domainSummary: 'Sirve para mostrar circuitos documentales, revisiones y alertas sin ejecutar integraciones ni runtime real.',
     nextRecommendedPhase,
     navItems: [
       { id: 'dashboard', label: 'Dashboard', hint: 'Estado general' },
       { id: 'documents', label: 'Documentos', hint: 'Listado principal' },
       { id: 'clients', label: 'Responsables', hint: 'Asignación' },
-      { id: 'reminders', label: 'Vencimientos', hint: 'Próximas alertas' },
+      { id: 'reminders', label: 'Vencimientos', hint: 'Próximas alertas y revisiones' },
       { id: 'reports', label: 'Reportes', hint: 'Indicadores mock' },
     ],
     metrics: [
       { id: 'docs', label: 'Documentos activos', value: '46', tone: 'sky', detail: 'Expedientes y legajos en revisión' },
-      { id: 'deadlines', label: 'Vencimientos próximos', value: '7', tone: 'amber', detail: 'Alertas para la próxima semana' },
+      { id: 'deadlines', label: 'Vencimientos próximos', value: '7', tone: 'amber', detail: 'Alertas y revisiones para la próxima semana' },
       { id: 'owners', label: 'Responsables', value: '9', tone: 'emerald', detail: 'Asignación local consistente' },
     ],
     alerts: [{ id: 'a1', tone: 'rose', title: 'Expediente con vencimiento cercano', detail: 'Conviene revisarlo desde la demo local.' }],
@@ -15425,8 +15453,8 @@ function buildDocumentManagementFullstackLocalDemoData({
     ],
     quickActions: [{ id: 'qa1', label: 'Ver vencimientos', targetView: 'reminders', feedback: 'Se abrió el tablero local de vencimientos.' }],
     statusOptions: {},
-    domainEntities: ['documentos', 'responsables', 'vencimientos', 'observaciones', 'reportes'],
-    modules: ['documentos', 'responsables', 'vencimientos', 'reportes'],
+    domainEntities: ['documentos', 'responsables', 'revisiones', 'vencimientos', 'observaciones', 'reportes'],
+    modules: ['documentos', 'responsables', 'revisiones', 'vencimientos', 'reportes'],
   })
 }
 
@@ -15437,19 +15465,19 @@ function buildOperationsFullstackLocalDemoData({
   return buildTemplateFullstackLocalDemoData({
     appTitle,
     archetype: 'operations',
-    heroKicker: 'Operación local',
-    subtitle: 'Demo local segura para solicitudes, seguimiento, alertas y reportes.',
-    domainSummary: 'Primera entrega demostrable para gestión operativa sin runtime real.',
+    heroKicker: 'Operaciones locales',
+    subtitle: 'Demo local segura para operaciones, solicitudes, casos, seguimiento, alertas y reportes.',
+    domainSummary: 'Primera entrega demostrable para gestión operativa y seguimiento de casos sin runtime real.',
     nextRecommendedPhase,
     navItems: [
       { id: 'dashboard', label: 'Dashboard', hint: 'Estado general' },
-      { id: 'clients', label: 'Solicitantes', hint: 'Referentes' },
-      { id: 'appointments', label: 'Solicitudes', hint: 'Tablero operativo' },
+      { id: 'clients', label: 'Solicitantes', hint: 'Referentes y casos' },
+      { id: 'appointments', label: 'Solicitudes', hint: 'Tablero de operaciones' },
       { id: 'reminders', label: 'Alertas', hint: 'Seguimientos' },
       { id: 'reports', label: 'Reportes', hint: 'Indicadores mock' },
     ],
     metrics: [
-      { id: 'requests', label: 'Solicitudes abiertas', value: '18', tone: 'sky', detail: '7 críticas y 11 en seguimiento' },
+      { id: 'requests', label: 'Solicitudes abiertas', value: '18', tone: 'sky', detail: '7 críticas y 11 en seguimiento de casos' },
       { id: 'owners', label: 'Referentes activos', value: '6', tone: 'emerald', detail: 'Equipos con tablero local asignado' },
       { id: 'alerts', label: 'Alertas operativas', value: '4', tone: 'amber', detail: 'Seguimientos para esta semana' },
     ],
@@ -15500,9 +15528,398 @@ function buildOperationsFullstackLocalDemoData({
       buildFullstackLocalDemoView({ id: 'reports', label: 'Reportes', title: 'Reportes', description: 'Indicadores mock del tablero operativo.', datasetKey: 'reports', kind: 'reports', supportsSearch: false }),
     ],
     quickActions: [{ id: 'qa1', label: 'Ver solicitudes', targetView: 'appointments', feedback: 'Se abrió el tablero local de solicitudes.' }],
+    interactionHighlights: [
+      'Buscar solicitudes, áreas y estados desde el tablero principal.',
+      'Cambiar el estado mock de una solicitud sin salir del navegador.',
+      'Marcar alertas como revisadas solo en memoria local.',
+    ],
     statusOptions: { appointments: ['todos', 'pendiente', 'confirmado', 'en revisión', 'resuelto'] },
-    domainEntities: ['solicitudes', 'solicitantes', 'alertas', 'reportes'],
-    modules: ['solicitudes', 'seguimiento', 'alertas', 'reportes'],
+    domainEntities: ['operaciones', 'casos', 'solicitudes', 'solicitantes', 'alertas', 'reportes'],
+    modules: ['operaciones', 'casos', 'solicitudes', 'seguimiento', 'alertas', 'reportes'],
+  })
+}
+
+function buildRealEstateFullstackLocalDemoData({
+  appTitle,
+  nextRecommendedPhase,
+}) {
+  return buildTemplateFullstackLocalDemoData({
+    appTitle,
+    archetype: 'real-estate',
+    heroKicker: 'Inmobiliaria local',
+    subtitle:
+      'Demo local segura para propiedades, consultas, corredores, visitas, seguimientos y reportes.',
+    domainSummary:
+      'Permite mostrar propiedades, corredores, interesados y agenda comercial sin CRM real ni portales externos.',
+    nextRecommendedPhase,
+    navItems: [
+      { id: 'dashboard', label: 'Dashboard', hint: 'Resumen comercial' },
+      { id: 'resources', label: 'Propiedades', hint: 'Disponibles y en reserva' },
+      { id: 'clients', label: 'Consultas', hint: 'Interesados y dueños' },
+      { id: 'appointments', label: 'Visitas', hint: 'Agenda comercial' },
+      { id: 'reminders', label: 'Seguimientos', hint: 'Documentación y próximos pasos' },
+      { id: 'reports', label: 'Reportes', hint: 'Indicadores mock' },
+    ],
+    metrics: [
+      { id: 'properties', label: 'Propiedades activas', value: '22', tone: 'sky', detail: '15 en alquiler y 7 en venta' },
+      { id: 'visits', label: 'Visitas de la semana', value: '9', tone: 'emerald', detail: '4 confirmadas y 2 con reprogramación' },
+      { id: 'leads', label: 'Consultas pendientes', value: '6', tone: 'amber', detail: 'Interesados esperando respuesta comercial' },
+      { id: 'docs', label: 'Alertas documentales', value: '3', tone: 'rose', detail: 'Tasaciones y reservas con revisión pendiente' },
+    ],
+    alerts: [
+      { id: 'rea-1', tone: 'amber', title: 'Dos visitas para cerrar hoy', detail: 'Conviene revisar estado de reserva y feedback del corredor local.' },
+      { id: 'rea-2', tone: 'rose', title: 'Tasación pendiente', detail: 'Un PH en Caballito sigue esperando actualización comercial.' },
+    ],
+    constraints: [
+      'Sin CRM real ni portales externos',
+      'Sin npm install ni node_modules',
+      'Sin backend real ni base de datos activa',
+      'Sin integraciones con WhatsApp, mail ni pasarelas',
+    ],
+    team: [
+      { id: 'REA-001', name: 'Luciana Peralta', role: 'Corredora senior', shift: '9 a 18 hs', status: 'En visitas', focus: 'Cierre de alquileres y reservas' },
+      { id: 'REA-002', name: 'Tomás Leiva', role: 'Backoffice comercial', shift: '9 a 17 hs', status: 'Disponible', focus: 'Tasaciones y documentación' },
+    ],
+    datasets: {
+      resources: [
+        { id: 'PRO-001', name: 'PH 4 amb en Caballito', surface: '118 m²', schedule: 'Visitable 17:30', status: 'Disponible', note: 'Apto crédito y con patio.' },
+        { id: 'PRO-002', name: 'Depto 2 amb en Palermo', surface: '52 m²', schedule: 'Visitable 19:00', status: 'Reserva en curso', note: 'Interés alto por ubicación.' },
+      ],
+      clients: [
+        { id: 'LEA-001', name: 'Martina Salvatierra', contact: '11 5555-4101', segment: 'Compradora', status: 'Seguimiento activo', nextVisit: 'Visita 05/05 17:30', notes: 'Busca patio y gastos bajos.' },
+        { id: 'LEA-002', name: 'Carlos Acosta', contact: '11 5555-4102', segment: 'Propietario', status: 'Tasación pendiente', nextVisit: 'Llamado 06/05', notes: 'Esperando propuesta comercial.' },
+      ],
+      appointments: [
+        { id: 'VIS-001', clientName: 'Martina Salvatierra', professional: 'Luciana Peralta', reason: 'Visita a PH 4 amb', slot: '05/05 17:30', status: 'confirmado', room: 'Caballito', notes: 'Llevar comparativa de valores.' },
+        { id: 'VIS-002', clientName: 'Carlos Acosta', professional: 'Tomás Leiva', reason: 'Revisión de tasación', slot: '06/05 11:00', status: 'pendiente', room: 'Videollamada local', notes: 'Validar estrategia de publicación.' },
+      ],
+      reminders: [
+        { id: 'REM-REA-001', clientName: 'Martina Salvatierra', type: 'Feedback post visita', dueDate: '05/05', channel: 'Panel local', status: 'pendiente', detail: 'Registrar objeciones y probabilidad de cierre.' },
+        { id: 'REM-REA-002', clientName: 'Carlos Acosta', type: 'Tasación', dueDate: '06/05', channel: 'Backoffice local', status: 'pendiente', detail: 'Subir valores de referencia y observaciones.' },
+      ],
+      reports: [
+        { id: 'REP-REA-001', name: 'Propiedades por estado', value: '22', detail: '15 disponibles, 4 reservadas y 3 en revisión documental.', status: 'Estable' },
+        { id: 'REP-REA-002', name: 'Conversión de visitas', value: '38%', detail: 'Mejor desempeño en alquileres medianos y PH con patio.', status: 'Seguimiento' },
+      ],
+      activity: [
+        { id: 'ACT-REA-001', time: '10:20', title: 'Nueva consulta registrada', detail: 'Ingresó una compradora interesada en Caballito.', tone: 'sky' },
+        { id: 'ACT-REA-002', time: '11:15', title: 'Reserva en revisión', detail: 'El depto de Palermo quedó a la espera de seña mock.', tone: 'amber' },
+      ],
+    },
+    views: [
+      buildFullstackLocalDemoView({ id: 'dashboard', label: 'Dashboard', title: 'Estado inmobiliario', description: 'Resumen local de propiedades, consultas, visitas y alertas comerciales.', kind: 'dashboard', supportsSearch: false }),
+      buildFullstackLocalDemoView({
+        id: 'resources',
+        label: 'Propiedades',
+        title: 'Propiedades activas',
+        description: 'Listado local de inmuebles con estado, superficie y observaciones comerciales.',
+        datasetKey: 'resources',
+        columns: [{ key: 'name', label: 'Propiedad' }, { key: 'surface', label: 'Superficie' }, { key: 'schedule', label: 'Agenda' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'note', label: 'Notas' }],
+        searchableKeys: ['name', 'surface', 'schedule', 'status', 'note'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'clients',
+        label: 'Consultas',
+        title: 'Interesados y propietarios',
+        description: 'Seguimiento local de interesados, dueños y próximos pasos comerciales.',
+        datasetKey: 'clients',
+        columns: [{ key: 'name', label: 'Contacto' }, { key: 'segment', label: 'Perfil' }, { key: 'contact', label: 'Canal' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'nextVisit', label: 'Próximo paso' }, { key: 'notes', label: 'Notas' }],
+        searchableKeys: ['name', 'segment', 'contact', 'status', 'notes'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'appointments',
+        label: 'Visitas',
+        title: 'Agenda comercial',
+        description: 'Visitas, tasaciones y seguimiento de estado mock en memoria local.',
+        datasetKey: 'appointments',
+        columns: [{ key: 'slot', label: 'Horario' }, { key: 'clientName', label: 'Contacto' }, { key: 'professional', label: 'Responsable' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'reason', label: 'Motivo' }, { key: 'room', label: 'Ubicación' }, { key: 'notes', label: 'Notas' }],
+        searchableKeys: ['slot', 'clientName', 'professional', 'reason', 'status'],
+        supportsStatusFilter: true,
+      }),
+      buildFullstackLocalDemoView({
+        id: 'reminders',
+        label: 'Seguimientos',
+        title: 'Seguimientos y documentación',
+        description: 'Pendientes comerciales y documentales para revisar sin salir del modo seguro.',
+        datasetKey: 'reminders',
+        columns: [{ key: 'type', label: 'Seguimiento' }, { key: 'clientName', label: 'Contacto' }, { key: 'dueDate', label: 'Fecha' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'channel', label: 'Canal local' }, { key: 'detail', label: 'Detalle' }],
+        searchableKeys: ['type', 'clientName', 'dueDate', 'status', 'detail'],
+      }),
+      buildFullstackLocalDemoView({ id: 'reports', label: 'Reportes', title: 'Reportes', description: 'Indicadores mock de pipeline, visitas y propiedades.', datasetKey: 'reports', kind: 'reports', supportsSearch: false }),
+    ],
+    quickActions: [
+      { id: 'qa-rea-1', label: 'Ver visitas', targetView: 'appointments', feedback: 'Se abrió la agenda comercial local.' },
+      { id: 'qa-rea-2', label: 'Abrir propiedades', targetView: 'resources', feedback: 'Se enfocó el listado de propiedades activas.' },
+      { id: 'qa-rea-3', label: 'Revisar seguimientos', targetView: 'reminders', feedback: 'Quedaron visibles los pendientes documentales y de cierre.' },
+    ],
+    interactionHighlights: [
+      'Buscar propiedades, interesados y responsables comerciales.',
+      'Cambiar el estado mock de una visita o tasación en memoria local.',
+      'Marcar seguimientos como revisados sin tocar CRM ni canales reales.',
+    ],
+    statusOptions: { appointments: ['todos', 'pendiente', 'confirmado', 'en visita', 'reprogramado', 'reserva en curso'] },
+    domainEntities: ['propiedades', 'corredores', 'interesados', 'propietarios', 'visitas', 'seguimientos', 'reportes'],
+    modules: ['propiedades', 'corredores', 'consultas comerciales', 'visitas', 'seguimientos', 'reportes'],
+  })
+}
+
+function buildSecurityMonitoringFullstackLocalDemoData({
+  appTitle,
+  nextRecommendedPhase,
+}) {
+  return buildTemplateFullstackLocalDemoData({
+    appTitle,
+    archetype: 'security-monitoring',
+    heroKicker: 'Seguridad local',
+    subtitle:
+      'Demo local segura para accesos, alertas, sensores, rondas y reportes operativos.',
+    domainSummary:
+      'Sirve para mostrar monitoreo y respuesta operativa sin cámaras reales, sin puertos y sin integración externa.',
+    nextRecommendedPhase,
+    navItems: [
+      { id: 'dashboard', label: 'Dashboard', hint: 'Monitoreo general' },
+      { id: 'resources', label: 'Sensores', hint: 'Estado del parque' },
+      { id: 'clients', label: 'Operadores', hint: 'Turnos y foco' },
+      { id: 'appointments', label: 'Alertas', hint: 'Eventos y prioridad' },
+      { id: 'reminders', label: 'Rondas', hint: 'Pendientes operativos' },
+      { id: 'reports', label: 'Reportes', hint: 'Indicadores mock' },
+    ],
+    metrics: [
+      { id: 'alerts', label: 'Alertas abiertas', value: '5', tone: 'rose', detail: '2 críticas, 2 medias y 1 baja' },
+      { id: 'sensors', label: 'Sensores activos', value: '48', tone: 'emerald', detail: 'Solo 3 con revisión sugerida' },
+      { id: 'operators', label: 'Operadores en turno', value: '6', tone: 'sky', detail: 'Cobertura completa para esta noche' },
+      { id: 'rounds', label: 'Rondas pendientes', value: '3', tone: 'amber', detail: 'Dos zonas esperan cierre local' },
+    ],
+    alerts: [
+      { id: 'sec-1', tone: 'rose', title: 'Alerta crítica en depósito', detail: 'El sensor perimetral disparó una revisión local prioritaria.' },
+      { id: 'sec-2', tone: 'amber', title: 'Ronda nocturna pendiente', detail: 'La zona norte todavía no registró cierre local.' },
+    ],
+    constraints: [
+      'Sin cámaras ni sensores reales',
+      'Sin backend real ni listeners',
+      'Sin integraciones externas ni dispatch real',
+      'Sin npm install ni Docker',
+    ],
+    team: [
+      { id: 'SEC-001', name: 'Valeria Sosa', role: 'Monitoreo central', shift: 'Noche', status: 'Activa', focus: 'Alertas críticas y escalamiento local' },
+      { id: 'SEC-002', name: 'Lucas Medina', role: 'Supervisor de ronda', shift: 'Noche', status: 'En recorrido', focus: 'Cierre de zonas y novedades' },
+    ],
+    datasets: {
+      resources: [
+        { id: 'SNS-001', name: 'Sensor perimetral depósito', surface: 'Zona norte', schedule: 'Último ping 21:42', status: 'Crítico', note: 'Se recomienda revisión local inmediata.' },
+        { id: 'SNS-002', name: 'Lector de acceso hall central', surface: 'Ingreso principal', schedule: 'Último ping 21:41', status: 'Operativo', note: 'Sin desvíos en la última hora.' },
+      ],
+      clients: [
+        { id: 'OPR-001', name: 'Valeria Sosa', contact: 'interno 401', segment: 'Monitoreo central', status: 'Activa', nextVisit: 'Ronda 22:15', notes: 'Cubre alertas críticas.' },
+        { id: 'OPR-002', name: 'Lucas Medina', contact: 'interno 418', segment: 'Supervisor', status: 'En recorrido', nextVisit: 'Chequeo 22:40', notes: 'Revisión de zona norte.' },
+      ],
+      appointments: [
+        { id: 'ALR-001', clientName: 'Depósito norte', professional: 'Valeria Sosa', reason: 'Movimiento fuera de horario', slot: '05/05 21:42', status: 'confirmado', room: 'Zona norte', notes: 'Verificar cierre perimetral local.' },
+        { id: 'ALR-002', clientName: 'Ingreso principal', professional: 'Lucas Medina', reason: 'Intento de acceso no reconocido', slot: '05/05 22:10', status: 'pendiente', room: 'Hall central', notes: 'Esperando confirmación de ronda.' },
+      ],
+      reminders: [
+        { id: 'RND-001', clientName: 'Zona norte', type: 'Ronda pendiente', dueDate: '05/05 22:15', channel: 'Panel local', status: 'pendiente', detail: 'Falta registrar cierre de recorrido.' },
+        { id: 'RND-002', clientName: 'Depósito', type: 'Revisión de sensor', dueDate: '05/05 22:30', channel: 'Supervisor local', status: 'pendiente', detail: 'Confirmar estado del perimetral.' },
+      ],
+      reports: [
+        { id: 'REP-SEC-001', name: 'Alertas por prioridad', value: '5', detail: '2 críticas, 2 medias y 1 baja en la franja nocturna.', status: 'Atención' },
+        { id: 'REP-SEC-002', name: 'Sensores operativos', value: '94%', detail: 'Solo tres dispositivos quedaron en revisión local.', status: 'Controlado' },
+      ],
+      activity: [
+        { id: 'ACT-SEC-001', time: '21:42', title: 'Alerta generada', detail: 'El depósito norte abrió incidente local por movimiento fuera de horario.', tone: 'rose' },
+        { id: 'ACT-SEC-002', time: '22:05', title: 'Ronda iniciada', detail: 'Lucas Medina salió a verificar la zona norte.', tone: 'sky' },
+      ],
+    },
+    views: [
+      buildFullstackLocalDemoView({ id: 'dashboard', label: 'Dashboard', title: 'Estado de seguridad', description: 'Resumen local de alertas, sensores, rondas y actividad reciente.', kind: 'dashboard', supportsSearch: false }),
+      buildFullstackLocalDemoView({
+        id: 'resources',
+        label: 'Sensores',
+        title: 'Sensores y accesos',
+        description: 'Estado del parque de sensores, lectores y zonas monitoreadas.',
+        datasetKey: 'resources',
+        columns: [{ key: 'name', label: 'Dispositivo' }, { key: 'surface', label: 'Zona' }, { key: 'schedule', label: 'Último evento' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'note', label: 'Detalle' }],
+        searchableKeys: ['name', 'surface', 'schedule', 'status', 'note'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'clients',
+        label: 'Operadores',
+        title: 'Operadores y turnos',
+        description: 'Quién está cubriendo cada frente y qué seguimiento tiene asignado.',
+        datasetKey: 'clients',
+        columns: [{ key: 'name', label: 'Operador' }, { key: 'segment', label: 'Rol' }, { key: 'contact', label: 'Contacto' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'nextVisit', label: 'Próximo control' }, { key: 'notes', label: 'Notas' }],
+        searchableKeys: ['name', 'segment', 'contact', 'status', 'notes'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'appointments',
+        label: 'Alertas',
+        title: 'Alertas y eventos',
+        description: 'Cambios de estado mock para incidentes, accesos y eventos operativos.',
+        datasetKey: 'appointments',
+        columns: [{ key: 'slot', label: 'Hora' }, { key: 'clientName', label: 'Zona' }, { key: 'reason', label: 'Evento' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'professional', label: 'Responsable' }, { key: 'room', label: 'Ubicación' }, { key: 'notes', label: 'Notas' }],
+        searchableKeys: ['slot', 'clientName', 'reason', 'status', 'professional'],
+        supportsStatusFilter: true,
+      }),
+      buildFullstackLocalDemoView({
+        id: 'reminders',
+        label: 'Rondas',
+        title: 'Rondas y pendientes',
+        description: 'Pendientes operativos que se pueden marcar como revisados solo en memoria local.',
+        datasetKey: 'reminders',
+        columns: [{ key: 'type', label: 'Pendiente' }, { key: 'clientName', label: 'Zona' }, { key: 'dueDate', label: 'Límite' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'channel', label: 'Canal local' }, { key: 'detail', label: 'Detalle' }],
+        searchableKeys: ['type', 'clientName', 'dueDate', 'status', 'detail'],
+      }),
+      buildFullstackLocalDemoView({ id: 'reports', label: 'Reportes', title: 'Reportes', description: 'Indicadores mock de incidentes, sensores y cobertura.', datasetKey: 'reports', kind: 'reports', supportsSearch: false }),
+    ],
+    quickActions: [
+      { id: 'qa-sec-1', label: 'Ver alertas', targetView: 'appointments', feedback: 'Se abrió el tablero local de alertas.' },
+      { id: 'qa-sec-2', label: 'Abrir sensores', targetView: 'resources', feedback: 'Quedó visible el estado del parque de sensores.' },
+      { id: 'qa-sec-3', label: 'Revisar rondas', targetView: 'reminders', feedback: 'Se enfocaron las rondas y pendientes del turno.' },
+    ],
+    interactionHighlights: [
+      'Filtrar alertas por estado y prioridad operativa.',
+      'Seleccionar un sensor o alerta para ver el detalle del evento local.',
+      'Marcar pendientes de ronda como revisados sin tocar hardware ni servicios reales.',
+    ],
+    statusOptions: { appointments: ['todos', 'pendiente', 'confirmado', 'en revisión', 'crítico', 'cerrado'] },
+    domainEntities: ['operadores', 'sensores', 'accesos', 'alertas', 'rondas', 'reportes'],
+    modules: ['monitoreo local', 'alertas', 'sensores', 'rondas', 'reportes'],
+  })
+}
+
+function buildCommunitySocialFullstackLocalDemoData({
+  appTitle,
+  nextRecommendedPhase,
+}) {
+  return buildTemplateFullstackLocalDemoData({
+    appTitle,
+    archetype: 'community-social',
+    heroKicker: 'Comunidad local',
+    subtitle:
+      'Demo local segura para grupos, miembros, publicaciones, moderación y reportes comunitarios.',
+    domainSummary:
+      'Permite mostrar grupos, miembros, actividad social y moderación básica sin runtime real, sin login y sin servicios externos.',
+    nextRecommendedPhase,
+    navItems: [
+      { id: 'dashboard', label: 'Dashboard', hint: 'Estado de la comunidad' },
+      { id: 'resources', label: 'Grupos', hint: 'Espacios activos' },
+      { id: 'clients', label: 'Referentes', hint: 'Moderadores y líderes' },
+      { id: 'appointments', label: 'Publicaciones', hint: 'Feed local' },
+      { id: 'reminders', label: 'Moderación', hint: 'Pendientes y revisiones' },
+      { id: 'reports', label: 'Reportes', hint: 'Indicadores mock' },
+    ],
+    metrics: [
+      { id: 'groups', label: 'Grupos activos', value: '8', tone: 'sky', detail: '4 barriales, 2 culturales y 2 de apoyo' },
+      { id: 'posts', label: 'Publicaciones del día', value: '19', tone: 'emerald', detail: '12 visibles y 7 en revisión local' },
+      { id: 'flags', label: 'Pendientes de moderación', value: '4', tone: 'amber', detail: 'Contenido para revisar sin tocar servicios reales' },
+      { id: 'engagement', label: 'Participación mock', value: '73%', tone: 'sky', detail: 'Interacciones simuladas dentro del feed local' },
+    ],
+    alerts: [
+      { id: 'com-1', tone: 'amber', title: 'Grupo barrial con actividad alta', detail: 'Conviene revisar las publicaciones programadas para la tarde.' },
+      { id: 'com-2', tone: 'rose', title: 'Moderación pendiente', detail: 'Hay 2 publicaciones con observaciones locales sin cerrar.' },
+    ],
+    constraints: [
+      'Sin login real ni sesiones',
+      'Sin integraciones externas ni notificaciones reales',
+      'Sin npm install ni backend activo',
+      'Sin almacenamiento persistente fuera de archivos mock',
+    ],
+    team: [
+      { id: 'COM-001', name: 'Belén Ruiz', role: 'Moderación local', shift: 'Tarde', status: 'Activa', focus: 'Publicaciones y reglas comunitarias' },
+      { id: 'COM-002', name: 'Julián Ponce', role: 'Líder barrial', shift: 'Tarde', status: 'Disponible', focus: 'Eventos y participación local' },
+    ],
+    datasets: {
+      resources: [
+        { id: 'GRP-001', name: 'Vecinos de Parque Chas', surface: 'Barrial', schedule: 'Actividad 18:00', status: 'Activo', note: 'Grupo con agenda comunitaria semanal.' },
+        { id: 'GRP-002', name: 'Feria cultural del sábado', surface: 'Eventos', schedule: 'Actividad 16:00', status: 'Moderación alta', note: 'Se esperan publicaciones coordinadas.' },
+      ],
+      clients: [
+        { id: 'REF-001', name: 'Belén Ruiz', contact: 'interno local', segment: 'Moderación', status: 'Activa', nextVisit: 'Revisión 17:00', notes: 'Cubre alertas del feed comunitario.' },
+        { id: 'REF-002', name: 'Julián Ponce', contact: 'interno local', segment: 'Referente barrial', status: 'Disponible', nextVisit: 'Evento 19:30', notes: 'Coordina publicaciones de la feria.' },
+      ],
+      appointments: [
+        { id: 'POST-001', clientName: 'Vecinos de Parque Chas', professional: 'Belén Ruiz', reason: 'Publicación de evento solidario', slot: '05/05 17:20', status: 'confirmado', room: 'Feed local', notes: 'Programada para fijar en portada.' },
+        { id: 'POST-002', clientName: 'Feria cultural del sábado', professional: 'Julián Ponce', reason: 'Convocatoria de voluntarios', slot: '05/05 18:10', status: 'pendiente', room: 'Feed local', notes: 'Esperando revisión de copy.' },
+      ],
+      reminders: [
+        { id: 'MOD-001', clientName: 'Vecinos de Parque Chas', type: 'Revisar comentarios', dueDate: '05/05', channel: 'Panel local', status: 'pendiente', detail: 'Hay observaciones sobre convivencia.' },
+        { id: 'MOD-002', clientName: 'Feria cultural del sábado', type: 'Aprobar publicación', dueDate: '05/05', channel: 'Moderación local', status: 'pendiente', detail: 'Falta validar copy y horario.' },
+      ],
+      reports: [
+        { id: 'REP-COM-001', name: 'Publicaciones visibles', value: '12', detail: '7 quedaron en revisión y 5 destacadas en grupos barriales.', status: 'Estable' },
+        { id: 'REP-COM-002', name: 'Pendientes de moderación', value: '4', detail: 'Dos por copy y dos por revisión de comentarios.', status: 'Seguimiento' },
+      ],
+      activity: [
+        { id: 'ACT-COM-001', time: '16:45', title: 'Nueva publicación local', detail: 'Se cargó una convocatoria solidaria en el grupo barrial.', tone: 'sky' },
+        { id: 'ACT-COM-002', time: '17:05', title: 'Comentario observado', detail: 'Moderación local marcó un hilo para revisar.', tone: 'amber' },
+      ],
+    },
+    views: [
+      buildFullstackLocalDemoView({ id: 'dashboard', label: 'Dashboard', title: 'Estado de la comunidad', description: 'Resumen local de grupos, publicaciones, moderación y actividad reciente.', kind: 'dashboard', supportsSearch: false }),
+      buildFullstackLocalDemoView({
+        id: 'resources',
+        label: 'Grupos',
+        title: 'Grupos y espacios activos',
+        description: 'Listado local de grupos, ferias o espacios comunitarios con su estado.',
+        datasetKey: 'resources',
+        columns: [{ key: 'name', label: 'Grupo' }, { key: 'surface', label: 'Tipo' }, { key: 'schedule', label: 'Próxima actividad' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'note', label: 'Notas' }],
+        searchableKeys: ['name', 'surface', 'schedule', 'status', 'note'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'clients',
+        label: 'Referentes',
+        title: 'Referentes y moderación',
+        description: 'Quién coordina cada frente comunitario y qué seguimiento tiene asignado.',
+        datasetKey: 'clients',
+        columns: [{ key: 'name', label: 'Referente' }, { key: 'segment', label: 'Rol' }, { key: 'contact', label: 'Canal local' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'nextVisit', label: 'Próximo hito' }, { key: 'notes', label: 'Notas' }],
+        searchableKeys: ['name', 'segment', 'status', 'notes'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'appointments',
+        label: 'Publicaciones',
+        title: 'Feed local revisable',
+        description: 'Publicaciones mock que se pueden filtrar y cambiar de estado solo en memoria.',
+        datasetKey: 'appointments',
+        columns: [{ key: 'slot', label: 'Hora' }, { key: 'clientName', label: 'Grupo' }, { key: 'reason', label: 'Tema' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'professional', label: 'Responsable' }, { key: 'room', label: 'Ubicación' }, { key: 'notes', label: 'Notas' }],
+        searchableKeys: ['slot', 'clientName', 'reason', 'status', 'professional'],
+        supportsStatusFilter: true,
+      }),
+      buildFullstackLocalDemoView({
+        id: 'reminders',
+        label: 'Moderación',
+        title: 'Pendientes de moderación',
+        description: 'Alertas que se pueden marcar como revisadas para simular el flujo comunitario.',
+        datasetKey: 'reminders',
+        columns: [{ key: 'type', label: 'Pendiente' }, { key: 'clientName', label: 'Grupo' }, { key: 'dueDate', label: 'Fecha' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'channel', label: 'Canal local' }, { key: 'detail', label: 'Detalle' }],
+        searchableKeys: ['type', 'clientName', 'dueDate', 'status', 'detail'],
+      }),
+      buildFullstackLocalDemoView({ id: 'reports', label: 'Reportes', title: 'Reportes', description: 'Indicadores mock de actividad, moderación y participación.', datasetKey: 'reports', kind: 'reports', supportsSearch: false }),
+    ],
+    quickActions: [
+      { id: 'qa-com-1', label: 'Ver publicaciones', targetView: 'appointments', feedback: 'Se abrió el feed local para revisar publicaciones.' },
+      { id: 'qa-com-2', label: 'Abrir moderación', targetView: 'reminders', feedback: 'Quedaron visibles los pendientes de moderación.' },
+      { id: 'qa-com-3', label: 'Explorar grupos', targetView: 'resources', feedback: 'Se abrió el mapa local de grupos y espacios activos.' },
+    ],
+    interactionHighlights: [
+      'Buscar publicaciones, grupos y referentes desde la demo local.',
+      'Cambiar el estado mock de publicaciones para mostrar moderación segura.',
+      'Marcar pendientes de moderación como revisados sin login ni servicios externos.',
+    ],
+    statusOptions: { appointments: ['todos', 'pendiente', 'confirmado', 'programado', 'revisado', 'moderación'] },
+    domainEntities: ['grupos', 'miembros', 'referentes', 'publicaciones', 'moderación', 'reportes'],
+    modules: ['grupos', 'miembros', 'publicaciones', 'moderación local', 'reportes'],
   })
 }
 
@@ -15540,6 +15957,11 @@ function buildFullstackLocalDemoData({
         appTitle,
         nextRecommendedPhase,
       })
+    case 'real-estate':
+      return buildRealEstateFullstackLocalDemoData({
+        appTitle,
+        nextRecommendedPhase,
+      })
     case 'school-crm':
       return buildSchoolCrmFullstackLocalDemoData({
         appTitle,
@@ -15547,6 +15969,16 @@ function buildFullstackLocalDemoData({
       })
     case 'document-management':
       return buildDocumentManagementFullstackLocalDemoData({
+        appTitle,
+        nextRecommendedPhase,
+      })
+    case 'security-monitoring':
+      return buildSecurityMonitoringFullstackLocalDemoData({
+        appTitle,
+        nextRecommendedPhase,
+      })
+    case 'community-social':
+      return buildCommunitySocialFullstackLocalDemoData({
         appTitle,
         nextRecommendedPhase,
       })
@@ -16808,6 +17240,44 @@ function buildFullstackLocalInteractiveFrontendMainContent() {
 `
 }
 
+function buildFullstackLocalDatasetCollectionMap(fullstackLocalDemoData) {
+  const datasetKeys = new Set([
+    'team',
+    'clients',
+    'pets',
+    'appointments',
+    'reminders',
+    'inventory',
+    'reports',
+    'activity',
+  ])
+
+  for (const view of Array.isArray(fullstackLocalDemoData?.views)
+    ? fullstackLocalDemoData.views
+    : []) {
+    if (typeof view?.datasetKey === 'string' && view.datasetKey.trim()) {
+      datasetKeys.add(view.datasetKey.trim())
+    }
+  }
+
+  const datasetMap = {}
+  for (const datasetKey of datasetKeys) {
+    if (Array.isArray(fullstackLocalDemoData?.[datasetKey])) {
+      datasetMap[datasetKey] = fullstackLocalDemoData[datasetKey]
+    }
+  }
+
+  return datasetMap
+}
+
+function toFullstackLocalDatasetHelperName(datasetKey) {
+  return String(datasetKey || '')
+    .split(/[^a-z0-9]+/iu)
+    .filter(Boolean)
+    .map((token) => `${token.charAt(0).toUpperCase()}${token.slice(1)}`)
+    .join('')
+}
+
 function buildFullstackLocalBackendDomainModuleContent(fullstackLocalDemoData) {
   const appointmentStatuses = summarizeUniqueExecutorStrings(
     [
@@ -16816,53 +17286,83 @@ function buildFullstackLocalBackendDomainModuleContent(fullstackLocalDemoData) {
     ],
     12,
   ).filter((entry) => normalizeSectorDetectionText(entry) !== 'todos')
-  const domainMockBundle = {
-    archetype: fullstackLocalDemoData?.overview?.archetype || 'operations',
-    clients: fullstackLocalDemoData?.clients || [],
-    pets: fullstackLocalDemoData?.pets || [],
-    appointments: fullstackLocalDemoData?.appointments || [],
-    reminders: fullstackLocalDemoData?.reminders || [],
-    inventory: fullstackLocalDemoData?.inventory || [],
-    reports: fullstackLocalDemoData?.reports || [],
-    team: fullstackLocalDemoData?.team || [],
-  }
+  const domainMockBundle = buildFullstackLocalDatasetCollectionMap(fullstackLocalDemoData)
+  const datasetKeys = Object.keys(domainMockBundle)
+  const datasetHelpers = datasetKeys
+    .map((datasetKey) => {
+      const helperSuffix = toFullstackLocalDatasetHelperName(datasetKey)
+      if (!helperSuffix) {
+        return ''
+      }
+
+      return `function list${helperSuffix}() {
+  return listCollection(${JSON.stringify(datasetKey)})
+}
+`
+    })
+    .filter(Boolean)
+    .join('\n')
+  const datasetHelperExports = datasetKeys
+    .map((datasetKey) => {
+      const helperSuffix = toFullstackLocalDatasetHelperName(datasetKey)
+      return helperSuffix ? `  list${helperSuffix},` : ''
+    })
+    .filter(Boolean)
+    .join('\n')
 
   return `const appointmentStatuses = ${JSON.stringify(appointmentStatuses, null, 2)}
 const domainMockBundle = ${JSON.stringify(domainMockBundle, null, 2)}
 
+function listCollection(datasetKey) {
+  const collection = domainMockBundle && Object.prototype.hasOwnProperty.call(domainMockBundle, datasetKey)
+    ? domainMockBundle[datasetKey]
+    : []
+
+  return Array.isArray(collection) ? collection : []
+}
+
+function listDatasetKeys() {
+  return Object.keys(domainMockBundle || {})
+}
+
 function listMockAppointments() {
-  return Array.isArray(domainMockBundle.appointments) ? domainMockBundle.appointments : []
+  return listCollection('appointments')
 }
 
 function listMockClients() {
-  return Array.isArray(domainMockBundle.clients) ? domainMockBundle.clients : []
+  return listCollection('clients')
 }
 
 function listMockPets() {
-  return Array.isArray(domainMockBundle.pets) ? domainMockBundle.pets : []
+  return listCollection('pets')
 }
 
 function listMockReminders() {
-  return Array.isArray(domainMockBundle.reminders) ? domainMockBundle.reminders : []
+  return listCollection('reminders')
 }
 
 function listMockInventory() {
-  return Array.isArray(domainMockBundle.inventory) ? domainMockBundle.inventory : []
+  return listCollection('inventory')
 }
 
 function listMockReports() {
-  return Array.isArray(domainMockBundle.reports) ? domainMockBundle.reports : []
+  return listCollection('reports')
 }
+
+${datasetHelpers}
 
 module.exports = {
   appointmentStatuses,
   domainMockBundle,
+  listCollection,
+  listDatasetKeys,
   listMockAppointments,
   listMockClients,
   listMockPets,
   listMockReminders,
   listMockInventory,
   listMockReports,
+${datasetHelperExports}
 }
 `
 }
@@ -16897,6 +17397,14 @@ module.exports = {
 }
 
 function buildFullstackLocalBackendServerContent(fullstackLocalDemoData) {
+  const datasetMap = buildFullstackLocalDatasetCollectionMap(fullstackLocalDemoData)
+  const collectionCounts = Object.fromEntries(
+    Object.entries(datasetMap).map(([datasetKey, entries]) => [
+      datasetKey,
+      Array.isArray(entries) ? entries.length : 0,
+    ]),
+  )
+
   return `const { healthRoute } = require('./routes/health')
 const {
   listMockAppointments,
@@ -16905,6 +17413,7 @@ const {
   listMockReminders,
   listMockInventory,
   listMockReports,
+  listDatasetKeys,
 } = require('./modules/appointments')
 
 function createServerManifest() {
@@ -16921,6 +17430,8 @@ function createServerManifest() {
       inventory: listMockInventory().length,
       reports: listMockReports().length,
     },
+    collections: ${JSON.stringify(collectionCounts, null, 2)},
+    availableDatasets: listDatasetKeys(),
     health: healthRoute(),
   }
 }
@@ -16932,6 +17443,24 @@ module.exports = {
 }
 
 function buildFullstackLocalSharedDomainObject(fullstackLocalDemoData) {
+  const datasetMap = buildFullstackLocalDatasetCollectionMap(fullstackLocalDemoData)
+  const datasetSummaries = (Array.isArray(fullstackLocalDemoData?.views)
+    ? fullstackLocalDemoData.views
+    : []
+  )
+    .filter((entry) => entry && typeof entry === 'object')
+    .map((entry) => ({
+      id: entry?.id || '',
+      label: entry?.label || '',
+      datasetKey: entry?.datasetKey || '',
+      kind: entry?.kind || 'dataset',
+      count:
+        entry?.datasetKey &&
+        Array.isArray(datasetMap[entry.datasetKey])
+          ? datasetMap[entry.datasetKey].length
+          : 0,
+    }))
+
   return {
     deliveryLevel: 'fullstack-local',
     archetype: fullstackLocalDemoData?.overview?.archetype || 'operations',
@@ -16956,6 +17485,9 @@ function buildFullstackLocalSharedDomainObject(fullstackLocalDemoData) {
       name: entry?.name || '',
       status: entry?.status || '',
     })),
+    datasets: datasetSummaries,
+    interactionHighlights:
+      fullstackLocalDemoData?.interactionHighlights || [],
     activeServices: false,
     installRequired: false,
   }
@@ -16984,6 +17516,8 @@ const sharedContracts = {
   statuses: domainContracts.appointmentStatuses,
   navItems: domainContracts.navItems,
   constraints: domainContracts.constraints,
+  datasets: domainContracts.datasets,
+  interactionHighlights: domainContracts.interactionHighlights,
 }
 
 module.exports = {
@@ -17173,6 +17707,464 @@ insert into appointments (id, patient_id, professional_id, scheduled_at, reason,
     }
   }
 
+  if (archetype === 'sports-booking') {
+    return {
+      readmeContent: `# Database local
+
+Esta carpeta queda como diseño revisable para reservas deportivas.
+
+- No se creó una base de datos real.
+- No se ejecutaron migraciones.
+- \`schema.sql\` y \`seeds/seed-local.sql\` describen canchas, clientes, reservas y utilería.
+`,
+      schemaContent: `-- Esquema local revisable para ${appTitle}
+-- No ejecutar automáticamente.
+
+create table customers (
+  id text primary key,
+  full_name text not null,
+  contact_phone text,
+  segment text,
+  notes text
+);
+
+create table courts (
+  id text primary key,
+  name text not null,
+  surface text not null,
+  availability_window text,
+  status text not null,
+  notes text
+);
+
+create table bookings (
+  id text primary key,
+  customer_id text not null,
+  court_id text not null,
+  scheduled_at text not null,
+  reason text not null,
+  status text not null,
+  notes text,
+  foreign key (customer_id) references customers(id),
+  foreign key (court_id) references courts(id)
+);
+
+create table inventory_items (
+  id text primary key,
+  name text not null,
+  category text not null,
+  current_stock integer not null,
+  min_stock integer not null,
+  status text not null,
+  notes text
+);
+`,
+      seedContent: `-- Seed local y revisable. No ejecutar automáticamente.
+
+insert into customers (id, full_name, contact_phone, segment, notes) values
+  ('CUS-001', 'Nicolás López', '11 5555-1200', 'Fútbol 5', 'Reserva nocturna frecuente'),
+  ('CUS-002', 'Agustina Romero', '11 5555-1201', 'Hockey', 'Consulta por bloque de 90 minutos');
+
+insert into courts (id, name, surface, availability_window, status, notes) values
+  ('CRT-001', 'Cancha 1', 'Sintético', '18:00 a 23:00', 'Disponible', 'Iluminación OK'),
+  ('CRT-002', 'Cancha 2', 'Piso mixto', '18:00 a 23:00', 'Mantenimiento programado', 'Revisión de red a las 17:00');
+
+insert into bookings (id, customer_id, court_id, scheduled_at, reason, status, notes) values
+  ('RES-001', 'CUS-001', 'CRT-001', '2026-05-05 20:00', 'Fútbol 5', 'confirmado', 'Equipo completo confirmado'),
+  ('RES-002', 'CUS-002', 'CRT-002', '2026-05-06 18:00', 'Entrenamiento', 'pendiente', 'Falta confirmar duración');
+`,
+    }
+  }
+
+  if (archetype === 'ecommerce') {
+    return {
+      readmeContent: `# Database local
+
+Esta carpeta queda como diseño revisable para ecommerce local.
+
+- No se creó una base de datos real.
+- No se ejecutaron migraciones.
+- \`schema.sql\` y \`seeds/seed-local.sql\` describen catálogo, clientes, pedidos y stock.
+`,
+      schemaContent: `-- Esquema local revisable para ${appTitle}
+-- No ejecutar automáticamente.
+
+create table customers (
+  id text primary key,
+  full_name text not null,
+  contact_phone text,
+  segment text,
+  notes text
+);
+
+create table products (
+  id text primary key,
+  name text not null,
+  category text not null,
+  price_label text not null,
+  publish_status text not null,
+  notes text
+);
+
+create table orders (
+  id text primary key,
+  customer_id text not null,
+  scheduled_review_at text,
+  status text not null,
+  reason text not null,
+  notes text,
+  foreign key (customer_id) references customers(id)
+);
+
+create table inventory_items (
+  id text primary key,
+  product_id text not null,
+  current_stock integer not null,
+  min_stock integer not null,
+  status text not null,
+  notes text,
+  foreign key (product_id) references products(id)
+);
+`,
+      seedContent: `-- Seed local y revisable. No ejecutar automáticamente.
+
+insert into customers (id, full_name, contact_phone, segment, notes) values
+  ('CLI-001', 'Lucía Costa', '11 5555-8801', 'Cliente recurrente', 'Busca novedades semanales');
+
+insert into products (id, name, category, price_label, publish_status, notes) values
+  ('PRD-001', 'Zapatillas Urban Run', 'Calzado', '$89.900', 'Publicado', 'Producto con mejor conversión mock'),
+  ('PRD-002', 'Campera Softshell', 'Abrigo', '$129.000', 'Stock bajo', 'Conviene revisar reposición local');
+
+insert into orders (id, customer_id, scheduled_review_at, status, reason, notes) values
+  ('ORD-001', 'CLI-001', '2026-05-05 15:00', 'confirmado', 'Pedido #1008', 'Listo para despacho manual futuro');
+
+insert into inventory_items (id, product_id, current_stock, min_stock, status, notes) values
+  ('INV-001', 'PRD-002', 4, 6, 'stock bajo', 'Revisar reposición local');
+`,
+    }
+  }
+
+  if (archetype === 'school-crm') {
+    return {
+      readmeContent: `# Database local
+
+Esta carpeta queda como diseño revisable para gestión escolar.
+
+- No se creó una base de datos real.
+- No se ejecutaron migraciones.
+- \`schema.sql\` y \`seeds/seed-local.sql\` describen familias, alumnos, cursos y seguimiento.
+`,
+      schemaContent: `-- Esquema local revisable para ${appTitle}
+-- No ejecutar automáticamente.
+
+create table families (
+  id text primary key,
+  family_name text not null,
+  contact_phone text,
+  segment text,
+  notes text
+);
+
+create table students (
+  id text primary key,
+  family_id text not null,
+  full_name text not null,
+  course text not null,
+  status text not null,
+  notes text,
+  foreign key (family_id) references families(id)
+);
+
+create table follow_ups (
+  id text primary key,
+  family_id text not null,
+  owner_area text not null,
+  scheduled_at text not null,
+  reason text not null,
+  status text not null,
+  notes text,
+  foreign key (family_id) references families(id)
+);
+`,
+      seedContent: `-- Seed local y revisable. No ejecutar automáticamente.
+
+insert into families (id, family_name, contact_phone, segment, notes) values
+  ('FAM-001', 'Familia Roldán', '11 5555-3301', 'Primaria', 'Seguimiento por asistencia');
+
+insert into students (id, family_id, full_name, course, status, notes) values
+  ('STD-001', 'FAM-001', 'Sofía Roldán', '5° A', 'Asistencia estable', 'Buen rendimiento general');
+
+insert into follow_ups (id, family_id, owner_area, scheduled_at, reason, status, notes) values
+  ('SEG-001', 'FAM-001', 'Coordinación', '2026-05-08 08:30', 'Reunión de seguimiento', 'confirmado', 'Repasar plan de acompañamiento');
+`,
+    }
+  }
+
+  if (archetype === 'document-management') {
+    return {
+      readmeContent: `# Database local
+
+Esta carpeta queda como diseño revisable para gestión documental.
+
+- No se creó una base de datos real.
+- No se ejecutaron migraciones.
+- \`schema.sql\` y \`seeds/seed-local.sql\` describen documentos, responsables y vencimientos.
+`,
+      schemaContent: `-- Esquema local revisable para ${appTitle}
+-- No ejecutar automáticamente.
+
+create table documents (
+  id text primary key,
+  name text not null,
+  category text not null,
+  owner_area text not null,
+  status text not null,
+  notes text
+);
+
+create table responsible_areas (
+  id text primary key,
+  name text not null,
+  contact_channel text,
+  status text not null,
+  notes text
+);
+
+create table document_deadlines (
+  id text primary key,
+  document_id text not null,
+  due_date text not null,
+  status text not null,
+  detail text,
+  foreign key (document_id) references documents(id)
+);
+`,
+      seedContent: `-- Seed local y revisable. No ejecutar automáticamente.
+
+insert into documents (id, name, category, owner_area, status, notes) values
+  ('DOC-001', 'Legajo técnico 2026', 'Legajos', 'Mesa documental', 'vigente', 'Revisión interna al día'),
+  ('DOC-002', 'Expediente de proveedor', 'Expedientes', 'Compras', 'por vencer', 'Falta adjuntar renovación local');
+
+insert into responsible_areas (id, name, contact_channel, status, notes) values
+  ('RES-001', 'Mesa documental', 'interno 201', 'Activa', 'Valida cambios antes del cierre');
+
+insert into document_deadlines (id, document_id, due_date, status, detail) values
+  ('DDL-001', 'DOC-002', '2026-05-09', 'pendiente', 'Revisar documentación adjunta');
+`,
+    }
+  }
+
+  if (archetype === 'real-estate') {
+    return {
+      readmeContent: `# Database local
+
+Esta carpeta queda como diseño revisable para inmobiliaria local.
+
+- No se creó una base de datos real.
+- No se ejecutaron migraciones.
+- \`schema.sql\` y \`seeds/seed-local.sql\` describen propiedades, contactos, visitas y seguimientos.
+`,
+      schemaContent: `-- Esquema local revisable para ${appTitle}
+-- No ejecutar automáticamente.
+
+create table contacts (
+  id text primary key,
+  full_name text not null,
+  contact_phone text,
+  profile_type text not null,
+  notes text
+);
+
+create table properties (
+  id text primary key,
+  title text not null,
+  area_label text,
+  commercial_status text not null,
+  notes text
+);
+
+create table visits (
+  id text primary key,
+  contact_id text not null,
+  property_id text not null,
+  scheduled_at text not null,
+  status text not null,
+  reason text not null,
+  notes text,
+  foreign key (contact_id) references contacts(id),
+  foreign key (property_id) references properties(id)
+);
+
+create table follow_ups (
+  id text primary key,
+  contact_id text not null,
+  follow_up_type text not null,
+  due_date text not null,
+  status text not null,
+  detail text,
+  foreign key (contact_id) references contacts(id)
+);
+`,
+      seedContent: `-- Seed local y revisable. No ejecutar automáticamente.
+
+insert into contacts (id, full_name, contact_phone, profile_type, notes) values
+  ('LEA-001', 'Martina Salvatierra', '11 5555-4101', 'Compradora', 'Busca patio y gastos bajos'),
+  ('LEA-002', 'Carlos Acosta', '11 5555-4102', 'Propietario', 'Esperando propuesta comercial');
+
+insert into properties (id, title, area_label, commercial_status, notes) values
+  ('PRO-001', 'PH 4 amb en Caballito', '118 m²', 'Disponible', 'Apto crédito y con patio'),
+  ('PRO-002', 'Depto 2 amb en Palermo', '52 m²', 'Reserva en curso', 'Interés alto por ubicación');
+
+insert into visits (id, contact_id, property_id, scheduled_at, status, reason, notes) values
+  ('VIS-001', 'LEA-001', 'PRO-001', '2026-05-05 17:30', 'confirmado', 'Visita a PH 4 amb', 'Llevar comparativa de valores');
+
+insert into follow_ups (id, contact_id, follow_up_type, due_date, status, detail) values
+  ('REM-REA-001', 'LEA-001', 'Feedback post visita', '2026-05-05', 'pendiente', 'Registrar objeciones y probabilidad de cierre');
+`,
+    }
+  }
+
+  if (archetype === 'security-monitoring') {
+    return {
+      readmeContent: `# Database local
+
+Esta carpeta queda como diseño revisable para seguridad y monitoreo.
+
+- No se creó una base de datos real.
+- No se ejecutaron migraciones.
+- \`schema.sql\` y \`seeds/seed-local.sql\` describen operadores, sensores, alertas y rondas.
+`,
+      schemaContent: `-- Esquema local revisable para ${appTitle}
+-- No ejecutar automáticamente.
+
+create table operators (
+  id text primary key,
+  full_name text not null,
+  role text not null,
+  status text not null,
+  notes text
+);
+
+create table sensors (
+  id text primary key,
+  name text not null,
+  zone text not null,
+  status text not null,
+  notes text
+);
+
+create table incidents (
+  id text primary key,
+  sensor_id text,
+  operator_id text not null,
+  detected_at text not null,
+  status text not null,
+  reason text not null,
+  notes text,
+  foreign key (sensor_id) references sensors(id),
+  foreign key (operator_id) references operators(id)
+);
+
+create table rounds (
+  id text primary key,
+  operator_id text not null,
+  zone text not null,
+  due_at text not null,
+  status text not null,
+  detail text,
+  foreign key (operator_id) references operators(id)
+);
+`,
+      seedContent: `-- Seed local y revisable. No ejecutar automáticamente.
+
+insert into operators (id, full_name, role, status, notes) values
+  ('OPR-001', 'Valeria Sosa', 'Monitoreo central', 'Activa', 'Cubre alertas críticas'),
+  ('OPR-002', 'Lucas Medina', 'Supervisor', 'En recorrido', 'Revisión de zona norte');
+
+insert into sensors (id, name, zone, status, notes) values
+  ('SNS-001', 'Sensor perimetral depósito', 'Zona norte', 'Crítico', 'Se recomienda revisión local inmediata'),
+  ('SNS-002', 'Lector de acceso hall central', 'Ingreso principal', 'Operativo', 'Sin desvíos en la última hora');
+
+insert into incidents (id, sensor_id, operator_id, detected_at, status, reason, notes) values
+  ('ALR-001', 'SNS-001', 'OPR-001', '2026-05-05 21:42', 'confirmado', 'Movimiento fuera de horario', 'Verificar cierre perimetral local');
+
+insert into rounds (id, operator_id, zone, due_at, status, detail) values
+  ('RND-001', 'OPR-002', 'Zona norte', '2026-05-05 22:15', 'pendiente', 'Falta registrar cierre de recorrido');
+`,
+    }
+  }
+
+  if (archetype === 'community-social') {
+    return {
+      readmeContent: `# Database local
+
+Esta carpeta queda como diseño revisable para comunidad y social local.
+
+- No se creó una base de datos real.
+- No se ejecutaron migraciones.
+- \`schema.sql\` y \`seeds/seed-local.sql\` describen grupos, referentes, publicaciones y moderación.
+`,
+      schemaContent: `-- Esquema local revisable para ${appTitle}
+-- No ejecutar automáticamente.
+
+create table groups (
+  id text primary key,
+  name text not null,
+  group_type text not null,
+  status text not null,
+  notes text
+);
+
+create table members (
+  id text primary key,
+  full_name text not null,
+  role text not null,
+  status text not null,
+  notes text
+);
+
+create table posts (
+  id text primary key,
+  group_id text not null,
+  member_id text not null,
+  scheduled_at text not null,
+  status text not null,
+  topic text not null,
+  notes text,
+  foreign key (group_id) references groups(id),
+  foreign key (member_id) references members(id)
+);
+
+create table moderation_flags (
+  id text primary key,
+  post_id text,
+  group_id text not null,
+  due_date text not null,
+  status text not null,
+  detail text,
+  foreign key (post_id) references posts(id),
+  foreign key (group_id) references groups(id)
+);
+`,
+      seedContent: `-- Seed local y revisable. No ejecutar automáticamente.
+
+insert into groups (id, name, group_type, status, notes) values
+  ('GRP-001', 'Vecinos de Parque Chas', 'Barrial', 'Activo', 'Grupo con agenda comunitaria semanal'),
+  ('GRP-002', 'Feria cultural del sábado', 'Eventos', 'Moderación alta', 'Se esperan publicaciones coordinadas');
+
+insert into members (id, full_name, role, status, notes) values
+  ('REF-001', 'Belén Ruiz', 'Moderación', 'Activa', 'Cubre alertas del feed comunitario'),
+  ('REF-002', 'Julián Ponce', 'Referente barrial', 'Disponible', 'Coordina publicaciones de la feria');
+
+insert into posts (id, group_id, member_id, scheduled_at, status, topic, notes) values
+  ('POST-001', 'GRP-001', 'REF-001', '2026-05-05 17:20', 'confirmado', 'Publicación de evento solidario', 'Programada para fijar en portada');
+
+insert into moderation_flags (id, post_id, group_id, due_date, status, detail) values
+  ('MOD-001', 'POST-001', 'GRP-001', '2026-05-05', 'pendiente', 'Hay observaciones sobre convivencia');
+`,
+    }
+  }
+
   return {
     readmeContent: `# Database local
 
@@ -17244,11 +18236,49 @@ function buildFullstackLocalDocumentationBundle({
     modules && modules.length > 0 ? modules : fullstackLocalDemoData?.modules || [],
     12,
   )
+  const interactionHighlights = summarizeUniqueExecutorStrings(
+    [
+      ...(Array.isArray(fullstackLocalDemoData?.interactionHighlights)
+        ? fullstackLocalDemoData.interactionHighlights
+        : []),
+      ...(Array.isArray(fullstackLocalDemoData?.quickActions)
+        ? fullstackLocalDemoData.quickActions.map(
+            (entry) => entry?.feedback || entry?.label || '',
+          )
+        : []),
+    ],
+    12,
+  )
+  const domainEntities = summarizeUniqueExecutorStrings(
+    fullstackLocalDemoData?.domainEntities,
+    12,
+  )
+  const highlightedMetrics = summarizeUniqueExecutorStrings(
+    (Array.isArray(fullstackLocalDemoData?.metrics)
+      ? fullstackLocalDemoData.metrics
+      : []
+    ).map((entry) => entry?.label || ''),
+    12,
+  )
+  const highlightedAlerts = summarizeUniqueExecutorStrings(
+    (Array.isArray(fullstackLocalDemoData?.alerts)
+      ? fullstackLocalDemoData.alerts
+      : []
+    ).map((entry) => entry?.title || entry?.detail || ''),
+    12,
+  )
+  const nextSafePhases = [
+    overview.nextRecommendedPhase || 'frontend-mock-flow',
+    'backend-contracts',
+    'database-design',
+    'local-validation',
+    'review-and-expand',
+  ].filter((entry, index, entries) => entry && entries.indexOf(entry) === index)
 
   return {
     readmeContent: `# ${appTitle}
 
-Scaffold fullstack local y revisable generado por JEFE.
+Scaffold fullstack local, seguro y revisable generado por JEFE.
 
 ## Qué incluye esta demo
 
@@ -17256,6 +18286,29 @@ Scaffold fullstack local y revisable generado por JEFE.
 - Datos mock ricos orientados al dominio
 - Interacciones client-side sin servidor
 - Backend, shared, database y docs como referencia revisable
+- Compatibilidad con abrir \`frontend/index.html\` por \`file://\`
+
+## Qué podés mostrar en la demo
+
+- Dominio visible: ${overview.archetype || 'operations'}
+- Entidades principales: ${domainEntities.join(', ') || 'sin entidades declaradas'}
+- Métricas mock: ${highlightedMetrics.join(', ') || 'sin métricas declaradas'}
+- Alertas o pendientes: ${highlightedAlerts.join(', ') || 'sin alertas declaradas'}
+- Módulos visibles: ${visibleModules.join(', ') || 'sin módulos visibles declarados'}
+
+## Qué esperar al abrir la demo
+
+${demoSections.map((entry) => `- ${entry}`).join('\n') || '- Dashboard local'}
+
+## Interacciones locales
+
+${interactionHighlights.map((entry) => `- ${entry}`).join('\n') || '- Búsqueda, filtros y selección en memoria local'}
+
+## Cómo abrirla
+
+1. Abrí \`frontend/index.html\` con doble click.
+2. Confirmá que cargue por \`file://\`, sin servidor y sin instalar dependencias.
+3. Probá navegación, filtros, búsqueda, selección y cambios de estado mock.
 
 ## Alcance
 
@@ -17267,16 +18320,36 @@ Scaffold fullstack local y revisable generado por JEFE.
 - Sin deploy
 - Sin integraciones externas
 
+## Qué no se ejecutó
+
+- No se levantó frontend real
+- No se levantó backend real
+- No se creó base de datos real
+- No se ejecutaron migraciones ni seeds
+- No se configuró auth real, pagos reales ni integraciones externas
+
 ## Cómo revisar
 
-1. Hacé doble click en \`frontend/index.html\`.
-2. Recorré la demo por \`file://\` sin abrir ningún servidor.
-3. Probá búsqueda, filtros, selección y acciones locales mock.
-4. Revisá \`backend/\`, \`shared/\`, \`database/\` y \`docs/\` como referencia.
+1. Recorré la demo por \`file://\` sin abrir ningún servidor.
+2. Revisá \`backend/\`, \`shared/\`, \`database/\` y \`docs/\` como referencia.
+3. Confirmá que la demo siga siendo mock/local y no prometa runtime real.
+4. Validá que el dominio visible coincida con el pedido y no se mezcle con otra vertical.
 
 ## Próxima fase segura
 
 - \`${overview.nextRecommendedPhase || 'frontend-mock-flow'}\`
+
+## Cadena sugerida de continuidad
+
+${nextSafePhases.map((entry) => `- \`${entry}\``).join('\n')}
+
+## Aprobaciones futuras
+
+- npm install o dependencias reales
+- runtime local con servidor
+- base de datos real, migraciones o seeds reales
+- Docker o deploy
+- auth real, pagos reales o integraciones externas
 `,
     architectureContent: `# Arquitectura local propuesta
 
@@ -17299,6 +18372,9 @@ Dejar una primera demo local segura, revisable y abrible por \`file://\`.
 - arquetipo: ${overview.archetype || 'operations'}
 - módulos visibles: ${visibleModules.join(', ') || 'sin módulos declarados'}
 - secciones de demo: ${demoSections.join(', ') || 'sin secciones declaradas'}
+- interacciones locales: ${interactionHighlights.join(', ') || 'búsqueda, filtros y selección en memoria'}
+- entidades principales: ${domainEntities.join(', ') || 'sin entidades declaradas'}
+- métricas mock visibles: ${highlightedMetrics.join(', ') || 'sin métricas declaradas'}
 
 ## Límites
 
@@ -17311,6 +18387,16 @@ Dejar una primera demo local segura, revisable y abrible por \`file://\`.
 ## Continuidad
 
 La siguiente fase segura recomendada es \`${overview.nextRecommendedPhase || 'frontend-mock-flow'}\`.
+
+## Aprobaciones futuras
+
+Estas acciones siguen fuera del flujo seguro actual y solo deberían aparecer como preview o aprobación futura:
+
+- instalar dependencias reales
+- levantar runtime real
+- conectar una DB real
+- crear Docker o deploy
+- auth real, pagos reales o integraciones externas
 `,
     runbookContent: `# Local runbook
 
@@ -17323,6 +18409,8 @@ El proyecto quedó como demo local segura y revisable.
 1. Abrí \`frontend/index.html\` con doble click o desde el navegador.
 2. Confirmá que la UI cargue por \`file://\`, sin servidor y sin \`npm install\`.
 3. Probá navegación, búsqueda, filtros y acciones locales mock.
+4. Verificá que el dominio visible coincida con el pedido y no se mezcle con otra vertical.
+5. Mostrá métricas, alertas, detalle lateral y al menos una acción local segura.
 
 ## Qué está mockeado
 
@@ -17347,6 +18435,20 @@ El proyecto quedó como demo local segura y revisable.
 ## Próxima fase segura
 
 La siguiente fase recomendada es \`${overview.nextRecommendedPhase || 'frontend-mock-flow'}\`.
+
+## Próximos pasos sugeridos
+
+${nextSafePhases.map((entry) => `- \`${entry}\``).join('\n')}
+
+## Interacciones sugeridas para la demo
+
+${interactionHighlights.map((entry) => `- ${entry}`).join('\n') || '- Búsqueda, filtros y revisión en memoria local.'}
+
+## Aprobaciones futuras
+
+- Preparar runtime local solo como preview
+- Preparar npm install solo como preview
+- Preparar DB real, Docker o deploy solo como aprobación futura
 `,
   }
 }
@@ -18038,7 +19140,21 @@ module.exports = {
       ? 'create table pets'
       : fullstackLocalArchetype === 'medical-clinic'
         ? 'create table patients'
-        : 'create table records'
+        : fullstackLocalArchetype === 'sports-booking'
+          ? 'create table courts'
+          : fullstackLocalArchetype === 'ecommerce'
+            ? 'create table products'
+            : fullstackLocalArchetype === 'school-crm'
+              ? 'create table students'
+              : fullstackLocalArchetype === 'document-management'
+                ? 'create table documents'
+                : fullstackLocalArchetype === 'real-estate'
+                  ? 'create table properties'
+                  : fullstackLocalArchetype === 'security-monitoring'
+                    ? 'create table sensors'
+                    : fullstackLocalArchetype === 'community-social'
+                      ? 'create table posts'
+                      : 'create table records'
   const instructionLines = [
     `Materializar un scaffold fullstack local y revisable dentro de "${rootFolder}" en el workspace activo.`,
     `Usar solo archivos y carpetas permitidos dentro de ${rootFolder}.`,
@@ -22099,20 +23215,29 @@ function buildProjectReadinessDemoScript({
       .map((entry) => normalizeModuleExpansionId(entry?.id || entry?.name))
       .filter(Boolean),
   )
+  const hasFrontendIndex = hasPath('/frontend/index.html')
+  const hasValidationReport = hasPath('/docs/validation-report.md')
 
   return summarizeUniqueExecutorStrings(
     [
       'Revisar `docs/release-candidate-checklist.md` para seguir el flujo de demo sugerido.',
+      'Confirmar que las aprobaciones futuras no bloqueen la fase segura actual.',
       hasPath('/jefe-project.json')
         ? 'Abrir `jefe-project.json` y confirmar fases, módulos y próximo paso recomendado.'
         : '',
       hasPath('/docs/local-runbook.md')
         ? 'Leer `docs/local-runbook.md` antes de probar cualquier flujo local.'
         : '',
+      hasFrontendIndex
+        ? 'Abrir `frontend/index.html` con doble click y validar la demo por `file://`, sin servidor ni npm install.'
+        : '',
+      hasFrontendIndex
+        ? 'Recorrer navegación, métricas, detalle y acciones locales mock para confirmar que la demo no queda en blanco.'
+        : '',
       phaseStates.some(
         (entry) => entry.id === 'frontend-mock-flow' && entry.status === 'done',
       )
-        ? 'Revisar el frontend generado y sus mocks sin levantar runtime real.'
+        ? 'Revisar el frontend generado, sus mocks y los estados locales sin levantar runtime real.'
         : '',
       phaseStates.some(
         (entry) => entry.id === 'backend-contracts' && entry.status === 'done',
@@ -22127,7 +23252,9 @@ function buildProjectReadinessDemoScript({
       phaseStates.some(
         (entry) => entry.id === 'local-validation' && entry.status === 'done',
       )
-        ? 'Leer `docs/validation-report.md` para entender que se valido y que sigue siendo mock.'
+        ? hasValidationReport
+          ? 'Leer `docs/validation-report.md` para entender qué se validó y qué sigue siendo mock.'
+          : 'Confirmar que la validación local quedó cerrada sin instalar dependencias ni levantar servicios.'
         : '',
       doneModuleIds.has('notifications')
         ? 'Mostrar el modulo de notificaciones mock como expansion segura ya agregada.'
@@ -22137,6 +23264,13 @@ function buildProjectReadinessDemoScript({
         : '',
       doneModuleIds.has('inventory')
         ? 'Mostrar el modulo de inventario mock como expansion segura ya agregada.'
+        : '',
+      phaseStates.every((entry) =>
+        ['frontend-mock-flow', 'backend-contracts', 'database-design', 'local-validation'].includes(entry.id)
+          ? entry.status === 'done'
+          : true,
+      )
+        ? 'La demo local segura ya puede mostrarse como release candidate mock, todavía sin producto real.'
         : '',
       'No ejecutar npm install, runtime real, DB real, Docker, deploy, pagos, auth real ni integraciones externas.',
     ],
