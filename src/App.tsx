@@ -8954,6 +8954,21 @@ const normalizeOptionalStringArray = (value: unknown) =>
       )
     : []
 
+const summarizeUniqueStrings = (value: unknown, limit = 10) => {
+  const uniqueValues: string[] = []
+
+  normalizeOptionalStringArray(value).forEach((entry) => {
+    const normalizedEntry = entry.trim()
+    if (!normalizedEntry || uniqueValues.includes(normalizedEntry)) {
+      return
+    }
+
+    uniqueValues.push(normalizedEntry)
+  })
+
+  return uniqueValues.slice(0, Math.max(1, limit))
+}
+
 const summarizeInlineText = (value: unknown, maxLength = 120) => {
   const normalizedValue = normalizeOptionalString(value).replace(/\s+/g, ' ')
 

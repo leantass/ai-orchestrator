@@ -8,6 +8,7 @@ const require = createRequire(import.meta.url)
 const currentFilePath = fileURLToPath(import.meta.url)
 const repoRoot = path.resolve(path.dirname(currentFilePath), '..')
 const mainFilePath = path.join(repoRoot, 'electron', 'main.cjs')
+const appFilePath = path.join(repoRoot, 'src', 'App.tsx')
 const mainSource = fs.readFileSync(mainFilePath, 'utf8')
 const {
   LOCAL_MATERIALIZATION_PLAN_VERSION,
@@ -1111,6 +1112,33 @@ async function runUiContractSanityCase() {
   }
 }
 
+async function runUiHelperSanityCase() {
+  const failures = []
+  const appSource = fs.readFileSync(appFilePath, 'utf8')
+
+  pushFailure(
+    failures,
+    /const summarizeUniqueStrings\s*=\s*\(/.test(appSource),
+    'App.tsx debe definir summarizeUniqueStrings para evitar crashes del renderer en continuidad.',
+  )
+  pushFailure(
+    failures,
+    /function ProjectContinuityCenterCard\(/.test(appSource),
+    'App.tsx debe seguir exponiendo ProjectContinuityCenterCard para el flujo de continuidad.',
+  )
+  pushFailure(
+    failures,
+    /summarizeUniqueStrings\(/.test(appSource),
+    'ProjectContinuityCenterCard debe seguir pudiendo resumir listas visibles sin depender de helpers faltantes.',
+  )
+
+  return {
+    id: 'operator-ui-helper-sanity',
+    label: 'Helpers criticos de continuidad definidos en UI',
+    failures,
+  }
+}
+
 async function main() {
   ensureCleanDirectory(smokeWorkspaceRoot)
   try {
@@ -1189,6 +1217,7 @@ async function main() {
     results.push(await runSensitivePreviewCase())
     results.push(await runFinalReadinessCase())
     results.push(await runUiContractSanityCase())
+    results.push(await runUiHelperSanityCase())
 
     const failedResults = results.filter((result) => result.failures.length > 0)
 
