@@ -13226,7 +13226,7 @@ function buildPlanningArchitectureBundle({
     continuationActionPlan,
     expansionOptions,
   })
-  const projectReadinessState = buildProjectReadinessState({
+  const provisionalProjectReadinessState = buildProjectReadinessState({
     strategy,
     scalableDeliveryPlan,
     localProjectManifest,
@@ -13234,21 +13234,43 @@ function buildPlanningArchitectureBundle({
     validationPlan,
     projectContinuationState,
   })
+  const runtimeApprovalState = buildRuntimeApprovalState({
+    continuationActionPlan,
+    projectContinuationState,
+    projectReadinessState: provisionalProjectReadinessState,
+    localProjectManifest,
+  })
+  const projectReadinessState = buildProjectReadinessState({
+    strategy,
+    scalableDeliveryPlan,
+    localProjectManifest,
+    nextActionPlan,
+    validationPlan,
+    projectContinuationState,
+    runtimeApprovalState,
+  })
+  const continuationSyncedManifest =
+    syncLocalProjectManifestWithContinuationState({
+      localProjectManifest,
+      projectContinuationState,
+    }) || localProjectManifest
+  const runtimeSyncedManifest =
+    syncLocalProjectManifestWithRuntimeApprovalState({
+      localProjectManifest: continuationSyncedManifest,
+      runtimeApprovalState,
+    }) || continuationSyncedManifest
   const enrichedLocalProjectManifest = normalizeLocalProjectManifestContract(
     syncLocalProjectManifestWithReadinessState({
-      localProjectManifest:
-        syncLocalProjectManifestWithContinuationState({
-          localProjectManifest,
-          projectContinuationState,
-        }) || localProjectManifest,
+      localProjectManifest: runtimeSyncedManifest,
       projectReadinessState,
-    }) || localProjectManifest,
+    }) || runtimeSyncedManifest,
   )
   const approvalRequestPlan = buildApprovalRequestPlan({
     continuationActionPlan,
     projectContinuationState,
     projectReadinessState,
     localProjectManifest: enrichedLocalProjectManifest,
+    runtimeApprovalState,
   })
 
   return {
@@ -13268,6 +13290,7 @@ function buildPlanningArchitectureBundle({
     moduleExpansionPlan: normalizeModuleExpansionPlanContract(moduleExpansionPlan),
     continuationActionPlan: normalizeContinuationActionContract(continuationActionPlan),
     approvalRequestPlan: normalizeApprovalRequestPlanContract(approvalRequestPlan),
+    runtimeApprovalState: normalizeRuntimeApprovalStateContract(runtimeApprovalState),
   }
 }
 
@@ -15848,6 +15871,32 @@ function normalizeApprovalRequestPlanContract(value) {
     ...(typeof value.projectRoot === 'string' && value.projectRoot.trim()
       ? { projectRoot: value.projectRoot.trim() }
       : {}),
+    ...(typeof value.approvalPhrase === 'string' && value.approvalPhrase.trim()
+      ? { approvalPhrase: value.approvalPhrase.trim() }
+      : {}),
+    ...(typeof value.operatorMustConfirm === 'string' && value.operatorMustConfirm.trim()
+      ? { operatorMustConfirm: value.operatorMustConfirm.trim() }
+      : {}),
+    ...(typeof value.notExecutedDisclaimer === 'string' &&
+    value.notExecutedDisclaimer.trim()
+      ? { notExecutedDisclaimer: value.notExecutedDisclaimer.trim() }
+      : {}),
+    ...(typeof value.expectedOutcome === 'string' && value.expectedOutcome.trim()
+      ? { expectedOutcome: value.expectedOutcome.trim() }
+      : {}),
+    ...(typeof value.blockedReason === 'string' && value.blockedReason.trim()
+      ? { blockedReason: value.blockedReason.trim() }
+      : {}),
+    ...(typeof value.relatedReadinessArea === 'string' &&
+    value.relatedReadinessArea.trim()
+      ? { relatedReadinessArea: value.relatedReadinessArea.trim() }
+      : {}),
+    ...(typeof value.createdAt === 'string' && value.createdAt.trim()
+      ? { createdAt: value.createdAt.trim() }
+      : {}),
+    ...(typeof value.expiresAt === 'string' && value.expiresAt.trim()
+      ? { expiresAt: value.expiresAt.trim() }
+      : {}),
     ...(summarizeUniqueExecutorStrings(value.touches, 20).length > 0
       ? { touches: summarizeUniqueExecutorStrings(value.touches, 20) }
       : {}),
@@ -15859,6 +15908,130 @@ function normalizeApprovalRequestPlanContract(value) {
           validationsRequired: summarizeUniqueExecutorStrings(
             value.validationsRequired,
             20,
+          ),
+        }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.warnings, 16).length > 0
+      ? { warnings: summarizeUniqueExecutorStrings(value.warnings, 16) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.commandsPreview, 16).length > 0
+      ? { commandsPreview: summarizeUniqueExecutorStrings(value.commandsPreview, 16) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.filesPreview, 20).length > 0
+      ? { filesPreview: summarizeUniqueExecutorStrings(value.filesPreview, 20) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.directoriesPreview, 16).length > 0
+      ? {
+          directoriesPreview: summarizeUniqueExecutorStrings(
+            value.directoriesPreview,
+            16,
+          ),
+        }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.envRequirements, 16).length > 0
+      ? { envRequirements: summarizeUniqueExecutorStrings(value.envRequirements, 16) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.secretsRequired, 16).length > 0
+      ? { secretsRequired: summarizeUniqueExecutorStrings(value.secretsRequired, 16) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.rollbackPlan, 16).length > 0
+      ? { rollbackPlan: summarizeUniqueExecutorStrings(value.rollbackPlan, 16) }
+      : {}),
+    ...(normalizeValidationPlanContract(value.validationPlan)
+      ? { validationPlan: normalizeValidationPlanContract(value.validationPlan) }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
+function normalizeRuntimeApprovalStateContract(value) {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const normalizedValue = {
+    ...(typeof value.approvalId === 'string' && value.approvalId.trim()
+      ? { approvalId: value.approvalId.trim() }
+      : {}),
+    ...(typeof value.actionId === 'string' && value.actionId.trim()
+      ? { actionId: value.actionId.trim() }
+      : {}),
+    ...(typeof value.title === 'string' && value.title.trim()
+      ? { title: value.title.trim() }
+      : {}),
+    ...(typeof value.description === 'string' && value.description.trim()
+      ? { description: value.description.trim() }
+      : {}),
+    ...(typeof value.status === 'string' && value.status.trim()
+      ? { status: value.status.trim() }
+      : {}),
+    ...(typeof value.riskLevel === 'string' && value.riskLevel.trim()
+      ? { riskLevel: value.riskLevel.trim() }
+      : {}),
+    ...(typeof value.requiresExplicitApproval === 'boolean'
+      ? { requiresExplicitApproval: value.requiresExplicitApproval }
+      : {}),
+    ...(typeof value.approvalPhrase === 'string' && value.approvalPhrase.trim()
+      ? { approvalPhrase: value.approvalPhrase.trim() }
+      : {}),
+    ...(typeof value.operatorMustConfirm === 'string' &&
+    value.operatorMustConfirm.trim()
+      ? { operatorMustConfirm: value.operatorMustConfirm.trim() }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.commandsPreview, 16).length > 0
+      ? { commandsPreview: summarizeUniqueExecutorStrings(value.commandsPreview, 16) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.filesPreview, 20).length > 0
+      ? { filesPreview: summarizeUniqueExecutorStrings(value.filesPreview, 20) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.directoriesPreview, 16).length > 0
+      ? {
+          directoriesPreview: summarizeUniqueExecutorStrings(
+            value.directoriesPreview,
+            16,
+          ),
+        }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.envRequirements, 16).length > 0
+      ? { envRequirements: summarizeUniqueExecutorStrings(value.envRequirements, 16) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.secretsRequired, 16).length > 0
+      ? { secretsRequired: summarizeUniqueExecutorStrings(value.secretsRequired, 16) }
+      : {}),
+    ...(normalizeValidationPlanContract(value.validationPlan)
+      ? { validationPlan: normalizeValidationPlanContract(value.validationPlan) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.rollbackPlan, 16).length > 0
+      ? { rollbackPlan: summarizeUniqueExecutorStrings(value.rollbackPlan, 16) }
+      : {}),
+    ...(typeof value.safeAlternative === 'string' && value.safeAlternative.trim()
+      ? { safeAlternative: value.safeAlternative.trim() }
+      : {}),
+    ...(typeof value.blockedReason === 'string' && value.blockedReason.trim()
+      ? { blockedReason: value.blockedReason.trim() }
+      : {}),
+    ...(typeof value.expectedOutcome === 'string' && value.expectedOutcome.trim()
+      ? { expectedOutcome: value.expectedOutcome.trim() }
+      : {}),
+    ...(typeof value.notExecutedDisclaimer === 'string' &&
+    value.notExecutedDisclaimer.trim()
+      ? { notExecutedDisclaimer: value.notExecutedDisclaimer.trim() }
+      : {}),
+    ...(typeof value.createdAt === 'string' && value.createdAt.trim()
+      ? { createdAt: value.createdAt.trim() }
+      : {}),
+    ...(typeof value.expiresAt === 'string' && value.expiresAt.trim()
+      ? { expiresAt: value.expiresAt.trim() }
+      : {}),
+    ...(typeof value.relatedReadinessArea === 'string' &&
+    value.relatedReadinessArea.trim()
+      ? { relatedReadinessArea: value.relatedReadinessArea.trim() }
+      : {}),
+    ...(normalizeContinuationActionContract(value.relatedContinuationAction)
+      ? {
+          relatedContinuationAction: normalizeContinuationActionContract(
+            value.relatedContinuationAction,
           ),
         }
       : {}),
@@ -15937,6 +16110,12 @@ function normalizeProjectReadinessStateContract(value) {
       : {}),
     ...(typeof value.operatorSummary === 'string' && value.operatorSummary.trim()
       ? { operatorSummary: value.operatorSummary.trim() }
+      : {}),
+    ...(typeof value.runtimeReadiness === 'string' && value.runtimeReadiness.trim()
+      ? { runtimeReadiness: value.runtimeReadiness.trim() }
+      : {}),
+    ...(typeof value.realExecutionReady === 'boolean'
+      ? { realExecutionReady: value.realExecutionReady }
       : {}),
     ...(normalizeContinuationActionContract(value.nextBestAction)
       ? { nextBestAction: normalizeContinuationActionContract(value.nextBestAction) }
@@ -16393,6 +16572,31 @@ function normalizeLocalProjectManifestContract(value) {
         )
         .filter((entry) => entry && Object.keys(entry).length > 0)
     : []
+  const normalizedApprovalHistory = Array.isArray(value.approvalHistory)
+    ? value.approvalHistory
+        .map((entry) =>
+          entry && typeof entry === 'object'
+            ? {
+                ...(typeof entry.kind === 'string' && entry.kind.trim()
+                  ? { kind: entry.kind.trim() }
+                  : {}),
+                ...(typeof entry.id === 'string' && entry.id.trim()
+                  ? { id: entry.id.trim() }
+                  : {}),
+                ...(typeof entry.status === 'string' && entry.status.trim()
+                  ? { status: entry.status.trim() }
+                  : {}),
+                ...(typeof entry.at === 'string' && entry.at.trim()
+                  ? { at: entry.at.trim() }
+                  : {}),
+                ...(typeof entry.note === 'string' && entry.note.trim()
+                  ? { note: entry.note.trim() }
+                  : {}),
+              }
+            : null,
+        )
+        .filter((entry) => entry && Object.keys(entry).length > 0)
+    : []
 
   const normalizedValue = {
     version:
@@ -16450,6 +16654,17 @@ function normalizeLocalProjectManifestContract(value) {
     ...(typeof value.updatedAt === 'string' && value.updatedAt.trim()
       ? { updatedAt: value.updatedAt.trim() }
       : {}),
+    ...(typeof value.lastApprovalRequest === 'string' &&
+    value.lastApprovalRequest.trim()
+      ? { lastApprovalRequest: value.lastApprovalRequest.trim() }
+      : {}),
+    ...(typeof value.runtimeReadiness === 'string' && value.runtimeReadiness.trim()
+      ? { runtimeReadiness: value.runtimeReadiness.trim() }
+      : {}),
+    ...(typeof value.realExecutionReadiness === 'string' &&
+    value.realExecutionReadiness.trim()
+      ? { realExecutionReadiness: value.realExecutionReadiness.trim() }
+      : {}),
     ...(typeof value.readinessLevel === 'string' && value.readinessLevel.trim()
       ? { readinessLevel: value.readinessLevel.trim() }
       : {}),
@@ -16475,7 +16690,24 @@ function normalizeLocalProjectManifestContract(value) {
     ...(summarizeUniqueExecutorStrings(value.warnings, 20).length > 0
       ? { warnings: summarizeUniqueExecutorStrings(value.warnings, 20) }
       : {}),
+    ...(summarizeUniqueExecutorStrings(value.pendingApprovals, 20).length > 0
+      ? { pendingApprovals: summarizeUniqueExecutorStrings(value.pendingApprovals, 20) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.blockedRuntimeActions, 20).length > 0
+      ? {
+          blockedRuntimeActions: summarizeUniqueExecutorStrings(
+            value.blockedRuntimeActions,
+            20,
+          ),
+        }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.approvedActions, 20).length > 0
+      ? { approvedActions: summarizeUniqueExecutorStrings(value.approvedActions, 20) }
+      : {}),
     ...(normalizedHistory.length > 0 ? { history: normalizedHistory } : {}),
+    ...(normalizedApprovalHistory.length > 0
+      ? { approvalHistory: normalizedApprovalHistory }
+      : {}),
   }
 
   return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
@@ -17186,6 +17418,34 @@ function getApprovalPolicyEntry(policyId) {
   return APPROVAL_POLICY_REGISTRY_BY_ID.get(normalizedValue) || null
 }
 
+function detectApprovalPolicyHintFromText(input) {
+  const normalizedValue =
+    typeof input === 'string' && input.trim()
+      ? normalizeSectorDetectionText(input)
+          .replace(/[^a-z0-9\s-]/g, ' ')
+          .trim()
+          .replace(/\s+/g, ' ')
+      : ''
+
+  if (!normalizedValue) {
+    return null
+  }
+
+  let bestMatch = null
+
+  for (const [alias, canonicalId] of APPROVAL_POLICY_REGISTRY_ALIASES) {
+    if (normalizedValue === alias || normalizedValue.includes(alias)) {
+      if (!bestMatch || alias.length > bestMatch.alias.length) {
+        bestMatch = { alias, canonicalId }
+      }
+    }
+  }
+
+  return bestMatch
+    ? APPROVAL_POLICY_REGISTRY_BY_ID.get(bestMatch.canonicalId) || null
+    : null
+}
+
 const PROJECT_CONTINUATION_ACTION_REGISTRY = [
   {
     id: 'prepare-frontend-improvement-plan',
@@ -17579,6 +17839,510 @@ function buildProjectContinuationActionTargetPaths({
     `${normalizedProjectRoot}/docs/validation-report.md`,
     `${normalizedProjectRoot}/jefe-project.json`,
   ]
+}
+
+const RUNTIME_APPROVAL_PREVIEW_REGISTRY = [
+  {
+    approvalType: 'dependency-install',
+    relatedReadinessArea: 'Dependencias reales y entorno local',
+    commandsPreview: [
+      'npm install',
+      'npm run lint',
+      'npx tsc --noEmit',
+      'npm run build',
+      'npm run ai-planner-smoke',
+      'node scripts/ai-release-smoke.mjs',
+    ],
+    filesPreview: [
+      '<project-root>/package.json',
+      '<project-root>/package-lock.json',
+    ],
+    directoriesPreview: ['<project-root>/node_modules'],
+    envRequirements: [
+      'Node.js y npm disponibles en la maquina local.',
+      'Acceso al workspace local donde se genero el proyecto.',
+    ],
+    secretsRequired: [],
+    validationCommands: [
+      'npm run lint',
+      'npx tsc --noEmit',
+      'npm run build',
+      'npm run ai-planner-smoke',
+      'node scripts/ai-release-smoke.mjs',
+    ],
+    manualChecks: [
+      'Revisar package-lock.json y node_modules si la instalacion aprobada deja cambios inesperados.',
+      'Confirmar que la instalacion aprobada no agregue dependencias fuera del alcance previsto.',
+    ],
+    rollbackPlan: [
+      'Eliminar node_modules y revisar package-lock.json si la prueba aprobada falla.',
+      'Volver al estado previo del entorno local antes de seguir con otra corrida.',
+    ],
+    expectedOutcome:
+      'Dejar el entorno local listo para compilar y validar el proyecto con dependencias reales aprobadas.',
+  },
+  {
+    approvalType: 'npm-install',
+    relatedReadinessArea: 'Dependencias reales y entorno local',
+    commandsPreview: ['npm install'],
+    filesPreview: [
+      '<project-root>/package.json',
+      '<project-root>/package-lock.json',
+    ],
+    directoriesPreview: ['<project-root>/node_modules'],
+    envRequirements: [
+      'Node.js y npm disponibles en la maquina local.',
+      'Acceso al workspace local donde se genero el proyecto.',
+    ],
+    secretsRequired: [],
+    validationCommands: [
+      'npm run lint',
+      'npx tsc --noEmit',
+      'npm run build',
+    ],
+    manualChecks: [
+      'Confirmar que npm install aprobado no altere package contracts fuera del plan revisado.',
+    ],
+    rollbackPlan: [
+      'Eliminar node_modules si la prueba aprobada falla.',
+      'Revisar package-lock.json antes de conservar cambios del entorno.',
+    ],
+    expectedOutcome:
+      'Preparar una instalacion real de dependencias sin ejecutarla todavia.',
+  },
+  {
+    approvalType: 'runtime-start',
+    relatedReadinessArea: 'Runtime local y verificacion visual',
+    commandsPreview: ['npm run dev', 'npm run build', 'npm run preview'],
+    filesPreview: [
+      '<project-root>/frontend/index.html',
+      '<project-root>/frontend/src/main.js',
+      '<project-root>/frontend/src/components/App.js',
+    ],
+    directoriesPreview: ['<project-root>/frontend', '<project-root>/dist'],
+    envRequirements: [
+      'Puerto local libre para el dev server aprobado.',
+      'Operador disponible para cerrar el proceso al finalizar la prueba.',
+    ],
+    secretsRequired: [],
+    validationCommands: ['npm run build'],
+    manualChecks: [
+      'Hacer verificacion visual controlada y cerrar el proceso despues de usarlo.',
+      'Confirmar que no queden puertos abiertos ni procesos colgados.',
+    ],
+    rollbackPlan: [
+      'Cerrar cualquier proceso local levantado en la prueba aprobada.',
+      'Liberar puertos antes de seguir con otra tarea.',
+    ],
+    expectedOutcome:
+      'Permitir una verificacion visual de runtime local aprobada sin tocar servicios externos.',
+  },
+  {
+    approvalType: 'dev-server',
+    relatedReadinessArea: 'Runtime local y verificacion visual',
+    commandsPreview: ['npm run dev'],
+    filesPreview: [
+      '<project-root>/frontend/index.html',
+      '<project-root>/frontend/src/main.js',
+    ],
+    directoriesPreview: ['<project-root>/frontend'],
+    envRequirements: [
+      'Puerto local libre para el servidor de desarrollo aprobado.',
+      'Operador disponible para cerrar el proceso al finalizar la prueba.',
+    ],
+    secretsRequired: [],
+    validationCommands: ['npm run build'],
+    manualChecks: [
+      'Cerrar el dev server apenas termine la inspeccion aprobada.',
+      'Validar visualmente sin tocar runtime backend real.',
+    ],
+    rollbackPlan: [
+      'Cerrar el proceso del dev server aprobado.',
+      'Liberar el puerto local antes de seguir.',
+    ],
+    expectedOutcome:
+      'Preparar una corrida visual local aprobada sin iniciarla todavia.',
+  },
+  {
+    approvalType: 'backend-listen',
+    relatedReadinessArea: 'Backend escuchando puerto',
+    commandsPreview: ['npm run start', 'node backend/src/server.js'],
+    filesPreview: [
+      '<project-root>/backend/src/server.js',
+      '<project-root>/backend/src/routes/health.js',
+      '<project-root>/backend/package.json',
+    ],
+    directoriesPreview: ['<project-root>/backend'],
+    envRequirements: [
+      'Puerto backend libre y supervisado localmente.',
+      'Operador listo para cerrar el proceso cuando termine la prueba aprobada.',
+    ],
+    secretsRequired: [],
+    validationCommands: ['node --check backend/src/server.js'],
+    manualChecks: [
+      'Verificar que el backend aprobado no quede escuchando mas tiempo del necesario.',
+      'Confirmar que el alcance siga sin DB real ni integraciones externas.',
+    ],
+    rollbackPlan: [
+      'Detener el proceso backend aprobado si abre un puerto local.',
+      'Revisar logs locales antes de continuar.',
+    ],
+    expectedOutcome:
+      'Preparar una escucha local del backend bajo aprobacion fuerte y sin ejecutarla ahora.',
+  },
+  {
+    approvalType: 'db-create',
+    relatedReadinessArea: 'Base de datos real local',
+    commandsPreview: [
+      'Crear una base local aprobada',
+      'Aplicar database/schema.sql de forma controlada',
+      'Preparar una corrida de migracion local aprobada',
+      'Preparar una corrida de seed local aprobada',
+    ],
+    filesPreview: [
+      '<project-root>/database/schema.sql',
+      '<project-root>/database/seeds/seed-local.sql',
+      '<project-root>/docs/local-runbook.md',
+    ],
+    directoriesPreview: ['<project-root>/database'],
+    envRequirements: [
+      'Motor de base local aprobado y disponible en la maquina.',
+    ],
+    secretsRequired: [
+      'Credenciales locales de base real, si la prueba aprobada las requiere.',
+    ],
+    validationCommands: ['npm run build'],
+    manualChecks: [
+      'Revisar schema y seeds antes de tocar una base real.',
+      'Confirmar que no se ejecute SQL fuera de una fase aprobada.',
+    ],
+    rollbackPlan: [
+      'Eliminar la base local creada en la prueba aprobada si algo falla.',
+      'Volver a usar schema.sql y seed-local.sql solo como diseno textual.',
+    ],
+    expectedOutcome:
+      'Preparar el salto a DB real local sin crearla ni ejecutarla todavia.',
+  },
+  {
+    approvalType: 'db-migrate',
+    relatedReadinessArea: 'Migraciones reales',
+    commandsPreview: [
+      'Ejecutar migraciones aprobadas sobre la base local',
+      'Verificar el estado final del schema real',
+    ],
+    filesPreview: [
+      '<project-root>/database/schema.sql',
+      '<project-root>/docs/local-runbook.md',
+    ],
+    directoriesPreview: ['<project-root>/database'],
+    envRequirements: ['Base local real aprobada y disponible.'],
+    secretsRequired: [
+      'Credenciales locales de base real, si la prueba aprobada las requiere.',
+    ],
+    validationCommands: ['npm run build'],
+    manualChecks: [
+      'Confirmar que las migraciones reales siguen bloqueadas hasta una aprobacion futura.',
+    ],
+    rollbackPlan: [
+      'Revertir la base local a un snapshot previo si la migracion aprobada falla.',
+    ],
+    expectedOutcome:
+      'Preparar una migracion real aprobada sin correrla todavia.',
+  },
+  {
+    approvalType: 'db-seed',
+    relatedReadinessArea: 'Seeds reales',
+    commandsPreview: [
+      'Ejecutar seeds aprobados sobre la base local',
+      'Verificar los datos cargados de forma controlada',
+    ],
+    filesPreview: [
+      '<project-root>/database/seeds/seed-local.sql',
+      '<project-root>/docs/local-runbook.md',
+    ],
+    directoriesPreview: ['<project-root>/database/seeds'],
+    envRequirements: ['Base local real aprobada y disponible.'],
+    secretsRequired: [
+      'Credenciales locales de base real, si la prueba aprobada las requiere.',
+    ],
+    validationCommands: ['npm run build'],
+    manualChecks: [
+      'Confirmar que los seeds reales no se ejecuten fuera de una fase aprobada.',
+    ],
+    rollbackPlan: [
+      'Limpiar los datos insertados si la corrida aprobada deja el entorno inconsistente.',
+    ],
+    expectedOutcome:
+      'Preparar una corrida real de seeds sin ejecutarla todavia.',
+  },
+  {
+    approvalType: 'docker',
+    relatedReadinessArea: 'Infraestructura Docker',
+    commandsPreview: ['docker build .', 'docker run <imagen-aprobada>'],
+    filesPreview: ['<project-root>/Dockerfile', '<project-root>/docs/local-runbook.md'],
+    directoriesPreview: ['<project-root>/infra-local', '<project-root>/deploy'],
+    envRequirements: ['Docker o equivalente instalado y aprobado localmente.'],
+    secretsRequired: [],
+    validationCommands: ['npm run build'],
+    manualChecks: [
+      'Confirmar que Docker siga bloqueado hasta una fase aprobada de infraestructura.',
+    ],
+    rollbackPlan: [
+      'Eliminar imagenes o contenedores creados solo dentro de una prueba aprobada.',
+    ],
+    expectedOutcome:
+      'Dejar una propuesta de infraestructura Docker sin crear archivos reales.',
+  },
+  {
+    approvalType: 'docker-compose',
+    relatedReadinessArea: 'Infraestructura compose local',
+    commandsPreview: ['docker compose up --build', 'docker compose down'],
+    filesPreview: [
+      '<project-root>/docker-compose.yml',
+      '<project-root>/docs/local-runbook.md',
+    ],
+    directoriesPreview: ['<project-root>/infra-local'],
+    envRequirements: ['Docker compose aprobado y disponible localmente.'],
+    secretsRequired: [],
+    validationCommands: ['npm run build'],
+    manualChecks: [
+      'Confirmar que docker-compose siga bloqueado hasta una aprobacion futura.',
+    ],
+    rollbackPlan: ['Apagar servicios aprobados con docker compose down.'],
+    expectedOutcome:
+      'Preparar una topologia compose revisable sin crear archivos reales.',
+  },
+  {
+    approvalType: 'dockerfile',
+    relatedReadinessArea: 'Empaquetado Docker futuro',
+    commandsPreview: ['Crear Dockerfile aprobado', 'docker build .'],
+    filesPreview: ['<project-root>/Dockerfile', '<project-root>/docs/architecture.md'],
+    directoriesPreview: ['<project-root>/deploy', '<project-root>/infra-local'],
+    envRequirements: ['Motor Docker aprobado para una fase futura.'],
+    secretsRequired: [],
+    validationCommands: ['npm run build'],
+    manualChecks: [
+      'Confirmar que Dockerfile siga bloqueado y no se escriba en esta tarea.',
+    ],
+    rollbackPlan: ['Descartar el Dockerfile futuro si no pasa la revision aprobada.'],
+    expectedOutcome:
+      'Dejar la idea de empaquetado lista para una fase futura aprobada.',
+  },
+  {
+    approvalType: 'deploy',
+    relatedReadinessArea: 'Deploy y produccion',
+    commandsPreview: [
+      'Preparar pipeline de build y revision final',
+      'Ejecutar deploy aprobado en un destino futuro',
+    ],
+    filesPreview: ['<project-root>/docs/architecture.md', '<project-root>/docs/local-runbook.md'],
+    directoriesPreview: ['<project-root>/deploy'],
+    envRequirements: ['Destino de deploy aprobado y configurado en una tarea futura.'],
+    secretsRequired: ['Credenciales del destino de deploy, si la fase futura las requiere.'],
+    validationCommands: ['npm run build', 'npm run ai-planner-smoke'],
+    manualChecks: [
+      'Confirmar que el deploy sigue bloqueado hasta una fase futura dedicada.',
+    ],
+    rollbackPlan: [
+      'Mantener el deploy en preview hasta tener aprobacion explicita y un plan de rollback real.',
+    ],
+    expectedOutcome:
+      'Preparar un deploy futuro sin tocar infraestructura real ni remoto productivo.',
+  },
+  {
+    approvalType: 'auth-real',
+    relatedReadinessArea: 'Autenticacion real',
+    commandsPreview: [
+      'Configurar provider de auth aprobado',
+      'Revisar sesiones, permisos y cookies reales',
+    ],
+    filesPreview: [
+      '<project-root>/backend/src/server.js',
+      '<project-root>/shared/contracts/domain.js',
+      '<project-root>/docs/architecture.md',
+    ],
+    directoriesPreview: ['<project-root>/backend', '<project-root>/shared'],
+    envRequirements: ['Provider de auth definido en una fase futura aprobada.'],
+    secretsRequired: [
+      'Client ID y secret del provider real.',
+      'Configuracion real de sesiones o cookies.',
+    ],
+    validationCommands: ['npm run build'],
+    manualChecks: [
+      'Confirmar que auth real no se implemente en esta tarea.',
+    ],
+    rollbackPlan: [
+      'Mantener la autenticacion en modo plan hasta una aprobacion de seguridad dedicada.',
+    ],
+    expectedOutcome:
+      'Preparar un plan de auth real sin tocar credenciales ni sesiones reales.',
+  },
+  {
+    approvalType: 'payments-real',
+    relatedReadinessArea: 'Pagos reales',
+    commandsPreview: [
+      'Configurar gateway de pagos aprobado',
+      'Revisar conciliacion y webhooks reales',
+    ],
+    filesPreview: [
+      '<project-root>/docs/architecture.md',
+      '<project-root>/docs/local-runbook.md',
+    ],
+    directoriesPreview: ['<project-root>/backend', '<project-root>/docs'],
+    envRequirements: ['Gateway de pagos real definido en una fase futura aprobada.'],
+    secretsRequired: ['Claves reales del gateway de pagos.'],
+    validationCommands: ['npm run build'],
+    manualChecks: [
+      'Confirmar que pagos reales siguen bloqueados por seguridad.',
+    ],
+    rollbackPlan: [
+      'Mantener pagos reales en preview hasta una aprobacion maxima posterior.',
+    ],
+    expectedOutcome:
+      'Preparar una discusion futura de pagos sin tocar dinero real.',
+  },
+  {
+    approvalType: 'external-integration',
+    relatedReadinessArea: 'Integraciones externas reales',
+    commandsPreview: [
+      'Configurar credenciales aprobadas',
+      'Definir webhook o endpoint externo',
+      'Preparar una prueba controlada de conectividad',
+    ],
+    filesPreview: [
+      '<project-root>/docs/architecture.md',
+      '<project-root>/docs/local-runbook.md',
+      '<project-root>/docs/validation-report.md',
+    ],
+    directoriesPreview: ['<project-root>/backend', '<project-root>/docs'],
+    envRequirements: ['Red, endpoint externo y contexto legal/seguro aprobados.'],
+    secretsRequired: ['Tokens o credenciales reales del servicio externo.'],
+    validationCommands: ['npm run build'],
+    manualChecks: [
+      'Confirmar que no haya fetch ni API real en esta tarea.',
+    ],
+    rollbackPlan: [
+      'Mantener la integracion en preview hasta tener aprobacion explicita.',
+    ],
+    expectedOutcome:
+      'Preparar una integracion externa revisable sin tocar APIs reales.',
+  },
+  {
+    approvalType: 'secrets-env',
+    relatedReadinessArea: 'Secretos y variables reales',
+    commandsPreview: [
+      'Crear .env aprobado',
+      'Cargar variables sensibles locales de forma controlada',
+    ],
+    filesPreview: ['<project-root>/.env', '<project-root>/docs/local-runbook.md'],
+    directoriesPreview: ['<project-root>'],
+    envRequirements: ['Inventario aprobado de variables y secretos reales.'],
+    secretsRequired: ['Valores reales de entorno, tokens y claves locales.'],
+    validationCommands: ['npm run build'],
+    manualChecks: [
+      'Confirmar que .env real siga bloqueado en esta tarea.',
+    ],
+    rollbackPlan: [
+      'Eliminar cualquier archivo de secretos creado solo dentro de una fase aprobada.',
+    ],
+    expectedOutcome:
+      'Preparar el manejo futuro de secretos sin crear .env real ahora.',
+  },
+  {
+    approvalType: 'production-config',
+    relatedReadinessArea: 'Configuracion de produccion',
+    commandsPreview: [
+      'Ajustar configuracion de produccion aprobada',
+      'Revisar endpoints, flags y secretos productivos',
+    ],
+    filesPreview: ['<project-root>/docs/architecture.md', '<project-root>/deploy'],
+    directoriesPreview: ['<project-root>/deploy', '<project-root>/docs'],
+    envRequirements: ['Entorno productivo aprobado y fuera del alcance actual.'],
+    secretsRequired: ['Variables productivas y secretos del entorno real.'],
+    validationCommands: ['npm run build'],
+    manualChecks: [
+      'Confirmar que configuracion de produccion siga fuera del modo seguro.',
+    ],
+    rollbackPlan: [
+      'Mantener la configuracion de produccion como preview hasta tener una fase aprobada.',
+    ],
+    expectedOutcome:
+      'Preparar una configuracion productiva futura sin tocar archivos reales.',
+  },
+  {
+    approvalType: 'github-remote-write',
+    relatedReadinessArea: 'Escritura remota en GitHub',
+    commandsPreview: [
+      'git status --short',
+      'git add <paths-aprobados>',
+      'git commit -m "<mensaje>"',
+      'git push origin main',
+    ],
+    filesPreview: ['<project-root>/docs/architecture.md', '<project-root>/jefe-project.json'],
+    directoriesPreview: ['repo git local', 'remote origin'],
+    envRequirements: ['Remoto GitHub configurado y tarea explicita de cierre.'],
+    secretsRequired: ['Credenciales o sesion local valida para GitHub, si aplica.'],
+    validationCommands: ['git status --short'],
+    manualChecks: [
+      'Confirmar que el remoto sigue bloqueado salvo una tarea explicita de cierre.',
+    ],
+    rollbackPlan: [
+      'Mantener los cambios locales sin push hasta recibir una tarea explicita de cierre.',
+    ],
+    expectedOutcome:
+      'Preparar una escritura remota futura sin tocar GitHub en esta corrida.',
+  },
+]
+
+const RUNTIME_APPROVAL_PREVIEW_REGISTRY_BY_ID = new Map(
+  RUNTIME_APPROVAL_PREVIEW_REGISTRY.map((entry) => [entry.approvalType, entry]),
+)
+
+function resolveRuntimeApprovalPreviewPath(projectRoot, previewPath) {
+  const normalizedPreviewPath =
+    typeof previewPath === 'string' && previewPath.trim() ? previewPath.trim() : ''
+  const normalizedProjectRoot =
+    typeof projectRoot === 'string' && projectRoot.trim()
+      ? projectRoot.trim().replace(/[\\/]+/g, '/')
+      : ''
+
+  if (!normalizedPreviewPath) {
+    return ''
+  }
+
+  if (normalizedPreviewPath.startsWith('<project-root>') && normalizedProjectRoot) {
+    return normalizedPreviewPath.replace('<project-root>', normalizedProjectRoot)
+  }
+
+  return normalizedPreviewPath
+}
+
+function buildRuntimeApprovalPreviewEntries({ projectRoot, entries, limit = 20 }) {
+  return summarizeUniqueExecutorStrings(
+    (Array.isArray(entries) ? entries : []).map((entry) =>
+      resolveRuntimeApprovalPreviewPath(projectRoot, entry),
+    ),
+    limit,
+  )
+}
+
+function getRuntimeApprovalPreviewEntry(approvalType) {
+  const normalizedApprovalType =
+    typeof approvalType === 'string' && approvalType.trim()
+      ? approvalType.trim()
+      : ''
+
+  if (!normalizedApprovalType) {
+    return null
+  }
+
+  return (
+    RUNTIME_APPROVAL_PREVIEW_REGISTRY_BY_ID.get(normalizedApprovalType) ||
+    RUNTIME_APPROVAL_PREVIEW_REGISTRY_BY_ID.get(
+      getApprovalPolicyEntry(normalizedApprovalType)?.id || '',
+    ) ||
+    null
+  )
 }
 
 function getUnsupportedModuleExpansionMaterializationBlocker(moduleId, moduleName) {
@@ -18369,6 +19133,7 @@ function buildProjectReadinessState({
   nextActionPlan,
   validationPlan,
   projectContinuationState,
+  runtimeApprovalState,
 }) {
   const normalizedManifest =
     normalizeLocalProjectManifestContract(localProjectManifest)
@@ -18378,6 +19143,8 @@ function buildProjectReadinessState({
   const normalizedValidationPlan = normalizeValidationPlanContract(validationPlan)
   const normalizedContinuationState =
     normalizeProjectContinuationStateContract(projectContinuationState)
+  const normalizedRuntimeApprovalState =
+    normalizeRuntimeApprovalStateContract(runtimeApprovalState)
   const resolvedDeliveryLevel =
     normalizedManifest?.deliveryLevel ||
     normalizedManifest?.projectType ||
@@ -18439,9 +19206,16 @@ function buildProjectReadinessState({
     20,
   )
   const approvalRequiredAreas = summarizeUniqueExecutorStrings(
-    (normalizedContinuationState?.approvalRequiredActions || []).map(
-      (entry) => entry.title || entry.id,
-    ),
+    [
+      ...(normalizedContinuationState?.approvalRequiredActions || []).map(
+        (entry) => entry.title || entry.id,
+      ),
+      normalizedRuntimeApprovalState?.status === 'preview'
+        ? normalizedRuntimeApprovalState.title ||
+          normalizedRuntimeApprovalState.relatedReadinessArea ||
+          ''
+        : '',
+    ],
     20,
   )
   const blockedAreas = summarizeUniqueExecutorStrings(
@@ -18450,6 +19224,11 @@ function buildProjectReadinessState({
       ...(normalizedContinuationState?.blockedActions || []).map(
         (entry) => entry.title || entry.id,
       ),
+      normalizedRuntimeApprovalState?.status === 'blocked'
+        ? normalizedRuntimeApprovalState.title ||
+          normalizedRuntimeApprovalState.relatedReadinessArea ||
+          ''
+        : '',
     ],
     20,
   )
@@ -18466,6 +19245,19 @@ function buildProjectReadinessState({
   const safeLocalDemoReady =
     completedCoreFlow && blockedCorePhases.length === 0
   const demoReady = safeLocalDemoReady
+  const runtimeReadiness =
+    normalizedRuntimeApprovalState?.status === 'blocked'
+      ? 'blocked'
+      : normalizedRuntimeApprovalState
+        ? 'approval-preview'
+        : approvalRequiredAreas.length > 0
+          ? 'approval-pending'
+          : blockedAreas.length > 0
+            ? 'blocked'
+            : demoReady
+              ? 'not-requested'
+              : 'not-ready'
+  const realExecutionReady = false
   const nextBestAction =
     normalizedContinuationState?.nextRecommendedAction ||
     buildReadinessActionFromNextActionPlan(normalizedNextActionPlan)
@@ -18482,6 +19274,9 @@ function buildProjectReadinessState({
         : '',
       approvalRequiredAreas.length > 0
         ? 'No se toca nada real sin aprobacion.'
+        : '',
+      runtimeReadiness === 'approval-preview'
+        ? 'Hay una aprobacion preparada, pero sigue en modo preview.'
         : '',
       blockedAreas.length > 0
         ? 'Hay areas bloqueadas por seguridad.'
@@ -18511,12 +19306,16 @@ function buildProjectReadinessState({
               ? 'planning'
               : 'not-started'
   const lastValidationSummary = demoReady
-    ? 'Listo para demo local segura. No se ejecuto nada real: todo sigue en modo revisable y mock donde corresponde.'
+    ? runtimeReadiness === 'approval-preview'
+      ? 'Listo para demo local segura. El paso a runtime real sigue pendiente de aprobacion explicita y no se ejecuto nada real.'
+      : 'Listo para demo local segura. No se ejecuto nada real: todo sigue en modo revisable y mock donde corresponde.'
     : completedCoreFlow
       ? 'La base local esta cerrada, pero todavia conviene revisar el resultado antes de hablar de una demo completa.'
       : 'Todavia falta completar el flujo base y la validacion local para cerrar una demo segura.'
   const operatorSummary = demoReady
-    ? 'Listo para demo local segura.'
+    ? runtimeReadiness === 'approval-preview'
+      ? 'Listo para demo local segura, con runtime real pendiente de aprobacion explicita.'
+      : 'Listo para demo local segura.'
     : blockedCorePhases.length > 0
       ? 'Bloqueado por seguridad antes de cerrar la demo local.'
       : 'Todavia falta completar el flujo base antes de cerrar la demo local segura.'
@@ -18538,6 +19337,8 @@ function buildProjectReadinessState({
     validationStatus,
     lastValidationSummary,
     operatorSummary,
+    runtimeReadiness,
+    realExecutionReady,
     nextBestAction,
     recommendedDemoScript,
     warnings,
@@ -18545,7 +19346,89 @@ function buildProjectReadinessState({
   })
 }
 
-function buildApprovalRequestPlan({
+function buildRuntimeApprovalTimestamp() {
+  return new Date().toISOString()
+}
+
+function buildRuntimeApprovalExpiry(timestamp) {
+  const baseTimestamp =
+    typeof timestamp === 'string' && timestamp.trim() ? Date.parse(timestamp) : Number.NaN
+
+  if (!Number.isFinite(baseTimestamp)) {
+    return ''
+  }
+
+  return new Date(baseTimestamp + 1000 * 60 * 60 * 24).toISOString()
+}
+
+function buildRuntimeApprovalPreviewValidationPlan({
+  approvalType,
+  projectRoot,
+  filesPreview,
+  previewEntry,
+  baseValidationPlan,
+}) {
+  const normalizedBaseValidationPlan =
+    normalizeValidationPlanContract(baseValidationPlan)
+
+  return normalizeValidationPlanContract({
+    scope: projectRoot
+      ? `${projectRoot}:${approvalType || 'runtime-approval'}:preview`
+      : 'runtime-approval-preview',
+    level: 'high',
+    commands: summarizeUniqueExecutorStrings(
+      [
+        ...(Array.isArray(previewEntry?.validationCommands)
+          ? previewEntry.validationCommands
+          : []),
+        ...(Array.isArray(normalizedBaseValidationPlan?.commands)
+          ? normalizedBaseValidationPlan.commands
+          : []),
+      ],
+      20,
+    ),
+    fileChecks: summarizeUniqueExecutorStrings(filesPreview, 20).map((targetPath) => ({
+      path: targetPath,
+      expectation:
+        'Solo podria cambiar despues de una aprobacion explicita y una ejecucion futura controlada.',
+    })),
+    forbiddenPaths: summarizeUniqueExecutorStrings(
+      [
+        'node_modules',
+        '.env',
+        'Dockerfile',
+        'docker-compose.yml',
+        'deploy',
+      ],
+      12,
+    ),
+    runtimeChecks: [],
+    manualChecks: summarizeUniqueExecutorStrings(
+      [
+        'No se ejecutó nada todavía.',
+        'Revisar cada comando propuesto con el operador antes de aprobar.',
+        'Confirmar que la accion siga en preview y sin executor.',
+        ...(Array.isArray(previewEntry?.manualChecks) ? previewEntry.manualChecks : []),
+        ...(Array.isArray(normalizedBaseValidationPlan?.manualChecks)
+          ? normalizedBaseValidationPlan.manualChecks
+          : []),
+      ],
+      20,
+    ),
+    successCriteria: summarizeUniqueExecutorStrings(
+      [
+        'Mantener la accion en preview hasta aprobacion explicita.',
+        'No ejecutar comandos ni tocar archivos reales en esta corrida.',
+        ...(Array.isArray(normalizedBaseValidationPlan?.successCriteria)
+          ? normalizedBaseValidationPlan.successCriteria
+          : []),
+      ],
+      16,
+    ),
+  })
+}
+
+function buildRuntimeApprovalState({
   continuationActionPlan,
   projectContinuationState,
   projectReadinessState,
@@ -18572,38 +19455,344 @@ function buildApprovalRequestPlan({
     return null
   }
 
-  const approvalPolicy = getApprovalPolicyEntry(
-    normalizedAction.approvalType || normalizedAction.id || '',
-  )
   const normalizedManifest =
     normalizeLocalProjectManifestContract(localProjectManifest)
-  const touches =
-    normalizedAction.allowedTargetPaths ||
-    normalizedAction.targetFiles ||
-    buildProjectContinuationActionTargetPaths({
-      projectRoot: normalizedAction.projectRoot || getLocalProjectManifestProjectRoot(normalizedManifest),
-      actionId: normalizedAction.id,
-    })
+  const projectRoot =
+    normalizedAction.projectRoot || getLocalProjectManifestProjectRoot(normalizedManifest)
+  const approvalPolicy =
+    detectApprovalPolicyHintFromText(
+      [
+        normalizedApprovalRequest?.reason,
+        normalizedApprovalRequest?.question,
+        normalizedAction.approvalType,
+        normalizedAction.id,
+      ]
+        .filter((entry) => typeof entry === 'string' && entry.trim())
+        .join(' '),
+    ) ||
+    getApprovalPolicyEntry(normalizedAction.approvalType || normalizedAction.id || '')
+  const resolvedApprovalType =
+    approvalPolicy?.id || normalizedAction.approvalType || normalizedAction.id || ''
+  const previewEntry = getRuntimeApprovalPreviewEntry(resolvedApprovalType)
+  const commandsPreview = summarizeUniqueExecutorStrings(
+    previewEntry?.commandsPreview,
+    16,
+  )
+  const filesPreview = buildRuntimeApprovalPreviewEntries({
+    projectRoot,
+    entries:
+      previewEntry?.filesPreview ||
+      normalizedAction.allowedTargetPaths ||
+      normalizedAction.targetFiles,
+    limit: 20,
+  })
+  const directoriesPreview = buildRuntimeApprovalPreviewEntries({
+    projectRoot,
+    entries: previewEntry?.directoriesPreview,
+    limit: 16,
+  })
+  const envRequirements = summarizeUniqueExecutorStrings(
+    previewEntry?.envRequirements,
+    16,
+  )
+  const secretsRequired = summarizeUniqueExecutorStrings(
+    previewEntry?.secretsRequired,
+    16,
+  )
+  const createdAt = buildRuntimeApprovalTimestamp()
+  const expiresAt = buildRuntimeApprovalExpiry(createdAt)
+  const blockedByDefault =
+    normalizedAction.blocked === true || approvalPolicy?.blockedByDefault === true
+  const approvalId = summarizeUniqueExecutorStrings(
+    [
+      `${normalizedAction.id || 'approval'}:${resolvedApprovalType || 'sensitive'}:${
+        normalizeModuleExpansionId(projectRoot || 'local-project') || 'local-project'
+      }`,
+    ],
+    1,
+  )[0]
+  const validationPlan = buildRuntimeApprovalPreviewValidationPlan({
+    approvalType: resolvedApprovalType,
+    projectRoot,
+    filesPreview,
+    previewEntry,
+    baseValidationPlan: normalizedAction.validationPlan,
+  })
+  const blockedReason =
+    normalizedAction.blocker ||
+    approvalPolicy?.approvalCopy ||
+    (blockedByDefault
+      ? 'La accion sigue bloqueada hasta una fase futura aprobada.'
+      : '')
+  const safeAlternative =
+    previewEntry?.safeAlternative ||
+    approvalPolicy?.safeAlternative ||
+    normalizedAction.reason ||
+    'Seguir con un plan revisable y mantener todo en modo local seguro.'
+  const notExecutedDisclaimer =
+    'No se ejecutó nada todavía. Esto es solo un preview controlado y sigue bloqueado hasta aprobación explícita.'
+  const approvalPhrase = blockedByDefault
+    ? `No apruebo ejecutar ${approvalPolicy?.title || normalizedAction.title || normalizedAction.id} en esta tarea. Solo se permite revisar el preview y mantener el bloqueo.`
+    : `Apruebo revisar el preview de ${approvalPolicy?.title || normalizedAction.title || normalizedAction.id} y dejarlo listo para una futura ejecución controlada, sabiendo que en esta corrida no se ejecuta nada real.`
+  const operatorMustConfirm =
+    'Para avanzar, el operador debe aprobarlo de forma explícita y revisar uno por uno los comandos propuestos.'
 
-  return normalizeApprovalRequestPlanContract({
-    id: normalizedAction.id || approvalPolicy?.id || 'approval-plan',
+  return normalizeRuntimeApprovalStateContract({
+    approvalId,
+    actionId: normalizedAction.id || '',
     title:
-      normalizedAction.title ||
-      approvalPolicy?.title ||
-      'Accion sensible pendiente de aprobacion',
+      blockedByDefault
+        ? `Preview bloqueado de ${approvalPolicy?.title || normalizedAction.title || 'accion sensible'}`
+        : `Preview de ${approvalPolicy?.title || normalizedAction.title || 'accion sensible'}`,
     description:
       normalizedAction.description ||
       approvalPolicy?.description ||
       normalizedApprovalRequest?.reason ||
+      'Esta accion sale del modo local seguro y solo se muestra como preview controlado.',
+    status: blockedByDefault ? 'blocked' : 'preview',
+    riskLevel:
+      normalizedAction.riskLevel || approvalPolicy?.riskLevel || 'high',
+    requiresExplicitApproval: true,
+    approvalPhrase,
+    operatorMustConfirm,
+    commandsPreview,
+    filesPreview,
+    directoriesPreview,
+    envRequirements,
+    secretsRequired,
+    validationPlan,
+    rollbackPlan: summarizeUniqueExecutorStrings(previewEntry?.rollbackPlan, 16),
+    safeAlternative,
+    blockedReason,
+    expectedOutcome:
+      previewEntry?.expectedOutcome ||
+      normalizedAction.expectedOutcome ||
+      'Dejar una transicion futura a runtime real lista para revision, no para ejecucion inmediata.',
+    notExecutedDisclaimer,
+    createdAt,
+    expiresAt,
+    relatedReadinessArea:
+      previewEntry?.relatedReadinessArea ||
+      approvalPolicy?.title ||
+      normalizedAction.title ||
+      '',
+    relatedContinuationAction: normalizedAction,
+    warnings: summarizeUniqueExecutorStrings(
+      [
+        notExecutedDisclaimer,
+        approvalPolicy?.description || '',
+        blockedReason,
+        safeAlternative,
+      ],
+      16,
+    ),
+  })
+}
+
+function buildLocalProjectManifestApprovalHistory({
+  localProjectManifest,
+  approvalEntry,
+}) {
+  const normalizedManifest =
+    normalizeLocalProjectManifestContract(localProjectManifest)
+  const normalizedApprovalEntry =
+    approvalEntry && typeof approvalEntry === 'object'
+      ? {
+          ...(typeof approvalEntry.kind === 'string' && approvalEntry.kind.trim()
+            ? { kind: approvalEntry.kind.trim() }
+            : {}),
+          ...(typeof approvalEntry.id === 'string' && approvalEntry.id.trim()
+            ? { id: approvalEntry.id.trim() }
+            : {}),
+          ...(typeof approvalEntry.status === 'string' && approvalEntry.status.trim()
+            ? { status: approvalEntry.status.trim() }
+            : {}),
+          ...(typeof approvalEntry.at === 'string' && approvalEntry.at.trim()
+            ? { at: approvalEntry.at.trim() }
+            : {}),
+          ...(typeof approvalEntry.note === 'string' && approvalEntry.note.trim()
+            ? { note: approvalEntry.note.trim() }
+            : {}),
+        }
+      : null
+  const baseHistory = Array.isArray(normalizedManifest?.approvalHistory)
+    ? normalizedManifest.approvalHistory.filter((entry) => entry && typeof entry === 'object')
+    : []
+
+  if (!normalizedApprovalEntry || Object.keys(normalizedApprovalEntry).length === 0) {
+    return baseHistory
+  }
+
+  const lastEntry = baseHistory[baseHistory.length - 1] || null
+  if (
+    lastEntry &&
+    lastEntry.id === normalizedApprovalEntry.id &&
+    lastEntry.status === normalizedApprovalEntry.status
+  ) {
+    return baseHistory
+  }
+
+  return [...baseHistory, normalizedApprovalEntry].slice(-12)
+}
+
+function syncLocalProjectManifestWithRuntimeApprovalState({
+  localProjectManifest,
+  runtimeApprovalState,
+}) {
+  const normalizedManifest =
+    normalizeLocalProjectManifestContract(localProjectManifest)
+  const normalizedRuntimeApprovalState =
+    normalizeRuntimeApprovalStateContract(runtimeApprovalState)
+
+  if (!normalizedManifest) {
+    return null
+  }
+
+  if (!normalizedRuntimeApprovalState) {
+    return normalizedManifest
+  }
+
+  const pendingApprovals =
+    normalizedRuntimeApprovalState.status === 'blocked'
+      ? []
+      : summarizeUniqueExecutorStrings(
+          [
+            normalizedRuntimeApprovalState.approvalId ||
+              normalizedRuntimeApprovalState.actionId,
+          ],
+          12,
+        )
+  const blockedRuntimeActions = summarizeUniqueExecutorStrings(
+    [
+      ...(Array.isArray(normalizedManifest.blockedRuntimeActions)
+        ? normalizedManifest.blockedRuntimeActions
+        : []),
+      normalizedRuntimeApprovalState.status === 'blocked'
+        ? normalizedRuntimeApprovalState.actionId ||
+          normalizedRuntimeApprovalState.approvalId
+        : '',
+    ],
+    20,
+  )
+
+  return {
+    ...normalizedManifest,
+    ...(pendingApprovals.length > 0 ? { pendingApprovals } : {}),
+    ...(normalizedRuntimeApprovalState.approvalId ||
+    normalizedRuntimeApprovalState.actionId
+      ? {
+          lastApprovalRequest:
+            normalizedRuntimeApprovalState.approvalId ||
+            normalizedRuntimeApprovalState.actionId,
+        }
+      : {}),
+    runtimeReadiness:
+      normalizedRuntimeApprovalState.status === 'blocked'
+        ? 'blocked'
+        : 'approval-preview',
+    realExecutionReadiness:
+      normalizedRuntimeApprovalState.status === 'blocked'
+        ? 'blocked'
+        : 'requires-approval',
+    ...(blockedRuntimeActions.length > 0 ? { blockedRuntimeActions } : {}),
+    approvalHistory: buildLocalProjectManifestApprovalHistory({
+      localProjectManifest: normalizedManifest,
+      approvalEntry: {
+        kind: 'approval-preview',
+        id:
+          normalizedRuntimeApprovalState.approvalId ||
+          normalizedRuntimeApprovalState.actionId,
+        status: normalizedRuntimeApprovalState.status || 'preview',
+        at: normalizedRuntimeApprovalState.createdAt || buildRuntimeApprovalTimestamp(),
+        note:
+          normalizedRuntimeApprovalState.title ||
+          normalizedRuntimeApprovalState.relatedReadinessArea ||
+          'Se preparo un preview de aprobacion.',
+      },
+    }),
+  }
+}
+
+function buildApprovalRequestPlan({
+  continuationActionPlan,
+  projectContinuationState,
+  projectReadinessState,
+  localProjectManifest,
+  approvalRequest,
+  runtimeApprovalState,
+}) {
+  const normalizedAction =
+    normalizeContinuationActionContract(continuationActionPlan) ||
+    normalizeProjectContinuationStateContract(projectContinuationState)?.approvalRequiredActions?.[0] ||
+    normalizeProjectContinuationStateContract(projectContinuationState)?.blockedActions?.[0] ||
+    normalizeProjectReadinessStateContract(projectReadinessState)?.nextBestAction ||
+    null
+  const normalizedApprovalRequest =
+    approvalRequest && typeof approvalRequest === 'object' ? approvalRequest : null
+  const normalizedRuntimeApprovalState =
+    normalizeRuntimeApprovalStateContract(runtimeApprovalState)
+
+  if (
+    !normalizedAction ||
+    !(
+      normalizedAction.requiresApproval === true ||
+      normalizedAction.blocked === true ||
+      normalizedApprovalRequest ||
+      normalizedRuntimeApprovalState
+    )
+  ) {
+    return null
+  }
+
+  const approvalPolicy = getApprovalPolicyEntry(
+    normalizedAction.approvalType ||
+      normalizedRuntimeApprovalState?.actionId ||
+      normalizedAction.id ||
+      '',
+  )
+  const normalizedManifest =
+    normalizeLocalProjectManifestContract(localProjectManifest)
+  const touches =
+    normalizedRuntimeApprovalState?.filesPreview ||
+    normalizedAction.allowedTargetPaths ||
+    normalizedAction.targetFiles ||
+    buildProjectContinuationActionTargetPaths({
+      projectRoot:
+        normalizedAction.projectRoot || getLocalProjectManifestProjectRoot(normalizedManifest),
+      actionId: normalizedAction.id,
+    })
+
+  return normalizeApprovalRequestPlanContract({
+    id:
+      normalizedAction.id ||
+      normalizedRuntimeApprovalState?.approvalId ||
+      approvalPolicy?.id ||
+      'approval-plan',
+    title:
+      normalizedAction.title ||
+      normalizedRuntimeApprovalState?.title ||
+      approvalPolicy?.title ||
+      'Accion sensible pendiente de aprobacion',
+    description:
+      normalizedAction.description ||
+      normalizedRuntimeApprovalState?.description ||
+      approvalPolicy?.description ||
+      normalizedApprovalRequest?.reason ||
       'Esta accion sale del modo local seguro y solo se puede revisar, no ejecutar.',
     approvalType:
-      normalizedAction.approvalType || approvalPolicy?.id || '',
+      normalizedAction.approvalType ||
+      normalizedRuntimeApprovalState?.actionId ||
+      approvalPolicy?.id ||
+      '',
     status:
       normalizedAction.blocked || approvalPolicy?.blockedByDefault === true
         ? 'blocked'
         : 'requires-approval',
     riskLevel:
-      normalizedAction.riskLevel || approvalPolicy?.riskLevel || 'high',
+      normalizedAction.riskLevel ||
+      normalizedRuntimeApprovalState?.riskLevel ||
+      approvalPolicy?.riskLevel ||
+      'high',
     requiresApproval: true,
     blockedByDefault:
       normalizedAction.blocked === true || approvalPolicy?.blockedByDefault === true,
@@ -18611,10 +19800,11 @@ function buildApprovalRequestPlan({
     operatorMessage:
       normalizedAction.blocked === true
         ? 'Bloqueado por seguridad. Se puede revisar el alcance, pero no ejecutar nada real en esta tarea.'
-        : 'Requiere aprobacion antes de avanzar. Todavia no se ejecuto nada real.',
+        : 'Requiere aprobación explícita. No se ejecutó nada todavía.',
     areaSummary:
       normalizedAction.reason ||
       normalizedAction.blocker ||
+      normalizedRuntimeApprovalState?.relatedReadinessArea ||
       normalizedApprovalRequest?.reason ||
       'JEFE preparo un paquete de aprobacion sin salir del modo seguro.',
     touches,
@@ -18630,6 +19820,12 @@ function buildApprovalRequestPlan({
     ),
     validationsRequired: summarizeUniqueExecutorStrings(
       [
+        ...(Array.isArray(normalizedRuntimeApprovalState?.validationPlan?.commands)
+          ? normalizedRuntimeApprovalState.validationPlan.commands
+          : []),
+        ...(Array.isArray(normalizedRuntimeApprovalState?.validationPlan?.manualChecks)
+          ? normalizedRuntimeApprovalState.validationPlan.manualChecks
+          : []),
         ...(Array.isArray(normalizedAction.validationPlan?.manualChecks)
           ? normalizedAction.validationPlan.manualChecks
           : []),
@@ -18639,6 +19835,7 @@ function buildApprovalRequestPlan({
       20,
     ),
     safeAlternative:
+      normalizedRuntimeApprovalState?.safeAlternative ||
       approvalPolicy?.safeAlternative ||
       normalizedAction.reason ||
       'Seguir con un plan revisable y mantener todo en modo local seguro.',
@@ -18647,16 +19844,47 @@ function buildApprovalRequestPlan({
       normalizedApprovalRequest?.reason ||
       'Esta accion sensible requiere aprobacion explicita.',
     explicitApprovalText:
-      normalizedAction.blocked === true
+      normalizedRuntimeApprovalState?.approvalPhrase ||
+      (normalizedAction.blocked === true
         ? `No aprobar ejecucion real de ${normalizedAction.title || normalizedAction.id} en esta tarea. Primero hace falta una fase futura aprobada.`
-        : `Aprobar solo la preparacion futura de ${normalizedAction.title || normalizedAction.id}, sabiendo que en esta tarea no se ejecuto nada real.`,
+        : `Aprobar solo la preparacion futura de ${normalizedAction.title || normalizedAction.id}, sabiendo que en esta tarea no se ejecuto nada real.`),
     targetStrategy:
       normalizedAction.targetStrategy || 'prepare-continuation-action-plan',
     projectRoot:
       normalizedAction.projectRoot || getLocalProjectManifestProjectRoot(normalizedManifest),
+    approvalPhrase:
+      normalizedRuntimeApprovalState?.approvalPhrase ||
+      `Para avanzar, el operador debe aprobar ${normalizedAction.title || normalizedAction.id} de forma explicita.`,
+    operatorMustConfirm:
+      normalizedRuntimeApprovalState?.operatorMustConfirm ||
+      'Para avanzar, el operador debe aprobarlo.',
+    notExecutedDisclaimer:
+      normalizedRuntimeApprovalState?.notExecutedDisclaimer ||
+      'No se ejecutó nada todavía.',
+    expectedOutcome:
+      normalizedRuntimeApprovalState?.expectedOutcome ||
+      normalizedAction.expectedOutcome ||
+      'Dejar la accion sensible lista para una futura ejecucion controlada.',
+    blockedReason:
+      normalizedRuntimeApprovalState?.blockedReason ||
+      normalizedAction.blocker ||
+      '',
+    relatedReadinessArea:
+      normalizedRuntimeApprovalState?.relatedReadinessArea || approvalPolicy?.title || '',
+    createdAt: normalizedRuntimeApprovalState?.createdAt || buildRuntimeApprovalTimestamp(),
+    expiresAt: normalizedRuntimeApprovalState?.expiresAt || '',
+    commandsPreview: normalizedRuntimeApprovalState?.commandsPreview || [],
+    filesPreview: normalizedRuntimeApprovalState?.filesPreview || touches,
+    directoriesPreview: normalizedRuntimeApprovalState?.directoriesPreview || [],
+    envRequirements: normalizedRuntimeApprovalState?.envRequirements || [],
+    secretsRequired: normalizedRuntimeApprovalState?.secretsRequired || [],
+    rollbackPlan: normalizedRuntimeApprovalState?.rollbackPlan || [],
+    validationPlan:
+      normalizedRuntimeApprovalState?.validationPlan ||
+      normalizeValidationPlanContract(normalizedAction.validationPlan),
     warnings: summarizeUniqueExecutorStrings(
       [
-        'No se ejecutó todavía.',
+        normalizedRuntimeApprovalState?.notExecutedDisclaimer || 'No se ejecutó todavía.',
         approvalPolicy?.description || '',
         approvalPolicy?.safeAlternative || '',
       ],
@@ -18786,6 +20014,7 @@ function buildProjectContinuationActionTargetValidationPlan({
 
 function buildProjectContinuationActionPlan({
   actionId,
+  approvalTypeHint,
   inferredProjectState,
 }) {
   const normalizedManifest = normalizeLocalProjectManifestContract(
@@ -18818,7 +20047,11 @@ function buildProjectContinuationActionPlan({
     )
   }
 
-  const approvalPolicy = getApprovalPolicyEntry(registryEntry.approvalType)
+  const resolvedApprovalType =
+    typeof approvalTypeHint === 'string' && approvalTypeHint.trim()
+      ? approvalTypeHint.trim()
+      : registryEntry.approvalType
+  const approvalPolicy = getApprovalPolicyEntry(resolvedApprovalType)
   const targetFiles = buildProjectContinuationActionTargetPaths({
     projectRoot,
     actionId: registryEntry.id,
@@ -18845,7 +20078,7 @@ function buildProjectContinuationActionPlan({
       registryEntry.blocker ||
       approvalPolicy?.approvalCopy ||
       '',
-    approvalType: registryEntry.approvalType || '',
+    approvalType: resolvedApprovalType || '',
     expectedOutcome: registryEntry.expectedOutcome,
     recommended: false,
     priority: registryEntry.suggestedOrder,
@@ -18913,12 +20146,20 @@ function detectProjectContinuationActionIntent(goal, context) {
     normalizedText.includes('approval') ||
     normalizedText.includes('aprobacion') ||
     normalizedText.includes('runtime') ||
+    normalizedText.includes('dev server') ||
+    normalizedText.includes('servidor de desarrollo') ||
+    normalizedText.includes('vite') ||
+    normalizedText.includes('listen') ||
     normalizedText.includes('deploy') ||
     normalizedText.includes('docker') ||
+    normalizedText.includes('dockerfile') ||
+    normalizedText.includes('docker compose') ||
+    normalizedText.includes('compose') ||
     normalizedText.includes('infraestructura') ||
     normalizedText.includes('dependencias') ||
     normalizedText.includes('dependency') ||
     normalizedText.includes('install') ||
+    normalizedText.includes('npm') ||
     normalizedText.includes('db real') ||
     normalizedText.includes('base real') ||
     normalizedText.includes('migraciones') ||
@@ -18939,12 +20180,18 @@ function detectProjectContinuationActionIntent(goal, context) {
   const registryEntry =
     getProjectContinuationActionEntry(explicitActionId) ||
     getProjectContinuationActionEntry(normalizedText)
+  const approvalPolicyHint = detectApprovalPolicyHintFromText(normalizedText)
 
   return {
     matches: wantsPrepare && referencesContinuation && Boolean(registryEntry?.id),
     actionId: registryEntry?.id || '',
+    approvalTypeHint: approvalPolicyHint?.id || '',
     explicitSignals: summarizeUniqueExecutorStrings(
-      [wantsPrepare ? 'prepare-continuation-action' : '', registryEntry?.id || ''],
+      [
+        wantsPrepare ? 'prepare-continuation-action' : '',
+        registryEntry?.id || '',
+        approvalPolicyHint?.id || '',
+      ],
       6,
     ),
   }
@@ -22689,6 +23936,7 @@ function buildBrainDecisionContract({
   projectContinuationState,
   projectReadinessState,
   approvalRequestPlan,
+  runtimeApprovalState,
   materializationPlan,
   finalResult,
 }) {
@@ -22716,8 +23964,22 @@ function buildBrainDecisionContract({
       continuationActionPlan,
       expansionOptions,
     })
-  const normalizedReadinessState =
-    normalizeProjectReadinessStateContract(projectReadinessState) ||
+  const computedRuntimeApprovalState = buildRuntimeApprovalState({
+    continuationActionPlan,
+    projectContinuationState: normalizedContinuationState,
+    projectReadinessState: normalizeProjectReadinessStateContract(projectReadinessState),
+    localProjectManifest,
+    approvalRequest: resolvedApprovalRequest,
+  })
+  const normalizedRuntimeApprovalState = normalizeRuntimeApprovalStateContract({
+    ...(computedRuntimeApprovalState && typeof computedRuntimeApprovalState === 'object'
+      ? computedRuntimeApprovalState
+      : {}),
+    ...(runtimeApprovalState && typeof runtimeApprovalState === 'object'
+      ? runtimeApprovalState
+      : {}),
+  })
+  const computedReadinessState =
     buildProjectReadinessState({
       strategy,
       scalableDeliveryPlan: normalizedScalablePlan,
@@ -22725,16 +23987,31 @@ function buildBrainDecisionContract({
       nextActionPlan,
       validationPlan,
       projectContinuationState: normalizedContinuationState,
+      runtimeApprovalState: normalizedRuntimeApprovalState,
     })
+  const normalizedReadinessState = normalizeProjectReadinessStateContract({
+    ...(computedReadinessState && typeof computedReadinessState === 'object'
+      ? computedReadinessState
+      : {}),
+    ...(projectReadinessState && typeof projectReadinessState === 'object'
+      ? projectReadinessState
+      : {}),
+  })
+  const continuationSyncedManifest =
+    syncLocalProjectManifestWithContinuationState({
+      localProjectManifest,
+      projectContinuationState: normalizedContinuationState,
+    }) || localProjectManifest
+  const runtimeSyncedManifest =
+    syncLocalProjectManifestWithRuntimeApprovalState({
+      localProjectManifest: continuationSyncedManifest,
+      runtimeApprovalState: normalizedRuntimeApprovalState,
+    }) || continuationSyncedManifest
   const enrichedLocalProjectManifest = normalizeLocalProjectManifestContract(
     syncLocalProjectManifestWithReadinessState({
-      localProjectManifest:
-        syncLocalProjectManifestWithContinuationState({
-          localProjectManifest,
-          projectContinuationState: normalizedContinuationState,
-        }) || localProjectManifest,
+      localProjectManifest: runtimeSyncedManifest,
       projectReadinessState: normalizedReadinessState,
-    }) || localProjectManifest,
+    }) || runtimeSyncedManifest,
   )
   const normalizedApprovalRequestPlan =
     normalizeApprovalRequestPlanContract(approvalRequestPlan) ||
@@ -22744,6 +24021,7 @@ function buildBrainDecisionContract({
       projectReadinessState: normalizedReadinessState,
       localProjectManifest: enrichedLocalProjectManifest,
       approvalRequest: resolvedApprovalRequest,
+      runtimeApprovalState: normalizedRuntimeApprovalState,
     })
 
   return {
@@ -22853,6 +24131,9 @@ function buildBrainDecisionContract({
       : {}),
     ...(normalizedApprovalRequestPlan
       ? { approvalRequestPlan: normalizedApprovalRequestPlan }
+      : {}),
+    ...(normalizedRuntimeApprovalState
+      ? { runtimeApprovalState: normalizedRuntimeApprovalState }
       : {}),
     ...(materializationPlan && typeof materializationPlan === 'object'
       ? { materializationPlan }
@@ -28137,6 +29418,7 @@ async function buildLocalStrategicBrainDecision({
       projectContinuationState: planningContracts.projectContinuationState,
       projectReadinessState: planningContracts.projectReadinessState,
       approvalRequestPlan: planningContracts.approvalRequestPlan,
+      runtimeApprovalState: planningContracts.runtimeApprovalState,
     })
   }
   const reusablePlanningContext =
@@ -28569,6 +29851,7 @@ async function buildLocalStrategicBrainDecision({
   ) {
     const continuationActionPlan = buildProjectContinuationActionPlan({
       actionId: projectContinuationActionIntent.actionId,
+      approvalTypeHint: projectContinuationActionIntent.approvalTypeHint,
       inferredProjectState,
     })
 
@@ -29827,6 +31110,7 @@ Reglas:
 - projectContinuationState debe resumir estado, riesgos, blockers, acciones seguras, acciones revisables y acciones que requieren aprobacion en un lenguaje claro para operador.
 - projectReadinessState debe explicar si el proyecto esta listo para demo local segura, que partes siguen siendo mock, que existe en disco, que requiere aprobacion y que sigue bloqueado.
 - approvalRequestPlan debe empaquetar las acciones sensibles con riesgo, alcance, alternativa segura, validaciones requeridas y aclaracion de que todavia no se ejecuto nada real.
+- runtimeApprovalState debe dejar un preview controlado de ejecucion sensible con commandsPreview, filesPreview, validationPlan, rollbackPlan, disclaimer de no ejecucion y frase exacta de aprobacion futura.
 - projectBlueprint debe capturar tipo de producto, dominio, intent, deliveryLevel, stackProfile, roles, modules, entities, coreFlows, integrations, riesgos, decisiones delegadas, phasePlan, exclusiones, approvals futuros y successCriteria.
 - questionPolicy debe explicar si conviene preguntar ahora o decidir faltantes con criterio profesional, especialmente cuando userParticipationMode es "brain-decides-missing".
 - implementationRoadmap debe ordenar fases, outputs esperados, validaciones, blockers y approvals sin ejecutar nada automáticamente.
@@ -30515,6 +31799,8 @@ function buildOpenAIBrainSchema() {
           plannerOnlyAreas: { type: 'array', items: { type: 'string' } },
           approvalRequiredAreas: { type: 'array', items: { type: 'string' } },
           blockedAreas: { type: 'array', items: { type: 'string' } },
+          runtimeReadiness: { type: 'string' },
+          realExecutionReady: { type: 'boolean' },
           validationStatus: { type: 'string' },
           lastValidationSummary: { type: 'string' },
           operatorSummary: { type: 'string' },
@@ -30547,6 +31833,52 @@ function buildOpenAIBrainSchema() {
           touches: { type: 'array', items: { type: 'string' } },
           willNotTouch: { type: 'array', items: { type: 'string' } },
           validationsRequired: { type: 'array', items: { type: 'string' } },
+          approvalPhrase: { type: 'string' },
+          operatorMustConfirm: { type: 'string' },
+          notExecutedDisclaimer: { type: 'string' },
+          expectedOutcome: { type: 'string' },
+          blockedReason: { type: 'string' },
+          relatedReadinessArea: { type: 'string' },
+          createdAt: { type: 'string' },
+          expiresAt: { type: 'string' },
+          commandsPreview: { type: 'array', items: { type: 'string' } },
+          filesPreview: { type: 'array', items: { type: 'string' } },
+          directoriesPreview: { type: 'array', items: { type: 'string' } },
+          envRequirements: { type: 'array', items: { type: 'string' } },
+          secretsRequired: { type: 'array', items: { type: 'string' } },
+          rollbackPlan: { type: 'array', items: { type: 'string' } },
+          validationPlan: { type: 'object', additionalProperties: true },
+          warnings: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      runtimeApprovalState: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          approvalId: { type: 'string' },
+          actionId: { type: 'string' },
+          title: { type: 'string' },
+          description: { type: 'string' },
+          status: { type: 'string' },
+          riskLevel: { type: 'string' },
+          requiresExplicitApproval: { type: 'boolean' },
+          approvalPhrase: { type: 'string' },
+          operatorMustConfirm: { type: 'string' },
+          commandsPreview: { type: 'array', items: { type: 'string' } },
+          filesPreview: { type: 'array', items: { type: 'string' } },
+          directoriesPreview: { type: 'array', items: { type: 'string' } },
+          envRequirements: { type: 'array', items: { type: 'string' } },
+          secretsRequired: { type: 'array', items: { type: 'string' } },
+          validationPlan: { type: 'object', additionalProperties: true },
+          rollbackPlan: { type: 'array', items: { type: 'string' } },
+          safeAlternative: { type: 'string' },
+          blockedReason: { type: 'string' },
+          expectedOutcome: { type: 'string' },
+          notExecutedDisclaimer: { type: 'string' },
+          createdAt: { type: 'string' },
+          expiresAt: { type: 'string' },
+          relatedReadinessArea: { type: 'string' },
+          relatedContinuationAction: { type: 'object', additionalProperties: true },
           warnings: { type: 'array', items: { type: 'string' } },
         },
       },
@@ -30930,6 +32262,11 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
       typeof rawDecision.approvalRequestPlan === 'object'
         ? rawDecision.approvalRequestPlan
         : fallbackDecision.approvalRequestPlan,
+    runtimeApprovalState:
+      rawDecision?.runtimeApprovalState &&
+      typeof rawDecision.runtimeApprovalState === 'object'
+        ? rawDecision.runtimeApprovalState
+        : fallbackDecision.runtimeApprovalState,
     materializationPlan:
       rawDecision?.materializationPlan &&
       typeof rawDecision.materializationPlan === 'object'
@@ -33080,6 +34417,7 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       projectContinuationState: brainDecision.projectContinuationState,
       projectReadinessState: brainDecision.projectReadinessState,
       approvalRequestPlan: brainDecision.approvalRequestPlan,
+      runtimeApprovalState: brainDecision.runtimeApprovalState,
       materializationPlan: brainDecision.materializationPlan,
       contextHubStatus,
       brainRoutingDecision,
@@ -33135,6 +34473,7 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
     projectContinuationState: brainDecision.projectContinuationState,
     projectReadinessState: brainDecision.projectReadinessState,
     approvalRequestPlan: brainDecision.approvalRequestPlan,
+    runtimeApprovalState: brainDecision.runtimeApprovalState,
     materializationPlan: brainDecision.materializationPlan,
     contextHubStatus,
     brainRoutingDecision,

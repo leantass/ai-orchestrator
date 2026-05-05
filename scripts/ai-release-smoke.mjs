@@ -914,7 +914,10 @@ async function runSensitiveActionCase({
   const fixture = await buildModuleExpansionReadyFixture(`release-${id}`)
   const decision = await requestSensitiveActionDecision(fixture, goal)
   const approvalPacket = decision?.approvalRequestPlan || null
+  const runtimeApproval = decision?.runtimeApprovalState || null
   const continuationAction = decision?.continuationActionPlan || null
+  const readiness = decision?.projectReadinessState || null
+  const manifest = decision?.localProjectManifest || null
 
   pushFailure(
     failures,
@@ -938,6 +941,11 @@ async function runSensitiveActionCase({
   )
   pushFailure(
     failures,
+    Boolean(runtimeApproval),
+    'Debe devolver runtimeApprovalState.',
+  )
+  pushFailure(
+    failures,
     Boolean(continuationAction),
     'Debe devolver continuationActionPlan.',
   )
@@ -953,8 +961,42 @@ async function runSensitiveActionCase({
   )
   pushFailure(
     failures,
+    normalizeIdentifier(runtimeApproval?.actionId) === normalizeIdentifier(expectedActionId),
+    `runtimeApprovalState.actionId deberia ser ${expectedActionId}.`,
+  )
+  pushFailure(
+    failures,
+    normalizeIdentifier(runtimeApproval?.status) ===
+      normalizeIdentifier(expectBlocked ? 'blocked' : 'preview'),
+    `runtimeApprovalState.status deberia ser ${expectBlocked ? 'blocked' : 'preview'}.`,
+  )
+  pushFailure(
+    failures,
     Array.isArray(approvalPacket?.willNotTouch) && approvalPacket.willNotTouch.length > 0,
     'approvalRequestPlan debe aclarar que no se ejecuto nada real.',
+  )
+  pushFailure(
+    failures,
+    Array.isArray(runtimeApproval?.commandsPreview) &&
+      runtimeApproval.commandsPreview.length > 0,
+    'runtimeApprovalState debe incluir commandsPreview.',
+  )
+  pushFailure(
+    failures,
+    typeof runtimeApproval?.approvalPhrase === 'string' &&
+      runtimeApproval.approvalPhrase.trim().length > 0,
+    'runtimeApprovalState debe incluir approvalPhrase.',
+  )
+  pushFailure(
+    failures,
+    typeof runtimeApproval?.notExecutedDisclaimer === 'string' &&
+      runtimeApproval.notExecutedDisclaimer.toLocaleLowerCase().includes('no se ejecut'),
+    'runtimeApprovalState debe incluir notExecutedDisclaimer.',
+  )
+  pushFailure(
+    failures,
+    runtimeApproval?.validationPlan && typeof runtimeApproval.validationPlan === 'object',
+    'runtimeApprovalState debe incluir validationPlan.',
   )
   if (expectBlocked) {
     pushFailure(
@@ -962,11 +1004,38 @@ async function runSensitiveActionCase({
       continuationAction?.blocked === true || approvalPacket?.blockedByDefault === true,
       'La accion deberia quedar bloqueada por defecto.',
     )
+    pushFailure(
+      failures,
+      Array.isArray(manifest?.blockedRuntimeActions) &&
+        manifest.blockedRuntimeActions.length > 0,
+      'El manifest deberia registrar blockedRuntimeActions.',
+    )
+    pushFailure(
+      failures,
+      Array.isArray(readiness?.blockedAreas) && readiness.blockedAreas.length > 0,
+      'Readiness deberia reflejar el bloqueo sensible.',
+    )
   } else {
     pushFailure(
       failures,
       continuationAction?.requiresApproval === true,
       'La accion deberia requerir aprobacion.',
+    )
+    pushFailure(
+      failures,
+      Array.isArray(manifest?.pendingApprovals) && manifest.pendingApprovals.length > 0,
+      'El manifest deberia registrar pendingApprovals.',
+    )
+    pushFailure(
+      failures,
+      normalizeIdentifier(manifest?.runtimeReadiness) === 'approval-preview',
+      'El manifest deberia marcar runtimeReadiness=approval-preview.',
+    )
+    pushFailure(
+      failures,
+      Array.isArray(readiness?.approvalRequiredAreas) &&
+        readiness.approvalRequiredAreas.length > 0,
+      'Readiness deberia reflejar approvalRequiredAreas.',
     )
   }
 
@@ -1185,6 +1254,101 @@ async function runReadinessBlockedCase() {
   return { id: 'readiness-blocked', label: 'Readiness blocked', failures }
 }
 
+async function runRuntimePendingReadinessCase() {
+  const failures = []
+  const fixture = await buildModuleExpansionReadyFixture('release-runtime-pending')
+  const decision = await requestSensitiveActionDecision(
+    fixture,
+    'Preparar un plan de runtime local para el proyecto fullstack local de turnos medicos.',
+  )
+  const readiness = decision?.projectReadinessState || null
+  const manifest = decision?.localProjectManifest || null
+
+  pushFailure(
+    failures,
+    readiness?.demoReady === true,
+    'La demo local segura deberia seguir lista mientras runtime queda pendiente.',
+  )
+  pushFailure(
+    failures,
+    readiness?.realExecutionReady === false,
+    'realExecutionReady deberia quedar en false.',
+  )
+  pushFailure(
+    failures,
+    normalizeIdentifier(readiness?.runtimeReadiness) === 'approval-preview',
+    'runtimeReadiness deberia ser approval-preview.',
+  )
+  pushFailure(
+    failures,
+    Array.isArray(readiness?.approvalRequiredAreas) &&
+      readiness.approvalRequiredAreas.length > 0,
+    'approvalRequiredAreas deberia listar el salto a runtime real.',
+  )
+  pushFailure(
+    failures,
+    normalizeIdentifier(manifest?.runtimeReadiness) === 'approval-preview',
+    'El manifest deberia persistir runtimeReadiness=approval-preview.',
+  )
+  pushFailure(
+    failures,
+    normalizeIdentifier(manifest?.realExecutionReadiness) === 'requires-approval',
+    'El manifest deberia persistir realExecutionReadiness=requires-approval.',
+  )
+
+  return {
+    id: 'runtime-pending-readiness',
+    label: 'Demo lista con runtime pendiente de aprobacion',
+    failures,
+  }
+}
+
+async function runApprovalPacketSanityCase() {
+  const failures = []
+  const fixture = await buildModuleExpansionReadyFixture('release-approval-packet')
+  const decision = await requestSensitiveActionDecision(
+    fixture,
+    'Preparar un preview de npm install para el proyecto fullstack local de turnos medicos.',
+  )
+  const runtimeApproval = decision?.runtimeApprovalState || null
+  const approvalPacket = decision?.approvalRequestPlan || null
+
+  pushFailure(
+    failures,
+    typeof runtimeApproval?.approvalPhrase === 'string' &&
+      runtimeApproval.approvalPhrase.trim().length > 0,
+    'approvalPhrase deberia estar presente.',
+  )
+  pushFailure(
+    failures,
+    Array.isArray(runtimeApproval?.commandsPreview) &&
+      runtimeApproval.commandsPreview.length > 0,
+    'commandsPreview deberia estar presente.',
+  )
+  pushFailure(
+    failures,
+    typeof runtimeApproval?.notExecutedDisclaimer === 'string' &&
+      runtimeApproval.notExecutedDisclaimer.trim().length > 0,
+    'notExecutedDisclaimer deberia estar presente.',
+  )
+  pushFailure(
+    failures,
+    runtimeApproval?.validationPlan && typeof runtimeApproval.validationPlan === 'object',
+    'validationPlan deberia estar presente.',
+  )
+  pushFailure(
+    failures,
+    Array.isArray(approvalPacket?.touches) && approvalPacket.touches.length > 0,
+    'approvalRequestPlan deberia seguir siendo util para la UI y mostrar alcance.',
+  )
+
+  return {
+    id: 'approval-packet-sanity',
+    label: 'Approval packet sanity',
+    failures,
+  }
+}
+
 async function runUiContractSanityCase() {
   const failures = []
   const fixture = await buildModuleExpansionReadyFixture('release-ui-contract')
@@ -1223,6 +1387,21 @@ async function runUiContractSanityCase() {
     failures,
     Boolean(sensitiveDecision?.approvalRequestPlan),
     'La UI deberia poder recibir approvalRequestPlan.',
+  )
+  pushFailure(
+    failures,
+    Boolean(sensitiveDecision?.runtimeApprovalState),
+    'La UI deberia poder recibir runtimeApprovalState.',
+  )
+  pushFailure(
+    failures,
+    Array.isArray(sensitiveDecision?.runtimeApprovalState?.commandsPreview),
+    'La UI deberia recibir commandsPreview serializable.',
+  )
+  pushFailure(
+    failures,
+    Array.isArray(sensitiveDecision?.runtimeApprovalState?.filesPreview),
+    'La UI deberia recibir filesPreview serializable.',
   )
 
   return { id: 'ui-contract-sanity', label: 'Contrato serializable para UI', failures }
@@ -1281,11 +1460,29 @@ async function main() {
     results.push(await runAllSafeModulesDoneCase())
     results.push(
       await runSensitiveActionCase({
+        id: 'npm-install-approval',
+        label: 'npm install queda en preview aprobado pendiente',
+        goal: 'Preparar un preview de npm install para el proyecto fullstack local de turnos medicos.',
+        expectedActionId: 'prepare-dependency-install-plan',
+        expectedApprovalType: 'npm-install',
+      }),
+    )
+    results.push(
+      await runSensitiveActionCase({
         id: 'runtime-approval',
         label: 'Runtime local requiere aprobacion',
         goal: 'Preparar un plan de runtime local para el proyecto fullstack local de turnos medicos.',
         expectedActionId: 'prepare-runtime-plan',
         expectedApprovalType: 'runtime-start',
+      }),
+    )
+    results.push(
+      await runSensitiveActionCase({
+        id: 'dev-server-approval',
+        label: 'Dev server queda en preview aprobado pendiente',
+        goal: 'Preparar un preview de dev server para el proyecto fullstack local de turnos medicos.',
+        expectedActionId: 'prepare-runtime-plan',
+        expectedApprovalType: 'dev-server',
       }),
     )
     results.push(
@@ -1304,6 +1501,26 @@ async function main() {
         goal: 'Preparar un plan de base real para el proyecto fullstack local de turnos medicos.',
         expectedActionId: 'prepare-db-real-plan',
         expectedApprovalType: 'db-create',
+      }),
+    )
+    results.push(
+      await runSensitiveActionCase({
+        id: 'db-migrate-blocked',
+        label: 'Migraciones reales quedan bloqueadas',
+        goal: 'Preparar un preview de migraciones reales para el proyecto fullstack local de turnos medicos.',
+        expectedActionId: 'prepare-db-real-plan',
+        expectedApprovalType: 'db-migrate',
+        expectBlocked: true,
+      }),
+    )
+    results.push(
+      await runSensitiveActionCase({
+        id: 'db-seed-blocked',
+        label: 'Seeds reales quedan bloqueados',
+        goal: 'Preparar un preview de seeds reales para el proyecto fullstack local de turnos medicos.',
+        expectedActionId: 'prepare-db-real-plan',
+        expectedApprovalType: 'db-seed',
+        expectBlocked: true,
       }),
     )
     results.push(
@@ -1347,6 +1564,26 @@ async function main() {
     )
     results.push(
       await runSensitiveActionCase({
+        id: 'dockerfile-blocked',
+        label: 'Dockerfile queda bloqueado',
+        goal: 'Preparar un preview de Dockerfile para el proyecto fullstack local de turnos medicos.',
+        expectedActionId: 'prepare-docker-plan',
+        expectedApprovalType: 'dockerfile',
+        expectBlocked: true,
+      }),
+    )
+    results.push(
+      await runSensitiveActionCase({
+        id: 'docker-compose-blocked',
+        label: 'docker-compose queda bloqueado',
+        goal: 'Preparar un preview de docker-compose para el proyecto fullstack local de turnos medicos.',
+        expectedActionId: 'prepare-docker-plan',
+        expectedApprovalType: 'docker-compose',
+        expectBlocked: true,
+      }),
+    )
+    results.push(
+      await runSensitiveActionCase({
         id: 'integrations-approval',
         label: 'Integraciones externas requieren aprobacion',
         goal: 'Preparar un plan de integracion externa para el proyecto fullstack local de turnos medicos.',
@@ -1380,6 +1617,8 @@ async function main() {
     results.push(await runBlockedModuleCase())
     results.push(await runDemoReadyCase())
     results.push(await runReadinessBlockedCase())
+    results.push(await runRuntimePendingReadinessCase())
+    results.push(await runApprovalPacketSanityCase())
     results.push(await runUiContractSanityCase())
 
     const failedResults = results.filter((result) => result.failures.length > 0)

@@ -53,8 +53,10 @@ Esta guia sirve para demostrar JEFE como plataforma local de programacion automa
 2. Confirmar que JEFE:
    - no ejecute nada real
    - devuelva un paquete de aprobacion
+   - muestre el preview controlado con comandos propuestos
    - muestre riesgo, alternativa segura y alcance
    - mantenga todo en planner-only o bloqueado
+3. Revisar tambien `docs/runtime-approval-flow.md` para interpretar el preview, la frase sugerida de aprobacion y las validaciones obligatorias.
 
 ## Escenario 5: interpretar readiness
 
@@ -99,4 +101,5 @@ La demo se considera segura cuando:
 - la validacion local esta cerrada
 - los modulos seguros agregados siguen en mock
 - las acciones sensibles aparecen como aprobables o bloqueadas
+- las aprobaciones sensibles quedan en preview y no como ejecuciones reales
 - no se ejecuto nada real fuera del modo local seguro

@@ -519,6 +519,21 @@ type ApprovalRequestPlanContract = {
   explicitApprovalText?: string
   targetStrategy?: string
   projectRoot?: string
+  approvalPhrase?: string
+  operatorMustConfirm?: string
+  notExecutedDisclaimer?: string
+  expectedOutcome?: string
+  blockedReason?: string
+  relatedReadinessArea?: string
+  createdAt?: string
+  expiresAt?: string
+  commandsPreview?: string[]
+  filesPreview?: string[]
+  directoriesPreview?: string[]
+  envRequirements?: string[]
+  secretsRequired?: string[]
+  rollbackPlan?: string[]
+  validationPlan?: ValidationPlanContract | null
   warnings?: string[]
 }
 
@@ -536,6 +551,8 @@ type ProjectReadinessStateContract = {
   plannerOnlyAreas?: string[]
   approvalRequiredAreas?: string[]
   blockedAreas?: string[]
+  runtimeReadiness?: string
+  realExecutionReady?: boolean
   validationStatus?: string
   lastValidationSummary?: string
   operatorSummary?: string
@@ -543,6 +560,34 @@ type ProjectReadinessStateContract = {
   recommendedDemoScript?: string[]
   warnings?: string[]
   blockers?: string[]
+}
+
+type RuntimeApprovalStateContract = {
+  approvalId?: string
+  actionId?: string
+  title?: string
+  description?: string
+  status?: string
+  riskLevel?: 'low' | 'medium' | 'high' | string
+  requiresExplicitApproval?: boolean
+  approvalPhrase?: string
+  operatorMustConfirm?: string
+  commandsPreview?: string[]
+  filesPreview?: string[]
+  directoriesPreview?: string[]
+  envRequirements?: string[]
+  secretsRequired?: string[]
+  validationPlan?: ValidationPlanContract | null
+  rollbackPlan?: string[]
+  safeAlternative?: string
+  blockedReason?: string
+  expectedOutcome?: string
+  notExecutedDisclaimer?: string
+  createdAt?: string
+  expiresAt?: string
+  relatedReadinessArea?: string
+  relatedContinuationAction?: ContinuationActionContract | null
+  warnings?: string[]
 }
 
 type ProjectPhaseExecutionOperationPreviewContract = {
@@ -619,6 +664,13 @@ type LocalProjectManifestContract = {
   completedCoreFlow?: boolean
   lastValidationSummary?: string
   recommendedDemoScript?: string[]
+  lastApprovalRequest?: string
+  runtimeReadiness?: string
+  realExecutionReadiness?: string
+  pendingApprovals?: string[]
+  blockedRuntimeActions?: string[]
+  approvedActions?: string[]
+  approvalHistory?: LocalProjectManifestHistoryContract[]
   warnings?: string[]
 }
 
@@ -667,6 +719,7 @@ type PlannerExecutionMetadata = {
   projectContinuationState: ProjectContinuationStateContract | null
   projectReadinessState: ProjectReadinessStateContract | null
   approvalRequestPlan: ApprovalRequestPlanContract | null
+  runtimeApprovalState: RuntimeApprovalStateContract | null
   materializationPlan: MaterializationPlanContract | null
 }
 
@@ -873,6 +926,7 @@ type PlannerDecisionResponse = {
   projectContinuationState?: ProjectContinuationStateContract | null
   projectReadinessState?: ProjectReadinessStateContract | null
   approvalRequestPlan?: ApprovalRequestPlanContract | null
+  runtimeApprovalState?: RuntimeApprovalStateContract | null
   materializationPlan?: MaterializationPlanContract | null
   brainRoutingDecision?: BrainRoutingDecision
   tasks?: unknown[]
@@ -1079,6 +1133,7 @@ const EMPTY_PLANNER_EXECUTION_METADATA: PlannerExecutionMetadata = {
   projectContinuationState: null,
   projectReadinessState: null,
   approvalRequestPlan: null,
+  runtimeApprovalState: null,
   materializationPlan: null,
 }
 
@@ -2263,6 +2318,172 @@ const normalizeApprovalRequestPlanContract = (
     ...(normalizeOptionalString(contract.projectRoot)
       ? { projectRoot: normalizeOptionalString(contract.projectRoot) }
       : {}),
+    ...(normalizeOptionalString(contract.approvalPhrase)
+      ? { approvalPhrase: normalizeOptionalString(contract.approvalPhrase) }
+      : {}),
+    ...(normalizeOptionalString(contract.operatorMustConfirm)
+      ? { operatorMustConfirm: normalizeOptionalString(contract.operatorMustConfirm) }
+      : {}),
+    ...(normalizeOptionalString(contract.notExecutedDisclaimer)
+      ? {
+          notExecutedDisclaimer: normalizeOptionalString(
+            contract.notExecutedDisclaimer,
+          ),
+        }
+      : {}),
+    ...(normalizeOptionalString(contract.expectedOutcome)
+      ? { expectedOutcome: normalizeOptionalString(contract.expectedOutcome) }
+      : {}),
+    ...(normalizeOptionalString(contract.blockedReason)
+      ? { blockedReason: normalizeOptionalString(contract.blockedReason) }
+      : {}),
+    ...(normalizeOptionalString(contract.relatedReadinessArea)
+      ? {
+          relatedReadinessArea: normalizeOptionalString(
+            contract.relatedReadinessArea,
+          ),
+        }
+      : {}),
+    ...(normalizeOptionalString(contract.createdAt)
+      ? { createdAt: normalizeOptionalString(contract.createdAt) }
+      : {}),
+    ...(normalizeOptionalString(contract.expiresAt)
+      ? { expiresAt: normalizeOptionalString(contract.expiresAt) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.commandsPreview).length > 0
+      ? { commandsPreview: normalizeOptionalStringArray(contract.commandsPreview) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.filesPreview).length > 0
+      ? { filesPreview: normalizeOptionalStringArray(contract.filesPreview) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.directoriesPreview).length > 0
+      ? {
+          directoriesPreview: normalizeOptionalStringArray(
+            contract.directoriesPreview,
+          ),
+        }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.envRequirements).length > 0
+      ? { envRequirements: normalizeOptionalStringArray(contract.envRequirements) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.secretsRequired).length > 0
+      ? { secretsRequired: normalizeOptionalStringArray(contract.secretsRequired) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.rollbackPlan).length > 0
+      ? { rollbackPlan: normalizeOptionalStringArray(contract.rollbackPlan) }
+      : {}),
+    ...(normalizeValidationPlanContract(contract.validationPlan)
+      ? { validationPlan: normalizeValidationPlanContract(contract.validationPlan) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.warnings).length > 0
+      ? { warnings: normalizeOptionalStringArray(contract.warnings) }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
+const normalizeRuntimeApprovalStateContract = (
+  value: unknown,
+): RuntimeApprovalStateContract | null => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const contract = value as RuntimeApprovalStateContract
+  const normalizedValue: RuntimeApprovalStateContract = {
+    ...(normalizeOptionalString(contract.approvalId)
+      ? { approvalId: normalizeOptionalString(contract.approvalId) }
+      : {}),
+    ...(normalizeOptionalString(contract.actionId)
+      ? { actionId: normalizeOptionalString(contract.actionId) }
+      : {}),
+    ...(normalizeOptionalString(contract.title)
+      ? { title: normalizeOptionalString(contract.title) }
+      : {}),
+    ...(normalizeOptionalString(contract.description)
+      ? { description: normalizeOptionalString(contract.description) }
+      : {}),
+    ...(normalizeOptionalString(contract.status)
+      ? { status: normalizeOptionalString(contract.status) }
+      : {}),
+    ...(normalizeOptionalString(contract.riskLevel)
+      ? {
+          riskLevel: normalizeOptionalString(
+            contract.riskLevel,
+          ) as RuntimeApprovalStateContract['riskLevel'],
+        }
+      : {}),
+    ...(typeof contract.requiresExplicitApproval === 'boolean'
+      ? { requiresExplicitApproval: contract.requiresExplicitApproval }
+      : {}),
+    ...(normalizeOptionalString(contract.approvalPhrase)
+      ? { approvalPhrase: normalizeOptionalString(contract.approvalPhrase) }
+      : {}),
+    ...(normalizeOptionalString(contract.operatorMustConfirm)
+      ? { operatorMustConfirm: normalizeOptionalString(contract.operatorMustConfirm) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.commandsPreview).length > 0
+      ? { commandsPreview: normalizeOptionalStringArray(contract.commandsPreview) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.filesPreview).length > 0
+      ? { filesPreview: normalizeOptionalStringArray(contract.filesPreview) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.directoriesPreview).length > 0
+      ? {
+          directoriesPreview: normalizeOptionalStringArray(
+            contract.directoriesPreview,
+          ),
+        }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.envRequirements).length > 0
+      ? { envRequirements: normalizeOptionalStringArray(contract.envRequirements) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.secretsRequired).length > 0
+      ? { secretsRequired: normalizeOptionalStringArray(contract.secretsRequired) }
+      : {}),
+    ...(normalizeValidationPlanContract(contract.validationPlan)
+      ? { validationPlan: normalizeValidationPlanContract(contract.validationPlan) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.rollbackPlan).length > 0
+      ? { rollbackPlan: normalizeOptionalStringArray(contract.rollbackPlan) }
+      : {}),
+    ...(normalizeOptionalString(contract.safeAlternative)
+      ? { safeAlternative: normalizeOptionalString(contract.safeAlternative) }
+      : {}),
+    ...(normalizeOptionalString(contract.blockedReason)
+      ? { blockedReason: normalizeOptionalString(contract.blockedReason) }
+      : {}),
+    ...(normalizeOptionalString(contract.expectedOutcome)
+      ? { expectedOutcome: normalizeOptionalString(contract.expectedOutcome) }
+      : {}),
+    ...(normalizeOptionalString(contract.notExecutedDisclaimer)
+      ? {
+          notExecutedDisclaimer: normalizeOptionalString(
+            contract.notExecutedDisclaimer,
+          ),
+        }
+      : {}),
+    ...(normalizeOptionalString(contract.createdAt)
+      ? { createdAt: normalizeOptionalString(contract.createdAt) }
+      : {}),
+    ...(normalizeOptionalString(contract.expiresAt)
+      ? { expiresAt: normalizeOptionalString(contract.expiresAt) }
+      : {}),
+    ...(normalizeOptionalString(contract.relatedReadinessArea)
+      ? {
+          relatedReadinessArea: normalizeOptionalString(
+            contract.relatedReadinessArea,
+          ),
+        }
+      : {}),
+    ...(normalizeContinuationActionContract(contract.relatedContinuationAction)
+      ? {
+          relatedContinuationAction: normalizeContinuationActionContract(
+            contract.relatedContinuationAction,
+          ),
+        }
+      : {}),
     ...(normalizeOptionalStringArray(contract.warnings).length > 0
       ? { warnings: normalizeOptionalStringArray(contract.warnings) }
       : {}),
@@ -2327,6 +2548,12 @@ const normalizeProjectReadinessStateContract = (
     ...(normalizeOptionalStringArray(contract.blockedAreas).length > 0
       ? { blockedAreas: normalizeOptionalStringArray(contract.blockedAreas) }
       : {}),
+    ...(normalizeOptionalString(contract.runtimeReadiness)
+      ? { runtimeReadiness: normalizeOptionalString(contract.runtimeReadiness) }
+      : {}),
+    ...(typeof contract.realExecutionReady === 'boolean'
+      ? { realExecutionReady: contract.realExecutionReady }
+      : {}),
     ...(normalizeOptionalString(contract.validationStatus)
       ? { validationStatus: normalizeOptionalString(contract.validationStatus) }
       : {}),
@@ -2344,6 +2571,62 @@ const normalizeProjectReadinessStateContract = (
           recommendedDemoScript: normalizeOptionalStringArray(
             contract.recommendedDemoScript,
           ),
+        }
+      : {}),
+    ...(normalizeOptionalString(contract.lastApprovalRequest)
+      ? { lastApprovalRequest: normalizeOptionalString(contract.lastApprovalRequest) }
+      : {}),
+    ...(normalizeOptionalString(contract.runtimeReadiness)
+      ? { runtimeReadiness: normalizeOptionalString(contract.runtimeReadiness) }
+      : {}),
+    ...(normalizeOptionalString(contract.realExecutionReadiness)
+      ? {
+          realExecutionReadiness: normalizeOptionalString(
+            contract.realExecutionReadiness,
+          ),
+        }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.pendingApprovals).length > 0
+      ? { pendingApprovals: normalizeOptionalStringArray(contract.pendingApprovals) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.blockedRuntimeActions).length > 0
+      ? {
+          blockedRuntimeActions: normalizeOptionalStringArray(
+            contract.blockedRuntimeActions,
+          ),
+        }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.approvedActions).length > 0
+      ? { approvedActions: normalizeOptionalStringArray(contract.approvedActions) }
+      : {}),
+    ...(Array.isArray(contract.approvalHistory) && contract.approvalHistory.length > 0
+      ? {
+          approvalHistory: contract.approvalHistory
+            .map((entry) =>
+              entry && typeof entry === 'object'
+                ? {
+                    ...(normalizeOptionalString(entry.kind)
+                      ? { kind: normalizeOptionalString(entry.kind) }
+                      : {}),
+                    ...(normalizeOptionalString(entry.id)
+                      ? { id: normalizeOptionalString(entry.id) }
+                      : {}),
+                    ...(normalizeOptionalString(entry.status)
+                      ? { status: normalizeOptionalString(entry.status) }
+                      : {}),
+                    ...(normalizeOptionalString(entry.at)
+                      ? { at: normalizeOptionalString(entry.at) }
+                      : {}),
+                    ...(normalizeOptionalString(entry.note)
+                      ? { note: normalizeOptionalString(entry.note) }
+                      : {}),
+                  }
+                : null,
+            )
+            .filter(
+              (entry): entry is LocalProjectManifestHistoryContract =>
+                Boolean(entry) && Object.keys(entry).length > 0,
+            ),
         }
       : {}),
     ...(normalizeOptionalStringArray(contract.warnings).length > 0
@@ -3198,6 +3481,9 @@ const extractPlannerExecutionMetadata = (payload?: {
   ),
   approvalRequestPlan: normalizeApprovalRequestPlanContract(
     payload?.approvalRequestPlan,
+  ),
+  runtimeApprovalState: normalizeRuntimeApprovalStateContract(
+    payload?.runtimeApprovalState,
   ),
   materializationPlan:
     payload?.materializationPlan && typeof payload.materializationPlan === 'object'
@@ -5149,6 +5435,47 @@ const getProjectReadinessTone = (
   return 'amber' as const
 }
 
+const getRuntimeApprovalStatusLabel = (value?: string) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (normalizedValue === 'preview') {
+    return 'Preview controlado'
+  }
+  if (normalizedValue === 'requires-approval') {
+    return 'Requiere aprobacion'
+  }
+  if (normalizedValue === 'approved') {
+    return 'Aprobado'
+  }
+  if (normalizedValue === 'blocked') {
+    return 'Bloqueado por seguridad'
+  }
+  if (normalizedValue === 'rejected') {
+    return 'Rechazado'
+  }
+  if (normalizedValue === 'expired') {
+    return 'Expirado'
+  }
+
+  return normalizeOptionalString(value) || 'Sin estado'
+}
+
+const getRuntimeApprovalTone = (value?: string) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (normalizedValue === 'blocked' || normalizedValue === 'rejected') {
+    return 'rose' as const
+  }
+  if (normalizedValue === 'approved') {
+    return 'emerald' as const
+  }
+  if (normalizedValue === 'preview' || normalizedValue === 'requires-approval') {
+    return 'amber' as const
+  }
+
+  return 'sky' as const
+}
+
 const getValidationStatusLabel = (value?: string) => {
   const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
 
@@ -5986,6 +6313,7 @@ function ProjectContinuityCenterCard({
   projectContinuationState,
   projectReadinessState,
   approvalRequestPlan,
+  runtimeApprovalState,
   compact = false,
   busy = false,
   onPreparePhase,
@@ -6006,6 +6334,7 @@ function ProjectContinuityCenterCard({
   projectContinuationState?: ProjectContinuationStateContract | null
   projectReadinessState?: ProjectReadinessStateContract | null
   approvalRequestPlan?: ApprovalRequestPlanContract | null
+  runtimeApprovalState?: RuntimeApprovalStateContract | null
   compact?: boolean
   busy?: boolean
   onPreparePhase?: (phaseId: string) => void
@@ -6259,6 +6588,48 @@ function ProjectContinuityCenterCard({
     normalizeOptionalString(projectReadinessState?.lastValidationSummary) ||
     normalizeOptionalString(localProjectManifest?.lastValidationSummary) ||
     'Todavia no hay un estado de demo resumido para este proyecto.'
+  const runtimeApprovalCommands = normalizeOptionalStringArray(
+    runtimeApprovalState?.commandsPreview,
+  )
+  const runtimeApprovalFiles = normalizeOptionalStringArray(runtimeApprovalState?.filesPreview)
+  const runtimeApprovalDirectories = normalizeOptionalStringArray(
+    runtimeApprovalState?.directoriesPreview,
+  )
+  const runtimeApprovalEnv = normalizeOptionalStringArray(runtimeApprovalState?.envRequirements)
+  const runtimeApprovalSecrets = normalizeOptionalStringArray(
+    runtimeApprovalState?.secretsRequired,
+  )
+  const runtimeApprovalRollback = normalizeOptionalStringArray(runtimeApprovalState?.rollbackPlan)
+  const runtimeApprovalWarnings = normalizeOptionalStringArray(runtimeApprovalState?.warnings)
+  const runtimeApprovalValidationPlan = normalizeValidationPlanContract(
+    runtimeApprovalState?.validationPlan,
+  )
+  const runtimeApprovalValidations = summarizeUniqueStrings(
+    [
+      ...normalizeOptionalStringArray(runtimeApprovalValidationPlan?.commands),
+      ...normalizeOptionalStringArray(runtimeApprovalValidationPlan?.manualChecks),
+      ...normalizeOptionalStringArray(runtimeApprovalValidationPlan?.successCriteria),
+    ],
+    24,
+  )
+  const runtimeApprovalAlternativeItems = summarizeUniqueStrings(
+    [
+      normalizeOptionalString(runtimeApprovalState?.safeAlternative),
+      normalizeOptionalString(runtimeApprovalState?.operatorMustConfirm),
+    ],
+    16,
+  )
+  const runtimeApprovalRiskItems = summarizeUniqueStrings(
+    [
+      normalizeOptionalString(runtimeApprovalState?.blockedReason),
+      normalizeOptionalString(runtimeApprovalState?.approvalPhrase),
+      ...runtimeApprovalWarnings,
+      ...runtimeApprovalRollback,
+    ],
+    24,
+  )
+  const runtimeApprovalStatusLabel = getRuntimeApprovalStatusLabel(runtimeApprovalState?.status)
+  const runtimeApprovalTone = getRuntimeApprovalTone(runtimeApprovalState?.status)
   const approvalPacketTouches = normalizeOptionalStringArray(approvalRequestPlan?.touches)
   const approvalPacketWillNotTouch = normalizeOptionalStringArray(
     approvalRequestPlan?.willNotTouch,
@@ -6295,6 +6666,9 @@ function ProjectContinuityCenterCard({
     (nextRecommendedAction?.requiresApproval || nextRecommendedAction?.blocked
       ? nextRecommendedAction
       : null)
+  const runtimeApprovalAction =
+    normalizeContinuationActionContract(runtimeApprovalState?.relatedContinuationAction) ||
+    approvalPacketAction
 
   const dispatchPrepareAction = (action: ContinuationActionContract) => {
     if (onPrepareContinuationAction) {
@@ -6820,7 +7194,194 @@ function ProjectContinuityCenterCard({
         </div>
       ) : null}
 
-      {approvalRequestPlan ? (
+      {runtimeApprovalState ? (
+        <div className="mt-4 rounded-2xl border border-rose-300/20 bg-rose-300/[0.06] px-4 py-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Aprobaciones pendientes
+              </div>
+              <div className="mt-2 text-base font-semibold text-white">
+                {normalizeOptionalString(runtimeApprovalState.title) ||
+                  'Pasar a ejecucion real'}
+              </div>
+              <div className="mt-2 text-sm leading-6 text-slate-300">
+                {normalizeOptionalString(runtimeApprovalState.notExecutedDisclaimer) ||
+                  'No se ejecuto nada todavia.'}
+              </div>
+              <div className="mt-2 text-xs leading-5 text-slate-400">
+                {normalizeOptionalString(runtimeApprovalState.description) ||
+                  normalizeOptionalString(runtimeApprovalState.safeAlternative) ||
+                  'JEFE preparo un preview controlado sin salir del modo local seguro.'}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <span
+                className={joinClasses(
+                  'rounded-full border px-3 py-1 text-xs font-medium',
+                  getContinuityStateToneClass(runtimeApprovalTone),
+                )}
+              >
+                {runtimeApprovalStatusLabel}
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
+                {getRiskLabel(runtimeApprovalState.riskLevel)}
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <MetricCard
+              label="Pasar a ejecucion real"
+              value={runtimeApprovalStatusLabel}
+              detail={
+                normalizeOptionalString(runtimeApprovalState.relatedReadinessArea) ||
+                'La ejecucion real sigue bloqueada hasta aprobacion explicita.'
+              }
+              tone={runtimeApprovalTone}
+            />
+            <MetricCard
+              label="Comandos propuestos"
+              value={
+                runtimeApprovalCommands.length > 0
+                  ? `${runtimeApprovalCommands.length} comando(s)`
+                  : 'Sin comandos'
+              }
+              detail={
+                runtimeApprovalCommands[0] ||
+                'No hay comandos propuestos para esta aprobacion.'
+              }
+              tone="amber"
+            />
+            <MetricCard
+              label="Validaciones obligatorias"
+              value={
+                runtimeApprovalValidations.length > 0
+                  ? `${runtimeApprovalValidations.length} check(s)`
+                  : 'Sin checks'
+              }
+              detail={
+                runtimeApprovalValidations[0] ||
+                'Primero hay que revisar riesgo, alcance y alternativa segura.'
+              }
+              tone="sky"
+            />
+            <MetricCard
+              label="Alternativa segura"
+              value={
+                normalizeOptionalString(runtimeApprovalState.safeAlternative) ||
+                'Seguir en modo local seguro'
+              }
+              detail={
+                normalizeOptionalString(runtimeApprovalState.expectedOutcome) ||
+                'Todavia no se ejecuta nada real.'
+              }
+              tone="emerald"
+            />
+          </div>
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            <ProductArchitectureGroup
+              title="Comandos propuestos"
+              items={
+                runtimeApprovalCommands.length > 0
+                  ? runtimeApprovalCommands
+                  : ['Todavia no hay comandos propuestos para esta aprobacion.']
+              }
+              compact={compact}
+              tone="amber"
+            />
+            <ProductArchitectureGroup
+              title="Archivos que podrian cambiar"
+              items={
+                runtimeApprovalFiles.length > 0
+                  ? runtimeApprovalFiles
+                  : approvalPacketTouches.length > 0
+                    ? approvalPacketTouches
+                    : ['El alcance sigue siendo solo informativo por ahora.']
+              }
+              compact={compact}
+              tone="amber"
+            />
+          </div>
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            <ProductArchitectureGroup
+              title="Directorios y entorno"
+              items={
+                [
+                  ...runtimeApprovalDirectories,
+                  ...runtimeApprovalEnv,
+                  ...runtimeApprovalSecrets,
+                ].length > 0
+                  ? [
+                      ...runtimeApprovalDirectories,
+                      ...runtimeApprovalEnv,
+                      ...runtimeApprovalSecrets,
+                    ]
+                  : ['No se toca nada real sin aprobacion.']
+              }
+              compact={compact}
+              tone="rose"
+            />
+            <ProductArchitectureGroup
+              title="Validaciones obligatorias"
+              items={
+                runtimeApprovalValidations.length > 0
+                  ? runtimeApprovalValidations
+                  : approvalPacketValidations.length > 0
+                    ? approvalPacketValidations
+                    : ['Revisar alcance, riesgo y alternativa segura antes de aprobar.']
+              }
+              compact={compact}
+              tone="sky"
+            />
+          </div>
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            <ProductArchitectureGroup
+              title="Alternativa segura"
+              items={
+                runtimeApprovalAlternativeItems.length > 0
+                  ? runtimeApprovalAlternativeItems
+                  : approvalPacketWillNotTouch.length > 0
+                    ? approvalPacketWillNotTouch
+                    : ['No se ejecutó nada todavía.']
+              }
+              compact={compact}
+              tone="emerald"
+            />
+            <ProductArchitectureGroup
+              title="Riesgo"
+              items={
+                runtimeApprovalRiskItems.length > 0
+                  ? runtimeApprovalRiskItems
+                  : ['No se toca nada real sin aprobacion.']
+              }
+              compact={compact}
+              tone="rose"
+            />
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {runtimeApprovalAction && runtimeApprovalAction.safeToPrepare !== false ? (
+              <button
+                type="button"
+                onClick={() => dispatchPrepareAction(runtimeApprovalAction)}
+                disabled={busy}
+                className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-2.5 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+              >
+                Preparar aprobacion
+              </button>
+            ) : null}
+            <span className="text-sm leading-6 text-slate-400">
+              {normalizeOptionalString(runtimeApprovalState.approvalPhrase) ||
+                normalizeOptionalString(runtimeApprovalState.notExecutedDisclaimer) ||
+                'No se ejecuto todavia. Primero hace falta revisar y aprobar el alcance.'}
+            </span>
+          </div>
+        </div>
+      ) : approvalRequestPlan ? (
         <div className="mt-4 rounded-2xl border border-rose-300/20 bg-rose-300/[0.06] px-4 py-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -10652,6 +11213,8 @@ function App() {
     effectivePlannerExecutionMetadata.projectReadinessState
   const activeApprovalRequestPlan =
     effectivePlannerExecutionMetadata.approvalRequestPlan
+  const activeRuntimeApprovalState =
+    effectivePlannerExecutionMetadata.runtimeApprovalState
   const activeScalableDeliveryLevel = normalizeOptionalString(
     activeScalableDeliveryPlan?.deliveryLevel,
   ).toLocaleLowerCase()
@@ -10695,6 +11258,7 @@ function App() {
     Boolean(activeProjectContinuationState) ||
     Boolean(activeProjectReadinessState) ||
     Boolean(activeApprovalRequestPlan) ||
+    Boolean(activeRuntimeApprovalState) ||
     Boolean(activeContinuationActionPlan) ||
     Boolean(activeExpansionOptions) ||
     Boolean(activeModuleExpansionPlan) ||
@@ -18164,6 +18728,7 @@ function App() {
                           projectContinuationState={activeProjectContinuationState}
                           projectReadinessState={activeProjectReadinessState}
                           approvalRequestPlan={activeApprovalRequestPlan}
+                          runtimeApprovalState={activeRuntimeApprovalState}
                           compact
                           busy={isPlanning || isExecutingTask}
                           onPreparePhase={handlePrepareProjectPhase}
@@ -19703,6 +20268,7 @@ function App() {
                     projectContinuationState={activeProjectContinuationState}
                     projectReadinessState={activeProjectReadinessState}
                     approvalRequestPlan={activeApprovalRequestPlan}
+                    runtimeApprovalState={activeRuntimeApprovalState}
                     busy={isPlanning || isExecutingTask}
                     onPreparePhase={handlePrepareProjectPhase}
                     onMaterializePhase={handleMaterializeProjectPhase}
