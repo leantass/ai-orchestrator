@@ -14005,6 +14005,3352 @@ if (!appData || typeof appRenderer !== 'function') {
 `
 }
 
+function buildFullstackLocalDemoView({
+  id,
+  label,
+  title,
+  description,
+  datasetKey = '',
+  kind = 'dataset',
+  columns = [],
+  detailFields = [],
+  searchableKeys = [],
+  emptyCopy = 'No hay datos mock cargados todavía.',
+  searchPlaceholder = 'Buscar dentro de esta sección',
+  supportsSearch = true,
+  supportsStatusFilter = false,
+  supportsLowStockToggle = false,
+}) {
+  return {
+    id,
+    label,
+    title,
+    description,
+    datasetKey,
+    kind,
+    columns,
+    detailFields,
+    searchableKeys,
+    emptyCopy,
+    searchPlaceholder,
+    supportsSearch,
+    supportsStatusFilter,
+    supportsLowStockToggle,
+  }
+}
+
+function detectFullstackLocalDemoArchetype({
+  normalizedText,
+  domainUnderstanding,
+  modules,
+}) {
+  const modulesText = summarizeUniqueExecutorStrings(modules, 20).join(' ')
+  const understandingText = [
+    normalizedText,
+    summarizeUniqueExecutorStrings(domainUnderstanding?.primaryModules, 20).join(' '),
+    summarizeUniqueExecutorStrings(domainUnderstanding?.primaryEntities, 20).join(' '),
+    modulesText,
+  ]
+    .filter(Boolean)
+    .join(' ')
+  const combinedText = normalizeSectorDetectionText(understandingText)
+
+  if (
+    /\bveterinaria\b|\bveterinari[oa]s?\b|\bmascotas?\b|\bvacunas?\b|\bpet\b/u.test(
+      combinedText,
+    )
+  ) {
+    return 'veterinary'
+  }
+
+  if (
+    /\bcanchas?\b|\breservas?\b|\bhorarios?\b|\bdisponibilidad\b|\btorneos?\b/u.test(
+      combinedText,
+    )
+  ) {
+    return 'sports-booking'
+  }
+
+  if (
+    /\becommerce\b|\btienda online\b|\bcatalogo\b|\bcarrito\b|\bcheckout\b|\bproductos?\b|\borderes?\b|\bordenes?\b|\bcomercio\b|\bstock\b|\binventario\b|\bventas?\b|\bsku\b/u.test(
+      combinedText,
+    )
+  ) {
+    return 'ecommerce'
+  }
+
+  if (
+    /\bescuel|\balumnos?\b|\bfamilias?\b|\bcursos?\b|\bcomunicaciones?\b|\bboletines?\b/u.test(
+      combinedText,
+    )
+  ) {
+    return 'school-crm'
+  }
+
+  if (
+    /\bdocumental\b|\bdocumentos?\b|\bexpedientes?\b|\bvencimientos?\b|\bresponsables?\b/u.test(
+      combinedText,
+    )
+  ) {
+    return 'document-management'
+  }
+
+  if (
+    /\bsolicitudes?\b|\btickets?\b|\bhelpdesk\b|\bmesa de ayuda\b|\boperativ[ao]s?\b|\btramites?\b/u.test(
+      combinedText,
+    )
+  ) {
+    return 'operations'
+  }
+
+  if (
+    /\bturnos?\b|\bclinicas?\b|\bsalud\b|\bmedic[oa]s?\b|\bpacientes?\b|\bconsultorio\b/u.test(
+      combinedText,
+    )
+  ) {
+    return 'medical-clinic'
+  }
+
+  return 'operations'
+}
+
+function buildFullstackLocalDemoBase({
+  appTitle,
+  archetype,
+  heroKicker,
+  subtitle,
+  domainSummary,
+  nextRecommendedPhase,
+  navItems,
+  metrics,
+  alerts,
+  constraints,
+  team = [],
+  clients = [],
+  pets = [],
+  appointments = [],
+  reminders = [],
+  inventory = [],
+  reports = [],
+  activity = [],
+  views = [],
+  quickActions = [],
+  statusOptions = {},
+  domainEntities = [],
+  modules = [],
+}) {
+  return {
+    overview: {
+      name: appTitle,
+      archetype,
+      heroKicker,
+      subtitle,
+      mode: 'local-static-review',
+      deliveryLevel: 'fullstack-local',
+      domainSummary,
+      safeModeLabel: 'Modo local seguro',
+      safeModeCopy:
+        'Sin npm install, sin backend real, sin base de datos real y sin integraciones externas.',
+      nextRecommendedPhase,
+      mockScopeLabel: 'Todo el contenido es mock y se puede revisar por file://.',
+    },
+    navItems,
+    metrics,
+    alerts,
+    constraints,
+    team,
+    clients,
+    pets,
+    appointments,
+    reminders,
+    inventory,
+    reports,
+    activity,
+    views,
+    quickActions,
+    statusOptions,
+    domainEntities,
+    modules,
+  }
+}
+
+function buildVeterinaryFullstackLocalDemoData({
+  appTitle,
+  nextRecommendedPhase,
+}) {
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', hint: 'Resumen operativo' },
+    { id: 'clients', label: 'Clientes', hint: 'Dueños y contacto' },
+    { id: 'pets', label: 'Mascotas', hint: 'Fichas activas' },
+    { id: 'appointments', label: 'Turnos', hint: 'Agenda del día' },
+    { id: 'reminders', label: 'Recordatorios', hint: 'Vacunas y controles' },
+    { id: 'reports', label: 'Reportes', hint: 'Indicadores mock' },
+    { id: 'inventory', label: 'Inventario', hint: 'Stock básico' },
+  ]
+  const metrics = [
+    {
+      id: 'today-appointments',
+      label: 'Turnos de hoy',
+      value: '14',
+      tone: 'sky',
+      detail: '10 confirmados y 4 pendientes',
+    },
+    {
+      id: 'active-pets',
+      label: 'Mascotas activas',
+      value: '68',
+      tone: 'emerald',
+      detail: 'Seguimiento preventivo al día en 49',
+    },
+    {
+      id: 'reminders-due',
+      label: 'Recordatorios pendientes',
+      value: '6',
+      tone: 'amber',
+      detail: 'Vacunas, controles y desparasitación',
+    },
+    {
+      id: 'low-stock',
+      label: 'Stock bajo',
+      value: '4',
+      tone: 'rose',
+      detail: 'Medicamentos e insumos a reponer',
+    },
+  ]
+  const alerts = [
+    {
+      id: 'alert-appointments',
+      tone: 'sky',
+      title: 'Agenda activa de la mañana',
+      detail: 'Hay 3 turnos consecutivos de vacunación entre las 10:00 y las 11:30.',
+    },
+    {
+      id: 'alert-reminders',
+      tone: 'amber',
+      title: 'Vacunas por revisar',
+      detail: 'Luna, Milo y Nala tienen recordatorios listos para seguimiento local.',
+    },
+    {
+      id: 'alert-stock',
+      tone: 'rose',
+      title: 'Stock bajo en antiparasitarios',
+      detail: 'Quedan menos unidades que el mínimo recomendado para la semana.',
+    },
+  ]
+  const constraints = [
+    'Abrible con doble click en frontend/index.html',
+    'Sin npm install ni node_modules',
+    'Sin backend real ni puertos abiertos',
+    'Sin base de datos real ni SQL ejecutado',
+    'Sin Docker, deploy ni integraciones externas',
+  ]
+  const team = [
+    {
+      id: 'VET-001',
+      name: 'Dra. Paula Benítez',
+      role: 'Clínica general',
+      shift: 'Mañana',
+      status: 'En consultorio',
+      focus: 'Controles y seguimiento preventivo',
+    },
+    {
+      id: 'VET-002',
+      name: 'Dr. Julián Rivas',
+      role: 'Cirugía menor',
+      shift: 'Tarde',
+      status: 'Disponible',
+      focus: 'Postoperatorios y urgencias leves',
+    },
+    {
+      id: 'VET-003',
+      name: 'Dra. Malena Torres',
+      role: 'Vacunación y nutrición',
+      shift: 'Mañana',
+      status: 'Agenda completa',
+      focus: 'Planes preventivos y alimentación',
+    },
+  ]
+  const clients = [
+    {
+      id: 'CLI-001',
+      name: 'María Gómez',
+      contact: '11 5555-1234',
+      neighborhood: 'Palermo',
+      petsSummary: 'Luna y Simba',
+      status: 'Activa',
+      nextVisit: '05/05 09:30',
+      notes: 'Prefiere recordatorios por WhatsApp local.',
+    },
+    {
+      id: 'CLI-002',
+      name: 'Santiago Fernández',
+      contact: '11 5555-8282',
+      neighborhood: 'Caballito',
+      petsSummary: 'Milo',
+      status: 'Pendiente de revisión',
+      nextVisit: '05/05 11:15',
+      notes: 'Pidió control posvacuna para esta semana.',
+    },
+    {
+      id: 'CLI-003',
+      name: 'Carla Ibarra',
+      contact: '11 5555-6631',
+      neighborhood: 'Belgrano',
+      petsSummary: 'Nala y Coco',
+      status: 'Al día',
+      nextVisit: '06/05 16:00',
+      notes: 'Tiene seguimiento nutricional abierto.',
+    },
+    {
+      id: 'CLI-004',
+      name: 'Diego Suárez',
+      contact: '11 5555-0047',
+      neighborhood: 'Villa Urquiza',
+      petsSummary: 'Toby',
+      status: 'Requiere contacto',
+      nextVisit: 'Pendiente',
+      notes: 'Falta confirmar recordatorio anual.',
+    },
+  ]
+  const pets = [
+    {
+      id: 'PET-001',
+      name: 'Luna',
+      species: 'Canina',
+      breed: 'Mestiza',
+      age: '6 años',
+      ownerName: 'María Gómez',
+      status: 'Vacunas al día',
+      nextControl: '20/05',
+      reason: 'Control anual',
+      notes: 'Peso estable y buen apetito.',
+    },
+    {
+      id: 'PET-002',
+      name: 'Simba',
+      species: 'Felina',
+      breed: 'Europeo',
+      age: '3 años',
+      ownerName: 'María Gómez',
+      status: 'Recordatorio pendiente',
+      nextControl: '10/05',
+      reason: 'Refuerzo antirrábico',
+      notes: 'Necesita seguimiento de vacuna anual.',
+    },
+    {
+      id: 'PET-003',
+      name: 'Milo',
+      species: 'Canina',
+      breed: 'Beagle',
+      age: '1 año',
+      ownerName: 'Santiago Fernández',
+      status: 'En observación',
+      nextControl: '05/05',
+      reason: 'Control posvacuna',
+      notes: 'Tuvo decaimiento leve las últimas 24h.',
+    },
+    {
+      id: 'PET-004',
+      name: 'Nala',
+      species: 'Felina',
+      breed: 'Siamesa',
+      age: '8 años',
+      ownerName: 'Carla Ibarra',
+      status: 'Control geriátrico',
+      nextControl: '06/05',
+      reason: 'Chequeo general',
+      notes: 'Se sugiere análisis preventivo en próxima iteración.',
+    },
+  ]
+  const appointments = [
+    {
+      id: 'APT-001',
+      petName: 'Luna',
+      clientName: 'María Gómez',
+      veterinarian: 'Dra. Paula Benítez',
+      reason: 'Control anual',
+      slot: '05/05 09:30',
+      status: 'confirmado',
+      room: 'Consultorio 1',
+      reminderState: 'pendiente',
+      notes: 'Traer libreta sanitaria.',
+    },
+    {
+      id: 'APT-002',
+      petName: 'Simba',
+      clientName: 'María Gómez',
+      veterinarian: 'Dra. Malena Torres',
+      reason: 'Vacuna antirrábica',
+      slot: '05/05 10:15',
+      status: 'pendiente',
+      room: 'Vacunación',
+      reminderState: 'enviado',
+      notes: 'Se puede confirmar desde recepción local.',
+    },
+    {
+      id: 'APT-003',
+      petName: 'Milo',
+      clientName: 'Santiago Fernández',
+      veterinarian: 'Dr. Julián Rivas',
+      reason: 'Control posvacuna',
+      slot: '05/05 11:15',
+      status: 'en atención',
+      room: 'Consultorio 2',
+      reminderState: 'revisado',
+      notes: 'Seguimiento local de síntomas leves.',
+    },
+    {
+      id: 'APT-004',
+      petName: 'Nala',
+      clientName: 'Carla Ibarra',
+      veterinarian: 'Dra. Paula Benítez',
+      reason: 'Chequeo geriátrico',
+      slot: '06/05 16:00',
+      status: 'confirmado',
+      room: 'Consultorio 1',
+      reminderState: 'pendiente',
+      notes: 'Preparar observaciones de alimentación.',
+    },
+  ]
+  const reminders = [
+    {
+      id: 'REM-001',
+      petName: 'Simba',
+      clientName: 'María Gómez',
+      type: 'Vacuna antirrábica',
+      dueDate: '10/05',
+      channel: 'WhatsApp local',
+      status: 'pendiente',
+      detail: 'Enviar recordatorio 48 hs antes del turno.',
+    },
+    {
+      id: 'REM-002',
+      petName: 'Milo',
+      clientName: 'Santiago Fernández',
+      type: 'Control posvacuna',
+      dueDate: '05/05',
+      channel: 'Llamado interno',
+      status: 'revisado',
+      detail: 'Chequear evolución después del turno.',
+    },
+    {
+      id: 'REM-003',
+      petName: 'Nala',
+      clientName: 'Carla Ibarra',
+      type: 'Análisis preventivo',
+      dueDate: '12/05',
+      channel: 'Panel local',
+      status: 'pendiente',
+      detail: 'Sugerencia para próxima iteración aprobada.',
+    },
+  ]
+  const inventory = [
+    {
+      id: 'INV-001',
+      name: 'Antiparasitario spot-on',
+      category: 'Medicamentos',
+      stock: 6,
+      minStock: 8,
+      unit: 'unidades',
+      status: 'stock bajo',
+      note: 'Reponer antes del viernes.',
+    },
+    {
+      id: 'INV-002',
+      name: 'Vacuna séxtuple',
+      category: 'Vacunas',
+      stock: 18,
+      minStock: 10,
+      unit: 'dosis',
+      status: 'normal',
+      note: 'Cobertura para la próxima semana.',
+    },
+    {
+      id: 'INV-003',
+      name: 'Alimento gastrointestinal',
+      category: 'Alimentos',
+      stock: 4,
+      minStock: 6,
+      unit: 'bolsas',
+      status: 'stock bajo',
+      note: 'Se mueve rápido en seguimiento nutricional.',
+    },
+    {
+      id: 'INV-004',
+      name: 'Jeringas 5 ml',
+      category: 'Insumos',
+      stock: 42,
+      minStock: 20,
+      unit: 'cajas',
+      status: 'normal',
+      note: 'Sin desvíos para esta semana.',
+    },
+  ]
+  const reports = [
+    {
+      id: 'REP-001',
+      name: 'Turnos por motivo',
+      value: '14',
+      detail: '6 controles, 4 vacunas, 2 chequeos geriátricos y 2 revisiones posvacuna.',
+      status: 'Estable',
+    },
+    {
+      id: 'REP-002',
+      name: 'Mascotas con recordatorios',
+      value: '6',
+      detail: '4 pendientes y 2 ya revisados por el equipo local.',
+      status: 'Seguimiento activo',
+    },
+    {
+      id: 'REP-003',
+      name: 'Ítems con stock bajo',
+      value: '4',
+      detail: 'Medicamentos, alimentos e insumos con reposición sugerida.',
+      status: 'Atención',
+    },
+  ]
+  const activity = [
+    {
+      id: 'ACT-001',
+      time: '09:05',
+      title: 'Ingreso de paciente',
+      detail: 'Luna quedó lista para control anual en Consultorio 1.',
+      tone: 'sky',
+    },
+    {
+      id: 'ACT-002',
+      time: '09:40',
+      title: 'Recordatorio revisado',
+      detail: 'Recepción validó el seguimiento de Simba para la vacuna antirrábica.',
+      tone: 'emerald',
+    },
+    {
+      id: 'ACT-003',
+      time: '10:10',
+      title: 'Alerta de stock',
+      detail: 'Antiparasitario spot-on quedó por debajo del mínimo local.',
+      tone: 'rose',
+    },
+  ]
+  const views = [
+    buildFullstackLocalDemoView({
+      id: 'dashboard',
+      label: 'Dashboard',
+      title: 'Estado operativo de la veterinaria',
+      description:
+        'Resumen local de agenda, recordatorios, reportes e inventario sin depender de runtime real.',
+      kind: 'dashboard',
+      supportsSearch: false,
+    }),
+    buildFullstackLocalDemoView({
+      id: 'clients',
+      label: 'Clientes',
+      title: 'Dueños y contacto',
+      description: 'Buscá clientes, repasá sus mascotas y revisá el próximo seguimiento.',
+      datasetKey: 'clients',
+      columns: [
+        { key: 'name', label: 'Cliente' },
+        { key: 'petsSummary', label: 'Mascotas' },
+        { key: 'contact', label: 'Contacto' },
+        { key: 'status', label: 'Estado', kind: 'badge' },
+      ],
+      detailFields: [
+        { key: 'contact', label: 'Contacto' },
+        { key: 'neighborhood', label: 'Zona' },
+        { key: 'nextVisit', label: 'Próximo turno' },
+        { key: 'notes', label: 'Notas' },
+      ],
+      searchableKeys: ['name', 'contact', 'petsSummary', 'neighborhood', 'status'],
+      searchPlaceholder: 'Buscar cliente, mascota o contacto',
+    }),
+    buildFullstackLocalDemoView({
+      id: 'pets',
+      label: 'Mascotas',
+      title: 'Fichas activas',
+      description: 'Mostrá especie, dueño, estado y próximo control.',
+      datasetKey: 'pets',
+      columns: [
+        { key: 'name', label: 'Mascota' },
+        { key: 'species', label: 'Especie' },
+        { key: 'ownerName', label: 'Dueño' },
+        { key: 'status', label: 'Estado', kind: 'badge' },
+      ],
+      detailFields: [
+        { key: 'breed', label: 'Raza' },
+        { key: 'age', label: 'Edad' },
+        { key: 'nextControl', label: 'Próximo control' },
+        { key: 'notes', label: 'Notas' },
+      ],
+      searchableKeys: ['name', 'species', 'breed', 'ownerName', 'status', 'reason'],
+      searchPlaceholder: 'Buscar mascota, especie o dueño',
+    }),
+    buildFullstackLocalDemoView({
+      id: 'appointments',
+      label: 'Turnos',
+      title: 'Agenda veterinaria',
+      description: 'Cambiá estados mock, filtrá la agenda y revisá el detalle del turno.',
+      datasetKey: 'appointments',
+      columns: [
+        { key: 'slot', label: 'Horario' },
+        { key: 'petName', label: 'Mascota' },
+        { key: 'veterinarian', label: 'Veterinario' },
+        { key: 'status', label: 'Estado', kind: 'badge' },
+      ],
+      detailFields: [
+        { key: 'clientName', label: 'Cliente' },
+        { key: 'reason', label: 'Motivo' },
+        { key: 'room', label: 'Espacio' },
+        { key: 'notes', label: 'Notas' },
+      ],
+      searchableKeys: [
+        'petName',
+        'clientName',
+        'veterinarian',
+        'reason',
+        'status',
+        'slot',
+      ],
+      searchPlaceholder: 'Buscar turno, mascota o veterinario',
+      supportsStatusFilter: true,
+    }),
+    buildFullstackLocalDemoView({
+      id: 'reminders',
+      label: 'Recordatorios',
+      title: 'Vacunas y controles',
+      description: 'Marcá seguimientos locales como revisados sin salir del modo seguro.',
+      datasetKey: 'reminders',
+      columns: [
+        { key: 'petName', label: 'Mascota' },
+        { key: 'type', label: 'Motivo' },
+        { key: 'dueDate', label: 'Fecha' },
+        { key: 'status', label: 'Estado', kind: 'badge' },
+      ],
+      detailFields: [
+        { key: 'clientName', label: 'Cliente' },
+        { key: 'channel', label: 'Canal mock' },
+        { key: 'detail', label: 'Detalle' },
+      ],
+      searchableKeys: ['petName', 'clientName', 'type', 'channel', 'status'],
+      searchPlaceholder: 'Buscar recordatorio, mascota o cliente',
+    }),
+    buildFullstackLocalDemoView({
+      id: 'reports',
+      label: 'Reportes',
+      title: 'Indicadores mock',
+      description: 'Resumen rápido para mostrar producto, no para operar con datos reales.',
+      datasetKey: 'reports',
+      kind: 'reports',
+      columns: [],
+      detailFields: [],
+      supportsSearch: false,
+    }),
+    buildFullstackLocalDemoView({
+      id: 'inventory',
+      label: 'Inventario',
+      title: 'Stock básico',
+      description: 'Revisá stock bajo y seleccioná ítems para ver alertas de reposición.',
+      datasetKey: 'inventory',
+      columns: [
+        { key: 'name', label: 'Ítem' },
+        { key: 'category', label: 'Categoría' },
+        { key: 'stockSummary', label: 'Stock' },
+        { key: 'status', label: 'Estado', kind: 'badge' },
+      ],
+      detailFields: [
+        { key: 'unit', label: 'Unidad' },
+        { key: 'minStock', label: 'Mínimo' },
+        { key: 'note', label: 'Nota' },
+      ],
+      searchableKeys: ['name', 'category', 'status', 'note'],
+      searchPlaceholder: 'Buscar medicamento, alimento o insumo',
+      supportsLowStockToggle: true,
+    }),
+  ]
+  const quickActions = [
+    {
+      id: 'qa-dashboard',
+      label: 'Ver resumen',
+      targetView: 'dashboard',
+      feedback: 'Se abrió el dashboard local con el estado general de la veterinaria.',
+    },
+    {
+      id: 'qa-appointments',
+      label: 'Revisar turnos',
+      targetView: 'appointments',
+      feedback: 'La agenda mock quedó lista para filtrar y cambiar estados localmente.',
+    },
+    {
+      id: 'qa-reminders',
+      label: 'Abrir recordatorios',
+      targetView: 'reminders',
+      feedback: 'Podés revisar vacunas y controles pendientes sin salir del modo local.',
+    },
+    {
+      id: 'qa-inventory',
+      label: 'Ver stock bajo',
+      targetView: 'inventory',
+      feedback: 'Se enfocó el inventario básico para revisar reposición sugerida.',
+    },
+  ]
+
+  return buildFullstackLocalDemoBase({
+    appTitle,
+    archetype: 'veterinary',
+    heroKicker: 'Veterinaria local',
+    subtitle:
+      'Demo local segura con clientes, mascotas, turnos, recordatorios, reportes e inventario básico.',
+    domainSummary:
+      'Incluye agenda veterinaria, seguimiento preventivo, stock y reportes mock listos para recorrer.',
+    nextRecommendedPhase,
+    navItems,
+    metrics,
+    alerts,
+    constraints,
+    team,
+    clients,
+    pets,
+    appointments: appointments.map((entry) => ({
+      ...entry,
+      statusLabel: entry.status,
+    })),
+    reminders,
+    inventory: inventory.map((entry) => ({
+      ...entry,
+      stockSummary: `${entry.stock} / mínimo ${entry.minStock}`,
+    })),
+    reports,
+    activity,
+    views,
+    quickActions,
+    statusOptions: {
+      appointments: ['todos', 'pendiente', 'confirmado', 'en atención', 'reprogramado'],
+    },
+    domainEntities: [
+      'clientes',
+      'mascotas',
+      'veterinarios',
+      'turnos',
+      'recordatorios',
+      'inventario',
+    ],
+    modules: [
+      'agenda veterinaria',
+      'clientes y dueños',
+      'mascotas',
+      'recordatorios',
+      'reportes',
+      'inventario básico',
+    ],
+  })
+}
+
+function buildTemplateFullstackLocalDemoData({
+  appTitle,
+  archetype,
+  heroKicker,
+  subtitle,
+  domainSummary,
+  nextRecommendedPhase,
+  navItems,
+  metrics,
+  alerts,
+  constraints,
+  team,
+  datasets,
+  views,
+  quickActions,
+  statusOptions,
+  domainEntities,
+  modules,
+}) {
+  return buildFullstackLocalDemoBase({
+    appTitle,
+    archetype,
+    heroKicker,
+    subtitle,
+    domainSummary,
+    nextRecommendedPhase,
+    navItems,
+    metrics,
+    alerts,
+    constraints,
+    team,
+    views,
+    quickActions,
+    statusOptions,
+    domainEntities,
+    modules,
+    ...(datasets || {}),
+  })
+}
+
+function buildMedicalFullstackLocalDemoData({
+  appTitle,
+  nextRecommendedPhase,
+}) {
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', hint: 'Resumen de la clínica' },
+    { id: 'clients', label: 'Pacientes', hint: 'Pacientes y contacto' },
+    { id: 'appointments', label: 'Turnos', hint: 'Agenda diaria' },
+    { id: 'reminders', label: 'Seguimiento', hint: 'Controles y estudios' },
+    { id: 'reports', label: 'Reportes', hint: 'Indicadores' },
+    { id: 'team', label: 'Equipo', hint: 'Profesionales' },
+  ]
+  const clients = [
+    {
+      id: 'PAT-001',
+      name: 'Lucía Pérez',
+      contact: '11 5555-9001',
+      coverage: 'Prepaga',
+      status: 'Activa',
+      nextVisit: '05/05 09:00',
+      notes: 'Control general',
+    },
+    {
+      id: 'PAT-002',
+      name: 'Martín Suárez',
+      contact: '11 5555-9002',
+      coverage: 'Particular',
+      status: 'Pendiente de confirmación',
+      nextVisit: '05/05 10:30',
+      notes: 'Consulta de seguimiento',
+    },
+  ]
+  const appointments = [
+    {
+      id: 'APT-001',
+      clientName: 'Lucía Pérez',
+      professional: 'Dra. Ana Gómez',
+      reason: 'Control general',
+      slot: '05/05 09:00',
+      status: 'confirmado',
+      room: 'Consultorio 1',
+      notes: 'Traer estudios previos.',
+    },
+    {
+      id: 'APT-002',
+      clientName: 'Martín Suárez',
+      professional: 'Dr. Pablo Ruiz',
+      reason: 'Chequeo de seguimiento',
+      slot: '05/05 10:30',
+      status: 'pendiente',
+      room: 'Consultorio 2',
+      notes: 'Esperando confirmación local.',
+    },
+  ]
+  const reminders = [
+    {
+      id: 'REM-001',
+      clientName: 'Lucía Pérez',
+      type: 'Control anual',
+      dueDate: '12/05',
+      channel: 'Panel local',
+      status: 'pendiente',
+      detail: 'Recordatorio de seguimiento preventivo.',
+    },
+  ]
+  const reports = [
+    {
+      id: 'REP-001',
+      name: 'Turnos confirmados',
+      value: '11',
+      detail: 'La agenda local tiene 11 turnos confirmados para hoy.',
+      status: 'Estable',
+    },
+  ]
+  const activity = [
+    {
+      id: 'ACT-001',
+      time: '08:55',
+      title: 'Recepción abierta',
+      detail: 'Se habilitó la agenda mock del turno mañana.',
+      tone: 'sky',
+    },
+  ]
+  return buildTemplateFullstackLocalDemoData({
+    appTitle,
+    archetype: 'medical-clinic',
+    heroKicker: 'Clínica local',
+    subtitle: 'Demo local segura para turnos, pacientes, seguimiento y reportes.',
+    domainSummary: 'Se enfoca en agenda, pacientes, equipo y reportes sin runtime real.',
+    nextRecommendedPhase,
+    navItems,
+    metrics: [
+      { id: 'appt', label: 'Turnos de hoy', value: '11', tone: 'sky', detail: 'Agenda con foco en consultorio' },
+      { id: 'follow-up', label: 'Seguimientos', value: '5', tone: 'amber', detail: 'Controles pendientes de revisar' },
+      { id: 'team', label: 'Profesionales', value: '4', tone: 'emerald', detail: 'Equipo médico activo hoy' },
+    ],
+    alerts: [
+      { id: 'a1', tone: 'amber', title: '2 turnos para confirmar', detail: 'Recepción puede validarlos desde la demo local.' },
+    ],
+    constraints: [
+      'Sin npm install',
+      'Sin backend real',
+      'Sin base de datos real',
+      'Sin deploy ni integraciones externas',
+    ],
+    team: [
+      { id: 'PRO-001', name: 'Dra. Ana Gómez', role: 'Clínica médica', shift: 'Mañana', status: 'Disponible', focus: 'Controles generales' },
+      { id: 'PRO-002', name: 'Dr. Pablo Ruiz', role: 'Pediatría', shift: 'Tarde', status: 'Agenda completa', focus: 'Seguimiento infantil' },
+    ],
+    datasets: { clients, appointments, reminders, reports, activity },
+    views: [
+      buildFullstackLocalDemoView({
+        id: 'dashboard',
+        label: 'Dashboard',
+        title: 'Estado de la clínica',
+        description: 'Resumen de agenda, alertas y seguimientos.',
+        kind: 'dashboard',
+        supportsSearch: false,
+      }),
+      buildFullstackLocalDemoView({
+        id: 'clients',
+        label: 'Pacientes',
+        title: 'Pacientes',
+        description: 'Listado local de pacientes y próximos turnos.',
+        datasetKey: 'clients',
+        columns: [
+          { key: 'name', label: 'Paciente' },
+          { key: 'coverage', label: 'Cobertura' },
+          { key: 'contact', label: 'Contacto' },
+          { key: 'status', label: 'Estado', kind: 'badge' },
+        ],
+        detailFields: [
+          { key: 'nextVisit', label: 'Próximo turno' },
+          { key: 'notes', label: 'Notas' },
+        ],
+        searchableKeys: ['name', 'coverage', 'contact', 'status'],
+        searchPlaceholder: 'Buscar paciente o cobertura',
+      }),
+      buildFullstackLocalDemoView({
+        id: 'appointments',
+        label: 'Turnos',
+        title: 'Agenda',
+        description: 'Filtrá y actualizá estados mock de turnos.',
+        datasetKey: 'appointments',
+        columns: [
+          { key: 'slot', label: 'Horario' },
+          { key: 'clientName', label: 'Paciente' },
+          { key: 'professional', label: 'Profesional' },
+          { key: 'status', label: 'Estado', kind: 'badge' },
+        ],
+        detailFields: [
+          { key: 'reason', label: 'Motivo' },
+          { key: 'room', label: 'Consultorio' },
+          { key: 'notes', label: 'Notas' },
+        ],
+        searchableKeys: ['clientName', 'professional', 'reason', 'status', 'slot'],
+        supportsStatusFilter: true,
+      }),
+      buildFullstackLocalDemoView({
+        id: 'reminders',
+        label: 'Seguimiento',
+        title: 'Recordatorios',
+        description: 'Seguimientos y estudios pendientes.',
+        datasetKey: 'reminders',
+        columns: [
+          { key: 'clientName', label: 'Paciente' },
+          { key: 'type', label: 'Tipo' },
+          { key: 'dueDate', label: 'Fecha' },
+          { key: 'status', label: 'Estado', kind: 'badge' },
+        ],
+        detailFields: [
+          { key: 'channel', label: 'Canal mock' },
+          { key: 'detail', label: 'Detalle' },
+        ],
+        searchableKeys: ['clientName', 'type', 'status'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'reports',
+        label: 'Reportes',
+        title: 'Reportes',
+        description: 'Indicadores mock de la clínica.',
+        datasetKey: 'reports',
+        kind: 'reports',
+        supportsSearch: false,
+      }),
+      buildFullstackLocalDemoView({
+        id: 'team',
+        label: 'Equipo',
+        title: 'Equipo',
+        description: 'Profesionales activos en la demo local.',
+        datasetKey: 'team',
+        columns: [
+          { key: 'name', label: 'Profesional' },
+          { key: 'role', label: 'Especialidad' },
+          { key: 'shift', label: 'Turno' },
+          { key: 'status', label: 'Estado', kind: 'badge' },
+        ],
+        detailFields: [{ key: 'focus', label: 'Foco' }],
+        searchableKeys: ['name', 'role', 'shift', 'status'],
+      }),
+    ],
+    quickActions: [
+      { id: 'qa1', label: 'Agenda del día', targetView: 'appointments', feedback: 'La agenda local quedó lista para revisar turnos.' },
+      { id: 'qa2', label: 'Pacientes activos', targetView: 'clients', feedback: 'Se abrió el listado de pacientes activos.' },
+    ],
+    statusOptions: { appointments: ['todos', 'pendiente', 'confirmado', 'en atención', 'reprogramado'] },
+    domainEntities: ['pacientes', 'profesionales', 'turnos', 'seguimientos', 'reportes'],
+    modules: ['agenda clínica', 'pacientes', 'seguimiento', 'reportes'],
+  })
+}
+
+function buildSportsBookingFullstackLocalDemoData({
+  appTitle,
+  nextRecommendedPhase,
+}) {
+  const customers = [
+    {
+      id: 'CUS-001',
+      name: 'Nicolás López',
+      contact: '11 5555-1200',
+      segment: 'Fútbol 5',
+      status: 'Activo',
+      nextVisit: '05/05 20:00',
+      notes: 'Suele reservar para 10 jugadores.',
+    },
+    {
+      id: 'CUS-002',
+      name: 'Agustina Romero',
+      contact: '11 5555-1201',
+      segment: 'Hockey',
+      status: 'Pendiente',
+      nextVisit: '06/05 18:00',
+      notes: 'Esperando confirmar horario extendido.',
+    },
+  ]
+  const courts = [
+    {
+      id: 'CRT-001',
+      name: 'Cancha 1',
+      surface: 'Sintético',
+      schedule: '18:00 a 23:00',
+      status: 'Disponible',
+      note: 'Iluminación OK.',
+    },
+    {
+      id: 'CRT-002',
+      name: 'Cancha 2',
+      surface: 'Piso mixto',
+      schedule: '18:00 a 23:00',
+      status: 'Mantenimiento programado',
+      note: 'Revisión de red a las 17:00.',
+    },
+  ]
+  const bookings = [
+    {
+      id: 'RES-001',
+      clientName: 'Nicolás López',
+      professional: 'Cancha 1',
+      reason: 'Fútbol 5',
+      slot: '05/05 20:00',
+      status: 'confirmado',
+      room: 'Horario nocturno',
+      notes: 'Equipo completo confirmado.',
+    },
+    {
+      id: 'RES-002',
+      clientName: 'Agustina Romero',
+      professional: 'Cancha 2',
+      reason: 'Entrenamiento',
+      slot: '06/05 18:00',
+      status: 'pendiente',
+      room: 'Bloque de 90 min',
+      notes: 'A definir si suma utilería.',
+    },
+  ]
+  const reminders = [
+    {
+      id: 'REM-001',
+      clientName: 'Agustina Romero',
+      type: 'Confirmar reserva',
+      dueDate: '06/05',
+      channel: 'Panel local',
+      status: 'pendiente',
+      detail: 'Falta confirmar duración del bloque.',
+    },
+  ]
+  const inventory = [
+    {
+      id: 'RSC-001',
+      name: 'Pelotas oficiales',
+      category: 'Insumos deportivos',
+      stock: 7,
+      minStock: 5,
+      stockSummary: '7 / mínimo 5',
+      status: 'normal',
+      note: 'Cobertura para el fin de semana.',
+    },
+    {
+      id: 'RSC-002',
+      name: 'Conos de entrenamiento',
+      category: 'Utilería',
+      stock: 3,
+      minStock: 4,
+      stockSummary: '3 / mínimo 4',
+      status: 'stock bajo',
+      note: 'Conviene reponer antes del torneo interno.',
+    },
+  ]
+  return buildTemplateFullstackLocalDemoData({
+    appTitle,
+    archetype: 'sports-booking',
+    heroKicker: 'Reservas locales',
+    subtitle: 'Demo local segura para disponibilidad, clientes y reservas.',
+    domainSummary: 'Permite revisar canchas, agenda, utilería e indicadores sin runtime real.',
+    nextRecommendedPhase,
+    navItems: [
+      { id: 'dashboard', label: 'Dashboard', hint: 'Estado general' },
+      { id: 'clients', label: 'Clientes', hint: 'Equipos y contacto' },
+      { id: 'resources', label: 'Canchas', hint: 'Disponibilidad' },
+      { id: 'appointments', label: 'Reservas', hint: 'Agenda' },
+      { id: 'reports', label: 'Reportes', hint: 'Indicadores' },
+      { id: 'inventory', label: 'Utilería', hint: 'Stock local' },
+    ],
+    metrics: [
+      { id: 'bookings', label: 'Reservas confirmadas', value: '9', tone: 'sky', detail: 'Bloques listos para esta semana' },
+      { id: 'courts', label: 'Canchas activas', value: '3', tone: 'emerald', detail: '2 disponibles hoy' },
+      { id: 'alerts', label: 'Alertas', value: '2', tone: 'amber', detail: '1 mantenimiento y 1 confirmación pendiente' },
+    ],
+    alerts: [
+      { id: 'a1', tone: 'amber', title: 'Cancha 2 con mantenimiento', detail: 'La revisión previa no bloquea la demo local.' },
+    ],
+    constraints: ['Sin npm install', 'Sin backend real', 'Sin base de datos real', 'Sin pagos ni integraciones externas'],
+    team: [
+      { id: 'OP-001', name: 'Recepción turno noche', role: 'Operación local', shift: '18:00 a 23:00', status: 'Activa', focus: 'Confirmaciones y cambios de horario' },
+    ],
+    datasets: {
+      clients: customers,
+      resources: courts,
+      appointments: bookings,
+      reminders,
+      inventory,
+      reports: [
+        { id: 'REP-001', name: 'Ocupación semanal', value: '78%', detail: 'Horarios pico entre 20:00 y 22:00.', status: 'Buena' },
+      ],
+      activity: [
+        { id: 'ACT-001', time: '18:10', title: 'Reserva confirmada', detail: 'Cancha 1 quedó tomada por Nicolás López.', tone: 'sky' },
+      ],
+    },
+    views: [
+      buildFullstackLocalDemoView({ id: 'dashboard', label: 'Dashboard', title: 'Operación de reservas', description: 'Resumen local de agenda, alertas y ocupación.', kind: 'dashboard', supportsSearch: false }),
+      buildFullstackLocalDemoView({
+        id: 'clients', label: 'Clientes', title: 'Clientes', description: 'Equipos y referentes de reserva.',
+        datasetKey: 'clients',
+        columns: [
+          { key: 'name', label: 'Cliente' }, { key: 'segment', label: 'Segmento' }, { key: 'contact', label: 'Contacto' }, { key: 'status', label: 'Estado', kind: 'badge' },
+        ],
+        detailFields: [{ key: 'nextVisit', label: 'Próxima reserva' }, { key: 'notes', label: 'Notas' }],
+        searchableKeys: ['name', 'segment', 'contact', 'status'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'resources', label: 'Canchas', title: 'Canchas y disponibilidad', description: 'Estado y horarios de las canchas.',
+        datasetKey: 'resources',
+        columns: [
+          { key: 'name', label: 'Cancha' }, { key: 'surface', label: 'Superficie' }, { key: 'schedule', label: 'Horario' }, { key: 'status', label: 'Estado', kind: 'badge' },
+        ],
+        detailFields: [{ key: 'note', label: 'Detalle' }],
+        searchableKeys: ['name', 'surface', 'status', 'schedule'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'appointments', label: 'Reservas', title: 'Reservas', description: 'Agenda local y cambios de estado mock.',
+        datasetKey: 'appointments',
+        columns: [
+          { key: 'slot', label: 'Horario' }, { key: 'clientName', label: 'Cliente' }, { key: 'professional', label: 'Cancha' }, { key: 'status', label: 'Estado', kind: 'badge' },
+        ],
+        detailFields: [{ key: 'reason', label: 'Motivo' }, { key: 'room', label: 'Bloque' }, { key: 'notes', label: 'Notas' }],
+        searchableKeys: ['slot', 'clientName', 'professional', 'reason', 'status'],
+        supportsStatusFilter: true,
+      }),
+      buildFullstackLocalDemoView({ id: 'reports', label: 'Reportes', title: 'Reportes', description: 'Indicadores mock de ocupación.', datasetKey: 'reports', kind: 'reports', supportsSearch: false }),
+      buildFullstackLocalDemoView({
+        id: 'inventory', label: 'Utilería', title: 'Utilería e insumos', description: 'Stock local básico para la operación.',
+        datasetKey: 'inventory',
+        columns: [
+          { key: 'name', label: 'Ítem' }, { key: 'category', label: 'Categoría' }, { key: 'stockSummary', label: 'Stock' }, { key: 'status', label: 'Estado', kind: 'badge' },
+        ],
+        detailFields: [{ key: 'note', label: 'Nota' }],
+        searchableKeys: ['name', 'category', 'status'],
+        supportsLowStockToggle: true,
+      }),
+    ],
+    quickActions: [
+      { id: 'qa1', label: 'Ver reservas', targetView: 'appointments', feedback: 'La agenda local de reservas quedó lista para revisar.' },
+    ],
+    statusOptions: { appointments: ['todos', 'pendiente', 'confirmado', 'reprogramado', 'cerrado'] },
+    domainEntities: ['clientes', 'canchas', 'reservas', 'utilería', 'reportes'],
+    modules: ['clientes', 'disponibilidad', 'reservas', 'utilería', 'reportes'],
+  })
+}
+
+function buildEcommerceFullstackLocalDemoData({
+  appTitle,
+  nextRecommendedPhase,
+}) {
+  return buildTemplateFullstackLocalDemoData({
+    appTitle,
+    archetype: 'ecommerce',
+    heroKicker: 'Ecommerce local',
+    subtitle: 'Demo local segura para catálogo, pedidos, reportes y stock básico.',
+    domainSummary: 'Incluye catálogo mock, pedidos, clientes y reposición sin checkout real.',
+    nextRecommendedPhase,
+    navItems: [
+      { id: 'dashboard', label: 'Dashboard', hint: 'Resumen comercial' },
+      { id: 'products', label: 'Catálogo', hint: 'Productos destacados' },
+      { id: 'clients', label: 'Clientes', hint: 'Compradores locales' },
+      { id: 'appointments', label: 'Pedidos', hint: 'Estado de órdenes' },
+      { id: 'inventory', label: 'Stock', hint: 'Reposición' },
+      { id: 'reports', label: 'Reportes', hint: 'Indicadores mock' },
+    ],
+    metrics: [
+      { id: 'orders', label: 'Pedidos abiertos', value: '12', tone: 'sky', detail: '7 listos y 5 en preparación' },
+      { id: 'products', label: 'Productos activos', value: '38', tone: 'emerald', detail: 'Catálogo listo para demo' },
+      { id: 'low-stock', label: 'Stock bajo', value: '5', tone: 'amber', detail: 'Ítems con reposición sugerida' },
+    ],
+    alerts: [
+      { id: 'a1', tone: 'rose', title: 'Checkout no real', detail: 'Los cobros siguen explícitamente fuera de alcance en esta demo local.' },
+    ],
+    constraints: ['Sin pagos reales', 'Sin npm install', 'Sin backend real', 'Sin integraciones externas'],
+    team: [
+      { id: 'OPS-001', name: 'Operación comercial local', role: 'Backoffice mock', shift: '09:00 a 18:00', status: 'Activa', focus: 'Pedidos y stock' },
+    ],
+    datasets: {
+      products: [
+        { id: 'PRD-001', name: 'Zapatillas Urban Run', category: 'Calzado', price: '$89.900', status: 'Publicado', stock: '12 unidades', note: 'Producto con mejor conversión mock.' },
+        { id: 'PRD-002', name: 'Campera Softshell', category: 'Abrigo', price: '$129.000', status: 'Stock bajo', stock: '4 unidades', note: 'Conviene revisar reposición local.' },
+      ],
+      clients: [
+        { id: 'CLI-001', name: 'Lucía Costa', contact: '11 5555-8801', segment: 'Cliente recurrente', status: 'Activa', nextVisit: 'Revisión de compra', notes: 'Busca novedades semanales.' },
+      ],
+      appointments: [
+        { id: 'ORD-001', clientName: 'Lucía Costa', professional: 'Preparación local', reason: 'Pedido #1008', slot: '05/05 15:00', status: 'confirmado', room: 'Depósito A', notes: 'Listo para despacho manual futuro.' },
+      ],
+      inventory: [
+        { id: 'INV-001', name: 'Campera Softshell', category: 'Abrigo', stock: 4, minStock: 6, stockSummary: '4 / mínimo 6', status: 'stock bajo', note: 'Revisar reposición local.' },
+      ],
+      reports: [
+        { id: 'REP-001', name: 'Pedidos del día', value: '12', detail: '5 listos para revisar y 7 en preparación mock.', status: 'Estable' },
+      ],
+      activity: [
+        { id: 'ACT-001', time: '11:20', title: 'Pedido preparado', detail: 'El pedido #1008 pasó a revisión local.', tone: 'sky' },
+      ],
+    },
+    views: [
+      buildFullstackLocalDemoView({ id: 'dashboard', label: 'Dashboard', title: 'Operación comercial', description: 'Resumen local de catálogo, pedidos y stock.', kind: 'dashboard', supportsSearch: false }),
+      buildFullstackLocalDemoView({
+        id: 'products', label: 'Catálogo', title: 'Catálogo', description: 'Productos mock y estado comercial.',
+        datasetKey: 'products',
+        columns: [
+          { key: 'name', label: 'Producto' }, { key: 'category', label: 'Categoría' }, { key: 'price', label: 'Precio' }, { key: 'status', label: 'Estado', kind: 'badge' },
+        ],
+        detailFields: [{ key: 'stock', label: 'Stock' }, { key: 'note', label: 'Nota' }],
+        searchableKeys: ['name', 'category', 'status'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'clients', label: 'Clientes', title: 'Clientes', description: 'Clientes y seguimiento comercial.',
+        datasetKey: 'clients',
+        columns: [
+          { key: 'name', label: 'Cliente' }, { key: 'segment', label: 'Segmento' }, { key: 'contact', label: 'Contacto' }, { key: 'status', label: 'Estado', kind: 'badge' },
+        ],
+        detailFields: [{ key: 'notes', label: 'Notas' }],
+        searchableKeys: ['name', 'segment', 'contact', 'status'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'appointments', label: 'Pedidos', title: 'Pedidos', description: 'Estado mock de órdenes locales.',
+        datasetKey: 'appointments',
+        columns: [
+          { key: 'slot', label: 'Horario' }, { key: 'clientName', label: 'Cliente' }, { key: 'reason', label: 'Pedido' }, { key: 'status', label: 'Estado', kind: 'badge' },
+        ],
+        detailFields: [{ key: 'professional', label: 'Área' }, { key: 'notes', label: 'Notas' }],
+        searchableKeys: ['clientName', 'reason', 'status'],
+        supportsStatusFilter: true,
+      }),
+      buildFullstackLocalDemoView({
+        id: 'inventory', label: 'Stock', title: 'Stock', description: 'Reposición sugerida sin integración real.',
+        datasetKey: 'inventory',
+        columns: [
+          { key: 'name', label: 'Producto' }, { key: 'category', label: 'Categoría' }, { key: 'stockSummary', label: 'Stock' }, { key: 'status', label: 'Estado', kind: 'badge' },
+        ],
+        detailFields: [{ key: 'note', label: 'Nota' }],
+        searchableKeys: ['name', 'category', 'status'],
+        supportsLowStockToggle: true,
+      }),
+      buildFullstackLocalDemoView({ id: 'reports', label: 'Reportes', title: 'Reportes', description: 'Indicadores mock comerciales.', datasetKey: 'reports', kind: 'reports', supportsSearch: false }),
+    ],
+    quickActions: [{ id: 'qa1', label: 'Ver pedidos', targetView: 'appointments', feedback: 'Se abrió el estado local de pedidos.' }],
+    statusOptions: { appointments: ['todos', 'pendiente', 'confirmado', 'en preparación', 'revisado'] },
+    domainEntities: ['productos', 'clientes', 'pedidos', 'stock', 'reportes'],
+    modules: ['catálogo', 'pedidos', 'clientes', 'stock', 'reportes'],
+  })
+}
+
+function buildSchoolCrmFullstackLocalDemoData({
+  appTitle,
+  nextRecommendedPhase,
+}) {
+  return buildTemplateFullstackLocalDemoData({
+    appTitle,
+    archetype: 'school-crm',
+    heroKicker: 'Gestión escolar local',
+    subtitle: 'Demo local segura para familias, alumnos, seguimiento y reportes.',
+    domainSummary: 'Ayuda a recorrer seguimiento escolar sin runtime real ni datos sensibles reales.',
+    nextRecommendedPhase,
+    navItems: [
+      { id: 'dashboard', label: 'Dashboard', hint: 'Resumen escolar' },
+      { id: 'clients', label: 'Familias', hint: 'Contacto y seguimiento' },
+      { id: 'students', label: 'Alumnos', hint: 'Estado actual' },
+      { id: 'appointments', label: 'Seguimiento', hint: 'Reuniones y hitos' },
+      { id: 'reports', label: 'Reportes', hint: 'Indicadores mock' },
+    ],
+    metrics: [
+      { id: 'students', label: 'Alumnos activos', value: '124', tone: 'sky', detail: 'Seguimiento con foco en asistencia y comunicación' },
+      { id: 'families', label: 'Familias activas', value: '91', tone: 'emerald', detail: 'Canales locales revisables' },
+      { id: 'alerts', label: 'Alertas', value: '3', tone: 'amber', detail: 'Seguimientos con acción sugerida' },
+    ],
+    alerts: [{ id: 'a1', tone: 'amber', title: 'Comunicación pendiente', detail: 'Hay 3 familias con seguimiento manual pendiente.' }],
+    constraints: ['Sin datos reales', 'Sin backend real', 'Sin npm install', 'Sin integraciones externas'],
+    team: [
+      { id: 'EDU-001', name: 'Coordinación académica', role: 'Seguimiento escolar', shift: 'Turno mañana', status: 'Activa', focus: 'Asistencia y comunicaciones' },
+    ],
+    datasets: {
+      clients: [
+        { id: 'FAM-001', name: 'Familia Roldán', contact: '11 5555-3301', segment: 'Primaria', status: 'Activa', nextVisit: 'Reunión 08/05', notes: 'Seguimiento por asistencia.' },
+      ],
+      students: [
+        { id: 'STD-001', name: 'Sofía Roldán', course: '5° A', guardian: 'Familia Roldán', status: 'Asistencia estable', notes: 'Buen rendimiento general.' },
+      ],
+      appointments: [
+        { id: 'SEG-001', clientName: 'Familia Roldán', professional: 'Coordinación', reason: 'Reunión de seguimiento', slot: '08/05 08:30', status: 'confirmado', room: 'Sala 2', notes: 'Repasar plan de acompañamiento.' },
+      ],
+      reports: [{ id: 'REP-001', name: 'Asistencia semanal', value: '94%', detail: 'Asistencia mock consolidada por curso.', status: 'Buena' }],
+      activity: [{ id: 'ACT-001', time: '09:00', title: 'Seguimiento actualizado', detail: 'Se registró una observación local en 5° A.', tone: 'sky' }],
+    },
+    views: [
+      buildFullstackLocalDemoView({ id: 'dashboard', label: 'Dashboard', title: 'Estado escolar', description: 'Resumen local de familias, alumnos y seguimientos.', kind: 'dashboard', supportsSearch: false }),
+      buildFullstackLocalDemoView({
+        id: 'clients', label: 'Familias', title: 'Familias', description: 'Familias y contacto local.',
+        datasetKey: 'clients',
+        columns: [{ key: 'name', label: 'Familia' }, { key: 'segment', label: 'Nivel' }, { key: 'contact', label: 'Contacto' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'nextVisit', label: 'Próxima reunión' }, { key: 'notes', label: 'Notas' }],
+        searchableKeys: ['name', 'segment', 'contact', 'status'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'students', label: 'Alumnos', title: 'Alumnos', description: 'Vista local de alumnos y estado actual.',
+        datasetKey: 'students',
+        columns: [{ key: 'name', label: 'Alumno' }, { key: 'course', label: 'Curso' }, { key: 'guardian', label: 'Familia' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'notes', label: 'Notas' }],
+        searchableKeys: ['name', 'course', 'guardian', 'status'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'appointments', label: 'Seguimiento', title: 'Seguimiento', description: 'Reuniones y acciones mock.',
+        datasetKey: 'appointments',
+        columns: [{ key: 'slot', label: 'Horario' }, { key: 'clientName', label: 'Familia' }, { key: 'reason', label: 'Motivo' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'professional', label: 'Área' }, { key: 'notes', label: 'Notas' }],
+        searchableKeys: ['clientName', 'reason', 'status'],
+        supportsStatusFilter: true,
+      }),
+      buildFullstackLocalDemoView({ id: 'reports', label: 'Reportes', title: 'Reportes', description: 'Indicadores mock escolares.', datasetKey: 'reports', kind: 'reports', supportsSearch: false }),
+    ],
+    quickActions: [{ id: 'qa1', label: 'Abrir seguimiento', targetView: 'appointments', feedback: 'Se abrió el tablero local de seguimiento escolar.' }],
+    statusOptions: { appointments: ['todos', 'pendiente', 'confirmado', 'reprogramado', 'cerrado'] },
+    domainEntities: ['familias', 'alumnos', 'cursos', 'seguimiento', 'reportes'],
+    modules: ['familias', 'alumnos', 'seguimiento', 'reportes'],
+  })
+}
+
+function buildDocumentManagementFullstackLocalDemoData({
+  appTitle,
+  nextRecommendedPhase,
+}) {
+  return buildTemplateFullstackLocalDemoData({
+    appTitle,
+    archetype: 'document-management',
+    heroKicker: 'Gestión documental local',
+    subtitle: 'Demo local segura para documentos, responsables, vencimientos y reportes.',
+    domainSummary: 'Sirve para mostrar circuitos documentales sin ejecutar integraciones ni runtime real.',
+    nextRecommendedPhase,
+    navItems: [
+      { id: 'dashboard', label: 'Dashboard', hint: 'Estado general' },
+      { id: 'documents', label: 'Documentos', hint: 'Listado principal' },
+      { id: 'clients', label: 'Responsables', hint: 'Asignación' },
+      { id: 'reminders', label: 'Vencimientos', hint: 'Próximas alertas' },
+      { id: 'reports', label: 'Reportes', hint: 'Indicadores mock' },
+    ],
+    metrics: [
+      { id: 'docs', label: 'Documentos activos', value: '46', tone: 'sky', detail: 'Expedientes y legajos en revisión' },
+      { id: 'deadlines', label: 'Vencimientos próximos', value: '7', tone: 'amber', detail: 'Alertas para la próxima semana' },
+      { id: 'owners', label: 'Responsables', value: '9', tone: 'emerald', detail: 'Asignación local consistente' },
+    ],
+    alerts: [{ id: 'a1', tone: 'rose', title: 'Expediente con vencimiento cercano', detail: 'Conviene revisarlo desde la demo local.' }],
+    constraints: ['Sin npm install', 'Sin backend real', 'Sin base real', 'Sin integraciones externas'],
+    team: [{ id: 'OPS-001', name: 'Mesa documental', role: 'Operación local', shift: '09:00 a 17:00', status: 'Activa', focus: 'Vencimientos y observaciones' }],
+    datasets: {
+      documents: [
+        { id: 'DOC-001', name: 'Legajo técnico 2026', category: 'Legajos', owner: 'Mesa documental', status: 'vigente', note: 'Revisión interna al día.' },
+        { id: 'DOC-002', name: 'Expediente de proveedor', category: 'Expedientes', owner: 'Compras', status: 'por vencer', note: 'Falta adjuntar renovación local.' },
+      ],
+      clients: [
+        { id: 'RES-001', name: 'Mesa documental', contact: 'interno 201', segment: 'Operación', status: 'Activa', nextVisit: 'Seguimiento semanal', notes: 'Valida cambios antes del cierre.' },
+      ],
+      reminders: [
+        { id: 'REM-001', clientName: 'Compras', type: 'Vencimiento expediente', dueDate: '09/05', channel: 'Panel local', status: 'pendiente', detail: 'Revisar documentación adjunta.' },
+      ],
+      reports: [{ id: 'REP-001', name: 'Documentos vigentes', value: '39', detail: 'La mayoría está en estado vigente o revisión local.', status: 'Controlado' }],
+      activity: [{ id: 'ACT-001', time: '10:40', title: 'Observación registrada', detail: 'Se agregó una nota local al expediente de proveedor.', tone: 'sky' }],
+    },
+    views: [
+      buildFullstackLocalDemoView({ id: 'dashboard', label: 'Dashboard', title: 'Estado documental', description: 'Resumen local de expedientes, responsables y alertas.', kind: 'dashboard', supportsSearch: false }),
+      buildFullstackLocalDemoView({
+        id: 'documents', label: 'Documentos', title: 'Documentos', description: 'Listado mock de documentos y expedientes.',
+        datasetKey: 'documents',
+        columns: [{ key: 'name', label: 'Documento' }, { key: 'category', label: 'Categoría' }, { key: 'owner', label: 'Responsable' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'note', label: 'Nota' }],
+        searchableKeys: ['name', 'category', 'owner', 'status'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'clients', label: 'Responsables', title: 'Responsables', description: 'Referentes y áreas asignadas.',
+        datasetKey: 'clients',
+        columns: [{ key: 'name', label: 'Responsable' }, { key: 'segment', label: 'Área' }, { key: 'contact', label: 'Contacto' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'notes', label: 'Notas' }],
+        searchableKeys: ['name', 'segment', 'contact', 'status'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'reminders', label: 'Vencimientos', title: 'Vencimientos', description: 'Alertas locales de seguimiento.',
+        datasetKey: 'reminders',
+        columns: [{ key: 'type', label: 'Tipo' }, { key: 'clientName', label: 'Área' }, { key: 'dueDate', label: 'Fecha' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'detail', label: 'Detalle' }],
+        searchableKeys: ['type', 'clientName', 'status'],
+      }),
+      buildFullstackLocalDemoView({ id: 'reports', label: 'Reportes', title: 'Reportes', description: 'Indicadores mock documentales.', datasetKey: 'reports', kind: 'reports', supportsSearch: false }),
+    ],
+    quickActions: [{ id: 'qa1', label: 'Ver vencimientos', targetView: 'reminders', feedback: 'Se abrió el tablero local de vencimientos.' }],
+    statusOptions: {},
+    domainEntities: ['documentos', 'responsables', 'vencimientos', 'observaciones', 'reportes'],
+    modules: ['documentos', 'responsables', 'vencimientos', 'reportes'],
+  })
+}
+
+function buildOperationsFullstackLocalDemoData({
+  appTitle,
+  nextRecommendedPhase,
+}) {
+  return buildTemplateFullstackLocalDemoData({
+    appTitle,
+    archetype: 'operations',
+    heroKicker: 'Operación local',
+    subtitle: 'Demo local segura para solicitudes, seguimiento, alertas y reportes.',
+    domainSummary: 'Primera entrega demostrable para gestión operativa sin runtime real.',
+    nextRecommendedPhase,
+    navItems: [
+      { id: 'dashboard', label: 'Dashboard', hint: 'Estado general' },
+      { id: 'clients', label: 'Solicitantes', hint: 'Referentes' },
+      { id: 'appointments', label: 'Solicitudes', hint: 'Tablero operativo' },
+      { id: 'reminders', label: 'Alertas', hint: 'Seguimientos' },
+      { id: 'reports', label: 'Reportes', hint: 'Indicadores mock' },
+    ],
+    metrics: [
+      { id: 'requests', label: 'Solicitudes abiertas', value: '18', tone: 'sky', detail: '7 críticas y 11 en seguimiento' },
+      { id: 'owners', label: 'Referentes activos', value: '6', tone: 'emerald', detail: 'Equipos con tablero local asignado' },
+      { id: 'alerts', label: 'Alertas operativas', value: '4', tone: 'amber', detail: 'Seguimientos para esta semana' },
+    ],
+    alerts: [{ id: 'a1', tone: 'amber', title: 'Tablero local con seguimientos', detail: 'Hay 4 alertas que conviene revisar.' }],
+    constraints: ['Sin npm install', 'Sin backend real', 'Sin base real', 'Sin deploy'],
+    team: [{ id: 'OPS-001', name: 'Mesa operativa', role: 'Seguimiento local', shift: '9 a 18 hs', status: 'Activa', focus: 'Prioridades y bloqueos' }],
+    datasets: {
+      clients: [
+        { id: 'REQ-001', name: 'Operación sucursal norte', contact: 'interno 115', segment: 'Sucursal', status: 'Activa', nextVisit: 'Seguimiento 06/05', notes: 'Solicita actualizaciones cada mañana.' },
+      ],
+      appointments: [
+        { id: 'SOL-001', clientName: 'Operación sucursal norte', professional: 'Mesa operativa', reason: 'Reposición de insumos', slot: '05/05 10:00', status: 'confirmado', room: 'Tablero local', notes: 'Pendiente de validación interna.' },
+      ],
+      reminders: [
+        { id: 'REM-001', clientName: 'Operación sucursal norte', type: 'Seguimiento semanal', dueDate: '06/05', channel: 'Panel local', status: 'pendiente', detail: 'Revisar avance y observaciones.' },
+      ],
+      reports: [
+        { id: 'REP-001', name: 'Solicitudes por estado', value: '18', detail: 'La mayoría sigue en circuito local revisable.', status: 'Controlado' },
+      ],
+      activity: [
+        { id: 'ACT-001', time: '08:50', title: 'Prioridad actualizada', detail: 'La reposición de insumos pasó a seguimiento activo.', tone: 'sky' },
+      ],
+    },
+    views: [
+      buildFullstackLocalDemoView({ id: 'dashboard', label: 'Dashboard', title: 'Estado operativo', description: 'Resumen local de solicitudes y alertas.', kind: 'dashboard', supportsSearch: false }),
+      buildFullstackLocalDemoView({
+        id: 'clients', label: 'Solicitantes', title: 'Solicitantes', description: 'Áreas o personas que originan pedidos.',
+        datasetKey: 'clients',
+        columns: [{ key: 'name', label: 'Solicitante' }, { key: 'segment', label: 'Tipo' }, { key: 'contact', label: 'Contacto' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'notes', label: 'Notas' }],
+        searchableKeys: ['name', 'segment', 'contact', 'status'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'appointments', label: 'Solicitudes', title: 'Solicitudes', description: 'Tablero local para revisar el flujo principal.',
+        datasetKey: 'appointments',
+        columns: [{ key: 'slot', label: 'Fecha' }, { key: 'clientName', label: 'Solicitante' }, { key: 'reason', label: 'Motivo' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'professional', label: 'Área' }, { key: 'notes', label: 'Notas' }],
+        searchableKeys: ['clientName', 'reason', 'status'],
+        supportsStatusFilter: true,
+      }),
+      buildFullstackLocalDemoView({
+        id: 'reminders', label: 'Alertas', title: 'Alertas', description: 'Seguimientos y recordatorios locales.',
+        datasetKey: 'reminders',
+        columns: [{ key: 'type', label: 'Alerta' }, { key: 'clientName', label: 'Área' }, { key: 'dueDate', label: 'Fecha' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'detail', label: 'Detalle' }],
+        searchableKeys: ['type', 'clientName', 'status'],
+      }),
+      buildFullstackLocalDemoView({ id: 'reports', label: 'Reportes', title: 'Reportes', description: 'Indicadores mock del tablero operativo.', datasetKey: 'reports', kind: 'reports', supportsSearch: false }),
+    ],
+    quickActions: [{ id: 'qa1', label: 'Ver solicitudes', targetView: 'appointments', feedback: 'Se abrió el tablero local de solicitudes.' }],
+    statusOptions: { appointments: ['todos', 'pendiente', 'confirmado', 'en revisión', 'resuelto'] },
+    domainEntities: ['solicitudes', 'solicitantes', 'alertas', 'reportes'],
+    modules: ['solicitudes', 'seguimiento', 'alertas', 'reportes'],
+  })
+}
+
+function buildFullstackLocalDemoData({
+  appTitle,
+  normalizedText,
+  domainUnderstanding,
+  modules,
+  nextRecommendedPhase,
+}) {
+  const archetype = detectFullstackLocalDemoArchetype({
+    normalizedText,
+    domainUnderstanding,
+    modules,
+  })
+
+  switch (archetype) {
+    case 'veterinary':
+      return buildVeterinaryFullstackLocalDemoData({
+        appTitle,
+        nextRecommendedPhase,
+      })
+    case 'medical-clinic':
+      return buildMedicalFullstackLocalDemoData({
+        appTitle,
+        nextRecommendedPhase,
+      })
+    case 'sports-booking':
+      return buildSportsBookingFullstackLocalDemoData({
+        appTitle,
+        nextRecommendedPhase,
+      })
+    case 'ecommerce':
+      return buildEcommerceFullstackLocalDemoData({
+        appTitle,
+        nextRecommendedPhase,
+      })
+    case 'school-crm':
+      return buildSchoolCrmFullstackLocalDemoData({
+        appTitle,
+        nextRecommendedPhase,
+      })
+    case 'document-management':
+      return buildDocumentManagementFullstackLocalDemoData({
+        appTitle,
+        nextRecommendedPhase,
+      })
+    default:
+      return buildOperationsFullstackLocalDemoData({
+        appTitle,
+        nextRecommendedPhase,
+      })
+  }
+}
+
+function buildFullstackLocalInteractiveFrontendStyles() {
+  return `:root {
+  color-scheme: light;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: #f3f6fb;
+  color: #0f172a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(14, 165, 233, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.16), transparent 22%),
+    linear-gradient(180deg, #f8fbff 0%, #edf4fb 100%);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.app-shell {
+  width: min(1280px, calc(100% - 28px));
+  margin: 0 auto;
+  padding: 28px 0 40px;
+}
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(37, 99, 235, 0.9));
+  color: #f8fafc;
+  padding: 28px;
+  box-shadow: 0 22px 70px rgba(15, 23, 42, 0.18);
+}
+
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: auto -80px -80px auto;
+  width: 240px;
+  height: 240px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  filter: blur(6px);
+}
+
+.hero-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.hero-kicker,
+.hero-safe-pill,
+.chip,
+.status-badge {
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.hero-kicker {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.hero-safe-pill {
+  background: rgba(134, 239, 172, 0.16);
+  color: #dcfce7;
+}
+
+.hero h1 {
+  margin: 18px 0 0;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 1.05;
+}
+
+.hero p {
+  margin: 14px 0 0;
+  max-width: 860px;
+  color: rgba(226, 232, 240, 0.96);
+  line-height: 1.75;
+}
+
+.hero-meta {
+  margin-top: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.hero-meta-item {
+  min-width: 180px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 14px 16px;
+}
+
+.hero-meta-item strong,
+.metric-card strong {
+  display: block;
+  font-size: 1.1rem;
+}
+
+.hero-quick-actions {
+  margin-top: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.hero-action {
+  border: 0;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: transform 140ms ease, background 140ms ease;
+}
+
+.hero-action:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.flash-banner {
+  margin-top: 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.14);
+  padding: 12px 14px;
+  color: #eff6ff;
+}
+
+.nav-bar,
+.metrics-grid,
+.summary-grid,
+.content-grid,
+.dashboard-grid,
+.cards-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.nav-bar {
+  margin-top: 22px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.nav-button {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #0f172a;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.nav-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(37, 99, 235, 0.26);
+}
+
+.nav-button.is-active {
+  border-color: rgba(37, 99, 235, 0.4);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.nav-button strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.nav-button span {
+  display: block;
+  margin-top: 6px;
+  color: #475569;
+  font-size: 0.84rem;
+}
+
+.metrics-grid {
+  margin-top: 22px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.metric-card,
+.surface-card,
+.detail-card,
+.list-card,
+.empty-card {
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+}
+
+.metric-card {
+  padding: 18px;
+}
+
+.metric-card span {
+  display: block;
+  color: #475569;
+  font-size: 0.86rem;
+}
+
+.metric-card p {
+  margin: 8px 0 0;
+  color: #64748b;
+  line-height: 1.55;
+}
+
+.tone-sky strong,
+.tone-sky .section-title,
+.status-badge.tone-sky {
+  color: #0c4a6e;
+}
+
+.tone-emerald strong,
+.tone-emerald .section-title,
+.status-badge.tone-emerald {
+  color: #166534;
+}
+
+.tone-amber strong,
+.tone-amber .section-title,
+.status-badge.tone-amber {
+  color: #92400e;
+}
+
+.tone-rose strong,
+.tone-rose .section-title,
+.status-badge.tone-rose {
+  color: #9f1239;
+}
+
+.summary-grid {
+  margin-top: 20px;
+  grid-template-columns: 1.2fr 1fr;
+}
+
+.surface-card {
+  padding: 20px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.section-copy,
+.surface-card p,
+.detail-card p,
+.empty-card p {
+  color: #475569;
+  line-height: 1.7;
+}
+
+.chip-list,
+.badge-list,
+.detail-list,
+.detail-meta,
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.chip {
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+}
+
+.status-badge {
+  border: 1px solid transparent;
+  background: rgba(226, 232, 240, 0.55);
+  color: #334155;
+}
+
+.status-badge.tone-emerald {
+  background: rgba(134, 239, 172, 0.18);
+  border-color: rgba(22, 163, 74, 0.14);
+}
+
+.status-badge.tone-amber {
+  background: rgba(253, 230, 138, 0.22);
+  border-color: rgba(217, 119, 6, 0.18);
+}
+
+.status-badge.tone-rose {
+  background: rgba(254, 205, 211, 0.26);
+  border-color: rgba(225, 29, 72, 0.18);
+}
+
+.status-badge.tone-sky {
+  background: rgba(186, 230, 253, 0.24);
+  border-color: rgba(2, 132, 199, 0.18);
+}
+
+.content-grid {
+  margin-top: 24px;
+  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr);
+  align-items: start;
+}
+
+.toolbar-card {
+  margin-bottom: 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.92);
+  padding: 18px;
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.06);
+}
+
+.toolbar-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.toolbar-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.toolbar-copy {
+  margin: 6px 0 0;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.toolbar-controls {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.toolbar-input,
+.toolbar-select {
+  min-height: 44px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  background: #fff;
+  color: #0f172a;
+  padding: 0 14px;
+}
+
+.toolbar-input {
+  min-width: min(100%, 320px);
+  flex: 1 1 220px;
+}
+
+.toolbar-select {
+  min-width: 180px;
+}
+
+.toolbar-toggle {
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 14px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+  padding: 0 14px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.toolbar-toggle.is-active {
+  background: rgba(37, 99, 235, 0.16);
+}
+
+.cards-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.list-card {
+  padding: 18px;
+  cursor: pointer;
+  transition: transform 140ms ease, border-color 140ms ease;
+}
+
+.list-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(37, 99, 235, 0.22);
+}
+
+.list-card.is-selected {
+  border-color: rgba(37, 99, 235, 0.42);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.list-card h3,
+.detail-card h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.list-card p,
+.detail-card p,
+.list-card li {
+  margin: 0;
+}
+
+.list-meta {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.list-meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.list-meta-row strong {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.inline-actions {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.inline-action {
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.inline-action.tone-emerald {
+  background: rgba(34, 197, 94, 0.14);
+  color: #166534;
+}
+
+.inline-action.tone-amber {
+  background: rgba(245, 158, 11, 0.14);
+  color: #92400e;
+}
+
+.inline-action.tone-rose {
+  background: rgba(244, 63, 94, 0.14);
+  color: #9f1239;
+}
+
+.detail-card {
+  position: sticky;
+  top: 22px;
+  padding: 20px;
+}
+
+.detail-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.detail-rows {
+  margin-top: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.detail-row {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.detail-row span {
+  display: block;
+  color: #64748b;
+  font-size: 0.82rem;
+}
+
+.detail-row strong {
+  display: block;
+  margin-top: 4px;
+  color: #0f172a;
+}
+
+.report-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.report-card {
+  border-radius: 22px;
+  padding: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.92));
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.06);
+}
+
+.report-card strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 1.7rem;
+}
+
+.timeline {
+  display: grid;
+  gap: 12px;
+}
+
+.timeline-item {
+  border-left: 4px solid rgba(37, 99, 235, 0.24);
+  padding: 10px 0 10px 14px;
+}
+
+.timeline-item time {
+  display: block;
+  color: #64748b;
+  font-size: 0.82rem;
+}
+
+.empty-card {
+  padding: 22px;
+}
+
+.detail-muted {
+  color: #64748b;
+}
+
+.safe-mode-card {
+  margin-top: 18px;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.08);
+  padding: 14px 16px;
+}
+
+.safe-mode-card strong {
+  display: block;
+  color: #0f172a;
+}
+
+@media (max-width: 1024px) {
+  .summary-grid,
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-card {
+    position: static;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    width: min(100% - 18px, 1280px);
+    padding: 18px 0 28px;
+  }
+
+  .hero {
+    padding: 20px;
+    border-radius: 22px;
+  }
+
+  .nav-bar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .toolbar-controls {
+    flex-direction: column;
+  }
+
+  .toolbar-input,
+  .toolbar-select,
+  .toolbar-toggle {
+    width: 100%;
+  }
+}
+`
+}
+
+function buildFullstackLocalInteractiveFrontendAppContent() {
+  return buildBrowserWindowRenderScript({
+    functionName: 'renderApp',
+    globalName: 'renderApp',
+    scriptSource: `function renderApp(fullstackPlan, uiState) {
+  function normalizeArray(value) {
+    return Array.isArray(value) ? value : []
+  }
+
+  function normalizeString(value) {
+    return typeof value === 'string' ? value : value == null ? '' : String(value)
+  }
+
+  function normalizeText(value) {
+    return normalizeString(value)
+      .normalize('NFD')
+      .replace(/[\\u0300-\\u036f]/g, '')
+      .toLowerCase()
+      .trim()
+  }
+
+  function escapeHtml(value) {
+    return normalizeString(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+  }
+
+  function renderStatusBadge(value) {
+    const normalizedValue = normalizeText(value)
+    const tone =
+      normalizedValue.includes('bajo') ||
+      normalizedValue.includes('bloque') ||
+      normalizedValue.includes('crit') ||
+      normalizedValue.includes('por vencer')
+        ? 'tone-rose'
+        : normalizedValue.includes('pend') ||
+          normalizedValue.includes('observ') ||
+          normalizedValue.includes('atencion') ||
+          normalizedValue.includes('revis')
+          ? 'tone-amber'
+          : normalizedValue.includes('confirm') ||
+            normalizedValue.includes('activa') ||
+            normalizedValue.includes('al dia') ||
+            normalizedValue.includes('vigente')
+            ? 'tone-emerald'
+            : 'tone-sky'
+
+    return '<span class="status-badge ' + tone + '">' + escapeHtml(value || 'Sin estado') + '</span>'
+  }
+
+  function renderMetricCards(metrics) {
+    return normalizeArray(metrics)
+      .map(function (metric) {
+        const toneClass = metric && metric.tone ? 'tone-' + escapeHtml(metric.tone) : ''
+        return '<article class="metric-card ' + toneClass + '">' +
+          '<span>' + escapeHtml(metric && metric.label ? metric.label : 'Métrica') + '</span>' +
+          '<strong>' + escapeHtml(metric && metric.value ? metric.value : '0') + '</strong>' +
+          '<p>' + escapeHtml(metric && metric.detail ? metric.detail : 'Sin detalle adicional') + '</p>' +
+        '</article>'
+      })
+      .join('')
+  }
+
+  function getViews(plan) {
+    return normalizeArray(plan && plan.views)
+  }
+
+  function getViewMap(plan) {
+    return getViews(plan).reduce(function (accumulator, view) {
+      if (view && view.id) {
+        accumulator[view.id] = view
+      }
+      return accumulator
+    }, {})
+  }
+
+  function getActiveView(plan, state) {
+    const views = getViews(plan)
+    const fallbackView = views[0] || { id: 'dashboard', label: 'Dashboard', kind: 'dashboard' }
+    const requestedViewId = normalizeString(state && state.activeView)
+    const matchedView = views.find(function (view) {
+      return normalizeString(view && view.id) === requestedViewId
+    })
+
+    return matchedView || fallbackView
+  }
+
+  function getCollection(plan, datasetKey) {
+    if (!datasetKey || !plan || typeof plan !== 'object') {
+      return []
+    }
+
+    return normalizeArray(plan[datasetKey])
+  }
+
+  function getAppointmentStatus(record, state) {
+    const recordId = normalizeString(record && record.id)
+    const overrideMap = state && state.appointmentStatusOverrides && typeof state.appointmentStatusOverrides === 'object'
+      ? state.appointmentStatusOverrides
+      : {}
+
+    return normalizeString(overrideMap[recordId] || (record && record.status) || 'pendiente')
+  }
+
+  function getReminderStatus(record, state) {
+    const recordId = normalizeString(record && record.id)
+    const reviewedIds = state && state.reviewedReminderIds && typeof state.reviewedReminderIds === 'object'
+      ? state.reviewedReminderIds
+      : {}
+
+    if (reviewedIds[recordId]) {
+      return 'revisado local'
+    }
+
+    return normalizeString((record && record.status) || 'pendiente')
+  }
+
+  function getInventoryStatus(record) {
+    return normalizeString((record && record.status) || 'normal')
+  }
+
+  function getRecordStatus(view, record, state) {
+    if (!view) {
+      return ''
+    }
+
+    if (view.id === 'appointments') {
+      return getAppointmentStatus(record, state)
+    }
+
+    if (view.id === 'reminders') {
+      return getReminderStatus(record, state)
+    }
+
+    if (view.id === 'inventory') {
+      return getInventoryStatus(record)
+    }
+
+    return normalizeString((record && record.status) || '')
+  }
+
+  function matchesSearch(record, view, searchTerm, state) {
+    if (!searchTerm) {
+      return true
+    }
+
+    const searchableKeys = normalizeArray(view && view.searchableKeys)
+    if (!record || searchableKeys.length === 0) {
+      return true
+    }
+
+    return searchableKeys.some(function (key) {
+      const value =
+        key === 'status'
+          ? getRecordStatus(view, record, state)
+          : record && Object.prototype.hasOwnProperty.call(record, key)
+            ? record[key]
+            : ''
+
+      return normalizeText(Array.isArray(value) ? value.join(' ') : value).includes(searchTerm)
+    })
+  }
+
+  function filterRecords(plan, view, state) {
+    const records = getCollection(plan, view && view.datasetKey)
+    const searchTerm = normalizeText(state && state.searchTerm)
+    const statusFilter = normalizeText(state && state.appointmentStatusFilter)
+    const lowStockOnly = Boolean(state && state.inventoryLowStockOnly)
+
+    return records.filter(function (record) {
+      if (!matchesSearch(record, view, searchTerm, state)) {
+        return false
+      }
+
+      if (view && view.id === 'appointments' && statusFilter && statusFilter !== 'todos') {
+        return normalizeText(getAppointmentStatus(record, state)) === statusFilter
+      }
+
+      if (view && view.id === 'inventory' && lowStockOnly) {
+        return normalizeText(getInventoryStatus(record)).includes('bajo')
+      }
+
+      return true
+    })
+  }
+
+  function getSelectedRecordId(state, viewId) {
+    const selectedByView = state && state.selectedByView && typeof state.selectedByView === 'object'
+      ? state.selectedByView
+      : {}
+
+    return normalizeString(selectedByView[viewId] || '')
+  }
+
+  function getSelectedRecord(records, view, state) {
+    const selectedRecordId = getSelectedRecordId(state, view && view.id)
+    const selectedRecord = records.find(function (record) {
+      return normalizeString(record && record.id) === selectedRecordId
+    })
+
+    return selectedRecord || records[0] || null
+  }
+
+  function renderHero(plan, state) {
+    const overview = plan && plan.overview ? plan.overview : {}
+    const quickActions = normalizeArray(plan && plan.quickActions)
+    const flashMessage = normalizeString(state && state.flashMessage)
+
+    return '<section class="hero">' +
+      '<div class="hero-top">' +
+        '<span class="hero-kicker">' + escapeHtml(overview.heroKicker || 'Fullstack local') + '</span>' +
+        '<span class="hero-safe-pill">' + escapeHtml(overview.safeModeLabel || 'Modo local seguro') + '</span>' +
+      '</div>' +
+      '<h1>' + escapeHtml(overview.name || 'Demo local') + '</h1>' +
+      '<p>' + escapeHtml(overview.subtitle || 'Demo local segura y revisable.') + '</p>' +
+      '<div class="hero-meta">' +
+        '<div class="hero-meta-item"><span>Dominio</span><strong>' + escapeHtml(overview.domainSummary || 'Sin resumen') + '</strong></div>' +
+        '<div class="hero-meta-item"><span>Siguiente fase segura</span><strong>' + escapeHtml(overview.nextRecommendedPhase || 'frontend-mock-flow') + '</strong></div>' +
+        '<div class="hero-meta-item"><span>Alcance</span><strong>' + escapeHtml(overview.mockScopeLabel || 'Mock local revisable') + '</strong></div>' +
+      '</div>' +
+      '<div class="hero-quick-actions">' +
+        quickActions.map(function (action) {
+          return '<button type="button" class="hero-action" data-local-action-target="' + escapeHtml(action.targetView || 'dashboard') + '" data-local-action-label="' + escapeHtml(action.feedback || action.label || 'Acción local') + '">' +
+            escapeHtml(action.label || 'Acción local') +
+          '</button>'
+        }).join('') +
+      '</div>' +
+      (flashMessage ? '<div class="flash-banner">' + escapeHtml(flashMessage) + '</div>' : '') +
+      '<div class="safe-mode-card"><strong>' + escapeHtml(overview.safeModeLabel || 'Modo local seguro') + '</strong><p>' + escapeHtml(overview.safeModeCopy || 'No se ejecutó nada real.') + '</p></div>' +
+    '</section>'
+  }
+
+  function renderNav(plan, state) {
+    const activeView = getActiveView(plan, state)
+
+    return '<section class="nav-bar">' +
+      normalizeArray(plan && plan.navItems).map(function (item) {
+        const isActive = normalizeString(item && item.id) === normalizeString(activeView && activeView.id)
+        return '<button type="button" class="nav-button' + (isActive ? ' is-active' : '') + '" data-view-id="' + escapeHtml(item && item.id ? item.id : '') + '">' +
+          '<strong>' + escapeHtml(item && item.label ? item.label : 'Sección') + '</strong>' +
+          '<span>' + escapeHtml(item && item.hint ? item.hint : 'Revisión local') + '</span>' +
+        '</button>'
+      }).join('') +
+    '</section>'
+  }
+
+  function renderConstraints(plan) {
+    return '<section class="surface-card"><h2 class="section-title">Modo local seguro</h2><p class="section-copy">Lo que ves está pensado para demo, revisión y continuidad sin salir del modo local.</p><div class="chip-list">' +
+      normalizeArray(plan && plan.constraints).map(function (entry) {
+        return '<span class="chip">' + escapeHtml(entry) + '</span>'
+      }).join('') +
+    '</div></section>'
+  }
+
+  function renderAlerts(plan) {
+    const alerts = normalizeArray(plan && plan.alerts)
+
+    return '<section class="surface-card"><h2 class="section-title">Alertas mock</h2><div class="cards-grid">' +
+      alerts.map(function (alert) {
+        const toneClass = alert && alert.tone ? 'tone-' + escapeHtml(alert.tone) : 'tone-sky'
+        return '<article class="list-card ' + toneClass + '">' +
+          '<div class="status-badge ' + toneClass + '">' + escapeHtml(alert && alert.title ? alert.title : 'Alerta local') + '</div>' +
+          '<p class="toolbar-copy" style="margin-top: 12px;">' + escapeHtml(alert && alert.detail ? alert.detail : 'Sin detalle adicional') + '</p>' +
+        '</article>'
+      }).join('') +
+    '</div></section>'
+  }
+
+  function renderActivity(plan) {
+    const activity = normalizeArray(plan && plan.activity)
+
+    return '<section class="surface-card"><h2 class="section-title">Actividad reciente</h2><div class="timeline">' +
+      activity.map(function (entry) {
+        const toneClass = entry && entry.tone ? 'tone-' + escapeHtml(entry.tone) : 'tone-sky'
+        return '<article class="timeline-item ' + toneClass + '">' +
+          '<time>' + escapeHtml(entry && entry.time ? entry.time : 'Ahora') + '</time>' +
+          '<strong>' + escapeHtml(entry && entry.title ? entry.title : 'Actividad local') + '</strong>' +
+          '<p class="toolbar-copy">' + escapeHtml(entry && entry.detail ? entry.detail : 'Sin detalle adicional') + '</p>' +
+        '</article>'
+      }).join('') +
+    '</div></section>'
+  }
+
+  function renderReports(plan) {
+    const reports = normalizeArray(plan && plan.reports)
+
+    return '<section class="surface-card"><h2 class="section-title">Reportes mock</h2><div class="report-grid">' +
+      reports.map(function (report) {
+        return '<article class="report-card">' +
+          renderStatusBadge(report && report.status ? report.status : 'Mock') +
+          '<h3 style="margin-top: 12px;">' + escapeHtml(report && report.name ? report.name : 'Reporte') + '</h3>' +
+          '<strong>' + escapeHtml(report && report.value ? report.value : '0') + '</strong>' +
+          '<p class="toolbar-copy" style="margin-top: 8px;">' + escapeHtml(report && report.detail ? report.detail : 'Sin detalle adicional') + '</p>' +
+        '</article>'
+      }).join('') +
+    '</div></section>'
+  }
+
+  function renderToolbar(plan, view, state, records) {
+    const searchPlaceholder = escapeHtml(view && view.searchPlaceholder ? view.searchPlaceholder : 'Buscar')
+    const searchValue = escapeHtml(state && state.searchTerm ? state.searchTerm : '')
+    const appointmentOptions = normalizeArray(plan && plan.statusOptions && plan.statusOptions.appointments)
+    const normalizedStatusFilter = normalizeString(state && state.appointmentStatusFilter || 'todos')
+
+    return '<section class="toolbar-card">' +
+      '<div class="toolbar-top">' +
+        '<div><h2 class="toolbar-title">' + escapeHtml(view && view.title ? view.title : 'Sección') + '</h2><p class="toolbar-copy">' + escapeHtml(view && view.description ? view.description : 'Sin descripción') + '</p></div>' +
+        '<div class="status-badge tone-sky">' + escapeHtml(records.length + ' resultado(s)') + '</div>' +
+      '</div>' +
+      '<div class="toolbar-controls">' +
+        ((view && view.supportsSearch) !== false
+          ? '<input class="toolbar-input" data-search-input="true" type="search" value="' + searchValue + '" placeholder="' + searchPlaceholder + '" />'
+          : '') +
+        (view && view.supportsStatusFilter
+          ? '<select class="toolbar-select" data-status-filter="true">' +
+            appointmentOptions.map(function (option) {
+              const optionLabel = normalizeString(option || 'todos')
+              const isSelected = normalizeString(optionLabel) === normalizedStatusFilter
+              return '<option value="' + escapeHtml(optionLabel) + '"' + (isSelected ? ' selected' : '') + '>' + escapeHtml(optionLabel) + '</option>'
+            }).join('') +
+          '</select>'
+          : '') +
+        (view && view.supportsLowStockToggle
+          ? '<button type="button" class="toolbar-toggle' + (state && state.inventoryLowStockOnly ? ' is-active' : '') + '" data-toggle-low-stock="true">' +
+            (state && state.inventoryLowStockOnly ? 'Mostrando stock bajo' : 'Ver solo stock bajo') +
+          '</button>'
+          : '') +
+      '</div>' +
+    '</section>'
+  }
+
+  function renderColumnValue(view, record, column, state) {
+    const key = normalizeString(column && column.key)
+    const kind = normalizeString(column && column.kind)
+    let value = key === 'status'
+      ? getRecordStatus(view, record, state)
+      : record && Object.prototype.hasOwnProperty.call(record, key)
+        ? record[key]
+        : ''
+
+    if (Array.isArray(value)) {
+      value = value.join(', ')
+    }
+
+    if (kind === 'badge') {
+      return renderStatusBadge(value)
+    }
+
+    return '<strong>' + escapeHtml(value || 'Sin dato') + '</strong>'
+  }
+
+  function renderRecordCards(plan, view, records, state) {
+    return records.map(function (record) {
+      const recordId = normalizeString(record && record.id)
+      const selectedRecordId = getSelectedRecordId(state, view && view.id)
+      const isSelected = recordId && recordId === selectedRecordId
+      const columns = normalizeArray(view && view.columns)
+      const inlineActions = []
+
+      if (view && view.id === 'appointments') {
+        inlineActions.push(
+          '<button type="button" class="inline-action tone-sky" data-appointment-next-status="' + escapeHtml(recordId) + '" data-next-status-value="confirmado">Confirmar</button>',
+          '<button type="button" class="inline-action tone-amber" data-appointment-next-status="' + escapeHtml(recordId) + '" data-next-status-value="en atención">Pasar a atención</button>',
+          '<button type="button" class="inline-action tone-rose" data-appointment-next-status="' + escapeHtml(recordId) + '" data-next-status-value="reprogramado">Reprogramar</button>',
+        )
+      }
+
+      if (view && view.id === 'reminders') {
+        inlineActions.push(
+          '<button type="button" class="inline-action tone-emerald" data-reminder-review-id="' + escapeHtml(recordId) + '">Marcar como revisado</button>',
+        )
+      }
+
+      return '<article class="list-card' + (isSelected ? ' is-selected' : '') + '" data-select-view="' + escapeHtml(view && view.id ? view.id : '') + '" data-select-id="' + escapeHtml(recordId) + '">' +
+        '<header style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">' +
+          '<div><h3>' + escapeHtml(record && (record.name || record.petName || record.clientName || record.type) ? (record.name || record.petName || record.clientName || record.type) : 'Registro') + '</h3>' +
+          '<p class="toolbar-copy" style="margin-top:6px;">' + escapeHtml(record && (record.reason || record.category || record.segment || record.species || record.role || record.detail) ? (record.reason || record.category || record.segment || record.species || record.role || record.detail) : 'Dato local revisable') + '</p></div>' +
+          renderStatusBadge(getRecordStatus(view, record, state) || (record && record.status) || 'mock') +
+        '</header>' +
+        '<div class="list-meta">' +
+          columns.map(function (column) {
+            return '<div class="list-meta-row"><span>' + escapeHtml(column && column.label ? column.label : 'Dato') + '</span>' + renderColumnValue(view, record, column, state) + '</div>'
+          }).join('') +
+        '</div>' +
+        (inlineActions.length > 0 ? '<div class="inline-actions">' + inlineActions.join('') + '</div>' : '') +
+      '</article>'
+    }).join('')
+  }
+
+  function renderDetailPanel(view, record, state) {
+    if (!view || !record) {
+      return '<aside class="detail-card"><h3>Sin selección</h3><p class="detail-muted">Elegí un registro para ver el detalle local.</p></aside>'
+    }
+
+    const detailFields = normalizeArray(view && view.detailFields)
+    const recordTitle =
+      record.name || record.petName || record.clientName || record.type || record.id || 'Detalle'
+
+    return '<aside class="detail-card">' +
+      '<header><div><p class="toolbar-copy" style="margin:0;">' + escapeHtml(view.title || 'Detalle') + '</p><h3 style="margin-top:4px;">' + escapeHtml(recordTitle) + '</h3></div>' +
+      renderStatusBadge(getRecordStatus(view, record, state) || record.status || 'mock') +
+      '</header>' +
+      '<div class="detail-rows">' +
+        detailFields.map(function (field) {
+          const key = normalizeString(field && field.key)
+          const label = normalizeString(field && field.label)
+          const rawValue = key === 'status'
+            ? getRecordStatus(view, record, state)
+            : record && Object.prototype.hasOwnProperty.call(record, key)
+              ? record[key]
+              : ''
+          const value = Array.isArray(rawValue) ? rawValue.join(', ') : rawValue
+          return '<div class="detail-row"><span>' + escapeHtml(label || key || 'Dato') + '</span><strong>' + escapeHtml(value || 'Sin detalle') + '</strong></div>'
+        }).join('') +
+      '</div>' +
+    '</aside>'
+  }
+
+  function renderDashboard(plan, state) {
+    const appointments = normalizeArray(plan && plan.appointments).slice(0, 3)
+    const reminders = normalizeArray(plan && plan.reminders).slice(0, 3)
+    const inventory = normalizeArray(plan && plan.inventory).filter(function (item) {
+      return normalizeText(item && item.status).includes('bajo')
+    }).slice(0, 3)
+    const team = normalizeArray(plan && plan.team).slice(0, 3)
+
+    return '<div class="dashboard-grid">' +
+      '<section class="summary-grid">' +
+        renderConstraints(plan) +
+        renderAlerts(plan) +
+      '</section>' +
+      renderReports(plan) +
+      '<section class="surface-card"><h2 class="section-title">Agenda destacada</h2><div class="cards-grid">' +
+        appointments.map(function (record) {
+          return '<article class="list-card"><h3>' + escapeHtml(record.petName || record.clientName || record.name || 'Turno') + '</h3><p class="toolbar-copy" style="margin-top:8px;">' + escapeHtml(record.slot || 'Sin horario') + ' · ' + escapeHtml(record.reason || 'Sin motivo') + '</p><div class="inline-actions" style="margin-top:12px;">' + renderStatusBadge(getAppointmentStatus(record, state) || record.status || 'pendiente') + '</div></article>'
+        }).join('') +
+      '</div></section>' +
+      '<section class="summary-grid">' +
+        '<section class="surface-card"><h2 class="section-title">Recordatorios</h2><div class="cards-grid">' +
+          reminders.map(function (entry) {
+            return '<article class="list-card"><h3>' + escapeHtml(entry.petName || entry.clientName || entry.type || 'Recordatorio') + '</h3><p class="toolbar-copy" style="margin-top:8px;">' + escapeHtml(entry.detail || entry.type || 'Seguimiento local') + '</p><div class="inline-actions" style="margin-top:12px;">' + renderStatusBadge(getReminderStatus(entry, state) || entry.status || 'pendiente') + '</div></article>'
+          }).join('') +
+        '</div></section>' +
+        '<section class="surface-card"><h2 class="section-title">Equipo y stock crítico</h2><div class="cards-grid">' +
+          team.map(function (member) {
+            return '<article class="list-card"><h3>' + escapeHtml(member.name || 'Equipo') + '</h3><p class="toolbar-copy" style="margin-top:8px;">' + escapeHtml(member.role || member.focus || 'Sin rol') + '</p><div class="inline-actions" style="margin-top:12px;">' + renderStatusBadge(member.status || 'activo') + '</div></article>'
+          }).join('') +
+          inventory.map(function (item) {
+            return '<article class="list-card"><h3>' + escapeHtml(item.name || 'Stock') + '</h3><p class="toolbar-copy" style="margin-top:8px;">' + escapeHtml(item.note || item.stockSummary || 'Sin nota') + '</p><div class="inline-actions" style="margin-top:12px;">' + renderStatusBadge(item.status || 'normal') + '</div></article>'
+          }).join('') +
+        '</div></section>' +
+      '</section>' +
+      renderActivity(plan) +
+    '</div>'
+  }
+
+  const activeView = getActiveView(fullstackPlan, uiState)
+
+  if (activeView.kind === 'dashboard') {
+    return '<main class="app-shell">' +
+      renderHero(fullstackPlan, uiState || {}) +
+      renderNav(fullstackPlan, uiState || {}) +
+      '<section class="metrics-grid">' + renderMetricCards(fullstackPlan && fullstackPlan.metrics) + '</section>' +
+      renderDashboard(fullstackPlan, uiState || {}) +
+    '</main>'
+  }
+
+  if (activeView.kind === 'reports') {
+    return '<main class="app-shell">' +
+      renderHero(fullstackPlan, uiState || {}) +
+      renderNav(fullstackPlan, uiState || {}) +
+      '<section class="metrics-grid">' + renderMetricCards(fullstackPlan && fullstackPlan.metrics) + '</section>' +
+      '<section class="content-grid"><div>' +
+      renderToolbar(fullstackPlan, activeView, uiState || {}, normalizeArray(fullstackPlan && fullstackPlan.reports)) +
+      renderReports(fullstackPlan) +
+      '</div>' +
+      '<aside class="detail-card"><h3>Qué se muestra</h3><p class="toolbar-copy">Estos reportes son mock, locales y sirven para demostrar el alcance del sistema sin depender de datos reales.</p>' +
+      '<div class="detail-rows"><div class="detail-row"><span>Siguiente fase segura</span><strong>' + escapeHtml(fullstackPlan && fullstackPlan.overview && fullstackPlan.overview.nextRecommendedPhase ? fullstackPlan.overview.nextRecommendedPhase : 'frontend-mock-flow') + '</strong></div><div class="detail-row"><span>Modo</span><strong>' + escapeHtml(fullstackPlan && fullstackPlan.overview && fullstackPlan.overview.safeModeCopy ? fullstackPlan.overview.safeModeCopy : 'Mock local') + '</strong></div></div></aside>' +
+      '</section>' +
+    '</main>'
+  }
+
+  const filteredRecords = filterRecords(fullstackPlan, activeView, uiState || {})
+  const selectedRecord = getSelectedRecord(filteredRecords, activeView, uiState || {})
+
+  return '<main class="app-shell">' +
+    renderHero(fullstackPlan, uiState || {}) +
+    renderNav(fullstackPlan, uiState || {}) +
+    '<section class="metrics-grid">' + renderMetricCards(fullstackPlan && fullstackPlan.metrics) + '</section>' +
+    '<section class="content-grid"><div>' +
+      renderToolbar(fullstackPlan, activeView, uiState || {}, filteredRecords) +
+      (filteredRecords.length > 0
+        ? '<section class="cards-grid">' + renderRecordCards(fullstackPlan, activeView, filteredRecords, uiState || {}) + '</section>'
+        : '<section class="empty-card"><h3>Sin resultados</h3><p>' + escapeHtml(activeView.emptyCopy || 'No hay resultados para mostrar.') + '</p></section>') +
+    '</div>' +
+    renderDetailPanel(activeView, selectedRecord, uiState || {}) +
+    '</section>' +
+  '</main>'
+}`,
+  })
+}
+
+function buildFullstackLocalInteractiveFrontendMainContent() {
+  return `(function () {
+  const rootElement = document.getElementById('app')
+
+  function showError(message) {
+    if (!rootElement) {
+      return
+    }
+
+    rootElement.innerHTML = '<main class="app-shell"><section class="empty-card"><h1>No se pudo abrir la demo local</h1><p>' +
+      String(message || 'Error desconocido') +
+      '</p><p>Revisá que index.html siga cargando mock-data.js, App.js y main.js en ese orden.</p></section></main>'
+  }
+
+  if (!rootElement) {
+    throw new Error('No se encontró el contenedor #app para renderizar el scaffold fullstack local.')
+  }
+
+  const fullstackPlan = window.fullstackPlan
+  const renderApp = window.renderApp
+
+  if (!fullstackPlan || typeof renderApp !== 'function') {
+    showError('Faltan los datos mock o el renderer local del scaffold fullstack.')
+    return
+  }
+
+  const navItems = Array.isArray(fullstackPlan.navItems) ? fullstackPlan.navItems : []
+  const defaultViewId = navItems[0] && navItems[0].id ? navItems[0].id : 'dashboard'
+  const state = {
+    activeView: defaultViewId,
+    searchTerm: '',
+    appointmentStatusFilter: 'todos',
+    inventoryLowStockOnly: false,
+    selectedByView: {},
+    reviewedReminderIds: {},
+    appointmentStatusOverrides: {},
+    flashMessage: '',
+  }
+
+  function render() {
+    rootElement.innerHTML = renderApp(fullstackPlan, state)
+  }
+
+  function setFlashMessage(message) {
+    state.flashMessage = message
+  }
+
+  function handleClick(event) {
+    const viewButton = event.target.closest('[data-view-id]')
+    if (viewButton) {
+      state.activeView = viewButton.getAttribute('data-view-id') || defaultViewId
+      state.searchTerm = ''
+      state.inventoryLowStockOnly = false
+      state.flashMessage = ''
+      render()
+      return
+    }
+
+    const localActionButton = event.target.closest('[data-local-action-target]')
+    if (localActionButton) {
+      state.activeView = localActionButton.getAttribute('data-local-action-target') || defaultViewId
+      setFlashMessage(localActionButton.getAttribute('data-local-action-label') || 'Se actualizó la vista local.')
+      render()
+      return
+    }
+
+    const selectButton = event.target.closest('[data-select-view][data-select-id]')
+    if (selectButton) {
+      const viewId = selectButton.getAttribute('data-select-view') || state.activeView
+      const recordId = selectButton.getAttribute('data-select-id') || ''
+      state.selectedByView[viewId] = recordId
+      render()
+      return
+    }
+
+    const reminderButton = event.target.closest('[data-reminder-review-id]')
+    if (reminderButton) {
+      const reminderId = reminderButton.getAttribute('data-reminder-review-id') || ''
+      if (reminderId) {
+        state.reviewedReminderIds[reminderId] = true
+        state.flashMessage = 'El recordatorio quedó marcado como revisado solo en memoria local.'
+        render()
+      }
+      return
+    }
+
+    const appointmentButton = event.target.closest('[data-appointment-next-status]')
+    if (appointmentButton) {
+      const appointmentId = appointmentButton.getAttribute('data-appointment-next-status') || ''
+      const nextStatus = appointmentButton.getAttribute('data-next-status-value') || 'confirmado'
+      if (appointmentId) {
+        state.appointmentStatusOverrides[appointmentId] = nextStatus
+        state.flashMessage = 'El turno cambió de estado solo dentro de esta demo local.'
+        render()
+      }
+      return
+    }
+
+    const lowStockButton = event.target.closest('[data-toggle-low-stock]')
+    if (lowStockButton) {
+      state.inventoryLowStockOnly = !state.inventoryLowStockOnly
+      state.flashMessage = state.inventoryLowStockOnly
+        ? 'Ahora se muestran solo los ítems con stock bajo.'
+        : 'Se volvió a mostrar todo el inventario local.'
+      render()
+    }
+  }
+
+  function handleInput(event) {
+    const searchInput = event.target.closest('[data-search-input]')
+    if (!searchInput) {
+      return
+    }
+
+    state.searchTerm = searchInput.value || ''
+    render()
+  }
+
+  function handleChange(event) {
+    const statusSelect = event.target.closest('[data-status-filter]')
+    if (!statusSelect) {
+      return
+    }
+
+    state.appointmentStatusFilter = statusSelect.value || 'todos'
+    render()
+  }
+
+  rootElement.addEventListener('click', handleClick)
+  rootElement.addEventListener('input', handleInput)
+  rootElement.addEventListener('change', handleChange)
+
+  try {
+    render()
+  } catch (error) {
+    console.error('Falló el render de la demo local.', error)
+    showError(error && error.message ? error.message : 'Ocurrió un error al renderizar la demo local revisable.')
+  }
+})()
+`
+}
+
+function buildFullstackLocalBackendDomainModuleContent(fullstackLocalDemoData) {
+  const appointmentStatuses = summarizeUniqueExecutorStrings(
+    [
+      ...(fullstackLocalDemoData?.statusOptions?.appointments || []),
+      ...(fullstackLocalDemoData?.appointments || []).map((entry) => entry?.status || ''),
+    ],
+    12,
+  ).filter((entry) => normalizeSectorDetectionText(entry) !== 'todos')
+  const domainMockBundle = {
+    archetype: fullstackLocalDemoData?.overview?.archetype || 'operations',
+    clients: fullstackLocalDemoData?.clients || [],
+    pets: fullstackLocalDemoData?.pets || [],
+    appointments: fullstackLocalDemoData?.appointments || [],
+    reminders: fullstackLocalDemoData?.reminders || [],
+    inventory: fullstackLocalDemoData?.inventory || [],
+    reports: fullstackLocalDemoData?.reports || [],
+    team: fullstackLocalDemoData?.team || [],
+  }
+
+  return `const appointmentStatuses = ${JSON.stringify(appointmentStatuses, null, 2)}
+const domainMockBundle = ${JSON.stringify(domainMockBundle, null, 2)}
+
+function listMockAppointments() {
+  return Array.isArray(domainMockBundle.appointments) ? domainMockBundle.appointments : []
+}
+
+function listMockClients() {
+  return Array.isArray(domainMockBundle.clients) ? domainMockBundle.clients : []
+}
+
+function listMockPets() {
+  return Array.isArray(domainMockBundle.pets) ? domainMockBundle.pets : []
+}
+
+function listMockReminders() {
+  return Array.isArray(domainMockBundle.reminders) ? domainMockBundle.reminders : []
+}
+
+function listMockInventory() {
+  return Array.isArray(domainMockBundle.inventory) ? domainMockBundle.inventory : []
+}
+
+function listMockReports() {
+  return Array.isArray(domainMockBundle.reports) ? domainMockBundle.reports : []
+}
+
+module.exports = {
+  appointmentStatuses,
+  domainMockBundle,
+  listMockAppointments,
+  listMockClients,
+  listMockPets,
+  listMockReminders,
+  listMockInventory,
+  listMockReports,
+}
+`
+}
+
+function buildFullstackLocalBackendHealthRouteContent(fullstackLocalDemoData) {
+  const conceptualRoutes = summarizeUniqueExecutorStrings(
+    (Array.isArray(fullstackLocalDemoData?.navItems)
+      ? fullstackLocalDemoData.navItems
+      : []
+    ).map(
+      (entry) => `GET /mock/${entry.id || 'section'}`,
+    ),
+    12,
+  )
+
+  return `const { ok } = require('../lib/response')
+
+function healthRoute() {
+  return ok({
+    service: 'fullstack-local-backend',
+    mode: 'review-only',
+    activeServer: false,
+    archetype: ${JSON.stringify(fullstackLocalDemoData?.overview?.archetype || 'operations')},
+    conceptualRoutes: ${JSON.stringify(conceptualRoutes, null, 2)},
+  })
+}
+
+module.exports = {
+  healthRoute,
+}
+`
+}
+
+function buildFullstackLocalBackendServerContent(fullstackLocalDemoData) {
+  return `const { healthRoute } = require('./routes/health')
+const {
+  listMockAppointments,
+  listMockClients,
+  listMockPets,
+  listMockReminders,
+  listMockInventory,
+  listMockReports,
+} = require('./modules/appointments')
+
+function createServerManifest() {
+  return {
+    kind: 'fullstack-local',
+    archetype: ${JSON.stringify(fullstackLocalDemoData?.overview?.archetype || 'operations')},
+    activeServer: false,
+    routes: ['GET /health'],
+    counts: {
+      appointments: listMockAppointments().length,
+      clients: listMockClients().length,
+      pets: listMockPets().length,
+      reminders: listMockReminders().length,
+      inventory: listMockInventory().length,
+      reports: listMockReports().length,
+    },
+    health: healthRoute(),
+  }
+}
+
+module.exports = {
+  createServerManifest,
+}
+`
+}
+
+function buildFullstackLocalSharedDomainObject(fullstackLocalDemoData) {
+  return {
+    deliveryLevel: 'fullstack-local',
+    archetype: fullstackLocalDemoData?.overview?.archetype || 'operations',
+    domainLabel: fullstackLocalDemoData?.overview?.name || 'Sistema Fullstack Local',
+    modules: fullstackLocalDemoData?.modules || [],
+    entities: fullstackLocalDemoData?.domainEntities || [],
+    navItems: (Array.isArray(fullstackLocalDemoData?.navItems)
+      ? fullstackLocalDemoData.navItems
+      : []
+    ).map((entry) => ({
+      id: entry?.id || '',
+      label: entry?.label || '',
+    })),
+    appointmentStatuses:
+      fullstackLocalDemoData?.statusOptions?.appointments || [],
+    constraints: fullstackLocalDemoData?.constraints || [],
+    reports: (Array.isArray(fullstackLocalDemoData?.reports)
+      ? fullstackLocalDemoData.reports
+      : []
+    ).map((entry) => ({
+      id: entry?.id || '',
+      name: entry?.name || '',
+      status: entry?.status || '',
+    })),
+    activeServices: false,
+    installRequired: false,
+  }
+}
+
+function buildFullstackLocalSharedDomainContent(fullstackLocalDemoData) {
+  return `const domainContracts = ${JSON.stringify(
+    buildFullstackLocalSharedDomainObject(fullstackLocalDemoData),
+    null,
+    2,
+  )}
+
+module.exports = {
+  domainContracts,
+}
+`
+}
+
+function buildFullstackLocalSharedContractsContent(fullstackLocalDemoData) {
+  return `const { domainContracts } = require('../contracts/domain')
+
+const sharedContracts = {
+  archetype: domainContracts.archetype,
+  entities: domainContracts.entities,
+  modules: domainContracts.modules,
+  statuses: domainContracts.appointmentStatuses,
+  navItems: domainContracts.navItems,
+  constraints: domainContracts.constraints,
+}
+
+module.exports = {
+  sharedContracts,
+}
+`
+}
+
+function buildFullstackLocalDatabaseArtifacts({
+  archetype,
+  appTitle,
+}) {
+  if (archetype === 'veterinary') {
+    return {
+      readmeContent: `# Database local
+
+Esta carpeta queda como diseño revisable para la veterinaria local.
+
+- No se creó una base de datos real.
+- No se ejecutaron migraciones.
+- No se levantaron servicios locales.
+- \`schema.sql\` y \`seeds/seed-local.sql\` son solo referencias editables para el dominio veterinario.
+`,
+      schemaContent: `-- Esquema local revisable para ${appTitle}
+-- No ejecutar automáticamente sin una aprobación posterior.
+
+create table clients (
+  id text primary key,
+  full_name text not null,
+  phone text,
+  neighborhood text,
+  preferred_channel text,
+  notes text
+);
+
+create table veterinarians (
+  id text primary key,
+  full_name text not null,
+  specialty text not null,
+  shift text not null,
+  status text not null
+);
+
+create table pets (
+  id text primary key,
+  client_id text not null,
+  name text not null,
+  species text not null,
+  breed text,
+  age_label text,
+  health_status text not null,
+  next_control_at text,
+  notes text,
+  foreign key (client_id) references clients(id)
+);
+
+create table appointments (
+  id text primary key,
+  pet_id text not null,
+  veterinarian_id text not null,
+  scheduled_at text not null,
+  reason text not null,
+  status text not null,
+  room text,
+  notes text,
+  foreign key (pet_id) references pets(id),
+  foreign key (veterinarian_id) references veterinarians(id)
+);
+
+create table reminders (
+  id text primary key,
+  pet_id text not null,
+  reminder_type text not null,
+  due_date text not null,
+  status text not null,
+  channel text,
+  notes text,
+  foreign key (pet_id) references pets(id)
+);
+
+create table inventory_items (
+  id text primary key,
+  name text not null,
+  category text not null,
+  stock integer not null,
+  min_stock integer not null,
+  unit text not null,
+  status text not null,
+  notes text
+);
+`,
+      seedContent: `-- Seed local de referencia. No ejecutar automáticamente.
+
+insert into clients (id, full_name, phone, neighborhood, preferred_channel, notes) values
+  ('CLI-001', 'María Gómez', '11 5555-1234', 'Palermo', 'WhatsApp local', 'Seguimiento preventivo de Luna y Simba'),
+  ('CLI-002', 'Santiago Fernández', '11 5555-8282', 'Caballito', 'Llamado interno', 'Control posvacuna de Milo');
+
+insert into veterinarians (id, full_name, specialty, shift, status) values
+  ('VET-001', 'Dra. Paula Benítez', 'Clínica general', 'Mañana', 'En consultorio'),
+  ('VET-002', 'Dr. Julián Rivas', 'Cirugía menor', 'Tarde', 'Disponible');
+
+insert into pets (id, client_id, name, species, breed, age_label, health_status, next_control_at, notes) values
+  ('PET-001', 'CLI-001', 'Luna', 'Canina', 'Mestiza', '6 años', 'Vacunas al día', '2026-05-20', 'Control anual'),
+  ('PET-002', 'CLI-001', 'Simba', 'Felina', 'Europeo', '3 años', 'Recordatorio pendiente', '2026-05-10', 'Refuerzo antirrábico'),
+  ('PET-003', 'CLI-002', 'Milo', 'Canina', 'Beagle', '1 año', 'En observación', '2026-05-05', 'Control posvacuna');
+
+insert into appointments (id, pet_id, veterinarian_id, scheduled_at, reason, status, room, notes) values
+  ('APT-001', 'PET-001', 'VET-001', '2026-05-05 09:30', 'Control anual', 'confirmado', 'Consultorio 1', 'Traer libreta sanitaria'),
+  ('APT-002', 'PET-002', 'VET-001', '2026-05-05 10:15', 'Vacuna antirrábica', 'pendiente', 'Vacunación', 'Pendiente de confirmación');
+
+insert into reminders (id, pet_id, reminder_type, due_date, status, channel, notes) values
+  ('REM-001', 'PET-002', 'Vacuna antirrábica', '2026-05-10', 'pendiente', 'WhatsApp local', 'Enviar 48 hs antes'),
+  ('REM-002', 'PET-003', 'Control posvacuna', '2026-05-05', 'revisado', 'Llamado interno', 'Seguimiento ya revisado');
+
+insert into inventory_items (id, name, category, stock, min_stock, unit, status, notes) values
+  ('INV-001', 'Antiparasitario spot-on', 'Medicamentos', 6, 8, 'unidades', 'stock bajo', 'Reponer antes del viernes'),
+  ('INV-002', 'Vacuna séxtuple', 'Vacunas', 18, 10, 'dosis', 'normal', 'Cobertura para la próxima semana');
+`,
+    }
+  }
+
+  if (archetype === 'medical-clinic') {
+    return {
+      readmeContent: `# Database local
+
+Esta carpeta queda como diseño revisable para la clínica local.
+
+- No se creó una base de datos real.
+- No se ejecutaron migraciones.
+- \`schema.sql\` y \`seeds/seed-local.sql\` describen una estructura local de pacientes, profesionales y turnos.
+`,
+      schemaContent: `-- Esquema local revisable para ${appTitle}
+-- No ejecutar automáticamente.
+
+create table patients (
+  id text primary key,
+  full_name text not null,
+  coverage text,
+  contact_phone text,
+  notes text
+);
+
+create table professionals (
+  id text primary key,
+  full_name text not null,
+  specialty text not null,
+  shift text not null,
+  status text not null
+);
+
+create table appointments (
+  id text primary key,
+  patient_id text not null,
+  professional_id text not null,
+  scheduled_at text not null,
+  reason text not null,
+  status text not null,
+  room text,
+  notes text,
+  foreign key (patient_id) references patients(id),
+  foreign key (professional_id) references professionals(id)
+);
+
+create table reminders (
+  id text primary key,
+  patient_id text not null,
+  reminder_type text not null,
+  due_date text not null,
+  status text not null,
+  notes text,
+  foreign key (patient_id) references patients(id)
+);
+`,
+      seedContent: `-- Seed local y revisable. No ejecutar automáticamente.
+
+insert into patients (id, full_name, coverage, contact_phone, notes) values
+  ('PAT-001', 'Lucía Pérez', 'Prepaga', '11 5555-9001', 'Control general'),
+  ('PAT-002', 'Martín Suárez', 'Particular', '11 5555-9002', 'Seguimiento clínico');
+
+insert into professionals (id, full_name, specialty, shift, status) values
+  ('PRO-001', 'Dra. Ana Gómez', 'Clínica médica', 'Mañana', 'Disponible'),
+  ('PRO-002', 'Dr. Pablo Ruiz', 'Pediatría', 'Tarde', 'Agenda completa');
+
+insert into appointments (id, patient_id, professional_id, scheduled_at, reason, status, room, notes) values
+  ('APT-001', 'PAT-001', 'PRO-001', '2026-05-05 09:00', 'Control general', 'confirmado', 'Consultorio 1', 'Traer estudios previos');
+`,
+    }
+  }
+
+  return {
+    readmeContent: `# Database local
+
+Esta carpeta queda como diseño revisable para ${appTitle}.
+
+- No se creó una base de datos real.
+- No se ejecutaron migraciones.
+- \`schema.sql\` y \`seeds/seed-local.sql\` sirven como referencia local editable.
+`,
+    schemaContent: `-- Esquema local revisable para ${appTitle}
+-- No ejecutar automáticamente sin aprobación posterior.
+
+create table records (
+  id text primary key,
+  title text not null,
+  owner text,
+  category text,
+  status text not null,
+  notes text
+);
+
+create table schedule_items (
+  id text primary key,
+  record_id text not null,
+  scheduled_at text not null,
+  status text not null,
+  notes text,
+  foreign key (record_id) references records(id)
+);
+
+create table reminders (
+  id text primary key,
+  record_id text not null,
+  reminder_type text not null,
+  due_date text not null,
+  status text not null,
+  notes text,
+  foreign key (record_id) references records(id)
+);
+`,
+    seedContent: `-- Seed local y revisable. No ejecutar automáticamente.
+
+insert into records (id, title, owner, category, status, notes) values
+  ('REC-001', 'Registro principal', 'Operación local', 'General', 'activo', 'Dato mock base');
+
+insert into schedule_items (id, record_id, scheduled_at, status, notes) values
+  ('SCH-001', 'REC-001', '2026-05-05 10:00', 'confirmado', 'Seguimiento local');
+
+insert into reminders (id, record_id, reminder_type, due_date, status, notes) values
+  ('REM-001', 'REC-001', 'Recordatorio local', '2026-05-06', 'pendiente', 'No ejecutar nada real');
+`,
+  }
+}
+
+function buildFullstackLocalDocumentationBundle({
+  appTitle,
+  fullstackLocalDemoData,
+  modules,
+}) {
+  const overview = fullstackLocalDemoData?.overview || {}
+  const demoSections = summarizeUniqueExecutorStrings(
+    (Array.isArray(fullstackLocalDemoData?.navItems)
+      ? fullstackLocalDemoData.navItems
+      : []
+    ).map((entry) => entry?.label || ''),
+    12,
+  )
+  const visibleModules = summarizeUniqueExecutorStrings(
+    modules && modules.length > 0 ? modules : fullstackLocalDemoData?.modules || [],
+    12,
+  )
+
+  return {
+    readmeContent: `# ${appTitle}
+
+Scaffold fullstack local y revisable generado por JEFE.
+
+## Qué incluye esta demo
+
+- Navegación local por ${demoSections.join(', ')}
+- Datos mock ricos orientados al dominio
+- Interacciones client-side sin servidor
+- Backend, shared, database y docs como referencia revisable
+
+## Alcance
+
+- Sin npm install
+- Sin node_modules
+- Sin backend real activo
+- Sin base de datos real activa
+- Sin Docker
+- Sin deploy
+- Sin integraciones externas
+
+## Cómo revisar
+
+1. Hacé doble click en \`frontend/index.html\`.
+2. Recorré la demo por \`file://\` sin abrir ningún servidor.
+3. Probá búsqueda, filtros, selección y acciones locales mock.
+4. Revisá \`backend/\`, \`shared/\`, \`database/\` y \`docs/\` como referencia.
+
+## Próxima fase segura
+
+- \`${overview.nextRecommendedPhase || 'frontend-mock-flow'}\`
+`,
+    architectureContent: `# Arquitectura local propuesta
+
+## Objetivo
+
+Dejar una primera demo local segura, revisable y abrible por \`file://\`.
+
+## Capas
+
+- frontend/: demo estática con navegación, métricas, listas y detalle local
+- backend/: contratos y helpers puros sin \`listen()\`
+- shared/: contratos del dominio reutilizables
+- database/: diseño SQL local no ejecutado
+- scripts/: referencias operativas futuras sin ejecución
+- docs/: runbook, arquitectura y continuidad
+
+## Dominio representado
+
+- nombre: ${appTitle}
+- arquetipo: ${overview.archetype || 'operations'}
+- módulos visibles: ${visibleModules.join(', ') || 'sin módulos declarados'}
+- secciones de demo: ${demoSections.join(', ') || 'sin secciones declaradas'}
+
+## Límites
+
+- no instala dependencias
+- no levanta frontend ni backend real
+- no crea base de datos real
+- no usa Docker ni deploy
+- no toca integraciones externas
+
+## Continuidad
+
+La siguiente fase segura recomendada es \`${overview.nextRecommendedPhase || 'frontend-mock-flow'}\`.
+`,
+    runbookContent: `# Local runbook
+
+## Estado actual
+
+El proyecto quedó como demo local segura y revisable.
+
+## Cómo abrir la demo estática
+
+1. Abrí \`frontend/index.html\` con doble click o desde el navegador.
+2. Confirmá que la UI cargue por \`file://\`, sin servidor y sin \`npm install\`.
+3. Probá navegación, búsqueda, filtros y acciones locales mock.
+
+## Qué está mockeado
+
+- métricas
+- listas y detalle
+- cambios de estado locales
+- recordatorios y reportes
+- stock o seguimiento operativo según dominio
+
+## Qué sigue fuera de alcance
+
+- runtime real
+- backend escuchando puertos
+- base de datos real
+- migraciones y seeds ejecutados
+- Docker
+- deploy
+- auth real
+- pagos reales
+- integraciones externas
+
+## Próxima fase segura
+
+La siguiente fase recomendada es \`${overview.nextRecommendedPhase || 'frontend-mock-flow'}\`.
+`,
+  }
+}
+
 function buildFrontendProjectMaterializationPlan({
   goal,
   context,
@@ -14496,30 +17842,30 @@ function buildFullstackLocalMaterializationPlan({
       ],
     12,
   )
-  const detectedPrimaryEntities = summarizeUniqueExecutorStrings(
-    normalizedDomainUnderstanding?.primaryEntities,
-    8,
-  )
-  const medicalDomainDetected =
-    normalizedDomainText.includes('turnos') ||
-    normalizedDomainText.includes('medic') ||
-    normalizedDomainText.includes('salud') ||
-    normalizedDomainText.includes('clinica')
-  const domainEntities =
-    detectedPrimaryEntities.length > 0
-      ? detectedPrimaryEntities
-      : medicalDomainDetected
-        ? ['pacientes', 'profesionales', 'turnos', 'disponibilidad', 'especialidades']
-        : ['usuarios', 'entidades principales', 'agenda', 'estados']
-  const appointmentStatuses = medicalDomainDetected
-    ? ['pendiente', 'confirmado', 'en atencion', 'cancelado']
-    : ['pendiente', 'confirmado', 'resuelto']
   const packageName =
     slugifyBusinessSector(path.basename(rootFolder)) ||
     slugifyBusinessSector(domainLabel) ||
     'fullstack-local'
   const appTitle =
     sanitizeBusinessSectorLabel(domainLabel) || 'Sistema Fullstack Local'
+  const fullstackLocalDemoData = buildFullstackLocalDemoData({
+    appTitle,
+    normalizedText: normalizedDomainText,
+    domainUnderstanding: normalizedDomainUnderstanding,
+    modules,
+    nextRecommendedPhase: 'frontend-mock-flow',
+  })
+  const fullstackLocalArchetype =
+    fullstackLocalDemoData?.overview?.archetype || 'operations'
+  const databaseArtifacts = buildFullstackLocalDatabaseArtifacts({
+    archetype: fullstackLocalArchetype,
+    appTitle,
+  })
+  const documentationBundle = buildFullstackLocalDocumentationBundle({
+    appTitle,
+    fullstackLocalDemoData,
+    modules,
+  })
   const successCriteria = summarizeUniqueExecutorStrings(
     [
       `Materializar solo "${rootFolder}" y su estructura fullstack permitida dentro del workspace.`,
@@ -14568,82 +17914,13 @@ function buildFullstackLocalMaterializationPlan({
     nextRecommendedPhase: 'frontend-mock-flow',
   })
   const localProjectManifestContent = `${JSON.stringify(localProjectManifest, null, 2)}\n`
-  const domainContractsObject = {
-    deliveryLevel: 'fullstack-local',
-    domainLabel: appTitle,
-    modules,
-    entities: domainEntities,
-    appointmentStatuses,
-    installRequired: false,
-    activeServices: false,
-  }
-  const frontendMockDataObject = {
-    overview: {
-      name: appTitle,
-      mode: 'local-static-review',
-      deliveryLevel: 'fullstack-local',
-    },
-    highlights: summarizeUniqueExecutorStrings(
-      [
-        ...domainEntities,
-        'Sin backend real activo',
-        'Sin base de datos real',
-        'Sin npm install',
-      ],
-      12,
-    ),
-    routes: [
-      { id: 'overview', label: 'Resumen', path: '#resumen' },
-      { id: 'appointments', label: 'Turnos', path: '#turnos' },
-      { id: 'team', label: 'Equipo', path: '#equipo' },
-    ],
-    stats: medicalDomainDetected
-      ? [
-          { label: 'Turnos del día', value: 18 },
-          { label: 'Profesionales activos', value: 7 },
-          { label: 'Especialidades', value: 4 },
-        ]
-      : [
-          { label: 'Entidades activas', value: 12 },
-          { label: 'Flujos mock', value: 4 },
-          { label: 'Estados definidos', value: appointmentStatuses.length },
-        ],
-    appointments: medicalDomainDetected
-      ? [
-          {
-            id: 'T-001',
-            patient: 'Lucia Perez',
-            professional: 'Dra. Ana Gomez',
-            specialty: 'Clínica médica',
-            slot: '2026-05-02 09:30',
-            status: 'confirmado',
-          },
-          {
-            id: 'T-002',
-            patient: 'Martin Suarez',
-            professional: 'Dr. Pablo Ruiz',
-            specialty: 'Pediatría',
-            slot: '2026-05-02 10:15',
-            status: 'pendiente',
-          },
-        ]
-      : [
-          {
-            id: 'ITEM-001',
-            owner: 'Equipo local',
-            category: 'Flujo principal',
-            slot: '2026-05-02 09:30',
-            status: 'confirmado',
-          },
-        ],
-  }
   const rootPackageJsonContent = `${JSON.stringify(
     {
       name: packageName,
       private: true,
       version: '0.0.0',
       description:
-        'Scaffold fullstack local y revisable generado por JEFE sin instalar dependencias.',
+        'Demo fullstack local segura, estática y revisable generada por JEFE sin instalar dependencias.',
       workspaces: ['frontend', 'backend'],
       scripts: {
         review: 'echo "Revisar estructura fullstack local sin instalar dependencias"',
@@ -14657,7 +17934,8 @@ function buildFullstackLocalMaterializationPlan({
       name: `${packageName}-frontend`,
       private: true,
       version: '0.0.0',
-      description: 'Frontend local estático y revisable del scaffold fullstack.',
+      description:
+        'Frontend local estático, interactivo y revisable del scaffold fullstack.',
       scripts: {
         review: 'echo "Abrir frontend/index.html localmente para revisar la base visual"',
       },
@@ -14670,7 +17948,8 @@ function buildFullstackLocalMaterializationPlan({
       name: `${packageName}-backend`,
       private: true,
       version: '0.0.0',
-      description: 'Backend local revisable sin ejecución automática ni dependencias instaladas.',
+      description:
+        'Backend local revisable como contrato de referencia, sin ejecución automática ni dependencias instaladas.',
       scripts: {
         review: 'echo "Revisar backend/src sin levantar servicios"',
       },
@@ -14694,214 +17973,15 @@ function buildFullstackLocalMaterializationPlan({
   </body>
 </html>
 `
-  const rootReadmeContent = `# ${appTitle}
-
-Scaffold fullstack local y revisable generado por JEFE.
-
-## Alcance
-
-- Sin npm install
-- Sin node_modules
-- Sin backend real activo
-- Sin base de datos real activa
-- Sin Docker
-- Sin deploy
-- Sin integraciones externas
-
-## Capas incluidas
-
-- frontend/
-- backend/
-- shared/
-- database/
-- scripts/
-- docs/
-
-## Cómo revisar
-
-1. Hacer doble click en \`frontend/index.html\` o abrirlo directo desde el navegador para revisar la base visual local con \`file://\`.
-2. Inspeccionar \`backend/src/\` y \`shared/\` como contratos de referencia.
-3. Revisar \`database/schema.sql\` y \`database/seeds/seed-local.sql\` como diseño editable.
-4. Confirmar en \`docs/\` los límites antes de pensar en una fase ejecutable real.
-`
-  const frontendStylesContent = `:root {
-  color-scheme: light;
-  font-family: "Segoe UI", Arial, sans-serif;
-  background: #f4f7fb;
-  color: #112031;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  min-height: 100vh;
-  background:
-    radial-gradient(circle at top, rgba(37, 99, 235, 0.14), transparent 35%),
-    linear-gradient(180deg, #f9fbff 0%, #eef4fb 100%);
-}
-
-.app-shell {
-  width: min(1180px, calc(100% - 32px));
-  margin: 0 auto;
-  padding: 32px 0 48px;
-}
-
-.hero,
-.panel {
-  border-radius: 24px;
-  border: 1px solid rgba(148, 163, 184, 0.24);
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
-}
-
-.hero {
-  padding: 28px;
-}
-
-.hero h1 {
-  margin: 0;
-  font-size: clamp(2rem, 4vw, 3rem);
-}
-
-.hero p,
-.panel p {
-  color: #425466;
-  line-height: 1.7;
-}
-
-.chip-row,
-.stats-grid,
-.panel-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.chip {
-  border-radius: 999px;
-  background: #dbeafe;
-  color: #0f3d68;
-  padding: 8px 14px;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.grid {
-  margin-top: 24px;
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-}
-
-.panel {
-  padding: 20px;
-}
-
-.panel h2 {
-  margin: 0 0 12px;
-  font-size: 1.05rem;
-}
-
-.panel ul {
-  margin: 0;
-  padding-left: 18px;
-  color: #425466;
-  line-height: 1.6;
-}
-
-.stat {
-  min-width: 150px;
-  border-radius: 20px;
-  background: rgba(15, 23, 42, 0.04);
-  padding: 16px;
-}
-
-.stat strong {
-  display: block;
-  font-size: 1.5rem;
-}
-`
+  const rootReadmeContent = documentationBundle.readmeContent
+  const frontendStylesContent = buildFullstackLocalInteractiveFrontendStyles()
   const frontendMockDataContent = buildBrowserWindowDataScript(
     'fullstackPlan',
-    frontendMockDataObject,
+    fullstackLocalDemoData,
   )
-  const frontendAppComponentContent = buildBrowserWindowRenderScript({
-    functionName: 'renderApp',
-    globalName: 'renderApp',
-    scriptSource: `function renderApp(fullstackPlan) {
-  const routes = Array.isArray(fullstackPlan?.routes) ? fullstackPlan.routes : []
-  const highlights = Array.isArray(fullstackPlan?.highlights) ? fullstackPlan.highlights : []
-  const stats = Array.isArray(fullstackPlan?.stats) ? fullstackPlan.stats : []
-  const appointments = Array.isArray(fullstackPlan?.appointments)
-    ? fullstackPlan.appointments
-    : []
-
-  return \`
-    <main class="app-shell">
-      <section class="hero">
-        <span class="chip">Fullstack local</span>
-        <h1>${appTitle}</h1>
-        <p>
-          Base revisable con frontend, backend, shared y database modelados
-          como scaffold local, sin instalar dependencias ni levantar servicios.
-        </p>
-        <div class="chip-row">
-          \${routes.map((route) => \`<span class="chip">\${route.label}</span>\`).join('')}
-        </div>
-      </section>
-
-      <div class="grid">
-        <section class="panel">
-          <h2>Métricas mock</h2>
-          <div class="stats-grid">
-            \${stats
-              .map(
-                (stat) => \`<div class="stat"><span>\${stat.label}</span><strong>\${stat.value}</strong></div>\`,
-              )
-              .join('')}
-          </div>
-        </section>
-        <section class="panel">
-          <h2>Capas incluidas</h2>
-          <ul>
-            <li>frontend estático y revisable</li>
-            <li>backend de referencia sin ejecución automática</li>
-            <li>shared contracts entre capas</li>
-            <li>database local como esquema editable</li>
-          </ul>
-        </section>
-        <section class="panel">
-          <h2>Restricciones activas</h2>
-          <ul>
-            \${highlights.map((item) => \`<li>\${item}</li>\`).join('')}
-          </ul>
-        </section>
-        <section class="panel">
-          <h2>Agenda mock</h2>
-          <ul>
-            \${appointments
-              .map((item) => \`<li>\${item.slot} - \${item.status} - \${item.patient || item.owner}</li>\`)
-              .join('')}
-          </ul>
-        </section>
-      </div>
-    </main>
-  \`
-}`,
-  })
-  const frontendMainJsContent = buildStaticBrowserBootstrapScript({
-    dataGlobalName: 'fullstackPlan',
-    renderGlobalName: 'renderApp',
-    rootElementId: 'app',
-    errorHeading: 'No se pudo abrir el scaffold fullstack local',
-    missingAssetsMessage:
-      'Faltan los datos mock o el renderer local del scaffold fullstack.',
-    troubleshootingMessage:
-      'Abrí frontend/index.html directamente con doble click y revisá que mock-data.js, App.js y main.js sigan presentes y en ese orden.',
-  })
+  const frontendAppComponentContent =
+    buildFullstackLocalInteractiveFrontendAppContent()
+  const frontendMainJsContent = buildFullstackLocalInteractiveFrontendMainContent()
   const backendResponseLibContent = `function buildResponse(status, payload) {
   return {
     status,
@@ -14919,211 +17999,46 @@ module.exports = {
   ok,
 }
 `
-  const backendHealthRouteContent = `const { ok } = require('../lib/response')
-
-function healthRoute() {
-  return ok({
-    service: 'fullstack-local-backend',
-    mode: 'review-only',
-    activeServer: false,
-  })
-}
-
-module.exports = {
-  healthRoute,
-}
-`
-  const backendAppointmentsContent = `const appointmentStatuses = ${JSON.stringify(
-    appointmentStatuses,
-    null,
-    2,
-  )}
-
-function listMockAppointments() {
-  return [
-    {
-      id: 'APT-001',
-      patient: '${medicalDomainDetected ? 'Lucia Perez' : 'Entidad local'}',
-      professional: '${medicalDomainDetected ? 'Dra. Ana Gomez' : 'Equipo local'}',
-      status: appointmentStatuses[1] || appointmentStatuses[0],
-      slot: '2026-05-02T09:30:00',
-    },
-  ]
-}
-
-module.exports = {
-  appointmentStatuses,
-  listMockAppointments,
-}
-`
-  const backendServerContent = `const { healthRoute } = require('./routes/health')
-const { listMockAppointments } = require('./modules/appointments')
-
-function createServerManifest() {
-  return {
-    kind: 'fullstack-local',
-    activeServer: false,
-    routes: ['GET /health'],
-    sampleData: listMockAppointments(),
-    health: healthRoute(),
-  }
-}
-
-module.exports = {
-  createServerManifest,
-}
-`
-  const sharedDomainContent = `const domainContracts = ${JSON.stringify(
-    domainContractsObject,
-    null,
-    2,
-  )}
-
-module.exports = {
-  domainContracts,
-}
-`
-  const sharedContractsContent = `const { domainContracts } = require('../contracts/domain')
-
-const sharedContracts = {
-  entities: domainContracts.entities,
-  statuses: domainContracts.appointmentStatuses,
-  modules: domainContracts.modules,
-}
-
-module.exports = {
-  sharedContracts,
-}
-`
-  const databaseReadmeContent = `# Database local
-
-Esta carpeta queda como diseño revisable.
-
-- No se creó una base de datos real.
-- No se ejecutaron migraciones.
-- No se levantaron servicios locales.
-- \`schema.sql\` y \`seeds/seed-local.sql\` son solo referencias editables.
-`
-  const databaseSchemaContent = `-- Esquema local revisable para ${appTitle}
--- No ejecutar automáticamente sin una aprobación posterior.
-
-create table professionals (
-  id integer primary key,
-  full_name text not null,
-  specialty text not null,
-  active integer not null default 1
-);
-
-create table patients (
-  id integer primary key,
-  full_name text not null,
-  document_id text,
-  active integer not null default 1
-);
-
-create table appointments (
-  id integer primary key,
-  patient_id integer not null,
-  professional_id integer not null,
-  scheduled_at text not null,
-  status text not null,
-  notes text,
-  foreign key (patient_id) references patients(id),
-  foreign key (professional_id) references professionals(id)
-);
-
-create table availability_slots (
-  id integer primary key,
-  professional_id integer not null,
-  slot_start text not null,
-  slot_end text not null,
-  status text not null,
-  foreign key (professional_id) references professionals(id)
-);
-`
-  const databaseSeedContent = `-- Seed local de referencia. No ejecutar automáticamente.
-
-insert into professionals (id, full_name, specialty, active) values
-  (1, 'Dra. Ana Gomez', 'Clínica médica', 1),
-  (2, 'Dr. Pablo Ruiz', 'Pediatría', 1);
-
-insert into patients (id, full_name, document_id, active) values
-  (1, 'Lucia Perez', '30111222', 1),
-  (2, 'Martin Suarez', '33444555', 1);
-
-insert into appointments (id, patient_id, professional_id, scheduled_at, status, notes) values
-  (1, 1, 1, '2026-05-02T09:30:00', 'confirmado', 'Control general'),
-  (2, 2, 2, '2026-05-02T10:15:00', 'pendiente', 'Primera consulta');
-`
+  const backendHealthRouteContent =
+    buildFullstackLocalBackendHealthRouteContent(fullstackLocalDemoData)
+  const backendAppointmentsContent =
+    buildFullstackLocalBackendDomainModuleContent(fullstackLocalDemoData)
+  const backendServerContent =
+    buildFullstackLocalBackendServerContent(fullstackLocalDemoData)
+  const sharedDomainContent =
+    buildFullstackLocalSharedDomainContent(fullstackLocalDemoData)
+  const sharedContractsContent =
+    buildFullstackLocalSharedContractsContent(fullstackLocalDemoData)
+  const databaseReadmeContent = databaseArtifacts.readmeContent
+  const databaseSchemaContent = databaseArtifacts.schemaContent
+  const databaseSeedContent = databaseArtifacts.seedContent
   const scriptsReadmeContent = `# Scripts locales
 
 Estos scripts quedan como referencia y no se ejecutaron automáticamente.
 
-- seed-local.js describe como transformar el seed en un paso manual futuro.
+- seed-local.js describe cómo transformar el seed en un paso manual futuro.
+- La siguiente fase segura recomendada sigue siendo \`${fullstackLocalDemoData?.overview?.nextRecommendedPhase || 'frontend-mock-flow'}\`.
 - Cualquier ejecución real requiere aprobación posterior.
 `
   const scriptsSeedContent = `const seedManifest = {
   mode: 'review-only',
   databaseActive: false,
   seedFile: '../database/seeds/seed-local.sql',
-  nextStep: 'Revisar schema.sql y aprobar una fase posterior antes de ejecutar seeds reales.',
+  nextStep: 'Revisar schema.sql y seguir con ${fullstackLocalDemoData?.overview?.nextRecommendedPhase || 'frontend-mock-flow'} antes de pensar en una base real.',
 }
 
 module.exports = {
   seedManifest,
 }
 `
-  const docsArchitectureContent = `# Arquitectura local propuesta
-
-## Capas
-
-- frontend/: base visual local y revisable
-- backend/: modulos y rutas de referencia sin servidor activo
-- shared/: contratos y tipos compartidos
-- database/: esquema y seed local solo como diseño
-- scripts/: ayudas operativas futuras sin ejecución
-- docs/: alcance, límites y runbook manual
-
-## Dominio sugerido
-
-- Entidades: ${domainEntities.join(', ')}
-- Módulos: ${modules.join(', ')}
-- Estados principales: ${appointmentStatuses.join(', ')}
-
-## Límites
-
-- Sin npm install
-- Sin node_modules
-- Sin backend real activo
-- Sin base de datos real activa
-- Sin Docker ni servicios externos
-`
-  const docsRunbookContent = `# Local runbook
-
-## Estado actual
-
-Este scaffold solo materializa archivos locales revisables.
-
-## No ejecutado
-
-- No instalar dependencias
-- No levantar frontend
-- No levantar backend
-- No crear ni migrar una base de datos real
-- No usar datos reales
-
-## Cómo abrir la demo estática
-
-1. Abrir \`frontend/index.html\` directamente con doble click o desde el navegador.
-2. Confirmar que la UI cargue sin servidor, sin \`npm install\` y sin abrir puertos.
-3. Si algo falla, revisar que \`src/mock-data.js\`, \`src/components/App.js\` y \`src/main.js\` sigan presentes.
-
-## Siguiente fase posible con aprobación
-
-1. Revisar package.json raiz, frontend y backend.
-2. Confirmar contratos compartidos y schema.sql.
-3. Aprobar una fase ejecutable futura para instalar dependencias y levantar servicios locales.
-`
+  const docsArchitectureContent = documentationBundle.architectureContent
+  const docsRunbookContent = documentationBundle.runbookContent
+  const databaseSchemaValidationMarker =
+    fullstackLocalArchetype === 'veterinary'
+      ? 'create table pets'
+      : fullstackLocalArchetype === 'medical-clinic'
+        ? 'create table patients'
+        : 'create table records'
   const instructionLines = [
     `Materializar un scaffold fullstack local y revisable dentro de "${rootFolder}" en el workspace activo.`,
     `Usar solo archivos y carpetas permitidos dentro de ${rootFolder}.`,
@@ -15242,11 +18157,16 @@ Este scaffold solo materializa archivos locales revisables.
         { type: 'file-contains', targetPath: frontendIndexHtmlPath, expectedText: './src/main.js' },
         { type: 'file-contains', targetPath: frontendMainJsPath, expectedText: 'window.fullstackPlan' },
         { type: 'file-contains', targetPath: frontendMainJsPath, expectedText: 'window.renderApp' },
+        { type: 'file-contains', targetPath: frontendMainJsPath, expectedText: 'appointmentStatusOverrides' },
         { type: 'file-contains', targetPath: frontendMockDataPath, expectedText: 'window.fullstackPlan' },
+        { type: 'file-contains', targetPath: frontendMockDataPath, expectedText: 'nextRecommendedPhase' },
         { type: 'file-contains', targetPath: frontendAppComponentPath, expectedText: 'window.renderApp = renderApp' },
+        { type: 'file-contains', targetPath: frontendAppComponentPath, expectedText: 'data-view-id' },
+        { type: 'file-contains', targetPath: frontendStylesPath, expectedText: '.nav-button' },
         { type: 'file-contains', targetPath: backendServerPath, expectedText: 'fullstack-local' },
-        { type: 'file-contains', targetPath: databaseSchemaPath, expectedText: 'create table appointments' },
-        { type: 'file-contains', targetPath: docsRunbookPath, expectedText: 'No instalar dependencias' },
+        { type: 'file-contains', targetPath: backendAppointmentsPath, expectedText: 'listMockClients' },
+        { type: 'file-contains', targetPath: databaseSchemaPath, expectedText: databaseSchemaValidationMarker },
+        { type: 'file-contains', targetPath: docsRunbookPath, expectedText: 'Cómo abrir la demo estática' },
         { type: 'file-contains', targetPath: projectManifestPath, expectedText: '"nextRecommendedPhase": "frontend-mock-flow"' },
       ],
     },

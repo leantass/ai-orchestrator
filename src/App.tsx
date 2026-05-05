@@ -4558,6 +4558,16 @@ function ScalableDeliveryPlanCard({
     reviewOnly &&
     normalizedDeliveryLevel.toLocaleLowerCase() === 'fullstack-local' &&
     typeof onPrepareMaterialization === 'function'
+  const prepareMaterializationLabel = canPrepareFrontendMaterialization
+    ? 'Preparar materialización frontend'
+    : canPrepareFullstackMaterialization
+      ? 'Preparar materialización fullstack local'
+      : ''
+  const prepareMaterializationHelperCopy = canPrepareFrontendMaterialization
+    ? 'Después de revisar este plan, este es el paso para convertirlo en un scaffold frontend local y ejecutable de forma segura.'
+    : canPrepareFullstackMaterialization
+      ? 'Después de revisar este plan, este es el paso para preparar el scaffold fullstack local que sí se puede materializar de forma segura.'
+      : ''
   const fileEntries = Array.isArray(plan.filesToCreate)
     ? plan.filesToCreate
         .map((entry) =>
@@ -4599,26 +4609,28 @@ function ScalableDeliveryPlanCard({
           <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-medium text-amber-100">
             No ejecuta todavía
           </span>
-          {canPrepareFrontendMaterialization ? (
-            <button
-              type="button"
-              onClick={onPrepareMaterialization || undefined}
-              className="rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-1 text-xs font-medium text-sky-100 transition hover:bg-sky-300/15"
-            >
-              Preparar materialización frontend
-            </button>
-          ) : null}
-          {canPrepareFullstackMaterialization ? (
-            <button
-              type="button"
-              onClick={onPrepareMaterialization || undefined}
-              className="rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-1 text-xs font-medium text-sky-100 transition hover:bg-sky-300/15"
-            >
-              Preparar materialización fullstack local
-            </button>
-          ) : null}
         </div>
       </div>
+
+      {prepareMaterializationLabel ? (
+        <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-sky-300/20 bg-slate-950/45 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="text-sm font-semibold leading-6 text-white">
+              Paso siguiente para este plan
+            </div>
+            <div className="mt-1 text-sm leading-6 text-slate-300">
+              {prepareMaterializationHelperCopy}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onPrepareMaterialization || undefined}
+            className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-sky-300/25 bg-sky-300/15 px-4 py-3 text-sm font-semibold text-sky-100 transition hover:bg-sky-300/20"
+          >
+            {prepareMaterializationLabel}
+          </button>
+        </div>
+      ) : null}
 
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
@@ -6670,13 +6682,15 @@ function ProjectContinuityCenterCard({
   const runtimeApprovalAction =
     normalizeContinuationActionContract(runtimeApprovalState?.relatedContinuationAction) ||
     approvalPacketAction
+  const nextRecommendedNeedsApproval = Boolean(
+    nextRecommendedAction &&
+      (nextRecommendedAction.requiresApproval || nextRecommendedAction.blocked),
+  )
   const hasActiveApprovalFlow = Boolean(
     (runtimeApprovalAction &&
+      runtimeApprovalState &&
       (runtimeApprovalAction.requiresApproval || runtimeApprovalAction.blocked)) ||
-      (approvalPacketAction &&
-        (approvalPacketAction.requiresApproval || approvalPacketAction.blocked)) ||
-      (nextRecommendedAction &&
-        (nextRecommendedAction.requiresApproval || nextRecommendedAction.blocked)),
+      nextRecommendedNeedsApproval,
   )
   const shouldShowRuntimeApprovalPanel = Boolean(
     runtimeApprovalState &&
@@ -6687,6 +6701,7 @@ function ProjectContinuityCenterCard({
     !shouldShowRuntimeApprovalPanel &&
       approvalRequestPlan &&
       approvalPacketAction &&
+      nextRecommendedNeedsApproval &&
       (approvalPacketAction.requiresApproval || approvalPacketAction.blocked),
   )
   const readinessApprovalTitle = hasActiveApprovalFlow

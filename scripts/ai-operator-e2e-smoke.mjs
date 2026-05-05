@@ -109,6 +109,7 @@ function extractOrderedStaticScriptSources(html) {
 
 function buildVmRootElement() {
   let innerHtml = ''
+  const listeners = {}
 
   return {
     get innerHTML() {
@@ -116,6 +117,34 @@ function buildVmRootElement() {
     },
     set innerHTML(value) {
       innerHtml = String(value ?? '')
+    },
+    addEventListener(eventName, handler) {
+      if (typeof eventName !== 'string' || typeof handler !== 'function') {
+        return
+      }
+
+      if (!Array.isArray(listeners[eventName])) {
+        listeners[eventName] = []
+      }
+
+      listeners[eventName].push(handler)
+    },
+    removeEventListener(eventName, handler) {
+      if (!Array.isArray(listeners[eventName])) {
+        return
+      }
+
+      listeners[eventName] = listeners[eventName].filter((entry) => entry !== handler)
+    },
+    dispatchEvent(event) {
+      const eventName = String(event?.type || '').trim()
+      const handlers = Array.isArray(listeners[eventName]) ? listeners[eventName] : []
+
+      for (const handler of handlers) {
+        handler(event)
+      }
+
+      return handlers.length > 0
     },
   }
 }
@@ -930,6 +959,23 @@ async function runFullstackStaticFileCompatibilityCase() {
   )
   pushFailure(
     failures,
+    mockDataJs.includes('clients') &&
+      mockDataJs.includes('pets') &&
+      mockDataJs.includes('appointments') &&
+      mockDataJs.includes('reminders') &&
+      mockDataJs.includes('inventory') &&
+      mockDataJs.includes('reports'),
+    'frontend/src/mock-data.js debe incluir datasets ricos para clientes, mascotas, turnos, recordatorios, inventario y reportes.',
+  )
+  pushFailure(
+    failures,
+    !normalizeText(`${indexHtml}\n${mainJs}\n${mockDataJs}\n${appJs}`).includes('clinica medica') &&
+      !normalizeText(`${indexHtml}\n${mainJs}\n${mockDataJs}\n${appJs}`).includes('pediatria') &&
+      !normalizeText(`${indexHtml}\n${mainJs}\n${mockDataJs}\n${appJs}`).includes('pacientes'),
+    'El frontend veterinario generado no debe arrastrar términos de clínica humana en sus archivos.',
+  )
+  pushFailure(
+    failures,
     normalizeText(`${readmeContent}\n${runbookContent}`).includes('frontend/index.html') &&
       normalizeText(`${readmeContent}\n${runbookContent}`).includes('doble click'),
     'README y runbook deben declarar que frontend/index.html se puede abrir directo con doble click.',
@@ -938,6 +984,9 @@ async function runFullstackStaticFileCompatibilityCase() {
   try {
     const simulatedBundle = executeStaticFrontendBundle(fixture.projectRootPath)
     const renderedText = normalizeText(simulatedBundle.renderedHtml)
+    const serializedPlan = normalizeText(
+      JSON.stringify(simulatedBundle.windowObject?.fullstackPlan || {}),
+    )
 
     pushFailure(
       failures,
@@ -948,6 +997,33 @@ async function runFullstackStaticFileCompatibilityCase() {
       failures,
       renderedText.includes('veterinaria') || renderedText.includes('turnos'),
       'El bundle estático debe renderizar el dominio esperado sin quedar en blanco.',
+    )
+    pushFailure(
+      failures,
+      renderedText.includes('clientes') &&
+        renderedText.includes('mascotas') &&
+        renderedText.includes('turnos') &&
+        renderedText.includes('recordatorios') &&
+        renderedText.includes('reportes') &&
+        renderedText.includes('inventario'),
+      'La demo veterinaria debe mostrar secciones reales para clientes, mascotas, turnos, recordatorios, reportes e inventario.',
+    )
+    pushFailure(
+      failures,
+      serializedPlan.includes('veterinaria') &&
+        serializedPlan.includes('mascotas') &&
+        serializedPlan.includes('recordatorios') &&
+        serializedPlan.includes('inventario'),
+      'Los datos mock del scaffold deben reflejar el dominio veterinario real.',
+    )
+    pushFailure(
+      failures,
+      !renderedText.includes('clinica medica') &&
+        !renderedText.includes('pediatria') &&
+        !serializedPlan.includes('clinica medica') &&
+        !serializedPlan.includes('pediatria') &&
+        !serializedPlan.includes('pacientes'),
+      'La demo veterinaria no debe contaminarse con clínica humana ni pacientes como concepto principal.',
     )
   } catch (error) {
     failures.push(
@@ -969,8 +1045,20 @@ async function runFullstackStaticFileCompatibilityCase() {
     )
     pushFailure(
       failures,
-      normalizeText(browserVerification.bodyText).includes('fullstack local'),
-      'La validación opcional en navegador debe mostrar contenido en body.',
+      normalizeText(browserVerification.bodyText).includes('fullstack local') &&
+        normalizeText(browserVerification.bodyText).includes('veterinaria') &&
+        normalizeText(browserVerification.bodyText).includes('mascotas') &&
+        normalizeText(browserVerification.bodyText).includes('clientes') &&
+        normalizeText(browserVerification.bodyText).includes('recordatorios') &&
+        normalizeText(browserVerification.bodyText).includes('inventario'),
+      'La validación opcional en navegador debe mostrar una demo veterinaria rica en el body.',
+    )
+    pushFailure(
+      failures,
+      !normalizeText(browserVerification.bodyText).includes('clinica medica') &&
+        !normalizeText(browserVerification.bodyText).includes('pediatria') &&
+        !normalizeText(browserVerification.bodyText).includes('pacientes'),
+      'La validación opcional en navegador no debe mostrar términos de clínica humana dentro de la demo veterinaria.',
     )
   }
 
@@ -1285,6 +1373,11 @@ async function runExplicitRestrictionsSafeFlowCase() {
       reviewDecision?.nextActionPlan?.userFacingLabel ||
       '',
   )
+  const initialPlannerNextActionLabel = normalizeText(
+    fixture.phaseOneDecision?.nextActionPlan?.userFacingLabel ||
+      fixture.phaseOneDecision?.nextActionPlan?.recommendedAction ||
+      '',
+  )
 
   pushFailure(
     failures,
@@ -1295,6 +1388,12 @@ async function runExplicitRestrictionsSafeFlowCase() {
     failures,
     !reviewDecision?.approvalRequestPlan,
     'El scaffold seguro no debe crear approvalRequestPlan por restricciones explícitas ya respetadas.',
+  )
+  pushFailure(
+    failures,
+    !fixture.phaseOneDecision?.runtimeApprovalState &&
+      !fixture.phaseOneDecision?.approvalRequestPlan,
+    'El plan fullstack inicial tampoco debe inflar approvalRequestPlan ni runtimeApprovalState cuando el pedido ya excluye todo lo sensible.',
   )
   pushFailure(
     failures,
@@ -1311,6 +1410,11 @@ async function runExplicitRestrictionsSafeFlowCase() {
     failures,
     !nextActionLabel.includes('resolver aprobacion sensible'),
     'El siguiente paso no debe sugerir resolver una aprobación sensible cuando el flujo base sigue seguro.',
+  )
+  pushFailure(
+    failures,
+    !initialPlannerNextActionLabel.includes('resolver aprobacion sensible'),
+    'El plan fullstack inicial no debe empujar a resolver una aprobación sensible si el pedido ya pidió evitar esas acciones.',
   )
   pushFailure(
     failures,
