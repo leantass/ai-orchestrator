@@ -1,8 +1,8 @@
-# Release candidate checklist
+# Release Candidate Checklist
 
 ## Objetivo
 
-Esta guia sirve para demostrar JEFE como plataforma local de programacion automatizada sin salir del modo seguro.
+Esta guía sirve para demostrar JEFE como plataforma local de programación automatizada sin salir del modo seguro.
 
 ## Escenario 1: pedir un sistema desde cero
 
@@ -13,7 +13,7 @@ Esta guia sirve para demostrar JEFE como plataforma local de programacion automa
    - blueprint
    - roadmap
    - siguiente paso seguro
-3. Verificar que la UI muestre continuidad y readiness en modo planificacion.
+3. Verificar que la UI muestre continuidad y readiness en modo planificación.
 
 ## Escenario 2: avanzar las fases base
 
@@ -29,16 +29,16 @@ Esta guia sirve para demostrar JEFE como plataforma local de programacion automa
    - `nextRecommendedAction`
    - `readinessLevel`
 
-## Escenario 3: expandir modulos seguros
+## Escenario 3: expandir módulos seguros
 
 1. Preparar `review-and-expand`.
-2. Elegir un modulo seguro:
+2. Elegir un módulo seguro:
    - `notifications`
    - `reports`
    - `inventory`
-3. Preparar el plan del modulo.
+3. Preparar el plan del módulo.
 4. Materializarlo solo si JEFE lo marca como seguro.
-5. Confirmar que el manifest no duplique modulos ya hechos.
+5. Confirmar que el manifest no duplique módulos ya hechos.
 
 ## Escenario 4: ver bloqueos y aprobaciones
 
@@ -52,29 +52,29 @@ Esta guia sirve para demostrar JEFE como plataforma local de programacion automa
    - integraciones externas
 2. Confirmar que JEFE:
    - no ejecute nada real
-   - devuelva un paquete de aprobacion
+   - devuelva un paquete de aprobación
    - muestre el preview controlado con comandos propuestos
    - muestre riesgo, alternativa segura y alcance
    - mantenga todo en planner-only o bloqueado
-3. Revisar tambien `docs/runtime-approval-flow.md` para interpretar el preview, la frase sugerida de aprobacion y las validaciones obligatorias.
+3. Revisar también `docs/runtime-approval-flow.md` para interpretar el preview, la frase sugerida de aprobación y las validaciones obligatorias.
 
 ## Escenario 5: interpretar readiness
 
 1. Abrir el centro de continuidad.
 2. Revisar:
    - `Estado para demo`
-   - `Que ya esta construido`
-   - `Que sigue siendo mock`
-   - `Requiere aprobacion`
+   - `Qué ya está construido`
+   - `Qué sigue siendo mock`
+   - `Requiere aprobación`
    - `Bloqueado por seguridad`
-   - `Guia rapida para probar`
+   - `Guía rápida para probar`
 3. Confirmar que JEFE explique:
-   - si esta listo para demo local segura
-   - que sigue siendo mock
-   - que falta para producto real
-   - cual es el proximo paso recomendado
+   - si está listo para demo local segura
+   - qué sigue siendo mock
+   - qué falta para producto real
+   - cuál es el próximo paso recomendado
 
-## Que NO probar todavia
+## Qué NO probar todavía
 
 - no correr `npm install`
 - no levantar runtime real
@@ -96,10 +96,10 @@ Esta guia sirve para demostrar JEFE como plataforma local de programacion automa
 
 La demo se considera segura cuando:
 
-- el proyecto esta materializado solo con archivos locales revisables
-- las fases base estan completas
-- la validacion local esta cerrada
-- los modulos seguros agregados siguen en mock
+- el proyecto está materializado solo con archivos locales revisables
+- las fases base están completas
+- la validación local está cerrada
+- los módulos seguros agregados siguen en mock
 - las acciones sensibles aparecen como aprobables o bloqueadas
 - las aprobaciones sensibles quedan en preview y no como ejecuciones reales
-- no se ejecuto nada real fuera del modo local seguro
+- no se ejecutó nada real fuera del modo local seguro

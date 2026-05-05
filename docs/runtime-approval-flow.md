@@ -1,17 +1,17 @@
-# Runtime approval flow
+# Runtime Approval Flow
 
 ## Objetivo
 
-Esta guia explica como leer el flujo de aprobacion para pasar de demo local segura a una futura ejecucion real controlada.
+Esta guía explica cómo leer el flujo de aprobación para pasar de demo local segura a una futura ejecución real controlada.
 
-## Que esta permitido hoy
+## Qué está permitido hoy
 
 - preparar fases locales seguras
-- materializar modulos seguros ya soportados
+- materializar módulos seguros ya soportados
 - revisar continuidad, readiness y manifest
 - preparar previews de acciones sensibles sin ejecutarlas
 
-## Que sigue bloqueado o bajo aprobacion
+## Qué sigue bloqueado o bajo aprobación
 
 - `npm install` y otras instalaciones reales
 - levantar runtime o dev server
@@ -24,46 +24,46 @@ Esta guia explica como leer el flujo de aprobacion para pasar de demo local segu
 - pagos reales
 - integraciones externas reales
 - `.env` y secretos
-- escritura remota en GitHub fuera de un cierre explicito pedido por operador
+- escritura remota en GitHub fuera de un cierre explícito pedido por operador
 
-## Que significa preview
+## Qué significa preview
 
 Cuando JEFE devuelve `runtimeApprovalState`, significa:
 
-- no se ejecuto nada todavia
+- no se ejecutó nada todavía
 - los comandos son solo una propuesta
 - los archivos y directorios son un alcance posible, no cambios ya aplicados
 - las validaciones obligatorias ya quedaron listadas
-- la accion sigue bloqueada o pendiente hasta aprobacion explicita
+- la acción sigue bloqueada o pendiente hasta aprobación explícita
 
-## Que deberia mirar el operador
+## Qué debería mirar el operador
 
 1. `Comandos propuestos`
-2. `Archivos que podrian cambiar`
+2. `Archivos que podrían cambiar`
 3. `Validaciones obligatorias`
 4. `Alternativa segura`
 5. `Riesgo`
-6. `No se ejecuto nada todavia`
+6. `No se ejecutó nada todavía`
 
-## Frase de aprobacion futura
+## Frase de aprobación futura
 
-JEFE deja una frase sugerida de aprobacion para una futura tarea, pero en esta etapa:
+JEFE deja una frase sugerida de aprobación para una futura tarea, pero en esta etapa:
 
-- no aprueba nada automaticamente
-- no ejecuta nada automaticamente
+- no aprueba nada automáticamente
+- no ejecuta nada automáticamente
 - no convierte el preview en runtime real
 
-## Como interpretar readiness
+## Cómo interpretar readiness
 
 - `demoReady` o `safeLocalDemoReady` puede ser `true` aunque `realExecutionReady` siga en `false`
-- eso significa que la demo local segura esta lista, pero el salto a runtime real sigue pendiente de aprobacion
-- `runtimeReadiness=approval-preview` indica que JEFE ya preparo el paquete, pero no avanzo a ejecucion
+- eso significa que la demo local segura está lista, pero el salto a runtime real sigue pendiente de aprobación
+- `runtimeReadiness=approval-preview` indica que JEFE ya preparó el paquete, pero no avanzó a ejecución
 
-## Que no se ejecuta todavia
+## Qué no se ejecuta todavía
 
 - no se crea `node_modules`
 - no se crea `.env`
-- no se abre ningun puerto
+- no se abre ningún puerto
 - no se crea DB real
 - no se ejecuta SQL
 - no se corren migraciones

@@ -3938,32 +3938,32 @@ const APP_NAV_SECTIONS: Array<{
   {
     key: 'inicio',
     label: 'Inicio',
-    description: 'Estado general, resumen del flujo y acciones rapidas.',
+    description: 'Estado general, resumen del flujo y acciones rÁpidas.',
   },
   {
     key: 'objetivo',
     label: 'Objetivo y contexto',
-    description: 'Objetivo actual, contexto, participacion y criterio del Cerebro.',
+    description: 'Objetivo actual, contexto, participación y criterio del Cerebro.',
   },
   {
     key: 'planificacion',
-    label: 'Planificacion',
-    description: 'Ruta planificada, decisionKey, motivo y siguiente accion.',
+    label: 'Planificación',
+    description: 'Ruta planificada, decisionKey, motivo y siguiente acción.',
   },
   {
     key: 'ejecucion',
-    label: 'Ejecucion',
-    description: 'Estado del ejecutor, resultado y accion manual.',
+    label: 'Ejecución',
+    description: 'Estado del ejecutor, resultado y acción manual.',
   },
   {
     key: 'aprobaciones',
     label: 'Aprobaciones',
-    description: 'Pendientes, ultima respuesta humana e historial corto.',
+    description: 'Pendientes, última respuesta humana e historial corto.',
   },
   {
     key: 'memoria',
     label: 'Memoria reutilizable',
-    description: 'Catalogo, filtros, seleccion manual y modo reusable.',
+    description: 'Catálogo, filtros, selección manual y modo reusable.',
   },
   {
     key: 'corridas',
@@ -5280,10 +5280,10 @@ const getOperatorStrategyLabel = (value: unknown) => {
   const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
 
   if (normalizedValue === 'prepare-module-expansion-plan') {
-    return 'Preparar expansión'
+    return 'Preparar expansi\u00f3n'
   }
   if (normalizedValue === 'materialize-module-expansion-plan') {
-    return 'Materializar módulo'
+    return 'Materializar m\u00f3dulo'
   }
   if (normalizedValue === 'prepare-project-phase-plan') {
     return 'Preparar fase'
@@ -5334,8 +5334,8 @@ const getContinuityVisualState = ({
 
   if (requiresApproval) {
     return {
-      label: 'Requiere aprobación',
-      detail: 'Sale del modo seguro actual y necesita una revisión humana antes de avanzar.',
+      label: 'Requiere aprobaci\u00f3n',
+      detail: 'Sale del modo seguro actual y necesita una revisi\u00f3n humana antes de avanzar.',
       tone: 'rose' as const,
     }
   }
@@ -5343,7 +5343,7 @@ const getContinuityVisualState = ({
   if (safeToMaterialize) {
     return {
       label: 'Seguro para materializar',
-      detail: 'JEFE ya tiene una ruta local y revisable para ejecutar esta expansión.',
+      detail: 'JEFE ya tiene una ruta local y revisable para ejecutar esta expansi\u00f3n.',
       tone: 'emerald' as const,
     }
   }
@@ -5351,22 +5351,22 @@ const getContinuityVisualState = ({
   if (blocked) {
     return {
       label: 'Bloqueado',
-      detail: 'Hace falta revisar un prerequisito o una restricción antes de seguir.',
+      detail: 'Hace falta revisar un prerequisito o una restricci\u00f3n antes de seguir.',
       tone: 'rose' as const,
     }
   }
 
   if (safeToPrepare) {
     return {
-      label: 'Solo planificación',
-      detail: 'Se puede preparar el plan, pero todavía no ejecutar cambios reales.',
+      label: 'Solo planificaci\u00f3n',
+      detail: 'Se puede preparar el plan, pero todav\u00eda no ejecutar cambios reales.',
       tone: 'amber' as const,
     }
   }
 
   return {
-    label: 'Solo revisión',
-    detail: 'Conviene revisar esta propuesta antes de habilitar más pasos.',
+    label: 'Solo revisi\u00f3n',
+    detail: 'Conviene revisar esta propuesta antes de habilitar m\u00e1s pasos.',
     tone: 'default' as const,
   }
 }
@@ -5378,13 +5378,13 @@ const getProjectContinuationStatusLabel = (value?: string) => {
     return 'Base segura en progreso'
   }
   if (normalizedValue === 'safe-module-expansion-ready') {
-    return 'Listo para expandir modulos'
+    return 'Listo para expandir m\u00f3dulos'
   }
   if (normalizedValue === 'safe-capabilities-complete') {
     return 'Capacidades seguras completas'
   }
   if (normalizedValue === 'review-only') {
-    return 'En revision'
+    return 'En revisi\u00f3n'
   }
 
   return normalizeOptionalString(value) || 'Sin estado'
@@ -5397,10 +5397,10 @@ const getProjectReadinessLevelLabel = (value?: string) => {
     return 'Listo para demo local segura'
   }
   if (normalizedValue === 'scaffolded') {
-    return 'Todavia falta completar'
+    return 'Todav\u00eda falta completar'
   }
   if (normalizedValue === 'planning') {
-    return 'En planificacion'
+    return 'En planificaci\u00f3n'
   }
   if (normalizedValue === 'blocked') {
     return 'Bloqueado por seguridad'
@@ -5409,7 +5409,7 @@ const getProjectReadinessLevelLabel = (value?: string) => {
     return 'No iniciado'
   }
   if (normalizedValue === 'needs-review') {
-    return 'Necesita revision'
+    return 'Necesita revisi\u00f3n'
   }
 
   return normalizeOptionalString(value) || 'Sin estado'
@@ -5442,7 +5442,7 @@ const getRuntimeApprovalStatusLabel = (value?: string) => {
     return 'Preview controlado'
   }
   if (normalizedValue === 'requires-approval') {
-    return 'Requiere aprobacion'
+    return 'Requiere aprobaci\u00f3n'
   }
   if (normalizedValue === 'approved') {
     return 'Aprobado'
@@ -5483,19 +5483,19 @@ const getValidationStatusLabel = (value?: string) => {
     return 'Validado en local seguro'
   }
   if (normalizedValue === 'pending-local-validation') {
-    return 'Falta validacion local'
+    return 'Falta validaci\u00f3n local'
   }
   if (normalizedValue === 'scaffolded-not-validated') {
-    return 'Base armada, sin validacion'
+    return 'Base armada, sin validaci\u00f3n'
   }
   if (normalizedValue === 'blocked') {
     return 'Bloqueado'
   }
   if (normalizedValue === 'not-run') {
-    return 'Sin validacion'
+    return 'Sin validaci\u00f3n'
   }
 
-  return normalizeOptionalString(value) || 'Sin validacion'
+  return normalizeOptionalString(value) || 'Sin validaci\u00f3n'
 }
 
 const getPrepareActionButtonLabel = ({
@@ -5512,7 +5512,7 @@ const getPrepareActionButtonLabel = ({
   }
 
   if (requiresApproval) {
-    return 'Preparar aprobacion'
+    return 'Preparar aprobaci\u00f3n'
   }
 
   return 'Preparar plan'
@@ -5534,10 +5534,10 @@ const getContinuationCategoryLabel = (value?: string) => {
     return 'Datos y schema'
   }
   if (normalizedValue === 'validation-improvement') {
-    return 'Validacion y docs'
+    return 'Validaci\u00f3n y docs'
   }
   if (normalizedValue === 'approval-required') {
-    return 'Requiere aprobacion'
+    return 'Requiere aprobaci\u00f3n'
   }
   if (normalizedValue === 'blocked') {
     return 'Bloqueado por seguridad'
@@ -6077,6 +6077,7 @@ function ProjectContinuityCard({
                 safeToPrepare: option.safeToPrepare,
                 safeToMaterialize: option.safeToMaterialize,
                 requiresApproval: option.requiresApproval,
+                blocked: option.blocked,
                 alreadyDone,
               })
               const optionPayload: ModuleExpansionActionPayload = {
@@ -6404,7 +6405,7 @@ function ProjectContinuityCenterCard({
     normalizeOptionalString(moduleExpansionPlan?.reason) ||
     normalizeOptionalString(phaseExpansionPlan?.goal) ||
     normalizeOptionalString(projectPhaseExecutionPlan?.reason) ||
-    'JEFE ya dejo contexto suficiente para seguir, pero todavia no armo un resumen corto.'
+    'JEFE ya dejó contexto suficiente para seguir, pero todavía no armó un resumen corto.'
   const operatorMessage =
     normalizeOptionalString(projectContinuationState?.operatorMessage) ||
     continuationSummary
@@ -6444,7 +6445,7 @@ function ProjectContinuityCenterCard({
           explicitExclusions: moduleExpansionPlan.explicitExclusions || [],
           successCriteria: moduleExpansionPlan.successCriteria || [],
           expectedOutcome:
-            'Dejar la expansion del modulo lista para revision o materializacion segura.',
+            'Dejar la expansión del módulo lista para revisión o materialización segura.',
         }
       : null) ||
     (projectPhaseExecutionPlan?.phaseId
@@ -6587,7 +6588,7 @@ function ProjectContinuityCenterCard({
     normalizeOptionalString(projectReadinessState?.operatorSummary) ||
     normalizeOptionalString(projectReadinessState?.lastValidationSummary) ||
     normalizeOptionalString(localProjectManifest?.lastValidationSummary) ||
-    'Todavia no hay un estado de demo resumido para este proyecto.'
+    'Todav\u00eda no hay un estado de demo resumido para este proyecto.'
   const runtimeApprovalCommands = normalizeOptionalStringArray(
     runtimeApprovalState?.commandsPreview,
   )
@@ -6791,7 +6792,7 @@ function ProjectContinuityCenterCard({
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="text-sm font-medium leading-6 text-slate-100">
-                        {normalizeOptionalString(action.title) || 'Accion sin titulo'}
+                        {normalizeOptionalString(action.title) || 'Acción sin título'}
                       </div>
                       {action.recommended ? (
                         <span className="rounded-full border border-sky-300/20 bg-sky-300/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-100">
@@ -6801,7 +6802,7 @@ function ProjectContinuityCenterCard({
                     </div>
                     <div className="mt-2 text-sm leading-6 text-slate-300">
                       {normalizeOptionalString(action.description) ||
-                        'Sin descripcion declarada.'}
+                        'Sin descripción declarada.'}
                     </div>
                     <div className="mt-2 text-xs leading-5 text-slate-400">
                       {detailCopy}
@@ -6829,7 +6830,7 @@ function ProjectContinuityCenterCard({
 
                 <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <MetricCard
-                    label="Como sigue"
+                    label="Cómo sigue"
                     value={getOperatorStrategyLabel(action.targetStrategy)}
                     detail={
                       normalizeOptionalString(action.expectedOutcome) ||
@@ -6844,19 +6845,19 @@ function ProjectContinuityCenterCard({
                     tone={getRiskTone(action.riskLevel)}
                   />
                   <MetricCard
-                    label="Preparacion"
+                    label="Preparación"
                     value={action.safeToPrepare === false ? 'No' : 'Si'}
                     detail={
                       action.requiresApproval
-                        ? 'Requiere aprobacion antes de salir del modo seguro.'
+                        ? 'Requiere aprobación antes de salir del modo seguro.'
                         : action.blocked
                           ? 'Conviene revisar el bloqueo primero.'
-                          : 'Se puede dejar lista como siguiente accion revisable.'
+                          : 'Se puede dejar lista como siguiente acción revisable.'
                     }
                     tone={action.safeToPrepare === false ? 'rose' : 'emerald'}
                   />
                   <MetricCard
-                    label="Materializacion"
+                    label="Materialización"
                     value={action.safeToMaterialize ? 'Segura' : 'No disponible'}
                     detail={
                       alreadyDone
@@ -6864,10 +6865,10 @@ function ProjectContinuityCenterCard({
                         : action.safeToMaterialize
                           ? 'Existe una ruta local y revisable.'
                           : action.requiresApproval
-                            ? 'Necesita aprobacion antes de ejecutar.'
+                            ? 'Necesita aprobación antes de ejecutar.'
                             : action.blocked
                               ? 'Bloqueado por seguridad.'
-                              : 'Todavia no se puede ejecutar solo.'
+                              : 'Todavía no se puede ejecutar sola.'
                     }
                     tone={
                       alreadyDone
@@ -6910,11 +6911,11 @@ function ProjectContinuityCenterCard({
                       {alreadyDone
                         ? 'Ya agregado al proyecto.'
                         : action.requiresApproval
-                          ? 'Requiere aprobacion antes de salir del modo seguro.'
+                          ? 'Requiere aprobación antes de salir del modo seguro.'
                           : action.blocked
                             ? normalizeOptionalString(action.blocker) ||
                               'Bloqueado por seguridad.'
-                            : 'Todavia no se puede ejecutar solo.'}
+                            : 'Todavía no se puede ejecutar sola.'}
                     </span>
                   )}
                 </div>
@@ -6973,7 +6974,7 @@ function ProjectContinuityCenterCard({
               ? `${completedPhases.length} fase(s)`
               : 'Nada declarado'
           }
-          detail={completedPhases[0] || 'Todavia no hay fases completas declaradas'}
+          detail={completedPhases[0] || 'Todav\u00eda no hay fases completas declaradas'}
           tone="sky"
         />
         <MetricCard
@@ -6991,15 +6992,15 @@ function ProjectContinuityCenterCard({
           tone={pendingPhases.length > 0 ? 'amber' : 'emerald'}
         />
         <MetricCard
-          label="Modulos del proyecto"
+          label="Módulos del proyecto"
           value={
-            manifestModules.length > 0 ? `${manifestModules.length} modulo(s)` : 'Sin modulos'
+            manifestModules.length > 0 ? `${manifestModules.length} módulo(s)` : 'Sin módulos'
           }
           detail={
             modulesDone[0] ||
             visibleModules[0]?.name ||
             visibleModules[0]?.id ||
-            'Todavia no hay modulos declarados'
+            'Todavía no hay módulos declarados'
           }
           tone="emerald"
         />
@@ -7046,8 +7047,8 @@ function ProjectContinuityCenterCard({
               <div className="mt-2 text-sm leading-6 text-slate-300">{readinessSummary}</div>
               <div className="mt-2 text-xs leading-5 text-slate-400">
                 {projectReadinessState.demoReady || projectReadinessState.safeLocalDemoReady
-                  ? 'No se ejecuto nada real. La demo sigue apoyada en archivos locales y mocks revisables.'
-                  : 'No se toca nada real sin aprobacion. El proyecto puede seguir creciendo por fases seguras.'}
+                  ? 'No se ejecutó nada real. La demo sigue apoyada en archivos locales y mocks revisables.'
+                  : 'No se toca nada real sin aprobación. El proyecto puede seguir creciendo por fases seguras.'}
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -7077,36 +7078,36 @@ function ProjectContinuityCenterCard({
               value={projectReadinessState.completedCoreFlow ? 'Completo' : 'Incompleto'}
               detail={
                 projectReadinessState.completedCoreFlow
-                  ? 'La base segura ya cerro frontend, backend, datos y validacion local.'
-                  : readinessMissingCorePhases[0] || 'Todavia falta completar la base segura.'
+                  ? 'La base segura ya cerró frontend, backend, datos y validación local.'
+                  : readinessMissingCorePhases[0] || 'Todavía falta completar la base segura.'
               }
               tone={projectReadinessState.completedCoreFlow ? 'emerald' : 'amber'}
             />
             <MetricCard
-              label="Validacion local"
+              label="Validación local"
               value={getValidationStatusLabel(projectReadinessState.validationStatus)}
               detail={
                 normalizeOptionalString(projectReadinessState.lastValidationSummary) ||
                 normalizeOptionalString(localProjectManifest?.lastValidationSummary) ||
-                'Sin resumen de validacion declarado.'
+                'Sin resumen de validación declarado.'
               }
               tone={readinessTone}
             />
             <MetricCard
-              label="Guia rapida"
+              label="Guía rápida"
               value={
                 recommendedDemoScript.length > 0
                   ? `${recommendedDemoScript.length} paso(s)`
-                  : 'Sin guia'
+                  : 'Sin guía'
               }
-              detail={recommendedDemoScript[0] || 'Todavia no hay una guia rapida declarada.'}
+              detail={recommendedDemoScript[0] || 'Todavía no hay una guía rápida declarada.'}
               tone="sky"
             />
           </div>
 
           <div className="mt-4 grid gap-4 xl:grid-cols-2">
             <ProductArchitectureGroup
-              title="Que ya esta construido"
+              title="Qué ya está construido"
               items={[
                 ...readinessCompletedPhases,
                 ...readinessCompletedModules,
@@ -7116,11 +7117,11 @@ function ProjectContinuityCenterCard({
               tone="emerald"
             />
             <ProductArchitectureGroup
-              title="Que sigue siendo mock"
+              title="Qué sigue siendo mock"
               items={
                 readinessMockOnlyAreas.length > 0
                   ? readinessMockOnlyAreas
-                  : ['Esto es mock, no produccion.']
+                  : ['Esto es mock, no producción.']
               }
               compact={compact}
               tone="amber"
@@ -7129,11 +7130,11 @@ function ProjectContinuityCenterCard({
 
           <div className="mt-4 grid gap-4 xl:grid-cols-2">
             <ProductArchitectureGroup
-              title="Requiere aprobacion"
+              title="Requiere aprobación"
               items={
                 readinessApprovalAreas.length > 0
                   ? readinessApprovalAreas
-                  : ['No se toca nada real sin aprobacion.']
+                  : ['No se toca nada real sin aprobación.']
               }
               compact={compact}
               tone="rose"
@@ -7154,7 +7155,7 @@ function ProjectContinuityCenterCard({
 
           <div className="mt-4 grid gap-4 xl:grid-cols-2">
             <ProductArchitectureGroup
-              title="Todavia falta completar"
+              title="Todavía falta completar"
               items={[
                 ...readinessMissingCorePhases,
                 ...readinessMissingRecommendedModules,
@@ -7164,7 +7165,7 @@ function ProjectContinuityCenterCard({
               tone="amber"
             />
             <ProductArchitectureGroup
-              title="Guia rapida para probar"
+              title="Guía rápida para probar"
               items={
                 recommendedDemoScript.length > 0
                   ? recommendedDemoScript
@@ -7203,16 +7204,16 @@ function ProjectContinuityCenterCard({
               </div>
               <div className="mt-2 text-base font-semibold text-white">
                 {normalizeOptionalString(runtimeApprovalState.title) ||
-                  'Pasar a ejecucion real'}
+                  'Pasar a ejecución real'}
               </div>
               <div className="mt-2 text-sm leading-6 text-slate-300">
                 {normalizeOptionalString(runtimeApprovalState.notExecutedDisclaimer) ||
-                  'No se ejecuto nada todavia.'}
+                  'No se ejecutó nada todavía.'}
               </div>
               <div className="mt-2 text-xs leading-5 text-slate-400">
                 {normalizeOptionalString(runtimeApprovalState.description) ||
                   normalizeOptionalString(runtimeApprovalState.safeAlternative) ||
-                  'JEFE preparo un preview controlado sin salir del modo local seguro.'}
+                  'JEFE preparó un preview controlado sin salir del modo local seguro.'}
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -7232,11 +7233,11 @@ function ProjectContinuityCenterCard({
 
           <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard
-              label="Pasar a ejecucion real"
+              label="Pasar a ejecución real"
               value={runtimeApprovalStatusLabel}
               detail={
                 normalizeOptionalString(runtimeApprovalState.relatedReadinessArea) ||
-                'La ejecucion real sigue bloqueada hasta aprobacion explicita.'
+                'La ejecución real sigue bloqueada hasta aprobación explícita.'
               }
               tone={runtimeApprovalTone}
             />
@@ -7274,7 +7275,7 @@ function ProjectContinuityCenterCard({
               }
               detail={
                 normalizeOptionalString(runtimeApprovalState.expectedOutcome) ||
-                'Todavia no se ejecuta nada real.'
+                'Todavía no se ejecuta nada real.'
               }
               tone="emerald"
             />
@@ -7286,13 +7287,13 @@ function ProjectContinuityCenterCard({
               items={
                 runtimeApprovalCommands.length > 0
                   ? runtimeApprovalCommands
-                  : ['Todavia no hay comandos propuestos para esta aprobacion.']
+                  : ['Todavía no hay comandos propuestos para esta aprobación.']
               }
               compact={compact}
               tone="amber"
             />
             <ProductArchitectureGroup
-              title="Archivos que podrian cambiar"
+              title="Archivos que podrían cambiar"
               items={
                 runtimeApprovalFiles.length > 0
                   ? runtimeApprovalFiles
@@ -7319,7 +7320,7 @@ function ProjectContinuityCenterCard({
                       ...runtimeApprovalEnv,
                       ...runtimeApprovalSecrets,
                     ]
-                  : ['No se toca nada real sin aprobacion.']
+                  : ['No se toca nada real sin aprobación.']
               }
               compact={compact}
               tone="rose"
@@ -7356,7 +7357,7 @@ function ProjectContinuityCenterCard({
               items={
                 runtimeApprovalRiskItems.length > 0
                   ? runtimeApprovalRiskItems
-                  : ['No se toca nada real sin aprobacion.']
+                  : ['No se toca nada real sin aprobación.']
               }
               compact={compact}
               tone="rose"
@@ -7371,13 +7372,13 @@ function ProjectContinuityCenterCard({
                 disabled={busy}
                 className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-2.5 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
               >
-                Preparar aprobacion
+                Preparar aprobación
               </button>
             ) : null}
             <span className="text-sm leading-6 text-slate-400">
               {normalizeOptionalString(runtimeApprovalState.approvalPhrase) ||
                 normalizeOptionalString(runtimeApprovalState.notExecutedDisclaimer) ||
-                'No se ejecuto todavia. Primero hace falta revisar y aprobar el alcance.'}
+                'No se ejecutó todavía. Primero hace falta revisar y aprobar el alcance.'}
             </span>
           </div>
         </div>
@@ -7386,21 +7387,21 @@ function ProjectContinuityCenterCard({
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Requiere aprobacion
+                Requiere aprobación
               </div>
               <div className="mt-2 text-base font-semibold text-white">
                 {normalizeOptionalString(approvalRequestPlan.title) ||
-                  'Accion sensible pendiente'}
+                  'Acción sensible pendiente'}
               </div>
               <div className="mt-2 text-sm leading-6 text-slate-300">
                 {normalizeOptionalString(approvalRequestPlan.operatorMessage) ||
                   normalizeOptionalString(approvalRequestPlan.description) ||
-                  'Todavia no se ejecuto nada real.'}
+                  'Todavía no se ejecutó nada real.'}
               </div>
               <div className="mt-2 text-xs leading-5 text-slate-400">
                 {normalizeOptionalString(approvalRequestPlan.areaSummary) ||
                   normalizeOptionalString(approvalRequestPlan.safeAlternative) ||
-                  'JEFE preparo el paquete de aprobacion sin salir del modo local seguro.'}
+                  'JEFE preparó el paquete de aprobación sin salir del modo local seguro.'}
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -7414,7 +7415,7 @@ function ProjectContinuityCenterCard({
               >
                 {approvalRequestPlan.blockedByDefault
                   ? 'Bloqueado por seguridad'
-                  : 'Requiere aprobacion'}
+                  : 'Requiere aprobación'}
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
                 {getRiskLabel(approvalRequestPlan.riskLevel)}
@@ -7430,11 +7431,11 @@ function ProjectContinuityCenterCard({
               tone={getRiskTone(approvalRequestPlan.riskLevel)}
             />
             <MetricCard
-              label="Que se aprobaria"
+              label="Qué se aprobaría"
               value={
                 approvalPacketTouches.length > 0
                   ? `${approvalPacketTouches.length} area(s)`
-                  : 'Sin areas'
+                  : 'Sin áreas'
               }
               detail={approvalPacketTouches[0] || 'Sin alcance declarado'}
               tone="amber"
@@ -7460,7 +7461,7 @@ function ProjectContinuityCenterCard({
               detail={
                 approvalRequestPlan.forbiddenInCurrentTask
                   ? 'No se ejecuta en esta tarea.'
-                  : 'Todavia no se ejecuto nada real.'
+                  : 'Todavía no se ejecutó nada real.'
               }
               tone={approvalRequestPlan.blockedByDefault ? 'rose' : 'amber'}
             />
@@ -7468,7 +7469,7 @@ function ProjectContinuityCenterCard({
 
           <div className="mt-4 grid gap-4 xl:grid-cols-2">
             <ProductArchitectureGroup
-              title="Que tocaria"
+              title="Qué tocaría"
               items={
                 approvalPacketTouches.length > 0
                   ? approvalPacketTouches
@@ -7478,11 +7479,11 @@ function ProjectContinuityCenterCard({
               tone="amber"
             />
             <ProductArchitectureGroup
-              title="No se ejecuto todavia"
+              title="No se ejecutó todavía"
               items={
                 approvalPacketWillNotTouch.length > 0
                   ? approvalPacketWillNotTouch
-                  : ['No se toca nada real sin aprobacion.']
+                  : ['No se toca nada real sin aprobación.']
               }
               compact={compact}
               tone="emerald"
@@ -7523,12 +7524,12 @@ function ProjectContinuityCenterCard({
                 disabled={busy}
                 className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-2.5 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
               >
-                Preparar aprobacion
+                Preparar aprobación
               </button>
             ) : null}
             <span className="text-sm leading-6 text-slate-400">
               {normalizeOptionalString(approvalRequestPlan.explicitApprovalText) ||
-                'No se ejecuto todavia. Primero hace falta revisar y aprobar el alcance.'}
+                'No se ejecutó todavía. Primero hace falta revisar y aprobar el alcance.'}
             </span>
           </div>
         </div>
@@ -7583,19 +7584,19 @@ function ProjectContinuityCenterCard({
         {renderActionCards(
           'Podes avanzar ahora',
           availableSafeActions,
-          'Todavia no hay acciones seguras nuevas para ejecutar dentro del modo local.',
+          'Todav\u00eda no hay acciones seguras nuevas para ejecutar dentro del modo local.',
           'emerald',
         )}
         {renderActionCards(
           'Acciones revisables',
           availablePlanningActions,
-          'JEFE no dejo nuevas acciones revisables ademas del siguiente paso recomendado.',
+          'JEFE no dejó nuevas acciones revisables además del siguiente paso recomendado.',
           'amber',
         )}
         {renderActionCards(
-          'Requiere aprobacion',
+          'Requiere aprobación',
           approvalRequiredActions,
-          'No hay acciones pendientes de aprobacion en esta corrida.',
+          'No hay acciones pendientes de aprobación en esta corrida.',
           'rose',
         )}
         {renderActionCards(
@@ -7638,15 +7639,18 @@ function ProjectContinuityCenterCard({
                 title:
                   normalizeOptionalString(option.label) ||
                   normalizeOptionalString(option.id) ||
-                  'Opcion sin titulo',
+                  'Opción sin título',
                 description: normalizeOptionalString(option.description),
                 category: normalizeOptionalString(option.expansionType),
                 targetStrategy: normalizeOptionalString(option.targetStrategy),
                 safeToPrepare: option.safeToPrepare !== false,
                 safeToMaterialize: option.safeToMaterialize === true,
                 requiresApproval: option.requiresApproval === true,
-                blocked: alreadyDone,
-                blocker: alreadyDone ? 'Ya agregado al proyecto.' : '',
+                blocked: option.blocked === true || alreadyDone,
+                blocker:
+                  alreadyDone
+                    ? 'Ya agregado al proyecto.'
+                    : normalizeOptionalString(option.blocker),
                 moduleId: isModuleOption ? normalizeOptionalString(option.id) : '',
                 riskLevel: option.riskLevel,
                 reason: normalizeOptionalString(option.reason),
@@ -7656,6 +7660,7 @@ function ProjectContinuityCenterCard({
               const canMaterialize =
                 option.safeToMaterialize === true &&
                 !option.requiresApproval &&
+                !option.blocked &&
                 !alreadyDone
 
               return (
@@ -7667,7 +7672,7 @@ function ProjectContinuityCenterCard({
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="text-sm font-medium leading-6 text-slate-100">
-                          {normalizeOptionalString(option.label) || 'Opcion sin titulo'}
+                          {normalizeOptionalString(option.label) || 'Opción sin título'}
                         </div>
                         {recommendedOptionId &&
                         recommendedOptionId === normalizedOptionId ? (
@@ -7678,7 +7683,7 @@ function ProjectContinuityCenterCard({
                       </div>
                       <div className="mt-2 text-sm leading-6 text-slate-300">
                         {normalizeOptionalString(option.description) ||
-                          'Sin descripcion declarada.'}
+                          'Sin descripción declarada.'}
                       </div>
                       <div className="mt-2 text-xs leading-5 text-slate-400">
                         {normalizeOptionalString(option.reason) || visualState.detail}
@@ -7700,7 +7705,7 @@ function ProjectContinuityCenterCard({
                   </div>
                   <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <MetricCard
-                      label="Como sigue"
+                      label="Cómo sigue"
                       value={getOperatorStrategyLabel(option.targetStrategy)}
                       detail={
                         alreadyDone
@@ -7710,8 +7715,8 @@ function ProjectContinuityCenterCard({
                             : option.requiresApproval
                               ? 'Necesita revision humana antes de salir del modo seguro.'
                               : option.safeToPrepare === false
-                                ? 'Todavia no esta lista para prepararse desde la interfaz.'
-                                : 'Se puede dejar lista como plan revisable sin ejecutar cambios todavia.'
+                                ? 'Todavía no está lista para prepararse desde la interfaz.'
+                                : 'Se puede dejar lista como plan revisable sin ejecutar cambios todavía.'
                       }
                       tone="sky"
                     />
@@ -7722,24 +7727,24 @@ function ProjectContinuityCenterCard({
                       tone={getRiskTone(option.riskLevel)}
                     />
                     <MetricCard
-                      label="Preparacion"
+                      label="Preparación"
                       value={option.safeToPrepare === false ? 'No' : 'Si'}
                       detail={
                         option.requiresApproval
-                          ? 'Necesita revision humana'
+                          ? 'Necesita revisión humana'
                           : 'Puede dejar un plan revisable'
                       }
                       tone={option.safeToPrepare === false ? 'rose' : 'emerald'}
                     />
                     <MetricCard
-                      label="Materializacion"
+                      label="Materialización"
                       value={option.safeToMaterialize ? 'Segura' : 'No disponible'}
                       detail={
                         alreadyDone
                           ? 'Ya existe en el proyecto'
                           : option.safeToMaterialize
                             ? 'Existe una ruta local y revisable'
-                            : 'Todavia no tiene materializador seguro'
+                            : 'Todavía no tiene materializador seguro'
                       }
                       tone={
                         alreadyDone
@@ -7763,6 +7768,7 @@ function ProjectContinuityCenterCard({
                         {getPrepareActionButtonLabel({
                           alreadyDone,
                           requiresApproval: option.requiresApproval,
+                          blocked: option.blocked,
                         })}
                       </button>
                     ) : null}
@@ -7773,17 +7779,18 @@ function ProjectContinuityCenterCard({
                         disabled={busy}
                         className="rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-2.5 text-sm font-medium text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
                       >
-                        Materializar modulo
+                        Materializar módulo
                       </button>
                     ) : (
                       <span className="text-sm leading-6 text-slate-400">
                         {alreadyDone
                           ? 'Ya agregado al proyecto.'
                           : option.requiresApproval
-                            ? 'Requiere aprobacion antes de salir del modo seguro.'
+                            ? 'Requiere aprobación antes de salir del modo seguro.'
                             : option.safeToMaterialize
                               ? 'Listo para revisar antes de ejecutar.'
-                              : 'Todavia no tiene materializador seguro.'}
+                              : normalizeOptionalString(option.blocker) ||
+                                'Todavía no tiene materializador seguro.'}
                       </span>
                     )}
                   </div>
@@ -7797,7 +7804,7 @@ function ProjectContinuityCenterCard({
       {visibleModules.length > 0 ? (
         <div className="mt-4">
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Modulos del proyecto
+            Módulos del proyecto
           </div>
           <div className="mt-3 grid gap-3 xl:grid-cols-2">
             {visibleModules.map((moduleEntry) => {
@@ -8553,7 +8560,7 @@ const buildFrontendProjectMaterializationPrompt = ({
       'sourceStrategy: scalable-delivery-plan.',
       'sourceNextExpectedAction: review-scalable-delivery.',
       'deliveryLevel: frontend-project.',
-      'accion requerida: materializar frontend-project.',
+      'acción requerida: materializar frontend-project.',
       'modo esperado: scaffold frontend local, estatico y revisable.',
       `allowedRootPaths: ${allowedRootPaths.join(', ') || targetRoot}.`,
       targetStructure.length > 0
@@ -8618,7 +8625,7 @@ const buildFullstackLocalMaterializationPrompt = ({
       'sourceStrategy: scalable-delivery-plan.',
       'sourceNextExpectedAction: review-scalable-delivery.',
       'deliveryLevel: fullstack-local.',
-      'accion requerida: materializar fullstack-local.',
+      'acción requerida: materializar fullstack-local.',
       'modo esperado: scaffold fullstack local, estatico y revisable.',
       `allowedRootPaths: ${allowedRootPaths.join(', ') || targetRoot}.`,
       targetStructure.length > 0
@@ -11083,10 +11090,10 @@ function App() {
     : 'Plan activo cargado'
   const plannerReviewHelperText = plannerIsReviewOnly
     ? plannerIsSafeFirstDeliveryReview
-      ? 'Este plan define una primera fase segura y no ejecuta cambios todavia.'
+      ? 'Este plan define una primera fase segura y no ejecuta cambios todavÍa.'
       : plannerIsScalableDeliveryReview
-        ? 'JEFE detecto una entrega escalable y por ahora solo devuelve un plan revisable; no ejecuta cambios todavia.'
-        : 'Este plan no ejecuta cambios todavia; primero requiere revision manual.'
+        ? 'JEFE detecto una entrega escalable y por ahora solo devuelve un plan revisable; no ejecuta cambios todavÍa.'
+        : 'Este plan no ejecuta cambios todavÍa; primero requiere revision manual.'
     : 'La instruccion actual puede pasar a ejecucion manual cuando corresponda.'
   const plannerReviewActionLabel = plannerIsSafeFirstDeliveryReview
     ? 'Revisar primera entrega segura'
@@ -11398,8 +11405,8 @@ function App() {
       action === 'materialize'
         ? safeToMaterialize
           ? 'Solo materializar si existe una ruta local, segura y revisable para esta expansion.'
-          : 'Si todavia no existe materializador seguro, devolver solo un plan revisable y no ejecutar cambios.'
-        : 'Solo preparar el plan; no escribir archivos todavia.',
+          : 'Si todavÍa no existe materializador seguro, devolver solo un plan revisable y no ejecutar cambios.'
+        : 'Solo preparar el plan; no escribir archivos todavÍa.',
       'Usar jefe-project.json si existe para entender el estado local del proyecto.',
       'No tocar package.json, node_modules, .env, Docker, deploy ni runtime real.',
     ].filter(Boolean)
@@ -11430,7 +11437,7 @@ function App() {
     const resolvedModuleName =
       normalizeOptionalString(moduleName) ||
       normalizeOptionalString(moduleId).replace(/-/g, ' ') ||
-      'modulo local'
+      'módulo local'
     const projectRoot =
       normalizeOptionalString(activeModuleExpansionPlan?.projectRoot) || activeLocalProjectRoot
     const domainLabel =
@@ -11440,8 +11447,8 @@ function App() {
     const normalizedExpectedFiles = normalizeOptionalStringArray(expectedFiles)
     const goal =
       action === 'materialize'
-        ? `Materializar la expansion de modulo de ${resolvedModuleName} para el proyecto fullstack local de ${domainLabel}.`
-        : `Preparar una expansion de modulo de ${resolvedModuleName} para el proyecto fullstack local de ${domainLabel}.`
+        ? `Materializar la expansión de módulo de ${resolvedModuleName} para el proyecto fullstack local de ${domainLabel}.`
+        : `Preparar una expansión de módulo de ${resolvedModuleName} para el proyecto fullstack local de ${domainLabel}.`
     const contextLines = [
       'deliveryLevel: fullstack-local.',
       `moduleId: ${resolvedModuleId}.`,
@@ -11461,9 +11468,9 @@ function App() {
         : '',
       action === 'materialize'
         ? safeToMaterialize
-          ? 'Solo materializar si existe un materializador seguro real para este modulo.'
-          : 'No prometer ejecucion inmediata si el modulo todavia no tiene materializador seguro.'
-        : 'Solo preparar el plan; no escribir archivos todavia.',
+          ? 'Solo materializar si existe un materializador seguro real para este módulo.'
+          : 'No prometer ejecución inmediata si el módulo todavía no tiene materializador seguro.'
+        : 'Solo preparar el plan; no escribir archivos todavÍa.',
       'Usar jefe-project.json si existe para entender el estado local del proyecto.',
       'No tocar package.json, node_modules, .env, Docker, deploy ni runtime real.',
     ].filter(Boolean)
@@ -11522,11 +11529,11 @@ function App() {
         ? `expectedOutcome: ${normalizeOptionalString(expectedOutcome)}`
         : '',
       requiresApproval
-        ? 'Requiere aprobacion: no ejecutar runtime real ni cambios sensibles.'
+        ? 'Requiere aprobación: no ejecutar runtime real ni cambios sensibles.'
         : '',
       blocked
         ? 'Si sigue bloqueado, devolver solo un plan revisable con alternativa segura.'
-        : 'Solo preparar el plan; no escribir archivos todavia.',
+        : 'Solo preparar el plan; no escribir archivos todavÍa.',
       'Usar jefe-project.json si existe para entender el estado local del proyecto.',
       'No tocar package.json, node_modules, .env, Docker, deploy ni runtime real.',
     ].filter(Boolean)
@@ -11764,7 +11771,7 @@ function App() {
     (entry) => entry.ok !== false && inferValidationEntryKind(entry) === 'file',
   ).length
   const contextualExecutorModeCardLabel = fastRouteDetected
-    ? 'Modo de ejecucion'
+    ? 'Modo de ejecución'
     : 'Modo del executor'
   const contextualExecutorModeLabel = fastRouteDetected
     ? 'Ruta rapida local'
@@ -13370,9 +13377,9 @@ function App() {
       instruction: fallbackInstruction,
       result: payload.result || payload.resultPreview || fallbackResult,
       approval: 'No requerida',
-      finalStatus: 'Ejecucion completada',
+      finalStatus: 'Ejecución completada',
       currentStepLabel: 'La instruccion actual ya fue ejecutada',
-      sessionStatusLabel: 'Ejecucion completada',
+      sessionStatusLabel: 'Ejecución completada',
       requestState: 'success',
     })
 
@@ -13824,7 +13831,7 @@ function App() {
           'La replanificación no devolvió una instrucción utilizable para continuar.',
         )
         setSessionStatus('Bloqueo real en la replanificación')
-        setCurrentStep('El Cerebro no pudo definir una accion ejecutable')
+        setCurrentStep('El Cerebro no pudo definir una acción ejecutable')
         updateLastRunSummary({
           objective: normalizedGoalInput,
           instruction: instructionToExecute,
@@ -13942,7 +13949,7 @@ function App() {
       }
 
       clearVisibleExecutionRuntimeState()
-      setSessionStatus('El Cerebro definio una nueva accion')
+      setSessionStatus('El Cerebro definió una nueva acción')
       updateLastRunSummary({
         objective: normalizedGoalInput,
         instruction: response.instruction,
@@ -13958,7 +13965,7 @@ function App() {
           requestState: 'success',
           result: response.instruction,
         })
-        setSessionStatus('Ejecucion completada')
+        setSessionStatus('Ejecución completada')
         setCurrentStep('El Cerebro cerró la corrida sin necesitar otra ejecución')
         updateLastRunSummary({
           objective: normalizedGoalInput,
@@ -13967,7 +13974,7 @@ function App() {
           approval: approvedByProjectRule
             ? 'Autoaprobada por regla del proyecto'
             : 'No requerida',
-          finalStatus: 'Ejecucion completada',
+          finalStatus: 'Ejecución completada',
         })
         return
       }
@@ -15290,7 +15297,7 @@ function App() {
       goal: prompt.goal,
       context: prompt.context,
       sourceLabel: `Materializar fase ${normalizeOptionalString(phaseId) || 'local'}`,
-      sendContent: `Se envio una solicitud para materializar la fase ${normalizeOptionalString(phaseId) || 'local'} del proyecto existente.`,
+      sendContent: `Se envió una solicitud para materializar la fase ${normalizeOptionalString(phaseId) || 'local'} del proyecto existente.`,
       persistPreparedInputs: true,
     })
   }
@@ -15360,20 +15367,20 @@ function App() {
     })
 
     clearVisibleExecutionRuntimeState()
-    setSessionStatus('Preparando materializacion de modulo seguro')
+    setSessionStatus('Preparando materialización de módulo seguro')
     setCurrentStep(
-      `El orquestador esta preparando la materializacion del modulo ${normalizeOptionalString(payload.moduleName) || normalizeOptionalString(payload.moduleId) || 'local'}`,
+      `El orquestador está preparando la materialización del módulo ${normalizeOptionalString(payload.moduleName) || normalizeOptionalString(payload.moduleId) || 'local'}`,
     )
     setSessionEvents((currentEvents) => [
       ...currentEvents,
-      `Se solicito la materializacion del modulo ${normalizeOptionalString(payload.moduleName) || normalizeOptionalString(payload.moduleId) || 'local'}`,
+      `Se solicitó la materialización del módulo ${normalizeOptionalString(payload.moduleName) || normalizeOptionalString(payload.moduleId) || 'local'}`,
     ])
 
     await handleGenerateNextStep({
       goal: prompt.goal,
       context: prompt.context,
       sourceLabel: `Materializar ${normalizeOptionalString(payload.moduleName) || 'modulo'}`,
-      sendContent: `Se envio una solicitud para materializar ${normalizeOptionalString(payload.moduleName) || 'un modulo seguro'} del proyecto existente.`,
+      sendContent: `Se envió una solicitud para materializar ${normalizeOptionalString(payload.moduleName) || 'un módulo seguro'} del proyecto existente.`,
       persistPreparedInputs: true,
     })
   }
@@ -15413,7 +15420,7 @@ function App() {
     )
     setSessionEvents((currentEvents) => [
       ...currentEvents,
-      `Se preparo una continuidad revisable para ${normalizeOptionalString(action.title) || normalizeOptionalString(action.id) || 'la siguiente accion'}`,
+      `Se preparó una continuidad revisable para ${normalizeOptionalString(action.title) || normalizeOptionalString(action.id) || 'la siguiente acción'}`,
     ])
 
     await handleGenerateNextStep({
@@ -15481,7 +15488,7 @@ function App() {
       context: preparedPlanningPrompt.context,
       sourceLabel: 'Primera entrega segura preparada',
       sendContent:
-        'Se envio al planificador una solicitud acotada para preparar la primera entrega segura sin ejecutar cambios todavia.',
+        'Se envio al planificador una solicitud acotada para preparar la primera entrega segura sin ejecutar cambios todavÍa.',
       persistPreparedInputs: true,
     })
   }
@@ -15555,7 +15562,7 @@ function App() {
       context: preparedPlanningPrompt.context,
       sourceLabel: 'Materialización segura preparada',
       sendContent:
-        'Se envio al planificador una solicitud acotada para preparar la materializacion segura de la primera entrega sin ejecutar cambios todavia.',
+        'Se envio al planificador una solicitud acotada para preparar la materializacion segura de la primera entrega sin ejecutar cambios todavÍa.',
       onPlanningFailure: () => {
         resetPlannerMaterializationAttemptState({
           fallbackMetadata: safePlanReviewMetadata,
@@ -15654,7 +15661,7 @@ function App() {
       normalizeOptionalString(activeScalableDeliveryPlan.deliveryLevel).toLocaleLowerCase() !==
       'fullstack-local'
     ) {
-      setSessionStatus('Plan escalable todavia no materializable')
+      setSessionStatus('Plan escalable todavÍa no materializable')
       setCurrentStep(
         'La materializacion fullstack local solo esta disponible para deliveryLevel fullstack-local',
       )
