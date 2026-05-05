@@ -10,21 +10,22 @@ Usar un pedido simple pero rico en continuidad:
 
 1. Confirmar que JEFE elija un delivery level seguro y devuelva blueprint + roadmap.
 2. Materializar la base `fullstack-local`.
-3. Avanzar las fases base:
+3. Abrir `frontend/index.html` con doble click y confirmar que la demo estática carga con `file://`, sin servidor ni instalación de dependencias.
+4. Avanzar las fases base:
    - `frontend-mock-flow`
    - `backend-contracts`
    - `database-design`
    - `local-validation`
-4. Abrir el centro de continuidad.
-5. Confirmar el próximo paso recomendado.
-6. Preparar `review-and-expand`.
-7. Expandir al menos un módulo seguro:
+5. Abrir el centro de continuidad.
+6. Confirmar el próximo paso recomendado.
+7. Preparar `review-and-expand`.
+8. Expandir al menos un módulo seguro:
    - `notifications`
    - `reports`
    - `inventory`
-8. Revisar el estado para demo.
-9. Pedir una acción sensible como `npm install` o runtime local.
-10. Confirmar que JEFE solo prepare la aprobación y no ejecute nada real.
+9. Revisar el estado para demo.
+10. Pedir una acción sensible como `npm install` o runtime local.
+11. Confirmar que JEFE solo prepare la aprobación y no ejecute nada real.
 
 ## Qué debería mostrar la UI
 

@@ -11388,6 +11388,7 @@ function buildQuestionPolicy({
 }) {
   const normalizedMode = normalizeUserParticipationMode(userParticipationMode)
   const combinedText = normalizeSectorDetectionText([goal, context].join(' '))
+  const explicitExclusionDetectionText = combinedText
   const sensitiveDetectionText = [
     /\blocal(?:\s+)?onlyconstraints?\s*:[\s\S]*?(?=\bexplicit(?:\s+)?exclusions?\s*:|\bapproval(?:\s+)?required(?:\s+)?later\s*:|\barchivos requeridos\s*:|\bdevolver un\b|$)/gu,
     /\bapproval(?:\s+)?required(?:\s+)?later\s*:[\s\S]*?(?=\bexplicit(?:\s+)?exclusions?\s*:|\barchivos requeridos\s*:|\bdevolver un\b|$)/gu,
@@ -11422,7 +11423,7 @@ function buildQuestionPolicy({
         `\\bdejar\\b[^\\n\\.]{0,220}${groupedPatternSource}[^\\n\\.]{0,80}\\bfuera\\b`,
         'u',
       ),
-    ].some((expression) => expression.test(sensitiveDetectionText))
+    ].some((expression) => expression.test(explicitExclusionDetectionText))
   }
   const blockingQuestions = []
   const optionalQuestions = []
@@ -12006,11 +12007,9 @@ function buildImplementationRoadmap({
       status:
         strategy === 'materialize-fullstack-local-plan'
           ? 'ready'
-          : hasSensitiveBlockingQuestions
-            ? 'blocked'
-            : 'planned',
+          : 'planned',
       executableNow: strategy === 'materialize-fullstack-local-plan',
-      approvalRequired: hasSensitiveBlockingQuestions,
+      approvalRequired: false,
       riskLevel: 'medium',
       expectedOutputs: [
         'frontend/',
@@ -13923,6 +13922,89 @@ function buildScalableDeliveryPlan({
   }
 }
 
+function buildBrowserWindowDataScript(globalName, value) {
+  const normalizedGlobalName =
+    typeof globalName === 'string' && globalName.trim()
+      ? globalName.trim()
+      : 'appData'
+
+  return `window.${normalizedGlobalName} = ${JSON.stringify(value, null, 2)}\n`
+}
+
+function buildBrowserWindowRenderScript({
+  scriptSource,
+  functionName = 'renderApp',
+  globalName,
+}) {
+  const normalizedFunctionName =
+    typeof functionName === 'string' && functionName.trim()
+      ? functionName.trim()
+      : 'renderApp'
+  const normalizedSource =
+    typeof scriptSource === 'string' && scriptSource.trim()
+      ? scriptSource.trim()
+      : `function ${normalizedFunctionName}() {\n  return ''\n}`
+  const normalizedGlobalName =
+    typeof globalName === 'string' && globalName.trim()
+      ? globalName.trim()
+      : normalizedFunctionName
+
+  return `${normalizedSource}\n\nwindow.${normalizedGlobalName} = ${normalizedFunctionName}\n`
+}
+
+function buildStaticBrowserBootstrapScript({
+  dataGlobalName = 'appData',
+  renderGlobalName = 'renderApp',
+  rootElementId = 'app',
+  errorHeading = 'No se pudo abrir la demo local',
+  missingAssetsMessage = 'Faltan los datos mock o el renderer local.',
+  troubleshootingMessage = 'Volvé a abrir frontend/index.html directamente y revisá que src/mock-data.js, src/components/App.js y src/main.js sigan disponibles.',
+}) {
+  return `const rootElement = document.getElementById('${rootElementId}')
+
+function showBootstrapError(message) {
+  if (!rootElement) {
+    return
+  }
+
+  rootElement.innerHTML = \`
+    <main class="app-shell">
+      <section class="panel">
+        <h1>${errorHeading}</h1>
+        <p>\${message}</p>
+        <p>${troubleshootingMessage}</p>
+      </section>
+    </main>
+  \`
+}
+
+if (!rootElement) {
+  throw new Error('No se encontró el contenedor #${rootElementId} para renderizar el scaffold.')
+}
+
+const appData = window.${dataGlobalName}
+const appRenderer = window.${renderGlobalName}
+
+if (!appData || typeof appRenderer !== 'function') {
+  console.error(
+    'No se pudo renderizar la demo local porque faltan los scripts clásicos o no se cargaron en orden.',
+    {
+      hasAppData: Boolean(appData),
+      hasRenderApp: typeof appRenderer === 'function',
+    },
+  )
+  showBootstrapError('${missingAssetsMessage}')
+} else {
+  try {
+    rootElement.innerHTML = appRenderer(appData)
+  } catch (error) {
+    console.error('Falló el render de la demo local.', error)
+    showBootstrapError('Ocurrió un error al renderizar la demo local revisable.')
+  }
+}
+`
+}
+
 function buildFrontendProjectMaterializationPlan({
   goal,
   context,
@@ -14049,7 +14131,9 @@ function buildFrontendProjectMaterializationPlan({
   </head>
   <body>
     <div id="app"></div>
-    <script type="module" src="./src/main.js"></script>
+    <script src="./src/mock-data.js"></script>
+    <script src="./src/components/App.js"></script>
+    <script src="./src/main.js"></script>
   </body>
 </html>
 `
@@ -14515,7 +14599,7 @@ function buildFullstackLocalMaterializationPlan({
     ],
     stats: medicalDomainDetected
       ? [
-          { label: 'Turnos del dia', value: 18 },
+          { label: 'Turnos del día', value: 18 },
           { label: 'Profesionales activos', value: 7 },
           { label: 'Especialidades', value: 4 },
         ]
@@ -14530,7 +14614,7 @@ function buildFullstackLocalMaterializationPlan({
             id: 'T-001',
             patient: 'Lucia Perez',
             professional: 'Dra. Ana Gomez',
-            specialty: 'Clinica medica',
+            specialty: 'Clínica médica',
             slot: '2026-05-02 09:30',
             status: 'confirmado',
           },
@@ -14538,7 +14622,7 @@ function buildFullstackLocalMaterializationPlan({
             id: 'T-002',
             patient: 'Martin Suarez',
             professional: 'Dr. Pablo Ruiz',
-            specialty: 'Pediatria',
+            specialty: 'Pediatría',
             slot: '2026-05-02 10:15',
             status: 'pendiente',
           },
@@ -14573,7 +14657,7 @@ function buildFullstackLocalMaterializationPlan({
       name: `${packageName}-frontend`,
       private: true,
       version: '0.0.0',
-      description: 'Frontend local estatico y revisable del scaffold fullstack.',
+      description: 'Frontend local estático y revisable del scaffold fullstack.',
       scripts: {
         review: 'echo "Abrir frontend/index.html localmente para revisar la base visual"',
       },
@@ -14586,7 +14670,7 @@ function buildFullstackLocalMaterializationPlan({
       name: `${packageName}-backend`,
       private: true,
       version: '0.0.0',
-      description: 'Backend local revisable sin ejecucion automatica ni dependencias instaladas.',
+      description: 'Backend local revisable sin ejecución automática ni dependencias instaladas.',
       scripts: {
         review: 'echo "Revisar backend/src sin levantar servicios"',
       },
@@ -14604,7 +14688,9 @@ function buildFullstackLocalMaterializationPlan({
   </head>
   <body>
     <div id="app"></div>
-    <script type="module" src="./src/main.js"></script>
+    <script src="./src/mock-data.js"></script>
+    <script src="./src/components/App.js"></script>
+    <script src="./src/main.js"></script>
   </body>
 </html>
 `
@@ -14631,12 +14717,12 @@ Scaffold fullstack local y revisable generado por JEFE.
 - scripts/
 - docs/
 
-## Como revisar
+## Cómo revisar
 
-1. Abrir \`frontend/index.html\` para revisar la base visual local.
+1. Hacer doble click en \`frontend/index.html\` o abrirlo directo desde el navegador para revisar la base visual local con \`file://\`.
 2. Inspeccionar \`backend/src/\` y \`shared/\` como contratos de referencia.
-3. Revisar \`database/schema.sql\` y \`database/seeds/seed-local.sql\` como diseno editable.
-4. Confirmar en \`docs/\` los limites antes de pensar en una fase ejecutable real.
+3. Revisar \`database/schema.sql\` y \`database/seeds/seed-local.sql\` como diseño editable.
+4. Confirmar en \`docs/\` los límites antes de pensar en una fase ejecutable real.
 `
   const frontendStylesContent = `:root {
   color-scheme: light;
@@ -14738,13 +14824,14 @@ body {
   font-size: 1.5rem;
 }
 `
-  const frontendMockDataContent = `export const fullstackPlan = ${JSON.stringify(
+  const frontendMockDataContent = buildBrowserWindowDataScript(
+    'fullstackPlan',
     frontendMockDataObject,
-    null,
-    2,
-  )}
-`
-  const frontendAppComponentContent = `export function renderApp(fullstackPlan) {
+  )
+  const frontendAppComponentContent = buildBrowserWindowRenderScript({
+    functionName: 'renderApp',
+    globalName: 'renderApp',
+    scriptSource: `function renderApp(fullstackPlan) {
   const routes = Array.isArray(fullstackPlan?.routes) ? fullstackPlan.routes : []
   const highlights = Array.isArray(fullstackPlan?.highlights) ? fullstackPlan.highlights : []
   const stats = Array.isArray(fullstackPlan?.stats) ? fullstackPlan.stats : []
@@ -14768,7 +14855,7 @@ body {
 
       <div class="grid">
         <section class="panel">
-          <h2>Metricas mock</h2>
+          <h2>Métricas mock</h2>
           <div class="stats-grid">
             \${stats
               .map(
@@ -14780,8 +14867,8 @@ body {
         <section class="panel">
           <h2>Capas incluidas</h2>
           <ul>
-            <li>frontend estatico y revisable</li>
-            <li>backend de referencia sin ejecucion automatica</li>
+            <li>frontend estático y revisable</li>
+            <li>backend de referencia sin ejecución automática</li>
             <li>shared contracts entre capas</li>
             <li>database local como esquema editable</li>
           </ul>
@@ -14803,19 +14890,18 @@ body {
       </div>
     </main>
   \`
-}
-`
-  const frontendMainJsContent = `import { renderApp } from './components/App.js'
-import { fullstackPlan } from './mock-data.js'
-
-const rootElement = document.getElementById('app')
-
-if (!rootElement) {
-  throw new Error('No se encontro el contenedor #app para renderizar el scaffold.')
-}
-
-rootElement.innerHTML = renderApp(fullstackPlan)
-`
+}`,
+  })
+  const frontendMainJsContent = buildStaticBrowserBootstrapScript({
+    dataGlobalName: 'fullstackPlan',
+    renderGlobalName: 'renderApp',
+    rootElementId: 'app',
+    errorHeading: 'No se pudo abrir el scaffold fullstack local',
+    missingAssetsMessage:
+      'Faltan los datos mock o el renderer local del scaffold fullstack.',
+    troubleshootingMessage:
+      'Abrí frontend/index.html directamente con doble click y revisá que mock-data.js, App.js y main.js sigan presentes y en ese orden.',
+  })
   const backendResponseLibContent = `function buildResponse(status, payload) {
   return {
     status,
@@ -14911,15 +14997,15 @@ module.exports = {
 `
   const databaseReadmeContent = `# Database local
 
-Esta carpeta queda como diseno revisable.
+Esta carpeta queda como diseño revisable.
 
-- No se creo una base de datos real.
+- No se creó una base de datos real.
 - No se ejecutaron migraciones.
 - No se levantaron servicios locales.
 - \`schema.sql\` y \`seeds/seed-local.sql\` son solo referencias editables.
 `
   const databaseSchemaContent = `-- Esquema local revisable para ${appTitle}
--- No ejecutar automaticamente sin una aprobacion posterior.
+-- No ejecutar automáticamente sin una aprobación posterior.
 
 create table professionals (
   id integer primary key,
@@ -14955,11 +15041,11 @@ create table availability_slots (
   foreign key (professional_id) references professionals(id)
 );
 `
-  const databaseSeedContent = `-- Seed local de referencia. No ejecutar automaticamente.
+  const databaseSeedContent = `-- Seed local de referencia. No ejecutar automáticamente.
 
 insert into professionals (id, full_name, specialty, active) values
-  (1, 'Dra. Ana Gomez', 'Clinica medica', 1),
-  (2, 'Dr. Pablo Ruiz', 'Pediatria', 1);
+  (1, 'Dra. Ana Gomez', 'Clínica médica', 1),
+  (2, 'Dr. Pablo Ruiz', 'Pediatría', 1);
 
 insert into patients (id, full_name, document_id, active) values
   (1, 'Lucia Perez', '30111222', 1),
@@ -14971,10 +15057,10 @@ insert into appointments (id, patient_id, professional_id, scheduled_at, status,
 `
   const scriptsReadmeContent = `# Scripts locales
 
-Estos scripts quedan como referencia y no se ejecutaron automaticamente.
+Estos scripts quedan como referencia y no se ejecutaron automáticamente.
 
 - seed-local.js describe como transformar el seed en un paso manual futuro.
-- Cualquier ejecucion real requiere aprobacion posterior.
+- Cualquier ejecución real requiere aprobación posterior.
 `
   const scriptsSeedContent = `const seedManifest = {
   mode: 'review-only',
@@ -14994,17 +15080,17 @@ module.exports = {
 - frontend/: base visual local y revisable
 - backend/: modulos y rutas de referencia sin servidor activo
 - shared/: contratos y tipos compartidos
-- database/: esquema y seed local solo como diseno
-- scripts/: ayudas operativas futuras sin ejecucion
-- docs/: alcance, limites y runbook manual
+- database/: esquema y seed local solo como diseño
+- scripts/: ayudas operativas futuras sin ejecución
+- docs/: alcance, límites y runbook manual
 
 ## Dominio sugerido
 
 - Entidades: ${domainEntities.join(', ')}
-- Modulos: ${modules.join(', ')}
+- Módulos: ${modules.join(', ')}
 - Estados principales: ${appointmentStatuses.join(', ')}
 
-## Limites
+## Límites
 
 - Sin npm install
 - Sin node_modules
@@ -15026,7 +15112,13 @@ Este scaffold solo materializa archivos locales revisables.
 - No crear ni migrar una base de datos real
 - No usar datos reales
 
-## Siguiente fase posible con aprobacion
+## Cómo abrir la demo estática
+
+1. Abrir \`frontend/index.html\` directamente con doble click o desde el navegador.
+2. Confirmar que la UI cargue sin servidor, sin \`npm install\` y sin abrir puertos.
+3. Si algo falla, revisar que \`src/mock-data.js\`, \`src/components/App.js\` y \`src/main.js\` sigan presentes.
+
+## Siguiente fase posible con aprobación
 
 1. Revisar package.json raiz, frontend y backend.
 2. Confirmar contratos compartidos y schema.sql.
@@ -15145,7 +15237,13 @@ Este scaffold solo materializa archivos locales revisables.
         { type: 'exists', targetPath: docsArchitecturePath, expectedKind: 'file' },
         { type: 'exists', targetPath: docsRunbookPath, expectedKind: 'file' },
         { type: 'exists', targetPath: projectManifestPath, expectedKind: 'file' },
+        { type: 'file-contains', targetPath: frontendIndexHtmlPath, expectedText: './src/mock-data.js' },
+        { type: 'file-contains', targetPath: frontendIndexHtmlPath, expectedText: './src/components/App.js' },
         { type: 'file-contains', targetPath: frontendIndexHtmlPath, expectedText: './src/main.js' },
+        { type: 'file-contains', targetPath: frontendMainJsPath, expectedText: 'window.fullstackPlan' },
+        { type: 'file-contains', targetPath: frontendMainJsPath, expectedText: 'window.renderApp' },
+        { type: 'file-contains', targetPath: frontendMockDataPath, expectedText: 'window.fullstackPlan' },
+        { type: 'file-contains', targetPath: frontendAppComponentPath, expectedText: 'window.renderApp = renderApp' },
         { type: 'file-contains', targetPath: backendServerPath, expectedText: 'fullstack-local' },
         { type: 'file-contains', targetPath: databaseSchemaPath, expectedText: 'create table appointments' },
         { type: 'file-contains', targetPath: docsRunbookPath, expectedText: 'No instalar dependencias' },
@@ -19086,7 +19184,7 @@ function buildProjectReadinessDemoScript({
     [
       'Revisar `docs/release-candidate-checklist.md` para seguir el flujo de demo sugerido.',
       hasPath('/jefe-project.json')
-        ? 'Abrir `jefe-project.json` y confirmar fases, modulos y proximo paso recomendado.'
+        ? 'Abrir `jefe-project.json` y confirmar fases, módulos y próximo paso recomendado.'
         : '',
       hasPath('/docs/local-runbook.md')
         ? 'Leer `docs/local-runbook.md` antes de probar cualquier flujo local.'
@@ -19104,7 +19202,7 @@ function buildProjectReadinessDemoScript({
       phaseStates.some(
         (entry) => entry.id === 'database-design' && entry.status === 'done',
       )
-        ? 'Revisar `database/schema.sql` y `database/seeds/seed-local.sql` solo como diseno textual.'
+        ? 'Revisar `database/schema.sql` y `database/seeds/seed-local.sql` solo como diseño textual.'
         : '',
       phaseStates.some(
         (entry) => entry.id === 'local-validation' && entry.status === 'done',
@@ -19268,15 +19366,15 @@ function buildProjectReadinessState({
   })
   const warnings = summarizeUniqueExecutorStrings(
     [
-      'Esto es mock, no produccion.',
+      'Esto es mock, no producción.',
       !demoReady && missingCorePhases.length > 0
-        ? `Todavia falta completar ${missingCorePhases[0]} antes de cerrar la demo local segura.`
+        ? `Todavía falta completar ${missingCorePhases[0]} antes de cerrar la demo local segura.`
         : '',
       approvalRequiredAreas.length > 0
-        ? 'No se toca nada real sin aprobacion.'
+        ? 'No se toca nada real sin aprobación.'
         : '',
       runtimeReadiness === 'approval-preview'
-        ? 'Hay una aprobacion preparada, pero sigue en modo preview.'
+        ? 'Hay una aprobación preparada, pero sigue en modo preview.'
         : '',
       blockedAreas.length > 0
         ? 'Hay areas bloqueadas por seguridad.'
@@ -19288,7 +19386,7 @@ function buildProjectReadinessState({
     [
       ...blockedAreas,
       ...missingCorePhases.map(
-        (entry) => `Todavia falta completar ${entry} para cerrar el flujo base.`,
+        (entry) => `Todavía falta completar ${entry} para cerrar el flujo base.`,
       ),
     ],
     20,
@@ -19307,18 +19405,18 @@ function buildProjectReadinessState({
               : 'not-started'
   const lastValidationSummary = demoReady
     ? runtimeReadiness === 'approval-preview'
-      ? 'Listo para demo local segura. El paso a runtime real sigue pendiente de aprobacion explicita y no se ejecuto nada real.'
-      : 'Listo para demo local segura. No se ejecuto nada real: todo sigue en modo revisable y mock donde corresponde.'
+      ? 'Listo para demo local segura. El paso a runtime real sigue pendiente de aprobación explícita y no se ejecutó nada real.'
+      : 'Listo para demo local segura. No se ejecutó nada real: todo sigue en modo revisable y mock donde corresponde.'
     : completedCoreFlow
-      ? 'La base local esta cerrada, pero todavia conviene revisar el resultado antes de hablar de una demo completa.'
-      : 'Todavia falta completar el flujo base y la validacion local para cerrar una demo segura.'
+      ? 'La base local está cerrada, pero todavía conviene revisar el resultado antes de hablar de una demo completa.'
+      : 'Todavía falta completar el flujo base y la validación local para cerrar una demo segura.'
   const operatorSummary = demoReady
     ? runtimeReadiness === 'approval-preview'
-      ? 'Listo para demo local segura, con runtime real pendiente de aprobacion explicita.'
+      ? 'Listo para demo local segura, con runtime real pendiente de aprobación explícita.'
       : 'Listo para demo local segura.'
     : blockedCorePhases.length > 0
       ? 'Bloqueado por seguridad antes de cerrar la demo local.'
-      : 'Todavia falta completar el flujo base antes de cerrar la demo local segura.'
+      : 'Todavía falta completar el flujo base antes de cerrar la demo local segura.'
 
   return normalizeProjectReadinessStateContract({
     readinessLevel,
@@ -19428,6 +19526,91 @@ function buildRuntimeApprovalPreviewValidationPlan({
   })
 }
 
+function findActiveSensitiveContinuationAction({
+  continuationActionPlan,
+  projectContinuationState,
+  projectReadinessState,
+  approvalRequest,
+}) {
+  const normalizedContinuationAction =
+    normalizeContinuationActionContract(continuationActionPlan)
+
+  if (
+    normalizedContinuationAction &&
+    (normalizedContinuationAction.requiresApproval === true ||
+      normalizedContinuationAction.blocked === true)
+  ) {
+    return normalizedContinuationAction
+  }
+
+  const normalizedContinuationState =
+    normalizeProjectContinuationStateContract(projectContinuationState)
+  const normalizedReadinessState =
+    normalizeProjectReadinessStateContract(projectReadinessState)
+  const currentSensitiveActionCandidates = [
+    normalizeContinuationActionContract(
+      normalizedContinuationState?.nextRecommendedAction,
+    ),
+    normalizeContinuationActionContract(normalizedReadinessState?.nextBestAction),
+  ].filter(
+    (entry) =>
+      entry &&
+      (entry.requiresApproval === true || entry.blocked === true),
+  )
+
+  const normalizedApprovalRequest =
+    approvalRequest && typeof approvalRequest === 'object' ? approvalRequest : null
+
+  if (!normalizedApprovalRequest) {
+    return currentSensitiveActionCandidates[0] || null
+  }
+
+  const approvalPolicyHint = detectApprovalPolicyHintFromText(
+    [
+      normalizedApprovalRequest.reason,
+      normalizedApprovalRequest.question,
+      normalizedApprovalRequest.decisionKey,
+    ]
+      .filter((entry) => typeof entry === 'string' && entry.trim())
+      .join(' '),
+  )
+  const expectedActionIdentities = summarizeUniqueExecutorStrings(
+    [
+      normalizedApprovalRequest.actionId,
+      normalizedApprovalRequest.approvalType,
+      approvalPolicyHint?.id || '',
+      normalizedApprovalRequest.reason,
+      normalizedApprovalRequest.question,
+    ],
+    12,
+  )
+    .map((entry) => normalizeModuleExpansionId(entry))
+    .filter(Boolean)
+  const availableSensitiveActions = [
+    ...(Array.isArray(normalizedContinuationState?.approvalRequiredActions)
+      ? normalizedContinuationState.approvalRequiredActions
+      : []),
+    ...(Array.isArray(normalizedContinuationState?.blockedActions)
+      ? normalizedContinuationState.blockedActions
+      : []),
+  ]
+    .map((entry) => normalizeContinuationActionContract(entry))
+    .filter(Boolean)
+
+  const matchingSensitiveAction = availableSensitiveActions.find((action) => {
+    const actionIdentities = summarizeUniqueExecutorStrings(
+      [action.id, action.approvalType, action.title],
+      8,
+    )
+      .map((entry) => normalizeModuleExpansionId(entry))
+      .filter(Boolean)
+
+    return actionIdentities.some((entry) => expectedActionIdentities.includes(entry))
+  })
+
+  return matchingSensitiveAction || currentSensitiveActionCandidates[0] || null
+}
+
 function buildRuntimeApprovalState({
   continuationActionPlan,
   projectContinuationState,
@@ -19435,12 +19618,12 @@ function buildRuntimeApprovalState({
   localProjectManifest,
   approvalRequest,
 }) {
-  const normalizedAction =
-    normalizeContinuationActionContract(continuationActionPlan) ||
-    normalizeProjectContinuationStateContract(projectContinuationState)?.approvalRequiredActions?.[0] ||
-    normalizeProjectContinuationStateContract(projectContinuationState)?.blockedActions?.[0] ||
-    normalizeProjectReadinessStateContract(projectReadinessState)?.nextBestAction ||
-    null
+  const normalizedAction = findActiveSensitiveContinuationAction({
+    continuationActionPlan,
+    projectContinuationState,
+    projectReadinessState,
+    approvalRequest,
+  })
   const normalizedApprovalRequest =
     approvalRequest && typeof approvalRequest === 'object' ? approvalRequest : null
 
@@ -19707,7 +19890,7 @@ function syncLocalProjectManifestWithRuntimeApprovalState({
         note:
           normalizedRuntimeApprovalState.title ||
           normalizedRuntimeApprovalState.relatedReadinessArea ||
-          'Se preparo un preview de aprobacion.',
+          'Se preparó un preview de aprobación.',
       },
     }),
   }
@@ -19721,12 +19904,12 @@ function buildApprovalRequestPlan({
   approvalRequest,
   runtimeApprovalState,
 }) {
-  const normalizedAction =
-    normalizeContinuationActionContract(continuationActionPlan) ||
-    normalizeProjectContinuationStateContract(projectContinuationState)?.approvalRequiredActions?.[0] ||
-    normalizeProjectContinuationStateContract(projectContinuationState)?.blockedActions?.[0] ||
-    normalizeProjectReadinessStateContract(projectReadinessState)?.nextBestAction ||
-    null
+  const normalizedAction = findActiveSensitiveContinuationAction({
+    continuationActionPlan,
+    projectContinuationState,
+    projectReadinessState,
+    approvalRequest,
+  })
   const normalizedApprovalRequest =
     approvalRequest && typeof approvalRequest === 'object' ? approvalRequest : null
   const normalizedRuntimeApprovalState =
@@ -19806,7 +19989,7 @@ function buildApprovalRequestPlan({
       normalizedAction.blocker ||
       normalizedRuntimeApprovalState?.relatedReadinessArea ||
       normalizedApprovalRequest?.reason ||
-      'JEFE preparo un paquete de aprobacion sin salir del modo seguro.',
+      'JEFE preparó un paquete de aprobación sin salir del modo seguro.',
     touches,
     willNotTouch: summarizeUniqueExecutorStrings(
       [
@@ -20611,9 +20794,9 @@ function buildProjectContinuationState({
     : 'JEFE no encontro una continuidad automatica nueva y conviene revisar el estado actual.'
   const operatorMessage = nextRecommendedAction
     ? nextRecommendedAction.safeToMaterialize
-      ? `Podes avanzar ahora con ${nextRecommendedAction.title}. No se toca nada real sin aprobacion.`
+      ? `Podés avanzar ahora con ${nextRecommendedAction.title}. No se toca nada real sin aprobación.`
       : nextRecommendedAction.requiresApproval
-        ? `El siguiente paso es ${nextRecommendedAction.title}, pero requiere aprobacion antes de salir del modo seguro.`
+        ? `El siguiente paso es ${nextRecommendedAction.title}, pero requiere aprobación antes de salir del modo seguro.`
         : nextRecommendedAction.blocked
           ? `El siguiente paso quedo bloqueado por seguridad. Conviene revisar ${nextRecommendedAction.title} antes de seguir.`
           : `Conviene preparar ${nextRecommendedAction.title} como plan revisable antes de ejecutar algo nuevo.`
@@ -23465,22 +23648,22 @@ La siguiente fase recomendada es \`database-design\`, en modo planner-only.
   const stylesPath = `${projectRoot}/frontend/src/styles.css`
   const runbookPath = `${projectRoot}/docs/local-runbook.md`
   const manifestPath = `${projectRoot}/jefe-project.json`
-  const mockDataContent = `export const fullstackPlan = {
+  const mockDataContent = buildBrowserWindowDataScript('fullstackPlan', {
   overview: {
-    name: 'Turnos medicos local',
+    name: 'Turnos médicos local',
     mode: 'frontend-mock-flow',
     deliveryLevel: 'fullstack-local',
   },
   specialties: [
-    'Clinica medica',
-    'Pediatria',
-    'Cardiologia',
-    'Dermatologia',
+    'Clínica médica',
+    'Pediatría',
+    'Cardiología',
+    'Dermatología',
   ],
   professionals: [
-    { id: 'PRO-001', name: 'Dra. Ana Gomez', specialty: 'Clinica medica', status: 'disponible' },
-    { id: 'PRO-002', name: 'Dr. Pablo Ruiz', specialty: 'Pediatria', status: 'consultorio ocupado' },
-    { id: 'PRO-003', name: 'Dra. Marta Diaz', specialty: 'Cardiologia', status: 'disponible' },
+    { id: 'PRO-001', name: 'Dra. Ana Gomez', specialty: 'Clínica médica', status: 'disponible' },
+    { id: 'PRO-002', name: 'Dr. Pablo Ruiz', specialty: 'Pediatría', status: 'consultorio ocupado' },
+    { id: 'PRO-003', name: 'Dra. Marta Diaz', specialty: 'Cardiología', status: 'disponible' },
   ],
   patients: [
     { id: 'PAC-001', name: 'Lucia Perez', plan: 'Particular', status: 'confirmado' },
@@ -23493,9 +23676,9 @@ La siguiente fase recomendada es \`database-design\`, en modo planner-only.
     { professional: 'Dra. Marta Diaz', slot: '11:00', state: 'libre' },
   ],
   appointments: [
-    { id: 'APT-001', patient: 'Lucia Perez', professional: 'Dra. Ana Gomez', specialty: 'Clinica medica', slot: '2026-05-03 09:30', status: 'confirmado' },
-    { id: 'APT-002', patient: 'Martin Suarez', professional: 'Dr. Pablo Ruiz', specialty: 'Pediatria', slot: '2026-05-03 10:15', status: 'pendiente' },
-    { id: 'APT-003', patient: 'Camila Torres', professional: 'Dra. Marta Diaz', specialty: 'Cardiologia', slot: '2026-05-03 11:00', status: 'en espera' },
+    { id: 'APT-001', patient: 'Lucia Perez', professional: 'Dra. Ana Gomez', specialty: 'Clínica médica', slot: '2026-05-03 09:30', status: 'confirmado' },
+    { id: 'APT-002', patient: 'Martin Suarez', professional: 'Dr. Pablo Ruiz', specialty: 'Pediatría', slot: '2026-05-03 10:15', status: 'pendiente' },
+    { id: 'APT-003', patient: 'Camila Torres', professional: 'Dra. Marta Diaz', specialty: 'Cardiología', slot: '2026-05-03 11:00', status: 'en espera' },
   ],
   quickActions: [
     'Reservar turno mock',
@@ -23509,9 +23692,11 @@ La siguiente fase recomendada es \`database-design\`, en modo planner-only.
     pendingConfirmations: 5,
     specialties: 4,
   },
-}
-`
-  const appContent = `export function renderApp(fullstackPlan) {
+})
+  const appContent = buildBrowserWindowRenderScript({
+    functionName: 'renderApp',
+    globalName: 'renderApp',
+    scriptSource: `function renderApp(fullstackPlan) {
   const specialties = Array.isArray(fullstackPlan?.specialties) ? fullstackPlan.specialties : []
   const professionals = Array.isArray(fullstackPlan?.professionals) ? fullstackPlan.professionals : []
   const patients = Array.isArray(fullstackPlan?.patients) ? fullstackPlan.patients : []
@@ -23524,7 +23709,7 @@ La siguiente fase recomendada es \`database-design\`, en modo planner-only.
     <main class="app-shell phase-shell">
       <section class="hero phase-hero">
         <span class="chip">Frontend mock flow</span>
-        <h1>\${fullstackPlan?.overview?.name || 'Turnos medicos local'}</h1>
+        <h1>\${fullstackPlan?.overview?.name || 'Turnos médicos local'}</h1>
         <p>
           Flujo local y revisable para pacientes, profesionales, especialidades, disponibilidad y turnos,
           sin backend real ni dependencias instaladas.
@@ -23535,7 +23720,7 @@ La siguiente fase recomendada es \`database-design\`, en modo planner-only.
       </section>
 
       <section class="summary-grid">
-        <article class="panel stat-panel"><span>Turnos del dia</span><strong>\${summary.appointmentsToday || 0}</strong></article>
+        <article class="panel stat-panel"><span>Turnos del día</span><strong>\${summary.appointmentsToday || 0}</strong></article>
         <article class="panel stat-panel"><span>Profesionales activos</span><strong>\${summary.activeProfessionals || 0}</strong></article>
         <article class="panel stat-panel"><span>Pendientes</span><strong>\${summary.pendingConfirmations || 0}</strong></article>
         <article class="panel stat-panel"><span>Especialidades</span><strong>\${summary.specialties || specialties.length}</strong></article>
@@ -23580,8 +23765,8 @@ La siguiente fase recomendada es \`database-design\`, en modo planner-only.
       </section>
     </main>
   \`
-}
-`
+}`,
+  })
   const stylesContent = `:root {
   color-scheme: light;
   font-family: "Segoe UI", Arial, sans-serif;
@@ -25259,16 +25444,16 @@ function buildModuleExpansionMockDataContent(activeModuleIds) {
   const hasInventory = activeModuleIds.includes('inventory')
   const dataset = {
     overview: {
-      name: 'Turnos medicos local',
+      name: 'Turnos médicos local',
       mode: 'module-expansion',
       deliveryLevel: 'fullstack-local',
       modules: activeModuleIds,
     },
-    specialties: ['Clinica medica', 'Pediatria', 'Cardiologia', 'Dermatologia'],
+    specialties: ['Clínica médica', 'Pediatría', 'Cardiología', 'Dermatología'],
     professionals: [
-      { id: 'PRO-001', name: 'Dra. Ana Gomez', specialty: 'Clinica medica', status: 'disponible' },
-      { id: 'PRO-002', name: 'Dr. Pablo Ruiz', specialty: 'Pediatria', status: 'consultorio ocupado' },
-      { id: 'PRO-003', name: 'Dra. Marta Diaz', specialty: 'Cardiologia', status: 'disponible' },
+      { id: 'PRO-001', name: 'Dra. Ana Gomez', specialty: 'Clínica médica', status: 'disponible' },
+      { id: 'PRO-002', name: 'Dr. Pablo Ruiz', specialty: 'Pediatría', status: 'consultorio ocupado' },
+      { id: 'PRO-003', name: 'Dra. Marta Diaz', specialty: 'Cardiología', status: 'disponible' },
     ],
     patients: [
       { id: 'PAC-001', name: 'Lucia Perez', plan: 'Particular', status: 'confirmado' },
@@ -25281,9 +25466,9 @@ function buildModuleExpansionMockDataContent(activeModuleIds) {
       { professional: 'Dra. Marta Diaz', slot: '11:00', state: 'libre' },
     ],
     appointments: [
-      { id: 'APT-001', patient: 'Lucia Perez', professional: 'Dra. Ana Gomez', specialty: 'Clinica medica', slot: '2026-05-03 09:30', status: 'confirmado' },
-      { id: 'APT-002', patient: 'Martin Suarez', professional: 'Dr. Pablo Ruiz', specialty: 'Pediatria', slot: '2026-05-03 10:15', status: 'pendiente' },
-      { id: 'APT-003', patient: 'Camila Torres', professional: 'Dra. Marta Diaz', specialty: 'Cardiologia', slot: '2026-05-03 11:00', status: 'en espera' },
+      { id: 'APT-001', patient: 'Lucia Perez', professional: 'Dra. Ana Gomez', specialty: 'Clínica médica', slot: '2026-05-03 09:30', status: 'confirmado' },
+      { id: 'APT-002', patient: 'Martin Suarez', professional: 'Dr. Pablo Ruiz', specialty: 'Pediatría', slot: '2026-05-03 10:15', status: 'pendiente' },
+      { id: 'APT-003', patient: 'Camila Torres', professional: 'Dra. Marta Diaz', specialty: 'Cardiología', slot: '2026-05-03 11:00', status: 'en espera' },
     ],
     notifications: hasNotifications
       ? [
@@ -25333,11 +25518,14 @@ function buildModuleExpansionMockDataContent(activeModuleIds) {
     },
   }
 
-  return `export const fullstackPlan = ${JSON.stringify(dataset, null, 2)}\n`
+  return buildBrowserWindowDataScript('fullstackPlan', dataset)
 }
 
 function buildModuleExpansionAppContent() {
-  return `function renderList(items = [], formatter) {
+  return buildBrowserWindowRenderScript({
+    functionName: 'renderApp',
+    globalName: 'renderApp',
+    scriptSource: `function renderList(items = [], formatter) {
   return items.map((item) => formatter(item)).join('')
 }
 
@@ -25345,7 +25533,7 @@ function renderChips(items = [], className = 'chip chip-secondary') {
   return items.map((item) => \`<span class="\${className}">\${item}</span>\`).join('')
 }
 
-export function renderApp(fullstackPlan) {
+function renderApp(fullstackPlan) {
   const overview = fullstackPlan?.overview || {}
   const specialties = Array.isArray(fullstackPlan?.specialties) ? fullstackPlan.specialties : []
   const patients = Array.isArray(fullstackPlan?.patients) ? fullstackPlan.patients : []
@@ -25371,9 +25559,10 @@ export function renderApp(fullstackPlan) {
     ? \`<section class="panel inventory-panel"><div class="panel-header"><h2>Inventario y stock mock</h2><div class="chip-row">\${renderChips(fullstackPlan.inventoryActions || [], 'chip chip-inventory')}</div></div><div class="phase-grid"><section class="panel panel-inner"><h3>Items</h3><ul class="list-grid">\${renderList(inventoryItems, (item) => \`<li><strong>\${item.name}</strong><span>\${item.category}</span><em>\${item.currentStock} unidades · \${item.status}</em></li>\`)}</ul></section><section class="panel panel-inner"><h3>Movimientos</h3><ul class="list-grid">\${renderList(inventoryMovements, (item) => \`<li><strong>\${item.itemId}</strong><span>\${item.type}</span><em>\${item.quantity} · \${item.detail}</em></li>\`)}</ul></section></div><ul class="alert-list">\${renderList(inventoryAlerts, (entry) => \`<li>\${entry}</li>\`)}</ul></section>\`
     : ''
 
-  return \`<main class="app-shell phase-shell"><section class="hero phase-hero"><span class="chip">Continuidad local</span><h1>\${overview.name || 'Turnos medicos local'}</h1><p>Expansion local del proyecto con modulos revisables, sin backend real, sin dependencias instaladas y sin integraciones externas activas.</p><div class="chip-row">\${renderChips((overview.modules || []).map((entry) => \`Modulo: \${entry}\`))}\${renderChips(specialties)}</div></section><section class="summary-grid"><article class="panel stat-panel"><span>Turnos del dia</span><strong>\${summary.appointmentsToday || 0}</strong></article><article class="panel stat-panel"><span>Profesionales activos</span><strong>\${summary.activeProfessionals || 0}</strong></article><article class="panel stat-panel"><span>Notificaciones pendientes</span><strong>\${summary.notificationsPending || 0}</strong></article><article class="panel stat-panel"><span>Reportes listos</span><strong>\${summary.reportsReady || 0}</strong></article><article class="panel stat-panel"><span>Items con stock bajo</span><strong>\${summary.lowStockItems || 0}</strong></article></section><div class="phase-grid"><section class="panel"><h2>Pacientes</h2><ul class="list-grid">\${renderList(patients, (item) => \`<li><strong>\${item.name}</strong><span>\${item.plan}</span><em>\${item.status}</em></li>\`)}</ul></section><section class="panel"><h2>Profesionales</h2><ul class="list-grid">\${renderList(professionals, (item) => \`<li><strong>\${item.name}</strong><span>\${item.specialty}</span><em>\${item.status}</em></li>\`)}</ul></section><section class="panel"><h2>Disponibilidad</h2><ul class="list-grid">\${renderList(availability, (item) => \`<li><strong>\${item.professional}</strong><span>\${item.slot}</span><em>\${item.state}</em></li>\`)}</ul></section><section class="panel"><h2>Turnos y estados</h2><ul class="list-grid">\${renderList(appointments, (item) => \`<li><strong>\${item.patient}</strong><span>\${item.specialty}</span><em>\${item.status} · \${item.slot}</em></li>\`)}</ul></section></div>\${notificationsSection}\${reportsSection}\${inventorySection}</main>\`
+  return \`<main class="app-shell phase-shell"><section class="hero phase-hero"><span class="chip">Continuidad local</span><h1>\${overview.name || 'Turnos médicos local'}</h1><p>Expansión local del proyecto con módulos revisables, sin backend real, sin dependencias instaladas y sin integraciones externas activas.</p><div class="chip-row">\${renderChips((overview.modules || []).map((entry) => \`Módulo: \${entry}\`))}\${renderChips(specialties)}</div></section><section class="summary-grid"><article class="panel stat-panel"><span>Turnos del día</span><strong>\${summary.appointmentsToday || 0}</strong></article><article class="panel stat-panel"><span>Profesionales activos</span><strong>\${summary.activeProfessionals || 0}</strong></article><article class="panel stat-panel"><span>Notificaciones pendientes</span><strong>\${summary.notificationsPending || 0}</strong></article><article class="panel stat-panel"><span>Reportes listos</span><strong>\${summary.reportsReady || 0}</strong></article><article class="panel stat-panel"><span>Ítems con stock bajo</span><strong>\${summary.lowStockItems || 0}</strong></article></section><div class="phase-grid"><section class="panel"><h2>Pacientes</h2><ul class="list-grid">\${renderList(patients, (item) => \`<li><strong>\${item.name}</strong><span>\${item.plan}</span><em>\${item.status}</em></li>\`)}</ul></section><section class="panel"><h2>Profesionales</h2><ul class="list-grid">\${renderList(professionals, (item) => \`<li><strong>\${item.name}</strong><span>\${item.specialty}</span><em>\${item.status}</em></li>\`)}</ul></section><section class="panel"><h2>Disponibilidad</h2><ul class="list-grid">\${renderList(availability, (item) => \`<li><strong>\${item.professional}</strong><span>\${item.slot}</span><em>\${item.state}</em></li>\`)}</ul></section><section class="panel"><h2>Turnos y estados</h2><ul class="list-grid">\${renderList(appointments, (item) => \`<li><strong>\${item.patient}</strong><span>\${item.specialty}</span><em>\${item.status} · \${item.slot}</em></li>\`)}</ul></section></div>\${notificationsSection}\${reportsSection}\${inventorySection}</main>\`
 }
-`
+`,
+  })
 }
 
 function buildModuleExpansionStylesContent() {

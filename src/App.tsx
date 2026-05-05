@@ -4614,7 +4614,7 @@ function ScalableDeliveryPlanCard({
               onClick={onPrepareMaterialization || undefined}
               className="rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-1 text-xs font-medium text-sky-100 transition hover:bg-sky-300/15"
             >
-              Preparar materializacion fullstack local
+              Preparar materialización fullstack local
             </button>
           ) : null}
         </div>
@@ -6670,6 +6670,36 @@ function ProjectContinuityCenterCard({
   const runtimeApprovalAction =
     normalizeContinuationActionContract(runtimeApprovalState?.relatedContinuationAction) ||
     approvalPacketAction
+  const hasActiveApprovalFlow = Boolean(
+    (runtimeApprovalAction &&
+      (runtimeApprovalAction.requiresApproval || runtimeApprovalAction.blocked)) ||
+      (approvalPacketAction &&
+        (approvalPacketAction.requiresApproval || approvalPacketAction.blocked)) ||
+      (nextRecommendedAction &&
+        (nextRecommendedAction.requiresApproval || nextRecommendedAction.blocked)),
+  )
+  const shouldShowRuntimeApprovalPanel = Boolean(
+    runtimeApprovalState &&
+      runtimeApprovalAction &&
+      (runtimeApprovalAction.requiresApproval || runtimeApprovalAction.blocked),
+  )
+  const shouldShowApprovalRequestPanel = Boolean(
+    !shouldShowRuntimeApprovalPanel &&
+      approvalRequestPlan &&
+      approvalPacketAction &&
+      (approvalPacketAction.requiresApproval || approvalPacketAction.blocked),
+  )
+  const readinessApprovalTitle = hasActiveApprovalFlow
+    ? 'Requiere aprobación'
+    : 'Aprobaciones futuras'
+  const readinessApprovalItems =
+    readinessApprovalAreas.length > 0
+      ? readinessApprovalAreas
+      : [
+          hasActiveApprovalFlow
+            ? 'No se toca nada real sin aprobación.'
+            : 'La fase segura actual no necesita aprobación. Lo sensible queda para más adelante.',
+        ]
 
   const dispatchPrepareAction = (action: ContinuationActionContract) => {
     if (onPrepareContinuationAction) {
@@ -6846,7 +6876,7 @@ function ProjectContinuityCenterCard({
                   />
                   <MetricCard
                     label="Preparación"
-                    value={action.safeToPrepare === false ? 'No' : 'Si'}
+                    value={action.safeToPrepare === false ? 'No' : 'Sí'}
                     detail={
                       action.requiresApproval
                         ? 'Requiere aprobación antes de salir del modo seguro.'
@@ -6935,7 +6965,7 @@ function ProjectContinuityCenterCard({
             Centro de continuidad
           </div>
           <div className="mt-2 text-lg font-semibold text-white">
-            Proximo paso recomendado
+            Próximo paso recomendado
           </div>
           <div className="mt-2 text-sm leading-6 text-slate-300">
             {operatorMessage}
@@ -6987,7 +7017,7 @@ function ProjectContinuityCenterCard({
           detail={
             pendingPhases[0] ||
             nextRecommendedPhaseId ||
-            'Conviene revisar la siguiente expansion'
+            'Conviene revisar la siguiente expansión'
           }
           tone={pendingPhases.length > 0 ? 'amber' : 'emerald'}
         />
@@ -7130,12 +7160,8 @@ function ProjectContinuityCenterCard({
 
           <div className="mt-4 grid gap-4 xl:grid-cols-2">
             <ProductArchitectureGroup
-              title="Requiere aprobación"
-              items={
-                readinessApprovalAreas.length > 0
-                  ? readinessApprovalAreas
-                  : ['No se toca nada real sin aprobación.']
-              }
+              title={readinessApprovalTitle}
+              items={readinessApprovalItems}
               compact={compact}
               tone="rose"
             />
@@ -7195,7 +7221,7 @@ function ProjectContinuityCenterCard({
         </div>
       ) : null}
 
-      {runtimeApprovalState ? (
+      {shouldShowRuntimeApprovalPanel ? (
         <div className="mt-4 rounded-2xl border border-rose-300/20 bg-rose-300/[0.06] px-4 py-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -7250,7 +7276,7 @@ function ProjectContinuityCenterCard({
               }
               detail={
                 runtimeApprovalCommands[0] ||
-                'No hay comandos propuestos para esta aprobacion.'
+                'No hay comandos propuestos para esta aprobación.'
               }
               tone="amber"
             />
@@ -7382,7 +7408,7 @@ function ProjectContinuityCenterCard({
             </span>
           </div>
         </div>
-      ) : approvalRequestPlan ? (
+      ) : shouldShowApprovalRequestPanel ? (
         <div className="mt-4 rounded-2xl border border-rose-300/20 bg-rose-300/[0.06] px-4 py-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -7552,7 +7578,7 @@ function ProjectContinuityCenterCard({
 
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
         <ProductArchitectureGroup
-          title="Podria sumar despues"
+          title="Podría sumar después"
           items={modulesAvailable}
           compact={compact}
           tone="emerald"
@@ -7562,7 +7588,7 @@ function ProjectContinuityCenterCard({
           items={
             continuationRisks.length > 0
               ? continuationRisks
-              : ['No se toca nada real sin aprobacion.']
+              : ['No se toca nada real sin aprobación.']
           }
           compact={compact}
           tone="amber"
@@ -7582,7 +7608,7 @@ function ProjectContinuityCenterCard({
 
       <div className="mt-4 space-y-4">
         {renderActionCards(
-          'Podes avanzar ahora',
+          'Podés avanzar ahora',
           availableSafeActions,
           'Todav\u00eda no hay acciones seguras nuevas para ejecutar dentro del modo local.',
           'emerald',
@@ -7594,9 +7620,11 @@ function ProjectContinuityCenterCard({
           'amber',
         )}
         {renderActionCards(
-          'Requiere aprobación',
+          hasActiveApprovalFlow ? 'Requiere aprobación' : 'Aprobaciones futuras',
           approvalRequiredActions,
-          'No hay acciones pendientes de aprobación en esta corrida.',
+          hasActiveApprovalFlow
+            ? 'No hay acciones pendientes de aprobación en esta corrida.'
+            : 'No hay aprobaciones futuras nuevas en esta corrida.',
           'rose',
         )}
         {renderActionCards(
@@ -15299,13 +15327,13 @@ function App() {
     const prompt = buildProjectPhasePrompt('materialize', phaseId)
 
     clearVisibleExecutionRuntimeState()
-    setSessionStatus('Preparando materializacion de fase segura')
+    setSessionStatus('Preparando materialización de fase segura')
     setCurrentStep(
-      `El orquestador esta preparando la materializacion de la fase ${normalizeOptionalString(phaseId) || 'local'}`,
+      `El orquestador está preparando la materialización de la fase ${normalizeOptionalString(phaseId) || 'local'}`,
     )
     setSessionEvents((currentEvents) => [
       ...currentEvents,
-      `Se solicito la materializacion de la fase ${normalizeOptionalString(phaseId) || 'local'}`,
+      `Se solicitó la materialización de la fase ${normalizeOptionalString(phaseId) || 'local'}`,
     ])
 
     await handleGenerateNextStep({
@@ -15577,7 +15605,7 @@ function App() {
       context: preparedPlanningPrompt.context,
       sourceLabel: 'Materialización segura preparada',
       sendContent:
-        'Se envio al planificador una solicitud acotada para preparar la materializacion segura de la primera entrega sin ejecutar cambios todavÍa.',
+        'Se envió al planificador una solicitud acotada para preparar la materialización segura de la primera entrega sin ejecutar cambios todavía.',
       onPlanningFailure: () => {
         resetPlannerMaterializationAttemptState({
           fallbackMetadata: safePlanReviewMetadata,
@@ -15596,7 +15624,7 @@ function App() {
     if (!plannerIsReviewOnly || !activeScalableDeliveryPlan) {
       setSessionStatus('Error al generar el plan')
       setCurrentStep(
-        'No hay un scalableDeliveryPlan activo y valido para preparar la materializacion frontend',
+        'No hay un scalableDeliveryPlan activo y válido para preparar la materialización frontend',
       )
       addFlowMessage({
         source: 'orquestador',
@@ -15614,7 +15642,7 @@ function App() {
     ) {
       setSessionStatus('Plan escalable todavía no materializable')
       setCurrentStep(
-        'La materializacion frontend solo está disponible para deliveryLevel frontend-project',
+        'La materialización frontend solo está disponible para deliveryLevel frontend-project',
       )
       addFlowMessage({
         source: 'orquestador',
@@ -15660,13 +15688,13 @@ function App() {
     if (!plannerIsReviewOnly || !activeScalableDeliveryPlan) {
       setSessionStatus('Error al generar el plan')
       setCurrentStep(
-        'No hay un scalableDeliveryPlan activo y valido para preparar la materializacion fullstack local',
+        'No hay un scalableDeliveryPlan activo y válido para preparar la materialización fullstack local',
       )
       addFlowMessage({
         source: 'orquestador',
-        title: 'Decision del orquestador',
+        title: 'Decisión del orquestador',
         content:
-          'No hay un scalableDeliveryPlan activo y valido para preparar la materializacion fullstack local.',
+          'No hay un scalableDeliveryPlan activo y válido para preparar la materialización fullstack local.',
         status: 'error',
       })
       return
@@ -15676,9 +15704,9 @@ function App() {
       normalizeOptionalString(activeScalableDeliveryPlan.deliveryLevel).toLocaleLowerCase() !==
       'fullstack-local'
     ) {
-      setSessionStatus('Plan escalable todavÍa no materializable')
+      setSessionStatus('Plan escalable todavía no materializable')
       setCurrentStep(
-        'La materializacion fullstack local solo esta disponible para deliveryLevel fullstack-local',
+        'La materialización fullstack local solo está disponible para deliveryLevel fullstack-local',
       )
       addFlowMessage({
         source: 'orquestador',
@@ -15697,21 +15725,21 @@ function App() {
     })
 
     clearVisibleExecutionRuntimeState()
-    setSessionStatus('Preparando materializacion fullstack local')
+    setSessionStatus('Preparando materialización fullstack local')
     setCurrentStep(
-      'El orquestador esta preparando un scaffold fullstack local, revisable y materializable por el executor deterministico',
+      'El orquestador está preparando un scaffold fullstack local, revisable y materializable por el executor determinístico',
     )
     setSessionEvents((currentEvents) => [
       ...currentEvents,
-      'Se preparo una nueva planificacion para materializar un fullstack-local local',
+      'Se preparó una nueva planificación para materializar un fullstack-local local',
     ])
 
     await handleGenerateNextStep({
       goal: preparedPlanningPrompt.goal,
       context: preparedPlanningPrompt.context,
-      sourceLabel: 'Materializacion fullstack local preparada',
+      sourceLabel: 'Materialización fullstack local preparada',
       sendContent:
-        'Se envio al planificador una solicitud controlada para preparar la materializacion local de un fullstack-local sin instalar dependencias ni ejecutar servicios.',
+        'Se envió al planificador una solicitud controlada para preparar la materialización local de un fullstack-local sin instalar dependencias ni ejecutar servicios.',
       validateResponse: (_response, metadata) =>
         buildFullstackLocalMaterializationCoherenceIssue({
           sourcePlan: activeScalableDeliveryPlan,

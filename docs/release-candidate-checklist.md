@@ -18,7 +18,8 @@ Esta guía sirve para demostrar JEFE como plataforma local de programación auto
 ## Escenario 2: avanzar las fases base
 
 1. Materializar `fullstack-local`.
-2. Preparar y materializar:
+2. Abrir `frontend/index.html` con doble click para confirmar que la demo estática local levanta con `file://`, sin servidor y sin `npm install`.
+3. Preparar y materializar:
    - `frontend-mock-flow`
    - `backend-contracts`
    - `database-design`

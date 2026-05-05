@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { createRequire } from 'node:module'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const require = createRequire(import.meta.url)
 const currentFilePath = fileURLToPath(import.meta.url)
@@ -99,6 +99,139 @@ function cleanupSmokeWorkspaceRoot() {
   if (remainingEntries.length === 0) {
     fs.rmSync(smokeParentPath, { recursive: true, force: true })
   }
+}
+
+function extractOrderedStaticScriptSources(html) {
+  return [...String(html || '').matchAll(/<script\b[^>]*src="([^"]+)"[^>]*><\/script>/gi)].map(
+    (match) => String(match[1] || '').trim(),
+  )
+}
+
+function buildVmRootElement() {
+  let innerHtml = ''
+
+  return {
+    get innerHTML() {
+      return innerHtml
+    },
+    set innerHTML(value) {
+      innerHtml = String(value ?? '')
+    },
+  }
+}
+
+function executeStaticFrontendBundle(projectRootPath) {
+  const frontendRootPath = path.join(projectRootPath, 'frontend')
+  const indexHtmlPath = path.join(frontendRootPath, 'index.html')
+  const indexHtml = fs.readFileSync(indexHtmlPath, 'utf8')
+  const scriptSources = extractOrderedStaticScriptSources(indexHtml)
+  const rootElement = buildVmRootElement()
+  const document = {
+    getElementById(id) {
+      return id === 'app' ? rootElement : null
+    },
+  }
+  const windowObject = {
+    document,
+    location: {
+      href: pathToFileURL(indexHtmlPath).href,
+    },
+  }
+  const sandbox = {
+    window: windowObject,
+    document,
+    console,
+    setTimeout,
+    clearTimeout,
+  }
+
+  sandbox.globalThis = sandbox
+  windowObject.window = windowObject
+  windowObject.globalThis = sandbox
+
+  const context = vm.createContext(sandbox)
+
+  for (const scriptSource of scriptSources) {
+    const scriptPath = path.join(frontendRootPath, scriptSource)
+    const scriptContent = fs.readFileSync(scriptPath, 'utf8')
+    vm.runInContext(scriptContent, context, { filename: scriptPath })
+  }
+
+  return {
+    indexHtmlPath,
+    scriptSources,
+    renderedHtml: rootElement.innerHTML,
+    windowObject,
+  }
+}
+
+async function tryVerifyStaticFrontendInBrowser(indexHtmlPath) {
+  try {
+    const playwrightModule = await import('playwright')
+    const chromium =
+      playwrightModule?.chromium || playwrightModule?.default?.chromium || null
+
+    if (!chromium) {
+      return {
+        available: false,
+        attempted: false,
+        reason: 'playwright-sin-chromium',
+      }
+    }
+
+    const browser = await chromium.launch({ headless: true })
+
+    try {
+      const page = await browser.newPage()
+      const pageErrors = []
+      const consoleErrors = []
+
+      page.on('pageerror', (error) => {
+        pageErrors.push(error instanceof Error ? error.message : String(error))
+      })
+      page.on('console', (message) => {
+        if (message.type() === 'error') {
+          consoleErrors.push(message.text())
+        }
+      })
+
+      await page.goto(pathToFileURL(indexHtmlPath).href, {
+        waitUntil: 'load',
+      })
+
+      const bodyText = await page.locator('body').innerText()
+
+      return {
+        available: true,
+        attempted: true,
+        ok: pageErrors.length === 0 && consoleErrors.length === 0,
+        bodyText,
+        pageErrors,
+        consoleErrors,
+      }
+    } finally {
+      await browser.close()
+    }
+  } catch (error) {
+    return {
+      available: false,
+      attempted: false,
+      reason: error instanceof Error ? error.message : String(error),
+    }
+  }
+}
+
+function getRoadmapPhaseEntry(implementationRoadmap, phaseId) {
+  const normalizedPhaseId = normalizeIdentifier(phaseId)
+  const phaseEntries = Array.isArray(implementationRoadmap?.phases)
+    ? implementationRoadmap.phases
+    : []
+
+  return (
+    phaseEntries.find(
+      (entry) => normalizeIdentifier(entry?.id || entry?.phaseId || '') === normalizedPhaseId,
+    ) || null
+  )
 }
 
 function extractSegment({ name, startMarker, endMarker }) {
@@ -727,6 +860,136 @@ async function runFullstackBaseCase() {
   return { id: 'operator-fullstack-base', label: 'Base fullstack local', failures }
 }
 
+async function runFullstackStaticFileCompatibilityCase() {
+  const failures = []
+  const fixture = await buildFullstackFixture({
+    workspaceName: 'operator-file-compatibility',
+    goal: veterinaryGoalCase.goal,
+    context: veterinaryGoalCase.context,
+    projectLabel: veterinaryGoalCase.projectLabel,
+  })
+  const frontendRootPath = path.join(fixture.projectRootPath, 'frontend')
+  const indexHtmlPath = path.join(frontendRootPath, 'index.html')
+  const mainJsPath = path.join(frontendRootPath, 'src', 'main.js')
+  const mockDataPath = path.join(frontendRootPath, 'src', 'mock-data.js')
+  const appPath = path.join(frontendRootPath, 'src', 'components', 'App.js')
+  const runbookPath = path.join(fixture.projectRootPath, 'docs', 'local-runbook.md')
+  const readmePath = path.join(fixture.projectRootPath, 'README.md')
+  const indexHtml = fs.readFileSync(indexHtmlPath, 'utf8')
+  const mainJs = fs.readFileSync(mainJsPath, 'utf8')
+  const mockDataJs = fs.readFileSync(mockDataPath, 'utf8')
+  const appJs = fs.readFileSync(appPath, 'utf8')
+  const runbookContent = fs.readFileSync(runbookPath, 'utf8')
+  const readmeContent = fs.readFileSync(readmePath, 'utf8')
+  const orderedScripts = extractOrderedStaticScriptSources(indexHtml)
+
+  pushFailure(
+    failures,
+    !indexHtml.includes('type="module"'),
+    'frontend/index.html no debe usar type="module" para file://.',
+  )
+  pushFailure(
+    failures,
+    JSON.stringify(orderedScripts) ===
+      JSON.stringify([
+        './src/mock-data.js',
+        './src/components/App.js',
+        './src/main.js',
+      ]),
+    'frontend/index.html debe cargar mock-data.js, App.js y main.js como scripts clásicos en ese orden.',
+  )
+  pushFailure(
+    failures,
+    !/\bimport\s/.test(mainJs),
+    'frontend/src/main.js no debe usar import en el scaffold fullstack local.',
+  )
+  pushFailure(
+    failures,
+    !/\bexport\s/.test(mockDataJs),
+    'frontend/src/mock-data.js no debe usar export en el scaffold fullstack local.',
+  )
+  pushFailure(
+    failures,
+    !/\bexport\s/.test(appJs),
+    'frontend/src/components/App.js no debe usar export en el scaffold fullstack local.',
+  )
+  pushFailure(
+    failures,
+    mockDataJs.includes('window.fullstackPlan'),
+    'frontend/src/mock-data.js debe exponer window.fullstackPlan.',
+  )
+  pushFailure(
+    failures,
+    appJs.includes('window.renderApp'),
+    'frontend/src/components/App.js debe exponer window.renderApp.',
+  )
+  pushFailure(
+    failures,
+    mainJs.includes('window.fullstackPlan') && mainJs.includes('window.renderApp'),
+    'frontend/src/main.js debe usar window.fullstackPlan y window.renderApp.',
+  )
+  pushFailure(
+    failures,
+    normalizeText(`${readmeContent}\n${runbookContent}`).includes('frontend/index.html') &&
+      normalizeText(`${readmeContent}\n${runbookContent}`).includes('doble click'),
+    'README y runbook deben declarar que frontend/index.html se puede abrir directo con doble click.',
+  )
+
+  try {
+    const simulatedBundle = executeStaticFrontendBundle(fixture.projectRootPath)
+    const renderedText = normalizeText(simulatedBundle.renderedHtml)
+
+    pushFailure(
+      failures,
+      renderedText.includes('fullstack local'),
+      'El bundle estático debe renderizar contenido visible de fullstack local.',
+    )
+    pushFailure(
+      failures,
+      renderedText.includes('veterinaria') || renderedText.includes('turnos'),
+      'El bundle estático debe renderizar el dominio esperado sin quedar en blanco.',
+    )
+  } catch (error) {
+    failures.push(
+      `La ejecución simulada del frontend estático falló: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    )
+  }
+
+  const browserVerification = await tryVerifyStaticFrontendInBrowser(indexHtmlPath)
+  if (browserVerification.available && browserVerification.attempted) {
+    pushFailure(
+      failures,
+      browserVerification.ok === true,
+      `La validación opcional en navegador no debe arrojar errores: ${[
+        ...(browserVerification.pageErrors || []),
+        ...(browserVerification.consoleErrors || []),
+      ].join(' | ')}`,
+    )
+    pushFailure(
+      failures,
+      normalizeText(browserVerification.bodyText).includes('fullstack local'),
+      'La validación opcional en navegador debe mostrar contenido en body.',
+    )
+  }
+
+  pushFailure(
+    failures,
+    !fs.existsSync(path.join(fixture.projectRootPath, 'node_modules')) &&
+      !fs.existsSync(path.join(fixture.projectRootPath, '.env')) &&
+      !fs.existsSync(path.join(fixture.projectRootPath, 'Dockerfile')) &&
+      !fs.existsSync(path.join(fixture.projectRootPath, 'docker-compose.yml')),
+    'El scaffold file:// no debe crear node_modules, .env, Dockerfile ni docker-compose.yml.',
+  )
+
+  return {
+    id: 'operator-fullstack-file-compatibility',
+    label: 'Scaffold fullstack local compatible con file://',
+    failures,
+  }
+}
+
 async function runPhaseRecommendationCase({ id, label, phaseStatuses, expectedNextPhase, includePhases = true }) {
   const failures = []
   let fixture = await buildFullstackFixture({
@@ -999,6 +1262,81 @@ async function runSensitivePreviewCase() {
   }
 }
 
+async function runExplicitRestrictionsSafeFlowCase() {
+  const failures = []
+  const goal =
+    'Haceme un sistema fullstack local para una veterinaria, con clientes, mascotas, turnos, recordatorios, reportes e inventario básico. Quiero una demo local segura con datos mock, sin instalar dependencias, sin levantar backend real, sin crear base de datos real, sin ejecutar SQL, sin Docker, sin deploy y sin tocar integraciones externas.'
+  const fixture = await buildFullstackFixture({
+    workspaceName: 'operator-explicit-restrictions',
+    goal,
+    context: '',
+    projectLabel: 'veterinaria segura',
+  })
+  const reviewDecision = await requestReviewExpandDecision(fixture)
+  const scaffoldRoadmapPhase = getRoadmapPhaseEntry(
+    fixture.phaseOneDecision?.implementationRoadmap,
+    'scaffold-fullstack-local',
+  )
+  const approvalAreaTexts = Array.isArray(reviewDecision?.projectReadinessState?.approvalRequiredAreas)
+    ? reviewDecision.projectReadinessState.approvalRequiredAreas
+    : []
+  const nextActionLabel = normalizeText(
+    reviewDecision?.projectContinuationState?.nextRecommendedAction?.title ||
+      reviewDecision?.nextActionPlan?.userFacingLabel ||
+      '',
+  )
+
+  pushFailure(
+    failures,
+    !reviewDecision?.runtimeApprovalState,
+    'El scaffold seguro no debe crear runtimeApprovalState por restricciones explícitas ya respetadas.',
+  )
+  pushFailure(
+    failures,
+    !reviewDecision?.approvalRequestPlan,
+    'El scaffold seguro no debe crear approvalRequestPlan por restricciones explícitas ya respetadas.',
+  )
+  pushFailure(
+    failures,
+    normalizeIdentifier(reviewDecision?.projectContinuationState?.nextRecommendedPhase) ===
+      'frontend-mock-flow',
+    'Después del scaffold seguro debe recomendar frontend-mock-flow.',
+  )
+  pushFailure(
+    failures,
+    scaffoldRoadmapPhase?.approvalRequired !== true,
+    'implementationRoadmap.phases.scaffold-fullstack-local no debe pedir aprobación para la base local segura.',
+  )
+  pushFailure(
+    failures,
+    !nextActionLabel.includes('resolver aprobacion sensible'),
+    'El siguiente paso no debe sugerir resolver una aprobación sensible cuando el flujo base sigue seguro.',
+  )
+  pushFailure(
+    failures,
+    !approvalAreaTexts.some((entry) =>
+      normalizeText(entry).includes('resolver aprobacion sensible'),
+    ),
+    'approvalRequiredAreas no debe inflar un preview de resolver aprobación sensible para restricciones explícitas ya aceptadas.',
+  )
+  pushFailure(
+    failures,
+    Array.isArray(reviewDecision?.projectContinuationState?.availableSafeActions) &&
+      reviewDecision.projectContinuationState.availableSafeActions.some(
+        (entry) =>
+          normalizeIdentifier(entry?.phaseId || entry?.id) === 'frontend-mock-flow' ||
+          normalizeIdentifier(entry?.phaseId || entry?.id) === 'phase-frontend-mock-flow',
+      ),
+    'La continuidad debe dejar frontend-mock-flow como acción segura disponible.',
+  )
+
+  return {
+    id: 'operator-explicit-restrictions-safe-flow',
+    label: 'Restricciones explícitas no inflan aprobaciones del flujo seguro',
+    failures,
+  }
+}
+
 async function runFinalReadinessCase() {
   const failures = []
   let fixture = await buildModuleExpansionReadyFixture('operator-final-readiness')
@@ -1145,6 +1483,7 @@ async function main() {
     const results = []
     results.push(await runZeroSystemCase())
     results.push(await runFullstackBaseCase())
+    results.push(await runFullstackStaticFileCompatibilityCase())
     results.push(
       await runPhaseRecommendationCase({
         id: 'operator-no-phases',
@@ -1215,6 +1554,7 @@ async function main() {
     }
     results.push(await runModuleStatusCase())
     results.push(await runSensitivePreviewCase())
+    results.push(await runExplicitRestrictionsSafeFlowCase())
     results.push(await runFinalReadinessCase())
     results.push(await runUiContractSanityCase())
     results.push(await runUiHelperSanityCase())
