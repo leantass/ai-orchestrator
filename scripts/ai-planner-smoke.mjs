@@ -597,6 +597,128 @@ const phaseExecutionValidationCases = {
   },
 }
 
+const continuationValidationCases = {
+  legacyManifestWithoutPhases: {
+    id: 'continuation-legacy-without-phases',
+    label: 'Manifest viejo sin phases',
+    goal:
+      'Preparar la fase review-and-expand del proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  manifestFrontendDone: {
+    id: 'continuation-frontend-done',
+    label: 'Manifest con frontend done',
+    goal:
+      'Preparar la fase review-and-expand del proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  manifestBackendDone: {
+    id: 'continuation-backend-done',
+    label: 'Manifest con frontend y backend done',
+    goal:
+      'Preparar la fase review-and-expand del proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  manifestDatabaseDone: {
+    id: 'continuation-database-done',
+    label: 'Manifest con database done',
+    goal:
+      'Preparar la fase review-and-expand del proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  manifestBaseComplete: {
+    id: 'continuation-base-complete',
+    label: 'Manifest con base completa',
+    goal:
+      'Preparar la fase review-and-expand del proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  manifestBaseCompleteWithoutModules: {
+    id: 'continuation-base-complete-without-modules',
+    label: 'Base completa sin modulos',
+    goal:
+      'Preparar la fase review-and-expand del proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  manifestNotificationsDone: {
+    id: 'continuation-notifications-done',
+    label: 'Notifications ya hecho',
+    goal:
+      'Preparar la fase review-and-expand del proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  manifestAllSafeModulesDone: {
+    id: 'continuation-all-safe-modules-done',
+    label: 'Todos los modulos seguros hechos',
+    goal:
+      'Preparar la fase review-and-expand del proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  manifestPartialModule: {
+    id: 'continuation-partial-module',
+    label: 'Modulo partial',
+    goal:
+      'Preparar la fase review-and-expand del proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  manifestBlockedModule: {
+    id: 'continuation-blocked-module',
+    label: 'Modulo blocked',
+    goal:
+      'Preparar la fase review-and-expand del proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  prepareRuntimePlan: {
+    id: 'continuation-runtime-plan',
+    label: 'Plan de runtime local',
+    goal:
+      'Preparar un plan de runtime local para el proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  prepareDependencyInstallPlan: {
+    id: 'continuation-dependency-plan',
+    label: 'Plan de dependencias',
+    goal:
+      'Preparar un plan de instalacion de dependencias para el proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  prepareDbRealPlan: {
+    id: 'continuation-db-real-plan',
+    label: 'Plan de DB real',
+    goal:
+      'Preparar un plan de base real para el proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  prepareAuthPlan: {
+    id: 'continuation-auth-plan',
+    label: 'Plan de auth real',
+    goal:
+      'Preparar un plan de auth real para el proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  prepareDeployPlan: {
+    id: 'continuation-deploy-plan',
+    label: 'Plan de deploy',
+    goal:
+      'Preparar un plan de deploy futuro para el proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  prepareExternalIntegrationPlan: {
+    id: 'continuation-external-integration-plan',
+    label: 'Plan de integracion externa',
+    goal:
+      'Preparar un plan de integracion externa para el proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  prepareDockerPlan: {
+    id: 'continuation-docker-plan',
+    label: 'Plan de Docker',
+    goal:
+      'Preparar un plan de Docker e infraestructura para el proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+}
+
 const smokeExecutionWorkspaceRoot = path.join(
   process.env.TEMP || 'C:/tmp',
   'ai-planner-phase-smoke',
@@ -1133,6 +1255,79 @@ function summarizeModuleExpansionPlan(moduleExpansionPlan) {
   }
 }
 
+function summarizeContinuationAction(action) {
+  return {
+    id: action?.id || '',
+    title: action?.title || '',
+    description: action?.description || '',
+    category: action?.category || '',
+    targetStrategy: action?.targetStrategy || '',
+    safeToPrepare: action?.safeToPrepare !== false,
+    safeToMaterialize: action?.safeToMaterialize === true,
+    requiresApproval: action?.requiresApproval === true,
+    blocked: action?.blocked === true,
+    blocker: action?.blocker || '',
+    approvalType: action?.approvalType || '',
+    expectedOutcome: action?.expectedOutcome || '',
+    recommended: action?.recommended === true,
+    priority: Number.isFinite(action?.priority) ? action.priority : 0,
+    phaseId: action?.phaseId || '',
+    moduleId: action?.moduleId || '',
+    riskLevel: action?.riskLevel || '',
+    projectRoot: action?.projectRoot || '',
+    reason: action?.reason || '',
+    targetFiles: toStringArray(action?.targetFiles, 24),
+    allowedTargetPaths: toStringArray(action?.allowedTargetPaths, 24),
+    explicitExclusions: toStringArray(action?.explicitExclusions, 24),
+    successCriteria: toStringArray(action?.successCriteria, 24),
+    risks: toStringArray(action?.risks, 24),
+    validationPlan:
+      action?.validationPlan && typeof action.validationPlan === 'object'
+        ? summarizeValidationPlan(action.validationPlan)
+        : null,
+  }
+}
+
+function summarizeProjectContinuationState(projectContinuationState) {
+  return {
+    projectStatus: projectContinuationState?.projectStatus || '',
+    completedPhases: toStringArray(projectContinuationState?.completedPhases, 24),
+    pendingPhases: toStringArray(projectContinuationState?.pendingPhases, 24),
+    availableSafeActions: Array.isArray(projectContinuationState?.availableSafeActions)
+      ? projectContinuationState.availableSafeActions.map(summarizeContinuationAction)
+      : [],
+    availablePlanningActions: Array.isArray(
+      projectContinuationState?.availablePlanningActions,
+    )
+      ? projectContinuationState.availablePlanningActions.map(summarizeContinuationAction)
+      : [],
+    approvalRequiredActions: Array.isArray(
+      projectContinuationState?.approvalRequiredActions,
+    )
+      ? projectContinuationState.approvalRequiredActions.map(
+          summarizeContinuationAction,
+        )
+      : [],
+    blockedActions: Array.isArray(projectContinuationState?.blockedActions)
+      ? projectContinuationState.blockedActions.map(summarizeContinuationAction)
+      : [],
+    modulesDone: toStringArray(projectContinuationState?.modulesDone, 24),
+    modulesAvailable: toStringArray(projectContinuationState?.modulesAvailable, 24),
+    modulesBlocked: toStringArray(projectContinuationState?.modulesBlocked, 24),
+    nextRecommendedAction:
+      projectContinuationState?.nextRecommendedAction &&
+      typeof projectContinuationState.nextRecommendedAction === 'object'
+        ? summarizeContinuationAction(projectContinuationState.nextRecommendedAction)
+        : null,
+    nextRecommendedPhase: projectContinuationState?.nextRecommendedPhase || '',
+    nextRecommendedModule: projectContinuationState?.nextRecommendedModule || '',
+    risks: toStringArray(projectContinuationState?.risks, 24),
+    blockers: toStringArray(projectContinuationState?.blockers, 24),
+    summary: projectContinuationState?.summary || '',
+    operatorMessage: projectContinuationState?.operatorMessage || '',
+  }
+}
+
 function summarizeLocalProjectManifest(localProjectManifest) {
   return {
     version: Number.isFinite(localProjectManifest?.version)
@@ -1145,6 +1340,25 @@ function summarizeLocalProjectManifest(localProjectManifest) {
     materializationLayer: localProjectManifest?.materializationLayer || '',
     forbiddenPaths: toStringArray(localProjectManifest?.forbiddenPaths, 24),
     nextRecommendedPhase: localProjectManifest?.nextRecommendedPhase || '',
+    nextRecommendedAction: localProjectManifest?.nextRecommendedAction || '',
+    lastCompletedPhase: localProjectManifest?.lastCompletedPhase || '',
+    availableActions: toStringArray(localProjectManifest?.availableActions, 24),
+    blockedActions: toStringArray(localProjectManifest?.blockedActions, 24),
+    approvalRequiredActions: toStringArray(
+      localProjectManifest?.approvalRequiredActions,
+      24,
+    ),
+    risks: toStringArray(localProjectManifest?.risks, 24),
+    updatedAt: localProjectManifest?.updatedAt || '',
+    history: Array.isArray(localProjectManifest?.history)
+      ? localProjectManifest.history.map((entry) => ({
+          kind: entry?.kind || '',
+          id: entry?.id || '',
+          status: entry?.status || '',
+          at: entry?.at || '',
+          note: entry?.note || '',
+        }))
+      : [],
     phases: Array.isArray(localProjectManifest?.phases)
       ? localProjectManifest.phases.map((entry) => ({
           id: entry?.id || '',
@@ -2428,6 +2642,130 @@ async function buildModuleExpansionReadyFixture(workspaceName) {
     requestId: `${workspaceName}-validation`,
   })
   return fixture
+}
+
+const continuationBasePhaseIds = [
+  'fullstack-local-scaffold',
+  'frontend-mock-flow',
+  'backend-contracts',
+  'database-design',
+  'local-validation',
+  'review-and-expand',
+]
+
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value))
+}
+
+function buildContinuationScenarioManifest(baseManifest, options = {}) {
+  const manifest = cloneJson(baseManifest || {})
+  const existingPhaseMap = new Map(
+    (Array.isArray(manifest.phases) ? manifest.phases : []).map((entry) => [
+      String(entry?.id || '').trim(),
+      entry,
+    ]),
+  )
+  const phaseStatuses =
+    options.phaseStatuses && typeof options.phaseStatuses === 'object'
+      ? options.phaseStatuses
+      : {}
+
+  manifest.version = Number.isFinite(manifest.version) ? manifest.version : 1
+  manifest.projectType = 'fullstack-local'
+  manifest.deliveryLevel = 'fullstack-local'
+
+  if (options.includePhases === false) {
+    delete manifest.phases
+  } else {
+    const declaredPhaseIds = summarizeUniqueStrings(
+      [...continuationBasePhaseIds, ...Object.keys(phaseStatuses)],
+      24,
+    )
+    manifest.phases = declaredPhaseIds
+      .map((phaseId) => {
+        const existingEntry = existingPhaseMap.get(phaseId) || {}
+        const status =
+          typeof phaseStatuses[phaseId] === 'string'
+            ? phaseStatuses[phaseId]
+            : String(existingEntry?.status || '').trim()
+
+        if (!status) {
+          return null
+        }
+
+        return {
+          ...existingEntry,
+          id: phaseId,
+          status,
+          createdAt: existingEntry?.createdAt || 'scenario-manifest',
+          files: toStringArray(existingEntry?.files, 24),
+        }
+      })
+      .filter(Boolean)
+  }
+
+  if (options.modulesMode === 'remove') {
+    delete manifest.modules
+  } else if (options.modulesMode === 'replace') {
+    manifest.modules = Array.isArray(options.modules)
+      ? options.modules.map((entry) => ({
+          id: String(entry?.id || '').trim(),
+          name: String(entry?.name || entry?.id || '').trim(),
+          status: String(entry?.status || '').trim(),
+          addedAt: String(entry?.addedAt || 'scenario-manifest').trim(),
+          layers: toStringArray(entry?.layers, 16),
+          files: toStringArray(entry?.files, 24),
+        }))
+      : []
+  }
+
+  if (Object.prototype.hasOwnProperty.call(options, 'nextRecommendedPhase')) {
+    if (options.nextRecommendedPhase) {
+      manifest.nextRecommendedPhase = String(options.nextRecommendedPhase).trim()
+    } else {
+      delete manifest.nextRecommendedPhase
+    }
+  }
+
+  delete manifest.nextRecommendedAction
+  delete manifest.lastCompletedPhase
+  delete manifest.availableActions
+  delete manifest.blockedActions
+  delete manifest.approvalRequiredActions
+  delete manifest.risks
+  delete manifest.updatedAt
+  delete manifest.history
+
+  return manifest
+}
+
+function writeFixtureManifest(fixture, manifest) {
+  fs.writeFileSync(fixture.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+  return {
+    ...fixture,
+    manifest,
+  }
+}
+
+async function requestContinuationDecision({ fixture, testCase }) {
+  const reusablePlanningContext = buildReusablePlanningContext()
+  return plannerApi.buildLocalStrategicBrainDecision({
+    goal: testCase.goal,
+    context: testCase.context,
+    workspacePath: fixture.workspacePath,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
 }
 
 function buildExpectedModuleTargets(fixture, moduleId) {
@@ -6274,6 +6612,309 @@ async function runReviewAndExpandAfterModuleValidation({
   }
 }
 
+function continuationActionMatchesId(actionSummary, identifier) {
+  const expectedId = String(identifier || '').trim()
+
+  if (!expectedId || !actionSummary || typeof actionSummary !== 'object') {
+    return false
+  }
+
+  return [actionSummary.id, actionSummary.phaseId, actionSummary.moduleId].some(
+    (value) => String(value || '').trim() === expectedId,
+  )
+}
+
+async function runContinuationRecommendationValidation({
+  testCase,
+  workspaceName,
+  baseFixture = 'phase',
+  manifestOptions = {},
+  expectedNextPhase = '',
+  expectedNextActionId = '',
+  expectedProjectStatus = '',
+  expectedSafeActionIds = [],
+  expectedPlanningActionIds = [],
+  expectedApprovalActionIds = [],
+  expectedBlockedActionIds = [],
+  expectedSafeModuleOptions = [],
+  forbiddenMaterializableOptionIds = [],
+  expectedModulesAvailable = [],
+  expectedModulesBlocked = [],
+}) {
+  const fixtureBuilder =
+    baseFixture === 'review-ready'
+      ? buildModuleExpansionReadyFixture
+      : async (name) => buildPhaseExecutionFixture({ workspaceName: name })
+  let fixture = await fixtureBuilder(workspaceName)
+  fixture = writeFixtureManifest(
+    fixture,
+    buildContinuationScenarioManifest(fixture.manifest, manifestOptions),
+  )
+
+  const decision = await requestContinuationDecision({ fixture, testCase })
+  const failures = []
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const nextExpectedAction = String(decision?.nextExpectedAction || '').trim()
+  const materializationPlan =
+    decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+      ? decision.materializationPlan
+      : null
+  const projectContinuationState =
+    decision?.projectContinuationState &&
+    typeof decision.projectContinuationState === 'object'
+      ? decision.projectContinuationState
+      : null
+  const localProjectManifest =
+    decision?.localProjectManifest && typeof decision.localProjectManifest === 'object'
+      ? decision.localProjectManifest
+      : null
+  const expansionOptions =
+    decision?.expansionOptions && typeof decision.expansionOptions === 'object'
+      ? decision.expansionOptions
+      : null
+
+  if (strategy !== 'prepare-project-phase-plan') {
+    failures.push('La validacion de continuidad deberia seguir usando prepare-project-phase-plan para review-and-expand.')
+  }
+  if (executionMode !== 'planner-only') {
+    failures.push('La validacion de continuidad deberia mantenerse en planner-only.')
+  }
+  if (nextExpectedAction !== 'review-project-phase') {
+    failures.push('La validacion de continuidad deberia devolver review-project-phase.')
+  }
+  if (materializationPlan) {
+    failures.push('La continuidad revisable no deberia devolver materializationPlan.')
+  }
+  if (!projectContinuationState) {
+    failures.push('projectContinuationState ausente en el escenario de continuidad.')
+  } else {
+    const stateSummary = summarizeProjectContinuationState(projectContinuationState)
+
+    if (expectedNextPhase && stateSummary.nextRecommendedPhase !== expectedNextPhase) {
+      failures.push(
+        `projectContinuationState.nextRecommendedPhase deberia ser ${expectedNextPhase}.`,
+      )
+    }
+    if (expectedProjectStatus && stateSummary.projectStatus !== expectedProjectStatus) {
+      failures.push(
+        `projectContinuationState.projectStatus deberia ser ${expectedProjectStatus}.`,
+      )
+    }
+    if (
+      expectedNextActionId &&
+      !continuationActionMatchesId(stateSummary.nextRecommendedAction, expectedNextActionId)
+    ) {
+      failures.push(
+        `projectContinuationState.nextRecommendedAction deberia apuntar a ${expectedNextActionId}.`,
+      )
+    }
+
+    for (const actionId of expectedSafeActionIds) {
+      if (
+        !stateSummary.availableSafeActions.some((entry) =>
+          continuationActionMatchesId(entry, actionId),
+        )
+      ) {
+        failures.push(`availableSafeActions deberia incluir ${actionId}.`)
+      }
+    }
+    for (const actionId of expectedPlanningActionIds) {
+      if (
+        !stateSummary.availablePlanningActions.some((entry) =>
+          continuationActionMatchesId(entry, actionId),
+        )
+      ) {
+        failures.push(`availablePlanningActions deberia incluir ${actionId}.`)
+      }
+    }
+    for (const actionId of expectedApprovalActionIds) {
+      if (
+        !stateSummary.approvalRequiredActions.some((entry) =>
+          continuationActionMatchesId(entry, actionId),
+        )
+      ) {
+        failures.push(`approvalRequiredActions deberia incluir ${actionId}.`)
+      }
+    }
+    for (const actionId of expectedBlockedActionIds) {
+      if (
+        !stateSummary.blockedActions.some((entry) =>
+          continuationActionMatchesId(entry, actionId),
+        )
+      ) {
+        failures.push(`blockedActions deberia incluir ${actionId}.`)
+      }
+    }
+    for (const moduleName of expectedModulesAvailable) {
+      if (
+        !stateSummary.modulesAvailable.some(
+          (entry) => normalizeText(entry) === normalizeText(moduleName),
+        )
+      ) {
+        failures.push(`modulesAvailable deberia incluir ${moduleName}.`)
+      }
+    }
+    for (const moduleName of expectedModulesBlocked) {
+      if (
+        !stateSummary.modulesBlocked.some(
+          (entry) => normalizeText(entry) === normalizeText(moduleName),
+        )
+      ) {
+        failures.push(`modulesBlocked deberia incluir ${moduleName}.`)
+      }
+    }
+  }
+
+  if (!localProjectManifest) {
+    failures.push('localProjectManifest ausente en el escenario de continuidad.')
+  } else {
+    const manifestSummary = summarizeLocalProjectManifest(localProjectManifest)
+
+    if (expectedNextPhase && manifestSummary.nextRecommendedPhase !== expectedNextPhase) {
+      failures.push(`localProjectManifest.nextRecommendedPhase deberia ser ${expectedNextPhase}.`)
+    }
+    if (expectedSafeActionIds.length > 0) {
+      expectedSafeActionIds.forEach((actionId) => {
+        if (!manifestSummary.availableActions.includes(actionId)) {
+          failures.push(`localProjectManifest.availableActions deberia incluir ${actionId}.`)
+        }
+      })
+    }
+  }
+
+  if (expectedSafeModuleOptions.length > 0 || forbiddenMaterializableOptionIds.length > 0) {
+    if (!expansionOptions) {
+      failures.push('expansionOptions ausente cuando deberia sugerir modulos seguros.')
+    } else {
+      const optionsSummary = summarizeExpansionOptions(expansionOptions)
+      expectedSafeModuleOptions.forEach((moduleId) => {
+        if (
+          !optionsSummary.options.some(
+            (entry) => entry.id === moduleId && entry.safeToMaterialize === true,
+          )
+        ) {
+          failures.push(`expansionOptions deberia incluir ${moduleId} como opcion materializable segura.`)
+        }
+      })
+      forbiddenMaterializableOptionIds.forEach((moduleId) => {
+        if (
+          optionsSummary.options.some(
+            (entry) => entry.id === moduleId && entry.safeToMaterialize === true,
+          )
+        ) {
+          failures.push(`expansionOptions no deberia sugerir ${moduleId} como materializable nuevo.`)
+        }
+      })
+    }
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction,
+  }
+}
+
+async function runContinuationActionPlanValidation({
+  testCase,
+  workspaceName,
+  expectedActionId,
+  expectApproval = true,
+  expectBlocked = false,
+}) {
+  const fixture = await buildModuleExpansionReadyFixture(workspaceName)
+  const decision = await requestContinuationDecision({ fixture, testCase })
+  const failures = []
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const nextExpectedAction = String(decision?.nextExpectedAction || '').trim()
+  const materializationPlan =
+    decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+      ? decision.materializationPlan
+      : null
+  const executionScope =
+    decision?.executionScope && typeof decision.executionScope === 'object'
+      ? decision.executionScope
+      : null
+  const continuationActionPlan =
+    decision?.continuationActionPlan &&
+    typeof decision.continuationActionPlan === 'object'
+      ? decision.continuationActionPlan
+      : null
+  const projectContinuationState =
+    decision?.projectContinuationState &&
+    typeof decision.projectContinuationState === 'object'
+      ? decision.projectContinuationState
+      : null
+
+  if (strategy !== 'prepare-continuation-action-plan') {
+    failures.push('La accion sensible deberia devolver prepare-continuation-action-plan.')
+  }
+  if (executionMode !== 'planner-only') {
+    failures.push('Las acciones sensibles o revisables deben quedar en planner-only.')
+  }
+  if (nextExpectedAction !== 'review-continuation-action') {
+    failures.push('Las acciones sensibles deben volver a review-continuation-action.')
+  }
+  if (materializationPlan) {
+    failures.push('Las acciones sensibles no deberian devolver materializationPlan.')
+  }
+  if (executionScope) {
+    failures.push('Las acciones sensibles no deberian devolver executionScope ejecutable.')
+  }
+  if (!continuationActionPlan) {
+    failures.push('continuationActionPlan ausente.')
+  } else {
+    const actionSummary = summarizeContinuationAction(continuationActionPlan)
+    if (!continuationActionMatchesId(actionSummary, expectedActionId)) {
+      failures.push(`continuationActionPlan.id deberia ser ${expectedActionId}.`)
+    }
+    if (actionSummary.safeToMaterialize) {
+      failures.push('Una accion sensible nunca deberia quedar safeToMaterialize=true.')
+    }
+    if (actionSummary.requiresApproval !== expectApproval) {
+      failures.push('requiresApproval inesperado en continuationActionPlan.')
+    }
+    if (actionSummary.blocked !== expectBlocked) {
+      failures.push('blocked inesperado en continuationActionPlan.')
+    }
+    if (
+      !actionSummary.blocker &&
+      !actionSummary.reason &&
+      !actionSummary.description
+    ) {
+      failures.push('continuationActionPlan deberia explicar el motivo de la restriccion.')
+    }
+  }
+  if (!projectContinuationState) {
+    failures.push('projectContinuationState ausente en accion sensible.')
+  } else {
+    const stateSummary = summarizeProjectContinuationState(projectContinuationState)
+    const targetList = expectBlocked
+      ? stateSummary.blockedActions
+      : stateSummary.approvalRequiredActions
+
+    if (!targetList.some((entry) => continuationActionMatchesId(entry, expectedActionId))) {
+      failures.push(
+        `${expectBlocked ? 'blockedActions' : 'approvalRequiredActions'} deberia incluir ${expectedActionId}.`,
+      )
+    }
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction,
+  }
+}
+
 async function main() {
   const { verbose, listOnly, caseId } = parseArgs(process.argv.slice(2))
 
@@ -6324,6 +6965,7 @@ async function main() {
   let frontendMaterializationResult = null
   let fullstackMaterializationResult = null
   let projectPhaseExecutionResults = []
+  let continuationResults = []
   if (!caseId) {
     console.log('Frontend Project Materialization Check')
     console.log('=====================================')
@@ -6445,6 +7087,280 @@ async function main() {
     ]
     projectPhaseExecutionResults.forEach(printScalableValidationResult)
     console.log('-----------------')
+
+    console.log('Project Continuation Checks')
+    console.log('===========================')
+    continuationResults = [
+      await runContinuationRecommendationValidation({
+        testCase: continuationValidationCases.legacyManifestWithoutPhases,
+        workspaceName: 'fullstack-project-continuation-legacy-manifest',
+        baseFixture: 'phase',
+        manifestOptions: {
+          includePhases: false,
+          modulesMode: 'remove',
+          nextRecommendedPhase: '',
+        },
+        expectedNextPhase: 'frontend-mock-flow',
+        expectedNextActionId: 'frontend-mock-flow',
+        expectedProjectStatus: 'base-phases-in-progress',
+        expectedSafeActionIds: ['frontend-mock-flow'],
+      }),
+      await runContinuationRecommendationValidation({
+        testCase: continuationValidationCases.manifestFrontendDone,
+        workspaceName: 'fullstack-project-continuation-frontend-done',
+        baseFixture: 'phase',
+        manifestOptions: {
+          phaseStatuses: {
+            'fullstack-local-scaffold': 'done',
+            'frontend-mock-flow': 'done',
+            'backend-contracts': 'available',
+            'database-design': 'planned',
+            'local-validation': 'pending',
+            'review-and-expand': 'pending',
+          },
+          modulesMode: 'remove',
+          nextRecommendedPhase: 'backend-contracts',
+        },
+        expectedNextPhase: 'backend-contracts',
+        expectedNextActionId: 'backend-contracts',
+        expectedProjectStatus: 'base-phases-in-progress',
+        expectedSafeActionIds: ['backend-contracts'],
+      }),
+      await runContinuationRecommendationValidation({
+        testCase: continuationValidationCases.manifestBackendDone,
+        workspaceName: 'fullstack-project-continuation-backend-done',
+        baseFixture: 'phase',
+        manifestOptions: {
+          phaseStatuses: {
+            'fullstack-local-scaffold': 'done',
+            'frontend-mock-flow': 'done',
+            'backend-contracts': 'done',
+            'database-design': 'available',
+            'local-validation': 'pending',
+            'review-and-expand': 'pending',
+          },
+          modulesMode: 'remove',
+          nextRecommendedPhase: 'database-design',
+        },
+        expectedNextPhase: 'database-design',
+        expectedNextActionId: 'database-design',
+        expectedProjectStatus: 'base-phases-in-progress',
+        expectedSafeActionIds: ['database-design'],
+      }),
+      await runContinuationRecommendationValidation({
+        testCase: continuationValidationCases.manifestDatabaseDone,
+        workspaceName: 'fullstack-project-continuation-database-done',
+        baseFixture: 'phase',
+        manifestOptions: {
+          phaseStatuses: {
+            'fullstack-local-scaffold': 'done',
+            'frontend-mock-flow': 'done',
+            'backend-contracts': 'done',
+            'database-design': 'done',
+            'local-validation': 'available',
+            'review-and-expand': 'pending',
+          },
+          modulesMode: 'remove',
+          nextRecommendedPhase: 'local-validation',
+        },
+        expectedNextPhase: 'local-validation',
+        expectedNextActionId: 'local-validation',
+        expectedProjectStatus: 'base-phases-in-progress',
+        expectedSafeActionIds: ['local-validation'],
+      }),
+      await runContinuationRecommendationValidation({
+        testCase: continuationValidationCases.manifestBaseComplete,
+        workspaceName: 'fullstack-project-continuation-base-complete',
+        baseFixture: 'review-ready',
+        manifestOptions: {
+          nextRecommendedPhase: 'review-and-expand',
+        },
+        expectedNextPhase: 'review-and-expand',
+        expectedNextActionId: 'notifications',
+        expectedProjectStatus: 'safe-module-expansion-ready',
+        expectedSafeActionIds: ['notifications', 'reports', 'inventory'],
+      }),
+      await runContinuationRecommendationValidation({
+        testCase: continuationValidationCases.manifestBaseCompleteWithoutModules,
+        workspaceName: 'fullstack-project-continuation-without-modules',
+        baseFixture: 'review-ready',
+        manifestOptions: {
+          modulesMode: 'remove',
+          nextRecommendedPhase: 'review-and-expand',
+        },
+        expectedNextPhase: 'review-and-expand',
+        expectedNextActionId: 'notifications',
+        expectedProjectStatus: 'safe-module-expansion-ready',
+        expectedSafeActionIds: ['notifications', 'reports', 'inventory'],
+        expectedSafeModuleOptions: ['notifications', 'reports', 'inventory'],
+        expectedModulesAvailable: ['Notificaciones', 'Reportes', 'Inventario'],
+      }),
+      await runContinuationRecommendationValidation({
+        testCase: continuationValidationCases.manifestNotificationsDone,
+        workspaceName: 'fullstack-project-continuation-notifications-done',
+        baseFixture: 'review-ready',
+        manifestOptions: {
+          modulesMode: 'replace',
+          modules: [
+            {
+              id: 'notifications',
+              name: 'Notificaciones',
+              status: 'done',
+              addedAt: 'scenario-manifest',
+              layers: ['frontend', 'backend', 'shared', 'database', 'docs'],
+              files: ['docs/validation-report.md'],
+            },
+          ],
+          nextRecommendedPhase: 'review-and-expand',
+        },
+        expectedNextPhase: 'review-and-expand',
+        expectedNextActionId: 'reports',
+        expectedProjectStatus: 'safe-module-expansion-ready',
+        expectedSafeActionIds: ['reports', 'inventory'],
+        expectedSafeModuleOptions: ['reports', 'inventory'],
+        forbiddenMaterializableOptionIds: ['notifications'],
+      }),
+      await runContinuationRecommendationValidation({
+        testCase: continuationValidationCases.manifestAllSafeModulesDone,
+        workspaceName: 'fullstack-project-continuation-all-safe-done',
+        baseFixture: 'review-ready',
+        manifestOptions: {
+          modulesMode: 'replace',
+          modules: [
+            {
+              id: 'notifications',
+              name: 'Notificaciones',
+              status: 'done',
+              addedAt: 'scenario-manifest',
+              layers: ['frontend', 'backend', 'shared', 'database', 'docs'],
+              files: ['docs/validation-report.md'],
+            },
+            {
+              id: 'reports',
+              name: 'Reportes',
+              status: 'done',
+              addedAt: 'scenario-manifest',
+              layers: ['frontend', 'backend', 'shared', 'database', 'docs'],
+              files: ['docs/architecture.md'],
+            },
+            {
+              id: 'inventory',
+              name: 'Inventario',
+              status: 'done',
+              addedAt: 'scenario-manifest',
+              layers: ['frontend', 'backend', 'shared', 'database', 'docs'],
+              files: ['database/schema.sql'],
+            },
+          ],
+          nextRecommendedPhase: 'review-and-expand',
+        },
+        expectedNextPhase: 'review-and-expand',
+        expectedNextActionId: 'prepare-frontend-improvement-plan',
+        expectedProjectStatus: 'safe-capabilities-complete',
+        expectedPlanningActionIds: [
+          'prepare-frontend-improvement-plan',
+          'prepare-backend-improvement-plan',
+          'prepare-validation-improvement-plan',
+        ],
+        forbiddenMaterializableOptionIds: ['notifications', 'reports', 'inventory'],
+      }),
+      await runContinuationRecommendationValidation({
+        testCase: continuationValidationCases.manifestPartialModule,
+        workspaceName: 'fullstack-project-continuation-partial-module',
+        baseFixture: 'review-ready',
+        manifestOptions: {
+          modulesMode: 'replace',
+          modules: [
+            {
+              id: 'notifications',
+              name: 'Notificaciones',
+              status: 'partial',
+              addedAt: 'scenario-manifest',
+              layers: ['frontend', 'backend'],
+              files: ['frontend/src/components/App.js'],
+            },
+          ],
+          nextRecommendedPhase: 'review-and-expand',
+        },
+        expectedNextPhase: 'review-and-expand',
+        expectedNextActionId: 'notifications',
+        expectedProjectStatus: 'safe-module-expansion-ready',
+        expectedSafeActionIds: ['reports', 'inventory'],
+        expectedPlanningActionIds: ['notifications'],
+        forbiddenMaterializableOptionIds: ['notifications'],
+      }),
+      await runContinuationRecommendationValidation({
+        testCase: continuationValidationCases.manifestBlockedModule,
+        workspaceName: 'fullstack-project-continuation-blocked-module',
+        baseFixture: 'review-ready',
+        manifestOptions: {
+          modulesMode: 'replace',
+          modules: [
+            {
+              id: 'notifications',
+              name: 'Notificaciones',
+              status: 'blocked',
+              addedAt: 'scenario-manifest',
+              layers: ['frontend', 'backend'],
+              files: ['frontend/src/components/App.js'],
+            },
+          ],
+          nextRecommendedPhase: 'review-and-expand',
+        },
+        expectedNextPhase: 'review-and-expand',
+        expectedProjectStatus: 'safe-module-expansion-ready',
+        expectedSafeActionIds: ['reports', 'inventory'],
+        expectedBlockedActionIds: ['notifications'],
+        forbiddenMaterializableOptionIds: ['notifications'],
+        expectedModulesBlocked: ['Notificaciones'],
+      }),
+      await runContinuationActionPlanValidation({
+        testCase: continuationValidationCases.prepareRuntimePlan,
+        workspaceName: 'fullstack-project-continuation-runtime-plan',
+        expectedActionId: 'prepare-runtime-plan',
+        expectApproval: true,
+      }),
+      await runContinuationActionPlanValidation({
+        testCase: continuationValidationCases.prepareDependencyInstallPlan,
+        workspaceName: 'fullstack-project-continuation-dependency-plan',
+        expectedActionId: 'prepare-dependency-install-plan',
+        expectApproval: true,
+      }),
+      await runContinuationActionPlanValidation({
+        testCase: continuationValidationCases.prepareDbRealPlan,
+        workspaceName: 'fullstack-project-continuation-db-real-plan',
+        expectedActionId: 'prepare-db-real-plan',
+        expectApproval: true,
+      }),
+      await runContinuationActionPlanValidation({
+        testCase: continuationValidationCases.prepareAuthPlan,
+        workspaceName: 'fullstack-project-continuation-auth-plan',
+        expectedActionId: 'prepare-auth-plan',
+        expectApproval: true,
+      }),
+      await runContinuationActionPlanValidation({
+        testCase: continuationValidationCases.prepareDeployPlan,
+        workspaceName: 'fullstack-project-continuation-deploy-plan',
+        expectedActionId: 'prepare-deploy-plan',
+        expectApproval: true,
+        expectBlocked: true,
+      }),
+      await runContinuationActionPlanValidation({
+        testCase: continuationValidationCases.prepareExternalIntegrationPlan,
+        workspaceName: 'fullstack-project-continuation-external-integration-plan',
+        expectedActionId: 'prepare-external-integration-plan',
+        expectApproval: true,
+      }),
+      await runContinuationActionPlanValidation({
+        testCase: continuationValidationCases.prepareDockerPlan,
+        workspaceName: 'fullstack-project-continuation-docker-plan',
+        expectedActionId: 'prepare-docker-plan',
+        expectApproval: true,
+        expectBlocked: true,
+      }),
+    ]
+    continuationResults.forEach(printScalableValidationResult)
+    console.log('-----------------')
   }
 
   const failedScalableResults = scalableResults.filter((result) => !result.ok)
@@ -6452,6 +7368,7 @@ async function main() {
   const failedProjectPhaseExecutionResults = projectPhaseExecutionResults.filter(
     (result) => !result.ok,
   )
+  const failedContinuationResults = continuationResults.filter((result) => !result.ok)
   const frontendMaterializationFailed = frontendMaterializationResult?.ok === false
   const fullstackMaterializationFailed = fullstackMaterializationResult?.ok === false
 
@@ -6459,6 +7376,7 @@ async function main() {
     failedResults.length === 0 &&
     failedScalableResults.length === 0 &&
     failedQuestionPolicyResults.length === 0 &&
+    failedContinuationResults.length === 0 &&
     failedProjectPhaseExecutionResults.length === 0 &&
     !frontendMaterializationFailed &&
     !fullstackMaterializationFailed
@@ -6481,6 +7399,11 @@ async function main() {
     if (projectPhaseExecutionResults.length > 0) {
       console.log(
         `OK. ${projectPhaseExecutionResults.length}/${projectPhaseExecutionResults.length} checks de project phase execution pasaron.`,
+      )
+    }
+    if (continuationResults.length > 0) {
+      console.log(
+        `OK. ${continuationResults.length}/${continuationResults.length} checks de project continuation pasaron.`,
       )
     }
     return
@@ -6509,6 +7432,13 @@ async function main() {
   if (failedProjectPhaseExecutionResults.length > 0) {
     console.log('checks de project phase execution fallidos:')
     failedProjectPhaseExecutionResults.forEach((result) => {
+      console.log(`- ${result.testCase.id}: ${result.failures[0] || 'sin detalle'}`)
+    })
+  }
+
+  if (failedContinuationResults.length > 0) {
+    console.log('checks de project continuation fallidos:')
+    failedContinuationResults.forEach((result) => {
       console.log(`- ${result.testCase.id}: ${result.failures[0] || 'sin detalle'}`)
     })
   }

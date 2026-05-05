@@ -450,6 +450,55 @@ type ModuleExpansionActionPayload = {
   reason?: string
 }
 
+type ContinuationActionContract = {
+  id?: string
+  title?: string
+  description?: string
+  category?: string
+  targetStrategy?: string
+  safeToPrepare?: boolean
+  safeToMaterialize?: boolean
+  requiresApproval?: boolean
+  blocked?: boolean
+  blocker?: string
+  approvalType?: string
+  expectedOutcome?: string
+  recommended?: boolean
+  priority?: number
+  phaseId?: string
+  moduleId?: string
+  riskLevel?: 'low' | 'medium' | 'high' | string
+  projectRoot?: string
+  deliveryLevel?: ScalableDeliveryPlanContract['deliveryLevel'] | string
+  reason?: string
+  targetFiles?: string[]
+  allowedTargetPaths?: string[]
+  explicitExclusions?: string[]
+  successCriteria?: string[]
+  risks?: string[]
+  validationPlan?: ValidationPlanContract | null
+}
+
+type ProjectContinuationStateContract = {
+  projectStatus?: string
+  completedPhases?: string[]
+  pendingPhases?: string[]
+  availableSafeActions?: ContinuationActionContract[]
+  availablePlanningActions?: ContinuationActionContract[]
+  approvalRequiredActions?: ContinuationActionContract[]
+  blockedActions?: ContinuationActionContract[]
+  modulesDone?: string[]
+  modulesAvailable?: string[]
+  modulesBlocked?: string[]
+  nextRecommendedAction?: ContinuationActionContract | null
+  nextRecommendedPhase?: string
+  nextRecommendedModule?: string
+  risks?: string[]
+  blockers?: string[]
+  summary?: string
+  operatorMessage?: string
+}
+
 type ProjectPhaseExecutionOperationPreviewContract = {
   type?: string
   targetPath?: string
@@ -491,6 +540,14 @@ type LocalProjectManifestModuleContract = {
   files?: string[]
 }
 
+type LocalProjectManifestHistoryContract = {
+  kind?: string
+  id?: string
+  status?: string
+  at?: string
+  note?: string
+}
+
 type LocalProjectManifestContract = {
   version?: number
   projectType?: string
@@ -502,6 +559,14 @@ type LocalProjectManifestContract = {
   modules?: LocalProjectManifestModuleContract[]
   forbiddenPaths?: string[]
   nextRecommendedPhase?: string
+  nextRecommendedAction?: string
+  lastCompletedPhase?: string
+  availableActions?: string[]
+  blockedActions?: string[]
+  approvalRequiredActions?: string[]
+  risks?: string[]
+  updatedAt?: string
+  history?: LocalProjectManifestHistoryContract[]
 }
 
 type MaterializationPlanContract = Record<string, unknown>
@@ -545,6 +610,8 @@ type PlannerExecutionMetadata = {
   localProjectManifest: LocalProjectManifestContract | null
   expansionOptions: ExpansionOptionsContract | null
   moduleExpansionPlan: ModuleExpansionPlanContract | null
+  continuationActionPlan: ContinuationActionContract | null
+  projectContinuationState: ProjectContinuationStateContract | null
   materializationPlan: MaterializationPlanContract | null
 }
 
@@ -747,6 +814,8 @@ type PlannerDecisionResponse = {
   localProjectManifest?: LocalProjectManifestContract | null
   expansionOptions?: ExpansionOptionsContract | null
   moduleExpansionPlan?: ModuleExpansionPlanContract | null
+  continuationActionPlan?: ContinuationActionContract | null
+  projectContinuationState?: ProjectContinuationStateContract | null
   materializationPlan?: MaterializationPlanContract | null
   brainRoutingDecision?: BrainRoutingDecision
   tasks?: unknown[]
@@ -949,6 +1018,8 @@ const EMPTY_PLANNER_EXECUTION_METADATA: PlannerExecutionMetadata = {
   localProjectManifest: null,
   expansionOptions: null,
   moduleExpansionPlan: null,
+  continuationActionPlan: null,
+  projectContinuationState: null,
   materializationPlan: null,
 }
 
@@ -1879,6 +1950,186 @@ const normalizeNextActionPlanContract = (
   return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
 }
 
+const normalizeContinuationActionContract = (
+  value: unknown,
+): ContinuationActionContract | null => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const contract = value as ContinuationActionContract
+  const normalizedValue: ContinuationActionContract = {
+    ...(normalizeOptionalString(contract.id)
+      ? { id: normalizeOptionalString(contract.id) }
+      : {}),
+    ...(normalizeOptionalString(contract.title)
+      ? { title: normalizeOptionalString(contract.title) }
+      : {}),
+    ...(normalizeOptionalString(contract.description)
+      ? { description: normalizeOptionalString(contract.description) }
+      : {}),
+    ...(normalizeOptionalString(contract.category)
+      ? { category: normalizeOptionalString(contract.category) }
+      : {}),
+    ...(normalizeOptionalString(contract.targetStrategy)
+      ? { targetStrategy: normalizeOptionalString(contract.targetStrategy) }
+      : {}),
+    ...(typeof contract.safeToPrepare === 'boolean'
+      ? { safeToPrepare: contract.safeToPrepare }
+      : {}),
+    ...(typeof contract.safeToMaterialize === 'boolean'
+      ? { safeToMaterialize: contract.safeToMaterialize }
+      : {}),
+    ...(typeof contract.requiresApproval === 'boolean'
+      ? { requiresApproval: contract.requiresApproval }
+      : {}),
+    ...(typeof contract.blocked === 'boolean' ? { blocked: contract.blocked } : {}),
+    ...(normalizeOptionalString(contract.blocker)
+      ? { blocker: normalizeOptionalString(contract.blocker) }
+      : {}),
+    ...(normalizeOptionalString(contract.approvalType)
+      ? { approvalType: normalizeOptionalString(contract.approvalType) }
+      : {}),
+    ...(normalizeOptionalString(contract.expectedOutcome)
+      ? { expectedOutcome: normalizeOptionalString(contract.expectedOutcome) }
+      : {}),
+    ...(typeof contract.recommended === 'boolean'
+      ? { recommended: contract.recommended }
+      : {}),
+    ...(Number.isFinite(contract.priority) ? { priority: contract.priority } : {}),
+    ...(normalizeOptionalString(contract.phaseId)
+      ? { phaseId: normalizeOptionalString(contract.phaseId) }
+      : {}),
+    ...(normalizeOptionalString(contract.moduleId)
+      ? { moduleId: normalizeOptionalString(contract.moduleId) }
+      : {}),
+    ...(normalizeOptionalString(contract.riskLevel)
+      ? {
+          riskLevel: normalizeOptionalString(
+            contract.riskLevel,
+          ) as ContinuationActionContract['riskLevel'],
+        }
+      : {}),
+    ...(normalizeOptionalString(contract.projectRoot)
+      ? { projectRoot: normalizeOptionalString(contract.projectRoot) }
+      : {}),
+    ...(normalizeOptionalString(contract.deliveryLevel)
+      ? {
+          deliveryLevel: normalizeOptionalString(
+            contract.deliveryLevel,
+          ) as ContinuationActionContract['deliveryLevel'],
+        }
+      : {}),
+    ...(normalizeOptionalString(contract.reason)
+      ? { reason: normalizeOptionalString(contract.reason) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.targetFiles).length > 0
+      ? { targetFiles: normalizeOptionalStringArray(contract.targetFiles) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.allowedTargetPaths).length > 0
+      ? { allowedTargetPaths: normalizeOptionalStringArray(contract.allowedTargetPaths) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.explicitExclusions).length > 0
+      ? { explicitExclusions: normalizeOptionalStringArray(contract.explicitExclusions) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.successCriteria).length > 0
+      ? { successCriteria: normalizeOptionalStringArray(contract.successCriteria) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.risks).length > 0
+      ? { risks: normalizeOptionalStringArray(contract.risks) }
+      : {}),
+    ...(normalizeValidationPlanContract(contract.validationPlan)
+      ? { validationPlan: normalizeValidationPlanContract(contract.validationPlan) }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
+const normalizeProjectContinuationStateContract = (
+  value: unknown,
+): ProjectContinuationStateContract | null => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const contract = value as ProjectContinuationStateContract
+  const normalizeActionList = (entries: unknown) =>
+    Array.isArray(entries)
+      ? entries
+          .map((entry) => normalizeContinuationActionContract(entry))
+          .filter((entry): entry is ContinuationActionContract => Boolean(entry))
+      : []
+
+  const normalizedValue: ProjectContinuationStateContract = {
+    ...(normalizeOptionalString(contract.projectStatus)
+      ? { projectStatus: normalizeOptionalString(contract.projectStatus) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.completedPhases).length > 0
+      ? { completedPhases: normalizeOptionalStringArray(contract.completedPhases) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.pendingPhases).length > 0
+      ? { pendingPhases: normalizeOptionalStringArray(contract.pendingPhases) }
+      : {}),
+    ...(normalizeActionList(contract.availableSafeActions).length > 0
+      ? { availableSafeActions: normalizeActionList(contract.availableSafeActions) }
+      : {}),
+    ...(normalizeActionList(contract.availablePlanningActions).length > 0
+      ? {
+          availablePlanningActions: normalizeActionList(
+            contract.availablePlanningActions,
+          ),
+        }
+      : {}),
+    ...(normalizeActionList(contract.approvalRequiredActions).length > 0
+      ? {
+          approvalRequiredActions: normalizeActionList(
+            contract.approvalRequiredActions,
+          ),
+        }
+      : {}),
+    ...(normalizeActionList(contract.blockedActions).length > 0
+      ? { blockedActions: normalizeActionList(contract.blockedActions) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.modulesDone).length > 0
+      ? { modulesDone: normalizeOptionalStringArray(contract.modulesDone) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.modulesAvailable).length > 0
+      ? { modulesAvailable: normalizeOptionalStringArray(contract.modulesAvailable) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.modulesBlocked).length > 0
+      ? { modulesBlocked: normalizeOptionalStringArray(contract.modulesBlocked) }
+      : {}),
+    ...(normalizeContinuationActionContract(contract.nextRecommendedAction)
+      ? {
+          nextRecommendedAction: normalizeContinuationActionContract(
+            contract.nextRecommendedAction,
+          ),
+        }
+      : {}),
+    ...(normalizeOptionalString(contract.nextRecommendedPhase)
+      ? { nextRecommendedPhase: normalizeOptionalString(contract.nextRecommendedPhase) }
+      : {}),
+    ...(normalizeOptionalString(contract.nextRecommendedModule)
+      ? { nextRecommendedModule: normalizeOptionalString(contract.nextRecommendedModule) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.risks).length > 0
+      ? { risks: normalizeOptionalStringArray(contract.risks) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.blockers).length > 0
+      ? { blockers: normalizeOptionalStringArray(contract.blockers) }
+      : {}),
+    ...(normalizeOptionalString(contract.summary)
+      ? { summary: normalizeOptionalString(contract.summary) }
+      : {}),
+    ...(normalizeOptionalString(contract.operatorMessage)
+      ? { operatorMessage: normalizeOptionalString(contract.operatorMessage) }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
 const normalizeValidationPlanContract = (
   value: unknown,
 ): ValidationPlanContract | null => {
@@ -2307,6 +2558,34 @@ const normalizeLocalProjectManifestContract = (
             Boolean(entry) && Object.keys(entry).length > 0,
         )
     : []
+  const normalizedHistory = Array.isArray(contract.history)
+    ? contract.history
+        .map((entry) =>
+          entry && typeof entry === 'object'
+            ? {
+                ...(normalizeOptionalString(entry.kind)
+                  ? { kind: normalizeOptionalString(entry.kind) }
+                  : {}),
+                ...(normalizeOptionalString(entry.id)
+                  ? { id: normalizeOptionalString(entry.id) }
+                  : {}),
+                ...(normalizeOptionalString(entry.status)
+                  ? { status: normalizeOptionalString(entry.status) }
+                  : {}),
+                ...(normalizeOptionalString(entry.at)
+                  ? { at: normalizeOptionalString(entry.at) }
+                  : {}),
+                ...(normalizeOptionalString(entry.note)
+                  ? { note: normalizeOptionalString(entry.note) }
+                  : {}),
+              }
+            : null,
+        )
+        .filter(
+          (entry): entry is LocalProjectManifestHistoryContract =>
+            Boolean(entry) && Object.keys(entry).length > 0,
+        )
+    : []
 
   const normalizedValue: LocalProjectManifestContract = {
     ...(typeof contract.version === 'number' && Number.isFinite(contract.version)
@@ -2339,6 +2618,32 @@ const normalizeLocalProjectManifestContract = (
     ...(normalizeOptionalString(contract.nextRecommendedPhase)
       ? { nextRecommendedPhase: normalizeOptionalString(contract.nextRecommendedPhase) }
       : {}),
+    ...(normalizeOptionalString(contract.nextRecommendedAction)
+      ? { nextRecommendedAction: normalizeOptionalString(contract.nextRecommendedAction) }
+      : {}),
+    ...(normalizeOptionalString(contract.lastCompletedPhase)
+      ? { lastCompletedPhase: normalizeOptionalString(contract.lastCompletedPhase) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.availableActions).length > 0
+      ? { availableActions: normalizeOptionalStringArray(contract.availableActions) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.blockedActions).length > 0
+      ? { blockedActions: normalizeOptionalStringArray(contract.blockedActions) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.approvalRequiredActions).length > 0
+      ? {
+          approvalRequiredActions: normalizeOptionalStringArray(
+            contract.approvalRequiredActions,
+          ),
+        }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.risks).length > 0
+      ? { risks: normalizeOptionalStringArray(contract.risks) }
+      : {}),
+    ...(normalizeOptionalString(contract.updatedAt)
+      ? { updatedAt: normalizeOptionalString(contract.updatedAt) }
+      : {}),
+    ...(normalizedHistory.length > 0 ? { history: normalizedHistory } : {}),
   }
 
   return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
@@ -2437,6 +2742,8 @@ const extractPlannerExecutionMetadata = (payload?: {
   localProjectManifest?: LocalProjectManifestContract | null
   expansionOptions?: ExpansionOptionsContract | null
   moduleExpansionPlan?: ModuleExpansionPlanContract | null
+  continuationActionPlan?: ContinuationActionContract | null
+  projectContinuationState?: ProjectContinuationStateContract | null
   materializationPlan?: MaterializationPlanContract | null
   tasks?: unknown[]
   assumptions?: string[]
@@ -2628,6 +2935,12 @@ const extractPlannerExecutionMetadata = (payload?: {
   ),
   expansionOptions: normalizeExpansionOptionsContract(payload?.expansionOptions),
   moduleExpansionPlan: normalizeModuleExpansionPlanContract(payload?.moduleExpansionPlan),
+  continuationActionPlan: normalizeContinuationActionContract(
+    payload?.continuationActionPlan,
+  ),
+  projectContinuationState: normalizeProjectContinuationStateContract(
+    payload?.projectContinuationState,
+  ),
   materializationPlan:
     payload?.materializationPlan && typeof payload.materializationPlan === 'object'
       ? payload.materializationPlan
@@ -4434,6 +4747,9 @@ const getOperatorStrategyLabel = (value: unknown) => {
   if (normalizedValue === 'materialize-project-phase-plan') {
     return 'Materializar fase'
   }
+  if (normalizedValue === 'prepare-continuation-action-plan') {
+    return 'Preparar continuidad'
+  }
 
   return getTechnicalDiagnosticLabel(value, 'Sin estrategia')
 }
@@ -4509,6 +4825,53 @@ const getContinuityVisualState = ({
     detail: 'Conviene revisar esta propuesta antes de habilitar más pasos.',
     tone: 'default' as const,
   }
+}
+
+const getProjectContinuationStatusLabel = (value?: string) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (normalizedValue === 'base-phases-in-progress') {
+    return 'Base segura en progreso'
+  }
+  if (normalizedValue === 'safe-module-expansion-ready') {
+    return 'Listo para expandir modulos'
+  }
+  if (normalizedValue === 'safe-capabilities-complete') {
+    return 'Capacidades seguras completas'
+  }
+  if (normalizedValue === 'review-only') {
+    return 'En revision'
+  }
+
+  return normalizeOptionalString(value) || 'Sin estado'
+}
+
+const getContinuationCategoryLabel = (value?: string) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (normalizedValue === 'project-phase') {
+    return 'Fase del proyecto'
+  }
+  if (normalizedValue === 'frontend-improvement') {
+    return 'Mejora de frontend'
+  }
+  if (normalizedValue === 'backend-contract-extension') {
+    return 'Mejora de backend'
+  }
+  if (normalizedValue === 'database-extension') {
+    return 'Datos y schema'
+  }
+  if (normalizedValue === 'validation-improvement') {
+    return 'Validacion y docs'
+  }
+  if (normalizedValue === 'approval-required') {
+    return 'Requiere aprobacion'
+  }
+  if (normalizedValue === 'blocked') {
+    return 'Bloqueado por seguridad'
+  }
+
+  return getExpansionTypeLabel(value)
 }
 
 function LocalProjectManifestCard({
@@ -4744,6 +5107,7 @@ function ProjectPhaseExecutionPlanCard({
   )
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ProjectContinuityCard({
   nextActionPlan,
   implementationRoadmap,
@@ -5259,6 +5623,954 @@ function ProjectContinuityCard({
               </article>
             ))}
           </div>
+        </div>
+      ) : null}
+    </article>
+  )
+}
+
+function ProjectContinuityCenterCard({
+  nextActionPlan,
+  implementationRoadmap,
+  phaseExpansionPlan,
+  projectPhaseExecutionPlan,
+  localProjectManifest,
+  expansionOptions,
+  moduleExpansionPlan,
+  continuationActionPlan,
+  projectContinuationState,
+  compact = false,
+  busy = false,
+  onPreparePhase,
+  onMaterializePhase,
+  onPrepareModuleExpansion,
+  onMaterializeModuleExpansion,
+  onPrepareContinuationAction,
+  onMaterializeContinuationAction,
+}: {
+  nextActionPlan?: NextActionPlanContract | null
+  implementationRoadmap?: ImplementationRoadmapContract | null
+  phaseExpansionPlan?: PhaseExpansionPlanContract | null
+  projectPhaseExecutionPlan?: ProjectPhaseExecutionPlanContract | null
+  localProjectManifest?: LocalProjectManifestContract | null
+  expansionOptions?: ExpansionOptionsContract | null
+  moduleExpansionPlan?: ModuleExpansionPlanContract | null
+  continuationActionPlan?: ContinuationActionContract | null
+  projectContinuationState?: ProjectContinuationStateContract | null
+  compact?: boolean
+  busy?: boolean
+  onPreparePhase?: (phaseId: string) => void
+  onMaterializePhase?: (phaseId: string) => void
+  onPrepareModuleExpansion?: (payload: ModuleExpansionActionPayload) => void
+  onMaterializeModuleExpansion?: (payload: ModuleExpansionActionPayload) => void
+  onPrepareContinuationAction?: (action: ContinuationActionContract) => void
+  onMaterializeContinuationAction?: (action: ContinuationActionContract) => void
+}) {
+  const manifestPhases = Array.isArray(localProjectManifest?.phases)
+    ? localProjectManifest?.phases || []
+    : []
+  const manifestModules = Array.isArray(localProjectManifest?.modules)
+    ? localProjectManifest?.modules || []
+    : []
+  const completedPhases = normalizeOptionalStringArray(
+    projectContinuationState?.completedPhases,
+  )
+  const pendingPhases = normalizeOptionalStringArray(
+    projectContinuationState?.pendingPhases,
+  )
+  const availableSafeActions = Array.isArray(
+    projectContinuationState?.availableSafeActions,
+  )
+    ? projectContinuationState?.availableSafeActions || []
+    : []
+  const availablePlanningActions = Array.isArray(
+    projectContinuationState?.availablePlanningActions,
+  )
+    ? projectContinuationState?.availablePlanningActions || []
+    : []
+  const approvalRequiredActions = Array.isArray(
+    projectContinuationState?.approvalRequiredActions,
+  )
+    ? projectContinuationState?.approvalRequiredActions || []
+    : []
+  const blockedActions = Array.isArray(projectContinuationState?.blockedActions)
+    ? projectContinuationState?.blockedActions || []
+    : []
+  const modulesDone = normalizeOptionalStringArray(projectContinuationState?.modulesDone)
+  const modulesAvailable = normalizeOptionalStringArray(
+    projectContinuationState?.modulesAvailable,
+  )
+  const modulesBlocked = normalizeOptionalStringArray(
+    projectContinuationState?.modulesBlocked,
+  )
+  const continuationRisks = normalizeOptionalStringArray(projectContinuationState?.risks)
+  const continuationBlockers = normalizeOptionalStringArray(
+    projectContinuationState?.blockers,
+  )
+  const nextRecommendedPhaseId =
+    normalizeOptionalString(projectContinuationState?.nextRecommendedPhase) ||
+    normalizeOptionalString(localProjectManifest?.nextRecommendedPhase)
+  const nextManifestPhase =
+    manifestPhases.find(
+      (phase) => normalizeOptionalString(phase.id) === nextRecommendedPhaseId,
+    ) || null
+  const currentPhaseLabel =
+    normalizeOptionalString(expansionOptions?.currentPhase) ||
+    normalizeOptionalString(implementationRoadmap?.currentPhase) ||
+    nextRecommendedPhaseId ||
+    normalizeOptionalString(localProjectManifest?.lastCompletedPhase) ||
+    'Sin fase declarada'
+  const continuationSummary =
+    normalizeOptionalString(projectContinuationState?.summary) ||
+    normalizeOptionalString(nextActionPlan?.recommendedAction) ||
+    normalizeOptionalString(moduleExpansionPlan?.reason) ||
+    normalizeOptionalString(phaseExpansionPlan?.goal) ||
+    normalizeOptionalString(projectPhaseExecutionPlan?.reason) ||
+    'JEFE ya dejo contexto suficiente para seguir, pero todavia no armo un resumen corto.'
+  const operatorMessage =
+    normalizeOptionalString(projectContinuationState?.operatorMessage) ||
+    continuationSummary
+  const projectStatusLabel = getProjectContinuationStatusLabel(
+    projectContinuationState?.projectStatus,
+  )
+  const nextRecommendedAction =
+    projectContinuationState?.nextRecommendedAction ||
+    continuationActionPlan ||
+    (moduleExpansionPlan?.moduleId
+      ? {
+          id: `prepared-module-${normalizeOptionalString(moduleExpansionPlan.moduleId)}`,
+          title:
+            normalizeOptionalString(moduleExpansionPlan.moduleName) ||
+            normalizeOptionalString(moduleExpansionPlan.moduleId) ||
+            'Modulo preparado',
+          description:
+            normalizeOptionalString(moduleExpansionPlan.reason) ||
+            'Hay una expansion preparada para revisar.',
+          category: normalizeOptionalString(moduleExpansionPlan.expansionType),
+          targetStrategy:
+            moduleExpansionPlan.safeToMaterialize === true
+              ? 'materialize-module-expansion-plan'
+              : 'prepare-module-expansion-plan',
+          safeToPrepare: moduleExpansionPlan.safeToPrepare !== false,
+          safeToMaterialize: moduleExpansionPlan.safeToMaterialize === true,
+          requiresApproval: moduleExpansionPlan.approvalRequired === true,
+          blocked:
+            normalizeOptionalStringArray(moduleExpansionPlan.blockers).length > 0,
+          blocker: normalizeOptionalStringArray(moduleExpansionPlan.blockers)[0] || '',
+          moduleId: normalizeOptionalString(moduleExpansionPlan.moduleId),
+          riskLevel: moduleExpansionPlan.riskLevel,
+          projectRoot: normalizeOptionalString(moduleExpansionPlan.projectRoot),
+          reason: normalizeOptionalString(moduleExpansionPlan.reason),
+          targetFiles: moduleExpansionPlan.targetFiles || [],
+          allowedTargetPaths: moduleExpansionPlan.allowedTargetPaths || [],
+          explicitExclusions: moduleExpansionPlan.explicitExclusions || [],
+          successCriteria: moduleExpansionPlan.successCriteria || [],
+          expectedOutcome:
+            'Dejar la expansion del modulo lista para revision o materializacion segura.',
+        }
+      : null) ||
+    (projectPhaseExecutionPlan?.phaseId
+      ? {
+          id: `prepared-phase-${normalizeOptionalString(projectPhaseExecutionPlan.phaseId)}`,
+          title:
+            normalizeOptionalString(projectPhaseExecutionPlan.phaseId) ||
+            'Fase preparada',
+          description:
+            normalizeOptionalString(projectPhaseExecutionPlan.reason) ||
+            'Hay una fase preparada para revisar.',
+          category: 'project-phase',
+          targetStrategy:
+            normalizeOptionalString(projectPhaseExecutionPlan.targetStrategy) ||
+            'prepare-project-phase-plan',
+          safeToPrepare: true,
+          safeToMaterialize: projectPhaseExecutionPlan.executableNow === true,
+          requiresApproval: projectPhaseExecutionPlan.approvalRequired === true,
+          blocked:
+            normalizeOptionalStringArray(projectPhaseExecutionPlan.blockers).length > 0,
+          blocker:
+            normalizeOptionalStringArray(projectPhaseExecutionPlan.blockers)[0] || '',
+          phaseId: normalizeOptionalString(projectPhaseExecutionPlan.phaseId),
+          riskLevel: projectPhaseExecutionPlan.riskLevel,
+          projectRoot: normalizeOptionalString(projectPhaseExecutionPlan.projectRoot),
+          reason: normalizeOptionalString(projectPhaseExecutionPlan.reason),
+          targetFiles: projectPhaseExecutionPlan.targetFiles || [],
+          allowedTargetPaths: projectPhaseExecutionPlan.allowedTargetPaths || [],
+          explicitExclusions: projectPhaseExecutionPlan.explicitExclusions || [],
+          successCriteria: projectPhaseExecutionPlan.successCriteria || [],
+          expectedOutcome:
+            'Dejar la fase lista para revision o materializacion segura.',
+        }
+      : null)
+  const nextStepTitle =
+    normalizeOptionalString(nextRecommendedAction?.title) ||
+    normalizeOptionalString(nextActionPlan?.userFacingLabel) ||
+    normalizeOptionalString(nextManifestPhase?.id) ||
+    normalizeOptionalString(phaseExpansionPlan?.phaseId) ||
+    normalizeOptionalString(implementationRoadmap?.nextRecommendedPhase) ||
+    'Sin siguiente paso declarado'
+  const nextStepReason =
+    normalizeOptionalString(nextRecommendedAction?.reason) ||
+    normalizeOptionalString(nextActionPlan?.recommendedAction) ||
+    normalizeOptionalString(implementationRoadmap?.suggestedNextAction) ||
+    continuationSummary
+  const nextStepVisualState = getContinuityVisualState({
+    safeToPrepare:
+      nextRecommendedAction?.safeToPrepare ??
+      (nextActionPlan?.actionType === 'review-plan' ||
+        nextActionPlan?.actionType === 'expand-next-phase'),
+    safeToMaterialize:
+      nextRecommendedAction?.safeToMaterialize ??
+      projectPhaseExecutionPlan?.executableNow ??
+      nextActionPlan?.safeToRunNow,
+    requiresApproval:
+      nextRecommendedAction?.requiresApproval || nextActionPlan?.requiresApproval,
+    blocked:
+      nextRecommendedAction?.blocked ||
+      normalizeOptionalString(nextManifestPhase?.status).toLocaleLowerCase() ===
+        'blocked',
+  })
+  const actionIdentitySet = new Set(
+    [
+      ...availableSafeActions,
+      ...availablePlanningActions,
+      ...approvalRequiredActions,
+      ...blockedActions,
+    ]
+      .map((entry) => normalizeModuleUiId(entry?.moduleId || entry?.id || ''))
+      .filter(Boolean),
+  )
+  const recommendedOptionId = normalizeModuleUiId(expansionOptions?.recommendedOptionId)
+  const visibleOptions = (
+    Array.isArray(expansionOptions?.options) ? expansionOptions?.options || [] : []
+  )
+    .filter((option) => {
+      const hasVisibleContent = Boolean(
+        normalizeOptionalString(option?.id) ||
+          normalizeOptionalString(option?.label) ||
+          normalizeOptionalString(option?.description) ||
+          normalizeOptionalString(option?.reason),
+      )
+      const optionIdentity = normalizeModuleUiId(option?.id || option?.label || '')
+
+      if (!hasVisibleContent) {
+        return false
+      }
+
+      if (
+        actionIdentitySet.size > 0 &&
+        optionIdentity &&
+        actionIdentitySet.has(optionIdentity)
+      ) {
+        return false
+      }
+
+      return true
+    })
+    .slice(0, compact ? 4 : Number.MAX_SAFE_INTEGER)
+  const visibleModules = compact ? manifestModules.slice(0, 3) : manifestModules
+
+  const dispatchPrepareAction = (action: ContinuationActionContract) => {
+    if (onPrepareContinuationAction) {
+      onPrepareContinuationAction(action)
+      return
+    }
+
+    const normalizedPhaseId = normalizeOptionalString(action.phaseId)
+    const normalizedModuleId = normalizeOptionalString(action.moduleId)
+
+    if (normalizedPhaseId && onPreparePhase) {
+      onPreparePhase(normalizedPhaseId)
+      return
+    }
+
+    if (normalizedModuleId && onPrepareModuleExpansion) {
+      onPrepareModuleExpansion({
+        moduleId: normalizedModuleId,
+        moduleName: action.title,
+        optionType: action.category,
+        targetStrategy: action.targetStrategy,
+        expectedFiles: action.targetFiles || null,
+        safeToPrepare: action.safeToPrepare,
+        safeToMaterialize: action.safeToMaterialize,
+        requiresApproval: action.requiresApproval,
+        reason: action.reason || action.blocker || action.description,
+      })
+    }
+  }
+
+  const dispatchMaterializeAction = (action: ContinuationActionContract) => {
+    if (action.safeToMaterialize !== true) {
+      return
+    }
+
+    if (onMaterializeContinuationAction) {
+      onMaterializeContinuationAction(action)
+      return
+    }
+
+    const normalizedPhaseId = normalizeOptionalString(action.phaseId)
+    const normalizedModuleId = normalizeOptionalString(action.moduleId)
+
+    if (normalizedPhaseId && onMaterializePhase) {
+      onMaterializePhase(normalizedPhaseId)
+      return
+    }
+
+    if (normalizedModuleId && onMaterializeModuleExpansion) {
+      onMaterializeModuleExpansion({
+        moduleId: normalizedModuleId,
+        moduleName: action.title,
+        optionType: action.category,
+        targetStrategy: action.targetStrategy,
+        expectedFiles: action.targetFiles || null,
+        safeToPrepare: action.safeToPrepare,
+        safeToMaterialize: action.safeToMaterialize,
+        requiresApproval: action.requiresApproval,
+        reason: action.reason || action.description,
+      })
+    }
+  }
+
+  const renderActionCards = (
+    title: string,
+    actions: ContinuationActionContract[],
+    emptyCopy: string,
+    sectionTone: 'emerald' | 'amber' | 'rose' | 'sky',
+  ) => {
+    if (actions.length === 0) {
+      return (
+        <div className="rounded-2xl border border-white/8 bg-slate-950/35 px-4 py-4 text-sm leading-6 text-slate-400">
+          {emptyCopy}
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-3">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+          {title}
+        </div>
+        <div className="grid gap-3">
+          {actions.map((action) => {
+            const normalizedModuleId = normalizeModuleUiId(action.moduleId || '')
+            const matchingModule =
+              manifestModules.find(
+                (moduleEntry) =>
+                  normalizeModuleUiId(moduleEntry.id || moduleEntry.name) ===
+                  normalizedModuleId,
+              ) || null
+            const alreadyDone =
+              normalizeOptionalString(matchingModule?.status).toLocaleLowerCase() ===
+              'done'
+            const visualState = getContinuityVisualState({
+              safeToPrepare: action.safeToPrepare,
+              safeToMaterialize: action.safeToMaterialize,
+              requiresApproval: action.requiresApproval,
+              blocked: action.blocked,
+              alreadyDone,
+            })
+            const detailCopy =
+              normalizeOptionalString(action.blocker) ||
+              normalizeOptionalString(action.reason) ||
+              normalizeOptionalString(action.description) ||
+              visualState.detail
+            const canPrepare = action.safeToPrepare !== false && !alreadyDone
+            const canMaterialize =
+              action.safeToMaterialize === true &&
+              !action.requiresApproval &&
+              !action.blocked &&
+              !alreadyDone
+
+            return (
+              <article
+                key={action.id || action.title}
+                className="rounded-2xl border border-white/8 bg-slate-950/45 px-4 py-4"
+              >
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="text-sm font-medium leading-6 text-slate-100">
+                        {normalizeOptionalString(action.title) || 'Accion sin titulo'}
+                      </div>
+                      {action.recommended ? (
+                        <span className="rounded-full border border-sky-300/20 bg-sky-300/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-100">
+                          Recomendado
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-2 text-sm leading-6 text-slate-300">
+                      {normalizeOptionalString(action.description) ||
+                        'Sin descripcion declarada.'}
+                    </div>
+                    <div className="mt-2 text-xs leading-5 text-slate-400">
+                      {detailCopy}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <span
+                      className={joinClasses(
+                        'rounded-full border px-3 py-1 text-xs font-medium',
+                        getContinuityStateToneClass(visualState.tone),
+                      )}
+                    >
+                      {visualState.label}
+                    </span>
+                    <span
+                      className={joinClasses(
+                        'rounded-full border px-3 py-1 text-xs font-medium',
+                        getContinuityStateToneClass(sectionTone),
+                      )}
+                    >
+                      {getContinuationCategoryLabel(action.category)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <MetricCard
+                    label="Como sigue"
+                    value={getOperatorStrategyLabel(action.targetStrategy)}
+                    detail={
+                      normalizeOptionalString(action.expectedOutcome) ||
+                      'Sin resultado esperado declarado.'
+                    }
+                    tone="sky"
+                  />
+                  <MetricCard
+                    label="Riesgo"
+                    value={getRiskLabel(action.riskLevel)}
+                    detail={detailCopy}
+                    tone={getRiskTone(action.riskLevel)}
+                  />
+                  <MetricCard
+                    label="Preparacion"
+                    value={action.safeToPrepare === false ? 'No' : 'Si'}
+                    detail={
+                      action.requiresApproval
+                        ? 'Requiere aprobacion antes de salir del modo seguro.'
+                        : action.blocked
+                          ? 'Conviene revisar el bloqueo primero.'
+                          : 'Se puede dejar lista como siguiente accion revisable.'
+                    }
+                    tone={action.safeToPrepare === false ? 'rose' : 'emerald'}
+                  />
+                  <MetricCard
+                    label="Materializacion"
+                    value={action.safeToMaterialize ? 'Segura' : 'No disponible'}
+                    detail={
+                      alreadyDone
+                        ? 'Ya agregado al proyecto.'
+                        : action.safeToMaterialize
+                          ? 'Existe una ruta local y revisable.'
+                          : action.requiresApproval
+                            ? 'Necesita aprobacion antes de ejecutar.'
+                            : action.blocked
+                              ? 'Bloqueado por seguridad.'
+                              : 'Todavia no se puede ejecutar solo.'
+                    }
+                    tone={
+                      alreadyDone
+                        ? 'sky'
+                        : action.safeToMaterialize
+                          ? 'emerald'
+                          : action.requiresApproval || action.blocked
+                            ? 'rose'
+                            : 'amber'
+                    }
+                  />
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  {canPrepare ? (
+                    <button
+                      type="button"
+                      onClick={() => dispatchPrepareAction(action)}
+                      disabled={busy}
+                      className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-2.5 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                    >
+                      {alreadyDone ? 'Revisar primero' : 'Preparar plan'}
+                    </button>
+                  ) : null}
+                  {canMaterialize ? (
+                    <button
+                      type="button"
+                      onClick={() => dispatchMaterializeAction(action)}
+                      disabled={busy}
+                      className="rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-2.5 text-sm font-medium text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                    >
+                      Materializar seguro
+                    </button>
+                  ) : (
+                    <span className="text-sm leading-6 text-slate-400">
+                      {alreadyDone
+                        ? 'Ya agregado al proyecto.'
+                        : action.requiresApproval
+                          ? 'Requiere aprobacion antes de salir del modo seguro.'
+                          : action.blocked
+                            ? normalizeOptionalString(action.blocker) ||
+                              'Bloqueado por seguridad.'
+                            : 'Todavia no se puede ejecutar solo.'}
+                    </span>
+                  )}
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <article className="rounded-3xl border border-emerald-300/15 bg-emerald-300/[0.05] p-5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Centro de continuidad
+          </div>
+          <div className="mt-2 text-lg font-semibold text-white">
+            Proximo paso recomendado
+          </div>
+          <div className="mt-2 text-sm leading-6 text-slate-300">
+            {operatorMessage}
+          </div>
+          <div className="mt-2 text-xs leading-5 text-slate-400">{nextStepReason}</div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span
+            className={joinClasses(
+              'rounded-full border px-3 py-1 text-xs font-medium',
+              getContinuityStateToneClass(nextStepVisualState.tone),
+            )}
+          >
+            {nextStepVisualState.label}
+          </span>
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
+            {nextStepTitle}
+          </span>
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
+            {projectStatusLabel}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="Estado del proyecto"
+          value={projectStatusLabel}
+          detail={currentPhaseLabel}
+          tone={nextStepVisualState.tone}
+        />
+        <MetricCard
+          label="Ya completado"
+          value={
+            completedPhases.length > 0
+              ? `${completedPhases.length} fase(s)`
+              : 'Nada declarado'
+          }
+          detail={completedPhases[0] || 'Todavia no hay fases completas declaradas'}
+          tone="sky"
+        />
+        <MetricCard
+          label="Falta resolver"
+          value={
+            pendingPhases.length > 0
+              ? `${pendingPhases.length} fase(s)`
+              : 'Base segura completa'
+          }
+          detail={
+            pendingPhases[0] ||
+            nextRecommendedPhaseId ||
+            'Conviene revisar la siguiente expansion'
+          }
+          tone={pendingPhases.length > 0 ? 'amber' : 'emerald'}
+        />
+        <MetricCard
+          label="Modulos del proyecto"
+          value={
+            manifestModules.length > 0 ? `${manifestModules.length} modulo(s)` : 'Sin modulos'
+          }
+          detail={
+            modulesDone[0] ||
+            visibleModules[0]?.name ||
+            visibleModules[0]?.id ||
+            'Todavia no hay modulos declarados'
+          }
+          tone="emerald"
+        />
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {nextRecommendedAction?.safeToPrepare !== false ? (
+          <button
+            type="button"
+            onClick={() => nextRecommendedAction && dispatchPrepareAction(nextRecommendedAction)}
+            disabled={busy || !nextRecommendedAction}
+            className="rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-2 text-xs font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+          >
+            Preparar plan
+          </button>
+        ) : null}
+        {nextRecommendedAction?.safeToMaterialize === true &&
+        !nextRecommendedAction.requiresApproval &&
+        !nextRecommendedAction.blocked ? (
+          <button
+            type="button"
+            onClick={() =>
+              nextRecommendedAction && dispatchMaterializeAction(nextRecommendedAction)
+            }
+            disabled={busy || !nextRecommendedAction}
+            className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-2 text-xs font-medium text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+          >
+            Materializar seguro
+          </button>
+        ) : null}
+      </div>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+        <ProductArchitectureGroup
+          title="Ya completado"
+          items={completedPhases}
+          compact={compact}
+          tone="sky"
+        />
+        <ProductArchitectureGroup
+          title="Falta resolver"
+          items={pendingPhases}
+          compact={compact}
+          tone={pendingPhases.length > 0 ? 'amber' : 'emerald'}
+        />
+      </div>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+        <ProductArchitectureGroup
+          title="Podria sumar despues"
+          items={modulesAvailable}
+          compact={compact}
+          tone="emerald"
+        />
+        <ProductArchitectureGroup
+          title="Riesgo controlado"
+          items={
+            continuationRisks.length > 0
+              ? continuationRisks
+              : ['No se toca nada real sin aprobacion.']
+          }
+          compact={compact}
+          tone="amber"
+        />
+      </div>
+
+      {continuationBlockers.length > 0 ? (
+        <div className="mt-4">
+          <ProductArchitectureGroup
+            title="Bloqueos actuales"
+            items={continuationBlockers}
+            compact={compact}
+            tone="rose"
+          />
+        </div>
+      ) : null}
+
+      <div className="mt-4 space-y-4">
+        {renderActionCards(
+          'Podes avanzar ahora',
+          availableSafeActions,
+          'Todavia no hay acciones seguras nuevas para ejecutar dentro del modo local.',
+          'emerald',
+        )}
+        {renderActionCards(
+          'Acciones revisables',
+          availablePlanningActions,
+          'JEFE no dejo nuevas acciones revisables ademas del siguiente paso recomendado.',
+          'amber',
+        )}
+        {renderActionCards(
+          'Requiere aprobacion',
+          approvalRequiredActions,
+          'No hay acciones pendientes de aprobacion en esta corrida.',
+          'rose',
+        )}
+        {renderActionCards(
+          'Bloqueado por seguridad',
+          blockedActions,
+          'No hay acciones bloqueadas nuevas en esta corrida.',
+          'rose',
+        )}
+      </div>
+
+      {visibleOptions.length > 0 ? (
+        <div className="mt-4">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Opciones para seguir
+          </div>
+          <div className="mt-3 grid gap-3">
+            {visibleOptions.map((option) => {
+              const normalizedOptionId = normalizeModuleUiId(option.id)
+              const matchingModule =
+                manifestModules.find(
+                  (moduleEntry) =>
+                    normalizeModuleUiId(moduleEntry.id || moduleEntry.name) ===
+                    normalizedOptionId,
+                ) || null
+              const alreadyDone =
+                normalizeOptionalString(matchingModule?.status).toLocaleLowerCase() ===
+                'done'
+              const visualState = getContinuityVisualState({
+                safeToPrepare: option.safeToPrepare,
+                safeToMaterialize: option.safeToMaterialize,
+                requiresApproval: option.requiresApproval,
+                alreadyDone,
+              })
+              const isModuleOption =
+                normalizeOptionalString(option.targetStrategy).includes(
+                  'module-expansion',
+                ) || option.safeToMaterialize === true
+              const optionAction: ContinuationActionContract = {
+                id: normalizeOptionalString(option.id),
+                title:
+                  normalizeOptionalString(option.label) ||
+                  normalizeOptionalString(option.id) ||
+                  'Opcion sin titulo',
+                description: normalizeOptionalString(option.description),
+                category: normalizeOptionalString(option.expansionType),
+                targetStrategy: normalizeOptionalString(option.targetStrategy),
+                safeToPrepare: option.safeToPrepare !== false,
+                safeToMaterialize: option.safeToMaterialize === true,
+                requiresApproval: option.requiresApproval === true,
+                blocked: alreadyDone,
+                blocker: alreadyDone ? 'Ya agregado al proyecto.' : '',
+                moduleId: isModuleOption ? normalizeOptionalString(option.id) : '',
+                riskLevel: option.riskLevel,
+                reason: normalizeOptionalString(option.reason),
+                targetFiles: option.expectedFiles || [],
+              }
+              const canPrepare = option.safeToPrepare !== false && !alreadyDone
+              const canMaterialize =
+                option.safeToMaterialize === true &&
+                !option.requiresApproval &&
+                !alreadyDone
+
+              return (
+                <article
+                  key={option.id || option.label}
+                  className="rounded-2xl border border-white/8 bg-slate-950/45 px-4 py-4"
+                >
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-sm font-medium leading-6 text-slate-100">
+                          {normalizeOptionalString(option.label) || 'Opcion sin titulo'}
+                        </div>
+                        {recommendedOptionId &&
+                        recommendedOptionId === normalizedOptionId ? (
+                          <span className="rounded-full border border-sky-300/20 bg-sky-300/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-100">
+                            Recomendado
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-300">
+                        {normalizeOptionalString(option.description) ||
+                          'Sin descripcion declarada.'}
+                      </div>
+                      <div className="mt-2 text-xs leading-5 text-slate-400">
+                        {normalizeOptionalString(option.reason) || visualState.detail}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <span
+                        className={joinClasses(
+                          'rounded-full border px-3 py-1 text-xs font-medium',
+                          getContinuityStateToneClass(visualState.tone),
+                        )}
+                      >
+                        {visualState.label}
+                      </span>
+                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
+                        {getContinuationCategoryLabel(option.expansionType)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <MetricCard
+                      label="Como sigue"
+                      value={getOperatorStrategyLabel(option.targetStrategy)}
+                      detail={
+                        alreadyDone
+                          ? 'Ya existe en el proyecto y conviene revisarlo antes de volver a expandirlo.'
+                          : option.safeToMaterialize
+                            ? 'Tiene una ruta segura y revisable dentro del flujo actual.'
+                            : option.requiresApproval
+                              ? 'Necesita revision humana antes de salir del modo seguro.'
+                              : option.safeToPrepare === false
+                                ? 'Todavia no esta lista para prepararse desde la interfaz.'
+                                : 'Se puede dejar lista como plan revisable sin ejecutar cambios todavia.'
+                      }
+                      tone="sky"
+                    />
+                    <MetricCard
+                      label="Riesgo"
+                      value={getRiskLabel(option.riskLevel)}
+                      detail={normalizeOptionalString(option.reason) || visualState.detail}
+                      tone={getRiskTone(option.riskLevel)}
+                    />
+                    <MetricCard
+                      label="Preparacion"
+                      value={option.safeToPrepare === false ? 'No' : 'Si'}
+                      detail={
+                        option.requiresApproval
+                          ? 'Necesita revision humana'
+                          : 'Puede dejar un plan revisable'
+                      }
+                      tone={option.safeToPrepare === false ? 'rose' : 'emerald'}
+                    />
+                    <MetricCard
+                      label="Materializacion"
+                      value={option.safeToMaterialize ? 'Segura' : 'No disponible'}
+                      detail={
+                        alreadyDone
+                          ? 'Ya existe en el proyecto'
+                          : option.safeToMaterialize
+                            ? 'Existe una ruta local y revisable'
+                            : 'Todavia no tiene materializador seguro'
+                      }
+                      tone={
+                        alreadyDone
+                          ? 'sky'
+                          : option.safeToMaterialize
+                            ? 'emerald'
+                            : option.requiresApproval
+                              ? 'rose'
+                              : 'amber'
+                      }
+                    />
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    {canPrepare ? (
+                      <button
+                        type="button"
+                        onClick={() => dispatchPrepareAction(optionAction)}
+                        disabled={busy}
+                        className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-2.5 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                      >
+                        {alreadyDone ? 'Revisar primero' : 'Preparar plan'}
+                      </button>
+                    ) : null}
+                    {canMaterialize ? (
+                      <button
+                        type="button"
+                        onClick={() => dispatchMaterializeAction(optionAction)}
+                        disabled={busy}
+                        className="rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-2.5 text-sm font-medium text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                      >
+                        Materializar modulo
+                      </button>
+                    ) : (
+                      <span className="text-sm leading-6 text-slate-400">
+                        {alreadyDone
+                          ? 'Ya agregado al proyecto.'
+                          : option.requiresApproval
+                            ? 'Requiere aprobacion antes de salir del modo seguro.'
+                            : option.safeToMaterialize
+                              ? 'Listo para revisar antes de ejecutar.'
+                              : 'Todavia no tiene materializador seguro.'}
+                      </span>
+                    )}
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {visibleModules.length > 0 ? (
+        <div className="mt-4">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Modulos del proyecto
+          </div>
+          <div className="mt-3 grid gap-3 xl:grid-cols-2">
+            {visibleModules.map((moduleEntry) => {
+              const normalizedStatus = normalizeOptionalString(
+                moduleEntry.status,
+              ).toLocaleLowerCase()
+              const moduleTone =
+                normalizedStatus === 'done'
+                  ? 'sky'
+                  : normalizedStatus === 'blocked'
+                    ? 'rose'
+                    : normalizedStatus === 'partial' || normalizedStatus === 'planned'
+                      ? 'amber'
+                      : 'default'
+
+              return (
+                <article
+                  key={moduleEntry.id || moduleEntry.name}
+                  className="rounded-2xl border border-white/8 bg-slate-950/45 px-4 py-4"
+                >
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <div className="text-sm font-medium leading-6 text-slate-100">
+                        {normalizeOptionalString(moduleEntry.name) ||
+                          normalizeOptionalString(moduleEntry.id) ||
+                          'Modulo sin nombre'}
+                      </div>
+                      <div className="mt-1 text-xs leading-5 text-slate-400">
+                        {normalizeOptionalString(moduleEntry.addedAt) ||
+                          'Sin fecha declarada'}
+                      </div>
+                    </div>
+                    <span
+                      className={joinClasses(
+                        'rounded-full border px-3 py-1 text-xs font-medium',
+                        getContinuityStateToneClass(moduleTone),
+                      )}
+                    >
+                      {normalizedStatus === 'done'
+                        ? 'Ya agregado al proyecto'
+                        : getManifestPhaseStatusLabel(moduleEntry.status)}
+                    </span>
+                  </div>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <MetricCard
+                      label="Capas"
+                      value={
+                        normalizeOptionalStringArray(moduleEntry.layers).length > 0
+                          ? `${normalizeOptionalStringArray(moduleEntry.layers).length} capa(s)`
+                          : 'Sin capas'
+                      }
+                      detail={
+                        normalizeOptionalStringArray(moduleEntry.layers)[0] || 'Sin detalle'
+                      }
+                    />
+                    <MetricCard
+                      label="Archivos"
+                      value={
+                        normalizeOptionalStringArray(moduleEntry.files).length > 0
+                          ? `${normalizeOptionalStringArray(moduleEntry.files).length} archivo(s)`
+                          : 'Sin archivos'
+                      }
+                      detail={
+                        normalizeOptionalStringArray(moduleEntry.files)[0] || 'Sin detalle'
+                      }
+                      tone="sky"
+                    />
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {modulesBlocked.length > 0 ? (
+        <div className="mt-4">
+          <ProductArchitectureGroup
+            title="Modulos con restricciones"
+            items={modulesBlocked}
+            compact={compact}
+            tone="rose"
+          />
         </div>
       ) : null}
     </article>
@@ -8583,6 +9895,10 @@ function App() {
   const activeExpansionOptions = effectivePlannerExecutionMetadata.expansionOptions
   const activeModuleExpansionPlan =
     effectivePlannerExecutionMetadata.moduleExpansionPlan
+  const activeContinuationActionPlan =
+    effectivePlannerExecutionMetadata.continuationActionPlan
+  const activeProjectContinuationState =
+    effectivePlannerExecutionMetadata.projectContinuationState
   const activeScalableDeliveryLevel = normalizeOptionalString(
     activeScalableDeliveryPlan?.deliveryLevel,
   ).toLocaleLowerCase()
@@ -8623,6 +9939,8 @@ function App() {
       activeProjectPhaseExecutionPlan?.deliveryLevel,
     ).toLocaleLowerCase() === 'fullstack-local'
   const shouldShowProjectContinuity =
+    Boolean(activeProjectContinuationState) ||
+    Boolean(activeContinuationActionPlan) ||
     Boolean(activeExpansionOptions) ||
     Boolean(activeModuleExpansionPlan) ||
     shouldShowProjectPhaseExecutionPlan ||
@@ -8640,6 +9958,14 @@ function App() {
   const activeLocalProjectRoot = (() => {
     if (normalizeOptionalString(activeProjectPhaseExecutionPlan?.projectRoot)) {
       return normalizeOptionalString(activeProjectPhaseExecutionPlan?.projectRoot)
+    }
+
+    if (normalizeOptionalString(activeModuleExpansionPlan?.projectRoot)) {
+      return normalizeOptionalString(activeModuleExpansionPlan?.projectRoot)
+    }
+
+    if (normalizeOptionalString(activeContinuationActionPlan?.projectRoot)) {
+      return normalizeOptionalString(activeContinuationActionPlan?.projectRoot)
     }
 
     const executionScopePaths = Array.isArray(
@@ -8818,6 +10144,69 @@ function App() {
         ? safeToMaterialize
           ? 'Solo materializar si existe un materializador seguro real para este modulo.'
           : 'No prometer ejecucion inmediata si el modulo todavia no tiene materializador seguro.'
+        : 'Solo preparar el plan; no escribir archivos todavia.',
+      'Usar jefe-project.json si existe para entender el estado local del proyecto.',
+      'No tocar package.json, node_modules, .env, Docker, deploy ni runtime real.',
+    ].filter(Boolean)
+
+    return {
+      goal,
+      context: contextLines.join('\n'),
+    }
+  }
+  const buildContinuationActionPrompt = ({
+    actionId,
+    title,
+    targetStrategy,
+    approvalType,
+    requiresApproval,
+    blocked,
+    blocker,
+    expectedOutcome,
+    targetFiles,
+  }: ContinuationActionContract) => {
+    const resolvedActionId = normalizeOptionalString(actionId)
+    const resolvedTitle =
+      normalizeOptionalString(title) ||
+      normalizeOptionalString(actionId).replace(/-/g, ' ') ||
+      'continuidad del proyecto'
+    const projectRoot =
+      normalizeOptionalString(activeContinuationActionPlan?.projectRoot) ||
+      activeLocalProjectRoot
+    const domainLabel =
+      normalizeOptionalString(activeLocalProjectManifest?.domain) ||
+      normalizeOptionalString(activeProjectBlueprint?.domain) ||
+      'proyecto local'
+    const normalizedTargetFiles = normalizeOptionalStringArray(targetFiles)
+    const goal = `Preparar ${resolvedTitle} para el proyecto fullstack local de ${domainLabel}.`
+    const contextLines = [
+      'deliveryLevel: fullstack-local.',
+      `continuationActionId: ${resolvedActionId}.`,
+      `continuationActionTitle: ${resolvedTitle}.`,
+      projectRoot ? `projectRoot: ${projectRoot}.` : '',
+      normalizeOptionalString(targetStrategy)
+        ? `targetStrategyHint: ${normalizeOptionalString(targetStrategy)}.`
+        : '',
+      normalizeOptionalString(approvalType)
+        ? `approvalType: ${normalizeOptionalString(approvalType)}.`
+        : '',
+      normalizeOptionalString(activeLocalProjectManifest?.nextRecommendedPhase)
+        ? `nextRecommendedPhase: ${normalizeOptionalString(activeLocalProjectManifest?.nextRecommendedPhase)}.`
+        : '',
+      normalizedTargetFiles.length > 0
+        ? `expectedFiles: ${normalizedTargetFiles.join(', ')}`
+        : '',
+      normalizeOptionalString(blocker)
+        ? `blockerHint: ${normalizeOptionalString(blocker)}`
+        : '',
+      normalizeOptionalString(expectedOutcome)
+        ? `expectedOutcome: ${normalizeOptionalString(expectedOutcome)}`
+        : '',
+      requiresApproval
+        ? 'Requiere aprobacion: no ejecutar runtime real ni cambios sensibles.'
+        : '',
+      blocked
+        ? 'Si sigue bloqueado, devolver solo un plan revisable con alternativa segura.'
         : 'Solo preparar el plan; no escribir archivos todavia.',
       'Usar jefe-project.json si existe para entender el estado local del proyecto.',
       'No tocar package.json, node_modules, .env, Docker, deploy ni runtime real.',
@@ -12670,6 +14059,83 @@ function App() {
     })
   }
 
+  const handlePrepareContinuationAction = async (
+    action: ContinuationActionContract,
+  ) => {
+    const normalizedPhaseId = normalizeOptionalString(action.phaseId)
+    const normalizedModuleId = normalizeOptionalString(action.moduleId)
+
+    if (normalizedPhaseId) {
+      await handlePrepareProjectPhase(normalizedPhaseId)
+      return
+    }
+
+    if (normalizedModuleId) {
+      await handlePrepareModuleExpansion({
+        moduleId: normalizedModuleId,
+        moduleName: action.title,
+        optionType: action.category,
+        targetStrategy: action.targetStrategy,
+        expectedFiles: action.targetFiles || null,
+        safeToPrepare: action.safeToPrepare,
+        safeToMaterialize: action.safeToMaterialize,
+        requiresApproval: action.requiresApproval,
+        reason: action.reason || action.blocker || action.description,
+      })
+      return
+    }
+
+    const prompt = buildContinuationActionPrompt(action)
+
+    clearVisibleExecutionRuntimeState()
+    setSessionStatus('Preparando continuidad revisable')
+    setCurrentStep(
+      `El orquestador esta preparando ${normalizeOptionalString(action.title) || 'la siguiente continuidad'} del proyecto local`,
+    )
+    setSessionEvents((currentEvents) => [
+      ...currentEvents,
+      `Se preparo una continuidad revisable para ${normalizeOptionalString(action.title) || normalizeOptionalString(action.id) || 'la siguiente accion'}`,
+    ])
+
+    await handleGenerateNextStep({
+      goal: prompt.goal,
+      context: prompt.context,
+      sourceLabel: `Preparar ${normalizeOptionalString(action.title) || 'continuidad'}`,
+      sendContent: `Se envio una solicitud para preparar ${normalizeOptionalString(action.title) || 'la siguiente continuidad'} del proyecto existente.`,
+      persistPreparedInputs: true,
+    })
+  }
+
+  const handleMaterializeContinuationAction = async (
+    action: ContinuationActionContract,
+  ) => {
+    if (action.safeToMaterialize !== true) {
+      return
+    }
+
+    const normalizedPhaseId = normalizeOptionalString(action.phaseId)
+    const normalizedModuleId = normalizeOptionalString(action.moduleId)
+
+    if (normalizedPhaseId) {
+      await handleMaterializeProjectPhase(normalizedPhaseId)
+      return
+    }
+
+    if (normalizedModuleId) {
+      await handleMaterializeModuleExpansion({
+        moduleId: normalizedModuleId,
+        moduleName: action.title,
+        optionType: action.category,
+        targetStrategy: action.targetStrategy,
+        expectedFiles: action.targetFiles || null,
+        safeToPrepare: action.safeToPrepare,
+        safeToMaterialize: action.safeToMaterialize,
+        requiresApproval: action.requiresApproval,
+        reason: action.reason || action.description,
+      })
+    }
+  }
+
   const handlePrepareSafeFirstDeliveryPlan = async () => {
     if (!plannerIsReviewOnly || !activeProductArchitecture) {
       return
@@ -15931,7 +17397,7 @@ function App() {
                         />
                       ) : null}
                       {shouldShowProjectContinuity ? (
-                        <ProjectContinuityCard
+                        <ProjectContinuityCenterCard
                           nextActionPlan={activeNextActionPlan}
                           implementationRoadmap={activeImplementationRoadmap}
                           phaseExpansionPlan={activePhaseExpansionPlan}
@@ -15939,12 +17405,18 @@ function App() {
                           localProjectManifest={activeLocalProjectManifest}
                           expansionOptions={activeExpansionOptions}
                           moduleExpansionPlan={activeModuleExpansionPlan}
+                          continuationActionPlan={activeContinuationActionPlan}
+                          projectContinuationState={activeProjectContinuationState}
                           compact
                           busy={isPlanning || isExecutingTask}
                           onPreparePhase={handlePrepareProjectPhase}
                           onMaterializePhase={handleMaterializeProjectPhase}
                           onPrepareModuleExpansion={handlePrepareModuleExpansion}
                           onMaterializeModuleExpansion={handleMaterializeModuleExpansion}
+                          onPrepareContinuationAction={handlePrepareContinuationAction}
+                          onMaterializeContinuationAction={
+                            handleMaterializeContinuationAction
+                          }
                         />
                       ) : null}
                       {shouldShowProjectBlueprint && activeProjectBlueprint ? (
@@ -17462,7 +18934,7 @@ function App() {
                   />
                 ) : null}
                 {shouldShowProjectContinuity ? (
-                  <ProjectContinuityCard
+                  <ProjectContinuityCenterCard
                     nextActionPlan={activeNextActionPlan}
                     implementationRoadmap={activeImplementationRoadmap}
                     phaseExpansionPlan={activePhaseExpansionPlan}
@@ -17470,11 +18942,17 @@ function App() {
                     localProjectManifest={activeLocalProjectManifest}
                     expansionOptions={activeExpansionOptions}
                     moduleExpansionPlan={activeModuleExpansionPlan}
+                    continuationActionPlan={activeContinuationActionPlan}
+                    projectContinuationState={activeProjectContinuationState}
                     busy={isPlanning || isExecutingTask}
                     onPreparePhase={handlePrepareProjectPhase}
                     onMaterializePhase={handleMaterializeProjectPhase}
                     onPrepareModuleExpansion={handlePrepareModuleExpansion}
                     onMaterializeModuleExpansion={handleMaterializeModuleExpansion}
+                    onPrepareContinuationAction={handlePrepareContinuationAction}
+                    onMaterializeContinuationAction={
+                      handleMaterializeContinuationAction
+                    }
                   />
                 ) : null}
                 {shouldShowProjectBlueprint && activeProjectBlueprint ? (
