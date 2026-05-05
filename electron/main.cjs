@@ -13226,12 +13226,30 @@ function buildPlanningArchitectureBundle({
     continuationActionPlan,
     expansionOptions,
   })
+  const projectReadinessState = buildProjectReadinessState({
+    strategy,
+    scalableDeliveryPlan,
+    localProjectManifest,
+    nextActionPlan,
+    validationPlan,
+    projectContinuationState,
+  })
   const enrichedLocalProjectManifest = normalizeLocalProjectManifestContract(
-    syncLocalProjectManifestWithContinuationState({
-      localProjectManifest,
-      projectContinuationState,
+    syncLocalProjectManifestWithReadinessState({
+      localProjectManifest:
+        syncLocalProjectManifestWithContinuationState({
+          localProjectManifest,
+          projectContinuationState,
+        }) || localProjectManifest,
+      projectReadinessState,
     }) || localProjectManifest,
   )
+  const approvalRequestPlan = buildApprovalRequestPlan({
+    continuationActionPlan,
+    projectContinuationState,
+    projectReadinessState,
+    localProjectManifest: enrichedLocalProjectManifest,
+  })
 
   return {
     projectBlueprint,
@@ -13241,6 +13259,7 @@ function buildPlanningArchitectureBundle({
     validationPlan,
     phaseExpansionPlan,
     projectContinuationState,
+    projectReadinessState,
     projectPhaseExecutionPlan: normalizeProjectPhaseExecutionPlanContract(
       projectPhaseExecutionPlan,
     ),
@@ -13248,6 +13267,7 @@ function buildPlanningArchitectureBundle({
     expansionOptions: normalizeExpansionOptionsContract(expansionOptions),
     moduleExpansionPlan: normalizeModuleExpansionPlanContract(moduleExpansionPlan),
     continuationActionPlan: normalizeContinuationActionContract(continuationActionPlan),
+    approvalRequestPlan: normalizeApprovalRequestPlanContract(approvalRequestPlan),
   }
 }
 
@@ -15773,6 +15793,173 @@ function normalizeProjectContinuationStateContract(value) {
   return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
 }
 
+function normalizeApprovalRequestPlanContract(value) {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const normalizedValue = {
+    ...(typeof value.id === 'string' && value.id.trim()
+      ? { id: value.id.trim() }
+      : {}),
+    ...(typeof value.title === 'string' && value.title.trim()
+      ? { title: value.title.trim() }
+      : {}),
+    ...(typeof value.description === 'string' && value.description.trim()
+      ? { description: value.description.trim() }
+      : {}),
+    ...(typeof value.approvalType === 'string' && value.approvalType.trim()
+      ? { approvalType: value.approvalType.trim() }
+      : {}),
+    ...(typeof value.status === 'string' && value.status.trim()
+      ? { status: value.status.trim() }
+      : {}),
+    ...(typeof value.riskLevel === 'string' && value.riskLevel.trim()
+      ? { riskLevel: value.riskLevel.trim() }
+      : {}),
+    ...(typeof value.requiresApproval === 'boolean'
+      ? { requiresApproval: value.requiresApproval }
+      : {}),
+    ...(typeof value.blockedByDefault === 'boolean'
+      ? { blockedByDefault: value.blockedByDefault }
+      : {}),
+    ...(typeof value.forbiddenInCurrentTask === 'boolean'
+      ? { forbiddenInCurrentTask: value.forbiddenInCurrentTask }
+      : {}),
+    ...(typeof value.operatorMessage === 'string' && value.operatorMessage.trim()
+      ? { operatorMessage: value.operatorMessage.trim() }
+      : {}),
+    ...(typeof value.areaSummary === 'string' && value.areaSummary.trim()
+      ? { areaSummary: value.areaSummary.trim() }
+      : {}),
+    ...(typeof value.safeAlternative === 'string' && value.safeAlternative.trim()
+      ? { safeAlternative: value.safeAlternative.trim() }
+      : {}),
+    ...(typeof value.approvalCopy === 'string' && value.approvalCopy.trim()
+      ? { approvalCopy: value.approvalCopy.trim() }
+      : {}),
+    ...(typeof value.explicitApprovalText === 'string' &&
+    value.explicitApprovalText.trim()
+      ? { explicitApprovalText: value.explicitApprovalText.trim() }
+      : {}),
+    ...(typeof value.targetStrategy === 'string' && value.targetStrategy.trim()
+      ? { targetStrategy: value.targetStrategy.trim() }
+      : {}),
+    ...(typeof value.projectRoot === 'string' && value.projectRoot.trim()
+      ? { projectRoot: value.projectRoot.trim() }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.touches, 20).length > 0
+      ? { touches: summarizeUniqueExecutorStrings(value.touches, 20) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.willNotTouch, 20).length > 0
+      ? { willNotTouch: summarizeUniqueExecutorStrings(value.willNotTouch, 20) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.validationsRequired, 20).length > 0
+      ? {
+          validationsRequired: summarizeUniqueExecutorStrings(
+            value.validationsRequired,
+            20,
+          ),
+        }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.warnings, 16).length > 0
+      ? { warnings: summarizeUniqueExecutorStrings(value.warnings, 16) }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
+function normalizeProjectReadinessStateContract(value) {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const normalizedValue = {
+    ...(typeof value.readinessLevel === 'string' && value.readinessLevel.trim()
+      ? { readinessLevel: value.readinessLevel.trim() }
+      : {}),
+    ...(typeof value.demoReady === 'boolean' ? { demoReady: value.demoReady } : {}),
+    ...(typeof value.safeLocalDemoReady === 'boolean'
+      ? { safeLocalDemoReady: value.safeLocalDemoReady }
+      : {}),
+    ...(typeof value.completedCoreFlow === 'boolean'
+      ? { completedCoreFlow: value.completedCoreFlow }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.completedPhases, 16).length > 0
+      ? { completedPhases: summarizeUniqueExecutorStrings(value.completedPhases, 16) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.missingCorePhases, 16).length > 0
+      ? { missingCorePhases: summarizeUniqueExecutorStrings(value.missingCorePhases, 16) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.completedModules, 16).length > 0
+      ? { completedModules: summarizeUniqueExecutorStrings(value.completedModules, 16) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.missingRecommendedModules, 16).length > 0
+      ? {
+          missingRecommendedModules: summarizeUniqueExecutorStrings(
+            value.missingRecommendedModules,
+            16,
+          ),
+        }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.mockOnlyAreas, 20).length > 0
+      ? { mockOnlyAreas: summarizeUniqueExecutorStrings(value.mockOnlyAreas, 20) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.realFilesystemAreas, 20).length > 0
+      ? {
+          realFilesystemAreas: summarizeUniqueExecutorStrings(
+            value.realFilesystemAreas,
+            20,
+          ),
+        }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.plannerOnlyAreas, 20).length > 0
+      ? { plannerOnlyAreas: summarizeUniqueExecutorStrings(value.plannerOnlyAreas, 20) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.approvalRequiredAreas, 20).length > 0
+      ? {
+          approvalRequiredAreas: summarizeUniqueExecutorStrings(
+            value.approvalRequiredAreas,
+            20,
+          ),
+        }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.blockedAreas, 20).length > 0
+      ? { blockedAreas: summarizeUniqueExecutorStrings(value.blockedAreas, 20) }
+      : {}),
+    ...(typeof value.validationStatus === 'string' && value.validationStatus.trim()
+      ? { validationStatus: value.validationStatus.trim() }
+      : {}),
+    ...(typeof value.lastValidationSummary === 'string' &&
+    value.lastValidationSummary.trim()
+      ? { lastValidationSummary: value.lastValidationSummary.trim() }
+      : {}),
+    ...(typeof value.operatorSummary === 'string' && value.operatorSummary.trim()
+      ? { operatorSummary: value.operatorSummary.trim() }
+      : {}),
+    ...(normalizeContinuationActionContract(value.nextBestAction)
+      ? { nextBestAction: normalizeContinuationActionContract(value.nextBestAction) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.recommendedDemoScript, 20).length > 0
+      ? {
+          recommendedDemoScript: summarizeUniqueExecutorStrings(
+            value.recommendedDemoScript,
+            20,
+          ),
+        }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.warnings, 20).length > 0
+      ? { warnings: summarizeUniqueExecutorStrings(value.warnings, 20) }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.blockers, 20).length > 0
+      ? { blockers: summarizeUniqueExecutorStrings(value.blockers, 20) }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
 function normalizeValidationPlanContract(value) {
   if (!value || typeof value !== 'object') {
     return null
@@ -16262,6 +16449,31 @@ function normalizeLocalProjectManifestContract(value) {
       : {}),
     ...(typeof value.updatedAt === 'string' && value.updatedAt.trim()
       ? { updatedAt: value.updatedAt.trim() }
+      : {}),
+    ...(typeof value.readinessLevel === 'string' && value.readinessLevel.trim()
+      ? { readinessLevel: value.readinessLevel.trim() }
+      : {}),
+    ...(typeof value.demoReady === 'boolean' ? { demoReady: value.demoReady } : {}),
+    ...(typeof value.safeLocalDemoReady === 'boolean'
+      ? { safeLocalDemoReady: value.safeLocalDemoReady }
+      : {}),
+    ...(typeof value.completedCoreFlow === 'boolean'
+      ? { completedCoreFlow: value.completedCoreFlow }
+      : {}),
+    ...(typeof value.lastValidationSummary === 'string' &&
+    value.lastValidationSummary.trim()
+      ? { lastValidationSummary: value.lastValidationSummary.trim() }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.recommendedDemoScript, 20).length > 0
+      ? {
+          recommendedDemoScript: summarizeUniqueExecutorStrings(
+            value.recommendedDemoScript,
+            20,
+          ),
+        }
+      : {}),
+    ...(summarizeUniqueExecutorStrings(value.warnings, 20).length > 0
+      ? { warnings: summarizeUniqueExecutorStrings(value.warnings, 20) }
       : {}),
     ...(normalizedHistory.length > 0 ? { history: normalizedHistory } : {}),
   }
@@ -17135,6 +17347,66 @@ const PROJECT_CONTINUATION_ACTION_REGISTRY = [
       'Dejar un plan revisable de auth real sin tocar seguridad productiva.',
   },
   {
+    id: 'prepare-payments-plan',
+    aliases: ['pagos', 'payments', 'payment gateway', 'cobros'],
+    title: 'Plan de pagos reales',
+    description:
+      'Preparar un plan de pagos futuros sin tocar dinero real, gateways ni credenciales.',
+    category: 'blocked',
+    safeToPrepare: true,
+    safeToMaterialize: false,
+    requiresApproval: true,
+    blocked: true,
+    blocker:
+      'Pagos reales siguen bloqueados por riesgo financiero y regulatorio hasta una fase futura aprobada.',
+    approvalType: 'payments-real',
+    riskLevel: 'high',
+    targetStrategy: 'prepare-continuation-action-plan',
+    suggestedOrder: 85,
+    expectedOutcome:
+      'Dejar un plan futuro de pagos sin salir del modo local seguro.',
+  },
+  {
+    id: 'prepare-secrets-env-plan',
+    aliases: ['.env', 'secrets', 'credenciales', 'variables reales'],
+    title: 'Plan de secretos y .env',
+    description:
+      'Preparar un plan futuro de variables y secretos sin crear .env real ni tocar credenciales.',
+    category: 'blocked',
+    safeToPrepare: true,
+    safeToMaterialize: false,
+    requiresApproval: true,
+    blocked: true,
+    blocker:
+      'Los secretos reales siguen bloqueados hasta una fase futura aprobada.',
+    approvalType: 'secrets-env',
+    riskLevel: 'high',
+    targetStrategy: 'prepare-continuation-action-plan',
+    suggestedOrder: 88,
+    expectedOutcome:
+      'Dejar una propuesta de configuracion futura sin crear archivos sensibles.',
+  },
+  {
+    id: 'prepare-github-remote-plan',
+    aliases: ['github remoto', 'push', 'remote write', 'escritura remota'],
+    title: 'Plan de escritura remota',
+    description:
+      'Separar cualquier escritura remota en GitHub como una accion futura y aprobada.',
+    category: 'blocked',
+    safeToPrepare: true,
+    safeToMaterialize: false,
+    requiresApproval: true,
+    blocked: true,
+    blocker:
+      'El remoto de GitHub sigue bloqueado salvo una tarea explicita de cierre.',
+    approvalType: 'github-remote-write',
+    riskLevel: 'high',
+    targetStrategy: 'prepare-continuation-action-plan',
+    suggestedOrder: 89,
+    expectedOutcome:
+      'Dejar cambios listos para revision local sin escribir nada en remoto.',
+  },
+  {
     id: 'prepare-deploy-plan',
     aliases: ['deploy', 'produccion', 'production'],
     title: 'Plan de deploy futuro',
@@ -17900,6 +18172,499 @@ function getContinuationActionStorageId(action) {
   return typeof normalizedAction.id === 'string' ? normalizedAction.id.trim() : ''
 }
 
+function listLocalProjectManifestTrackedFiles(localProjectManifest) {
+  const normalizedManifest =
+    normalizeLocalProjectManifestContract(localProjectManifest)
+
+  if (!normalizedManifest) {
+    return []
+  }
+
+  return summarizeUniqueExecutorStrings(
+    [
+      ...(Array.isArray(normalizedManifest.phases)
+        ? normalizedManifest.phases.flatMap((entry) =>
+            Array.isArray(entry?.files) ? entry.files : [],
+          )
+        : []),
+      ...(Array.isArray(normalizedManifest.modules)
+        ? normalizedManifest.modules.flatMap((entry) =>
+            Array.isArray(entry?.files) ? entry.files : [],
+          )
+        : []),
+    ],
+    120,
+  )
+}
+
+function buildReadinessActionFromNextActionPlan(nextActionPlan) {
+  const normalizedNextActionPlan =
+    normalizeNextActionPlanContract(nextActionPlan)
+
+  if (!normalizedNextActionPlan) {
+    return null
+  }
+
+  return buildProjectContinuationAction({
+    id:
+      normalizedNextActionPlan.targetStrategy ||
+      normalizedNextActionPlan.currentState ||
+      'planning-next-action',
+    title:
+      normalizedNextActionPlan.userFacingLabel ||
+      normalizedNextActionPlan.recommendedAction ||
+      'Siguiente paso del proyecto',
+    description:
+      normalizedNextActionPlan.reason ||
+      normalizedNextActionPlan.expectedOutcome ||
+      normalizedNextActionPlan.recommendedAction ||
+      'JEFE detecto una siguiente accion posible para el proyecto.',
+    category: normalizedNextActionPlan.actionType || 'planning',
+    targetStrategy: normalizedNextActionPlan.targetStrategy || '',
+    safeToPrepare: true,
+    safeToMaterialize: normalizedNextActionPlan.safeToRunNow === true,
+    requiresApproval: normalizedNextActionPlan.requiresApproval === true,
+    blocked: false,
+    blocker: '',
+    expectedOutcome: normalizedNextActionPlan.expectedOutcome || '',
+    recommended: true,
+    priority: 1,
+    riskLevel:
+      normalizedNextActionPlan.requiresApproval === true ? 'high' : 'medium',
+    reason:
+      normalizedNextActionPlan.reason ||
+      normalizedNextActionPlan.recommendedAction ||
+      '',
+  })
+}
+
+function buildProjectReadinessFilesystemAreas(localProjectManifest) {
+  const trackedFiles = listLocalProjectManifestTrackedFiles(localProjectManifest)
+  const areaDefinitions = [
+    { label: 'Frontend local en disco', pattern: '/frontend/' },
+    { label: 'Backend local en disco', pattern: '/backend/' },
+    { label: 'Contratos compartidos en disco', pattern: '/shared/' },
+    { label: 'Diseno de datos local en disco', pattern: '/database/' },
+    { label: 'Documentacion local en disco', pattern: '/docs/' },
+    { label: 'Manifest local jefe-project.json', pattern: '/jefe-project.json' },
+  ]
+
+  return areaDefinitions
+    .filter((definition) =>
+      trackedFiles.some((entry) => String(entry || '').includes(definition.pattern)),
+    )
+    .map((definition) => definition.label)
+}
+
+function buildProjectReadinessMockAreas({
+  phaseStates,
+  moduleEntries,
+}) {
+  const doneModuleIds = new Set(
+    (Array.isArray(moduleEntries) ? moduleEntries : [])
+      .filter((entry) => String(entry?.status || '').trim().toLocaleLowerCase() === 'done')
+      .map((entry) => normalizeModuleExpansionId(entry?.id || entry?.name))
+      .filter(Boolean),
+  )
+
+  return summarizeUniqueExecutorStrings(
+    [
+      phaseStates.some(
+        (entry) => entry.id === 'frontend-mock-flow' && entry.status === 'done',
+      )
+        ? 'Frontend mock local y navegacion revisable, sin runtime real.'
+        : '',
+      phaseStates.some(
+        (entry) => entry.id === 'backend-contracts' && entry.status === 'done',
+      )
+        ? 'Backend y shared en modo mock, sin listen() ni puertos abiertos.'
+        : '',
+      phaseStates.some(
+        (entry) => entry.id === 'database-design' && entry.status === 'done',
+      )
+        ? 'Schema SQL y seeds textuales, sin DB real ni SQL ejecutado.'
+        : '',
+      phaseStates.some(
+        (entry) => entry.id === 'local-validation' && entry.status === 'done',
+      )
+        ? 'Validacion local segura, sin instalar dependencias ni levantar servicios.'
+        : '',
+      doneModuleIds.has('notifications')
+        ? 'Notificaciones mock, sin envios reales ni integraciones externas.'
+        : '',
+      doneModuleIds.has('reports')
+        ? 'Reportes operativos mock, sin PDF real ni librerias externas.'
+        : '',
+      doneModuleIds.has('inventory')
+        ? 'Inventario y stock mock, sin sincronizacion con proveedores ni sistemas reales.'
+        : '',
+    ],
+    20,
+  )
+}
+
+function buildProjectReadinessDemoScript({
+  localProjectManifest,
+  phaseStates,
+  moduleEntries,
+}) {
+  const trackedFiles = listLocalProjectManifestTrackedFiles(localProjectManifest)
+  const hasPath = (segment) =>
+    trackedFiles.some((entry) => String(entry || '').includes(segment))
+  const doneModuleIds = new Set(
+    (Array.isArray(moduleEntries) ? moduleEntries : [])
+      .filter((entry) => String(entry?.status || '').trim().toLocaleLowerCase() === 'done')
+      .map((entry) => normalizeModuleExpansionId(entry?.id || entry?.name))
+      .filter(Boolean),
+  )
+
+  return summarizeUniqueExecutorStrings(
+    [
+      'Revisar `docs/release-candidate-checklist.md` para seguir el flujo de demo sugerido.',
+      hasPath('/jefe-project.json')
+        ? 'Abrir `jefe-project.json` y confirmar fases, modulos y proximo paso recomendado.'
+        : '',
+      hasPath('/docs/local-runbook.md')
+        ? 'Leer `docs/local-runbook.md` antes de probar cualquier flujo local.'
+        : '',
+      phaseStates.some(
+        (entry) => entry.id === 'frontend-mock-flow' && entry.status === 'done',
+      )
+        ? 'Revisar el frontend generado y sus mocks sin levantar runtime real.'
+        : '',
+      phaseStates.some(
+        (entry) => entry.id === 'backend-contracts' && entry.status === 'done',
+      )
+        ? 'Inspeccionar contratos backend y handlers mock sin ejecutar listen().'
+        : '',
+      phaseStates.some(
+        (entry) => entry.id === 'database-design' && entry.status === 'done',
+      )
+        ? 'Revisar `database/schema.sql` y `database/seeds/seed-local.sql` solo como diseno textual.'
+        : '',
+      phaseStates.some(
+        (entry) => entry.id === 'local-validation' && entry.status === 'done',
+      )
+        ? 'Leer `docs/validation-report.md` para entender que se valido y que sigue siendo mock.'
+        : '',
+      doneModuleIds.has('notifications')
+        ? 'Mostrar el modulo de notificaciones mock como expansion segura ya agregada.'
+        : '',
+      doneModuleIds.has('reports')
+        ? 'Mostrar el modulo de reportes mock como expansion segura ya agregada.'
+        : '',
+      doneModuleIds.has('inventory')
+        ? 'Mostrar el modulo de inventario mock como expansion segura ya agregada.'
+        : '',
+      'No ejecutar npm install, runtime real, DB real, Docker, deploy, pagos, auth real ni integraciones externas.',
+    ],
+    20,
+  )
+}
+
+function buildProjectReadinessState({
+  strategy,
+  scalableDeliveryPlan,
+  localProjectManifest,
+  nextActionPlan,
+  validationPlan,
+  projectContinuationState,
+}) {
+  const normalizedManifest =
+    normalizeLocalProjectManifestContract(localProjectManifest)
+  const normalizedScalablePlan =
+    normalizeScalableDeliveryPlanContract(scalableDeliveryPlan)
+  const normalizedNextActionPlan = normalizeNextActionPlanContract(nextActionPlan)
+  const normalizedValidationPlan = normalizeValidationPlanContract(validationPlan)
+  const normalizedContinuationState =
+    normalizeProjectContinuationStateContract(projectContinuationState)
+  const resolvedDeliveryLevel =
+    normalizedManifest?.deliveryLevel ||
+    normalizedManifest?.projectType ||
+    normalizedScalablePlan?.deliveryLevel ||
+    ''
+
+  if (resolvedDeliveryLevel !== 'fullstack-local') {
+    return null
+  }
+
+  const phaseStates = normalizedManifest
+    ? getFullstackLocalBasePhaseStates(normalizedManifest)
+    : FULLSTACK_LOCAL_BASE_PHASES.map((entry) => ({
+        ...entry,
+        status: entry.id === 'frontend-mock-flow' ? 'available' : 'pending',
+      }))
+  const corePhaseIds = [
+    'frontend-mock-flow',
+    'backend-contracts',
+    'database-design',
+    'local-validation',
+  ]
+  const completedPhases = phaseStates
+    .filter((entry) => entry.status === 'done')
+    .map((entry) => entry.title)
+  const missingCorePhases = phaseStates
+    .filter(
+      (entry) => corePhaseIds.includes(entry.id) && entry.status !== 'done',
+    )
+    .map((entry) => entry.title)
+  const completedCoreFlow = missingCorePhases.length === 0
+  const blockedCorePhases = phaseStates
+    .filter(
+      (entry) => corePhaseIds.includes(entry.id) && entry.status === 'blocked',
+    )
+    .map((entry) => entry.title)
+  const moduleEntries = Array.isArray(normalizedManifest?.modules)
+    ? normalizedManifest.modules
+    : []
+  const completedModules = moduleEntries
+    .filter((entry) => String(entry?.status || '').trim().toLocaleLowerCase() === 'done')
+    .map((entry) => entry?.name || buildModuleExpansionDisplayName(entry?.id))
+  const missingRecommendedModules = getModuleExpansionRegistryEntries()
+    .filter((entry) => entry.capability === 'materializable')
+    .filter((entry) => {
+      const moduleStatus = getModuleManifestStatusSnapshot(normalizedManifest, entry.id).status
+      return moduleStatus !== 'done'
+    })
+    .map((entry) => entry.title)
+  const realFilesystemAreas = buildProjectReadinessFilesystemAreas(normalizedManifest)
+  const mockOnlyAreas = buildProjectReadinessMockAreas({
+    phaseStates,
+    moduleEntries,
+  })
+  const plannerOnlyAreas = summarizeUniqueExecutorStrings(
+    (normalizedContinuationState?.availablePlanningActions || []).map(
+      (entry) => entry.title || entry.id,
+    ),
+    20,
+  )
+  const approvalRequiredAreas = summarizeUniqueExecutorStrings(
+    (normalizedContinuationState?.approvalRequiredActions || []).map(
+      (entry) => entry.title || entry.id,
+    ),
+    20,
+  )
+  const blockedAreas = summarizeUniqueExecutorStrings(
+    [
+      ...blockedCorePhases,
+      ...(normalizedContinuationState?.blockedActions || []).map(
+        (entry) => entry.title || entry.id,
+      ),
+    ],
+    20,
+  )
+  const validationStatus =
+    blockedCorePhases.length > 0
+      ? 'blocked'
+      : completedCoreFlow
+        ? 'validated-local-safe'
+        : completedPhases.length > 0 || normalizedValidationPlan
+          ? 'pending-local-validation'
+          : normalizedManifest
+            ? 'scaffolded-not-validated'
+            : 'not-run'
+  const safeLocalDemoReady =
+    completedCoreFlow && blockedCorePhases.length === 0
+  const demoReady = safeLocalDemoReady
+  const nextBestAction =
+    normalizedContinuationState?.nextRecommendedAction ||
+    buildReadinessActionFromNextActionPlan(normalizedNextActionPlan)
+  const recommendedDemoScript = buildProjectReadinessDemoScript({
+    localProjectManifest: normalizedManifest,
+    phaseStates,
+    moduleEntries,
+  })
+  const warnings = summarizeUniqueExecutorStrings(
+    [
+      'Esto es mock, no produccion.',
+      !demoReady && missingCorePhases.length > 0
+        ? `Todavia falta completar ${missingCorePhases[0]} antes de cerrar la demo local segura.`
+        : '',
+      approvalRequiredAreas.length > 0
+        ? 'No se toca nada real sin aprobacion.'
+        : '',
+      blockedAreas.length > 0
+        ? 'Hay areas bloqueadas por seguridad.'
+        : '',
+    ],
+    20,
+  )
+  const blockers = summarizeUniqueExecutorStrings(
+    [
+      ...blockedAreas,
+      ...missingCorePhases.map(
+        (entry) => `Todavia falta completar ${entry} para cerrar el flujo base.`,
+      ),
+    ],
+    20,
+  )
+  const readinessLevel =
+    blockedCorePhases.length > 0
+      ? 'blocked'
+      : !normalizedManifest
+        ? 'planning'
+        : demoReady
+          ? 'demo-ready'
+          : completedPhases.length > 0
+            ? 'scaffolded'
+            : normalizedScalablePlan
+              ? 'planning'
+              : 'not-started'
+  const lastValidationSummary = demoReady
+    ? 'Listo para demo local segura. No se ejecuto nada real: todo sigue en modo revisable y mock donde corresponde.'
+    : completedCoreFlow
+      ? 'La base local esta cerrada, pero todavia conviene revisar el resultado antes de hablar de una demo completa.'
+      : 'Todavia falta completar el flujo base y la validacion local para cerrar una demo segura.'
+  const operatorSummary = demoReady
+    ? 'Listo para demo local segura.'
+    : blockedCorePhases.length > 0
+      ? 'Bloqueado por seguridad antes de cerrar la demo local.'
+      : 'Todavia falta completar el flujo base antes de cerrar la demo local segura.'
+
+  return normalizeProjectReadinessStateContract({
+    readinessLevel,
+    demoReady,
+    safeLocalDemoReady,
+    completedCoreFlow,
+    completedPhases,
+    missingCorePhases,
+    completedModules,
+    missingRecommendedModules,
+    mockOnlyAreas,
+    realFilesystemAreas,
+    plannerOnlyAreas,
+    approvalRequiredAreas,
+    blockedAreas,
+    validationStatus,
+    lastValidationSummary,
+    operatorSummary,
+    nextBestAction,
+    recommendedDemoScript,
+    warnings,
+    blockers,
+  })
+}
+
+function buildApprovalRequestPlan({
+  continuationActionPlan,
+  projectContinuationState,
+  projectReadinessState,
+  localProjectManifest,
+  approvalRequest,
+}) {
+  const normalizedAction =
+    normalizeContinuationActionContract(continuationActionPlan) ||
+    normalizeProjectContinuationStateContract(projectContinuationState)?.approvalRequiredActions?.[0] ||
+    normalizeProjectContinuationStateContract(projectContinuationState)?.blockedActions?.[0] ||
+    normalizeProjectReadinessStateContract(projectReadinessState)?.nextBestAction ||
+    null
+  const normalizedApprovalRequest =
+    approvalRequest && typeof approvalRequest === 'object' ? approvalRequest : null
+
+  if (
+    !normalizedAction ||
+    !(
+      normalizedAction.requiresApproval === true ||
+      normalizedAction.blocked === true ||
+      normalizedApprovalRequest
+    )
+  ) {
+    return null
+  }
+
+  const approvalPolicy = getApprovalPolicyEntry(
+    normalizedAction.approvalType || normalizedAction.id || '',
+  )
+  const normalizedManifest =
+    normalizeLocalProjectManifestContract(localProjectManifest)
+  const touches =
+    normalizedAction.allowedTargetPaths ||
+    normalizedAction.targetFiles ||
+    buildProjectContinuationActionTargetPaths({
+      projectRoot: normalizedAction.projectRoot || getLocalProjectManifestProjectRoot(normalizedManifest),
+      actionId: normalizedAction.id,
+    })
+
+  return normalizeApprovalRequestPlanContract({
+    id: normalizedAction.id || approvalPolicy?.id || 'approval-plan',
+    title:
+      normalizedAction.title ||
+      approvalPolicy?.title ||
+      'Accion sensible pendiente de aprobacion',
+    description:
+      normalizedAction.description ||
+      approvalPolicy?.description ||
+      normalizedApprovalRequest?.reason ||
+      'Esta accion sale del modo local seguro y solo se puede revisar, no ejecutar.',
+    approvalType:
+      normalizedAction.approvalType || approvalPolicy?.id || '',
+    status:
+      normalizedAction.blocked || approvalPolicy?.blockedByDefault === true
+        ? 'blocked'
+        : 'requires-approval',
+    riskLevel:
+      normalizedAction.riskLevel || approvalPolicy?.riskLevel || 'high',
+    requiresApproval: true,
+    blockedByDefault:
+      normalizedAction.blocked === true || approvalPolicy?.blockedByDefault === true,
+    forbiddenInCurrentTask: approvalPolicy?.forbiddenInCurrentTask === true,
+    operatorMessage:
+      normalizedAction.blocked === true
+        ? 'Bloqueado por seguridad. Se puede revisar el alcance, pero no ejecutar nada real en esta tarea.'
+        : 'Requiere aprobacion antes de avanzar. Todavia no se ejecuto nada real.',
+    areaSummary:
+      normalizedAction.reason ||
+      normalizedAction.blocker ||
+      normalizedApprovalRequest?.reason ||
+      'JEFE preparo un paquete de aprobacion sin salir del modo seguro.',
+    touches,
+    willNotTouch: summarizeUniqueExecutorStrings(
+      [
+        'No va a instalar dependencias reales todavia.',
+        'No va a levantar runtime ni abrir puertos.',
+        'No va a crear DB real ni ejecutar SQL.',
+        'No va a crear Dockerfile, docker-compose ni deploy real.',
+        'No va a tocar credenciales ni .env reales.',
+      ],
+      12,
+    ),
+    validationsRequired: summarizeUniqueExecutorStrings(
+      [
+        ...(Array.isArray(normalizedAction.validationPlan?.manualChecks)
+          ? normalizedAction.validationPlan.manualChecks
+          : []),
+        'Revisar alcance, riesgo y alternativa segura antes de aprobar.',
+        'Confirmar que la accion siga sin ejecutarse automaticamente en esta corrida.',
+      ],
+      20,
+    ),
+    safeAlternative:
+      approvalPolicy?.safeAlternative ||
+      normalizedAction.reason ||
+      'Seguir con un plan revisable y mantener todo en modo local seguro.',
+    approvalCopy:
+      approvalPolicy?.approvalCopy ||
+      normalizedApprovalRequest?.reason ||
+      'Esta accion sensible requiere aprobacion explicita.',
+    explicitApprovalText:
+      normalizedAction.blocked === true
+        ? `No aprobar ejecucion real de ${normalizedAction.title || normalizedAction.id} en esta tarea. Primero hace falta una fase futura aprobada.`
+        : `Aprobar solo la preparacion futura de ${normalizedAction.title || normalizedAction.id}, sabiendo que en esta tarea no se ejecuto nada real.`,
+    targetStrategy:
+      normalizedAction.targetStrategy || 'prepare-continuation-action-plan',
+    projectRoot:
+      normalizedAction.projectRoot || getLocalProjectManifestProjectRoot(normalizedManifest),
+    warnings: summarizeUniqueExecutorStrings(
+      [
+        'No se ejecutó todavía.',
+        approvalPolicy?.description || '',
+        approvalPolicy?.safeAlternative || '',
+      ],
+      16,
+    ),
+  })
+}
+
 function getModuleManifestStatusSnapshot(localProjectManifest, moduleId) {
   const normalizedManifest =
     normalizeLocalProjectManifestContract(localProjectManifest)
@@ -18160,6 +18925,13 @@ function detectProjectContinuationActionIntent(goal, context) {
     normalizedText.includes('seeds') ||
     normalizedText.includes('auth')
     || normalizedText.includes('autenticacion')
+    || normalizedText.includes('pagos')
+    || normalizedText.includes('payments')
+    || normalizedText.includes('.env')
+    || normalizedText.includes('secret')
+    || normalizedText.includes('credencial')
+    || normalizedText.includes('github')
+    || normalizedText.includes('remote')
     || normalizedText.includes('integracion')
     || normalizedText.includes('api externa')
     || normalizedText.includes('whatsapp')
@@ -18766,6 +19538,50 @@ function syncLocalProjectManifestWithContinuationState({
   }
 }
 
+function syncLocalProjectManifestWithReadinessState({
+  localProjectManifest,
+  projectReadinessState,
+}) {
+  const normalizedManifest =
+    normalizeLocalProjectManifestContract(localProjectManifest)
+
+  if (!normalizedManifest) {
+    return null
+  }
+
+  const normalizedReadiness =
+    normalizeProjectReadinessStateContract(projectReadinessState)
+
+  if (!normalizedReadiness) {
+    return normalizedManifest
+  }
+
+  return {
+    ...normalizedManifest,
+    ...(normalizedReadiness.readinessLevel
+      ? { readinessLevel: normalizedReadiness.readinessLevel }
+      : {}),
+    ...(typeof normalizedReadiness.demoReady === 'boolean'
+      ? { demoReady: normalizedReadiness.demoReady }
+      : {}),
+    ...(typeof normalizedReadiness.safeLocalDemoReady === 'boolean'
+      ? { safeLocalDemoReady: normalizedReadiness.safeLocalDemoReady }
+      : {}),
+    ...(typeof normalizedReadiness.completedCoreFlow === 'boolean'
+      ? { completedCoreFlow: normalizedReadiness.completedCoreFlow }
+      : {}),
+    ...(normalizedReadiness.lastValidationSummary
+      ? { lastValidationSummary: normalizedReadiness.lastValidationSummary }
+      : {}),
+    ...(normalizedReadiness.recommendedDemoScript?.length
+      ? { recommendedDemoScript: normalizedReadiness.recommendedDemoScript }
+      : {}),
+    ...(normalizedReadiness.warnings?.length
+      ? { warnings: normalizedReadiness.warnings }
+      : {}),
+  }
+}
+
 function buildLocalProjectManifest({
   rootFolder,
   domain,
@@ -18853,19 +19669,28 @@ function buildLocalProjectManifest({
     strategy: 'materialize-fullstack-local-plan',
     localProjectManifest: baseManifest,
   })
+  const projectReadinessState = buildProjectReadinessState({
+    strategy: 'materialize-fullstack-local-plan',
+    localProjectManifest: baseManifest,
+    projectContinuationState,
+  })
 
   return (
-    syncLocalProjectManifestWithContinuationState({
-      localProjectManifest: baseManifest,
-      projectContinuationState,
-      updatedAt: 'local-deterministic-plan',
-      historyEntry: {
-        kind: 'phase',
-        id: 'fullstack-local-scaffold',
-        status: 'done',
-        at: 'local-deterministic-plan',
-        note: 'Se genero el scaffold base del proyecto fullstack local.',
-      },
+    syncLocalProjectManifestWithReadinessState({
+      localProjectManifest:
+        syncLocalProjectManifestWithContinuationState({
+          localProjectManifest: baseManifest,
+          projectContinuationState,
+          updatedAt: 'local-deterministic-plan',
+          historyEntry: {
+            kind: 'phase',
+            id: 'fullstack-local-scaffold',
+            status: 'done',
+            at: 'local-deterministic-plan',
+            note: 'Se genero el scaffold base del proyecto fullstack local.',
+          },
+        }) || baseManifest,
+      projectReadinessState,
     }) || baseManifest
   )
 }
@@ -19090,19 +19915,28 @@ function buildUpdatedLocalProjectManifestForModule({
     strategy: 'materialize-module-expansion-plan',
     localProjectManifest: baseManifest,
   })
+  const projectReadinessState = buildProjectReadinessState({
+    strategy: 'materialize-module-expansion-plan',
+    localProjectManifest: baseManifest,
+    projectContinuationState,
+  })
 
   return (
-    syncLocalProjectManifestWithContinuationState({
-      localProjectManifest: baseManifest,
-      projectContinuationState,
-      updatedAt: 'local-deterministic-module-materialization',
-      historyEntry: {
-        kind: 'module',
-        id: normalizedModuleId,
-        status: 'done',
-        at: 'local-deterministic-module-materialization',
-        note: `Se materializo el modulo ${moduleName || buildModuleExpansionDisplayName(normalizedModuleId)}.`,
-      },
+    syncLocalProjectManifestWithReadinessState({
+      localProjectManifest:
+        syncLocalProjectManifestWithContinuationState({
+          localProjectManifest: baseManifest,
+          projectContinuationState,
+          updatedAt: 'local-deterministic-module-materialization',
+          historyEntry: {
+            kind: 'module',
+            id: normalizedModuleId,
+            status: 'done',
+            at: 'local-deterministic-module-materialization',
+            note: `Se materializo el modulo ${moduleName || buildModuleExpansionDisplayName(normalizedModuleId)}.`,
+          },
+        }) || baseManifest,
+      projectReadinessState,
     }) || baseManifest
   )
 }
@@ -19239,19 +20073,28 @@ function buildUpdatedLocalProjectManifestForPhase({
     strategy: 'materialize-project-phase-plan',
     localProjectManifest: baseManifest,
   })
+  const projectReadinessState = buildProjectReadinessState({
+    strategy: 'materialize-project-phase-plan',
+    localProjectManifest: baseManifest,
+    projectContinuationState,
+  })
 
   return (
-    syncLocalProjectManifestWithContinuationState({
-      localProjectManifest: baseManifest,
-      projectContinuationState,
-      updatedAt: 'local-deterministic-phase-materialization',
-      historyEntry: {
-        kind: 'phase',
-        id: phaseId,
-        status: 'done',
-        at: 'local-deterministic-phase-materialization',
-        note: `Se materializo la fase ${phaseId}.`,
-      },
+    syncLocalProjectManifestWithReadinessState({
+      localProjectManifest:
+        syncLocalProjectManifestWithContinuationState({
+          localProjectManifest: baseManifest,
+          projectContinuationState,
+          updatedAt: 'local-deterministic-phase-materialization',
+          historyEntry: {
+            kind: 'phase',
+            id: phaseId,
+            status: 'done',
+            at: 'local-deterministic-phase-materialization',
+            note: `Se materializo la fase ${phaseId}.`,
+          },
+        }) || baseManifest,
+      projectReadinessState,
     }) || baseManifest
   )
 }
@@ -21844,6 +22687,8 @@ function buildBrainDecisionContract({
   moduleExpansionPlan,
   continuationActionPlan,
   projectContinuationState,
+  projectReadinessState,
+  approvalRequestPlan,
   materializationPlan,
   finalResult,
 }) {
@@ -21858,6 +22703,48 @@ function buildBrainDecisionContract({
   const resolvedQuestion =
     resolvedApprovalRequest?.question ||
     (typeof question === 'string' ? question : '')
+  const normalizedScalablePlan =
+    normalizeScalableDeliveryPlanContract(scalableDeliveryPlan)
+  const normalizedContinuationState =
+    normalizeProjectContinuationStateContract(projectContinuationState) ||
+    buildProjectContinuationState({
+      strategy,
+      localProjectManifest,
+      nextActionPlan,
+      projectPhaseExecutionPlan,
+      moduleExpansionPlan,
+      continuationActionPlan,
+      expansionOptions,
+    })
+  const normalizedReadinessState =
+    normalizeProjectReadinessStateContract(projectReadinessState) ||
+    buildProjectReadinessState({
+      strategy,
+      scalableDeliveryPlan: normalizedScalablePlan,
+      localProjectManifest,
+      nextActionPlan,
+      validationPlan,
+      projectContinuationState: normalizedContinuationState,
+    })
+  const enrichedLocalProjectManifest = normalizeLocalProjectManifestContract(
+    syncLocalProjectManifestWithReadinessState({
+      localProjectManifest:
+        syncLocalProjectManifestWithContinuationState({
+          localProjectManifest,
+          projectContinuationState: normalizedContinuationState,
+        }) || localProjectManifest,
+      projectReadinessState: normalizedReadinessState,
+    }) || localProjectManifest,
+  )
+  const normalizedApprovalRequestPlan =
+    normalizeApprovalRequestPlanContract(approvalRequestPlan) ||
+    buildApprovalRequestPlan({
+      continuationActionPlan,
+      projectContinuationState: normalizedContinuationState,
+      projectReadinessState: normalizedReadinessState,
+      localProjectManifest: enrichedLocalProjectManifest,
+      approvalRequest: resolvedApprovalRequest,
+    })
 
   return {
     decisionKey: decisionKey || strategy || 'brain-decision',
@@ -21912,12 +22799,8 @@ function buildBrainDecisionContract({
     ...(normalizeDomainUnderstandingContract(domainUnderstanding)
       ? { domainUnderstanding: normalizeDomainUnderstandingContract(domainUnderstanding) }
       : {}),
-    ...(normalizeScalableDeliveryPlanContract(scalableDeliveryPlan)
-      ? {
-          scalableDeliveryPlan: normalizeScalableDeliveryPlanContract(
-            scalableDeliveryPlan,
-          ),
-        }
+    ...(normalizedScalablePlan
+      ? { scalableDeliveryPlan: normalizedScalablePlan }
       : {}),
     ...(normalizeProjectBlueprintContract(projectBlueprint)
       ? { projectBlueprint: normalizeProjectBlueprintContract(projectBlueprint) }
@@ -21947,8 +22830,8 @@ function buildBrainDecisionContract({
             normalizeProjectPhaseExecutionPlanContract(projectPhaseExecutionPlan),
         }
       : {}),
-    ...(normalizeLocalProjectManifestContract(localProjectManifest)
-      ? { localProjectManifest: normalizeLocalProjectManifestContract(localProjectManifest) }
+    ...(enrichedLocalProjectManifest
+      ? { localProjectManifest: enrichedLocalProjectManifest }
       : {}),
     ...(normalizeExpansionOptionsContract(expansionOptions)
       ? { expansionOptions: normalizeExpansionOptionsContract(expansionOptions) }
@@ -21962,11 +22845,14 @@ function buildBrainDecisionContract({
             normalizeContinuationActionContract(continuationActionPlan),
         }
       : {}),
-    ...(normalizeProjectContinuationStateContract(projectContinuationState)
-      ? {
-          projectContinuationState:
-            normalizeProjectContinuationStateContract(projectContinuationState),
-        }
+    ...(normalizedContinuationState
+      ? { projectContinuationState: normalizedContinuationState }
+      : {}),
+    ...(normalizedReadinessState
+      ? { projectReadinessState: normalizedReadinessState }
+      : {}),
+    ...(normalizedApprovalRequestPlan
+      ? { approvalRequestPlan: normalizedApprovalRequestPlan }
       : {}),
     ...(materializationPlan && typeof materializationPlan === 'object'
       ? { materializationPlan }
@@ -27249,6 +28135,8 @@ async function buildLocalStrategicBrainDecision({
       moduleExpansionPlan: planningContracts.moduleExpansionPlan,
       continuationActionPlan: planningContracts.continuationActionPlan,
       projectContinuationState: planningContracts.projectContinuationState,
+      projectReadinessState: planningContracts.projectReadinessState,
+      approvalRequestPlan: planningContracts.approvalRequestPlan,
     })
   }
   const reusablePlanningContext =
@@ -28937,6 +29825,8 @@ Reglas:
 - Usá prepare-continuation-action-plan para runtime local, dependencias, DB real, auth, deploy, Docker, integraciones externas o mejoras revisables que todavia no tengan materializador seguro. En ese caso usá executionMode="planner-only", nextExpectedAction="review-continuation-action" y devolvé continuationActionPlan + projectContinuationState sin materializationPlan.
 - Cuando puedas, devolvé también projectBlueprint, questionPolicy, implementationRoadmap, nextActionPlan, validationPlan, phaseExpansionPlan, projectPhaseExecutionPlan y localProjectManifest alineados con la estrategia elegida.
 - projectContinuationState debe resumir estado, riesgos, blockers, acciones seguras, acciones revisables y acciones que requieren aprobacion en un lenguaje claro para operador.
+- projectReadinessState debe explicar si el proyecto esta listo para demo local segura, que partes siguen siendo mock, que existe en disco, que requiere aprobacion y que sigue bloqueado.
+- approvalRequestPlan debe empaquetar las acciones sensibles con riesgo, alcance, alternativa segura, validaciones requeridas y aclaracion de que todavia no se ejecuto nada real.
 - projectBlueprint debe capturar tipo de producto, dominio, intent, deliveryLevel, stackProfile, roles, modules, entities, coreFlows, integrations, riesgos, decisiones delegadas, phasePlan, exclusiones, approvals futuros y successCriteria.
 - questionPolicy debe explicar si conviene preguntar ahora o decidir faltantes con criterio profesional, especialmente cuando userParticipationMode es "brain-decides-missing".
 - implementationRoadmap debe ordenar fases, outputs esperados, validaciones, blockers y approvals sin ejecutar nada automáticamente.
@@ -29425,6 +30315,13 @@ function buildOpenAIBrainSchema() {
           approvalRequiredActions: { type: 'array', items: { type: 'string' } },
           risks: { type: 'array', items: { type: 'string' } },
           updatedAt: { type: 'string' },
+          readinessLevel: { type: 'string' },
+          demoReady: { type: 'boolean' },
+          safeLocalDemoReady: { type: 'boolean' },
+          completedCoreFlow: { type: 'boolean' },
+          lastValidationSummary: { type: 'string' },
+          recommendedDemoScript: { type: 'array', items: { type: 'string' } },
+          warnings: { type: 'array', items: { type: 'string' } },
           phases: {
             type: 'array',
             items: {
@@ -29599,6 +30496,58 @@ function buildOpenAIBrainSchema() {
           blockers: { type: 'array', items: { type: 'string' } },
           summary: { type: 'string' },
           operatorMessage: { type: 'string' },
+        },
+      },
+      projectReadinessState: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          readinessLevel: { type: 'string' },
+          demoReady: { type: 'boolean' },
+          safeLocalDemoReady: { type: 'boolean' },
+          completedCoreFlow: { type: 'boolean' },
+          completedPhases: { type: 'array', items: { type: 'string' } },
+          missingCorePhases: { type: 'array', items: { type: 'string' } },
+          completedModules: { type: 'array', items: { type: 'string' } },
+          missingRecommendedModules: { type: 'array', items: { type: 'string' } },
+          mockOnlyAreas: { type: 'array', items: { type: 'string' } },
+          realFilesystemAreas: { type: 'array', items: { type: 'string' } },
+          plannerOnlyAreas: { type: 'array', items: { type: 'string' } },
+          approvalRequiredAreas: { type: 'array', items: { type: 'string' } },
+          blockedAreas: { type: 'array', items: { type: 'string' } },
+          validationStatus: { type: 'string' },
+          lastValidationSummary: { type: 'string' },
+          operatorSummary: { type: 'string' },
+          nextBestAction: { type: 'object', additionalProperties: true },
+          recommendedDemoScript: { type: 'array', items: { type: 'string' } },
+          warnings: { type: 'array', items: { type: 'string' } },
+          blockers: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      approvalRequestPlan: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          id: { type: 'string' },
+          title: { type: 'string' },
+          description: { type: 'string' },
+          approvalType: { type: 'string' },
+          status: { type: 'string' },
+          riskLevel: { type: 'string' },
+          requiresApproval: { type: 'boolean' },
+          blockedByDefault: { type: 'boolean' },
+          forbiddenInCurrentTask: { type: 'boolean' },
+          operatorMessage: { type: 'string' },
+          areaSummary: { type: 'string' },
+          safeAlternative: { type: 'string' },
+          approvalCopy: { type: 'string' },
+          explicitApprovalText: { type: 'string' },
+          targetStrategy: { type: 'string' },
+          projectRoot: { type: 'string' },
+          touches: { type: 'array', items: { type: 'string' } },
+          willNotTouch: { type: 'array', items: { type: 'string' } },
+          validationsRequired: { type: 'array', items: { type: 'string' } },
+          warnings: { type: 'array', items: { type: 'string' } },
         },
       },
       materializationPlan: {
@@ -29971,6 +30920,16 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
       typeof rawDecision.projectContinuationState === 'object'
         ? rawDecision.projectContinuationState
         : fallbackDecision.projectContinuationState,
+    projectReadinessState:
+      rawDecision?.projectReadinessState &&
+      typeof rawDecision.projectReadinessState === 'object'
+        ? rawDecision.projectReadinessState
+        : fallbackDecision.projectReadinessState,
+    approvalRequestPlan:
+      rawDecision?.approvalRequestPlan &&
+      typeof rawDecision.approvalRequestPlan === 'object'
+        ? rawDecision.approvalRequestPlan
+        : fallbackDecision.approvalRequestPlan,
     materializationPlan:
       rawDecision?.materializationPlan &&
       typeof rawDecision.materializationPlan === 'object'
@@ -32119,6 +33078,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       moduleExpansionPlan: brainDecision.moduleExpansionPlan,
       continuationActionPlan: brainDecision.continuationActionPlan,
       projectContinuationState: brainDecision.projectContinuationState,
+      projectReadinessState: brainDecision.projectReadinessState,
+      approvalRequestPlan: brainDecision.approvalRequestPlan,
       materializationPlan: brainDecision.materializationPlan,
       contextHubStatus,
       brainRoutingDecision,
@@ -32172,6 +33133,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
     moduleExpansionPlan: brainDecision.moduleExpansionPlan,
     continuationActionPlan: brainDecision.continuationActionPlan,
     projectContinuationState: brainDecision.projectContinuationState,
+    projectReadinessState: brainDecision.projectReadinessState,
+    approvalRequestPlan: brainDecision.approvalRequestPlan,
     materializationPlan: brainDecision.materializationPlan,
     contextHubStatus,
     brainRoutingDecision,
