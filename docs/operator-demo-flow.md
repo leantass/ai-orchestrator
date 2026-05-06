@@ -36,6 +36,7 @@ También podés validar otras verticales ya soportadas:
    - ruta exacta de `frontend/index.html`
    - próxima fase segura recomendada
    - readiness actual
+   - estado de MEMORIA / Context Hub
 5. Abrí `frontend/index.html` con doble click.
 6. Confirmá que la demo carga por `file://`, sin servidor, sin `npm install` y sin pantalla blanca.
 7. Recorré la demo y validá que muestre una vertical real, no un scaffold genérico vacío.
@@ -104,6 +105,12 @@ Lectura práctica:
 - `Demo visual en progreso`: el proyecto ya avanzó por una o más fases base, pero aún no cerró `local-validation`.
 - `Listo para demo local segura`: ya pasó el flujo base local y puede mostrarse como entrega mock revisable.
 
+## MEMORIA / Context Hub
+
+- Si Context Hub está disponible, JEFE debería mostrarlo como contexto aplicado o disponible, sin convertirlo en un bloqueo.
+- Si Context Hub no está disponible, JEFE debería seguir funcionando y decirlo claro como ausencia de memoria externa, no como error crítico.
+- En el resultado final conviene revisar si JEFE indica `MEMORIA / Context Hub: Disponible` o `No disponible`, para entender cuánto contexto externo usó.
+
 ## Cuándo hay una aprobación real
 
 Una aprobación real aparece recién cuando el operador pide salir del modo seguro, por ejemplo:
@@ -130,6 +137,10 @@ La recomendación operable es:
 - después revisar `frontend/index.html` por `file://`
 - luego completar `frontend-mock-flow`, `backend-contracts`, `database-design` y `local-validation`
 - recién ahí evaluar `Guardar como reusable`
+
+Mientras no haya validación local cerrada, la UI debería sugerir:
+
+- `Guardar como reusable después de validar`
 
 ## Checklist de demo salió bien
 

@@ -17,6 +17,11 @@ const {
 } = require(
   path.join(repoRoot, 'electron', 'local-deterministic-executor.cjs'),
 )
+const {
+  FULLSTACK_LOCAL_BASE_PHASES,
+  getFullstackLocalBasePhaseDefinition,
+  buildFullstackLocalManifestPhaseBlueprints,
+} = require(path.join(repoRoot, 'electron', 'fullstack-phase-contracts.cjs'))
 
 const smokeWorkspaceRoot = path.join(repoRoot, '.tmp', 'ai-operator-e2e-smoke')
 const continuationBasePhaseIds = [
@@ -478,6 +483,9 @@ module.exports = {
     fs,
     path,
     LOCAL_MATERIALIZATION_PLAN_VERSION,
+    FULLSTACK_LOCAL_BASE_PHASES,
+    getFullstackLocalBasePhaseDefinition,
+    buildFullstackLocalManifestPhaseBlueprints,
     setTimeout,
     clearTimeout,
     setInterval,
@@ -1593,6 +1601,18 @@ async function runPhaseMaterializationFlowCase() {
   )
   pushFailure(
     failures,
+    normalizeText(getManifestPhase('frontend-mock-flow')?.objective || '').includes('frontend'),
+    'frontend-mock-flow debe conservar un objective visible dentro del manifest.',
+  )
+  pushFailure(
+    failures,
+    (getManifestPhase('frontend-mock-flow')?.allowedTargetPaths || []).some((entry) =>
+      normalizePathForComparison(entry).endsWith('/frontend/src/mock-data.js'),
+    ),
+    'frontend-mock-flow debe exponer allowedTargetPaths ricos dentro del manifest.',
+  )
+  pushFailure(
+    failures,
     normalizeIdentifier(fixture.manifest?.nextRecommendedPhase) === 'backend-contracts',
     'Después de frontend-mock-flow debe recomendar backend-contracts.',
   )
@@ -1761,6 +1781,12 @@ async function runPhaseMaterializationFlowCase() {
     failures,
     normalizeIdentifier(getManifestPhase('local-validation')?.status) === 'done',
     'local-validation debe quedar en done dentro del manifest.',
+  )
+  pushFailure(
+    failures,
+    normalizeIdentifier(getManifestPhase('local-validation')?.nextRecommendedPhase) ===
+      'review-and-expand',
+    'local-validation debe declarar review-and-expand como siguiente fase.',
   )
   pushFailure(
     failures,
@@ -2394,6 +2420,16 @@ async function runUiHelperSanityCase() {
     failures,
     appSource.includes('Carpetas creadas') && appSource.includes('Archivos escritos'),
     'El resultado final debe resumir carpetas creadas y archivos escritos por separado.',
+  )
+  pushFailure(
+    failures,
+    appSource.includes('MEMORIA / Context Hub'),
+    'La UI final debe mostrar si MEMORIA / Context Hub estuvo disponible o no.',
+  )
+  pushFailure(
+    failures,
+    appSource.includes('Próxima fase segura'),
+    'La UI final debe seguir destacando la próxima fase segura para el operador.',
   )
   pushFailure(
     failures,

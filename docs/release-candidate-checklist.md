@@ -2,124 +2,165 @@
 
 ## Objetivo
 
-Esta guía sirve para validar JEFE como plataforma local de programación automatizada en modo seguro: planifica, materializa demos ricas por `file://`, deja continuidad útil y mantiene las acciones sensibles fuera de ejecución.
+Esta guía sirve para validar JEFE como plataforma local segura y operable. El criterio de salida no es solo “generó archivos”, sino que el operador pueda entender el flujo, abrir la demo, continuar por fases seguras y distinguir con claridad qué está listo, qué sigue mockeado y qué requiere aprobación futura.
 
-## Escenario 1: pedir un sistema desde cero
+## Precondiciones
 
-1. Pedí un sistema nuevo, por ejemplo:
-   - `Haceme un sistema fullstack local para una veterinaria...`
-   - `Haceme un sistema fullstack local para reservas de canchas...`
-   - `Haceme un sistema fullstack local para ecommerce...`
-2. Confirmá que JEFE devuelva:
-   - delivery level razonable
-   - blueprint
-   - roadmap
-   - siguiente paso seguro
-3. Verificá que no prometa runtime real ni `npm install`.
+Antes de correr la demo o el smoke final:
 
-## Escenario 2: materializar un fullstack-local rico
+- usar la rama esperada del repo
+- confirmar que JEFE abre sin errores visibles
+- partir de un workspace limpio para el proyecto a materializar
+- no instalar dependencias
+- no crear `.env`
+- no ejecutar runtime real
+- no conectar una base de datos real
 
-1. Prepará la materialización fullstack local.
-2. Ejecutá la materialización segura.
-3. Verificá que el cierre muestre:
+## Escenario 1: pedir un sistema fullstack local
+
+Usar un pedido que fuerce a JEFE a demostrar dominio, seguridad y continuidad. Ejemplo recomendado:
+
+> Haceme un sistema fullstack local para una veterinaria, con clientes, mascotas, turnos, recordatorios, reportes e inventario básico. Quiero una demo local segura con datos mock, sin instalar dependencias, sin levantar backend real, sin crear base de datos real y sin tocar integraciones externas.
+
+Verificar que JEFE:
+
+- elija `fullstack-local`
+- devuelva un plan revisable
+- proponga una materialización segura
+- no convierta restricciones explícitas en bloqueos actuales
+- muestre el estado de MEMORIA / Context Hub como disponible o no disponible, sin romper el flujo
+
+## Escenario 2: materializar el scaffold seguro
+
+1. En Paso 5, usar el CTA principal para preparar la materialización.
+2. Ejecutar la materialización segura.
+3. Confirmar en el resultado:
+   - `Scaffold fullstack local materializado`
    - carpeta creada
    - carpetas creadas
    - archivos escritos
-   - validaciones útiles
+   - validaciones OK
    - ruta exacta de `frontend/index.html`
-   - próxima fase segura
+   - próxima fase segura recomendada
    - readiness actual
-4. Confirmá que el proyecto generado incluya:
-   - `frontend/`
-   - `backend/`
-   - `shared/`
-   - `database/`
-   - `docs/`
-   - `jefe-project.json`
+   - si MEMORIA / Context Hub estuvo disponible o no
 
-## Escenario 3: abrir la demo estática
+## Escenario 3: abrir la demo por file://
 
-1. Abrí `frontend/index.html` con doble click.
-2. Confirmá que la demo carga por `file://`.
-3. Confirmá que:
-   - no usa servidor
-   - no requiere `npm install`
+1. Abrir `frontend/index.html` con doble click.
+2. Confirmar que la demo:
+   - abre por `file://`
+   - no usa `type="module"`
+   - no usa `import` ni `export`
+   - no usa `fetch`
+   - no necesita servidor
+   - no necesita `npm install`
    - no deja pantalla blanca
-   - muestra navegación, métricas, listas, detalle y actividad
 
-## Escenario 4: validar que la demo sea rica y del dominio correcto
+## Escenario 4: validar la calidad del dominio
 
-Para cualquier vertical, la demo debería incluir:
+La demo generada debe sentirse como una primera entrega local revisable, no como un cascarón vacío.
 
-- secciones navegables
-- métricas mock
-- alertas o pendientes
-- detalle de entidad seleccionada
-- al menos dos o tres interacciones locales en memoria
+Para veterinaria, confirmar:
 
-Para veterinaria, confirmar específicamente:
-
-- clientes o dueños
+- `Veterinaria` como título visible presentable
+- clientes o tutores
 - mascotas
 - turnos
 - recordatorios
+- inventario
 - reportes
-- inventario básico
-- veterinarios o profesionales veterinarios
-- ausencia de `Clínica médica`, `Pediatría` y `pacientes` como concepto principal
+- profesionales veterinarios
+- ausencia de `Clínica médica`
+- ausencia de `Pediatría`
+- ausencia de `Ingreso de paciente`
 
-## Escenario 5: avanzar continuidad por fases
+Para otros dominios, confirmar que no haya contaminación entre verticales.
 
-1. Después del scaffold, confirmar que la siguiente fase recomendada sea `frontend-mock-flow`.
-2. Confirmar que el readiness pase a `Scaffold materializado` y no quede en `En planificación`.
-2. Luego preparar y materializar, cuando corresponda:
-   - `frontend-mock-flow`
-   - `backend-contracts`
-   - `database-design`
-   - `local-validation`
-3. Verificar en `jefe-project.json`:
-   - fases registradas
-   - `nextRecommendedPhase`
-   - `nextRecommendedAction`
-   - `readinessLevel`
-4. Confirmar que después de `local-validation` quede disponible `review-and-expand`.
+## Escenario 5: continuidad por fases
 
-## Escenario 6: interpretar readiness
+Después del scaffold, JEFE debería poder seguir con:
 
-1. Abrí el centro de continuidad.
-2. Revisá:
-   - `Estado para demo`
-   - `Qué ya está construido`
-   - `Qué sigue siendo mock`
-   - `Próxima fase segura`
-   - `Aprobaciones futuras`
-3. Confirmá que JEFE explique:
-   - si la demo local segura ya está lista
-   - qué sigue siendo mock
-   - qué falta para producto real
-4. Si el estado es `Scaffold materializado`, todavía no conviene tratar la salida como reusable definitiva.
+- `frontend-mock-flow`
+- `backend-contracts`
+- `database-design`
+- `local-validation`
+- `review-and-expand`
 
-## Escenario 7: revisar aprobaciones futuras sin bloquear el flujo seguro
+Validar que cada fase:
 
-1. Pedí acciones sensibles, por ejemplo:
-   - `npm install`
-   - runtime local real
-   - DB real
-   - Docker
-   - deploy
-   - auth real
-   - pagos reales
-   - integraciones externas
-2. Confirmá que JEFE:
-   - no ejecute nada real
-   - devuelva preview y aprobación controlada
-   - muestre riesgo, comandos propuestos y validaciones
-   - no convierta esas aprobaciones futuras en bloqueo del scaffold seguro actual
+- tenga id estable
+- tenga título visible claro
+- tenga objetivo y summary
+- tenga `allowedTargetPaths`
+- actualice `jefe-project.json`
+- marque `done` cuando corresponde
+- deje la siguiente fase segura como recomendada
+- no vuelva a sugerir fases ya completadas
+
+## Escenario 6: lectura de readiness
+
+Verificar que el readiness hable en lenguaje de producto:
+
+- `En planificación` solo antes de materializar
+- `Scaffold materializado` después de crear la base real
+- `Demo visual en progreso` cuando las fases base están avanzando
+- `Listo para demo local segura` recién después de `local-validation`
+
+No debería pasar:
+
+- `En planificación` con scaffold ya escrito
+- `demo lista` si todavía falta `local-validation`
+- `bloqueado por seguridad` cuando el flujo actual sigue siendo seguro
+
+## Escenario 7: autonomía y aprobaciones futuras
+
+Cuando el operador elige un modo de baja intervención o pide “decidí vos”:
+
+- JEFE debería resolver faltantes menores sin frenar
+- debería avanzar hasta la próxima acción segura
+- no debería preguntar por detalles cosméticos o menores
+- debería frenar solo ante riesgo real
+
+Las acciones sensibles futuras deben mostrarse como futuras:
+
+- `npm install`
+- runtime real
+- DB real
+- migraciones o seeds reales
+- Docker
+- deploy
+- auth real
+- pagos reales
+- integraciones externas
+
+## Escenario 8: MEMORIA / Context Hub
+
+Validar dos comportamientos:
+
+1. Si Context Hub está disponible:
+   - JEFE lo muestra como contexto aplicado o disponible
+   - no duplica contexto innecesario
+   - no rompe el flujo
+2. Si Context Hub no está disponible:
+   - JEFE sigue funcionando
+   - lo informa como ausencia de memoria externa
+   - no lo trata como error crítico
+
+## Escenario 9: reusable solo después de validar
+
+La UI no debería empujar reusable demasiado temprano.
+
+Antes de `local-validation`, el mensaje esperado es algo como:
+
+- `Guardar como reusable después de validar`
+
+Recién después de validación visual/local tiene sentido tratar la salida como reusable o base para variantes.
 
 ## Qué no debería pasar nunca
 
 - `type="module"` en `frontend/index.html`
-- `import` o `export` en el frontend estático generado
+- `import` o `export` en el frontend estático
 - `fetch` en la demo estática
 - creación de `node_modules`
 - creación de `.env`
@@ -129,20 +170,24 @@ Para veterinaria, confirmar específicamente:
 - base de datos real
 - deploy real
 
-## Criterio de demo local segura
+## Comandos de validación recomendados
 
-La demo se considera lista para mostrar cuando:
+- `npm run ai-planner-smoke`
+- `node scripts/ai-release-smoke.mjs`
+- `node scripts/ai-operator-e2e-smoke.mjs`
+- `node --check electron/main.cjs`
+- `node --check electron/local-deterministic-executor.cjs`
 
-- abre por `file://`
+## Criterio de release candidate
+
+JEFE queda en estado de release candidate operable cuando:
+
+- el flujo guiado es entendible
+- el scaffold se materializa en modo seguro
+- la demo abre por `file://`
 - el dominio visible es coherente
-- la interacción local funciona en memoria
-- las fases base avanzan sin tocar runtime real
-- readiness lo explica con honestidad
-- las acciones sensibles quedan como aprobación futura o bloqueo explícito, nunca como ejecución real
-
-Antes de marcar una salida como reusable, conviene además:
-
-- abrir `frontend/index.html` con doble click
-- revisar `docs/local-runbook.md`
-- confirmar `node --check` sobre los archivos principales del scaffold
-- completar `local-validation` o, como mínimo, una revisión visual y estructural equivalente
+- la continuidad por fases funciona
+- el readiness es honesto
+- las aprobaciones futuras no bloquean el flujo seguro actual
+- MEMORIA / Context Hub suma sin volverse un punto único de falla
+- el resultado final le dice al operador qué hizo, dónde quedó y qué sigue

@@ -16,6 +16,11 @@ const {
 } = require(
   path.join(repoRoot, 'electron', 'local-deterministic-executor.cjs'),
 )
+const {
+  FULLSTACK_LOCAL_BASE_PHASES,
+  getFullstackLocalBasePhaseDefinition,
+  buildFullstackLocalManifestPhaseBlueprints,
+} = require(path.join(repoRoot, 'electron', 'fullstack-phase-contracts.cjs'))
 
 const smokeWorkspaceRoot = path.join(repoRoot, '.tmp', 'ai-release-smoke')
 const continuationBasePhaseIds = [
@@ -147,6 +152,9 @@ module.exports = {
     fs,
     path,
     LOCAL_MATERIALIZATION_PLAN_VERSION,
+    FULLSTACK_LOCAL_BASE_PHASES,
+    getFullstackLocalBasePhaseDefinition,
+    buildFullstackLocalManifestPhaseBlueprints,
     setTimeout,
     clearTimeout,
     setInterval,

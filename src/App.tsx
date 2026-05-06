@@ -621,12 +621,18 @@ type ProjectPhaseExecutionPlanContract = {
 type LocalProjectManifestPhaseContract = {
   id?: string
   title?: string
+  description?: string
+  objective?: string
+  summary?: string
   status?: string
   createdAt?: string
   updatedAt?: string
   safeToMaterialize?: boolean
   approvalRequired?: boolean
+  targetStrategy?: string
   validationHints?: string[]
+  allowedTargetPaths?: string[]
+  nextRecommendedPhase?: string
   files?: string[]
 }
 
@@ -3039,6 +3045,15 @@ const normalizeLocalProjectManifestContract = (
                 ...(normalizeOptionalString(entry.title)
                   ? { title: normalizeOptionalString(entry.title) }
                   : {}),
+                ...(normalizeOptionalString(entry.description)
+                  ? { description: normalizeOptionalString(entry.description) }
+                  : {}),
+                ...(normalizeOptionalString(entry.objective)
+                  ? { objective: normalizeOptionalString(entry.objective) }
+                  : {}),
+                ...(normalizeOptionalString(entry.summary)
+                  ? { summary: normalizeOptionalString(entry.summary) }
+                  : {}),
                 ...(normalizeOptionalString(entry.status)
                   ? { status: normalizeOptionalString(entry.status) }
                   : {}),
@@ -3054,10 +3069,27 @@ const normalizeLocalProjectManifestContract = (
                 ...(typeof entry.approvalRequired === 'boolean'
                   ? { approvalRequired: entry.approvalRequired }
                   : {}),
+                ...(normalizeOptionalString(entry.targetStrategy)
+                  ? { targetStrategy: normalizeOptionalString(entry.targetStrategy) }
+                  : {}),
                 ...(normalizeOptionalStringArray(entry.validationHints).length > 0
                   ? {
                       validationHints: normalizeOptionalStringArray(
                         entry.validationHints,
+                      ),
+                    }
+                  : {}),
+                ...(normalizeOptionalStringArray(entry.allowedTargetPaths).length > 0
+                  ? {
+                      allowedTargetPaths: normalizeOptionalStringArray(
+                        entry.allowedTargetPaths,
+                      ),
+                    }
+                  : {}),
+                ...(normalizeOptionalString(entry.nextRecommendedPhase)
+                  ? {
+                      nextRecommendedPhase: normalizeOptionalString(
+                        entry.nextRecommendedPhase,
                       ),
                     }
                   : {}),
@@ -12475,6 +12507,27 @@ function App() {
     normalizeOptionalString(resultMaterializationNextPhaseEntry?.title) ||
     resultMaterializationNextPhaseId ||
     'Sin fase segura declarada'
+  const resultMaterializationNextPhaseDetail = summarizeInlineText(
+    normalizeOptionalString(
+      resultMaterializationNextPhaseEntry?.objective ||
+        resultMaterializationNextPhaseEntry?.summary ||
+        resultMaterializationNextPhaseEntry?.description,
+    ) ||
+      normalizeOptionalString(activeProjectContinuationState?.operatorMessage) ||
+      'Sin detalle adicional para la siguiente fase segura.',
+    180,
+  )
+  const resultContextHubLabel = activeContextHubStatus?.available
+    ? 'Disponible'
+    : 'No disponible'
+  const resultContextHubDetail = activeContextHubStatus?.available
+    ? activeContextHubUiDetail
+    : [
+        'JEFE continuó sin MEMORIA externa.',
+        activeContextHubStatus?.reason ? `Motivo: ${activeContextHubStatus.reason}` : '',
+      ]
+        .filter(Boolean)
+        .join(' ')
   const resultMaterializationSummaryTitle = resultIsSafeFirstDeliveryMaterialization
     ? 'Primera entrega segura generada'
     : resultIsFullstackLocalMaterialization
@@ -14803,6 +14856,11 @@ function App() {
                 reuseMode: currentPlannerExecutionMetadata.reuseMode,
               }
             : {}),
+          ...(currentPlannerExecutionMetadata.contextHubStatus
+            ? {
+                contextHubStatus: currentPlannerExecutionMetadata.contextHubStatus,
+              }
+            : {}),
           ...(currentPlannerExecutionMetadata.executionScope
             ? {
                 executionScope: currentPlannerExecutionMetadata.executionScope,
@@ -14812,6 +14870,12 @@ function App() {
             ? {
                 safeFirstDeliveryMaterialization:
                   currentPlannerExecutionMetadata.safeFirstDeliveryMaterialization,
+              }
+            : {}),
+          ...(currentPlannerExecutionMetadata.materializationPlan
+            ? {
+                materializationPlan:
+                  currentPlannerExecutionMetadata.materializationPlan,
               }
             : {}),
         }
@@ -16226,6 +16290,9 @@ function App() {
         : {}),
       ...(executionMetadata.reuseMode && executionMetadata.reuseMode !== 'none'
         ? { reuseMode: executionMetadata.reuseMode }
+        : {}),
+      ...(executionMetadata.contextHubStatus
+        ? { contextHubStatus: executionMetadata.contextHubStatus }
         : {}),
       ...(executionMetadata.executionScope
         ? { executionScope: executionMetadata.executionScope }
@@ -19431,10 +19498,7 @@ function App() {
                               {
                                 label: 'Próxima fase segura',
                                 value: resultMaterializationNextPhaseLabel,
-                                detail:
-                                  normalizeOptionalString(
-                                    activeProjectContinuationState?.operatorMessage,
-                                  ) || 'Sin mensaje adicional.',
+                                detail: resultMaterializationNextPhaseDetail,
                               },
                               {
                                 label: 'Readiness actual',
@@ -19443,6 +19507,11 @@ function App() {
                                     activeProjectReadinessState?.readinessLevel,
                                   ) || 'Sin estado',
                                 detail: resultMaterializationReadinessLabel,
+                              },
+                              {
+                                label: 'MEMORIA / Context Hub',
+                                value: resultContextHubLabel,
+                                detail: resultContextHubDetail,
                               },
                             ]}
                           />
@@ -19585,6 +19654,11 @@ function App() {
                                   latestMaterializationPlanSource ||
                                   latestMaterializationStrategy ||
                                   'Sin fuente reportada',
+                              },
+                              {
+                                label: 'MEMORIA / Context Hub',
+                                value: resultContextHubLabel,
+                                detail: resultContextHubDetail,
                               },
                             ]}
                           />

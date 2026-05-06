@@ -17,6 +17,16 @@ const {
 } = require(
   path.join(repoRoot, 'electron', 'local-deterministic-executor.cjs'),
 )
+const {
+  summarizeContextHubPackForLog,
+  buildExecutionFinishedEventPayload,
+  buildExecutionFailedEventPayload,
+} = require(path.join(repoRoot, 'electron', 'context-hub-events.cjs'))
+const {
+  FULLSTACK_LOCAL_BASE_PHASES,
+  getFullstackLocalBasePhaseDefinition,
+  buildFullstackLocalManifestPhaseBlueprints,
+} = require(path.join(repoRoot, 'electron', 'fullstack-phase-contracts.cjs'))
 const requiredPlannerFunctions = [
   'buildDomainUnderstanding',
   'buildProductArchitecturePlan',
@@ -872,6 +882,9 @@ module.exports = {
     fs,
     path,
     LOCAL_MATERIALIZATION_PLAN_VERSION,
+    FULLSTACK_LOCAL_BASE_PHASES,
+    getFullstackLocalBasePhaseDefinition,
+    buildFullstackLocalManifestPhaseBlueprints,
     setTimeout,
     clearTimeout,
     setInterval,
@@ -1367,8 +1380,17 @@ function summarizeLocalProjectManifest(localProjectManifest) {
     phases: Array.isArray(localProjectManifest?.phases)
       ? localProjectManifest.phases.map((entry) => ({
           id: entry?.id || '',
+          title: entry?.title || '',
+          description: entry?.description || '',
+          objective: entry?.objective || '',
+          summary: entry?.summary || '',
           status: entry?.status || '',
           createdAt: entry?.createdAt || '',
+          safeToMaterialize: entry?.safeToMaterialize === true,
+          approvalRequired: entry?.approvalRequired === true,
+          targetStrategy: entry?.targetStrategy || '',
+          allowedTargetPaths: toStringArray(entry?.allowedTargetPaths, 24),
+          nextRecommendedPhase: entry?.nextRecommendedPhase || '',
           files: toStringArray(entry?.files, 24),
         }))
       : [],
@@ -1382,6 +1404,189 @@ function summarizeLocalProjectManifest(localProjectManifest) {
           files: toStringArray(entry?.files, 24),
         }))
       : [],
+  }
+}
+
+async function runFullstackPhaseContractsHelperValidation() {
+  const failures = []
+  const rootFolder = 'C:/tmp/fullstack-demo'
+  const phaseBlueprints = buildFullstackLocalManifestPhaseBlueprints(rootFolder)
+  const scaffoldBlueprint = phaseBlueprints.find(
+    (entry) => entry?.id === 'fullstack-local-scaffold',
+  )
+  const frontendPhase = phaseBlueprints.find(
+    (entry) => entry?.id === 'frontend-mock-flow',
+  )
+  const validationPhase = phaseBlueprints.find(
+    (entry) => entry?.id === 'local-validation',
+  )
+
+  if (FULLSTACK_LOCAL_BASE_PHASES.length < 5) {
+    failures.push('FULLSTACK_LOCAL_BASE_PHASES deberia incluir las fases base del flujo local seguro.')
+  }
+
+  if (!scaffoldBlueprint) {
+    failures.push('El helper de fases deberia construir fullstack-local-scaffold.')
+  } else {
+    if (scaffoldBlueprint.nextRecommendedPhase !== 'frontend-mock-flow') {
+      failures.push('fullstack-local-scaffold deberia recomendar frontend-mock-flow.')
+    }
+    if (!toStringArray(scaffoldBlueprint.allowedTargetPaths, 20).some((entry) => entry.endsWith('/frontend/index.html'))) {
+      failures.push('fullstack-local-scaffold deberia incluir frontend/index.html en allowedTargetPaths.')
+    }
+  }
+
+  if (!frontendPhase) {
+    failures.push('El helper de fases deberia construir frontend-mock-flow.')
+  } else {
+    if (frontendPhase.nextRecommendedPhase !== 'backend-contracts') {
+      failures.push('frontend-mock-flow deberia recomendar backend-contracts.')
+    }
+    if (
+      !normalizeText(frontendPhase.summary).includes('sin') ||
+      !normalizeText(frontendPhase.summary).includes('runtime real')
+    ) {
+      failures.push('frontend-mock-flow deberia aclarar que sigue sin runtime real dentro del summary.')
+    }
+    if (!toStringArray(frontendPhase.allowedTargetPaths, 20).some((entry) => entry.endsWith('/frontend/src/mock-data.js'))) {
+      failures.push('frontend-mock-flow deberia incluir mock-data.js en allowedTargetPaths.')
+    }
+  }
+
+  if (!validationPhase) {
+    failures.push('El helper de fases deberia construir local-validation.')
+  } else {
+    if (validationPhase.nextRecommendedPhase !== 'review-and-expand') {
+      failures.push('local-validation deberia recomendar review-and-expand.')
+    }
+    if (!toStringArray(validationPhase.allowedTargetPaths, 20).some((entry) => entry.endsWith('/docs/validation-report.md'))) {
+      failures.push('local-validation deberia incluir docs/validation-report.md en allowedTargetPaths.')
+    }
+  }
+
+  return {
+    testCase: {
+      id: 'fullstack-phase-contracts-helper',
+      label: 'Helper de fases fullstack local',
+      goal: 'Validar la metadata pura de continuidad fullstack local.',
+    },
+    ok: failures.length === 0,
+    failures,
+    strategy: 'helper',
+    executionMode: 'local-test',
+    nextExpectedAction: 'phase-blueprints-ready',
+  }
+}
+
+async function runContextHubEventHelpersValidation() {
+  const failures = []
+  const availableContextHubStatus = summarizeContextHubPackForLog({
+    available: true,
+    endpoint: '/v1/packs/suggested',
+    pack: {
+      id: 'pack-veterinaria',
+      slug: 'veterinaria-demo',
+      title: 'Veterinaria local segura',
+      metadata: {
+        itemsCount: 4,
+        estimatedTokens: 320,
+      },
+    },
+  })
+  const unavailableContextHubStatus = summarizeContextHubPackForLog({
+    available: false,
+    endpoint: '/v1/packs/suggested',
+    reason: 'offline',
+  })
+
+  const finishedPayload = buildExecutionFinishedEventPayload({
+    finalResponse: {
+      ok: true,
+      requestId: 'smoke-finished',
+      instruction: 'Materializar scaffold fullstack local.',
+      materializationLayer: 'local-deterministic',
+      details: {
+        decisionKey: 'materialize-fullstack-local-plan',
+        strategy: 'materialize-fullstack-local-plan',
+        executionMode: 'executor',
+        createdPaths: [
+          'C:/tmp/fullstack-demo/frontend/index.html',
+          'item.started',
+        ],
+        touchedPaths: ['C:/tmp/fullstack-demo/jefe-project.json'],
+        validationResults: [{ ok: true }, { ok: true }],
+      },
+    },
+    requestId: 'smoke-finished',
+    instruction: 'Materializar scaffold fullstack local.',
+    workspacePath: path.join(repoRoot, 'tmp-smoke-workspace'),
+    decisionKey: 'materialize-fullstack-local-plan',
+    contextHubStatus: availableContextHubStatus,
+  })
+  const failedPayload = buildExecutionFailedEventPayload({
+    finalResponse: {
+      ok: false,
+      requestId: 'smoke-failed',
+      error: 'Fallo controlado',
+      failureType: 'scaffold-error',
+      details: {
+        decisionKey: 'materialize-fullstack-local-plan',
+        strategy: 'materialize-fullstack-local-plan',
+        executionMode: 'executor',
+        createdPaths: ['C:/tmp/fullstack-demo/frontend/index.html'],
+        touchedPaths: ['C:/tmp/fullstack-demo/jefe-project.json'],
+        validationResults: [{ ok: true }, { ok: false }],
+        recentFailures: [
+          {
+            timestamp: '2026-05-06T10:00:00.000Z',
+            failureType: 'scaffold-error',
+            currentAction: 'write-file',
+            currentTargetPath: 'frontend/src/mock-data.js',
+            materialState: 'failed',
+          },
+        ],
+      },
+    },
+    requestId: 'smoke-failed',
+    instruction: 'Materializar scaffold fullstack local.',
+    workspacePath: path.join(repoRoot, 'tmp-smoke-workspace'),
+    decisionKey: 'materialize-fullstack-local-plan',
+    contextHubStatus: unavailableContextHubStatus,
+  })
+
+  if (availableContextHubStatus.available !== true) {
+    failures.push('summarizeContextHubPackForLog deberia marcar available=true para un pack valido.')
+  }
+  if (unavailableContextHubStatus.available !== false || unavailableContextHubStatus.reason !== 'offline') {
+    failures.push('summarizeContextHubPackForLog deberia preservar unavailable + reason cuando Context Hub no esta disponible.')
+  }
+  if (finishedPayload.contextHub?.available !== true) {
+    failures.push('buildExecutionFinishedEventPayload deberia incluir contextHub disponible.')
+  }
+  if (finishedPayload.sourceWorkspaceRelativePath !== 'tmp-smoke-workspace') {
+    failures.push(`buildExecutionFinishedEventPayload deberia incluir sourceWorkspaceRelativePath relativo. Recibido: ${finishedPayload.sourceWorkspaceRelativePath || '(vacio)'}.`)
+  }
+  if ((finishedPayload.files?.createdPaths || []).some((entry) => entry === 'item.started')) {
+    failures.push('buildExecutionFinishedEventPayload deberia limpiar ruido tecnico de createdPaths.')
+  }
+  if (failedPayload.contextHub?.available !== false) {
+    failures.push('buildExecutionFailedEventPayload deberia incluir contextHub unavailable cuando no hay MEMORIA.')
+  }
+  if ((failedPayload.failure?.recentFailures || []).length !== 1) {
+    failures.push('buildExecutionFailedEventPayload deberia resumir recentFailures para el evento de error.')
+  }
+
+  return {
+    testCase: {
+      id: 'context-hub-event-helpers',
+      label: 'Helpers de eventos Context Hub',
+      goal: 'Validar payloads compactos y fallback best-effort para MEMORIA.',
+    },
+    ok: failures.length === 0,
+    failures,
+    strategy: 'helper',
+    executionMode: 'local-test',
+    nextExpectedAction: 'context-hub-event-ready',
   }
 }
 
@@ -3256,6 +3461,31 @@ async function runFullstackLocalMaterializationValidation() {
         }
       },
     )
+    const scaffoldPhase = manifestSummary.phases.find(
+      (entry) => entry.id === 'fullstack-local-scaffold',
+    )
+    const frontendPhase = manifestSummary.phases.find(
+      (entry) => entry.id === 'frontend-mock-flow',
+    )
+    if (!scaffoldPhase?.summary || !scaffoldPhase.summary.toLocaleLowerCase().includes('scaffold')) {
+      failures.push('La fase fullstack-local-scaffold deberia conservar un summary entendible dentro del manifest.')
+    }
+    if (scaffoldPhase?.nextRecommendedPhase !== 'frontend-mock-flow') {
+      failures.push('La fase fullstack-local-scaffold deberia apuntar a frontend-mock-flow como siguiente fase.')
+    }
+    if (!frontendPhase?.safeToMaterialize) {
+      failures.push('frontend-mock-flow deberia figurar safeToMaterialize=true dentro del manifest.')
+    }
+    if (frontendPhase?.targetStrategy !== 'prepare-project-phase-plan') {
+      failures.push('frontend-mock-flow deberia declarar prepare-project-phase-plan como targetStrategy base.')
+    }
+    if (
+      !frontendPhase?.allowedTargetPaths.some((entry) =>
+        normalizePathForComparison(entry).endsWith('/frontend/src/mock-data.js'),
+      )
+    ) {
+      failures.push('frontend-mock-flow deberia exponer allowedTargetPaths ricos dentro del manifest.')
+    }
   }
 
   const expectedTargets = [
@@ -3416,6 +3646,15 @@ async function runPrepareFrontendMockFlowValidation() {
     const manifestSummary = summarizeLocalProjectManifest(localProjectManifest)
     if (manifestSummary.nextRecommendedPhase !== 'frontend-mock-flow') {
       failures.push('localProjectManifest.nextRecommendedPhase deberia seguir apuntando a frontend-mock-flow.')
+    }
+    const frontendPhase = manifestSummary.phases.find(
+      (entry) => entry.id === 'frontend-mock-flow',
+    )
+    if (!frontendPhase?.objective || !normalizeText(frontendPhase.objective).includes('frontend')) {
+      failures.push('frontend-mock-flow deberia conservar objective dentro del manifest.')
+    }
+    if (frontendPhase?.nextRecommendedPhase !== 'backend-contracts') {
+      failures.push('frontend-mock-flow deberia declarar backend-contracts como siguiente fase.')
     }
   }
 
@@ -6977,6 +7216,7 @@ async function main() {
 
   let scalableResults = []
   let questionPolicyResults = []
+  let internalHardeningResults = []
   if (!caseId) {
     console.log('Scalable Delivery Checks')
     console.log('=======================')
@@ -6993,6 +7233,15 @@ async function main() {
       runQuestionPolicySensitiveRiskValidation(),
     ])
     questionPolicyResults.forEach(printScalableValidationResult)
+    console.log('-----------------')
+
+    console.log('Internal Hardening Checks')
+    console.log('=========================')
+    internalHardeningResults = await Promise.all([
+      runFullstackPhaseContractsHelperValidation(),
+      runContextHubEventHelpersValidation(),
+    ])
+    internalHardeningResults.forEach(printScalableValidationResult)
     console.log('-----------------')
   }
 
@@ -7399,6 +7648,9 @@ async function main() {
 
   const failedScalableResults = scalableResults.filter((result) => !result.ok)
   const failedQuestionPolicyResults = questionPolicyResults.filter((result) => !result.ok)
+  const failedInternalHardeningResults = internalHardeningResults.filter(
+    (result) => !result.ok,
+  )
   const failedProjectPhaseExecutionResults = projectPhaseExecutionResults.filter(
     (result) => !result.ok,
   )
@@ -7410,6 +7662,7 @@ async function main() {
     failedResults.length === 0 &&
     failedScalableResults.length === 0 &&
     failedQuestionPolicyResults.length === 0 &&
+    failedInternalHardeningResults.length === 0 &&
     failedContinuationResults.length === 0 &&
     failedProjectPhaseExecutionResults.length === 0 &&
     !frontendMaterializationFailed &&
@@ -7422,6 +7675,11 @@ async function main() {
     if (questionPolicyResults.length > 0) {
       console.log(
         `OK. ${questionPolicyResults.length}/${questionPolicyResults.length} checks de questionPolicy pasaron.`,
+      )
+    }
+    if (internalHardeningResults.length > 0) {
+      console.log(
+        `OK. ${internalHardeningResults.length}/${internalHardeningResults.length} checks de hardening interno pasaron.`,
       )
     }
     if (frontendMaterializationResult) {
@@ -7459,6 +7717,13 @@ async function main() {
   if (failedQuestionPolicyResults.length > 0) {
     console.log('checks de questionPolicy fallidos:')
     failedQuestionPolicyResults.forEach((result) => {
+      console.log(`- ${result.testCase.id}: ${result.failures[0] || 'sin detalle'}`)
+    })
+  }
+
+  if (failedInternalHardeningResults.length > 0) {
+    console.log('checks de hardening interno fallidos:')
+    failedInternalHardeningResults.forEach((result) => {
       console.log(`- ${result.testCase.id}: ${result.failures[0] || 'sin detalle'}`)
     })
   }
