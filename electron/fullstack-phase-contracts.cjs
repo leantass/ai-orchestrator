@@ -104,12 +104,14 @@ const FULLSTACK_LOCAL_BASE_PHASES = [
       'Validar el proyecto local sin instalar dependencias, levantar servicios ni tocar una DB real.',
     suggestedOrder: 40,
     buildFiles: (rootFolder, manifestPath) => [
+      `${rootFolder}/frontend/src/mock-data.js`,
       `${rootFolder}/docs/validation-report.md`,
       `${rootFolder}/docs/local-runbook.md`,
       manifestPath,
     ],
     validationHints: [
       'Leer docs/validation-report.md para revisar checks, límites y próxima fase.',
+      'Confirmar que frontend/src/mock-data.js refleje demo-ready y review-and-expand como siguiente fase segura.',
       'Confirmar que el proyecto siga sin node_modules, .env, Docker ni runtime real.',
       'Verificar que review-and-expand quede disponible después de esta fase.',
     ],

@@ -25527,51 +25527,135 @@ function buildPhaseAwareFullstackLocalDemoData({
   const phaseDescription =
     phaseDefinition?.description ||
     'Fase segura materializada dentro del modo local revisable.'
+  const normalizedNextRecommendedPhase =
+    typeof nextRecommendedPhase === 'string' && nextRecommendedPhase.trim()
+      ? nextRecommendedPhase.trim()
+      : 'review-and-expand'
+  const normalizedPhaseId = String(phaseId || '').trim().toLocaleLowerCase()
+  const isLocalValidationPhase = normalizedPhaseId === 'local-validation'
+  const completedBasePhaseLabels = [
+    'Fullstack local scaffold',
+    'Frontend mock flow',
+    'Backend contracts',
+    'Database design',
+    'Local validation',
+  ]
+  const completedBasePhaseSummary = completedBasePhaseLabels.join(', ')
   const overview = {
     ...(baseDemoData?.overview || {}),
-    heroKicker: phaseLabel,
-    subtitle: phaseDescription,
-    nextRecommendedPhase: nextRecommendedPhase || 'review-and-expand',
-    mockScopeLabel: `Fase segura ${phaseLabel} materializada sin salir del modo local.`,
-    safeModeCopy:
-      'Sin npm install, sin backend real, sin base de datos real y sin integraciones externas. Todo sigue en modo local revisable.',
+    heroKicker: isLocalValidationPhase ? 'Demo local segura validada' : phaseLabel,
+    subtitle: isLocalValidationPhase
+      ? 'Core flow completo. La base local segura ya fue validada y sigue en modo mock revisable.'
+      : phaseDescription,
+    nextRecommendedPhase: normalizedNextRecommendedPhase,
+    mockScopeLabel: isLocalValidationPhase
+      ? 'Última fase completada: local-validation. Próxima fase segura: review-and-expand.'
+      : `Fase segura ${phaseLabel} materializada sin salir del modo local.`,
+    safeModeCopy: isLocalValidationPhase
+      ? 'Core flow completo sin backend real, DB real, Docker, deploy ni integraciones externas. Todo sigue en modo local revisable.'
+      : 'Sin npm install, sin backend real, sin base de datos real y sin integraciones externas. Todo sigue en modo local revisable.',
   }
+  const phaseMetricEntries = isLocalValidationPhase
+    ? [
+        {
+          id: 'phase-local-validation-demo-ready',
+          label: 'Demo local',
+          value: 'Validada',
+          tone: 'emerald',
+          detail: 'Safe local demo ready',
+        },
+        {
+          id: 'phase-local-validation-core-flow',
+          label: 'Core flow',
+          value: 'Completo',
+          tone: 'sky',
+          detail: 'Última fase: local-validation',
+        },
+        {
+          id: 'phase-local-validation-next-phase',
+          label: 'Siguiente fase',
+          value: normalizedNextRecommendedPhase,
+          tone: 'amber',
+          detail: 'Review and expand disponible',
+        },
+      ]
+    : [
+        {
+          id: `phase-${phaseId}-ready`,
+          label: 'Fase segura',
+          value: phaseLabel,
+          tone: 'sky',
+          detail: `Siguiente paso: ${normalizedNextRecommendedPhase}`,
+        },
+      ]
   const metrics = summarizeUniqueExecutorObjects(
     [
       ...(Array.isArray(baseDemoData?.metrics) ? baseDemoData.metrics : []),
-      {
-        id: `phase-${phaseId}-ready`,
-        label: 'Fase segura',
-        value: phaseLabel,
-        tone: 'sky',
-        detail: `Siguiente paso: ${nextRecommendedPhase || 'review-and-expand'}`,
-      },
+      ...phaseMetricEntries,
     ],
     8,
     (entry) => normalizeModuleExpansionId(entry?.id || entry?.label),
   )
+  const phaseAlertEntries = isLocalValidationPhase
+    ? [
+        {
+          id: 'phase-local-validation-ready-alert',
+          tone: 'emerald',
+          title: 'Demo local segura validada',
+          detail: 'El core flow base ya quedó completo y la siguiente fase segura es review-and-expand.',
+        },
+        {
+          id: 'phase-local-validation-completed-phases',
+          tone: 'sky',
+          title: 'Fases base completadas',
+          detail: completedBasePhaseSummary,
+        },
+      ]
+    : [
+        {
+          id: `phase-${phaseId}-alert`,
+          tone: 'emerald',
+          title: `${phaseLabel} materializada`,
+          detail: `La demo sigue siendo local y mock. El próximo paso seguro es ${normalizedNextRecommendedPhase}.`,
+        },
+      ]
   const alerts = summarizeUniqueExecutorObjects(
     [
-      {
-        id: `phase-${phaseId}-alert`,
-        tone: 'emerald',
-        title: `${phaseLabel} materializada`,
-        detail: `La demo sigue siendo local y mock. El próximo paso seguro es ${nextRecommendedPhase || 'review-and-expand'}.`,
-      },
+      ...phaseAlertEntries,
       ...(Array.isArray(baseDemoData?.alerts) ? baseDemoData.alerts : []),
     ],
     8,
     (entry) => normalizeModuleExpansionId(entry?.id || entry?.title),
   )
+  const phaseActivityEntries = isLocalValidationPhase
+    ? [
+        {
+          id: 'phase-local-validation-activity-ready',
+          time: 'Ahora',
+          title: 'Core flow completo',
+          detail: 'Scaffold, frontend mock flow, backend contracts, database design y local validation ya están cerradas.',
+          tone: 'emerald',
+        },
+        {
+          id: 'phase-local-validation-activity-next',
+          time: 'Siguiente',
+          title: 'Review and expand disponible',
+          detail: 'La próxima fase segura queda preparada para ampliar módulos sin activar runtime real.',
+          tone: 'sky',
+        },
+      ]
+    : [
+        {
+          id: `phase-${phaseId}-activity`,
+          time: 'Ahora',
+          title: `${phaseLabel} lista`,
+          detail: 'JEFE dejó esta fase cerrada sin tocar runtime real, dependencias ni integraciones externas.',
+          tone: 'emerald',
+        },
+      ]
   const activity = summarizeUniqueExecutorObjects(
     [
-      {
-        id: `phase-${phaseId}-activity`,
-        time: 'Ahora',
-        title: `${phaseLabel} lista`,
-        detail: `JEFE dejó esta fase cerrada sin tocar runtime real, dependencias ni integraciones externas.`,
-        tone: 'emerald',
-      },
+      ...phaseActivityEntries,
       ...(Array.isArray(baseDemoData?.activity) ? baseDemoData.activity : []),
     ],
     12,
@@ -25582,9 +25666,13 @@ function buildPhaseAwareFullstackLocalDemoData({
       ...(Array.isArray(baseDemoData?.quickActions) ? baseDemoData.quickActions : []),
       {
         id: `qa-${phaseId}-next-phase`,
-        label: 'Ver siguiente fase segura',
+        label: isLocalValidationPhase
+          ? 'Ver review-and-expand'
+          : 'Ver siguiente fase segura',
         targetView: 'dashboard',
-        feedback: `La siguiente fase sugerida es ${nextRecommendedPhase || 'review-and-expand'}.`,
+        feedback: isLocalValidationPhase
+          ? 'La demo local segura ya está validada y la siguiente fase disponible es review-and-expand.'
+          : `La siguiente fase sugerida es ${normalizedNextRecommendedPhase}.`,
       },
     ],
     10,
@@ -25593,7 +25681,13 @@ function buildPhaseAwareFullstackLocalDemoData({
   const constraints = summarizeUniqueExecutorStrings(
     [
       ...(Array.isArray(baseDemoData?.constraints) ? baseDemoData.constraints : []),
-      `Fase segura materializada: ${phaseLabel}.`,
+      ...(isLocalValidationPhase
+        ? [
+            'Flujo base completo: scaffold, frontend mock flow, backend contracts, database design y local validation.',
+            'Siguiente fase segura disponible: review-and-expand.',
+            'No hay backend real, DB real, Docker, deploy ni integraciones externas.',
+          ]
+        : [`Fase segura materializada: ${phaseLabel}.`]),
     ],
     12,
   )
@@ -25968,6 +26062,7 @@ ${reviewAndExpandOptions.map((entry) => `- ${entry}`).join('\n')}
 `
 
   return {
+    fullstackLocalDemoData: demoArtifacts.fullstackLocalDemoData,
     validationReportContent,
     runbookContent,
     documentationBundle: demoArtifacts.documentationBundle,
@@ -26925,6 +27020,7 @@ function buildProjectPhaseExecutionPlan({
     })
     const blockedByPrerequisite = phasePrerequisiteState.blockers.length > 0
     const targetFiles = [
+      `${projectRoot}/frontend/src/mock-data.js`,
       `${projectRoot}/docs/validation-report.md`,
       `${projectRoot}/docs/local-runbook.md`,
       `${projectRoot}/jefe-project.json`,
@@ -26937,6 +27033,7 @@ function buildProjectPhaseExecutionPlan({
       scope: `${projectRoot}:fullstack-local-project-validation`,
       level: 'full',
       commands: [
+        `node --check ${projectRoot}/frontend/src/mock-data.js`,
         `node --check ${projectRoot}/backend/src/server.js`,
         `node --check ${projectRoot}/backend/src/routes/health.js`,
         `node --check ${projectRoot}/backend/src/modules/appointments.js`,
@@ -26953,6 +27050,11 @@ function buildProjectPhaseExecutionPlan({
         {
           path: `${projectRoot}/frontend/src/main.js`,
           expectation: 'Debe mantenerse el flujo principal del frontend local.',
+        },
+        {
+          path: `${projectRoot}/frontend/src/mock-data.js`,
+          expectation:
+            'Debe reflejar demo-ready, core flow completo y review-and-expand como siguiente fase segura.',
         },
         {
           path: `${projectRoot}/backend/src/server.js`,
@@ -27003,12 +27105,13 @@ function buildProjectPhaseExecutionPlan({
       runtimeChecks: [],
       manualChecks: [
         'Abrir frontend/index.html y revisar el flujo mock local.',
+        'Confirmar que la superficie visible ya no muestre backend-contracts como siguiente fase principal.',
         'Revisar contratos backend y helpers puros del dominio.',
         'Revisar schema SQL y seed SQL como artefactos documentales.',
         'Revisar validation-report.md y confirmar que no afirme ejecuciones no realizadas.',
       ],
       successCriteria: [
-        'Actualizar solo docs/validation-report.md, docs/local-runbook.md y jefe-project.json.',
+        'Actualizar solo frontend/src/mock-data.js, docs/validation-report.md, docs/local-runbook.md y jefe-project.json.',
         'Mantener la validacion en modo local y documental, sin runtime, sin DB real y sin instalar dependencias.',
       ],
     }
@@ -27037,6 +27140,11 @@ function buildProjectPhaseExecutionPlan({
       operationsPreview: [
         {
           type: blockedByPrerequisite ? 'review-file' : 'replace-file',
+          targetPath: `${projectRoot}/frontend/src/mock-data.js`,
+          purpose: 'Sincronizar la superficie visible del frontend con demo-ready y review-and-expand.',
+        },
+        {
+          type: blockedByPrerequisite ? 'review-file' : 'replace-file',
           targetPath: `${projectRoot}/docs/validation-report.md`,
           purpose: 'Consolidar el reporte local de validacion del proyecto sin afirmar ejecuciones no realizadas.',
         },
@@ -27055,7 +27163,7 @@ function buildProjectPhaseExecutionPlan({
       explicitExclusions: [
         'servicios reales',
         'base real',
-        'frontend',
+        'frontend salvo frontend/src/mock-data.js',
         'backend',
         'shared',
         'database',
@@ -27486,6 +27594,7 @@ function buildProjectPhaseMaterializationPlan({
 
   if (normalizedPlan.phaseId === 'local-validation') {
     const projectRoot = normalizedPlan.projectRoot
+    const mockDataPath = `${projectRoot}/frontend/src/mock-data.js`
     const validationReportPath = `${projectRoot}/docs/validation-report.md`
     const runbookPath = `${projectRoot}/docs/local-runbook.md`
     const manifestPath = `${projectRoot}/jefe-project.json`
@@ -27493,6 +27602,16 @@ function buildProjectPhaseMaterializationPlan({
       localProjectManifest,
       projectRoot,
     })
+    const mockDataContent = buildBrowserWindowDataScript(
+      'fullstackPlan',
+      validationArtifacts.fullstackLocalDemoData ||
+        buildPhaseAwareFullstackLocalDemoData({
+          localProjectManifest,
+          projectRoot,
+          phaseId: 'local-validation',
+          nextRecommendedPhase: 'review-and-expand',
+        }),
+    )
     const validationReportContent = validationArtifacts.validationReportContent
     const runbookContent = validationArtifacts.runbookContent
     const updatedLocalProjectManifest = buildUpdatedLocalProjectManifestForPhase({
@@ -27500,6 +27619,7 @@ function buildProjectPhaseMaterializationPlan({
       projectRoot,
       phaseId: normalizedPlan.phaseId,
       touchedFiles: [
+        mockDataPath,
         validationReportPath,
         runbookPath,
         manifestPath,
@@ -27527,12 +27647,12 @@ function buildProjectPhaseMaterializationPlan({
       assumptions: [
         'La validacion sigue siendo local y documental.',
         'No se ejecutan servicios, SQL, seeds ni dependencias.',
-        'Frontend, backend, shared, database y scripts quedan fuera de alcance de escritura.',
+        'Solo se sincroniza frontend/src/mock-data.js para reflejar el estado demo-ready visible; backend, shared, database y scripts quedan fuera de alcance de escritura.',
       ],
       instruction: [
         `Materializar la fase ${normalizedPlan.phaseId} dentro de ${normalizedPlan.projectRoot}.`,
         `Usar solo estos targetPaths: ${normalizedPlan.allowedTargetPaths.join(', ')}`,
-        'No tocar frontend, backend, shared, database, scripts, node_modules, .env, Docker ni deploy.',
+        'Sincronizar frontend/src/mock-data.js con demo-ready y review-and-expand, sin tocar backend, shared, database, scripts, node_modules, .env, Docker ni deploy.',
       ].join('\n'),
       executionScope: normalizeExecutorExecutionScope({
         allowedTargetPaths: normalizedPlan.allowedTargetPaths,
@@ -27547,6 +27667,11 @@ function buildProjectPhaseMaterializationPlan({
         reasoningLayer: 'local-rules',
         materializationLayer: 'local-deterministic',
         operations: [
+          {
+            type: 'replace-file',
+            targetPath: mockDataPath,
+            nextContent: mockDataContent,
+          },
           {
             type: 'replace-file',
             targetPath: validationReportPath,
@@ -27568,11 +27693,32 @@ function buildProjectPhaseMaterializationPlan({
             : []),
         ],
         validations: [
+          { type: 'exists', targetPath: mockDataPath, expectedKind: 'file' },
           { type: 'exists', targetPath: validationReportPath, expectedKind: 'file' },
           { type: 'exists', targetPath: runbookPath, expectedKind: 'file' },
           ...(updatedLocalProjectManifest
             ? [{ type: 'exists', targetPath: manifestPath, expectedKind: 'file' }]
             : []),
+          {
+            type: 'file-contains',
+            targetPath: mockDataPath,
+            expectedText: 'Demo local segura validada',
+          },
+          {
+            type: 'file-contains',
+            targetPath: mockDataPath,
+            expectedText: 'review-and-expand',
+          },
+          {
+            type: 'file-contains',
+            targetPath: mockDataPath,
+            expectedText: 'local-validation',
+          },
+          {
+            type: 'file-contains',
+            targetPath: mockDataPath,
+            expectedText: 'Core flow completo',
+          },
           {
             type: 'file-contains',
             targetPath: validationReportPath,

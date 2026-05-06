@@ -2018,9 +2018,14 @@ async function runPhaseMaterializationFlowCase() {
     path.join(fixture.projectRootPath, 'docs', 'local-runbook.md'),
     'utf8',
   )
+  const validationMockDataSource = fs.readFileSync(
+    path.join(fixture.projectRootPath, 'frontend', 'src', 'mock-data.js'),
+    'utf8',
+  )
   const normalizedValidationSurface = normalizeText(
     `${validationReportSource}\n${validationRunbookSource}`,
   )
+  const normalizedValidationMockData = normalizeText(validationMockDataSource)
   pushFailure(
     failures,
     normalizeIdentifier(getManifestPhase('local-validation')?.status) === 'done',
@@ -2052,6 +2057,20 @@ async function runPhaseMaterializationFlowCase() {
   )
   pushFailure(
     failures,
+    normalizedValidationMockData.includes('demo local segura validada') &&
+      normalizedValidationMockData.includes('review-and-expand') &&
+      normalizedValidationMockData.includes('core flow completo') &&
+      normalizedValidationMockData.includes('local-validation'),
+    'local-validation debe resincronizar frontend/src/mock-data.js con demo-ready y review-and-expand.',
+  )
+  pushFailure(
+    failures,
+    !normalizedValidationMockData.includes('siguiente paso: backend-contracts') &&
+      !normalizedValidationMockData.includes('el proximo paso seguro es backend-contracts'),
+    'local-validation no debe seguir mostrando backend-contracts como siguiente paso principal en el frontend mock.',
+  )
+  pushFailure(
+    failures,
     fixture.manifest?.safeLocalDemoReady === true &&
       fixture.manifest?.demoReady === true &&
       fixture.manifest?.completedCoreFlow === true &&
@@ -2068,6 +2087,26 @@ async function runPhaseMaterializationFlowCase() {
       !fs.existsSync(path.join(fixture.projectRootPath, 'Dockerfile')) &&
       !fs.existsSync(path.join(fixture.projectRootPath, 'docker-compose.yml')),
     'La cadena completa de fases seguras no debe crear node_modules, .env ni Docker.',
+  )
+  const validatedFrontendExecution = executeStaticFrontendBundle(fixture.projectRootPath)
+  const normalizedValidatedFrontendHtml = normalizeText(
+    validatedFrontendExecution.renderedHtml,
+  )
+  pushFailure(
+    failures,
+    normalizedValidatedFrontendHtml.includes('demo local segura validada') &&
+      normalizedValidatedFrontendHtml.includes('review-and-expand') &&
+      normalizedValidatedFrontendHtml.includes('core flow completo') &&
+      normalizedValidatedFrontendHtml.includes('backend contracts') &&
+      normalizedValidatedFrontendHtml.includes('database design') &&
+      normalizedValidatedFrontendHtml.includes('local validation'),
+    'La demo renderizada por file:// debe mostrar demo local segura validada, core flow completo y review-and-expand.',
+  )
+  pushFailure(
+    failures,
+    !normalizedValidatedFrontendHtml.includes('siguiente fase segura</span><strong>backend-contracts') &&
+      !normalizedValidatedFrontendHtml.includes('siguiente paso: backend-contracts'),
+    'La demo renderizada por file:// no debe seguir mostrando backend-contracts como siguiente fase principal despues de local-validation.',
   )
 
   const reviewDecision = await requestReviewExpandDecision(fixture)

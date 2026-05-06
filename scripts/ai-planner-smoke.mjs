@@ -1481,6 +1481,9 @@ async function runFullstackPhaseContractsHelperValidation() {
     if (validationPhase.nextRecommendedPhase !== 'review-and-expand') {
       failures.push('local-validation deberia recomendar review-and-expand.')
     }
+    if (!toStringArray(validationPhase.allowedTargetPaths, 20).some((entry) => entry.endsWith('/frontend/src/mock-data.js'))) {
+      failures.push('local-validation deberia incluir frontend/src/mock-data.js en allowedTargetPaths.')
+    }
     if (!toStringArray(validationPhase.allowedTargetPaths, 20).some((entry) => entry.endsWith('/docs/validation-report.md'))) {
       failures.push('local-validation deberia incluir docs/validation-report.md en allowedTargetPaths.')
     }
@@ -5567,6 +5570,7 @@ async function runMaterializeLocalValidationValidation() {
   }
 
   const expectedTargets = [
+    `${fixture.projectRootRelativePath}/frontend/src/mock-data.js`,
     `${fixture.projectRootRelativePath}/docs/validation-report.md`,
     `${fixture.projectRootRelativePath}/docs/local-runbook.md`,
     `${fixture.projectRootRelativePath}/jefe-project.json`,
@@ -5599,14 +5603,17 @@ async function runMaterializeLocalValidationValidation() {
         failures.push(`materializationPlan.operations no incluye ${targetPath}.`)
       }
     })
-    if (
-      operationTargets.some((targetPath) =>
-        /frontend\/|backend\/|shared\/|database\/|scripts\/|node_modules|\.env$|docker|deploy/i.test(
-          targetPath,
-        ),
+    const invalidOperationTargets = operationTargets.filter((targetPath) => {
+      if (targetPath.endsWith('/frontend/src/mock-data.js')) {
+        return false
+      }
+
+      return /frontend\/|backend\/|shared\/|database\/|scripts\/|node_modules|\.env$|docker|deploy/i.test(
+        targetPath,
       )
-    ) {
-      failures.push('materializationPlan.operations no deberia tocar frontend, backend, shared, database, scripts, node_modules, .env, docker ni deploy.')
+    })
+    if (invalidOperationTargets.length > 0) {
+      failures.push('materializationPlan.operations solo deberia tocar frontend/src/mock-data.js, docs y jefe-project.json durante local-validation.')
     }
   }
 
@@ -5615,14 +5622,17 @@ async function runMaterializeLocalValidationValidation() {
       failures.push(`allowedTargetPaths no incluye ${targetPath}.`)
     }
   })
-  if (
-    allowedTargetPaths.some((targetPath) =>
-      /frontend\/|backend\/|shared\/|database\/|scripts\/|node_modules|\.env$|docker|deploy/i.test(
-        targetPath,
-      ),
+  const invalidAllowedTargetPaths = allowedTargetPaths.filter((targetPath) => {
+    if (targetPath.endsWith('/frontend/src/mock-data.js')) {
+      return false
+    }
+
+    return /frontend\/|backend\/|shared\/|database\/|scripts\/|node_modules|\.env$|docker|deploy/i.test(
+      targetPath,
     )
-  ) {
-    failures.push('allowedTargetPaths no deberia incluir frontend, backend, shared, database, scripts, node_modules, .env, docker ni deploy.')
+  })
+  if (invalidAllowedTargetPaths.length > 0) {
+    failures.push('allowedTargetPaths solo deberia incluir frontend/src/mock-data.js, docs y jefe-project.json durante local-validation.')
   }
 
   if (!localProjectManifest) {
@@ -5684,6 +5694,10 @@ async function runMaterializeLocalValidationValidation() {
       failures.push('No se pudo construir la tarea local deterministica para local-validation.')
     } else {
       const beforeSnapshot = {
+        frontendMockData: fs.readFileSync(
+          path.join(fixture.projectRootPath, 'frontend', 'src', 'mock-data.js'),
+          'utf8',
+        ),
         frontendMain: fs.readFileSync(
           path.join(fixture.projectRootPath, 'frontend', 'src', 'main.js'),
           'utf8',
@@ -5742,6 +5756,10 @@ async function runMaterializeLocalValidationValidation() {
         )
         const validationReportContent = fs.readFileSync(validationReportPath, 'utf8')
         const runbookContent = fs.readFileSync(runbookPath, 'utf8')
+        const mockDataContent = fs.readFileSync(
+          path.join(fixture.projectRootPath, 'frontend', 'src', 'mock-data.js'),
+          'utf8',
+        )
 
         expectedTargets.forEach((targetPath) => {
           if (
@@ -5813,6 +5831,27 @@ async function runMaterializeLocalValidationValidation() {
           !manifestFromDisk.availableActions.includes('review-and-expand')
         ) {
           failures.push('El jefe-project.json resultante deberia ofrecer review-and-expand dentro de availableActions.')
+        }
+        if (mockDataContent === beforeSnapshot.frontendMockData) {
+          failures.push('local-validation deberia resincronizar frontend/src/mock-data.js con el estado demo-ready.')
+        }
+        if (!mockDataContent.includes('Demo local segura validada')) {
+          failures.push('frontend/src/mock-data.js deberia mostrar Demo local segura validada despues de local-validation.')
+        }
+        if (!mockDataContent.includes('review-and-expand')) {
+          failures.push('frontend/src/mock-data.js deberia mencionar review-and-expand como siguiente fase segura.')
+        }
+        if (!mockDataContent.includes('Core flow completo')) {
+          failures.push('frontend/src/mock-data.js deberia marcar el core flow como completo despues de local-validation.')
+        }
+        if (!mockDataContent.includes('local-validation')) {
+          failures.push('frontend/src/mock-data.js deberia dejar visible que la ultima fase completada fue local-validation.')
+        }
+        if (
+          mockDataContent.includes('Siguiente paso: backend-contracts') ||
+          mockDataContent.includes('La demo sigue siendo local y mock. El próximo paso seguro es backend-contracts.')
+        ) {
+          failures.push('frontend/src/mock-data.js no deberia seguir mostrando backend-contracts como siguiente paso principal despues de local-validation.')
         }
 
         const frontendAfter = fs.readFileSync(
