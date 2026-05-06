@@ -5228,16 +5228,17 @@ async function runMaterializeLocalValidationValidation() {
             'El jefe-project.json resultante deberia mantener review-and-expand como available.',
           )
         }
-        if (!validationReportContent.includes('Validacion local del proyecto')) {
+        const normalizedValidationReportContent = normalizeText(validationReportContent)
+        if (!normalizedValidationReportContent.includes(normalizeText('Validación local del proyecto'))) {
           failures.push('validation-report.md deberia incluir el titulo principal de validacion local.')
         }
-        if (!validationReportContent.includes('no se ejecuto base de datos')) {
+        if (!normalizedValidationReportContent.includes(normalizeText('no se ejecutó base de datos'))) {
           failures.push('validation-report.md deberia aclarar que no se ejecuto base de datos.')
         }
-        if (!validationReportContent.includes('no se levanto backend')) {
+        if (!normalizedValidationReportContent.includes(normalizeText('no se levantó backend'))) {
           failures.push('validation-report.md deberia aclarar que no se levanto backend.')
         }
-        if (!validationReportContent.includes('no se instalaron dependencias')) {
+        if (!normalizedValidationReportContent.includes(normalizeText('no se instalaron dependencias'))) {
           failures.push('validation-report.md deberia aclarar que no se instalaron dependencias.')
         }
         if (!validationReportContent.includes('review-and-expand')) {
@@ -6370,6 +6371,10 @@ async function runMaterializeSpecificModuleExpansionValidation({
           path.join(fixture.projectRootPath, 'frontend', 'src', 'components', 'App.js'),
           'utf8',
         )
+        const mockDataContent = fs.readFileSync(
+          path.join(fixture.projectRootPath, 'frontend', 'src', 'mock-data.js'),
+          'utf8',
+        )
         const moduleContent = fs.readFileSync(
           path.join(fixture.projectRootPath, 'backend', 'src', 'modules', `${moduleId}.js`),
           'utf8',
@@ -6378,8 +6383,11 @@ async function runMaterializeSpecificModuleExpansionValidation({
           path.join(fixture.projectRootPath, 'backend', 'src', 'routes', `${moduleId}.js`),
           'utf8',
         )
-        if (!appContent.includes(markers.app)) {
-          failures.push(`App.js deberia mencionar ${markers.app}.`)
+        if (!appContent.includes('data-view-id')) {
+          failures.push('App.js deberia seguir exponiendo la superficie generica data-view-id.')
+        }
+        if (!mockDataContent.includes(markers.app)) {
+          failures.push(`mock-data.js deberia mencionar ${markers.app}.`)
         }
         if (!moduleContent.includes(markers.module)) {
           failures.push(`El modulo ${moduleId}.js deberia incluir ${markers.module}.`)

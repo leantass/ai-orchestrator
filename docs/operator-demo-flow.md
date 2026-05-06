@@ -2,15 +2,15 @@
 
 ## Objetivo
 
-Esta guía sirve para mostrar JEFE como orquestador local seguro: planifica, materializa una demo estática rica, deja continuidad por fases y no ejecuta nada sensible sin aprobación explícita.
+Esta guía sirve para mostrar JEFE como orquestador local seguro: planifica, prepara una materialización revisable, genera una demo estática rica y deja continuidad real por fases sin ejecutar nada sensible.
 
 ## Escenario recomendado
 
-Usá un pedido que obligue a JEFE a demostrar dominio, continuidad y seguridad:
+Usá un pedido que obligue a JEFE a mostrar dominio, continuidad y seguridad:
 
 > Haceme un sistema fullstack local para una veterinaria, con clientes, mascotas, turnos, recordatorios, reportes e inventario básico. Quiero una demo local segura con datos mock, sin instalar dependencias, sin levantar backend real, sin crear base de datos real y sin tocar integraciones externas.
 
-También podés usar otras verticales ya soportadas:
+También podés validar otras verticales ya soportadas:
 
 - reservas y canchas
 - ecommerce y catálogo
@@ -23,22 +23,25 @@ También podés usar otras verticales ya soportadas:
 
 ## Recorrido sugerido
 
-1. Confirmá que JEFE elija un delivery level seguro y devuelva blueprint, roadmap y siguiente paso.
-2. Revisá el plan escalable y usá el CTA principal para preparar la materialización fullstack local.
+1. Confirmá que JEFE elija `fullstack-local` y devuelva un plan revisable.
+2. En Paso 5, usá el CTA principal:
+   - `Preparar materialización fullstack local`
 3. Ejecutá la materialización segura.
-4. En el cierre, verificá:
+4. En Paso 6 y Paso 7, verificá que JEFE muestre:
    - carpeta creada
-   - operaciones aplicadas
-   - validaciones
-   - ruta de `frontend/index.html`
+   - cantidad de operaciones aplicadas
+   - cantidad de validaciones
+   - ruta del proyecto
+   - ruta exacta de `frontend/index.html`
    - próxima fase segura recomendada
+   - readiness actual
 5. Abrí `frontend/index.html` con doble click.
 6. Confirmá que la demo carga por `file://`, sin servidor, sin `npm install` y sin pantalla blanca.
 7. Recorré la demo y validá que muestre una vertical real, no un scaffold genérico vacío.
 
 ## Qué debería mostrar una demo rica
 
-- header o hero operativo
+- hero o encabezado operativo
 - métricas mock visibles
 - navegación local por secciones
 - listas o tablas claras
@@ -46,6 +49,7 @@ También podés usar otras verticales ya soportadas:
 - alertas o pendientes
 - actividad reciente
 - mensaje explícito de modo local seguro
+- mensaje claro de qué no se ejecutó
 - al menos dos o tres interacciones locales en memoria
 
 ## Qué probar dentro de la demo
@@ -67,15 +71,12 @@ Después de materializar `fullstack-local`, JEFE debería recomendar esta cadena
 - `local-validation`
 - `review-and-expand`
 
-El operador no debería ver esas restricciones como bloqueos actuales:
+Cada fase segura debería poder:
 
-- sin instalar dependencias
-- sin backend real
-- sin DB real
-- sin Docker
-- sin deploy
-
-Eso debe quedar como restricción respetada o aprobación futura, no como algo que impide el flujo seguro.
+- prepararse como plan revisable
+- materializarse sin runtime real
+- actualizar `jefe-project.json`
+- dejar el siguiente paso seguro sugerido
 
 ## Cómo leer readiness
 
@@ -109,8 +110,8 @@ En esos casos JEFE tiene que mostrar preview, riesgo, comandos propuestos y vali
 ## Checklist de demo salió bien
 
 - el wizard no se rompió
-- el plan escalable fue entendible
-- el CTA para preparar materialización se vio como acción principal
+- el plan revisable fue entendible
+- el CTA principal fue claro
 - el scaffold se abrió por `file://`
 - la demo mostró contenido específico del dominio
 - la continuidad recomendó la siguiente fase segura

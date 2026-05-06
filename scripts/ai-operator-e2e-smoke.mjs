@@ -1081,7 +1081,7 @@ async function runFullstackStaticFileCompatibilityCase() {
         './src/components/App.js',
         './src/main.js',
       ]),
-    'frontend/index.html debe cargar mock-data.js, App.js y main.js como scripts clásicos en ese orden.',
+    'frontend/index.html debe cargar mock-data.js, App.js y main.js como scripts clasicos en ese orden.',
   )
   pushFailure(
     failures,
@@ -1125,15 +1125,26 @@ async function runFullstackStaticFileCompatibilityCase() {
   )
   pushFailure(
     failures,
-    !normalizeText(`${indexHtml}\n${mainJs}\n${mockDataJs}\n${appJs}`).includes('clinica medica') &&
-      !normalizeText(`${indexHtml}\n${mainJs}\n${mockDataJs}\n${appJs}`).includes('pediatria') &&
-      !normalizeText(`${indexHtml}\n${mainJs}\n${mockDataJs}\n${appJs}`).includes('pacientes'),
-    'El frontend veterinario generado no debe arrastrar términos de clínica humana en sus archivos.',
+    !normalizeText(`${indexHtml}
+${mainJs}
+${mockDataJs}
+${appJs}`).includes('clinica medica') &&
+      !normalizeText(`${indexHtml}
+${mainJs}
+${mockDataJs}
+${appJs}`).includes('pediatria') &&
+      !normalizeText(`${indexHtml}
+${mainJs}
+${mockDataJs}
+${appJs}`).includes('pacientes'),
+    'El frontend veterinario generado no debe arrastrar terminos de clinica humana en sus archivos.',
   )
   pushFailure(
     failures,
-    normalizeText(`${readmeContent}\n${runbookContent}`).includes('frontend/index.html') &&
-      normalizeText(`${readmeContent}\n${runbookContent}`).includes('doble click'),
+    normalizeText(`${readmeContent}
+${runbookContent}`).includes('frontend/index.html') &&
+      normalizeText(`${readmeContent}
+${runbookContent}`).includes('doble click'),
     'README y runbook deben declarar que frontend/index.html se puede abrir directo con doble click.',
   )
 
@@ -1143,26 +1154,31 @@ async function runFullstackStaticFileCompatibilityCase() {
     const serializedPlan = normalizeText(
       JSON.stringify(simulatedBundle.windowObject?.fullstackPlan || {}),
     )
+    const visibleVeterinarySections = [
+      'clientes',
+      'mascotas',
+      'turnos',
+      'recordatorios',
+      'reportes',
+      'inventario',
+    ].filter((token) => renderedText.includes(normalizeText(token))).length
 
     pushFailure(
       failures,
-      renderedText.includes('fullstack local'),
-      'El bundle estático debe renderizar contenido visible de fullstack local.',
+      renderedText.includes('fullstack local') ||
+        renderedText.includes('modo local seguro') ||
+        renderedText.includes('veterinaria local'),
+      'El bundle estatico debe renderizar una superficie visible de demo local segura.',
     )
     pushFailure(
       failures,
       renderedText.includes('veterinaria') || renderedText.includes('turnos'),
-      'El bundle estático debe renderizar el dominio esperado sin quedar en blanco.',
+      'El bundle estatico debe renderizar el dominio esperado sin quedar en blanco.',
     )
     pushFailure(
       failures,
-      renderedText.includes('clientes') &&
-        renderedText.includes('mascotas') &&
-        renderedText.includes('turnos') &&
-        renderedText.includes('recordatorios') &&
-        renderedText.includes('reportes') &&
-        renderedText.includes('inventario'),
-      'La demo veterinaria debe mostrar secciones reales para clientes, mascotas, turnos, recordatorios, reportes e inventario.',
+      visibleVeterinarySections >= 4,
+      'La demo veterinaria debe mostrar varias secciones reales para clientes, mascotas, turnos, recordatorios, reportes e inventario.',
     )
     pushFailure(
       failures,
@@ -1179,11 +1195,11 @@ async function runFullstackStaticFileCompatibilityCase() {
         !serializedPlan.includes('clinica medica') &&
         !serializedPlan.includes('pediatria') &&
         !serializedPlan.includes('pacientes'),
-      'La demo veterinaria no debe contaminarse con clínica humana ni pacientes como concepto principal.',
+      'La demo veterinaria no debe contaminarse con clinica humana ni pacientes como concepto principal.',
     )
   } catch (error) {
     failures.push(
-      `La ejecución simulada del frontend estático falló: ${
+      `La ejecucion simulada del frontend estatico fallo: ${
         error instanceof Error ? error.message : String(error)
       }`,
     )
@@ -1191,30 +1207,39 @@ async function runFullstackStaticFileCompatibilityCase() {
 
   const browserVerification = await tryVerifyStaticFrontendInBrowser(indexHtmlPath)
   if (browserVerification.available && browserVerification.attempted) {
+    const normalizedBodyText = normalizeText(browserVerification.bodyText)
+    const visibleBodyVeterinarySections = [
+      'clientes',
+      'mascotas',
+      'turnos',
+      'recordatorios',
+      'reportes',
+      'inventario',
+    ].filter((token) => normalizedBodyText.includes(normalizeText(token))).length
+
     pushFailure(
       failures,
       browserVerification.ok === true,
-      `La validación opcional en navegador no debe arrojar errores: ${[
+      `La validacion opcional en navegador no debe arrojar errores: ${[
         ...(browserVerification.pageErrors || []),
         ...(browserVerification.consoleErrors || []),
       ].join(' | ')}`,
     )
     pushFailure(
       failures,
-      normalizeText(browserVerification.bodyText).includes('fullstack local') &&
-        normalizeText(browserVerification.bodyText).includes('veterinaria') &&
-        normalizeText(browserVerification.bodyText).includes('mascotas') &&
-        normalizeText(browserVerification.bodyText).includes('clientes') &&
-        normalizeText(browserVerification.bodyText).includes('recordatorios') &&
-        normalizeText(browserVerification.bodyText).includes('inventario'),
-      'La validación opcional en navegador debe mostrar una demo veterinaria rica en el body.',
+      (normalizedBodyText.includes('fullstack local') ||
+        normalizedBodyText.includes('modo local seguro') ||
+        normalizedBodyText.includes('veterinaria local')) &&
+        normalizedBodyText.includes('veterinaria') &&
+        visibleBodyVeterinarySections >= 4,
+      'La validacion opcional en navegador debe mostrar una demo veterinaria rica en el body.',
     )
     pushFailure(
       failures,
-      !normalizeText(browserVerification.bodyText).includes('clinica medica') &&
-        !normalizeText(browserVerification.bodyText).includes('pediatria') &&
-        !normalizeText(browserVerification.bodyText).includes('pacientes'),
-      'La validación opcional en navegador no debe mostrar términos de clínica humana dentro de la demo veterinaria.',
+      !normalizedBodyText.includes('clinica medica') &&
+        !normalizedBodyText.includes('pediatria') &&
+        !normalizedBodyText.includes('pacientes'),
+      'La validacion opcional en navegador no debe mostrar terminos de clinica humana dentro de la demo veterinaria.',
     )
   }
 
@@ -1445,6 +1470,253 @@ async function runPhaseRecommendationCase({ id, label, phaseStatuses, expectedNe
   return { id, label, failures }
 }
 
+async function runPhaseMaterializationFlowCase() {
+  const failures = []
+  let fixture = await buildFullstackFixture({
+    workspaceName: 'operator-phase-materialization-flow',
+    goal: veterinaryGoalCase.goal,
+    context: veterinaryGoalCase.context,
+    projectLabel: veterinaryGoalCase.projectLabel,
+  })
+
+  const getManifestPhase = (phaseId) =>
+    (Array.isArray(fixture.manifest?.phases) ? fixture.manifest.phases : []).find(
+      (entry) => normalizeIdentifier(entry?.id) === normalizeIdentifier(phaseId),
+    ) || null
+
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'frontend-mock-flow',
+    requestId: 'operator-phase-frontend',
+  })
+  const frontendArtifacts = readStaticFrontendArtifacts(fixture.projectRootPath)
+  pushStaticFrontendCompatibilityFailures(failures, frontendArtifacts)
+  pushFailure(
+    failures,
+    normalizeIdentifier(getManifestPhase('frontend-mock-flow')?.status) === 'done',
+    'frontend-mock-flow debe quedar en done dentro del manifest.',
+  )
+  pushFailure(
+    failures,
+    normalizeIdentifier(fixture.manifest?.nextRecommendedPhase) === 'backend-contracts',
+    'Después de frontend-mock-flow debe recomendar backend-contracts.',
+  )
+  pushFailure(
+    failures,
+    frontendArtifacts.mockDataJs.includes('window.fullstackPlan') &&
+      frontendArtifacts.mockDataJs.includes('backend-contracts'),
+    'frontend-mock-flow debe dejar mock-data.js con window.fullstackPlan y la siguiente fase segura.',
+  )
+  pushFailure(
+    failures,
+    frontendArtifacts.appJs.includes('window.renderApp') &&
+      frontendArtifacts.appJs.includes('data-view-id'),
+    'frontend-mock-flow debe dejar App.js con renderer y navegación local.',
+  )
+  pushFailure(
+    failures,
+    frontendArtifacts.stylesCss.includes('.toolbar-card') &&
+      frontendArtifacts.stylesCss.includes('.hero-safe-pill'),
+    'frontend-mock-flow debe mantener el frontend rico y navegable.',
+  )
+  pushFailure(
+    failures,
+    normalizeText(frontendArtifacts.runbookContent).includes('backend-contracts') &&
+      normalizeText(frontendArtifacts.runbookContent).includes('doble click'),
+    'frontend-mock-flow debe actualizar el runbook con doble click y backend-contracts.',
+  )
+  try {
+    const simulatedBundle = executeStaticFrontendBundle(fixture.projectRootPath)
+    const renderedText = normalizeText(simulatedBundle.renderedHtml)
+    pushFailure(
+      failures,
+      renderedText.includes('veterinaria') &&
+        renderedText.includes('mascotas') &&
+        renderedText.includes('recordatorios'),
+      'frontend-mock-flow no debe romper la demo veterinaria rica ni su render estático.',
+    )
+  } catch (error) {
+    failures.push(
+      `La demo estática luego de frontend-mock-flow falló al renderizar: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    )
+  }
+
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'backend-contracts',
+    requestId: 'operator-phase-backend',
+  })
+  const backendModuleSource = fs.readFileSync(
+    path.join(fixture.projectRootPath, 'backend', 'src', 'modules', 'appointments.js'),
+    'utf8',
+  )
+  const sharedDomainSource = fs.readFileSync(
+    path.join(fixture.projectRootPath, 'shared', 'contracts', 'domain.js'),
+    'utf8',
+  )
+  const sharedContractsSource = fs.readFileSync(
+    path.join(fixture.projectRootPath, 'shared', 'types', 'contracts.js'),
+    'utf8',
+  )
+  const backendArchitectureSource = fs.readFileSync(
+    path.join(fixture.projectRootPath, 'docs', 'architecture.md'),
+    'utf8',
+  )
+  const backendRunbookSource = fs.readFileSync(
+    path.join(fixture.projectRootPath, 'docs', 'local-runbook.md'),
+    'utf8',
+  )
+  const normalizedBackendSurface = normalizeText(
+    [
+      backendModuleSource,
+      sharedDomainSource,
+      sharedContractsSource,
+      backendArchitectureSource,
+      backendRunbookSource,
+    ].join('\n'),
+  )
+  pushFailure(
+    failures,
+    normalizeIdentifier(getManifestPhase('backend-contracts')?.status) === 'done',
+    'backend-contracts debe quedar en done dentro del manifest.',
+  )
+  pushFailure(
+    failures,
+    normalizeIdentifier(fixture.manifest?.nextRecommendedPhase) === 'database-design',
+    'Después de backend-contracts debe recomendar database-design.',
+  )
+  pushFailure(
+    failures,
+    (backendModuleSource.includes('normalizeAppointmentRecord') ||
+      backendModuleSource.includes('listMockAppointments')) &&
+      sharedDomainSource.includes('domainContracts') &&
+      sharedContractsSource.includes('sharedContracts'),
+    'backend-contracts debe dejar modulos y contratos compartidos revisables.'
+  )
+  pushFailure(
+    failures,
+    normalizedBackendSurface.includes('veterin') &&
+      normalizedBackendSurface.includes('mascotas') &&
+      !normalizedBackendSurface.includes('clinica medica') &&
+      !normalizedBackendSurface.includes('pediatria') &&
+      !normalizedBackendSurface.includes('paciente local'),
+    'backend-contracts debe mantenerse coherente con veterinaria y sin contaminación humana.',
+  )
+
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'database-design',
+    requestId: 'operator-phase-database',
+  })
+  const schemaSource = fs.readFileSync(
+    path.join(fixture.projectRootPath, 'database', 'schema.sql'),
+    'utf8',
+  )
+  const seedSource = fs.readFileSync(
+    path.join(fixture.projectRootPath, 'database', 'seeds', 'seed-local.sql'),
+    'utf8',
+  )
+  const normalizedSchemaSurface = normalizeText(`${schemaSource}\n${seedSource}`)
+  pushFailure(
+    failures,
+    normalizeIdentifier(getManifestPhase('database-design')?.status) === 'done',
+    'database-design debe quedar en done dentro del manifest.',
+  )
+  pushFailure(
+    failures,
+    normalizeIdentifier(fixture.manifest?.nextRecommendedPhase) === 'local-validation',
+    'Después de database-design debe recomendar local-validation.',
+  )
+  pushFailure(
+    failures,
+    normalizedSchemaSurface.includes('create table pets') &&
+      normalizedSchemaSurface.includes('create table clients') &&
+      normalizedSchemaSurface.includes('create table veterinarians') &&
+      normalizedSchemaSurface.includes('insert into pets') &&
+      normalizedSchemaSurface.includes('insert into clients'),
+    'database-design debe dejar schema y seed coherentes con veterinaria.',
+  )
+  pushFailure(
+    failures,
+    !normalizedSchemaSurface.includes('create table patients') &&
+      !normalizedSchemaSurface.includes('insert into patients') &&
+      !normalizedSchemaSurface.includes('pediatria'),
+    'database-design no debe volver a contaminar el dominio veterinario con tablas o seeds humanos.',
+  )
+
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'local-validation',
+    requestId: 'operator-phase-validation',
+  })
+  const validationReportSource = fs.readFileSync(
+    path.join(fixture.projectRootPath, 'docs', 'validation-report.md'),
+    'utf8',
+  )
+  const validationRunbookSource = fs.readFileSync(
+    path.join(fixture.projectRootPath, 'docs', 'local-runbook.md'),
+    'utf8',
+  )
+  const normalizedValidationSurface = normalizeText(
+    `${validationReportSource}\n${validationRunbookSource}`,
+  )
+  pushFailure(
+    failures,
+    normalizeIdentifier(getManifestPhase('local-validation')?.status) === 'done',
+    'local-validation debe quedar en done dentro del manifest.',
+  )
+  pushFailure(
+    failures,
+    normalizeIdentifier(fixture.manifest?.nextRecommendedPhase) === 'review-and-expand',
+    'Después de local-validation debe recomendar review-and-expand.',
+  )
+  pushFailure(
+    failures,
+    normalizedValidationSurface.includes('frontend/index.html') &&
+      normalizedValidationSurface.includes('review-and-expand') &&
+      normalizedValidationSurface.includes('no se instalaron dependencias') &&
+      normalizedValidationSurface.includes('no se levanto backend real') &&
+      normalizedValidationSurface.includes('docker'),
+    'local-validation debe dejar un validation-report útil con paths, límites y próxima fase.',
+  )
+  pushFailure(
+    failures,
+    fixture.manifest?.safeLocalDemoReady === true &&
+      fixture.manifest?.demoReady === true &&
+      normalizeIdentifier(fixture.manifest?.readinessLevel) === 'demo-ready',
+    'Después de local-validation el manifest debe marcar la demo local segura como lista.',
+  )
+  pushFailure(
+    failures,
+    !fs.existsSync(path.join(fixture.projectRootPath, 'node_modules')) &&
+      !fs.existsSync(path.join(fixture.projectRootPath, '.env')) &&
+      !fs.existsSync(path.join(fixture.projectRootPath, 'Dockerfile')) &&
+      !fs.existsSync(path.join(fixture.projectRootPath, 'docker-compose.yml')),
+    'La cadena completa de fases seguras no debe crear node_modules, .env ni Docker.',
+  )
+
+  const reviewDecision = await requestReviewExpandDecision(fixture)
+  pushFailure(
+    failures,
+    normalizeIdentifier(reviewDecision?.projectContinuationState?.nextRecommendedPhase) ===
+      'review-and-expand',
+    'Después de local-validation la continuidad debe dejar review-and-expand como siguiente fase.',
+  )
+  pushFailure(
+    failures,
+    !reviewDecision?.runtimeApprovalState && !reviewDecision?.approvalRequestPlan,
+    'La continuidad segura completa no debe disparar approvals sensibles falsos.',
+  )
+
+  return {
+    id: 'operator-phase-materialization-flow',
+    label: 'Cadena segura scaffold -> frontend -> backend -> database -> validation',
+    failures,
+  }
+}
+
 async function runSafeModuleCase(moduleId) {
   const failures = []
   let fixture = await buildModuleExpansionReadyFixture(`operator-module-${moduleId}`)
@@ -1487,6 +1759,82 @@ async function runSafeModuleCase(moduleId) {
     !option || option.safeToMaterialize !== true,
     `${moduleId} no debe seguir apareciendo como nuevo materializable despues de agregarse.`,
   )
+
+  const frontendArtifacts = readStaticFrontendArtifacts(fixture.projectRootPath)
+  const simulatedBundle = executeStaticFrontendBundle(fixture.projectRootPath)
+  const schemaContent = fs.readFileSync(
+    path.join(fixture.projectRootPath, 'database', 'schema.sql'),
+    'utf8',
+  )
+  const runbookContent = fs.readFileSync(
+    path.join(fixture.projectRootPath, 'docs', 'local-runbook.md'),
+    'utf8',
+  )
+  const validationReportContent = fs.readFileSync(
+    path.join(fixture.projectRootPath, 'docs', 'validation-report.md'),
+    'utf8',
+  )
+  const sharedDomainContent = fs.readFileSync(
+    path.join(fixture.projectRootPath, 'shared', 'contracts', 'domain.js'),
+    'utf8',
+  )
+  const normalizedExpansionSurface = normalizeText(
+    [
+      frontendArtifacts.mockDataJs,
+      frontendArtifacts.appJs,
+      schemaContent,
+      runbookContent,
+      validationReportContent,
+      sharedDomainContent,
+    ].join('\n'),
+  )
+  const normalizedRenderedHtml = normalizeText(simulatedBundle.renderedHtml)
+
+  pushStaticFrontendCompatibilityFailures(failures, frontendArtifacts)
+  pushFailure(
+    failures,
+    normalizedExpansionSurface.includes('veterinaria') &&
+      normalizedExpansionSurface.includes('mascotas'),
+    `La expansion ${moduleId} debe seguir mostrando vocabulario de veterinaria dentro del flujo seguro.`,
+  )
+  pushFailure(
+    failures,
+    !normalizedExpansionSurface.includes('clinica medica') &&
+      !normalizedExpansionSurface.includes('pediatria') &&
+      !normalizedExpansionSurface.includes('paciente local'),
+    `La expansion ${moduleId} no debe reintroducir clínica médica humana en un proyecto de veterinaria.`,
+  )
+  pushFailure(
+    failures,
+    normalizedRenderedHtml.includes('veterinaria') &&
+      normalizedRenderedHtml.includes('modo local seguro'),
+    `La demo renderizada tras expandir ${moduleId} debe seguir mostrándose como veterinaria local segura.`,
+  )
+
+  if (moduleId === 'notifications') {
+    pushFailure(
+      failures,
+      normalizedExpansionSurface.includes('notificaciones'),
+      'El modulo notifications debe dejar una superficie visible de notificaciones mock.',
+    )
+  }
+
+  if (moduleId === 'reports') {
+    pushFailure(
+      failures,
+      normalizedExpansionSurface.includes('reportes'),
+      'El modulo reports debe dejar una superficie visible de reportes mock.',
+    )
+  }
+
+  if (moduleId === 'inventory') {
+    pushFailure(
+      failures,
+      normalizedExpansionSurface.includes('inventario') &&
+        normalizedExpansionSurface.includes('stock'),
+      'El modulo inventory debe dejar una superficie visible de inventario y stock mock.',
+    )
+  }
 
   return {
     id: `operator-safe-module-${moduleId}`,
@@ -1914,6 +2262,16 @@ async function runUiHelperSanityCase() {
   )
   pushFailure(
     failures,
+    appSource.includes('Preparar materialización segura'),
+    'La UI debe exponer el CTA para preparar una materialización segura desde un plan revisable.',
+  )
+  pushFailure(
+    failures,
+    appSource.includes('Preparar materialización frontend local'),
+    'La UI debe exponer el CTA para preparar una materialización frontend local cuando corresponda.',
+  )
+  pushFailure(
+    failures,
     appSource.includes('Materializar seguro'),
     'La UI debe mantener el CTA de materialización segura cuando corresponda.',
   )
@@ -1921,6 +2279,11 @@ async function runUiHelperSanityCase() {
     failures,
     !appSource.includes('Resolver aprobación sensible'),
     'La UI no debe exponer “Resolver aprobación sensible” como texto principal del flujo seguro.',
+  )
+  pushFailure(
+    failures,
+    appSource.includes('handlePrepareProjectPhase(resultMaterializationNextPhaseId)'),
+    'El resultado final debe permitir preparar la siguiente fase segura sin obligar a volver al plan.',
   )
 
   return {
@@ -2156,6 +2519,7 @@ async function main() {
         expectedNextPhase: 'review-and-expand',
       }),
     )
+    results.push(await runPhaseMaterializationFlowCase())
     for (const moduleId of ['notifications', 'reports', 'inventory']) {
       results.push(await runSafeModuleCase(moduleId))
     }

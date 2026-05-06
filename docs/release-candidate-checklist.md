@@ -25,7 +25,7 @@ Esta guía sirve para validar JEFE como plataforma local de programación automa
    - carpeta creada
    - operaciones aplicadas
    - validaciones
-   - ruta de `frontend/index.html`
+   - ruta exacta de `frontend/index.html`
    - próxima fase segura
    - readiness actual
 4. Confirmá que el proyecto generado incluya:
@@ -65,7 +65,7 @@ Para veterinaria, confirmar específicamente:
 - reportes
 - inventario básico
 - veterinarios o profesionales veterinarios
-- ausencia de “Clínica médica”, “Pediatría” y “pacientes” como concepto principal
+- ausencia de `Clínica médica`, `Pediatría` y `pacientes` como concepto principal
 
 ## Escenario 5: avanzar continuidad por fases
 
@@ -80,6 +80,7 @@ Para veterinaria, confirmar específicamente:
    - `nextRecommendedPhase`
    - `nextRecommendedAction`
    - `readinessLevel`
+4. Confirmar que después de `local-validation` quede disponible `review-and-expand`.
 
 ## Escenario 6: interpretar readiness
 

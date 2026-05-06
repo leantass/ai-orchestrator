@@ -617,8 +617,13 @@ type ProjectPhaseExecutionPlanContract = {
 
 type LocalProjectManifestPhaseContract = {
   id?: string
+  title?: string
   status?: string
   createdAt?: string
+  updatedAt?: string
+  safeToMaterialize?: boolean
+  approvalRequired?: boolean
+  validationHints?: string[]
   files?: string[]
 }
 
@@ -646,6 +651,8 @@ type LocalProjectManifestContract = {
   deliveryLevel?: ScalableDeliveryPlanContract['deliveryLevel'] | string
   createdBy?: string
   materializationLayer?: string
+  projectRoot?: string
+  generatedAt?: string
   phases?: LocalProjectManifestPhaseContract[]
   modules?: LocalProjectManifestModuleContract[]
   forbiddenPaths?: string[]
@@ -3020,11 +3027,30 @@ const normalizeLocalProjectManifestContract = (
                 ...(normalizeOptionalString(entry.id)
                   ? { id: normalizeOptionalString(entry.id) }
                   : {}),
+                ...(normalizeOptionalString(entry.title)
+                  ? { title: normalizeOptionalString(entry.title) }
+                  : {}),
                 ...(normalizeOptionalString(entry.status)
                   ? { status: normalizeOptionalString(entry.status) }
                   : {}),
                 ...(normalizeOptionalString(entry.createdAt)
                   ? { createdAt: normalizeOptionalString(entry.createdAt) }
+                  : {}),
+                ...(normalizeOptionalString(entry.updatedAt)
+                  ? { updatedAt: normalizeOptionalString(entry.updatedAt) }
+                  : {}),
+                ...(typeof entry.safeToMaterialize === 'boolean'
+                  ? { safeToMaterialize: entry.safeToMaterialize }
+                  : {}),
+                ...(typeof entry.approvalRequired === 'boolean'
+                  ? { approvalRequired: entry.approvalRequired }
+                  : {}),
+                ...(normalizeOptionalStringArray(entry.validationHints).length > 0
+                  ? {
+                      validationHints: normalizeOptionalStringArray(
+                        entry.validationHints,
+                      ),
+                    }
                   : {}),
                 ...(normalizeOptionalStringArray(entry.files).length > 0
                   ? { files: normalizeOptionalStringArray(entry.files) }
@@ -3119,6 +3145,12 @@ const normalizeLocalProjectManifestContract = (
       : {}),
     ...(normalizeOptionalString(contract.materializationLayer)
       ? { materializationLayer: normalizeOptionalString(contract.materializationLayer) }
+      : {}),
+    ...(normalizeOptionalString(contract.projectRoot)
+      ? { projectRoot: normalizeOptionalString(contract.projectRoot) }
+      : {}),
+    ...(normalizeOptionalString(contract.generatedAt)
+      ? { generatedAt: normalizeOptionalString(contract.generatedAt) }
       : {}),
     ...(normalizedPhases.length > 0 ? { phases: normalizedPhases } : {}),
     ...(normalizedModules.length > 0 ? { modules: normalizedModules } : {}),
@@ -5834,6 +5866,13 @@ function ProjectContinuityCard({
     manifestPhases.find(
       (phase) => normalizeOptionalString(phase.id) === nextRecommendedPhaseId,
     ) || null
+  const currentPhaseId =
+    normalizeOptionalString(expansionOptions?.currentPhase) ||
+    normalizeOptionalString(implementationRoadmap?.currentPhase) ||
+    normalizeOptionalString(localProjectManifest?.nextRecommendedPhase) ||
+    ''
+  const currentManifestPhase =
+    manifestPhases.find((phase) => normalizeOptionalString(phase.id) === currentPhaseId) || null
   const recommendedOptionId = normalizeModuleUiId(expansionOptions?.recommendedOptionId)
   const options = Array.isArray(expansionOptions?.options) ? expansionOptions?.options || [] : []
   const visibleOptions = compact ? options.slice(0, 4) : options
@@ -5846,13 +5885,13 @@ function ProjectContinuityCard({
     blocked: modulePlanBlockers.length > 0,
   })
   const currentPhaseLabel =
-    normalizeOptionalString(expansionOptions?.currentPhase) ||
-    normalizeOptionalString(implementationRoadmap?.currentPhase) ||
-    normalizeOptionalString(localProjectManifest?.nextRecommendedPhase) ||
+    normalizeOptionalString(currentManifestPhase?.title) ||
+    currentPhaseId ||
     'Sin fase declarada'
   const nextStepTitle =
     normalizeOptionalString(nextActionPlan?.userFacingLabel) ||
     normalizeOptionalString(moduleExpansionPlan?.moduleName) ||
+    normalizeOptionalString(nextManifestPhase?.title) ||
     normalizeOptionalString(nextManifestPhase?.id) ||
     normalizeOptionalString(phaseExpansionPlan?.phaseId) ||
     normalizeOptionalString(implementationRoadmap?.nextRecommendedPhase) ||
@@ -6405,11 +6444,17 @@ function ProjectContinuityCenterCard({
     manifestPhases.find(
       (phase) => normalizeOptionalString(phase.id) === nextRecommendedPhaseId,
     ) || null
-  const currentPhaseLabel =
+  const currentPhaseId =
     normalizeOptionalString(expansionOptions?.currentPhase) ||
     normalizeOptionalString(implementationRoadmap?.currentPhase) ||
     nextRecommendedPhaseId ||
     normalizeOptionalString(localProjectManifest?.lastCompletedPhase) ||
+    ''
+  const currentManifestPhase =
+    manifestPhases.find((phase) => normalizeOptionalString(phase.id) === currentPhaseId) || null
+  const currentPhaseLabel =
+    normalizeOptionalString(currentManifestPhase?.title) ||
+    currentPhaseId ||
     'Sin fase declarada'
   const continuationSummary =
     normalizeOptionalString(projectContinuationState?.summary) ||
@@ -6464,6 +6509,13 @@ function ProjectContinuityCenterCard({
       ? {
           id: `prepared-phase-${normalizeOptionalString(projectPhaseExecutionPlan.phaseId)}`,
           title:
+            normalizeOptionalString(
+              manifestPhases.find(
+                (phase) =>
+                  normalizeOptionalString(phase.id) ===
+                  normalizeOptionalString(projectPhaseExecutionPlan.phaseId),
+              )?.title,
+            ) ||
             normalizeOptionalString(projectPhaseExecutionPlan.phaseId) ||
             'Fase preparada',
           description:
@@ -6495,6 +6547,7 @@ function ProjectContinuityCenterCard({
   const nextStepTitle =
     normalizeOptionalString(nextRecommendedAction?.title) ||
     normalizeOptionalString(nextActionPlan?.userFacingLabel) ||
+    normalizeOptionalString(nextManifestPhase?.title) ||
     normalizeOptionalString(nextManifestPhase?.id) ||
     normalizeOptionalString(phaseExpansionPlan?.phaseId) ||
     normalizeOptionalString(implementationRoadmap?.nextRecommendedPhase) ||
@@ -9393,7 +9446,7 @@ const getBrainProblemNatureLabel = (value: unknown) => {
   }
 
   if (normalizedValue === 'review-scalable-delivery') {
-    return 'Revisar plan escalable'
+    return 'Plan escalable revisable'
   }
 
   if (normalizedValue === 'review-product-architecture') {
@@ -11160,7 +11213,7 @@ function App() {
   const plannerReviewActionLabel = plannerIsSafeFirstDeliveryReview
     ? 'Revisar primera entrega segura'
     : plannerIsScalableDeliveryReview
-      ? 'Revisar plan escalable'
+      ? 'Plan escalable revisable'
       : 'Revisar arquitectura'
   const plannerBadge = isPlanning ? 'Planificación en curso' : plannerReviewStatusLabel
 
@@ -12158,10 +12211,21 @@ function App() {
     normalizeOptionalString(activeProjectReadinessState?.operatorSummary) ||
     normalizeOptionalString(activeProjectReadinessState?.lastValidationSummary) ||
     'Todavía no hay un resumen de readiness para esta salida.'
-  const resultMaterializationNextPhaseLabel =
+  const resultMaterializationNextPhaseId =
     normalizeOptionalString(activeProjectContinuationState?.nextRecommendedPhase) ||
     normalizeOptionalString(activeLocalProjectManifest?.nextRecommendedPhase) ||
     normalizeOptionalString(activeImplementationRoadmap?.nextRecommendedPhase) ||
+    ''
+  const resultMaterializationNextPhaseEntry =
+    (Array.isArray(activeLocalProjectManifest?.phases)
+      ? activeLocalProjectManifest.phases
+      : []
+    ).find(
+      (phase) => normalizeOptionalString(phase?.id) === resultMaterializationNextPhaseId,
+    ) || null
+  const resultMaterializationNextPhaseLabel =
+    normalizeOptionalString(resultMaterializationNextPhaseEntry?.title) ||
+    resultMaterializationNextPhaseId ||
     'Sin fase segura declarada'
   const resultMaterializationSummaryTitle = resultIsSafeFirstDeliveryMaterialization
     ? 'Primera entrega segura generada'
@@ -15813,6 +15877,26 @@ function App() {
     })
   }
 
+  const plannerReviewPrimaryActionLabel = plannerIsSafeFirstDeliveryReview
+    ? 'Preparar materialización segura'
+    : plannerIsScalableDeliveryReview
+      ? plannerScalableDeliveryLevel === 'fullstack-local'
+        ? 'Preparar materialización fullstack local'
+        : plannerScalableDeliveryLevel === 'frontend-project'
+          ? 'Preparar materialización frontend local'
+          : ''
+      : ''
+  const handlePlannerReviewPrimaryAction =
+    plannerIsSafeFirstDeliveryReview
+      ? handlePrepareSafeMaterializationPlan
+      : plannerIsScalableDeliveryReview
+        ? plannerScalableDeliveryLevel === 'fullstack-local'
+          ? handlePrepareFullstackLocalMaterializationPlan
+          : plannerScalableDeliveryLevel === 'frontend-project'
+            ? handlePrepareFrontendProjectMaterializationPlan
+            : null
+        : null
+
   const handleExecuteCurrentInstruction = async (
     overrideInstruction?: string,
     overridePlannerExecutionMetadata?: PlannerExecutionMetadata,
@@ -19157,6 +19241,20 @@ function App() {
                                 </div>
                               ))}
                             </div>
+                            {resultMaterializationNextPhaseId ? (
+                              <div className="pt-2">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handlePrepareProjectPhase(resultMaterializationNextPhaseId)
+                                  }
+                                  disabled={isPlanning || isExecutingTask}
+                                  className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                                >
+                                  {`Preparar ${resultMaterializationNextPhaseLabel}`}
+                                </button>
+                              </div>
+                            ) : null}
                           </div>
                         </ResultSectionCard>
                       ) : null}
@@ -19644,9 +19742,21 @@ function App() {
                         {isPlanning ? 'Generando...' : 'Regenerar plan'}
                       </button>
                       {plannerIsReviewOnly ? (
-                        <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200">
-                          {plannerReviewActionLabel}
-                        </div>
+                        handlePlannerReviewPrimaryAction &&
+                        plannerReviewPrimaryActionLabel ? (
+                          <button
+                            type="button"
+                            onClick={handlePlannerReviewPrimaryAction}
+                            disabled={isPlanning}
+                            className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                          >
+                            {plannerReviewPrimaryActionLabel}
+                          </button>
+                        ) : (
+                          <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200">
+                            {plannerReviewActionLabel}
+                          </div>
+                        )
                       ) : (
                         <button
                           type="button"
@@ -19911,9 +20021,21 @@ function App() {
                         {isRunning ? 'Ejecutando...' : 'Correr ciclo de prueba'}
                       </button>
                       {plannerIsReviewOnly ? (
-                        <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200">
-                          {plannerReviewActionLabel}
-                        </div>
+                        handlePlannerReviewPrimaryAction &&
+                        plannerReviewPrimaryActionLabel ? (
+                          <button
+                            type="button"
+                            onClick={handlePlannerReviewPrimaryAction}
+                            disabled={isPlanning}
+                            className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                          >
+                            {plannerReviewPrimaryActionLabel}
+                          </button>
+                        ) : (
+                          <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200">
+                            {plannerReviewActionLabel}
+                          </div>
+                        )
                       ) : null}
                       <button
                         type="button"
