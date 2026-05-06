@@ -1895,6 +1895,10 @@ async function runPhaseMaterializationFlowCase() {
     phaseId: 'backend-contracts',
     requestId: 'operator-phase-backend',
   })
+  const backendServerSource = fs.readFileSync(
+    path.join(fixture.projectRootPath, 'backend', 'src', 'server.js'),
+    'utf8',
+  )
   const backendModuleSource = fs.readFileSync(
     path.join(fixture.projectRootPath, 'backend', 'src', 'modules', 'appointments.js'),
     'utf8',
@@ -1917,6 +1921,7 @@ async function runPhaseMaterializationFlowCase() {
   )
   const normalizedBackendSurface = normalizeText(
     [
+      backendServerSource,
       backendModuleSource,
       sharedDomainSource,
       sharedContractsSource,
@@ -1936,8 +1941,9 @@ async function runPhaseMaterializationFlowCase() {
   )
   pushFailure(
     failures,
-    (backendModuleSource.includes('normalizeAppointmentRecord') ||
-      backendModuleSource.includes('listMockAppointments')) &&
+    backendServerSource.includes('createServerContract') &&
+      backendModuleSource.includes('transitionAppointmentStatus') &&
+      backendModuleSource.includes('markReminderReviewed') &&
       sharedDomainSource.includes('domainContracts') &&
       sharedContractsSource.includes('sharedContracts'),
     'backend-contracts debe dejar modulos y contratos compartidos revisables.'
@@ -1965,7 +1971,11 @@ async function runPhaseMaterializationFlowCase() {
     path.join(fixture.projectRootPath, 'database', 'seeds', 'seed-local.sql'),
     'utf8',
   )
-  const normalizedSchemaSurface = normalizeText(`${schemaSource}\n${seedSource}`)
+  const seedScriptSource = fs.readFileSync(
+    path.join(fixture.projectRootPath, 'scripts', 'seed-local.js'),
+    'utf8',
+  )
+  const normalizedSchemaSurface = normalizeText(`${schemaSource}\n${seedSource}\n${seedScriptSource}`)
   pushFailure(
     failures,
     normalizeIdentifier(getManifestPhase('database-design')?.status) === 'done',
@@ -1981,8 +1991,10 @@ async function runPhaseMaterializationFlowCase() {
     normalizedSchemaSurface.includes('create table pets') &&
       normalizedSchemaSurface.includes('create table clients') &&
       normalizedSchemaSurface.includes('create table veterinarians') &&
+      normalizedSchemaSurface.includes('create table report_snapshots') &&
       normalizedSchemaSurface.includes('insert into pets') &&
-      normalizedSchemaSurface.includes('insert into clients'),
+      normalizedSchemaSurface.includes('insert into clients') &&
+      normalizedSchemaSurface.includes('seedpreview'),
     'database-design debe dejar schema y seed coherentes con veterinaria.',
   )
   pushFailure(
@@ -2029,6 +2041,10 @@ async function runPhaseMaterializationFlowCase() {
     failures,
     normalizedValidationSurface.includes('frontend/index.html') &&
       normalizedValidationSurface.includes('review-and-expand') &&
+      normalizedValidationSurface.includes('scaffold fullstack local') &&
+      normalizedValidationSurface.includes('backend contracts') &&
+      normalizedValidationSurface.includes('75%') &&
+      normalizedValidationSurface.includes('65%') &&
       normalizedValidationSurface.includes('no se instalaron dependencias') &&
       normalizedValidationSurface.includes('no se levanto backend real') &&
       normalizedValidationSurface.includes('docker'),
@@ -2038,6 +2054,10 @@ async function runPhaseMaterializationFlowCase() {
     failures,
     fixture.manifest?.safeLocalDemoReady === true &&
       fixture.manifest?.demoReady === true &&
+      fixture.manifest?.completedCoreFlow === true &&
+      normalizeIdentifier(fixture.manifest?.lastCompletedPhase) === 'local-validation' &&
+      Array.isArray(fixture.manifest?.availableActions) &&
+      fixture.manifest.availableActions.includes('review-and-expand') &&
       normalizeIdentifier(fixture.manifest?.readinessLevel) === 'demo-ready',
     'Después de local-validation el manifest debe marcar la demo local segura como lista.',
   )

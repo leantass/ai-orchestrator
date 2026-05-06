@@ -4473,6 +4473,7 @@ async function runMaterializeBackendContractsValidation() {
   }
 
   const expectedTargets = [
+    `${fixture.projectRootRelativePath}/backend/src/server.js`,
     `${fixture.projectRootRelativePath}/backend/src/modules/appointments.js`,
     `${fixture.projectRootRelativePath}/backend/src/routes/health.js`,
     `${fixture.projectRootRelativePath}/backend/src/lib/response.js`,
@@ -4650,14 +4651,44 @@ async function runMaterializeBackendContractsValidation() {
           path.join(fixture.projectRootPath, 'database', 'schema.sql'),
           'utf8',
         )
+        const serverModule = require(
+          path.join(fixture.projectRootPath, 'backend', 'src', 'server.js'),
+        )
+        const healthModule = require(
+          path.join(fixture.projectRootPath, 'backend', 'src', 'routes', 'health.js'),
+        )
+        const responseModule = require(
+          path.join(fixture.projectRootPath, 'backend', 'src', 'lib', 'response.js'),
+        )
         if (frontendAfter !== backendBefore.frontendMain) {
           failures.push('backend-contracts no deberia tocar frontend/src/main.js.')
         }
         if (databaseAfter !== backendBefore.databaseSchema) {
           failures.push('backend-contracts no deberia tocar database/schema.sql.')
         }
+        if (
+          typeof serverModule?.createServerContract !== 'function' ||
+          serverModule.createServerContract()?.canListen !== false
+        ) {
+          failures.push('backend/src/server.js deberia exportar un contrato local sin listen() ni puertos.')
+        }
+        if (
+          typeof healthModule?.healthRoute !== 'function' ||
+          healthModule.healthRoute()?.ok !== true
+        ) {
+          failures.push('backend/src/routes/health.js deberia devolver una respuesta mock valida.')
+        }
+        if (
+          typeof responseModule?.ok !== 'function' ||
+          typeof responseModule?.fail !== 'function' ||
+          typeof responseModule?.list !== 'function' ||
+          typeof responseModule?.validation !== 'function'
+        ) {
+          failures.push('backend/src/lib/response.js deberia exponer helpers ok, fail, list y validation.')
+        }
 
         ;[
+          path.join(fixture.projectRootPath, 'backend', 'src', 'server.js'),
           path.join(fixture.projectRootPath, 'backend', 'src', 'modules', 'appointments.js'),
           path.join(fixture.projectRootPath, 'backend', 'src', 'routes', 'health.js'),
           path.join(fixture.projectRootPath, 'backend', 'src', 'lib', 'response.js'),
@@ -4984,6 +5015,7 @@ async function runMaterializeDatabaseDesignValidation() {
     `${fixture.projectRootRelativePath}/database/schema.sql`,
     `${fixture.projectRootRelativePath}/database/seeds/seed-local.sql`,
     `${fixture.projectRootRelativePath}/database/README.md`,
+    `${fixture.projectRootRelativePath}/scripts/seed-local.js`,
     `${fixture.projectRootRelativePath}/docs/architecture.md`,
     `${fixture.projectRootRelativePath}/docs/local-runbook.md`,
     `${fixture.projectRootRelativePath}/jefe-project.json`,
@@ -5018,12 +5050,12 @@ async function runMaterializeDatabaseDesignValidation() {
     })
     if (
       operationTargets.some((targetPath) =>
-        /frontend\/|backend\/|shared\/|scripts\/|node_modules|\.env$|docker|deploy/i.test(
+        /frontend\/|backend\/|shared\/|node_modules|\.env$|docker|deploy/i.test(
           targetPath,
         ),
       )
     ) {
-      failures.push('materializationPlan.operations no deberia tocar frontend, backend, shared, scripts, node_modules, .env, docker ni deploy.')
+      failures.push('materializationPlan.operations no deberia tocar frontend, backend, shared, node_modules, .env, docker ni deploy.')
     }
   }
 
@@ -5034,12 +5066,12 @@ async function runMaterializeDatabaseDesignValidation() {
   })
   if (
     allowedTargetPaths.some((targetPath) =>
-      /frontend\/|backend\/|shared\/|scripts\/|node_modules|\.env$|docker|deploy/i.test(
+      /frontend\/|backend\/|shared\/|node_modules|\.env$|docker|deploy/i.test(
         targetPath,
       ),
     )
   ) {
-    failures.push('allowedTargetPaths no deberia incluir frontend, backend, shared, scripts, node_modules, .env, docker ni deploy.')
+    failures.push('allowedTargetPaths no deberia incluir frontend, backend, shared, node_modules, .env, docker ni deploy.')
   }
 
   if (!localProjectManifest) {
@@ -5184,6 +5216,10 @@ async function runMaterializeDatabaseDesignValidation() {
           path.join(fixture.projectRootPath, 'scripts', 'README.md'),
           'utf8',
         )
+        const seedScriptSource = fs.readFileSync(
+          path.join(fixture.projectRootPath, 'scripts', 'seed-local.js'),
+          'utf8',
+        )
         if (frontendAfter !== beforeSnapshot.frontendMain) {
           failures.push('database-design no deberia tocar frontend/src/main.js.')
         }
@@ -5196,6 +5232,14 @@ async function runMaterializeDatabaseDesignValidation() {
         if (scriptsAfter !== beforeSnapshot.scriptsReadme) {
           failures.push('database-design no deberia tocar scripts/README.md.')
         }
+        if (!seedScriptSource.includes('seedPreview') || !seedScriptSource.includes('printSeedPreview')) {
+          failures.push('scripts/seed-local.js deberia quedar como preview local seguro del seed.')
+        }
+        execFileSync(
+          process.execPath,
+          ['--check', path.join(fixture.projectRootPath, 'scripts', 'seed-local.js')],
+          { stdio: 'pipe' },
+        )
       }
     }
   }
@@ -5740,8 +5784,35 @@ async function runMaterializeLocalValidationValidation() {
         if (!validationReportContent.includes('review-and-expand')) {
           failures.push('validation-report.md deberia mencionar review-and-expand como siguiente paso.')
         }
+        if (!validationReportContent.includes('| Scaffold fullstack local |')) {
+          failures.push('validation-report.md deberia incluir la tabla final de fases y porcentajes.')
+        }
+        if (!validationReportContent.includes('Backend contracts | done | 75%')) {
+          failures.push('validation-report.md deberia reflejar backend-contracts con 75% o mas.')
+        }
+        if (!validationReportContent.includes('Database design | done | 75%')) {
+          failures.push('validation-report.md deberia reflejar database-design con 75% o mas.')
+        }
+        if (!validationReportContent.includes('Local validation | done | 65%')) {
+          failures.push('validation-report.md deberia reflejar local-validation con 65% o mas.')
+        }
+        if (!validationReportContent.includes('Review and expand | available | 50%')) {
+          failures.push('validation-report.md deberia reflejar review-and-expand preparado al 50%.')
+        }
         if (!runbookContent.includes('local-validation')) {
           failures.push('docs/local-runbook.md deberia incluir la fase local-validation.')
+        }
+        if (manifestFromDiskSummary.lastCompletedPhase !== 'local-validation') {
+          failures.push('El jefe-project.json resultante deberia marcar lastCompletedPhase como local-validation.')
+        }
+        if (manifestFromDisk?.safeLocalDemoReady !== true || manifestFromDisk?.completedCoreFlow !== true) {
+          failures.push('El jefe-project.json resultante deberia marcar safeLocalDemoReady y completedCoreFlow en true.')
+        }
+        if (
+          !Array.isArray(manifestFromDisk?.availableActions) ||
+          !manifestFromDisk.availableActions.includes('review-and-expand')
+        ) {
+          failures.push('El jefe-project.json resultante deberia ofrecer review-and-expand dentro de availableActions.')
         }
 
         const frontendAfter = fs.readFileSync(

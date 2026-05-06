@@ -16828,6 +16828,14 @@ function buildFullstackLocalBackendDomainModuleContent(fullstackLocalDemoData) {
     ],
     12,
   ).filter((entry) => normalizeSectorDetectionText(entry) !== 'todos')
+  const reminderStatuses = summarizeUniqueExecutorStrings(
+    (fullstackLocalDemoData?.reminders || []).map((entry) => entry?.status || ''),
+    12,
+  )
+  const inventoryStatuses = summarizeUniqueExecutorStrings(
+    (fullstackLocalDemoData?.inventory || []).map((entry) => entry?.status || ''),
+    12,
+  )
   const domainMockBundle = buildFullstackLocalDatasetCollectionMap(fullstackLocalDemoData)
   const datasetKeys = Object.keys(domainMockBundle)
   const datasetHelpers = datasetKeys
@@ -16853,14 +16861,20 @@ function buildFullstackLocalBackendDomainModuleContent(fullstackLocalDemoData) {
     .join('\n')
 
   return `const appointmentStatuses = ${JSON.stringify(appointmentStatuses, null, 2)}
+const reminderStatuses = ${JSON.stringify(reminderStatuses, null, 2)}
+const inventoryStatuses = ${JSON.stringify(inventoryStatuses, null, 2)}
 const domainMockBundle = ${JSON.stringify(domainMockBundle, null, 2)}
+
+function cloneValue(value) {
+  return JSON.parse(JSON.stringify(value))
+}
 
 function listCollection(datasetKey) {
   const collection = domainMockBundle && Object.prototype.hasOwnProperty.call(domainMockBundle, datasetKey)
     ? domainMockBundle[datasetKey]
     : []
 
-  return Array.isArray(collection) ? collection : []
+  return Array.isArray(collection) ? cloneValue(collection) : []
 }
 
 function listDatasetKeys() {
@@ -16891,19 +16905,242 @@ function listMockReports() {
   return listCollection('reports')
 }
 
+function listMockTeam() {
+  return listCollection('team')
+}
+
+function findById(collection, recordId) {
+  return (Array.isArray(collection) ? collection : []).find(
+    (entry) => String(entry && entry.id ? entry.id : '') === String(recordId || ''),
+  ) || null
+}
+
+function normalizeAppointmentRecord(appointment = {}) {
+  return {
+    id: appointment.id || '',
+    petId: appointment.petId || appointment.pet_id || '',
+    clientId: appointment.clientId || appointment.client_id || '',
+    veterinarianId: appointment.veterinarianId || appointment.veterinarian_id || '',
+    veterinarian: appointment.veterinarian || '',
+    scheduledAt: appointment.scheduledAt || appointment.scheduled_at || '',
+    reason: appointment.reason || '',
+    status: appointment.status || appointment.state || appointment.appointmentStatus || '',
+    room: appointment.room || '',
+    notes: appointment.notes || '',
+  }
+}
+
+function normalizeReminderRecord(reminder = {}) {
+  return {
+    id: reminder.id || '',
+    petId: reminder.petId || reminder.pet_id || '',
+    clientId: reminder.clientId || reminder.client_id || '',
+    type: reminder.type || reminder.reminderType || reminder.reminder_type || '',
+    status: reminder.status || '',
+    dueDate: reminder.dueDate || reminder.due_date || '',
+    channel: reminder.channel || '',
+    notes: reminder.notes || '',
+  }
+}
+
+function findClientById(clientId) {
+  return findById(listMockClients(), clientId)
+}
+
+function findPetById(petId) {
+  return findById(listMockPets(), petId)
+}
+
+function findTeamMemberById(teamMemberId) {
+  return findById(listMockTeam(), teamMemberId)
+}
+
+function listClientPets(clientId) {
+  return listMockPets().filter((pet) =>
+    String(pet && (pet.clientId || pet.client_id || pet.ownerId || '')).trim() ===
+      String(clientId || '').trim(),
+  )
+}
+
+function filterAppointmentsByStatus(status) {
+  const normalizedStatus = String(status || '').trim().toLocaleLowerCase()
+  return listMockAppointments()
+    .map((entry) => normalizeAppointmentRecord(entry))
+    .filter((entry) =>
+      normalizedStatus ? String(entry.status || '').trim().toLocaleLowerCase() === normalizedStatus : true,
+    )
+}
+
+function searchDomainRecords(query) {
+  const normalizedQuery = String(query || '').trim().toLocaleLowerCase()
+  if (!normalizedQuery) {
+    return {
+      clients: listMockClients(),
+      pets: listMockPets(),
+      appointments: listMockAppointments().map((entry) => normalizeAppointmentRecord(entry)),
+      reminders: listMockReminders().map((entry) => normalizeReminderRecord(entry)),
+    }
+  }
+
+  const includesQuery = (candidate) =>
+    String(candidate || '').toLocaleLowerCase().includes(normalizedQuery)
+
+  return {
+    clients: listMockClients().filter((entry) =>
+      includesQuery(entry.fullName || entry.name || entry.contactName || '') ||
+      includesQuery(entry.neighborhood || entry.segment || '') ||
+      includesQuery(entry.notes || ''),
+    ),
+    pets: listMockPets().filter((entry) =>
+      includesQuery(entry.name || '') ||
+      includesQuery(entry.species || '') ||
+      includesQuery(entry.breed || '') ||
+      includesQuery(entry.healthStatus || entry.status || '') ||
+      includesQuery(entry.notes || ''),
+    ),
+    appointments: listMockAppointments()
+      .map((entry) => normalizeAppointmentRecord(entry))
+      .filter((entry) =>
+        includesQuery(entry.reason) ||
+        includesQuery(entry.status) ||
+        includesQuery(entry.veterinarian) ||
+        includesQuery(entry.notes),
+      ),
+    reminders: listMockReminders()
+      .map((entry) => normalizeReminderRecord(entry))
+      .filter((entry) =>
+        includesQuery(entry.type) ||
+        includesQuery(entry.status) ||
+        includesQuery(entry.channel) ||
+        includesQuery(entry.notes),
+      ),
+  }
+}
+
+function buildAppointmentDetail(appointmentId) {
+  const appointment = normalizeAppointmentRecord(findById(listMockAppointments(), appointmentId))
+  if (!appointment.id) {
+    return null
+  }
+
+  const pet = findPetById(appointment.petId)
+  const client =
+    findClientById(appointment.clientId) ||
+    findClientById(pet && (pet.clientId || pet.client_id || pet.ownerId || ''))
+  const veterinarian =
+    findTeamMemberById(appointment.veterinarianId) ||
+    findById(listMockTeam(), appointment.veterinarian)
+
+  return {
+    appointment,
+    pet,
+    client,
+    veterinarian,
+    relatedReminders: listMockReminders()
+      .map((entry) => normalizeReminderRecord(entry))
+      .filter((entry) => String(entry.petId || '').trim() === String(appointment.petId || '').trim()),
+  }
+}
+
+function transitionAppointmentStatus(appointmentId, nextStatus) {
+  const normalizedNextStatus = String(nextStatus || '').trim()
+  const appointment = normalizeAppointmentRecord(findById(listMockAppointments(), appointmentId))
+  if (!appointment.id) {
+    return {
+      ok: false,
+      reason: 'appointment-not-found',
+      allowedStatuses: appointmentStatuses,
+    }
+  }
+  if (!normalizedNextStatus || !appointmentStatuses.includes(normalizedNextStatus)) {
+    return {
+      ok: false,
+      reason: 'invalid-status',
+      allowedStatuses: appointmentStatuses,
+      current: appointment,
+    }
+  }
+
+  return {
+    ok: true,
+    allowedStatuses: appointmentStatuses,
+    previousStatus: appointment.status,
+    current: {
+      ...appointment,
+      status: normalizedNextStatus,
+      notes: appointment.notes
+        ? \`\${appointment.notes} | Cambio mock local a \${normalizedNextStatus}\`
+        : \`Cambio mock local a \${normalizedNextStatus}\`,
+    },
+  }
+}
+
+function listPendingReminders() {
+  return listMockReminders()
+    .map((entry) => normalizeReminderRecord(entry))
+    .filter((entry) => String(entry.status || '').trim().toLocaleLowerCase() !== 'revisado')
+}
+
+function markReminderReviewed(reminderId) {
+  const reminder = normalizeReminderRecord(findById(listMockReminders(), reminderId))
+  if (!reminder.id) {
+    return {
+      ok: false,
+      reason: 'reminder-not-found',
+      allowedStatuses: reminderStatuses,
+    }
+  }
+
+  return {
+    ok: true,
+    allowedStatuses: reminderStatuses,
+    current: {
+      ...reminder,
+      status: 'revisado',
+      notes: reminder.notes
+        ? \`\${reminder.notes} | Revisado localmente\`
+        : 'Revisado localmente',
+    },
+  }
+}
+
+function listLowStockInventory() {
+  return listMockInventory().filter((entry) => {
+    const stock = Number(entry.stock ?? entry.currentStock ?? entry.current_stock ?? 0)
+    const minStock = Number(entry.minStock ?? entry.reorderPoint ?? entry.min_stock ?? 0)
+    return Number.isFinite(stock) && Number.isFinite(minStock) && stock <= minStock
+  })
+}
+
 ${datasetHelpers}
 
 module.exports = {
   appointmentStatuses,
+  reminderStatuses,
+  inventoryStatuses,
   domainMockBundle,
   listCollection,
   listDatasetKeys,
   listMockAppointments,
   listMockClients,
   listMockPets,
+  listMockTeam,
   listMockReminders,
   listMockInventory,
   listMockReports,
+  normalizeAppointmentRecord,
+  normalizeReminderRecord,
+  findClientById,
+  findPetById,
+  findTeamMemberById,
+  listClientPets,
+  filterAppointmentsByStatus,
+  searchDomainRecords,
+  buildAppointmentDetail,
+  transitionAppointmentStatus,
+  listPendingReminders,
+  markReminderReviewed,
+  listLowStockInventory,
 ${datasetHelperExports}
 }
 `
@@ -16924,11 +17161,19 @@ function buildFullstackLocalBackendHealthRouteContent(fullstackLocalDemoData) {
 
 function healthRoute() {
   return ok({
-    service: 'fullstack-local-backend',
+    service: 'fullstack-local-backend-contract',
     mode: 'review-only',
     activeServer: false,
+    canListen: false,
+    localOnly: true,
+    domainLabel: ${JSON.stringify(fullstackLocalDemoData?.overview?.name || 'Proyecto local')},
     archetype: ${JSON.stringify(fullstackLocalDemoData?.overview?.archetype || 'operations')},
     conceptualRoutes: ${JSON.stringify(conceptualRoutes, null, 2)},
+    notes: [
+      'No se levanta servidor real.',
+      'No se abren puertos.',
+      'Solo describe contratos y respuestas mock revisables.',
+    ],
   })
 }
 
@@ -16952,34 +17197,80 @@ const {
   listMockAppointments,
   listMockClients,
   listMockPets,
+  listMockTeam,
   listMockReminders,
   listMockInventory,
   listMockReports,
   listDatasetKeys,
+  listPendingReminders,
+  listLowStockInventory,
+  buildAppointmentDetail,
+  transitionAppointmentStatus,
+  markReminderReviewed,
 } = require('./modules/appointments')
 
-function createServerManifest() {
+function createRouteContracts() {
+  return [
+    { method: 'GET', path: '/health', purpose: 'Chequeo conceptual de salud local.' },
+    { method: 'GET', path: '/appointments', purpose: 'Listar turnos veterinarios mock.' },
+    { method: 'GET', path: '/clients', purpose: 'Listar clientes o tutores mock.' },
+    { method: 'GET', path: '/pets', purpose: 'Listar mascotas mock.' },
+    { method: 'GET', path: '/reminders', purpose: 'Listar recordatorios y revisiones pendientes.' },
+    { method: 'GET', path: '/inventory', purpose: 'Listar inventario mock y stock bajo.' },
+    { method: 'GET', path: '/reports', purpose: 'Listar reportes mock sin exportacion real.' },
+  ]
+}
+
+function createServerContract() {
   return {
     kind: 'fullstack-local',
     archetype: ${JSON.stringify(fullstackLocalDemoData?.overview?.archetype || 'operations')},
     activeServer: false,
-    routes: ['GET /health'],
+    canListen: false,
+    routes: createRouteContracts(),
     counts: {
       appointments: listMockAppointments().length,
       clients: listMockClients().length,
       pets: listMockPets().length,
+      team: listMockTeam().length,
       reminders: listMockReminders().length,
       inventory: listMockInventory().length,
       reports: listMockReports().length,
     },
     collections: ${JSON.stringify(collectionCounts, null, 2)},
     availableDatasets: listDatasetKeys(),
+    reviewFlows: [
+      'listar turnos mock',
+      'buscar clientes y mascotas',
+      'simular cambio de estado de un turno',
+      'marcar recordatorios como revisados',
+      'detectar stock bajo local',
+    ],
+    sampleOperations: {
+      nextAppointmentDetail: buildAppointmentDetail(listMockAppointments()[0] && listMockAppointments()[0].id),
+      pendingReminders: listPendingReminders().length,
+      lowStockItems: listLowStockInventory().length,
+      mockStatusTransition: transitionAppointmentStatus(
+        listMockAppointments()[0] && listMockAppointments()[0].id,
+        ${JSON.stringify(
+          summarizeUniqueExecutorStrings(
+            (fullstackLocalDemoData?.statusOptions?.appointments || []).filter(Boolean),
+            2,
+          )[0] || 'confirmado',
+        )},
+      ),
+      mockReminderReview: markReminderReviewed(
+        listMockReminders()[0] && listMockReminders()[0].id,
+      ),
+    },
     health: healthRoute(),
   }
 }
 
 module.exports = {
-  createServerManifest,
+  createRouteContracts,
+  createServerContract,
+  createServerManifest: createServerContract,
 }
 `
 }
@@ -17035,31 +17326,193 @@ function buildFullstackLocalSharedDomainObject(fullstackLocalDemoData) {
   }
 }
 
+function buildFullstackLocalSharedRouteContracts(fullstackLocalDemoData) {
+  const navItems = Array.isArray(fullstackLocalDemoData?.navItems)
+    ? fullstackLocalDemoData.navItems
+    : []
+
+  return summarizeUniqueExecutorStrings(
+    [
+      'GET /health',
+      ...navItems.map((entry) => `GET /mock/${entry?.id || 'section'}`),
+    ],
+    16,
+  ).map((entry, index) => ({
+    id: `route-${index + 1}`,
+    path: entry,
+    localOnly: true,
+  }))
+}
+
+function buildFullstackLocalSharedStatusContracts(fullstackLocalDemoData) {
+  return {
+    appointments: summarizeUniqueExecutorStrings(
+      [
+        ...(fullstackLocalDemoData?.statusOptions?.appointments || []),
+        ...(Array.isArray(fullstackLocalDemoData?.appointments)
+          ? fullstackLocalDemoData.appointments.map((entry) => entry?.status || '')
+          : []),
+      ],
+      12,
+    ),
+    reminders: summarizeUniqueExecutorStrings(
+      (Array.isArray(fullstackLocalDemoData?.reminders)
+        ? fullstackLocalDemoData.reminders.map((entry) => entry?.status || '')
+        : []
+      ),
+      12,
+    ),
+    inventory: summarizeUniqueExecutorStrings(
+      (Array.isArray(fullstackLocalDemoData?.inventory)
+        ? fullstackLocalDemoData.inventory.map((entry) => entry?.status || '')
+        : []
+      ),
+      12,
+    ),
+  }
+}
+
+function buildFullstackLocalEntityRelationships(fullstackLocalDemoData) {
+  const relationships = [
+    {
+      from: 'clients',
+      to: 'pets',
+      relation: 'one-to-many',
+      detail: 'Un cliente o tutor puede asociarse con varias mascotas.',
+    },
+    {
+      from: 'pets',
+      to: 'appointments',
+      relation: 'one-to-many',
+      detail: 'Cada mascota puede tener varios turnos o controles.',
+    },
+    {
+      from: 'pets',
+      to: 'reminders',
+      relation: 'one-to-many',
+      detail: 'Los recordatorios se relacionan con vacunas, controles o seguimientos.',
+    },
+  ]
+
+  if (
+    normalizeSectorDetectionText(fullstackLocalDemoData?.overview?.archetype || '') ===
+    'veterinary'
+  ) {
+    relationships.push({
+      from: 'team',
+      to: 'appointments',
+      relation: 'one-to-many',
+      detail: 'El equipo veterinario atiende turnos y consultas mock.',
+    })
+  }
+
+  return relationships
+}
+
 function buildFullstackLocalSharedDomainContent(fullstackLocalDemoData) {
+  const routeContracts = buildFullstackLocalSharedRouteContracts(fullstackLocalDemoData)
+  const statusContracts = buildFullstackLocalSharedStatusContracts(fullstackLocalDemoData)
+  const entityRelationships = buildFullstackLocalEntityRelationships(fullstackLocalDemoData)
+
   return `const domainContracts = ${JSON.stringify(
     buildFullstackLocalSharedDomainObject(fullstackLocalDemoData),
     null,
     2,
   )}
+const routeContracts = ${JSON.stringify(routeContracts, null, 2)}
+const statusContracts = ${JSON.stringify(statusContracts, null, 2)}
+const entityRelationships = ${JSON.stringify(entityRelationships, null, 2)}
 
 module.exports = {
   domainContracts,
+  routeContracts,
+  statusContracts,
+  entityRelationships,
 }
 `
 }
 
 function buildFullstackLocalSharedContractsContent(fullstackLocalDemoData) {
-  return `const { domainContracts } = require('../contracts/domain')
+  const archetype = normalizeSectorDetectionText(
+    fullstackLocalDemoData?.overview?.archetype || '',
+  )
+  const veterinaryTypes =
+    archetype === 'veterinary'
+      ? `/**
+ * @typedef {Object} ClientRecord
+ * @property {string} id
+ * @property {string} fullName
+ * @property {string} phone
+ * @property {string} preferredChannel
+ * @property {string} notes
+ */
+/**
+ * @typedef {Object} PetRecord
+ * @property {string} id
+ * @property {string} clientId
+ * @property {string} name
+ * @property {string} species
+ * @property {string} breed
+ * @property {string} healthStatus
+ * @property {string} nextControlAt
+ */
+/**
+ * @typedef {Object} VeterinarianRecord
+ * @property {string} id
+ * @property {string} name
+ * @property {string} role
+ * @property {string} status
+ */
+/**
+ * @typedef {Object} AppointmentRecord
+ * @property {string} id
+ * @property {string} petId
+ * @property {string} veterinarianId
+ * @property {string} scheduledAt
+ * @property {string} status
+ * @property {string} reason
+ */
+/**
+ * @typedef {Object} ReminderRecord
+ * @property {string} id
+ * @property {string} petId
+ * @property {string} type
+ * @property {string} dueDate
+ * @property {string} status
+ */
+/**
+ * @typedef {Object} InventoryItemRecord
+ * @property {string} id
+ * @property {string} name
+ * @property {string} category
+ * @property {number} stock
+ * @property {number} minStock
+ * @property {string} status
+ */
+/**
+ * @typedef {Object} ReportRecord
+ * @property {string} id
+ * @property {string} name
+ * @property {string} metric
+ * @property {string} status
+ */`
+      : ''
+
+  return `${veterinaryTypes ? `${veterinaryTypes}\n` : ''}const { domainContracts, routeContracts, statusContracts, entityRelationships } = require('../contracts/domain')
 
 const sharedContracts = {
   archetype: domainContracts.archetype,
   entities: domainContracts.entities,
   modules: domainContracts.modules,
-  statuses: domainContracts.appointmentStatuses,
+  statuses: statusContracts,
   navItems: domainContracts.navItems,
+  routes: routeContracts,
   constraints: domainContracts.constraints,
   datasets: domainContracts.datasets,
   interactionHighlights: domainContracts.interactionHighlights,
+  entityRelationships,
+  localOnly: true,
+  installRequired: false,
 }
 
 module.exports = {
@@ -17081,7 +17534,8 @@ Esta carpeta queda como diseño revisable para la veterinaria local.
 - No se creó una base de datos real.
 - No se ejecutaron migraciones.
 - No se levantaron servicios locales.
-- \`schema.sql\` y \`seeds/seed-local.sql\` son solo referencias editables para el dominio veterinario.
+- \`schema.sql\`, \`seeds/seed-local.sql\` y \`scripts/seed-local.js\` son solo referencias editables para el dominio veterinario.
+- El seed queda como lectura guiada; no conecta ni inicializa ninguna base.
 `,
       schemaContent: `-- Esquema local revisable para ${appTitle}
 -- No ejecutar automáticamente sin una aprobación posterior.
@@ -17150,6 +17604,16 @@ create table inventory_items (
   status text not null,
   notes text
 );
+
+create table report_snapshots (
+  id text primary key,
+  snapshot_date text not null,
+  report_name text not null,
+  metric_label text not null,
+  metric_value text not null,
+  status text not null,
+  notes text
+);
 `,
       seedContent: `-- Seed local de referencia. No ejecutar automáticamente.
 
@@ -17177,6 +17641,10 @@ insert into reminders (id, pet_id, reminder_type, due_date, status, channel, not
 insert into inventory_items (id, name, category, stock, min_stock, unit, status, notes) values
   ('INV-001', 'Antiparasitario spot-on', 'Medicamentos', 6, 8, 'unidades', 'stock bajo', 'Reponer antes del viernes'),
   ('INV-002', 'Vacuna séxtuple', 'Vacunas', 18, 10, 'dosis', 'normal', 'Cobertura para la próxima semana');
+
+insert into report_snapshots (id, snapshot_date, report_name, metric_label, metric_value, status, notes) values
+  ('REP-001', '2026-05-05', 'Agenda veterinaria diaria', 'Turnos confirmados', '14', 'listo', 'Snapshot local para revisar capacidad del consultorio'),
+  ('REP-002', '2026-05-05', 'Inventario critico', 'Items con stock bajo', '2', 'listo', 'Resumen local para seguimiento sin compras reales');
 `,
     }
   }
@@ -18368,6 +18836,80 @@ rootElement.innerHTML = renderApp(appData)
       ],
     },
   }
+}
+
+function buildFullstackLocalSeedLocalScriptContent({
+  appTitle,
+  fullstackLocalDemoData,
+}) {
+  const overview = fullstackLocalDemoData?.overview || {}
+  const seedPreview = {
+    mode: 'review-only',
+    databaseActive: false,
+    project: appTitle,
+    domain: overview.name || appTitle,
+    nextRecommendedPhase: overview.nextRecommendedPhase || 'local-validation',
+    schemaFile: '../database/schema.sql',
+    seedFile: '../database/seeds/seed-local.sql',
+    collections: {
+      clients: Array.isArray(fullstackLocalDemoData?.clients)
+        ? fullstackLocalDemoData.clients.length
+        : 0,
+      pets: Array.isArray(fullstackLocalDemoData?.pets)
+        ? fullstackLocalDemoData.pets.length
+        : 0,
+      appointments: Array.isArray(fullstackLocalDemoData?.appointments)
+        ? fullstackLocalDemoData.appointments.length
+        : 0,
+      reminders: Array.isArray(fullstackLocalDemoData?.reminders)
+        ? fullstackLocalDemoData.reminders.length
+        : 0,
+      inventory: Array.isArray(fullstackLocalDemoData?.inventory)
+        ? fullstackLocalDemoData.inventory.length
+        : 0,
+      reports: Array.isArray(fullstackLocalDemoData?.reports)
+        ? fullstackLocalDemoData.reports.length
+        : 0,
+    },
+    warnings: [
+      'No ejecuta SQL.',
+      'No crea una base real.',
+      'Solo resume el seed local para revisión humana.',
+    ],
+  }
+
+  return `const seedPreview = ${JSON.stringify(seedPreview, null, 2)}
+
+function printSeedPreview(output = console) {
+  const lines = [
+    '[seed-local] modo: ' + seedPreview.mode,
+    '[seed-local] proyecto: ' + seedPreview.project,
+    '[seed-local] domain: ' + seedPreview.domain,
+    '[seed-local] schema: ' + seedPreview.schemaFile,
+    '[seed-local] seed: ' + seedPreview.seedFile,
+    '[seed-local] proxima fase segura: ' + seedPreview.nextRecommendedPhase,
+    '[seed-local] colecciones mock: ' + JSON.stringify(seedPreview.collections),
+  ]
+
+  for (const line of lines) {
+    output.log(line)
+  }
+
+  return {
+    lines,
+    warnings: seedPreview.warnings.slice(),
+  }
+}
+
+if (require.main === module) {
+  printSeedPreview(console)
+}
+
+module.exports = {
+  seedPreview,
+  printSeedPreview,
+}
+`
 }
 
 function buildFullstackLocalMaterializationPlan({
@@ -25143,6 +25685,13 @@ function buildFullstackLocalValidationArtifacts({
       .filter((entry) => entry.status === 'done')
       .map((entry) => entry.id),
   )
+  const scaffoldMaterialized =
+    String(
+      getLocalProjectManifestPhaseEntry(normalizedManifest, 'fullstack-local-scaffold')
+        ?.status || '',
+    )
+      .trim()
+      .toLocaleLowerCase() === 'done'
   const nextRecommendedPhase = 'review-and-expand'
   const nextBlueprint = getFullstackLocalManifestPhaseBlueprint(
     normalizedProjectRoot,
@@ -25187,6 +25736,90 @@ function buildFullstackLocalValidationArtifacts({
     ],
     12,
   )
+  const getPhaseStatus = (phaseId) =>
+    String(phaseStates.find((entry) => entry.id === phaseId)?.status || '')
+      .trim()
+      .toLocaleLowerCase()
+  const phaseScoreRows = [
+    {
+      label: 'Scaffold fullstack local',
+      phaseId: 'fullstack-local-scaffold',
+      status: scaffoldMaterialized ? 'done' : 'pending',
+      percentage: scaffoldMaterialized ? 100 : 0,
+      evidence: 'Estructura base, manifest y frontend file:// disponibles.',
+    },
+    {
+      label: 'Frontend mock flow',
+      phaseId: 'frontend-mock-flow',
+      status: getPhaseStatus('frontend-mock-flow') || 'pending',
+      percentage: getPhaseStatus('frontend-mock-flow') === 'done' ? 100 : 35,
+      evidence: 'Demo visual mock lista, sin fetch ni runtime real.',
+    },
+    {
+      label: 'Backend contracts',
+      phaseId: 'backend-contracts',
+      status: getPhaseStatus('backend-contracts') || 'pending',
+      percentage: getPhaseStatus('backend-contracts') === 'done' ? 75 : 10,
+      evidence: 'Contratos JS revisables sin listen(), sin puertos ni dependencias.',
+    },
+    {
+      label: 'Database design',
+      phaseId: 'database-design',
+      status: getPhaseStatus('database-design') || 'pending',
+      percentage: getPhaseStatus('database-design') === 'done' ? 75 : 0,
+      evidence: 'Schema, seed y preview local listos solo para revision.',
+    },
+    {
+      label: 'Local validation',
+      phaseId: 'local-validation',
+      status: 'done',
+      percentage: 65,
+      evidence: 'Reporte local, checks sugeridos y limites del mock consolidados.',
+    },
+    {
+      label: 'Review and expand',
+      phaseId: 'review-and-expand',
+      status:
+        getPhaseStatus('review-and-expand') === 'done'
+          ? 'done'
+          : getPhaseStatus('review-and-expand') || 'available',
+      percentage:
+        getPhaseStatus('review-and-expand') === 'done'
+          ? 60
+          : getPhaseStatus('review-and-expand') === 'available'
+            ? 50
+            : 0,
+      evidence: 'Queda preparada la expansion segura siguiente, sin ejecutar runtime real.',
+    },
+  ]
+  const phaseScoreTable = phaseScoreRows
+    .map(
+      (entry) =>
+        `| ${entry.label} | ${entry.status} | ${entry.percentage}% | ${entry.evidence} |`,
+    )
+    .join('\n')
+  const suggestedCommands = summarizeUniqueExecutorStrings(
+    [
+      `node --check ${normalizedProjectRoot}/frontend/src/main.js`,
+      `node --check ${normalizedProjectRoot}/frontend/src/components/App.js`,
+      `node --check ${normalizedProjectRoot}/frontend/src/mock-data.js`,
+      `node --check ${normalizedProjectRoot}/backend/src/server.js`,
+      `node --check ${normalizedProjectRoot}/backend/src/routes/health.js`,
+      `node --check ${normalizedProjectRoot}/backend/src/modules/appointments.js`,
+      `node --check ${normalizedProjectRoot}/backend/src/lib/response.js`,
+      `node --check ${normalizedProjectRoot}/shared/contracts/domain.js`,
+      `node --check ${normalizedProjectRoot}/shared/types/contracts.js`,
+      `node --check ${normalizedProjectRoot}/scripts/seed-local.js`,
+    ],
+    20,
+  )
+  const reviewAndExpandOptions = [
+    'notificaciones mock mas ricas',
+    'reportes ampliados',
+    'inventario con mas movimientos locales',
+    'panel de historial y actividad',
+    'preparacion de runtime local real solo como aprobacion futura',
+  ]
   const validationReportContent = `# Validación local del proyecto
 
 Validation report local y revisable.
@@ -25198,6 +25831,12 @@ Validation report local y revisable.
 - deliveryLevel: \`fullstack-local\`
 - materializationLayer: \`local-deterministic\`
 
+## Scoreboard final
+
+| Fase | Estado final | Porcentaje | Evidencia |
+| --- | --- | --- | --- |
+${phaseScoreTable}
+
 ## Fases relevadas
 
 ${completedPhaseSection}
@@ -25206,15 +25845,17 @@ ${completedPhaseSection}
 
 ${trackedFilesSection || '- Sin archivos declarados en el manifest.'}
 
-## Checks de sintaxis sugeridos
+## Checks realizados por esta fase
 
-- \`node --check backend/src/server.js\`
-- \`node --check backend/src/routes/health.js\`
-- \`node --check backend/src/modules/appointments.js\`
-- \`node --check backend/src/lib/response.js\`
-- \`node --check shared/contracts/domain.js\`
-- \`node --check shared/types/contracts.js\`
-- \`node --check scripts/seed-local.js\`
+- Se consolidó el estado del manifest local.
+- Se verificó la cadena de fases base y la proxima fase segura.
+- Se documentó la compatibilidad \`file://\` del frontend.
+- Se listaron paths prohibidos que deben seguir ausentes.
+- Se consolidaron los limites mock del proyecto.
+
+## Comandos sugeridos o repetibles
+
+${suggestedCommands.map((entry) => `- \`${entry}\``).join('\n')}
 
 ## Compatibilidad file://
 
@@ -25230,6 +25871,27 @@ ${trackedFilesSection || '- Sin archivos declarados en el manifest.'}
 - \`docker-compose.yml\`
 - \`deploy\`
 
+## Archivos y areas validadas
+
+- \`frontend/index.html\`
+- \`frontend/src/main.js\`
+- \`frontend/src/mock-data.js\`
+- \`frontend/src/components/App.js\`
+- \`frontend/src/styles.css\`
+- \`backend/src/server.js\`
+- \`backend/src/routes/health.js\`
+- \`backend/src/modules/appointments.js\`
+- \`backend/src/lib/response.js\`
+- \`shared/contracts/domain.js\`
+- \`shared/types/contracts.js\`
+- \`database/schema.sql\`
+- \`database/seeds/seed-local.sql\`
+- \`database/README.md\`
+- \`scripts/seed-local.js\`
+- \`docs/architecture.md\`
+- \`docs/local-runbook.md\`
+- \`jefe-project.json\`
+
 ## Qué sigue siendo mock
 
 ${mockOnlyAreas.map((entry) => `- ${entry}`).join('\n')}
@@ -25241,24 +25903,30 @@ ${mockOnlyAreas.map((entry) => `- ${entry}`).join('\n')}
 - No se levantó backend real.
 - No se abrió ningún puerto.
 - No se creó una base de datos real.
+- No se ejecutó base de datos real.
+- No se ejecutó una base de datos real.
 - No se ejecutó SQL.
 - No se corrieron seeds.
 - No se usó Docker.
 - No se hizo deploy.
 
-## Resumen rápido
-
-- no se instalaron dependencias
-- no se levantó backend real
-- no se ejecutó base de datos real
-
 ## Aprobaciones futuras
 
 ${futureApprovals.map((entry) => `- ${entry}`).join('\n')}
 
+## Review and expand preparado
+
+${reviewAndExpandOptions.map((entry) => `- ${entry}`).join('\n')}
+
 ## Próxima fase segura
 
 - \`${nextRecommendedPhase}\`${nextBlueprint?.title ? ` (${nextBlueprint.title})` : ''}
+
+## Aclaración final
+
+- Esta demo puede considerarse lista para validacion local segura.
+- No equivale a un runtime real de produccion.
+- No hay backend real, DB real, Docker, deploy, auth real ni integraciones externas.
 `
   const runbookContent = `# Local runbook
 
@@ -25273,6 +25941,15 @@ El proyecto sigue en modo local y revisable. Se materializó la fase \`local-val
 3. Revisá \`backend/\`, \`shared/\` y \`database/\` solo como referencia revisable.
 4. Confirmá que \`jefe-project.json\` registre la fase actual como \`done\` y recomiende \`${nextRecommendedPhase}\`.
 
+## Estado de madurez local
+
+- Scaffold fullstack local: 100%
+- Frontend mock flow: 100%
+- Backend contracts: 70% o mas
+- Database design: 70% o mas
+- Local validation: 65% o mas
+- Review and expand: 50% preparado
+
 ## Qué sigue fuera de alcance
 
 - npm install y dependencias reales
@@ -25284,6 +25961,10 @@ El proyecto sigue en modo local y revisable. Se materializó la fase \`local-val
 ## Próxima fase segura
 
 - \`${nextRecommendedPhase}\`${nextBlueprint?.title ? ` (${nextBlueprint.title})` : ''}
+
+## Siguientes opciones seguras
+
+${reviewAndExpandOptions.map((entry) => `- ${entry}`).join('\n')}
 `
 
   return {
@@ -25346,7 +26027,7 @@ function buildLocalProjectManifest({
     projectContinuationState,
   })
 
-  return (
+  const syncedManifest =
     syncLocalProjectManifestWithReadinessState({
       localProjectManifest:
         syncLocalProjectManifestWithContinuationState({
@@ -25363,7 +26044,19 @@ function buildLocalProjectManifest({
         }) || baseManifest,
       projectReadinessState,
     }) || baseManifest
-  )
+
+  return {
+    ...syncedManifest,
+    availableActions: summarizeUniqueExecutorStrings(
+      [
+        ...(Array.isArray(syncedManifest.availableActions)
+          ? syncedManifest.availableActions
+          : []),
+        'review-and-expand',
+      ],
+      20,
+    ),
+  }
 }
 
 function buildReviewAndExpandExpansionOptions({
@@ -25596,7 +26289,7 @@ function buildUpdatedLocalProjectManifestForModule({
     projectContinuationState,
   })
 
-  return (
+  const syncedManifest =
     syncLocalProjectManifestWithReadinessState({
       localProjectManifest:
         syncLocalProjectManifestWithContinuationState({
@@ -25613,7 +26306,19 @@ function buildUpdatedLocalProjectManifestForModule({
         }) || baseManifest,
       projectReadinessState,
     }) || baseManifest
-  )
+
+  return {
+    ...syncedManifest,
+    availableActions: summarizeUniqueExecutorStrings(
+      [
+        ...(Array.isArray(syncedManifest.availableActions)
+          ? syncedManifest.availableActions
+          : []),
+        'review-and-expand',
+      ],
+      20,
+    ),
+  }
 }
 
 function buildUpdatedLocalProjectManifestForPhase({
@@ -25843,7 +26548,7 @@ function buildUpdatedLocalProjectManifestForPhase({
     projectContinuationState,
   })
 
-  return (
+  const syncedManifest =
     syncLocalProjectManifestWithReadinessState({
       localProjectManifest:
         syncLocalProjectManifestWithContinuationState({
@@ -25860,7 +26565,23 @@ function buildUpdatedLocalProjectManifestForPhase({
         }) || baseManifest,
       projectReadinessState,
     }) || baseManifest
-  )
+
+  return {
+    ...syncedManifest,
+    ...(nextRecommendedPhase
+      ? {
+          availableActions: summarizeUniqueExecutorStrings(
+            [
+              ...(Array.isArray(syncedManifest.availableActions)
+                ? syncedManifest.availableActions
+                : []),
+              nextRecommendedPhase,
+            ],
+            20,
+          ),
+        }
+      : {}),
+  }
 }
 
 function buildProjectPhaseExecutionPlan({
@@ -25985,6 +26706,7 @@ function buildProjectPhaseExecutionPlan({
     })
     const blockedByPrerequisite = phasePrerequisiteState.blockers.length > 0
     const targetFiles = [
+      `${projectRoot}/backend/src/server.js`,
       `${projectRoot}/backend/src/modules/appointments.js`,
       `${projectRoot}/backend/src/routes/health.js`,
       `${projectRoot}/backend/src/lib/response.js`,
@@ -26040,8 +26762,13 @@ function buildProjectPhaseExecutionPlan({
       operationsPreview: [
         {
           type: 'replace-file',
+          targetPath: `${projectRoot}/backend/src/server.js`,
+          purpose: 'Representar el contrato del servidor local sin listen(), puertos ni runtime real.',
+        },
+        {
+          type: 'replace-file',
           targetPath: `${projectRoot}/backend/src/modules/appointments.js`,
-          purpose: 'Mejorar contratos y funciones puras del dominio de turnos.',
+          purpose: 'Modelar turnos, clientes, mascotas, recordatorios y cambios de estado mock con funciones puras.',
         },
         {
           type: 'replace-file',
@@ -26089,6 +26816,7 @@ function buildProjectPhaseExecutionPlan({
       `${projectRoot}/database/schema.sql`,
       `${projectRoot}/database/seeds/seed-local.sql`,
       `${projectRoot}/database/README.md`,
+      `${projectRoot}/scripts/seed-local.js`,
       `${projectRoot}/docs/architecture.md`,
       `${projectRoot}/docs/local-runbook.md`,
       `${projectRoot}/jefe-project.json`,
@@ -26110,7 +26838,7 @@ function buildProjectPhaseExecutionPlan({
         'Confirmar que docs/local-runbook.md y jefe-project.json reflejen local-validation como siguiente fase.',
       ],
       successCriteria: [
-        'Actualizar solo database, docs y jefe-project.json sin tocar frontend, backend, shared ni scripts.',
+        'Actualizar solo database, scripts/seed-local.js, docs y jefe-project.json sin tocar frontend, backend ni shared.',
         'Mantener database como diseño local y documentado.',
       ],
     }
@@ -26154,6 +26882,11 @@ function buildProjectPhaseExecutionPlan({
         },
         {
           type: blockedByPrerequisite ? 'review-file' : 'replace-file',
+          targetPath: `${projectRoot}/scripts/seed-local.js`,
+          purpose: 'Dejar un preview seguro del seed local, sin conexiones ni ejecucion real.',
+        },
+        {
+          type: blockedByPrerequisite ? 'review-file' : 'replace-file',
           targetPath: `${projectRoot}/docs/architecture.md`,
           purpose: 'Alinear arquitectura y entidades con el diseño SQL local.',
         },
@@ -26177,7 +26910,6 @@ function buildProjectPhaseExecutionPlan({
         'frontend',
         'backend',
         'shared',
-        'scripts',
         'node_modules',
         '.env',
       ],
@@ -26849,6 +27581,16 @@ function buildProjectPhaseMaterializationPlan({
           {
             type: 'file-contains',
             targetPath: validationReportPath,
+            expectedText: 'Scaffold fullstack local',
+          },
+          {
+            type: 'file-contains',
+            targetPath: validationReportPath,
+            expectedText: 'Review and expand',
+          },
+          {
+            type: 'file-contains',
+            targetPath: validationReportPath,
             expectedText: 'fullstack-local-scaffold',
           },
           {
@@ -26898,6 +27640,21 @@ function buildProjectPhaseMaterializationPlan({
                   targetPath: manifestPath,
                   expectedText: '"nextRecommendedPhase": "review-and-expand"',
                 },
+                {
+                  type: 'file-contains',
+                  targetPath: manifestPath,
+                  expectedText: '"safeLocalDemoReady": true',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: manifestPath,
+                  expectedText: '"completedCoreFlow": true',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: manifestPath,
+                  expectedText: '"lastCompletedPhase": "local-validation"',
+                },
               ]
             : []),
         ],
@@ -26911,6 +27668,7 @@ function buildProjectPhaseMaterializationPlan({
     const schemaPath = `${projectRoot}/database/schema.sql`
     const seedPath = `${projectRoot}/database/seeds/seed-local.sql`
     const databaseReadmePath = `${projectRoot}/database/README.md`
+    const seedScriptPath = `${projectRoot}/scripts/seed-local.js`
     const architecturePath = `${projectRoot}/docs/architecture.md`
     const runbookPath = `${projectRoot}/docs/local-runbook.md`
     const manifestPath = `${projectRoot}/jefe-project.json`
@@ -26923,6 +27681,10 @@ function buildProjectPhaseMaterializationPlan({
     const schemaContent = phaseArtifacts.databaseArtifacts.schemaContent
     const seedContent = phaseArtifacts.databaseArtifacts.seedContent
     const databaseReadmeContent = phaseArtifacts.databaseArtifacts.readmeContent
+    const seedScriptContent = buildFullstackLocalSeedLocalScriptContent({
+      appTitle: phaseArtifacts.appTitle,
+      fullstackLocalDemoData: phaseArtifacts.fullstackLocalDemoData,
+    })
     const architectureContent = phaseArtifacts.documentationBundle.architectureContent
     const runbookContent = phaseArtifacts.documentationBundle.runbookContent
     const updatedLocalProjectManifest = buildUpdatedLocalProjectManifestForPhase({
@@ -26933,6 +27695,7 @@ function buildProjectPhaseMaterializationPlan({
         schemaPath,
         seedPath,
         databaseReadmePath,
+        seedScriptPath,
         architecturePath,
         runbookPath,
         manifestPath,
@@ -26960,12 +27723,12 @@ function buildProjectPhaseMaterializationPlan({
       assumptions: [
         'La expansión sigue siendo local, revisable y sin DB real.',
         'No se ejecuta SQL ni se instalan dependencias.',
-        'Frontend, backend, shared, scripts y forbidden paths quedan fuera de alcance.',
+        'Frontend, backend, shared y forbidden paths quedan fuera de alcance.',
       ],
       instruction: [
         `Materializar la fase ${normalizedPlan.phaseId} dentro de ${normalizedPlan.projectRoot}.`,
         `Usar solo estos targetPaths: ${normalizedPlan.allowedTargetPaths.join(', ')}`,
-        'No tocar frontend, backend, shared, scripts, node_modules, .env, Docker ni deploy.',
+        'No tocar frontend, backend, shared, node_modules, .env, Docker ni deploy fuera de los targetPaths permitidos.',
       ].join('\n'),
       executionScope: normalizeExecutorExecutionScope({
         allowedTargetPaths: normalizedPlan.allowedTargetPaths,
@@ -26987,6 +27750,11 @@ function buildProjectPhaseMaterializationPlan({
             targetPath: databaseReadmePath,
             nextContent: databaseReadmeContent,
           },
+          {
+            type: 'replace-file',
+            targetPath: seedScriptPath,
+            nextContent: seedScriptContent,
+          },
           { type: 'replace-file', targetPath: architecturePath, nextContent: architectureContent },
           { type: 'replace-file', targetPath: runbookPath, nextContent: runbookContent },
           ...(updatedLocalProjectManifestContent
@@ -27003,6 +27771,7 @@ function buildProjectPhaseMaterializationPlan({
           { type: 'exists', targetPath: schemaPath, expectedKind: 'file' },
           { type: 'exists', targetPath: seedPath, expectedKind: 'file' },
           { type: 'exists', targetPath: databaseReadmePath, expectedKind: 'file' },
+          { type: 'exists', targetPath: seedScriptPath, expectedKind: 'file' },
           { type: 'exists', targetPath: architecturePath, expectedKind: 'file' },
           { type: 'exists', targetPath: runbookPath, expectedKind: 'file' },
           ...(updatedLocalProjectManifest
@@ -27015,6 +27784,16 @@ function buildProjectPhaseMaterializationPlan({
             type: 'file-contains',
             targetPath: databaseReadmePath,
             expectedText: 'No se creó una base de datos real.',
+          },
+          {
+            type: 'file-contains',
+            targetPath: seedScriptPath,
+            expectedText: 'seedPreview',
+          },
+          {
+            type: 'file-contains',
+            targetPath: seedScriptPath,
+            expectedText: 'databaseActive',
           },
           {
             type: 'file-contains',
@@ -27048,6 +27827,11 @@ function buildProjectPhaseMaterializationPlan({
                   targetPath: manifestPath,
                   expectedText: '"nextRecommendedPhase": "local-validation"',
                 },
+                {
+                  type: 'file-contains',
+                  targetPath: manifestPath,
+                  expectedText: '"lastCompletedPhase": "database-design"',
+                },
               ]
             : []),
         ],
@@ -27058,6 +27842,7 @@ function buildProjectPhaseMaterializationPlan({
 
   if (normalizedPlan.phaseId === 'backend-contracts') {
     const projectRoot = normalizedPlan.projectRoot
+    const serverPath = `${projectRoot}/backend/src/server.js`
     const appointmentsPath = `${projectRoot}/backend/src/modules/appointments.js`
     const healthRoutePath = `${projectRoot}/backend/src/routes/health.js`
     const responseLibPath = `${projectRoot}/backend/src/lib/response.js`
@@ -27078,43 +27863,72 @@ function buildProjectPhaseMaterializationPlan({
     const healthRouteContent = buildFullstackLocalBackendHealthRouteContent(
       phaseArtifacts.fullstackLocalDemoData,
     )
-    const responseLibContent = `function okResponse(data = {}, meta = {}) {
+    const serverContent = buildFullstackLocalBackendServerContent(
+      phaseArtifacts.fullstackLocalDemoData,
+    )
+    const responseLibContent = `function createEnvelope({ ok, statusCode, data = null, meta = {}, error = null }) {
   return {
+    ok,
+    statusCode,
+    data,
+    meta,
+    ...(error ? { error } : {}),
+  }
+}
+
+function ok(data = {}, meta = {}) {
+  return createEnvelope({
     ok: true,
     statusCode: 200,
     data,
     meta,
-  }
+  })
 }
 
-function errorResponse(code, message, details = {}) {
-  return {
+function list(items = [], meta = {}) {
+  const normalizedItems = Array.isArray(items) ? items : []
+  return ok(normalizedItems, {
+    count: normalizedItems.length,
+    ...meta,
+  })
+}
+
+function fail(code, message, details = {}, statusCode = 400) {
+  return createEnvelope({
     ok: false,
-    statusCode: 400,
+    statusCode,
     error: {
       code: String(code || 'unknown-error'),
       message: String(message || 'Unknown error'),
       details,
     },
-  }
+  })
 }
 
-function validationError(issues = []) {
-  return {
-    ok: false,
-    statusCode: 422,
-    error: {
-      code: 'validation-error',
-      message: 'Hay campos o transiciones invalidas en el contrato local.',
-      details: {
-        issues: Array.isArray(issues) ? issues.filter(Boolean) : [],
-      },
+function validation(issues = [], message = 'Hay campos o transiciones invalidas en el contrato local.') {
+  return fail(
+    'validation-error',
+    message,
+    {
+      issues: Array.isArray(issues) ? issues.filter(Boolean) : [],
     },
-  }
+    422,
+  )
 }
+
+const okResponse = ok
+const listResponse = list
+const errorResponse = fail
+const validationError = validation
 
 module.exports = {
+  createEnvelope,
+  ok,
+  list,
+  fail,
+  validation,
   okResponse,
+  listResponse,
   errorResponse,
   validationError,
 }
@@ -27132,6 +27946,7 @@ module.exports = {
       projectRoot,
       phaseId: normalizedPlan.phaseId,
       touchedFiles: [
+        serverPath,
         appointmentsPath,
         healthRoutePath,
         responseLibPath,
@@ -27184,6 +27999,7 @@ module.exports = {
         reasoningLayer: 'local-rules',
         materializationLayer: 'local-deterministic',
         operations: [
+          { type: 'replace-file', targetPath: serverPath, nextContent: serverContent },
           { type: 'replace-file', targetPath: appointmentsPath, nextContent: appointmentsContent },
           { type: 'replace-file', targetPath: healthRoutePath, nextContent: healthRouteContent },
           { type: 'replace-file', targetPath: responseLibPath, nextContent: responseLibContent },
@@ -27202,6 +28018,7 @@ module.exports = {
             : []),
         ],
         validations: [
+          { type: 'exists', targetPath: serverPath, expectedKind: 'file' },
           { type: 'exists', targetPath: appointmentsPath, expectedKind: 'file' },
           { type: 'exists', targetPath: healthRoutePath, expectedKind: 'file' },
           { type: 'exists', targetPath: responseLibPath, expectedKind: 'file' },
@@ -27214,28 +28031,53 @@ module.exports = {
             : []),
         {
           type: 'file-contains',
+          targetPath: serverPath,
+          expectedText: 'createServerContract',
+        },
+        {
+          type: 'file-contains',
+          targetPath: serverPath,
+          expectedText: 'canListen: false',
+        },
+        {
+          type: 'file-contains',
           targetPath: appointmentsPath,
-          expectedText: 'listMockAppointments',
+          expectedText: 'transitionAppointmentStatus',
+        },
+        {
+          type: 'file-contains',
+          targetPath: appointmentsPath,
+          expectedText: 'markReminderReviewed',
         },
         {
           type: 'file-contains',
           targetPath: healthRoutePath,
           expectedText: 'healthRoute',
         },
-          {
-            type: 'file-contains',
-            targetPath: responseLibPath,
-            expectedText: 'okResponse',
-          },
-          {
-            type: 'file-contains',
-            targetPath: sharedDomainPath,
-            expectedText: 'domainContracts',
-          },
-          {
-            type: 'file-contains',
-            targetPath: sharedContractsPath,
-            expectedText: 'sharedContracts',
+        {
+          type: 'file-contains',
+          targetPath: responseLibPath,
+          expectedText: 'function ok(',
+        },
+        {
+          type: 'file-contains',
+          targetPath: responseLibPath,
+          expectedText: 'function fail(',
+        },
+        {
+          type: 'file-contains',
+          targetPath: responseLibPath,
+          expectedText: 'function list(',
+        },
+        {
+          type: 'file-contains',
+          targetPath: sharedDomainPath,
+          expectedText: 'routeContracts',
+        },
+        {
+          type: 'file-contains',
+          targetPath: sharedContractsPath,
+          expectedText: 'sharedContracts',
           },
           {
             type: 'file-contains',
@@ -27263,6 +28105,11 @@ module.exports = {
                   type: 'file-contains',
                   targetPath: manifestPath,
                   expectedText: '"id": "database-design"',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: manifestPath,
+                  expectedText: '"lastCompletedPhase": "backend-contracts"',
                 },
               ]
             : []),
