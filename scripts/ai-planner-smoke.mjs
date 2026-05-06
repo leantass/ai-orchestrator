@@ -3055,11 +3055,46 @@ async function runExistingWorkspaceProjectDetectionValidation() {
     if (projectPhaseExecutionPlan.phaseId !== 'frontend-mock-flow') {
       failures.push('La continuidad detectada desde disco debería arrancar en frontend-mock-flow.')
     }
+    if (projectPhaseExecutionPlan.targetStrategy !== 'materialize-project-phase-plan') {
+      failures.push('projectPhaseExecutionPlan.targetStrategy debería apuntar a materialize-project-phase-plan.')
+    }
     if (
       normalizePathForComparison(projectPhaseExecutionPlan.projectRoot) !==
       fixture.projectRootRelativePath
     ) {
       failures.push('projectPhaseExecutionPlan.projectRoot debería apuntar al proyecto detectado dentro del workspace.')
+    }
+    const allowedTargetPaths = toStringArray(
+      projectPhaseExecutionPlan.allowedTargetPaths,
+      24,
+    ).map((entry) => normalizePathForComparison(entry))
+    const expectedAllowedPathTokens = [
+      '/frontend/src/mock-data.js',
+      '/frontend/src/components/App.js',
+      '/frontend/src/styles.css',
+      '/docs/local-runbook.md',
+      '/jefe-project.json',
+    ]
+    if (
+      !expectedAllowedPathTokens.every((token) =>
+        allowedTargetPaths.some((entry) => entry.endsWith(token)),
+      )
+    ) {
+      failures.push('projectPhaseExecutionPlan.allowedTargetPaths debería quedar acotado a frontend/src, docs/local-runbook.md y jefe-project.json.')
+    }
+    if (
+      !allowedTargetPaths.every(
+        (entry) =>
+          entry.startsWith(`${fixture.projectRootRelativePath}/`) &&
+          !entry.includes('/backend/') &&
+          !entry.includes('/database/') &&
+          !entry.includes('/shared/') &&
+          !entry.includes('node_modules') &&
+          !entry.endsWith('/.env') &&
+          !entry.toLocaleLowerCase().includes('docker'),
+      )
+    ) {
+      failures.push('projectPhaseExecutionPlan.allowedTargetPaths no debería reabrir backend, database, shared, node_modules, .env ni Docker.')
     }
   }
   if (!projectContinuationState) {
@@ -4012,6 +4047,14 @@ async function runMaterializeFrontendMockFlowValidation() {
         const touchedPaths = toStringArray(executionResult?.details?.touchedPaths, 24).map(
           normalizePathForComparison,
         )
+        const validationResults = Array.isArray(executionResult?.details?.validationResults)
+          ? executionResult.details.validationResults
+          : []
+        const frontendCriticalPaths = [
+          `${fixture.projectRootRelativePath}/frontend/src/mock-data.js`,
+          `${fixture.projectRootRelativePath}/frontend/src/components/App.js`,
+          `${fixture.projectRootRelativePath}/frontend/src/styles.css`,
+        ]
         const manifestPath = path.join(
           fixture.workspacePath,
           fixture.projectRootRelativePath,
@@ -4025,6 +4068,41 @@ async function runMaterializeFrontendMockFlowValidation() {
         const backendPhase = manifestFromDiskSummary.phases.find(
           (entry) => entry.id === 'backend-contracts',
         )
+
+        if (validationResults.length === 0 || validationResults.some((entry) => entry?.ok === false)) {
+          failures.push(
+            'La ejecucion real de frontend-mock-flow debe devolver validaciones finales OK y no quedar sin coverage.',
+          )
+        }
+        if (
+          normalizeText(executionResult?.result || '').includes('pendiente de ejecucion') ||
+          normalizeText(executionResult?.resultPreview || '').includes('pendiente de ejecucion')
+        ) {
+          failures.push(
+            'La materializacion real de frontend-mock-flow no debe cerrar como pendiente de ejecucion.',
+          )
+        }
+        frontendCriticalPaths.forEach((targetPath) => {
+          const resolvedPath = path.join(fixture.workspacePath, targetPath)
+          const stats = fs.statSync(resolvedPath)
+          if (!stats.isFile() || Number(stats.size) <= 0) {
+            failures.push(`${targetPath} no debe quedar vacio tras frontend-mock-flow.`)
+          }
+          if (!touchedPaths.some((entry) => entry.endsWith(normalizePathForComparison(targetPath)))) {
+            failures.push(`La ejecucion real de frontend-mock-flow deberia tocar ${targetPath}.`)
+          }
+        })
+        if (
+          touchedPaths.some((entry) =>
+            /\/backend\/|\/database\/|\/shared\/|package\.json$|node_modules|\/\.env$|docker/i.test(
+              entry,
+            ),
+          )
+        ) {
+          failures.push(
+            'frontend-mock-flow no debe tocar backend, database, shared, package.json, node_modules, .env ni Docker.',
+          )
+        }
 
         if (
           !touchedPaths.some((targetPath) =>
@@ -4045,6 +4123,11 @@ async function runMaterializeFrontendMockFlowValidation() {
         if (!frontendPhase || frontendPhase.status !== 'done') {
           failures.push(
             'El jefe-project.json resultante deberia marcar frontend-mock-flow como done.',
+          )
+        }
+        if (normalizeText(manifestFromDiskSummary.lastCompletedPhase) !== 'frontend-mock-flow') {
+          failures.push(
+            'El jefe-project.json resultante deberia marcar lastCompletedPhase como frontend-mock-flow.',
           )
         }
         if (!backendPhase || backendPhase.status !== 'available') {

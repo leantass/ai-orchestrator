@@ -1111,6 +1111,7 @@ async function runFullstackBaseCase() {
 
 async function runExistingWorkspaceProjectDetectionCase() {
   const failures = []
+  const appSource = fs.readFileSync(appFilePath, 'utf8')
   const fixture = await buildFullstackFixture({
     workspaceName: 'operator-existing-workspace-veterinary',
     goal: veterinaryGoalCase.goal,
@@ -1152,6 +1153,12 @@ async function runExistingWorkspaceProjectDetectionCase() {
     failures,
     normalizeIdentifier(decision?.projectPhaseExecutionPlan?.phaseId) === 'frontend-mock-flow',
     'La continuidad detectada desde disco debe arrancar en frontend-mock-flow.',
+  )
+  pushFailure(
+    failures,
+    normalizeIdentifier(decision?.projectPhaseExecutionPlan?.targetStrategy) ===
+      'materialize-project-phase-plan',
+    'La fase detectada desde disco debe apuntar a materialize-project-phase-plan.',
   )
   pushFailure(
     failures,
@@ -1203,10 +1210,59 @@ async function runExistingWorkspaceProjectDetectionCase() {
       normalizeText(decision?.instruction || '').includes('proyecto existente detectado'),
     'La decisión debe explicar que se detectó un proyecto existente dentro del workspace.',
   )
+  const allowedTargetPaths = Array.isArray(
+    decision?.projectPhaseExecutionPlan?.allowedTargetPaths,
+  )
+    ? decision.projectPhaseExecutionPlan.allowedTargetPaths.map((entry) =>
+        normalizePathForComparison(entry),
+      )
+    : []
+  const expectedAllowedPathTokens = [
+    '/frontend/src/mock-data.js',
+    '/frontend/src/components/App.js',
+    '/frontend/src/styles.css',
+    '/docs/local-runbook.md',
+    '/jefe-project.json',
+  ]
+  pushFailure(
+    failures,
+    expectedAllowedPathTokens.every((token) =>
+      allowedTargetPaths.some((entry) => entry.endsWith(token)),
+    ),
+    'Los allowedTargetPaths deben seguir acotados a frontend/src, docs/local-runbook.md y jefe-project.json.',
+  )
+  pushFailure(
+    failures,
+    allowedTargetPaths.every(
+      (entry) =>
+        entry.startsWith(`${fixture.projectRootRelativePath}/`) &&
+        !entry.includes('/backend/') &&
+        !entry.includes('/database/') &&
+        !entry.includes('/shared/') &&
+        !entry.includes('node_modules') &&
+        !entry.endsWith('/.env') &&
+        !entry.toLocaleLowerCase().includes('docker'),
+    ),
+    'frontend-mock-flow no debe reabrir backend, database, shared, node_modules, .env ni Docker.',
+  )
   pushFailure(
     failures,
     mainSource.includes('Proyecto existente detectado'),
     'La UI debe poder mostrar Proyecto existente detectado en el centro de continuidad.',
+  )
+  pushFailure(
+    failures,
+    appSource.includes('Preparar materialización de') &&
+      appSource.includes('plannerProjectPhaseReviewCanMaterialize') &&
+      appSource.includes('handleMaterializeProjectPhase(plannerProjectPhaseReviewId)'),
+    'La UI debe exponer un CTA principal habilitable para preparar la materialización de la fase segura detectada.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('requiresLocalProjectPhaseMaterialization') &&
+      mainSource.includes('isMaterializeProjectPhaseDecisionKey(decisionKey)') &&
+      mainSource.includes("materialize-project-phase-plan"),
+    'Electron debe tratar materialize-project-phase-plan como una ruta local determinística y no delegarla al bridge por defecto.',
   )
 
   return {
@@ -1725,6 +1781,15 @@ async function runPhaseMaterializationFlowCase() {
     requestId: 'operator-phase-frontend',
   })
   const frontendArtifacts = readStaticFrontendArtifacts(fixture.projectRootPath)
+  const frontendValidationResults = Array.isArray(
+    fixture.lastPhaseExecutionResult?.details?.validationResults,
+  )
+    ? fixture.lastPhaseExecutionResult.details.validationResults
+    : []
+  const frontendTouchedPaths = summarizeUniqueStrings(
+    fixture.lastPhaseExecutionResult?.details?.touchedPaths,
+    24,
+  ).map(normalizePathForComparison)
   pushStaticFrontendCompatibilityFailures(failures, frontendArtifacts)
   pushFailure(
     failures,
@@ -1750,6 +1815,22 @@ async function runPhaseMaterializationFlowCase() {
   )
   pushFailure(
     failures,
+    normalizeIdentifier(fixture.manifest?.lastCompletedPhase) === 'frontend-mock-flow',
+    'Después de frontend-mock-flow debe marcar lastCompletedPhase como frontend-mock-flow.',
+  )
+  pushFailure(
+    failures,
+    frontendValidationResults.length > 0 &&
+      frontendValidationResults.every((entry) => entry?.ok !== false),
+    'frontend-mock-flow debe cerrar con validaciones finales OK.',
+  )
+  pushFailure(
+    failures,
+    !normalizeText(fixture.lastPhaseExecutionResult?.result || '').includes('pendiente de ejecucion'),
+    'frontend-mock-flow no debe cerrar como pendiente de ejecución si ya materializó archivos.',
+  )
+  pushFailure(
+    failures,
     frontendArtifacts.mockDataJs.includes('window.fullstackPlan') &&
       frontendArtifacts.mockDataJs.includes('backend-contracts'),
     'frontend-mock-flow debe dejar mock-data.js con window.fullstackPlan y la siguiente fase segura.',
@@ -1771,6 +1852,25 @@ async function runPhaseMaterializationFlowCase() {
     normalizeText(frontendArtifacts.runbookContent).includes('backend-contracts') &&
       normalizeText(frontendArtifacts.runbookContent).includes('doble click'),
     'frontend-mock-flow debe actualizar el runbook con doble click y backend-contracts.',
+  )
+  pushFailure(
+    failures,
+    Buffer.byteLength(frontendArtifacts.mockDataJs, 'utf8') > 0 &&
+      Buffer.byteLength(frontendArtifacts.appJs, 'utf8') > 0 &&
+      Buffer.byteLength(frontendArtifacts.stylesCss, 'utf8') > 0,
+    'frontend-mock-flow no debe dejar mock-data.js, App.js ni styles.css en 0 bytes.',
+  )
+  pushFailure(
+    failures,
+    frontendTouchedPaths.some((entry) => entry.endsWith('/frontend/src/mock-data.js')) &&
+      frontendTouchedPaths.some((entry) => entry.endsWith('/frontend/src/components/App.js')) &&
+      frontendTouchedPaths.some((entry) => entry.endsWith('/frontend/src/styles.css')) &&
+      !frontendTouchedPaths.some((entry) =>
+        /\/backend\/|\/database\/|\/shared\/|package\.json$|node_modules|\/\.env$|docker|deploy/i.test(
+          entry,
+        ),
+      ),
+    'frontend-mock-flow debe tocar solo frontend/src, docs/local-runbook.md y jefe-project.json.',
   )
   try {
     const simulatedBundle = executeStaticFrontendBundle(fixture.projectRootPath)

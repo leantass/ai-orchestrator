@@ -9713,6 +9713,14 @@ const getNextExpectedActionLabel = (value: unknown) => {
     return 'Materializacion controlada de frontend project'
   }
 
+  if (normalizedValue === 'review-project-phase') {
+    return 'Revisar fase segura preparada'
+  }
+
+  if (normalizedValue === 'review-continuation-action') {
+    return 'Revisar continuidad preparada'
+  }
+
   return normalizeOptionalString(value).replace(/-/g, ' ')
 }
 
@@ -11380,6 +11388,41 @@ function App() {
     plannerExecutionMetadata,
   )
   const plannerIsReviewOnly = isReviewOnlyPlannerResponse(plannerExecutionMetadata)
+  const plannerProjectPhaseReviewPlan =
+    plannerExecutionMetadata.projectPhaseExecutionPlan &&
+    typeof plannerExecutionMetadata.projectPhaseExecutionPlan === 'object'
+      ? plannerExecutionMetadata.projectPhaseExecutionPlan
+      : null
+  const plannerProjectPhaseReviewId = normalizeOptionalString(
+    plannerProjectPhaseReviewPlan?.phaseId,
+  )
+  const plannerProjectPhaseReviewTargetStrategy = normalizeOptionalString(
+    plannerProjectPhaseReviewPlan?.targetStrategy,
+  ).toLocaleLowerCase()
+  const plannerProjectPhaseReviewAllowedTargetPaths = normalizeOptionalStringArray(
+    plannerProjectPhaseReviewPlan?.allowedTargetPaths,
+  )
+  const plannerIsProjectPhaseReview =
+    normalizeOptionalString(plannerExecutionMetadata.decisionKey).toLocaleLowerCase() ===
+      'prepare-project-phase-plan' ||
+    normalizeOptionalString(plannerExecutionMetadata.strategy).toLocaleLowerCase() ===
+      'prepare-project-phase-plan' ||
+    normalizeOptionalString(
+      plannerExecutionMetadata.nextExpectedAction,
+    ).toLocaleLowerCase() === 'review-project-phase' ||
+    (plannerIsReviewOnly &&
+      normalizeOptionalString(
+        plannerProjectPhaseReviewPlan?.deliveryLevel,
+      ).toLocaleLowerCase() === 'fullstack-local' &&
+      plannerProjectPhaseReviewId !== '')
+  const plannerProjectPhaseReviewCanMaterialize =
+    plannerIsProjectPhaseReview &&
+    plannerProjectPhaseReviewId !== '' &&
+    normalizeOptionalString(plannerProjectPhaseReviewPlan?.projectRoot) !== '' &&
+    plannerProjectPhaseReviewPlan?.executableNow === true &&
+    plannerProjectPhaseReviewPlan?.approvalRequired !== true &&
+    plannerProjectPhaseReviewTargetStrategy === 'materialize-project-phase-plan' &&
+    plannerProjectPhaseReviewAllowedTargetPaths.length > 0
   const plannerIsSafeFirstDeliveryReview =
     normalizeOptionalString(plannerExecutionMetadata.decisionKey).toLocaleLowerCase() ===
       'safe-first-delivery-plan' ||
@@ -11404,24 +11447,34 @@ function App() {
     ).toLocaleLowerCase() === 'review-scalable-delivery' ||
     plannerHasDedicatedScalableDeliveryLevel
   const plannerReviewStatusLabel = plannerIsReviewOnly
-    ? plannerIsSafeFirstDeliveryReview
-      ? 'Primera entrega en revision'
-      : plannerIsScalableDeliveryReview
-        ? 'Plan escalable en revision'
-        : 'Plan en revision'
+    ? plannerIsProjectPhaseReview
+      ? 'Fase segura en revision'
+      : plannerIsSafeFirstDeliveryReview
+        ? 'Primera entrega en revision'
+        : plannerIsScalableDeliveryReview
+          ? 'Plan escalable en revision'
+          : 'Plan en revision'
     : 'Plan activo cargado'
   const plannerReviewHelperText = plannerIsReviewOnly
-    ? plannerIsSafeFirstDeliveryReview
-      ? 'Este plan define una primera fase segura y no ejecuta cambios todavÍa.'
-      : plannerIsScalableDeliveryReview
-        ? 'JEFE detecto una entrega escalable y por ahora solo devuelve un plan revisable; no ejecuta cambios todavÍa.'
-        : 'Este plan no ejecuta cambios todavÍa; primero requiere revision manual.'
+    ? plannerIsProjectPhaseReview
+      ? plannerProjectPhaseReviewCanMaterialize
+        ? `JEFE detecto la fase segura ${plannerProjectPhaseReviewId} y puede preparar su materializacion sin recrear el scaffold.`
+        : `JEFE detecto la fase segura ${plannerProjectPhaseReviewId || 'actual'} para revisar antes de seguir con la continuidad.`
+      : plannerIsSafeFirstDeliveryReview
+        ? 'Este plan define una primera fase segura y no ejecuta cambios todavÍa.'
+        : plannerIsScalableDeliveryReview
+          ? 'JEFE detecto una entrega escalable y por ahora solo devuelve un plan revisable; no ejecuta cambios todavÍa.'
+          : 'Este plan no ejecuta cambios todavÍa; primero requiere revision manual.'
     : 'La instruccion actual puede pasar a ejecucion manual cuando corresponda.'
   const plannerReviewActionLabel = plannerIsSafeFirstDeliveryReview
     ? 'Revisar primera entrega segura'
-    : plannerIsScalableDeliveryReview
-      ? 'Plan escalable revisable'
-      : 'Revisar arquitectura'
+    : plannerIsProjectPhaseReview
+      ? plannerProjectPhaseReviewId
+        ? `Revisar fase segura: ${plannerProjectPhaseReviewId}`
+        : 'Revisar fase segura'
+      : plannerIsScalableDeliveryReview
+        ? 'Plan escalable revisable'
+        : 'Revisar arquitectura'
   const plannerBadge = isPlanning ? 'Planificación en curso' : plannerReviewStatusLabel
 
   const executorBadge = isExecutingTask
@@ -11603,6 +11656,18 @@ function App() {
       normalizeOptionalString(
         activeImplementationRoadmap?.deliveryLevel,
       ).toLocaleLowerCase() === 'fullstack-local')
+  const activeExecutableProjectPhaseId =
+    !plannerIsReviewOnly &&
+    normalizeOptionalString(plannerExecutionMetadata.strategy).toLocaleLowerCase() ===
+      'materialize-project-phase-plan'
+      ? normalizeOptionalString(activeProjectPhaseExecutionPlan?.phaseId)
+      : ''
+  const executeCurrentInstructionLabel = activeExecutableProjectPhaseId
+    ? `Ejecutar ${activeExecutableProjectPhaseId}`
+    : 'Ejecutar'
+  const executeCurrentInstructionQuickLabel = activeExecutableProjectPhaseId
+    ? `Ejecutar ${activeExecutableProjectPhaseId}`
+    : 'Ejecutar instrucción actual'
   const activeLocalProjectRoot = (() => {
     if (normalizeOptionalString(activeProjectPhaseExecutionPlan?.projectRoot)) {
       return normalizeOptionalString(activeProjectPhaseExecutionPlan?.projectRoot)
@@ -12340,6 +12405,24 @@ function App() {
           buildComparablePath(artifactPath, workspacePath) === comparableBlockedPath,
       )
     })
+  const resultHasTrackedMaterialProgress =
+    latestCreatedArtifacts.length > 0 || latestTouchedArtifactsRaw.length > 0
+  const resultHasPlanOnlyMaterialProgress =
+    !resultHasTrackedMaterialProgress && latestMaterializationPlanOperations.length > 0
+  const resultExecutionNeedsMaterialReview =
+    executorRequestState !== 'running' &&
+    resultStatusPresentation.label !== 'Ejecución completada' &&
+    (resultHasTrackedMaterialProgress || resultHasPlanOnlyMaterialProgress)
+  const effectiveResultStatusPresentation = resultExecutionNeedsMaterialReview
+    ? {
+        label: 'Ejecución incompleta',
+        tone: 'rose' as const,
+        detail:
+          'La ejecución dejó archivos previstos o tocados, pero no cerró con validaciones finales suficientes.',
+      }
+    : resultStatusPresentation
+  const resultExecutionCompleted =
+    effectiveResultStatusPresentation.label === 'Ejecución completada'
   const resultCodexLabel = fastRouteDetected
     ? 'No requerido'
     : latestBridgeModeValue.toLocaleLowerCase() === 'codex' ||
@@ -12377,7 +12460,7 @@ function App() {
           detail: 'Sirve para validar rápido el resultado visual y el copy final.',
         }
       : null,
-    resultStatusPresentation.label === 'Ejecución completada'
+    resultExecutionCompleted
       ? {
           title: resultCanSuggestReusableNow
             ? 'Guardar como reusable'
@@ -12387,7 +12470,7 @@ function App() {
             : 'Conviene hacerlo cuando la demo pase la revisión visual y la fase de local-validation.',
         }
       : null,
-    resultStatusPresentation.label === 'Ejecución completada'
+    resultExecutionCompleted
       ? {
           title: resultCanSuggestReusableNow
             ? 'Crear variante reutilizando estilo'
@@ -12397,7 +12480,7 @@ function App() {
             : 'Mejor hacerlo cuando la base ya esté validada visualmente y lista para reutilizar.',
         }
       : null,
-    resultStatusPresentation.label === 'Ejecución completada'
+    resultExecutionCompleted
       ? {
           title: 'Crear variante reutilizando estructura',
           detail: resultCanSuggestReusableNow
@@ -12429,24 +12512,32 @@ function App() {
       : 'Sin campos reportados'
     : latestReusableReferenceSummary
   const resultIsSafeFirstDeliveryMaterialization =
-    resultStatusPresentation.label === 'Ejecución completada' &&
+    resultExecutionCompleted &&
     (isSafeFirstDeliveryMaterializationDecision(plannerExecutionMetadata.decisionKey) ||
       isSafeFirstDeliveryMaterializationDecision(plannerExecutionMetadata.strategy) ||
       isSafeFirstDeliveryMaterializationDecision(latestBrainStrategy))
   const resultIsFrontendProjectMaterialization =
-    resultStatusPresentation.label === 'Ejecución completada' &&
+    resultExecutionCompleted &&
     (isFrontendProjectMaterializationDecision(plannerExecutionMetadata.decisionKey) ||
       isFrontendProjectMaterializationDecision(plannerExecutionMetadata.strategy) ||
       isFrontendProjectMaterializationDecision(latestBrainStrategy))
   const resultIsFullstackLocalMaterialization =
-    resultStatusPresentation.label === 'Ejecución completada' &&
+    resultExecutionCompleted &&
     (isFullstackLocalMaterializationDecision(plannerExecutionMetadata.decisionKey) ||
       isFullstackLocalMaterializationDecision(plannerExecutionMetadata.strategy) ||
       isFullstackLocalMaterializationDecision(latestBrainStrategy))
+  const resultIsProjectPhaseMaterialization =
+    resultExecutionCompleted &&
+    [
+      normalizeOptionalString(plannerExecutionMetadata.decisionKey),
+      normalizeOptionalString(plannerExecutionMetadata.strategy),
+      normalizeOptionalString(latestBrainStrategy),
+    ].some((value) => value.toLocaleLowerCase() === 'materialize-project-phase-plan')
   const shouldShowLocalMaterializationSummary =
     resultIsSafeFirstDeliveryMaterialization ||
     resultIsFrontendProjectMaterialization ||
-    resultIsFullstackLocalMaterialization
+    resultIsFullstackLocalMaterialization ||
+    resultIsProjectPhaseMaterialization
   const resultMaterializationFilePaths = mergeUniqueStringValues(
     latestWrittenFiles,
     [
@@ -12511,22 +12602,39 @@ function App() {
       ? `${resultCreatedFolderPaths.length} carpeta(s)`
       : 'Sin carpetas reportadas'
   const resultMaterializationWrittenFilesLabel =
-    resultWrittenFilePaths.length > 0
-      ? `${resultWrittenFilePaths.length} archivo(s)`
-      : 'Sin archivos reportados'
+    resultWrittenArtifactPaths.length > 0
+      ? `${resultWrittenArtifactPaths.length} archivo(s)`
+      : resultExecutionCompleted
+        ? 'Sin archivos reportados'
+        : 'Sin archivos confirmados'
   const resultMaterializationValidationsLabel =
     latestValidationResults.length > 0
       ? `${latestValidationOkCount}/${latestValidationResults.length} OK`
       : resultMaterializationStats.validationsCount > 0
         ? `${resultMaterializationStats.validationsCount} validación(es)`
         : latestMaterializationPlanValidations.length > 0
-          ? `${latestMaterializationPlanValidations.length} previstas`
-        : 'No reportadas'
+          ? resultExecutionNeedsMaterialReview
+            ? `${latestMaterializationPlanValidations.length} faltantes`
+            : `${latestMaterializationPlanValidations.length} previstas`
+          : 'No reportadas'
   const resultMaterializationEngineLabel = latestMaterializationLayer || 'No disponible'
   const resultMaterializationBridgeDetail =
     latestMaterializationLayer === 'local-deterministic' || fastRouteDetected
       ? 'No se usó bridge y Codex no fue requerido para materializar esta salida.'
       : 'La corrida no informó una resolución completamente local.'
+  const resultWrittenArtifactsLabel = resultExecutionCompleted
+    ? 'Archivos escritos'
+    : 'Archivos previstos o tocados'
+  const resultWrittenArtifactsDescription = resultExecutionCompleted
+    ? 'Resumen de carpeta principal, carpetas creadas, archivos escritos y alcance activo.'
+    : 'La corrida no cerró correctamente. Este bloque distingue lo previsto por el plan de lo realmente tocado para facilitar la revisión.'
+  const resultWrittenArtifactPaths = resultExecutionCompleted
+    ? resultWrittenFilePaths
+    : mergeUniqueStringValues(resultWrittenFilePaths, resultMaterializationFileLabels, 12)
+  const effectiveResultValidationSummaryText =
+    resultExecutionNeedsMaterialReview && latestValidationResults.length === 0
+      ? 'La ejecución no devolvió validaciones finales. Revisar la materialización antes de tomar estos archivos como correctos.'
+      : resultValidationSummaryText
   const resultMaterializationLimits = [
     'Sin npm install.',
     'Sin node_modules.',
@@ -12584,6 +12692,8 @@ function App() {
     ? 'Primera entrega segura generada'
     : resultIsFullstackLocalMaterialization
       ? 'Scaffold fullstack local materializado'
+      : resultIsProjectPhaseMaterialization
+        ? 'Fase segura materializada'
       : resultIsFrontendProjectMaterialization
         ? 'Frontend local generado'
         : 'Entrega local generada'
@@ -12591,6 +12701,8 @@ function App() {
     ? 'Resumen corto de la materialización segura para revisar rápido qué se creó, cómo abrirlo y cuáles son sus límites.'
     : resultIsFullstackLocalMaterialization
       ? 'Resumen corto del scaffold fullstack local para abrir la demo, revisar lo generado y saber cuál es la siguiente fase segura.'
+      : resultIsProjectPhaseMaterialization
+        ? 'Resumen corto de la fase segura materializada para revisar qué se actualizó, qué quedó validado y cuál es la siguiente fase segura.'
       : resultIsFrontendProjectMaterialization
         ? 'Resumen corto del frontend local generado para abrirlo por file:// y validar la interfaz sin levantar runtime real.'
         : 'Resumen corto de la salida local materializada.'
@@ -12600,6 +12712,8 @@ function App() {
       : 'Abrir el index.html generado para revisar la interfaz.',
     resultIsFullstackLocalMaterialization
       ? 'Revisar backend, shared, database y docs como referencia revisable del mismo dominio.'
+      : resultIsProjectPhaseMaterialization
+        ? 'Revisar solo los archivos tocados por la fase segura y confirmar que el resto del proyecto siga intacto.'
       : 'Revisar los archivos creados y confirmar que la salida siga siendo local y mock.',
     resultMaterializationNextPhaseLabel !== 'Sin fase segura declarada'
       ? `Preparar la siguiente fase segura: ${resultMaterializationNextPhaseLabel}.`
@@ -16241,25 +16355,33 @@ function App() {
     })
   }
 
-  const plannerReviewPrimaryActionLabel = plannerIsSafeFirstDeliveryReview
-    ? 'Preparar materialización segura'
-    : plannerIsScalableDeliveryReview
-      ? plannerScalableDeliveryLevel === 'fullstack-local'
-        ? 'Preparar materialización fullstack local'
-        : plannerScalableDeliveryLevel === 'frontend-project'
-          ? 'Preparar materialización frontend local'
-          : ''
+  const plannerReviewPrimaryActionLabel = plannerIsProjectPhaseReview
+    ? plannerProjectPhaseReviewCanMaterialize
+      ? `Preparar materialización de ${plannerProjectPhaseReviewId}`
       : ''
-  const handlePlannerReviewPrimaryAction =
-    plannerIsSafeFirstDeliveryReview
-      ? handlePrepareSafeMaterializationPlan
+    : plannerIsSafeFirstDeliveryReview
+      ? 'Preparar materialización segura'
       : plannerIsScalableDeliveryReview
         ? plannerScalableDeliveryLevel === 'fullstack-local'
-          ? handlePrepareFullstackLocalMaterializationPlan
+          ? 'Preparar materialización fullstack local'
           : plannerScalableDeliveryLevel === 'frontend-project'
-            ? handlePrepareFrontendProjectMaterializationPlan
-            : null
+            ? 'Preparar materialización frontend local'
+            : ''
+        : ''
+  const handlePlannerReviewPrimaryAction =
+    plannerIsProjectPhaseReview
+      ? plannerProjectPhaseReviewCanMaterialize
+        ? () => handleMaterializeProjectPhase(plannerProjectPhaseReviewId)
         : null
+      : plannerIsSafeFirstDeliveryReview
+        ? handlePrepareSafeMaterializationPlan
+        : plannerIsScalableDeliveryReview
+          ? plannerScalableDeliveryLevel === 'fullstack-local'
+            ? handlePrepareFullstackLocalMaterializationPlan
+            : plannerScalableDeliveryLevel === 'frontend-project'
+              ? handlePrepareFrontendProjectMaterializationPlan
+              : null
+          : null
 
   const handleExecuteCurrentInstruction = async (
     overrideInstruction?: string,
@@ -19523,7 +19645,7 @@ function App() {
                                 value: resultMaterializationCreatedFoldersLabel,
                               },
                               {
-                                label: 'Archivos escritos',
+                                label: resultWrittenArtifactsLabel,
                                 value: resultMaterializationWrittenFilesLabel,
                               },
                               {
@@ -19533,7 +19655,7 @@ function App() {
                               {
                                 label: 'Validaciones',
                                 value: resultMaterializationValidationsLabel,
-                                detail: resultValidationSummaryText,
+                                detail: effectiveResultValidationSummaryText,
                               },
                               {
                                 label: 'Cómo probar',
@@ -19647,11 +19769,11 @@ function App() {
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div className="flex flex-wrap items-center gap-3">
                             <ResultStatusBadge
-                              label={resultStatusPresentation.label}
-                              tone={resultStatusPresentation.tone}
+                              label={effectiveResultStatusPresentation.label}
+                              tone={effectiveResultStatusPresentation.tone}
                             />
                             <div className="text-sm leading-6 text-slate-300">
-                              {resultStatusPresentation.detail}
+                              {effectiveResultStatusPresentation.detail}
                             </div>
                           </div>
                           {shouldShowVisibleFinalTextResponse ? (
@@ -19719,7 +19841,7 @@ function App() {
 
                       <ResultSectionCard
                         title="Archivos"
-                        description="Resumen de carpeta principal, carpetas creadas, archivos escritos y alcance activo."
+                        description={resultWrittenArtifactsDescription}
                       >
                         <ResultKeyValueGrid
                           items={[
@@ -19739,11 +19861,13 @@ function App() {
                                   : 'Sin carpetas creadas',
                             },
                             {
-                              label: 'Archivos escritos',
+                              label: resultWrittenArtifactsLabel,
                               value:
-                                resultWrittenFilePaths.length > 0
-                                  ? `${resultWrittenFilePaths.length} archivo(s)`
-                                  : 'Sin archivos escritos',
+                                resultWrittenArtifactPaths.length > 0
+                                  ? `${resultWrittenArtifactPaths.length} archivo(s)`
+                                  : resultExecutionCompleted
+                                    ? 'Sin archivos escritos'
+                                    : 'Sin archivos previstos ni tocados',
                             },
                             {
                               label: 'Rutas rastreadas',
@@ -19778,11 +19902,11 @@ function App() {
                           </div>
                           <div className="space-y-2">
                             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              Archivos escritos
+                              {resultWrittenArtifactsLabel}
                             </div>
                             <div className="grid gap-2">
-                              {resultWrittenFilePaths.length > 0 ? (
-                                resultWrittenFilePaths.map((artifactPath) => (
+                              {resultWrittenArtifactPaths.length > 0 ? (
+                                resultWrittenArtifactPaths.map((artifactPath) => (
                                   <div
                                     key={`written-${artifactPath}`}
                                     className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
@@ -19792,7 +19916,9 @@ function App() {
                                 ))
                               ) : (
                                 <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                                  No se reportaron archivos escritos.
+                                  {resultExecutionCompleted
+                                    ? 'No se reportaron archivos escritos.'
+                                    : 'No se reportaron archivos previstos ni tocados.'}
                                 </div>
                               )}
                             </div>
@@ -19809,19 +19935,23 @@ function App() {
                             label={
                               latestValidationResults.length > 0
                                 ? `${latestValidationOkCount}/${latestValidationResults.length} OK`
-                                : 'Sin validaciones'
+                                : resultExecutionNeedsMaterialReview
+                                  ? 'Validación faltante'
+                                  : 'Sin validaciones'
                             }
                             tone={
                               latestValidationResults.length > 0 &&
                               latestValidationOkCount === latestValidationResults.length
                                 ? 'emerald'
-                                : latestValidationResults.length > 0
+                              : latestValidationResults.length > 0
                                   ? 'amber'
-                                  : 'default'
+                                  : resultExecutionNeedsMaterialReview
+                                    ? 'rose'
+                                    : 'default'
                             }
                           />
                           <div className="text-sm leading-6 text-slate-300">
-                            {resultValidationSummaryText}
+                            {effectiveResultValidationSummaryText}
                           </div>
                         </div>
                         <div className="mt-4 grid gap-2">
@@ -19847,7 +19977,9 @@ function App() {
                             ))
                           ) : (
                             <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                              No hay validaciones disponibles para mostrar.
+                              {resultExecutionNeedsMaterialReview
+                                ? 'La ejecución no devolvió validaciones finales para mostrar.'
+                                : 'No hay validaciones disponibles para mostrar.'}
                             </div>
                           )}
                         </div>
@@ -19960,9 +20092,9 @@ function App() {
                     <div className="space-y-4">
                       <MetricCard
                         label="Estado final"
-                        value={resultStatusPresentation.label}
-                        detail={resultStatusPresentation.detail}
-                        tone={resultStatusPresentation.tone}
+                        value={effectiveResultStatusPresentation.label}
+                        detail={effectiveResultStatusPresentation.detail}
+                        tone={effectiveResultStatusPresentation.tone}
                       />
                       <MetricCard
                         label="Modo de ejecución"
@@ -20013,12 +20145,16 @@ function App() {
                         value={
                           latestValidationResults.length > 0
                             ? `${latestValidationOkCount}/${latestValidationResults.length} OK`
-                            : 'Sin validaciones reportadas'
+                            : resultExecutionNeedsMaterialReview
+                              ? 'Validación faltante'
+                              : 'Sin validaciones reportadas'
                         }
                         detail={
                           latestValidationResults.length > 0
-                            ? resultValidationSummaryText
-                            : 'No hubo validaciones estructuradas para resumir.'
+                            ? effectiveResultValidationSummaryText
+                            : resultExecutionNeedsMaterialReview
+                              ? 'La corrida dejó progreso material pero no devolvió validaciones finales.'
+                              : 'No hubo validaciones estructuradas para resumir.'
                         }
                       />
                       <MetricCard
@@ -20154,7 +20290,9 @@ function App() {
                           disabled={!canExecuteInstruction || isExecutingTask}
                           className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
                         >
-                          {isExecutingTask ? 'Ejecutando...' : 'Ejecutar'}
+                          {isExecutingTask
+                            ? 'Ejecutando...'
+                            : executeCurrentInstructionLabel}
                         </button>
                       )}
                     </>
@@ -20362,9 +20500,21 @@ function App() {
                   {isPlanning ? 'Generando...' : 'Generar siguiente paso'}
                 </button>
                 {plannerIsReviewOnly ? (
-                  <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200">
-                    {plannerReviewStatusLabel}
-                  </div>
+                  handlePlannerReviewPrimaryAction &&
+                  plannerReviewPrimaryActionLabel ? (
+                    <button
+                      type="button"
+                      onClick={handlePlannerReviewPrimaryAction}
+                      disabled={isPlanning}
+                      className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                    >
+                      {plannerReviewPrimaryActionLabel}
+                    </button>
+                  ) : (
+                    <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200">
+                      {plannerReviewStatusLabel}
+                    </div>
+                  )
                 ) : null}
                 <button
                   type="button"
@@ -20373,7 +20523,9 @@ function App() {
                   disabled={!canExecuteInstruction || isExecutingTask}
                   className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
                 >
-                  {isExecutingTask ? 'Ejecutando...' : 'Ejecutar instrucción'}
+                  {isExecutingTask
+                    ? 'Ejecutando...'
+                    : executeCurrentInstructionQuickLabel}
                 </button>
                 <button
                   type="button"

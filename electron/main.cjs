@@ -731,6 +731,26 @@ function buildMaterializeFullstackLocalPlanSkipReason({
   })
 }
 
+function buildMaterializeProjectPhaseLocalPlanSkipReason({
+  executionScope,
+  plan,
+}) {
+  const allowedTargetPaths = summarizeUniqueExecutorStrings(
+    executionScope?.allowedTargetPaths,
+    24,
+  )
+
+  if (allowedTargetPaths.length === 0) {
+    return 'missing-allowed-target-paths'
+  }
+
+  if (plan && !isMaterializationPlanWithinAllowedTargetPaths(plan, allowedTargetPaths)) {
+    return 'plan-target-outside-allowed-paths'
+  }
+
+  return 'task-build-failed'
+}
+
 function buildMaterializeSafeFirstDeliveryLocalFailureResponse({
   requestId,
   instruction,
@@ -837,6 +857,45 @@ function buildMaterializeFullstackLocalFailureResponse({
       strategy: decisionKey,
       executionMode: 'executor',
       currentAction: 'build-local-materialization-plan',
+      currentTargetPath: allowedTargetPaths[0] || undefined,
+      createdPaths: [],
+      touchedPaths: [],
+      hasMaterialProgress: false,
+      materialState: 'local-deterministic-plan-invalid',
+      allowedTargetPaths,
+      errorMessage: reason,
+    },
+  }
+}
+
+function buildMaterializeProjectPhaseLocalFailureResponse({
+  requestId,
+  instruction,
+  decisionKey,
+  executionScope,
+  reason,
+}) {
+  const allowedTargetPaths = summarizeUniqueExecutorStrings(
+    executionScope?.allowedTargetPaths,
+    24,
+  )
+
+  return {
+    ok: false,
+    ...(requestId ? { requestId } : {}),
+    instruction,
+    error:
+      'No se pudo preparar la materializacion de la fase segura porque el alcance permitido es invalido o el plan excede los targets permitidos.',
+    resultPreview:
+      'La materializacion de la fase segura no pudo iniciarse por un alcance permitido invalido o porque el plan excede los targets permitidos.',
+    failureType: 'invalid_local_project_phase_scope',
+    reasoningLayer: 'local-rules',
+    materializationLayer: 'local-deterministic',
+    details: {
+      decisionKey,
+      strategy: decisionKey,
+      executionMode: 'executor',
+      currentAction: 'build-local-project-phase-materialization',
       currentTargetPath: allowedTargetPaths[0] || undefined,
       createdPaths: [],
       touchedPaths: [],
@@ -1213,6 +1272,13 @@ function isMaterializeFullstackLocalDecisionKey(value) {
   return (
     typeof value === 'string' &&
     value.trim().toLocaleLowerCase() === 'materialize-fullstack-local-plan'
+  )
+}
+
+function isMaterializeProjectPhaseDecisionKey(value) {
+  return (
+    typeof value === 'string' &&
+    value.trim().toLocaleLowerCase() === 'materialize-project-phase-plan'
   )
 }
 
@@ -38913,6 +38979,8 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
     isMaterializeFrontendProjectDecisionKey(decisionKey)
   const requiresLocalFullstackLocalMaterialization =
     isMaterializeFullstackLocalDecisionKey(decisionKey)
+  const requiresLocalProjectPhaseMaterialization =
+    isMaterializeProjectPhaseDecisionKey(decisionKey)
   const derivedMaterializationPlan =
     materializationPlan ||
     !executionScope ||
@@ -38964,28 +39032,35 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
       if (
         requiresLocalSafeFirstDeliveryMaterialization ||
         requiresLocalFrontendProjectMaterialization ||
-        requiresLocalFullstackLocalMaterialization
+        requiresLocalFullstackLocalMaterialization ||
+        requiresLocalProjectPhaseMaterialization
       ) {
-        const localPlanOperationLabel = requiresLocalFullstackLocalMaterialization
-          ? 'materialize-fullstack-local-plan'
-          : requiresLocalFrontendProjectMaterialization
-            ? 'materialize-frontend-project-plan'
-            : 'materialize-safe-first-delivery-plan'
-        const localPlanSkipReason = requiresLocalFullstackLocalMaterialization
-          ? buildMaterializeFullstackLocalPlanSkipReason
-          : requiresLocalFrontendProjectMaterialization
-            ? buildMaterializeFrontendProjectLocalPlanSkipReason
-            : buildMaterializeSafeFirstDeliveryLocalPlanSkipReason
-        const localPlanFailureResponseBuilder =
-          requiresLocalFullstackLocalMaterialization
-            ? buildMaterializeFullstackLocalFailureResponse
+        const localPlanOperationLabel = requiresLocalProjectPhaseMaterialization
+          ? 'materialize-project-phase-plan'
+          : requiresLocalFullstackLocalMaterialization
+            ? 'materialize-fullstack-local-plan'
             : requiresLocalFrontendProjectMaterialization
-              ? buildMaterializeFrontendProjectLocalFailureResponse
-              : buildMaterializeSafeFirstDeliveryLocalFailureResponse
+              ? 'materialize-frontend-project-plan'
+              : 'materialize-safe-first-delivery-plan'
+        const localPlanSkipReason = requiresLocalProjectPhaseMaterialization
+          ? buildMaterializeProjectPhaseLocalPlanSkipReason
+          : requiresLocalFullstackLocalMaterialization
+            ? buildMaterializeFullstackLocalPlanSkipReason
+            : requiresLocalFrontendProjectMaterialization
+              ? buildMaterializeFrontendProjectLocalPlanSkipReason
+              : buildMaterializeSafeFirstDeliveryLocalPlanSkipReason
+        const localPlanFailureResponseBuilder =
+          requiresLocalProjectPhaseMaterialization
+            ? buildMaterializeProjectPhaseLocalFailureResponse
+            : requiresLocalFullstackLocalMaterialization
+              ? buildMaterializeFullstackLocalFailureResponse
+              : requiresLocalFrontendProjectMaterialization
+                ? buildMaterializeFrontendProjectLocalFailureResponse
+                : buildMaterializeSafeFirstDeliveryLocalFailureResponse
         const resolvedMaterializationPlan =
           materializationPlan || derivedMaterializationPlan
 
-        debugMainLog('materialize-safe-first-delivery:local-plan-attempt', {
+        debugMainLog('local-materialization-plan:attempt', {
           requestId: requestId || undefined,
           decisionKey,
           allowedTargetPathsCount: executionScope?.allowedTargetPaths?.length || 0,
@@ -38998,7 +39073,7 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
             instruction,
             plan: resolvedMaterializationPlan,
           })
-          debugMainLog('materialize-safe-first-delivery:local-plan-skipped', {
+          debugMainLog('local-materialization-plan:skipped', {
             requestId: requestId || undefined,
             decisionKey,
             reason,
@@ -39073,7 +39148,7 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
             instruction,
             plan: resolvedMaterializationPlan,
           })
-          debugMainLog('materialize-safe-first-delivery:local-plan-skipped', {
+          debugMainLog('local-materialization-plan:skipped', {
             requestId: requestId || undefined,
             decisionKey,
             reason,
@@ -39120,7 +39195,7 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
           return
         }
 
-        debugMainLog('materialize-safe-first-delivery:local-plan-built', {
+        debugMainLog('local-materialization-plan:built', {
           requestId: requestId || undefined,
           decisionKey,
           operationsCount: Array.isArray(forcedLocalTask.operations)

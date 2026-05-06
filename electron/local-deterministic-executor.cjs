@@ -4521,47 +4521,158 @@ function capturePathState(targetPath) {
   }
 }
 
+function buildAtomicTempPath(targetPath, suffix = 'tmp') {
+  const nonce = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`
+  return `${targetPath}.ai-orchestrator-${suffix}-${nonce}`
+}
+
+async function replaceFileAtomically(targetPath, nextContent) {
+  const normalizedContent = typeof nextContent === 'string' ? nextContent : ''
+  const tempPath = buildAtomicTempPath(targetPath, 'write')
+  const backupPath = buildAtomicTempPath(targetPath, 'backup')
+  let movedOriginalToBackup = false
+
+  await fs.promises.mkdir(path.dirname(targetPath), { recursive: true })
+
+  try {
+    await fs.promises.writeFile(tempPath, normalizedContent, 'utf8')
+    const tempStats = await fs.promises.stat(tempPath)
+
+    if (normalizedContent.length > 0 && Number(tempStats.size) <= 0) {
+      throw new Error(
+        `La escritura temporal de "${targetPath}" quedo vacia aunque se esperaba contenido no vacio.`,
+      )
+    }
+
+    try {
+      const targetStats = await fs.promises.stat(targetPath)
+
+      if (!targetStats.isFile()) {
+        throw new Error(`"${targetPath}" existe pero no es un archivo reemplazable.`)
+      }
+
+      await fs.promises.rename(targetPath, backupPath)
+      movedOriginalToBackup = true
+    } catch (error) {
+      if (!(error && typeof error === 'object' && error.code === 'ENOENT')) {
+        throw error
+      }
+    }
+
+    try {
+      await fs.promises.rename(tempPath, targetPath)
+    } catch (error) {
+      if (movedOriginalToBackup) {
+        try {
+          await fs.promises.rename(backupPath, targetPath)
+          movedOriginalToBackup = false
+        } catch {
+          // Si la restauración falla, preservamos el error original de la operación.
+        }
+      }
+
+      throw error
+    }
+
+    if (movedOriginalToBackup) {
+      await fs.promises.rm(backupPath, { force: true })
+    }
+  } catch (error) {
+    await fs.promises.rm(tempPath, { force: true }).catch(() => {})
+
+    if (movedOriginalToBackup) {
+      try {
+        await fs.promises.access(targetPath, fs.constants.F_OK)
+      } catch {
+        await fs.promises.rename(backupPath, targetPath).catch(() => {})
+      }
+    }
+
+    throw error
+  }
+}
+
+function buildOperationContentExpectation(operation) {
+  if (!operation || typeof operation !== 'object') {
+    return null
+  }
+
+  if (operation.type === 'create-file') {
+    return {
+      type: 'operation-content',
+      operationType: operation.type,
+      targetPath: operation.relativeTargetPath,
+      resolvedTargetPath: operation.resolvedTargetPath,
+      expectedContent:
+        typeof operation.initialContent === 'string' ? operation.initialContent : '',
+    }
+  }
+
+  if (operation.type === 'replace-file') {
+    return {
+      type: 'operation-content',
+      operationType: operation.type,
+      targetPath: operation.relativeTargetPath,
+      resolvedTargetPath: operation.resolvedTargetPath,
+      expectedContent:
+        typeof operation.nextContent === 'string' ? operation.nextContent : '',
+    }
+  }
+
+  if (operation.type === 'append-file') {
+    return {
+      type: 'operation-content',
+      operationType: operation.type,
+      targetPath: operation.relativeTargetPath,
+      resolvedTargetPath: operation.resolvedTargetPath,
+      expectedContent:
+        typeof operation.appendContent === 'string' ? operation.appendContent : '',
+    }
+  }
+
+  return null
+}
+
 async function applyMaterializationOperation(operation) {
   switch (operation.type) {
     case 'create-folder':
       await fs.promises.mkdir(operation.resolvedTargetPath, { recursive: true })
       return
     case 'create-file':
-      await fs.promises.mkdir(path.dirname(operation.resolvedTargetPath), {
-        recursive: true,
-      })
-      await fs.promises.writeFile(
+      await replaceFileAtomically(
         operation.resolvedTargetPath,
         operation.initialContent || '',
-        'utf8',
       )
       return
     case 'replace-file':
-      await fs.promises.mkdir(path.dirname(operation.resolvedTargetPath), {
-        recursive: true,
-      })
-      await fs.promises.writeFile(
+      await replaceFileAtomically(
         operation.resolvedTargetPath,
         operation.nextContent || '',
-        'utf8',
       )
       return
-    case 'append-file':
-      await fs.promises.mkdir(path.dirname(operation.resolvedTargetPath), {
-        recursive: true,
-      })
-      await fs.promises.appendFile(
+    case 'append-file': {
+      let previousContent = ''
+
+      try {
+        previousContent = await fs.promises.readFile(operation.resolvedTargetPath, 'utf8')
+      } catch (error) {
+        if (!(error && typeof error === 'object' && error.code === 'ENOENT')) {
+          throw error
+        }
+      }
+
+      await replaceFileAtomically(
         operation.resolvedTargetPath,
-        operation.appendContent || '',
-        'utf8',
+        `${previousContent}${operation.appendContent || ''}`,
       )
       return
+    }
     default:
       throw new Error(`Operacion local no soportada: ${operation.type}`)
   }
 }
 
-async function runPlanValidations(validations) {
+async function runPlanValidations(validations, operations = []) {
   const validationResults = []
 
   for (const validation of validations) {
@@ -4647,6 +4758,97 @@ async function runPlanValidations(validations) {
     }
   }
 
+  const operationExpectations = operations
+    .map(buildOperationContentExpectation)
+    .filter(Boolean)
+
+  for (const expectation of operationExpectations) {
+    let fileContent = ''
+    let fileStats = null
+
+    try {
+      fileStats = await fs.promises.stat(expectation.resolvedTargetPath)
+      fileContent = await fs.promises.readFile(expectation.resolvedTargetPath, 'utf8')
+    } catch (error) {
+      if (error && typeof error === 'object' && error.code === 'ENOENT') {
+        return {
+          ok: false,
+          validationResults: [
+            ...validationResults,
+            {
+              type: expectation.type,
+              targetPath: expectation.targetPath,
+              ok: false,
+              reason: 'El archivo esperado no existe despues de la materializacion.',
+            },
+          ],
+        }
+      }
+
+      throw error
+    }
+
+    if (!fileStats?.isFile()) {
+      return {
+        ok: false,
+        validationResults: [
+          ...validationResults,
+          {
+            type: expectation.type,
+            targetPath: expectation.targetPath,
+            ok: false,
+            reason: 'La ruta final existe pero no es un archivo valido.',
+          },
+        ],
+      }
+    }
+
+    if (expectation.expectedContent && fileContent.length === 0) {
+      return {
+        ok: false,
+        validationResults: [
+          ...validationResults,
+          {
+            type: expectation.type,
+            targetPath: expectation.targetPath,
+            ok: false,
+            reason:
+              'El archivo final quedo vacio aunque la operacion esperaba contenido no vacio.',
+          },
+        ],
+      }
+    }
+
+    const contentMatches =
+      expectation.operationType === 'append-file'
+        ? fileContent.endsWith(expectation.expectedContent)
+        : fileContent === expectation.expectedContent
+
+    if (!contentMatches) {
+      return {
+        ok: false,
+        validationResults: [
+          ...validationResults,
+          {
+            type: expectation.type,
+            targetPath: expectation.targetPath,
+            ok: false,
+            reason:
+              expectation.operationType === 'append-file'
+                ? 'El append final no conserva el contenido esperado.'
+                : 'El archivo final no coincide con el contenido esperado del plan.',
+          },
+        ],
+      }
+    }
+
+    validationResults.push({
+      type: expectation.type,
+      targetPath: expectation.targetPath,
+      ok: true,
+    })
+  }
+
   return {
     ok: true,
     validationResults,
@@ -4717,7 +4919,7 @@ async function runLocalDeterministicTask(task) {
       })
     }
 
-    const validationOutcome = await runPlanValidations(task.validations)
+    const validationOutcome = await runPlanValidations(task.validations, task.operations)
     const afterStates = new Map(
       trackedPaths.map((targetPath) => [targetPath, capturePathState(targetPath)]),
     )
