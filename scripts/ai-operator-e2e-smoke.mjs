@@ -22,6 +22,10 @@ const {
   getFullstackLocalBasePhaseDefinition,
   buildFullstackLocalManifestPhaseBlueprints,
 } = require(path.join(repoRoot, 'electron', 'fullstack-phase-contracts.cjs'))
+const {
+  selectBestWorkspaceProjectCandidate,
+  shouldIgnoreWorkspaceDirectoryEntry,
+} = require(path.join(repoRoot, 'electron', 'workspace-project-detection.cjs'))
 
 const smokeWorkspaceRoot = path.join(repoRoot, '.tmp', 'ai-operator-e2e-smoke')
 const continuationBasePhaseIds = [
@@ -104,6 +108,25 @@ function normalizeText(value) {
 
 function normalizeIdentifier(value) {
   return normalizeText(value).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
+function continuationActionMatchesId(action, expectedId) {
+  const normalizedExpectedId = normalizeIdentifier(expectedId)
+  if (!normalizedExpectedId || !action || typeof action !== 'object') {
+    return false
+  }
+
+  const candidateValues = [
+    action.id,
+    action.phaseId,
+    action.title,
+    action.description,
+    action.reason,
+  ]
+
+  return candidateValues.some((value) =>
+    normalizeIdentifier(value).includes(normalizedExpectedId),
+  )
 }
 
 function normalizePathForComparison(value) {
@@ -486,6 +509,8 @@ module.exports = {
     FULLSTACK_LOCAL_BASE_PHASES,
     getFullstackLocalBasePhaseDefinition,
     buildFullstackLocalManifestPhaseBlueprints,
+    selectBestWorkspaceProjectCandidate,
+    shouldIgnoreWorkspaceDirectoryEntry,
     setTimeout,
     clearTimeout,
     setInterval,
@@ -1082,6 +1107,113 @@ async function runFullstackBaseCase() {
   )
 
   return { id: 'operator-fullstack-base', label: 'Base fullstack local', failures }
+}
+
+async function runExistingWorkspaceProjectDetectionCase() {
+  const failures = []
+  const fixture = await buildFullstackFixture({
+    workspaceName: 'operator-existing-workspace-veterinary',
+    goal: veterinaryGoalCase.goal,
+    context: veterinaryGoalCase.context,
+    projectLabel: veterinaryGoalCase.projectLabel,
+  })
+  const decision = await requestPlannerDecision({
+    goal: veterinaryGoalCase.goal,
+    context: veterinaryGoalCase.context,
+    workspacePath: fixture.workspacePath,
+  })
+
+  pushFailure(
+    failures,
+    decision?.strategy === 'prepare-project-phase-plan',
+    'Con un proyecto fullstack local existente debe priorizar continuidad de fase, no el scaffold inicial.',
+  )
+  pushFailure(
+    failures,
+    decision?.executionMode === 'planner-only',
+    'La continuidad desde un proyecto existente debe volver en planner-only.',
+  )
+  pushFailure(
+    failures,
+    decision?.nextExpectedAction === 'review-project-phase',
+    'La continuidad desde un proyecto existente debe volver a review-project-phase.',
+  )
+  pushFailure(
+    failures,
+    !decision?.scalableDeliveryPlan,
+    'No debe volver a devolver scalableDeliveryPlan cuando el proyecto ya existe en disco.',
+  )
+  pushFailure(
+    failures,
+    !decision?.materializationPlan,
+    'No debe intentar recrear el scaffold cuando ya existe un proyecto local compatible.',
+  )
+  pushFailure(
+    failures,
+    normalizeIdentifier(decision?.projectPhaseExecutionPlan?.phaseId) === 'frontend-mock-flow',
+    'La continuidad detectada desde disco debe arrancar en frontend-mock-flow.',
+  )
+  pushFailure(
+    failures,
+    normalizeIdentifier(decision?.projectContinuationState?.nextRecommendedPhase) ===
+      'frontend-mock-flow',
+    'El siguiente paso seguro debe seguir siendo frontend-mock-flow.',
+  )
+  pushFailure(
+    failures,
+    continuationActionMatchesId(
+      decision?.projectContinuationState?.nextRecommendedAction,
+      'frontend-mock-flow',
+    ),
+    'La acción recomendada debe apuntar al frontend mock flow.',
+  )
+  pushFailure(
+    failures,
+    normalizeIdentifier(decision?.projectReadinessState?.readinessLevel) ===
+      'scaffold-materialized',
+    'El readiness debe rehidratarse como scaffold-materialized desde el manifest detectado.',
+  )
+  pushFailure(
+    failures,
+    !normalizeText(decision?.projectReadinessState?.operatorSummary || '').includes(
+      'planificacion',
+    ),
+    'El readiness no debe volver a mostrarse como planificación si el scaffold ya existe.',
+  )
+  pushFailure(
+    failures,
+    normalizePathForComparison(decision?.localProjectManifest?.projectRoot || '') ===
+      fixture.projectRootRelativePath,
+    'El manifest detectado debe apuntar a la carpeta existente dentro del workspace.',
+  )
+  pushFailure(
+    failures,
+    normalizeIdentifier(decision?.localProjectManifest?.lastCompletedPhase) ===
+      'fullstack-local-scaffold',
+    'El manifest detectado debe conservar la última fase completada del scaffold.',
+  )
+  pushFailure(
+    failures,
+    !decision?.approvalRequestPlan && !decision?.runtimeApprovalState,
+    'Context Hub no disponible y el proyecto detectado no deben bloquear la continuidad con aprobaciones sensibles falsas.',
+  )
+  pushFailure(
+    failures,
+    normalizeText(decision?.reason || '').includes('proyecto existente') &&
+      normalizeText(decision?.instruction || '').includes('proyecto existente detectado'),
+    'La decisión debe explicar que se detectó un proyecto existente dentro del workspace.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('Proyecto existente detectado'),
+    'La UI debe poder mostrar Proyecto existente detectado en el centro de continuidad.',
+  )
+
+  return {
+    id: 'operator-existing-workspace-project',
+    label: 'Proyecto existente detectado desde workspace',
+    failures,
+  }
 }
 
 async function runFullstackStaticFileCompatibilityCase() {
@@ -2450,6 +2582,7 @@ async function main() {
     const results = []
     results.push(await runZeroSystemCase())
     results.push(await runFullstackBaseCase())
+    results.push(await runExistingWorkspaceProjectDetectionCase())
     results.push(await runFullstackStaticFileCompatibilityCase())
     results.push(
       await runDomainRichnessCase({

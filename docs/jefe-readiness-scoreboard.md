@@ -14,7 +14,7 @@ Este scoreboard resume el estado de madurez real de JEFE después de la pasada d
 | Planificación local / Cerebro fallback | 65% | 71% | Planner mantiene planes escalables, continuidad y contexto separado de MEMORIA / Context Hub. | La lógica sigue muy concentrada en Electron main. |
 | Materialización segura local | 75% | 82% | La ruta local determinística sigue generando scaffold seguro y ahora conserva mejor metadata de fases. | Falta seguir reduciendo duplicación interna. |
 | Fullstack-local inicial | 75% | 84% | La demo factory multi-dominio sigue operable, `file://` compatible y con mejor continuidad posterior. | Algunas verticales siguen menos profundas que veterinaria. |
-| Continuidad por fases | 45% | 74% | Fases base con metadata rica, `allowedTargetPaths`, summary, `nextRecommendedPhase` y actualización coherente del manifest. | Conviene seguir endureciendo expansión de módulos y más casos cruzados. |
+| Continuidad por fases | 45% | 74% | Fases base con metadata rica, `allowedTargetPaths`, summary, `nextRecommendedPhase`, actualización coherente del manifest y detección de proyecto existente desde `jefe-project.json`. | Conviene seguir endureciendo expansión de módulos y más casos cruzados. |
 | Validaciones / smoke / seguridad | 75% | 87% | `ai-planner-smoke` y `ai-operator-e2e-smoke` cubren helper modules, Context Hub, continuidad, `file://` y UI sanity. | Los smokes ya son más grandes y piden futura modularización. |
 | Resultado final entendible para operador | 70% | 82% | El resultado ahora muestra mejor readiness, próxima fase, MEMORIA / Context Hub y estado reusable. | Se puede seguir puliendo el detalle de validaciones y densidad visual. |
 | MEMORIA / Context Hub integrada de verdad en uso diario | 45% | 64% | Context Hub viaja separado en planning y execution, con payloads compactos y fallback best-effort. | Todavía falta más observabilidad específica si se quiere subir mucho más. |
@@ -25,6 +25,7 @@ Este scoreboard resume el estado de madurez real de JEFE después de la pasada d
 
 - Se extrajeron helpers puros y reutilizables desde `electron/main.cjs`.
 - Las fases `frontend-mock-flow`, `backend-contracts`, `database-design`, `local-validation` y `review-and-expand` quedan mejor definidas y rastreables.
+- JEFE puede retomar continuidad desde un proyecto ya materializado dentro del workspace activo en vez de recrear el scaffold.
 - El resultado final del operador ahora informa mejor:
   - qué se creó
   - dónde quedó

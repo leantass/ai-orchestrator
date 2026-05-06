@@ -27,6 +27,10 @@ const {
   getFullstackLocalBasePhaseDefinition,
   buildFullstackLocalManifestPhaseBlueprints,
 } = require(path.join(repoRoot, 'electron', 'fullstack-phase-contracts.cjs'))
+const {
+  selectBestWorkspaceProjectCandidate,
+  shouldIgnoreWorkspaceDirectoryEntry,
+} = require(path.join(repoRoot, 'electron', 'workspace-project-detection.cjs'))
 const requiredPlannerFunctions = [
   'buildDomainUnderstanding',
   'buildProductArchitecturePlan',
@@ -885,6 +889,8 @@ module.exports = {
     FULLSTACK_LOCAL_BASE_PHASES,
     getFullstackLocalBasePhaseDefinition,
     buildFullstackLocalManifestPhaseBlueprints,
+    selectBestWorkspaceProjectCandidate,
+    shouldIgnoreWorkspaceDirectoryEntry,
     setTimeout,
     clearTimeout,
     setInterval,
@@ -1341,6 +1347,21 @@ function summarizeProjectContinuationState(projectContinuationState) {
   }
 }
 
+function summarizeProjectReadinessState(projectReadinessState) {
+  return {
+    readinessLevel: projectReadinessState?.readinessLevel || '',
+    demoReady: projectReadinessState?.demoReady === true,
+    safeLocalDemoReady: projectReadinessState?.safeLocalDemoReady === true,
+    completedCoreFlow: projectReadinessState?.completedCoreFlow === true,
+    lastCompletedPhase: projectReadinessState?.lastCompletedPhase || '',
+    nextRecommendedPhase: projectReadinessState?.nextRecommendedPhase || '',
+    operatorSummary: projectReadinessState?.operatorSummary || '',
+    warnings: toStringArray(projectReadinessState?.warnings, 24),
+    pendingMilestones: toStringArray(projectReadinessState?.pendingMilestones, 24),
+    completedMilestones: toStringArray(projectReadinessState?.completedMilestones, 24),
+  }
+}
+
 function summarizeLocalProjectManifest(localProjectManifest) {
   return {
     version: Number.isFinite(localProjectManifest?.version)
@@ -1351,6 +1372,7 @@ function summarizeLocalProjectManifest(localProjectManifest) {
     deliveryLevel: localProjectManifest?.deliveryLevel || '',
     createdBy: localProjectManifest?.createdBy || '',
     materializationLayer: localProjectManifest?.materializationLayer || '',
+    projectRoot: localProjectManifest?.projectRoot || '',
     forbiddenPaths: toStringArray(localProjectManifest?.forbiddenPaths, 24),
     nextRecommendedPhase: localProjectManifest?.nextRecommendedPhase || '',
     nextRecommendedAction: localProjectManifest?.nextRecommendedAction || '',
@@ -2976,6 +2998,132 @@ async function requestContinuationDecision({ fixture, testCase }) {
     },
     reusablePlanningContext,
   })
+}
+
+async function runExistingWorkspaceProjectDetectionValidation() {
+  const failures = []
+  const fixture = await buildPhaseExecutionFixture({
+    workspaceName: 'fullstack-project-existing-workspace-detection',
+  })
+  const decision = await requestContinuationDecision({
+    fixture,
+    testCase: fullstackLocalMaterializationCase,
+  })
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const nextExpectedAction = String(decision?.nextExpectedAction || '').trim()
+  const projectPhaseExecutionPlan =
+    decision?.projectPhaseExecutionPlan &&
+    typeof decision.projectPhaseExecutionPlan === 'object'
+      ? decision.projectPhaseExecutionPlan
+      : null
+  const projectContinuationState =
+    decision?.projectContinuationState &&
+    typeof decision.projectContinuationState === 'object'
+      ? decision.projectContinuationState
+      : null
+  const projectReadinessState =
+    decision?.projectReadinessState &&
+    typeof decision.projectReadinessState === 'object'
+      ? decision.projectReadinessState
+      : null
+  const localProjectManifest =
+    decision?.localProjectManifest && typeof decision.localProjectManifest === 'object'
+      ? decision.localProjectManifest
+      : null
+
+  if (strategy !== 'prepare-project-phase-plan') {
+    failures.push(
+      `Con un proyecto local existente debería devolver prepare-project-phase-plan. Recibido: ${strategy || '(vacío)'}.`,
+    )
+  }
+  if (executionMode !== 'planner-only') {
+    failures.push('La continuidad desde un proyecto existente debería quedar en planner-only.')
+  }
+  if (nextExpectedAction !== 'review-project-phase') {
+    failures.push('La continuidad desde un proyecto existente debería volver a review-project-phase.')
+  }
+  if (decision?.materializationPlan) {
+    failures.push('No debería devolver materializationPlan cuando ya existe el scaffold local.')
+  }
+  if (decision?.scalableDeliveryPlan) {
+    failures.push('No debería volver a devolver scalableDeliveryPlan cuando ya existe el proyecto local.')
+  }
+  if (!projectPhaseExecutionPlan) {
+    failures.push('projectPhaseExecutionPlan ausente al detectar un proyecto existente.')
+  } else {
+    if (projectPhaseExecutionPlan.phaseId !== 'frontend-mock-flow') {
+      failures.push('La continuidad detectada desde disco debería arrancar en frontend-mock-flow.')
+    }
+    if (
+      normalizePathForComparison(projectPhaseExecutionPlan.projectRoot) !==
+      fixture.projectRootRelativePath
+    ) {
+      failures.push('projectPhaseExecutionPlan.projectRoot debería apuntar al proyecto detectado dentro del workspace.')
+    }
+  }
+  if (!projectContinuationState) {
+    failures.push('projectContinuationState ausente al detectar un proyecto existente.')
+  } else {
+    const stateSummary = summarizeProjectContinuationState(projectContinuationState)
+    if (stateSummary.nextRecommendedPhase !== 'frontend-mock-flow') {
+      failures.push('projectContinuationState.nextRecommendedPhase debería ser frontend-mock-flow.')
+    }
+    if (!continuationActionMatchesId(stateSummary.nextRecommendedAction, 'frontend-mock-flow')) {
+      failures.push('projectContinuationState.nextRecommendedAction debería apuntar a frontend-mock-flow.')
+    }
+    if (!String(stateSummary.projectStatus || '').trim()) {
+      failures.push('projectContinuationState.projectStatus no debería quedar vacío.')
+    }
+  }
+  if (!projectReadinessState) {
+    failures.push('projectReadinessState ausente al detectar un proyecto existente.')
+  } else {
+    const readinessSummary = summarizeProjectReadinessState(projectReadinessState)
+    if (normalizeText(readinessSummary.readinessLevel) !== 'scaffold-materialized') {
+      failures.push('El readiness debería inferir scaffold-materialized desde el manifest existente.')
+    }
+  }
+  if (!localProjectManifest) {
+    failures.push('localProjectManifest ausente al detectar un proyecto existente.')
+  } else {
+    const manifestSummary = summarizeLocalProjectManifest(localProjectManifest)
+    if (manifestSummary.nextRecommendedPhase !== 'frontend-mock-flow') {
+      failures.push('El manifest detectado debería seguir recomendando frontend-mock-flow.')
+    }
+    if (
+      normalizePathForComparison(manifestSummary.projectRoot || '') !==
+      fixture.projectRootRelativePath
+    ) {
+      failures.push('localProjectManifest.projectRoot debería coincidir con la carpeta detectada dentro del workspace.')
+    }
+    if (normalizeText(manifestSummary.readinessLevel) !== 'scaffold-materialized') {
+      failures.push('localProjectManifest.readinessLevel debería rehidratarse como scaffold-materialized.')
+    }
+  }
+  if (
+    !normalizeText(decision?.reason || '').includes('proyecto existente') ||
+    !normalizeText(decision?.instruction || '').includes('proyecto existente detectado')
+  ) {
+    failures.push('La continuidad debería explicar que se detectó un proyecto existente dentro del workspace.')
+  }
+  if (decision?.approvalRequestPlan || decision?.runtimeApprovalState) {
+    failures.push('La detección del proyecto existente no debería exigir aprobación sensible.')
+  }
+
+  return {
+    testCase: {
+      id: 'existing-workspace-project-detection',
+      label: 'Proyecto existente detectado antes del scaffold inicial',
+      goal: fullstackLocalMaterializationCase.goal,
+      context: fullstackLocalMaterializationCase.context,
+    },
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction,
+  }
 }
 
 function buildExpectedModuleTargets(fixture, moduleId) {
@@ -7374,6 +7522,7 @@ async function main() {
     console.log('Project Continuation Checks')
     console.log('===========================')
     continuationResults = [
+      await runExistingWorkspaceProjectDetectionValidation(),
       await runContinuationRecommendationValidation({
         testCase: continuationValidationCases.legacyManifestWithoutPhases,
         workspaceName: 'fullstack-project-continuation-legacy-manifest',

@@ -98,6 +98,14 @@ Validar que cada fase:
 - deje la siguiente fase segura como recomendada
 - no vuelva a sugerir fases ya completadas
 
+Si el workspace ya contiene un proyecto local con `jefe-project.json`, validar además que JEFE:
+
+- detecte la carpeta existente antes de decidir la estrategia principal
+- no vuelva a ofrecer `Preparar materialización fullstack local` si el scaffold ya existe
+- recomiende `frontend-mock-flow` o la siguiente fase segura real del manifest
+- no deje el estado del proyecto en `Sin estado`
+- no trate la continuidad segura como aprobación sensible
+
 ## Escenario 6: lectura de readiness
 
 Verificar que el readiness hable en lenguaje de producto:

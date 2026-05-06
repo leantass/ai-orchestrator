@@ -118,6 +118,10 @@ const {
   getFullstackLocalBasePhaseDefinition,
   buildFullstackLocalManifestPhaseBlueprints,
 } = require('./fullstack-phase-contracts.cjs')
+const {
+  selectBestWorkspaceProjectCandidate,
+  shouldIgnoreWorkspaceDirectoryEntry,
+} = require('./workspace-project-detection.cjs')
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL)
 const defaultExecutorBridgePath = path.join(
@@ -22306,7 +22310,13 @@ function inferProjectStateFromWorkspace({ goal, context, workspacePath }) {
   try {
     const topLevelEntries = fs
       .readdirSync(resolvedWorkspacePath, { withFileTypes: true })
-      .filter((entry) => entry && entry.isDirectory && entry.isDirectory())
+      .filter(
+        (entry) =>
+          entry &&
+          entry.isDirectory &&
+          entry.isDirectory() &&
+          !shouldIgnoreWorkspaceDirectoryEntry(entry.name),
+      )
       .slice(0, 12)
 
     topLevelEntries.forEach((entry) => {
@@ -22318,6 +22328,8 @@ function inferProjectStateFromWorkspace({ goal, context, workspacePath }) {
     return null
   }
 
+  const loadedCandidates = []
+
   for (const manifestPath of candidateManifestPaths) {
     const loadedManifest = readLocalProjectManifest(manifestPath)
 
@@ -22325,15 +22337,56 @@ function inferProjectStateFromWorkspace({ goal, context, workspacePath }) {
       continue
     }
 
-    return {
+    loadedCandidates.push({
       ...loadedManifest,
       projectRootRelativePath:
         path.relative(resolvedWorkspacePath, loadedManifest.projectRootResolvedPath) || '.',
       workspacePath: resolvedWorkspacePath,
-    }
+    })
   }
 
-  return null
+  return (
+    selectBestWorkspaceProjectCandidate({
+      goal,
+      context,
+      candidates: loadedCandidates,
+    }) || null
+  )
+}
+
+function resolveExistingWorkspaceProjectNextPhaseId(inferredProjectState) {
+  const normalizedManifest = normalizeLocalProjectManifestContract(
+    inferredProjectState?.manifest,
+  )
+
+  if (!normalizedManifest || normalizedManifest.deliveryLevel !== 'fullstack-local') {
+    return ''
+  }
+
+  const phaseStates = getFullstackLocalBasePhaseStates(normalizedManifest)
+  const explicitNextPhase =
+    typeof normalizedManifest.nextRecommendedPhase === 'string'
+      ? normalizedManifest.nextRecommendedPhase.trim()
+      : ''
+  const explicitNextPhaseEntry =
+    explicitNextPhase && phaseStates.find((entry) => entry.id === explicitNextPhase) || null
+
+  if (explicitNextPhaseEntry && explicitNextPhaseEntry.status !== 'done') {
+    return explicitNextPhaseEntry.id
+  }
+
+  const nextBasePhase =
+    phaseStates.find(
+      (entry) => entry.id !== 'review-and-expand' && entry.status !== 'done',
+    ) || null
+
+  if (nextBasePhase) {
+    return nextBasePhase.id
+  }
+
+  return phaseStates.some((entry) => entry.id === 'review-and-expand')
+    ? 'review-and-expand'
+    : ''
 }
 
 function detectProjectPhasePlanningIntent(goal, context) {
@@ -34079,6 +34132,110 @@ async function buildLocalStrategicBrainDecision({
               inferredProjectState.projectRootRelativePath || continuationActionPlan.projectRoot,
             localProjectManifest: inferredProjectState.manifest,
           }),
+        },
+      )
+    }
+  }
+
+  const existingWorkspaceProjectNextPhaseId =
+    inferredProjectState?.manifest
+      ? resolveExistingWorkspaceProjectNextPhaseId(inferredProjectState)
+      : ''
+  const shouldContinueExistingWorkspaceProject =
+    Boolean(existingWorkspaceProjectNextPhaseId) &&
+    Boolean(inferredProjectState?.manifest) &&
+    !projectPhaseIntent.matches &&
+    !moduleExpansionIntent.matches &&
+    !projectContinuationActionIntent.matches &&
+    !safeFirstDeliveryIntent.matches &&
+    !materializeSafeFirstDeliveryIntent.matches &&
+    !frontendProjectMaterializationIntent.matches &&
+    !scopedFileEditIntent &&
+    !localGoalDescriptor &&
+    !looksLikeWebBaseGoal &&
+    compositeSteps.length < 2 &&
+    (!previousExecutionResult ||
+      iteration === 1 ||
+      approvalAlreadyGranted ||
+      hasRecoverableExecutionError)
+
+  if (shouldContinueExistingWorkspaceProject) {
+    const projectPhaseExecutionPlan = buildProjectPhaseExecutionPlan({
+      strategy: 'prepare-project-phase-plan',
+      phaseId: existingWorkspaceProjectNextPhaseId,
+      inferredProjectState,
+    })
+
+    if (projectPhaseExecutionPlan) {
+      const expansionOptions =
+        existingWorkspaceProjectNextPhaseId === 'review-and-expand'
+          ? buildReviewAndExpandExpansionOptions({
+              projectRoot: projectPhaseExecutionPlan.projectRoot,
+              localProjectManifest: inferredProjectState.manifest,
+            })
+          : null
+      const detectedProjectRoot =
+        inferredProjectState.projectRootRelativePath ||
+        projectPhaseExecutionPlan.projectRoot
+      const detectedManifest =
+        normalizeLocalProjectManifestContract(inferredProjectState.manifest)
+      const detectedPhaseEntry =
+        getLocalProjectManifestPhaseEntry(
+          detectedManifest,
+          existingWorkspaceProjectNextPhaseId,
+        ) || null
+      const detectedPhaseLabel =
+        detectedPhaseEntry?.title ||
+        projectPhaseExecutionPlan.phaseId ||
+        'la siguiente fase segura'
+      const lastCompletedPhase =
+        typeof detectedManifest?.lastCompletedPhase === 'string' &&
+        detectedManifest.lastCompletedPhase.trim()
+          ? detectedManifest.lastCompletedPhase.trim()
+          : 'fullstack-local-scaffold'
+
+      return buildDecisionWithPlanningContracts(
+        {
+          decisionKey: 'prepare-project-phase-plan',
+          strategy: 'prepare-project-phase-plan',
+          executionMode: 'planner-only',
+          reason: `Se detectó el proyecto existente ${detectedProjectRoot} dentro del workspace. El scaffold fullstack local ya está materializado y conviene seguir con ${detectedPhaseLabel}.`,
+          tasks: [
+            {
+              step: 1,
+              title: 'Revisar el manifest local detectado y confirmar la carpeta existente.',
+              operation: 'review-existing-project-manifest',
+              targetPath: detectedProjectRoot,
+            },
+            {
+              step: 2,
+              title: `Preparar ${detectedPhaseLabel} como siguiente fase segura del proyecto existente.`,
+              operation: 'prepare-existing-project-phase',
+              targetPath: detectedProjectRoot,
+            },
+          ],
+          requiresApproval: false,
+          assumptions: [
+            `Se detectó un proyecto local existente en ${detectedProjectRoot}.`,
+            `La última fase completada registrada es ${lastCompletedPhase}.`,
+            'Conviene continuar desde el manifest actual en vez de recrear el scaffold.',
+            'No se habilitan runtime real, npm install, DB real, Docker, deploy ni integraciones externas.',
+          ],
+          instruction: [
+            `Proyecto existente detectado: ${detectedProjectRoot}.`,
+            `Última fase completada: ${lastCompletedPhase}.`,
+            `Próxima fase segura: ${projectPhaseExecutionPlan.phaseId}.`,
+            `Target strategy: ${projectPhaseExecutionPlan.targetStrategy}.`,
+            `Allowed target paths: ${projectPhaseExecutionPlan.allowedTargetPaths.join(', ')}`,
+          ].join('\n'),
+          completed: false,
+          nextExpectedAction: 'review-project-phase',
+        },
+        {
+          deliveryLevel: 'fullstack-local',
+          projectPhaseExecutionPlan,
+          localProjectManifest: inferredProjectState.manifest,
+          expansionOptions,
         },
       )
     }

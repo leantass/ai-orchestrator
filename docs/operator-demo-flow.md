@@ -73,6 +73,22 @@ Después de materializar `fullstack-local`, JEFE debería recomendar esta cadena
 - `local-validation`
 - `review-and-expand`
 
+Si el workspace ya contiene un proyecto existente con `jefe-project.json`, JEFE no debería volver a ofrecer el scaffold como primera acción. En ese caso, la lectura esperable es:
+
+- `Proyecto existente detectado`
+- carpeta detectada
+- última fase completada
+- próxima fase segura calculada desde el manifest actual
+- continuidad sobre `frontend-mock-flow` o la fase que corresponda
+- sin volver a mostrar `Preparar materialización fullstack local` como CTA principal si el scaffold ya existe
+
+Para un caso como `fullstack-local-veterinaria/jefe-project.json` dentro del workspace activo, JEFE debería:
+
+- leer el manifest antes de decidir la estrategia principal
+- inferir readiness desde fases y archivos si el manifest vino con campos viejos
+- conservar `frontend-mock-flow` como siguiente fase segura cuando el scaffold ya está `done`
+- mostrar en Paso 5 que el proyecto existente fue detectado y que la continuidad sigue desde esa carpeta
+
 Después del scaffold base, el readiness no debería decir `En planificación`. La lectura esperable es:
 
 - `Scaffold materializado`

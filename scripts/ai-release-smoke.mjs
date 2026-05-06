@@ -21,6 +21,10 @@ const {
   getFullstackLocalBasePhaseDefinition,
   buildFullstackLocalManifestPhaseBlueprints,
 } = require(path.join(repoRoot, 'electron', 'fullstack-phase-contracts.cjs'))
+const {
+  selectBestWorkspaceProjectCandidate,
+  shouldIgnoreWorkspaceDirectoryEntry,
+} = require(path.join(repoRoot, 'electron', 'workspace-project-detection.cjs'))
 
 const smokeWorkspaceRoot = path.join(repoRoot, '.tmp', 'ai-release-smoke')
 const continuationBasePhaseIds = [
@@ -155,6 +159,8 @@ module.exports = {
     FULLSTACK_LOCAL_BASE_PHASES,
     getFullstackLocalBasePhaseDefinition,
     buildFullstackLocalManifestPhaseBlueprints,
+    selectBestWorkspaceProjectCandidate,
+    shouldIgnoreWorkspaceDirectoryEntry,
     setTimeout,
     clearTimeout,
     setInterval,
