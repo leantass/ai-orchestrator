@@ -23,8 +23,9 @@ Esta guía sirve para validar JEFE como plataforma local de programación automa
 2. Ejecutá la materialización segura.
 3. Verificá que el cierre muestre:
    - carpeta creada
-   - operaciones aplicadas
-   - validaciones
+   - carpetas creadas
+   - archivos escritos
+   - validaciones útiles
    - ruta exacta de `frontend/index.html`
    - próxima fase segura
    - readiness actual
@@ -70,6 +71,7 @@ Para veterinaria, confirmar específicamente:
 ## Escenario 5: avanzar continuidad por fases
 
 1. Después del scaffold, confirmar que la siguiente fase recomendada sea `frontend-mock-flow`.
+2. Confirmar que el readiness pase a `Scaffold materializado` y no quede en `En planificación`.
 2. Luego preparar y materializar, cuando corresponda:
    - `frontend-mock-flow`
    - `backend-contracts`
@@ -95,6 +97,7 @@ Para veterinaria, confirmar específicamente:
    - si la demo local segura ya está lista
    - qué sigue siendo mock
    - qué falta para producto real
+4. Si el estado es `Scaffold materializado`, todavía no conviene tratar la salida como reusable definitiva.
 
 ## Escenario 7: revisar aprobaciones futuras sin bloquear el flujo seguro
 
@@ -136,3 +139,10 @@ La demo se considera lista para mostrar cuando:
 - las fases base avanzan sin tocar runtime real
 - readiness lo explica con honestidad
 - las acciones sensibles quedan como aprobación futura o bloqueo explícito, nunca como ejecución real
+
+Antes de marcar una salida como reusable, conviene además:
+
+- abrir `frontend/index.html` con doble click
+- revisar `docs/local-runbook.md`
+- confirmar `node --check` sobre los archivos principales del scaffold
+- completar `local-validation` o, como mínimo, una revisión visual y estructural equivalente

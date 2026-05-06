@@ -25,7 +25,9 @@ type ExecutorValidationResult = {
   type?: string
   targetPath?: string
   expectedKind?: string
+  expectedText?: string
   ok?: boolean
+  reason?: string
 }
 
 type ExecutorFailureContext = {
@@ -58,6 +60,7 @@ type ExecutorFailureContext = {
   reasoningLayer?: string
   materializationLayer?: string
   materializationPlanSource?: string
+  materializationPlan?: MaterializationPlanContract | null
   validationResults?: ExecutorValidationResult[]
   appliedReuseMode?: string
   reusedStyleFromArtifactId?: string
@@ -1308,8 +1311,14 @@ const normalizeValidationResults = (value: unknown): ExecutorValidationResult[] 
                 ...(typeof (entry as { expectedKind?: unknown }).expectedKind === 'string'
                   ? { expectedKind: (entry as { expectedKind: string }).expectedKind.trim() }
                   : {}),
+                ...(typeof (entry as { expectedText?: unknown }).expectedText === 'string'
+                  ? { expectedText: (entry as { expectedText: string }).expectedText.trim() }
+                  : {}),
                 ...(typeof (entry as { ok?: unknown }).ok === 'boolean'
                   ? { ok: (entry as { ok: boolean }).ok }
+                  : {}),
+                ...(typeof (entry as { reason?: unknown }).reason === 'string'
+                  ? { reason: (entry as { reason: string }).reason.trim() }
                   : {}),
               }
             : null,
@@ -5440,8 +5449,14 @@ const getProjectReadinessLevelLabel = (value?: string) => {
   if (normalizedValue === 'demo-ready') {
     return 'Listo para demo local segura'
   }
+  if (normalizedValue === 'scaffold-materialized') {
+    return 'Scaffold materializado'
+  }
+  if (normalizedValue === 'base-phases-in-progress') {
+    return 'Demo visual en progreso'
+  }
   if (normalizedValue === 'scaffolded') {
-    return 'Todav\u00eda falta completar'
+    return 'Base pendiente de completar'
   }
   if (normalizedValue === 'planning') {
     return 'En planificaci\u00f3n'
@@ -9252,6 +9267,111 @@ const parseMaterializationExecutionStats = (value: string) => {
   }
 }
 
+const normalizeMaterializationPlanOperations = (
+  value: unknown,
+): Array<{ type: string; targetPath: string }> =>
+  Array.isArray(value)
+    ? value
+        .map((entry) => {
+          if (!entry || typeof entry !== 'object') {
+            return null
+          }
+
+          const type = normalizeOptionalString((entry as { type?: unknown }).type)
+          const targetPath = normalizeOptionalString(
+            (entry as { targetPath?: unknown }).targetPath,
+          )
+
+          if (!type || !targetPath) {
+            return null
+          }
+
+          return { type, targetPath }
+        })
+        .filter((entry): entry is { type: string; targetPath: string } => entry !== null)
+    : []
+
+const normalizeMaterializationPlanValidationEntries = (
+  value: unknown,
+): ExecutorValidationResult[] =>
+  Array.isArray(value)
+    ? value
+        .map((entry) => {
+          if (!entry || typeof entry !== 'object') {
+            return null
+          }
+
+          return {
+            type: normalizeOptionalString((entry as { type?: unknown }).type),
+            targetPath: normalizeOptionalString((entry as { targetPath?: unknown }).targetPath),
+            expectedKind: normalizeOptionalString(
+              (entry as { expectedKind?: unknown }).expectedKind,
+            ),
+            expectedText: normalizeOptionalString(
+              (entry as { expectedText?: unknown }).expectedText,
+            ),
+          }
+        })
+        .filter(
+          (entry): entry is ExecutorValidationResult =>
+            entry !== null && Boolean(entry.type || entry.targetPath),
+        )
+    : []
+
+const buildValidationLookupKey = (value?: {
+  type?: string
+  targetPath?: string
+  expectedText?: string
+}) =>
+  [
+    normalizeOptionalString(value?.type).toLocaleLowerCase(),
+    normalizePathValue(value?.targetPath).toLocaleLowerCase(),
+    normalizeOptionalString(value?.expectedText).toLocaleLowerCase(),
+  ].join('::')
+
+const buildMaterializationArtifactSummary = ({
+  materializationPlan,
+  createdPaths,
+  touchedPaths,
+}: {
+  materializationPlan: MaterializationPlanContract | null
+  createdPaths: string[]
+  touchedPaths: string[]
+}) => {
+  const operations = normalizeMaterializationPlanOperations(materializationPlan?.operations)
+  const createdFolderPathsFromOperations = operations
+    .filter((entry) => normalizeOptionalString(entry.type).toLocaleLowerCase() === 'create-folder')
+    .map((entry) => entry.targetPath)
+  const writtenFilePathsFromOperations = operations
+    .filter((entry) =>
+      ['replace-file', 'append-file'].includes(
+        normalizeOptionalString(entry.type).toLocaleLowerCase(),
+      ),
+    )
+    .map((entry) => entry.targetPath)
+  const createdFolderPaths = mergeUniqueStringValues(
+    createdFolderPathsFromOperations,
+    createdPaths.filter((pathValue) => !isLikelyFilePath(pathValue)),
+    48,
+  )
+  const writtenFilePaths = mergeUniqueStringValues(
+    writtenFilePathsFromOperations,
+    [
+      ...createdPaths.filter((pathValue) => isLikelyFilePath(pathValue)),
+      ...touchedPaths.filter((pathValue) => isLikelyFilePath(pathValue)),
+    ],
+    64,
+  )
+  const trackedPaths = mergeUniqueStringValues(createdPaths, touchedPaths, 96)
+
+  return {
+    operations,
+    createdFolderPaths,
+    writtenFilePaths,
+    trackedPaths,
+  }
+}
+
 const deriveResultStatusPresentation = ({
   runStatus,
   requestState,
@@ -10263,6 +10383,9 @@ const extractExecutorFailureContext = (payload?: {
             details?.materializationPlanSource,
           ),
         }
+      : {}),
+    ...(details?.materializationPlan && typeof details.materializationPlan === 'object'
+      ? { materializationPlan: details.materializationPlan }
       : {}),
     ...(normalizeValidationResults(details?.validationResults).length > 0
       ? { validationResults: normalizeValidationResults(details?.validationResults) }
@@ -11860,6 +11983,21 @@ function App() {
   const latestMaterializationPlanSource = normalizeOptionalString(
     lastExecutorSnapshot?.materializationPlanSource,
   )
+  const latestMaterializationPlan =
+    (lastExecutorSnapshot?.materializationPlan &&
+    typeof lastExecutorSnapshot.materializationPlan === 'object'
+      ? lastExecutorSnapshot.materializationPlan
+      : null) ||
+    (plannerExecutionMetadata.materializationPlan &&
+    typeof plannerExecutionMetadata.materializationPlan === 'object'
+      ? plannerExecutionMetadata.materializationPlan
+      : null)
+  const latestMaterializationPlanOperations = normalizeMaterializationPlanOperations(
+    latestMaterializationPlan?.operations,
+  )
+  const latestMaterializationPlanValidations = normalizeMaterializationPlanValidationEntries(
+    latestMaterializationPlan?.validations,
+  )
   const latestBrainStrategy = normalizeOptionalString(lastExecutorSnapshot?.brainStrategy)
   const latestValidationResults = normalizeValidationResults(lastExecutorSnapshot?.validationResults)
   const inferValidationEntryKind = (
@@ -11928,6 +12066,14 @@ function App() {
     lastExecutorSnapshot?.touchedPaths,
     12,
   )
+  const latestMaterializationArtifacts = buildMaterializationArtifactSummary({
+    materializationPlan: latestMaterializationPlan,
+    createdPaths: latestCreatedArtifacts,
+    touchedPaths: latestTouchedArtifactsRaw,
+  })
+  const latestCreatedFolders = latestMaterializationArtifacts.createdFolderPaths
+  const latestWrittenFiles = latestMaterializationArtifacts.writtenFilePaths
+  const latestTrackedArtifacts = latestMaterializationArtifacts.trackedPaths
   const latestCurrentTargetPath = normalizeOptionalString(lastExecutorSnapshot?.currentTargetPath)
   const latestAllowedTargetPaths = normalizeOptionalStringArray(
     plannerExecutionMetadata.executionScope?.allowedTargetPaths,
@@ -12014,10 +12160,13 @@ function App() {
     latestCurrentTargetPath,
     workspacePath,
   )
-  const resultCreatedPaths = latestCreatedArtifacts.map((pathValue) =>
+  const resultCreatedFolderPaths = latestCreatedFolders.map((pathValue) =>
     formatWorkspaceRelativePath(pathValue, workspacePath),
   )
-  const resultTouchedPaths = latestTouchedArtifactsRaw.map((pathValue) =>
+  const resultWrittenFilePaths = latestWrittenFiles.map((pathValue) =>
+    formatWorkspaceRelativePath(pathValue, workspacePath),
+  )
+  const resultTrackedPaths = latestTrackedArtifacts.map((pathValue) =>
     formatWorkspaceRelativePath(pathValue, workspacePath),
   )
   const resultAllowedPaths = latestAllowedTargetPaths.map((pathValue) =>
@@ -12026,19 +12175,60 @@ function App() {
   const resultBlockedPaths = latestBlockedTargetPaths.map((pathValue) =>
     formatWorkspaceRelativePath(pathValue, workspacePath),
   )
-  const resultValidationItems = latestValidationResults.map((entry, index) => ({
-    key: `${index}-${entry.type || 'validation'}-${entry.targetPath || 'target'}`,
-    ok: entry.ok !== false,
-    label:
-      formatWorkspaceRelativePath(entry.targetPath, workspacePath) ||
-      'Ruta no reportada',
-    detail: [
-      normalizeOptionalString(entry.type) || 'validación',
-      normalizeOptionalString(entry.expectedKind),
-    ]
-      .filter(Boolean)
-      .join(' · '),
-  }))
+  const latestMaterializationPlanValidationLookup = new Map(
+    latestMaterializationPlanValidations.map((entry, index) => [
+      buildValidationLookupKey(entry) || `validation-${index}`,
+      entry,
+    ]),
+  )
+  const resultValidationItems = latestValidationResults.map((entry, index) => {
+    const matchedPlanValidation =
+      latestMaterializationPlanValidationLookup.get(buildValidationLookupKey(entry)) ||
+      latestMaterializationPlanValidations[index] ||
+      null
+    const normalizedType = normalizeOptionalString(entry.type).toLocaleLowerCase()
+    const expectedKind =
+      normalizeOptionalString(entry.expectedKind) ||
+      normalizeOptionalString(matchedPlanValidation?.expectedKind)
+    const expectedText =
+      normalizeOptionalString(entry.expectedText) ||
+      normalizeOptionalString(matchedPlanValidation?.expectedText)
+    let detail = normalizeOptionalString(entry.reason)
+
+    if (!detail && normalizedType === 'exists') {
+      detail =
+        expectedKind === 'folder'
+          ? 'Existe la carpeta esperada.'
+          : expectedKind === 'file'
+            ? 'Existe el archivo esperado.'
+            : 'Existe la ruta esperada.'
+    }
+
+    if (!detail && normalizedType === 'file-contains') {
+      detail = expectedText
+        ? `Contiene ${summarizeInlineText(expectedText, 72)}.`
+        : 'Contiene el texto esperado.'
+    }
+
+    if (!detail) {
+      detail = [
+        normalizeOptionalString(entry.type) || 'validación',
+        expectedKind,
+        expectedText ? summarizeInlineText(expectedText, 72) : '',
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    }
+
+    return {
+      key: `${index}-${entry.type || 'validation'}-${entry.targetPath || 'target'}`,
+      ok: entry.ok !== false,
+      label:
+        formatWorkspaceRelativePath(entry.targetPath, workspacePath) ||
+        'Ruta no reportada',
+      detail,
+    }
+  })
   const inferredValidationCount = latestValidatedFolderCount + latestValidatedFileCount
   const inferredValidationSummaryParts = [
     latestValidatedFolderCount > 0 ? `${latestValidatedFolderCount} carpeta(s)` : '',
@@ -12049,6 +12239,8 @@ function App() {
       ? inferredValidationCount > 0
         ? `${inferredValidationSummaryParts.join(' y ')} validados.`
         : `${latestValidationResults.length} validación(es) reportadas.`
+      : latestMaterializationPlanValidations.length > 0
+        ? `${latestMaterializationPlanValidations.length} validación(es) previstas en el plan.`
       : 'La corrida no devolvió validaciones estructuradas.'
   const resultScopeRespected =
     resultBlockedPaths.length > 0 &&
@@ -12059,7 +12251,7 @@ function App() {
         return true
       }
 
-      return ![...latestCreatedArtifacts, ...latestTouchedArtifactsRaw].some(
+      return !latestTrackedArtifacts.some(
         (artifactPath) =>
           buildComparablePath(artifactPath, workspacePath) === comparableBlockedPath,
       )
@@ -12079,6 +12271,13 @@ function App() {
         ? 'Codex'
         : latestBridgeModeValue
       : 'No disponible'
+  const resultCanSuggestReusableNow =
+    activeProjectReadinessState?.safeLocalDemoReady === true ||
+    activeProjectReadinessState?.demoReady === true ||
+    normalizeOptionalString(
+      activeProjectContinuationState?.nextRecommendedPhase ||
+        activeLocalProjectManifest?.nextRecommendedPhase,
+    ).toLocaleLowerCase() === 'review-and-expand'
   const resultSuggestedActions = [
     resultPrimaryAffectedPathLabel
       ? {
@@ -12086,7 +12285,7 @@ function App() {
           detail: `Revisar ${resultPrimaryAffectedPathLabel} para continuar sobre la salida generada.`,
         }
       : null,
-    [...resultCreatedPaths, ...resultTouchedPaths].some((pathValue) =>
+    [...resultWrittenFilePaths, ...resultTrackedPaths].some((pathValue) =>
       pathValue.toLocaleLowerCase().endsWith('index.html'),
     )
       ? {
@@ -12096,20 +12295,30 @@ function App() {
       : null,
     resultStatusPresentation.label === 'Ejecución completada'
       ? {
-          title: 'Guardar como reusable',
-          detail: 'Si el cierre te sirve como base, conviene registrarlo como memoria reutilizable.',
+          title: resultCanSuggestReusableNow
+            ? 'Guardar como reusable'
+            : 'Guardar como reusable después de validar',
+          detail: resultCanSuggestReusableNow
+            ? 'Si el cierre ya pasó la validación local, conviene registrarlo como memoria reutilizable.'
+            : 'Conviene hacerlo cuando la demo pase la revisión visual y la fase de local-validation.',
         }
       : null,
     resultStatusPresentation.label === 'Ejecución completada'
       ? {
-          title: 'Crear variante reutilizando estilo',
-          detail: 'Buena opción para iterar una nueva versión sin perder la identidad visual.',
+          title: resultCanSuggestReusableNow
+            ? 'Crear variante reutilizando estilo'
+            : 'Crear variante después de validar',
+          detail: resultCanSuggestReusableNow
+            ? 'Buena opción para iterar una nueva versión sin perder la identidad visual.'
+            : 'Mejor hacerlo cuando la base ya esté validada visualmente y lista para reutilizar.',
         }
       : null,
     resultStatusPresentation.label === 'Ejecución completada'
       ? {
           title: 'Crear variante reutilizando estructura',
-          detail: 'Útil cuando la composición ya funciona y querés cambiar rubro o contenido.',
+          detail: resultCanSuggestReusableNow
+            ? 'Útil cuando la composición ya funciona y querés cambiar rubro o contenido.'
+            : 'Conviene esperar a la validación local para tomar esta salida como base estructural.',
         }
       : null,
     {
@@ -12155,16 +12364,41 @@ function App() {
     resultIsFrontendProjectMaterialization ||
     resultIsFullstackLocalMaterialization
   const resultMaterializationFilePaths = mergeUniqueStringValues(
-    latestCreatedArtifacts.filter((pathValue) => isLikelyFilePath(pathValue)),
-    latestTouchedArtifactsRaw.filter((pathValue) => isLikelyFilePath(pathValue)),
-    12,
+    latestWrittenFiles,
+    [
+      ...latestCreatedArtifacts.filter((pathValue) => isLikelyFilePath(pathValue)),
+      ...latestTouchedArtifactsRaw.filter((pathValue) => isLikelyFilePath(pathValue)),
+      ...latestAllowedTargetPaths.filter((pathValue) => isLikelyFilePath(pathValue)),
+    ],
+    24,
   )
+  const resultMaterializationPriorityFiles = [
+    'frontend/index.html',
+    'README.md',
+    'jefe-project.json',
+    'docs/local-runbook.md',
+    'backend/src/server.js',
+    'database/schema.sql',
+    'shared/contracts/domain.js',
+  ]
+  const resultMaterializationKeyFilePaths = resultMaterializationPriorityFiles
+    .map((priorityPath) =>
+      resultMaterializationFilePaths.find((pathValue) =>
+        normalizePathValue(pathValue)
+          .replace(/\\/g, '/')
+          .toLocaleLowerCase()
+          .endsWith(priorityPath.toLocaleLowerCase()),
+      ) || '',
+    )
+    .filter(Boolean)
   const resultMaterializationFileLabels = mergeUniqueStringValues(
-    resultMaterializationFilePaths.map((pathValue) => getPathLeafName(pathValue)),
-    latestAllowedTargetPaths
-      .filter((pathValue) => isLikelyFilePath(pathValue))
-      .map((pathValue) => getPathLeafName(pathValue)),
-    8,
+    resultMaterializationKeyFilePaths.map((pathValue) =>
+      formatWorkspaceRelativePath(pathValue, workspacePath),
+    ),
+    resultMaterializationFilePaths.map((pathValue) =>
+      formatWorkspaceRelativePath(pathValue, workspacePath),
+    ),
+    10,
   )
   const resultMaterializationFolderLabel =
     resultPrimaryAffectedPathLabel ||
@@ -12183,14 +12417,26 @@ function App() {
     ) || 'No disponible'
   const resultMaterializationStats = parseMaterializationExecutionStats(resultHumanText)
   const resultMaterializationOperationsLabel =
-    resultMaterializationStats.operationsCount > 0
-      ? `${resultMaterializationStats.operationsCount} operación(es)`
+    latestMaterializationPlanOperations.length > 0
+      ? `${latestMaterializationPlanOperations.length} operación(es)`
+      : resultMaterializationStats.operationsCount > 0
+        ? `${resultMaterializationStats.operationsCount} operación(es)`
       : 'No reportadas'
+  const resultMaterializationCreatedFoldersLabel =
+    resultCreatedFolderPaths.length > 0
+      ? `${resultCreatedFolderPaths.length} carpeta(s)`
+      : 'Sin carpetas reportadas'
+  const resultMaterializationWrittenFilesLabel =
+    resultWrittenFilePaths.length > 0
+      ? `${resultWrittenFilePaths.length} archivo(s)`
+      : 'Sin archivos reportados'
   const resultMaterializationValidationsLabel =
-    resultMaterializationStats.validationsCount > 0
-      ? `${resultMaterializationStats.validationsCount} validación(es)`
-      : latestValidationResults.length > 0
-        ? `${latestValidationResults.length} validación(es)`
+    latestValidationResults.length > 0
+      ? `${latestValidationOkCount}/${latestValidationResults.length} OK`
+      : resultMaterializationStats.validationsCount > 0
+        ? `${resultMaterializationStats.validationsCount} validación(es)`
+        : latestMaterializationPlanValidations.length > 0
+          ? `${latestMaterializationPlanValidations.length} previstas`
         : 'No reportadas'
   const resultMaterializationEngineLabel = latestMaterializationLayer || 'No disponible'
   const resultMaterializationBridgeDetail =
@@ -12210,7 +12456,9 @@ function App() {
   const resultMaterializationReadinessLabel =
     normalizeOptionalString(activeProjectReadinessState?.operatorSummary) ||
     normalizeOptionalString(activeProjectReadinessState?.lastValidationSummary) ||
-    'Todavía no hay un resumen de readiness para esta salida.'
+    (resultIsFullstackLocalMaterialization
+      ? 'Scaffold materializado · demo base pendiente de completar.'
+      : 'Todavía no hay un resumen de readiness para esta salida.')
   const resultMaterializationNextPhaseId =
     normalizeOptionalString(activeProjectContinuationState?.nextRecommendedPhase) ||
     normalizeOptionalString(activeLocalProjectManifest?.nextRecommendedPhase) ||
@@ -12230,7 +12478,7 @@ function App() {
   const resultMaterializationSummaryTitle = resultIsSafeFirstDeliveryMaterialization
     ? 'Primera entrega segura generada'
     : resultIsFullstackLocalMaterialization
-      ? 'Demo fullstack local generada'
+      ? 'Scaffold fullstack local materializado'
       : resultIsFrontendProjectMaterialization
         ? 'Frontend local generado'
         : 'Entrega local generada'
@@ -19152,12 +19400,21 @@ function App() {
                                     : 'No disponible',
                               },
                               {
-                                label: 'Operaciones',
+                                label: 'Carpetas creadas',
+                                value: resultMaterializationCreatedFoldersLabel,
+                              },
+                              {
+                                label: 'Archivos escritos',
+                                value: resultMaterializationWrittenFilesLabel,
+                              },
+                              {
+                                label: 'Operaciones totales',
                                 value: resultMaterializationOperationsLabel,
                               },
                               {
                                 label: 'Validaciones',
                                 value: resultMaterializationValidationsLabel,
+                                detail: resultValidationSummaryText,
                               },
                               {
                                 label: 'Cómo probar',
@@ -19192,7 +19449,7 @@ function App() {
                           <div className="mt-4 grid gap-4 lg:grid-cols-2">
                             <div className="space-y-2">
                               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                Archivos generados
+                                Archivos clave
                               </div>
                               <div className="grid gap-2">
                                 {resultMaterializationFileLabels.length > 0 ? (
@@ -19336,7 +19593,7 @@ function App() {
 
                       <ResultSectionCard
                         title="Archivos"
-                        description="Resumen de carpeta principal, archivos creados, archivos tocados y alcance activo."
+                        description="Resumen de carpeta principal, carpetas creadas, archivos escritos y alcance activo."
                       >
                         <ResultKeyValueGrid
                           items={[
@@ -19349,29 +19606,36 @@ function App() {
                               value: resultCurrentTargetPathLabel || 'No disponible',
                             },
                             {
-                              label: 'Paths creados',
+                              label: 'Carpetas creadas',
                               value:
-                                resultCreatedPaths.length > 0
-                                  ? `${resultCreatedPaths.length} ruta(s)`
-                                  : 'Sin paths creados',
+                                resultCreatedFolderPaths.length > 0
+                                  ? `${resultCreatedFolderPaths.length} carpeta(s)`
+                                  : 'Sin carpetas creadas',
                             },
                             {
-                              label: 'Paths tocados',
+                              label: 'Archivos escritos',
                               value:
-                                resultTouchedPaths.length > 0
-                                  ? `${resultTouchedPaths.length} ruta(s)`
-                                  : 'Sin paths tocados',
+                                resultWrittenFilePaths.length > 0
+                                  ? `${resultWrittenFilePaths.length} archivo(s)`
+                                  : 'Sin archivos escritos',
+                            },
+                            {
+                              label: 'Rutas rastreadas',
+                              value:
+                                resultTrackedPaths.length > 0
+                                  ? `${resultTrackedPaths.length} ruta(s)`
+                                  : 'Sin rutas rastreadas',
                             },
                           ]}
                         />
                         <div className="mt-4 grid gap-4 lg:grid-cols-2">
                           <div className="space-y-2">
                             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              createdPaths
+                              Carpetas creadas
                             </div>
                             <div className="grid gap-2">
-                              {resultCreatedPaths.length > 0 ? (
-                                resultCreatedPaths.map((artifactPath) => (
+                              {resultCreatedFolderPaths.length > 0 ? (
+                                resultCreatedFolderPaths.map((artifactPath) => (
                                   <div
                                     key={`created-${artifactPath}`}
                                     className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
@@ -19381,20 +19645,20 @@ function App() {
                                 ))
                               ) : (
                                 <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                                  No se reportaron rutas creadas.
+                                  No se reportaron carpetas creadas.
                                 </div>
                               )}
                             </div>
                           </div>
                           <div className="space-y-2">
                             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              touchedPaths
+                              Archivos escritos
                             </div>
                             <div className="grid gap-2">
-                              {resultTouchedPaths.length > 0 ? (
-                                resultTouchedPaths.map((artifactPath) => (
+                              {resultWrittenFilePaths.length > 0 ? (
+                                resultWrittenFilePaths.map((artifactPath) => (
                                   <div
-                                    key={`touched-${artifactPath}`}
+                                    key={`written-${artifactPath}`}
                                     className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
                                   >
                                     {artifactPath}
@@ -19402,7 +19666,7 @@ function App() {
                                 ))
                               ) : (
                                 <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                                  No se reportaron rutas tocadas.
+                                  No se reportaron archivos escritos.
                                 </div>
                               )}
                             </div>

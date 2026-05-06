@@ -350,7 +350,7 @@ function pushStaticFrontendCompatibilityFailures(failures, frontendArtifacts) {
   )
 }
 
-async function tryVerifyStaticFrontendInBrowser(indexHtmlPath) {
+async function tryVerifyStaticFrontendInBrowser(indexHtmlPath, options = {}) {
   try {
     const playwrightModule = await import('playwright')
     const chromium =
@@ -370,6 +370,10 @@ async function tryVerifyStaticFrontendInBrowser(indexHtmlPath) {
       const page = await browser.newPage()
       const pageErrors = []
       const consoleErrors = []
+      const clickTexts = Array.isArray(options?.clickTexts)
+        ? options.clickTexts.filter((value) => typeof value === 'string' && value.trim())
+        : []
+      const interactionSnapshots = []
 
       page.on('pageerror', (error) => {
         pageErrors.push(error instanceof Error ? error.message : String(error))
@@ -386,11 +390,25 @@ async function tryVerifyStaticFrontendInBrowser(indexHtmlPath) {
 
       const bodyText = await page.locator('body').innerText()
 
+      for (const label of clickTexts) {
+        const button =
+          page.getByRole('button', { name: new RegExp(escapeRegExp(label), 'i') }).first()
+        if ((await button.count()) > 0) {
+          await button.click()
+          await page.waitForTimeout(80)
+          interactionSnapshots.push({
+            label,
+            bodyText: await page.locator('body').innerText(),
+          })
+        }
+      }
+
       return {
         available: true,
         attempted: true,
         ok: pageErrors.length === 0 && consoleErrors.length === 0,
         bodyText,
+        interactionSnapshots,
         pageErrors,
         consoleErrors,
       }
@@ -1037,6 +1055,19 @@ async function runFullstackBaseCase() {
   )
   pushFailure(
     failures,
+    normalizeIdentifier(decision?.projectReadinessState?.readinessLevel) ===
+      'scaffold-materialized',
+    'Después del scaffold el readiness debe marcar scaffold-materialized.',
+  )
+  pushFailure(
+    failures,
+    normalizeText(decision?.projectReadinessState?.operatorSummary || '').includes(
+      'scaffold materializado',
+    ),
+    'Después del scaffold la lectura para operador debe mencionar scaffold materializado.',
+  )
+  pushFailure(
+    failures,
     normalizeIdentifier(decision?.projectContinuationState?.nextRecommendedPhase) ===
       'frontend-mock-flow',
     'Despues del scaffold debe recomendar frontend-mock-flow.',
@@ -1067,6 +1098,7 @@ async function runFullstackStaticFileCompatibilityCase() {
   const runbookContent = fs.readFileSync(runbookPath, 'utf8')
   const readmeContent = fs.readFileSync(readmePath, 'utf8')
   const orderedScripts = extractOrderedStaticScriptSources(indexHtml)
+  const normalizedFrontendSurface = normalizeText(`${indexHtml}\n${mainJs}\n${mockDataJs}\n${appJs}`)
 
   pushFailure(
     failures,
@@ -1125,18 +1157,20 @@ async function runFullstackStaticFileCompatibilityCase() {
   )
   pushFailure(
     failures,
-    !normalizeText(`${indexHtml}
-${mainJs}
-${mockDataJs}
-${appJs}`).includes('clinica medica') &&
-      !normalizeText(`${indexHtml}
-${mainJs}
-${mockDataJs}
-${appJs}`).includes('pediatria') &&
-      !normalizeText(`${indexHtml}
-${mainJs}
-${mockDataJs}
-${appJs}`).includes('pacientes'),
+    readmeContent.includes('Veterinaria') || mockDataJs.includes('Veterinaria') || appJs.includes('Veterinaria'),
+    'La demo veterinaria debe usar un título visible presentable como Veterinaria.',
+  )
+  pushFailure(
+    failures,
+    normalizedFrontendSurface.includes('atencion veterinaria general'),
+    'La demo veterinaria debe usar Atención veterinaria general en lugar de Clínica general.',
+  )
+  pushFailure(
+    failures,
+    !normalizedFrontendSurface.includes('ingreso de paciente') &&
+      !normalizedFrontendSurface.includes('clinica medica') &&
+      !normalizedFrontendSurface.includes('pediatria') &&
+      !normalizedFrontendSurface.includes('pacientes'),
     'El frontend veterinario generado no debe arrastrar terminos de clinica humana en sus archivos.',
   )
   pushFailure(
@@ -1205,7 +1239,9 @@ ${runbookContent}`).includes('doble click'),
     )
   }
 
-  const browserVerification = await tryVerifyStaticFrontendInBrowser(indexHtmlPath)
+  const browserVerification = await tryVerifyStaticFrontendInBrowser(indexHtmlPath, {
+    clickTexts: ['Turnos', 'Recordatorios', 'Inventario'],
+  })
   if (browserVerification.available && browserVerification.attempted) {
     const normalizedBodyText = normalizeText(browserVerification.bodyText)
     const visibleBodyVeterinarySections = [
@@ -1241,6 +1277,40 @@ ${runbookContent}`).includes('doble click'),
         !normalizedBodyText.includes('pacientes'),
       'La validacion opcional en navegador no debe mostrar terminos de clinica humana dentro de la demo veterinaria.',
     )
+    pushFailure(
+      failures,
+      normalizedBodyText.includes('dashboard') &&
+        normalizedBodyText.includes('clientes') &&
+        normalizedBodyText.includes('mascotas') &&
+        normalizedBodyText.includes('turnos') &&
+        normalizedBodyText.includes('recordatorios') &&
+        normalizedBodyText.includes('reportes') &&
+        normalizedBodyText.includes('inventario'),
+      'La validación opcional en navegador debe mostrar la navegación principal de la demo veterinaria.',
+    )
+    const interactionSnapshots = Array.isArray(browserVerification.interactionSnapshots)
+      ? browserVerification.interactionSnapshots
+      : []
+    pushFailure(
+      failures,
+      interactionSnapshots.length >= 3,
+      'La validación opcional en navegador debe poder navegar Turnos, Recordatorios e Inventario sin romper la demo.',
+    )
+    for (const entry of [
+      { label: 'Turnos', expectedToken: 'turnos' },
+      { label: 'Recordatorios', expectedToken: 'recordatorios' },
+      { label: 'Inventario', expectedToken: 'inventario' },
+    ]) {
+      const snapshot = interactionSnapshots.find(
+        (item) => normalizeText(item.label) === normalizeText(entry.label),
+      )
+      pushFailure(
+        failures,
+        Boolean(snapshot) &&
+          normalizeText(snapshot?.bodyText || '').includes(normalizeText(entry.expectedToken)),
+        `La navegación ${entry.label} debe seguir mostrando contenido visible del dominio veterinario.`,
+      )
+    }
   }
 
   pushFailure(
@@ -1294,6 +1364,19 @@ async function runDomainRichnessCase({
     normalizeIdentifier(reviewDecision?.projectContinuationState?.nextRecommendedPhase) ===
       'frontend-mock-flow',
     'Después del scaffold debe recomendar frontend-mock-flow.',
+  )
+  pushFailure(
+    failures,
+    normalizeIdentifier(reviewDecision?.projectReadinessState?.readinessLevel) ===
+      'scaffold-materialized',
+    `Después del scaffold ${label} debe marcar scaffold-materialized.`,
+  )
+  pushFailure(
+    failures,
+    normalizeText(reviewDecision?.projectReadinessState?.operatorSummary || '').includes(
+      'scaffold materializado',
+    ),
+    `Después del scaffold ${label} debe explicar que el scaffold ya fue materializado.`,
   )
   pushFailure(
     failures,
@@ -1483,6 +1566,18 @@ async function runPhaseMaterializationFlowCase() {
     (Array.isArray(fixture.manifest?.phases) ? fixture.manifest.phases : []).find(
       (entry) => normalizeIdentifier(entry?.id) === normalizeIdentifier(phaseId),
     ) || null
+
+  pushFailure(
+    failures,
+    normalizeIdentifier(fixture.manifest?.readinessLevel) === 'scaffold-materialized',
+    'El manifest base debe dejar scaffold-materialized después del scaffold fullstack local.',
+  )
+  pushFailure(
+    failures,
+    normalizeText(fixture.manifest?.recommendedDemoScript || '').includes('frontend/index.html') &&
+      normalizeText(fixture.manifest?.recommendedDemoScript || '').includes('doble click'),
+    'El manifest base debe explicar cómo abrir frontend/index.html con doble click.',
+  )
 
   fixture = await materializePhaseOnFixture({
     fixture,
@@ -2284,6 +2379,26 @@ async function runUiHelperSanityCase() {
     failures,
     appSource.includes('handlePrepareProjectPhase(resultMaterializationNextPhaseId)'),
     'El resultado final debe permitir preparar la siguiente fase segura sin obligar a volver al plan.',
+  )
+  pushFailure(
+    failures,
+    appSource.includes('Scaffold materializado'),
+    'La UI debe poder mostrar Scaffold materializado como readiness visible luego del scaffold.',
+  )
+  pushFailure(
+    failures,
+    appSource.includes('Guardar como reusable después de validar'),
+    'La UI debe bajar la sugerencia reusable hasta después de la validación local.',
+  )
+  pushFailure(
+    failures,
+    appSource.includes('Carpetas creadas') && appSource.includes('Archivos escritos'),
+    'El resultado final debe resumir carpetas creadas y archivos escritos por separado.',
+  )
+  pushFailure(
+    failures,
+    appSource.includes('Contiene el texto esperado.'),
+    'El detalle de validaciones debe explicar file-contains con un texto útil.',
   )
 
   return {

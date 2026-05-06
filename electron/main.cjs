@@ -14168,6 +14168,7 @@ function buildFullstackLocalDemoBase({
     overview: {
       name: appTitle,
       archetype,
+      archetypeLabel: buildFullstackLocalArchetypeDisplayLabel(archetype),
       heroKicker,
       subtitle,
       mode: 'local-static-review',
@@ -14274,7 +14275,7 @@ function buildVeterinaryFullstackLocalDemoData({
     {
       id: 'VET-001',
       name: 'Dra. Paula Benítez',
-      role: 'Clínica general',
+      role: 'Atención veterinaria general',
       shift: 'Mañana',
       status: 'En consultorio',
       focus: 'Controles y seguimiento preventivo',
@@ -14539,7 +14540,7 @@ function buildVeterinaryFullstackLocalDemoData({
     {
       id: 'ACT-001',
       time: '09:05',
-      title: 'Ingreso de paciente',
+      title: 'Ingreso de mascota',
       detail: 'Luna quedó lista para control anual en Consultorio 1.',
       tone: 'sky',
     },
@@ -17616,7 +17617,7 @@ insert into clients (id, full_name, phone, neighborhood, preferred_channel, note
   ('CLI-002', 'Santiago Fernández', '11 5555-8282', 'Caballito', 'Llamado interno', 'Control posvacuna de Milo');
 
 insert into veterinarians (id, full_name, specialty, shift, status) values
-  ('VET-001', 'Dra. Paula Benítez', 'Clínica general', 'Mañana', 'En consultorio'),
+  ('VET-001', 'Dra. Paula Benítez', 'Atención veterinaria general', 'Mañana', 'En consultorio'),
   ('VET-002', 'Dr. Julián Rivas', 'Cirugía menor', 'Tarde', 'Disponible');
 
 insert into pets (id, client_id, name, species, breed, age_label, health_status, next_control_at, notes) values
@@ -18225,6 +18226,10 @@ function buildFullstackLocalDocumentationBundle({
   modules,
 }) {
   const overview = fullstackLocalDemoData?.overview || {}
+  const archetypeLabel =
+    buildFullstackLocalArchetypeDisplayLabel(overview.archetype) ||
+    overview.archetypeLabel ||
+    'Sistema local'
   const demoSections = summarizeUniqueExecutorStrings(
     (Array.isArray(fullstackLocalDemoData?.navItems)
       ? fullstackLocalDemoData.navItems
@@ -18290,7 +18295,7 @@ Scaffold fullstack local, seguro y revisable generado por JEFE.
 
 ## Qué podés mostrar en la demo
 
-- Dominio visible: ${overview.archetype || 'operations'}
+- Dominio visible: ${archetypeLabel}
 - Entidades principales: ${domainEntities.join(', ') || 'sin entidades declaradas'}
 - Métricas mock: ${highlightedMetrics.join(', ') || 'sin métricas declaradas'}
 - Alertas o pendientes: ${highlightedAlerts.join(', ') || 'sin alertas declaradas'}
@@ -18369,7 +18374,7 @@ Dejar una primera demo local segura, revisable y abrible por \`file://\`.
 ## Dominio representado
 
 - nombre: ${appTitle}
-- arquetipo: ${overview.archetype || 'operations'}
+- arquetipo: ${archetypeLabel}
 - módulos visibles: ${visibleModules.join(', ') || 'sin módulos declarados'}
 - secciones de demo: ${demoSections.join(', ') || 'sin secciones declaradas'}
 - interacciones locales: ${interactionHighlights.join(', ') || 'búsqueda, filtros y selección en memoria'}
@@ -18960,9 +18965,7 @@ function buildFullstackLocalMaterializationPlan({
     slugifyBusinessSector(path.basename(rootFolder)) ||
     slugifyBusinessSector(domainLabel) ||
     'fullstack-local'
-  const appTitle =
-    sanitizeBusinessSectorLabel(domainLabel) ||
-    buildFullstackLocalArchetypeAppTitle(inferredArchetype)
+  const appTitle = buildPresentableFullstackLocalAppTitle(domainLabel, inferredArchetype)
   const fullstackLocalDemoData = buildFullstackLocalDemoData({
     appTitle,
     normalizedText: normalizedDomainText,
@@ -23058,12 +23061,24 @@ function getLocalProjectManifestProjectRoot(localProjectManifest) {
     [
       ...(Array.isArray(normalizedManifest.phases)
         ? normalizedManifest.phases.flatMap((entry) =>
-            Array.isArray(entry?.files) ? entry.files : [],
+            Array.isArray(entry?.files)
+              ? entry.files.map((filePath) =>
+                  typeof filePath === 'string'
+                    ? filePath.replace(/[\\/]+/g, '/')
+                    : filePath,
+                )
+              : [],
           )
         : []),
       ...(Array.isArray(normalizedManifest.modules)
         ? normalizedManifest.modules.flatMap((entry) =>
-            Array.isArray(entry?.files) ? entry.files : [],
+            Array.isArray(entry?.files)
+              ? entry.files.map((filePath) =>
+                  typeof filePath === 'string'
+                    ? filePath.replace(/[\\/]+/g, '/')
+                    : filePath,
+                )
+              : [],
           )
         : []),
     ],
@@ -23121,12 +23136,24 @@ function listLocalProjectManifestTrackedFiles(localProjectManifest) {
     [
       ...(Array.isArray(normalizedManifest.phases)
         ? normalizedManifest.phases.flatMap((entry) =>
-            Array.isArray(entry?.files) ? entry.files : [],
+            Array.isArray(entry?.files)
+              ? entry.files.map((filePath) =>
+                  typeof filePath === 'string'
+                    ? filePath.replace(/[\\/]+/g, '/')
+                    : filePath,
+                )
+              : [],
           )
         : []),
       ...(Array.isArray(normalizedManifest.modules)
         ? normalizedManifest.modules.flatMap((entry) =>
-            Array.isArray(entry?.files) ? entry.files : [],
+            Array.isArray(entry?.files)
+              ? entry.files.map((filePath) =>
+                  typeof filePath === 'string'
+                    ? filePath.replace(/[\\/]+/g, '/')
+                    : filePath,
+                )
+              : [],
           )
         : []),
     ],
@@ -23361,6 +23388,16 @@ function buildProjectReadinessState({
   const completedPhases = phaseStates
     .filter((entry) => entry.status === 'done')
     .map((entry) => entry.title)
+  const scaffoldMaterialized =
+    String(
+      getLocalProjectManifestPhaseEntry(normalizedManifest, 'fullstack-local-scaffold')
+        ?.status || '',
+    )
+      .trim()
+      .toLocaleLowerCase() === 'done'
+  const completedCorePhaseEntries = phaseStates.filter(
+    (entry) => corePhaseIds.includes(entry.id) && entry.status === 'done',
+  )
   const missingCorePhases = phaseStates
     .filter(
       (entry) => corePhaseIds.includes(entry.id) && entry.status !== 'done',
@@ -23491,17 +23528,25 @@ function buildProjectReadinessState({
         ? 'planning'
         : demoReady
           ? 'demo-ready'
-          : completedPhases.length > 0
-            ? 'scaffolded'
-            : normalizedScalablePlan
-              ? 'planning'
-              : 'not-started'
+          : scaffoldMaterialized && completedCorePhaseEntries.length > 0
+            ? 'base-phases-in-progress'
+            : scaffoldMaterialized
+              ? 'scaffold-materialized'
+              : completedPhases.length > 0
+                ? 'scaffolded'
+                : normalizedScalablePlan
+                  ? 'planning'
+                  : 'not-started'
   const lastValidationSummary = demoReady
     ? runtimeReadiness === 'approval-preview'
       ? 'Listo para demo local segura. El paso a runtime real sigue pendiente de aprobación explícita y no se ejecutó nada real.'
       : 'Listo para demo local segura. No se ejecutó nada real: todo sigue en modo revisable y mock donde corresponde.'
     : completedCoreFlow
       ? 'La base local está cerrada, pero todavía conviene revisar el resultado antes de hablar de una demo completa.'
+      : scaffoldMaterialized && completedCorePhaseEntries.length > 0
+        ? `La demo base ya avanzó por fases seguras, pero todavía falta completar ${missingCorePhases[0] || 'la validación local'} para cerrar el flujo.`
+        : scaffoldMaterialized
+          ? 'Scaffold materializado. La demo base todavía necesita Frontend mock flow, Backend contracts, Database design y Local validation.'
       : 'Todavía falta completar el flujo base y la validación local para cerrar una demo segura.'
   const operatorSummary = demoReady
     ? runtimeReadiness === 'approval-preview'
@@ -23509,6 +23554,10 @@ function buildProjectReadinessState({
       : 'Listo para demo local segura.'
     : blockedCorePhases.length > 0
       ? 'Bloqueado por seguridad antes de cerrar la demo local.'
+      : scaffoldMaterialized && completedCorePhaseEntries.length > 0
+        ? `Demo visual en progreso. Falta completar ${missingCorePhases[0] || 'la validación local'} para cerrar la base segura.`
+        : scaffoldMaterialized
+          ? 'Scaffold materializado · demo base pendiente de completar.'
       : 'Todavía falta completar el flujo base antes de cerrar la demo local segura.'
 
   return normalizeProjectReadinessStateContract({
@@ -25396,6 +25445,55 @@ function buildFullstackLocalArchetypeAppTitle(archetype) {
   return 'Sistema Fullstack Local'
 }
 
+function buildFullstackLocalArchetypeDisplayLabel(archetype) {
+  if (archetype === 'veterinary') {
+    return 'Veterinaria'
+  }
+  if (archetype === 'medical-clinic') {
+    return 'Turnos médicos'
+  }
+  if (archetype === 'sports-booking') {
+    return 'Reservas deportivas'
+  }
+  if (archetype === 'ecommerce') {
+    return 'Ecommerce'
+  }
+  if (archetype === 'real-estate') {
+    return 'Inmobiliaria'
+  }
+  if (archetype === 'school-crm') {
+    return 'Gestión escolar'
+  }
+  if (archetype === 'document-management') {
+    return 'Sistema documental'
+  }
+  if (archetype === 'security-monitoring') {
+    return 'Seguridad y monitoreo'
+  }
+  if (archetype === 'community-social') {
+    return 'Comunidad'
+  }
+
+  return 'Sistema local'
+}
+
+function buildPresentableFullstackLocalAppTitle(value, archetype) {
+  const sanitizedValue = sanitizeBusinessSectorLabel(value)
+  if (!sanitizedValue || isGenericFullstackLocalDomainLabel(sanitizedValue)) {
+    return buildFullstackLocalArchetypeAppTitle(archetype)
+  }
+
+  const normalizedValue = normalizeSectorDetectionText(sanitizedValue)
+  if (normalizedValue === 'veterinaria') {
+    return 'Veterinaria'
+  }
+  if (normalizedValue === 'veterinaria local') {
+    return 'Veterinaria local'
+  }
+
+  return /[A-ZÁÉÍÓÚÑ]/u.test(sanitizedValue) ? sanitizedValue : toTitleCaseWords(sanitizedValue)
+}
+
 function buildPhaseAwareFullstackLocalDemoData({
   localProjectManifest,
   projectRoot,
@@ -25417,11 +25515,10 @@ function buildPhaseAwareFullstackLocalDemoData({
   const manifestDomainLabel = sanitizeBusinessSectorLabel(
     normalizedManifest?.domain || '',
   )
-  const appTitle =
-    manifestDomainLabel &&
-    !isGenericFullstackLocalDomainLabel(manifestDomainLabel)
-      ? manifestDomainLabel
-      : buildFullstackLocalArchetypeAppTitle(inferredArchetype)
+  const appTitle = buildPresentableFullstackLocalAppTitle(
+    manifestDomainLabel,
+    inferredArchetype,
+  )
   const baseDemoData = buildFullstackLocalDemoData({
     appTitle,
     normalizedText: [normalizedManifest?.domain || '', projectRoot || ''].join(' '),
@@ -25530,10 +25627,10 @@ function buildFullstackLocalPhaseArtifacts({
     phaseId,
     nextRecommendedPhase,
   })
-  const appTitle =
-    sanitizeBusinessSectorLabel(normalizedManifest?.domain || '') ||
-    fullstackLocalDemoData?.overview?.name ||
-    'Sistema Fullstack Local'
+  const appTitle = buildPresentableFullstackLocalAppTitle(
+    normalizedManifest?.domain || fullstackLocalDemoData?.overview?.name || '',
+    fullstackLocalDemoData?.overview?.archetype || 'operations',
+  )
   const modules = buildFullstackLocalPhaseModuleNames(normalizedManifest)
   const documentationBundle = buildFullstackLocalDocumentationBundle({
     appTitle,
@@ -30216,11 +30313,10 @@ function buildModuleExpansionArtifacts({
     domainUnderstanding: null,
     modules: visibleModuleNames,
   })
-  const appTitle =
-    manifestDomainLabel &&
-    !isGenericFullstackLocalDomainLabel(manifestDomainLabel)
-      ? manifestDomainLabel
-      : buildFullstackLocalArchetypeAppTitle(inferredArchetype)
+  const appTitle = buildPresentableFullstackLocalAppTitle(
+    manifestDomainLabel,
+    inferredArchetype,
+  )
   const normalizedText = normalizeSectorDetectionText(
     [
       appTitle,

@@ -4578,6 +4578,7 @@ async function runPlanValidations(validations) {
               {
                 type: validation.type,
                 targetPath: validation.relativeTargetPath,
+                ...(validation.expectedKind ? { expectedKind: validation.expectedKind } : {}),
                 ok: false,
                 reason: `Se esperaba ${validation.expectedKind} y se encontro ${detectedKind}.`,
               },
@@ -4588,6 +4589,7 @@ async function runPlanValidations(validations) {
         validationResults.push({
           type: validation.type,
           targetPath: validation.relativeTargetPath,
+          ...(validation.expectedKind ? { expectedKind: validation.expectedKind } : {}),
           ok: true,
         })
       } catch (error) {
@@ -4599,6 +4601,7 @@ async function runPlanValidations(validations) {
               {
                 type: validation.type,
                 targetPath: validation.relativeTargetPath,
+                ...(validation.expectedKind ? { expectedKind: validation.expectedKind } : {}),
                 ok: false,
                 reason: 'No existe al finalizar la materializacion.',
               },
@@ -4624,12 +4627,13 @@ async function runPlanValidations(validations) {
           ok: false,
           validationResults: [
             ...validationResults,
-            {
-              type: validation.type,
-              targetPath: validation.relativeTargetPath,
-              ok: false,
-              reason: 'El contenido final no incluye el texto esperado.',
-            },
+              {
+                type: validation.type,
+                targetPath: validation.relativeTargetPath,
+                ...(validation.expectedText ? { expectedText: validation.expectedText } : {}),
+                ok: false,
+                reason: 'El contenido final no incluye el texto esperado.',
+              },
           ],
         }
       }
@@ -4637,6 +4641,7 @@ async function runPlanValidations(validations) {
       validationResults.push({
         type: validation.type,
         targetPath: validation.relativeTargetPath,
+        ...(validation.expectedText ? { expectedText: validation.expectedText } : {}),
         ok: true,
       })
     }
@@ -4797,11 +4802,14 @@ async function runLocalDeterministicTask(task) {
             type: validation.type,
             targetPath: validation.relativeTargetPath,
             ...(validation.expectedKind ? { expectedKind: validation.expectedKind } : {}),
+            ...(validation.expectedText ? { expectedText: validation.expectedText } : {}),
           })),
         },
         validationResults: task.validations.map((validation) => ({
           type: validation.type,
           targetPath: validation.relativeTargetPath,
+          ...(validation.expectedKind ? { expectedKind: validation.expectedKind } : {}),
+          ...(validation.expectedText ? { expectedText: validation.expectedText } : {}),
           ok: true,
         })),
         stepResults,

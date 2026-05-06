@@ -29,7 +29,8 @@ También podés validar otras verticales ya soportadas:
 3. Ejecutá la materialización segura.
 4. En Paso 6 y Paso 7, verificá que JEFE muestre:
    - carpeta creada
-   - cantidad de operaciones aplicadas
+   - carpetas creadas
+   - archivos escritos
    - cantidad de validaciones
    - ruta del proyecto
    - ruta exacta de `frontend/index.html`
@@ -71,6 +72,12 @@ Después de materializar `fullstack-local`, JEFE debería recomendar esta cadena
 - `local-validation`
 - `review-and-expand`
 
+Después del scaffold base, el readiness no debería decir `En planificación`. La lectura esperable es:
+
+- `Scaffold materializado`
+- `Demo base pendiente de completar`
+- próxima fase segura: `frontend-mock-flow`
+
 Cada fase segura debería poder:
 
 - prepararse como plan revisable
@@ -91,6 +98,12 @@ JEFE debería poder decir con claridad si el proyecto está:
 - listo para demo local segura
 - todavía no listo para producto real
 
+Lectura práctica:
+
+- `Scaffold materializado`: ya existe la base real en disco, pero todavía falta completar fases seguras.
+- `Demo visual en progreso`: el proyecto ya avanzó por una o más fases base, pero aún no cerró `local-validation`.
+- `Listo para demo local segura`: ya pasó el flujo base local y puede mostrarse como entrega mock revisable.
+
 ## Cuándo hay una aprobación real
 
 Una aprobación real aparece recién cuando el operador pide salir del modo seguro, por ejemplo:
@@ -106,6 +119,17 @@ Una aprobación real aparece recién cuando el operador pide salir del modo segu
 - integraciones externas
 
 En esos casos JEFE tiene que mostrar preview, riesgo, comandos propuestos y validaciones, pero no ejecutar nada todavía.
+
+## Cuándo conviene guardar como reusable
+
+No conviene hacerlo apenas apareció un scaffold.
+
+La recomendación operable es:
+
+- primero materializar el scaffold
+- después revisar `frontend/index.html` por `file://`
+- luego completar `frontend-mock-flow`, `backend-contracts`, `database-design` y `local-validation`
+- recién ahí evaluar `Guardar como reusable`
 
 ## Checklist de demo salió bien
 
@@ -128,6 +152,7 @@ En esos casos JEFE tiene que mostrar preview, riesgo, comandos propuestos y vali
    - `node scripts/ai-release-smoke.mjs`
    - `node scripts/ai-operator-e2e-smoke.mjs`
 4. Confirmá que no se hayan creado `.env`, `node_modules`, `Dockerfile` ni `docker-compose.yml`.
+5. Si el resultado dice `Scaffold materializado`, seguí con `frontend-mock-flow` antes de declarar la demo como reusable.
 
 ## Qué no probar todavía
 

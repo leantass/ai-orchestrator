@@ -1348,6 +1348,11 @@ function summarizeLocalProjectManifest(localProjectManifest) {
       localProjectManifest?.approvalRequiredActions,
       24,
     ),
+    readinessLevel: localProjectManifest?.readinessLevel || '',
+    demoReady: localProjectManifest?.demoReady === true,
+    safeLocalDemoReady: localProjectManifest?.safeLocalDemoReady === true,
+    completedCoreFlow: localProjectManifest?.completedCoreFlow === true,
+    recommendedDemoScript: toStringArray(localProjectManifest?.recommendedDemoScript, 24),
     risks: toStringArray(localProjectManifest?.risks, 24),
     updatedAt: localProjectManifest?.updatedAt || '',
     history: Array.isArray(localProjectManifest?.history)
@@ -3210,6 +3215,27 @@ async function runFullstackLocalMaterializationValidation() {
     }
     if (!String(manifestSummary.nextRecommendedPhase || '').trim()) {
       failures.push('localProjectManifest.nextRecommendedPhase vacio.')
+    }
+    if (normalizeText(manifestSummary.readinessLevel) !== 'scaffold-materialized') {
+      failures.push(
+        `localProjectManifest.readinessLevel deberia marcar scaffold-materialized luego del scaffold base. Recibido: ${manifestSummary.readinessLevel || '(vacio)'}.`,
+      )
+    }
+    if (manifestSummary.demoReady || manifestSummary.safeLocalDemoReady) {
+      failures.push(
+        'localProjectManifest no deberia marcar demoReady ni safeLocalDemoReady luego del scaffold base.',
+      )
+    }
+    const normalizedRecommendedDemoScript = normalizeText(
+      manifestSummary.recommendedDemoScript.join(' '),
+    )
+    if (
+      !normalizedRecommendedDemoScript.includes('frontend/index.html') ||
+      !normalizedRecommendedDemoScript.includes('doble click')
+    ) {
+      failures.push(
+        `localProjectManifest.recommendedDemoScript deberia explicar como abrir frontend/index.html con doble click. Recibido: ${manifestSummary.recommendedDemoScript.join(' | ') || '(vacio)'}.`,
+      )
     }
     ;[
       'fullstack-local-scaffold',
