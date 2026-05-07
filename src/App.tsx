@@ -7,6 +7,16 @@ import {
   type ReactNode,
 } from 'react'
 import {
+  MetricCard,
+  ResultKeyValueGrid,
+  ResultSectionCard,
+  ResultStatusBadge,
+  SectionHeader,
+  SidebarSectionButton,
+  type MetricTone,
+} from './components/AppUiPrimitives'
+import { ContextHubControlPanel } from './components/ContextHubControlPanel'
+import {
   getPrepareActionButtonLabel,
   getProjectContinuationStatusLabel,
   getProjectReadinessLevelLabel,
@@ -767,6 +777,41 @@ type ContextHubStatusSummary = {
   reason?: string
 }
 
+type ContextHubRuntimeState = {
+  source: 'context-hub'
+  available: boolean
+  state: 'connected' | 'starting' | 'unavailable' | 'error'
+  endpoint: string
+  baseUrl?: string
+  openUrl?: string
+  healthUrl?: string
+  managedByJefe?: boolean
+  processId?: number | null
+  canStart?: boolean
+  canOpen?: boolean
+  appPath?: string
+  packageJsonPath?: string
+  apiEntryPath?: string
+  workspaceRoot?: string
+  reason?: string
+  message?: string
+  runtimeLogNotice?: string
+  lastError?: string
+  lastStdout?: string
+  lastStderr?: string
+  lastCheckAt?: string
+  lastStartAt?: string
+}
+
+type ContextHubRuntimeResponse = {
+  ok: boolean
+  started?: boolean
+  opened?: boolean
+  url?: string
+  error?: string
+  status?: ContextHubRuntimeState
+}
+
 type BrainCostMode = 'cheap' | 'balanced' | 'smart' | 'max-quality'
 
 type BrainRoutingDecision = {
@@ -988,6 +1033,10 @@ declare global {
         bridgeMode: string
         bridgeModeSource: string
       }>
+      getContextHubStatus?: () => Promise<ContextHubRuntimeResponse>
+      retryContextHubConnection?: () => Promise<ContextHubRuntimeResponse>
+      openContextHub?: () => Promise<ContextHubRuntimeResponse>
+      startLocalContextHub?: () => Promise<ContextHubRuntimeResponse>
       listReusableArtifacts?: (payload?: {
         id?: string
         type?: string
@@ -1237,6 +1286,112 @@ const DEFAULT_RUNTIME_STATUS = {
   executorModeSource: '',
   bridgeMode: 'unknown',
   bridgeModeSource: '',
+}
+
+const DEFAULT_CONTEXT_HUB_RUNTIME_STATE: ContextHubRuntimeState = {
+  source: 'context-hub',
+  available: false,
+  state: 'unavailable',
+  endpoint: '/v1/packs/suggested',
+  baseUrl: 'http://127.0.0.1:3210',
+  openUrl: '',
+  healthUrl: '',
+  managedByJefe: false,
+  processId: null,
+  canStart: false,
+  canOpen: false,
+  appPath: '',
+  packageJsonPath: '',
+  apiEntryPath: '',
+  workspaceRoot: '',
+  reason: 'unavailable',
+  message: 'JEFE puede seguir funcionando aunque MEMORIA este apagada.',
+  runtimeLogNotice:
+    'Context Hub puede escribir .context-hub/events.json como log runtime. No lo incluyas en commits.',
+  lastError: '',
+  lastStdout: '',
+  lastStderr: '',
+  lastCheckAt: '',
+  lastStartAt: '',
+}
+
+function normalizeContextHubRuntimeState(
+  value?: ContextHubRuntimeState | null,
+): ContextHubRuntimeState {
+  if (!value || typeof value !== 'object') {
+    return DEFAULT_CONTEXT_HUB_RUNTIME_STATE
+  }
+
+  const normalizedState = normalizeOptionalString(value.state)
+  const nextState =
+    normalizedState === 'connected' ||
+    normalizedState === 'starting' ||
+    normalizedState === 'error'
+      ? (normalizedState as ContextHubRuntimeState['state'])
+      : 'unavailable'
+
+  return {
+    source: 'context-hub',
+    available: value.available === true,
+    state: value.available === true ? 'connected' : nextState,
+    endpoint: normalizeOptionalString(value.endpoint) || '/v1/packs/suggested',
+    baseUrl: normalizeOptionalString(value.baseUrl) || 'http://127.0.0.1:3210',
+    openUrl: normalizeOptionalString(value.openUrl),
+    healthUrl: normalizeOptionalString(value.healthUrl),
+    managedByJefe: value.managedByJefe === true,
+    processId:
+      Number.isInteger(value.processId) && value.processId > 0 ? value.processId : null,
+    canStart: value.canStart === true,
+    canOpen: value.canOpen === true,
+    appPath: normalizeOptionalString(value.appPath),
+    packageJsonPath: normalizeOptionalString(value.packageJsonPath),
+    apiEntryPath: normalizeOptionalString(value.apiEntryPath),
+    workspaceRoot: normalizeOptionalString(value.workspaceRoot),
+    reason: normalizeOptionalString(value.reason) || 'unavailable',
+    message:
+      normalizeOptionalString(value.message) ||
+      DEFAULT_CONTEXT_HUB_RUNTIME_STATE.message,
+    runtimeLogNotice:
+      normalizeOptionalString(value.runtimeLogNotice) ||
+      DEFAULT_CONTEXT_HUB_RUNTIME_STATE.runtimeLogNotice,
+    lastError: normalizeOptionalString(value.lastError),
+    lastStdout: normalizeOptionalString(value.lastStdout),
+    lastStderr: normalizeOptionalString(value.lastStderr),
+    lastCheckAt: normalizeOptionalString(value.lastCheckAt),
+    lastStartAt: normalizeOptionalString(value.lastStartAt),
+  }
+}
+
+function formatContextHubTimestampLabel(value?: string) {
+  const normalizedValue = normalizeOptionalString(value)
+
+  if (!normalizedValue) {
+    return 'Sin chequeo reciente'
+  }
+
+  const parsedValue = new Date(normalizedValue)
+
+  if (Number.isNaN(parsedValue.getTime())) {
+    return normalizedValue
+  }
+
+  return parsedValue.toLocaleTimeString()
+}
+
+function getContextHubRuntimeTone(status: ContextHubRuntimeState): MetricTone {
+  if (status.available) {
+    return 'emerald'
+  }
+
+  if (status.state === 'starting') {
+    return 'sky'
+  }
+
+  if (status.state === 'error') {
+    return 'rose'
+  }
+
+  return 'amber'
 }
 
 function formatExecutorRuntimeModeLabel(executorMode?: string, bridgeMode?: string) {
@@ -4103,107 +4258,6 @@ const GUIDED_WIZARD_STEPS: Array<{
 
 const joinClasses = (...tokens: Array<string | false | null | undefined>) =>
   tokens.filter(Boolean).join(' ')
-
-function SidebarSectionButton({
-  active,
-  label,
-  description,
-  badge,
-  onClick,
-}: {
-  active: boolean
-  label: string
-  description: string
-  badge?: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={joinClasses(
-        'w-full rounded-2xl border px-4 py-4 text-left transition',
-        active
-          ? 'border-sky-300/35 bg-sky-300/12 text-white shadow-[0_14px_40px_rgba(56,189,248,0.16)]'
-          : 'border-white/10 bg-white/[0.03] text-slate-200 hover:border-white/20 hover:bg-white/[0.06]',
-      )}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-sm font-semibold">{label}</div>
-          <div className="mt-1 text-xs leading-5 text-slate-400">{description}</div>
-        </div>
-        {badge ? (
-          <span className="rounded-full border border-white/10 bg-slate-950/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300">
-            {badge}
-          </span>
-        ) : null}
-      </div>
-    </button>
-  )
-}
-
-function SectionHeader({
-  eyebrow,
-  title,
-  description,
-  actions,
-}: {
-  eyebrow?: string
-  title: string
-  description: string
-  actions?: ReactNode
-}) {
-  return (
-    <div className="flex flex-col gap-4 border-b border-white/8 pb-5 lg:flex-row lg:items-end lg:justify-between">
-      <div className="space-y-2">
-        {eyebrow ? (
-          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-200/80">
-            {eyebrow}
-          </div>
-        ) : null}
-        <div className="text-2xl font-semibold text-white">{title}</div>
-        <p className="max-w-3xl text-sm leading-6 text-slate-400">{description}</p>
-      </div>
-      {actions ? <div className="flex flex-wrap gap-3">{actions}</div> : null}
-    </div>
-  )
-}
-
-function MetricCard({
-  label,
-  value,
-  detail,
-  tone = 'default',
-}: {
-  label: string
-  value: string
-  detail?: string
-  tone?: 'default' | 'sky' | 'emerald' | 'amber' | 'rose'
-}) {
-  const toneClassName =
-    tone === 'sky'
-      ? 'border-sky-300/20 bg-sky-300/8'
-      : tone === 'emerald'
-        ? 'border-emerald-300/20 bg-emerald-300/8'
-        : tone === 'amber'
-          ? 'border-amber-300/20 bg-amber-300/8'
-          : tone === 'rose'
-            ? 'border-rose-300/20 bg-rose-300/8'
-            : 'border-white/8 bg-white/[0.03]'
-
-  return (
-    <article className={joinClasses('rounded-2xl border px-4 py-4', toneClassName)}>
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-        {label}
-      </div>
-      <div className="mt-3 text-sm font-medium leading-6 text-slate-100">{value}</div>
-      {detail ? (
-        <div className="mt-2 text-xs leading-5 text-slate-400">{detail}</div>
-      ) : null}
-    </article>
-  )
-}
 
 const PRODUCT_ARCHITECTURE_TYPE_LABELS: Record<string, string> = {
   'business-system': 'Sistema de negocio',
@@ -8700,91 +8754,6 @@ const buildFullstackLocalMaterializationPrompt = ({
   }
 }
 
-function ResultSectionCard({
-  title,
-  description,
-  children,
-}: {
-  title: string
-  description?: string
-  children: ReactNode
-}) {
-  return (
-    <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-      <div className="flex flex-col gap-1">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-          {title}
-        </div>
-        {description ? (
-          <div className="text-sm leading-6 text-slate-400">{description}</div>
-        ) : null}
-      </div>
-      <div className="mt-4">{children}</div>
-    </article>
-  )
-}
-
-function ResultStatusBadge({
-  label,
-  tone = 'default',
-}: {
-  label: string
-  tone?: 'default' | 'sky' | 'emerald' | 'amber' | 'rose'
-}) {
-  const toneClassName =
-    tone === 'sky'
-      ? 'border-sky-300/20 bg-sky-300/10 text-sky-100'
-      : tone === 'emerald'
-        ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100'
-        : tone === 'amber'
-          ? 'border-amber-300/20 bg-amber-300/10 text-amber-100'
-          : tone === 'rose'
-            ? 'border-rose-300/20 bg-rose-300/10 text-rose-100'
-            : 'border-white/10 bg-white/5 text-slate-100'
-
-  return (
-    <span
-      className={joinClasses(
-        'inline-flex rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em]',
-        toneClassName,
-      )}
-    >
-      {label}
-    </span>
-  )
-}
-
-function ResultKeyValueGrid({
-  items,
-}: {
-  items: Array<{
-    label: string
-    value: string
-    detail?: string
-  }>
-}) {
-  return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      {items.map((item) => (
-        <div
-          key={`${item.label}-${item.value}`}
-          className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3"
-        >
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            {item.label}
-          </div>
-          <div className="mt-2 text-sm font-medium leading-6 text-slate-100">
-            {item.value}
-          </div>
-          {item.detail ? (
-            <div className="mt-1 text-xs leading-5 text-slate-400">{item.detail}</div>
-          ) : null}
-        </div>
-      ))}
-    </div>
-  )
-}
-
 function DetailDialog({
   open,
   title,
@@ -11076,6 +11045,12 @@ function App() {
   )
   const [sessionEvents, setSessionEvents] = useState(() => getStoredSessionEvents())
   const [runtimeStatus, setRuntimeStatus] = useState(DEFAULT_RUNTIME_STATUS)
+  const [contextHubRuntimeState, setContextHubRuntimeState] = useState(
+    DEFAULT_CONTEXT_HUB_RUNTIME_STATE,
+  )
+  const [contextHubActionMessage, setContextHubActionMessage] = useState('')
+  const [isRefreshingContextHub, setIsRefreshingContextHub] = useState(false)
+  const [isStartingContextHub, setIsStartingContextHub] = useState(false)
   const [flowMessages, setFlowMessages] = useState(() => persistedFlowMessages)
   const [executionRunSummaries, setExecutionRunSummaries] = useState<
     ExecutionRunSummary[]
@@ -11233,6 +11208,144 @@ function App() {
   useEffect(() => {
     void loadReusableArtifacts()
   }, [loadReusableArtifacts])
+
+  const applyContextHubRuntimeResponse = useCallback(
+    (response?: ContextHubRuntimeResponse | null, fallbackMessage = '') => {
+      const normalizedStatus = normalizeContextHubRuntimeState(response?.status)
+
+      setContextHubRuntimeState(normalizedStatus)
+      setContextHubActionMessage(
+        normalizeOptionalString(response?.error) ||
+          normalizeOptionalString(normalizedStatus.message) ||
+          normalizeOptionalString(fallbackMessage),
+      )
+
+      return normalizedStatus
+    },
+    [],
+  )
+
+  const refreshContextHubRuntimeState = useCallback(
+    async (mode: 'status' | 'retry' = 'status') => {
+      setIsRefreshingContextHub(true)
+
+      try {
+        const response =
+          mode === 'retry'
+            ? await window.aiOrchestrator?.retryContextHubConnection?.()
+            : await window.aiOrchestrator?.getContextHubStatus?.()
+
+        return applyContextHubRuntimeResponse(
+          response,
+          mode === 'retry'
+            ? 'JEFE reintento la conexion con MEMORIA.'
+            : 'JEFE consulto el estado actual de MEMORIA.',
+        )
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : 'No se pudo consultar el estado actual de MEMORIA.'
+
+        setContextHubRuntimeState((currentValue) =>
+          normalizeContextHubRuntimeState({
+            ...currentValue,
+            available: false,
+            state: 'error',
+            canOpen: false,
+            message: 'JEFE no pudo consultar MEMORIA, pero sigue operativo.',
+            lastError: errorMessage,
+            lastCheckAt: new Date().toISOString(),
+          }),
+        )
+        setContextHubActionMessage(errorMessage)
+        return null
+      } finally {
+        setIsRefreshingContextHub(false)
+      }
+    },
+    [applyContextHubRuntimeResponse],
+  )
+
+  const handleRetryContextHubConnection = useCallback(async () => {
+    await refreshContextHubRuntimeState('retry')
+  }, [refreshContextHubRuntimeState])
+
+  const handleOpenContextHub = useCallback(async () => {
+    setIsRefreshingContextHub(true)
+
+    try {
+      const response = await window.aiOrchestrator?.openContextHub?.()
+      applyContextHubRuntimeResponse(
+        response,
+        'JEFE intento abrir MEMORIA desde el endpoint local disponible.',
+      )
+    } catch (error) {
+      setContextHubActionMessage(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo abrir MEMORIA desde JEFE.',
+      )
+    } finally {
+      setIsRefreshingContextHub(false)
+    }
+  }, [applyContextHubRuntimeResponse])
+
+  const handleStartLocalContextHub = useCallback(async () => {
+    setIsStartingContextHub(true)
+    setContextHubActionMessage('JEFE esta intentando levantar MEMORIA local.')
+
+    try {
+      const response = await window.aiOrchestrator?.startLocalContextHub?.()
+      const normalizedStatus = applyContextHubRuntimeResponse(
+        response,
+        response?.started
+          ? 'JEFE levanto MEMORIA local y ya la dejo disponible.'
+          : 'JEFE reviso MEMORIA local sin bloquear el flujo.',
+      )
+
+      if (normalizedStatus?.available) {
+        setSessionEvents((currentEvents) =>
+          currentEvents.at(-1) === 'MEMORIA local quedo disponible'
+            ? currentEvents
+            : [...currentEvents, 'MEMORIA local quedo disponible'],
+        )
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'No se pudo iniciar MEMORIA local desde JEFE.'
+
+      setContextHubActionMessage(errorMessage)
+      setContextHubRuntimeState((currentValue) =>
+        normalizeContextHubRuntimeState({
+          ...currentValue,
+          state: 'error',
+          available: false,
+          canOpen: false,
+          lastError: errorMessage,
+          lastCheckAt: new Date().toISOString(),
+        }),
+      )
+    } finally {
+      setIsStartingContextHub(false)
+    }
+  }, [applyContextHubRuntimeResponse])
+
+  useEffect(() => {
+    void refreshContextHubRuntimeState()
+  }, [refreshContextHubRuntimeState])
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      void refreshContextHubRuntimeState()
+    }, 15000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [refreshContextHubRuntimeState])
 
   const humanApprovalsBadge = decisionPending
     ? 'Aprobación manual requerida'
@@ -11876,6 +11989,50 @@ function App() {
   const activeContextHubUiDetail = [activeContextHubDetail, `Endpoint: ${activeContextHubEndpointLabel}`]
     .filter(Boolean)
     .join(' · ')
+  const contextHubRuntimeTone = getContextHubRuntimeTone(contextHubRuntimeState)
+  const contextHubRuntimeLabel = contextHubRuntimeState.available
+    ? 'MEMORIA conectada'
+    : contextHubRuntimeState.state === 'starting'
+      ? 'MEMORIA iniciando'
+      : contextHubRuntimeState.state === 'error'
+        ? 'MEMORIA con error'
+        : 'MEMORIA no disponible'
+  const contextHubRuntimeDetail = contextHubRuntimeState.available
+    ? [
+        contextHubRuntimeState.managedByJefe ? 'Levantada desde JEFE' : 'Disponible en local',
+        contextHubRuntimeState.workspaceRoot
+          ? `Workspace: ${contextHubRuntimeState.workspaceRoot}`
+          : '',
+        contextHubRuntimeState.processId
+          ? `PID: ${contextHubRuntimeState.processId}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' | ') || 'MEMORIA responde en el endpoint local.'
+    : [
+        contextHubRuntimeState.message,
+        contextHubRuntimeState.lastError
+          ? `Error: ${contextHubRuntimeState.lastError}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' ')
+  const contextHubRuntimeEndpointLabel =
+    contextHubRuntimeState.openUrl ||
+    (contextHubRuntimeState.baseUrl
+      ? `${contextHubRuntimeState.baseUrl}/v1/packs/suggested`
+      : '/v1/packs/suggested')
+  const contextHubRuntimeAppPathLabel =
+    contextHubRuntimeState.appPath || 'Ruta local no detectada'
+  const contextHubRuntimeWorkspaceLabel = contextHubRuntimeState.workspaceRoot
+    ? `Workspace servido: ${contextHubRuntimeState.workspaceRoot}`
+    : contextHubRuntimeState.packageJsonPath
+      ? `package.json: ${contextHubRuntimeState.packageJsonPath}`
+      : 'Sin workspace reportado'
+  const contextHubLastCheckLabel = `Chequeado ${formatContextHubTimestampLabel(
+    contextHubRuntimeState.lastCheckAt,
+  )}`
+  const isContextHubBusy = isRefreshingContextHub || isStartingContextHub
   const activeReuseModeLabelLegacy =
     effectivePlannerExecutionMetadata.reuseMode === 'reuse-style-and-structure'
       ? 'Reutilizar estilo y estructura'
@@ -19064,6 +19221,25 @@ function App() {
                 {activeWizardStep === 'memory' ? (
                   <div className="grid h-full gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
                     <div className="space-y-4">
+                      <ContextHubControlPanel
+                        description="JEFE puede consultar MEMORIA, reintentar la conexion, abrir el endpoint util o intentar levantar el servicio local sin bloquear el resto del flujo."
+                        stateLabel={contextHubRuntimeLabel}
+                        stateTone={contextHubRuntimeTone}
+                        stateDetail={contextHubRuntimeDetail}
+                        endpointLabel={contextHubRuntimeEndpointLabel}
+                        appPathLabel={contextHubRuntimeAppPathLabel}
+                        workspaceRootLabel={contextHubRuntimeWorkspaceLabel}
+                        runtimeNotice={contextHubRuntimeState.runtimeLogNotice || ''}
+                        actionMessage={contextHubActionMessage}
+                        lastCheckLabel={contextHubLastCheckLabel}
+                        canStart={contextHubRuntimeState.canStart === true}
+                        canOpen={contextHubRuntimeState.canOpen === true}
+                        isBusy={isContextHubBusy}
+                        isStarting={isStartingContextHub}
+                        onRetry={handleRetryContextHubConnection}
+                        onOpen={handleOpenContextHub}
+                        onStart={handleStartLocalContextHub}
+                      />
                       <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
                         <label
                           htmlFor="guided-reuse-mode"
@@ -20550,6 +20726,26 @@ function App() {
                       </button>
                     </>
                   }
+                />
+
+                <ContextHubControlPanel
+                  description="Esta zona muestra si MEMORIA esta disponible, si JEFE la levanto localmente y como seguir sin bloquear la sesion cuando esta apagada."
+                  stateLabel={contextHubRuntimeLabel}
+                  stateTone={contextHubRuntimeTone}
+                  stateDetail={contextHubRuntimeDetail}
+                  endpointLabel={contextHubRuntimeEndpointLabel}
+                  appPathLabel={contextHubRuntimeAppPathLabel}
+                  workspaceRootLabel={contextHubRuntimeWorkspaceLabel}
+                  runtimeNotice={contextHubRuntimeState.runtimeLogNotice || ''}
+                  actionMessage={contextHubActionMessage}
+                  lastCheckLabel={contextHubLastCheckLabel}
+                  canStart={contextHubRuntimeState.canStart === true}
+                  canOpen={contextHubRuntimeState.canOpen === true}
+                  isBusy={isContextHubBusy}
+                  isStarting={isStartingContextHub}
+                  onRetry={handleRetryContextHubConnection}
+                  onOpen={handleOpenContextHub}
+                  onStart={handleStartLocalContextHub}
                 />
 
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">

@@ -126,6 +126,13 @@ Lectura práctica:
 - Si Context Hub está disponible, JEFE debería mostrarlo como contexto aplicado o disponible, sin convertirlo en un bloqueo.
 - Si Context Hub no está disponible, JEFE debería seguir funcionando y decirlo claro como ausencia de memoria externa, no como error crítico.
 - En el resultado final conviene revisar si JEFE indica `MEMORIA / Context Hub: Disponible` o `No disponible`, para entender cuánto contexto externo usó.
+- En Paso 4 también debería aparecer un panel de MEMORIA con:
+  - `Reintentar conexión`
+  - `Abrir MEMORIA`
+  - `Levantar MEMORIA local`
+- Si JEFE levanta MEMORIA, la UI debería pasar a `MEMORIA conectada` y mostrar el workspace servido y el PID local.
+- Si MEMORIA expone solo API, `Abrir MEMORIA` abre el endpoint útil en `GET /v1/packs/suggested`.
+- Si el uso de MEMORIA ensucia `.context-hub/events.json`, tratarlo como runtime/log y no como trabajo de código.
 
 ## Cuándo hay una aprobación real
 

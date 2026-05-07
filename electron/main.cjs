@@ -60,7 +60,7 @@ function relaunchElectronRuntimeIfNeeded() {
 relaunchElectronRuntimeIfNeeded()
 
 const electronModule = require('electron')
-const { app, BrowserWindow, ipcMain } = electronModule
+const { app, BrowserWindow, ipcMain, shell } = electronModule
 
 if (
   !electronModule ||
@@ -113,6 +113,12 @@ const {
   buildExecutionFinishedEventLogSummary,
   buildExecutionFailedEventLogSummary,
 } = require('./context-hub-events.cjs')
+const {
+  CONTEXT_HUB_RUNTIME_LOG_NOTICE,
+  getContextHubStatusSnapshot,
+  retryContextHubConnection,
+  startLocalContextHub,
+} = require('./context-hub-launcher.cjs')
 const {
   FULLSTACK_LOCAL_BASE_PHASES,
   getFullstackLocalBasePhaseDefinition,
@@ -40292,6 +40298,62 @@ ipcMain.handle('ai-orchestrator:get-runtime-status', () => {
     materializationLayer: 'local-deterministic',
     materializationPlanVersion: LOCAL_MATERIALIZATION_PLAN_VERSION,
     supportsStructuredMaterializationPlan: true,
+  }
+})
+
+ipcMain.handle('contextHub:getStatus', async () => {
+  const status = await getContextHubStatusSnapshot()
+
+  return {
+    ok: true,
+    status,
+  }
+})
+
+ipcMain.handle('contextHub:retryConnection', async () => {
+  const status = await retryContextHubConnection()
+
+  return {
+    ok: true,
+    status,
+  }
+})
+
+ipcMain.handle('contextHub:startLocal', async () => {
+  const result = await startLocalContextHub()
+
+  return {
+    ok: result.ok === true,
+    started: result.started === true,
+    ...(result.error ? { error: result.error } : {}),
+    status: result.status,
+  }
+})
+
+ipcMain.handle('contextHub:open', async () => {
+  const status = await getContextHubStatusSnapshot()
+
+  if (!status.available || !status.openUrl) {
+    return {
+      ok: false,
+      error:
+        'MEMORIA todavía no está disponible para abrir. Reintentá la conexión o iniciá el servicio local.',
+      status,
+    }
+  }
+
+  await shell.openExternal(status.openUrl)
+
+  return {
+    ok: true,
+    opened: true,
+    url: status.openUrl,
+    status: {
+      ...status,
+      message:
+        'Se abrió el endpoint útil de MEMORIA. Hoy Context Hub expone API local, no una UI dedicada.',
+      runtimeLogNotice: CONTEXT_HUB_RUNTIME_LOG_NOTICE,
+    },
   }
 })
 

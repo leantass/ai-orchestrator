@@ -51,8 +51,15 @@ npm run desktop:codex
 - Endpoints usados por JEFE:
   - `GET /v1/packs/suggested`
   - `POST /v1/events`
+- Desde JEFE ahora podés:
+  - ver si MEMORIA está conectada, iniciando o no disponible
+  - reintentar conexión sin bloquear el flujo
+  - levantar MEMORIA local desde `C:\Users\letas\Desktop\Proyectos\Desarrollo\context-hub\app`
+  - abrir el endpoint útil de MEMORIA cuando la API ya está respondiendo
 
 Si Context Hub esta apagado, JEFE sigue funcionando. La UI debe mostrar `Context Hub no disponible` y continuar sin bloquear la planificacion ni la entrega local.
+
+Si la API queda disponible, `Abrir MEMORIA` abre `http://127.0.0.1:3210/v1/packs/suggested`. Hoy JEFE integra la API local de MEMORIA; no depende de una UI separada.
 
 ## Como interpretar el resultado final
 
@@ -108,6 +115,7 @@ Prueba rapida en PowerShell:
 - No toques `.context-hub/events.json` a mano.
 - Si aparece sucio en el repo de Context Hub, tratelo como runtime/log, no como codigo de producto.
 - No mezclar ese archivo con commits funcionales de JEFE.
+- El launcher de MEMORIA desde JEFE no debe commitear runtime logs. Si el uso de eventos ensucia `.context-hub/events.json`, dejalo fuera del commit.
 
 ## Scripts utiles
 

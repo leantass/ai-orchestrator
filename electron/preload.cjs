@@ -171,6 +171,10 @@ async function invokeForRenderer(channel, payload, timeoutMs = RENDERER_INVOKE_T
 contextBridge.exposeInMainWorld('aiOrchestrator', {
   platform: process.platform,
   getRuntimeStatus: () => ipcRenderer.invoke('ai-orchestrator:get-runtime-status'),
+  getContextHubStatus: () => ipcRenderer.invoke('contextHub:getStatus'),
+  retryContextHubConnection: () => ipcRenderer.invoke('contextHub:retryConnection'),
+  openContextHub: () => ipcRenderer.invoke('contextHub:open'),
+  startLocalContextHub: () => ipcRenderer.invoke('contextHub:startLocal'),
   testReturn: (payload) => ipcRenderer.invoke('ai-orchestrator:test-return', payload),
   listReusableArtifacts: (payload) =>
     ipcRenderer.invoke('ai-orchestrator:list-reusable-artifacts', payload),

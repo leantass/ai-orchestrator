@@ -1,4 +1,5 @@
 const DEFAULT_CONTEXT_HUB_API_URL = 'http://127.0.0.1:3210'
+const CONTEXT_HUB_HEALTH_ENDPOINT = '/health'
 const SUGGESTED_CONTEXT_HUB_ENDPOINT = '/v1/packs/suggested'
 const CONTEXT_HUB_EVENTS_ENDPOINT = '/v1/events'
 const CONTEXT_HUB_TIMEOUT_MS = 1200
@@ -251,6 +252,37 @@ async function fetchSuggestedContextHubPack() {
   }
 }
 
+async function fetchContextHubHealth() {
+  const result = await requestContextHubJson(CONTEXT_HUB_HEALTH_ENDPOINT, {
+    method: 'GET',
+  })
+
+  if (result.ok !== true) {
+    return {
+      ok: false,
+      source: 'context-hub',
+      endpoint: CONTEXT_HUB_HEALTH_ENDPOINT,
+      available: false,
+      reason: result.reason || 'unavailable',
+      ...(Number.isInteger(result.statusCode) ? { statusCode: result.statusCode } : {}),
+    }
+  }
+
+  const payload =
+    result.payload && typeof result.payload === 'object' ? result.payload : {}
+
+  return {
+    ok: true,
+    source: 'context-hub',
+    endpoint: CONTEXT_HUB_HEALTH_ENDPOINT,
+    available: true,
+    baseUrl: result.baseUrl,
+    workspaceRoot:
+      typeof payload.workspaceRoot === 'string' ? payload.workspaceRoot : '',
+    statusCode: result.statusCode,
+  }
+}
+
 async function emitContextHubEvent(eventPayload) {
   const eventType =
     typeof eventPayload?.type === 'string' ? eventPayload.type : 'unknown'
@@ -302,6 +334,7 @@ async function emitExecutionFailedEvent(payload) {
 
 module.exports = {
   DEFAULT_CONTEXT_HUB_API_URL,
+  CONTEXT_HUB_HEALTH_ENDPOINT,
   SUGGESTED_CONTEXT_HUB_ENDPOINT,
   CONTEXT_HUB_EVENTS_ENDPOINT,
   CONTEXT_HUB_TIMEOUT_MS,
@@ -310,5 +343,8 @@ module.exports = {
   emitContextHubEvent,
   emitExecutionFailedEvent,
   emitExecutionFinishedEvent,
+  fetchContextHubHealth,
   fetchSuggestedContextHubPack,
+  requestContextHubJson,
+  resolveContextHubApiUrls,
 }
