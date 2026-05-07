@@ -777,6 +777,17 @@ type ContextHubStatusSummary = {
   reason?: string
 }
 
+type ContextHubEventStatusSummary = {
+  state: 'idle' | 'pending' | 'sent' | 'failed' | 'skipped'
+  eventType?: string
+  endpoint: string
+  label: string
+  detail: string
+  updatedAt?: string
+  reason?: string
+  statusCode?: number | null
+}
+
 type ContextHubRuntimeState = {
   source: 'context-hub'
   available: boolean
@@ -806,6 +817,7 @@ type ContextHubRuntimeState = {
   lastStderr?: string
   lastCheckAt?: string
   lastStartAt?: string
+  lastEventStatus?: ContextHubEventStatusSummary | null
 }
 
 type ContextHubRuntimeResponse = {
@@ -1324,6 +1336,15 @@ const DEFAULT_CONTEXT_HUB_RUNTIME_STATE: ContextHubRuntimeState = {
   lastStderr: '',
   lastCheckAt: '',
   lastStartAt: '',
+  lastEventStatus: {
+    state: 'idle',
+    endpoint: '/v1/events',
+    label: 'Sin eventos emitidos',
+    detail: 'JEFE todavia no registro eventos de MEMORIA en esta sesion.',
+    updatedAt: '',
+    reason: '',
+    statusCode: null,
+  },
 }
 
 function normalizeContextHubRuntimeState(
@@ -1379,6 +1400,38 @@ function normalizeContextHubRuntimeState(
     lastStderr: normalizeOptionalString(value.lastStderr),
     lastCheckAt: normalizeOptionalString(value.lastCheckAt),
     lastStartAt: normalizeOptionalString(value.lastStartAt),
+    lastEventStatus:
+      value.lastEventStatus && typeof value.lastEventStatus === 'object'
+        ? {
+            state:
+              normalizeOptionalString(value.lastEventStatus.state) === 'pending' ||
+              normalizeOptionalString(value.lastEventStatus.state) === 'sent' ||
+              normalizeOptionalString(value.lastEventStatus.state) === 'failed' ||
+              normalizeOptionalString(value.lastEventStatus.state) === 'skipped'
+                ? (normalizeOptionalString(
+                    value.lastEventStatus.state,
+                  ) as ContextHubEventStatusSummary['state'])
+                : 'idle',
+            eventType: normalizeOptionalString(value.lastEventStatus.eventType),
+            endpoint:
+              normalizeOptionalString(value.lastEventStatus.endpoint) || '/v1/events',
+            label:
+              normalizeOptionalString(value.lastEventStatus.label) ||
+              DEFAULT_CONTEXT_HUB_RUNTIME_STATE.lastEventStatus?.label ||
+              'Sin eventos emitidos',
+            detail:
+              normalizeOptionalString(value.lastEventStatus.detail) ||
+              DEFAULT_CONTEXT_HUB_RUNTIME_STATE.lastEventStatus?.detail ||
+              'JEFE todavia no registro eventos de MEMORIA en esta sesion.',
+            updatedAt: normalizeOptionalString(value.lastEventStatus.updatedAt),
+            reason: normalizeOptionalString(value.lastEventStatus.reason),
+            statusCode:
+              Number.isInteger(value.lastEventStatus.statusCode) &&
+              value.lastEventStatus.statusCode >= 100
+                ? value.lastEventStatus.statusCode
+                : null,
+          }
+        : DEFAULT_CONTEXT_HUB_RUNTIME_STATE.lastEventStatus,
   }
 }
 
@@ -12063,6 +12116,30 @@ function App() {
   const contextHubLastCheckLabel = `Chequeado ${formatContextHubTimestampLabel(
     contextHubRuntimeState.lastCheckAt,
   )}`
+  const contextHubLastEventStatus = contextHubRuntimeState.lastEventStatus ||
+    DEFAULT_CONTEXT_HUB_RUNTIME_STATE.lastEventStatus
+  const contextHubLastEventTone: MetricTone =
+    contextHubLastEventStatus?.state === 'sent'
+      ? 'emerald'
+      : contextHubLastEventStatus?.state === 'pending'
+        ? 'sky'
+        : contextHubLastEventStatus?.state === 'failed'
+          ? 'rose'
+          : contextHubLastEventStatus?.state === 'skipped'
+            ? 'amber'
+            : 'default'
+  const contextHubLastEventLabel =
+    contextHubLastEventStatus?.label || 'Sin eventos emitidos'
+  const contextHubLastEventDetail = [
+    contextHubLastEventStatus?.detail || '',
+    contextHubLastEventStatus?.updatedAt
+      ? `Actualizado ${formatContextHubTimestampLabel(
+          contextHubLastEventStatus.updatedAt,
+        )}`
+      : '',
+  ]
+    .filter(Boolean)
+    .join(' | ')
   const isContextHubBusy = isRefreshingContextHub || isStartingContextHub
   const activeReuseModeLabelLegacy =
     effectivePlannerExecutionMetadata.reuseMode === 'reuse-style-and-structure'
@@ -19257,6 +19334,9 @@ function App() {
                         stateLabel={contextHubRuntimeLabel}
                         stateTone={contextHubRuntimeTone}
                         stateDetail={contextHubRuntimeDetail}
+                        lastEventLabel={contextHubLastEventLabel}
+                        lastEventTone={contextHubLastEventTone}
+                        lastEventDetail={contextHubLastEventDetail}
                         openTargetLabel={contextHubRuntimeOpenTargetLabel}
                         openTargetDetail={contextHubRuntimeOpenTargetDetail}
                         openButtonLabel={contextHubRuntimeOpenButtonLabel}
@@ -19783,6 +19863,11 @@ function App() {
                                 label: 'MEMORIA / Context Hub',
                                 value: resultContextHubLabel,
                                 detail: resultContextHubDetail,
+                              },
+                              {
+                                label: 'Ultimo evento a MEMORIA',
+                                value: contextHubLastEventLabel,
+                                detail: contextHubLastEventDetail,
                               },
                             ]}
                           />
@@ -20766,6 +20851,9 @@ function App() {
                   stateLabel={contextHubRuntimeLabel}
                   stateTone={contextHubRuntimeTone}
                   stateDetail={contextHubRuntimeDetail}
+                  lastEventLabel={contextHubLastEventLabel}
+                  lastEventTone={contextHubLastEventTone}
+                  lastEventDetail={contextHubLastEventDetail}
                   openTargetLabel={contextHubRuntimeOpenTargetLabel}
                   openTargetDetail={contextHubRuntimeOpenTargetDetail}
                   openButtonLabel={contextHubRuntimeOpenButtonLabel}

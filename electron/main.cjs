@@ -120,6 +120,12 @@ const {
   startLocalContextHub,
 } = require('./context-hub-launcher.cjs')
 const {
+  attachLastContextHubEventStatus,
+  recordContextHubEventPending,
+  recordContextHubEventResult,
+  recordContextHubEventSkipped,
+} = require('./context-hub-event-status.cjs')
+const {
   FULLSTACK_LOCAL_BASE_PHASES,
   getFullstackLocalBasePhaseDefinition,
   buildFullstackLocalManifestPhaseBlueprints,
@@ -333,6 +339,10 @@ function emitExecutionFinishedEventBestEffort({
   })
 
   if (!markExecutionEventRequestId(emittedExecutionFinishedRequestIds, eventPayload.requestId)) {
+    recordContextHubEventSkipped({
+      eventType: eventPayload.type || 'execution_finished',
+      reason: 'Evento duplicado para el mismo requestId.',
+    })
     debugMainLog(
       'execute-task:context-hub-execution-finished-skipped-duplicate',
       buildExecutionFinishedEventLogSummary({
@@ -343,8 +353,16 @@ function emitExecutionFinishedEventBestEffort({
     return
   }
 
+  recordContextHubEventPending({
+    eventType: eventPayload.type || 'execution_finished',
+  })
+
   void emitExecutionFinishedEvent(eventPayload)
     .then((eventResult) => {
+      recordContextHubEventResult({
+        eventType: eventPayload.type || 'execution_finished',
+        eventResult,
+      })
       debugMainLog(
         'execute-task:context-hub-execution-finished',
         buildExecutionFinishedEventLogSummary({
@@ -365,6 +383,15 @@ function emitExecutionFinishedEventBestEffort({
           },
         }),
         error: error instanceof Error ? error.message : String(error),
+      })
+      recordContextHubEventResult({
+        eventType: eventPayload.type || 'execution_finished',
+        eventResult: {
+          ok: false,
+          endpoint: '/v1/events',
+          eventType: 'execution_finished',
+          reason: 'error',
+        },
       })
     })
 }
@@ -391,6 +418,10 @@ function emitExecutionFailedEventBestEffort({
   })
 
   if (hasMarkedExecutionEventRequestId(emittedExecutionFinishedRequestIds, eventPayload.requestId)) {
+    recordContextHubEventSkipped({
+      eventType: eventPayload.type || 'execution_failed',
+      reason: 'Ya se habia registrado execution_finished para este requestId.',
+    })
     debugMainLog(
       'execute-task:context-hub-execution-failed-skipped-finished',
       buildExecutionFailedEventLogSummary({
@@ -402,6 +433,10 @@ function emitExecutionFailedEventBestEffort({
   }
 
   if (!markExecutionEventRequestId(emittedExecutionFailedRequestIds, eventPayload.requestId)) {
+    recordContextHubEventSkipped({
+      eventType: eventPayload.type || 'execution_failed',
+      reason: 'Evento duplicado para el mismo requestId.',
+    })
     debugMainLog(
       'execute-task:context-hub-execution-failed-skipped-duplicate',
       buildExecutionFailedEventLogSummary({
@@ -412,8 +447,16 @@ function emitExecutionFailedEventBestEffort({
     return
   }
 
+  recordContextHubEventPending({
+    eventType: eventPayload.type || 'execution_failed',
+  })
+
   void emitExecutionFailedEvent(eventPayload)
     .then((eventResult) => {
+      recordContextHubEventResult({
+        eventType: eventPayload.type || 'execution_failed',
+        eventResult,
+      })
       debugMainLog(
         'execute-task:context-hub-execution-failed',
         buildExecutionFailedEventLogSummary({
@@ -434,6 +477,15 @@ function emitExecutionFailedEventBestEffort({
           },
         }),
         error: error instanceof Error ? error.message : String(error),
+      })
+      recordContextHubEventResult({
+        eventType: eventPayload.type || 'execution_failed',
+        eventResult: {
+          ok: false,
+          endpoint: '/v1/events',
+          eventType: 'execution_failed',
+          reason: 'error',
+        },
       })
     })
 }
@@ -40306,7 +40358,7 @@ ipcMain.handle('contextHub:getStatus', async () => {
 
   return {
     ok: true,
-    status,
+    status: attachLastContextHubEventStatus(status),
   }
 })
 
@@ -40315,7 +40367,7 @@ ipcMain.handle('contextHub:retryConnection', async () => {
 
   return {
     ok: true,
-    status,
+    status: attachLastContextHubEventStatus(status),
   }
 })
 
@@ -40326,7 +40378,7 @@ ipcMain.handle('contextHub:startLocal', async () => {
     ok: result.ok === true,
     started: result.started === true,
     ...(result.error ? { error: result.error } : {}),
-    status: result.status,
+    status: attachLastContextHubEventStatus(result.status),
   }
 })
 
@@ -40338,7 +40390,7 @@ ipcMain.handle('contextHub:open', async () => {
       ok: false,
       error:
         'MEMORIA todavia no esta disponible para abrir. Reintenta la conexion o inicia el servicio local.',
-      status,
+      status: attachLastContextHubEventStatus(status),
     }
   }
 
@@ -40348,14 +40400,14 @@ ipcMain.handle('contextHub:open', async () => {
     ok: true,
     opened: true,
     url: status.openUrl,
-    status: {
+    status: attachLastContextHubEventStatus({
       ...status,
       message:
         status.openKind === 'ui'
           ? 'Se abrio la UI local de MEMORIA.'
           : 'Se abrio un endpoint tecnico de MEMORIA. La UI real no estaba detectada.',
       runtimeLogNotice: CONTEXT_HUB_RUNTIME_LOG_NOTICE,
-    },
+    }),
   }
 })
 
@@ -40527,7 +40579,14 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
     brainDecision,
     contextHubStatus,
   })
+  recordContextHubEventPending({
+    eventType: planningFinishedEventPayload.type || 'planning_finished',
+  })
   const contextHubEventResult = await emitContextHubEvent(planningFinishedEventPayload)
+  recordContextHubEventResult({
+    eventType: planningFinishedEventPayload.type || 'planning_finished',
+    eventResult: contextHubEventResult,
+  })
 
   debugMainLog(
     'plan-task:context-hub-event',

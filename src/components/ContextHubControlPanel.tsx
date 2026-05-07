@@ -6,6 +6,9 @@ export function ContextHubControlPanel({
   stateLabel,
   stateTone,
   stateDetail,
+  lastEventLabel,
+  lastEventTone,
+  lastEventDetail,
   openTargetLabel,
   openTargetDetail,
   openButtonLabel,
@@ -27,6 +30,9 @@ export function ContextHubControlPanel({
   stateLabel: string
   stateTone: MetricTone
   stateDetail: string
+  lastEventLabel: string
+  lastEventTone: MetricTone
+  lastEventDetail: string
   openTargetLabel: string
   openTargetDetail: string
   openButtonLabel: string
@@ -44,7 +50,10 @@ export function ContextHubControlPanel({
   onStart: () => void
 }) {
   return (
-    <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
+    <article
+      data-testid="context-hub-panel"
+      className="relative z-10 isolate rounded-3xl border border-white/8 bg-white/[0.03] p-5"
+    >
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -59,12 +68,18 @@ export function ContextHubControlPanel({
         ) : null}
       </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Estado"
           value={stateLabel}
           detail={stateDetail}
           tone={stateTone}
+        />
+        <MetricCard
+          label="Ultimo evento"
+          value={lastEventLabel}
+          detail={lastEventDetail}
+          tone={lastEventTone}
         />
         <MetricCard
           label="Destino de apertura"
@@ -88,12 +103,13 @@ export function ContextHubControlPanel({
         {runtimeNotice}
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-3">
+      <div className="relative z-10 mt-4 flex flex-wrap gap-3">
         <button
           type="button"
           onClick={onRetry}
           disabled={isBusy}
-          className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
+          data-testid="context-hub-retry-button"
+          className="pointer-events-auto rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
         >
           {isBusy && !isStarting ? 'Consultando...' : 'Reintentar conexion'}
         </button>
@@ -101,7 +117,8 @@ export function ContextHubControlPanel({
           type="button"
           onClick={onOpen}
           disabled={!canOpen || isBusy}
-          className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
+          data-testid="context-hub-open-button"
+          className="pointer-events-auto rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
         >
           {openButtonLabel}
         </button>
@@ -109,7 +126,8 @@ export function ContextHubControlPanel({
           type="button"
           onClick={onStart}
           disabled={!canStart || isBusy}
-          className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+          data-testid="context-hub-start-button"
+          className="pointer-events-auto rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
         >
           {isStarting ? 'Iniciando MEMORIA...' : 'Levantar MEMORIA local'}
         </button>

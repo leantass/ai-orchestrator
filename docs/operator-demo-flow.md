@@ -200,3 +200,8 @@ Mientras no haya validación local cerrada, la UI debería sugerir:
 - auth real
 - pagos reales
 - integraciones externas reales
+
+## Nota de deuda tecnica actual
+
+- El panel de MEMORIA ya muestra el ultimo evento emitido por JEFE en la sesion.
+- `src/App.tsx` y `electron/main.cjs` siguen siendo grandes, pero hoy no bloquean esta validacion operativa local.

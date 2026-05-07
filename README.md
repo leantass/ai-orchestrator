@@ -55,6 +55,7 @@ npm run desktop:codex
 Desde JEFE ahora podes:
 
 - ver si MEMORIA esta conectada, iniciando, con error o no disponible
+- ver el ultimo evento que JEFE intento emitir hacia MEMORIA
 - reintentar conexion sin bloquear el flujo
 - levantar MEMORIA local desde `C:\Users\letas\Desktop\Proyectos\Desarrollo\context-hub\app`
 - abrir la UI real de MEMORIA cuando Context Hub la esta sirviendo en local
@@ -67,6 +68,13 @@ Si Context Hub esta apagado, JEFE sigue funcionando. La UI muestra `MEMORIA no d
 Si tambien hay una UI real de Context Hub sirviendose en local, JEFE la detecta y `Abrir MEMORIA` abre esa UI.
 
 Si solo responde la API, JEFE cambia el CTA a `Abrir endpoint tecnico` y abre `http://127.0.0.1:3210/v1/packs/suggested` como vista tecnica de diagnostico.
+
+El panel de MEMORIA tambien muestra el ultimo evento emitido por JEFE en esta sesion:
+
+- `planning_finished`
+- `execution_finished`
+- `execution_failed`
+- o si el evento fue omitido, duplicado o fallo
 
 Para tener UI real de MEMORIA, Context Hub puede levantarse aparte desde `app/` con alguno de estos caminos:
 
@@ -130,6 +138,13 @@ Prueba rapida en PowerShell:
 - Si aparece sucio en el repo de Context Hub, tratalo como runtime/log, no como codigo de producto.
 - No mezclar ese archivo con commits funcionales de JEFE.
 - El launcher de MEMORIA desde JEFE no debe commitear runtime logs. Si el uso de eventos ensucia `.context-hub/events.json`, dejalo fuera del commit.
+
+## Deuda tecnica conocida
+
+- `src/App.tsx` sigue siendo grande. La deuda queda mitigada, no cerrada.
+- `electron/main.cjs` sigue concentrando mucha logica critica. La deuda queda mitigada, no cerrada.
+- El build puede seguir mostrando warning de chunk principal grande.
+- Ese warning no bloquea el release candidate local mientras `lint`, `tsc`, smokes, build y `desktop:dev` sigan pasando.
 
 ## Scripts utiles
 
