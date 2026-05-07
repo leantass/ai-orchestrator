@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Esta guía explica cómo leer el flujo de aprobación para pasar de demo local segura a una futura ejecución real controlada.
+Esta guía explica como leer el flujo de aprobacion para pasar de una entrega funcional local segura a una futura ejecucion real controlada.
 
 ## Qué está permitido hoy
 
@@ -56,7 +56,7 @@ JEFE deja una frase sugerida de aprobación para una futura tarea, pero en esta 
 ## Cómo interpretar readiness
 
 - `demoReady` o `safeLocalDemoReady` puede ser `true` aunque `realExecutionReady` siga en `false`
-- eso significa que la demo local segura está lista, pero el salto a runtime real sigue pendiente de aprobación
+- eso significa que la entrega funcional local segura esta lista, pero el salto a runtime real sigue pendiente de aprobacion
 - `runtimeReadiness=approval-preview` indica que JEFE ya preparó el paquete, pero no avanzó a ejecución
 
 ## Qué no se ejecuta todavía

@@ -1095,9 +1095,9 @@ async function runFullstackBaseCase() {
   pushFailure(
     failures,
     normalizeText(decision?.projectReadinessState?.operatorSummary || '').includes(
-      'scaffold materializado',
+      'base local materializada',
     ),
-    'Después del scaffold la lectura para operador debe mencionar scaffold materializado.',
+    'Despues del scaffold la lectura para operador debe mencionar base local materializada.',
   )
   pushFailure(
     failures,
@@ -1252,7 +1252,7 @@ async function runExistingWorkspaceProjectDetectionCase() {
   )
   pushFailure(
     failures,
-    appSource.includes('Preparar materialización de') &&
+    appSource.includes('Preparar materializacion de fase') &&
       appSource.includes('plannerProjectPhaseReviewCanMaterialize') &&
       appSource.includes('handleMaterializeProjectPhase(plannerProjectPhaseReviewId)'),
     'La UI debe exponer un CTA principal habilitable para preparar la materialización de la fase segura detectada.',
@@ -1570,9 +1570,9 @@ async function runDomainRichnessCase({
   pushFailure(
     failures,
     normalizeText(reviewDecision?.projectReadinessState?.operatorSummary || '').includes(
-      'scaffold materializado',
+      'base local materializada',
     ),
-    `Después del scaffold ${label} debe explicar que el scaffold ya fue materializado.`,
+    `Despues del scaffold ${label} debe explicar que la base local ya fue materializada.`,
   )
   pushFailure(
     failures,
@@ -2057,11 +2057,11 @@ async function runPhaseMaterializationFlowCase() {
   )
   pushFailure(
     failures,
-    normalizedValidationMockData.includes('demo local segura validada') &&
+    normalizedValidationMockData.includes('entrega funcional local validada') &&
       normalizedValidationMockData.includes('review-and-expand') &&
       normalizedValidationMockData.includes('core flow completo') &&
       normalizedValidationMockData.includes('local-validation'),
-    'local-validation debe resincronizar frontend/src/mock-data.js con demo-ready y review-and-expand.',
+    'local-validation debe resincronizar frontend/src/mock-data.js con entrega funcional local validada y review-and-expand.',
   )
   pushFailure(
     failures,
@@ -2078,7 +2078,7 @@ async function runPhaseMaterializationFlowCase() {
       Array.isArray(fixture.manifest?.availableActions) &&
       fixture.manifest.availableActions.includes('review-and-expand') &&
       normalizeIdentifier(fixture.manifest?.readinessLevel) === 'demo-ready',
-    'Después de local-validation el manifest debe marcar la demo local segura como lista.',
+    'Despues de local-validation el manifest debe marcar la entrega funcional local segura como lista.',
   )
   pushFailure(
     failures,
@@ -2094,13 +2094,14 @@ async function runPhaseMaterializationFlowCase() {
   )
   pushFailure(
     failures,
-    normalizedValidatedFrontendHtml.includes('demo local segura validada') &&
+    (normalizedValidatedFrontendHtml.includes('entrega funcional local validada') ||
+      normalizedValidatedFrontendHtml.includes('base local segura ya fue validada')) &&
       normalizedValidatedFrontendHtml.includes('review-and-expand') &&
       normalizedValidatedFrontendHtml.includes('core flow completo') &&
       normalizedValidatedFrontendHtml.includes('backend contracts') &&
       normalizedValidatedFrontendHtml.includes('database design') &&
       normalizedValidatedFrontendHtml.includes('local validation'),
-    'La demo renderizada por file:// debe mostrar demo local segura validada, core flow completo y review-and-expand.',
+    'La entrega renderizada por file:// debe mostrar entrega funcional local validada, core flow completo y review-and-expand.',
   )
   pushFailure(
     failures,
@@ -2740,8 +2741,8 @@ async function runUiHelperSanityCase() {
   )
   pushFailure(
     failures,
-    appSource.includes('Preparar materialización fullstack local'),
-    'La UI debe exponer el CTA para preparar materialización fullstack local.',
+    appSource.includes('Preparar entrega funcional local'),
+    'La UI debe exponer el CTA para preparar una entrega funcional local.',
   )
   pushFailure(
     failures,
@@ -2750,12 +2751,12 @@ async function runUiHelperSanityCase() {
   )
   pushFailure(
     failures,
-    appSource.includes('Preparar materialización segura'),
+    appSource.includes('Preparar ejecucion local segura'),
     'La UI debe exponer el CTA para preparar una materialización segura desde un plan revisable.',
   )
   pushFailure(
     failures,
-    appSource.includes('Preparar materialización frontend local'),
+    appSource.includes('Preparar frontend local ejecutable'),
     'La UI debe exponer el CTA para preparar una materialización frontend local cuando corresponda.',
   )
   pushFailure(
@@ -2775,8 +2776,8 @@ async function runUiHelperSanityCase() {
   )
   pushFailure(
     failures,
-    appSource.includes('Scaffold materializado'),
-    'La UI debe poder mostrar Scaffold materializado como readiness visible luego del scaffold.',
+    appSource.includes('Base local materializada'),
+    'La UI debe poder mostrar Base local materializada como readiness visible luego del scaffold.',
   )
   pushFailure(
     failures,
@@ -2785,7 +2786,10 @@ async function runUiHelperSanityCase() {
   )
   pushFailure(
     failures,
-    appSource.includes('Carpetas creadas') && appSource.includes('Archivos escritos'),
+    appSource.includes('Carpetas creadas') &&
+      appSource.includes('Archivos escritos confirmados') &&
+      appSource.includes('Archivos tocados') &&
+      appSource.includes('Archivos previstos por plan'),
     'El resultado final debe resumir carpetas creadas y archivos escritos por separado.',
   )
   pushFailure(

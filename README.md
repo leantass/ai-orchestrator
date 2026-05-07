@@ -1,12 +1,12 @@
-# AI Orchestrator
+# JEFE / Orquestador de IA Local
 
-Aplicacion desktop con React + Electron para validar un flujo local entre planificador, ejecutor y aprobacion manual.
+Aplicacion desktop con React + Electron para planificar, materializar y continuar entregas funcionales locales en modo seguro. JEFE puede trabajar aun si MEMORIA / Context Hub no esta disponible, y separa con claridad lo local-revisable de cualquier paso que requiera aprobacion futura.
 
 ## Modos de ejecucion
 
-- `mock`: el ejecutor responde desde Electron con una simulacion local
-- `bridge`: Electron llama al bridge local y el bridge responde en mock
-- `codex`: Electron llama al bridge local y el bridge delega en `codex exec`
+- `mock`: el ejecutor responde desde Electron con una simulacion local.
+- `bridge`: Electron llama al bridge local y el bridge responde en mock.
+- `codex`: Electron llama al bridge local y el bridge delega en `codex exec`.
 
 ## Requisitos
 
@@ -20,25 +20,48 @@ Aplicacion desktop con React + Electron para validar un flujo local entre planif
 npm install
 ```
 
-## Primera ejecucion operativa
+## Levantar JEFE
 
-### Flujo mock
+### Flujo local principal
 
 ```bash
 npm run desktop:dev
 ```
 
-### Flujo con bridge local
+JEFE espera levantar Vite en `http://127.0.0.1:5173` y Electron solo abre cuando confirma que esa URL pertenece a este repo.
+
+### Si el puerto 5173 esta ocupado
+
+- JEFE no debe saltar silenciosamente a `5174`.
+- Vite falla con `strictPort` y `desktop:dev` corta el arranque.
+- Libera el `5173` y volve a correr `npm run desktop:dev`.
+- Esto evita que Electron se conecte por error a otra app vieja o a otro Vite ajeno.
+
+### Otros modos
 
 ```bash
 npm run desktop:bridge
-```
-
-### Flujo con Codex
-
-```bash
 npm run desktop:codex
 ```
+
+## MEMORIA / Context Hub
+
+- Endpoint preferido: `http://127.0.0.1:3210`
+- Fallbacks: `http://localhost:3210` y `http://localhost:3710`
+- Endpoints usados por JEFE:
+  - `GET /v1/packs/suggested`
+  - `POST /v1/events`
+
+Si Context Hub esta apagado, JEFE sigue funcionando. La UI debe mostrar `Context Hub no disponible` y continuar sin bloquear la planificacion ni la entrega local.
+
+## Como interpretar el resultado final
+
+- `Plan revisable`: todavia no se ejecutaron cambios.
+- `Materializacion` o `Ejecucion completada`: ya hubo escritura local o cierre tecnico real.
+- `Archivos escritos confirmados`: archivos reportados como realmente escritos.
+- `Archivos previstos o tocados`: progreso parcial o materializacion que no cerro con confirmacion completa.
+- `Validaciones`: separa previstas, aprobadas y fallidas.
+- `MEMORIA / Context Hub`: muestra si JEFE pudo apoyarse en memoria externa o si siguio solo.
 
 ## Bridge local
 
@@ -80,12 +103,19 @@ Prueba rapida en PowerShell:
   - opcional
   - si no se define y el modo es `command`, Electron usa `node "./executor-bridge/executor-bridge.cjs"`
 
-## Scripts
+## Context Hub y Git
+
+- No toques `.context-hub/events.json` a mano.
+- Si aparece sucio en el repo de Context Hub, tratelo como runtime/log, no como codigo de producto.
+- No mezclar ese archivo con commits funcionales de JEFE.
+
+## Scripts utiles
 
 - `npm run dev`
 - `npm run desktop:dev`
 - `npm run desktop:bridge`
 - `npm run desktop:codex`
 - `npm run executor:bridge`
+- `npm run ai-planner-smoke`
 - `npm run build`
 - `npm run lint`

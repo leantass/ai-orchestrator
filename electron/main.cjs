@@ -11109,7 +11109,7 @@ function buildQuestionPolicy({
         'stack local recomendado',
         'estructura modular inicial',
         'naming interno de carpetas y archivos',
-        'flujo principal de demo local',
+        'flujo principal de entrega local',
       ],
       12,
     )
@@ -11119,7 +11119,7 @@ function buildQuestionPolicy({
         delegatedDecisions,
         [
           'modelo inicial de roles y permisos en modo local',
-          'supuestos de datos sensibles en ambiente de demo local',
+          'supuestos de datos sensibles en ambiente de entrega local',
         ],
         12,
       )
@@ -11144,7 +11144,7 @@ function buildQuestionPolicy({
       '¿Lo van a usar usuarios internos, usuarios externos o ambos en la fase futura?',
     )
     optionalQuestions.push(
-      '¿Querés optimizar la base para demo local o dejarla orientada a una evolución futura más productiva?',
+      '¿Querés optimizar la base para entrega local o dejarla orientada a una evolucion futura mas productiva?',
     )
   }
 
@@ -13497,7 +13497,7 @@ function buildStaticBrowserBootstrapScript({
   dataGlobalName = 'appData',
   renderGlobalName = 'renderApp',
   rootElementId = 'app',
-  errorHeading = 'No se pudo abrir la demo local',
+  errorHeading = 'No se pudo abrir la entrega local',
   missingAssetsMessage = 'Faltan los datos mock o el renderer local.',
   troubleshootingMessage = 'Volvé a abrir frontend/index.html directamente y revisá que src/mock-data.js, src/components/App.js y src/main.js sigan disponibles.',
 }) {
@@ -13528,7 +13528,7 @@ const appRenderer = window.${renderGlobalName}
 
 if (!appData || typeof appRenderer !== 'function') {
   console.error(
-    'No se pudo renderizar la demo local porque faltan los scripts clásicos o no se cargaron en orden.',
+    'No se pudo renderizar la entrega local porque faltan los scripts clasicos o no se cargaron en orden.',
     {
       hasAppData: Boolean(appData),
       hasRenderApp: typeof appRenderer === 'function',
@@ -13539,8 +13539,8 @@ if (!appData || typeof appRenderer !== 'function') {
   try {
     rootElement.innerHTML = appRenderer(appData)
   } catch (error) {
-    console.error('Falló el render de la demo local.', error)
-    showBootstrapError('Ocurrió un error al renderizar la demo local revisable.')
+    console.error('Fallo el render de la entrega local.', error)
+    showBootstrapError('Ocurrio un error al renderizar la entrega local revisable.')
   }
 }
 `
@@ -14266,7 +14266,7 @@ function buildVeterinaryFullstackLocalDemoData({
     archetype: 'veterinary',
     heroKicker: 'Veterinaria local',
     subtitle:
-      'Demo local segura con clientes, mascotas, turnos, recordatorios, reportes e inventario básico.',
+      'Sistema local funcional y seguro con clientes, mascotas, turnos, recordatorios, reportes e inventario basico.',
     domainSummary:
       'Incluye agenda veterinaria, seguimiento preventivo, stock y reportes mock listos para recorrer.',
     nextRecommendedPhase,
@@ -14441,7 +14441,7 @@ function buildMedicalFullstackLocalDemoData({
     appTitle,
     archetype: 'medical-clinic',
     heroKicker: 'Clínica local',
-    subtitle: 'Demo local segura para turnos, pacientes, seguimiento y reportes.',
+    subtitle: 'Entrega funcional local para turnos, pacientes, seguimiento y reportes.',
     domainSummary: 'Se enfoca en agenda, pacientes, equipo y reportes sin runtime real.',
     nextRecommendedPhase,
     navItems,
@@ -14451,7 +14451,7 @@ function buildMedicalFullstackLocalDemoData({
       { id: 'team', label: 'Profesionales', value: '4', tone: 'emerald', detail: 'Equipo médico activo hoy' },
     ],
     alerts: [
-      { id: 'a1', tone: 'amber', title: '2 turnos para confirmar', detail: 'Recepción puede validarlos desde la demo local.' },
+      { id: 'a1', tone: 'amber', title: '2 turnos para confirmar', detail: 'Recepcion puede validarlos desde esta entrega local.' },
     ],
     constraints: [
       'Sin npm install',
@@ -14543,7 +14543,7 @@ function buildMedicalFullstackLocalDemoData({
         id: 'team',
         label: 'Equipo',
         title: 'Equipo',
-        description: 'Profesionales activos en la demo local.',
+        description: 'Profesionales activos en la entrega local.',
         datasetKey: 'team',
         columns: [
           { key: 'name', label: 'Profesional' },
@@ -14666,7 +14666,7 @@ function buildSportsBookingFullstackLocalDemoData({
     appTitle,
     archetype: 'sports-booking',
     heroKicker: 'Reservas locales',
-    subtitle: 'Demo local segura para disponibilidad, clientes y reservas.',
+    subtitle: 'Entrega funcional local para disponibilidad, clientes y reservas.',
     domainSummary: 'Permite revisar canchas, agenda, utilería e indicadores sin runtime real.',
     nextRecommendedPhase,
     navItems: [
@@ -14683,7 +14683,7 @@ function buildSportsBookingFullstackLocalDemoData({
       { id: 'alerts', label: 'Alertas', value: '2', tone: 'amber', detail: '1 mantenimiento y 1 confirmación pendiente' },
     ],
     alerts: [
-      { id: 'a1', tone: 'amber', title: 'Cancha 2 con mantenimiento', detail: 'La revisión previa no bloquea la demo local.' },
+      { id: 'a1', tone: 'amber', title: 'Cancha 2 con mantenimiento', detail: 'La revision previa no bloquea la entrega local.' },
     ],
     constraints: ['Sin npm install', 'Sin backend real', 'Sin base de datos real', 'Sin pagos ni integraciones externas'],
     team: [
@@ -14761,7 +14761,7 @@ function buildEcommerceFullstackLocalDemoData({
     appTitle,
     archetype: 'ecommerce',
     heroKicker: 'Ecommerce local',
-    subtitle: 'Demo local segura para catálogo, pedidos, reportes y stock básico.',
+    subtitle: 'Entrega funcional local para catalogo, pedidos, reportes y stock basico.',
     domainSummary: 'Incluye catálogo mock, pedidos, clientes y reposición sin checkout real.',
     nextRecommendedPhase,
     navItems: [
@@ -14778,7 +14778,7 @@ function buildEcommerceFullstackLocalDemoData({
       { id: 'low-stock', label: 'Stock bajo', value: '5', tone: 'amber', detail: 'Ítems con reposición sugerida' },
     ],
     alerts: [
-      { id: 'a1', tone: 'rose', title: 'Checkout no real', detail: 'Los cobros siguen explícitamente fuera de alcance en esta demo local.' },
+      { id: 'a1', tone: 'rose', title: 'Checkout no real', detail: 'Los cobros siguen explicitamente fuera de alcance en esta entrega local.' },
     ],
     constraints: ['Sin pagos reales', 'Sin npm install', 'Sin backend real', 'Sin integraciones externas'],
     team: [
@@ -14862,7 +14862,7 @@ function buildSchoolCrmFullstackLocalDemoData({
     appTitle,
     archetype: 'school-crm',
     heroKicker: 'Gestión escolar local',
-    subtitle: 'Demo local segura para familias, alumnos, seguimiento y reportes.',
+    subtitle: 'Entrega funcional local para familias, alumnos, seguimiento y reportes.',
     domainSummary: 'Ayuda a recorrer seguimiento escolar sin runtime real ni datos sensibles reales.',
     nextRecommendedPhase,
     navItems: [
@@ -14936,7 +14936,7 @@ function buildDocumentManagementFullstackLocalDemoData({
     appTitle,
     archetype: 'document-management',
     heroKicker: 'Gestión documental local',
-    subtitle: 'Demo local segura para documentos, responsables, revisiones, vencimientos y reportes.',
+    subtitle: 'Entrega funcional local para documentos, responsables, revisiones, vencimientos y reportes.',
     domainSummary: 'Sirve para mostrar circuitos documentales, revisiones y alertas sin ejecutar integraciones ni runtime real.',
     nextRecommendedPhase,
     navItems: [
@@ -14951,7 +14951,7 @@ function buildDocumentManagementFullstackLocalDemoData({
       { id: 'deadlines', label: 'Vencimientos próximos', value: '7', tone: 'amber', detail: 'Alertas y revisiones para la próxima semana' },
       { id: 'owners', label: 'Responsables', value: '9', tone: 'emerald', detail: 'Asignación local consistente' },
     ],
-    alerts: [{ id: 'a1', tone: 'rose', title: 'Expediente con vencimiento cercano', detail: 'Conviene revisarlo desde la demo local.' }],
+    alerts: [{ id: 'a1', tone: 'rose', title: 'Expediente con vencimiento cercano', detail: 'Conviene revisarlo desde la entrega local.' }],
     constraints: ['Sin npm install', 'Sin backend real', 'Sin base real', 'Sin integraciones externas'],
     team: [{ id: 'OPS-001', name: 'Mesa documental', role: 'Operación local', shift: '09:00 a 17:00', status: 'Activa', focus: 'Vencimientos y observaciones' }],
     datasets: {
@@ -15008,7 +15008,7 @@ function buildOperationsFullstackLocalDemoData({
     appTitle,
     archetype: 'operations',
     heroKicker: 'Operaciones locales',
-    subtitle: 'Demo local segura para operaciones, solicitudes, casos, seguimiento, alertas y reportes.',
+    subtitle: 'Entrega funcional local para operaciones, solicitudes, casos, seguimiento, alertas y reportes.',
     domainSummary: 'Primera entrega demostrable para gestión operativa y seguimiento de casos sin runtime real.',
     nextRecommendedPhase,
     navItems: [
@@ -15090,7 +15090,7 @@ function buildRealEstateFullstackLocalDemoData({
     archetype: 'real-estate',
     heroKicker: 'Inmobiliaria local',
     subtitle:
-      'Demo local segura para propiedades, consultas, corredores, visitas, seguimientos y reportes.',
+      'Entrega funcional local para propiedades, consultas, corredores, visitas, seguimientos y reportes.',
     domainSummary:
       'Permite mostrar propiedades, corredores, interesados y agenda comercial sin CRM real ni portales externos.',
     nextRecommendedPhase,
@@ -15218,7 +15218,7 @@ function buildSecurityMonitoringFullstackLocalDemoData({
     archetype: 'security-monitoring',
     heroKicker: 'Seguridad local',
     subtitle:
-      'Demo local segura para accesos, alertas, sensores, rondas y reportes operativos.',
+      'Entrega funcional local para accesos, alertas, sensores, rondas y reportes operativos.',
     domainSummary:
       'Sirve para mostrar monitoreo y respuesta operativa sin cámaras reales, sin puertos y sin integración externa.',
     nextRecommendedPhase,
@@ -15346,7 +15346,7 @@ function buildCommunitySocialFullstackLocalDemoData({
     archetype: 'community-social',
     heroKicker: 'Comunidad local',
     subtitle:
-      'Demo local segura para grupos, miembros, publicaciones, moderación y reportes comunitarios.',
+      'Entrega funcional local para grupos, miembros, publicaciones, moderacion y reportes comunitarios.',
     domainSummary:
       'Permite mostrar grupos, miembros, actividad social y moderación básica sin runtime real, sin login y sin servicios externos.',
     nextRecommendedPhase,
@@ -15455,7 +15455,7 @@ function buildCommunitySocialFullstackLocalDemoData({
       { id: 'qa-com-3', label: 'Explorar grupos', targetView: 'resources', feedback: 'Se abrió el mapa local de grupos y espacios activos.' },
     ],
     interactionHighlights: [
-      'Buscar publicaciones, grupos y referentes desde la demo local.',
+      'Buscar publicaciones, grupos y referentes desde la entrega local.',
       'Cambiar el estado mock de publicaciones para mostrar moderación segura.',
       'Marcar pendientes de moderación como revisados sin login ni servicios externos.',
     ],
@@ -16351,8 +16351,8 @@ function buildFullstackLocalInteractiveFrontendAppContent() {
         '<span class="hero-kicker">' + escapeHtml(overview.heroKicker || 'Fullstack local') + '</span>' +
         '<span class="hero-safe-pill">' + escapeHtml(overview.safeModeLabel || 'Modo local seguro') + '</span>' +
       '</div>' +
-      '<h1>' + escapeHtml(overview.name || 'Demo local') + '</h1>' +
-      '<p>' + escapeHtml(overview.subtitle || 'Demo local segura y revisable.') + '</p>' +
+      '<h1>' + escapeHtml(overview.name || 'Sistema local funcional') + '</h1>' +
+      '<p>' + escapeHtml(overview.subtitle || 'Entrega funcional local segura y revisable.') + '</p>' +
       '<div class="hero-meta">' +
         '<div class="hero-meta-item"><span>Dominio</span><strong>' + escapeHtml(overview.domainSummary || 'Sin resumen') + '</strong></div>' +
         '<div class="hero-meta-item"><span>Siguiente fase segura</span><strong>' + escapeHtml(overview.nextRecommendedPhase || 'frontend-mock-flow') + '</strong></div>' +
@@ -16649,7 +16649,7 @@ function buildFullstackLocalInteractiveFrontendMainContent() {
       return
     }
 
-    rootElement.innerHTML = '<main class="app-shell"><section class="empty-card"><h1>No se pudo abrir la demo local</h1><p>' +
+    rootElement.innerHTML = '<main class="app-shell"><section class="empty-card"><h1>No se pudo abrir la entrega local</h1><p>' +
       String(message || 'Error desconocido') +
       '</p><p>Revisá que index.html siga cargando mock-data.js, App.js y main.js en ese orden.</p></section></main>'
   }
@@ -16732,7 +16732,7 @@ function buildFullstackLocalInteractiveFrontendMainContent() {
       const nextStatus = appointmentButton.getAttribute('data-next-status-value') || 'confirmado'
       if (appointmentId) {
         state.appointmentStatusOverrides[appointmentId] = nextStatus
-        state.flashMessage = 'El turno cambió de estado solo dentro de esta demo local.'
+        state.flashMessage = 'El turno cambio de estado solo dentro de esta entrega local.'
         render()
       }
       return
@@ -16775,8 +16775,8 @@ function buildFullstackLocalInteractiveFrontendMainContent() {
   try {
     render()
   } catch (error) {
-    console.error('Falló el render de la demo local.', error)
-    showError(error && error.message ? error.message : 'Ocurrió un error al renderizar la demo local revisable.')
+    console.error('Fallo el render de la entrega local.', error)
+    showError(error && error.message ? error.message : 'Ocurrio un error al renderizar la entrega local revisable.')
   }
 })()
 `
@@ -18294,7 +18294,7 @@ function buildFullstackLocalDocumentationBundle({
 
 Scaffold fullstack local, seguro y revisable generado por JEFE.
 
-## Qué incluye esta demo
+## Que incluye esta entrega local
 
 - Navegación local por ${demoSections.join(', ')}
 - Datos mock ricos orientados al dominio
@@ -18302,7 +18302,7 @@ Scaffold fullstack local, seguro y revisable generado por JEFE.
 - Backend, shared, database y docs como referencia revisable
 - Compatibilidad con abrir \`frontend/index.html\` por \`file://\`
 
-## Qué podés mostrar en la demo
+## Que podes mostrar en la entrega local
 
 - Dominio visible: ${archetypeLabel}
 - Entidades principales: ${domainEntities.join(', ') || 'sin entidades declaradas'}
@@ -18310,7 +18310,7 @@ Scaffold fullstack local, seguro y revisable generado por JEFE.
 - Alertas o pendientes: ${highlightedAlerts.join(', ') || 'sin alertas declaradas'}
 - Módulos visibles: ${visibleModules.join(', ') || 'sin módulos visibles declarados'}
 
-## Qué esperar al abrir la demo
+## Que esperar al abrir la entrega local
 
 ${demoSections.map((entry) => `- ${entry}`).join('\n') || '- Dashboard local'}
 
@@ -18344,9 +18344,9 @@ ${interactionHighlights.map((entry) => `- ${entry}`).join('\n') || '- Búsqueda,
 
 ## Cómo revisar
 
-1. Recorré la demo por \`file://\` sin abrir ningún servidor.
+1. Recorre la entrega local por \`file://\` sin abrir ningun servidor.
 2. Revisá \`backend/\`, \`shared/\`, \`database/\` y \`docs/\` como referencia.
-3. Confirmá que la demo siga siendo mock/local y no prometa runtime real.
+3. Confirma que la entrega siga siendo mock/local y no prometa runtime real.
 4. Validá que el dominio visible coincida con el pedido y no se mezcle con otra vertical.
 
 ## Próxima fase segura
@@ -18369,11 +18369,11 @@ ${nextSafePhases.map((entry) => `- \`${entry}\``).join('\n')}
 
 ## Objetivo
 
-Dejar una primera demo local segura, revisable y abrible por \`file://\`.
+Dejar una primera entrega funcional local, segura, revisable y abrible por \`file://\`.
 
 ## Capas
 
-- frontend/: demo estática con navegación, métricas, listas y detalle local
+- frontend/: entrega estática con navegación, métricas, listas y detalle local
 - backend/: contratos y helpers puros sin \`listen()\`
 - shared/: contratos del dominio reutilizables
 - database/: diseño SQL local no ejecutado
@@ -18385,7 +18385,7 @@ Dejar una primera demo local segura, revisable y abrible por \`file://\`.
 - nombre: ${appTitle}
 - arquetipo: ${archetypeLabel}
 - módulos visibles: ${visibleModules.join(', ') || 'sin módulos declarados'}
-- secciones de demo: ${demoSections.join(', ') || 'sin secciones declaradas'}
+- secciones visibles: ${demoSections.join(', ') || 'sin secciones declaradas'}
 - interacciones locales: ${interactionHighlights.join(', ') || 'búsqueda, filtros y selección en memoria'}
 - entidades principales: ${domainEntities.join(', ') || 'sin entidades declaradas'}
 - métricas mock visibles: ${highlightedMetrics.join(', ') || 'sin métricas declaradas'}
@@ -18416,9 +18416,9 @@ Estas acciones siguen fuera del flujo seguro actual y solo deberían aparecer co
 
 ## Estado actual
 
-El proyecto quedó como demo local segura y revisable.
+El proyecto quedo como entrega funcional local segura y revisable.
 
-## Cómo abrir la demo estática
+## Como abrir la entrega local
 
 1. Abrí \`frontend/index.html\` con doble click o desde el navegador.
 2. Confirmá que la UI cargue por \`file://\`, sin servidor y sin \`npm install\`.
@@ -18454,7 +18454,7 @@ La siguiente fase recomendada es \`${overview.nextRecommendedPhase || 'frontend-
 
 ${nextSafePhases.map((entry) => `- \`${entry}\``).join('\n')}
 
-## Interacciones sugeridas para la demo
+## Interacciones sugeridas para la entrega local
 
 ${interactionHighlights.map((entry) => `- ${entry}`).join('\n') || '- Búsqueda, filtros y revisión en memoria local.'}
 
@@ -19381,7 +19381,7 @@ module.exports = {
         { type: 'file-contains', targetPath: backendServerPath, expectedText: 'fullstack-local' },
         { type: 'file-contains', targetPath: backendAppointmentsPath, expectedText: 'listMockClients' },
         { type: 'file-contains', targetPath: databaseSchemaPath, expectedText: databaseSchemaValidationMarker },
-        { type: 'file-contains', targetPath: docsRunbookPath, expectedText: 'Cómo abrir la demo estática' },
+        { type: 'file-contains', targetPath: docsRunbookPath, expectedText: 'Como abrir la entrega local' },
         { type: 'file-contains', targetPath: projectManifestPath, expectedText: '"nextRecommendedPhase": "frontend-mock-flow"' },
       ],
     },
@@ -21685,7 +21685,7 @@ const PROJECT_CONTINUATION_ACTION_REGISTRY = [
     ],
     title: 'Preparar candidata reusable',
     description:
-      'Consolidar la demo local validada como candidata reusable sin guardarla todavia ni salir del modo seguro.',
+      'Consolidar la entrega funcional local validada como candidata reusable sin guardarla todavia ni salir del modo seguro.',
     category: 'reusable-candidate',
     safeToPrepare: true,
     safeToMaterialize: false,
@@ -23456,10 +23456,10 @@ function buildProjectReadinessDemoScript({
         ? 'Leer `docs/local-runbook.md` antes de probar cualquier flujo local.'
         : '',
       hasFrontendIndex
-        ? 'Abrir `frontend/index.html` con doble click y validar la demo por `file://`, sin servidor ni npm install.'
+        ? 'Abrir `frontend/index.html` con doble click y validar la entrega local por `file://`, sin servidor ni npm install.'
         : '',
       hasFrontendIndex
-        ? 'Recorrer navegación, métricas, detalle y acciones locales mock para confirmar que la demo no queda en blanco.'
+        ? 'Recorrer navegacion, metricas, detalle y acciones locales mock para confirmar que la entrega no queda en blanco.'
         : '',
       phaseStates.some(
         (entry) => entry.id === 'frontend-mock-flow' && entry.status === 'done',
@@ -23497,7 +23497,7 @@ function buildProjectReadinessDemoScript({
           ? entry.status === 'done'
           : true,
       )
-        ? 'La demo local segura ya puede mostrarse como release candidate mock, todavía sin producto real.'
+        ? 'La entrega funcional local segura ya puede mostrarse como release candidate mock, todavia sin producto real.'
         : '',
       'No ejecutar npm install, runtime real, DB real, Docker, deploy, pagos, auth real ni integraciones externas.',
     ],
@@ -23659,7 +23659,7 @@ function buildProjectReadinessState({
     [
       'Esto es mock, no producción.',
       !demoReady && missingCorePhases.length > 0
-        ? `Todavía falta completar ${missingCorePhases[0]} antes de cerrar la demo local segura.`
+        ? `Todavia falta completar ${missingCorePhases[0]} antes de cerrar la entrega funcional local segura.`
         : '',
       approvalRequiredAreas.length > 0
         ? 'No se toca nada real sin aprobación.'
@@ -23700,26 +23700,26 @@ function buildProjectReadinessState({
                   : 'not-started'
   const lastValidationSummary = demoReady
     ? runtimeReadiness === 'approval-preview'
-      ? 'Listo para demo local segura. El paso a runtime real sigue pendiente de aprobación explícita y no se ejecutó nada real.'
-      : 'Listo para demo local segura. No se ejecutó nada real: todo sigue en modo revisable y mock donde corresponde.'
+      ? 'Entrega funcional local validada. El paso a runtime real sigue pendiente de aprobacion explicita y no se ejecuto nada real.'
+      : 'Entrega funcional local validada. No se ejecuto nada real: todo sigue en modo revisable y mock donde corresponde.'
     : completedCoreFlow
-      ? 'La base local está cerrada, pero todavía conviene revisar el resultado antes de hablar de una demo completa.'
+      ? 'La base local esta cerrada, pero todavia conviene revisar el resultado antes de hablar de una entrega funcional completa.'
       : scaffoldMaterialized && completedCorePhaseEntries.length > 0
-        ? `La demo base ya avanzó por fases seguras, pero todavía falta completar ${missingCorePhases[0] || 'la validación local'} para cerrar el flujo.`
+        ? `La base local ya avanzo por fases seguras, pero todavia falta completar ${missingCorePhases[0] || 'la validacion local'} para cerrar el flujo.`
         : scaffoldMaterialized
-          ? 'Scaffold materializado. La demo base todavía necesita Frontend mock flow, Backend contracts, Database design y Local validation.'
-      : 'Todavía falta completar el flujo base y la validación local para cerrar una demo segura.'
+          ? 'Base local materializada. Todavia necesita Frontend mock flow, Backend contracts, Database design y Local validation.'
+      : 'Todavia falta completar el flujo base y la validacion local para cerrar una entrega local segura.'
   const operatorSummary = demoReady
     ? runtimeReadiness === 'approval-preview'
-      ? 'Listo para demo local segura, con runtime real pendiente de aprobación explícita.'
-      : 'Listo para demo local segura.'
+      ? 'Entrega funcional local validada, con runtime real pendiente de aprobacion explicita.'
+      : 'Entrega funcional local validada.'
     : blockedCorePhases.length > 0
-      ? 'Bloqueado por seguridad antes de cerrar la demo local.'
+      ? 'Bloqueado por seguridad antes de cerrar la entrega funcional local.'
       : scaffoldMaterialized && completedCorePhaseEntries.length > 0
-        ? `Demo visual en progreso. Falta completar ${missingCorePhases[0] || 'la validación local'} para cerrar la base segura.`
+        ? `Entrega funcional en progreso. Falta completar ${missingCorePhases[0] || 'la validacion local'} para cerrar la base segura.`
         : scaffoldMaterialized
-          ? 'Scaffold materializado · demo base pendiente de completar.'
-      : 'Todavía falta completar el flujo base antes de cerrar la demo local segura.'
+          ? 'Base local materializada · entrega funcional pendiente de completar.'
+      : 'Todavia falta completar el flujo base antes de cerrar la entrega funcional local segura.'
 
   return normalizeProjectReadinessStateContract({
     readinessLevel,
@@ -25676,10 +25676,10 @@ function buildPhaseAwareFullstackLocalDemoData({
     heroKicker: isReviewAndExpandPhase
       ? 'Review and expand completado'
       : isLocalValidationPhase
-        ? 'Demo local segura validada'
+        ? 'Entrega funcional local validada'
         : phaseLabel,
     subtitle: isReviewAndExpandPhase
-      ? 'Core flow completo. La demo local ya quedó validada y lista para seguir con expansiones seguras o reusable candidate.'
+      ? 'Core flow completo. La entrega funcional local ya quedo validada y lista para seguir con expansiones seguras o reusable candidate.'
       : isLocalValidationPhase
       ? 'Core flow completo. La base local segura ya fue validada y sigue en modo mock revisable.'
       : phaseDescription,
@@ -25690,7 +25690,7 @@ function buildPhaseAwareFullstackLocalDemoData({
       ? 'Última fase completada: local-validation. Próxima fase segura: review-and-expand.'
       : `Fase segura ${phaseLabel} materializada sin salir del modo local.`,
     safeModeCopy: isReviewAndExpandPhase
-      ? 'Demo local segura validada, reusable candidate disponible y sin backend real, DB real, Docker, deploy ni integraciones externas.'
+      ? 'Entrega funcional local validada, reusable candidate disponible y sin backend real, DB real, Docker, deploy ni integraciones externas.'
       : isLocalValidationPhase
       ? 'Core flow completo sin backend real, DB real, Docker, deploy ni integraciones externas. Todo sigue en modo local revisable.'
       : 'Sin npm install, sin backend real, sin base de datos real y sin integraciones externas. Todo sigue en modo local revisable.',
@@ -25699,7 +25699,7 @@ function buildPhaseAwareFullstackLocalDemoData({
     ? [
         {
           id: 'phase-review-expand-demo-ready',
-          label: 'Demo local',
+          label: 'Entrega local',
           value: 'Validada',
           tone: 'emerald',
           detail: 'Safe local demo ready',
@@ -25723,7 +25723,7 @@ function buildPhaseAwareFullstackLocalDemoData({
     ? [
         {
           id: 'phase-local-validation-demo-ready',
-          label: 'Demo local',
+          label: 'Entrega local',
           value: 'Validada',
           tone: 'emerald',
           detail: 'Safe local demo ready',
@@ -25766,7 +25766,7 @@ function buildPhaseAwareFullstackLocalDemoData({
           id: 'phase-review-expand-ready-alert',
           tone: 'emerald',
           title: 'Review and expand completado',
-          detail: 'La demo local segura ya quedó validada y la siguiente acción segura apunta a reusable candidate o expansión revisable.',
+          detail: 'La entrega funcional local ya quedo validada y la siguiente accion segura apunta a reusable candidate o expansion revisable.',
         },
         {
           id: 'phase-review-expand-completed-phases',
@@ -25780,8 +25780,8 @@ function buildPhaseAwareFullstackLocalDemoData({
         {
           id: 'phase-local-validation-ready-alert',
           tone: 'emerald',
-          title: 'Demo local segura validada',
-          detail: 'El core flow base ya quedó completo y la siguiente fase segura es review-and-expand.',
+          title: 'Entrega funcional local validada',
+          detail: 'El core flow base ya quedo completo y la siguiente fase segura es review-and-expand.',
         },
         {
           id: 'phase-local-validation-completed-phases',
@@ -25871,7 +25871,7 @@ function buildPhaseAwareFullstackLocalDemoData({
         feedback: isReviewAndExpandPhase
           ? `La base local quedó cerrada y la siguiente acción segura es ${normalizedNextRecommendedPhase}.`
           : isLocalValidationPhase
-          ? 'La demo local segura ya está validada y la siguiente fase disponible es review-and-expand.'
+          ? 'La entrega funcional local ya esta validada y la siguiente fase disponible es review-and-expand.'
           : `La siguiente fase sugerida es ${normalizedNextRecommendedPhase}.`,
       },
     ],
@@ -26053,7 +26053,7 @@ function buildFullstackLocalValidationArtifacts({
       phaseId: 'frontend-mock-flow',
       status: getPhaseStatus('frontend-mock-flow') || 'pending',
       percentage: getPhaseStatus('frontend-mock-flow') === 'done' ? 100 : 35,
-      evidence: 'Demo visual mock lista, sin fetch ni runtime real.',
+      evidence: 'Entrega visual mock lista, sin fetch ni runtime real.',
     },
     {
       label: 'Backend contracts',
@@ -26159,7 +26159,7 @@ ${suggestedCommands.map((entry) => `- \`${entry}\``).join('\n')}
 
 ## Compatibilidad file://
 
-- \`frontend/index.html\` sigue siendo el entrypoint recomendado para abrir la demo con doble click.
+- \`frontend/index.html\` sigue siendo el entrypoint recomendado para abrir la entrega con doble click.
 - El frontend debe mantenerse sin \`type="module"\`, sin \`import/export\` y sin \`fetch\`.
 - Si falta algún script clásico, el bootstrap debe mostrar error visible y no dejar pantalla blanca.
 
@@ -26224,7 +26224,7 @@ ${reviewAndExpandOptions.map((entry) => `- ${entry}`).join('\n')}
 
 ## Aclaración final
 
-- Esta demo puede considerarse lista para validacion local segura.
+- Esta entrega funcional local puede considerarse lista para validacion local segura.
 - No equivale a un runtime real de produccion.
 - No hay backend real, DB real, Docker, deploy, auth real ni integraciones externas.
 `
@@ -26236,7 +26236,7 @@ El proyecto sigue en modo local y revisable. Se materializó la fase \`local-val
 
 ## Cómo revisar esta entrega
 
-1. Abrí \`frontend/index.html\` con doble click y recorré la demo por \`file://\`.
+1. Abrí \`frontend/index.html\` con doble click y recorre la entrega por \`file://\`.
 2. Leé \`docs/validation-report.md\` para ver alcance, checks sugeridos y límites.
 3. Revisá \`backend/\`, \`shared/\` y \`database/\` solo como referencia revisable.
 4. Confirmá que \`jefe-project.json\` registre la fase actual como \`done\` y recomiende \`${nextRecommendedPhase}\`.
@@ -26373,7 +26373,7 @@ function buildFullstackLocalReviewAndExpandArtifacts({
 
 - root: \`${normalizedProjectRoot}\`
 - estado: \`review-and-expand\` completado
-- demo local segura: validada
+- entrega funcional local: validada
 - core flow: completo
 - siguiente accion segura: \`${nextRecommendedPhase}\`${nextRecommendedAction?.title ? ` (${nextRecommendedAction.title})` : ''}
 
@@ -26402,7 +26402,7 @@ ${reviewOptions.map((entry) => `- ${entry}`).join('\n')}
 
 ## Reusable candidate
 
-- La demo ya puede revisarse como candidata reusable.
+- La entrega funcional local ya puede revisarse como candidata reusable.
 - Antes de guardarla conviene hacer una última revisión humana del frontend visible y del runbook local.
 - Guardar reusable no debe reabrir fases ya cerradas ni tocar runtime real.
 `
@@ -26467,7 +26467,7 @@ El proyecto sigue en modo local y revisable. Se materializó la fase \`review-an
 
 ## Cómo revisar esta entrega
 
-1. Abrí \`frontend/index.html\` con doble click y confirmá el estado demo-ready.
+1. Abrí \`frontend/index.html\` con doble click y confirmá el estado funcional local validado.
 2. Leé \`docs/validation-report.md\` para ver el scoreboard final y límites mock.
 3. Leé \`docs/review-and-expand.md\` para decidir la siguiente expansión segura.
 4. Confirmá que \`jefe-project.json\` marque \`review-and-expand\` como done y recomiende \`${nextRecommendedPhase}\`.
@@ -26486,7 +26486,7 @@ El proyecto sigue en modo local y revisable. Se materializó la fase \`review-an
 
 ## Señal reusable
 
-- La demo ya puede revisarse como candidata reusable.
+- La entrega funcional local ya puede revisarse como candidata reusable.
 - Antes de guardarla conviene hacer una última revisión humana del contenido visible.
 `
 
@@ -27164,7 +27164,7 @@ function buildProjectPhaseExecutionPlan({
             ? 'Debe reflejar la expansión del flujo mock sin habilitar backend real.'
             : targetPath.endsWith('jefe-project.json')
               ? 'Debe actualizar el estado local del proyecto marcando frontend-mock-flow como done y backend-contracts como siguiente fase.'
-              : 'Debe mejorar la demo estática del dominio manteniendo compatibilidad file:// y alcance local.',
+              : 'Debe mejorar la entrega estatica del dominio manteniendo compatibilidad file:// y alcance local.',
       })),
       forbiddenPaths,
       runtimeChecks: [],
@@ -27187,7 +27187,7 @@ function buildProjectPhaseExecutionPlan({
       projectRoot,
       goal: `Expandir ${projectDomain} con un frontend mock flow local y revisable.`,
       reason:
-        'Esta fase mejora la demo local del frontend fullstack sin tocar backend, database ni dependencias reales.',
+        'Esta fase mejora la entrega local del frontend fullstack sin tocar backend, database ni dependencias reales.',
       executableNow: true,
       approvalRequired: false,
       riskLevel: 'low',
@@ -27495,7 +27495,7 @@ function buildProjectPhaseExecutionPlan({
         {
           path: `${projectRoot}/frontend/src/mock-data.js`,
           expectation:
-            'Debe reflejar demo-ready, core flow completo y review-and-expand como siguiente fase segura.',
+            'Debe reflejar entrega funcional local validada, core flow completo y review-and-expand como siguiente fase segura.',
         },
         {
           path: `${projectRoot}/backend/src/server.js`,
@@ -27582,7 +27582,7 @@ function buildProjectPhaseExecutionPlan({
         {
           type: blockedByPrerequisite ? 'review-file' : 'replace-file',
           targetPath: `${projectRoot}/frontend/src/mock-data.js`,
-          purpose: 'Sincronizar la superficie visible del frontend con demo-ready y review-and-expand.',
+          purpose: 'Sincronizar la superficie visible del frontend con entrega funcional local validada y review-and-expand.',
         },
         {
           type: blockedByPrerequisite ? 'review-file' : 'replace-file',
@@ -27644,7 +27644,7 @@ function buildProjectPhaseExecutionPlan({
         path: targetPath,
         expectation:
           targetPath.endsWith('mock-data.js')
-            ? 'Debe reflejar el estado final demo-ready y el siguiente paso seguro sin volver a fases ya cerradas.'
+            ? 'Debe reflejar el estado final funcional local validado y el siguiente paso seguro sin volver a fases ya cerradas.'
             : targetPath.endsWith('review-and-expand.md')
               ? 'Debe resumir expansiones seguras, reusable candidate y aprobaciones futuras.'
               : 'Debe servir como insumo para revision humana y decision de la siguiente expansion segura.',
@@ -27687,7 +27687,7 @@ function buildProjectPhaseExecutionPlan({
         {
           type: blockedByPrerequisite ? 'review-file' : 'replace-file',
           targetPath: `${projectRoot}/frontend/src/mock-data.js`,
-          purpose: 'Sincronizar la demo visible con review-and-expand y la siguiente acción segura.',
+          purpose: 'Sincronizar la entrega visible con review-and-expand y la siguiente accion segura.',
         },
         {
           type: blockedByPrerequisite ? 'review-file' : 'replace-file',
@@ -28118,12 +28118,12 @@ function buildProjectPhaseMaterializationPlan({
       assumptions: [
         'La validacion sigue siendo local y documental.',
         'No se ejecutan servicios, SQL, seeds ni dependencias.',
-        'Solo se sincroniza frontend/src/mock-data.js para reflejar el estado demo-ready visible; backend, shared, database y scripts quedan fuera de alcance de escritura.',
+        'Solo se sincroniza frontend/src/mock-data.js para reflejar el estado funcional local validado visible; backend, shared, database y scripts quedan fuera de alcance de escritura.',
       ],
       instruction: [
         `Materializar la fase ${normalizedPlan.phaseId} dentro de ${normalizedPlan.projectRoot}.`,
         `Usar solo estos targetPaths: ${normalizedPlan.allowedTargetPaths.join(', ')}`,
-        'Sincronizar frontend/src/mock-data.js con demo-ready y review-and-expand, sin tocar backend, shared, database, scripts, node_modules, .env, Docker ni deploy.',
+        'Sincronizar frontend/src/mock-data.js con entrega funcional local validada y review-and-expand, sin tocar backend, shared, database, scripts, node_modules, .env, Docker ni deploy.',
       ].join('\n'),
       executionScope: normalizeExecutorExecutionScope({
         allowedTargetPaths: normalizedPlan.allowedTargetPaths,
@@ -28173,7 +28173,7 @@ function buildProjectPhaseMaterializationPlan({
           {
             type: 'file-contains',
             targetPath: mockDataPath,
-            expectedText: 'Demo local segura validada',
+            expectedText: 'Entrega funcional local validada',
           },
           {
             type: 'file-contains',
@@ -31529,7 +31529,7 @@ function buildModuleExpansionArtifacts({
       visibleModuleNames.length > 0
         ? `Módulos seguros activos: ${visibleModuleNames.join(', ')}.`
         : '',
-      'No se ejecutaron envíos reales, exportaciones reales ni movimientos de stock fuera de la demo local.',
+      'No se ejecutaron envios reales, exportaciones reales ni movimientos de stock fuera de la entrega local.',
       'La siguiente fase segura sigue siendo review-and-expand.',
     ],
     20,
@@ -31748,7 +31748,7 @@ function buildModuleExpansionArtifacts({
 );`)
     seedBlocks.push(`INSERT INTO reports_snapshots (id, report_type, report_period, report_status, metric_summary, detail, created_at, updated_at) VALUES
   ('REP-001', 'operations-overview', 'daily', 'ready-mock', 'Indicadores locales preparados', 'Reporte mock sin exportación real.', '2026-05-05T09:10:00', '2026-05-05T09:10:00'),
-  ('REP-002', 'module-expansion-summary', 'weekly', 'draft', 'Expansión segura en revisión', 'Se mantiene la demo en modo local y revisable.', '2026-05-05T09:12:00', '2026-05-05T09:12:00');`)
+  ('REP-002', 'module-expansion-summary', 'weekly', 'draft', 'Expansión segura en revisión', 'Se mantiene la entrega en modo local y revisable.', '2026-05-05T09:12:00', '2026-05-05T09:12:00');`)
   }
 
   if (activeModuleIds.includes('inventory')) {
@@ -31813,7 +31813,7 @@ ${inventorySeedRows};`)
   const runbookContent = `${String(
     documentationBundle.runbookContent || '# Local runbook\n',
   ).trim()}\n\n## Expansiones seguras activas\n\n${moduleChecklist || '- sin módulos activos'}\n\n## Qué revisar ahora\n\n- abrir \`frontend/index.html\` con doble click\n- revisar \`frontend/src/mock-data.js\`\n- revisar \`frontend/src/components/App.js\`\n${moduleFileChecklist || ''}\n- revisar \`database/schema.sql\` y \`database/seeds/seed-local.sql\`\n- revisar \`docs/validation-report.md\`\n- revisar \`jefe-project.json\`\n\n## Próxima fase segura\n\nLa continuidad vuelve a \`review-and-expand\`, con módulos ya materializados y listos para revisión local.\n`
-  const validationReportContent = `# Validación local del proyecto\n\n## Proyecto\n\n- root: \`${projectRoot}\`\n- deliveryLevel: \`fullstack-local\`\n- dominio: \`${String(normalizedManifest?.domain || appTitle).trim() || appTitle}\`\n- materializationLayer: \`local-deterministic\`\n\n## Fases base cerradas\n\n- fullstack-local-scaffold: done\n- frontend-mock-flow: done\n- backend-contracts: done\n- database-design: done\n- local-validation: done\n\n## Expansiones seguras materializadas\n\n${moduleChecklist || '- sin módulos activos'}\n\n## Qué revisar sin servicios reales\n\n- abrir \`frontend/index.html\`\n- revisar \`docs/local-runbook.md\`\n- confirmar que la demo siga mostrando contenido coherente del dominio\n${moduleFileChecklist || ''}\n- revisar \`shared/contracts/domain.js\` y \`shared/types/contracts.js\`\n- revisar \`database/schema.sql\` y \`database/seeds/seed-local.sql\`\n\n## Checks de seguridad\n\n- no node_modules\n- no .env real\n- no Dockerfile\n- no docker-compose.yml\n- no deploy\n- no DB real activa\n- no servidor levantado\n- no integraciones externas reales\n\n## Qué sigue siendo mock\n\n- datos visibles del frontend\n- contratos backend de referencia\n- schema y seed SQL como diseño revisable\n- módulos agregados sin runtime real\n\n## Aprobaciones futuras\n\n- npm install\n- runtime real\n- DB real\n- Docker\n- deploy\n- auth real\n- pagos reales\n- integraciones externas\n\n## Próximo paso recomendado\n\n- \`review-and-expand\`\n`
+  const validationReportContent = `# Validación local del proyecto\n\n## Proyecto\n\n- root: \`${projectRoot}\`\n- deliveryLevel: \`fullstack-local\`\n- dominio: \`${String(normalizedManifest?.domain || appTitle).trim() || appTitle}\`\n- materializationLayer: \`local-deterministic\`\n\n## Fases base cerradas\n\n- fullstack-local-scaffold: done\n- frontend-mock-flow: done\n- backend-contracts: done\n- database-design: done\n- local-validation: done\n\n## Expansiones seguras materializadas\n\n${moduleChecklist || '- sin módulos activos'}\n\n## Qué revisar sin servicios reales\n\n- abrir \`frontend/index.html\`\n- revisar \`docs/local-runbook.md\`\n- confirmar que la entrega siga mostrando contenido coherente del dominio\n${moduleFileChecklist || ''}\n- revisar \`shared/contracts/domain.js\` y \`shared/types/contracts.js\`\n- revisar \`database/schema.sql\` y \`database/seeds/seed-local.sql\`\n\n## Checks de seguridad\n\n- no node_modules\n- no .env real\n- no Dockerfile\n- no docker-compose.yml\n- no deploy\n- no DB real activa\n- no servidor levantado\n- no integraciones externas reales\n\n## Qué sigue siendo mock\n\n- datos visibles del frontend\n- contratos backend de referencia\n- schema y seed SQL como diseño revisable\n- módulos agregados sin runtime real\n\n## Aprobaciones futuras\n\n- npm install\n- runtime real\n- DB real\n- Docker\n- deploy\n- auth real\n- pagos reales\n- integraciones externas\n\n## Próximo paso recomendado\n\n- \`review-and-expand\`\n`
   const sharedDomainObject = buildFullstackLocalSharedDomainObject(
     fullstackLocalDemoData,
   )
@@ -32039,7 +32039,7 @@ INSERT INTO patients (id, full_name, document_number, contact_phone, contact_ema
 
 INSERT INTO availability_slots (id, professional_id, specialty_id, slot_date, start_time, end_time, state, notes, created_at, updated_at) VALUES
   ('SLT-001', 'PRO-001', 'SPC-001', '2026-05-05', '09:30', '10:00', 'reserved', 'Turno mock ya reservado', '2026-05-04T09:15:00', '2026-05-04T09:15:00'),
-  ('SLT-002', 'PRO-002', 'SPC-002', '2026-05-05', '10:15', '10:45', 'free', 'Disponible para demo local', '2026-05-04T09:15:00', '2026-05-04T09:15:00'),
+  ('SLT-002', 'PRO-002', 'SPC-002', '2026-05-05', '10:15', '10:45', 'free', 'Disponible para entrega local', '2026-05-04T09:15:00', '2026-05-04T09:15:00'),
   ('SLT-003', 'PRO-002', 'SPC-003', '2026-05-05', '11:00', '11:30', 'free', 'Disponible para especialidad secundaria', '2026-05-04T09:15:00', '2026-05-04T09:15:00');
 
 INSERT INTO appointments (id, patient_id, professional_id, specialty_id, availability_slot_id, appointment_date, status, reason, notes, created_at, updated_at) VALUES
@@ -33277,7 +33277,7 @@ INSERT INTO patients (id, full_name, document_number, contact_phone, contact_ema
 
 INSERT INTO availability_slots (id, professional_id, specialty_id, slot_date, start_time, end_time, state, notes, created_at, updated_at) VALUES
   ('SLT-001', 'PRO-001', 'SPC-001', '2026-05-05', '09:30', '10:00', 'reserved', 'Turno mock ya reservado', '2026-05-04T09:15:00', '2026-05-04T09:15:00'),
-  ('SLT-002', 'PRO-002', 'SPC-002', '2026-05-05', '10:15', '10:45', 'free', 'Disponible para demo local', '2026-05-04T09:15:00', '2026-05-04T09:15:00'),
+  ('SLT-002', 'PRO-002', 'SPC-002', '2026-05-05', '10:15', '10:45', 'free', 'Disponible para entrega local', '2026-05-04T09:15:00', '2026-05-04T09:15:00'),
   ('SLT-003', 'PRO-002', 'SPC-003', '2026-05-05', '11:00', '11:30', 'free', 'Disponible para especialidad secundaria', '2026-05-04T09:15:00', '2026-05-04T09:15:00');
 
 INSERT INTO appointments (id, patient_id, professional_id, specialty_id, availability_slot_id, appointment_date, status, reason, notes, created_at, updated_at) VALUES
@@ -37218,7 +37218,7 @@ Reglas:
 - Usá prepare-continuation-action-plan para runtime local, dependencias, DB real, auth, deploy, Docker, integraciones externas o mejoras revisables que todavia no tengan materializador seguro. En ese caso usá executionMode="planner-only", nextExpectedAction="review-continuation-action" y devolvé continuationActionPlan + projectContinuationState sin materializationPlan.
 - Cuando puedas, devolvé también projectBlueprint, questionPolicy, implementationRoadmap, nextActionPlan, validationPlan, phaseExpansionPlan, projectPhaseExecutionPlan y localProjectManifest alineados con la estrategia elegida.
 - projectContinuationState debe resumir estado, riesgos, blockers, acciones seguras, acciones revisables y acciones que requieren aprobacion en un lenguaje claro para operador.
-- projectReadinessState debe explicar si el proyecto esta listo para demo local segura, que partes siguen siendo mock, que existe en disco, que requiere aprobacion y que sigue bloqueado.
+- projectReadinessState debe explicar si el proyecto esta listo para una entrega funcional local segura, que partes siguen siendo mock, que existe en disco, que requiere aprobacion y que sigue bloqueado.
 - approvalRequestPlan debe empaquetar las acciones sensibles con riesgo, alcance, alternativa segura, validaciones requeridas y aclaracion de que todavia no se ejecuto nada real.
 - runtimeApprovalState debe dejar un preview controlado de ejecucion sensible con commandsPreview, filesPreview, validationPlan, rollbackPlan, disclaimer de no ejecucion y frase exacta de aprobacion futura.
 - projectBlueprint debe capturar tipo de producto, dominio, intent, deliveryLevel, stackProfile, roles, modules, entities, coreFlows, integrations, riesgos, decisiones delegadas, phasePlan, exclusiones, approvals futuros y successCriteria.

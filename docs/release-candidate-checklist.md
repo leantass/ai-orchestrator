@@ -2,11 +2,11 @@
 
 ## Objetivo
 
-Esta guía sirve para validar JEFE como plataforma local segura y operable. El criterio de salida no es solo “generó archivos”, sino que el operador pueda entender el flujo, abrir la demo, continuar por fases seguras y distinguir con claridad qué está listo, qué sigue mockeado y qué requiere aprobación futura.
+Esta guía sirve para validar JEFE como plataforma local segura y operable. El criterio de salida no es solo “genero archivos”, sino que el operador pueda entender el flujo, abrir la entrega local, continuar por fases seguras y distinguir con claridad que esta listo, que sigue mockeado y que requiere aprobacion futura.
 
 ## Precondiciones
 
-Antes de correr la demo o el smoke final:
+Antes de correr la entrega local o el smoke final:
 
 - usar la rama esperada del repo
 - confirmar que JEFE abre sin errores visibles
@@ -20,7 +20,7 @@ Antes de correr la demo o el smoke final:
 
 Usar un pedido que fuerce a JEFE a demostrar dominio, seguridad y continuidad. Ejemplo recomendado:
 
-> Haceme un sistema fullstack local para una veterinaria, con clientes, mascotas, turnos, recordatorios, reportes e inventario básico. Quiero una demo local segura con datos mock, sin instalar dependencias, sin levantar backend real, sin crear base de datos real y sin tocar integraciones externas.
+> Haceme un sistema fullstack local para una veterinaria, con clientes, mascotas, turnos, recordatorios, reportes e inventario basico. Quiero una entrega funcional local segura con datos mock, sin instalar dependencias, sin levantar backend real, sin crear base de datos real y sin tocar integraciones externas.
 
 Verificar que JEFE:
 
@@ -45,10 +45,10 @@ Verificar que JEFE:
    - readiness actual
    - si MEMORIA / Context Hub estuvo disponible o no
 
-## Escenario 3: abrir la demo por file://
+## Escenario 3: abrir la entrega local por file://
 
 1. Abrir `frontend/index.html` con doble click.
-2. Confirmar que la demo:
+2. Confirmar que la entrega local:
    - abre por `file://`
    - no usa `type="module"`
    - no usa `import` ni `export`
@@ -112,8 +112,8 @@ Verificar que el readiness hable en lenguaje de producto:
 
 - `En planificación` solo antes de materializar
 - `Scaffold materializado` después de crear la base real
-- `Demo visual en progreso` cuando las fases base están avanzando
-- `Listo para demo local segura` recién después de `local-validation`
+- `Entrega funcional en progreso` cuando las fases base estan avanzando
+- `Entrega funcional local validada` recien despues de `local-validation`
 
 No debería pasar:
 
@@ -169,7 +169,7 @@ Recién después de validación visual/local tiene sentido tratar la salida como
 
 - `type="module"` en `frontend/index.html`
 - `import` o `export` en el frontend estático
-- `fetch` en la demo estática
+- `fetch` en la entrega estatica
 - creación de `node_modules`
 - creación de `.env`
 - creación de `Dockerfile`
@@ -192,7 +192,7 @@ JEFE queda en estado de release candidate operable cuando:
 
 - el flujo guiado es entendible
 - el scaffold se materializa en modo seguro
-- la demo abre por `file://`
+- la entrega abre por `file://`
 - el dominio visible es coherente
 - la continuidad por fases funciona
 - el readiness es honesto

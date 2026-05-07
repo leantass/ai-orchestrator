@@ -1652,7 +1652,7 @@ function buildSafeFirstDeliveryIndexHtml() {
           </div>
           <section class="hero-status" aria-label="Alcance seguro">
             <p class="eyebrow hero-kicker">Alcance seguro</p>
-            <h2 id="hero-safety-title">Demo local lista</h2>
+            <h2 id="hero-safety-title">Entrega local lista</h2>
             <p id="hero-safety-copy" class="panel-copy"></p>
           </section>
         </div>
@@ -1670,7 +1670,7 @@ function buildSafeFirstDeliveryIndexHtml() {
             <div class="toolbar workspace-toolbar">
               <label class="field">
                 <span>Buscar</span>
-                <input id="search-input" type="search" placeholder="Buscar en esta demo local" />
+                <input id="search-input" type="search" placeholder="Buscar en esta entrega local" />
               </label>
               <label class="field field-select">
                 <span>Estado</span>
@@ -2951,7 +2951,7 @@ function renderAppStats(meta) {
     {
       label: 'Acciones',
       value: String(localActions.length),
-      copy: 'Interacciones simuladas disponibles en esta demo.',
+      copy: 'Interacciones simuladas disponibles en esta entrega local.',
     },
     {
       label: 'Exclusiones',
@@ -3000,7 +3000,7 @@ function updateTitle() {
       ? meta.scope[0]
       : 'Se priorizo un flujo principal navegable con datos mock editables.') +
     ' Todo queda acotado a archivos locales.';
-  safetyTitleNode.textContent = 'Demo local segura y revisable';
+  safetyTitleNode.textContent = 'Entrega funcional local segura y revisable';
   safetyCopyNode.textContent =
     'Incluye ' +
     modules.length +
@@ -3307,7 +3307,7 @@ function renderActionPanel(module, record) {
   const intro = document.createElement('div');
   intro.className = 'card';
   intro.innerHTML =
-    '<p class="card-kicker">Interaccion segura</p><h3>Acciones disponibles</h3><p class="muted">Estas acciones solo actualizan datos mock locales dentro de esta demo segura.</p>';
+    '<p class="card-kicker">Interaccion segura</p><h3>Acciones disponibles</h3><p class="muted">Estas acciones solo actualizan datos mock locales dentro de esta entrega local segura.</p>';
   container.appendChild(intro);
 
   summaryNode.textContent =
@@ -3665,7 +3665,7 @@ function renamePrimaryRecord() {
   const record = getPrimaryEditableRecord();
 
   if (!record) {
-    logAction('No hay un registro principal disponible para editar en esta demo local.');
+    logAction('No hay un registro principal disponible para editar en esta entrega local.');
     return;
   }
 
@@ -3679,7 +3679,7 @@ function bumpPrimaryMetric() {
   const currencyKey = Array.isArray(MODE.currencyKeys) ? MODE.currencyKeys[0] : '';
 
   if (!record || !currencyKey) {
-    logAction('No hay un valor numerico local para ajustar en esta demo.');
+    logAction('No hay un valor numerico local para ajustar en esta entrega local.');
     return;
   }
 

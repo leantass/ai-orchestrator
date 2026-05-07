@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite --config vite.config.ts --configLoader native",
     "build": "vite build --config vite.config.ts --configLoader native",
-    "electron:dev": "wait-on http://localhost:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .",
+    "electron:dev": "node scripts/wait-for-vite-dev.mjs && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .",
     "electron:stable": "electron .",
     "desktop:dev": "concurrently -k \"npm:dev\" \"npm:electron:dev\"",
     "desktop:stable": "npm run build && npm run electron:stable",

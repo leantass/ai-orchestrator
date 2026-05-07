@@ -6,6 +6,15 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import {
+  getPrepareActionButtonLabel,
+  getProjectContinuationStatusLabel,
+  getProjectReadinessLevelLabel,
+  getProjectReadinessTone,
+  getRuntimeApprovalStatusLabel,
+  getRuntimeApprovalTone,
+  getValidationStatusLabel,
+} from './project-state-labels'
 
 type FlowMessage = {
   id: number
@@ -5456,159 +5465,6 @@ const getContinuityVisualState = ({
   }
 }
 
-const getProjectContinuationStatusLabel = (value?: string) => {
-  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
-
-  if (normalizedValue === 'base-phases-in-progress') {
-    return 'Base segura en progreso'
-  }
-  if (normalizedValue === 'safe-module-expansion-ready') {
-    return 'Listo para expandir m\u00f3dulos'
-  }
-  if (normalizedValue === 'safe-capabilities-complete') {
-    return 'Capacidades seguras completas'
-  }
-  if (normalizedValue === 'review-only') {
-    return 'En revisi\u00f3n'
-  }
-
-  return normalizeOptionalString(value) || 'Sin estado'
-}
-
-const getProjectReadinessLevelLabel = (value?: string) => {
-  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
-
-  if (normalizedValue === 'demo-ready') {
-    return 'Listo para demo local segura'
-  }
-  if (normalizedValue === 'scaffold-materialized') {
-    return 'Scaffold materializado'
-  }
-  if (normalizedValue === 'base-phases-in-progress') {
-    return 'Demo visual en progreso'
-  }
-  if (normalizedValue === 'scaffolded') {
-    return 'Base pendiente de completar'
-  }
-  if (normalizedValue === 'planning') {
-    return 'En planificaci\u00f3n'
-  }
-  if (normalizedValue === 'blocked') {
-    return 'Bloqueado por seguridad'
-  }
-  if (normalizedValue === 'not-started') {
-    return 'No iniciado'
-  }
-  if (normalizedValue === 'needs-review') {
-    return 'Necesita revisi\u00f3n'
-  }
-
-  return normalizeOptionalString(value) || 'Sin estado'
-}
-
-const getProjectReadinessTone = (
-  readinessState?: ProjectReadinessStateContract | null,
-) => {
-  if (readinessState?.demoReady === true || readinessState?.safeLocalDemoReady === true) {
-    return 'emerald' as const
-  }
-
-  const readinessLevel = normalizeOptionalString(
-    readinessState?.readinessLevel,
-  ).toLocaleLowerCase()
-  if (readinessLevel === 'blocked') {
-    return 'rose' as const
-  }
-  if (readinessLevel === 'planning' || readinessLevel === 'not-started') {
-    return 'sky' as const
-  }
-
-  return 'amber' as const
-}
-
-const getRuntimeApprovalStatusLabel = (value?: string) => {
-  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
-
-  if (normalizedValue === 'preview') {
-    return 'Preview controlado'
-  }
-  if (normalizedValue === 'requires-approval') {
-    return 'Requiere aprobaci\u00f3n'
-  }
-  if (normalizedValue === 'approved') {
-    return 'Aprobado'
-  }
-  if (normalizedValue === 'blocked') {
-    return 'Bloqueado por seguridad'
-  }
-  if (normalizedValue === 'rejected') {
-    return 'Rechazado'
-  }
-  if (normalizedValue === 'expired') {
-    return 'Expirado'
-  }
-
-  return normalizeOptionalString(value) || 'Sin estado'
-}
-
-const getRuntimeApprovalTone = (value?: string) => {
-  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
-
-  if (normalizedValue === 'blocked' || normalizedValue === 'rejected') {
-    return 'rose' as const
-  }
-  if (normalizedValue === 'approved') {
-    return 'emerald' as const
-  }
-  if (normalizedValue === 'preview' || normalizedValue === 'requires-approval') {
-    return 'amber' as const
-  }
-
-  return 'sky' as const
-}
-
-const getValidationStatusLabel = (value?: string) => {
-  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
-
-  if (normalizedValue === 'validated-local-safe') {
-    return 'Validado en local seguro'
-  }
-  if (normalizedValue === 'pending-local-validation') {
-    return 'Falta validaci\u00f3n local'
-  }
-  if (normalizedValue === 'scaffolded-not-validated') {
-    return 'Base armada, sin validaci\u00f3n'
-  }
-  if (normalizedValue === 'blocked') {
-    return 'Bloqueado'
-  }
-  if (normalizedValue === 'not-run') {
-    return 'Sin validaci\u00f3n'
-  }
-
-  return normalizeOptionalString(value) || 'Sin validaci\u00f3n'
-}
-
-const getPrepareActionButtonLabel = ({
-  alreadyDone,
-  requiresApproval,
-  blocked,
-}: {
-  alreadyDone?: boolean
-  requiresApproval?: boolean
-  blocked?: boolean
-}) => {
-  if (alreadyDone || blocked) {
-    return 'Revisar primero'
-  }
-
-  if (requiresApproval) {
-    return 'Preparar aprobaci\u00f3n'
-  }
-
-  return 'Preparar plan'
-}
-
 const getContinuationCategoryLabel = (value?: string) => {
   const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
 
@@ -5655,7 +5511,7 @@ function LocalProjectManifestCard({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Project phases
+            Fases del proyecto
           </div>
           <div className="mt-2 text-sm leading-6 text-slate-400">
             Estado local del proyecto materializado y fases seguras que JEFE puede seguir preparando.
@@ -5691,7 +5547,7 @@ function LocalProjectManifestCard({
           detail={visiblePhases[0]?.id || 'Sin detalle'}
         />
         <MetricCard
-          label="Forbidden paths"
+          label="Paths bloqueados"
           value={
             normalizeOptionalStringArray(manifest.forbiddenPaths).length > 0
               ? `${normalizeOptionalStringArray(manifest.forbiddenPaths).length} path(s)`
@@ -5774,7 +5630,7 @@ function ProjectPhaseExecutionPlanCard({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Project phase execution
+            Ejecucion de fase segura
           </div>
           <div className="mt-2 text-lg font-semibold text-white">
             {normalizeOptionalString(plan.phaseId) || 'Fase sin id'}
@@ -5785,7 +5641,7 @@ function ProjectPhaseExecutionPlanCard({
         </div>
         <div className="flex flex-wrap gap-2">
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-            {plan.executableNow ? 'Ejecutable ahora' : 'Planner only'}
+                  {plan.executableNow ? 'Lista para materializar' : 'Solo planificacion'}
           </span>
           {onMaterializePhase && plan.executableNow ? (
             <button
@@ -5801,13 +5657,13 @@ function ProjectPhaseExecutionPlanCard({
 
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Project root"
+          label="Proyecto local"
           value={normalizeOptionalString(plan.projectRoot) || 'Sin root'}
           detail={getDeliveryLevelLabel(plan.deliveryLevel)}
           tone="sky"
         />
         <MetricCard
-          label="Strategies"
+          label="Estrategias"
           value={normalizeOptionalString(plan.sourceStrategy) || 'Sin source'}
           detail={normalizeOptionalString(plan.targetStrategy) || 'Sin target'}
         />
@@ -5818,7 +5674,7 @@ function ProjectPhaseExecutionPlanCard({
           tone={tone}
         />
         <MetricCard
-          label="Target files"
+          label="Archivos objetivo"
           value={
             normalizeOptionalStringArray(plan.targetFiles).length > 0
               ? `${normalizeOptionalStringArray(plan.targetFiles).length} archivo(s)`
@@ -5830,7 +5686,7 @@ function ProjectPhaseExecutionPlanCard({
 
       <div className="mt-4 grid gap-3 xl:grid-cols-2">
         <ProductArchitectureGroup
-          title="Allowed target paths"
+          title="Paths permitidos"
           items={plan.allowedTargetPaths}
           compact={compact}
           tone="emerald"
@@ -7339,7 +7195,7 @@ function ProjectContinuityCenterCard({
                   ? readinessBlockedAreas
                   : readinessBlockers.length > 0
                     ? readinessBlockers
-                    : ['No hay bloqueos adicionales para la demo local segura.']
+                    : ['No hay bloqueos adicionales para la entrega funcional local segura.']
               }
               compact={compact}
               tone="rose"
@@ -11458,14 +11314,14 @@ function App() {
   const plannerReviewHelperText = plannerIsReviewOnly
     ? plannerIsProjectPhaseReview
       ? plannerProjectPhaseReviewCanMaterialize
-        ? `JEFE detecto la fase segura ${plannerProjectPhaseReviewId} y puede preparar su materializacion sin recrear el scaffold.`
-        : `JEFE detecto la fase segura ${plannerProjectPhaseReviewId || 'actual'} para revisar antes de seguir con la continuidad.`
+        ? `JEFE detecto la fase segura ${plannerProjectPhaseReviewId} y ya puede preparar su materializacion local sin recrear el proyecto.`
+        : `JEFE detecto la fase segura ${plannerProjectPhaseReviewId || 'actual'} para revisarla antes de seguir con la continuidad.`
       : plannerIsSafeFirstDeliveryReview
-        ? 'Este plan define una primera fase segura y no ejecuta cambios todavÍa.'
+        ? 'Estas revisando una primera entrega segura. El CTA azul solo prepara la materializacion; todavia no escribe archivos.'
         : plannerIsScalableDeliveryReview
-          ? 'JEFE detecto una entrega escalable y por ahora solo devuelve un plan revisable; no ejecuta cambios todavÍa.'
-          : 'Este plan no ejecuta cambios todavÍa; primero requiere revision manual.'
-    : 'La instruccion actual puede pasar a ejecucion manual cuando corresponda.'
+          ? 'Estas revisando una entrega funcional local mas amplia. El CTA azul prepara la materializacion, pero todavia no ejecuta cambios.'
+          : 'Este bloque quedo en revision manual. Primero se entiende y despues se decide si conviene preparar o ejecutar.'
+    : 'La instruccion actual ya es ejecutable y el CTA amarillo puede materializar o continuar sobre el workspace.'
   const plannerReviewActionLabel = plannerIsSafeFirstDeliveryReview
     ? 'Revisar primera entrega segura'
     : plannerIsProjectPhaseReview
@@ -11662,12 +11518,27 @@ function App() {
       'materialize-project-phase-plan'
       ? normalizeOptionalString(activeProjectPhaseExecutionPlan?.phaseId)
       : ''
+  const activeExecutionStrategy = normalizeOptionalString(
+    plannerExecutionMetadata.strategy || plannerExecutionMetadata.decisionKey,
+  ).toLocaleLowerCase()
   const executeCurrentInstructionLabel = activeExecutableProjectPhaseId
-    ? `Ejecutar ${activeExecutableProjectPhaseId}`
-    : 'Ejecutar'
+    ? `Materializar ${activeExecutableProjectPhaseId}`
+    : activeExecutionStrategy === 'materialize-fullstack-local-plan'
+      ? 'Materializar entrega local'
+      : activeExecutionStrategy === 'materialize-safe-first-delivery-plan'
+        ? 'Materializar primera entrega'
+        : activeExecutionStrategy === 'materialize-module-expansion-plan'
+          ? 'Materializar modulo'
+          : 'Ejecutar'
   const executeCurrentInstructionQuickLabel = activeExecutableProjectPhaseId
-    ? `Ejecutar ${activeExecutableProjectPhaseId}`
-    : 'Ejecutar instrucción actual'
+    ? `Materializar ${activeExecutableProjectPhaseId}`
+    : activeExecutionStrategy === 'materialize-fullstack-local-plan'
+      ? 'Materializar entrega local'
+      : activeExecutionStrategy === 'materialize-safe-first-delivery-plan'
+        ? 'Materializar primera entrega'
+        : activeExecutionStrategy === 'materialize-module-expansion-plan'
+          ? 'Materializar modulo'
+          : 'Ejecutar instrucción actual'
   const activeLocalProjectRoot = (() => {
     if (normalizeOptionalString(activeProjectPhaseExecutionPlan?.projectRoot)) {
       return normalizeOptionalString(activeProjectPhaseExecutionPlan?.projectRoot)
@@ -12166,6 +12037,8 @@ function App() {
     return lastTargetSegment.includes('.') ? 'file' : 'folder'
   }
   const latestValidationOkCount = latestValidationResults.filter((entry) => entry.ok !== false).length
+  const latestValidationFailureCount =
+    latestValidationResults.length - latestValidationOkCount
   const latestValidatedFolderCount = latestValidationResults.filter(
     (entry) => entry.ok !== false && inferValidationEntryKind(entry) === 'folder',
   ).length
@@ -12315,6 +12188,9 @@ function App() {
   const resultWrittenFilePaths = latestWrittenFiles.map((pathValue) =>
     formatWorkspaceRelativePath(pathValue, workspacePath),
   )
+  const resultTouchedFilePaths = latestTouchedArtifacts
+    .filter((pathValue) => isLikelyFilePath(pathValue))
+    .map((pathValue) => formatWorkspaceRelativePath(pathValue, workspacePath))
   const resultTrackedPaths = latestTrackedArtifacts.map((pathValue) =>
     formatWorkspaceRelativePath(pathValue, workspacePath),
   )
@@ -12467,7 +12343,7 @@ function App() {
             : 'Guardar como reusable después de validar',
           detail: resultCanSuggestReusableNow
             ? 'Si el cierre ya pasó la validación local, conviene registrarlo como memoria reutilizable.'
-            : 'Conviene hacerlo cuando la demo pase la revisión visual y la fase de local-validation.',
+            : 'Conviene hacerlo cuando la entrega funcional local pase la revision visual y la fase de local-validation.',
         }
       : null,
     resultExecutionCompleted
@@ -12477,7 +12353,7 @@ function App() {
             : 'Crear variante después de validar',
           detail: resultCanSuggestReusableNow
             ? 'Buena opción para iterar una nueva versión sin perder la identidad visual.'
-            : 'Mejor hacerlo cuando la base ya esté validada visualmente y lista para reutilizar.',
+            : 'Mejor hacerlo cuando la base ya este validada visualmente y lista para reutilizar.',
         }
       : null,
     resultExecutionCompleted
@@ -12485,7 +12361,7 @@ function App() {
           title: 'Crear variante reutilizando estructura',
           detail: resultCanSuggestReusableNow
             ? 'Útil cuando la composición ya funciona y querés cambiar rubro o contenido.'
-            : 'Conviene esperar a la validación local para tomar esta salida como base estructural.',
+            : 'Conviene esperar a la validacion local para tomar esta salida como base estructural.',
         }
       : null,
     {
@@ -12604,12 +12480,18 @@ function App() {
   const resultWrittenArtifactPaths = resultExecutionCompleted
     ? resultWrittenFilePaths
     : mergeUniqueStringValues(resultWrittenFilePaths, resultMaterializationFileLabels, 12)
-  const resultMaterializationWrittenFilesLabel =
-    resultWrittenArtifactPaths.length > 0
-      ? `${resultWrittenArtifactPaths.length} archivo(s)`
-      : resultExecutionCompleted
-        ? 'Sin archivos reportados'
-        : 'Sin archivos confirmados'
+  const resultConfirmedWrittenFilesLabel =
+    resultWrittenFilePaths.length > 0
+      ? `${resultWrittenFilePaths.length} archivo(s)`
+      : 'Sin archivos confirmados'
+  const resultTouchedFilesLabel =
+    resultTouchedFilePaths.length > 0
+      ? `${resultTouchedFilePaths.length} archivo(s)`
+      : 'Sin archivos tocados reportados'
+  const resultPlannedFilesLabel =
+    resultMaterializationFileLabels.length > 0
+      ? `${resultMaterializationFileLabels.length} archivo(s)`
+      : 'Sin archivos previstos'
   const resultMaterializationValidationsLabel =
     latestValidationResults.length > 0
       ? `${latestValidationOkCount}/${latestValidationResults.length} OK`
@@ -12625,12 +12507,9 @@ function App() {
     latestMaterializationLayer === 'local-deterministic' || fastRouteDetected
       ? 'No se usó bridge y Codex no fue requerido para materializar esta salida.'
       : 'La corrida no informó una resolución completamente local.'
-  const resultWrittenArtifactsLabel = resultExecutionCompleted
-    ? 'Archivos escritos'
-    : 'Archivos previstos o tocados'
   const resultWrittenArtifactsDescription = resultExecutionCompleted
-    ? 'Resumen de carpeta principal, carpetas creadas, archivos escritos y alcance activo.'
-    : 'La corrida no cerró correctamente. Este bloque distingue lo previsto por el plan de lo realmente tocado para facilitar la revisión.'
+    ? 'Resumen de carpeta principal, carpetas creadas, archivos escritos confirmados y alcance activo.'
+    : 'La corrida no cerro correctamente. Este bloque separa lo previsto por el plan, lo tocado y lo realmente confirmado.'
   const effectiveResultValidationSummaryText =
     resultExecutionNeedsMaterialReview && latestValidationResults.length === 0
       ? 'La ejecución no devolvió validaciones finales. Revisar la materialización antes de tomar estos archivos como correctos.'
@@ -12649,7 +12528,7 @@ function App() {
     normalizeOptionalString(activeProjectReadinessState?.operatorSummary) ||
     normalizeOptionalString(activeProjectReadinessState?.lastValidationSummary) ||
     (resultIsFullstackLocalMaterialization
-      ? 'Scaffold materializado · demo base pendiente de completar.'
+      ? 'Base local materializada; todavia falta completar fases funcionales seguras.'
       : 'Todavía no hay un resumen de readiness para esta salida.')
   const resultMaterializationNextPhaseId =
     normalizeOptionalString(activeProjectContinuationState?.nextRecommendedPhase) ||
@@ -12683,26 +12562,27 @@ function App() {
   const resultContextHubDetail = activeContextHubStatus?.available
     ? activeContextHubUiDetail
     : [
-        'JEFE continuó sin MEMORIA externa.',
+        'JEFE continuo sin MEMORIA externa.',
+        'Puede seguir planificando y materializando igual, pero sin contexto reutilizable adicional.',
         activeContextHubStatus?.reason ? `Motivo: ${activeContextHubStatus.reason}` : '',
       ]
         .filter(Boolean)
         .join(' ')
   const resultMaterializationSummaryTitle = resultIsSafeFirstDeliveryMaterialization
-    ? 'Primera entrega segura generada'
+    ? 'Primera entrega funcional local generada'
     : resultIsFullstackLocalMaterialization
-      ? 'Scaffold fullstack local materializado'
+      ? 'Sistema local funcional materializado'
       : resultIsProjectPhaseMaterialization
-        ? 'Fase segura materializada'
+        ? 'Fase funcional segura materializada'
       : resultIsFrontendProjectMaterialization
-        ? 'Frontend local generado'
+        ? 'Frontend local funcional generado'
         : 'Entrega local generada'
   const resultMaterializationSummaryDescription = resultIsSafeFirstDeliveryMaterialization
-    ? 'Resumen corto de la materialización segura para revisar rápido qué se creó, cómo abrirlo y cuáles son sus límites.'
+    ? 'Resumen corto de la materializacion segura para revisar rapido que se creo, como abrirlo y cuales son sus limites.'
     : resultIsFullstackLocalMaterialization
-      ? 'Resumen corto del scaffold fullstack local para abrir la demo, revisar lo generado y saber cuál es la siguiente fase segura.'
+      ? 'Resumen corto del sistema local funcional para abrirlo, revisar lo generado y saber cual es la siguiente fase segura.'
       : resultIsProjectPhaseMaterialization
-        ? 'Resumen corto de la fase segura materializada para revisar qué se actualizó, qué quedó validado y cuál es la siguiente fase segura.'
+        ? 'Resumen corto de la fase segura materializada para revisar que se actualizo, que quedo validado y cual es la siguiente fase segura.'
       : resultIsFrontendProjectMaterialization
         ? 'Resumen corto del frontend local generado para abrirlo por file:// y validar la interfaz sin levantar runtime real.'
         : 'Resumen corto de la salida local materializada.'
@@ -12711,15 +12591,15 @@ function App() {
       ? `Abrir ${resultMaterializationIndexPathLabel} en el navegador para revisar la interfaz.`
       : 'Abrir el index.html generado para revisar la interfaz.',
     resultIsFullstackLocalMaterialization
-      ? 'Revisar backend, shared, database y docs como referencia revisable del mismo dominio.'
+      ? 'Revisar backend, shared, database y docs como referencia funcional local del mismo dominio.'
       : resultIsProjectPhaseMaterialization
         ? 'Revisar solo los archivos tocados por la fase segura y confirmar que el resto del proyecto siga intacto.'
-      : 'Revisar los archivos creados y confirmar que la salida siga siendo local y mock.',
+      : 'Revisar los archivos creados y confirmar que la salida siga siendo local, funcional y con datos mock donde corresponda.',
     resultMaterializationNextPhaseLabel !== 'Sin fase segura declarada'
       ? `Preparar la siguiente fase segura: ${resultMaterializationNextPhaseLabel}.`
       : 'Definir la siguiente fase segura antes de salir del modo local.',
-    'Validar las acciones locales y el log de actividad de la entrega mock.',
-    'Recién después evaluar si hace falta una aprobación futura para runtime real.',
+    'Validar las acciones locales y el log de actividad de la entrega funcional local.',
+    'Recien despues evaluar si hace falta una aprobacion futura para runtime real.',
   ]
   const latestHumanDecision = [...resolvedDecisions]
     .filter(
@@ -16357,15 +16237,15 @@ function App() {
 
   const plannerReviewPrimaryActionLabel = plannerIsProjectPhaseReview
     ? plannerProjectPhaseReviewCanMaterialize
-      ? `Preparar materialización de ${plannerProjectPhaseReviewId}`
+      ? `Preparar materializacion de fase ${plannerProjectPhaseReviewId}`
       : ''
     : plannerIsSafeFirstDeliveryReview
-      ? 'Preparar materialización segura'
+      ? 'Preparar ejecucion local segura'
       : plannerIsScalableDeliveryReview
         ? plannerScalableDeliveryLevel === 'fullstack-local'
-          ? 'Preparar materialización fullstack local'
+          ? 'Preparar entrega funcional local'
           : plannerScalableDeliveryLevel === 'frontend-project'
-            ? 'Preparar materialización frontend local'
+            ? 'Preparar frontend local ejecutable'
             : ''
         : ''
   const handlePlannerReviewPrimaryAction =
@@ -19645,8 +19525,16 @@ function App() {
                                 value: resultMaterializationCreatedFoldersLabel,
                               },
                               {
-                                label: resultWrittenArtifactsLabel,
-                                value: resultMaterializationWrittenFilesLabel,
+                                label: 'Archivos escritos confirmados',
+                                value: resultConfirmedWrittenFilesLabel,
+                              },
+                              {
+                                label: 'Archivos tocados',
+                                value: resultTouchedFilesLabel,
+                              },
+                              {
+                                label: 'Archivos previstos por plan',
+                                value: resultPlannedFilesLabel,
                               },
                               {
                                 label: 'Operaciones totales',
@@ -19713,7 +19601,7 @@ function App() {
                             </div>
                             <div className="space-y-2">
                               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                Límites del mock
+                                Limites del modo local
                               </div>
                               <div className="grid gap-2">
                                 {resultMaterializationLimits.map((limitLabel) => (
@@ -19861,13 +19749,25 @@ function App() {
                                   : 'Sin carpetas creadas',
                             },
                             {
-                              label: resultWrittenArtifactsLabel,
+                              label: 'Archivos escritos confirmados',
                               value:
-                                resultWrittenArtifactPaths.length > 0
-                                  ? `${resultWrittenArtifactPaths.length} archivo(s)`
-                                  : resultExecutionCompleted
-                                    ? 'Sin archivos escritos'
-                                    : 'Sin archivos previstos ni tocados',
+                                resultWrittenFilePaths.length > 0
+                                  ? `${resultWrittenFilePaths.length} archivo(s)`
+                                  : 'Sin archivos escritos confirmados',
+                            },
+                            {
+                              label: 'Archivos tocados',
+                              value:
+                                resultTouchedFilePaths.length > 0
+                                  ? `${resultTouchedFilePaths.length} archivo(s)`
+                                  : 'Sin archivos tocados',
+                            },
+                            {
+                              label: 'Archivos previstos por plan',
+                              value:
+                                resultMaterializationFileLabels.length > 0
+                                  ? `${resultMaterializationFileLabels.length} archivo(s)`
+                                  : 'Sin archivos previstos',
                             },
                             {
                               label: 'Rutas rastreadas',
@@ -19878,7 +19778,7 @@ function App() {
                             },
                           ]}
                         />
-                        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                        <div className="mt-4 grid gap-4 lg:grid-cols-3">
                           <div className="space-y-2">
                             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                               Carpetas creadas
@@ -19902,11 +19802,11 @@ function App() {
                           </div>
                           <div className="space-y-2">
                             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              {resultWrittenArtifactsLabel}
+                              Archivos escritos confirmados
                             </div>
                             <div className="grid gap-2">
-                              {resultWrittenArtifactPaths.length > 0 ? (
-                                resultWrittenArtifactPaths.map((artifactPath) => (
+                              {resultWrittenFilePaths.length > 0 ? (
+                                resultWrittenFilePaths.map((artifactPath) => (
                                   <div
                                     key={`written-${artifactPath}`}
                                     className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
@@ -19916,9 +19816,28 @@ function App() {
                                 ))
                               ) : (
                                 <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                                  {resultExecutionCompleted
-                                    ? 'No se reportaron archivos escritos.'
-                                    : 'No se reportaron archivos previstos ni tocados.'}
+                                  No se reportaron archivos escritos confirmados.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              Archivos previstos o tocados
+                            </div>
+                            <div className="grid gap-2">
+                              {resultWrittenArtifactPaths.length > 0 ? (
+                                resultWrittenArtifactPaths.map((artifactPath) => (
+                                  <div
+                                    key={`planned-or-touched-${artifactPath}`}
+                                    className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
+                                  >
+                                    {artifactPath}
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                                  No se reportaron archivos previstos ni tocados.
                                 </div>
                               )}
                             </div>
@@ -19953,6 +19872,33 @@ function App() {
                           <div className="text-sm leading-6 text-slate-300">
                             {effectiveResultValidationSummaryText}
                           </div>
+                        </div>
+                        <div className="mt-4">
+                          <ResultKeyValueGrid
+                            items={[
+                              {
+                                label: 'Validaciones previstas',
+                                value:
+                                  latestMaterializationPlanValidations.length > 0
+                                    ? `${latestMaterializationPlanValidations.length}`
+                                    : '0',
+                              },
+                              {
+                                label: 'Validaciones OK',
+                                value:
+                                  latestValidationResults.length > 0
+                                    ? `${latestValidationOkCount}`
+                                    : '0',
+                              },
+                              {
+                                label: 'Validaciones fallidas',
+                                value:
+                                  latestValidationResults.length > 0
+                                    ? `${latestValidationFailureCount}`
+                                    : '0',
+                              },
+                            ]}
+                          />
                         </div>
                         <div className="mt-4 grid gap-2">
                           {resultValidationItems.length > 0 ? (
@@ -20214,8 +20160,8 @@ function App() {
                 <div className="text-sm leading-6 text-slate-400">
                   {activeWizardStep === 'plan'
                     ? plannerIsReviewOnly
-                      ? 'Este plan quedó en revisión y no ejecuta cambios todavía.'
-                      : 'Cuando el plan te cierre, ejecutalo desde acá.'
+                      ? 'Este plan quedo en revision. El CTA azul solo prepara la siguiente accion segura; todavia no ejecuta archivos.'
+                      : 'La instruccion actual ya esta lista para ejecutar o materializar desde aca.'
                     : activeWizardStep === 'execution'
                       ? 'Si aparece una aprobación, el flujo queda claramente bloqueado hasta resolverla.'
                       : activeWizardStep === 'result'

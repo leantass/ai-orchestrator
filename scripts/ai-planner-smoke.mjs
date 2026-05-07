@@ -6040,10 +6040,10 @@ async function runMaterializeLocalValidationValidation() {
           failures.push('El jefe-project.json resultante deberia ofrecer review-and-expand dentro de availableActions.')
         }
         if (mockDataContent === beforeSnapshot.frontendMockData) {
-          failures.push('local-validation deberia resincronizar frontend/src/mock-data.js con el estado demo-ready.')
+          failures.push('local-validation deberia resincronizar frontend/src/mock-data.js con el estado funcional local validado.')
         }
-        if (!mockDataContent.includes('Demo local segura validada')) {
-          failures.push('frontend/src/mock-data.js deberia mostrar Demo local segura validada despues de local-validation.')
+        if (!mockDataContent.includes('Entrega funcional local validada')) {
+          failures.push('frontend/src/mock-data.js deberia mostrar Entrega funcional local validada despues de local-validation.')
         }
         if (!mockDataContent.includes('review-and-expand')) {
           failures.push('frontend/src/mock-data.js deberia mencionar review-and-expand como siguiente fase segura.')

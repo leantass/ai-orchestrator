@@ -1,14 +1,14 @@
-# Flujo de Demo para Operador
+# Flujo Operativo Local para el Operador
 
 ## Objetivo
 
-Esta guía sirve para mostrar JEFE como orquestador local seguro: planifica, prepara una materialización revisable, genera una demo estática rica y deja continuidad real por fases sin ejecutar nada sensible.
+Esta guía sirve para mostrar JEFE como orquestador local seguro: planifica, prepara una materializacion revisable, genera una entrega funcional local rica y deja continuidad real por fases sin ejecutar nada sensible.
 
 ## Escenario recomendado
 
 Usá un pedido que obligue a JEFE a mostrar dominio, continuidad y seguridad:
 
-> Haceme un sistema fullstack local para una veterinaria, con clientes, mascotas, turnos, recordatorios, reportes e inventario básico. Quiero una demo local segura con datos mock, sin instalar dependencias, sin levantar backend real, sin crear base de datos real y sin tocar integraciones externas.
+> Haceme un sistema fullstack local para una veterinaria, con clientes, mascotas, turnos, recordatorios, reportes e inventario basico. Quiero una entrega funcional local segura con datos mock, sin instalar dependencias, sin levantar backend real, sin crear base de datos real y sin tocar integraciones externas.
 
 También podés validar otras verticales ya soportadas:
 
@@ -38,10 +38,10 @@ También podés validar otras verticales ya soportadas:
    - readiness actual
    - estado de MEMORIA / Context Hub
 5. Abrí `frontend/index.html` con doble click.
-6. Confirmá que la demo carga por `file://`, sin servidor, sin `npm install` y sin pantalla blanca.
-7. Recorré la demo y validá que muestre una vertical real, no un scaffold genérico vacío.
+6. Confirmá que la entrega local carga por `file://`, sin servidor, sin `npm install` y sin pantalla blanca.
+7. Recorre la entrega local y valida que muestre una vertical real, no un scaffold generico vacio.
 
-## Qué debería mostrar una demo rica
+## Que deberia mostrar una entrega local rica
 
 - hero o encabezado operativo
 - métricas mock visibles
@@ -54,7 +54,7 @@ También podés validar otras verticales ya soportadas:
 - mensaje claro de qué no se ejecutó
 - al menos dos o tres interacciones locales en memoria
 
-## Qué probar dentro de la demo
+## Que probar dentro de la entrega local
 
 - cambiar de sección
 - buscar o filtrar
@@ -92,7 +92,7 @@ Para un caso como `fullstack-local-veterinaria/jefe-project.json` dentro del wor
 Después del scaffold base, el readiness no debería decir `En planificación`. La lectura esperable es:
 
 - `Scaffold materializado`
-- `Demo base pendiente de completar`
+- `Entrega funcional pendiente de completar`
 - próxima fase segura: `frontend-mock-flow`
 
 Cada fase segura debería poder:
@@ -112,14 +112,14 @@ JEFE debería poder decir con claridad si el proyecto está:
 - con backend contracts listos
 - con database design listo
 - con validación local lista
-- listo para demo local segura
+- entrega funcional local validada
 - todavía no listo para producto real
 
 Lectura práctica:
 
 - `Scaffold materializado`: ya existe la base real en disco, pero todavía falta completar fases seguras.
-- `Demo visual en progreso`: el proyecto ya avanzó por una o más fases base, pero aún no cerró `local-validation`.
-- `Listo para demo local segura`: ya pasó el flujo base local y puede mostrarse como entrega mock revisable.
+- `Entrega funcional en progreso`: el proyecto ya avanzo por una o mas fases base, pero aun no cerro `local-validation`.
+- `Entrega funcional local validada`: ya paso el flujo base local y puede mostrarse como entrega mock revisable.
 
 ## MEMORIA / Context Hub
 
@@ -158,13 +158,13 @@ Mientras no haya validación local cerrada, la UI debería sugerir:
 
 - `Guardar como reusable después de validar`
 
-## Checklist de demo salió bien
+## Checklist de entrega local
 
 - el wizard no se rompió
 - el plan revisable fue entendible
 - el CTA principal fue claro
 - el scaffold se abrió por `file://`
-- la demo mostró contenido específico del dominio
+- la entrega mostro contenido especifico del dominio
 - la continuidad recomendó la siguiente fase segura
 - readiness explicó qué ya está listo y qué sigue siendo mock
 - las aprobaciones futuras no aparecieron como bloqueo actual
@@ -179,7 +179,7 @@ Mientras no haya validación local cerrada, la UI debería sugerir:
    - `node scripts/ai-release-smoke.mjs`
    - `node scripts/ai-operator-e2e-smoke.mjs`
 4. Confirmá que no se hayan creado `.env`, `node_modules`, `Dockerfile` ni `docker-compose.yml`.
-5. Si el resultado dice `Scaffold materializado`, seguí con `frontend-mock-flow` antes de declarar la demo como reusable.
+5. Si el resultado dice `Scaffold materializado`, segui con `frontend-mock-flow` antes de declarar la entrega como reusable.
 
 ## Qué no probar todavía
 
