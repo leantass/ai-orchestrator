@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import http from 'node:http'
 import path from 'node:path'
 import vm from 'node:vm'
 import { execFileSync } from 'node:child_process'
@@ -17,6 +18,11 @@ const {
 } = require(
   path.join(repoRoot, 'electron', 'local-deterministic-executor.cjs'),
 )
+const {
+  fetchSuggestedContextHubPack,
+  emitContextHubEvent,
+  CONTEXT_HUB_API_URL_FALLBACKS,
+} = require(path.join(repoRoot, 'electron', 'context-hub-client.cjs'))
 const {
   summarizeContextHubPackForLog,
   buildExecutionFinishedEventPayload,
@@ -483,6 +489,13 @@ const phaseExecutionValidationCases = {
       'Preparar la fase review-and-expand del proyecto fullstack local de turnos medicos.',
     context: '',
   },
+  materializeReviewAndExpand: {
+    id: 'materialize-review-and-expand',
+    label: 'Materializar review and expand',
+    goal:
+      'Materializar la fase review-and-expand del proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
   prepareModuleExpansion: {
     id: 'prepare-module-expansion',
     label: 'Preparar expansion de modulo',
@@ -666,6 +679,13 @@ const continuationValidationCases = {
     label: 'Todos los modulos seguros hechos',
     goal:
       'Preparar la fase review-and-expand del proyecto fullstack local de turnos medicos.',
+    context: '',
+  },
+  manifestReviewComplete: {
+    id: 'continuation-review-complete',
+    label: 'Review and expand ya completado',
+    goal:
+      'Hace lo que siga de forma segura para el proyecto fullstack local de turnos medicos.',
     context: '',
   },
   manifestPartialModule: {
@@ -1442,6 +1462,9 @@ async function runFullstackPhaseContractsHelperValidation() {
   const validationPhase = phaseBlueprints.find(
     (entry) => entry?.id === 'local-validation',
   )
+  const reviewPhase = phaseBlueprints.find(
+    (entry) => entry?.id === 'review-and-expand',
+  )
 
   if (FULLSTACK_LOCAL_BASE_PHASES.length < 5) {
     failures.push('FULLSTACK_LOCAL_BASE_PHASES deberia incluir las fases base del flujo local seguro.')
@@ -1486,6 +1509,33 @@ async function runFullstackPhaseContractsHelperValidation() {
     }
     if (!toStringArray(validationPhase.allowedTargetPaths, 20).some((entry) => entry.endsWith('/docs/validation-report.md'))) {
       failures.push('local-validation deberia incluir docs/validation-report.md en allowedTargetPaths.')
+    }
+  }
+
+  if (!reviewPhase) {
+    failures.push('El helper de fases deberia construir review-and-expand.')
+  } else {
+    if (reviewPhase.nextRecommendedPhase !== 'prepare-reusable-candidate-plan') {
+      failures.push(
+        'review-and-expand deberia recomendar prepare-reusable-candidate-plan como siguiente accion segura.',
+      )
+    }
+    if (reviewPhase.safeToMaterialize !== true) {
+      failures.push('review-and-expand deberia quedar materializable en modo local seguro.')
+    }
+    if (
+      !toStringArray(reviewPhase.allowedTargetPaths, 20).some((entry) =>
+        entry.endsWith('/docs/review-and-expand.md'),
+      )
+    ) {
+      failures.push('review-and-expand deberia incluir docs/review-and-expand.md en allowedTargetPaths.')
+    }
+    if (
+      !toStringArray(reviewPhase.allowedTargetPaths, 20).some((entry) =>
+        entry.endsWith('/frontend/src/mock-data.js'),
+      )
+    ) {
+      failures.push('review-and-expand deberia incluir frontend/src/mock-data.js en allowedTargetPaths.')
     }
   }
 
@@ -1612,6 +1662,163 @@ async function runContextHubEventHelpersValidation() {
     strategy: 'helper',
     executionMode: 'local-test',
     nextExpectedAction: 'context-hub-event-ready',
+  }
+}
+
+async function runContextHubClientHelpersValidation() {
+  const failures = []
+  const requests = []
+  const originalContextHubApiUrl = process.env.CONTEXT_HUB_API_URL
+  const fallbackUrls = Array.isArray(CONTEXT_HUB_API_URL_FALLBACKS)
+    ? CONTEXT_HUB_API_URL_FALLBACKS
+    : []
+  let server
+  let serverPort = 0
+
+  try {
+    server = await new Promise((resolve, reject) => {
+      const instance = http.createServer((request, response) => {
+        const requestUrl = new URL(request.url || '/', 'http://127.0.0.1')
+        const chunks = []
+
+        request.on('data', (chunk) => chunks.push(chunk))
+        request.on('end', () => {
+          const rawBody = Buffer.concat(chunks).toString('utf8')
+          let parsedBody = null
+
+          try {
+            parsedBody = rawBody ? JSON.parse(rawBody) : null
+          } catch {
+            parsedBody = null
+          }
+
+          requests.push({
+            method: request.method || 'GET',
+            pathname: requestUrl.pathname,
+            search: requestUrl.search,
+            body: parsedBody,
+          })
+
+          response.setHeader('Content-Type', 'application/json; charset=utf-8')
+
+          if (
+            request.method === 'GET' &&
+            requestUrl.pathname === '/v1/packs/suggested'
+          ) {
+            response.writeHead(200)
+            response.end(
+              JSON.stringify({
+                ok: true,
+                pack: {
+                  id: 'pack-veterinaria-local',
+                  slug: 'veterinaria-local',
+                  title: 'Veterinaria local segura',
+                  content: 'Pack compacto para la demo veterinaria.',
+                  metadata: {
+                    itemsCount: 3,
+                    estimatedTokens: 240,
+                  },
+                },
+              }),
+            )
+            return
+          }
+
+          if (request.method === 'POST' && requestUrl.pathname === '/v1/events') {
+            response.writeHead(200)
+            response.end(JSON.stringify({ ok: true, accepted: true }))
+            return
+          }
+
+          response.writeHead(404)
+          response.end(JSON.stringify({ ok: false, reason: 'not-found' }))
+        })
+      })
+
+      instance.once('error', reject)
+      instance.listen(0, '127.0.0.1', () => resolve(instance))
+    })
+
+    serverPort = server.address()?.port || 0
+    process.env.CONTEXT_HUB_API_URL = `http://127.0.0.1:${serverPort}`
+
+    const packResult = await fetchSuggestedContextHubPack()
+    const eventResult = await emitContextHubEvent({
+      type: 'planning_finished',
+      source: 'ai-orchestrator',
+      requestId: 'smoke-context-hub-client',
+      decisionKey: 'prepare-project-phase-plan',
+      status: 'ok',
+    })
+
+    if (!fallbackUrls.includes('http://127.0.0.1:3210')) {
+      failures.push('CONTEXT_HUB_API_URL_FALLBACKS deberia priorizar 127.0.0.1:3210.')
+    }
+    if (packResult?.available !== true) {
+      failures.push('fetchSuggestedContextHubPack deberia marcar available=true contra un API local valida.')
+    }
+    if (packResult?.pack?.id !== 'pack-veterinaria-local') {
+      failures.push('fetchSuggestedContextHubPack deberia normalizar el pack devuelto por Context Hub.')
+    }
+    if (packResult?.endpoint !== '/v1/packs/suggested') {
+      failures.push('fetchSuggestedContextHubPack deberia preservar el endpoint esperado.')
+    }
+    if (eventResult?.ok !== true) {
+      failures.push('emitContextHubEvent deberia devolver ok=true cuando /v1/events responde 200.')
+    }
+    if (eventResult?.endpoint !== '/v1/events') {
+      failures.push('emitContextHubEvent deberia reportar /v1/events como endpoint.')
+    }
+
+    const suggestedRequest = requests.find(
+      (entry) =>
+        entry.method === 'GET' && entry.pathname === '/v1/packs/suggested',
+    )
+    const eventRequest = requests.find(
+      (entry) => entry.method === 'POST' && entry.pathname === '/v1/events',
+    )
+
+    if (!suggestedRequest) {
+      failures.push('El helper cliente deberia consultar GET /v1/packs/suggested.')
+    }
+    if (!eventRequest) {
+      failures.push('El helper cliente deberia emitir POST /v1/events.')
+    } else {
+      if (eventRequest.body?.type !== 'planning_finished') {
+        failures.push('emitContextHubEvent deberia enviar el tipo de evento esperado.')
+      }
+      if (eventRequest.body?.requestId !== 'smoke-context-hub-client') {
+        failures.push('emitContextHubEvent deberia preservar requestId en el payload.')
+      }
+    }
+  } catch (error) {
+    failures.push(
+      `No se pudo validar el cliente local de Context Hub: ${
+        error instanceof Error ? error.message : String(error)
+      }.`,
+    )
+  } finally {
+    if (server) {
+      await new Promise((resolve) => server.close(resolve))
+    }
+    if (typeof originalContextHubApiUrl === 'string') {
+      process.env.CONTEXT_HUB_API_URL = originalContextHubApiUrl
+    } else {
+      delete process.env.CONTEXT_HUB_API_URL
+    }
+  }
+
+  return {
+    testCase: {
+      id: 'context-hub-client-helpers',
+      label: 'Cliente local de Context Hub',
+      goal: 'Validar GET /v1/packs/suggested y POST /v1/events del lado JEFE.',
+    },
+    ok: failures.length === 0,
+    failures,
+    strategy: 'helper',
+    executionMode: 'local-test',
+    nextExpectedAction: serverPort > 0 ? 'context-hub-client-ready' : 'context-hub-client-failed',
   }
 }
 
@@ -6007,8 +6214,13 @@ async function runPrepareReviewAndExpandValidation() {
     if (phaseSummary.phaseId !== 'review-and-expand') {
       failures.push('projectPhaseExecutionPlan.phaseId deberia ser review-and-expand.')
     }
-    if (phaseSummary.executableNow) {
-      failures.push('review-and-expand deberia seguir planner-only y no executableNow.')
+    if (!phaseSummary.executableNow) {
+      failures.push('review-and-expand deberia quedar executableNow para materializacion segura local.')
+    }
+    if (phaseSummary.targetStrategy !== 'materialize-project-phase-plan') {
+      failures.push(
+        'review-and-expand deberia apuntar a materialize-project-phase-plan como targetStrategy.',
+      )
     }
   }
 
@@ -6016,8 +6228,13 @@ async function runPrepareReviewAndExpandValidation() {
     failures.push('nextActionPlan ausente en review-and-expand.')
   } else {
     const nextActionSummary = summarizeNextActionPlan(nextActionPlan)
-    if (nextActionSummary.actionType !== 'review-plan') {
-      failures.push('review-and-expand deberia recomendar review-plan.')
+    if (nextActionSummary.actionType !== 'expand-next-phase') {
+      failures.push('review-and-expand deberia recomendar expand-next-phase.')
+    }
+    if (nextActionSummary.targetStrategy !== 'materialize-project-phase-plan') {
+      failures.push(
+        'review-and-expand deberia preparar una siguiente accion materialize-project-phase-plan.',
+      )
     }
   }
 
@@ -6047,6 +6264,288 @@ async function runPrepareReviewAndExpandValidation() {
     const authOption = optionsSummary.options.find((entry) => entry.id === 'auth')
     if (!authOption || authOption.requiresApproval !== true) {
       failures.push('review-and-expand deberia marcar auth como requiresApproval.')
+    }
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction,
+  }
+}
+
+async function runMaterializeReviewAndExpandValidation() {
+  const reusablePlanningContext = buildReusablePlanningContext()
+  let fixture = await buildModuleExpansionReadyFixture(
+    'fullstack-project-phase-review-and-expand-materialization',
+  )
+  const testCase = phaseExecutionValidationCases.materializeReviewAndExpand
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: testCase.goal,
+    context: testCase.context,
+    workspacePath: fixture.workspacePath,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: '',
+    manualReusablePreference: null,
+    contextHubPack: {
+      available: false,
+      endpoint: '/v1/packs/suggested',
+      reason: 'smoke',
+    },
+    reusablePlanningContext,
+  })
+
+  const failures = []
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const nextExpectedAction = String(decision?.nextExpectedAction || '').trim()
+  const projectPhaseExecutionPlan =
+    decision?.projectPhaseExecutionPlan &&
+    typeof decision.projectPhaseExecutionPlan === 'object'
+      ? decision.projectPhaseExecutionPlan
+      : null
+  const localProjectManifest =
+    decision?.localProjectManifest &&
+    typeof decision.localProjectManifest === 'object'
+      ? decision.localProjectManifest
+      : null
+  const materializationPlan =
+    decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+      ? decision.materializationPlan
+      : null
+  const executionScope =
+    decision?.executionScope && typeof decision.executionScope === 'object'
+      ? decision.executionScope
+      : null
+  const allowedTargetPaths = summarizeUniqueStrings(
+    executionScope?.allowedTargetPaths,
+    24,
+  ).map(normalizePathForComparison)
+  const expectedTargets = [
+    `${fixture.projectRootRelativePath}/frontend/src/mock-data.js`,
+    `${fixture.projectRootRelativePath}/docs/review-and-expand.md`,
+    `${fixture.projectRootRelativePath}/docs/validation-report.md`,
+    `${fixture.projectRootRelativePath}/docs/local-runbook.md`,
+    `${fixture.projectRootRelativePath}/jefe-project.json`,
+  ].map(normalizePathForComparison)
+
+  if (strategy !== 'materialize-project-phase-plan') {
+    failures.push(
+      `Estrategia incorrecta. Esperado: materialize-project-phase-plan. Recibido: ${strategy || '(vacia)'}.`,
+    )
+  }
+  if (executionMode !== 'executor') {
+    failures.push(
+      `executionMode incorrecto. Esperado: executor. Recibido: ${executionMode || '(vacio)'}.`,
+    )
+  }
+  if (nextExpectedAction !== 'execute-plan') {
+    failures.push(
+      `nextExpectedAction incorrecto. Esperado: execute-plan. Recibido: ${nextExpectedAction || '(vacio)'}.`,
+    )
+  }
+
+  if (!projectPhaseExecutionPlan) {
+    failures.push('projectPhaseExecutionPlan ausente en materialize review-and-expand.')
+  } else {
+    const phaseSummary = summarizeProjectPhaseExecutionPlan(projectPhaseExecutionPlan)
+    if (phaseSummary.phaseId !== 'review-and-expand') {
+      failures.push('projectPhaseExecutionPlan.phaseId deberia ser review-and-expand.')
+    }
+    if (!phaseSummary.executableNow) {
+      failures.push('review-and-expand deberia quedar executableNow en la materializacion.')
+    }
+  }
+
+  if (!materializationPlan) {
+    failures.push('materializationPlan ausente en materialize review-and-expand.')
+  } else {
+    if (String(materializationPlan.strategy || '').trim() !== 'materialize-project-phase-plan') {
+      failures.push('materializationPlan.strategy incorrecto para review-and-expand.')
+    }
+    const operationTargets = toStringArray(
+      materializationPlan.operations?.map((entry) => entry?.targetPath || ''),
+      24,
+    ).map(normalizePathForComparison)
+    expectedTargets.forEach((targetPath) => {
+      if (!operationTargets.includes(targetPath)) {
+        failures.push(`materializationPlan.operations no incluye ${targetPath}.`)
+      }
+    })
+  }
+
+  expectedTargets.forEach((targetPath) => {
+    if (!allowedTargetPaths.includes(targetPath)) {
+      failures.push(`allowedTargetPaths no incluye ${targetPath}.`)
+    }
+  })
+
+  if (!localProjectManifest) {
+    failures.push('localProjectManifest ausente en materialize review-and-expand.')
+  } else {
+    const manifestSummary = summarizeLocalProjectManifest(localProjectManifest)
+    const reviewPhase = manifestSummary.phases.find(
+      (entry) => entry.id === 'review-and-expand',
+    )
+    if (manifestSummary.nextRecommendedPhase !== 'prepare-reusable-candidate-plan') {
+      failures.push(
+        'localProjectManifest.nextRecommendedPhase deberia avanzar a prepare-reusable-candidate-plan.',
+      )
+    }
+    if (!reviewPhase || reviewPhase.status !== 'done') {
+      failures.push('localProjectManifest deberia marcar review-and-expand como done.')
+    }
+  }
+
+  if (materializationPlan) {
+    const task = buildLocalMaterializationTask({
+      plan: materializationPlan,
+      workspacePath: fixture.workspacePath,
+      requestId: 'smoke-review-and-expand-materialization',
+      instruction: decision?.instruction || '',
+      brainStrategy: decision?.strategy || '',
+      businessSector: decision?.businessSector || '',
+      businessSectorLabel: decision?.businessSectorLabel || '',
+      creativeDirection: decision?.creativeDirection || null,
+      reusableArtifactLookup: decision?.reusableArtifactLookup || null,
+      reusableArtifactsFound: decision?.reusableArtifactsFound || 0,
+      reuseDecision: decision?.reuseDecision === true,
+      reuseReason: decision?.reuseReason || '',
+      reusedArtifactIds: Array.isArray(decision?.reusedArtifactIds)
+        ? decision.reusedArtifactIds
+        : [],
+      reuseMode: decision?.reuseMode || 'none',
+      reuseMaterialization: null,
+      materializationPlanSource: decision?.materializationPlanSource || 'planner',
+    })
+
+    if (!task) {
+      failures.push('No se pudo construir la tarea local deterministica para review-and-expand.')
+    } else {
+      const executionResult = await runLocalDeterministicTask(task)
+      if (executionResult?.ok !== true) {
+        failures.push(
+          executionResult?.error ||
+            'La materializacion local de review-and-expand no termino en OK.',
+        )
+      } else {
+        const touchedPaths = toStringArray(executionResult?.details?.touchedPaths, 32).map(
+          normalizePathForComparison,
+        )
+        const manifestPath = path.join(
+          fixture.workspacePath,
+          fixture.projectRootRelativePath,
+          'jefe-project.json',
+        )
+        const reviewPath = path.join(
+          fixture.workspacePath,
+          fixture.projectRootRelativePath,
+          'docs',
+          'review-and-expand.md',
+        )
+        const validationReportPath = path.join(
+          fixture.workspacePath,
+          fixture.projectRootRelativePath,
+          'docs',
+          'validation-report.md',
+        )
+        const runbookPath = path.join(
+          fixture.workspacePath,
+          fixture.projectRootRelativePath,
+          'docs',
+          'local-runbook.md',
+        )
+        const mockDataPath = path.join(
+          fixture.projectRootPath,
+          'frontend',
+          'src',
+          'mock-data.js',
+        )
+        const manifestFromDisk = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+        const manifestFromDiskSummary = summarizeLocalProjectManifest(manifestFromDisk)
+        const reviewPhase = manifestFromDiskSummary.phases.find(
+          (entry) => entry.id === 'review-and-expand',
+        )
+        const reviewContent = fs.readFileSync(reviewPath, 'utf8')
+        const validationReportContent = fs.readFileSync(validationReportPath, 'utf8')
+        const runbookContent = fs.readFileSync(runbookPath, 'utf8')
+        const mockDataContent = fs.readFileSync(mockDataPath, 'utf8')
+
+        expectedTargets.forEach((targetPath) => {
+          if (
+            !touchedPaths.some((entry) =>
+              entry.endsWith(normalizePathForComparison(targetPath)),
+            )
+          ) {
+            failures.push(`La ejecucion real de review-and-expand deberia tocar ${targetPath}.`)
+          }
+        })
+
+        if (manifestFromDiskSummary.lastCompletedPhase !== 'review-and-expand') {
+          failures.push(
+            'El jefe-project.json resultante deberia marcar lastCompletedPhase como review-and-expand.',
+          )
+        }
+        if (
+          manifestFromDiskSummary.nextRecommendedPhase !==
+          'prepare-reusable-candidate-plan'
+        ) {
+          failures.push(
+            'El jefe-project.json resultante deberia apuntar a prepare-reusable-candidate-plan.',
+          )
+        }
+        if (!reviewPhase || reviewPhase.status !== 'done') {
+          failures.push(
+            'El jefe-project.json resultante deberia marcar review-and-expand como done.',
+          )
+        }
+        if (
+          !Array.isArray(manifestFromDisk?.availableActions) ||
+          !manifestFromDisk.availableActions.includes('prepare-reusable-candidate-plan')
+        ) {
+          failures.push(
+            'El jefe-project.json resultante deberia ofrecer prepare-reusable-candidate-plan dentro de availableActions.',
+          )
+        }
+        if (
+          manifestFromDisk?.safeLocalDemoReady !== true ||
+          manifestFromDisk?.completedCoreFlow !== true ||
+          manifestFromDisk?.demoReady !== true
+        ) {
+          failures.push(
+            'El jefe-project.json resultante deberia mantener demoReady, safeLocalDemoReady y completedCoreFlow en true.',
+          )
+        }
+        if (!reviewContent.includes('Reusable candidate')) {
+          failures.push('docs/review-and-expand.md deberia mencionar reusable candidate.')
+        }
+        if (!validationReportContent.includes('Review and expand | done | 90%')) {
+          failures.push(
+            'validation-report.md deberia reflejar review-and-expand como done al 90% o mas.',
+          )
+        }
+        if (!runbookContent.includes('prepare-reusable-candidate-plan')) {
+          failures.push(
+            'docs/local-runbook.md deberia mencionar prepare-reusable-candidate-plan como siguiente accion segura.',
+          )
+        }
+        if (!mockDataContent.includes('Review and expand completado')) {
+          failures.push(
+            'frontend/src/mock-data.js deberia reflejar Review and expand completado.',
+          )
+        }
+        if (!mockDataContent.includes('prepare-reusable-candidate-plan')) {
+          failures.push(
+            'frontend/src/mock-data.js deberia reflejar prepare-reusable-candidate-plan como siguiente accion segura.',
+          )
+        }
+      }
     }
   }
 
@@ -7243,6 +7742,9 @@ async function runContinuationRecommendationValidation({
   workspaceName,
   baseFixture = 'phase',
   manifestOptions = {},
+  expectedStrategy = 'prepare-project-phase-plan',
+  expectedExecutionMode = 'planner-only',
+  expectedNextExpectedAction = 'review-project-phase',
   expectedNextPhase = '',
   expectedNextActionId = '',
   expectedProjectStatus = '',
@@ -7288,14 +7790,20 @@ async function runContinuationRecommendationValidation({
       ? decision.expansionOptions
       : null
 
-  if (strategy !== 'prepare-project-phase-plan') {
-    failures.push('La validacion de continuidad deberia seguir usando prepare-project-phase-plan para review-and-expand.')
+  if (strategy !== expectedStrategy) {
+    failures.push(
+      `La validacion de continuidad deberia usar ${expectedStrategy}. Recibido: ${strategy || '(vacio)'}.`,
+    )
   }
-  if (executionMode !== 'planner-only') {
-    failures.push('La validacion de continuidad deberia mantenerse en planner-only.')
+  if (executionMode !== expectedExecutionMode) {
+    failures.push(
+      `La validacion de continuidad deberia mantenerse en ${expectedExecutionMode}. Recibido: ${executionMode || '(vacio)'}.`,
+    )
   }
-  if (nextExpectedAction !== 'review-project-phase') {
-    failures.push('La validacion de continuidad deberia devolver review-project-phase.')
+  if (nextExpectedAction !== expectedNextExpectedAction) {
+    failures.push(
+      `La validacion de continuidad deberia devolver ${expectedNextExpectedAction}. Recibido: ${nextExpectedAction || '(vacio)'}.`,
+    )
   }
   if (materializationPlan) {
     failures.push('La continuidad revisable no deberia devolver materializationPlan.')
@@ -7581,6 +8089,7 @@ async function main() {
     internalHardeningResults = await Promise.all([
       runFullstackPhaseContractsHelperValidation(),
       runContextHubEventHelpersValidation(),
+      runContextHubClientHelpersValidation(),
     ])
     internalHardeningResults.forEach(printScalableValidationResult)
     console.log('-----------------')
@@ -7620,6 +8129,7 @@ async function main() {
       await runPrepareLocalValidationValidation(),
       await runMaterializeLocalValidationValidation(),
       await runPrepareReviewAndExpandValidation(),
+      await runMaterializeReviewAndExpandValidation(),
       await runPrepareModuleExpansionValidation(),
       await runPrepareUnsupportedModuleExpansionValidation(),
       await runPrepareSpecificModuleExpansionValidation({
@@ -7801,9 +8311,9 @@ async function main() {
           nextRecommendedPhase: 'review-and-expand',
         },
         expectedNextPhase: 'review-and-expand',
-        expectedNextActionId: 'notifications',
-        expectedProjectStatus: 'safe-module-expansion-ready',
-        expectedSafeActionIds: ['notifications', 'reports', 'inventory'],
+        expectedNextActionId: 'review-and-expand',
+        expectedProjectStatus: 'needs-review',
+        expectedSafeActionIds: ['review-and-expand', 'notifications', 'reports', 'inventory'],
       }),
       await runContinuationRecommendationValidation({
         testCase: continuationValidationCases.manifestBaseCompleteWithoutModules,
@@ -7814,9 +8324,9 @@ async function main() {
           nextRecommendedPhase: 'review-and-expand',
         },
         expectedNextPhase: 'review-and-expand',
-        expectedNextActionId: 'notifications',
-        expectedProjectStatus: 'safe-module-expansion-ready',
-        expectedSafeActionIds: ['notifications', 'reports', 'inventory'],
+        expectedNextActionId: 'review-and-expand',
+        expectedProjectStatus: 'needs-review',
+        expectedSafeActionIds: ['review-and-expand', 'notifications', 'reports', 'inventory'],
         expectedSafeModuleOptions: ['notifications', 'reports', 'inventory'],
         expectedModulesAvailable: ['Notificaciones', 'Reportes', 'Inventario'],
       }),
@@ -7839,8 +8349,8 @@ async function main() {
           nextRecommendedPhase: 'review-and-expand',
         },
         expectedNextPhase: 'review-and-expand',
-        expectedNextActionId: 'reports',
-        expectedProjectStatus: 'safe-module-expansion-ready',
+        expectedNextActionId: 'review-and-expand',
+        expectedProjectStatus: 'needs-review',
         expectedSafeActionIds: ['reports', 'inventory'],
         expectedSafeModuleOptions: ['reports', 'inventory'],
         forbiddenMaterializableOptionIds: ['notifications'],
@@ -7880,14 +8390,38 @@ async function main() {
           nextRecommendedPhase: 'review-and-expand',
         },
         expectedNextPhase: 'review-and-expand',
-        expectedNextActionId: 'prepare-frontend-improvement-plan',
-        expectedProjectStatus: 'safe-capabilities-complete',
+        expectedNextActionId: 'review-and-expand',
+        expectedProjectStatus: 'needs-review',
+        expectedSafeActionIds: ['review-and-expand'],
         expectedPlanningActionIds: [
           'prepare-frontend-improvement-plan',
           'prepare-backend-improvement-plan',
           'prepare-validation-improvement-plan',
         ],
         forbiddenMaterializableOptionIds: ['notifications', 'reports', 'inventory'],
+      }),
+      await runContinuationRecommendationValidation({
+        testCase: continuationValidationCases.manifestReviewComplete,
+        workspaceName: 'fullstack-project-continuation-review-complete',
+        baseFixture: 'review-ready',
+        manifestOptions: {
+          phaseStatuses: {
+            'fullstack-local-scaffold': 'done',
+            'frontend-mock-flow': 'done',
+            'backend-contracts': 'done',
+            'database-design': 'done',
+            'local-validation': 'done',
+            'review-and-expand': 'done',
+          },
+          nextRecommendedPhase: 'prepare-reusable-candidate-plan',
+        },
+        expectedStrategy: 'prepare-continuation-action-plan',
+        expectedNextExpectedAction: 'review-continuation-action',
+        expectedNextPhase: 'prepare-reusable-candidate-plan',
+        expectedNextActionId: 'prepare-reusable-candidate-plan',
+        expectedProjectStatus: 'safe-module-expansion-ready',
+        expectedSafeActionIds: ['notifications', 'reports', 'inventory'],
+        expectedPlanningActionIds: ['prepare-reusable-candidate-plan'],
       }),
       await runContinuationRecommendationValidation({
         testCase: continuationValidationCases.manifestPartialModule,
@@ -7908,8 +8442,8 @@ async function main() {
           nextRecommendedPhase: 'review-and-expand',
         },
         expectedNextPhase: 'review-and-expand',
-        expectedNextActionId: 'notifications',
-        expectedProjectStatus: 'safe-module-expansion-ready',
+        expectedNextActionId: 'review-and-expand',
+        expectedProjectStatus: 'needs-review',
         expectedSafeActionIds: ['reports', 'inventory'],
         expectedPlanningActionIds: ['notifications'],
         forbiddenMaterializableOptionIds: ['notifications'],
@@ -7933,8 +8467,8 @@ async function main() {
           nextRecommendedPhase: 'review-and-expand',
         },
         expectedNextPhase: 'review-and-expand',
-        expectedProjectStatus: 'safe-module-expansion-ready',
-        expectedSafeActionIds: ['reports', 'inventory'],
+        expectedProjectStatus: 'needs-review',
+        expectedSafeActionIds: ['review-and-expand', 'reports', 'inventory'],
         expectedBlockedActionIds: ['notifications'],
         forbiddenMaterializableOptionIds: ['notifications'],
         expectedModulesBlocked: ['Notificaciones'],

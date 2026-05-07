@@ -21675,6 +21675,31 @@ function detectApprovalPolicyHintFromText(input) {
 
 const PROJECT_CONTINUATION_ACTION_REGISTRY = [
   {
+    id: 'prepare-reusable-candidate-plan',
+    aliases: [
+      'reusable candidate',
+      'candidata reusable',
+      'guardar reusable',
+      'memoria reusable final',
+      'cierre reusable',
+    ],
+    title: 'Preparar candidata reusable',
+    description:
+      'Consolidar la demo local validada como candidata reusable sin guardarla todavia ni salir del modo seguro.',
+    category: 'reusable-candidate',
+    safeToPrepare: true,
+    safeToMaterialize: false,
+    requiresApproval: false,
+    blocked: false,
+    blocker: '',
+    approvalType: '',
+    riskLevel: 'low',
+    targetStrategy: 'prepare-continuation-action-plan',
+    suggestedOrder: 5,
+    expectedOutcome:
+      'Dejar el proyecto listo para una revision reusable sin tocar runtime real, Docker ni integraciones externas.',
+  },
+  {
     id: 'prepare-frontend-improvement-plan',
     aliases: ['mejorar frontend', 'mejora frontend', 'flujo mock', 'pantalla principal'],
     title: 'Mejorar frontend local',
@@ -22056,6 +22081,16 @@ function buildProjectContinuationActionTargetPaths({
       `${normalizedProjectRoot}/docs/validation-report.md`,
       `${normalizedProjectRoot}/docs/local-runbook.md`,
       `${normalizedProjectRoot}/docs/architecture.md`,
+      `${normalizedProjectRoot}/jefe-project.json`,
+    ]
+  }
+
+  if (normalizedActionId === 'prepare-reusable-candidate-plan') {
+    return [
+      `${normalizedProjectRoot}/frontend/src/mock-data.js`,
+      `${normalizedProjectRoot}/docs/review-and-expand.md`,
+      `${normalizedProjectRoot}/docs/validation-report.md`,
+      `${normalizedProjectRoot}/docs/local-runbook.md`,
       `${normalizedProjectRoot}/jefe-project.json`,
     ]
   }
@@ -22976,8 +23011,15 @@ function resolveExistingWorkspaceProjectNextPhaseId(inferredProjectState) {
     typeof normalizedManifest.nextRecommendedPhase === 'string'
       ? normalizedManifest.nextRecommendedPhase.trim()
       : ''
+  const explicitNextAction =
+    typeof normalizedManifest.nextRecommendedAction === 'string'
+      ? normalizedManifest.nextRecommendedAction.trim()
+      : ''
   const explicitNextPhaseEntry =
     explicitNextPhase && phaseStates.find((entry) => entry.id === explicitNextPhase) || null
+  const explicitContinuationAction =
+    getProjectContinuationActionEntry(explicitNextAction) ||
+    getProjectContinuationActionEntry(explicitNextPhase)
 
   if (explicitNextPhaseEntry && explicitNextPhaseEntry.status !== 'done') {
     return explicitNextPhaseEntry.id
@@ -22987,9 +23029,28 @@ function resolveExistingWorkspaceProjectNextPhaseId(inferredProjectState) {
     phaseStates.find(
       (entry) => entry.id !== 'review-and-expand' && entry.status !== 'done',
     ) || null
+  const reviewAndExpandPhase =
+    phaseStates.find((entry) => entry.id === 'review-and-expand') || null
+  const explicitRecommendedContinuationActionId =
+    typeof normalizedManifest.nextRecommendedAction === 'string' &&
+    normalizedManifest.nextRecommendedAction.trim()
+      ? normalizedManifest.nextRecommendedAction.trim()
+      : typeof normalizedManifest.nextRecommendedPhase === 'string' &&
+        normalizedManifest.nextRecommendedPhase.trim() &&
+        getProjectContinuationActionEntry(normalizedManifest.nextRecommendedPhase.trim())
+        ? normalizedManifest.nextRecommendedPhase.trim()
+        : ''
+  const shouldSurfaceReviewAndExpandPhase =
+    !nextBasePhase &&
+    reviewAndExpandPhase &&
+    reviewAndExpandPhase.status !== 'done'
 
   if (nextBasePhase) {
     return nextBasePhase.id
+  }
+
+  if (explicitContinuationAction) {
+    return explicitContinuationAction.id
   }
 
   return phaseStates.some((entry) => entry.id === 'review-and-expand')
@@ -24678,11 +24739,26 @@ function buildProjectContinuationState({
     .map((entry) => entry?.name || buildModuleExpansionDisplayName(entry?.id))
   const modulesAvailable = []
   const modulesBlocked = []
+  const reviewAndExpandPhase =
+    phaseStates.find((entry) => entry.id === 'review-and-expand') || null
+  const explicitRecommendedContinuationActionId =
+    typeof normalizedManifest.nextRecommendedAction === 'string' &&
+    normalizedManifest.nextRecommendedAction.trim()
+      ? normalizedManifest.nextRecommendedAction.trim()
+      : typeof normalizedManifest.nextRecommendedPhase === 'string' &&
+        normalizedManifest.nextRecommendedPhase.trim() &&
+        getProjectContinuationActionEntry(normalizedManifest.nextRecommendedPhase.trim())
+        ? normalizedManifest.nextRecommendedPhase.trim()
+        : ''
 
   const nextBasePhase =
     phaseStates.find(
       (entry) => entry.id !== 'review-and-expand' && entry.status !== 'done',
     ) || null
+  const shouldSurfaceReviewAndExpandPhase =
+    !nextBasePhase &&
+    reviewAndExpandPhase &&
+    reviewAndExpandPhase.status !== 'done'
 
   if (nextBasePhase) {
     const nextBasePhaseEntry =
@@ -24731,6 +24807,51 @@ function buildProjectContinuationState({
       availableSafeActions.push(phaseAction)
     }
   } else {
+    if (shouldSurfaceReviewAndExpandPhase) {
+      const reviewManifestPhase =
+        getLocalProjectManifestPhaseEntry(normalizedManifest, 'review-and-expand') || null
+      const reviewAction = buildProjectContinuationAction({
+        id: 'phase-review-and-expand',
+        title: `Completar ${reviewAndExpandPhase.title}`,
+        description:
+          reviewManifestPhase?.summary ||
+          reviewManifestPhase?.objective ||
+          reviewAndExpandPhase.description,
+        category: 'project-phase',
+        targetStrategy: reviewAndExpandPhase.targetStrategy,
+        safeToPrepare: true,
+        safeToMaterialize: reviewAndExpandPhase.materializable === true,
+        requiresApproval: false,
+        blocked: reviewAndExpandPhase.status === 'blocked',
+        blocker:
+          reviewAndExpandPhase.status === 'blocked'
+            ? 'Review-and-expand figura bloqueada y conviene revisarla antes de continuar.'
+            : '',
+        expectedOutcome:
+          'Dejar el cierre seguro del proyecto listo para reusable candidate y futuras aprobaciones controladas.',
+        recommended: true,
+        priority: reviewAndExpandPhase.suggestedOrder,
+        phaseId: reviewAndExpandPhase.id,
+        riskLevel: 'low',
+        projectRoot,
+        deliveryLevel: 'fullstack-local',
+        reason:
+          reviewManifestPhase?.summary ||
+          'La base local ya está validada y conviene cerrar review-and-expand antes de abrir nuevas expansiones.',
+        targetFiles: reviewManifestPhase?.files || [],
+        allowedTargetPaths:
+          reviewManifestPhase?.allowedTargetPaths || reviewManifestPhase?.files || [],
+        explicitExclusions: normalizedManifest.forbiddenPaths || [],
+      })
+
+      if (reviewAction?.blocked) {
+        blockedActions.push(reviewAction)
+        blockers.push(reviewAction.blocker)
+      } else {
+        availableSafeActions.push(reviewAction)
+      }
+    }
+
     for (const entry of getModuleExpansionRegistryEntries()) {
       const moduleSnapshot = getModuleManifestStatusSnapshot(normalizedManifest, entry.id)
       const status = moduleSnapshot.status
@@ -24845,7 +24966,9 @@ function buildProjectContinuationState({
         blocker: entry.blocker || approvalPolicy?.approvalCopy || '',
         approvalType: entry.approvalType || '',
         expectedOutcome: entry.expectedOutcome,
-        recommended: false,
+        recommended:
+          explicitRecommendedContinuationActionId !== '' &&
+          explicitRecommendedContinuationActionId === entry.id,
         priority: entry.suggestedOrder,
         riskLevel: entry.riskLevel,
         projectRoot,
@@ -25030,6 +25153,8 @@ function buildProjectContinuationState({
   const projectStatus =
     nextBasePhase
       ? 'base-phases-in-progress'
+      : shouldSurfaceReviewAndExpandPhase
+        ? 'needs-review'
       : orderedSafeActions.some((entry) => entry.moduleId)
         ? 'safe-module-expansion-ready'
         : orderedPlanningActions.length > 0
@@ -25533,6 +25658,7 @@ function buildPhaseAwareFullstackLocalDemoData({
       : 'review-and-expand'
   const normalizedPhaseId = String(phaseId || '').trim().toLocaleLowerCase()
   const isLocalValidationPhase = normalizedPhaseId === 'local-validation'
+  const isReviewAndExpandPhase = normalizedPhaseId === 'review-and-expand'
   const completedBasePhaseLabels = [
     'Fullstack local scaffold',
     'Frontend mock flow',
@@ -25540,22 +25666,60 @@ function buildPhaseAwareFullstackLocalDemoData({
     'Database design',
     'Local validation',
   ]
+  const completedSafePhaseLabels = isReviewAndExpandPhase
+    ? [...completedBasePhaseLabels, 'Review and expand']
+    : completedBasePhaseLabels
   const completedBasePhaseSummary = completedBasePhaseLabels.join(', ')
+  const completedSafePhaseSummary = completedSafePhaseLabels.join(', ')
   const overview = {
     ...(baseDemoData?.overview || {}),
-    heroKicker: isLocalValidationPhase ? 'Demo local segura validada' : phaseLabel,
-    subtitle: isLocalValidationPhase
+    heroKicker: isReviewAndExpandPhase
+      ? 'Review and expand completado'
+      : isLocalValidationPhase
+        ? 'Demo local segura validada'
+        : phaseLabel,
+    subtitle: isReviewAndExpandPhase
+      ? 'Core flow completo. La demo local ya quedó validada y lista para seguir con expansiones seguras o reusable candidate.'
+      : isLocalValidationPhase
       ? 'Core flow completo. La base local segura ya fue validada y sigue en modo mock revisable.'
       : phaseDescription,
     nextRecommendedPhase: normalizedNextRecommendedPhase,
-    mockScopeLabel: isLocalValidationPhase
+    mockScopeLabel: isReviewAndExpandPhase
+      ? `Última fase completada: review-and-expand. Siguiente acción segura: ${normalizedNextRecommendedPhase}.`
+      : isLocalValidationPhase
       ? 'Última fase completada: local-validation. Próxima fase segura: review-and-expand.'
       : `Fase segura ${phaseLabel} materializada sin salir del modo local.`,
-    safeModeCopy: isLocalValidationPhase
+    safeModeCopy: isReviewAndExpandPhase
+      ? 'Demo local segura validada, reusable candidate disponible y sin backend real, DB real, Docker, deploy ni integraciones externas.'
+      : isLocalValidationPhase
       ? 'Core flow completo sin backend real, DB real, Docker, deploy ni integraciones externas. Todo sigue en modo local revisable.'
       : 'Sin npm install, sin backend real, sin base de datos real y sin integraciones externas. Todo sigue en modo local revisable.',
   }
-  const phaseMetricEntries = isLocalValidationPhase
+  const phaseMetricEntries = isReviewAndExpandPhase
+    ? [
+        {
+          id: 'phase-review-expand-demo-ready',
+          label: 'Demo local',
+          value: 'Validada',
+          tone: 'emerald',
+          detail: 'Safe local demo ready',
+        },
+        {
+          id: 'phase-review-expand-complete',
+          label: 'Review',
+          value: 'Completa',
+          tone: 'sky',
+          detail: 'Reusable candidate listo',
+        },
+        {
+          id: 'phase-review-expand-next',
+          label: 'Siguiente paso',
+          value: normalizedNextRecommendedPhase,
+          tone: 'amber',
+          detail: 'Sin runtime real',
+        },
+      ]
+    : isLocalValidationPhase
     ? [
         {
           id: 'phase-local-validation-demo-ready',
@@ -25596,7 +25760,22 @@ function buildPhaseAwareFullstackLocalDemoData({
     8,
     (entry) => normalizeModuleExpansionId(entry?.id || entry?.label),
   )
-  const phaseAlertEntries = isLocalValidationPhase
+  const phaseAlertEntries = isReviewAndExpandPhase
+    ? [
+        {
+          id: 'phase-review-expand-ready-alert',
+          tone: 'emerald',
+          title: 'Review and expand completado',
+          detail: 'La demo local segura ya quedó validada y la siguiente acción segura apunta a reusable candidate o expansión revisable.',
+        },
+        {
+          id: 'phase-review-expand-completed-phases',
+          tone: 'sky',
+          title: 'Fases cerradas',
+          detail: completedSafePhaseSummary,
+        },
+      ]
+    : isLocalValidationPhase
     ? [
         {
           id: 'phase-local-validation-ready-alert',
@@ -25627,7 +25806,24 @@ function buildPhaseAwareFullstackLocalDemoData({
     8,
     (entry) => normalizeModuleExpansionId(entry?.id || entry?.title),
   )
-  const phaseActivityEntries = isLocalValidationPhase
+  const phaseActivityEntries = isReviewAndExpandPhase
+    ? [
+        {
+          id: 'phase-review-expand-activity-ready',
+          time: 'Ahora',
+          title: 'Cierre seguro completo',
+          detail: 'Scaffold, frontend mock flow, backend contracts, database design, local validation y review-and-expand ya quedaron cerradas.',
+          tone: 'emerald',
+        },
+        {
+          id: 'phase-review-expand-activity-next',
+          time: 'Siguiente',
+          title: 'Reusable candidate disponible',
+          detail: 'La próxima acción segura puede preparar reusable o una nueva expansión mock, sin activar runtime real.',
+          tone: 'sky',
+        },
+      ]
+    : isLocalValidationPhase
     ? [
         {
           id: 'phase-local-validation-activity-ready',
@@ -25666,11 +25862,15 @@ function buildPhaseAwareFullstackLocalDemoData({
       ...(Array.isArray(baseDemoData?.quickActions) ? baseDemoData.quickActions : []),
       {
         id: `qa-${phaseId}-next-phase`,
-        label: isLocalValidationPhase
+        label: isReviewAndExpandPhase
+          ? 'Ver siguiente acción segura'
+          : isLocalValidationPhase
           ? 'Ver review-and-expand'
           : 'Ver siguiente fase segura',
         targetView: 'dashboard',
-        feedback: isLocalValidationPhase
+        feedback: isReviewAndExpandPhase
+          ? `La base local quedó cerrada y la siguiente acción segura es ${normalizedNextRecommendedPhase}.`
+          : isLocalValidationPhase
           ? 'La demo local segura ya está validada y la siguiente fase disponible es review-and-expand.'
           : `La siguiente fase sugerida es ${normalizedNextRecommendedPhase}.`,
       },
@@ -25681,7 +25881,13 @@ function buildPhaseAwareFullstackLocalDemoData({
   const constraints = summarizeUniqueExecutorStrings(
     [
       ...(Array.isArray(baseDemoData?.constraints) ? baseDemoData.constraints : []),
-      ...(isLocalValidationPhase
+      ...(isReviewAndExpandPhase
+        ? [
+            'Core flow completo y review-and-expand cerrado.',
+            `Siguiente acción segura disponible: ${normalizedNextRecommendedPhase}.`,
+            'No hay backend real, DB real, Docker, deploy ni integraciones externas.',
+          ]
+        : isLocalValidationPhase
         ? [
             'Flujo base completo: scaffold, frontend mock flow, backend contracts, database design y local validation.',
             'Siguiente fase segura disponible: review-and-expand.',
@@ -26069,6 +26275,232 @@ ${reviewAndExpandOptions.map((entry) => `- ${entry}`).join('\n')}
   }
 }
 
+function buildFullstackLocalReviewAndExpandArtifacts({
+  localProjectManifest,
+  projectRoot,
+}) {
+  const normalizedManifest =
+    normalizeLocalProjectManifestContract(localProjectManifest)
+  const normalizedProjectRoot =
+    typeof projectRoot === 'string' && projectRoot.trim()
+      ? projectRoot.trim().replace(/[\\/]+/g, '/')
+      : ''
+  const nextRecommendedPhase = 'prepare-reusable-candidate-plan'
+  const nextRecommendedAction = getProjectContinuationActionEntry(
+    nextRecommendedPhase,
+  )
+  const expansionOptions = buildReviewAndExpandExpansionOptions({
+    projectRoot: normalizedProjectRoot,
+    localProjectManifest: normalizedManifest,
+  })
+  const recommendedOption =
+    Array.isArray(expansionOptions?.options) && expansionOptions.options.length > 0
+      ? expansionOptions.options.find((entry) => entry?.recommended) ||
+        expansionOptions.options[0]
+      : null
+  const demoArtifacts = buildFullstackLocalPhaseArtifacts({
+    localProjectManifest: normalizedManifest,
+    projectRoot: normalizedProjectRoot,
+    phaseId: 'review-and-expand',
+    nextRecommendedPhase,
+  })
+  const reviewOptions = summarizeUniqueExecutorStrings(
+    [
+      recommendedOption?.label || '',
+      'Ampliar reportes mock sin runtime real',
+      'Profundizar inventario local y alertas de stock',
+      'Preparar candidata reusable antes de exportar memoria',
+      'Separar cualquier runtime real como aprobación futura',
+    ],
+    12,
+  )
+  const reusableSignals = summarizeUniqueExecutorStrings(
+    [
+      'Core flow base completo y validado.',
+      'Frontend file:// estable y coherente con el manifest.',
+      'Backend, shared y database ya quedan como referencias revisables.',
+      'No hay node_modules, .env, Docker, deploy ni integraciones externas.',
+    ],
+    12,
+  )
+  const phaseScoreRows = [
+    {
+      label: 'Scaffold fullstack local',
+      status: 'done',
+      percentage: 100,
+      evidence: 'Base local intacta, con manifest y apertura file:// estable.',
+    },
+    {
+      label: 'Frontend mock flow',
+      status: 'done',
+      percentage: 100,
+      evidence: 'Frontend mock operable, coherente con el dominio y sin runtime real.',
+    },
+    {
+      label: 'Backend contracts',
+      status: 'done',
+      percentage: 90,
+      evidence: 'Contratos backend/shared revisables, sin listen(), puertos ni dependencias.',
+    },
+    {
+      label: 'Database design',
+      status: 'done',
+      percentage: 90,
+      evidence: 'Schema, seed y preview local alineados como diseño documental.',
+    },
+    {
+      label: 'Local validation',
+      status: 'done',
+      percentage: 90,
+      evidence: 'Checks, límites mock y paths prohibidos consolidados en docs/validation-report.md.',
+    },
+    {
+      label: 'Review and expand',
+      status: 'done',
+      percentage: 90,
+      evidence: 'Cierre seguro del proyecto, reusable candidate y expansiones futuras separadas.',
+    },
+  ]
+  const phaseScoreTable = phaseScoreRows
+    .map(
+      (entry) =>
+        `| ${entry.label} | ${entry.status} | ${entry.percentage}% | ${entry.evidence} |`,
+    )
+    .join('\n')
+  const reviewAndExpandContent = `# Review and expand
+
+## Estado actual
+
+- root: \`${normalizedProjectRoot}\`
+- estado: \`review-and-expand\` completado
+- demo local segura: validada
+- core flow: completo
+- siguiente accion segura: \`${nextRecommendedPhase}\`${nextRecommendedAction?.title ? ` (${nextRecommendedAction.title})` : ''}
+
+## Qué ya está listo
+
+${reusableSignals.map((entry) => `- ${entry}`).join('\n')}
+
+## Qué sigue siendo mock
+
+- frontend visual y datos de demo
+- contratos backend de referencia
+- schema y seed SQL como diseño local
+- expansiones futuras todavía sin runtime real
+
+## Expansiones seguras sugeridas
+
+${reviewOptions.map((entry) => `- ${entry}`).join('\n')}
+
+## Qué requiere aprobación futura
+
+- npm install o dependencias reales
+- runtime local real o puertos abiertos
+- base de datos real, migraciones o seeds reales
+- Docker o deploy
+- auth real, pagos reales o integraciones externas
+
+## Reusable candidate
+
+- La demo ya puede revisarse como candidata reusable.
+- Antes de guardarla conviene hacer una última revisión humana del frontend visible y del runbook local.
+- Guardar reusable no debe reabrir fases ya cerradas ni tocar runtime real.
+`
+  const validationReportContent = `# Validación local del proyecto
+
+Validation report final y revisable.
+
+## Proyecto
+
+- root: \`${normalizedProjectRoot}\`
+- domain: \`${String(normalizedManifest?.domain || demoArtifacts.appTitle || 'proyecto local').trim() || 'proyecto local'}\`
+- deliveryLevel: \`fullstack-local\`
+- materializationLayer: \`local-deterministic\`
+- lastCompletedPhase esperado: \`review-and-expand\`
+
+## Scoreboard final
+
+| Fase | Estado final | Porcentaje | Evidencia |
+| --- | --- | --- | --- |
+${phaseScoreTable}
+
+## Qué quedó materializado
+
+- \`frontend/src/mock-data.js\`
+- \`docs/review-and-expand.md\`
+- \`docs/validation-report.md\`
+- \`docs/local-runbook.md\`
+- \`jefe-project.json\`
+
+## Qué sigue siendo mock
+
+- frontend visual y navegación local
+- contratos backend revisables
+- diseño SQL y preview de seed
+- expansiones futuras todavía no materializadas
+
+## Qué no se ejecutó
+
+- No se instalaron dependencias.
+- No se levantó frontend real.
+- No se levantó backend real.
+- No se abrió ningún puerto.
+- No se creó una base de datos real.
+- No se ejecutó SQL.
+- No se corrieron seeds reales.
+- No hubo Docker ni deploy.
+- No hubo auth real, pagos ni integraciones externas.
+
+## Próxima acción segura
+
+- \`${nextRecommendedPhase}\`${nextRecommendedAction?.title ? ` (${nextRecommendedAction.title})` : ''}
+
+## Expansiones seguras disponibles
+
+${reviewOptions.map((entry) => `- ${entry}`).join('\n')}
+`
+  const runbookContent = `# Local runbook
+
+## Estado actual
+
+El proyecto sigue en modo local y revisable. Se materializó la fase \`review-and-expand\`.
+
+## Cómo revisar esta entrega
+
+1. Abrí \`frontend/index.html\` con doble click y confirmá el estado demo-ready.
+2. Leé \`docs/validation-report.md\` para ver el scoreboard final y límites mock.
+3. Leé \`docs/review-and-expand.md\` para decidir la siguiente expansión segura.
+4. Confirmá que \`jefe-project.json\` marque \`review-and-expand\` como done y recomiende \`${nextRecommendedPhase}\`.
+
+## Qué sigue fuera de alcance
+
+- npm install y dependencias reales
+- runtime real del frontend o backend
+- base de datos real, migraciones o seeds reales
+- Docker o deploy
+- auth real, pagos reales e integraciones externas
+
+## Próxima acción segura
+
+- \`${nextRecommendedPhase}\`${nextRecommendedAction?.title ? ` (${nextRecommendedAction.title})` : ''}
+
+## Señal reusable
+
+- La demo ya puede revisarse como candidata reusable.
+- Antes de guardarla conviene hacer una última revisión humana del contenido visible.
+`
+
+  return {
+    fullstackLocalDemoData: demoArtifacts.fullstackLocalDemoData,
+    validationReportContent,
+    runbookContent,
+    reviewAndExpandContent,
+    documentationBundle: demoArtifacts.documentationBundle,
+    nextRecommendedPhase,
+    nextRecommendedActionId: nextRecommendedAction?.id || '',
+  }
+}
+
 function buildLocalProjectManifest({
   rootFolder,
   domain,
@@ -26421,6 +26853,7 @@ function buildUpdatedLocalProjectManifestForPhase({
   projectRoot,
   phaseId,
   touchedFiles,
+  nextRecommendedPhaseOverride,
 }) {
   const normalizedExistingManifest =
     normalizeLocalProjectManifestContract(existingManifest)
@@ -26444,8 +26877,10 @@ function buildUpdatedLocalProjectManifestForPhase({
     'backend-contracts': 'database-design',
     'database-design': 'local-validation',
     'local-validation': 'review-and-expand',
+    'review-and-expand': 'prepare-reusable-candidate-plan',
   }
   const nextRecommendedPhase =
+    nextRecommendedPhaseOverride ||
     nextRecommendedPhaseByPhaseId[phaseId] ||
     normalizedExistingManifest.nextRecommendedPhase ||
     ''
@@ -26577,8 +27012,14 @@ function buildUpdatedLocalProjectManifestForPhase({
     )
   }
 
+  const nextRecommendedPhaseBlueprint = getFullstackLocalManifestPhaseBlueprint(
+    normalizedProjectRoot,
+    nextRecommendedPhase,
+  )
+
   if (
     nextRecommendedPhase &&
+    nextRecommendedPhaseBlueprint &&
     !updatedPhases.some((entry) => entry && entry.id === nextRecommendedPhase)
   ) {
     updatedPhases.push(
@@ -27187,7 +27628,10 @@ function buildProjectPhaseExecutionPlan({
       phaseId,
       localProjectManifest: normalizedManifest,
     })
+    const blockedByPrerequisite = phasePrerequisiteState.blockers.length > 0
     const targetFiles = [
+      `${projectRoot}/frontend/src/mock-data.js`,
+      `${projectRoot}/docs/review-and-expand.md`,
       `${projectRoot}/docs/validation-report.md`,
       `${projectRoot}/docs/local-runbook.md`,
       `${projectRoot}/jefe-project.json`,
@@ -27199,56 +27643,83 @@ function buildProjectPhaseExecutionPlan({
       fileChecks: targetFiles.map((targetPath) => ({
         path: targetPath,
         expectation:
-          'Debe servir como insumo para revision humana y decision de la siguiente expansion segura.',
+          targetPath.endsWith('mock-data.js')
+            ? 'Debe reflejar el estado final demo-ready y el siguiente paso seguro sin volver a fases ya cerradas.'
+            : targetPath.endsWith('review-and-expand.md')
+              ? 'Debe resumir expansiones seguras, reusable candidate y aprobaciones futuras.'
+              : 'Debe servir como insumo para revision humana y decision de la siguiente expansion segura.',
       })),
       forbiddenPaths,
       runtimeChecks: [],
       manualChecks: [
-        'Revisar el reporte local y elegir la siguiente expansion segura.',
+        'Revisar el cierre local del proyecto y confirmar que el core flow siga completo.',
+        'Confirmar que reusable candidate, runtime real y aprobaciones futuras queden claramente separados.',
         'Confirmar que cualquier salto a runtime real quede sujeto a aprobacion futura.',
       ],
       successCriteria: [
-        'Dejar review-and-expand como fase planner-only sin materializacion automatica.',
+        'Actualizar solo frontend/src/mock-data.js, docs/ y jefe-project.json dentro del proyecto generado.',
+        'Mantener review-and-expand dentro del modo local seguro y sin runtime real.',
       ],
     }
 
     return {
       phaseId,
-      sourceStrategy: 'local-validation',
-      targetStrategy: 'prepare-project-phase-plan',
+      sourceStrategy:
+        strategy === 'materialize-project-phase-plan'
+          ? 'prepare-project-phase-plan'
+          : 'local-validation',
+      targetStrategy: 'materialize-project-phase-plan',
       deliveryLevel: 'fullstack-local',
       projectRoot,
-      goal: `Preparar una revision humana de ${projectDomain} para decidir la siguiente expansion segura.`,
-      reason: phasePrerequisiteState.blockers.length > 0
+      goal: blockedByPrerequisite
+        ? `Review-and-expand queda bloqueada hasta completar la fase previa de ${projectDomain}.`
+        : `Cerrar review-and-expand de ${projectDomain} dejando reusable candidate y futuras aprobaciones claramente separadas.`,
+      reason: blockedByPrerequisite
         ? `Review-and-expand todavia no puede proponerse como siguiente fase. ${phasePrerequisiteState.blockers.join(' ')}`
-        : 'La siguiente fase segura es revisar el estado local del proyecto y decidir si conviene ampliar frontend, backend o aprobaciones futuras.',
-      executableNow: false,
+        : 'Esta fase consolida el cierre local seguro, deja evidencia de reusable candidate y ordena las expansiones futuras sin activar runtime real.',
+      executableNow: blockedByPrerequisite ? false : true,
       approvalRequired: false,
-      riskLevel: 'medium',
+      riskLevel: 'low',
       prerequisitePhaseId: phasePrerequisiteState.prerequisitePhaseId,
       targetFiles,
       allowedTargetPaths: targetFiles,
       operationsPreview: [
         {
-          type: 'review-file',
-          targetPath: `${projectRoot}/docs/validation-report.md`,
-          purpose: 'Usar el reporte local como base para decidir la siguiente expansion del proyecto.',
+          type: blockedByPrerequisite ? 'review-file' : 'replace-file',
+          targetPath: `${projectRoot}/frontend/src/mock-data.js`,
+          purpose: 'Sincronizar la demo visible con review-and-expand y la siguiente acción segura.',
         },
         {
-          type: 'review-file',
+          type: blockedByPrerequisite ? 'review-file' : 'replace-file',
+          targetPath: `${projectRoot}/docs/review-and-expand.md`,
+          purpose: 'Dejar una guía operable de expansión segura y reusable candidate.',
+        },
+        {
+          type: blockedByPrerequisite ? 'review-file' : 'replace-file',
+          targetPath: `${projectRoot}/docs/validation-report.md`,
+          purpose: 'Actualizar el scoreboard final y el estado seguro real del proyecto.',
+        },
+        {
+          type: blockedByPrerequisite ? 'review-file' : 'replace-file',
+          targetPath: `${projectRoot}/docs/local-runbook.md`,
+          purpose: 'Actualizar el runbook local con el cierre review-and-expand.',
+        },
+        {
+          type: blockedByPrerequisite ? 'review-file' : 'replace-file',
           targetPath: `${projectRoot}/jefe-project.json`,
-          purpose: 'Confirmar el estado del proyecto y las fases ya completadas.',
+          purpose: 'Actualizar el manifest local para marcar review-and-expand y dejar la siguiente acción segura.',
         },
       ],
       validationPlan,
       explicitExclusions: [
-        'materializacion automatica',
         'servicios reales',
         'base real',
         'deploy',
         'Docker',
         'node_modules',
         '.env',
+        'backend real',
+        'database real',
       ],
       blockers: phasePrerequisiteState.blockers,
       successCriteria: validationPlan.successCriteria,
@@ -27800,6 +28271,185 @@ function buildProjectPhaseMaterializationPlan({
                   type: 'file-contains',
                   targetPath: manifestPath,
                   expectedText: '"lastCompletedPhase": "local-validation"',
+                },
+              ]
+            : []),
+        ],
+      },
+      localProjectManifest: updatedLocalProjectManifest,
+    }
+  }
+
+  if (normalizedPlan.phaseId === 'review-and-expand') {
+    const projectRoot = normalizedPlan.projectRoot
+    const mockDataPath = `${projectRoot}/frontend/src/mock-data.js`
+    const reviewPath = `${projectRoot}/docs/review-and-expand.md`
+    const validationReportPath = `${projectRoot}/docs/validation-report.md`
+    const runbookPath = `${projectRoot}/docs/local-runbook.md`
+    const manifestPath = `${projectRoot}/jefe-project.json`
+    const reviewArtifacts = buildFullstackLocalReviewAndExpandArtifacts({
+      localProjectManifest,
+      projectRoot,
+    })
+    const mockDataContent = buildBrowserWindowDataScript(
+      'fullstackPlan',
+      reviewArtifacts.fullstackLocalDemoData ||
+        buildPhaseAwareFullstackLocalDemoData({
+          localProjectManifest,
+          projectRoot,
+          phaseId: 'review-and-expand',
+          nextRecommendedPhase:
+            reviewArtifacts.nextRecommendedPhase || 'prepare-reusable-candidate-plan',
+        }),
+    )
+    const updatedLocalProjectManifest = buildUpdatedLocalProjectManifestForPhase({
+      existingManifest: localProjectManifest,
+      projectRoot,
+      phaseId: normalizedPlan.phaseId,
+      touchedFiles: [
+        mockDataPath,
+        reviewPath,
+        validationReportPath,
+        runbookPath,
+        manifestPath,
+      ],
+      nextRecommendedPhaseOverride:
+        reviewArtifacts.nextRecommendedPhase || 'prepare-reusable-candidate-plan',
+    })
+    const updatedLocalProjectManifestContent = updatedLocalProjectManifest
+      ? `${JSON.stringify(updatedLocalProjectManifest, null, 2)}\n`
+      : ''
+
+    return {
+      tasks: [
+        {
+          step: 1,
+          title: `Actualizar la fase "${normalizedPlan.phaseId}" solo dentro de ${normalizedPlan.projectRoot}.`,
+          operation: 'create-or-edit-files',
+          targetPath: normalizedPlan.projectRoot,
+        },
+        {
+          step: 2,
+          title: 'Validar que el cierre siga acotado a frontend mock visible, docs y manifest local.',
+          operation: 'validate-scope',
+          targetPath: normalizedPlan.projectRoot,
+        },
+      ],
+      assumptions: [
+        'Review-and-expand sigue siendo una fase local, segura y revisable.',
+        'No se instala nada ni se activa runtime real.',
+        'Solo se sincronizan frontend/src/mock-data.js, docs/ y jefe-project.json.',
+      ],
+      instruction: [
+        `Materializar la fase ${normalizedPlan.phaseId} dentro de ${normalizedPlan.projectRoot}.`,
+        `Usar solo estos targetPaths: ${normalizedPlan.allowedTargetPaths.join(', ')}`,
+        'Dejar review-and-expand como cierre seguro, reusable candidate y futura continuidad planner-only.',
+      ].join('\n'),
+      executionScope: normalizeExecutorExecutionScope({
+        allowedTargetPaths: normalizedPlan.allowedTargetPaths,
+        successCriteria: normalizedPlan.successCriteria,
+        enforceNarrowScope: true,
+      }),
+      materializationPlan: {
+        version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+        kind: 'project-phase-materialization',
+        summary: `Fase ${normalizedPlan.phaseId} actualizada dentro de "${normalizedPlan.projectRoot}".`,
+        strategy: 'materialize-project-phase-plan',
+        reasoningLayer: 'local-rules',
+        materializationLayer: 'local-deterministic',
+        operations: [
+          { type: 'replace-file', targetPath: mockDataPath, nextContent: mockDataContent },
+          {
+            type: 'replace-file',
+            targetPath: reviewPath,
+            nextContent: reviewArtifacts.reviewAndExpandContent,
+          },
+          {
+            type: 'replace-file',
+            targetPath: validationReportPath,
+            nextContent: reviewArtifacts.validationReportContent,
+          },
+          {
+            type: 'replace-file',
+            targetPath: runbookPath,
+            nextContent: reviewArtifacts.runbookContent,
+          },
+          ...(updatedLocalProjectManifestContent
+            ? [
+                {
+                  type: 'replace-file',
+                  targetPath: manifestPath,
+                  nextContent: updatedLocalProjectManifestContent,
+                },
+              ]
+            : []),
+        ],
+        validations: [
+          { type: 'exists', targetPath: mockDataPath, expectedKind: 'file' },
+          { type: 'exists', targetPath: reviewPath, expectedKind: 'file' },
+          { type: 'exists', targetPath: validationReportPath, expectedKind: 'file' },
+          { type: 'exists', targetPath: runbookPath, expectedKind: 'file' },
+          ...(updatedLocalProjectManifest
+            ? [{ type: 'exists', targetPath: manifestPath, expectedKind: 'file' }]
+            : []),
+          {
+            type: 'file-contains',
+            targetPath: mockDataPath,
+            expectedText: 'Review and expand completado',
+          },
+          {
+            type: 'file-contains',
+            targetPath: mockDataPath,
+            expectedText:
+              reviewArtifacts.nextRecommendedPhase || 'prepare-reusable-candidate-plan',
+          },
+          {
+            type: 'file-contains',
+            targetPath: reviewPath,
+            expectedText: 'Reusable candidate',
+          },
+          {
+            type: 'file-contains',
+            targetPath: validationReportPath,
+            expectedText: 'Review and expand',
+          },
+          {
+            type: 'file-contains',
+            targetPath: validationReportPath,
+            expectedText: '90%',
+          },
+          {
+            type: 'file-contains',
+            targetPath: runbookPath,
+            expectedText:
+              reviewArtifacts.nextRecommendedPhase || 'prepare-reusable-candidate-plan',
+          },
+          ...(updatedLocalProjectManifest
+            ? [
+                {
+                  type: 'file-contains',
+                  targetPath: manifestPath,
+                  expectedText: '"id": "review-and-expand"',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: manifestPath,
+                  expectedText: '"lastCompletedPhase": "review-and-expand"',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: manifestPath,
+                  expectedText: `"nextRecommendedPhase": "${reviewArtifacts.nextRecommendedPhase || 'prepare-reusable-candidate-plan'}"`,
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: manifestPath,
+                  expectedText: '"safeLocalDemoReady": true',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: manifestPath,
+                  expectedText: '"completedCoreFlow": true',
                 },
               ]
             : []),
@@ -35295,6 +35945,72 @@ async function buildLocalStrategicBrainDecision({
           projectPhaseExecutionPlan,
           localProjectManifest: inferredProjectState.manifest,
           expansionOptions,
+        },
+      )
+    }
+
+    const continuationActionPlan = buildProjectContinuationActionPlan({
+      actionId: existingWorkspaceProjectNextPhaseId,
+      inferredProjectState,
+    })
+
+    if (continuationActionPlan) {
+      const detectedProjectRoot =
+        inferredProjectState.projectRootRelativePath || continuationActionPlan.projectRoot
+      const detectedManifest =
+        normalizeLocalProjectManifestContract(inferredProjectState.manifest)
+      const lastCompletedPhase =
+        typeof detectedManifest?.lastCompletedPhase === 'string' &&
+        detectedManifest.lastCompletedPhase.trim()
+          ? detectedManifest.lastCompletedPhase.trim()
+          : 'local-validation'
+
+      return buildDecisionWithPlanningContracts(
+        {
+          decisionKey: 'prepare-continuation-action-plan',
+          strategy: 'prepare-continuation-action-plan',
+          executionMode: 'planner-only',
+          reason: `Se detectó el proyecto existente ${detectedProjectRoot} dentro del workspace. La base local ya está cerrada y conviene seguir con ${continuationActionPlan.title}.`,
+          tasks: [
+            {
+              step: 1,
+              title: 'Revisar el manifest local detectado y confirmar el estado final actual.',
+              operation: 'review-existing-project-manifest',
+              targetPath: detectedProjectRoot,
+            },
+            {
+              step: 2,
+              title: `Preparar ${continuationActionPlan.title} como siguiente acción segura del proyecto existente.`,
+              operation: 'prepare-existing-project-continuation',
+              targetPath: detectedProjectRoot,
+            },
+          ],
+          requiresApproval: continuationActionPlan.requiresApproval === true,
+          assumptions: [
+            `Se detectó un proyecto local existente en ${detectedProjectRoot}.`,
+            `La última fase completada registrada es ${lastCompletedPhase}.`,
+            'Conviene continuar desde el manifest actual en vez de recrear fases ya cerradas.',
+            'No se habilitan runtime real, npm install, DB real, Docker, deploy ni integraciones externas.',
+          ],
+          instruction: [
+            `Proyecto existente detectado: ${detectedProjectRoot}.`,
+            `Última fase completada: ${lastCompletedPhase}.`,
+            `Siguiente acción segura: ${continuationActionPlan.title}.`,
+            `Target strategy: ${continuationActionPlan.targetStrategy}.`,
+            `Allowed target paths: ${(continuationActionPlan.allowedTargetPaths || []).join(', ')}`,
+          ].join('\n'),
+          completed: false,
+          nextExpectedAction: 'review-continuation-action',
+        },
+        {
+          deliveryLevel: 'fullstack-local',
+          localProjectManifest: inferredProjectState.manifest,
+          continuationActionPlan,
+          expansionOptions: buildReviewAndExpandExpansionOptions({
+            projectRoot:
+              inferredProjectState.projectRootRelativePath || continuationActionPlan.projectRoot,
+            localProjectManifest: inferredProjectState.manifest,
+          }),
         },
       )
     }

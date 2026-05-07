@@ -122,9 +122,11 @@ const FULLSTACK_LOCAL_BASE_PHASES = [
     title: 'Review and expand',
     description:
       'Revisar lo ya materializado y decidir la siguiente expansión segura sin ejecutar runtime real.',
-    materializable: false,
+    materializable: true,
     suggestedOrder: 50,
     buildFiles: (rootFolder, manifestPath) => [
+      `${rootFolder}/frontend/src/mock-data.js`,
+      `${rootFolder}/docs/review-and-expand.md`,
       `${rootFolder}/docs/validation-report.md`,
       `${rootFolder}/docs/local-runbook.md`,
       manifestPath,
@@ -134,7 +136,7 @@ const FULLSTACK_LOCAL_BASE_PHASES = [
       'Diferenciar expansión segura actual de aprobaciones futuras sensibles.',
       'Mantener el proyecto en modo local seguro mientras no haya aprobaciones reales.',
     ],
-    nextRecommendedPhase: '',
+    nextRecommendedPhase: 'prepare-reusable-candidate-plan',
   }),
 ]
 

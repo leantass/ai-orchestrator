@@ -1,7 +1,12 @@
-const DEFAULT_CONTEXT_HUB_API_URL = 'http://localhost:3710'
+const DEFAULT_CONTEXT_HUB_API_URL = 'http://127.0.0.1:3210'
 const SUGGESTED_CONTEXT_HUB_ENDPOINT = '/v1/packs/suggested'
 const CONTEXT_HUB_EVENTS_ENDPOINT = '/v1/events'
 const CONTEXT_HUB_TIMEOUT_MS = 1200
+const CONTEXT_HUB_API_URL_FALLBACKS = [
+  DEFAULT_CONTEXT_HUB_API_URL,
+  'http://localhost:3210',
+  'http://localhost:3710',
+]
 
 function buildUnavailableContextHubPack(reason = 'unavailable') {
   return {
@@ -13,13 +18,87 @@ function buildUnavailableContextHubPack(reason = 'unavailable') {
   }
 }
 
-function resolveContextHubApiUrl() {
+function resolveContextHubApiUrls() {
   const configuredValue =
     typeof process.env.CONTEXT_HUB_API_URL === 'string'
       ? process.env.CONTEXT_HUB_API_URL.trim()
       : ''
 
-  return configuredValue || DEFAULT_CONTEXT_HUB_API_URL
+  if (configuredValue) {
+    return [configuredValue]
+  }
+
+  return [...new Set(CONTEXT_HUB_API_URL_FALLBACKS)]
+}
+
+async function requestContextHubJson(endpoint, options = {}) {
+  const baseUrls = resolveContextHubApiUrls()
+  let lastFailureReason = 'unavailable'
+  let lastStatusCode = null
+
+  for (const baseUrl of baseUrls) {
+    let requestUrl = ''
+
+    try {
+      requestUrl = new URL(endpoint, baseUrl).toString()
+    } catch {
+      lastFailureReason = 'error'
+      continue
+    }
+
+    const abortController = new AbortController()
+    const timeoutId = setTimeout(() => abortController.abort(), CONTEXT_HUB_TIMEOUT_MS)
+
+    try {
+      const response = await fetch(requestUrl, {
+        method: options.method || 'GET',
+        headers: {
+          Accept: 'application/json',
+          ...(options.body !== undefined
+            ? { 'Content-Type': 'application/json' }
+            : {}),
+          ...(options.headers && typeof options.headers === 'object' ? options.headers : {}),
+        },
+        ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+        signal: abortController.signal,
+      })
+
+      const responseText = await response.text()
+      let parsedPayload = null
+
+      try {
+        parsedPayload = responseText ? JSON.parse(responseText) : null
+      } catch {
+        parsedPayload = null
+      }
+
+      if (response.ok) {
+        return {
+          ok: true,
+          baseUrl,
+          statusCode: response.status,
+          payload: parsedPayload,
+        }
+      }
+
+      lastFailureReason = 'error'
+      lastStatusCode = response.status
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        lastFailureReason = 'timeout'
+      } else {
+        lastFailureReason = 'unavailable'
+      }
+    } finally {
+      clearTimeout(timeoutId)
+    }
+  }
+
+  return {
+    ok: false,
+    reason: lastFailureReason,
+    ...(Number.isInteger(lastStatusCode) ? { statusCode: lastStatusCode } : {}),
+  }
 }
 
 function normalizeSuggestedPackFromLegacyShape(pack) {
@@ -140,170 +219,76 @@ function resolveSuggestedPackPayload(payload) {
 }
 
 async function fetchSuggestedContextHubPack() {
-  let requestUrl = ''
+  const result = await requestContextHubJson(SUGGESTED_CONTEXT_HUB_ENDPOINT, {
+    method: 'GET',
+  })
 
-  try {
-    requestUrl = new URL(
-      SUGGESTED_CONTEXT_HUB_ENDPOINT,
-      resolveContextHubApiUrl(),
-    ).toString()
-  } catch {
+  if (result.ok !== true) {
+    return buildUnavailableContextHubPack(result.reason || 'unavailable')
+  }
+
+  const resolvedPayload = resolveSuggestedPackPayload(result.payload)
+
+  if (resolvedPayload.ok !== true) {
     return buildUnavailableContextHubPack('error')
   }
 
-  const abortController = new AbortController()
-  const timeoutId = setTimeout(() => abortController.abort(), CONTEXT_HUB_TIMEOUT_MS)
+  if (resolvedPayload.pack === null) {
+    return buildUnavailableContextHubPack('no-pack')
+  }
 
-  try {
-    const response = await fetch(requestUrl, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-      },
-      signal: abortController.signal,
-    })
+  const normalizedPack = normalizeSuggestedPack(resolvedPayload.pack)
 
-    const responseText = await response.text()
-    let parsedPayload = null
+  if (!normalizedPack) {
+    return buildUnavailableContextHubPack('error')
+  }
 
-    try {
-      parsedPayload = responseText ? JSON.parse(responseText) : null
-    } catch {
-      return buildUnavailableContextHubPack('error')
-    }
-
-    if (!response.ok) {
-      return buildUnavailableContextHubPack('error')
-    }
-
-    const resolvedPayload = resolveSuggestedPackPayload(parsedPayload)
-
-    if (resolvedPayload.ok !== true) {
-      return buildUnavailableContextHubPack('error')
-    }
-
-    if (resolvedPayload.pack === null) {
-      return buildUnavailableContextHubPack('no-pack')
-    }
-
-    const normalizedPack = normalizeSuggestedPack(resolvedPayload.pack)
-
-    if (!normalizedPack) {
-      return buildUnavailableContextHubPack('error')
-    }
-
-    return {
-      source: 'context-hub',
-      endpoint: SUGGESTED_CONTEXT_HUB_ENDPOINT,
-      available: true,
-      pack: normalizedPack,
-    }
-  } catch (error) {
-    if (error?.name === 'AbortError') {
-      return buildUnavailableContextHubPack('timeout')
-    }
-
-    return buildUnavailableContextHubPack('unavailable')
-  } finally {
-    clearTimeout(timeoutId)
+  return {
+    source: 'context-hub',
+    endpoint: SUGGESTED_CONTEXT_HUB_ENDPOINT,
+    available: true,
+    pack: normalizedPack,
   }
 }
 
 async function emitContextHubEvent(eventPayload) {
-  let requestUrl = ''
+  const eventType =
+    typeof eventPayload?.type === 'string' ? eventPayload.type : 'unknown'
+  const result = await requestContextHubJson(CONTEXT_HUB_EVENTS_ENDPOINT, {
+    method: 'POST',
+    body: eventPayload && typeof eventPayload === 'object' ? eventPayload : {},
+  })
 
-  try {
-    requestUrl = new URL(
-      CONTEXT_HUB_EVENTS_ENDPOINT,
-      resolveContextHubApiUrl(),
-    ).toString()
-  } catch {
+  if (result.ok !== true) {
     return {
       ok: false,
       endpoint: CONTEXT_HUB_EVENTS_ENDPOINT,
-      eventType:
-        typeof eventPayload?.type === 'string' ? eventPayload.type : 'unknown',
+      eventType,
+      ...(Number.isInteger(result.statusCode) ? { statusCode: result.statusCode } : {}),
+      reason: result.reason || 'error',
+    }
+  }
+
+  if (
+    result.payload &&
+    typeof result.payload === 'object' &&
+    Object.prototype.hasOwnProperty.call(result.payload, 'ok') &&
+    result.payload.ok !== true
+  ) {
+    return {
+      ok: false,
+      endpoint: CONTEXT_HUB_EVENTS_ENDPOINT,
+      eventType,
+      ...(Number.isInteger(result.statusCode) ? { statusCode: result.statusCode } : {}),
       reason: 'error',
     }
   }
 
-  const abortController = new AbortController()
-  const timeoutId = setTimeout(() => abortController.abort(), CONTEXT_HUB_TIMEOUT_MS)
-
-  try {
-    const response = await fetch(requestUrl, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(eventPayload && typeof eventPayload === 'object' ? eventPayload : {}),
-      signal: abortController.signal,
-    })
-
-    const responseText = await response.text()
-    let parsedPayload = null
-
-    try {
-      parsedPayload = responseText ? JSON.parse(responseText) : null
-    } catch {
-      parsedPayload = null
-    }
-
-    if (!response.ok) {
-      return {
-        ok: false,
-        endpoint: CONTEXT_HUB_EVENTS_ENDPOINT,
-        eventType:
-          typeof eventPayload?.type === 'string' ? eventPayload.type : 'unknown',
-        statusCode: response.status,
-        reason: 'error',
-      }
-    }
-
-    if (
-      parsedPayload &&
-      typeof parsedPayload === 'object' &&
-      Object.prototype.hasOwnProperty.call(parsedPayload, 'ok') &&
-      parsedPayload.ok !== true
-    ) {
-      return {
-        ok: false,
-        endpoint: CONTEXT_HUB_EVENTS_ENDPOINT,
-        eventType:
-          typeof eventPayload?.type === 'string' ? eventPayload.type : 'unknown',
-        statusCode: response.status,
-        reason: 'error',
-      }
-    }
-
-    return {
-      ok: true,
-      endpoint: CONTEXT_HUB_EVENTS_ENDPOINT,
-      eventType:
-        typeof eventPayload?.type === 'string' ? eventPayload.type : 'unknown',
-      statusCode: response.status,
-    }
-  } catch (error) {
-    if (error?.name === 'AbortError') {
-      return {
-        ok: false,
-        endpoint: CONTEXT_HUB_EVENTS_ENDPOINT,
-        eventType:
-          typeof eventPayload?.type === 'string' ? eventPayload.type : 'unknown',
-        reason: 'timeout',
-      }
-    }
-
-    return {
-      ok: false,
-      endpoint: CONTEXT_HUB_EVENTS_ENDPOINT,
-      eventType:
-        typeof eventPayload?.type === 'string' ? eventPayload.type : 'unknown',
-      reason: 'unavailable',
-    }
-  } finally {
-    clearTimeout(timeoutId)
+  return {
+    ok: true,
+    endpoint: CONTEXT_HUB_EVENTS_ENDPOINT,
+    eventType,
+    ...(Number.isInteger(result.statusCode) ? { statusCode: result.statusCode } : {}),
   }
 }
 
@@ -320,6 +305,7 @@ module.exports = {
   SUGGESTED_CONTEXT_HUB_ENDPOINT,
   CONTEXT_HUB_EVENTS_ENDPOINT,
   CONTEXT_HUB_TIMEOUT_MS,
+  CONTEXT_HUB_API_URL_FALLBACKS,
   buildUnavailableContextHubPack,
   emitContextHubEvent,
   emitExecutionFailedEvent,

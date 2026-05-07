@@ -916,6 +916,45 @@ async function runAllSafeModulesDoneCase() {
   }
 }
 
+async function runReviewCompleteCase() {
+  const failures = []
+  let fixture = await buildModuleExpansionReadyFixture('release-review-complete')
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'review-and-expand',
+    requestId: 'release-review-and-expand',
+  })
+  const decision = await requestReviewExpandDecision(fixture)
+  const continuation = decision?.projectContinuationState || null
+  const manifest = decision?.localProjectManifest || null
+  const planningActions = Array.isArray(continuation?.availablePlanningActions)
+    ? continuation.availablePlanningActions
+    : []
+
+  pushFailure(
+    failures,
+    continuation?.nextRecommendedPhase === 'prepare-reusable-candidate-plan',
+    'Con review-and-expand done debe recomendar prepare-reusable-candidate-plan.',
+  )
+  pushFailure(
+    failures,
+    planningActions.some((entry) => entry?.id === 'prepare-reusable-candidate-plan'),
+    'Con review-and-expand done debe exponer prepare-reusable-candidate-plan como planning action.',
+  )
+  pushFailure(
+    failures,
+    manifest?.lastCompletedPhase === 'review-and-expand' &&
+      manifest?.nextRecommendedPhase === 'prepare-reusable-candidate-plan',
+    'El manifest debe cerrar review-and-expand y dejar reusable candidate como siguiente accion segura.',
+  )
+
+  return {
+    id: 'review-complete',
+    label: 'Review and expand completo recomienda reusable candidate',
+    failures,
+  }
+}
+
 async function runSensitiveActionCase({
   id,
   label,
@@ -1472,6 +1511,7 @@ async function main() {
     results.push(await runBaseCompleteCase())
     results.push(await runNotificationsDoneCase())
     results.push(await runAllSafeModulesDoneCase())
+    results.push(await runReviewCompleteCase())
     results.push(
       await runSensitiveActionCase({
         id: 'npm-install-approval',

@@ -2122,9 +2122,85 @@ async function runPhaseMaterializationFlowCase() {
     'La continuidad segura completa no debe disparar approvals sensibles falsos.',
   )
 
+  fixture = await materializePhaseOnFixture({
+    fixture,
+    phaseId: 'review-and-expand',
+    requestId: 'operator-phase-review-and-expand',
+  })
+  const reviewManifest = fixture.manifest || {}
+  const reviewAndExpandSource = fs.readFileSync(
+    path.join(fixture.projectRootPath, 'docs', 'review-and-expand.md'),
+    'utf8',
+  )
+  const reviewValidationSource = fs.readFileSync(
+    path.join(fixture.projectRootPath, 'docs', 'validation-report.md'),
+    'utf8',
+  )
+  const reviewRunbookSource = fs.readFileSync(
+    path.join(fixture.projectRootPath, 'docs', 'local-runbook.md'),
+    'utf8',
+  )
+  const reviewMockDataSource = fs.readFileSync(
+    path.join(fixture.projectRootPath, 'frontend', 'src', 'mock-data.js'),
+    'utf8',
+  )
+  const normalizedReviewSurface = normalizeText(
+    `${reviewAndExpandSource}\n${reviewValidationSource}\n${reviewRunbookSource}\n${reviewMockDataSource}`,
+  )
+  pushFailure(
+    failures,
+    normalizeIdentifier(getManifestPhase('review-and-expand')?.status) === 'done',
+    'review-and-expand debe quedar en done dentro del manifest.',
+  )
+  pushFailure(
+    failures,
+    normalizeIdentifier(reviewManifest?.lastCompletedPhase) === 'review-and-expand' &&
+      normalizeIdentifier(reviewManifest?.nextRecommendedPhase) ===
+        'prepare-reusable-candidate-plan',
+    'review-and-expand debe dejar prepare-reusable-candidate-plan como siguiente accion segura.',
+  )
+  pushFailure(
+    failures,
+    Array.isArray(reviewManifest?.availableActions) &&
+      reviewManifest.availableActions.includes('prepare-reusable-candidate-plan') &&
+      !reviewManifest.availableActions.includes('backend-contracts'),
+    'review-and-expand no debe volver a ofrecer backend-contracts y debe exponer prepare-reusable-candidate-plan.',
+  )
+  pushFailure(
+    failures,
+    reviewManifest?.demoReady === true &&
+      reviewManifest?.safeLocalDemoReady === true &&
+      reviewManifest?.completedCoreFlow === true,
+    'review-and-expand debe mantener demoReady, safeLocalDemoReady y completedCoreFlow en true.',
+  )
+  pushFailure(
+    failures,
+    normalizedReviewSurface.includes('review and expand') &&
+      normalizedReviewSurface.includes('reusable candidate') &&
+      normalizedReviewSurface.includes('prepare-reusable-candidate-plan') &&
+      (normalizedReviewSurface.includes('no backend real') ||
+        normalizedReviewSurface.includes('no se levanto backend real')) &&
+      (normalizedReviewSurface.includes('no db real') ||
+        normalizedReviewSurface.includes('no se creo una base de datos real')) &&
+      normalizedReviewSurface.includes('docker') &&
+      normalizedReviewSurface.includes('deploy'),
+    'review-and-expand debe dejar docs y frontend sincronizados con reusable candidate y limites mock.',
+  )
+  const reviewedFrontendExecution = executeStaticFrontendBundle(fixture.projectRootPath)
+  const normalizedReviewedFrontendHtml = normalizeText(
+    reviewedFrontendExecution.renderedHtml,
+  )
+  pushFailure(
+    failures,
+    normalizedReviewedFrontendHtml.includes('review and expand completado') &&
+      normalizedReviewedFrontendHtml.includes('prepare-reusable-candidate-plan') &&
+      normalizedReviewedFrontendHtml.includes('core flow completo'),
+    'La demo renderizada por file:// debe reflejar review-and-expand completado y reusable candidate.',
+  )
+
   return {
     id: 'operator-phase-materialization-flow',
-    label: 'Cadena segura scaffold -> frontend -> backend -> database -> validation',
+    label: 'Cadena segura scaffold -> frontend -> backend -> database -> validation -> review',
     failures,
   }
 }
