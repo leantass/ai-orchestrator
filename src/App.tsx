@@ -12601,6 +12601,9 @@ function App() {
     resultCreatedFolderPaths.length > 0
       ? `${resultCreatedFolderPaths.length} carpeta(s)`
       : 'Sin carpetas reportadas'
+  const resultWrittenArtifactPaths = resultExecutionCompleted
+    ? resultWrittenFilePaths
+    : mergeUniqueStringValues(resultWrittenFilePaths, resultMaterializationFileLabels, 12)
   const resultMaterializationWrittenFilesLabel =
     resultWrittenArtifactPaths.length > 0
       ? `${resultWrittenArtifactPaths.length} archivo(s)`
@@ -12628,9 +12631,6 @@ function App() {
   const resultWrittenArtifactsDescription = resultExecutionCompleted
     ? 'Resumen de carpeta principal, carpetas creadas, archivos escritos y alcance activo.'
     : 'La corrida no cerró correctamente. Este bloque distingue lo previsto por el plan de lo realmente tocado para facilitar la revisión.'
-  const resultWrittenArtifactPaths = resultExecutionCompleted
-    ? resultWrittenFilePaths
-    : mergeUniqueStringValues(resultWrittenFilePaths, resultMaterializationFileLabels, 12)
   const effectiveResultValidationSummaryText =
     resultExecutionNeedsMaterialReview && latestValidationResults.length === 0
       ? 'La ejecución no devolvió validaciones finales. Revisar la materialización antes de tomar estos archivos como correctos.'
