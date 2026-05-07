@@ -23,6 +23,7 @@ const {
   buildFullstackLocalManifestPhaseBlueprints,
 } = require(path.join(repoRoot, 'electron', 'fullstack-phase-contracts.cjs'))
 const {
+  classifyWorkspaceProjectIntent,
   selectBestWorkspaceProjectCandidate,
   shouldIgnoreWorkspaceDirectoryEntry,
 } = require(path.join(repoRoot, 'electron', 'workspace-project-detection.cjs'))
@@ -509,6 +510,7 @@ module.exports = {
     FULLSTACK_LOCAL_BASE_PHASES,
     getFullstackLocalBasePhaseDefinition,
     buildFullstackLocalManifestPhaseBlueprints,
+    classifyWorkspaceProjectIntent,
     selectBestWorkspaceProjectCandidate,
     shouldIgnoreWorkspaceDirectoryEntry,
     setTimeout,
@@ -2407,55 +2409,55 @@ async function runSensitivePreviewCase() {
   const fixture = await buildModuleExpansionReadyFixture('operator-sensitive-preview')
   const cases = [
     {
-      goal: 'Preparar un preview de npm install para el proyecto fullstack local de turnos medicos.',
+      goal: `Preparar un preview de npm install para el proyecto ${fixture.projectRootRelativePath}.`,
       approvalType: 'npm-install',
     },
     {
-      goal: 'Preparar un preview de dev server para el proyecto fullstack local de turnos medicos.',
+      goal: `Preparar un preview de dev server para el proyecto ${fixture.projectRootRelativePath}.`,
       approvalType: 'dev-server',
     },
     {
-      goal: 'Preparar un plan de base real para el proyecto fullstack local de turnos medicos.',
+      goal: `Preparar un plan de base real para el proyecto ${fixture.projectRootRelativePath}.`,
       approvalType: 'db-create',
     },
     {
-      goal: 'Preparar un preview de migraciones reales para el proyecto fullstack local de turnos medicos.',
+      goal: `Preparar un preview de migraciones reales para el proyecto ${fixture.projectRootRelativePath}.`,
       approvalType: 'db-migrate',
     },
     {
-      goal: 'Preparar un preview de seeds reales para el proyecto fullstack local de turnos medicos.',
+      goal: `Preparar un preview de seeds reales para el proyecto ${fixture.projectRootRelativePath}.`,
       approvalType: 'db-seed',
     },
     {
-      goal: 'Preparar un preview de Dockerfile para el proyecto fullstack local de turnos medicos.',
+      goal: `Preparar un preview de Dockerfile para el proyecto ${fixture.projectRootRelativePath}.`,
       approvalType: 'dockerfile',
     },
     {
-      goal: 'Preparar un preview de docker-compose para el proyecto fullstack local de turnos medicos.',
+      goal: `Preparar un preview de docker-compose para el proyecto ${fixture.projectRootRelativePath}.`,
       approvalType: 'docker-compose',
     },
     {
-      goal: 'Preparar un plan de deploy futuro para el proyecto fullstack local de turnos medicos.',
+      goal: `Preparar un plan de deploy futuro para el proyecto ${fixture.projectRootRelativePath}.`,
       approvalType: 'deploy',
     },
     {
-      goal: 'Preparar un plan de auth real para el proyecto fullstack local de turnos medicos.',
+      goal: `Preparar un plan de auth real para el proyecto ${fixture.projectRootRelativePath}.`,
       approvalType: 'auth-real',
     },
     {
-      goal: 'Preparar un plan de pagos reales para el proyecto fullstack local de turnos medicos.',
+      goal: `Preparar un plan de pagos reales para el proyecto ${fixture.projectRootRelativePath}.`,
       approvalType: 'payments-real',
     },
     {
-      goal: 'Preparar un plan de integracion externa para el proyecto fullstack local de turnos medicos.',
+      goal: `Preparar un plan de integracion externa para el proyecto ${fixture.projectRootRelativePath}.`,
       approvalType: 'external-integration',
     },
     {
-      goal: 'Preparar un plan de secretos y .env para el proyecto fullstack local de turnos medicos.',
+      goal: `Preparar un plan de secretos y .env para el proyecto ${fixture.projectRootRelativePath}.`,
       approvalType: 'secrets-env',
     },
     {
-      goal: 'Preparar un plan de GitHub remoto para el proyecto fullstack local de turnos medicos.',
+      goal: `Preparar un plan de GitHub remoto para el proyecto ${fixture.projectRootRelativePath}.`,
       approvalType: 'github-remote-write',
     },
   ]
@@ -2621,7 +2623,7 @@ async function runFinalReadinessCase() {
   const reviewDecision = await requestReviewExpandDecision(fixture)
   const runtimeDecision = await requestSensitiveActionDecision(
     fixture,
-    'Preparar un plan de runtime local para el proyecto fullstack local de turnos medicos.',
+    `Preparar un plan de runtime local para el proyecto ${fixture.projectRootRelativePath}.`,
   )
 
   pushFailure(
@@ -2661,7 +2663,7 @@ async function runUiContractSanityCase() {
   const reviewDecision = await requestReviewExpandDecision(fixture)
   const sensitiveDecision = await requestSensitiveActionDecision(
     fixture,
-    'Preparar un plan de runtime local para el proyecto fullstack local de turnos medicos.',
+    `Preparar un plan de runtime local para el proyecto ${fixture.projectRootRelativePath}.`,
   )
 
   pushFailure(

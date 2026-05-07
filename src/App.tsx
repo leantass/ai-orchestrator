@@ -12833,24 +12833,30 @@ function App() {
       ]
         .filter(Boolean)
         .join(' ')
-  const resultMaterializationSummaryTitle = resultIsSafeFirstDeliveryMaterialization
-    ? 'Primera entrega funcional local generada'
-    : resultIsFullstackLocalMaterialization
-      ? 'Sistema local funcional materializado'
-      : resultIsProjectPhaseMaterialization
-        ? 'Fase funcional segura materializada'
-      : resultIsFrontendProjectMaterialization
-        ? 'Frontend local funcional generado'
-        : 'Entrega local generada'
-  const resultMaterializationSummaryDescription = resultIsSafeFirstDeliveryMaterialization
-    ? 'Resumen corto de la materializacion segura para revisar rapido que se creo, como abrirlo y cuales son sus limites.'
-    : resultIsFullstackLocalMaterialization
-      ? 'Resumen corto del sistema local funcional para abrirlo, revisar lo generado y saber cual es la siguiente fase segura.'
-      : resultIsProjectPhaseMaterialization
-        ? 'Resumen corto de la fase segura materializada para revisar que se actualizo, que quedo validado y cual es la siguiente fase segura.'
-      : resultIsFrontendProjectMaterialization
-        ? 'Resumen corto del frontend local generado para abrirlo por file:// y validar la interfaz sin levantar runtime real.'
-        : 'Resumen corto de la salida local materializada.'
+  const wizardHasExecutionError =
+    executorRequestState === 'error' || sessionStatus.toLocaleLowerCase().includes('error')
+  const resultMaterializationSummaryTitle = wizardHasExecutionError
+    ? 'Corrida con error'
+    : resultIsSafeFirstDeliveryMaterialization
+      ? 'Primera entrega funcional local generada'
+      : resultIsFullstackLocalMaterialization
+        ? 'Sistema local funcional materializado'
+        : resultIsProjectPhaseMaterialization
+          ? 'Fase funcional segura materializada'
+          : resultIsFrontendProjectMaterialization
+            ? 'Frontend local funcional generado'
+            : 'Entrega local generada'
+  const resultMaterializationSummaryDescription = wizardHasExecutionError
+    ? 'La corrida dejo detalle tecnico util para revisar el bloqueo, pero no debe leerse como una materializacion completada.'
+    : resultIsSafeFirstDeliveryMaterialization
+      ? 'Resumen corto de la materializacion segura para revisar rapido que se creo, como abrirlo y cuales son sus limites.'
+      : resultIsFullstackLocalMaterialization
+        ? 'Resumen corto del sistema local funcional para abrirlo, revisar lo generado y saber cual es la siguiente fase segura.'
+        : resultIsProjectPhaseMaterialization
+          ? 'Resumen corto de la fase segura materializada para revisar que se actualizo, que quedo validado y cual es la siguiente fase segura.'
+          : resultIsFrontendProjectMaterialization
+            ? 'Resumen corto del frontend local generado para abrirlo por file:// y validar la interfaz sin levantar runtime real.'
+            : 'Resumen corto de la salida local materializada.'
   const resultMaterializationSuggestedNextSteps = [
     resultMaterializationIndexPathLabel !== 'No disponible'
       ? `Abrir ${resultMaterializationIndexPathLabel} en el navegador para revisar la interfaz.`
@@ -12928,7 +12934,20 @@ function App() {
   )
   const activeWizardStepConfig =
     GUIDED_WIZARD_STEPS[activeWizardStepIndex] || GUIDED_WIZARD_STEPS[0]
-  const reusableWizardArtifacts = reusableArtifacts.slice(0, 3)
+  const reusableSuggestedArtifactIds =
+    activeReuseFoundCount > 0
+      ? new Set(
+          (effectivePlannerExecutionMetadata.reusableArtifactLookup?.matches || [])
+            .map((match) => normalizeOptionalString(match.id))
+            .filter(Boolean),
+        )
+      : null
+  const reusableWizardArtifacts =
+    reusableSuggestedArtifactIds === null
+      ? []
+      : reusableArtifacts
+          .filter((artifact) => reusableSuggestedArtifactIds.has(normalizeOptionalString(artifact.id)))
+          .slice(0, 3)
   const hasWizardPlan =
     plannerInstruction.trim() !== '' &&
     plannerInstruction !== DEFAULT_PLANNER_INSTRUCTION
@@ -12937,6 +12956,19 @@ function App() {
     Boolean(latestExecutionRunSummary) ||
     executorRequestState === 'success' ||
     executorRequestState === 'error'
+  const wizardResultAvailabilityLabel = wizardHasExecutionError
+    ? 'Detalle tecnico disponible'
+    : wizardCanShowResult
+      ? 'Si'
+      : 'Todavia no'
+  const wizardResultAvailabilityDetail = wizardHasExecutionError
+    ? 'Hay un error revisable y un resultado tecnico para inspeccionar, pero la ejecucion no cerro como exitosa.'
+    : wizardCanShowResult
+      ? 'Ya podes pasar al resultado.'
+      : 'Espera a que cierre la ejecucion.'
+  const wizardExecutionResultButtonLabel = wizardHasExecutionError
+    ? 'Ver detalle del error'
+    : 'Ver resultado'
   const activeSectionConfig =
     APP_NAV_SECTIONS.find((section) => section.key === activeSection) ||
     APP_NAV_SECTIONS[0]
@@ -13011,6 +13043,10 @@ function App() {
   const flowExecutionStageStates = flowExecutionStages.map((stage, index) => {
     if (fastRouteDetected && stage === 'Codex') {
       return 'not-required' as const
+    }
+
+    if (wizardHasExecutionError && flowExecutionFinished && index === flowExecutionStageIndex) {
+      return 'error' as const
     }
 
     if (!flowExecutionFinished && index === flowExecutionStageIndex) {
@@ -18654,6 +18690,8 @@ function App() {
                           className={`rounded-xl border px-4 py-3 text-sm font-medium transition ${
                             stageState === 'active'
                               ? 'border-sky-300/40 bg-sky-300/15 text-sky-100'
+                              : stageState === 'error'
+                                ? 'border-rose-300/40 bg-rose-300/15 text-rose-100'
                               : stageState === 'completed'
                                 ? 'border-emerald-300/30 bg-emerald-300/10 text-emerald-100'
                                 : stageState === 'not-required'
@@ -18667,6 +18705,8 @@ function App() {
                           <div className="mt-2 text-xs leading-5">
                             {stageState === 'active'
                               ? 'Activa'
+                              : stageState === 'error'
+                                ? 'Con error'
                               : stageState === 'completed'
                                 ? 'Completada'
                                 : stageState === 'not-required'
@@ -19771,12 +19811,9 @@ function App() {
                       ) : null}
                       <MetricCard
                         label="Resultado listo"
-                        value={wizardCanShowResult ? 'Sí' : 'Todavía no'}
-                        detail={
-                          wizardCanShowResult
-                            ? 'Ya podés pasar al resultado.'
-                            : 'Esperá a que cierre la ejecución.'
-                        }
+                        value={wizardResultAvailabilityLabel}
+                        detail={wizardResultAvailabilityDetail}
+                        tone={wizardHasExecutionError ? 'rose' : 'default'}
                       />
                     </div>
                   </div>
@@ -20545,7 +20582,7 @@ function App() {
                       disabled={!wizardCanShowResult}
                       className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
                     >
-                      Ver resultado
+                      {wizardExecutionResultButtonLabel}
                     </button>
                   ) : null}
                 </div>
@@ -22895,7 +22932,3 @@ function App() {
 }
 
 export default App
-
-
-
-

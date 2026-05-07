@@ -34,6 +34,7 @@ const {
   buildFullstackLocalManifestPhaseBlueprints,
 } = require(path.join(repoRoot, 'electron', 'fullstack-phase-contracts.cjs'))
 const {
+  classifyWorkspaceProjectIntent,
   selectBestWorkspaceProjectCandidate,
   shouldIgnoreWorkspaceDirectoryEntry,
 } = require(path.join(repoRoot, 'electron', 'workspace-project-detection.cjs'))
@@ -402,6 +403,30 @@ const fullstackLocalMaterializationCase = {
   goal:
     'Hacer un sistema fullstack local para turnos medicos con frontend, backend y base de datos local.',
   context: '',
+}
+
+const veterinaryFullstackLocalCase = {
+  id: 'fullstack-local-veterinaria',
+  label: 'Materializacion fullstack local veterinaria',
+  goal:
+    'Hacer un sistema fullstack local para turnos de veterinaria con clientes, mascotas, turnos, recordatorios y reportes.',
+  context: '',
+}
+
+const portOperationsNewProjectCase = {
+  id: 'port-operations-new-project',
+  label: 'Dominio portuario nuevo con workspace ya ocupado',
+  goal:
+    'Crear una entrega funcional local para un sistema de gestion de entradas de barcos a un puerto.',
+  context:
+    'Quiero buques, solicitudes de entrada, ETA y ETD, muelle o zona asignada, tipo de operacion de carga, descarga, reparacion, espera o abastecimiento, documentacion requerida, estado de aprobacion, alertas operativas, tablero de control, reportes basicos, historial de movimientos y usuarios internos con roles operativos. Primera entrega funcional local, con datos mock realistas, sin instalar dependencias, sin backend real, sin base real, sin Docker, sin deploy y preparada para continuar por fases.',
+}
+
+const veterinaryContinuationCase = {
+  id: 'explicit-veterinary-continuation',
+  label: 'Continuidad explicita veterinaria',
+  goal: 'Continuá el proyecto fullstack-local-veterinaria y agregale reportes.',
+  context: 'Mantener la continuidad del proyecto existente y no crear uno nuevo.',
 }
 
 const phaseExecutionValidationCases = {
@@ -805,6 +830,10 @@ function normalizeText(value) {
     .trim()
 }
 
+function normalizeIdentifier(value) {
+  return normalizeText(value).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -909,6 +938,7 @@ module.exports = {
     FULLSTACK_LOCAL_BASE_PHASES,
     getFullstackLocalBasePhaseDefinition,
     buildFullstackLocalManifestPhaseBlueprints,
+    classifyWorkspaceProjectIntent,
     selectBestWorkspaceProjectCandidate,
     shouldIgnoreWorkspaceDirectoryEntry,
     setTimeout,
@@ -2806,14 +2836,18 @@ function findManifestPathInsideWorkspace(workspacePath) {
   return ''
 }
 
-async function buildPhaseExecutionFixture({ workspaceName = 'fullstack-project-phase' } = {}) {
+async function buildFullstackFixtureForCase({
+  workspaceName,
+  goal,
+  context,
+}) {
   const workspacePath = path.join(smokeExecutionWorkspaceRoot, workspaceName)
   ensureCleanDirectory(workspacePath)
 
   const reusablePlanningContext = buildReusablePlanningContext()
   const phaseOneDecision = await plannerApi.buildLocalStrategicBrainDecision({
-    goal: fullstackLocalMaterializationCase.goal,
-    context: fullstackLocalMaterializationCase.context,
+    goal,
+    context,
     workspacePath,
     iteration: 1,
     previousExecutionResult: '',
@@ -2834,7 +2868,7 @@ async function buildPhaseExecutionFixture({ workspaceName = 'fullstack-project-p
       ? phaseOneDecision.scalableDeliveryPlan
       : null
   const prompt = buildFullstackLocalMaterializationPrompt({
-    goal: fullstackLocalMaterializationCase.goal,
+    goal,
     scalablePlan,
   })
   const phaseTwoDecision = await plannerApi.buildLocalStrategicBrainDecision({
@@ -2913,6 +2947,14 @@ async function buildPhaseExecutionFixture({ workspaceName = 'fullstack-project-p
     phaseTwoDecision,
     executionResult,
   }
+}
+
+async function buildPhaseExecutionFixture({ workspaceName = 'fullstack-project-phase' } = {}) {
+  return buildFullstackFixtureForCase({
+    workspaceName,
+    goal: fullstackLocalMaterializationCase.goal,
+    context: fullstackLocalMaterializationCase.context,
+  })
 }
 
 async function getPhaseExecutionFixture() {
@@ -3368,6 +3410,205 @@ async function runExistingWorkspaceProjectDetectionValidation() {
     strategy,
     executionMode,
     nextExpectedAction,
+  }
+}
+
+async function runPortDomainCreatesNewProjectValidation() {
+  const failures = []
+  const fixture = await buildFullstackFixtureForCase({
+    workspaceName: 'fullstack-project-existing-veterinary-for-port',
+    goal: veterinaryFullstackLocalCase.goal,
+    context: veterinaryFullstackLocalCase.context,
+  })
+  const decision = await requestContinuationDecision({
+    fixture,
+    testCase: portOperationsNewProjectCase,
+  })
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const roadmapSummary = summarizeImplementationRoadmap(decision?.implementationRoadmap || null)
+  const blueprintSummary = summarizeProjectBlueprint(decision?.projectBlueprint || null)
+  const nextActionSummary = summarizeNextActionPlan(decision?.nextActionPlan || null)
+  const intentSummary = classifyWorkspaceProjectIntent({
+    goal: portOperationsNewProjectCase.goal,
+    context: portOperationsNewProjectCase.context,
+    candidate: {
+      manifest: fixture.manifest,
+      projectRootRelativePath: fixture.projectRootRelativePath,
+    },
+  })
+  const modulePool = summarizeUniqueStrings([
+    ...toStringArray(decision?.domainUnderstanding?.primaryModules, 24),
+    ...roadmapSummary.phases.flatMap((entry) => [entry.goal, entry.title]),
+    ...blueprintSummary.modules,
+  ])
+  const entityPool = summarizeUniqueStrings([
+    ...toStringArray(decision?.domainUnderstanding?.primaryEntities, 24),
+    ...blueprintSummary.entities,
+  ])
+  const projectSlugSignals = [
+    roadmapSummary.projectSlug,
+    roadmapSummary.domain,
+    blueprintSummary.domain,
+  ]
+    .map((entry) => normalizeIdentifier(entry))
+    .filter(Boolean)
+  const joinedReasoning = normalizeText(
+    [decision?.reason, decision?.instruction, nextActionSummary.targetStrategy].join(' '),
+  )
+
+  if (intentSummary.intent !== 'new-project-intent') {
+    failures.push(
+      `La clasificacion de intención debería ser new-project-intent. Recibido: ${intentSummary.intent}.`,
+    )
+  }
+  if (
+    strategy === 'prepare-project-phase-plan' ||
+    strategy === 'prepare-continuation-action-plan'
+  ) {
+    failures.push('El pedido portuario nuevo no deberia caer en continuidad del proyecto existente.')
+  }
+  if (
+    executionMode !== 'planner-only' &&
+    executionMode !== 'executor'
+  ) {
+    failures.push(`executionMode inesperado para el caso portuario: ${executionMode || '(vacío)'}.`)
+  }
+  if (decision?.localProjectManifest) {
+    failures.push('Un pedido portuario nuevo no deberia reusar localProjectManifest del proyecto existente.')
+  }
+  if (decision?.projectPhaseExecutionPlan || decision?.continuationActionPlan) {
+    failures.push('El pedido portuario nuevo no deberia devolver planes de continuidad o fases del proyecto viejo.')
+  }
+  if (
+    normalizeIdentifier(nextActionSummary.targetStrategy).includes('prepare-dependency-install-plan') ||
+    normalizeIdentifier(decision?.approvalRequestPlan?.approvalType || '').includes('dependency-install')
+  ) {
+    failures.push('El pedido portuario con exclusión explícita no deberia proponer prepare-dependency-install-plan.')
+  }
+  if (joinedReasoning.includes('proyecto existente') || joinedReasoning.includes('veterinaria')) {
+    failures.push('El razonamiento del caso portuario no deberia quedar pegado al proyecto veterinaria existente.')
+  }
+  if (
+    !projectSlugSignals.some(
+      (entry) =>
+        entry.includes('port') || entry.includes('puert') || entry.includes('buque') || entry.includes('barco'),
+    )
+  ) {
+    failures.push(
+      `El slug/dominio propuesto deberia reflejar el dominio portuario. Recibido: ${projectSlugSignals.join(' | ') || '(vacio)'}.`,
+    )
+  }
+  ;['buques', 'muelles', 'operaciones portuarias', 'documentacion'].forEach((expectedModule) => {
+    if (!modulePool.some((entry) => normalizeText(entry).includes(normalizeText(expectedModule)))) {
+      failures.push(`El caso portuario deberia conservar el modulo ${expectedModule}.`)
+    }
+  })
+  ;['buque', 'muelle', 'operacion portuaria', 'documentacion'].forEach((expectedEntity) => {
+    if (!entityPool.some((entry) => normalizeText(entry).includes(normalizeText(expectedEntity)))) {
+      failures.push(`El caso portuario deberia conservar la entidad ${expectedEntity}.`)
+    }
+  })
+  if (
+    normalizeIdentifier(blueprintSummary.domain).includes('seguridad') ||
+    normalizeIdentifier(roadmapSummary.domain).includes('seguridad')
+  ) {
+    failures.push('El dominio portuario no deberia clasificarse como seguridad y monitoreo.')
+  }
+
+  return {
+    testCase: portOperationsNewProjectCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction: String(decision?.nextExpectedAction || '').trim(),
+  }
+}
+
+async function runExplicitVeterinaryContinuationValidation() {
+  const failures = []
+  const fixture = await buildFullstackFixtureForCase({
+    workspaceName: 'fullstack-project-explicit-veterinary-continuation',
+    goal: veterinaryFullstackLocalCase.goal,
+    context: veterinaryFullstackLocalCase.context,
+  })
+  const dynamicContinuationCase = {
+    ...veterinaryContinuationCase,
+    goal: `Continuá el proyecto ${fixture.projectRootRelativePath} y agregale reportes.`,
+    context: 'Mantener la continuidad del proyecto existente y no crear uno nuevo.',
+  }
+  const decision = await requestContinuationDecision({
+    fixture,
+    testCase: dynamicContinuationCase,
+  })
+  const strategy = String(decision?.strategy || '').trim()
+  const intentSummary = classifyWorkspaceProjectIntent({
+    goal: dynamicContinuationCase.goal,
+    context: dynamicContinuationCase.context,
+    candidate: {
+      manifest: fixture.manifest,
+      projectRootRelativePath: fixture.projectRootRelativePath,
+    },
+  })
+  const projectRootCandidates = summarizeUniqueStrings([
+    decision?.moduleExpansionPlan?.projectRoot,
+    decision?.projectPhaseExecutionPlan?.projectRoot,
+    decision?.continuationActionPlan?.projectRoot,
+    decision?.localProjectManifest?.projectRoot,
+  ])
+  const targetsCombined = summarizeUniqueStrings([
+    ...(Array.isArray(decision?.moduleExpansionPlan?.allowedTargetPaths)
+      ? decision.moduleExpansionPlan.allowedTargetPaths
+      : []),
+    ...(Array.isArray(decision?.projectPhaseExecutionPlan?.allowedTargetPaths)
+      ? decision.projectPhaseExecutionPlan.allowedTargetPaths
+      : []),
+    ...(Array.isArray(decision?.continuationActionPlan?.allowedTargetPaths)
+      ? decision.continuationActionPlan.allowedTargetPaths
+      : []),
+  ]).map((entry) => normalizePathForComparison(entry))
+
+  if (intentSummary.intent !== 'continue-existing-project-intent') {
+    failures.push(
+      `La clasificacion de intención debería ser continue-existing-project-intent. Recibido: ${intentSummary.intent}.`,
+    )
+  }
+  if (
+    strategy === 'scalable-delivery-plan' ||
+    strategy === 'safe-first-delivery-plan' ||
+    strategy === 'materialize-fullstack-local-plan'
+  ) {
+    failures.push('La continuidad veterinaria no deberia recrear un proyecto nuevo.')
+  }
+  if (
+    projectRootCandidates.length === 0 ||
+    !projectRootCandidates.every(
+      (entry) => normalizePathForComparison(entry) === fixture.projectRootRelativePath,
+    )
+  ) {
+    failures.push('La continuidad veterinaria deberia mantener el mismo projectRoot detectado en el workspace.')
+  }
+  if (
+    targetsCombined.length > 0 &&
+    !targetsCombined.every((entry) => entry.startsWith(`${fixture.projectRootRelativePath}/`))
+  ) {
+    failures.push('La continuidad veterinaria no deberia apuntar rutas fuera del proyecto existente.')
+  }
+  if (
+    decision?.moduleExpansionPlan &&
+    !normalizeIdentifier(decision.moduleExpansionPlan.moduleId).includes('report')
+  ) {
+    failures.push('La continuidad veterinaria con reportes deberia apuntar al modulo reports.')
+  }
+
+  return {
+    testCase: dynamicContinuationCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode: String(decision?.executionMode || '').trim(),
+    nextExpectedAction: String(decision?.nextExpectedAction || '').trim(),
   }
 }
 
@@ -8226,6 +8467,8 @@ async function main() {
     console.log('===========================')
     continuationResults = [
       await runExistingWorkspaceProjectDetectionValidation(),
+      await runPortDomainCreatesNewProjectValidation(),
+      await runExplicitVeterinaryContinuationValidation(),
       await runContinuationRecommendationValidation({
         testCase: continuationValidationCases.legacyManifestWithoutPhases,
         workspaceName: 'fullstack-project-continuation-legacy-manifest',

@@ -20,6 +20,7 @@ También podés validar otras verticales ya soportadas:
 - seguridad, accesos y sensores
 - comunidad social y grupos
 - gestión operativa genérica
+- operaciones portuarias con buques, muelles y documentación
 
 ## Recorrido sugerido
 
@@ -88,6 +89,12 @@ Para un caso como `fullstack-local-veterinaria/jefe-project.json` dentro del wor
 - inferir readiness desde fases y archivos si el manifest vino con campos viejos
 - conservar `frontend-mock-flow` como siguiente fase segura cuando el scaffold ya está `done`
 - mostrar en Paso 5 que el proyecto existente fue detectado y que la continuidad sigue desde esa carpeta
+
+Si en ese mismo workspace el operador pide una entrega nueva para otro dominio, por ejemplo operaciones portuarias con barcos y muelles, JEFE no debería pegarse a veterinaria:
+
+- debe proponer un proyecto nuevo del dominio pedido
+- no debe reutilizar `targetPath`, manifest ni fases del proyecto viejo
+- no debe disparar continuidad sensible solo porque exista un `jefe-project.json`
 
 Después del scaffold base, el readiness no debería decir `En planificación`. La lectura esperable es:
 
@@ -204,4 +211,5 @@ Mientras no haya validación local cerrada, la UI debería sugerir:
 ## Nota de deuda tecnica actual
 
 - El panel de MEMORIA ya muestra el ultimo evento emitido por JEFE en la sesion.
+- El planner ya distingue mejor proyecto nuevo vs continuidad, incluso con un workspace que ya contiene otro dominio.
 - `src/App.tsx` y `electron/main.cjs` siguen siendo grandes, pero hoy no bloquean esta validacion operativa local.

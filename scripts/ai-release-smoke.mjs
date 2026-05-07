@@ -22,6 +22,7 @@ const {
   buildFullstackLocalManifestPhaseBlueprints,
 } = require(path.join(repoRoot, 'electron', 'fullstack-phase-contracts.cjs'))
 const {
+  classifyWorkspaceProjectIntent,
   selectBestWorkspaceProjectCandidate,
   shouldIgnoreWorkspaceDirectoryEntry,
 } = require(path.join(repoRoot, 'electron', 'workspace-project-detection.cjs'))
@@ -159,6 +160,7 @@ module.exports = {
     FULLSTACK_LOCAL_BASE_PHASES,
     getFullstackLocalBasePhaseDefinition,
     buildFullstackLocalManifestPhaseBlueprints,
+    classifyWorkspaceProjectIntent,
     selectBestWorkspaceProjectCandidate,
     shouldIgnoreWorkspaceDirectoryEntry,
     setTimeout,

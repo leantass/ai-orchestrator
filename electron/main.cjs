@@ -131,6 +131,7 @@ const {
   buildFullstackLocalManifestPhaseBlueprints,
 } = require('./fullstack-phase-contracts.cjs')
 const {
+  classifyWorkspaceProjectIntent,
   selectBestWorkspaceProjectCandidate,
   shouldIgnoreWorkspaceDirectoryEntry,
 } = require('./workspace-project-detection.cjs')
@@ -6832,7 +6833,7 @@ function detectSafeFirstDeliverySecurityMonitoringIntent(normalizedText) {
   }
 
   if (
-    /\bseguridad\b|\bmonitoreo\b|\bsensores?\b|\baccesos?\b|\boperadores?\b|\bzonas?\b/u.test(
+    /\bseguridad\b|\bmonitoreo\b|\bsensores?\b|\baccesos?\b/u.test(
       normalizedText,
     )
   ) {
@@ -6860,6 +6861,76 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
   }
 
   const definitions = [
+    {
+      label: 'buques',
+      patterns: [/\b(?:buques?|barcos?|embarcaciones?)\b/u],
+      mockData: 'Buques mock con bandera, ETA, ETD y estado operativo local.',
+      screen: 'buques',
+      behavior: 'Revisar buques mock y su estado de arribo o salida local.',
+    },
+    {
+      label: 'solicitudes de entrada',
+      patterns: [/\b(?:solicitudes?\s+de\s+entrada|pedidos?\s+de\s+arribo|autorizaciones?\s+de\s+entrada)\b/u],
+      mockData: 'Solicitudes de entrada mock con estado de aprobacion y revision documental.',
+      screen: 'solicitudes de entrada',
+      behavior: 'Registrar una solicitud de entrada mock y revisar su aprobacion local.',
+    },
+    {
+      label: 'muelles',
+      patterns: [/\bmuelles?\b/u],
+      mockData: 'Muelles mock con disponibilidad, zona asignada y operaciones previstas.',
+      screen: 'muelles',
+      behavior: 'Asignar muelle mock y revisar disponibilidad operativa local.',
+    },
+    {
+      label: 'zonas portuarias',
+      patterns: [/\b(?:zonas?\s+portuarias?|zona\s+asignada)\b/u],
+      mockData: 'Zonas portuarias mock con capacidad, restricciones y estado operativo.',
+      screen: 'zonas portuarias',
+      behavior: 'Consultar zonas portuarias mock y su ocupacion local.',
+    },
+    {
+      label: 'arribos',
+      patterns: [/\b(?:eta|arribos?|ingresos?\s+de\s+embarcaciones?)\b/u],
+      mockData: 'Arribos mock con ETA, prioridad y estado de autorizacion.',
+      screen: 'arribos',
+      behavior: 'Revisar arribos mock y su estado operativo local.',
+    },
+    {
+      label: 'salidas',
+      patterns: [/\b(?:etd|salidas?)\b/u],
+      mockData: 'Salidas mock con ETD, muelle y autorizacion asociada.',
+      screen: 'salidas',
+      behavior: 'Revisar salidas mock y su trazabilidad local.',
+    },
+    {
+      label: 'operaciones portuarias',
+      patterns: [/\b(?:carga|descarga|reparacion|espera|abastecimiento|operaciones?\s+portuarias?)\b/u],
+      mockData: 'Operaciones portuarias mock con tipo de operacion, prioridad y estado.',
+      screen: 'operaciones portuarias',
+      behavior: 'Consultar operaciones portuarias mock y su avance local.',
+    },
+    {
+      label: 'documentacion',
+      patterns: [/\b(?:documentacion|documentos?\s+requeridos?)\b/u],
+      mockData: 'Documentacion mock con checklist, vencimientos y responsables de revision.',
+      screen: 'documentacion',
+      behavior: 'Revisar documentacion mock y su estado de aprobacion local.',
+    },
+    {
+      label: 'autorizaciones',
+      patterns: [/\b(?:autorizaciones?|aprobaciones?|estado\s+de\s+aprobacion)\b/u],
+      mockData: 'Autorizaciones mock con responsables, observaciones y resultado de aprobacion.',
+      screen: 'autorizaciones',
+      behavior: 'Registrar aprobaciones mock y su detalle operativo local.',
+    },
+    {
+      label: 'historial de movimientos',
+      patterns: [/\b(?:historial\s+de\s+movimientos|movimientos?\s+portuarios?)\b/u],
+      mockData: 'Historial de movimientos mock con arribo, salida, muelle y cambios de estado.',
+      screen: 'historial de movimientos',
+      behavior: 'Consultar historial mock de movimientos y cambios de estado operativos.',
+    },
     {
       label: 'perfiles',
       patterns: [/\bperfiles?\b/u],
@@ -7170,6 +7241,26 @@ function detectSafeFirstDeliveryModuleFamily(modules) {
       matches: ['accesos', 'alertas', 'sensores', 'zonas', 'operadores', 'eventos'],
     },
     {
+      key: 'port-operations',
+      domainLabel: 'operaciones portuarias',
+      productType: 'business-system',
+      minimumScore: 3,
+      matches: [
+        'buques',
+        'solicitudes de entrada',
+        'muelles',
+        'zonas portuarias',
+        'arribos',
+        'salidas',
+        'operaciones portuarias',
+        'documentacion',
+        'autorizaciones',
+        'historial de movimientos',
+        'alertas',
+        'reportes',
+      ],
+    },
+    {
       key: 'documental',
       domainLabel: 'gestion documental',
       productType: 'business-system',
@@ -7325,6 +7416,21 @@ function buildDomainUnderstanding({
         ? ['catalogo', 'productos', 'carrito local', 'checkout simulado', 'ordenes', 'reportes']
         : resolvedFamilyKey === 'school-crm'
           ? ['alumnos', 'familias', 'cursos', 'comunicaciones', 'seguimiento', 'reportes']
+          : resolvedFamilyKey === 'port-operations'
+            ? [
+                'buques',
+                'solicitudes de entrada',
+                'muelles',
+                'zonas portuarias',
+                'arribos',
+                'salidas',
+                'operaciones portuarias',
+                'documentacion',
+                'autorizaciones',
+                'historial de movimientos',
+                'alertas',
+                'reportes',
+              ]
           : explicitModuleFamily?.matches || []
   const primaryModules = summarizeUniqueExecutorStrings(
     [
@@ -7369,6 +7475,7 @@ function buildDomainUnderstanding({
     'school-crm': 'gestionar seguimiento escolar y comunicaciones',
     social: 'gestionar comunidad, perfiles e interacciones',
     security: 'monitorear accesos, alertas y eventos',
+    'port-operations': 'gestionar arribos, salidas y operaciones portuarias',
     documental: 'gestionar documentos, responsables y vencimientos',
     reservas: 'gestionar reservas y disponibilidad',
     'request-tracking': 'gestionar solicitudes y estados operativos',
@@ -7419,6 +7526,12 @@ function buildDomainUnderstanding({
     pushUniquePlannerValues(roles, ['administrador', 'moderador', 'miembro'])
   } else if (resolvedFamilyKey === 'security') {
     pushUniquePlannerValues(roles, ['administrador', 'operador', 'supervisor'])
+  } else if (resolvedFamilyKey === 'port-operations') {
+    pushUniquePlannerValues(roles, [
+      'administrador',
+      'operador portuario',
+      'supervisor de muelle',
+    ])
   } else if (resolvedFamilyKey === 'documental') {
     pushUniquePlannerValues(roles, ['administrador', 'responsable', 'operador'])
   } else if (resolvedFamilyKey === 'reservas') {
@@ -8213,6 +8326,46 @@ function inferSafeFirstDeliveryMaterializationCollectionKey(label) {
     return ''
   }
 
+  if (/\b(?:buques?|barcos?|embarcaciones?)\b/u.test(normalizedLabel)) {
+    return 'buques'
+  }
+
+  if (/\bsolicitudes?\s+de\s+entrada\b/u.test(normalizedLabel)) {
+    return 'solicitudesEntrada'
+  }
+
+  if (/\bmuelles?\b/u.test(normalizedLabel)) {
+    return 'muelles'
+  }
+
+  if (/\bzonas?\s+portuarias?\b|\bzona\s+asignada\b/u.test(normalizedLabel)) {
+    return 'zonasPortuarias'
+  }
+
+  if (/\barribos?\b|\beta\b/u.test(normalizedLabel)) {
+    return 'arribos'
+  }
+
+  if (/\bsalidas?\b|\betd\b/u.test(normalizedLabel)) {
+    return 'salidas'
+  }
+
+  if (/\boperaciones?\s+portuarias?\b|\bcarga\b|\bdescarga\b|\breparacion\b|\bespera\b|\babastecimiento\b/u.test(normalizedLabel)) {
+    return 'operacionesPortuarias'
+  }
+
+  if (/\bdocumentacion\b|\bdocumentos?\s+requeridos?\b/u.test(normalizedLabel)) {
+    return 'documentacion'
+  }
+
+  if (/\bautorizaciones?\b|\baprobaciones?\b/u.test(normalizedLabel)) {
+    return 'autorizaciones'
+  }
+
+  if (/\bhistorial\s+de\s+movimientos\b|\bmovimientos?\s+portuarios?\b/u.test(normalizedLabel)) {
+    return 'movimientosPortuarios'
+  }
+
   if (/\b(?:catalogo|productos?|detalle de producto|detalle principal)\b/u.test(normalizedLabel)) {
     return 'productos'
   }
@@ -8271,6 +8424,46 @@ function inferSafeFirstDeliveryMaterializationCollectionKey(label) {
 
   if (/\beventos?\b/u.test(normalizedLabel)) {
     return 'eventos'
+  }
+
+  if (/\b(?:buques?|barcos?|embarcaciones?)\b/u.test(normalizedLabel)) {
+    return 'buques'
+  }
+
+  if (/\bsolicitudes?\s+de\s+entrada\b/u.test(normalizedLabel)) {
+    return 'solicitudesEntrada'
+  }
+
+  if (/\bmuelles?\b/u.test(normalizedLabel)) {
+    return 'muelles'
+  }
+
+  if (/\bzonas?\s+portuarias?\b|\bzona\s+asignada\b/u.test(normalizedLabel)) {
+    return 'zonasPortuarias'
+  }
+
+  if (/\barribos?\b|\beta\b/u.test(normalizedLabel)) {
+    return 'arribos'
+  }
+
+  if (/\bsalidas?\b|\betd\b/u.test(normalizedLabel)) {
+    return 'salidas'
+  }
+
+  if (/\boperaciones?\s+portuarias?\b|\bcarga\b|\bdescarga\b|\breparacion\b|\bespera\b|\babastecimiento\b/u.test(normalizedLabel)) {
+    return 'operacionesPortuarias'
+  }
+
+  if (/\bdocumentacion\b|\bdocumentos?\s+requeridos?\b/u.test(normalizedLabel)) {
+    return 'documentacion'
+  }
+
+  if (/\bautorizaciones?\b|\baprobaciones?\b/u.test(normalizedLabel)) {
+    return 'autorizaciones'
+  }
+
+  if (/\bhistorial\s+de\s+movimientos\b|\bmovimientos?\s+portuarios?\b/u.test(normalizedLabel)) {
+    return 'movimientosPortuarios'
   }
 
   if (/\bdocumentos?\b/u.test(normalizedLabel)) {
@@ -8383,6 +8576,46 @@ function inferSafeFirstDeliveryMaterializationEntityName(label) {
     return ''
   }
 
+  if (/\b(?:buques?|barcos?|embarcaciones?)\b/u.test(normalizedLabel)) {
+    return 'buque'
+  }
+
+  if (/\bsolicitudes?\s+de\s+entrada\b/u.test(normalizedLabel)) {
+    return 'solicitud de entrada'
+  }
+
+  if (/\bmuelles?\b/u.test(normalizedLabel)) {
+    return 'muelle'
+  }
+
+  if (/\bzonas?\s+portuarias?\b|\bzona\s+asignada\b/u.test(normalizedLabel)) {
+    return 'zona portuaria'
+  }
+
+  if (/\barribos?\b|\beta\b/u.test(normalizedLabel)) {
+    return 'arribo'
+  }
+
+  if (/\bsalidas?\b|\betd\b/u.test(normalizedLabel)) {
+    return 'salida'
+  }
+
+  if (/\boperaciones?\s+portuarias?\b|\bcarga\b|\bdescarga\b|\breparacion\b|\bespera\b|\babastecimiento\b/u.test(normalizedLabel)) {
+    return 'operacion portuaria'
+  }
+
+  if (/\bdocumentacion\b|\bdocumentos?\s+requeridos?\b/u.test(normalizedLabel)) {
+    return 'documentacion'
+  }
+
+  if (/\bautorizaciones?\b|\baprobaciones?\b/u.test(normalizedLabel)) {
+    return 'autorizacion'
+  }
+
+  if (/\bhistorial\s+de\s+movimientos\b|\bmovimientos?\s+portuarios?\b/u.test(normalizedLabel)) {
+    return 'movimiento portuario'
+  }
+
   if (/\b(?:catalogo|productos?|detalle de producto|detalle principal)\b/u.test(normalizedLabel)) {
     return 'producto'
   }
@@ -8441,6 +8674,46 @@ function inferSafeFirstDeliveryMaterializationEntityName(label) {
 
   if (/\beventos?\b/u.test(normalizedLabel)) {
     return 'evento'
+  }
+
+  if (/\b(?:buques?|barcos?|embarcaciones?)\b/u.test(normalizedLabel)) {
+    return 'buque'
+  }
+
+  if (/\bsolicitudes?\s+de\s+entrada\b/u.test(normalizedLabel)) {
+    return 'solicitud de entrada'
+  }
+
+  if (/\bmuelles?\b/u.test(normalizedLabel)) {
+    return 'muelle'
+  }
+
+  if (/\bzonas?\s+portuarias?\b|\bzona\s+asignada\b/u.test(normalizedLabel)) {
+    return 'zona portuaria'
+  }
+
+  if (/\barribos?\b|\beta\b/u.test(normalizedLabel)) {
+    return 'arribo'
+  }
+
+  if (/\bsalidas?\b|\betd\b/u.test(normalizedLabel)) {
+    return 'salida'
+  }
+
+  if (/\boperaciones?\s+portuarias?\b|\bcarga\b|\bdescarga\b|\breparacion\b|\bespera\b|\babastecimiento\b/u.test(normalizedLabel)) {
+    return 'operacion portuaria'
+  }
+
+  if (/\bdocumentacion\b|\bdocumentos?\s+requeridos?\b/u.test(normalizedLabel)) {
+    return 'documentacion'
+  }
+
+  if (/\bautorizaciones?\b|\baprobaciones?\b/u.test(normalizedLabel)) {
+    return 'autorizacion'
+  }
+
+  if (/\bhistorial\s+de\s+movimientos\b|\bmovimientos?\s+portuarios?\b/u.test(normalizedLabel)) {
+    return 'movimiento portuario'
   }
 
   if (/\bdocumentos?\b/u.test(normalizedLabel)) {
@@ -19099,9 +19372,10 @@ function buildFullstackLocalMaterializationPlan({
     domainUnderstanding: normalizedDomainUnderstanding,
     modules,
   })
-  const domainLabel = !isGenericFullstackLocalDomainLabel(detectedDomainLabel)
-    ? detectedDomainLabel
-    : buildFullstackLocalArchetypeAppTitle(inferredArchetype)
+  const domainLabel = buildCompatibleFullstackLocalDomainLabel({
+    detectedDomainLabel,
+    inferredArchetype,
+  })
   const packageName =
     slugifyBusinessSector(path.basename(rootFolder)) ||
     slugifyBusinessSector(domainLabel) ||
@@ -24725,15 +24999,35 @@ function detectProjectContinuationActionIntent(goal, context) {
     getProjectContinuationActionEntry(explicitActionId) ||
     getProjectContinuationActionEntry(normalizedText)
   const approvalPolicyHint = detectApprovalPolicyHintFromText(normalizedText)
+  const forbidsDependencyInstall =
+    /\b(?:sin|no|evitar)\b[^.\n]{0,40}\b(?:instalar\s+dependencias|dependencias(?:\s+nuevas)?|npm install)\b/u.test(
+      normalizedText,
+    )
+  const forbidsRuntimeReal =
+    /\b(?:sin|no|evitar)\b[^.\n]{0,40}\b(?:backend\s+real|runtime\s+real|servidor\s+real|puertos?)\b/u.test(
+      normalizedText,
+    )
+  const forbidsRealDatabase =
+    /\b(?:sin|no|evitar)\b[^.\n]{0,40}\b(?:base(?:\s+de\s+datos)?\s+real|db\s+real|migraciones?)\b/u.test(
+      normalizedText,
+    )
+  const excludedByUserScope =
+    (registryEntry?.id === 'prepare-dependency-install-plan' && forbidsDependencyInstall) ||
+    (registryEntry?.id === 'prepare-runtime-plan' && forbidsRuntimeReal) ||
+    (registryEntry?.id === 'prepare-db-real-plan' && forbidsRealDatabase)
 
   return {
-    matches: wantsPrepare && referencesContinuation && Boolean(registryEntry?.id),
-    actionId: registryEntry?.id || '',
+    matches:
+      wantsPrepare &&
+      referencesContinuation &&
+      Boolean(registryEntry?.id) &&
+      !excludedByUserScope,
+    actionId: excludedByUserScope ? '' : registryEntry?.id || '',
     approvalTypeHint: approvalPolicyHint?.id || '',
     explicitSignals: summarizeUniqueExecutorStrings(
       [
         wantsPrepare ? 'prepare-continuation-action' : '',
-        registryEntry?.id || '',
+        excludedByUserScope ? 'excluded-by-user-scope' : registryEntry?.id || '',
         approvalPolicyHint?.id || '',
       ],
       6,
@@ -25656,6 +25950,58 @@ function buildFullstackLocalArchetypeDisplayLabel(archetype) {
   return 'Sistema local'
 }
 
+function fullstackLocalDomainLabelMatchesArchetype(label, archetype) {
+  const normalizedLabel = normalizeSectorDetectionText(label)
+
+  if (!normalizedLabel || !archetype || archetype === 'operations') {
+    return true
+  }
+
+  const compatibilityPatterns = {
+    veterinary: /\bveterinaria\b|\bveterinari[oa]s?\b|\bmascotas?\b|\bvacunas?\b|\bpet\b/u,
+    'medical-clinic':
+      /\bturnos?\b|\bclinicas?\b|\bsalud\b|\bmedic[oa]s?\b|\bpacientes?\b|\bconsultorio\b/u,
+    'sports-booking':
+      /\bcanchas?\b|\breservas?\b|\bhorarios?\b|\bdisponibilidad\b|\btorneos?\b/u,
+    ecommerce:
+      /\becommerce\b|\btienda online\b|\bcatalogo\b|\bcarrito\b|\bcheckout\b|\bproductos?\b|\borderes?\b|\bordenes?\b|\bcomercio\b|\bstock\b|\binventario\b|\bventas?\b|\bsku\b/u,
+    'real-estate':
+      /\binmobiliari|\bpropiedades?\b|\balquiler(?:es)?\b|\bventas? inmobiliarias?\b|\btasaciones?\b|\bvisitas?\b|\bconsultas?\b|\bcorredor(?:a)?\b/u,
+    'school-crm':
+      /\bescuel|\balumnos?\b|\bfamilias?\b|\bcursos?\b|\bcomunicaciones?\b|\bboletines?\b/u,
+    'document-management':
+      /\bdocumental\b|\bdocumentos?\b|\bexpedientes?\b|\bvencimientos?\b|\bresponsables?\b/u,
+    'security-monitoring':
+      /\bseguridad\b|\bmonitoreo\b|\baccesos?\b|\balertas?\b|\bsensores?\b|\bzonas?\b|\bguardias?\b|\bincidentes?\b/u,
+    'community-social':
+      /\bcomunidad\b|\bsocial\b|\bpublicaciones?\b|\bgrupos?\b|\bcomentarios?\b|\bmiembros?\b|\bmoderacion\b|\bfeed\b/u,
+  }
+
+  const compatibilityPattern = compatibilityPatterns[archetype]
+  return compatibilityPattern ? compatibilityPattern.test(normalizedLabel) : true
+}
+
+function buildCompatibleFullstackLocalDomainLabel({
+  detectedDomainLabel,
+  inferredArchetype,
+}) {
+  const sanitizedLabel = sanitizeBusinessSectorLabel(detectedDomainLabel || '')
+
+  if (!sanitizedLabel || isGenericFullstackLocalDomainLabel(sanitizedLabel)) {
+    return buildFullstackLocalArchetypeAppTitle(inferredArchetype)
+  }
+
+  if (
+    inferredArchetype &&
+    inferredArchetype !== 'operations' &&
+    !fullstackLocalDomainLabelMatchesArchetype(sanitizedLabel, inferredArchetype)
+  ) {
+    return buildFullstackLocalArchetypeDisplayLabel(inferredArchetype)
+  }
+
+  return sanitizedLabel
+}
+
 function buildPresentableFullstackLocalAppTitle(value, archetype) {
   const sanitizedValue = sanitizeBusinessSectorLabel(value)
   if (!sanitizedValue || isGenericFullstackLocalDomainLabel(sanitizedValue)) {
@@ -25982,7 +26328,12 @@ function buildFullstackLocalPhaseArtifacts({
     nextRecommendedPhase,
   })
   const appTitle = buildPresentableFullstackLocalAppTitle(
-    normalizedManifest?.domain || fullstackLocalDemoData?.overview?.name || '',
+    buildCompatibleFullstackLocalDomainLabel({
+      detectedDomainLabel:
+        normalizedManifest?.domain || fullstackLocalDemoData?.overview?.name || '',
+      inferredArchetype:
+        fullstackLocalDemoData?.overview?.archetype || 'operations',
+    }),
     fullstackLocalDemoData?.overview?.archetype || 'operations',
   )
   const modules = buildFullstackLocalPhaseModuleNames(normalizedManifest)
@@ -31493,9 +31844,6 @@ function buildModuleExpansionArtifacts({
     activeModuleIds.map((entry) => buildModuleExpansionDisplayName(entry)),
     12,
   )
-  const manifestDomainLabel = sanitizeBusinessSectorLabel(
-    String(normalizedManifest?.domain || '').trim(),
-  )
   const inferredArchetype = detectFullstackLocalDemoArchetype({
     normalizedText: [
       normalizedManifest?.domain || '',
@@ -31505,6 +31853,10 @@ function buildModuleExpansionArtifacts({
     ].join(' '),
     domainUnderstanding: null,
     modules: visibleModuleNames,
+  })
+  const manifestDomainLabel = buildCompatibleFullstackLocalDomainLabel({
+    detectedDomainLabel: String(normalizedManifest?.domain || '').trim(),
+    inferredArchetype,
   })
   const appTitle = buildPresentableFullstackLocalAppTitle(
     manifestDomainLabel,
@@ -35354,6 +35706,14 @@ async function buildLocalStrategicBrainDecision({
     context,
     workspacePath,
   })
+  const workspaceProjectIntent = classifyWorkspaceProjectIntent({
+    goal,
+    context,
+    candidate: inferredProjectState,
+  })
+  const shouldUseExistingWorkspaceProject =
+    Boolean(inferredProjectState?.manifest) &&
+    workspaceProjectIntent.intent !== 'new-project-intent'
   const projectContinuationActionIntent = detectProjectContinuationActionIntent(
     goal,
     context,
@@ -35626,7 +35986,7 @@ async function buildLocalStrategicBrainDecision({
 
   if (
     projectPhaseIntent.matches &&
-    inferredProjectState?.manifest &&
+    shouldUseExistingWorkspaceProject &&
     !safeFirstDeliveryIntent.matches &&
     !scopedFileEditIntent &&
     !localGoalDescriptor &&
@@ -35732,7 +36092,7 @@ async function buildLocalStrategicBrainDecision({
 
   if (
     moduleExpansionIntent.matches &&
-    inferredProjectState?.manifest &&
+    shouldUseExistingWorkspaceProject &&
     !safeFirstDeliveryIntent.matches &&
     !scopedFileEditIntent &&
     !localGoalDescriptor &&
@@ -35839,7 +36199,7 @@ async function buildLocalStrategicBrainDecision({
 
   if (
     projectContinuationActionIntent.matches &&
-    inferredProjectState?.manifest &&
+    shouldUseExistingWorkspaceProject &&
     !moduleExpansionIntent.matches &&
     !projectPhaseIntent.matches &&
     !safeFirstDeliveryIntent.matches &&
@@ -35910,7 +36270,7 @@ async function buildLocalStrategicBrainDecision({
       : ''
   const shouldContinueExistingWorkspaceProject =
     Boolean(existingWorkspaceProjectNextPhaseId) &&
-    Boolean(inferredProjectState?.manifest) &&
+    shouldUseExistingWorkspaceProject &&
     !projectPhaseIntent.matches &&
     !moduleExpansionIntent.matches &&
     !projectContinuationActionIntent.matches &&

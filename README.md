@@ -92,6 +92,22 @@ npm run preview -- --host 127.0.0.1 --port 4173 --strictPort
 - `Validaciones`: separa previstas, aprobadas y fallidas.
 - `MEMORIA / Context Hub`: muestra si JEFE pudo apoyarse en memoria externa o si siguio solo.
 
+Si la corrida termina con error, JEFE ya no deberia venderla como completada:
+
+- el Paso 6 marca `Con error`
+- `Resultado listo` pasa a mostrar detalle de error, no cierre exitoso
+- la barra de ejecucion no deberia marcar `Resultado` como completado si la corrida cerro con fallo
+
+## Proyecto nuevo vs continuidad
+
+JEFE ahora distingue mejor entre continuar un proyecto existente y crear uno nuevo dentro del mismo workspace.
+
+- Si el usuario pide `continuá`, `seguí con`, `agregale` o menciona de forma explícita la carpeta/proyecto actual, JEFE prioriza continuidad.
+- Si el usuario pide `crear`, `hacer`, `armar` o `generar` una entrega nueva y el dominio no coincide con el manifest detectado, JEFE debe abrir un proyecto nuevo.
+- Un `jefe-project.json` existente ya no alcanza por sí solo para secuestrar un pedido nuevo de otro dominio.
+
+Caso validado: un pedido portuario nuevo con barcos, muelles, arribo/salida y documentación ya no debe quedar pegado a un proyecto veterinaria existente del mismo workspace.
+
 ## Bridge local
 
 El bridge recibe un JSON por `stdin` con la forma:

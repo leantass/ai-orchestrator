@@ -101,10 +101,16 @@ Validar que cada fase:
 Si el workspace ya contiene un proyecto local con `jefe-project.json`, validar además que JEFE:
 
 - detecte la carpeta existente antes de decidir la estrategia principal
+- no deje que un proyecto existente secuestre un pedido nuevo de otro dominio
 - no vuelva a ofrecer `Preparar materialización fullstack local` si el scaffold ya existe
 - recomiende `frontend-mock-flow` o la siguiente fase segura real del manifest
 - no deje el estado del proyecto en `Sin estado`
 - no trate la continuidad segura como aprobación sensible
+
+Caso de control recomendado:
+
+- si el workspace tiene `fullstack-local-veterinaria` y el usuario pide una entrega nueva para operaciones portuarias con buques, muelles, arribo/salida y documentación, JEFE debe proponer proyecto nuevo
+- si el usuario pide `continuá el proyecto existente` o menciona la carpeta actual de forma explícita, JEFE sí debe quedarse en continuidad
 
 ## Escenario 6: lectura de readiness
 
