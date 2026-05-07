@@ -40333,11 +40333,11 @@ ipcMain.handle('contextHub:startLocal', async () => {
 ipcMain.handle('contextHub:open', async () => {
   const status = await getContextHubStatusSnapshot()
 
-  if (!status.available || !status.openUrl) {
+  if (!status.openUrl) {
     return {
       ok: false,
       error:
-        'MEMORIA todavía no está disponible para abrir. Reintentá la conexión o iniciá el servicio local.',
+        'MEMORIA todavia no esta disponible para abrir. Reintenta la conexion o inicia el servicio local.',
       status,
     }
   }
@@ -40351,7 +40351,9 @@ ipcMain.handle('contextHub:open', async () => {
     status: {
       ...status,
       message:
-        'Se abrió el endpoint útil de MEMORIA. Hoy Context Hub expone API local, no una UI dedicada.',
+        status.openKind === 'ui'
+          ? 'Se abrio la UI local de MEMORIA.'
+          : 'Se abrio un endpoint tecnico de MEMORIA. La UI real no estaba detectada.',
       runtimeLogNotice: CONTEXT_HUB_RUNTIME_LOG_NOTICE,
     },
   }

@@ -784,6 +784,11 @@ type ContextHubRuntimeState = {
   endpoint: string
   baseUrl?: string
   openUrl?: string
+  technicalOpenUrl?: string
+  uiUrl?: string
+  openKind?: string
+  openLabel?: string
+  openDetail?: string
   healthUrl?: string
   managedByJefe?: boolean
   processId?: number | null
@@ -1295,6 +1300,12 @@ const DEFAULT_CONTEXT_HUB_RUNTIME_STATE: ContextHubRuntimeState = {
   endpoint: '/v1/packs/suggested',
   baseUrl: 'http://127.0.0.1:3210',
   openUrl: '',
+  technicalOpenUrl: '',
+  uiUrl: '',
+  openKind: '',
+  openLabel: 'Abrir MEMORIA',
+  openDetail:
+    'Se habilita cuando MEMORIA responde o cuando hay una UI real detectada.',
   healthUrl: '',
   managedByJefe: false,
   processId: null,
@@ -1337,6 +1348,15 @@ function normalizeContextHubRuntimeState(
     endpoint: normalizeOptionalString(value.endpoint) || '/v1/packs/suggested',
     baseUrl: normalizeOptionalString(value.baseUrl) || 'http://127.0.0.1:3210',
     openUrl: normalizeOptionalString(value.openUrl),
+    technicalOpenUrl: normalizeOptionalString(value.technicalOpenUrl),
+    uiUrl: normalizeOptionalString(value.uiUrl),
+    openKind: normalizeOptionalString(value.openKind),
+    openLabel:
+      normalizeOptionalString(value.openLabel) ||
+      DEFAULT_CONTEXT_HUB_RUNTIME_STATE.openLabel,
+    openDetail:
+      normalizeOptionalString(value.openDetail) ||
+      DEFAULT_CONTEXT_HUB_RUNTIME_STATE.openDetail,
     healthUrl: normalizeOptionalString(value.healthUrl),
     managedByJefe: value.managedByJefe === true,
     processId:
@@ -11278,7 +11298,7 @@ function App() {
       const response = await window.aiOrchestrator?.openContextHub?.()
       applyContextHubRuntimeResponse(
         response,
-        'JEFE intento abrir MEMORIA desde el endpoint local disponible.',
+        'JEFE intento abrir la mejor superficie disponible de MEMORIA.',
       )
     } catch (error) {
       setContextHubActionMessage(
@@ -12017,11 +12037,22 @@ function App() {
       ]
         .filter(Boolean)
         .join(' ')
-  const contextHubRuntimeEndpointLabel =
+  const contextHubRuntimeOpenTargetLabel =
     contextHubRuntimeState.openUrl ||
+    contextHubRuntimeState.technicalOpenUrl ||
     (contextHubRuntimeState.baseUrl
       ? `${contextHubRuntimeState.baseUrl}/v1/packs/suggested`
       : '/v1/packs/suggested')
+  const contextHubRuntimeOpenTargetDetail =
+    contextHubRuntimeState.openDetail ||
+    (contextHubRuntimeState.uiUrl
+      ? 'Context Hub esta sirviendo una UI real en local.'
+      : contextHubRuntimeState.available
+        ? 'MEMORIA responde solo por API; JEFE abrira una vista tecnica de diagnostico.'
+        : 'Se habilita cuando MEMORIA responde o cuando hay una UI real detectada.')
+  const contextHubRuntimeOpenButtonLabel =
+    contextHubRuntimeState.openLabel ||
+    (contextHubRuntimeState.uiUrl ? 'Abrir MEMORIA' : 'Abrir endpoint tecnico')
   const contextHubRuntimeAppPathLabel =
     contextHubRuntimeState.appPath || 'Ruta local no detectada'
   const contextHubRuntimeWorkspaceLabel = contextHubRuntimeState.workspaceRoot
@@ -19222,11 +19253,13 @@ function App() {
                   <div className="grid h-full gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
                     <div className="space-y-4">
                       <ContextHubControlPanel
-                        description="JEFE puede consultar MEMORIA, reintentar la conexion, abrir el endpoint util o intentar levantar el servicio local sin bloquear el resto del flujo."
+                        description="JEFE puede consultar MEMORIA, reintentar la conexion, abrir la UI real cuando este disponible o caer al endpoint tecnico sin bloquear el resto del flujo."
                         stateLabel={contextHubRuntimeLabel}
                         stateTone={contextHubRuntimeTone}
                         stateDetail={contextHubRuntimeDetail}
-                        endpointLabel={contextHubRuntimeEndpointLabel}
+                        openTargetLabel={contextHubRuntimeOpenTargetLabel}
+                        openTargetDetail={contextHubRuntimeOpenTargetDetail}
+                        openButtonLabel={contextHubRuntimeOpenButtonLabel}
                         appPathLabel={contextHubRuntimeAppPathLabel}
                         workspaceRootLabel={contextHubRuntimeWorkspaceLabel}
                         runtimeNotice={contextHubRuntimeState.runtimeLogNotice || ''}
@@ -20733,7 +20766,9 @@ function App() {
                   stateLabel={contextHubRuntimeLabel}
                   stateTone={contextHubRuntimeTone}
                   stateDetail={contextHubRuntimeDetail}
-                  endpointLabel={contextHubRuntimeEndpointLabel}
+                  openTargetLabel={contextHubRuntimeOpenTargetLabel}
+                  openTargetDetail={contextHubRuntimeOpenTargetDetail}
+                  openButtonLabel={contextHubRuntimeOpenButtonLabel}
                   appPathLabel={contextHubRuntimeAppPathLabel}
                   workspaceRootLabel={contextHubRuntimeWorkspaceLabel}
                   runtimeNotice={contextHubRuntimeState.runtimeLogNotice || ''}

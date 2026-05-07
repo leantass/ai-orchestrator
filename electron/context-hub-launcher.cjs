@@ -9,6 +9,16 @@ const {
 
 const CONTEXT_HUB_START_TIMEOUT_MS = 9000
 const CONTEXT_HUB_POLL_INTERVAL_MS = 450
+const CONTEXT_HUB_UI_DETECTION_TIMEOUT_MS = 1200
+const CONTEXT_HUB_UI_LOCAL_STATE_ENDPOINT = '/__context-hub-api/local-state'
+const CONTEXT_HUB_UI_URL_CANDIDATES = [
+  'http://127.0.0.1:4173',
+  'http://localhost:4173',
+  'http://127.0.0.1:4174',
+  'http://localhost:4174',
+  'http://127.0.0.1:5174',
+  'http://localhost:5174',
+]
 const CONTEXT_HUB_RUNTIME_LOG_NOTICE =
   'Context Hub puede escribir .context-hub/events.json como log runtime. No lo incluyas en commits.'
 const CONTEXT_HUB_APP_HINT =
@@ -70,19 +80,24 @@ function inspectContextHubInstallation() {
       'node',
       'contextHubApiServer.js',
     )
+    const uiDistIndexPath = path.join(appPath, 'dist', 'index.html')
 
     const hasAppPath = pathExists(appPath)
     const hasPackageJson = pathExists(packageJsonPath)
     const hasCompiledApiEntry = pathExists(compiledApiEntryPath)
+    const hasUiDist = pathExists(uiDistIndexPath)
 
     return {
       appPath,
       packageJsonPath,
       apiEntryPath: compiledApiEntryPath,
+      uiDistIndexPath,
       exists: hasAppPath,
       hasPackageJson,
       hasCompiledApiEntry,
+      hasUiDist,
       startable: hasAppPath && hasPackageJson && hasCompiledApiEntry,
+      uiAvailableLocally: hasAppPath && hasPackageJson && hasUiDist,
     }
   })
 
@@ -121,9 +136,81 @@ async function waitForContextHubAvailability(timeoutMs = CONTEXT_HUB_START_TIMEO
   return null
 }
 
+function resolveContextHubUiCandidates() {
+  const configuredUiUrl = normalizeOptionalString(
+    process.env.AI_ORCHESTRATOR_CONTEXT_HUB_UI_URL || process.env.CONTEXT_HUB_UI_URL,
+  )
+
+  return [configuredUiUrl, ...CONTEXT_HUB_UI_URL_CANDIDATES]
+    .filter(Boolean)
+    .map((candidate) => normalizeOptionalString(candidate))
+    .filter((candidate, index, values) => values.indexOf(candidate) === index)
+}
+
+async function fetchContextHubUiState(baseUrl) {
+  let requestUrl = ''
+
+  try {
+    requestUrl = new URL(CONTEXT_HUB_UI_LOCAL_STATE_ENDPOINT, baseUrl).toString()
+  } catch {
+    return null
+  }
+
+  const abortController = new AbortController()
+  const timeoutId = setTimeout(() => abortController.abort(), CONTEXT_HUB_UI_DETECTION_TIMEOUT_MS)
+
+  try {
+    const response = await fetch(requestUrl, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+      signal: abortController.signal,
+    })
+
+    if (!response.ok) {
+      return null
+    }
+
+    const payload = await response.json()
+
+    if (!payload || typeof payload !== 'object') {
+      return null
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(payload, 'state')) {
+      return null
+    }
+
+    return {
+      baseUrl,
+      endpoint: CONTEXT_HUB_UI_LOCAL_STATE_ENDPOINT,
+    }
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+async function detectContextHubUi() {
+  const candidates = resolveContextHubUiCandidates()
+
+  for (const baseUrl of candidates) {
+    const uiState = await fetchContextHubUiState(baseUrl)
+
+    if (uiState) {
+      return uiState
+    }
+  }
+
+  return null
+}
+
 function buildContextHubStatusSnapshot({
   health,
   installation,
+  uiRuntime,
   actionMessage,
 } = {}) {
   const selectedCandidate = installation?.selectedCandidate || null
@@ -138,7 +225,16 @@ function buildContextHubStatusSnapshot({
         : 'unavailable'
   const suggestedBaseUrl =
     normalizeOptionalString(health?.baseUrl) || DEFAULT_CONTEXT_HUB_API_URL
-  const openUrl = `${suggestedBaseUrl}/v1/packs/suggested`
+  const technicalOpenUrl = `${suggestedBaseUrl}/v1/packs/suggested`
+  const uiUrl = normalizeOptionalString(uiRuntime?.baseUrl)
+  const openUrl = uiUrl || (available ? technicalOpenUrl : '')
+  const openKind = uiUrl ? 'ui' : available ? 'technical-endpoint' : ''
+  const openLabel = uiUrl ? 'Abrir MEMORIA' : 'Abrir endpoint tecnico'
+  const openDetail = uiUrl
+    ? 'Context Hub esta sirviendo una UI real en local.'
+    : available
+      ? 'MEMORIA responde solo por API; JEFE abrira una vista tecnica de diagnostico.'
+      : 'Se habilita cuando MEMORIA responde o cuando hay una UI real detectada.'
 
   return {
     source: 'context-hub',
@@ -149,12 +245,17 @@ function buildContextHubStatusSnapshot({
       : '/v1/packs/suggested',
     baseUrl: suggestedBaseUrl,
     openUrl,
+    technicalOpenUrl,
+    uiUrl,
+    openKind,
+    openLabel,
+    openDetail,
     healthUrl: `${suggestedBaseUrl}${CONTEXT_HUB_HEALTH_ENDPOINT}`,
     managedByJefe: Boolean(managedProcess),
     processId:
       managedProcess && Number.isInteger(managedProcess.pid) ? managedProcess.pid : null,
     canStart: selectedCandidate?.startable === true && !available,
-    canOpen: available,
+    canOpen: Boolean(openUrl),
     appPath: selectedCandidate?.appPath || '',
     packageJsonPath: selectedCandidate?.packageJsonPath || '',
     apiEntryPath: selectedCandidate?.apiEntryPath || '',
@@ -175,7 +276,9 @@ function buildContextHubStatusSnapshot({
     message:
       normalizeOptionalString(actionMessage) ||
       (available
-        ? 'MEMORIA disponible para packs sugeridos y eventos.'
+        ? uiUrl
+          ? 'MEMORIA disponible y con UI local detectada.'
+          : 'MEMORIA disponible para packs sugeridos y eventos.'
         : managedContextHubProcessState.starting
           ? 'JEFE está intentando levantar MEMORIA sin bloquear el flujo principal.'
           : normalizeOptionalString(managedContextHubProcessState.lastError) ||
@@ -192,10 +295,12 @@ function buildContextHubStatusSnapshot({
 async function getContextHubStatusSnapshot(actionMessage = '') {
   const installation = inspectContextHubInstallation()
   const health = await fetchContextHubHealth()
+  const uiRuntime = await detectContextHubUi()
 
   return buildContextHubStatusSnapshot({
     health,
     installation,
+    uiRuntime,
     actionMessage,
   })
 }

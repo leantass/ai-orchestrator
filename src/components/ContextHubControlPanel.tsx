@@ -6,7 +6,9 @@ export function ContextHubControlPanel({
   stateLabel,
   stateTone,
   stateDetail,
-  endpointLabel,
+  openTargetLabel,
+  openTargetDetail,
+  openButtonLabel,
   appPathLabel,
   workspaceRootLabel,
   runtimeNotice,
@@ -25,7 +27,9 @@ export function ContextHubControlPanel({
   stateLabel: string
   stateTone: MetricTone
   stateDetail: string
-  endpointLabel: string
+  openTargetLabel: string
+  openTargetDetail: string
+  openButtonLabel: string
   appPathLabel: string
   workspaceRootLabel: string
   runtimeNotice: string
@@ -63,9 +67,9 @@ export function ContextHubControlPanel({
           tone={stateTone}
         />
         <MetricCard
-          label="Endpoint útil"
-          value={endpointLabel}
-          detail={canOpen ? 'Disponible para abrir desde JEFE.' : 'Se habilita cuando MEMORIA responde.'}
+          label="Destino de apertura"
+          value={openTargetLabel}
+          detail={openTargetDetail}
         />
         <MetricCard
           label="Ruta local"
@@ -91,7 +95,7 @@ export function ContextHubControlPanel({
           disabled={isBusy}
           className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
         >
-          {isBusy && !isStarting ? 'Consultando...' : 'Reintentar conexión'}
+          {isBusy && !isStarting ? 'Consultando...' : 'Reintentar conexion'}
         </button>
         <button
           type="button"
@@ -99,7 +103,7 @@ export function ContextHubControlPanel({
           disabled={!canOpen || isBusy}
           className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
         >
-          Abrir MEMORIA
+          {openButtonLabel}
         </button>
         <button
           type="button"
