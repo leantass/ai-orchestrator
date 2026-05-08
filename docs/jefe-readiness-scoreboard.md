@@ -18,7 +18,7 @@ Estado consolidado: release candidate local operativo, con deuda critica conocid
 | Entrega funcional local fullstack | 93% | Copy visible y artefactos nuevos priorizan entrega funcional local, siguen siendo `file://` compatibles y no venden runtime real como hecho. | El proyecto veterinaria ya existente no fue retro-migrado automaticamente. |
 | Continuidad por fases | 97% | `review-and-expand` y `prepare-reusable-candidate-plan` mantienen continuidad segura, y ahora un proyecto existente no domina pedidos nuevos de otro dominio. | Conviene sumar mas casos de continuidad sobre workspaces largos. |
 | Resultado final entendible para operador | 97% | Paso 7 informa motor, memoria, readiness, archivos escritos unicos, tocados adicionales, previstos y validaciones previstas/OK/fallidas, y si MEMORIA no estaba disponible ya no ensucia el cierre principal como si hubiera fallado la materializacion. | Todavia hay mucha informacion en una sola pantalla. |
-| Validaciones / smoke / seguridad | 95% | `lint`, `tsc`, `ai-planner-smoke`, `ai-release-smoke`, `ai-operator-e2e-smoke` y `build` pasaron. | Sigue el warning de chunk grande por el peso de `src/App.tsx`. |
+| Validaciones / smoke / seguridad | 97% | `npm audit`, `lint`, `tsc`, `ai-planner-smoke`, `ai-release-smoke`, `ai-operator-e2e-smoke`, `quality:ci` y `build` pasaron. | La deuda principal ya no es el warning de chunk, sino el tamaño estructural de `src/App.tsx` y `electron/main.cjs`. |
 | MEMORIA / Context Hub integrada | 97% | JEFE detecta API y UI real por separado, permite reintentar, levantar la API local, abrir UI real o endpoint tecnico y mostrar el ultimo evento emitido a MEMORIA en la sesion. | Falta historial mas largo por corrida si se quiere trazabilidad fina. |
 | Autonomia alta segura | 93% | JEFE sigue resolviendo rutas locales, continuidad y materializacion sin depender de runtime real ni de MEMORIA encendida. | La autonomia segura todavia depende de heuristicas grandes en `main.cjs`. |
 | Modularizacion interna | 90% | La deuda operativa de MEMORIA ya quedo separada en modulos propios y el panel runtime quedo mas encapsulado y testeable. | `App.tsx` y `main.cjs` siguen siendo grandes; cerrar eso del todo ya implica una tercera pasada mas riesgosa. |
@@ -42,7 +42,7 @@ Estado consolidado: release candidate local operativo, con deuda critica conocid
 - `src/App.tsx` sigue superando el umbral que dispara deopt de Babel.
 - `electron/main.cjs` sigue siendo el mayor foco de deuda tecnica y riesgo de mantenimiento.
 - La entrega/proyecto veterinaria ya materializada en `web-prueba` puede seguir teniendo copy historico si no se la resincroniza aparte.
-- El warning de chunk grande y el deopt de Babel siguen presentes; hoy no bloquean release candidate, pero siguen siendo deuda estructural.
+- El warning de chunk grande quedo resuelto con split real de build; el deopt de Babel sigue presente y no bloquea release candidate.
 
 ## Clasificacion honesta de deuda
 

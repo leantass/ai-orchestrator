@@ -200,6 +200,12 @@ Antes de cerrar una tarea, la validacion local fuerte recomendada es:
 
 Esta suite no requiere `.env`, no usa secrets, no levanta Electron GUI, no toca Context Hub y no usa `web-prueba` como parte de la validacion.
 
+Estado esperado de la suite:
+
+- `npm audit` sin vulnerabilidades `moderate/high/critical`
+- build sin warning de chunk principal `>500 kB`
+- CI remoto alineado con `npm run quality:ci`
+
 ## Criterio de release candidate
 
 JEFE queda en estado de release candidate operable cuando:

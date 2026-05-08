@@ -204,6 +204,12 @@ La suite local fuerte ejecuta:
 
 No requiere `.env`, no usa secrets, no levanta Electron GUI, no toca Context Hub y no usa el workspace `web-prueba` como parte del comando.
 
+Estado actual de soporte:
+
+- `npm audit` quedo sin vulnerabilidades `moderate/high/critical`
+- el build ya no deja el warning de chunk principal `>500 kB`
+- el workflow remoto `CI` usa `npm run quality:ci`
+
 ## CI remoto
 
 GitHub Actions corre la misma suite fuerte en `push` a `main` y `pull_request`.
