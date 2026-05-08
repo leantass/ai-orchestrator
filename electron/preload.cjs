@@ -182,6 +182,14 @@ contextBridge.exposeInMainWorld('aiOrchestrator', {
     ipcRenderer.invoke('ai-orchestrator:search-reusable-artifacts', payload),
   saveReusableArtifact: (payload) =>
     ipcRenderer.invoke('ai-orchestrator:save-reusable-artifact', payload),
+  pickAttachedInputFiles: () =>
+    ipcRenderer.invoke('ai-orchestrator:pick-attached-input-files'),
+  pickAttachedInputFolder: () =>
+    ipcRenderer.invoke('ai-orchestrator:pick-attached-input-folder'),
+  pickExistingProject: () =>
+    ipcRenderer.invoke('ai-orchestrator:pick-existing-project'),
+  analyzeExistingProject: (payload) =>
+    ipcRenderer.invoke('ai-orchestrator:analyze-existing-project', payload),
   planTask: (payload) =>
     // El planner necesita el mismo contexto operativo que ya conoce la UI:
     // workspace, participation mode, decisiones resueltas y hints de routing.
@@ -199,6 +207,9 @@ contextBridge.exposeInMainWorld('aiOrchestrator', {
       costMode: payload?.costMode,
       routingHints: payload?.routingHints,
       manualReusablePreference: payload?.manualReusablePreference,
+      attachedInputs: payload?.attachedInputs,
+      existingProjectContext: payload?.existingProjectContext,
+      projectWorkMode: payload?.projectWorkMode,
     }),
   onExecutionEvent: (listener) => {
     if (typeof listener !== 'function') {

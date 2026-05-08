@@ -32,6 +32,25 @@ Verificar que JEFE:
 
 ## Escenario 2: materializar el scaffold seguro
 
+## Escenario 1b: cargar contexto real en Paso 2
+
+Antes de planificar, validar que Paso 2 permita:
+
+- adjuntar archivos locales como metadata segura
+- adjuntar carpetas de assets sin copiarlas por defecto
+- seleccionar una carpeta de proyecto existente
+- analizarla en modo read-only
+
+Confirmar tambien que JEFE:
+
+- no lea `.env`
+- no lea secretos o credenciales
+- no ejecute scripts del proyecto seleccionado
+- no trate archivos adjuntos como binarios para red
+- permita elegir entre proyecto nuevo, continuidad o decision automatica
+
+## Escenario 2: materializar el scaffold seguro
+
 1. En Paso 5, usar el CTA principal para preparar la materialización.
 2. Ejecutar la materialización segura.
 3. Confirmar en el resultado:
@@ -112,6 +131,10 @@ Caso de control recomendado:
 
 - si el workspace tiene `fullstack-local-veterinaria` y el usuario pide una entrega nueva para operaciones portuarias con buques, muelles, arribo/salida y documentación, JEFE debe proponer proyecto nuevo
 - si el usuario pide `continuá el proyecto existente` o menciona la carpeta actual de forma explícita, JEFE sí debe quedarse en continuidad
+
+Nota adicional de continuidad segura:
+
+- si el operador selecciona una carpeta local en Paso 2 y elige `Continuar proyecto existente`, JEFE debe usar esa carpeta como continuidad segura y solo en modo read-only durante el analisis
 
 ## Escenario 6: lectura de readiness
 

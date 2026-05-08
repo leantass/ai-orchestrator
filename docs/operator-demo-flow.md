@@ -42,6 +42,22 @@ También podés validar otras verticales ya soportadas:
 6. Confirmá que la entrega local carga por `file://`, sin servidor, sin `npm install` y sin pantalla blanca.
 7. Recorre la entrega local y valida que muestre una vertical real, no un scaffold generico vacio.
 
+## Paso 2: centro de contexto e insumos
+
+Antes de pedir el plan final, el operador ya puede cargar contexto real:
+
+- adjuntar archivos como logos, documentos, imagenes, gifs o videos
+- adjuntar carpetas de assets como referencia
+- seleccionar un proyecto existente y pedir analisis read-only
+- elegir si quiere crear proyecto nuevo, continuar el existente o dejar que JEFE decida
+
+Lectura esperable del operador:
+
+- los adjuntos aparecen como metadata segura con nombre, ruta, tipo, rol inferido y nota
+- el proyecto existente muestra framework, scripts, carpetas importantes, entrypoints y archivos protegidos detectados
+- JEFE no lee `.env`, no ejecuta scripts y no modifica la carpeta seleccionada
+- si el objetivo pide continuidad y hay carpeta seleccionada, el planner debe tratarla como continuidad real
+
 ## Que deberia mostrar una entrega local rica
 
 - hero o encabezado operativo

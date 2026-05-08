@@ -60,7 +60,7 @@ function relaunchElectronRuntimeIfNeeded() {
 relaunchElectronRuntimeIfNeeded()
 
 const electronModule = require('electron')
-const { app, BrowserWindow, ipcMain, shell } = electronModule
+const { app, BrowserWindow, dialog, ipcMain, shell } = electronModule
 
 if (
   !electronModule ||
@@ -135,6 +135,10 @@ const {
   selectBestWorkspaceProjectCandidate,
   shouldIgnoreWorkspaceDirectoryEntry,
 } = require('./workspace-project-detection.cjs')
+const {
+  analyzeExistingProject,
+  buildAttachedInputMetadataList,
+} = require('./project-context.cjs')
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL)
 const defaultExecutorBridgePath = path.join(
@@ -6927,6 +6931,8 @@ function finalizeWorkspaceProjectDecision({
   costMode,
   inferredProjectState,
   workspaceProjectIntent,
+  selectedExistingProjectContext,
+  projectWorkMode,
 }) {
   if (!decision || typeof decision !== 'object') {
     return decision
@@ -6935,14 +6941,34 @@ function finalizeWorkspaceProjectDecision({
   const normalizedExistingManifest = normalizeLocalProjectManifestContract(
     inferredProjectState?.manifest,
   )
-  const existingProjectRoot = normalizeWorkspaceProjectRoot(
+  const workspaceExistingProjectRoot = normalizeWorkspaceProjectRoot(
     inferredProjectState?.projectRootRelativePath || normalizedExistingManifest?.projectRoot,
   )
-  const existingProjectDetected = Boolean(normalizedExistingManifest && existingProjectRoot)
+  const normalizedSelectedExistingProjectContext =
+    normalizeExistingProjectContext(selectedExistingProjectContext)
+  const selectedExistingProjectRoot = normalizeWorkspaceProjectRoot(
+    normalizedSelectedExistingProjectContext?.selectedPath,
+  )
+  const selectedExistingProjectDetected = Boolean(
+    normalizedSelectedExistingProjectContext?.detected && selectedExistingProjectRoot,
+  )
+  const existingProjectRoot =
+    selectedExistingProjectRoot || workspaceExistingProjectRoot
+  const existingProjectDetected = Boolean(
+    selectedExistingProjectDetected ||
+      (normalizedExistingManifest && workspaceExistingProjectRoot),
+  )
   const workspaceIntentLabel =
     typeof workspaceProjectIntent?.intent === 'string' ? workspaceProjectIntent.intent : ''
+  const normalizedProjectWorkMode = normalizeProjectWorkMode(projectWorkMode)
+  const existingProjectApplicable =
+    normalizedProjectWorkMode === 'new-project'
+      ? false
+      : normalizedProjectWorkMode === 'continue-existing'
+        ? existingProjectDetected
+        : workspaceIntentLabel !== 'new-project-intent'
   const ignoredExistingProjectReason =
-    workspaceIntentLabel === 'new-project-intent' && existingProjectDetected
+    !existingProjectApplicable && existingProjectDetected
       ? `Se detectó ${existingProjectRoot}, pero el pedido actual describe un proyecto nuevo y queda fuera de alcance para esta corrida.`
       : ''
 
@@ -6956,16 +6982,33 @@ function finalizeWorkspaceProjectDecision({
       existingProjectDetection: existingProjectDetected
         ? {
             detected: true,
-            applicable: workspaceIntentLabel !== 'new-project-intent',
-            intent: workspaceIntentLabel,
-            projectRoot:
-              inferredProjectState?.projectRootRelativePath ||
-              normalizedExistingManifest?.projectRoot ||
+            applicable: existingProjectApplicable,
+            intent:
+              normalizedProjectWorkMode === 'continue-existing'
+                ? 'continue-existing-project-intent'
+                : workspaceIntentLabel,
+            projectRoot: existingProjectRoot,
+            domain:
+              normalizeOptionalString(
+                normalizedSelectedExistingProjectContext?.jefeManifestSummary?.domain,
+              ) || normalizedExistingManifest?.domain || '',
+            projectType:
+              normalizeOptionalString(
+                normalizedSelectedExistingProjectContext?.jefeManifestSummary?.projectType,
+              ) ||
+              normalizeOptionalString(
+                normalizedSelectedExistingProjectContext?.framework,
+              ) ||
+              normalizedExistingManifest?.projectType ||
               '',
-            domain: normalizedExistingManifest?.domain || '',
-            projectType: normalizedExistingManifest?.projectType || '',
-            lastCompletedPhase: normalizedExistingManifest?.lastCompletedPhase || '',
-            nextRecommendedPhase: normalizedExistingManifest?.nextRecommendedPhase || '',
+            lastCompletedPhase:
+              normalizeOptionalString(
+                normalizedSelectedExistingProjectContext?.jefeManifestSummary?.lastCompletedPhase,
+              ) || normalizedExistingManifest?.lastCompletedPhase || '',
+            nextRecommendedPhase:
+              normalizeOptionalString(
+                normalizedSelectedExistingProjectContext?.jefeManifestSummary?.nextRecommendedPhase,
+              ) || normalizedExistingManifest?.nextRecommendedPhase || '',
             reason: ignoredExistingProjectReason,
           }
         : {
@@ -6977,7 +7020,7 @@ function finalizeWorkspaceProjectDecision({
         mode: resolvedActiveProjectRootNormalized
           ? existingProjectDetected &&
             resolvedActiveProjectRootNormalized === existingProjectRoot &&
-            workspaceIntentLabel !== 'new-project-intent'
+            existingProjectApplicable
             ? 'existing-project'
             : 'new-project'
           : 'none',
@@ -6991,15 +7034,17 @@ function finalizeWorkspaceProjectDecision({
         source:
           existingProjectDetected &&
           resolvedActiveProjectRootNormalized === existingProjectRoot &&
-          workspaceIntentLabel !== 'new-project-intent'
-            ? 'workspace-existing-project'
+          existingProjectApplicable
+            ? selectedExistingProjectDetected
+              ? 'selected-existing-project'
+              : 'workspace-existing-project'
             : 'new-project-plan',
         note: ignoredExistingProjectReason,
       },
     })
   }
 
-  if (!existingProjectDetected || workspaceIntentLabel !== 'new-project-intent') {
+  if (!existingProjectDetected || existingProjectApplicable) {
     return buildDecoratedDecision(decision)
   }
 
@@ -36057,6 +36102,11 @@ async function buildLocalStrategicBrainDecision({
   userParticipationMode,
   costMode,
   manualReusablePreference,
+  attachedInputs,
+  existingProjectContext,
+  projectWorkMode,
+  securityConstraints,
+  plannerSupplementalContext: providedPlannerSupplementalContext,
   contextHubPack,
   reusablePlanningContext: providedReusablePlanningContext,
 }) {
@@ -36093,13 +36143,34 @@ async function buildLocalStrategicBrainDecision({
       : null
   const normalizedUserParticipationMode =
     normalizeUserParticipationMode(userParticipationMode)
+  const normalizedAttachedInputs = normalizeAttachedInputs(attachedInputs)
+  const normalizedExistingProjectContext =
+    normalizeExistingProjectContext(existingProjectContext)
+  const normalizedProjectWorkMode = normalizeProjectWorkMode(projectWorkMode)
+  const normalizedSecurityConstraints = Array.isArray(securityConstraints)
+    ? securityConstraints
+        .map((entry) => normalizeOptionalString(entry))
+        .filter(Boolean)
+    : buildPlannerSecurityConstraints()
+  const plannerSupplementalContext =
+    normalizeOptionalString(providedPlannerSupplementalContext) ||
+    buildPlannerSupplementalContext({
+      attachedInputs: normalizedAttachedInputs,
+      existingProjectContext: normalizedExistingProjectContext,
+      projectWorkMode: normalizedProjectWorkMode,
+      securityConstraints: normalizedSecurityConstraints,
+    })
+  const contextualContext = [context, plannerSupplementalContext]
+    .filter((entry) => typeof entry === 'string' && entry.trim())
+    .join('\n\n')
   const userDelegatedMissingInputs =
     normalizedUserParticipationMode === 'brain-decides-missing'
   const resolvedDecisionMap = buildResolvedDecisionMap(
     projectState,
     normalizedUserParticipationMode,
   )
-  const normalizedContext = typeof context === 'string' ? context.trim() : ''
+  const normalizedContext =
+    typeof contextualContext === 'string' ? contextualContext.trim() : ''
   const normalizedManualReusablePreference =
     normalizeManualReusablePreference(manualReusablePreference)
   const basePlan = buildLegacyPlannerInstruction(goal, iteration, previousExecutionResult)
@@ -36113,38 +36184,53 @@ async function buildLocalStrategicBrainDecision({
       ? compositeCandidateSteps
       : []
   const localGoalDescriptor = detectBrainAtomicOperationDescriptor(goal)
-  const analysisProposalIntent = detectAnalysisProposalPlanningIntent(goal, context)
+  const analysisProposalIntent = detectAnalysisProposalPlanningIntent(
+    goal,
+    normalizedContext,
+  )
   const materializeSafeFirstDeliveryIntent =
-    detectMaterializeSafeFirstDeliveryPlanningIntent(goal, context)
+    detectMaterializeSafeFirstDeliveryPlanningIntent(goal, normalizedContext)
   const frontendProjectMaterializationIntent =
-    detectFrontendProjectMaterializationPlanningIntent(goal, context)
+    detectFrontendProjectMaterializationPlanningIntent(goal, normalizedContext)
   const fullstackLocalMaterializationIntent =
-    detectFullstackLocalMaterializationPlanningIntent(goal, context)
-  const projectPhaseIntent = detectProjectPhasePlanningIntent(goal, context)
-  const moduleExpansionIntent = detectModuleExpansionPlanningIntent(goal, context)
-  const safeFirstDeliveryIntent = detectSafeFirstDeliveryPlanningIntent(goal, context)
-  const scalableDeliveryIntent = detectScalableDeliveryPlanningIntent(goal, context)
+    detectFullstackLocalMaterializationPlanningIntent(goal, normalizedContext)
+  const projectPhaseIntent = detectProjectPhasePlanningIntent(
+    goal,
+    normalizedContext,
+  )
+  const moduleExpansionIntent = detectModuleExpansionPlanningIntent(
+    goal,
+    normalizedContext,
+  )
+  const safeFirstDeliveryIntent = detectSafeFirstDeliveryPlanningIntent(
+    goal,
+    normalizedContext,
+  )
+  const scalableDeliveryIntent = detectScalableDeliveryPlanningIntent(
+    goal,
+    normalizedContext,
+  )
   const productArchitectureIntent = detectProductArchitecturePlanningIntent(
     goal,
-    context,
+    normalizedContext,
   )
   const scopedFileEditIntent = detectScopedExistingFileEditIntent({
     goal,
-    context,
+    context: normalizedContext,
     workspacePath,
   })
   const webScaffoldSector = resolveWebScaffoldSectorConfig({
     instruction: goal,
-    context,
+    context: normalizedContext,
   })
   const baseWebCreativeDirection = buildWebCreativeDirection({
     goal,
-    context,
+    context: normalizedContext,
     sectorConfig: webScaffoldSector || null,
   })
   const domainUnderstanding = buildDomainUnderstanding({
     goal,
-    context,
+    context: normalizedContext,
     productTypeHint:
       scalableDeliveryIntent.productTypeHint ||
       materializeSafeFirstDeliveryIntent.productTypeHint ||
@@ -36153,12 +36239,12 @@ async function buildLocalStrategicBrainDecision({
   })
   const inferredProjectState = inferProjectStateFromWorkspace({
     goal,
-    context,
+    context: normalizedContext,
     workspacePath,
   })
   const workspaceProjectIntent = classifyWorkspaceProjectIntent({
     goal,
-    context,
+    context: normalizedContext,
     candidate: inferredProjectState,
   })
   const shouldUseExistingWorkspaceProject =
@@ -36166,18 +36252,20 @@ async function buildLocalStrategicBrainDecision({
     workspaceProjectIntent.intent !== 'new-project-intent'
   const projectContinuationActionIntent = detectProjectContinuationActionIntent(
     goal,
-    context,
+    normalizedContext,
   )
   const finalizeDecisionForWorkspace = (decision) =>
     finalizeWorkspaceProjectDecision({
       decision,
       goal,
-      context,
+      context: normalizedContext,
       workspacePath,
       userParticipationMode: normalizedUserParticipationMode,
       costMode,
       inferredProjectState,
       workspaceProjectIntent,
+      selectedExistingProjectContext: normalizedExistingProjectContext,
+      projectWorkMode: normalizedProjectWorkMode,
     })
   const buildDecision = (payload) =>
     finalizeDecisionForWorkspace(
@@ -36201,7 +36289,7 @@ async function buildLocalStrategicBrainDecision({
   ) => {
     const planningContracts = buildPlanningArchitectureBundle({
       goal,
-      context,
+      context: normalizedContext,
       strategy: payload?.strategy,
       nextExpectedAction: payload?.nextExpectedAction,
       requiresApproval: payload?.requiresApproval,
@@ -36252,12 +36340,205 @@ async function buildLocalStrategicBrainDecision({
       ? await buildReusableArtifactPlanningContext({
           userDataPath: getArtifactMemoryUserDataPath(),
           goal,
-          context,
+          context: normalizedContext,
           sectorConfig: webScaffoldSector,
           creativeDirection: baseWebCreativeDirection,
           manualReusablePreference: normalizedManualReusablePreference,
         })
       : null
+  const selectedProjectExplicitContinuation =
+    Boolean(normalizedExistingProjectContext?.detected) &&
+    (normalizedProjectWorkMode === 'continue-existing' ||
+      (normalizedProjectWorkMode === 'auto' &&
+        detectExplicitContinueRequest(goal, normalizedContext))) &&
+    !shouldUseExistingWorkspaceProject
+
+  if (selectedProjectExplicitContinuation && normalizedExistingProjectContext) {
+    const selectedProjectRoot = normalizedExistingProjectContext.selectedPath
+    const selectedProjectDomain =
+      normalizeOptionalString(
+        normalizedExistingProjectContext.jefeManifestSummary?.domain,
+      ) ||
+      normalizeOptionalString(domainUnderstanding?.domainLabel) ||
+      normalizeOptionalString(normalizedExistingProjectContext.framework) ||
+      'proyecto existente local'
+    const continuationTitle = 'Preparar continuidad segura del proyecto existente'
+    const continuationValidationPlan = {
+      scope: 'read-only-project-continuation',
+      level: 'light',
+      fileChecks: normalizedExistingProjectContext.entrypoints
+        .slice(0, 8)
+        .map((entry) => ({
+          path: entry,
+          expectation: 'Revisar si este entrypoint o archivo clave requiere cambios.',
+        })),
+      forbiddenPaths: [
+        '.env',
+        '.env.local',
+        'node_modules',
+        'Dockerfile',
+        'docker-compose.yml',
+        'docker-compose.yaml',
+      ],
+      manualChecks: [
+        'Confirmar visualmente el objetivo final del proyecto existente.',
+        'Validar si el operador quiere continuidad sobre la carpeta seleccionada o un proyecto nuevo derivado.',
+      ],
+      successCriteria: [
+        'El plan deja claro que el analisis es read-only.',
+        'No se proponen installs, scripts ni runtime real.',
+        'Se identifican entrypoints, carpetas importantes y archivos protegidos.',
+      ],
+    }
+    const continuationActionPlan = {
+      id: 'existing-project-safe-continuation',
+      title: continuationTitle,
+      description: `Analizar ${selectedProjectRoot} en modo read-only y preparar una continuidad segura hacia ${selectedProjectDomain}.`,
+      category: 'existing-project-continuation',
+      targetStrategy: 'prepare-continuation-action-plan',
+      safeToPrepare: true,
+      safeToMaterialize: false,
+      requiresApproval: false,
+      expectedOutcome:
+        'Diagnostico del proyecto existente y plan de continuidad seguro antes de tocar archivos reales.',
+      recommended: true,
+      priority: 1,
+      projectRoot: selectedProjectRoot,
+      deliveryLevel: 'existing-project',
+      reason:
+        'El operador seleccionó un proyecto existente y pidió continuidad explícita. En esta primera versión JEFE solo planifica la continuidad de forma segura y read-only.',
+      targetFiles: normalizedExistingProjectContext.entrypoints.slice(0, 8),
+      allowedTargetPaths: [
+        selectedProjectRoot,
+        ...normalizedExistingProjectContext.entrypoints.map((entry) =>
+          path.join(selectedProjectRoot, entry),
+        ),
+      ].slice(0, 12),
+      explicitExclusions: normalizedSecurityConstraints,
+      successCriteria: continuationValidationPlan.successCriteria,
+      risks: normalizedExistingProjectContext.warnings,
+      validationPlan: continuationValidationPlan,
+    }
+
+    return buildDecision({
+      strategy: 'prepare-continuation-action-plan',
+      executionMode: 'planner-only',
+      reason: `Se detectó el proyecto existente ${selectedProjectRoot} y la corrida quedó en modo continuidad segura read-only.`,
+      instruction: `Revisar el proyecto existente seleccionado en ${selectedProjectRoot}, entender su stack y preparar una continuidad segura hacia el objetivo final sin ejecutar scripts ni tocar archivos protegidos.`,
+      nextExpectedAction: 'review-continuation-action',
+      tasks: [
+        {
+          step: 1,
+          title: 'Revisar stack y entrypoints',
+          operation: 'inspect-existing-project',
+          targetPath: selectedProjectRoot,
+        },
+        {
+          step: 2,
+          title: 'Mapear insumos y restricciones',
+          operation: 'collect-attached-inputs-metadata',
+          targetPath: selectedProjectRoot,
+        },
+        {
+          step: 3,
+          title: 'Proponer continuidad segura',
+          operation: 'prepare-safe-continuation',
+          targetPath: selectedProjectRoot,
+        },
+      ],
+      assumptions: [
+        'El proyecto seleccionado se analiza en modo read-only.',
+        normalizedExistingProjectContext.framework
+          ? `Framework probable detectado: ${normalizedExistingProjectContext.framework}.`
+          : 'El framework exacto puede requerir inspeccion adicional.',
+        normalizedAttachedInputs.length > 0
+          ? `Hay ${normalizedAttachedInputs.length} insumos adjuntos disponibles como metadata.`
+          : 'No se adjuntaron insumos adicionales en esta corrida.',
+      ],
+      requiresApproval: false,
+      continuationActionPlan,
+      projectContinuationState: {
+        projectStatus: 'Proyecto existente seleccionado para continuidad segura',
+        availablePlanningActions: [continuationActionPlan],
+        availableSafeActions: [continuationActionPlan],
+        modulesAvailable: normalizedExistingProjectContext.importantFolders,
+        blockers:
+          normalizedExistingProjectContext.protectedFilesDetected.length > 0
+            ? ['Hay archivos protegidos detectados que quedan fuera del alcance.']
+            : [],
+        risks: normalizedExistingProjectContext.warnings,
+        nextRecommendedAction: continuationActionPlan,
+        nextRecommendedPhase: 'prepare-safe-continuation',
+        summary:
+          'JEFE quedó listo para preparar una continuidad read-only sobre la carpeta seleccionada.',
+        operatorMessage:
+          'Primero se revisa la estructura existente y después se propone un plan seguro. No se ejecutó nada en la carpeta seleccionada.',
+      },
+      implementationRoadmap: {
+        projectSlug: path.basename(selectedProjectRoot),
+        projectType: 'existing-local-project',
+        domain: selectedProjectDomain,
+        deliveryLevel: 'existing-project',
+        currentPhase: 'inspect-existing-project',
+        phases: [
+          {
+            id: 'inspect-existing-project',
+            title: 'Inspeccionar proyecto existente',
+            goal: 'Leer stack, entrypoints y restricciones sin ejecutar nada.',
+            deliveryLevel: 'existing-project',
+            status: 'ready',
+            executableNow: true,
+            approvalRequired: false,
+            expectedOutputs: [
+              'Diagnostico del stack',
+              'Lista de entrypoints',
+              'Archivos protegidos detectados',
+            ],
+            allowedRootPaths: [selectedProjectRoot],
+            validationStrategy: ['Analisis read-only'],
+          },
+          {
+            id: 'prepare-safe-continuation',
+            title: 'Preparar continuidad segura',
+            goal: 'Definir la proxima fase segura antes de tocar el proyecto.',
+            deliveryLevel: 'existing-project',
+            status: 'planned',
+            executableNow: true,
+            approvalRequired: false,
+            expectedOutputs: ['Plan de continuidad revisable'],
+            allowedRootPaths: [selectedProjectRoot],
+            dependencies: ['inspect-existing-project'],
+            validationStrategy: ['Review del operador'],
+          },
+        ],
+        nextRecommendedPhase: 'prepare-safe-continuation',
+        suggestedNextAction: continuationTitle,
+        blockers:
+          normalizedExistingProjectContext.protectedFilesDetected.length > 0
+            ? ['Hay archivos protegidos que no deben leerse ni modificarse.']
+            : [],
+        explicitExclusions: normalizedSecurityConstraints,
+        successCriteria: continuationValidationPlan.successCriteria,
+      },
+      nextActionPlan: {
+        currentState: 'existing-project-selected',
+        recommendedAction: continuationTitle,
+        actionType: 'review-plan',
+        targetStrategy: 'prepare-continuation-action-plan',
+        targetDeliveryLevel: 'existing-project',
+        reason:
+          'La carpeta seleccionada necesita una continuidad segura y revisable antes de cualquier materializacion.',
+        safeToRunNow: true,
+        requiresApproval: false,
+        userFacingLabel: 'Preparar continuidad segura',
+        technicalLabel: 'prepare-continuation-action-plan',
+        expectedOutcome:
+          'Diagnostico estructurado y siguiente paso seguro para el proyecto existente.',
+      },
+      validationPlan: continuationValidationPlan,
+    })
+  }
+
   const looksLikeWebBaseGoal =
     !scopedFileEditIntent &&
     Boolean(webScaffoldSector) &&
@@ -37827,7 +38108,279 @@ function normalizeManualReusablePreference(value) {
   }
 }
 
+function normalizeProjectWorkMode(value) {
+  const normalizedValue =
+    typeof value === 'string' ? value.trim().toLocaleLowerCase() : ''
+
+  if (
+    normalizedValue === 'new-project' ||
+    normalizedValue === 'continue-existing'
+  ) {
+    return normalizedValue
+  }
+
+  return 'auto'
+}
+
+function normalizeAttachedInputEntry(value) {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const originalPath = normalizeOptionalString(value.originalPath)
+  const name = normalizeOptionalString(value.name)
+  const id = normalizeOptionalString(value.id)
+
+  if (!originalPath || !name || !id) {
+    return null
+  }
+
+  const kind =
+    normalizeOptionalString(value.kind).toLocaleLowerCase() === 'folder'
+      ? 'folder'
+      : 'file'
+  const inferredRole = normalizeOptionalString(value.inferredRole) || 'otro'
+  const status = normalizeOptionalString(value.status) || 'referenced'
+  const extension = normalizeOptionalString(value.extension).toLocaleLowerCase()
+  const sizeBytes =
+    Number.isFinite(value.sizeBytes) && value.sizeBytes >= 0 ? value.sizeBytes : 0
+
+  return {
+    id,
+    kind,
+    name,
+    originalPath,
+    extension,
+    sizeBytes,
+    inferredRole,
+    operatorNote: normalizeOptionalString(value.operatorNote),
+    status,
+    isDirectory: value.isDirectory === true || kind === 'folder',
+  }
+}
+
+function normalizeAttachedInputs(value) {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  const seenIds = new Set()
+
+  return value
+    .map((entry) => normalizeAttachedInputEntry(entry))
+    .filter(
+      (entry) => entry && !seenIds.has(entry.id) && seenIds.add(entry.id),
+    )
+}
+
+function normalizeExistingProjectContext(value) {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const selectedPath = normalizeOptionalString(value.selectedPath)
+  const projectName = normalizeOptionalString(value.projectName)
+  const framework = normalizeOptionalString(value.framework)
+  const packageManager = normalizeOptionalString(value.packageManager)
+
+  if (!selectedPath) {
+    return null
+  }
+
+  const normalizedScripts = Array.isArray(value.scripts)
+    ? value.scripts
+        .map((entry) => ({
+          name: normalizeOptionalString(entry?.name),
+          command: normalizeOptionalString(entry?.command),
+        }))
+        .filter((entry) => entry.name && entry.command)
+        .slice(0, 20)
+    : []
+
+  const normalizedGitStatusSummary =
+    value.gitStatusSummary && typeof value.gitStatusSummary === 'object'
+      ? {
+          detected: value.gitStatusSummary.detected === true,
+          branch: normalizeOptionalString(value.gitStatusSummary.branch),
+          dirty: value.gitStatusSummary.dirty === true,
+          summary: normalizeOptionalString(value.gitStatusSummary.summary),
+        }
+      : null
+
+  const normalizedManifestSummary =
+    value.jefeManifestSummary && typeof value.jefeManifestSummary === 'object'
+      ? {
+          detected: value.jefeManifestSummary.detected === true,
+          invalid: value.jefeManifestSummary.invalid === true,
+          projectRoot: normalizeOptionalString(value.jefeManifestSummary.projectRoot),
+          domain: normalizeOptionalString(value.jefeManifestSummary.domain),
+          projectType: normalizeOptionalString(value.jefeManifestSummary.projectType),
+          deliveryLevel: normalizeOptionalString(value.jefeManifestSummary.deliveryLevel),
+          nextRecommendedPhase: normalizeOptionalString(
+            value.jefeManifestSummary.nextRecommendedPhase,
+          ),
+          lastCompletedPhase: normalizeOptionalString(
+            value.jefeManifestSummary.lastCompletedPhase,
+          ),
+        }
+      : null
+
+  return {
+    selectedPath,
+    detected: value.detected === true,
+    projectName,
+    framework,
+    stack: Array.isArray(value.stack)
+      ? value.stack
+          .map((entry) => normalizeOptionalString(entry))
+          .filter(Boolean)
+          .slice(0, 16)
+      : [],
+    packageManager,
+    scripts: normalizedScripts,
+    gitStatusSummary: normalizedGitStatusSummary,
+    protectedFilesDetected: Array.isArray(value.protectedFilesDetected)
+      ? value.protectedFilesDetected
+          .map((entry) => normalizeOptionalString(entry))
+          .filter(Boolean)
+          .slice(0, 40)
+      : [],
+    importantFolders: Array.isArray(value.importantFolders)
+      ? value.importantFolders
+          .map((entry) => normalizeOptionalString(entry))
+          .filter(Boolean)
+          .slice(0, 20)
+      : [],
+    entrypoints: Array.isArray(value.entrypoints)
+      ? value.entrypoints
+          .map((entry) => normalizeOptionalString(entry))
+          .filter(Boolean)
+          .slice(0, 20)
+      : [],
+    warnings: Array.isArray(value.warnings)
+      ? value.warnings
+          .map((entry) => normalizeOptionalString(entry))
+          .filter(Boolean)
+          .slice(0, 24)
+      : [],
+    safeToInspect: value.safeToInspect !== false,
+    lastScannedAt: normalizeOptionalString(value.lastScannedAt),
+    hasPackageJson: value.hasPackageJson === true,
+    hasGit: value.hasGit === true,
+    hasNodeModules: value.hasNodeModules === true,
+    hasDocker: value.hasDocker === true,
+    packageJsonPath: normalizeOptionalString(value.packageJsonPath),
+    entrypointCount:
+      Number.isInteger(value.entrypointCount) && value.entrypointCount >= 0
+        ? value.entrypointCount
+        : 0,
+    topLevelEntryCount:
+      Number.isInteger(value.topLevelEntryCount) && value.topLevelEntryCount >= 0
+        ? value.topLevelEntryCount
+        : 0,
+    protectedFilesCount:
+      Number.isInteger(value.protectedFilesCount) &&
+      value.protectedFilesCount >= 0
+        ? value.protectedFilesCount
+        : 0,
+    jefeManifestSummary: normalizedManifestSummary,
+  }
+}
+
+function buildPlannerSecurityConstraints() {
+  return [
+    'No leer .env ni archivos de credenciales.',
+    'No ejecutar npm, composer, flutter, docker ni scripts del proyecto seleccionado.',
+    'No enviar archivos a servicios externos.',
+    'No copiar, borrar ni modificar archivos originales durante el analisis.',
+    'No materializar nada fuera del workspace o sin aprobacion explicita.',
+  ]
+}
+
+function buildPlannerSupplementalContext({
+  attachedInputs,
+  existingProjectContext,
+  projectWorkMode,
+  securityConstraints,
+}) {
+  const normalizedAttachedInputs = normalizeAttachedInputs(attachedInputs)
+  const normalizedExistingProjectContext =
+    normalizeExistingProjectContext(existingProjectContext)
+  const normalizedProjectWorkMode = normalizeProjectWorkMode(projectWorkMode)
+  const shouldDescribeProjectWorkMode =
+    normalizedProjectWorkMode !== 'auto' || Boolean(normalizedExistingProjectContext)
+
+  if (
+    normalizedAttachedInputs.length === 0 &&
+    !normalizedExistingProjectContext &&
+    !shouldDescribeProjectWorkMode
+  ) {
+    return ''
+  }
+
+  const lines = shouldDescribeProjectWorkMode
+    ? [`projectWorkMode: ${normalizedProjectWorkMode}`]
+    : []
+
+  if (normalizedAttachedInputs.length > 0) {
+    lines.push(
+      `attachedInputs: ${normalizedAttachedInputs
+        .map(
+          (entry) =>
+            `${entry.name} (${entry.kind}, ${entry.inferredRole}, ${entry.extension || 'sin-extension'})`,
+        )
+        .join('; ')}`,
+    )
+  }
+
+  if (normalizedExistingProjectContext) {
+    lines.push(`existingProject.selectedPath: ${normalizedExistingProjectContext.selectedPath}`)
+    if (normalizedExistingProjectContext.framework) {
+      lines.push(`existingProject.framework: ${normalizedExistingProjectContext.framework}`)
+    }
+    if (normalizedExistingProjectContext.projectName) {
+      lines.push(`existingProject.name: ${normalizedExistingProjectContext.projectName}`)
+    }
+    if (normalizedExistingProjectContext.entrypoints.length > 0) {
+      lines.push(
+        `existingProject.entrypoints: ${normalizedExistingProjectContext.entrypoints.join(', ')}`,
+      )
+    }
+    if (normalizedExistingProjectContext.importantFolders.length > 0) {
+      lines.push(
+        `existingProject.importantFolders: ${normalizedExistingProjectContext.importantFolders.join(', ')}`,
+      )
+    }
+    if (normalizedExistingProjectContext.protectedFilesDetected.length > 0) {
+      lines.push(
+        `existingProject.protectedFilesDetected: ${normalizedExistingProjectContext.protectedFilesDetected.join(', ')}`,
+      )
+    }
+  }
+
+  if (
+    Array.isArray(securityConstraints) &&
+    securityConstraints.length > 0 &&
+    (normalizedAttachedInputs.length > 0 || normalizedExistingProjectContext)
+  ) {
+    lines.push(`securityConstraints: ${securityConstraints.join(' | ')}`)
+  }
+
+  return lines.join('\n')
+}
+
+function detectExplicitContinueRequest(goal, context) {
+  return /\b(?:continua\s+el\s+proyecto|continua\s+con|continu[aá]\s+el\s+proyecto|continu[aá]\s+con|seguir\s+con|segui\s+con|segui\s+el\s+proyecto|proyecto\s+existente|proyecto\s+anterior|agregale|sumale|mejora\s+el\s+proyecto)\b/u.test(
+    [goal, context]
+      .filter((entry) => typeof entry === 'string' && entry.trim())
+      .join(' ')
+      .toLocaleLowerCase(),
+  )
+}
+
 function buildStrategicBrainInput(input) {
+  const securityConstraints = buildPlannerSecurityConstraints()
+
   return {
     goal: typeof input?.goal === 'string' ? input.goal : '',
     context: typeof input?.context === 'string' ? input.context : '',
@@ -37856,6 +38409,18 @@ function buildStrategicBrainInput(input) {
     manualReusablePreference: normalizeManualReusablePreference(
       input?.manualReusablePreference,
     ),
+    attachedInputs: normalizeAttachedInputs(input?.attachedInputs),
+    existingProjectContext: normalizeExistingProjectContext(
+      input?.existingProjectContext,
+    ),
+    projectWorkMode: normalizeProjectWorkMode(input?.projectWorkMode),
+    securityConstraints,
+    plannerSupplementalContext: buildPlannerSupplementalContext({
+      attachedInputs: input?.attachedInputs,
+      existingProjectContext: input?.existingProjectContext,
+      projectWorkMode: input?.projectWorkMode,
+      securityConstraints,
+    }),
     contextHubPack:
       input?.contextHubPack && typeof input.contextHubPack === 'object'
         ? input.contextHubPack
@@ -38148,6 +38713,12 @@ Reglas:
 - Si userParticipationMode es "brain-decides-missing", solo frená por credenciales, costos reales, publicaciones irreversibles, acciones destructivas, temas legales/seguridad o bloqueos realmente críticos.
 - Si manualReusablePreference trae artifactId y reuseMode, esa preferencia manual manda sobre el lookup automático y debe verse reflejada en reusableArtifactLookup, reusableArtifactsFound, reuseDecision, reuseMode, reusedArtifactIds e instruction.
 - Si reusablePlanningContext.reuseDecision es true, la instruction final no puede quedar genérica: debe mencionar explícitamente la reutilización o la referencia reusable seleccionada.
+- attachedInputs siempre llega como metadata segura: nombre, ruta, extension, tamano, rol inferido y nota opcional. Nunca asumas que podés leer el binario ni mandarlo afuera.
+- existingProjectContext representa un analisis read-only de una carpeta local seleccionada por el operador. Usalo para diagnosticar y preparar continuidad, pero no asumas que se pueden leer .env, secrets ni ejecutar scripts.
+- Si projectWorkMode es "continue-existing" y existingProjectContext.detected es true, priorizá una continuidad revisable del proyecto existente antes que un proyecto nuevo genérico.
+- Si projectWorkMode es "new-project", podés mencionar el proyecto detectado solo como referencia secundaria y no debe dominar la ruta principal.
+- Si attachedInputs trae logos, assets o documentos, incorporalos como insumos de contexto en la estrategia, la instruction y las assumptions sin tratarlos como archivos ya copiados.
+- securityConstraints es contrato duro: no leas .env, no uses credenciales, no ejecutes comandos del proyecto seleccionado, no copies secretos y no salgas del workspace o de la carpeta seleccionada sin aprobación explícita.
 - Si projectState.resolvedDecisions ya incluye una decision resuelta o delegada, no la vuelvas a preguntar salvo que aparezca un bloqueo nuevo y realmente crítico.
 - Si hubo execution-error o timeout del executor, conservá decisiones previas y replanificá en subtareas más chicas antes de volver a pedir un approval.
 - Si plannerFeedback.executorFailureContext trae currentTargetPath, currentAction, currentSubtask o archivos parciales, usalos para proponer una micro-subtarea de recuperación y no rehagas el scaffold entero.
@@ -38995,6 +39566,13 @@ function buildOpenAIBrainInputPayload(input) {
     userParticipationMode: input.userParticipationMode || '',
     routingHints: input.routingHints || null,
     manualReusablePreference: input.manualReusablePreference || null,
+    attachedInputs: input.attachedInputs || [],
+    existingProjectContext: input.existingProjectContext || null,
+    projectWorkMode: input.projectWorkMode || 'auto',
+    securityConstraints: Array.isArray(input.securityConstraints)
+      ? input.securityConstraints
+      : [],
+    plannerSupplementalContext: input.plannerSupplementalContext || '',
     contextHubPack: input.contextHubPack || buildUnavailableContextHubPack('unavailable'),
     reusablePlanningContext: input.reusablePlanningContext || null,
   }
@@ -41334,6 +41912,120 @@ ipcMain.handle('ai-orchestrator:save-reusable-artifact', async (_event, payload)
   }
 })
 
+ipcMain.handle('ai-orchestrator:pick-attached-input-files', async () => {
+  const result = await dialog.showOpenDialog({
+    title: 'Seleccionar insumos del proyecto',
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      {
+        name: 'Archivos compatibles',
+        extensions: [
+          'png',
+          'jpg',
+          'jpeg',
+          'webp',
+          'svg',
+          'gif',
+          'pdf',
+          'docx',
+          'txt',
+          'md',
+          'mp4',
+          'webm',
+        ],
+      },
+      { name: 'Todos los archivos', extensions: ['*'] },
+    ],
+  })
+
+  if (result.canceled) {
+    return {
+      ok: true,
+      canceled: true,
+      inputs: [],
+    }
+  }
+
+  return {
+    ok: true,
+    canceled: false,
+    inputs: buildAttachedInputMetadataList(result.filePaths, {
+      kind: 'file',
+      status: 'referenced',
+    }),
+  }
+})
+
+ipcMain.handle('ai-orchestrator:pick-attached-input-folder', async () => {
+  const result = await dialog.showOpenDialog({
+    title: 'Seleccionar carpeta de assets',
+    properties: ['openDirectory'],
+  })
+
+  if (result.canceled) {
+    return {
+      ok: true,
+      canceled: true,
+      inputs: [],
+    }
+  }
+
+  return {
+    ok: true,
+    canceled: false,
+    inputs: buildAttachedInputMetadataList(result.filePaths, {
+      kind: 'folder',
+      status: 'referenced',
+    }),
+  }
+})
+
+ipcMain.handle('ai-orchestrator:pick-existing-project', async () => {
+  const result = await dialog.showOpenDialog({
+    title: 'Seleccionar proyecto existente',
+    properties: ['openDirectory'],
+  })
+
+  if (result.canceled) {
+    return {
+      ok: true,
+      canceled: true,
+      selectedPath: '',
+      projectContext: null,
+    }
+  }
+
+  const selectedPath =
+    Array.isArray(result.filePaths) && result.filePaths[0]
+      ? result.filePaths[0]
+      : ''
+
+  return {
+    ok: true,
+    canceled: false,
+    selectedPath,
+    projectContext: selectedPath ? analyzeExistingProject(selectedPath) : null,
+  }
+})
+
+ipcMain.handle('ai-orchestrator:analyze-existing-project', async (_event, payload) => {
+  const selectedPath =
+    typeof payload?.selectedPath === 'string' ? payload.selectedPath.trim() : ''
+
+  if (!selectedPath) {
+    return {
+      ok: false,
+      error: 'No se selecciono ninguna carpeta para analizar.',
+      projectContext: null,
+    }
+  }
+
+  return {
+    ok: true,
+    projectContext: analyzeExistingProject(selectedPath),
+  }
+})
+
 ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
   const goal = typeof payload?.goal === 'string' ? payload.goal.trim() : ''
   const context =
@@ -41370,6 +42062,11 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
   const manualReusablePreference = normalizeManualReusablePreference(
     payload?.manualReusablePreference,
   )
+  const attachedInputs = normalizeAttachedInputs(payload?.attachedInputs)
+  const existingProjectContext = normalizeExistingProjectContext(
+    payload?.existingProjectContext,
+  )
+  const projectWorkMode = normalizeProjectWorkMode(payload?.projectWorkMode)
 
   if (!goal) {
     return {
@@ -41398,6 +42095,9 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
     userParticipationMode,
     routingHints,
     manualReusablePreference,
+    attachedInputs,
+    existingProjectContext,
+    projectWorkMode,
     contextHubPack,
   })
   const {

@@ -730,6 +730,82 @@ type ActiveProjectContextContract = {
   note?: string
 }
 
+type ProjectInputRole =
+  | 'logo'
+  | 'imagen'
+  | 'documento'
+  | 'video'
+  | 'gif'
+  | 'referencia'
+  | 'contenido'
+  | 'otro'
+
+type ProjectInputStatus = 'referenced' | 'pending-copy' | 'copied-to-workspace'
+
+type AttachedProjectInput = {
+  id: string
+  kind: 'file' | 'folder'
+  name: string
+  originalPath: string
+  extension: string
+  sizeBytes: number
+  inferredRole: ProjectInputRole | string
+  operatorNote: string
+  status: ProjectInputStatus | string
+  isDirectory?: boolean
+}
+
+type ExistingProjectScriptEntry = {
+  name: string
+  command: string
+}
+
+type ExistingProjectGitStatusSummary = {
+  detected: boolean
+  branch?: string
+  dirty?: boolean
+  summary?: string
+}
+
+type ExistingProjectManifestSummary = {
+  detected?: boolean
+  invalid?: boolean
+  projectRoot?: string
+  domain?: string
+  projectType?: string
+  deliveryLevel?: string
+  nextRecommendedPhase?: string
+  lastCompletedPhase?: string
+}
+
+type ExistingProjectContext = {
+  selectedPath: string
+  detected: boolean
+  projectName?: string
+  framework?: string
+  stack: string[]
+  packageManager?: string
+  scripts: ExistingProjectScriptEntry[]
+  gitStatusSummary?: ExistingProjectGitStatusSummary | null
+  protectedFilesDetected: string[]
+  importantFolders: string[]
+  entrypoints: string[]
+  warnings: string[]
+  safeToInspect: boolean
+  lastScannedAt?: string
+  hasPackageJson?: boolean
+  hasGit?: boolean
+  hasNodeModules?: boolean
+  hasDocker?: boolean
+  packageJsonPath?: string
+  entrypointCount?: number
+  topLevelEntryCount?: number
+  protectedFilesCount?: number
+  jefeManifestSummary?: ExistingProjectManifestSummary | null
+}
+
+type ProjectWorkMode = 'auto' | 'new-project' | 'continue-existing'
+
 type MaterializationPlanContract = Record<string, unknown>
 
 type PlannerExecutionMetadata = {
@@ -1104,6 +1180,29 @@ declare global {
         ok: boolean
         artifacts?: ReusableArtifactRecord[]
       }>
+      pickAttachedInputFiles?: () => Promise<{
+        ok: boolean
+        canceled?: boolean
+        inputs?: AttachedProjectInput[]
+      }>
+      pickAttachedInputFolder?: () => Promise<{
+        ok: boolean
+        canceled?: boolean
+        inputs?: AttachedProjectInput[]
+      }>
+      pickExistingProject?: () => Promise<{
+        ok: boolean
+        canceled?: boolean
+        selectedPath?: string
+        projectContext?: ExistingProjectContext | null
+      }>
+      analyzeExistingProject?: (payload: {
+        selectedPath: string
+      }) => Promise<{
+        ok: boolean
+        error?: string
+        projectContext?: ExistingProjectContext | null
+      }>
       planTask?: (payload: {
         goal: string
         iteration?: number
@@ -1119,6 +1218,9 @@ declare global {
           preferProvider?: string
         }
         manualReusablePreference?: ManualReusablePreference
+        attachedInputs?: AttachedProjectInput[]
+        existingProjectContext?: ExistingProjectContext | null
+        projectWorkMode?: ProjectWorkMode
       }) => Promise<PlannerDecisionResponse>
       executeTask?: (payload: {
         instruction: string
@@ -1556,7 +1658,7 @@ function formatExecutorRuntimeModeDetail({
     detailParts.push(executorCommand.trim())
   }
 
-  return detailParts.join(' · ') || 'Sin metadata de runtime'
+  return detailParts.join(' ? ') || 'Sin metadata de runtime'
 }
 
 const normalizeValidationResults = (value: unknown): ExecutorValidationResult[] =>
@@ -7299,7 +7401,7 @@ function ProjectContinuityCenterCard({
               tone="sky"
             />
             <MetricCard
-              label="Última fase completada"
+              label="?ltima fase completada"
               value={lastCompletedPhaseLabel}
               detail="La siguiente acción segura se calcula desde este estado."
               tone="emerald"
@@ -9097,6 +9199,218 @@ const sanitizePersistedValue = <T,>(value: T, depth = 0): T => {
 const normalizeOptionalString = (value: unknown) =>
   typeof value === 'string' ? value.trim() : ''
 
+const normalizeAttachedProjectInput = (
+  value: Partial<AttachedProjectInput> | null | undefined,
+): AttachedProjectInput | null => {
+  const id = normalizeOptionalString(value?.id)
+  const originalPath = normalizeOptionalString(value?.originalPath)
+  const name = normalizeOptionalString(value?.name)
+
+  if (!id || !originalPath || !name) {
+    return null
+  }
+
+  return {
+    id,
+    kind: normalizeOptionalString(value?.kind).toLocaleLowerCase() === 'folder'
+      ? 'folder'
+      : 'file',
+    name,
+    originalPath,
+    extension: normalizeOptionalString(value?.extension).toLocaleLowerCase(),
+    sizeBytes:
+      Number.isFinite(value?.sizeBytes) && Number(value?.sizeBytes) >= 0
+        ? Number(value?.sizeBytes)
+        : 0,
+    inferredRole: normalizeOptionalString(value?.inferredRole) || 'otro',
+    operatorNote: normalizeOptionalString(value?.operatorNote),
+    status: normalizeOptionalString(value?.status) || 'referenced',
+    isDirectory: value?.isDirectory === true,
+  }
+}
+
+const mergeAttachedProjectInputs = (
+  currentInputs: AttachedProjectInput[],
+  nextInputs: AttachedProjectInput[],
+) => {
+  const mergedById = new Map<string, AttachedProjectInput>()
+
+  ;[...currentInputs, ...nextInputs].forEach((entry) => {
+    const normalizedEntry = normalizeAttachedProjectInput(entry)
+
+    if (!normalizedEntry) {
+      return
+    }
+
+    const previousEntry = mergedById.get(normalizedEntry.id)
+    mergedById.set(normalizedEntry.id, {
+      ...(previousEntry || normalizedEntry),
+      ...normalizedEntry,
+      operatorNote:
+        normalizeOptionalString(normalizedEntry.operatorNote) ||
+        normalizeOptionalString(previousEntry?.operatorNote),
+    })
+  })
+
+  return [...mergedById.values()]
+}
+
+const normalizeExistingProjectContext = (
+  value: Partial<ExistingProjectContext> | null | undefined,
+): ExistingProjectContext | null => {
+  const selectedPath = normalizeOptionalString(value?.selectedPath)
+
+  if (!selectedPath) {
+    return null
+  }
+
+  return {
+    selectedPath,
+    detected: value?.detected === true,
+    projectName: normalizeOptionalString(value?.projectName),
+    framework: normalizeOptionalString(value?.framework),
+    stack: Array.isArray(value?.stack)
+      ? value.stack.map((entry) => normalizeOptionalString(entry)).filter(Boolean)
+      : [],
+    packageManager: normalizeOptionalString(value?.packageManager),
+    scripts: Array.isArray(value?.scripts)
+      ? value.scripts
+          .map((entry) => ({
+            name: normalizeOptionalString(entry?.name),
+            command: normalizeOptionalString(entry?.command),
+          }))
+          .filter((entry) => entry.name && entry.command)
+      : [],
+    gitStatusSummary:
+      value?.gitStatusSummary && typeof value.gitStatusSummary === 'object'
+        ? {
+            detected: value.gitStatusSummary.detected === true,
+            branch: normalizeOptionalString(value.gitStatusSummary.branch),
+            dirty: value.gitStatusSummary.dirty === true,
+            summary: normalizeOptionalString(value.gitStatusSummary.summary),
+          }
+        : null,
+    protectedFilesDetected: Array.isArray(value?.protectedFilesDetected)
+      ? value.protectedFilesDetected
+          .map((entry) => normalizeOptionalString(entry))
+          .filter(Boolean)
+      : [],
+    importantFolders: Array.isArray(value?.importantFolders)
+      ? value.importantFolders.map((entry) => normalizeOptionalString(entry)).filter(Boolean)
+      : [],
+    entrypoints: Array.isArray(value?.entrypoints)
+      ? value.entrypoints.map((entry) => normalizeOptionalString(entry)).filter(Boolean)
+      : [],
+    warnings: Array.isArray(value?.warnings)
+      ? value.warnings.map((entry) => normalizeOptionalString(entry)).filter(Boolean)
+      : [],
+    safeToInspect: value?.safeToInspect !== false,
+    lastScannedAt: normalizeOptionalString(value?.lastScannedAt),
+    hasPackageJson: value?.hasPackageJson === true,
+    hasGit: value?.hasGit === true,
+    hasNodeModules: value?.hasNodeModules === true,
+    hasDocker: value?.hasDocker === true,
+    packageJsonPath: normalizeOptionalString(value?.packageJsonPath),
+    entrypointCount:
+      Number.isFinite(value?.entrypointCount) && Number(value?.entrypointCount) >= 0
+        ? Number(value?.entrypointCount)
+        : 0,
+    topLevelEntryCount:
+      Number.isFinite(value?.topLevelEntryCount) &&
+      Number(value?.topLevelEntryCount) >= 0
+        ? Number(value?.topLevelEntryCount)
+        : 0,
+    protectedFilesCount:
+      Number.isFinite(value?.protectedFilesCount) &&
+      Number(value?.protectedFilesCount) >= 0
+        ? Number(value?.protectedFilesCount)
+        : 0,
+    jefeManifestSummary:
+      value?.jefeManifestSummary && typeof value.jefeManifestSummary === 'object'
+        ? {
+            detected: value.jefeManifestSummary.detected === true,
+            invalid: value.jefeManifestSummary.invalid === true,
+            projectRoot: normalizeOptionalString(value.jefeManifestSummary.projectRoot),
+            domain: normalizeOptionalString(value.jefeManifestSummary.domain),
+            projectType: normalizeOptionalString(value.jefeManifestSummary.projectType),
+            deliveryLevel: normalizeOptionalString(value.jefeManifestSummary.deliveryLevel),
+            nextRecommendedPhase: normalizeOptionalString(
+              value.jefeManifestSummary.nextRecommendedPhase,
+            ),
+            lastCompletedPhase: normalizeOptionalString(
+              value.jefeManifestSummary.lastCompletedPhase,
+            ),
+          }
+        : null,
+  }
+}
+
+const formatBytesLabel = (value: unknown) => {
+  const sizeBytes = Number(value)
+
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+    return 'Tamano no disponible'
+  }
+
+  if (sizeBytes < 1024) {
+    return `${sizeBytes} B`
+  }
+
+  if (sizeBytes < 1024 * 1024) {
+    return `${(sizeBytes / 1024).toFixed(1)} KB`
+  }
+
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+const getProjectInputRoleLabel = (value: unknown) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  switch (normalizedValue) {
+    case 'logo':
+      return 'Logo'
+    case 'imagen':
+      return 'Imagen'
+    case 'documento':
+      return 'Documento'
+    case 'video':
+      return 'Video'
+    case 'gif':
+      return 'GIF'
+    case 'referencia':
+      return 'Referencia'
+    case 'contenido':
+      return 'Contenido'
+    default:
+      return 'Otro'
+  }
+}
+
+const getProjectInputStatusLabel = (value: unknown) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  switch (normalizedValue) {
+    case 'pending-copy':
+      return 'Pendiente de copiar'
+    case 'copied-to-workspace':
+      return 'Copiado al workspace'
+    default:
+      return 'Referenciado'
+  }
+}
+
+const getProjectWorkModeLabel = (value: ProjectWorkMode) => {
+  if (value === 'new-project') {
+    return 'Crear proyecto nuevo'
+  }
+
+  if (value === 'continue-existing') {
+    return 'Continuar proyecto existente'
+  }
+
+  return 'Decidir automaticamente'
+}
+
 const normalizeBrainCostMode = (value: unknown): BrainCostMode => {
   if (typeof value !== 'string' || !value.trim()) {
     return DEFAULT_BRAIN_COST_MODE
@@ -9245,7 +9559,7 @@ const summarizeExecutionScope = (executionScope?: ExecutorExecutionScope | null)
     executionScope.enforceNarrowScope === true ? 'scope acotado' : '',
   ].filter(Boolean)
 
-  return parts.join(' · ')
+  return parts.join(' ? ')
 }
 
 const normalizePathValue = (value: unknown) =>
@@ -10025,7 +10339,7 @@ const getStackProfileSummary = (blueprint?: ProjectBlueprintContract | null) => 
       normalizeOptionalString(blueprint.stackProfile.database),
     ]
       .filter(Boolean)
-      .join(' · ') || 'Sin stack recomendado'
+      .join(' ? ') || 'Sin stack recomendado'
   )
 }
 
@@ -11208,6 +11522,16 @@ function App() {
   const [executionContextInput, setExecutionContextInput] = useState(
     DEFAULT_EXECUTION_CONTEXT_INPUT,
   )
+  const [attachedProjectInputs, setAttachedProjectInputs] = useState<
+    AttachedProjectInput[]
+  >([])
+  const [existingProjectContext, setExistingProjectContext] =
+    useState<ExistingProjectContext | null>(null)
+  const [projectWorkMode, setProjectWorkMode] =
+    useState<ProjectWorkMode>('auto')
+  const [projectContextActionMessage, setProjectContextActionMessage] =
+    useState('')
+  const [isProjectContextBusy, setIsProjectContextBusy] = useState(false)
   const [plannerRequestSnapshot, setPlannerRequestSnapshot] =
     useState<PlannerRequestSnapshot>({
       goal: '',
@@ -11723,6 +12047,78 @@ function App() {
   const workspaceStatusLabel = workspacePath.trim()
     ? 'Espacio de trabajo definido'
     : 'Espacio de trabajo no definido'
+  const attachedProjectInputsSummary =
+    attachedProjectInputs.length > 0
+      ? `${attachedProjectInputs.length} insumo${attachedProjectInputs.length === 1 ? '' : 's'} referenciado${attachedProjectInputs.length === 1 ? '' : 's'}`
+      : 'Sin insumos adjuntos'
+  const existingProjectSummary =
+    existingProjectContext?.selectedPath &&
+    normalizeOptionalString(existingProjectContext.projectName)
+      ? `${existingProjectContext.projectName} en ${existingProjectContext.selectedPath}`
+      : existingProjectContext?.selectedPath
+        ? existingProjectContext.selectedPath
+        : 'Sin proyecto existente seleccionado'
+  const projectWorkModeSummary =
+    projectWorkMode === 'continue-existing'
+      ? existingProjectContext?.selectedPath
+        ? 'JEFE va a priorizar continuidad segura sobre la carpeta seleccionada.'
+        : 'Elegiste continuar un proyecto existente, pero todavia no hay carpeta seleccionada.'
+      : projectWorkMode === 'new-project'
+        ? existingProjectContext?.selectedPath
+          ? 'JEFE va a usar la carpeta seleccionada solo como referencia y no como proyecto activo.'
+          : 'JEFE va a preparar un proyecto nuevo con los insumos y el objetivo actual.'
+        : existingProjectContext?.selectedPath
+          ? 'JEFE va a decidir automaticamente si conviene continuar la carpeta seleccionada o usarla solo como referencia.'
+          : 'JEFE va a decidir automaticamente con el objetivo, el contexto y los insumos disponibles.'
+  const plannerAttachedInputsPayload = attachedProjectInputs.map((entry) => ({
+    id: entry.id,
+    kind: entry.kind,
+    name: entry.name,
+    originalPath: entry.originalPath,
+    extension: entry.extension,
+    sizeBytes: entry.sizeBytes,
+    inferredRole: entry.inferredRole,
+    operatorNote: entry.operatorNote,
+    status: entry.status,
+    isDirectory: entry.isDirectory === true,
+  }))
+  const plannerExistingProjectContextPayload = existingProjectContext
+    ? {
+        ...existingProjectContext,
+      }
+    : null
+  const buildPlannerRequestPayload = ({
+    goal,
+    context,
+    workspacePath: nextWorkspacePath,
+    iteration,
+    previousExecutionResult,
+  }: {
+    goal?: string
+    context?: string
+    workspacePath?: string
+    iteration?: number
+    previousExecutionResult?: string
+  } = {}) => ({
+    goal: normalizeOptionalString(goal) || goalInput,
+    context: normalizeOptionalString(context) || executionContextInput.trim() || undefined,
+    workspacePath:
+      normalizeOptionalString(nextWorkspacePath) || workspacePath.trim() || undefined,
+    userParticipationMode: userParticipationMode || undefined,
+    projectState: plannerProjectState,
+    costMode: brainCostMode,
+    ...(Number.isInteger(iteration) ? { iteration } : {}),
+    ...(normalizeOptionalString(previousExecutionResult)
+      ? { previousExecutionResult: normalizeOptionalString(previousExecutionResult) }
+      : {}),
+    manualReusablePreference: manualReusablePreferencePayload || undefined,
+    attachedInputs:
+      plannerAttachedInputsPayload.length > 0
+        ? plannerAttachedInputsPayload
+        : undefined,
+    existingProjectContext: plannerExistingProjectContextPayload || undefined,
+    projectWorkMode,
+  })
   const manualReusablePreferencePayload = buildManualReusablePreferencePayload({
     mode: manualReuseMode,
     selectedArtifact: selectedReusableArtifact,
@@ -12136,7 +12532,7 @@ function App() {
         selectedReusableArtifact.heroStyle,
       ]
         .filter(Boolean)
-        .join(' · ')
+        .join(' ? ')
     : 'Todavía no hay un artefacto reusable seleccionado manualmente.'
   const selectedReusableArtifactTags = selectedReusableArtifact?.tags?.join(', ') || ''
   const activeBrainSelectedProvider = getBrainProviderLabel(
@@ -12190,7 +12586,7 @@ function App() {
           : '',
       ]
         .filter(Boolean)
-        .join(' · ') || 'JEFE consultó MEMORIA externa antes de planificar.'
+        .join(' ? ') || 'JEFE consultó MEMORIA externa antes de planificar.'
     : [
         'JEFE continúa sin memoria externa.',
         activeContextHubStatus?.reason ? `Motivo: ${activeContextHubStatus.reason}` : '',
@@ -12201,7 +12597,7 @@ function App() {
     activeContextHubStatus?.endpoint || '/v1/packs/suggested'
   const activeContextHubUiDetail = [activeContextHubDetail, `Endpoint: ${activeContextHubEndpointLabel}`]
     .filter(Boolean)
-    .join(' · ')
+    .join(' ? ')
   const contextHubRuntimeTone = getContextHubRuntimeTone(contextHubRuntimeState)
   const contextHubRuntimeLabel = contextHubRuntimeState.available
     ? 'MEMORIA conectada'
@@ -12463,14 +12859,14 @@ function App() {
         latestBrainStrategy ? `Plantilla: ${latestBrainStrategy}` : '',
       ]
         .filter(Boolean)
-        .join(' · ') || 'Ruta rapida resuelta en el proceso local'
+        .join(' ? ') || 'Ruta rapida resuelta en el proceso local'
     : activeExecutorRuntimeDetail
   const contextualConnectionLabel = fastRouteDetected
     ? 'Resuelta localmente'
     : runtimeStatus.connection
   const contextualConnectionDetail = fastRouteDetected
     ? 'Electron materializo la salida sin bridge ni Codex.'
-    : `${runtimeStatus.platform} · Electron ${runtimeStatus.electron}`
+    : `${runtimeStatus.platform} ? Electron ${runtimeStatus.electron}`
   const contextualRuntimeCardLabel = fastRouteDetected
     ? 'Materializacion'
     : 'Runtime del executor'
@@ -12660,7 +13056,7 @@ function App() {
         expectedText ? summarizeInlineText(expectedText, 72) : '',
       ]
         .filter(Boolean)
-        .join(' · ')
+        .join(' ? ')
     }
 
     return {
@@ -12778,7 +13174,7 @@ function App() {
       ? {
           title: 'Crear variante reutilizando estructura',
           detail: resultCanSuggestReusableNow
-            ? 'Útil cuando la composición ya funciona y querés cambiar rubro o contenido.'
+            ? '?til cuando la composición ya funciona y querés cambiar rubro o contenido.'
             : 'Conviene esperar a la validacion local para tomar esta salida como base estructural.',
         }
       : null,
@@ -13071,7 +13467,7 @@ function App() {
         normalizeOptionalString(latestHumanDecision.summary),
       ]
         .filter(Boolean)
-        .join(' · ')
+        .join(' ? ')
     : 'Todavía no hay una respuesta humana relevante registrada'
   const activeApprovalStatusLabel = decisionPending
     ? `Pendiente desde ${approvalSource === 'executor' ? 'el Ejecutor' : 'el Planificador'}`
@@ -13245,7 +13641,7 @@ function App() {
       executorRequestState === 'error'
       ? 'Finalizada con error'
       : fastRouteDetected
-        ? 'Finalizada · ruta rapida local'
+        ? 'Finalizada ? ruta rapida local'
         : 'Finalizada'
     : flowExecutionStages[flowExecutionStageIndex]
   const normalizedGoalInput = goalInput.trim() || 'Sin objetivo definido'
@@ -14756,6 +15152,147 @@ function App() {
     setIsFlowConsoleOpen(true)
   }, [isFlowConsoleOpen, isFlowConsolePinnedOpen])
 
+  const handleAttachInputFiles = async () => {
+    setIsProjectContextBusy(true)
+    setProjectContextActionMessage('')
+
+    try {
+      const response = await window.aiOrchestrator?.pickAttachedInputFiles?.()
+      const nextInputs = Array.isArray(response?.inputs)
+        ? response.inputs
+            .map((entry) => normalizeAttachedProjectInput(entry))
+            .filter((entry): entry is AttachedProjectInput => Boolean(entry))
+        : []
+
+      if (nextInputs.length === 0) {
+        setProjectContextActionMessage(
+          response?.canceled
+            ? 'No se agregaron archivos en esta accion.'
+            : 'No se detectaron archivos validos para adjuntar.',
+        )
+        return
+      }
+
+      setAttachedProjectInputs((currentInputs) =>
+        mergeAttachedProjectInputs(currentInputs, nextInputs),
+      )
+      setProjectContextActionMessage(
+        `Se agregaron ${nextInputs.length} archivo${nextInputs.length === 1 ? '' : 's'} como metadata de contexto.`,
+      )
+    } finally {
+      setIsProjectContextBusy(false)
+    }
+  }
+
+  const handleAttachInputFolder = async () => {
+    setIsProjectContextBusy(true)
+    setProjectContextActionMessage('')
+
+    try {
+      const response = await window.aiOrchestrator?.pickAttachedInputFolder?.()
+      const nextInputs = Array.isArray(response?.inputs)
+        ? response.inputs
+            .map((entry) => normalizeAttachedProjectInput(entry))
+            .filter((entry): entry is AttachedProjectInput => Boolean(entry))
+        : []
+
+      if (nextInputs.length === 0) {
+        setProjectContextActionMessage(
+          response?.canceled
+            ? 'No se agrego ninguna carpeta en esta accion.'
+            : 'No se detecto una carpeta valida para adjuntar.',
+        )
+        return
+      }
+
+      setAttachedProjectInputs((currentInputs) =>
+        mergeAttachedProjectInputs(currentInputs, nextInputs),
+      )
+      setProjectContextActionMessage(
+        'La carpeta de assets quedo referenciada como insumo del proyecto.',
+      )
+    } finally {
+      setIsProjectContextBusy(false)
+    }
+  }
+
+  const handlePickExistingProject = async () => {
+    setIsProjectContextBusy(true)
+    setProjectContextActionMessage('')
+
+    try {
+      const response = await window.aiOrchestrator?.pickExistingProject?.()
+      const nextContext = normalizeExistingProjectContext(response?.projectContext)
+
+      if (!nextContext) {
+        setProjectContextActionMessage(
+          response?.canceled
+            ? 'No se selecciono ningun proyecto existente.'
+            : 'No se pudo analizar la carpeta seleccionada.',
+        )
+        return
+      }
+
+      setExistingProjectContext(nextContext)
+      setProjectContextActionMessage(
+        'La carpeta seleccionada quedo analizada en modo read-only.',
+      )
+    } finally {
+      setIsProjectContextBusy(false)
+    }
+  }
+
+  const handleAnalyzeExistingProject = async () => {
+    if (!existingProjectContext?.selectedPath) {
+      setProjectContextActionMessage(
+        'Primero selecciona una carpeta para analizar como proyecto existente.',
+      )
+      return
+    }
+
+    setIsProjectContextBusy(true)
+    setProjectContextActionMessage('')
+
+    try {
+      const response = await window.aiOrchestrator?.analyzeExistingProject?.({
+        selectedPath: existingProjectContext.selectedPath,
+      })
+      const nextContext = normalizeExistingProjectContext(response?.projectContext)
+
+      if (!response?.ok || !nextContext) {
+        setProjectContextActionMessage(
+          normalizeOptionalString(response?.error) ||
+            'No se pudo actualizar el analisis del proyecto existente.',
+        )
+        return
+      }
+
+      setExistingProjectContext(nextContext)
+      setProjectContextActionMessage('El diagnostico del proyecto se actualizo.')
+    } finally {
+      setIsProjectContextBusy(false)
+    }
+  }
+
+  const handleClearSelectedProject = () => {
+    setExistingProjectContext(null)
+    setProjectContextActionMessage('Se limpio la referencia al proyecto existente.')
+  }
+
+  const handleRemoveAttachedProjectInput = (inputId: string) => {
+    setAttachedProjectInputs((currentInputs) =>
+      currentInputs.filter((entry) => entry.id !== inputId),
+    )
+  }
+
+  const handleAttachedProjectInputNoteChange = (inputId: string, value: string) => {
+    setAttachedProjectInputs((currentInputs) =>
+      currentInputs.map((entry) =>
+        entry.id === inputId ? { ...entry, operatorNote: value } : entry,
+      ),
+    )
+  }
+
   const replanManualFlow = async (
     previousExecutionResult: string,
     approvedByProjectRule = projectPolicyAllowed,
@@ -14791,30 +15328,22 @@ function App() {
       source: 'orquestador',
       title: 'Datos enviados al planificador',
       content: 'Se envió una nueva consulta al Cerebro con el contexto actualizado.',
-      raw: formatStructuredContent({
-        goal: goalInput,
-        context: currentExecutionContext || undefined,
-        workspacePath: workspacePath.trim() || undefined,
-        userParticipationMode: userParticipationMode || undefined,
-        projectState: plannerProjectState,
-        costMode: brainCostMode,
-        previousExecutionResult,
-        manualReusablePreference: manualReusablePreferencePayload || undefined,
-      }),
+      raw: formatStructuredContent(
+        buildPlannerRequestPayload({
+          context: currentExecutionContext,
+          previousExecutionResult,
+        }),
+      ),
       status: 'info',
     })
 
     try {
-      const response = await window.aiOrchestrator?.planTask?.({
-        goal: goalInput,
-        context: currentExecutionContext || undefined,
-        workspacePath: workspacePath.trim() || undefined,
-        userParticipationMode: userParticipationMode || undefined,
-        projectState: plannerProjectState,
-        costMode: brainCostMode,
-        previousExecutionResult,
-        manualReusablePreference: manualReusablePreferencePayload || undefined,
-      })
+      const response = await window.aiOrchestrator?.planTask?.(
+        buildPlannerRequestPayload({
+          context: currentExecutionContext,
+          previousExecutionResult,
+        }),
+      )
 
       if (!response?.ok || !response.instruction) {
         addFlowMessage({
@@ -15031,18 +15560,12 @@ function App() {
             source: 'orquestador',
             title: 'Datos enviados al planificador',
             content: `Se preparó el pedido de planificación para la iteración ${iteration}.`,
-            raw: formatStructuredContent({
-              goal: goalInput,
-              context: executionContextInput.trim() || undefined,
-              workspacePath: workspacePath.trim() || undefined,
-              userParticipationMode: userParticipationMode || undefined,
-              projectState: plannerProjectState,
-              costMode: brainCostMode,
-              iteration,
-              previousExecutionResult: previousExecutionResult || undefined,
-              manualReusablePreference:
-                manualReusablePreferencePayload || undefined,
-            }),
+            raw: formatStructuredContent(
+              buildPlannerRequestPayload({
+                iteration,
+                previousExecutionResult: previousExecutionResult || undefined,
+              }),
+            ),
             status: 'info',
           })
 
@@ -15053,17 +15576,12 @@ function App() {
             ])
           }
 
-          const planResponse = await window.aiOrchestrator?.planTask?.({
-            goal: goalInput,
-            context: executionContextInput.trim() || undefined,
-            workspacePath: workspacePath.trim() || undefined,
-            userParticipationMode: userParticipationMode || undefined,
-            projectState: plannerProjectState,
-            costMode: brainCostMode,
-            iteration,
-            previousExecutionResult: previousExecutionResult || undefined,
-            manualReusablePreference: manualReusablePreferencePayload || undefined,
-          })
+          const planResponse = await window.aiOrchestrator?.planTask?.(
+            buildPlannerRequestPayload({
+              iteration,
+              previousExecutionResult: previousExecutionResult || undefined,
+            }),
+          )
 
           if (!planResponse?.ok || !planResponse.instruction) {
             addFlowMessage({
@@ -16015,13 +16533,10 @@ function App() {
 
     try {
       const response = await window.aiOrchestrator?.planTask?.({
-        goal: plannerGoal,
-        context: plannerContext || undefined,
-        workspacePath: workspacePath.trim() || undefined,
-        userParticipationMode: userParticipationMode || undefined,
-        projectState: plannerProjectState,
-        costMode: brainCostMode,
-        manualReusablePreference: manualReusablePreferencePayload || undefined,
+        ...buildPlannerRequestPayload({
+          goal: plannerGoal,
+          context: plannerContext || undefined,
+        }),
       })
 
       if (!response?.ok || !response.instruction) {
@@ -17581,7 +18096,7 @@ function App() {
                             {latestExecutionRunSummary.objectiveSummary}
                           </div>
                           <div className="text-xs leading-5 text-slate-300">
-                            Último requestId: {latestExecutionRunSummary.latestRequestId}
+                            ?ltimo requestId: {latestExecutionRunSummary.latestRequestId}
                           </div>
                         </div>
                         <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[360px]">
@@ -17632,7 +18147,7 @@ function App() {
                                 {summary.objectiveSummary}
                               </div>
                               <div className="mt-1 text-xs leading-5 text-slate-400">
-                                {summary.updatedAtLabel} · {summary.latestRequestId}
+                                {summary.updatedAtLabel} ? {summary.latestRequestId}
                               </div>
                             </div>
                             <span
@@ -17765,7 +18280,7 @@ function App() {
                       Participación del usuario
                     </div>
                     <div className="mt-2 text-sm leading-6 text-slate-100">
-                      ¿Vas a aportar definiciones, recursos o contenidos durante este proceso, o querés que el Cerebro decida todo lo faltante?
+                      ?Vas a aportar definiciones, recursos o contenidos durante este proceso, o querés que el Cerebro decida todo lo faltante?
                     </div>
                     <div className="mt-2 text-xs leading-5 text-slate-400">
                       Si no elegís nada todavía, el sistema mantiene el comportamiento actual.
@@ -17858,7 +18373,7 @@ function App() {
                       <div className="mt-2 text-xs leading-5 text-slate-400">
                         {activeBrainFallbackUsed
                           ? `Respaldo aplicado hacia ${activeBrainResolvedProvider}`
-                          : 'Sin respaldo en la última decisión'} · Confianza: {activeBrainRoutingConfidence}
+                          : 'Sin respaldo en la última decisión'} ? Confianza: {activeBrainRoutingConfidence}
                       </div>
                     </div>
                     <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
@@ -17883,7 +18398,7 @@ function App() {
                         {getBrainRoutingSeverityLabel(lastBrainRoutingDecision?.ambiguity)}
                       </div>
                       <div className="mt-2 text-xs leading-5 text-slate-400">
-                        Riesgo: {getBrainRoutingSeverityLabel(lastBrainRoutingDecision?.risk)} · Impacto:{' '}
+                        Riesgo: {getBrainRoutingSeverityLabel(lastBrainRoutingDecision?.risk)} ? Impacto:{' '}
                         {getBrainRoutingSeverityLabel(lastBrainRoutingDecision?.impact)}
                       </div>
                     </div>
@@ -18464,7 +18979,7 @@ function App() {
                                 <div className="mt-2 leading-6">
                                   {getVisualStyleLabel(artifact.visualStyle) ||
                                     'Sin estilo visual'}{' '}
-                                  ·{' '}
+                                  ?{' '}
                                   {getLayoutVariantLabel(artifact.layoutVariant) ||
                                     'Sin estructura'}
                                 </div>
@@ -18547,7 +19062,7 @@ function App() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      Última instrucción del planificador
+                      ?ltima instrucción del planificador
                     </div>
                     <div className="mt-2 text-sm leading-6 text-slate-100">
                       {plannerInstruction}
@@ -18557,7 +19072,7 @@ function App() {
               </div>
               <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Último resultado del ejecutor
+                  ?ltimo resultado del ejecutor
                 </div>
                 <div className="mt-2 text-sm leading-6 text-slate-100">
                   {executorResult}
@@ -18566,7 +19081,7 @@ function App() {
               {hasLastExecutorSnapshot ? (
                 <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Último estado útil del ejecutor
+                    ?ltimo estado útil del ejecutor
                   </div>
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
@@ -18695,7 +19210,7 @@ function App() {
               </div>
               <div className="rounded-xl border border-white/8 bg-white/5 px-4 py-4">
                 <div className="text-lg font-semibold text-white">
-                  Última corrida
+                  ?ltima corrida
                 </div>
                 <div className="mt-4 grid auto-rows-fr gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                   <div className="min-w-0 rounded-xl border border-white/8 bg-slate-950/50 px-4 py-4">
@@ -18984,7 +19499,7 @@ function App() {
                         Actividad en vivo
                       </div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        Últimos 6 eventos
+                        ?ltimos 6 eventos
                       </div>
                     </div>
                     <div className="mt-4 space-y-2">
@@ -19420,7 +19935,8 @@ function App() {
                 ) : null}
 
                 {activeWizardStep === 'context' ? (
-                  <div className="grid h-full gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+                  <div className="grid h-full gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+                    <div className="space-y-4">
                     <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
                       <label
                         htmlFor="guided-context-input"
@@ -19433,11 +19949,297 @@ function App() {
                         ref={executionContextInputRef}
                         value={executionContextInput}
                         onChange={(event) => setExecutionContextInput(event.target.value)}
-                        rows={10}
+                        rows={8}
                         className="mt-4 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-4 text-sm leading-7 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
                         placeholder="Sumá restricciones, referencias, alcance o contexto operativo."
                       />
                     </article>
+                      <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              Insumos del proyecto
+                            </div>
+                            <div className="mt-2 text-sm leading-6 text-slate-400">
+                              Adjunta archivos o carpetas de assets como metadata segura. JEFE no
+                              toca los originales ni manda binarios a servicios externos.
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={handleAttachInputFiles}
+                              disabled={isProjectContextBusy}
+                              className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm font-medium text-slate-100 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Adjuntar archivos
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleAttachInputFolder}
+                              disabled={isProjectContextBusy}
+                              className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm font-medium text-slate-100 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Adjuntar carpeta
+                            </button>
+                          </div>
+                        </div>
+                        <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                          <div>{attachedProjectInputsSummary}</div>
+                          <div className="mt-1 text-slate-400">
+                            Estado actual: todo queda como referencia segura hasta que exista una
+                            decision explicita de copia o materializacion.
+                          </div>
+                          {projectContextActionMessage ? (
+                            <div className="mt-2 text-sky-100">{projectContextActionMessage}</div>
+                          ) : null}
+                        </div>
+                        {attachedProjectInputs.length > 0 ? (
+                          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                            {attachedProjectInputs.map((entry) => (
+                              <article
+                                key={entry.id}
+                                className="min-w-0 rounded-2xl border border-white/8 bg-slate-950/50 p-4"
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="truncate text-sm font-semibold text-slate-100">
+                                      {entry.name}
+                                    </div>
+                                    <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-400">
+                                      <span>{entry.kind === 'folder' ? 'Carpeta' : 'Archivo'}</span>
+                                      <span>{getProjectInputRoleLabel(entry.inferredRole)}</span>
+                                      <span>{getProjectInputStatusLabel(entry.status)}</span>
+                                      <span>{formatBytesLabel(entry.sizeBytes)}</span>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveAttachedProjectInput(entry.id)}
+                                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-white/10"
+                                  >
+                                    Quitar
+                                  </button>
+                                </div>
+                                <div className="mt-3 break-all text-xs leading-5 text-slate-500">
+                                  {entry.originalPath}
+                                </div>
+                                <label className="mt-3 block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                  Nota del operador
+                                </label>
+                                <input
+                                  type="text"
+                                  value={entry.operatorNote}
+                                  onChange={(event) =>
+                                    handleAttachedProjectInputNoteChange(
+                                      entry.id,
+                                      event.target.value,
+                                    )
+                                  }
+                                  className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
+                                  placeholder="Ejemplo: usar como logo principal o documento base."
+                                />
+                              </article>
+                            ))}
+                          </div>
+                        ) : null}
+                      </article>
+                      <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              Proyecto existente
+                            </div>
+                            <div className="mt-2 text-sm leading-6 text-slate-400">
+                              Selecciona una carpeta y deja que JEFE la inspeccione en modo
+                              read-only antes de decidir continuidad.
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={handlePickExistingProject}
+                              disabled={isProjectContextBusy}
+                              className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm font-medium text-slate-100 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Seleccionar proyecto existente
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleAnalyzeExistingProject}
+                              disabled={
+                                isProjectContextBusy ||
+                                !normalizeOptionalString(existingProjectContext?.selectedPath)
+                              }
+                              className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm font-medium text-slate-100 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Analizar proyecto
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleClearSelectedProject}
+                              disabled={
+                                isProjectContextBusy ||
+                                !normalizeOptionalString(existingProjectContext?.selectedPath)
+                              }
+                              className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm font-medium text-slate-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Limpiar proyecto seleccionado
+                            </button>
+                          </div>
+                        </div>
+                        <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                          <div className="font-medium text-slate-100">{existingProjectSummary}</div>
+                          <div className="mt-1 text-slate-400">
+                            Seguridad: no se leen archivos sensibles, no se ejecutan scripts y no
+                            se modifica la carpeta seleccionada.
+                          </div>
+                        </div>
+                        {existingProjectContext ? (
+                          <div className="mt-4 space-y-4">
+                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                                  Framework
+                                </div>
+                                <div className="mt-2 text-sm font-semibold text-slate-100">
+                                  {existingProjectContext.framework || 'Desconocido'}
+                                </div>
+                                <div className="mt-1 text-xs text-slate-400">
+                                  {existingProjectContext.stack.join(' / ') || 'Sin stack resumido'}
+                                </div>
+                              </div>
+                              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                                  Package manager
+                                </div>
+                                <div className="mt-2 text-sm font-semibold text-slate-100">
+                                  {existingProjectContext.packageManager || 'Sin lockfile'}
+                                </div>
+                                <div className="mt-1 text-xs text-slate-400">
+                                  {existingProjectContext.hasPackageJson
+                                    ? 'package.json detectado'
+                                    : 'package.json no detectado'}
+                                </div>
+                              </div>
+                              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                                  Git
+                                </div>
+                                <div className="mt-2 text-sm font-semibold text-slate-100">
+                                  {existingProjectContext.gitStatusSummary?.branch ||
+                                    (existingProjectContext.hasGit ? 'Detectado' : 'No detectado')}
+                                </div>
+                                <div className="mt-1 text-xs text-slate-400">
+                                  {existingProjectContext.gitStatusSummary?.summary ||
+                                    'Sin resumen disponible'}
+                                </div>
+                              </div>
+                              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                                  Protegidos
+                                </div>
+                                <div className="mt-2 text-sm font-semibold text-slate-100">
+                                  {existingProjectContext.protectedFilesCount || 0}
+                                </div>
+                                <div className="mt-1 text-xs text-slate-400">
+                                  JEFE detecta, pero no lee contenidos sensibles.
+                                </div>
+                              </div>
+                            </div>
+                            <div className="grid gap-3 lg:grid-cols-2">
+                              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                                  Carpetas importantes
+                                </div>
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  {existingProjectContext.importantFolders.length > 0 ? (
+                                    existingProjectContext.importantFolders.map((entry) => (
+                                      <span
+                                        key={entry}
+                                        className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-200"
+                                      >
+                                        {entry}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="text-sm text-slate-400">
+                                      No se detectaron carpetas clave.
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                                  Entrypoints probables
+                                </div>
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  {existingProjectContext.entrypoints.length > 0 ? (
+                                    existingProjectContext.entrypoints.map((entry) => (
+                                      <span
+                                        key={entry}
+                                        className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-200"
+                                      >
+                                        {entry}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="text-sm text-slate-400">
+                                      Sin entrypoints detectados.
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            {existingProjectContext.scripts.length > 0 ? (
+                              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                                  Scripts detectados
+                                </div>
+                                <div className="mt-3 grid gap-2">
+                                  {existingProjectContext.scripts.slice(0, 6).map((entry) => (
+                                    <div
+                                      key={entry.name}
+                                      className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3 text-sm text-slate-200"
+                                    >
+                                      <div className="font-medium text-slate-100">{entry.name}</div>
+                                      <div className="mt-1 break-all text-xs text-slate-400">
+                                        {entry.command}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                            {existingProjectContext.protectedFilesDetected.length > 0 ? (
+                              <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-4 text-sm text-amber-100">
+                                <div className="font-medium">Archivos protegidos detectados</div>
+                                <div className="mt-2 break-all text-xs leading-5 text-amber-50/90">
+                                  {existingProjectContext.protectedFilesDetected.join(', ')}
+                                </div>
+                              </div>
+                            ) : null}
+                            {existingProjectContext.warnings.length > 0 ? (
+                              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                                  Advertencias del analisis
+                                </div>
+                                <div className="mt-3 grid gap-2">
+                                  {existingProjectContext.warnings.map((warning) => (
+                                    <div
+                                      key={warning}
+                                      className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3 text-sm text-slate-300"
+                                    >
+                                      {warning}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </article>
+                    </div>
                     <div className="space-y-4">
                       <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
                         <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -19480,6 +20282,32 @@ function App() {
                       </article>
                       <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
                         <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Modo de trabajo
+                        </div>
+                        <div className="mt-4 grid gap-2">
+                          {(['auto', 'new-project', 'continue-existing'] as ProjectWorkMode[]).map(
+                            (mode) => (
+                              <button
+                                key={mode}
+                                type="button"
+                                onClick={() => setProjectWorkMode(mode)}
+                                className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
+                                  projectWorkMode === mode
+                                    ? 'border-sky-300/40 bg-sky-300/15 text-sky-100'
+                                    : 'border-white/10 bg-slate-950/50 text-slate-200 hover:bg-white/10'
+                                }`}
+                              >
+                                {getProjectWorkModeLabel(mode)}
+                              </button>
+                            ),
+                          )}
+                        </div>
+                        <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                          {projectWorkModeSummary}
+                        </div>
+                      </article>
+                      <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                           Espacio de trabajo
                         </div>
                         <textarea
@@ -19491,6 +20319,46 @@ function App() {
                         />
                         <div className="mt-3 text-sm text-slate-400">
                           {workspaceStatusLabel}
+                        </div>
+                      </article>
+                      <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Resumen del contexto
+                        </div>
+                        <div className="mt-4 grid gap-3">
+                          <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                            <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                              Insumos
+                            </div>
+                            <div className="mt-2 text-sm font-medium text-slate-100">
+                              {attachedProjectInputsSummary}
+                            </div>
+                          </div>
+                          <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                            <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                              Proyecto existente
+                            </div>
+                            <div className="mt-2 text-sm font-medium text-slate-100">
+                              {existingProjectContext?.projectName ||
+                                (existingProjectContext?.selectedPath
+                                  ? 'Seleccionado'
+                                  : 'No seleccionado')}
+                            </div>
+                            <div className="mt-1 break-all text-xs text-slate-400">
+                              {existingProjectContext?.selectedPath || 'Solo texto e insumos por ahora.'}
+                            </div>
+                          </div>
+                          <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                            <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                              Modo activo
+                            </div>
+                            <div className="mt-2 text-sm font-medium text-slate-100">
+                              {getProjectWorkModeLabel(projectWorkMode)}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-400">
+                              {projectWorkModeSummary}
+                            </div>
+                          </div>
                         </div>
                       </article>
                     </div>
@@ -20249,7 +21117,7 @@ function App() {
                                 value: resultHumanSummary,
                               },
                               {
-                                label: 'Último requestId',
+                                label: '?ltimo requestId',
                                 value:
                                   latestExecutionRunSummary?.latestRequestId ||
                                   'Sin corrida registrada',
@@ -20270,7 +21138,7 @@ function App() {
                                   ? 'Ruta rápida local'
                                   : activeExecutionModeLabel,
                                 detail: fastRouteDetected
-                                  ? 'Codex: No requerido · Bridge: No usado'
+                                  ? 'Codex: No requerido ? Bridge: No usado'
                                   : activePlannerStrategyLabel,
                               },
                               {
@@ -20611,7 +21479,7 @@ function App() {
                         value={fastRouteDetected ? 'Ruta rápida local' : activeExecutionModeLabel}
                         detail={
                           fastRouteDetected
-                            ? 'Codex: No requerido · Bridge: No usado'
+                            ? 'Codex: No requerido ? Bridge: No usado'
                             : activePlannerStrategyLabel
                         }
                       />
@@ -20628,7 +21496,7 @@ function App() {
                           latestBrainStrategy ? `Plantilla: ${latestBrainStrategy}` : '',
                         ]
                           .filter(Boolean)
-                          .join(' · ') || 'Sin capas reportadas'}
+                          .join(' ? ') || 'Sin capas reportadas'}
                       />
                       <MetricCard
                         label="Bridge"
@@ -21162,7 +22030,7 @@ function App() {
                   <MetricCard
                     label="Flujo"
                     value={flowStageLabel}
-                    detail={`${flowModeLabel} · ${flowApprovalPendingLabel}`}
+                    detail={`${flowModeLabel} ? ${flowApprovalPendingLabel}`}
                     tone={decisionPending ? 'amber' : 'default'}
                   />
                 </div>
@@ -21172,7 +22040,7 @@ function App() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-lg font-semibold text-white">
-                          Última corrida
+                          ?ltima corrida
                         </div>
                         <p className="mt-1 text-sm text-slate-400">
                           Lectura compacta del último cierre operativo.
@@ -21456,7 +22324,7 @@ function App() {
                         detail={
                           activeBrainFallbackUsed
                             ? `Respaldo hacia ${activeBrainResolvedProvider}`
-                            : 'Sin respaldo en la Última decisión'
+                            : 'Sin respaldo en la ?ltima decisión'
                         }
                       />
                       <MetricCard
@@ -21539,7 +22407,7 @@ function App() {
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
                   <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      Última instrucción del planificador
+                      ?ltima instrucción del planificador
                     </div>
                     <div className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-slate-100">
                       {plannerInstruction}
@@ -21848,7 +22716,7 @@ function App() {
 
                     <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
                       <div className="text-lg font-semibold text-white">
-                        Último resultado del ejecutor
+                        ?ltimo resultado del ejecutor
                       </div>
                       <div className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">
                         {executorResult}
@@ -21919,7 +22787,7 @@ function App() {
                     detail={`${visibleApprovalOptions.length} opcion(es) sugerida(s)`}
                   />
                   <MetricCard
-                    label="Última respuesta humana"
+                    label="?ltima respuesta humana"
                     value={latestHumanDecisionSummary}
                   />
                   <MetricCard
@@ -21969,7 +22837,7 @@ function App() {
                               normalizeOptionalString(record.summary),
                             ]
                               .filter(Boolean)
-                              .join(' · ') || 'Sin detalle adicional'}
+                              .join(' ? ') || 'Sin detalle adicional'}
                           </div>
                         </div>
                       ))
@@ -22370,7 +23238,7 @@ function App() {
                     }
                   />
                   <MetricCard
-                    label="Último requestId"
+                    label="?ltimo requestId"
                     value={
                       latestExecutionRunSummary?.latestRequestId || 'Sin corrida registrada'
                     }
@@ -22390,7 +23258,7 @@ function App() {
                               {summary.objectiveSummary}
                             </div>
                             <div className="mt-1 text-xs leading-5 text-slate-400">
-                              {summary.updatedAtLabel} · {summary.latestRequestId}
+                              {summary.updatedAtLabel} ? {summary.latestRequestId}
                             </div>
                           </div>
                           <span
@@ -22470,7 +23338,7 @@ function App() {
                         Actividad en vivo
                       </div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        Últimos 6 eventos
+                        ?ltimos 6 eventos
                       </div>
                     </div>
                     <div className="mt-4 space-y-2">
@@ -22901,7 +23769,7 @@ function App() {
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-lg font-semibold text-white">Actividad en vivo</div>
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Últimos 6 eventos
+                    ?ltimos 6 eventos
                   </div>
                 </div>
                 <div className="mt-4 space-y-2">

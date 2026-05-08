@@ -19,6 +19,7 @@ const {
   path.join(repoRoot, 'electron', 'local-deterministic-executor.cjs'),
 )
 const {
+  buildUnavailableContextHubPack,
   fetchSuggestedContextHubPack,
   emitContextHubEvent,
   CONTEXT_HUB_API_URL_FALLBACKS,
@@ -38,12 +39,17 @@ const {
   selectBestWorkspaceProjectCandidate,
   shouldIgnoreWorkspaceDirectoryEntry,
 } = require(path.join(repoRoot, 'electron', 'workspace-project-detection.cjs'))
+const {
+  analyzeExistingProject,
+  buildAttachedInputMetadataList,
+} = require(path.join(repoRoot, 'electron', 'project-context.cjs'))
 const requiredPlannerFunctions = [
   'buildDomainUnderstanding',
   'buildProductArchitecturePlan',
   'buildSafeFirstDeliveryPlan',
   'buildMaterializeSafeFirstDeliveryPlan',
   'buildLocalStrategicBrainDecision',
+  'buildStrategicBrainInput',
 ]
 
 const activeCases = [
@@ -931,6 +937,7 @@ module.exports = {
   buildSafeFirstDeliveryPlan,
   buildMaterializeSafeFirstDeliveryPlan,
   buildLocalStrategicBrainDecision,
+  buildStrategicBrainInput,
 };
 `
 
@@ -950,6 +957,7 @@ module.exports = {
     classifyWorkspaceProjectIntent,
     selectBestWorkspaceProjectCandidate,
     shouldIgnoreWorkspaceDirectoryEntry,
+    buildUnavailableContextHubPack,
     setTimeout,
     clearTimeout,
     setInterval,
@@ -1858,6 +1866,201 @@ async function runContextHubClientHelpersValidation() {
     strategy: 'helper',
     executionMode: 'local-test',
     nextExpectedAction: serverPort > 0 ? 'context-hub-client-ready' : 'context-hub-client-failed',
+  }
+}
+
+async function runProjectContextHelpersValidation() {
+  const fixtureRoot = path.join(smokeExecutionWorkspaceRoot, 'project-context-helper')
+  ensureCleanDirectory(fixtureRoot)
+
+  const logoPath = path.join(fixtureRoot, 'brand-logo.png')
+  const assetsFolderPath = path.join(fixtureRoot, 'assets')
+  const existingProjectPath = path.join(fixtureRoot, 'existing-react-app')
+  fs.writeFileSync(logoPath, Buffer.from([0x89, 0x50, 0x4e, 0x47]))
+  fs.mkdirSync(assetsFolderPath, { recursive: true })
+  fs.mkdirSync(path.join(existingProjectPath, 'src'), { recursive: true })
+  fs.mkdirSync(path.join(existingProjectPath, 'components'), { recursive: true })
+  fs.writeFileSync(
+    path.join(existingProjectPath, 'package.json'),
+    JSON.stringify(
+      {
+        name: 'existing-react-app',
+        scripts: {
+          dev: 'vite',
+          build: 'vite build',
+        },
+        dependencies: {
+          react: '^19.2.4',
+          'react-dom': '^19.2.4',
+        },
+        devDependencies: {
+          vite: '^8.0.4',
+        },
+      },
+      null,
+      2,
+    ),
+    'utf8',
+  )
+  fs.writeFileSync(path.join(existingProjectPath, 'vite.config.ts'), 'export default {}\n', 'utf8')
+  fs.writeFileSync(path.join(existingProjectPath, 'src', 'main.tsx'), 'console.log("hello")\n', 'utf8')
+  fs.writeFileSync(path.join(existingProjectPath, '.env'), 'SECRET_TOKEN=hidden\n', 'utf8')
+  fs.writeFileSync(path.join(existingProjectPath, 'Dockerfile'), 'FROM node:24\n', 'utf8')
+
+  const attachedInputs = buildAttachedInputMetadataList([logoPath, assetsFolderPath], {
+    status: 'referenced',
+  })
+  const existingProjectContext = analyzeExistingProject(existingProjectPath)
+  const strategicInput = plannerApi.buildStrategicBrainInput({
+    goal: 'Continuar un proyecto existente con assets ya entregados.',
+    context: 'Usar un logo y una carpeta de assets como contexto.',
+    workspacePath: fixtureRoot,
+    attachedInputs,
+    existingProjectContext,
+    projectWorkMode: 'continue-existing',
+  })
+  const failures = []
+
+  if (attachedInputs.length !== 2) {
+    failures.push('La metadata de insumos deberia conservar archivo y carpeta adjuntos.')
+  }
+  if (!attachedInputs.some((entry) => entry.kind === 'file' && entry.inferredRole === 'logo')) {
+    failures.push('La metadata del logo adjunto no deberia perder el rol inferido logo.')
+  }
+  if (!attachedInputs.some((entry) => entry.kind === 'folder')) {
+    failures.push('La carpeta de assets deberia registrarse como folder.')
+  }
+  if (attachedInputs.some((entry) => 'content' in entry || 'buffer' in entry)) {
+    failures.push('La metadata adjunta no deberia incluir contenido binario.')
+  }
+  if (existingProjectContext.framework !== 'Vite + React') {
+    failures.push(
+      `El analisis del proyecto existente deberia detectar Vite + React. Recibido: ${existingProjectContext.framework || '(vacio)'}.`,
+    )
+  }
+  if (!existingProjectContext.protectedFilesDetected.some((entry) => entry.endsWith('.env'))) {
+    failures.push('El analisis deberia detectar .env sin leer su contenido.')
+  }
+  if (!existingProjectContext.scripts.some((entry) => entry.name === 'dev')) {
+    failures.push('El analisis deberia exponer scripts de package.json en modo read-only.')
+  }
+  if (!strategicInput.existingProjectContext?.selectedPath) {
+    failures.push('buildStrategicBrainInput deberia incluir existingProjectContext.')
+  }
+  if (!Array.isArray(strategicInput.attachedInputs) || strategicInput.attachedInputs.length !== 2) {
+    failures.push('buildStrategicBrainInput deberia incluir attachedInputs completos.')
+  }
+  if (strategicInput.projectWorkMode !== 'continue-existing') {
+    failures.push('buildStrategicBrainInput deberia preservar projectWorkMode.')
+  }
+  if (
+    !Array.isArray(strategicInput.securityConstraints) ||
+    strategicInput.securityConstraints.length === 0
+  ) {
+    failures.push('buildStrategicBrainInput deberia adjuntar securityConstraints.')
+  }
+
+  return {
+    testCase: {
+      id: 'project-context-helpers',
+      label: 'Metadata de insumos y analisis read-only del proyecto existente',
+      goal: strategicInput.goal,
+      context: strategicInput.context,
+    },
+    ok: failures.length === 0,
+    failures,
+  }
+}
+
+async function runSelectedExistingProjectContinuationValidation() {
+  const fixtureRoot = path.join(smokeExecutionWorkspaceRoot, 'selected-existing-project')
+  ensureCleanDirectory(fixtureRoot)
+  const selectedProjectPath = path.join(fixtureRoot, 'legacy-admin-panel')
+  fs.mkdirSync(path.join(selectedProjectPath, 'src'), { recursive: true })
+  fs.writeFileSync(
+    path.join(selectedProjectPath, 'package.json'),
+    JSON.stringify(
+      {
+        name: 'legacy-admin-panel',
+        scripts: {
+          dev: 'vite',
+        },
+        dependencies: {
+          react: '^19.2.4',
+        },
+        devDependencies: {
+          vite: '^8.0.4',
+        },
+      },
+      null,
+      2,
+    ),
+    'utf8',
+  )
+  fs.writeFileSync(path.join(selectedProjectPath, 'src', 'App.tsx'), 'export default function App() { return null }\n', 'utf8')
+  fs.writeFileSync(path.join(selectedProjectPath, '.env.local'), 'PRIVATE_TOKEN=hidden\n', 'utf8')
+
+  const existingProjectContext = analyzeExistingProject(selectedProjectPath)
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: 'Continuar el proyecto existente seleccionado y llevarlo hacia un panel operativo mas claro.',
+    context:
+      'Tengo esta carpeta ya empezada y quiero que JEFE la continue sin ejecutar npm, sin tocar .env y sin instalar dependencias.',
+    workspacePath: fixtureRoot,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: 'brain-decides-missing',
+    costMode: 'balanced',
+    attachedInputs: [],
+    existingProjectContext,
+    projectWorkMode: 'continue-existing',
+    reusablePlanningContext: buildReusablePlanningContext(),
+  })
+  const failures = []
+
+  if (decision?.strategy !== 'prepare-continuation-action-plan') {
+    failures.push('La seleccion explicita de proyecto existente deberia forzar prepare-continuation-action-plan en esta V1 segura.')
+  }
+  if (decision?.executionMode !== 'planner-only') {
+    failures.push('La continuidad del proyecto seleccionado deberia quedar en planner-only.')
+  }
+  if (decision?.nextActionPlan?.targetStrategy !== 'prepare-continuation-action-plan') {
+    failures.push('nextActionPlan deberia apuntar a prepare-continuation-action-plan.')
+  }
+  if (decision?.existingProjectDetection?.detected !== true) {
+    failures.push('existingProjectDetection deberia registrar la carpeta seleccionada.')
+  }
+  if (decision?.existingProjectDetection?.applicable !== true) {
+    failures.push('existingProjectDetection deberia marcar la carpeta seleccionada como aplicable.')
+  }
+  if (decision?.activeProjectContext?.mode !== 'existing-project') {
+    failures.push('activeProjectContext deberia quedar como existing-project.')
+  }
+  if (
+    normalizePathForComparison(decision?.continuationActionPlan?.projectRoot || '') !==
+    normalizePathForComparison(selectedProjectPath)
+  ) {
+    failures.push('continuationActionPlan.projectRoot deberia apuntar a la carpeta seleccionada.')
+  }
+  if (decision?.materializationPlan) {
+    failures.push('La continuidad seleccionada en V1 no deberia devolver materializationPlan.')
+  }
+  if (decision?.localProjectManifest) {
+    failures.push('La continuidad sobre un proyecto externo no deberia inventar localProjectManifest de JEFE.')
+  }
+
+  return {
+    testCase: {
+      id: 'selected-existing-project-continuation',
+      label: 'Continuidad segura de una carpeta seleccionada manualmente',
+      goal: 'Continuar el proyecto existente seleccionado',
+      context: selectedProjectPath,
+    },
+    ok: failures.length === 0,
+    failures,
+    strategy: decision?.strategy || '',
+    executionMode: decision?.executionMode || '',
   }
 }
 
@@ -8506,6 +8709,7 @@ async function main() {
       runFullstackPhaseContractsHelperValidation(),
       runContextHubEventHelpersValidation(),
       runContextHubClientHelpersValidation(),
+      runProjectContextHelpersValidation(),
     ])
     internalHardeningResults.forEach(printScalableValidationResult)
     console.log('-----------------')
@@ -8642,6 +8846,7 @@ async function main() {
     console.log('===========================')
     continuationResults = [
       await runExistingWorkspaceProjectDetectionValidation(),
+      await runSelectedExistingProjectContinuationValidation(),
       await runPortDomainCreatesNewProjectValidation(),
       await runGenericNewDomainDoesNotReuseExistingProjectValidation(),
       await runExplicitVeterinaryContinuationValidation(),

@@ -58,6 +58,7 @@ const sections = [
       ['node', ['--check', 'electron/context-hub-event-status.cjs']],
       ['node', ['--check', 'electron/context-hub-launcher.cjs']],
       ['node', ['--check', 'electron/fullstack-phase-contracts.cjs']],
+      ['node', ['--check', 'electron/project-context.cjs']],
       ['node', ['--check', 'electron/workspace-project-detection.cjs']],
       ['node', ['--check', 'scripts/ai-planner-smoke.mjs']],
       ['node', ['--check', 'scripts/ai-operator-e2e-smoke.mjs']],

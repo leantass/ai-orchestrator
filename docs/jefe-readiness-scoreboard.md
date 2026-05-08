@@ -20,6 +20,7 @@ Estado consolidado: release candidate local operativo, con deuda critica conocid
 | Resultado final entendible para operador | 97% | Paso 7 informa motor, memoria, readiness, archivos escritos unicos, tocados adicionales, previstos y validaciones previstas/OK/fallidas, y si MEMORIA no estaba disponible ya no ensucia el cierre principal como si hubiera fallado la materializacion. | Todavia hay mucha informacion en una sola pantalla. |
 | Validaciones / smoke / seguridad | 97% | `npm audit`, `lint`, `tsc`, `ai-planner-smoke`, `ai-release-smoke`, `ai-operator-e2e-smoke`, `quality:ci` y `build` pasaron. | La deuda principal ya no es el warning de chunk, sino el tamaño estructural de `src/App.tsx` y `electron/main.cjs`. |
 | MEMORIA / Context Hub integrada | 97% | JEFE detecta API y UI real por separado, permite reintentar, levantar la API local, abrir UI real o endpoint tecnico y mostrar el ultimo evento emitido a MEMORIA en la sesion. | Falta historial mas largo por corrida si se quiere trazabilidad fina. |
+| Centro de contexto e insumos | 93% | Paso 2 ya permite adjuntar archivos o carpetas como metadata segura, seleccionar un proyecto existente, analizarlo en modo read-only y enviar ese contexto al planner sin leer `.env` ni ejecutar scripts. | La V1 no previsualiza contenido ni copia assets al workspace por defecto. |
 | Autonomia alta segura | 93% | JEFE sigue resolviendo rutas locales, continuidad y materializacion sin depender de runtime real ni de MEMORIA encendida. | La autonomia segura todavia depende de heuristicas grandes en `main.cjs`. |
 | Modularizacion interna | 90% | La deuda operativa de MEMORIA ya quedo separada en modulos propios y el panel runtime quedo mas encapsulado y testeable. | `App.tsx` y `main.cjs` siguen siendo grandes; cerrar eso del todo ya implica una tercera pasada mas riesgosa. |
 | Preparacion release candidate local | 100% | El flujo principal, MEMORIA, proyecto nuevo vs continuidad, safe-first-delivery visual y resultado final quedaron validados como operacion local seria sin deuda critica abierta. | Queda margen para bajar el chunk principal y seguir desmontando deuda estructural. |
@@ -36,6 +37,7 @@ Estado consolidado: release candidate local operativo, con deuda critica conocid
 - Si Context Hub tambien expone UI real, JEFE vuelve a mostrar `Abrir MEMORIA` y abre esa UI.
 - Context Hub puede estar apagado sin romper JEFE; la UI lo muestra y el launcher permite iniciar solo la API local desde la propia app.
 - La lectura final de safe-first-delivery ahora cae en `Primera entrega local generada`, `Revision visual local` y `Pendiente de revision visual` cuando no existe una fase formal en manifest.
+- Paso 2 ahora puede adjuntar insumos reales y analizar un proyecto local existente sin salir del modo seguro ni tocar archivos sensibles.
 
 ## Riesgos restantes
 

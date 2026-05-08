@@ -117,6 +117,47 @@ Caso validado: un pedido portuario nuevo con barcos, muelles, arribo/salida y do
 
 Caso generalista adicional validado: una mesa de ayuda interna nueva dentro de un workspace que ya contiene un proyecto veterinaria tampoco debe caer en continuidad ni pedir dependencias si fueron excluidas.
 
+## Centro de contexto e insumos
+
+En Paso 2, JEFE ya puede trabajar con contexto real de trabajo sin salir del modo seguro:
+
+- adjuntar archivos locales como metadata
+- adjuntar carpetas de assets como referencia
+- seleccionar una carpeta de proyecto existente
+- analizar ese proyecto en modo read-only antes de decidir continuidad
+
+Cada insumo adjunto queda resumido como metadata segura:
+
+- nombre y ruta original
+- tipo, extension y tamano si aplica
+- categoria inferida como logo, imagen, documento, video, gif, referencia, contenido u otro
+- nota del operador
+- estado de referencia
+
+El analisis de proyecto existente puede detectar:
+
+- `package.json`, scripts y package manager
+- framework probable y stack resumido
+- git, carpetas importantes y entrypoints
+- archivos protegidos como `.env`, `secrets` o `credentials` sin leer su contenido
+- `node_modules`, Docker y lockfiles
+
+Limites de seguridad de esta V1:
+
+- no lee `.env`
+- no lee secrets ni credenciales
+- no ejecuta scripts del proyecto seleccionado
+- no modifica la carpeta analizada
+- no envia binarios ni documentos a servicios externos
+
+Modo de trabajo disponible en Paso 2:
+
+- `Decidir automaticamente`
+- `Crear proyecto nuevo`
+- `Continuar proyecto existente`
+
+Si se selecciona un proyecto existente y el objetivo pide continuidad, JEFE lo manda al planner como continuidad real. Si solo hay insumos adjuntos o el objetivo pide algo nuevo, JEFE usa esos insumos como contexto para proyecto nuevo.
+
 ## Bridge local
 
 El bridge recibe un JSON por `stdin` con la forma:
