@@ -15,7 +15,16 @@ import {
   SidebarSectionButton,
   type MetricTone,
 } from './components/AppUiPrimitives'
+import { AppShell } from './components/AppShell'
+import { ContextSummaryPanel } from './components/ContextSummaryPanel'
 import { ContextHubControlPanel } from './components/ContextHubControlPanel'
+import { ExecutionTimeline } from './components/ExecutionTimeline'
+import { ExistingProjectPanel } from './components/ExistingProjectPanel'
+import { GuidedFlowShell } from './components/GuidedFlowShell'
+import { PlanOverviewPanel } from './components/PlanOverviewPanel'
+import { ProjectInputsPanel } from './components/ProjectInputsPanel'
+import { ResultSummaryPanel } from './components/ResultSummaryPanel'
+import { SystemStatusPanel } from './components/SystemStatusPanel'
 import {
   getPrepareActionButtonLabel,
   getProjectContinuationStatusLabel,
@@ -788,6 +797,7 @@ type ExistingProjectContext = {
   scripts: ExistingProjectScriptEntry[]
   gitStatusSummary?: ExistingProjectGitStatusSummary | null
   protectedFilesDetected: string[]
+  runtimeTemporaryFilesDetected?: string[]
   importantFolders: string[]
   entrypoints: string[]
   warnings: string[]
@@ -1471,7 +1481,7 @@ const DEFAULT_CONTEXT_HUB_RUNTIME_STATE: ContextHubRuntimeState = {
     state: 'idle',
     endpoint: '/v1/events',
     label: 'Sin eventos emitidos',
-    detail: 'JEFE todavia no registro eventos de MEMORIA en esta sesion.',
+    detail: 'JEFE todavía no registró eventos de MEMORIA en esta sesión.',
     updatedAt: '',
     reason: '',
     statusCode: null,
@@ -1553,7 +1563,7 @@ function normalizeContextHubRuntimeState(
             detail:
               normalizeOptionalString(value.lastEventStatus.detail) ||
               DEFAULT_CONTEXT_HUB_RUNTIME_STATE.lastEventStatus?.detail ||
-              'JEFE todavia no registro eventos de MEMORIA en esta sesion.',
+              'JEFE todavía no registró eventos de MEMORIA en esta sesión.',
             updatedAt: normalizeOptionalString(value.lastEventStatus.updatedAt),
             reason: normalizeOptionalString(value.lastEventStatus.reason),
             statusCode:
@@ -4442,7 +4452,7 @@ const APP_NAV_SECTIONS: Array<{
   {
     key: 'inicio',
     label: 'Inicio',
-    description: 'Estado general, resumen del flujo y acciones rÁpidas.',
+    description: 'Estado general, resumen del flujo y acciones rápidas.',
   },
   {
     key: 'objetivo',
@@ -4476,7 +4486,7 @@ const APP_NAV_SECTIONS: Array<{
   },
   {
     key: 'consola',
-    label: 'Consola tecnica',
+    label: 'Consola técnica',
     description: 'Timeline, eventos, conversacion interna y logs tecnicos.',
   },
 ]
@@ -9295,6 +9305,11 @@ const normalizeExistingProjectContext = (
           .map((entry) => normalizeOptionalString(entry))
           .filter(Boolean)
       : [],
+    runtimeTemporaryFilesDetected: Array.isArray(value?.runtimeTemporaryFilesDetected)
+      ? value.runtimeTemporaryFilesDetected
+          .map((entry) => normalizeOptionalString(entry))
+          .filter(Boolean)
+      : [],
     importantFolders: Array.isArray(value?.importantFolders)
       ? value.importantFolders.map((entry) => normalizeOptionalString(entry)).filter(Boolean)
       : [],
@@ -9349,7 +9364,7 @@ const formatBytesLabel = (value: unknown) => {
   const sizeBytes = Number(value)
 
   if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
-    return 'Tamano no disponible'
+    return 'Tamaño no disponible'
   }
 
   if (sizeBytes < 1024) {
@@ -13645,6 +13660,451 @@ function App() {
         : 'Finalizada'
     : flowExecutionStages[flowExecutionStageIndex]
   const normalizedGoalInput = goalInput.trim() || 'Sin objetivo definido'
+  const runtimePlatformLabel =
+    typeof navigator === 'undefined'
+      ? 'Desktop'
+      : normalizeOptionalString(
+            navigator.platform || navigator.userAgent,
+          ) || 'Desktop'
+  const runtimeOnlineLabel =
+    typeof navigator === 'undefined'
+      ? 'Estado de red no disponible'
+      : navigator.onLine
+        ? 'Online'
+        : 'Offline'
+  const guidedStepActionSummaryLabel =
+    activeWizardStep === 'goal'
+      ? 'Definir un objetivo concreto y accionable.'
+      : activeWizardStep === 'context'
+        ? 'Ordenar contexto, insumos, proyecto y workspace.'
+        : activeWizardStep === 'brain'
+          ? 'Ajustar criterio, costo y autonomía del Cerebro.'
+          : activeWizardStep === 'memory'
+            ? 'Decidir si conviene reutilizar memoria o seguir desde cero.'
+            : activeWizardStep === 'plan'
+              ? plannerIsReviewOnly
+                ? plannerReviewActionLabel
+                : executeCurrentInstructionLabel
+              : activeWizardStep === 'execution'
+                ? wizardExecutionResultButtonLabel
+                : 'Revisar cierre, validaciones y próxima fase segura.'
+  const guidedStepActionSummaryDetail =
+    activeWizardStep === 'goal'
+      ? 'Mientras más claro quede el objetivo, menos ambigüedad arrastra el resto del flujo.'
+      : activeWizardStep === 'context'
+        ? 'Separá lo obligatorio, lo opcional y lo técnico para que JEFE planifique sin ruido.'
+        : activeWizardStep === 'brain'
+          ? 'Este paso define cuánto decide JEFE por su cuenta y qué espera de la persona operadora.'
+          : activeWizardStep === 'memory'
+            ? 'La memoria reusable queda visible como apoyo, nunca como bloqueo.'
+            : activeWizardStep === 'plan'
+              ? plannerReviewHelperText
+              : activeWizardStep === 'execution'
+                ? decisionPending
+                  ? 'La ejecución quedó bloqueada por una aprobación. Resolvela antes de seguir.'
+                  : 'El tablero muestra etapa, actividad reciente y el CTA correcto según el estado real.'
+                : 'La salida final resume lo exitoso, lo omitido y lo que todavía conviene revisar.'
+  const guidedProgressItems = GUIDED_WIZARD_STEPS.map((step, index) => ({
+    key: step.key,
+    index,
+    label: step.label,
+    description: step.description,
+    status:
+      step.key === activeWizardStep
+        ? ('current' as const)
+        : index < activeWizardStepIndex
+          ? ('complete' as const)
+          : ('pending' as const),
+    onClick: () => setActiveWizardStep(step.key),
+  }))
+  const activeShellNavKey = (() => {
+    if (experienceMode === 'guided') {
+      return activeWizardStep === 'context' ? 'projects' : 'guided'
+    }
+
+    if (activeSection === 'corridas') {
+      return 'runs'
+    }
+
+    if (activeSection === 'memoria') {
+      return 'memory'
+    }
+
+    if (activeSection === 'inicio') {
+      return 'home'
+    }
+
+    return 'advanced'
+  })()
+  const appShellNavItems = [
+    {
+      key: 'home',
+      label: 'Inicio',
+      description: 'Resumen operativo y estado general.',
+      active: activeShellNavKey === 'home',
+      onClick: () => {
+        setExperienceMode('advanced')
+        setActiveSection('inicio')
+      },
+    },
+    {
+      key: 'guided',
+      label: 'Flujo guiado',
+      description: 'Recorrido 01 a 07 para operación paso a paso.',
+      active: activeShellNavKey === 'guided',
+      badge: `0${activeWizardStepIndex + 1}`,
+      onClick: () => setExperienceMode('guided'),
+    },
+    {
+      key: 'advanced',
+      label: 'Panel avanzado',
+      description: 'Vista técnica y de diagnóstico por secciones.',
+      active: activeShellNavKey === 'advanced',
+      onClick: () => {
+        setExperienceMode('advanced')
+      },
+    },
+    {
+      key: 'runs',
+      label: 'Corridas',
+      description: 'Últimos cierres, archivos tocados y estado final.',
+      active: activeShellNavKey === 'runs',
+      badge: executionRunSummaries.length > 0 ? String(executionRunSummaries.length) : undefined,
+      onClick: () => {
+        setExperienceMode('advanced')
+        setActiveSection('corridas')
+      },
+    },
+    {
+      key: 'history',
+      label: 'Historial',
+      description: 'Queda visible como próxima capa del shell.',
+      badge: 'Pronto',
+      disabled: true,
+    },
+    {
+      key: 'reports',
+      label: 'Reportes',
+      description: 'Reservado para salidas ejecutivas y métricas.',
+      badge: 'Pronto',
+      disabled: true,
+    },
+    {
+      key: 'memory',
+      label: 'Memoria',
+      description: 'Reusable, coincidencias y selección manual.',
+      active: activeShellNavKey === 'memory',
+      badge: activeReuseFoundCount > 0 ? String(activeReuseFoundCount) : undefined,
+      onClick: () => {
+        setExperienceMode('advanced')
+        setActiveSection('memoria')
+      },
+    },
+    {
+      key: 'context-hub',
+      label: 'Context Hub',
+      description: 'Estado de MEMORIA y operación local.',
+      badge: activeContextHubStatus?.available ? 'Online' : 'Local',
+      onClick: () => {
+        setExperienceMode('advanced')
+        setActiveSection('inicio')
+      },
+    },
+    {
+      key: 'projects',
+      label: 'Proyectos',
+      description: 'Contexto, continuidad y workspace.',
+      active: activeShellNavKey === 'projects',
+      onClick: () => {
+        setExperienceMode('guided')
+        setActiveWizardStep('context')
+      },
+    },
+    {
+      key: 'connectors',
+      label: 'Conectores',
+      description: 'Reservado para futuras integraciones visibles.',
+      badge: 'Pronto',
+      disabled: true,
+    },
+    {
+      key: 'settings',
+      label: 'Ajustes',
+      description: 'Reservado para configuración operativa.',
+      badge: 'Pronto',
+      disabled: true,
+    },
+  ]
+  const contextPanelSections =
+    experienceMode === 'guided'
+      ? [
+          {
+            title: 'Resumen del contexto',
+            items: [
+              {
+                label: 'Objetivo',
+                value: normalizedGoalInput,
+                detail: currentExecutionContextSummary,
+              },
+              {
+                label: 'Proyecto activo',
+                value:
+                  existingProjectContext?.projectName ||
+                  (existingProjectContext?.selectedPath ? 'Seleccionado' : 'Sin proyecto'),
+                detail:
+                  existingProjectContext?.selectedPath || 'Solo texto e insumos por ahora.',
+              },
+              {
+                label: 'Modo de trabajo',
+                value: getProjectWorkModeLabel(projectWorkMode),
+                detail: projectWorkModeSummary,
+              },
+            ],
+          },
+          {
+            title: 'Próximo paso',
+            items: [
+              {
+                label: 'Acción recomendada',
+                value: guidedStepActionSummaryLabel,
+                detail: guidedStepActionSummaryDetail,
+              },
+              {
+                label: 'Estado',
+                value: sessionStatus,
+                detail: visibleCurrentStepLabel,
+              },
+            ],
+          },
+        ]
+      : [
+          {
+            title: 'Vista activa',
+            items: [
+              {
+                label: 'Sección',
+                value: activeSectionConfig.label,
+                detail: activeSectionConfig.description,
+              },
+              {
+                label: 'Objetivo',
+                value: normalizedGoalInput,
+                detail: currentExecutionContextSummary,
+              },
+            ],
+          },
+          {
+            title: 'Próxima acción',
+            items: [
+              {
+                label: 'Ruta activa',
+                value: `${activeExecutionModeLabel} / ${activePlannerStrategyLabel}`,
+                detail: getNextExpectedActionLabel(
+                  plannerExecutionMetadata.nextExpectedAction,
+                ),
+              },
+              {
+                label: 'Corrida',
+                value: flowStageLabel,
+                detail: activeOperationalE2eStatusLabel,
+              },
+            ],
+          },
+        ]
+  const systemStatusItems = [
+    {
+      label: 'Planificador',
+      value: plannerBadge,
+      detail: activePlannerStrategyLabel,
+      tone: 'sky' as const,
+    },
+    {
+      label: 'Ejecutor',
+      value: executorRequestStateLabel,
+      detail: visibleCurrentStepLabel,
+      tone: wizardHasExecutionError ? ('rose' as const) : ('amber' as const),
+    },
+    {
+      label: 'Reuse',
+      value: activeReuseModeLabel,
+      detail: activeReuseDetailLabel,
+      tone: 'default' as const,
+    },
+    {
+      label: 'MEMORIA',
+      value: activeContextHubLabel,
+      detail: activeContextHubUiDetail,
+      tone: activeContextHubStatus?.available ? ('emerald' as const) : ('amber' as const),
+    },
+  ]
+  const attachedProjectInputRows = attachedProjectInputs.map((entry) => ({
+    id: entry.id,
+    kind: entry.kind,
+    name: entry.name,
+    originalPath: entry.originalPath,
+    sizeLabel: formatBytesLabel(entry.sizeBytes),
+    roleLabel: getProjectInputRoleLabel(entry.inferredRole),
+    statusLabel: getProjectInputStatusLabel(entry.status),
+    operatorNote: entry.operatorNote,
+  }))
+  const planOverviewMetrics = [
+    {
+      label: 'Tipo de plan',
+      value: plannerReviewStatusLabel,
+      detail: activePlannerStrategyLabel,
+      tone: 'sky' as const,
+    },
+    {
+      label: 'Proyecto activo',
+      value:
+        normalizeOptionalString(activeProjectContext?.projectRoot) ||
+        (activeProjectContext?.mode === 'new-project'
+          ? 'Nueva entrega local'
+          : activeProjectContext?.mode === 'existing-project'
+            ? 'Proyecto existente'
+            : 'Sin raíz declarada'),
+      detail:
+        normalizeOptionalString(activeProjectContext?.domain) ||
+        normalizeOptionalString(activeProjectContext?.note) ||
+        'El plan actual define el contexto activo de esta corrida.',
+      tone:
+        activeProjectContext?.mode === 'existing-project'
+          ? ('emerald' as const)
+          : ('default' as const),
+    },
+    {
+      label: 'Dominio',
+      value:
+        normalizeOptionalString(activeProjectContext?.domain) ||
+        normalizeOptionalString(activeProductArchitecture?.domain) ||
+        'Sin dominio declarado',
+      detail: plannerExecutionMetadata.reason || 'Sin motivo resumido',
+    },
+    {
+      label: 'Ruta planificada',
+      value: activeExecutionModeLabel,
+      detail: activePlannerStrategyLabel,
+    },
+    {
+      label: 'Siguiente paso',
+      value: getNextExpectedActionLabel(plannerExecutionMetadata.nextExpectedAction),
+      detail: plannerExecutionMetadata.nextExpectedAction || 'No disponible',
+      tone: 'amber' as const,
+    },
+    {
+      label: 'MEMORIA / reuse',
+      value: activeReuseModeLabel,
+      detail: activeReuseArtifactSummary || activeContextHubUiDetail,
+      tone: activeContextHubStatus?.available ? ('violet' as const) : ('default' as const),
+    },
+  ]
+  const executionBoardMetrics = [
+    {
+      label: 'Estado general',
+      value: executorRequestStateLabel,
+      detail: activeOperationalE2eStatusLabel,
+      tone: wizardHasExecutionError ? ('rose' as const) : ('amber' as const),
+    },
+    {
+      label: 'Etapa actual',
+      value: flowStageLabel,
+      detail: flowModeLabel,
+      tone: decisionPending ? ('amber' as const) : ('sky' as const),
+    },
+    {
+      label: contextualExecutorModeCardLabel,
+      value: contextualExecutorModeLabel,
+      detail: contextualExecutorModeDetail,
+      tone: 'default' as const,
+    },
+    {
+      label: contextualRuntimeCardLabel,
+      value: contextualRuntimeLabel,
+      detail: contextualRuntimeDetail,
+      tone: wizardHasExecutionError ? ('rose' as const) : ('default' as const),
+    },
+    {
+      label: 'Resultado listo',
+      value: wizardResultAvailabilityLabel,
+      detail: wizardResultAvailabilityDetail,
+      tone: wizardHasExecutionError ? ('rose' as const) : ('default' as const),
+    },
+  ]
+  const executionTimelineItems = [
+    { label: 'Análisis', status: flowExecutionStageStates[0] },
+    { label: 'Materialización', status: flowExecutionStageStates[2] },
+    { label: 'Validaciones', status: flowExecutionFinished ? flowExecutionStageStates[4] : 'pending' as const },
+    { label: 'Cierre', status: flowExecutionFinished ? 'completed' as const : 'pending' as const },
+  ]
+  const resultSummaryItems = [
+    {
+      label: 'Resumen corto',
+      value: resultHumanSummary,
+    },
+    {
+      label: 'Carpeta creada',
+      value: resultMaterializationFolderLabel,
+    },
+    {
+      label: 'Motor usado',
+      value: resultMaterializationEngineLabel,
+      detail: resultMaterializationBridgeDetail,
+    },
+    {
+      label: 'Codex / bridge',
+      value:
+        latestMaterializationLayer === 'local-deterministic' || fastRouteDetected
+          ? 'No requeridos'
+          : resultCodexLabel,
+      detail: resultBridgeLabel,
+    },
+    {
+      label: 'Validaciones',
+      value: resultMaterializationValidationsLabel,
+      detail: effectiveResultValidationSummaryText,
+    },
+    {
+      label: 'Operaciones',
+      value: resultMaterializationOperationsLabel,
+      detail: resultMaterializationCreatedFoldersLabel,
+    },
+    {
+      label: 'Archivos confirmados',
+      value: resultConfirmedWrittenFilesLabel,
+      detail: `Tocados: ${resultTouchedFilesLabel} / Previstos: ${resultPlannedFilesLabel}`,
+    },
+    {
+      label: 'Cómo abrir la salida',
+      value:
+        resultMaterializationIndexPathLabel !== 'No disponible'
+          ? `Abrir ${resultMaterializationIndexPathLabel}`
+          : 'Abrir el index.html generado',
+      detail:
+        resultIsFrontendProjectMaterialization || resultIsFullstackLocalMaterialization
+          ? 'Se abre por file://, sin servidor ni npm install.'
+          : 'Salida local y revisable dentro del workspace.',
+    },
+    {
+      label: 'Readiness',
+      value: resultMaterializationReadinessValue,
+      detail: resultMaterializationReadinessLabel,
+    },
+  ]
+  const resultNextStepItems = shouldShowLocalMaterializationSummary
+    ? resultMaterializationSuggestedNextSteps.map((stepLabel, index) => ({
+        title:
+          index === 0
+            ? 'Próxima fase segura'
+            : `Siguiente paso ${String(index + 1).padStart(2, '0')}`,
+        detail:
+          index === 0
+            ? `${resultMaterializationNextPhaseLabel}. ${stepLabel} ${resultMaterializationNextPhaseDetail}`.trim()
+            : stepLabel,
+      }))
+    : resultSuggestedActions.map((action) => ({
+        title: action.title,
+        detail: action.detail,
+      }))
 
   const handleWizardBack = () => {
     if (activeWizardStepIndex <= 0) {
@@ -15167,8 +15627,8 @@ function App() {
       if (nextInputs.length === 0) {
         setProjectContextActionMessage(
           response?.canceled
-            ? 'No se agregaron archivos en esta accion.'
-            : 'No se detectaron archivos validos para adjuntar.',
+            ? 'No se agregaron archivos en esta acción.'
+            : 'No se detectaron archivos válidos para adjuntar.',
         )
         return
       }
@@ -15177,7 +15637,9 @@ function App() {
         mergeAttachedProjectInputs(currentInputs, nextInputs),
       )
       setProjectContextActionMessage(
-        `Se agregaron ${nextInputs.length} archivo${nextInputs.length === 1 ? '' : 's'} como metadata de contexto.`,
+        nextInputs.length === 1
+          ? 'Se agregó 1 archivo como metadata de contexto.'
+          : `Se agregaron ${nextInputs.length} archivos como metadata de contexto.`,
       )
     } finally {
       setIsProjectContextBusy(false)
@@ -15199,8 +15661,8 @@ function App() {
       if (nextInputs.length === 0) {
         setProjectContextActionMessage(
           response?.canceled
-            ? 'No se agrego ninguna carpeta en esta accion.'
-            : 'No se detecto una carpeta valida para adjuntar.',
+            ? 'No se agregó ninguna carpeta en esta acción.'
+            : 'No se detectó una carpeta válida para adjuntar.',
         )
         return
       }
@@ -15209,7 +15671,7 @@ function App() {
         mergeAttachedProjectInputs(currentInputs, nextInputs),
       )
       setProjectContextActionMessage(
-        'La carpeta de assets quedo referenciada como insumo del proyecto.',
+        'La carpeta de assets quedó referenciada como insumo del proyecto.',
       )
     } finally {
       setIsProjectContextBusy(false)
@@ -15227,7 +15689,7 @@ function App() {
       if (!nextContext) {
         setProjectContextActionMessage(
           response?.canceled
-            ? 'No se selecciono ningun proyecto existente.'
+            ? 'No se seleccionó ningún proyecto existente.'
             : 'No se pudo analizar la carpeta seleccionada.',
         )
         return
@@ -15235,7 +15697,7 @@ function App() {
 
       setExistingProjectContext(nextContext)
       setProjectContextActionMessage(
-        'La carpeta seleccionada quedo analizada en modo read-only.',
+        'La carpeta seleccionada quedó analizada en modo read-only.',
       )
     } finally {
       setIsProjectContextBusy(false)
@@ -17925,6 +18387,1084 @@ function App() {
     await runAutoFlowLoop(1)
   }
 
+  const guidedStepContent =
+    activeWizardStep === 'goal' ? (
+      <div className="grid gap-4">
+        <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
+          <label
+            htmlFor="guided-goal-input"
+            className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+          >
+            01. Objetivo
+          </label>
+          <div className="mt-2 text-xl font-semibold text-white">
+            Qué tiene que resolver JEFE
+          </div>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+            El objetivo es el ancla del recorrido. Si queda preciso, el resto del
+            flujo se entiende más rápido y el planner necesita menos aclaraciones.
+          </p>
+          <textarea
+            id="guided-goal-input"
+            value={goalInput}
+            onChange={(event) => setGoalInput(event.target.value)}
+            rows={8}
+            className="mt-4 min-h-[240px] w-full rounded-[24px] border border-white/10 bg-slate-950/80 px-4 py-4 text-sm leading-7 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300/30"
+            placeholder="Escribí qué querés que JEFE resuelva, qué resultado esperás y cualquier límite importante."
+          />
+        </article>
+      </div>
+    ) : activeWizardStep === 'context' ? (
+      <div className="space-y-4">
+        <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
+          <label
+            htmlFor="guided-context-input"
+            className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+          >
+            01. Contexto adicional
+          </label>
+          <div className="mt-2 text-xl font-semibold text-white">
+            Alcance, restricciones y notas del operador
+          </div>
+          <textarea
+            id="guided-context-input"
+            ref={executionContextInputRef}
+            value={executionContextInput}
+            onChange={(event) => setExecutionContextInput(event.target.value)}
+            rows={8}
+            className="mt-4 w-full rounded-[24px] border border-white/10 bg-slate-950/80 px-4 py-4 text-sm leading-7 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300/30"
+            placeholder="Sumá restricciones, referencias, alcance, aclaraciones del operador o información operativa útil."
+          />
+        </article>
+
+        <ProjectInputsPanel
+          summary={attachedProjectInputsSummary}
+          actionMessage={projectContextActionMessage}
+          busy={isProjectContextBusy}
+          items={attachedProjectInputRows}
+          onAttachFiles={handleAttachInputFiles}
+          onAttachFolder={handleAttachInputFolder}
+          onRemove={handleRemoveAttachedProjectInput}
+          onNoteChange={handleAttachedProjectInputNoteChange}
+        />
+
+        <ExistingProjectPanel
+          summary={existingProjectSummary}
+          busy={isProjectContextBusy}
+          project={existingProjectContext}
+          onPick={handlePickExistingProject}
+          onAnalyze={handleAnalyzeExistingProject}
+          onClear={handleClearSelectedProject}
+        />
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+              04. Modo de trabajo
+            </div>
+            <div className="mt-4 grid gap-4">
+              <div>
+                <div className="text-sm font-semibold text-white">Participación del operador</div>
+                <div className="mt-3 grid gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setUserParticipationMode('user-will-contribute')}
+                    className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
+                      userParticipationMode === 'user-will-contribute'
+                        ? 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100'
+                        : 'border-white/10 bg-slate-950/60 text-slate-200 hover:bg-white/10'
+                    }`}
+                  >
+                    Sí, voy a aportar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUserParticipationMode('brain-decides-missing')}
+                    className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
+                      userParticipationMode === 'brain-decides-missing'
+                        ? 'border-emerald-300/30 bg-emerald-300/10 text-emerald-100'
+                        : 'border-white/10 bg-slate-950/60 text-slate-200 hover:bg-white/10'
+                    }`}
+                  >
+                    No, decidí vos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUserParticipationMode(DEFAULT_USER_PARTICIPATION_MODE)}
+                    className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-left text-sm font-medium text-slate-300 transition hover:bg-white/10"
+                  >
+                    Sin definir
+                  </button>
+                </div>
+                <div className="mt-3 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                  {userParticipationSummary}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-sm font-semibold text-white">Ruta de proyecto</div>
+                <div className="mt-3 grid gap-2">
+                  {(['auto', 'new-project', 'continue-existing'] as ProjectWorkMode[]).map(
+                    (mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setProjectWorkMode(mode)}
+                        className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
+                          projectWorkMode === mode
+                            ? 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100'
+                            : 'border-white/10 bg-slate-950/60 text-slate-200 hover:bg-white/10'
+                        }`}
+                      >
+                        {getProjectWorkModeLabel(mode)}
+                      </button>
+                    ),
+                  )}
+                </div>
+                <div className="mt-3 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                  {projectWorkModeSummary}
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+              05. Espacio de trabajo
+            </div>
+            <div className="mt-2 text-xl font-semibold text-white">Dónde va a operar JEFE</div>
+            <textarea
+              id="guided-workspace-path"
+              value={workspacePath}
+              onChange={(event) => setWorkspacePath(event.target.value)}
+              rows={4}
+              className="mt-4 w-full rounded-[24px] border border-white/10 bg-slate-950/80 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300/30"
+            />
+            <div className="mt-3 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+              {workspaceStatusLabel}
+            </div>
+
+            <div className="mt-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+              06. Resumen del contexto
+            </div>
+            <div className="mt-3 grid gap-3">
+              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-slate-500">Insumos</div>
+                <div className="mt-2 text-sm font-medium text-slate-100">
+                  {attachedProjectInputsSummary}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                  Proyecto existente
+                </div>
+                <div className="mt-2 text-sm font-medium text-slate-100">
+                  {existingProjectContext?.projectName ||
+                    (existingProjectContext?.selectedPath ? 'Seleccionado' : 'No seleccionado')}
+                </div>
+                <div
+                  title={existingProjectContext?.selectedPath || ''}
+                  className="mt-1 truncate text-xs text-slate-400"
+                >
+                  {existingProjectContext?.selectedPath || 'Solo texto e insumos por ahora.'}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-slate-500">Modo</div>
+                <div className="mt-2 text-sm font-medium text-slate-100">
+                  {getProjectWorkModeLabel(projectWorkMode)}
+                </div>
+                <div className="mt-1 text-xs text-slate-400">{projectWorkModeSummary}</div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    ) : activeWizardStep === 'brain' ? (
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+            03. Criterio del Cerebro
+          </div>
+          <div className="mt-2 text-xl font-semibold text-white">
+            Cómo decide y cuánto resuelve por su cuenta
+          </div>
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            {BRAIN_COST_MODE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setBrainCostMode(option.value)}
+                className={`rounded-[24px] border px-4 py-4 text-left transition ${
+                  brainCostMode === option.value
+                    ? 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100'
+                    : 'border-white/10 bg-slate-950/60 text-slate-200 hover:bg-white/10'
+                }`}
+              >
+                <div className="text-sm font-medium">{option.label}</div>
+                <div className="mt-1 text-xs leading-5 text-slate-400">
+                  {option.description}
+                </div>
+              </button>
+            ))}
+          </div>
+        </article>
+        <div className="space-y-4">
+          <MetricCard
+            label="Modo activo"
+            value={getBrainCostModeLabel(brainCostMode)}
+            detail={activeBrainRoutingMode}
+            tone="sky"
+          />
+          <MetricCard
+            label="Proveedor"
+            value={`${activeBrainSelectedProvider} -> ${activeBrainResolvedProvider}`}
+            detail={`Confianza: ${activeBrainRoutingConfidence}`}
+          />
+          <MetricCard
+            label="Naturaleza"
+            value={activeBrainProblemNature}
+            detail={activeBrainRoutingReason}
+          />
+        </div>
+      </div>
+    ) : activeWizardStep === 'memory' ? (
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-4">
+          <ContextHubControlPanel
+            description="JEFE puede consultar MEMORIA, reintentar la conexión, abrir la UI real cuando esté disponible o seguir sin bloquear el flujo."
+            stateLabel={contextHubRuntimeLabel}
+            stateTone={contextHubRuntimeTone}
+            stateDetail={contextHubRuntimeDetail}
+            lastEventLabel={contextHubLastEventLabel}
+            lastEventTone={contextHubLastEventTone}
+            lastEventDetail={contextHubLastEventDetail}
+            openTargetLabel={contextHubRuntimeOpenTargetLabel}
+            openTargetDetail={contextHubRuntimeOpenTargetDetail}
+            openButtonLabel={contextHubRuntimeOpenButtonLabel}
+            appPathLabel={contextHubRuntimeAppPathLabel}
+            workspaceRootLabel={contextHubRuntimeWorkspaceLabel}
+            runtimeNotice={contextHubRuntimeState.runtimeLogNotice || ''}
+            actionMessage={contextHubActionMessage}
+            lastCheckLabel={contextHubLastCheckLabel}
+            canStart={contextHubRuntimeState.canStart === true}
+            canOpen={contextHubRuntimeState.canOpen === true}
+            isBusy={isContextHubBusy}
+            isStarting={isStartingContextHub}
+            onRetry={handleRetryContextHubConnection}
+            onOpen={handleOpenContextHub}
+            onStart={handleStartLocalContextHub}
+          />
+          <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
+            <label
+              htmlFor="guided-reuse-mode"
+              className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+            >
+              04. Memoria reutilizable
+            </label>
+            <div className="mt-2 text-xl font-semibold text-white">Qué querés reutilizar</div>
+            <select
+              id="guided-reuse-mode"
+              value={manualReuseMode}
+              onChange={(event) => setManualReuseMode(event.target.value as ManualReuseMode)}
+              className="mt-4 w-full rounded-[24px] border border-white/10 bg-slate-950/80 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition focus:border-cyan-300/30"
+            >
+              <option value="auto">Búsqueda automática</option>
+              <option value="none">No reutilizar</option>
+              <option value="inspiration-only">Usar solo inspiración</option>
+              <option value="reuse-style">Reutilizar estilo</option>
+              <option value="reuse-structure">Reutilizar estructura</option>
+              <option value="reuse-style-and-structure">Reutilizar estilo y estructura</option>
+            </select>
+            <div className="mt-4 text-sm leading-6 text-slate-300">
+              {manualReusablePreferencePayload
+                ? manualReusablePreferencePayload.artifactId
+                  ? `El planificador va a priorizar ${manualReuseModeLabel.toLocaleLowerCase()} desde ${manualReusablePreferencePayload.artifactId}.`
+                  : 'La corrida va a seguir sin reutilización por decisión manual.'
+                : 'Si no elegís nada, la app sigue con búsqueda automática.'}
+            </div>
+          </article>
+          <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  Artefactos sugeridos
+                </div>
+                <div className="mt-2 text-sm text-slate-400">
+                  Elegí uno si querés orientar el plan. Si no, seguí igual.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExperienceMode('advanced')}
+                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+              >
+                Ver panel avanzado
+              </button>
+            </div>
+            <div className="mt-4 grid gap-3 lg:grid-cols-3">
+              {isLoadingReusableArtifacts ? (
+                <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm text-slate-300 lg:col-span-3">
+                  Cargando artefactos reutilizables...
+                </div>
+              ) : reusableArtifactError ? (
+                <div className="rounded-2xl border border-red-300/20 bg-red-300/10 px-4 py-4 text-sm text-red-100 lg:col-span-3">
+                  {reusableArtifactError}
+                </div>
+              ) : reusableWizardArtifacts.length === 0 ? (
+                <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm text-slate-300 lg:col-span-3">
+                  No hay artefactos listos para sugerir en esta vista compacta.
+                </div>
+              ) : (
+                reusableWizardArtifacts.map((artifact) => {
+                  const preview = buildReusableArtifactPreviewModel(artifact)
+                  const isSelected = selectedReusableArtifact?.id === artifact.id
+
+                  return (
+                    <article
+                      key={artifact.id}
+                      data-reusable-artifact-card={artifact.id}
+                      className={joinClasses(
+                        'rounded-2xl border p-4',
+                        isSelected
+                          ? 'border-cyan-300/30 bg-cyan-300/10'
+                          : 'border-white/8 bg-slate-950/50',
+                      )}
+                    >
+                      <div
+                        data-reusable-artifact-preview={artifact.id}
+                        className="rounded-2xl border border-white/10 p-4"
+                        style={{
+                          background: preview.background,
+                          color: preview.text,
+                        }}
+                      >
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.24em]">
+                          {preview.heroLabel}
+                        </div>
+                        <div className="mt-2 text-lg font-semibold">
+                          {artifact.sectorLabel || artifact.sector || artifact.id}
+                        </div>
+                        <div className="mt-2 text-xs leading-5">{preview.previewBody}</div>
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          data-reusable-artifact-select={artifact.id}
+                          onClick={() => {
+                            setSelectedReusableArtifact(artifact)
+                            setManualReuseMode((currentValue) =>
+                              currentValue === 'auto'
+                                ? 'reuse-style-and-structure'
+                                : currentValue,
+                            )
+                          }}
+                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                        >
+                          {isSelected ? 'Seleccionado' : 'Usar este artefacto'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDetailReusableArtifact(artifact)}
+                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                        >
+                          Ver detalle
+                        </button>
+                      </div>
+                    </article>
+                  )
+                })
+              )}
+            </div>
+          </article>
+        </div>
+        <div className="space-y-4">
+          <MetricCard
+            label="Selección actual"
+            value={manualReuseModeLabel}
+            detail={selectedReusableArtifactSummary}
+            tone={manualReuseMode === 'auto' ? 'default' : 'sky'}
+          />
+          <MetricCard
+            label="Memoria reutilizable"
+            value={`${activeReuseModeLabel} / ${activeReuseFoundCount} coincidencia(s)`}
+            detail={activeReuseDetailLabel}
+            tone="violet"
+          />
+        </div>
+      </div>
+    ) : activeWizardStep === 'plan' ? (
+      <PlanOverviewPanel
+        title={plannerIsReviewOnly ? plannerReviewStatusLabel : 'Plan generado'}
+        helperText={plannerReviewHelperText}
+        instruction={
+          hasWizardPlan
+            ? plannerInstruction
+            : 'Todavía no generaste un plan en esta corrida.'
+        }
+        metrics={planOverviewMetrics}
+        secondaryActions={
+          <button
+            type="button"
+            onClick={handleWizardGeneratePlan}
+            disabled={isPlanning}
+            className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
+          >
+            {isPlanning ? 'Generando...' : 'Regenerar plan'}
+          </button>
+        }
+        primaryAction={
+          plannerIsReviewOnly ? (
+            handlePlannerReviewPrimaryAction && plannerReviewPrimaryActionLabel ? (
+              <button
+                type="button"
+                onClick={handlePlannerReviewPrimaryAction}
+                disabled={isPlanning}
+                className="rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-medium text-cyan-100 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+              >
+                {plannerReviewPrimaryActionLabel}
+              </button>
+            ) : null
+          ) : (
+            <button
+              type="button"
+              onClick={handleWizardExecute}
+              disabled={!canExecuteInstruction || isExecutingTask}
+              className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+            >
+              {isExecutingTask ? 'Ejecutando...' : executeCurrentInstructionLabel}
+            </button>
+          )
+        }
+        callout={
+          activeExistingProjectDetection?.detected &&
+          activeExistingProjectDetection.applicable === false ? (
+            <article className="rounded-[28px] border border-amber-300/20 bg-amber-300/10 p-5">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100">
+                Proyecto detectado pero ignorado
+              </div>
+              <div className="mt-3 text-sm leading-6 text-amber-50">
+                {normalizeOptionalString(activeExistingProjectDetection.reason) ||
+                  'Hay un proyecto existente en el workspace, pero este plan abrió una entrega nueva.'}
+              </div>
+            </article>
+          ) : null
+        }
+        technicalDetails={
+          <>
+            <div className="grid gap-3 md:grid-cols-2">
+              <MetricCard label="decisionKey" value={activeDecisionKeyLabel} />
+              <MetricCard
+                label="Tareas previstas"
+                value={
+                  effectivePlannerExecutionMetadata.tasks.length > 0
+                    ? `${effectivePlannerExecutionMetadata.tasks.length} paso(s)`
+                    : 'Sin tareas estructuradas'
+                }
+                detail={
+                  effectivePlannerExecutionMetadata.tasks[0]?.title ||
+                  effectivePlannerExecutionMetadata.tasks[0]?.operation ||
+                  'No disponible'
+                }
+              />
+            </div>
+            {activeProductArchitecture ? (
+              <ProductArchitectureCard
+                architecture={activeProductArchitecture}
+                compact
+                reviewOnly={plannerIsReviewOnly}
+                onPrepareSafeFirstDelivery={
+                  plannerIsReviewOnly ? handlePrepareSafeFirstDeliveryPlan : null
+                }
+              />
+            ) : null}
+            {shouldShowProjectContinuity ? (
+              <ProjectContinuityCenterCard
+                nextActionPlan={activeNextActionPlan}
+                implementationRoadmap={activeImplementationRoadmap}
+                phaseExpansionPlan={activePhaseExpansionPlan}
+                projectPhaseExecutionPlan={activeProjectPhaseExecutionPlan}
+                localProjectManifest={activeLocalProjectManifest}
+                expansionOptions={activeExpansionOptions}
+                moduleExpansionPlan={activeModuleExpansionPlan}
+                continuationActionPlan={activeContinuationActionPlan}
+                projectContinuationState={activeProjectContinuationState}
+                projectReadinessState={activeProjectReadinessState}
+                approvalRequestPlan={activeApprovalRequestPlan}
+                runtimeApprovalState={activeRuntimeApprovalState}
+                compact
+                busy={isPlanning || isExecutingTask}
+                onPreparePhase={handlePrepareProjectPhase}
+                onMaterializePhase={handleMaterializeProjectPhase}
+                onPrepareModuleExpansion={handlePrepareModuleExpansion}
+                onMaterializeModuleExpansion={handleMaterializeModuleExpansion}
+                onPrepareContinuationAction={handlePrepareContinuationAction}
+                onMaterializeContinuationAction={handleMaterializeContinuationAction}
+              />
+            ) : null}
+            {shouldShowProjectBlueprint && activeProjectBlueprint ? (
+              <ProjectBlueprintCard
+                blueprint={activeProjectBlueprint}
+                questionPolicy={activeQuestionPolicy}
+                compact
+              />
+            ) : null}
+            {shouldShowImplementationRoadmap && activeImplementationRoadmap ? (
+              <ImplementationRoadmapCard roadmap={activeImplementationRoadmap} compact />
+            ) : null}
+            {shouldShowLocalProjectManifest && activeLocalProjectManifest ? (
+              <LocalProjectManifestCard
+                manifest={activeLocalProjectManifest}
+                compact
+                onPreparePhase={handlePrepareProjectPhase}
+              />
+            ) : null}
+            {shouldShowProjectPhaseExecutionPlan && activeProjectPhaseExecutionPlan ? (
+              <ProjectPhaseExecutionPlanCard
+                plan={activeProjectPhaseExecutionPlan}
+                compact
+                onMaterializePhase={handleMaterializeProjectPhase}
+              />
+            ) : null}
+            {shouldShowNextActionPlan && activeNextActionPlan ? (
+              <NextActionPlanCard plan={activeNextActionPlan} />
+            ) : null}
+            {shouldShowValidationPlan && activeValidationPlan ? (
+              <ValidationPlanCard plan={activeValidationPlan} compact />
+            ) : null}
+            {shouldShowPhaseExpansionPlan && activePhaseExpansionPlan ? (
+              <PhaseExpansionPlanCard plan={activePhaseExpansionPlan} compact />
+            ) : null}
+            {activeSafeFirstDeliveryPlan ? (
+              <SafeFirstDeliveryPlanCard
+                plan={activeSafeFirstDeliveryPlan}
+                compact
+                reviewOnly={plannerIsReviewOnly}
+                onPrepareMaterialization={
+                  plannerIsReviewOnly ? handlePrepareSafeMaterializationPlan : null
+                }
+              />
+            ) : null}
+            {shouldShowScalableDeliveryPlan && activeScalableDeliveryPlan ? (
+              <ScalableDeliveryPlanCard
+                plan={activeScalableDeliveryPlan}
+                compact
+                reviewOnly={plannerIsReviewOnly}
+                nextExpectedAction={plannerExecutionMetadata.nextExpectedAction}
+                onPrepareMaterialization={
+                  plannerIsReviewOnly
+                    ? normalizeOptionalString(
+                          activeScalableDeliveryPlan.deliveryLevel,
+                        ).toLocaleLowerCase() === 'fullstack-local'
+                      ? handlePrepareFullstackLocalMaterializationPlan
+                      : handlePrepareFrontendProjectMaterializationPlan
+                    : null
+                }
+              />
+            ) : null}
+          </>
+        }
+      />
+    ) : activeWizardStep === 'execution' ? (
+      <ExecutionTimeline
+        metrics={executionBoardMetrics}
+        stages={executionTimelineItems}
+        activity={liveActivityEvents}
+        result={executorResult}
+        blockedMessage={
+          decisionPending
+            ? 'Hay una decisión humana pendiente. El modal de aprobación ya quedó abierto para resolverla sin perder el flujo.'
+            : undefined
+        }
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={() => setIsFlowConsoleOpen(true)}
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+            >
+              Ver detalle técnico
+            </button>
+            {wizardCanShowResult ? (
+              <button
+                type="button"
+                onClick={handleWizardNext}
+                disabled={!wizardCanShowResult}
+                className="rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-medium text-cyan-100 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+              >
+                {wizardExecutionResultButtonLabel}
+              </button>
+            ) : null}
+          </>
+        }
+      />
+    ) : (
+      <ResultSummaryPanel
+        statusLabel={
+          shouldShowLocalMaterializationSummary
+            ? resultMaterializationSummaryTitle
+            : effectiveResultStatusPresentation.label
+        }
+        statusTone={effectiveResultStatusPresentation.tone}
+        statusDetail={
+          shouldShowLocalMaterializationSummary
+            ? resultMaterializationSummaryDescription
+            : effectiveResultStatusPresentation.detail
+        }
+        summaryItems={resultSummaryItems}
+        summaryText={resultHumanText}
+        nextStepItems={resultNextStepItems}
+        actions={
+          <>
+            {resultMaterializationNextPhaseId ? (
+              <button
+                type="button"
+                onClick={() => handlePrepareProjectPhase(resultMaterializationNextPhaseId)}
+                disabled={isPlanning || isExecutingTask}
+                className="rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-medium text-cyan-100 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+              >
+                {`Preparar ${resultMaterializationNextPhaseLabel}`}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={handleWizardStartOver}
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+            >
+              Volver al objetivo
+            </button>
+            <button
+              type="button"
+              onClick={() => setExperienceMode('advanced')}
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+            >
+              Abrir panel avanzado
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsFlowConsoleOpen(true)}
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+            >
+              Ver detalle técnico
+            </button>
+          </>
+        }
+        technicalSections={
+          <>
+            <ResultSectionCard title="Archivos" description={resultWrittenArtifactsDescription}>
+              <ResultKeyValueGrid
+                items={[
+                  {
+                    label: 'Carpeta principal',
+                    value: resultPrimaryAffectedPathLabel || 'No disponible',
+                  },
+                  {
+                    label: 'Target actual',
+                    value: resultCurrentTargetPathLabel || 'No disponible',
+                  },
+                  {
+                    label: 'Carpetas creadas',
+                    value:
+                      resultCreatedFolderPaths.length > 0
+                        ? `${resultCreatedFolderPaths.length} carpeta(s)`
+                        : 'Sin carpetas creadas',
+                  },
+                  {
+                    label: 'Archivos escritos confirmados',
+                    value:
+                      resultWrittenFilePaths.length > 0
+                        ? `${resultWrittenFilePaths.length} archivo(s)`
+                        : 'Sin archivos escritos confirmados',
+                  },
+                  {
+                    label: 'Archivos tocados adicionales',
+                    value:
+                      resultTouchedFilePaths.length > 0
+                        ? `${resultTouchedFilePaths.length} archivo(s)`
+                        : 'Sin archivos tocados',
+                  },
+                  {
+                    label: 'Archivos previstos por plan',
+                    value:
+                      resultMaterializationFileLabels.length > 0
+                        ? `${resultMaterializationFileLabels.length} archivo(s)`
+                        : 'Sin archivos previstos',
+                  },
+                ]}
+              />
+              <div className="mt-4 grid gap-2">
+                {resultWrittenArtifactPaths.length > 0 ? (
+                  resultWrittenArtifactPaths.map((artifactPath) => (
+                    <div
+                      key={`result-artifact-${artifactPath}`}
+                      className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
+                    >
+                      {artifactPath}
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                    No se reportaron archivos previstos ni tocados.
+                  </div>
+                )}
+              </div>
+              <div className="mt-4 grid gap-2">
+                {resultMaterializationLimits.map((limitLabel) => (
+                  <div
+                    key={`result-limit-${limitLabel}`}
+                    className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
+                  >
+                    {limitLabel}
+                  </div>
+                ))}
+              </div>
+            </ResultSectionCard>
+
+            <ResultSectionCard
+              title="Validaciones"
+              description="Chequeos reportados por la ejecución para confirmar la salida material."
+            >
+              <div className="flex flex-wrap items-center gap-3">
+                <ResultStatusBadge
+                  label={
+                    latestValidationResults.length > 0
+                      ? `${latestValidationOkCount}/${latestValidationResults.length} OK`
+                      : resultExecutionNeedsMaterialReview
+                        ? 'Validación faltante'
+                        : 'Sin validaciones'
+                  }
+                  tone={
+                    latestValidationResults.length > 0 &&
+                    latestValidationOkCount === latestValidationResults.length
+                      ? 'emerald'
+                      : latestValidationResults.length > 0
+                        ? 'amber'
+                        : resultExecutionNeedsMaterialReview
+                          ? 'rose'
+                          : 'default'
+                  }
+                />
+                <div className="text-sm leading-6 text-slate-300">
+                  {effectiveResultValidationSummaryText}
+                </div>
+              </div>
+              <div className="mt-4 grid gap-2">
+                <ResultKeyValueGrid
+                  items={[
+                    {
+                      label: 'Validaciones OK',
+                      value:
+                        latestValidationResults.length > 0
+                          ? `${latestValidationOkCount}`
+                          : '0',
+                    },
+                    {
+                      label: 'Validaciones fallidas',
+                      value:
+                        latestValidationResults.length > 0
+                          ? `${latestValidationFailureCount}`
+                          : '0',
+                    },
+                  ]}
+                />
+                {resultValidationItems.length > 0 ? (
+                  resultValidationItems.map((item) => (
+                    <div
+                      key={item.key}
+                      className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium leading-6 text-slate-100">
+                          {item.label}
+                        </div>
+                        <div className="text-xs leading-5 text-slate-400">
+                          {item.detail || 'Validación reportada'}
+                        </div>
+                      </div>
+                      <ResultStatusBadge
+                        label={item.ok ? 'OK' : 'Fallo'}
+                        tone={item.ok ? 'emerald' : 'rose'}
+                      />
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                    {resultExecutionNeedsMaterialReview
+                      ? 'La ejecución no devolvió validaciones finales para mostrar.'
+                      : 'No hay validaciones disponibles para mostrar.'}
+                  </div>
+                )}
+              </div>
+            </ResultSectionCard>
+
+            <ResultSectionCard
+              title="Reusable y scope"
+              description="Aplicación real de memoria reusable y restricciones respetadas por la corrida."
+            >
+              <ResultKeyValueGrid
+                items={[
+                  {
+                    label: 'Reusable',
+                    value: latestAppliedReuseModeLabel,
+                    detail:
+                      !latestReuseApplied
+                        ? 'No se aplicó memoria reusable en esta corrida.'
+                        : resultReusableSummaryLabel,
+                  },
+                  {
+                    label: resultReusableSupportLabel,
+                    value: resultReusableSupportValue,
+                  },
+                  {
+                    label: 'Scope',
+                    value: resultScopeSummaryLabel,
+                    detail: latestContinuationAnchor || 'Sin continuation anchor reportado',
+                  },
+                  {
+                    label: 'MEMORIA / Context Hub',
+                    value: resultContextHubLabel,
+                    detail: resultContextHubDetail,
+                  },
+                  {
+                    label: 'Archivos bloqueados respetados',
+                    value:
+                      resultBlockedPaths.length > 0
+                        ? resultScopeRespected
+                          ? 'S?'
+                          : 'Revisar'
+                        : 'No aplica',
+                    detail:
+                      resultBlockedPaths.length > 0
+                        ? resultScopeRespected
+                          ? 'Los paths bloqueados no aparecen en touchedPaths ni createdPaths.'
+                          : 'Hay paths bloqueados que requieren revisión técnica.'
+                        : 'La corrida no defini? archivos bloqueados.',
+                  },
+                ]}
+              />
+              {resultAllowedPaths.length > 0 ? (
+                <div className="mt-4 grid gap-2">
+                  {resultAllowedPaths.map((pathValue) => (
+                    <div
+                      key={`allowed-${pathValue}`}
+                      className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
+                    >
+                      {pathValue}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {latestScopeSuccessCriteria.length > 0 ? (
+                <div className="mt-4 grid gap-2">
+                  {latestScopeSuccessCriteria.map((criterion) => (
+                    <div
+                      key={criterion}
+                      className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
+                    >
+                      {criterion}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </ResultSectionCard>
+          </>
+        }
+      />
+    )
+
+  const guidedFooterNote =
+    activeWizardStep === 'plan'
+      ? plannerIsReviewOnly
+        ? 'El CTA principal prepara la siguiente acción segura; todavía no ejecuta archivos.'
+        : 'El CTA principal ejecuta la instrucción actual con el modo y el scope activos.'
+      : activeWizardStep === 'execution'
+        ? 'Si aparece una aprobación, el flujo queda bloqueado de forma explícita hasta resolverla.'
+        : activeWizardStep === 'result'
+          ? 'La salida final ya separa lo operativo de lo técnico para iterar con menos ruido.'
+          : 'Completá este bloque y seguí al próximo paso.'
+
+  const guidedFooterActions = (
+    <>
+      {activeWizardStep !== 'goal' ? (
+        <button
+          type="button"
+          onClick={handleWizardBack}
+          className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+        >
+          Atrás
+        </button>
+      ) : null}
+
+      {(activeWizardStep === 'goal' ||
+        activeWizardStep === 'context' ||
+        activeWizardStep === 'brain') && (
+        <button
+          type="button"
+          onClick={handleWizardNext}
+          disabled={activeWizardStep === 'goal' && !goalInput.trim()}
+          className="rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-medium text-cyan-100 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+        >
+          Siguiente
+        </button>
+      )}
+
+      {activeWizardStep === 'memory' ? (
+        <button
+          type="button"
+          onClick={handleWizardGeneratePlan}
+          disabled={isPlanning || !goalInput.trim()}
+          className="rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-medium text-cyan-100 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+        >
+          {isPlanning ? 'Generando...' : 'Generar plan'}
+        </button>
+      ) : null}
+
+      {activeWizardStep === 'execution' ? (
+        <button
+          type="button"
+          onClick={handleWizardNext}
+          disabled={!wizardCanShowResult}
+          className="rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-medium text-cyan-100 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+        >
+          {wizardExecutionResultButtonLabel}
+        </button>
+      ) : null}
+    </>
+  )
+
+  const guidedShell = (
+    <AppShell
+      eyebrow="Centro de control guiado"
+      title="JEFE ordena el flujo sin esconder capacidad"
+      description="Shell operativo nuevo para entender rápido qué hace JEFE, en qué paso está el operador y qué acción sigue."
+      modeSwitcher={
+        <div className="inline-flex rounded-2xl border border-white/10 bg-white/[0.04] p-1">
+          <button
+            type="button"
+            onClick={() => setExperienceMode('guided')}
+            className={joinClasses(
+              'rounded-xl px-4 py-2 text-sm font-medium transition',
+              experienceMode === 'guided'
+                ? 'bg-cyan-300/15 text-cyan-100'
+                : 'text-slate-300 hover:bg-white/5',
+            )}
+          >
+            Flujo guiado
+          </button>
+          <button
+            type="button"
+            onClick={() => setExperienceMode('advanced')}
+            className={joinClasses(
+              'rounded-xl px-4 py-2 text-sm font-medium transition',
+              experienceMode === 'advanced'
+                ? 'bg-cyan-300/15 text-cyan-100'
+                : 'text-slate-300 hover:bg-white/5',
+            )}
+          >
+            Panel avanzado
+          </button>
+        </div>
+      }
+      quickActions={
+        <>
+          <button
+            type="button"
+            onClick={() => setFlowConsoleVisibility({ open: true, pinned: true })}
+            className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+          >
+            Consola técnica
+          </button>
+          <button
+            type="button"
+            onClick={() => setExperienceMode('advanced')}
+            className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+          >
+            Abrir panel avanzado
+          </button>
+        </>
+      }
+      navItems={appShellNavItems}
+      statusLabel={`${runtimePlatformLabel} / ${runtimeOnlineLabel}`}
+      statusDetail={currentWorkspaceSummary}
+      statusBadge={activeContextHubStatus?.available ? 'Online' : 'Local'}
+      mainContent={
+        <GuidedFlowShell
+          stepIndex={activeWizardStepIndex}
+          totalSteps={GUIDED_WIZARD_STEPS.length}
+          title={activeWizardStepConfig.label}
+          description={activeWizardStepConfig.description}
+          statusBadges={[
+            {
+              label: 'Planificador',
+              value: plannerBadge,
+              tone: 'sky',
+            },
+            {
+              label: 'Ejecutor',
+              value: executorRequestStateLabel,
+              tone: wizardHasExecutionError ? 'rose' : 'amber',
+            },
+            {
+              label: 'Reuse',
+              value: activeReuseModeLabel,
+              tone: 'violet',
+            },
+            {
+              label: 'MEMORIA',
+              value: activeContextHubLabel,
+              tone: activeContextHubStatus?.available ? 'emerald' : 'amber',
+            },
+          ]}
+          actionSummaryLabel={guidedStepActionSummaryLabel}
+          actionSummaryDetail={guidedStepActionSummaryDetail}
+          progressItems={guidedProgressItems}
+          footerNote={guidedFooterNote}
+          footerActions={guidedFooterActions}
+        >
+          {guidedStepContent}
+        </GuidedFlowShell>
+      }
+      rightPanel={
+        <div className="space-y-4">
+          <ContextSummaryPanel
+            title="Panel contextual"
+            description="Resumen de contexto, próxima acción y apoyo para decidir sin hundirse en detalle técnico."
+            sections={contextPanelSections}
+            actions={
+              <>
+                <button
+                  type="button"
+                  onClick={() => setSelectedRunSummary(latestExecutionRunSummary)}
+                  disabled={!latestExecutionRunSummary}
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
+                >
+                  Ver última corrida
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetSessionMemory}
+                  disabled={isRunning}
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
+                >
+                  Reiniciar memoria de la sesión
+                </button>
+              </>
+            }
+          />
+          <SystemStatusPanel items={systemStatusItems} />
+        </div>
+      }
+      footer={
+        <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+          <span>{sessionStatus}</span>
+          <span>
+            {activeExecutionModeLabel} / {activePlannerStrategyLabel} / {runtimeOnlineLabel}
+          </span>
+        </div>
+      }
+    />
+  )
+
   const useLegacySingleScreenLayout = false
 
   return useLegacySingleScreenLayout ? (
@@ -19499,7 +21039,7 @@ function App() {
                         Actividad en vivo
                       </div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        ?ltimos 6 eventos
+                        Últimos 6 eventos
                       </div>
                     </div>
                     <div className="mt-4 space-y-2">
@@ -19779,1991 +21319,44 @@ function App() {
   ) : (
     <main
       ref={appRootRef}
-      className={joinClasses(
-        'w-full bg-transparent text-slate-100',
-        experienceMode === 'guided'
-          ? 'h-screen overflow-hidden'
-          : 'min-h-screen',
-      )}
+      className="min-h-screen w-full bg-transparent text-slate-100"
     >
       <div
-        className={joinClasses(
-          'mx-auto flex w-full max-w-[1600px] flex-col px-4 py-6 sm:px-6 lg:px-8',
-          experienceMode === 'guided'
-            ? 'h-full overflow-hidden'
-            : 'min-h-screen',
-        )}
+        className="mx-auto flex min-h-screen w-full max-w-[1600px] flex-col px-4 py-6 sm:px-6 lg:px-8"
       >
-        <div className="mb-3 rounded-3xl border border-white/10 bg-slate-950/50 px-4 py-2.5 shadow-[0_18px_50px_rgba(0,0,0,0.28)] sm:px-5">
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                Experiencia principal
+        {experienceMode === 'advanced' ? (
+          <div className="mb-3 rounded-3xl border border-white/10 bg-slate-950/50 px-4 py-2.5 shadow-[0_18px_50px_rgba(0,0,0,0.28)] sm:px-5">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  Experiencia principal
+                </div>
+                <div className="mt-1 text-base font-semibold text-white">Panel avanzado</div>
+                <p className="mt-1 text-xs leading-4 text-slate-400">
+                  La vista avanzada conserva el tablero reorganizado para inspección y diagnóstico.
+                </p>
               </div>
-              <div className="mt-1 text-base font-semibold text-white">
-                {experienceMode === 'guided'
-                  ? 'Flujo guiado paso a paso'
-                  : 'Panel avanzado'}
+              <div className="inline-flex rounded-2xl border border-white/10 bg-white/[0.04] p-1">
+                <button
+                  type="button"
+                  onClick={() => setExperienceMode('guided')}
+                  className="rounded-xl px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/5"
+                >
+                  Flujo guiado
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExperienceMode('advanced')}
+                  className="rounded-xl bg-sky-300/15 px-4 py-2 text-sm font-medium text-sky-100 transition"
+                >
+                  Panel avanzado
+                </button>
               </div>
-              <p className="mt-1 text-xs leading-4 text-slate-400">
-                {experienceMode === 'guided'
-                  ? 'La app te lleva por un recorrido compacto, con foco en completar un paso y seguir.'
-                  : 'La vista avanzada conserva el tablero reorganizado para inspecci\u00f3n y diagn\u00f3stico.'}
-              </p>
             </div>
-            <div className="inline-flex rounded-2xl border border-white/10 bg-white/[0.04] p-1">
-              <button
-                type="button"
-                onClick={() => setExperienceMode('guided')}
-                className={joinClasses(
-                  'rounded-xl px-4 py-2 text-sm font-medium transition',
-                  experienceMode === 'guided'
-                    ? 'bg-sky-300/15 text-sky-100'
-                    : 'text-slate-300 hover:bg-white/5',
-                )}
-              >
-                Flujo guiado
-              </button>
-              <button
-                type="button"
-                onClick={() => setExperienceMode('advanced')}
-                className={joinClasses(
-                  'rounded-xl px-4 py-2 text-sm font-medium transition',
-                  experienceMode === 'advanced'
-                    ? 'bg-sky-300/15 text-sky-100'
-                    : 'text-slate-300 hover:bg-white/5',
-                )}
-              >
-                Panel avanzado
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {experienceMode === 'guided' ? (
-          <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_240px]">
-            <section className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-white/10 bg-slate-950/60 p-3 shadow-[0_18px_50px_rgba(0,0,0,0.28)] sm:p-4">
-              <div className="flex flex-col gap-2 border-b border-white/8 pb-3">
-                <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-200/80">
-                      Paso {activeWizardStepIndex + 1} de {GUIDED_WIZARD_STEPS.length}
-                    </div>
-                    <div className="mt-1 text-lg font-semibold text-white sm:text-xl">
-                      {activeWizardStepConfig.label}
-                    </div>
-                    <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-400">
-                      {activeWizardStepConfig.description}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-[11px] font-medium text-emerald-100">
-                      <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-200/80">
-                        Planificador
-                      </span>
-                      <span>{plannerBadge}</span>
-                    </div>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-[11px] font-medium text-amber-100">
-                      <span className="text-[10px] uppercase tracking-[0.18em] text-amber-200/80">
-                        Ejecutor
-                      </span>
-                      <span>{executorRequestStateLabel}</span>
-                    </div>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-slate-200">
-                      <span className="text-[10px] uppercase tracking-[0.18em] text-slate-400">
-                        Reuse
-                      </span>
-                      <span>{activeReuseModeLabel}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="grid gap-2 md:grid-cols-7">
-                  {GUIDED_WIZARD_STEPS.map((step, index) => {
-                    const isActive = step.key === activeWizardStep
-                    const isCompleted = index < activeWizardStepIndex
-
-                    return (
-                      <button
-                        key={step.key}
-                        type="button"
-                        onClick={() => setActiveWizardStep(step.key)}
-                        className={joinClasses(
-                          'rounded-xl border px-2 py-1.5 text-left transition',
-                          isActive
-                            ? 'border-sky-300/35 bg-sky-300/12 text-white'
-                            : isCompleted
-                              ? 'border-emerald-300/25 bg-emerald-300/8 text-emerald-100'
-                              : 'border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]',
-                        )}
-                      >
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em]">
-                          {String(index + 1).padStart(2, '0')}
-                        </div>
-                        <div className="mt-0.5 text-xs font-medium leading-4 sm:text-sm">
-                          {step.label}
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              <div className="mt-3 min-h-0 flex-1 overflow-auto pr-1">
-                {activeWizardStep === 'goal' ? (
-                  <div className="grid h-full gap-4">
-                    <div className="flex h-full min-h-[360px] flex-col rounded-3xl border border-white/8 bg-white/[0.03] p-4 sm:p-5">
-                      <label
-                        htmlFor="guided-goal-input"
-                        className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
-                      >
-                        Objetivo actual
-                      </label>
-                      <textarea
-                        id="guided-goal-input"
-                        value={goalInput}
-                        onChange={(event) => setGoalInput(event.target.value)}
-                        rows={8}
-                        className="mt-3 min-h-[220px] w-full flex-1 rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-4 text-sm leading-7 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
-                        placeholder="Escribí qué querés que la app resuelva."
-                      />
-                      <div className="mt-3 text-sm leading-6 text-slate-400">
-                        El objetivo es la entrada principal del flujo. Si está claro,
-                        el resto del recorrido se vuelve mucho más corto.
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
-                {activeWizardStep === 'context' ? (
-                  <div className="grid h-full gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-                    <div className="space-y-4">
-                    <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-                      <label
-                        htmlFor="guided-context-input"
-                        className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
-                      >
-                        Contexto adicional
-                      </label>
-                      <textarea
-                        id="guided-context-input"
-                        ref={executionContextInputRef}
-                        value={executionContextInput}
-                        onChange={(event) => setExecutionContextInput(event.target.value)}
-                        rows={8}
-                        className="mt-4 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-4 text-sm leading-7 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
-                        placeholder="Sumá restricciones, referencias, alcance o contexto operativo."
-                      />
-                    </article>
-                      <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              Insumos del proyecto
-                            </div>
-                            <div className="mt-2 text-sm leading-6 text-slate-400">
-                              Adjunta archivos o carpetas de assets como metadata segura. JEFE no
-                              toca los originales ni manda binarios a servicios externos.
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={handleAttachInputFiles}
-                              disabled={isProjectContextBusy}
-                              className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm font-medium text-slate-100 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              Adjuntar archivos
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleAttachInputFolder}
-                              disabled={isProjectContextBusy}
-                              className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm font-medium text-slate-100 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              Adjuntar carpeta
-                            </button>
-                          </div>
-                        </div>
-                        <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                          <div>{attachedProjectInputsSummary}</div>
-                          <div className="mt-1 text-slate-400">
-                            Estado actual: todo queda como referencia segura hasta que exista una
-                            decision explicita de copia o materializacion.
-                          </div>
-                          {projectContextActionMessage ? (
-                            <div className="mt-2 text-sky-100">{projectContextActionMessage}</div>
-                          ) : null}
-                        </div>
-                        {attachedProjectInputs.length > 0 ? (
-                          <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                            {attachedProjectInputs.map((entry) => (
-                              <article
-                                key={entry.id}
-                                className="min-w-0 rounded-2xl border border-white/8 bg-slate-950/50 p-4"
-                              >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <div className="truncate text-sm font-semibold text-slate-100">
-                                      {entry.name}
-                                    </div>
-                                    <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-400">
-                                      <span>{entry.kind === 'folder' ? 'Carpeta' : 'Archivo'}</span>
-                                      <span>{getProjectInputRoleLabel(entry.inferredRole)}</span>
-                                      <span>{getProjectInputStatusLabel(entry.status)}</span>
-                                      <span>{formatBytesLabel(entry.sizeBytes)}</span>
-                                    </div>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveAttachedProjectInput(entry.id)}
-                                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-white/10"
-                                  >
-                                    Quitar
-                                  </button>
-                                </div>
-                                <div className="mt-3 break-all text-xs leading-5 text-slate-500">
-                                  {entry.originalPath}
-                                </div>
-                                <label className="mt-3 block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                                  Nota del operador
-                                </label>
-                                <input
-                                  type="text"
-                                  value={entry.operatorNote}
-                                  onChange={(event) =>
-                                    handleAttachedProjectInputNoteChange(
-                                      entry.id,
-                                      event.target.value,
-                                    )
-                                  }
-                                  className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
-                                  placeholder="Ejemplo: usar como logo principal o documento base."
-                                />
-                              </article>
-                            ))}
-                          </div>
-                        ) : null}
-                      </article>
-                      <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              Proyecto existente
-                            </div>
-                            <div className="mt-2 text-sm leading-6 text-slate-400">
-                              Selecciona una carpeta y deja que JEFE la inspeccione en modo
-                              read-only antes de decidir continuidad.
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={handlePickExistingProject}
-                              disabled={isProjectContextBusy}
-                              className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm font-medium text-slate-100 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              Seleccionar proyecto existente
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleAnalyzeExistingProject}
-                              disabled={
-                                isProjectContextBusy ||
-                                !normalizeOptionalString(existingProjectContext?.selectedPath)
-                              }
-                              className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm font-medium text-slate-100 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              Analizar proyecto
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleClearSelectedProject}
-                              disabled={
-                                isProjectContextBusy ||
-                                !normalizeOptionalString(existingProjectContext?.selectedPath)
-                              }
-                              className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm font-medium text-slate-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              Limpiar proyecto seleccionado
-                            </button>
-                          </div>
-                        </div>
-                        <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                          <div className="font-medium text-slate-100">{existingProjectSummary}</div>
-                          <div className="mt-1 text-slate-400">
-                            Seguridad: no se leen archivos sensibles, no se ejecutan scripts y no
-                            se modifica la carpeta seleccionada.
-                          </div>
-                        </div>
-                        {existingProjectContext ? (
-                          <div className="mt-4 space-y-4">
-                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
-                                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
-                                  Framework
-                                </div>
-                                <div className="mt-2 text-sm font-semibold text-slate-100">
-                                  {existingProjectContext.framework || 'Desconocido'}
-                                </div>
-                                <div className="mt-1 text-xs text-slate-400">
-                                  {existingProjectContext.stack.join(' / ') || 'Sin stack resumido'}
-                                </div>
-                              </div>
-                              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
-                                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
-                                  Package manager
-                                </div>
-                                <div className="mt-2 text-sm font-semibold text-slate-100">
-                                  {existingProjectContext.packageManager || 'Sin lockfile'}
-                                </div>
-                                <div className="mt-1 text-xs text-slate-400">
-                                  {existingProjectContext.hasPackageJson
-                                    ? 'package.json detectado'
-                                    : 'package.json no detectado'}
-                                </div>
-                              </div>
-                              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
-                                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
-                                  Git
-                                </div>
-                                <div className="mt-2 text-sm font-semibold text-slate-100">
-                                  {existingProjectContext.gitStatusSummary?.branch ||
-                                    (existingProjectContext.hasGit ? 'Detectado' : 'No detectado')}
-                                </div>
-                                <div className="mt-1 text-xs text-slate-400">
-                                  {existingProjectContext.gitStatusSummary?.summary ||
-                                    'Sin resumen disponible'}
-                                </div>
-                              </div>
-                              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
-                                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
-                                  Protegidos
-                                </div>
-                                <div className="mt-2 text-sm font-semibold text-slate-100">
-                                  {existingProjectContext.protectedFilesCount || 0}
-                                </div>
-                                <div className="mt-1 text-xs text-slate-400">
-                                  JEFE detecta, pero no lee contenidos sensibles.
-                                </div>
-                              </div>
-                            </div>
-                            <div className="grid gap-3 lg:grid-cols-2">
-                              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
-                                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
-                                  Carpetas importantes
-                                </div>
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                  {existingProjectContext.importantFolders.length > 0 ? (
-                                    existingProjectContext.importantFolders.map((entry) => (
-                                      <span
-                                        key={entry}
-                                        className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-200"
-                                      >
-                                        {entry}
-                                      </span>
-                                    ))
-                                  ) : (
-                                    <span className="text-sm text-slate-400">
-                                      No se detectaron carpetas clave.
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
-                                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
-                                  Entrypoints probables
-                                </div>
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                  {existingProjectContext.entrypoints.length > 0 ? (
-                                    existingProjectContext.entrypoints.map((entry) => (
-                                      <span
-                                        key={entry}
-                                        className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-200"
-                                      >
-                                        {entry}
-                                      </span>
-                                    ))
-                                  ) : (
-                                    <span className="text-sm text-slate-400">
-                                      Sin entrypoints detectados.
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            {existingProjectContext.scripts.length > 0 ? (
-                              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
-                                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
-                                  Scripts detectados
-                                </div>
-                                <div className="mt-3 grid gap-2">
-                                  {existingProjectContext.scripts.slice(0, 6).map((entry) => (
-                                    <div
-                                      key={entry.name}
-                                      className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3 text-sm text-slate-200"
-                                    >
-                                      <div className="font-medium text-slate-100">{entry.name}</div>
-                                      <div className="mt-1 break-all text-xs text-slate-400">
-                                        {entry.command}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : null}
-                            {existingProjectContext.protectedFilesDetected.length > 0 ? (
-                              <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-4 text-sm text-amber-100">
-                                <div className="font-medium">Archivos protegidos detectados</div>
-                                <div className="mt-2 break-all text-xs leading-5 text-amber-50/90">
-                                  {existingProjectContext.protectedFilesDetected.join(', ')}
-                                </div>
-                              </div>
-                            ) : null}
-                            {existingProjectContext.warnings.length > 0 ? (
-                              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
-                                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
-                                  Advertencias del analisis
-                                </div>
-                                <div className="mt-3 grid gap-2">
-                                  {existingProjectContext.warnings.map((warning) => (
-                                    <div
-                                      key={warning}
-                                      className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3 text-sm text-slate-300"
-                                    >
-                                      {warning}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </article>
-                    </div>
-                    <div className="space-y-4">
-                      <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Participación del usuario
-                        </div>
-                        <div className="mt-4 grid gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setUserParticipationMode('user-will-contribute')}
-                            className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
-                              userParticipationMode === 'user-will-contribute'
-                                ? 'border-sky-300/40 bg-sky-300/15 text-sky-100'
-                                : 'border-white/10 bg-slate-950/50 text-slate-200 hover:bg-white/10'
-                            }`}
-                          >
-                            Sí, voy a aportar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setUserParticipationMode('brain-decides-missing')}
-                            className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
-                              userParticipationMode === 'brain-decides-missing'
-                                ? 'border-emerald-300/40 bg-emerald-300/15 text-emerald-100'
-                                : 'border-white/10 bg-slate-950/50 text-slate-200 hover:bg-white/10'
-                            }`}
-                          >
-                            No, decidí vos
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setUserParticipationMode(DEFAULT_USER_PARTICIPATION_MODE)}
-                            className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-left text-sm font-medium text-slate-300 transition hover:bg-white/10"
-                          >
-                            Sin definir
-                          </button>
-                        </div>
-                        <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                          {userParticipationSummary}
-                        </div>
-                      </article>
-                      <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Modo de trabajo
-                        </div>
-                        <div className="mt-4 grid gap-2">
-                          {(['auto', 'new-project', 'continue-existing'] as ProjectWorkMode[]).map(
-                            (mode) => (
-                              <button
-                                key={mode}
-                                type="button"
-                                onClick={() => setProjectWorkMode(mode)}
-                                className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
-                                  projectWorkMode === mode
-                                    ? 'border-sky-300/40 bg-sky-300/15 text-sky-100'
-                                    : 'border-white/10 bg-slate-950/50 text-slate-200 hover:bg-white/10'
-                                }`}
-                              >
-                                {getProjectWorkModeLabel(mode)}
-                              </button>
-                            ),
-                          )}
-                        </div>
-                        <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                          {projectWorkModeSummary}
-                        </div>
-                      </article>
-                      <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Espacio de trabajo
-                        </div>
-                        <textarea
-                          id="guided-workspace-path"
-                          value={workspacePath}
-                          onChange={(event) => setWorkspacePath(event.target.value)}
-                          rows={3}
-                          className="mt-4 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40"
-                        />
-                        <div className="mt-3 text-sm text-slate-400">
-                          {workspaceStatusLabel}
-                        </div>
-                      </article>
-                      <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Resumen del contexto
-                        </div>
-                        <div className="mt-4 grid gap-3">
-                          <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
-                            <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                              Insumos
-                            </div>
-                            <div className="mt-2 text-sm font-medium text-slate-100">
-                              {attachedProjectInputsSummary}
-                            </div>
-                          </div>
-                          <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
-                            <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                              Proyecto existente
-                            </div>
-                            <div className="mt-2 text-sm font-medium text-slate-100">
-                              {existingProjectContext?.projectName ||
-                                (existingProjectContext?.selectedPath
-                                  ? 'Seleccionado'
-                                  : 'No seleccionado')}
-                            </div>
-                            <div className="mt-1 break-all text-xs text-slate-400">
-                              {existingProjectContext?.selectedPath || 'Solo texto e insumos por ahora.'}
-                            </div>
-                          </div>
-                          <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
-                            <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                              Modo activo
-                            </div>
-                            <div className="mt-2 text-sm font-medium text-slate-100">
-                              {getProjectWorkModeLabel(projectWorkMode)}
-                            </div>
-                            <div className="mt-1 text-xs text-slate-400">
-                              {projectWorkModeSummary}
-                            </div>
-                          </div>
-                        </div>
-                      </article>
-                    </div>
-                  </div>
-                ) : null}
-
-                {activeWizardStep === 'brain' ? (
-                  <div className="grid h-full gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-                    <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        Modo / criterio
-                      </div>
-                      <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                        {BRAIN_COST_MODE_OPTIONS.map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => setBrainCostMode(option.value)}
-                            className={`rounded-2xl border px-4 py-4 text-left transition ${
-                              brainCostMode === option.value
-                                ? 'border-sky-300/40 bg-sky-300/15 text-sky-100'
-                                : 'border-white/10 bg-slate-950/50 text-slate-200 hover:bg-white/10'
-                            }`}
-                          >
-                            <div className="text-sm font-medium">{option.label}</div>
-                            <div className="mt-1 text-xs leading-5 text-slate-400">
-                              {option.description}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </article>
-                    <div className="space-y-4">
-                      <MetricCard
-                        label="Modo activo"
-                        value={getBrainCostModeLabel(brainCostMode)}
-                        detail={activeBrainRoutingMode}
-                        tone="sky"
-                      />
-                      <MetricCard
-                        label="Proveedor"
-                        value={`${activeBrainSelectedProvider} -> ${activeBrainResolvedProvider}`}
-                        detail={`Confianza: ${activeBrainRoutingConfidence}`}
-                      />
-                      <MetricCard
-                        label="Naturaleza"
-                        value={activeBrainProblemNature}
-                        detail={activeBrainRoutingReason}
-                      />
-                    </div>
-                  </div>
-                ) : null}
-
-                {activeWizardStep === 'memory' ? (
-                  <div className="grid h-full gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-                    <div className="space-y-4">
-                      <ContextHubControlPanel
-                        description="JEFE puede consultar MEMORIA, reintentar la conexion, abrir la UI real cuando este disponible o caer al endpoint tecnico sin bloquear el resto del flujo."
-                        stateLabel={contextHubRuntimeLabel}
-                        stateTone={contextHubRuntimeTone}
-                        stateDetail={contextHubRuntimeDetail}
-                        lastEventLabel={contextHubLastEventLabel}
-                        lastEventTone={contextHubLastEventTone}
-                        lastEventDetail={contextHubLastEventDetail}
-                        openTargetLabel={contextHubRuntimeOpenTargetLabel}
-                        openTargetDetail={contextHubRuntimeOpenTargetDetail}
-                        openButtonLabel={contextHubRuntimeOpenButtonLabel}
-                        appPathLabel={contextHubRuntimeAppPathLabel}
-                        workspaceRootLabel={contextHubRuntimeWorkspaceLabel}
-                        runtimeNotice={contextHubRuntimeState.runtimeLogNotice || ''}
-                        actionMessage={contextHubActionMessage}
-                        lastCheckLabel={contextHubLastCheckLabel}
-                        canStart={contextHubRuntimeState.canStart === true}
-                        canOpen={contextHubRuntimeState.canOpen === true}
-                        isBusy={isContextHubBusy}
-                        isStarting={isStartingContextHub}
-                        onRetry={handleRetryContextHubConnection}
-                        onOpen={handleOpenContextHub}
-                        onStart={handleStartLocalContextHub}
-                      />
-                      <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-                        <label
-                          htmlFor="guided-reuse-mode"
-                          className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
-                        >
-                          Modo reusable
-                        </label>
-                        <select
-                          id="guided-reuse-mode"
-                          value={manualReuseMode}
-                          onChange={(event) =>
-                            setManualReuseMode(event.target.value as ManualReuseMode)
-                          }
-                          className="mt-4 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition focus:border-sky-300/40"
-                        >
-                          <option value="auto">Búsqueda automática</option>
-                          <option value="none">No reutilizar</option>
-                          <option value="inspiration-only">Usar solo inspiración</option>
-                          <option value="reuse-style">Reutilizar estilo</option>
-                          <option value="reuse-structure">Reutilizar estructura</option>
-                          <option value="reuse-style-and-structure">
-                            Reutilizar estilo y estructura
-                          </option>
-                        </select>
-                        <div className="mt-4 text-sm leading-6 text-slate-300">
-                          {manualReusablePreferencePayload
-                            ? manualReusablePreferencePayload.artifactId
-                              ? `El planificador va a priorizar ${manualReuseModeLabel.toLocaleLowerCase()} desde ${manualReusablePreferencePayload.artifactId}.`
-                              : 'La corrida va a seguir sin reutilización por decisión manual.'
-                            : 'Si no elegís nada, la app sigue con búsqueda automática.'}
-                        </div>
-                      </article>
-
-                      <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              Artefactos sugeridos
-                            </div>
-                            <div className="mt-2 text-sm text-slate-400">
-                              Elegí uno si querés orientar el plan. Si no, seguí igual.
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setExperienceMode('advanced')}
-                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-                          >
-                            Ver panel avanzado
-                          </button>
-                        </div>
-                        <div className="mt-4 grid gap-3 lg:grid-cols-3">
-                          {isLoadingReusableArtifacts ? (
-                            <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm text-slate-300 lg:col-span-3">
-                              Cargando artefactos reutilizables...
-                            </div>
-                          ) : reusableArtifactError ? (
-                            <div className="rounded-2xl border border-red-300/20 bg-red-300/10 px-4 py-4 text-sm text-red-100 lg:col-span-3">
-                              {reusableArtifactError}
-                            </div>
-                          ) : reusableWizardArtifacts.length === 0 ? (
-                            <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm text-slate-300 lg:col-span-3">
-                              No hay artefactos listos para sugerir en esta vista compacta.
-                            </div>
-                          ) : (
-                            reusableWizardArtifacts.map((artifact) => {
-                              const preview = buildReusableArtifactPreviewModel(artifact)
-                              const isSelected = selectedReusableArtifact?.id === artifact.id
-
-                              return (
-                                <article
-                                  key={artifact.id}
-                                  data-reusable-artifact-card={artifact.id}
-                                  className={joinClasses(
-                                    'rounded-2xl border p-4',
-                                    isSelected
-                                      ? 'border-sky-300/30 bg-sky-300/10'
-                                      : 'border-white/8 bg-slate-950/50',
-                                  )}
-                                >
-                                  <div
-                                    data-reusable-artifact-preview={artifact.id}
-                                    className="rounded-2xl border border-white/10 p-4"
-                                    style={{
-                                      background: preview.background,
-                                      color: preview.text,
-                                    }}
-                                  >
-                                    <div className="text-[10px] font-semibold uppercase tracking-[0.24em]">
-                                      {preview.heroLabel}
-                                    </div>
-                                    <div className="mt-2 text-lg font-semibold">
-                                      {artifact.sectorLabel || artifact.sector || artifact.id}
-                                    </div>
-                                    <div className="mt-2 text-xs leading-5">
-                                      {preview.previewBody}
-                                    </div>
-                                  </div>
-                                  <div className="mt-4 flex flex-wrap gap-2">
-                                    <button
-                                      type="button"
-                                      data-reusable-artifact-select={artifact.id}
-                                      onClick={() => {
-                                        setSelectedReusableArtifact(artifact)
-                                        setManualReuseMode((currentValue) =>
-                                          currentValue === 'auto'
-                                            ? 'reuse-style-and-structure'
-                                            : currentValue,
-                                        )
-                                      }}
-                                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-                                    >
-                                      {isSelected ? 'Seleccionado' : 'Usar este artefacto'}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setDetailReusableArtifact(artifact)}
-                                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-                                    >
-                                      Ver detalle
-                                    </button>
-                                  </div>
-                                </article>
-                              )
-                            })
-                          )}
-                        </div>
-                      </article>
-                    </div>
-                    <div className="space-y-4">
-                      <MetricCard
-                        label="Selección actual"
-                        value={manualReuseModeLabel}
-                        detail={selectedReusableArtifactSummary}
-                        tone={manualReuseMode === 'auto' ? 'default' : 'sky'}
-                      />
-                      <MetricCard
-                        label="Memoria reutilizable"
-                        value={`${activeReuseModeLabel} / ${activeReuseFoundCount} coincidencia(s)`}
-                        detail={activeReuseDetailLabel}
-                      />
-                    </div>
-                  </div>
-                ) : null}
-
-                {activeWizardStep === 'plan' ? (
-                  <div className="grid h-full gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-                    <div className="space-y-4">
-                      <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              {plannerIsReviewOnly
-                                ? plannerReviewStatusLabel
-                                : 'Plan generado'}
-                            </div>
-                            <div className="mt-2 text-sm text-slate-400">
-                              {plannerReviewHelperText}
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleWizardGeneratePlan}
-                            disabled={isPlanning}
-                            className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-                          >
-                            {isPlanning ? 'Generando...' : 'Generar plan'}
-                          </button>
-                        </div>
-                        <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-7 text-slate-100">
-                          {hasWizardPlan
-                            ? plannerInstruction
-                            : 'Todavía no generaste un plan en esta corrida.'}
-                        </div>
-                      </article>
-                      <div className="grid gap-3 lg:grid-cols-2">
-                        <MetricCard
-                          label="Ruta planificada"
-                          value={activeExecutionModeLabel}
-                          detail={activePlannerStrategyLabel}
-                          tone="sky"
-                        />
-                        <MetricCard
-                          label="Proyecto activo"
-                          value={
-                            normalizeOptionalString(activeProjectContext?.projectRoot) ||
-                            (activeProjectContext?.mode === 'new-project'
-                              ? 'Nueva entrega local'
-                              : activeProjectContext?.mode === 'existing-project'
-                                ? 'Proyecto existente'
-                                : 'Sin raiz declarada')
-                          }
-                          detail={
-                            normalizeOptionalString(activeProjectContext?.domain) ||
-                            normalizeOptionalString(activeProjectContext?.note) ||
-                            'El plan actual define el contexto activo de esta corrida.'
-                          }
-                          tone={
-                            activeProjectContext?.mode === 'existing-project'
-                              ? 'emerald'
-                              : 'sky'
-                          }
-                        />
-                        <MetricCard
-                          label="MEMORIA externa"
-                          value={activeContextHubLabel}
-                          detail={activeContextHubUiDetail}
-                          tone={activeContextHubStatus?.available ? 'emerald' : 'amber'}
-                        />
-                        <MetricCard
-                          label="Motivo resumido"
-                          value={plannerExecutionMetadata.reason || 'No disponible'}
-                        />
-                        <MetricCard
-                          label="Siguiente acción"
-                          value={getNextExpectedActionLabel(
-                            plannerExecutionMetadata.nextExpectedAction,
-                          )}
-                          detail={
-                            plannerExecutionMetadata.nextExpectedAction || 'No disponible'
-                          }
-                        />
-                        <MetricCard
-                          label="Memoria reusable aplicada"
-                          value={activeReuseModeLabel}
-                          detail={activeReuseArtifactSummary}
-                        />
-                      </div>
-                      {activeExistingProjectDetection?.detected &&
-                      activeExistingProjectDetection.applicable === false ? (
-                        <article className="rounded-3xl border border-amber-300/20 bg-amber-300/10 p-5">
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100">
-                            Proyecto detectado pero ignorado
-                          </div>
-                          <div className="mt-3 text-sm leading-6 text-amber-50">
-                            {normalizeOptionalString(activeExistingProjectDetection.reason) ||
-                              'Hay un proyecto existente en el workspace, pero no aplica para esta corrida porque el pedido actual abre una entrega nueva.'}
-                          </div>
-                          <div className="mt-3 grid gap-3 md:grid-cols-2">
-                            <MetricCard
-                              label="Proyecto detectado"
-                              value={
-                                normalizeOptionalString(
-                                  activeExistingProjectDetection.projectRoot,
-                                ) || 'Sin carpeta declarada'
-                              }
-                              detail={
-                                normalizeOptionalString(
-                                  activeExistingProjectDetection.domain,
-                                ) || 'Manifest local encontrado en el workspace.'
-                              }
-                              tone="amber"
-                            />
-                            <MetricCard
-                              label="Plan activo"
-                              value={
-                                normalizeOptionalString(activeProjectContext?.projectRoot) ||
-                                'Nueva entrega local'
-                              }
-                              detail="El plan actual no usa el proyecto detectado como continuidad."
-                              tone="sky"
-                            />
-                          </div>
-                        </article>
-                      ) : null}
-                      {activeProductArchitecture ? (
-                        <ProductArchitectureCard
-                          architecture={activeProductArchitecture}
-                          compact
-                          reviewOnly={plannerIsReviewOnly}
-                          onPrepareSafeFirstDelivery={
-                            plannerIsReviewOnly
-                              ? handlePrepareSafeFirstDeliveryPlan
-                              : null
-                          }
-                        />
-                      ) : null}
-                      {shouldShowProjectContinuity ? (
-                        <ProjectContinuityCenterCard
-                          nextActionPlan={activeNextActionPlan}
-                          implementationRoadmap={activeImplementationRoadmap}
-                          phaseExpansionPlan={activePhaseExpansionPlan}
-                          projectPhaseExecutionPlan={activeProjectPhaseExecutionPlan}
-                          localProjectManifest={activeLocalProjectManifest}
-                          expansionOptions={activeExpansionOptions}
-                          moduleExpansionPlan={activeModuleExpansionPlan}
-                          continuationActionPlan={activeContinuationActionPlan}
-                          projectContinuationState={activeProjectContinuationState}
-                          projectReadinessState={activeProjectReadinessState}
-                          approvalRequestPlan={activeApprovalRequestPlan}
-                          runtimeApprovalState={activeRuntimeApprovalState}
-                          compact
-                          busy={isPlanning || isExecutingTask}
-                          onPreparePhase={handlePrepareProjectPhase}
-                          onMaterializePhase={handleMaterializeProjectPhase}
-                          onPrepareModuleExpansion={handlePrepareModuleExpansion}
-                          onMaterializeModuleExpansion={handleMaterializeModuleExpansion}
-                          onPrepareContinuationAction={handlePrepareContinuationAction}
-                          onMaterializeContinuationAction={
-                            handleMaterializeContinuationAction
-                          }
-                        />
-                      ) : null}
-                      {shouldShowProjectBlueprint && activeProjectBlueprint ? (
-                        <ProjectBlueprintCard
-                          blueprint={activeProjectBlueprint}
-                          questionPolicy={activeQuestionPolicy}
-                          compact
-                        />
-                      ) : null}
-                      {shouldShowImplementationRoadmap &&
-                      activeImplementationRoadmap ? (
-                        <ImplementationRoadmapCard
-                          roadmap={activeImplementationRoadmap}
-                          compact
-                        />
-                      ) : null}
-                      {shouldShowLocalProjectManifest && activeLocalProjectManifest ? (
-                        <LocalProjectManifestCard
-                          manifest={activeLocalProjectManifest}
-                          compact
-                          onPreparePhase={handlePrepareProjectPhase}
-                        />
-                      ) : null}
-                      {shouldShowProjectPhaseExecutionPlan &&
-                      activeProjectPhaseExecutionPlan ? (
-                        <ProjectPhaseExecutionPlanCard
-                          plan={activeProjectPhaseExecutionPlan}
-                          compact
-                          onMaterializePhase={handleMaterializeProjectPhase}
-                        />
-                      ) : null}
-                      {shouldShowNextActionPlan && activeNextActionPlan ? (
-                        <NextActionPlanCard plan={activeNextActionPlan} />
-                      ) : null}
-                      {shouldShowValidationPlan && activeValidationPlan ? (
-                        <ValidationPlanCard
-                          plan={activeValidationPlan}
-                          compact
-                        />
-                      ) : null}
-                      {shouldShowPhaseExpansionPlan && activePhaseExpansionPlan ? (
-                        <PhaseExpansionPlanCard
-                          plan={activePhaseExpansionPlan}
-                          compact
-                        />
-                      ) : null}
-                      {activeSafeFirstDeliveryPlan ? (
-                        <SafeFirstDeliveryPlanCard
-                          plan={activeSafeFirstDeliveryPlan}
-                          compact
-                          reviewOnly={plannerIsReviewOnly}
-                          onPrepareMaterialization={
-                            plannerIsReviewOnly
-                              ? handlePrepareSafeMaterializationPlan
-                              : null
-                          }
-                        />
-                      ) : null}
-                      {shouldShowScalableDeliveryPlan && activeScalableDeliveryPlan ? (
-                        <ScalableDeliveryPlanCard
-                          plan={activeScalableDeliveryPlan}
-                          compact
-                          reviewOnly={plannerIsReviewOnly}
-                          nextExpectedAction={
-                            plannerExecutionMetadata.nextExpectedAction
-                          }
-                          onPrepareMaterialization={
-                            plannerIsReviewOnly
-                              ? normalizeOptionalString(
-                                    activeScalableDeliveryPlan.deliveryLevel,
-                                  ).toLocaleLowerCase() === 'fullstack-local'
-                                ? handlePrepareFullstackLocalMaterializationPlan
-                                : handlePrepareFrontendProjectMaterializationPlan
-                              : null
-                          }
-                        />
-                      ) : null}
-                    </div>
-                    <div className="space-y-4">
-                      <MetricCard
-                        label="decisionKey"
-                        value={activeDecisionKeyLabel}
-                      />
-                      <MetricCard
-                        label="Tareas previstas"
-                        value={
-                          effectivePlannerExecutionMetadata.tasks.length > 0
-                            ? `${effectivePlannerExecutionMetadata.tasks.length} paso(s)`
-                            : 'Sin tareas estructuradas'
-                        }
-                        detail={
-                          effectivePlannerExecutionMetadata.tasks[0]?.title ||
-                          effectivePlannerExecutionMetadata.tasks[0]?.operation ||
-                          'No disponible'
-                        }
-                      />
-                    </div>
-                  </div>
-                ) : null}
-
-                {activeWizardStep === 'execution' ? (
-                  <div className="grid h-full gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-                    <div className="space-y-4">
-                      <div className="grid gap-3 md:grid-cols-4">
-                        <MetricCard
-                          label="Estado"
-                          value={executorRequestStateLabel}
-                          detail={activeOperationalE2eStatusLabel}
-                          tone="amber"
-                        />
-                        <MetricCard
-                          label="Etapa"
-                          value={flowStageLabel}
-                          detail={flowModeLabel}
-                        />
-                        <MetricCard
-                          label="Paso actual"
-                          value={visibleCurrentStepLabel}
-                        />
-                        <MetricCard
-                          label={contextualExecutorModeCardLabel}
-                          value={contextualExecutorModeLabel}
-                          detail={contextualExecutorModeDetail}
-                        />
-                      </div>
-
-                      {decisionPending ? (
-                        <article className="rounded-3xl border border-amber-300/25 bg-amber-300/10 p-5">
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100">
-                            Bloqueo por aprobación
-                          </div>
-                          <div className="mt-3 text-sm leading-6 text-amber-50">
-                            Hay una decisión humana pendiente. El modal de aprobación
-                            ya quedó abierto para resolverla sin perder el flujo.
-                          </div>
-                        </article>
-                      ) : null}
-
-                      <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Resultado del ejecutor
-                        </div>
-                        <div className="mt-4 whitespace-pre-wrap break-words rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-7 text-slate-100">
-                          {executorResult}
-                        </div>
-                      </article>
-                    </div>
-                    <div className="space-y-4">
-                      <MetricCard
-                        label="Conexión local"
-                        value={contextualConnectionLabel}
-                        detail={contextualConnectionDetail}
-                        tone="emerald"
-                      />
-                      <MetricCard
-                        label={contextualRuntimeCardLabel}
-                        value={contextualRuntimeLabel}
-                        detail={contextualRuntimeDetail}
-                      />
-                      {fastRouteDetected ? (
-                        <>
-                          <MetricCard
-                            label="Codex"
-                            value="No requerido"
-                            detail="La resolución se cerró por ruta rápida local."
-                          />
-                          <MetricCard
-                            label="Bridge"
-                            value="No usado"
-                            detail="No hizo falta puente para esta ejecución."
-                          />
-                        </>
-                      ) : null}
-                      <MetricCard
-                        label="Resultado listo"
-                        value={wizardResultAvailabilityLabel}
-                        detail={wizardResultAvailabilityDetail}
-                        tone={wizardHasExecutionError ? 'rose' : 'default'}
-                      />
-                    </div>
-                  </div>
-                ) : null}
-
-                {activeWizardStep === 'result' ? (
-                  <div className="grid h-full gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-                    <div className="space-y-4">
-                      {shouldShowLocalMaterializationSummary ? (
-                        <ResultSectionCard
-                          title={resultMaterializationSummaryTitle}
-                          description={resultMaterializationSummaryDescription}
-                        >
-                          <ResultKeyValueGrid
-                            items={[
-                              {
-                                label: 'Carpeta creada',
-                                value: resultMaterializationFolderLabel,
-                              },
-                              {
-                                label: 'Motor usado',
-                                value: resultMaterializationEngineLabel,
-                                detail: resultMaterializationBridgeDetail,
-                              },
-                              {
-                                label: 'Codex / bridge',
-                                value:
-                                  latestMaterializationLayer === 'local-deterministic' ||
-                                  fastRouteDetected
-                                    ? 'No requeridos'
-                                    : 'No disponible',
-                              },
-                              {
-                                label: 'Carpetas creadas',
-                                value: resultMaterializationCreatedFoldersLabel,
-                              },
-                              {
-                                label: 'Archivos escritos confirmados',
-                                value: resultConfirmedWrittenFilesLabel,
-                              },
-                              {
-                                label: 'Archivos tocados adicionales',
-                                value: resultTouchedFilesLabel,
-                              },
-                              {
-                                label: 'Archivos previstos por plan',
-                                value: resultPlannedFilesLabel,
-                              },
-                              {
-                                label: 'Operaciones totales',
-                                value: resultMaterializationOperationsLabel,
-                              },
-                              {
-                                label: 'Validaciones',
-                                value: resultMaterializationValidationsLabel,
-                                detail: effectiveResultValidationSummaryText,
-                              },
-                              {
-                                label: 'Cómo probar',
-                                value:
-                                  resultMaterializationIndexPathLabel !== 'No disponible'
-                                    ? `Abrir ${resultMaterializationIndexPathLabel}`
-                                    : 'Abrir el index.html generado',
-                                detail:
-                                  resultIsFrontendProjectMaterialization ||
-                                  resultIsFullstackLocalMaterialization
-                                    ? 'Se abre por file://, sin servidor ni npm install.'
-                                    : 'Salida local y revisable dentro del workspace.',
-                              },
-                              {
-                                label: 'Próxima fase segura',
-                                value: resultMaterializationNextPhaseLabel,
-                                detail: resultMaterializationNextPhaseDetail,
-                              },
-                              {
-                                label: 'Readiness actual',
-                                value: resultMaterializationReadinessValue,
-                                detail: resultMaterializationReadinessLabel,
-                              },
-                              {
-                                label: 'MEMORIA / Context Hub',
-                                value: resultContextHubLabel,
-                                detail: resultContextHubDetail,
-                              },
-                              {
-                                label: 'Ultimo evento a MEMORIA',
-                                value: contextHubLastEventLabel,
-                                detail: contextHubLastEventDetail,
-                              },
-                            ]}
-                          />
-                          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                            <div className="space-y-2">
-                              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                Archivos clave
-                              </div>
-                              <div className="grid gap-2">
-                                {resultMaterializationFileLabels.length > 0 ? (
-                                  resultMaterializationFileLabels.map((fileLabel) => (
-                                    <div
-                                      key={`safe-delivery-file-${fileLabel}`}
-                                      className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
-                                    >
-                                      {fileLabel}
-                                    </div>
-                                  ))
-                                ) : (
-                                  <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                                    No hay archivos reportados para resumir.
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <div className="space-y-2">
-                              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                Limites del modo local
-                              </div>
-                              <div className="grid gap-2">
-                                {resultMaterializationLimits.map((limitLabel) => (
-                                  <div
-                                    key={`safe-delivery-limit-${limitLabel}`}
-                                    className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
-                                  >
-                                    {limitLabel}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="mt-4 space-y-2">
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              Próximo paso sugerido
-                            </div>
-                            <div className="grid gap-2">
-                              {resultMaterializationSuggestedNextSteps.map((stepLabel) => (
-                                <div
-                                  key={`safe-delivery-next-step-${stepLabel}`}
-                                  className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
-                                >
-                                  {stepLabel}
-                                </div>
-                              ))}
-                            </div>
-                            {resultMaterializationNextPhaseId ? (
-                              <div className="pt-2">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handlePrepareProjectPhase(resultMaterializationNextPhaseId)
-                                  }
-                                  disabled={isPlanning || isExecutingTask}
-                                  className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-                                >
-                                  {`Preparar ${resultMaterializationNextPhaseLabel}`}
-                                </button>
-                              </div>
-                            ) : null}
-                          </div>
-                        </ResultSectionCard>
-                      ) : null}
-                      <ResultSectionCard
-                        title={shouldShowLocalMaterializationSummary ? 'Cierre técnico' : 'Cierre'}
-                        description={
-                          shouldShowLocalMaterializationSummary
-                            ? 'Detalle humano y técnico del cierre, por si necesitás inspeccionar la corrida completa.'
-                            : 'Lectura humana del resultado y estado final de la corrida.'
-                        }
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex flex-wrap items-center gap-3">
-                            <ResultStatusBadge
-                              label={effectiveResultStatusPresentation.label}
-                              tone={effectiveResultStatusPresentation.tone}
-                            />
-                            <div className="text-sm leading-6 text-slate-300">
-                              {effectiveResultStatusPresentation.detail}
-                            </div>
-                          </div>
-                          {shouldShowVisibleFinalTextResponse ? (
-                            <button
-                              type="button"
-                              onClick={() => setIsFinalResponseOpen(true)}
-                              className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-                            >
-                              Ver resultado completo
-                            </button>
-                          ) : null}
-                        </div>
-                        <div className="mt-4 whitespace-pre-wrap break-words rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-7 text-slate-100">
-                          {resultHumanText}
-                        </div>
-                        <div className="mt-4">
-                          <ResultKeyValueGrid
-                            items={[
-                              {
-                                label: 'Resumen corto',
-                                value: resultHumanSummary,
-                              },
-                              {
-                                label: '?ltimo requestId',
-                                value:
-                                  latestExecutionRunSummary?.latestRequestId ||
-                                  'Sin corrida registrada',
-                              },
-                              {
-                                label: 'Escenario',
-                                value:
-                                  latestExecutionRunSummary?.scenarioLabel ||
-                                  activeOperationalE2eScenarioLabel,
-                              },
-                              {
-                                label: 'Workspace',
-                                value: currentWorkspaceSummary,
-                              },
-                              {
-                                label: 'Modo de ejecución',
-                                value: fastRouteDetected
-                                  ? 'Ruta rápida local'
-                                  : activeExecutionModeLabel,
-                                detail: fastRouteDetected
-                                  ? 'Codex: No requerido ? Bridge: No usado'
-                                  : activePlannerStrategyLabel,
-                              },
-                              {
-                                label: 'Materialización',
-                                value: latestMaterializationLayer || 'No disponible',
-                                detail:
-                                  latestMaterializationPlanSource ||
-                                  latestMaterializationStrategy ||
-                                  'Sin fuente reportada',
-                              },
-                              {
-                                label: 'MEMORIA / Context Hub',
-                                value: resultContextHubLabel,
-                                detail: resultContextHubDetail,
-                              },
-                            ]}
-                          />
-                        </div>
-                      </ResultSectionCard>
-
-                      <ResultSectionCard
-                        title="Archivos"
-                        description={resultWrittenArtifactsDescription}
-                      >
-                        <ResultKeyValueGrid
-                          items={[
-                            {
-                              label: 'Carpeta principal',
-                              value: resultPrimaryAffectedPathLabel || 'No disponible',
-                            },
-                            {
-                              label: 'Target actual',
-                              value: resultCurrentTargetPathLabel || 'No disponible',
-                            },
-                            {
-                              label: 'Carpetas creadas',
-                              value:
-                                resultCreatedFolderPaths.length > 0
-                                  ? `${resultCreatedFolderPaths.length} carpeta(s)`
-                                  : 'Sin carpetas creadas',
-                            },
-                            {
-                              label: 'Archivos escritos confirmados',
-                              value:
-                                resultWrittenFilePaths.length > 0
-                                  ? `${resultWrittenFilePaths.length} archivo(s)`
-                                  : 'Sin archivos escritos confirmados',
-                            },
-                              {
-                                label: 'Archivos tocados adicionales',
-                                value:
-                                  resultTouchedFilePaths.length > 0
-                                    ? `${resultTouchedFilePaths.length} archivo(s)`
-                                    : 'Sin archivos tocados',
-                            },
-                            {
-                              label: 'Archivos previstos por plan',
-                              value:
-                                resultMaterializationFileLabels.length > 0
-                                  ? `${resultMaterializationFileLabels.length} archivo(s)`
-                                  : 'Sin archivos previstos',
-                            },
-                            {
-                              label: 'Rutas rastreadas',
-                              value:
-                                resultTrackedPaths.length > 0
-                                  ? `${resultTrackedPaths.length} ruta(s)`
-                                  : 'Sin rutas rastreadas',
-                            },
-                          ]}
-                        />
-                        <div className="mt-4 grid gap-4 lg:grid-cols-3">
-                          <div className="space-y-2">
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              Carpetas creadas
-                            </div>
-                            <div className="grid gap-2">
-                              {resultCreatedFolderPaths.length > 0 ? (
-                                resultCreatedFolderPaths.map((artifactPath) => (
-                                  <div
-                                    key={`created-${artifactPath}`}
-                                    className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
-                                  >
-                                    {artifactPath}
-                                  </div>
-                                ))
-                              ) : (
-                                <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                                  No se reportaron carpetas creadas.
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              Archivos escritos confirmados
-                            </div>
-                            <div className="grid gap-2">
-                              {resultWrittenFilePaths.length > 0 ? (
-                                resultWrittenFilePaths.map((artifactPath) => (
-                                  <div
-                                    key={`written-${artifactPath}`}
-                                    className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
-                                  >
-                                    {artifactPath}
-                                  </div>
-                                ))
-                              ) : (
-                                <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                                  No se reportaron archivos escritos confirmados.
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              Archivos previstos o tocados adicionales
-                            </div>
-                            <div className="grid gap-2">
-                              {resultWrittenArtifactPaths.length > 0 ? (
-                                resultWrittenArtifactPaths.map((artifactPath) => (
-                                  <div
-                                    key={`planned-or-touched-${artifactPath}`}
-                                    className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
-                                  >
-                                    {artifactPath}
-                                  </div>
-                                ))
-                              ) : (
-                                <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                                  No se reportaron archivos previstos ni tocados.
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </ResultSectionCard>
-
-                      <ResultSectionCard
-                        title="Validaciones"
-                        description="Chequeos reportados por la ejecución para confirmar la salida material."
-                      >
-                        <div className="flex flex-wrap items-center gap-3">
-                          <ResultStatusBadge
-                            label={
-                              latestValidationResults.length > 0
-                                ? `${latestValidationOkCount}/${latestValidationResults.length} OK`
-                                : resultExecutionNeedsMaterialReview
-                                  ? 'Validación faltante'
-                                  : 'Sin validaciones'
-                            }
-                            tone={
-                              latestValidationResults.length > 0 &&
-                              latestValidationOkCount === latestValidationResults.length
-                                ? 'emerald'
-                              : latestValidationResults.length > 0
-                                  ? 'amber'
-                                  : resultExecutionNeedsMaterialReview
-                                    ? 'rose'
-                                    : 'default'
-                            }
-                          />
-                          <div className="text-sm leading-6 text-slate-300">
-                            {effectiveResultValidationSummaryText}
-                          </div>
-                        </div>
-                        <div className="mt-4">
-                          <ResultKeyValueGrid
-                            items={[
-                              {
-                                label: 'Validaciones previstas',
-                                value:
-                                  latestMaterializationPlanValidations.length > 0
-                                    ? `${latestMaterializationPlanValidations.length}`
-                                    : '0',
-                              },
-                              {
-                                label: 'Validaciones OK',
-                                value:
-                                  latestValidationResults.length > 0
-                                    ? `${latestValidationOkCount}`
-                                    : '0',
-                              },
-                              {
-                                label: 'Validaciones fallidas',
-                                value:
-                                  latestValidationResults.length > 0
-                                    ? `${latestValidationFailureCount}`
-                                    : '0',
-                              },
-                            ]}
-                          />
-                        </div>
-                        <div className="mt-4 grid gap-2">
-                          {resultValidationItems.length > 0 ? (
-                            resultValidationItems.map((item) => (
-                              <div
-                                key={item.key}
-                                className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3"
-                              >
-                                <div className="min-w-0">
-                                  <div className="text-sm font-medium leading-6 text-slate-100">
-                                    {item.label}
-                                  </div>
-                                  <div className="text-xs leading-5 text-slate-400">
-                                    {item.detail || 'Validación reportada'}
-                                  </div>
-                                </div>
-                                <ResultStatusBadge
-                                  label={item.ok ? 'OK' : 'Fallo'}
-                                  tone={item.ok ? 'emerald' : 'rose'}
-                                />
-                              </div>
-                            ))
-                          ) : (
-                            <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                              {resultExecutionNeedsMaterialReview
-                                ? 'La ejecución no devolvió validaciones finales para mostrar.'
-                                : 'No hay validaciones disponibles para mostrar.'}
-                            </div>
-                          )}
-                        </div>
-                      </ResultSectionCard>
-
-                      <ResultSectionCard
-                        title="Reusable y scope"
-                        description="Aplicación real de memoria reusable y restricciones respetadas por la corrida."
-                      >
-                        <ResultKeyValueGrid
-                          items={[
-                            {
-                              label: 'Reusable',
-                              value: latestAppliedReuseModeLabel,
-                              detail:
-                                !latestReuseApplied
-                                  ? 'No se aplicó memoria reusable en esta corrida.'
-                                  : resultReusableSummaryLabel,
-                            },
-                            {
-                              label: resultReusableSupportLabel,
-                              value: resultReusableSupportValue,
-                            },
-                            {
-                              label: 'Scope',
-                              value: resultScopeSummaryLabel,
-                              detail:
-                                latestContinuationAnchor || 'Sin continuation anchor reportado',
-                            },
-                            {
-                              label: 'Archivos bloqueados respetados',
-                              value:
-                                resultBlockedPaths.length > 0
-                                  ? resultScopeRespected
-                                    ? 'Sí'
-                                    : 'Revisar'
-                                  : 'No aplica',
-                              detail:
-                                resultBlockedPaths.length > 0
-                                  ? resultScopeRespected
-                                    ? 'Los paths bloqueados no aparecen en touchedPaths ni createdPaths.'
-                                    : 'Hay paths bloqueados que requieren revisión técnica.'
-                                  : 'La corrida no definió archivos bloqueados.',
-                            },
-                          ]}
-                        />
-                        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                          <div className="space-y-2">
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              allowedTargetPaths
-                            </div>
-                            <div className="grid gap-2">
-                              {resultAllowedPaths.length > 0 ? (
-                                resultAllowedPaths.map((pathValue) => (
-                                  <div
-                                    key={`allowed-${pathValue}`}
-                                    className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
-                                  >
-                                    {pathValue}
-                                  </div>
-                                ))
-                              ) : (
-                                <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                                  No se informaron archivos permitidos explícitamente.
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              blockedTargetPaths
-                            </div>
-                            <div className="grid gap-2">
-                              {resultBlockedPaths.length > 0 ? (
-                                resultBlockedPaths.map((pathValue) => (
-                                  <div
-                                    key={`blocked-${pathValue}`}
-                                    className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
-                                  >
-                                    {pathValue}
-                                  </div>
-                                ))
-                              ) : (
-                                <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                                  No se informaron paths bloqueados.
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        {latestScopeSuccessCriteria.length > 0 ? (
-                          <div className="mt-4 space-y-2">
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              successCriteria
-                            </div>
-                            <div className="grid gap-2">
-                              {latestScopeSuccessCriteria.map((criterion) => (
-                                <div
-                                  key={criterion}
-                                  className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
-                                >
-                                  {criterion}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ) : null}
-                      </ResultSectionCard>
-                    </div>
-                    <div className="space-y-4">
-                      <MetricCard
-                        label="Estado final"
-                        value={effectiveResultStatusPresentation.label}
-                        detail={effectiveResultStatusPresentation.detail}
-                        tone={effectiveResultStatusPresentation.tone}
-                      />
-                      <MetricCard
-                        label="Modo de ejecución"
-                        value={fastRouteDetected ? 'Ruta rápida local' : activeExecutionModeLabel}
-                        detail={
-                          fastRouteDetected
-                            ? 'Codex: No requerido ? Bridge: No usado'
-                            : activePlannerStrategyLabel
-                        }
-                      />
-                      <MetricCard
-                        label="Capas"
-                        value={latestReasoningLayer || 'No disponible'}
-                        detail={[
-                          latestMaterializationLayer
-                            ? `Materialización: ${latestMaterializationLayer}`
-                            : '',
-                          latestMaterializationPlanSource
-                            ? `Fuente: ${latestMaterializationPlanSource}`
-                            : '',
-                          latestBrainStrategy ? `Plantilla: ${latestBrainStrategy}` : '',
-                        ]
-                          .filter(Boolean)
-                          .join(' ? ') || 'Sin capas reportadas'}
-                      />
-                      <MetricCard
-                        label="Bridge"
-                        value={resultBridgeLabel}
-                        detail={
-                          fastRouteDetected
-                            ? 'La salida se resolvió completamente en local.'
-                            : activeExecutorRuntimeDetail
-                        }
-                      />
-                      <MetricCard
-                        label="Codex"
-                        value={resultCodexLabel}
-                        detail={
-                          fastRouteDetected
-                            ? 'No participó en esta corrida.'
-                            : latestBridgeModeValue.toLocaleLowerCase() === 'codex'
-                              ? 'El bridge ejecutó la corrida real con Codex.'
-                              : 'No hay evidencia de participación obligatoria de Codex.'
-                        }
-                      />
-                      <MetricCard
-                        label="Validaciones"
-                        value={
-                          latestValidationResults.length > 0
-                            ? `${latestValidationOkCount}/${latestValidationResults.length} OK`
-                            : resultExecutionNeedsMaterialReview
-                              ? 'Validación faltante'
-                              : 'Sin validaciones reportadas'
-                        }
-                        detail={
-                          latestValidationResults.length > 0
-                            ? effectiveResultValidationSummaryText
-                            : resultExecutionNeedsMaterialReview
-                              ? 'La corrida dejó progreso material pero no devolvió validaciones finales.'
-                              : 'No hubo validaciones estructuradas para resumir.'
-                        }
-                      />
-                      <MetricCard
-                        label="Reusable"
-                        value={latestAppliedReuseModeLabel}
-                        detail={resultReusableSummaryLabel}
-                      />
-                      <ResultSectionCard
-                        title="Acciones sugeridas"
-                        description="Siguientes pasos rápidos para revisar o iterar esta salida."
-                      >
-                        <div className="grid gap-2">
-                          {resultSuggestedActions.map((action) => (
-                            <div
-                              key={action.title}
-                              className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3"
-                            >
-                              <div className="text-sm font-medium leading-6 text-slate-100">
-                                {action.title}
-                              </div>
-                              <div className="text-xs leading-5 text-slate-400">
-                                {action.detail}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="mt-4 grid gap-2">
-                          <button
-                            type="button"
-                            onClick={handleWizardStartOver}
-                            className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-                          >
-                            Volver al objetivo
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setExperienceMode('advanced')}
-                            className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-                          >
-                            Abrir panel avanzado
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setIsFlowConsoleOpen(true)}
-                            className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-                          >
-                            Abrir consola técnica
-                          </button>
-                        </div>
-                      </ResultSectionCard>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="mt-6 flex flex-col gap-3 border-t border-white/8 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-sm leading-6 text-slate-400">
-                  {activeWizardStep === 'plan'
-                    ? plannerIsReviewOnly
-                      ? 'Este plan quedo en revision. El CTA azul solo prepara la siguiente accion segura; todavia no ejecuta archivos.'
-                      : 'La instruccion actual ya esta lista para ejecutar o materializar desde aca.'
-                    : activeWizardStep === 'execution'
-                      ? 'Si aparece una aprobación, el flujo queda claramente bloqueado hasta resolverla.'
-                      : activeWizardStep === 'result'
-                        ? 'Podés volver al objetivo o abrir el panel avanzado para seguir mirando detalle.'
-                        : 'Completá este paso y seguí al próximo.'}
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {activeWizardStep !== 'goal' ? (
-                    <button
-                      type="button"
-                      onClick={handleWizardBack}
-                      className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-                    >
-                      Atrás
-                    </button>
-                  ) : null}
-
-                  {activeWizardStep === 'goal' ||
-                  activeWizardStep === 'context' ||
-                  activeWizardStep === 'brain' ? (
-                    <button
-                      type="button"
-                      onClick={handleWizardNext}
-                      disabled={activeWizardStep === 'goal' && !goalInput.trim()}
-                      className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-                    >
-                      Siguiente
-                    </button>
-                  ) : null}
-
-                  {activeWizardStep === 'memory' ? (
-                    <button
-                      type="button"
-                      onClick={handleWizardGeneratePlan}
-                      disabled={isPlanning || !goalInput.trim()}
-                      className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-                    >
-                      {isPlanning ? 'Generando...' : 'Generar plan'}
-                    </button>
-                  ) : null}
-
-                  {activeWizardStep === 'plan' ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={handleWizardGeneratePlan}
-                        disabled={isPlanning || !goalInput.trim()}
-                        className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
-                      >
-                        {isPlanning ? 'Generando...' : 'Regenerar plan'}
-                      </button>
-                      {plannerIsReviewOnly ? (
-                        handlePlannerReviewPrimaryAction &&
-                        plannerReviewPrimaryActionLabel ? (
-                          <button
-                            type="button"
-                            onClick={handlePlannerReviewPrimaryAction}
-                            disabled={isPlanning}
-                            className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-                          >
-                            {plannerReviewPrimaryActionLabel}
-                          </button>
-                        ) : (
-                          <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200">
-                            {plannerReviewActionLabel}
-                          </div>
-                        )
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={handleWizardExecute}
-                          disabled={!canExecuteInstruction || isExecutingTask}
-                          className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-                        >
-                          {isExecutingTask
-                            ? 'Ejecutando...'
-                            : executeCurrentInstructionLabel}
-                        </button>
-                      )}
-                    </>
-                  ) : null}
-
-                  {activeWizardStep === 'execution' ? (
-                    <button
-                      type="button"
-                      onClick={handleWizardNext}
-                      disabled={!wizardCanShowResult}
-                      className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-                    >
-                      {wizardExecutionResultButtonLabel}
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            </section>
-
-            <aside className="min-h-0 space-y-3 overflow-auto pr-1">
-              <article className="rounded-3xl border border-white/10 bg-slate-950/60 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.28)]">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Resumen del flujo
-                </div>
-                <div className="mt-3 space-y-2">
-                  <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2.5">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      Objetivo
-                    </div>
-                    <div className="mt-1 text-sm font-medium leading-5 text-slate-100">
-                      {normalizedGoalInput}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2.5">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      Criterio
-                    </div>
-                    <div className="mt-1 text-sm font-medium leading-5 text-slate-100">
-                      {getBrainCostModeLabel(brainCostMode)}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2.5">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      Reuse
-                    </div>
-                    <div className="mt-1 text-sm font-medium leading-5 text-slate-100">
-                      {manualReuseModeLabel}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-sky-300/20 bg-sky-300/8 px-3 py-2.5">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-200/80">
-                      Estado
-                    </div>
-                    <div className="mt-1 text-sm font-medium leading-5 text-sky-50">
-                      {sessionStatus}
-                    </div>
-                  </div>
-                </div>
-              </article>
-
-              <article className="rounded-3xl border border-white/10 bg-slate-950/60 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.28)]">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Herramientas aparte
-                </div>
-                <div className="mt-3 grid gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setFlowConsoleVisibility({ open: true, pinned: true })}
-                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-medium text-slate-200 transition hover:bg-white/10"
-                  >
-                    Abrir consola técnica
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRunSummary(latestExecutionRunSummary)}
-                    disabled={!latestExecutionRunSummary}
-                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
-                  >
-                    Ver última corrida
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleResetSessionMemory}
-                    disabled={isRunning}
-                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
-                  >
-                    Reiniciar memoria de la sesión
-                  </button>
-                </div>
-              </article>
-            </aside>
           </div>
         ) : null}
+
+        {experienceMode === 'guided' ? guidedShell : null}
 
         {experienceMode === 'advanced' ? (
           <>
@@ -21985,7 +21578,7 @@ function App() {
                 />
 
                 <ContextHubControlPanel
-                  description="Esta zona muestra si MEMORIA esta disponible, si JEFE la levanto localmente y como seguir sin bloquear la sesion cuando esta apagada."
+                  description="Esta zona muestra si MEMORIA está disponible, si JEFE la levantó localmente y cómo seguir sin bloquear la sesión cuando está apagada."
                   stateLabel={contextHubRuntimeLabel}
                   stateTone={contextHubRuntimeTone}
                   stateDetail={contextHubRuntimeDetail}
@@ -23338,7 +22931,7 @@ function App() {
                         Actividad en vivo
                       </div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        ?ltimos 6 eventos
+                        Últimos 6 eventos
                       </div>
                     </div>
                     <div className="mt-4 space-y-2">
@@ -23769,7 +23362,7 @@ function App() {
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-lg font-semibold text-white">Actividad en vivo</div>
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    ?ltimos 6 eventos
+                    Últimos 6 eventos
                   </div>
                 </div>
                 <div className="mt-4 space-y-2">
@@ -24033,3 +23626,4 @@ function App() {
 }
 
 export default App
+

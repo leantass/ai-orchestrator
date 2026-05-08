@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 const joinClasses = (...tokens: Array<string | false | null | undefined>) =>
   tokens.filter(Boolean).join(' ')
 
-export type MetricTone = 'default' | 'sky' | 'emerald' | 'amber' | 'rose'
+export type MetricTone = 'default' | 'sky' | 'emerald' | 'amber' | 'rose' | 'violet'
 
 export function SidebarSectionButton({
   active,
@@ -91,6 +91,8 @@ export function MetricCard({
           ? 'border-amber-300/20 bg-amber-300/8'
           : tone === 'rose'
             ? 'border-rose-300/20 bg-rose-300/8'
+            : tone === 'violet'
+              ? 'border-violet-300/20 bg-violet-300/8'
             : 'border-white/8 bg-white/[0.03]'
 
   return (
@@ -146,6 +148,8 @@ export function ResultStatusBadge({
           ? 'border-amber-300/20 bg-amber-300/10 text-amber-100'
           : tone === 'rose'
             ? 'border-rose-300/20 bg-rose-300/10 text-rose-100'
+            : tone === 'violet'
+              ? 'border-violet-300/20 bg-violet-300/10 text-violet-100'
             : 'border-white/10 bg-white/5 text-slate-100'
 
   return (

@@ -2,9 +2,18 @@
 
 :root {
   color-scheme: dark;
-  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background-color: #0a0f1c;
-  color: #f3f7ff;
+  font-family: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: #07111f;
+  color: #f4f7fb;
+  --jefe-bg: #07111f;
+  --jefe-bg-deep: #030712;
+  --jefe-panel: rgba(9, 17, 32, 0.76);
+  --jefe-panel-soft: rgba(15, 23, 42, 0.62);
+  --jefe-line: rgba(148, 163, 184, 0.14);
+  --jefe-text: #f4f7fb;
+  --jefe-muted: #95a3b8;
+  --jefe-cyan: #67e8f9;
+  --jefe-violet: #c4b5fd;
 }
 
 * {
@@ -22,7 +31,47 @@ body,
 body {
   min-height: 100vh;
   background:
-    radial-gradient(circle at top, rgba(59, 130, 246, 0.16), transparent 30%),
-    linear-gradient(180deg, #0a0f1c 0%, #11182a 100%);
-  color: #f3f7ff;
+    radial-gradient(circle at top left, rgba(103, 232, 249, 0.12), transparent 28%),
+    radial-gradient(circle at top right, rgba(196, 181, 253, 0.08), transparent 24%),
+    linear-gradient(180deg, #07111f 0%, #0b1423 55%, #040811 100%);
+  color: var(--jefe-text);
+  background-attachment: fixed;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(148, 163, 184, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(circle at center, black, transparent 88%);
+}
+
+::selection {
+  background: rgba(103, 232, 249, 0.24);
+  color: #f8fafc;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.25);
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }

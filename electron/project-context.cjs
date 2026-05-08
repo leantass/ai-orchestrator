@@ -39,6 +39,25 @@ const PROTECTED_FILE_PATTERNS = [
   /apikey/i,
   /api[-_]?key/i,
 ]
+const RUNTIME_TEMPORARY_PATH_PATTERNS = [
+  /(^|\/)\.tmp[-/]/i,
+  /(^|\/)tmp[-/]/i,
+  /(^|\/)temp(?:\/|$)/i,
+  /(^|\/)user data(?:\/|$)/i,
+  /(^|\/)cache(?:\/|$)/i,
+  /(^|\/)code cache(?:\/|$)/i,
+  /(^|\/)gpucache(?:\/|$)/i,
+  /(^|\/)dawncache(?:\/|$)/i,
+  /(^|\/)grshadercache(?:\/|$)/i,
+  /(^|\/)blob_storage(?:\/|$)/i,
+  /(^|\/)service worker(?:\/|$)/i,
+  /(^|\/)crashpad(?:\/|$)/i,
+  /(^|\/)singleton(?:cookie|lock|socket)?$/i,
+  /(^|\/)local state$/i,
+  /chromium/i,
+  /chrome/i,
+  /electron/i,
+]
 
 function normalizeOptionalString(value) {
   return typeof value === 'string' ? value.trim() : ''
@@ -287,8 +306,21 @@ function summarizeGitStatus(projectPath) {
   }
 }
 
+function isRuntimeTemporaryPath(relativePath) {
+  const normalizedRelativePath = normalizeOptionalString(relativePath).replace(/\\/g, '/')
+
+  if (!normalizedRelativePath) {
+    return false
+  }
+
+  return RUNTIME_TEMPORARY_PATH_PATTERNS.some((pattern) =>
+    pattern.test(normalizedRelativePath),
+  )
+}
+
 function scanProtectedFiles(projectPath, maxEntries = 500) {
-  const detected = []
+  const sensitiveDetected = []
+  const runtimeTemporaryDetected = []
   const queue = [{ currentPath: projectPath, depth: 0 }]
   let visited = 0
 
@@ -321,9 +353,19 @@ function scanProtectedFiles(projectPath, maxEntries = 500) {
 
       const fullPath = path.join(entry.currentPath, entryName)
       const relativePath = path.relative(projectPath, fullPath) || entryName
+      const normalizedRelativePath = relativePath.replace(/\\/g, '/')
+      const matchesProtectedPattern = PROTECTED_FILE_PATTERNS.some((pattern) =>
+        pattern.test(entryName),
+      )
 
-      if (PROTECTED_FILE_PATTERNS.some((pattern) => pattern.test(entryName))) {
-        detected.push(relativePath.replace(/\\/g, '/'))
+      if (matchesProtectedPattern) {
+        if (isRuntimeTemporaryPath(normalizedRelativePath)) {
+          runtimeTemporaryDetected.push(normalizedRelativePath)
+        } else {
+          sensitiveDetected.push(normalizedRelativePath)
+        }
+      } else if (isRuntimeTemporaryPath(normalizedRelativePath)) {
+        runtimeTemporaryDetected.push(normalizedRelativePath)
       }
 
       if (
@@ -340,7 +382,10 @@ function scanProtectedFiles(projectPath, maxEntries = 500) {
     }
   }
 
-  return [...new Set(detected)].slice(0, 40)
+  return {
+    sensitiveDetected: [...new Set(sensitiveDetected)].slice(0, 40),
+    runtimeTemporaryDetected: [...new Set(runtimeTemporaryDetected)].slice(0, 40),
+  }
 }
 
 function detectEntrypoints(projectPath) {
@@ -533,7 +578,9 @@ function analyzeExistingProject(projectPath) {
   const importantFolders = PROJECT_IMPORTANT_FOLDERS.filter((folderName) =>
     fs.existsSync(path.join(selectedPath, folderName)),
   )
-  const protectedFilesDetected = scanProtectedFiles(selectedPath)
+  const protectedFileScan = scanProtectedFiles(selectedPath)
+  const protectedFilesDetected = protectedFileScan.sensitiveDetected
+  const runtimeTemporaryFilesDetected = protectedFileScan.runtimeTemporaryDetected
   const entrypoints = detectEntrypoints(selectedPath)
   const gitStatusSummary = summarizeGitStatus(selectedPath)
   const jefeManifestSummary = readJefeManifestSummary(selectedPath)
@@ -542,6 +589,12 @@ function analyzeExistingProject(projectPath) {
   if (protectedFilesDetected.length > 0) {
     warnings.push(
       'Se detectaron archivos protegidos. JEFE no los lee ni los envia al planner.',
+    )
+  }
+
+  if (runtimeTemporaryFilesDetected.length > 0) {
+    warnings.push(
+      'Se detectaron artefactos de runtime temporal o cache local. JEFE los ignora en este analisis.',
     )
   }
 
@@ -577,6 +630,7 @@ function analyzeExistingProject(projectPath) {
       })),
     gitStatusSummary,
     protectedFilesDetected,
+    runtimeTemporaryFilesDetected,
     importantFolders,
     entrypoints,
     warnings,
