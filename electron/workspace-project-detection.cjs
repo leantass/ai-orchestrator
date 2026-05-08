@@ -247,7 +247,7 @@ function classifyWorkspaceProjectIntent({
   const hasStrongSemanticMatch =
     semanticSignals.domainMatches.length > 0 ||
     semanticSignals.rootMatches.length > 0 ||
-    semanticSignals.moduleMatches.length >= 2
+    semanticSignals.moduleMatches.length >= 3
 
   if ((explicitNewProject || explicitFirstDelivery) && !explicitContinue) {
     return {

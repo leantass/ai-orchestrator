@@ -6296,7 +6296,7 @@ function detectSafeFirstDeliveryPlanningIntent(goal, context) {
           ? 'business-system'
           : 'unknown')
   const explicitPhaseIntent =
-    /\b(?:primera entrega segura|primera fase segura|safe first delivery|safe-first-delivery|base navegable inicial|prototipo funcional local|version inicial acotada|entrega inicial acotada|planificar una primera entrega segura|planificar la primera entrega segura|preparar la primera entrega segura|preparar la primera fase segura)\b/u.test(
+    /\b(?:primera entrega segura|primera fase segura|safe first delivery|safe-first-delivery|base navegable inicial|prototipo funcional local|version inicial acotada|entrega inicial acotada|primera entrega funcional local|entrega funcional local segura|version operativa local inicial|planificar una primera entrega segura|planificar la primera entrega segura|preparar la primera entrega segura|preparar la primera fase segura)\b/u.test(
       normalizedText,
     )
   const explicitFrontendProjectPhaseIntent =
@@ -6324,17 +6324,24 @@ function detectSafeFirstDeliveryPlanningIntent(goal, context) {
       normalizedText,
     )
   const exclusionSignals = [
+    /\bsin instalar dependencias\b/u,
+    /\bsin dependencias nuevas\b/u,
+    /\bsin npm install\b/u,
+    /\bsin backend real\b/u,
+    /\bsin base real\b/u,
     /\bsin pagos reales\b/u,
     /\bsin credenciales\b/u,
     /\bsin secretos\b/u,
     /\bsin webhooks?\b/u,
     /\bsin deploy\b/u,
+    /\bsin docker\b/u,
     /\bsin migraciones\b/u,
     /\bsin auth real\b/u,
     /\bsin autenticacion real\b/u,
     /\bsin base de datos real\b/u,
     /\bsin persistencia real\b/u,
     /\bsin integraciones sensibles\b/u,
+    /\bsin integraciones externas\b/u,
     /\bsin datos sensibles reales\b/u,
     /\bsin callbacks? externos reales\b/u,
   ]
@@ -6588,6 +6595,44 @@ function detectScalableDeliveryPlanningIntent(goal, context) {
     /\bseed(?:s|ers)?\b/u.test(normalizedText) ? 'seeds' : '',
     /\.env\.example\b/u.test(normalizedText) ? '.env.example' : '',
   ].filter(Boolean)
+  const localFunctionalDeliverySignals = [
+    /\bentrega funcional local\b/u.test(normalizedText) ? 'entrega funcional local' : '',
+    /\bsistema local funcional\b/u.test(normalizedText) ? 'sistema local funcional' : '',
+    /\bversion operativa local\b/u.test(normalizedText) ? 'version operativa local' : '',
+    /\bprimera entrega funcional\b/u.test(normalizedText) ? 'primera entrega funcional' : '',
+    /\bpreparad[oa] para continuar por fases\b/u.test(normalizedText)
+      ? 'continuidad por fases'
+      : '',
+  ].filter(Boolean)
+  const operationalDomainSignals = [
+    /\bpanel operativo\b/u.test(normalizedText) ? 'panel operativo' : '',
+    /\breportes?\b/u.test(normalizedText) ? 'reportes' : '',
+    /\broles?\b/u.test(normalizedText) ? 'roles' : '',
+    /\busuarios?\b/u.test(normalizedText) ? 'usuarios' : '',
+    /\baprobaciones?\b/u.test(normalizedText) ? 'aprobaciones' : '',
+    /\bdocumentacion\b/u.test(normalizedText) ? 'documentacion' : '',
+    /\bhistorial\b/u.test(normalizedText) ? 'historial' : '',
+    /\balertas?\b/u.test(normalizedText) ? 'alertas' : '',
+    /\bsolicitudes?\b/u.test(normalizedText) ? 'solicitudes' : '',
+  ].filter(Boolean)
+  const localOnlySignals = [
+    /\bsin instalar dependencias\b/u.test(normalizedText)
+      ? 'sin instalar dependencias'
+      : '',
+    /\bsin dependencias nuevas\b/u.test(normalizedText) ? 'sin dependencias nuevas' : '',
+    /\bsin npm install\b/u.test(normalizedText) ? 'sin npm install' : '',
+    /\bsin backend real\b/u.test(normalizedText) ? 'sin backend real' : '',
+    /\bsin base real\b/u.test(normalizedText) ? 'sin base real' : '',
+    /\bsin base de datos real\b/u.test(normalizedText)
+      ? 'sin base de datos real'
+      : '',
+    /\bsin docker\b/u.test(normalizedText) ? 'sin docker' : '',
+    /\bsin deploy\b/u.test(normalizedText) ? 'sin deploy' : '',
+    /\bsin integraciones externas\b/u.test(normalizedText)
+      ? 'sin integraciones externas'
+      : '',
+    /\bsin credenciales\b/u.test(normalizedText) ? 'sin credenciales' : '',
+  ].filter(Boolean)
 
   const matchesInfraPlan =
     infraSignals.length >= 2 &&
@@ -6603,7 +6648,10 @@ function detectScalableDeliveryPlanningIntent(goal, context) {
     ((fullstackSignals.includes('frontend') || fullstackSignals.includes('api')) &&
       fullstackSignals.includes('backend') &&
       (fullstackSignals.includes('base de datos local') ||
-        fullstackSignals.includes('db local')))
+        fullstackSignals.includes('db local'))) ||
+    (localFunctionalDeliverySignals.length > 0 &&
+      operationalDomainSignals.length >= 3 &&
+      localOnlySignals.length >= 3)
   const matchesFrontendPlan =
     (frontendSignals.includes('react') || frontendSignals.includes('frontend real')) &&
     frontendSignals.length >= 3
@@ -6623,7 +6671,12 @@ function detectScalableDeliveryPlanningIntent(goal, context) {
       : deliveryLevel === 'monorepo-local'
         ? monorepoSignals
         : deliveryLevel === 'fullstack-local'
-          ? fullstackSignals
+          ? summarizeUniqueExecutorStrings([
+              ...fullstackSignals,
+              ...localFunctionalDeliverySignals,
+              ...operationalDomainSignals,
+              ...localOnlySignals,
+            ], 16)
           : frontendSignals
 
   return {
@@ -6759,6 +6812,321 @@ function pushUniquePlannerValues(target, values, maxItems = 12) {
   }
 
   return target
+}
+
+function detectExplicitLocalFunctionalDeliveryIntent(goal, context) {
+  const normalizedText = normalizeSectorDetectionText(
+    [goal, context]
+      .filter((value) => typeof value === 'string' && value.trim())
+      .join(' '),
+  )
+
+  if (!normalizedText) {
+    return false
+  }
+
+  const deliverySignals = [
+    /\bentrega funcional local\b/u,
+    /\bsistema local funcional\b/u,
+    /\bversion operativa local\b/u,
+    /\bprimera entrega funcional\b/u,
+  ]
+  const operationalSignals = [
+    /\bpanel operativo\b/u,
+    /\breportes?\b/u,
+    /\broles?\b/u,
+    /\busuarios?\b/u,
+    /\baprobaciones?\b/u,
+    /\bdocumentacion\b/u,
+    /\bhistorial\b/u,
+    /\balertas?\b/u,
+    /\bsolicitudes?\b/u,
+  ]
+  const localOnlySignals = [
+    /\bsin instalar dependencias\b/u,
+    /\bsin dependencias nuevas\b/u,
+    /\bsin npm install\b/u,
+    /\bsin backend real\b/u,
+    /\bsin base real\b/u,
+    /\bsin base de datos real\b/u,
+    /\bsin docker\b/u,
+    /\bsin deploy\b/u,
+    /\bsin integraciones externas\b/u,
+    /\bsin credenciales\b/u,
+  ]
+  const deliveryCount = deliverySignals.reduce(
+    (count, pattern) => (pattern.test(normalizedText) ? count + 1 : count),
+    0,
+  )
+  const operationalCount = operationalSignals.reduce(
+    (count, pattern) => (pattern.test(normalizedText) ? count + 1 : count),
+    0,
+  )
+  const localOnlyCount = localOnlySignals.reduce(
+    (count, pattern) => (pattern.test(normalizedText) ? count + 1 : count),
+    0,
+  )
+
+  return deliveryCount > 0 && operationalCount >= 3 && localOnlyCount >= 3
+}
+
+function normalizePathForComparison(value) {
+  return typeof value === 'string' && value.trim()
+    ? value.trim().replace(/\\/gu, '/').replace(/\/{2,}/gu, '/')
+    : ''
+}
+
+function normalizeOptionalString(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function normalizeWorkspaceProjectRoot(value) {
+  return typeof value === 'string' && value.trim()
+    ? normalizePathForComparison(value.trim()).replace(/\/+$/u, '')
+    : ''
+}
+
+function pathTargetsWorkspaceProjectRoot(targetPath, projectRoot) {
+  const normalizedProjectRoot = normalizeWorkspaceProjectRoot(projectRoot)
+  const normalizedTargetPath = normalizeWorkspaceProjectRoot(targetPath)
+
+  if (!normalizedProjectRoot || !normalizedTargetPath) {
+    return false
+  }
+
+  return (
+    normalizedTargetPath === normalizedProjectRoot ||
+    normalizedTargetPath.startsWith(`${normalizedProjectRoot}/`)
+  )
+}
+
+function inferDecisionPrimaryProjectRoot(decision) {
+  const candidates = [
+    decision?.localProjectManifest?.projectRoot,
+    decision?.projectPhaseExecutionPlan?.projectRoot,
+    decision?.moduleExpansionPlan?.projectRoot,
+    decision?.continuationActionPlan?.projectRoot,
+    decision?.implementationRoadmap?.projectSlug,
+    Array.isArray(decision?.scalableDeliveryPlan?.allowedRootPaths)
+      ? decision.scalableDeliveryPlan.allowedRootPaths[0]
+      : '',
+    Array.isArray(decision?.executionScope?.allowedTargetPaths)
+      ? decision.executionScope.allowedTargetPaths[0]
+      : '',
+  ]
+
+  return candidates.find((entry) => typeof entry === 'string' && entry.trim()) || ''
+}
+
+function finalizeWorkspaceProjectDecision({
+  decision,
+  goal,
+  context,
+  workspacePath,
+  userParticipationMode,
+  costMode,
+  inferredProjectState,
+  workspaceProjectIntent,
+}) {
+  if (!decision || typeof decision !== 'object') {
+    return decision
+  }
+
+  const normalizedExistingManifest = normalizeLocalProjectManifestContract(
+    inferredProjectState?.manifest,
+  )
+  const existingProjectRoot = normalizeWorkspaceProjectRoot(
+    inferredProjectState?.projectRootRelativePath || normalizedExistingManifest?.projectRoot,
+  )
+  const existingProjectDetected = Boolean(normalizedExistingManifest && existingProjectRoot)
+  const workspaceIntentLabel =
+    typeof workspaceProjectIntent?.intent === 'string' ? workspaceProjectIntent.intent : ''
+  const ignoredExistingProjectReason =
+    workspaceIntentLabel === 'new-project-intent' && existingProjectDetected
+      ? `Se detectó ${existingProjectRoot}, pero el pedido actual describe un proyecto nuevo y queda fuera de alcance para esta corrida.`
+      : ''
+
+  const buildDecoratedDecision = (baseDecision) => {
+    const resolvedActiveProjectRoot = inferDecisionPrimaryProjectRoot(baseDecision)
+    const resolvedActiveProjectRootNormalized =
+      normalizeWorkspaceProjectRoot(resolvedActiveProjectRoot)
+
+    return buildBrainDecisionContract({
+      ...baseDecision,
+      existingProjectDetection: existingProjectDetected
+        ? {
+            detected: true,
+            applicable: workspaceIntentLabel !== 'new-project-intent',
+            intent: workspaceIntentLabel,
+            projectRoot:
+              inferredProjectState?.projectRootRelativePath ||
+              normalizedExistingManifest?.projectRoot ||
+              '',
+            domain: normalizedExistingManifest?.domain || '',
+            projectType: normalizedExistingManifest?.projectType || '',
+            lastCompletedPhase: normalizedExistingManifest?.lastCompletedPhase || '',
+            nextRecommendedPhase: normalizedExistingManifest?.nextRecommendedPhase || '',
+            reason: ignoredExistingProjectReason,
+          }
+        : {
+            detected: false,
+            applicable: false,
+            intent: workspaceIntentLabel,
+          },
+      activeProjectContext: {
+        mode: resolvedActiveProjectRootNormalized
+          ? existingProjectDetected &&
+            resolvedActiveProjectRootNormalized === existingProjectRoot &&
+            workspaceIntentLabel !== 'new-project-intent'
+            ? 'existing-project'
+            : 'new-project'
+          : 'none',
+        projectRoot: resolvedActiveProjectRoot,
+        domain:
+          normalizeOptionalString(baseDecision?.localProjectManifest?.domain) ||
+          normalizeOptionalString(baseDecision?.projectBlueprint?.domain) ||
+          normalizeOptionalString(baseDecision?.implementationRoadmap?.domain) ||
+          normalizeOptionalString(baseDecision?.domainUnderstanding?.domainLabel),
+        strategy: normalizeOptionalString(baseDecision?.strategy),
+        source:
+          existingProjectDetected &&
+          resolvedActiveProjectRootNormalized === existingProjectRoot &&
+          workspaceIntentLabel !== 'new-project-intent'
+            ? 'workspace-existing-project'
+            : 'new-project-plan',
+        note: ignoredExistingProjectReason,
+      },
+    })
+  }
+
+  if (!existingProjectDetected || workspaceIntentLabel !== 'new-project-intent') {
+    return buildDecoratedDecision(decision)
+  }
+
+  const normalizedScalablePlan = normalizeScalableDeliveryPlanContract(
+    decision.scalableDeliveryPlan,
+  )
+  const normalizedProjectBlueprint = normalizeProjectBlueprintContract(
+    decision.projectBlueprint,
+  )
+  const shouldDeriveScalablePlan =
+    !normalizedScalablePlan &&
+    detectExplicitLocalFunctionalDeliveryIntent(goal, context) &&
+    ['fullstack-local', 'frontend-project', 'safe-first-delivery'].includes(
+      normalizeOptionalString(normalizedProjectBlueprint?.deliveryLevel).toLocaleLowerCase(),
+    )
+  const derivedScalablePlan = shouldDeriveScalablePlan
+    ? buildScalableDeliveryPlan({
+        goal,
+        context,
+        workspacePath,
+        deliveryLevel:
+          normalizeOptionalString(normalizedProjectBlueprint?.deliveryLevel).toLocaleLowerCase() ||
+          'safe-first-delivery',
+        domainUnderstanding: decision.domainUnderstanding,
+        reason:
+          'El objetivo ya pide una entrega funcional local nueva y conviene dejar preparado un plan escalable local sin reusar el proyecto detectado en el workspace.',
+        productArchitecture: decision.productArchitecture,
+        projectBlueprint: normalizedProjectBlueprint,
+      }).scalableDeliveryPlan
+    : null
+
+  const sanitizedLocalProjectManifest = pathTargetsWorkspaceProjectRoot(
+    decision?.localProjectManifest?.projectRoot,
+    existingProjectRoot,
+  )
+    ? null
+    : normalizeLocalProjectManifestContract(decision?.localProjectManifest)
+  const sanitizedProjectPhaseExecutionPlan = pathTargetsWorkspaceProjectRoot(
+    decision?.projectPhaseExecutionPlan?.projectRoot,
+    existingProjectRoot,
+  )
+    ? null
+    : normalizeProjectPhaseExecutionPlanContract(decision?.projectPhaseExecutionPlan)
+  const sanitizedModuleExpansionPlan = pathTargetsWorkspaceProjectRoot(
+    decision?.moduleExpansionPlan?.projectRoot,
+    existingProjectRoot,
+  )
+    ? null
+    : normalizeModuleExpansionPlanContract(decision?.moduleExpansionPlan)
+  const sanitizedContinuationActionPlan =
+    pathTargetsWorkspaceProjectRoot(
+      decision?.continuationActionPlan?.projectRoot,
+      existingProjectRoot,
+    ) ||
+    normalizeOptionalString(decision?.continuationActionPlan?.targetStrategy).toLocaleLowerCase() ===
+      'prepare-continuation-action-plan'
+      ? null
+      : normalizeContinuationActionContract(decision?.continuationActionPlan)
+  const sanitizedExpansionOptions = pathTargetsWorkspaceProjectRoot(
+    decision?.expansionOptions?.projectRoot,
+    existingProjectRoot,
+  )
+    ? null
+    : normalizeExpansionOptionsContract(decision?.expansionOptions)
+  const sanitizedExecutionScope = normalizeExecutorExecutionScope(decision?.executionScope)
+    ? {
+        ...normalizeExecutorExecutionScope(decision?.executionScope),
+        allowedTargetPaths: summarizeUniqueExecutorStrings(
+          (normalizeExecutorExecutionScope(decision?.executionScope)?.allowedTargetPaths || []).filter(
+            (entry) => !pathTargetsWorkspaceProjectRoot(entry, existingProjectRoot),
+          ),
+          40,
+        ),
+      }
+    : null
+  const effectiveScalablePlan = normalizedScalablePlan || derivedScalablePlan
+  const effectiveDeliveryLevel =
+    normalizeOptionalString(sanitizedLocalProjectManifest?.deliveryLevel).toLocaleLowerCase() ||
+    normalizeOptionalString(effectiveScalablePlan?.deliveryLevel).toLocaleLowerCase() ||
+    normalizeOptionalString(normalizedProjectBlueprint?.deliveryLevel).toLocaleLowerCase() ||
+    'safe-first-delivery'
+  const rebuiltPlanningBundle = buildPlanningArchitectureBundle({
+    goal,
+    context,
+    strategy: decision.strategy,
+    nextExpectedAction: decision.nextExpectedAction,
+    requiresApproval: decision.requiresApproval,
+    deliveryLevel: effectiveDeliveryLevel,
+    domainUnderstanding: decision.domainUnderstanding,
+    scalableDeliveryPlan: effectiveScalablePlan,
+    productArchitecture: decision.productArchitecture,
+    userParticipationMode,
+    costMode,
+    materializationPlan: decision.materializationPlan,
+    projectPhaseExecutionPlan: sanitizedProjectPhaseExecutionPlan,
+    localProjectManifest: sanitizedLocalProjectManifest,
+    expansionOptions: sanitizedExpansionOptions,
+    moduleExpansionPlan: sanitizedModuleExpansionPlan,
+    continuationActionPlan: sanitizedContinuationActionPlan,
+  })
+
+  return buildDecoratedDecision({
+    ...decision,
+    executionScope: sanitizedExecutionScope,
+    scalableDeliveryPlan: rebuiltPlanningBundle.scalableDeliveryPlan || effectiveScalablePlan,
+    projectBlueprint: rebuiltPlanningBundle.projectBlueprint || normalizedProjectBlueprint,
+    questionPolicy: rebuiltPlanningBundle.questionPolicy || decision.questionPolicy,
+    implementationRoadmap:
+      rebuiltPlanningBundle.implementationRoadmap || decision.implementationRoadmap,
+    nextActionPlan: rebuiltPlanningBundle.nextActionPlan || decision.nextActionPlan,
+    validationPlan: rebuiltPlanningBundle.validationPlan || decision.validationPlan,
+    phaseExpansionPlan:
+      rebuiltPlanningBundle.phaseExpansionPlan || decision.phaseExpansionPlan,
+    projectPhaseExecutionPlan:
+      rebuiltPlanningBundle.projectPhaseExecutionPlan || sanitizedProjectPhaseExecutionPlan,
+    localProjectManifest:
+      rebuiltPlanningBundle.localProjectManifest || sanitizedLocalProjectManifest,
+    expansionOptions: rebuiltPlanningBundle.expansionOptions || sanitizedExpansionOptions,
+    moduleExpansionPlan:
+      rebuiltPlanningBundle.moduleExpansionPlan || sanitizedModuleExpansionPlan,
+    continuationActionPlan:
+      rebuiltPlanningBundle.continuationActionPlan || sanitizedContinuationActionPlan,
+    projectContinuationState: rebuiltPlanningBundle.projectContinuationState,
+    projectReadinessState: rebuiltPlanningBundle.projectReadinessState,
+    approvalRequestPlan: rebuiltPlanningBundle.approvalRequestPlan,
+    runtimeApprovalState: rebuiltPlanningBundle.runtimeApprovalState,
+  })
 }
 
 function extractProductArchitectureDomainLabel(goal, context, productType) {
@@ -12908,6 +13276,63 @@ function buildNextActionPlan({
       expectedOutcome:
         normalizedContinuationActionPlan.expectedOutcome ||
         'Dejar una continuidad revisable sin ejecutar runtime real ni infraestructura sensible.',
+    }
+  }
+
+  if (strategy === 'product-architecture-plan' && deliveryLevel === 'fullstack-local') {
+    return {
+      currentState: 'product-architecture-ready:fullstack-local',
+      recommendedAction:
+        'Preparar la entrega funcional local derivada del blueprint, sin reusar proyectos previos ni habilitar runtime real.',
+      actionType: 'prepare-materialization',
+      targetStrategy: 'materialize-fullstack-local-plan',
+      targetDeliveryLevel: 'fullstack-local',
+      reason:
+        'La arquitectura ya deja clara una primera ruta fullstack-local segura y el siguiente paso es preparar su materializacion controlada.',
+      safeToRunNow: true,
+      requiresApproval: false,
+      userFacingLabel: 'Preparar entrega funcional local',
+      technicalLabel: 'prepare-fullstack-from-architecture',
+      expectedOutcome:
+        'Dejar lista una ruta materializable fullstack-local, acotada al workspace y sin dependencias reales.',
+    }
+  }
+
+  if (strategy === 'product-architecture-plan' && deliveryLevel === 'frontend-project') {
+    return {
+      currentState: 'product-architecture-ready:frontend-project',
+      recommendedAction:
+        'Preparar el frontend local derivado del blueprint antes de pensar en runtimes o dependencias reales.',
+      actionType: 'prepare-materialization',
+      targetStrategy: 'materialize-frontend-project-plan',
+      targetDeliveryLevel: 'frontend-project',
+      reason:
+        'La arquitectura ya deja clara una ruta frontend-project revisable y el siguiente paso es preparar su materializacion controlada.',
+      safeToRunNow: true,
+      requiresApproval: false,
+      userFacingLabel: 'Preparar frontend local ejecutable',
+      technicalLabel: 'prepare-frontend-from-architecture',
+      expectedOutcome:
+        'Dejar lista una ruta materializable frontend-project sin instalar dependencias ni levantar servicios.',
+    }
+  }
+
+  if (strategy === 'product-architecture-plan' && deliveryLevel === 'safe-first-delivery') {
+    return {
+      currentState: 'product-architecture-ready:safe-first-delivery',
+      recommendedAction:
+        'Preparar la primera entrega segura derivada de la arquitectura antes de ejecutar cambios.',
+      actionType: 'review-plan',
+      targetStrategy: 'materialize-safe-first-delivery-plan',
+      targetDeliveryLevel: 'safe-first-delivery',
+      reason:
+        'La arquitectura ya deja definida una primera entrega segura y el siguiente paso es preparar una materializacion local acotada.',
+      safeToRunNow: true,
+      requiresApproval: false,
+      userFacingLabel: 'Preparar ejecucion local segura',
+      technicalLabel: 'prepare-safe-first-from-architecture',
+      expectedOutcome:
+        'Dejar lista una primera entrega materializable, local y revisable.',
     }
   }
 
@@ -23320,13 +23745,30 @@ function inferProjectStateFromWorkspace({ goal, context, workspacePath }) {
     })
   }
 
-  return (
-    selectBestWorkspaceProjectCandidate({
-      goal,
-      context,
-      candidates: loadedCandidates,
-    }) || null
-  )
+  const semanticCandidate = selectBestWorkspaceProjectCandidate({
+    goal,
+    context,
+    candidates: loadedCandidates,
+  })
+
+  if (semanticCandidate) {
+    return semanticCandidate
+  }
+
+  const fallbackCandidate = [...loadedCandidates].sort((leftEntry, rightEntry) =>
+    String(leftEntry?.projectRootRelativePath || '').localeCompare(
+      String(rightEntry?.projectRootRelativePath || ''),
+    ),
+  )[0]
+
+  return fallbackCandidate
+    ? {
+        ...fallbackCandidate,
+        matchScore: 0,
+        matchSignals: [],
+        matchedCandidateCount: loadedCandidates.length,
+      }
+    : null
 }
 
 function resolveExistingWorkspaceProjectNextPhaseId(inferredProjectState) {
@@ -29503,6 +29945,8 @@ function buildBrainDecisionContract({
   approvalRequestPlan,
   runtimeApprovalState,
   materializationPlan,
+  existingProjectDetection,
+  activeProjectContext,
   finalResult,
 }) {
   const resolvedRequiresApproval = requiresApproval === true
@@ -29699,6 +30143,12 @@ function buildBrainDecisionContract({
       : {}),
     ...(normalizedRuntimeApprovalState
       ? { runtimeApprovalState: normalizedRuntimeApprovalState }
+      : {}),
+    ...(existingProjectDetection && typeof existingProjectDetection === 'object'
+      ? { existingProjectDetection }
+      : {}),
+    ...(activeProjectContext && typeof activeProjectContext === 'object'
+      ? { activeProjectContext }
       : {}),
     ...(materializationPlan && typeof materializationPlan === 'object'
       ? { materializationPlan }
@@ -35718,11 +36168,24 @@ async function buildLocalStrategicBrainDecision({
     goal,
     context,
   )
-  const buildDecision = (payload) =>
-    buildBrainDecisionContract({
-      ...payload,
-      domainUnderstanding,
+  const finalizeDecisionForWorkspace = (decision) =>
+    finalizeWorkspaceProjectDecision({
+      decision,
+      goal,
+      context,
+      workspacePath,
+      userParticipationMode: normalizedUserParticipationMode,
+      costMode,
+      inferredProjectState,
+      workspaceProjectIntent,
     })
+  const buildDecision = (payload) =>
+    finalizeDecisionForWorkspace(
+      buildBrainDecisionContract({
+        ...payload,
+        domainUnderstanding,
+      }),
+    )
   const buildDecisionWithPlanningContracts = (
     payload,
     {
@@ -35759,25 +36222,27 @@ async function buildLocalStrategicBrainDecision({
       continuationActionPlan,
     })
 
-    return buildBrainDecisionContract({
-      ...payload,
-      domainUnderstanding,
-      projectBlueprint: planningContracts.projectBlueprint,
-      questionPolicy: planningContracts.questionPolicy,
-      implementationRoadmap: planningContracts.implementationRoadmap,
-      nextActionPlan: planningContracts.nextActionPlan,
-      validationPlan: planningContracts.validationPlan,
-      phaseExpansionPlan: planningContracts.phaseExpansionPlan,
-      projectPhaseExecutionPlan: planningContracts.projectPhaseExecutionPlan,
-      localProjectManifest: planningContracts.localProjectManifest,
-      expansionOptions: planningContracts.expansionOptions,
-      moduleExpansionPlan: planningContracts.moduleExpansionPlan,
-      continuationActionPlan: planningContracts.continuationActionPlan,
-      projectContinuationState: planningContracts.projectContinuationState,
-      projectReadinessState: planningContracts.projectReadinessState,
-      approvalRequestPlan: planningContracts.approvalRequestPlan,
-      runtimeApprovalState: planningContracts.runtimeApprovalState,
-    })
+    return finalizeDecisionForWorkspace(
+      buildBrainDecisionContract({
+        ...payload,
+        domainUnderstanding,
+        projectBlueprint: planningContracts.projectBlueprint,
+        questionPolicy: planningContracts.questionPolicy,
+        implementationRoadmap: planningContracts.implementationRoadmap,
+        nextActionPlan: planningContracts.nextActionPlan,
+        validationPlan: planningContracts.validationPlan,
+        phaseExpansionPlan: planningContracts.phaseExpansionPlan,
+        projectPhaseExecutionPlan: planningContracts.projectPhaseExecutionPlan,
+        localProjectManifest: planningContracts.localProjectManifest,
+        expansionOptions: planningContracts.expansionOptions,
+        moduleExpansionPlan: planningContracts.moduleExpansionPlan,
+        continuationActionPlan: planningContracts.continuationActionPlan,
+        projectContinuationState: planningContracts.projectContinuationState,
+        projectReadinessState: planningContracts.projectReadinessState,
+        approvalRequestPlan: planningContracts.approvalRequestPlan,
+        runtimeApprovalState: planningContracts.runtimeApprovalState,
+      }),
+    )
   }
   const reusablePlanningContext =
     providedReusablePlanningContext && typeof providedReusablePlanningContext === 'object'
@@ -36695,6 +37160,36 @@ async function buildLocalStrategicBrainDecision({
       intent: productArchitectureIntent,
       domainUnderstanding,
     })
+    const shouldDeriveLocalDeliveryPlan =
+      detectExplicitLocalFunctionalDeliveryIntent(goal, context) ||
+      (scalableDeliveryIntent.matches &&
+        scalableDeliveryIntent.deliveryLevel !== 'infra-local-plan')
+    const derivedDeliveryLevel =
+      scalableDeliveryIntent.matches && scalableDeliveryIntent.deliveryLevel
+        ? scalableDeliveryIntent.deliveryLevel
+        : shouldDeriveLocalDeliveryPlan
+          ? 'fullstack-local'
+          : 'safe-first-delivery'
+    const derivedScalableDeliveryPlan = shouldDeriveLocalDeliveryPlan
+      ? buildScalableDeliveryPlan({
+          goal,
+          context,
+          workspacePath,
+          deliveryLevel: derivedDeliveryLevel,
+          domainUnderstanding,
+          reason:
+            derivedDeliveryLevel === 'fullstack-local'
+              ? 'El objetivo ya describe una entrega funcional local completa y conviene dejar preparada una ruta fullstack-local sin tocar runtime real.'
+              : 'El objetivo ya describe una primera entrega local segura y conviene dejarla alineada con una ruta materializable posterior.',
+          projectBlueprint: {
+            domain:
+              productArchitecturePlan.productArchitecture?.domain ||
+              domainUnderstanding?.domainLabel ||
+              '',
+            deliveryLevel: derivedDeliveryLevel,
+          },
+        }).scalableDeliveryPlan
+      : null
 
     return buildDecisionWithPlanningContracts(
       {
@@ -36712,11 +37207,9 @@ async function buildLocalStrategicBrainDecision({
       productArchitecture: productArchitecturePlan.productArchitecture,
       },
       {
-        deliveryLevel:
-          scalableDeliveryIntent.matches && scalableDeliveryIntent.deliveryLevel
-            ? scalableDeliveryIntent.deliveryLevel
-            : 'safe-first-delivery',
+        deliveryLevel: derivedDeliveryLevel,
         productArchitecture: productArchitecturePlan.productArchitecture,
+        scalableDeliveryPlan: derivedScalableDeliveryPlan,
       },
     )
   }
@@ -38806,21 +39299,41 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
         ? rawDecision.domainUnderstanding
         : fallbackDecision.domainUnderstanding,
   })
+  const normalizedInferredProjectState = inferProjectStateFromWorkspace({
+    goal: input.goal,
+    context: input.context,
+    workspacePath: input.workspacePath,
+  })
+  const normalizedWorkspaceProjectIntent = classifyWorkspaceProjectIntent({
+    goal: input.goal,
+    context: input.context,
+    candidate: normalizedInferredProjectState,
+  })
+  const workspaceAwareDecision = finalizeWorkspaceProjectDecision({
+    decision: normalizedDecision,
+    goal: input.goal,
+    context: input.context,
+    workspacePath: input.workspacePath,
+    userParticipationMode: input.userParticipationMode,
+    costMode: input.costMode,
+    inferredProjectState: normalizedInferredProjectState,
+    workspaceProjectIntent: normalizedWorkspaceProjectIntent,
+  })
   const equivalentApprovalRejected =
-    normalizedDecision.requiresApproval === true &&
+    workspaceAwareDecision.requiresApproval === true &&
     (hasRejectedDecision(
       resolvedDecisionMap,
-      normalizedDecision.approvalRequest?.decisionKey,
+      workspaceAwareDecision.approvalRequest?.decisionKey,
     ) ||
       hasEquivalentApprovalRejected(
         resolvedDecisionMap,
         input.goal,
         input.context,
-        normalizedDecision.reason,
-        normalizedDecision.question,
-        normalizedDecision.approvalRequest?.decisionKey,
-        normalizedDecision.approvalRequest?.reason,
-        normalizedDecision.approvalRequest?.question,
+        workspaceAwareDecision.reason,
+        workspaceAwareDecision.question,
+        workspaceAwareDecision.approvalRequest?.decisionKey,
+        workspaceAwareDecision.approvalRequest?.reason,
+        workspaceAwareDecision.approvalRequest?.question,
       ))
 
   if (equivalentApprovalRejected) {
@@ -38834,26 +39347,26 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
     })
   }
   const shouldSuppressMinorApproval =
-    normalizedDecision.requiresApproval === true &&
+    workspaceAwareDecision.requiresApproval === true &&
     (hasEquivalentApprovalResolved(
       resolvedDecisionMap,
       input.goal,
       input.context,
-      normalizedDecision.reason,
-      normalizedDecision.question,
-      normalizedDecision.approvalRequest?.decisionKey,
-      normalizedDecision.approvalRequest?.reason,
-      normalizedDecision.approvalRequest?.question,
+      workspaceAwareDecision.reason,
+      workspaceAwareDecision.question,
+      workspaceAwareDecision.approvalRequest?.decisionKey,
+      workspaceAwareDecision.approvalRequest?.reason,
+      workspaceAwareDecision.approvalRequest?.question,
     ) ||
       normalizeUserParticipationMode(input.userParticipationMode) ===
         'brain-decides-missing') &&
     !detectRemoteOrCriticalAction(
       input.goal,
       input.context,
-      normalizedDecision.reason,
-      normalizedDecision.question,
-      normalizedDecision.approvalRequest?.reason,
-      normalizedDecision.approvalRequest?.question,
+      workspaceAwareDecision.reason,
+      workspaceAwareDecision.question,
+      workspaceAwareDecision.approvalRequest?.reason,
+      workspaceAwareDecision.approvalRequest?.question,
     ) &&
     (shouldSuppressPlaceholderAssetApproval({
       resolvedDecisionMap,
@@ -38861,16 +39374,16 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
       texts: [
         input.goal,
         input.context,
-        normalizedDecision.reason,
-        normalizedDecision.question,
-        normalizedDecision.approvalRequest?.decisionKey,
-        normalizedDecision.approvalRequest?.reason,
-        normalizedDecision.approvalRequest?.question,
+        workspaceAwareDecision.reason,
+        workspaceAwareDecision.question,
+        workspaceAwareDecision.approvalRequest?.decisionKey,
+        workspaceAwareDecision.approvalRequest?.reason,
+        workspaceAwareDecision.approvalRequest?.question,
       ],
     }) ||
       hasResolvedDecision(
         resolvedDecisionMap,
-        normalizedDecision.approvalRequest?.decisionKey,
+        workspaceAwareDecision.approvalRequest?.decisionKey,
         'technical-defaults',
         'placeholder-content',
         'provisional-assets',
@@ -38882,18 +39395,18 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
       detectMinorDelegableTopic(
         input.goal,
         input.context,
-        normalizedDecision.reason,
-        normalizedDecision.question,
-        normalizedDecision.approvalRequest?.reason,
-        normalizedDecision.approvalRequest?.question,
+        workspaceAwareDecision.reason,
+        workspaceAwareDecision.question,
+        workspaceAwareDecision.approvalRequest?.reason,
+        workspaceAwareDecision.approvalRequest?.question,
       ))
 
   if (!shouldSuppressMinorApproval) {
-    return normalizedDecision
+    return workspaceAwareDecision
   }
 
   return buildBrainDecisionContract({
-    ...normalizedDecision,
+    ...workspaceAwareDecision,
     requiresApproval: false,
     approvalRequest: null,
     question: '',
@@ -41012,6 +41525,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       approvalRequestPlan: brainDecision.approvalRequestPlan,
       runtimeApprovalState: brainDecision.runtimeApprovalState,
       materializationPlan: brainDecision.materializationPlan,
+      existingProjectDetection: brainDecision.existingProjectDetection,
+      activeProjectContext: brainDecision.activeProjectContext,
       contextHubStatus,
       brainRoutingDecision,
       brainPrimaryAdapter,
@@ -41068,6 +41583,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
     approvalRequestPlan: brainDecision.approvalRequestPlan,
     runtimeApprovalState: brainDecision.runtimeApprovalState,
     materializationPlan: brainDecision.materializationPlan,
+    existingProjectDetection: brainDecision.existingProjectDetection,
+    activeProjectContext: brainDecision.activeProjectContext,
     contextHubStatus,
     brainRoutingDecision,
     brainPrimaryAdapter,

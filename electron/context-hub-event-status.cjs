@@ -20,6 +20,11 @@ function normalizeStatusCode(value) {
   return Number.isInteger(value) && value >= 100 ? value : null
 }
 
+function shouldTreatEventResultAsSkipped(eventResult) {
+  const reason = normalizeOptionalString(eventResult?.reason)
+  return reason === 'unavailable' || reason === 'timeout'
+}
+
 function formatEventTypeLabel(eventType) {
   const normalizedEventType = normalizeOptionalString(eventType)
   return normalizedEventType || 'evento desconocido'
@@ -85,12 +90,18 @@ function buildContextHubEventStatus(value = {}) {
   }
 
   if (state === 'skipped') {
+    const skippedDetail =
+      reason === 'unavailable'
+        ? 'MEMORIA no estaba disponible y JEFE siguio sin enviar el evento.'
+        : reason === 'timeout'
+          ? 'MEMORIA no respondio a tiempo y JEFE siguio sin bloquear la corrida.'
+          : reason || 'JEFE omitio el evento en esta corrida.'
     return {
       state,
       eventType,
       endpoint,
       label: `${eventTypeLabel} omitido`,
-      detail: reason || 'JEFE omitio el evento en esta corrida.',
+      detail: skippedDetail,
       updatedAt,
       reason,
       statusCode,
@@ -147,7 +158,12 @@ function recordContextHubEventResult({
     normalizeOptionalString(eventResult?.eventType) || normalizeOptionalString(eventType)
 
   return setLastContextHubEventStatus({
-    state: eventResult?.ok === true ? 'sent' : 'failed',
+    state:
+      eventResult?.ok === true
+        ? 'sent'
+        : shouldTreatEventResultAsSkipped(eventResult)
+          ? 'skipped'
+          : 'failed',
     eventType: normalizedEventType,
     endpoint: normalizeOptionalString(eventResult?.endpoint) || '/v1/events',
     updatedAt: new Date().toISOString(),

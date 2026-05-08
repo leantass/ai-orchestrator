@@ -422,6 +422,15 @@ const portOperationsNewProjectCase = {
     'Quiero buques, solicitudes de entrada, ETA y ETD, muelle o zona asignada, tipo de operacion de carga, descarga, reparacion, espera o abastecimiento, documentacion requerida, estado de aprobacion, alertas operativas, tablero de control, reportes basicos, historial de movimientos y usuarios internos con roles operativos. Primera entrega funcional local, con datos mock realistas, sin instalar dependencias, sin backend real, sin base real, sin Docker, sin deploy y preparada para continuar por fases.',
 }
 
+const internalHelpdeskNewProjectCase = {
+  id: 'internal-helpdesk-new-project',
+  label: 'Mesa de ayuda interna nueva con workspace ya ocupado',
+  goal:
+    'Crear una entrega funcional local para una mesa de ayuda interna con tickets, responsables, prioridades, SLA, comentarios y reportes.',
+  context:
+    'Quiero tickets, responsables internos, prioridades, SLA, comentarios, historial, bandeja operativa, reportes basicos y datos mock revisables. Sin instalar dependencias, sin backend real, sin base real, sin Docker, sin deploy y preparada para continuar por fases.',
+}
+
 const veterinaryContinuationCase = {
   id: 'explicit-veterinary-continuation',
   label: 'Continuidad explicita veterinaria',
@@ -3429,6 +3438,14 @@ async function runPortDomainCreatesNewProjectValidation() {
   const roadmapSummary = summarizeImplementationRoadmap(decision?.implementationRoadmap || null)
   const blueprintSummary = summarizeProjectBlueprint(decision?.projectBlueprint || null)
   const nextActionSummary = summarizeNextActionPlan(decision?.nextActionPlan || null)
+  const existingProjectDetection =
+    decision?.existingProjectDetection && typeof decision.existingProjectDetection === 'object'
+      ? decision.existingProjectDetection
+      : null
+  const activeProjectContext =
+    decision?.activeProjectContext && typeof decision.activeProjectContext === 'object'
+      ? decision.activeProjectContext
+      : null
   const intentSummary = classifyWorkspaceProjectIntent({
     goal: portOperationsNewProjectCase.goal,
     context: portOperationsNewProjectCase.context,
@@ -3447,6 +3464,7 @@ async function runPortDomainCreatesNewProjectValidation() {
     ...blueprintSummary.entities,
   ])
   const projectSlugSignals = [
+    activeProjectContext?.projectRoot,
     roadmapSummary.projectSlug,
     roadmapSummary.domain,
     blueprintSummary.domain,
@@ -3468,6 +3486,15 @@ async function runPortDomainCreatesNewProjectValidation() {
   ) {
     failures.push('El pedido portuario nuevo no deberia caer en continuidad del proyecto existente.')
   }
+  if (existingProjectDetection?.detected !== true) {
+    failures.push('El caso portuario deberia registrar que existe un proyecto previo en el workspace.')
+  }
+  if (existingProjectDetection?.applicable !== false) {
+    failures.push('El proyecto detectado en el workspace deberia marcarse como no aplicable para el pedido portuario nuevo.')
+  }
+  if (normalizeIdentifier(activeProjectContext?.mode).includes('existing')) {
+    failures.push('El activeProjectContext no deberia quedar como existing-project en el caso portuario nuevo.')
+  }
   if (
     executionMode !== 'planner-only' &&
     executionMode !== 'executor'
@@ -3477,14 +3504,27 @@ async function runPortDomainCreatesNewProjectValidation() {
   if (decision?.localProjectManifest) {
     failures.push('Un pedido portuario nuevo no deberia reusar localProjectManifest del proyecto existente.')
   }
-  if (decision?.projectPhaseExecutionPlan || decision?.continuationActionPlan) {
-    failures.push('El pedido portuario nuevo no deberia devolver planes de continuidad o fases del proyecto viejo.')
+  if (
+    decision?.projectPhaseExecutionPlan ||
+    decision?.continuationActionPlan ||
+    decision?.projectContinuationState
+  ) {
+    failures.push('El pedido portuario nuevo no deberia devolver planes o estados de continuidad del proyecto viejo.')
+  }
+  if (decision?.expansionOptions) {
+    failures.push('El pedido portuario nuevo no deberia exponer expansionOptions del proyecto viejo como opciones activas.')
   }
   if (
     normalizeIdentifier(nextActionSummary.targetStrategy).includes('prepare-dependency-install-plan') ||
     normalizeIdentifier(decision?.approvalRequestPlan?.approvalType || '').includes('dependency-install')
   ) {
     failures.push('El pedido portuario con exclusión explícita no deberia proponer prepare-dependency-install-plan.')
+  }
+  if (normalizeIdentifier(nextActionSummary.targetStrategy).includes('prepare-continuation-action-plan')) {
+    failures.push('nextActionPlan.targetStrategy no deberia apuntar a prepare-continuation-action-plan en un proyecto portuario nuevo.')
+  }
+  if (normalizeText(nextActionSummary.userFacingLabel).includes('arquitectura')) {
+    failures.push('El CTA del caso portuario nuevo no deberia quedar en “Revisar arquitectura” si ya existe una ruta local segura.')
   }
   if (joinedReasoning.includes('proyecto existente') || joinedReasoning.includes('veterinaria')) {
     failures.push('El razonamiento del caso portuario no deberia quedar pegado al proyecto veterinaria existente.')
@@ -3509,6 +3549,27 @@ async function runPortDomainCreatesNewProjectValidation() {
       failures.push(`El caso portuario deberia conservar la entidad ${expectedEntity}.`)
     }
   })
+  const combinedTargetPaths = summarizeUniqueStrings([
+    ...(Array.isArray(decision?.executionScope?.allowedTargetPaths)
+      ? decision.executionScope.allowedTargetPaths
+      : []),
+    ...(Array.isArray(decision?.moduleExpansionPlan?.allowedTargetPaths)
+      ? decision.moduleExpansionPlan.allowedTargetPaths
+      : []),
+    ...(Array.isArray(decision?.projectPhaseExecutionPlan?.allowedTargetPaths)
+      ? decision.projectPhaseExecutionPlan.allowedTargetPaths
+      : []),
+    ...(Array.isArray(decision?.continuationActionPlan?.allowedTargetPaths)
+      ? decision.continuationActionPlan.allowedTargetPaths
+      : []),
+  ])
+  if (
+    combinedTargetPaths.some((entry) =>
+      normalizePathForComparison(entry).includes('fullstack-local-veterinaria'),
+    )
+  ) {
+    failures.push('allowedTargetPaths no deberia apuntar a fullstack-local-veterinaria en el caso portuario nuevo.')
+  }
   if (
     normalizeIdentifier(blueprintSummary.domain).includes('seguridad') ||
     normalizeIdentifier(roadmapSummary.domain).includes('seguridad')
@@ -3604,6 +3665,120 @@ async function runExplicitVeterinaryContinuationValidation() {
 
   return {
     testCase: dynamicContinuationCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode: String(decision?.executionMode || '').trim(),
+    nextExpectedAction: String(decision?.nextExpectedAction || '').trim(),
+  }
+}
+
+async function runGenericNewDomainDoesNotReuseExistingProjectValidation() {
+  const failures = []
+  const fixture = await buildFullstackFixtureForCase({
+    workspaceName: 'fullstack-project-existing-veterinary-for-helpdesk',
+    goal: veterinaryFullstackLocalCase.goal,
+    context: veterinaryFullstackLocalCase.context,
+  })
+  const decision = await requestContinuationDecision({
+    fixture,
+    testCase: internalHelpdeskNewProjectCase,
+  })
+  const strategy = String(decision?.strategy || '').trim()
+  const nextActionSummary = summarizeNextActionPlan(decision?.nextActionPlan || null)
+  const existingProjectDetection =
+    decision?.existingProjectDetection && typeof decision.existingProjectDetection === 'object'
+      ? decision.existingProjectDetection
+      : null
+  const activeProjectContext =
+    decision?.activeProjectContext && typeof decision.activeProjectContext === 'object'
+      ? decision.activeProjectContext
+      : null
+  const intentSummary = classifyWorkspaceProjectIntent({
+    goal: internalHelpdeskNewProjectCase.goal,
+    context: internalHelpdeskNewProjectCase.context,
+    candidate: {
+      manifest: fixture.manifest,
+      projectRootRelativePath: fixture.projectRootRelativePath,
+    },
+  })
+  const projectRootSignals = summarizeUniqueStrings([
+    activeProjectContext?.projectRoot,
+    decision?.implementationRoadmap?.projectSlug,
+    decision?.projectBlueprint?.projectRoot,
+  ]).map((entry) => normalizeIdentifier(entry))
+
+  if (intentSummary.intent !== 'new-project-intent') {
+    failures.push(
+      `La mesa de ayuda nueva deberia clasificarse como new-project-intent. Recibido: ${intentSummary.intent}.`,
+    )
+  }
+  if (existingProjectDetection?.detected !== true || existingProjectDetection?.applicable !== false) {
+    failures.push('El proyecto veterinaria existente deberia detectarse pero marcarse como no aplicable.')
+  }
+  if (normalizeIdentifier(activeProjectContext?.mode).includes('existing')) {
+    failures.push('La mesa de ayuda nueva no deberia usar activeProjectContext existing-project.')
+  }
+  if (
+    strategy === 'prepare-project-phase-plan' ||
+    strategy === 'prepare-continuation-action-plan' ||
+    normalizeIdentifier(nextActionSummary.targetStrategy).includes('prepare-continuation-action-plan')
+  ) {
+    failures.push('La mesa de ayuda nueva no deberia entrar en continuidad del proyecto veterinaria.')
+  }
+  if (
+    normalizeIdentifier(nextActionSummary.targetStrategy).includes('prepare-dependency-install-plan') ||
+    normalizeIdentifier(decision?.approvalRequestPlan?.approvalType || '').includes('dependency-install')
+  ) {
+    failures.push('La mesa de ayuda nueva no deberia pedir aprobacion de dependencias cuando fueron excluidas.')
+  }
+  if (
+    decision?.localProjectManifest ||
+    decision?.projectContinuationState ||
+    decision?.continuationActionPlan ||
+    decision?.expansionOptions
+  ) {
+    failures.push('La mesa de ayuda nueva no deberia reusar manifest, continuidad ni expansionOptions del proyecto existente.')
+  }
+  const combinedTargetPaths = summarizeUniqueStrings([
+    ...(Array.isArray(decision?.executionScope?.allowedTargetPaths)
+      ? decision.executionScope.allowedTargetPaths
+      : []),
+    ...(Array.isArray(decision?.moduleExpansionPlan?.allowedTargetPaths)
+      ? decision.moduleExpansionPlan.allowedTargetPaths
+      : []),
+    ...(Array.isArray(decision?.projectPhaseExecutionPlan?.allowedTargetPaths)
+      ? decision.projectPhaseExecutionPlan.allowedTargetPaths
+      : []),
+    ...(Array.isArray(decision?.continuationActionPlan?.allowedTargetPaths)
+      ? decision.continuationActionPlan.allowedTargetPaths
+      : []),
+  ])
+  if (
+    combinedTargetPaths.some((entry) =>
+      normalizePathForComparison(entry).includes('fullstack-local-veterinaria'),
+    )
+  ) {
+    failures.push('La mesa de ayuda nueva no deberia targetear paths de fullstack-local-veterinaria.')
+  }
+  if (
+    projectRootSignals.some((entry) => entry.includes('veterinaria')) ||
+    (projectRootSignals.length > 0 &&
+      !projectRootSignals.some(
+        (entry) =>
+          entry.includes('help') ||
+          entry.includes('mesa') ||
+          entry.includes('ticket') ||
+          entry.includes('soporte'),
+      ))
+  ) {
+    failures.push(
+      `La mesa de ayuda nueva deberia proponer un projectRoot propio del dominio. Recibido: ${projectRootSignals.join(' | ') || '(vacio)'}.`,
+    )
+  }
+
+  return {
+    testCase: internalHelpdeskNewProjectCase,
     ok: failures.length === 0,
     failures,
     strategy,
@@ -8468,6 +8643,7 @@ async function main() {
     continuationResults = [
       await runExistingWorkspaceProjectDetectionValidation(),
       await runPortDomainCreatesNewProjectValidation(),
+      await runGenericNewDomainDoesNotReuseExistingProjectValidation(),
       await runExplicitVeterinaryContinuationValidation(),
       await runContinuationRecommendationValidation({
         testCase: continuationValidationCases.legacyManifestWithoutPhases,

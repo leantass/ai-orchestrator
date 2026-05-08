@@ -95,6 +95,7 @@ Si en ese mismo workspace el operador pide una entrega nueva para otro dominio, 
 - debe proponer un proyecto nuevo del dominio pedido
 - no debe reutilizar `targetPath`, manifest ni fases del proyecto viejo
 - no debe disparar continuidad sensible solo porque exista un `jefe-project.json`
+- si el pedido es un dominio nuevo y el workspace ya tiene otro proyecto, JEFE puede mostrar el proyecto detectado como ignorado, pero no debe usarlo como plan activo ni como CTA principal
 
 Después del scaffold base, el readiness no debería decir `En planificación`. La lectura esperable es:
 
@@ -211,5 +212,6 @@ Mientras no haya validación local cerrada, la UI debería sugerir:
 ## Nota de deuda tecnica actual
 
 - El panel de MEMORIA ya muestra el ultimo evento emitido por JEFE en la sesion.
+- Si MEMORIA no estaba disponible, ese ultimo evento puede aparecer como omitido o no enviado sin marcar la corrida principal como fallida.
 - El planner ya distingue mejor proyecto nuevo vs continuidad, incluso con un workspace que ya contiene otro dominio.
 - `src/App.tsx` y `electron/main.cjs` siguen siendo grandes, pero hoy no bloquean esta validacion operativa local.

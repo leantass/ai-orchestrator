@@ -709,6 +709,27 @@ type LocalProjectManifestContract = {
   warnings?: string[]
 }
 
+type ExistingProjectDetectionContract = {
+  detected?: boolean
+  applicable?: boolean
+  intent?: string
+  projectRoot?: string
+  domain?: string
+  projectType?: string
+  lastCompletedPhase?: string
+  nextRecommendedPhase?: string
+  reason?: string
+}
+
+type ActiveProjectContextContract = {
+  mode?: 'new-project' | 'existing-project' | 'none' | string
+  projectRoot?: string
+  domain?: string
+  strategy?: string
+  source?: string
+  note?: string
+}
+
 type MaterializationPlanContract = Record<string, unknown>
 
 type PlannerExecutionMetadata = {
@@ -756,6 +777,8 @@ type PlannerExecutionMetadata = {
   approvalRequestPlan: ApprovalRequestPlanContract | null
   runtimeApprovalState: RuntimeApprovalStateContract | null
   materializationPlan: MaterializationPlanContract | null
+  existingProjectDetection: ExistingProjectDetectionContract | null
+  activeProjectContext: ActiveProjectContextContract | null
 }
 
 type PlannerRequestSnapshot = {
@@ -1015,6 +1038,8 @@ type PlannerDecisionResponse = {
   approvalRequestPlan?: ApprovalRequestPlanContract | null
   runtimeApprovalState?: RuntimeApprovalStateContract | null
   materializationPlan?: MaterializationPlanContract | null
+  existingProjectDetection?: ExistingProjectDetectionContract | null
+  activeProjectContext?: ActiveProjectContextContract | null
   brainRoutingDecision?: BrainRoutingDecision
   tasks?: unknown[]
   assumptions?: string[]
@@ -1226,6 +1251,8 @@ const EMPTY_PLANNER_EXECUTION_METADATA: PlannerExecutionMetadata = {
   approvalRequestPlan: null,
   runtimeApprovalState: null,
   materializationPlan: null,
+  existingProjectDetection: null,
+  activeProjectContext: null,
 }
 
 const buildSafeFirstDeliveryReviewMetadata = ({
@@ -1260,6 +1287,8 @@ const buildSafeFirstDeliveryReviewMetadata = ({
   projectPhaseExecutionPlan: baseMetadata.projectPhaseExecutionPlan,
   localProjectManifest: baseMetadata.localProjectManifest,
   materializationPlan: baseMetadata.materializationPlan,
+  existingProjectDetection: baseMetadata.existingProjectDetection,
+  activeProjectContext: baseMetadata.activeProjectContext,
   decisionKey: 'safe-first-delivery-plan',
   strategy: 'safe-first-delivery-plan',
   executionMode: 'planner-only',
@@ -3589,7 +3618,10 @@ const extractPlannerExecutionMetadata = (payload?: {
   projectContinuationState?: ProjectContinuationStateContract | null
   projectReadinessState?: ProjectReadinessStateContract | null
   approvalRequestPlan?: ApprovalRequestPlanContract | null
+  runtimeApprovalState?: RuntimeApprovalStateContract | null
   materializationPlan?: MaterializationPlanContract | null
+  existingProjectDetection?: ExistingProjectDetectionContract | null
+  activeProjectContext?: ActiveProjectContextContract | null
   tasks?: unknown[]
   assumptions?: string[]
 } | null): PlannerExecutionMetadata => ({
@@ -3798,6 +3830,66 @@ const extractPlannerExecutionMetadata = (payload?: {
   materializationPlan:
     payload?.materializationPlan && typeof payload.materializationPlan === 'object'
       ? payload.materializationPlan
+      : null,
+  existingProjectDetection:
+    payload?.existingProjectDetection &&
+    typeof payload.existingProjectDetection === 'object'
+      ? {
+          detected: payload.existingProjectDetection.detected === true,
+          ...(typeof payload.existingProjectDetection.applicable === 'boolean'
+            ? { applicable: payload.existingProjectDetection.applicable }
+            : {}),
+          ...(typeof payload.existingProjectDetection.intent === 'string'
+            ? { intent: payload.existingProjectDetection.intent.trim() }
+            : {}),
+          ...(typeof payload.existingProjectDetection.projectRoot === 'string'
+            ? { projectRoot: payload.existingProjectDetection.projectRoot.trim() }
+            : {}),
+          ...(typeof payload.existingProjectDetection.domain === 'string'
+            ? { domain: payload.existingProjectDetection.domain.trim() }
+            : {}),
+          ...(typeof payload.existingProjectDetection.projectType === 'string'
+            ? { projectType: payload.existingProjectDetection.projectType.trim() }
+            : {}),
+          ...(typeof payload.existingProjectDetection.lastCompletedPhase === 'string'
+            ? {
+                lastCompletedPhase:
+                  payload.existingProjectDetection.lastCompletedPhase.trim(),
+              }
+            : {}),
+          ...(typeof payload.existingProjectDetection.nextRecommendedPhase === 'string'
+            ? {
+                nextRecommendedPhase:
+                  payload.existingProjectDetection.nextRecommendedPhase.trim(),
+              }
+            : {}),
+          ...(typeof payload.existingProjectDetection.reason === 'string'
+            ? { reason: payload.existingProjectDetection.reason.trim() }
+            : {}),
+        }
+      : null,
+  activeProjectContext:
+    payload?.activeProjectContext && typeof payload.activeProjectContext === 'object'
+      ? {
+          ...(typeof payload.activeProjectContext.mode === 'string'
+            ? { mode: payload.activeProjectContext.mode.trim() }
+            : {}),
+          ...(typeof payload.activeProjectContext.projectRoot === 'string'
+            ? { projectRoot: payload.activeProjectContext.projectRoot.trim() }
+            : {}),
+          ...(typeof payload.activeProjectContext.domain === 'string'
+            ? { domain: payload.activeProjectContext.domain.trim() }
+            : {}),
+          ...(typeof payload.activeProjectContext.strategy === 'string'
+            ? { strategy: payload.activeProjectContext.strategy.trim() }
+            : {}),
+          ...(typeof payload.activeProjectContext.source === 'string'
+            ? { source: payload.activeProjectContext.source.trim() }
+            : {}),
+          ...(typeof payload.activeProjectContext.note === 'string'
+            ? { note: payload.activeProjectContext.note.trim() }
+            : {}),
+        }
       : null,
   tasks: Array.isArray(payload?.tasks)
     ? payload.tasks
@@ -9090,6 +9182,33 @@ const mergeUniqueStringValues = (
   return mergedValues.slice(0, limit)
 }
 
+const mergeUniquePathValues = (
+  currentValues: string[],
+  incomingValues: unknown,
+  limit = 10,
+) => {
+  const mergedValues = [...currentValues]
+  const seenComparablePaths = new Set(
+    currentValues
+      .map((value) => normalizePathValue(value).toLocaleLowerCase())
+      .filter(Boolean),
+  )
+
+  normalizeOptionalStringArray(incomingValues).forEach((value) => {
+    const normalizedPath = normalizePathValue(value)
+    const comparablePath = normalizedPath.toLocaleLowerCase()
+
+    if (!normalizedPath || seenComparablePaths.has(comparablePath)) {
+      return
+    }
+
+    mergedValues.push(normalizedPath)
+    seenComparablePaths.add(comparablePath)
+  })
+
+  return mergedValues.slice(0, limit)
+}
+
 const summarizeContinuationAnchor = (
   continuationAnchor?: ExecutorContinuationAnchor | null,
 ) => {
@@ -9185,6 +9304,19 @@ const isLikelyFilePath = (value: string) =>
 
 const buildComparablePath = (value: unknown, workspaceRoot: unknown) =>
   normalizePathValue(formatWorkspaceRelativePath(value, workspaceRoot)).toLocaleLowerCase()
+
+const formatUniqueWorkspaceRelativePaths = (
+  values: string[],
+  workspaceRoot: unknown,
+  limit = 96,
+) =>
+  mergeUniqueStringValues(
+    [],
+    values
+      .map((value) => formatWorkspaceRelativePath(value, workspaceRoot))
+      .filter(Boolean),
+    limit,
+  )
 
 const derivePrimaryAffectedPath = ({
   createdPaths,
@@ -9331,12 +9463,12 @@ const buildMaterializationArtifactSummary = ({
       ),
     )
     .map((entry) => entry.targetPath)
-  const createdFolderPaths = mergeUniqueStringValues(
+  const createdFolderPaths = mergeUniquePathValues(
     createdFolderPathsFromOperations,
     createdPaths.filter((pathValue) => !isLikelyFilePath(pathValue)),
     48,
   )
-  const writtenFilePaths = mergeUniqueStringValues(
+  const writtenFilePaths = mergeUniquePathValues(
     writtenFilePathsFromOperations,
     [
       ...createdPaths.filter((pathValue) => isLikelyFilePath(pathValue)),
@@ -9344,7 +9476,7 @@ const buildMaterializationArtifactSummary = ({
     ],
     64,
   )
-  const trackedPaths = mergeUniqueStringValues(createdPaths, touchedPaths, 96)
+  const trackedPaths = mergeUniquePathValues(createdPaths, touchedPaths, 96)
 
   return {
     operations,
@@ -11639,6 +11771,11 @@ function App() {
     effectivePlannerExecutionMetadata.approvalRequestPlan
   const activeRuntimeApprovalState =
     effectivePlannerExecutionMetadata.runtimeApprovalState
+  const activeExistingProjectDetection =
+    effectivePlannerExecutionMetadata.existingProjectDetection
+  const activeProjectContext = effectivePlannerExecutionMetadata.activeProjectContext
+  const existingProjectApplicable =
+    activeExistingProjectDetection?.applicable !== false
   const activeScalableDeliveryLevel = normalizeOptionalString(
     activeScalableDeliveryPlan?.deliveryLevel,
   ).toLocaleLowerCase()
@@ -11670,34 +11807,37 @@ function App() {
       shouldShowImplementationRoadmap)
   const shouldShowLocalProjectManifest =
     Boolean(activeLocalProjectManifest) &&
+    existingProjectApplicable &&
     normalizeOptionalString(
       activeLocalProjectManifest?.deliveryLevel,
     ).toLocaleLowerCase() === 'fullstack-local'
   const shouldShowProjectPhaseExecutionPlan =
     Boolean(activeProjectPhaseExecutionPlan) &&
+    existingProjectApplicable &&
     normalizeOptionalString(
       activeProjectPhaseExecutionPlan?.deliveryLevel,
     ).toLocaleLowerCase() === 'fullstack-local'
   const shouldShowProjectContinuity =
-    Boolean(activeProjectContinuationState) ||
-    Boolean(activeProjectReadinessState) ||
-    Boolean(activeApprovalRequestPlan) ||
-    Boolean(activeRuntimeApprovalState) ||
-    Boolean(activeContinuationActionPlan) ||
-    Boolean(activeExpansionOptions) ||
-    Boolean(activeModuleExpansionPlan) ||
-    shouldShowProjectPhaseExecutionPlan ||
-    shouldShowLocalProjectManifest ||
-    (shouldShowNextActionPlan &&
-      normalizeOptionalString(
-        activeNextActionPlan?.targetDeliveryLevel,
-      ).toLocaleLowerCase() === 'fullstack-local') ||
-    (shouldShowPhaseExpansionPlan &&
-      normalizeOptionalString(activePhaseExpansionPlan?.phaseId) !== '') ||
-    (shouldShowImplementationRoadmap &&
-      normalizeOptionalString(
-        activeImplementationRoadmap?.deliveryLevel,
-      ).toLocaleLowerCase() === 'fullstack-local')
+    existingProjectApplicable &&
+    (Boolean(activeProjectContinuationState) ||
+      Boolean(activeProjectReadinessState) ||
+      Boolean(activeApprovalRequestPlan) ||
+      Boolean(activeRuntimeApprovalState) ||
+      Boolean(activeContinuationActionPlan) ||
+      Boolean(activeExpansionOptions) ||
+      Boolean(activeModuleExpansionPlan) ||
+      shouldShowProjectPhaseExecutionPlan ||
+      shouldShowLocalProjectManifest ||
+      (shouldShowNextActionPlan &&
+        normalizeOptionalString(
+          activeNextActionPlan?.targetDeliveryLevel,
+        ).toLocaleLowerCase() === 'fullstack-local') ||
+      (shouldShowPhaseExpansionPlan &&
+        normalizeOptionalString(activePhaseExpansionPlan?.phaseId) !== '') ||
+      (shouldShowImplementationRoadmap &&
+        normalizeOptionalString(
+          activeImplementationRoadmap?.deliveryLevel,
+        ).toLocaleLowerCase() === 'fullstack-local'))
   const activeExecutableProjectPhaseId =
     !plannerIsReviewOnly &&
     normalizeOptionalString(plannerExecutionMetadata.strategy).toLocaleLowerCase() ===
@@ -12348,11 +12488,7 @@ function App() {
     executorRequestState !== 'idle'
   const latestCreatedArtifacts = normalizeOptionalStringArray(lastExecutorSnapshot?.createdPaths)
   const latestTouchedArtifactsRaw = normalizeOptionalStringArray(lastExecutorSnapshot?.touchedPaths)
-  const latestTouchedArtifacts = mergeUniqueStringValues(
-    latestCreatedArtifacts,
-    lastExecutorSnapshot?.touchedPaths,
-    12,
-  )
+  const latestTouchedArtifacts = mergeUniquePathValues([], latestTouchedArtifactsRaw, 12)
   const latestMaterializationArtifacts = buildMaterializationArtifactSummary({
     materializationPlan: latestMaterializationPlan,
     createdPaths: latestCreatedArtifacts,
@@ -12447,17 +12583,34 @@ function App() {
     latestCurrentTargetPath,
     workspacePath,
   )
-  const resultCreatedFolderPaths = latestCreatedFolders.map((pathValue) =>
-    formatWorkspaceRelativePath(pathValue, workspacePath),
+  const resultCreatedFolderPaths = formatUniqueWorkspaceRelativePaths(
+    latestCreatedFolders,
+    workspacePath,
+    48,
   )
-  const resultWrittenFilePaths = latestWrittenFiles.map((pathValue) =>
-    formatWorkspaceRelativePath(pathValue, workspacePath),
+  const resultWrittenFilePaths = formatUniqueWorkspaceRelativePaths(
+    latestWrittenFiles,
+    workspacePath,
+    64,
   )
-  const resultTouchedFilePaths = latestTouchedArtifacts
-    .filter((pathValue) => isLikelyFilePath(pathValue))
-    .map((pathValue) => formatWorkspaceRelativePath(pathValue, workspacePath))
-  const resultTrackedPaths = latestTrackedArtifacts.map((pathValue) =>
-    formatWorkspaceRelativePath(pathValue, workspacePath),
+  const writtenComparableResultPaths = new Set(
+    latestWrittenFiles
+      .map((pathValue) => buildComparablePath(pathValue, workspacePath))
+      .filter(Boolean),
+  )
+  const resultTouchedFilePaths = formatUniqueWorkspaceRelativePaths(
+    latestTouchedArtifactsRaw.filter(
+      (pathValue) =>
+        isLikelyFilePath(pathValue) &&
+        !writtenComparableResultPaths.has(buildComparablePath(pathValue, workspacePath)),
+    ),
+    workspacePath,
+    48,
+  )
+  const resultTrackedPaths = formatUniqueWorkspaceRelativePaths(
+    latestTrackedArtifacts,
+    workspacePath,
+    96,
   )
   const resultAllowedPaths = latestAllowedTargetPaths.map((pathValue) =>
     formatWorkspaceRelativePath(pathValue, workspacePath),
@@ -12708,12 +12861,8 @@ function App() {
     )
     .filter(Boolean)
   const resultMaterializationFileLabels = mergeUniqueStringValues(
-    resultMaterializationKeyFilePaths.map((pathValue) =>
-      formatWorkspaceRelativePath(pathValue, workspacePath),
-    ),
-    resultMaterializationFilePaths.map((pathValue) =>
-      formatWorkspaceRelativePath(pathValue, workspacePath),
-    ),
+    formatUniqueWorkspaceRelativePaths(resultMaterializationKeyFilePaths, workspacePath, 10),
+    formatUniqueWorkspaceRelativePaths(resultMaterializationFilePaths, workspacePath, 24),
     10,
   )
   const resultMaterializationFolderLabel =
@@ -12742,8 +12891,11 @@ function App() {
     resultCreatedFolderPaths.length > 0
       ? `${resultCreatedFolderPaths.length} carpeta(s)`
       : 'Sin carpetas reportadas'
+  const resultPlannedOnlyFilePaths = resultMaterializationFileLabels.filter(
+    (fileLabel) => !resultWrittenFilePaths.includes(fileLabel),
+  )
   const resultWrittenArtifactPaths = resultExecutionCompleted
-    ? resultWrittenFilePaths
+    ? mergeUniqueStringValues(resultTouchedFilePaths, resultPlannedOnlyFilePaths, 12)
     : mergeUniqueStringValues(resultWrittenFilePaths, resultMaterializationFileLabels, 12)
   const resultConfirmedWrittenFilesLabel =
     resultWrittenFilePaths.length > 0
@@ -12789,9 +12941,23 @@ function App() {
     'Sin pagos reales.',
     'Sin Docker ni deploy.',
   ]
+  const resultMaterializationReadinessValue =
+    getProjectReadinessLevelLabel(activeProjectReadinessState?.readinessLevel) ||
+    (resultIsSafeFirstDeliveryMaterialization
+      ? 'Primera entrega local generada'
+      : resultExecutionCompleted
+        ? 'Pendiente de revision visual'
+        : 'Sin estado')
   const resultMaterializationReadinessLabel =
     normalizeOptionalString(activeProjectReadinessState?.operatorSummary) ||
     normalizeOptionalString(activeProjectReadinessState?.lastValidationSummary) ||
+    (resultIsSafeFirstDeliveryMaterialization
+      ? latestValidationResults.length > 0 && latestValidationOkCount === latestValidationResults.length
+        ? 'Validaciones materiales OK; conviene revisar la interfaz local y los datos mock antes de continuar o guardar reusable.'
+        : 'La primera entrega local ya quedo generada, pero todavia conviene hacer una revision visual breve.'
+      : resultExecutionCompleted
+        ? 'La salida local quedo generada y revisable; conviene validar la interfaz antes de seguir.'
+        : '') ||
     (resultIsFullstackLocalMaterialization
       ? 'Base local materializada; todavia falta completar fases funcionales seguras.'
       : 'Todavía no hay un resumen de readiness para esta salida.')
@@ -12810,7 +12976,11 @@ function App() {
   const resultMaterializationNextPhaseLabel =
     normalizeOptionalString(resultMaterializationNextPhaseEntry?.title) ||
     resultMaterializationNextPhaseId ||
-    'Sin fase segura declarada'
+    (resultIsSafeFirstDeliveryMaterialization
+      ? 'Revision visual local'
+      : resultExecutionCompleted
+        ? 'Validacion local'
+        : 'Sin fase segura declarada')
   const resultMaterializationNextPhaseDetail = summarizeInlineText(
     normalizeOptionalString(
       resultMaterializationNextPhaseEntry?.objective ||
@@ -12818,14 +12988,22 @@ function App() {
         resultMaterializationNextPhaseEntry?.description,
     ) ||
       normalizeOptionalString(activeProjectContinuationState?.operatorMessage) ||
-      'Sin detalle adicional para la siguiente fase segura.',
+      (resultIsSafeFirstDeliveryMaterialization
+        ? 'Abrir el index.html por file://, revisar modulos, registros y copy antes de guardar reusable o preparar una continuidad segura.'
+        : resultExecutionCompleted
+          ? 'Revisar la salida local, validar la interfaz y definir la siguiente fase segura antes de salir del modo local.'
+          : 'Sin detalle adicional para la siguiente fase segura.'),
     180,
   )
   const resultContextHubLabel = activeContextHubStatus?.available
     ? 'Disponible'
-    : 'No disponible'
+    : contextHubRuntimeState.uiUrl
+      ? 'UI detectada sin API'
+      : 'No disponible'
   const resultContextHubDetail = activeContextHubStatus?.available
     ? activeContextHubUiDetail
+    : contextHubRuntimeState.uiUrl
+      ? 'Context Hub esta sirviendo una UI local, pero la API no respondio para sugerencias o eventos. JEFE continuo sin memoria reutilizable adicional.'
     : [
         'JEFE continuo sin MEMORIA externa.',
         'Puede seguir planificando y materializando igual, pero sin contexto reutilizable adicional.',
@@ -19576,6 +19754,27 @@ function App() {
                           tone="sky"
                         />
                         <MetricCard
+                          label="Proyecto activo"
+                          value={
+                            normalizeOptionalString(activeProjectContext?.projectRoot) ||
+                            (activeProjectContext?.mode === 'new-project'
+                              ? 'Nueva entrega local'
+                              : activeProjectContext?.mode === 'existing-project'
+                                ? 'Proyecto existente'
+                                : 'Sin raiz declarada')
+                          }
+                          detail={
+                            normalizeOptionalString(activeProjectContext?.domain) ||
+                            normalizeOptionalString(activeProjectContext?.note) ||
+                            'El plan actual define el contexto activo de esta corrida.'
+                          }
+                          tone={
+                            activeProjectContext?.mode === 'existing-project'
+                              ? 'emerald'
+                              : 'sky'
+                          }
+                        />
+                        <MetricCard
                           label="MEMORIA externa"
                           value={activeContextHubLabel}
                           detail={activeContextHubUiDetail}
@@ -19600,6 +19799,43 @@ function App() {
                           detail={activeReuseArtifactSummary}
                         />
                       </div>
+                      {activeExistingProjectDetection?.detected &&
+                      activeExistingProjectDetection.applicable === false ? (
+                        <article className="rounded-3xl border border-amber-300/20 bg-amber-300/10 p-5">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100">
+                            Proyecto detectado pero ignorado
+                          </div>
+                          <div className="mt-3 text-sm leading-6 text-amber-50">
+                            {normalizeOptionalString(activeExistingProjectDetection.reason) ||
+                              'Hay un proyecto existente en el workspace, pero no aplica para esta corrida porque el pedido actual abre una entrega nueva.'}
+                          </div>
+                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                            <MetricCard
+                              label="Proyecto detectado"
+                              value={
+                                normalizeOptionalString(
+                                  activeExistingProjectDetection.projectRoot,
+                                ) || 'Sin carpeta declarada'
+                              }
+                              detail={
+                                normalizeOptionalString(
+                                  activeExistingProjectDetection.domain,
+                                ) || 'Manifest local encontrado en el workspace.'
+                              }
+                              tone="amber"
+                            />
+                            <MetricCard
+                              label="Plan activo"
+                              value={
+                                normalizeOptionalString(activeProjectContext?.projectRoot) ||
+                                'Nueva entrega local'
+                              }
+                              detail="El plan actual no usa el proyecto detectado como continuidad."
+                              tone="sky"
+                            />
+                          </div>
+                        </article>
+                      ) : null}
                       {activeProductArchitecture ? (
                         <ProductArchitectureCard
                           architecture={activeProductArchitecture}
@@ -19855,7 +20091,7 @@ function App() {
                                 value: resultConfirmedWrittenFilesLabel,
                               },
                               {
-                                label: 'Archivos tocados',
+                                label: 'Archivos tocados adicionales',
                                 value: resultTouchedFilesLabel,
                               },
                               {
@@ -19890,10 +20126,7 @@ function App() {
                               },
                               {
                                 label: 'Readiness actual',
-                                value:
-                                  getProjectReadinessLevelLabel(
-                                    activeProjectReadinessState?.readinessLevel,
-                                  ) || 'Sin estado',
+                                value: resultMaterializationReadinessValue,
                                 detail: resultMaterializationReadinessLabel,
                               },
                               {
@@ -20086,12 +20319,12 @@ function App() {
                                   ? `${resultWrittenFilePaths.length} archivo(s)`
                                   : 'Sin archivos escritos confirmados',
                             },
-                            {
-                              label: 'Archivos tocados',
-                              value:
-                                resultTouchedFilePaths.length > 0
-                                  ? `${resultTouchedFilePaths.length} archivo(s)`
-                                  : 'Sin archivos tocados',
+                              {
+                                label: 'Archivos tocados adicionales',
+                                value:
+                                  resultTouchedFilePaths.length > 0
+                                    ? `${resultTouchedFilePaths.length} archivo(s)`
+                                    : 'Sin archivos tocados',
                             },
                             {
                               label: 'Archivos previstos por plan',
@@ -20154,7 +20387,7 @@ function App() {
                           </div>
                           <div className="space-y-2">
                             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              Archivos previstos o tocados
+                              Archivos previstos o tocados adicionales
                             </div>
                             <div className="grid gap-2">
                               {resultWrittenArtifactPaths.length > 0 ? (

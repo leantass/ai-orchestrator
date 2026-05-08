@@ -2,6 +2,8 @@
 
 Aplicacion desktop con React + Electron para planificar, materializar y continuar entregas funcionales locales en modo seguro. JEFE puede trabajar aun si MEMORIA / Context Hub no esta disponible, y separa con claridad lo local-revisable de cualquier paso que requiera aprobacion futura.
 
+Estado actual: release candidate local operativo. La deuda critica conocida quedo en 0; lo pendiente entra como mantenimiento evolutivo.
+
 ## Modos de ejecucion
 
 - `mock`: el ejecutor responde desde Electron con una simulacion local.
@@ -76,6 +78,8 @@ El panel de MEMORIA tambien muestra el ultimo evento emitido por JEFE en esta se
 - `execution_failed`
 - o si el evento fue omitido, duplicado o fallo
 
+Si MEMORIA no estaba disponible cuando JEFE intento emitir un evento, el panel lo muestra como evento omitido o no enviado, no como fallo principal de la ejecucion local.
+
 Para tener UI real de MEMORIA, Context Hub puede levantarse aparte desde `app/` con alguno de estos caminos:
 
 ```bash
@@ -88,9 +92,12 @@ npm run preview -- --host 127.0.0.1 --port 4173 --strictPort
 - `Plan revisable`: todavia no se ejecutaron cambios.
 - `Materializacion` o `Ejecucion completada`: ya hubo escritura local o cierre tecnico real.
 - `Archivos escritos confirmados`: archivos reportados como realmente escritos.
-- `Archivos previstos o tocados`: progreso parcial o materializacion que no cerro con confirmacion completa.
+- `Archivos tocados adicionales`: archivos reportados como tocados pero no confirmados como escritos unicos.
+- `Archivos previstos o tocados adicionales`: progreso parcial, rutas previstas por el plan o archivos tocados fuera del conteo de escritos confirmados.
 - `Validaciones`: separa previstas, aprobadas y fallidas.
 - `MEMORIA / Context Hub`: muestra si JEFE pudo apoyarse en memoria externa o si siguio solo.
+
+Para `safe-first-delivery`, si no existe una fase formal en manifest, JEFE usa fallbacks de producto como `Primera entrega local generada`, `Revision visual local` y `Pendiente de revision visual`.
 
 Si la corrida termina con error, JEFE ya no deberia venderla como completada:
 
@@ -107,6 +114,8 @@ JEFE ahora distingue mejor entre continuar un proyecto existente y crear uno nue
 - Un `jefe-project.json` existente ya no alcanza por sí solo para secuestrar un pedido nuevo de otro dominio.
 
 Caso validado: un pedido portuario nuevo con barcos, muelles, arribo/salida y documentación ya no debe quedar pegado a un proyecto veterinaria existente del mismo workspace.
+
+Caso generalista adicional validado: una mesa de ayuda interna nueva dentro de un workspace que ya contiene un proyecto veterinaria tampoco debe caer en continuidad ni pedir dependencias si fueron excluidas.
 
 ## Bridge local
 

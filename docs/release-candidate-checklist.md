@@ -38,7 +38,8 @@ Verificar que JEFE:
    - `Scaffold fullstack local materializado`
    - carpeta creada
    - carpetas creadas
-   - archivos escritos
+   - archivos escritos confirmados sin duplicados visibles
+   - archivos tocados adicionales solo si existen rutas fuera del conteo de escritos
    - validaciones OK
    - ruta exacta de `frontend/index.html`
    - próxima fase segura recomendada
@@ -160,6 +161,7 @@ Validar dos comportamientos:
    - JEFE sigue funcionando
    - lo informa como ausencia de memoria externa
    - no lo trata como error crítico
+   - si intento emitir `execution_finished`, el panel de MEMORIA debe mostrarlo como evento omitido o no enviado, no como fallo principal de la corrida
 
 ## Escenario 9: reusable solo después de validar
 
@@ -205,3 +207,4 @@ JEFE queda en estado de release candidate operable cuando:
 - las aprobaciones futuras no bloquean el flujo seguro actual
 - MEMORIA / Context Hub suma sin volverse un punto único de falla
 - el resultado final le dice al operador qué hizo, dónde quedó y qué sigue
+- si el workspace ya contiene otro proyecto, JEFE sigue distinguiendo proyecto nuevo vs continuidad sin contaminar el plan activo

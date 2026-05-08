@@ -716,18 +716,49 @@ function buildSafeFirstDeliveryCollectionSpecs({ modules, entities, mockCollecti
 
 function buildSafeFirstDeliveryStateSamples(stateHints, fallbackStates) {
   const normalizedHints = Array.isArray(stateHints)
-    ? stateHints.filter((entry) => typeof entry === 'string' && entry.trim())
+    ? stateHints
+        .filter((entry) => typeof entry === 'string' && entry.trim())
+        .map((entry) => normalizeSafeFirstDeliveryStateLabel(entry))
+    : []
+  const normalizedFallbackStates = Array.isArray(fallbackStates)
+    ? fallbackStates.map((entry) => normalizeSafeFirstDeliveryStateLabel(entry))
     : []
 
   const resolvedStates = []
   pushUniqueSafeFirstDeliveryValues(resolvedStates, normalizedHints, 3)
-  pushUniqueSafeFirstDeliveryValues(
-    resolvedStates,
-    Array.isArray(fallbackStates) ? fallbackStates : [],
-    3,
-  )
+  pushUniqueSafeFirstDeliveryValues(resolvedStates, normalizedFallbackStates, 3)
 
   return resolvedStates.slice(0, 3)
+}
+
+function normalizeSafeFirstDeliveryStateLabel(value) {
+  const normalizedValue = normalizeSafeFirstDeliveryText(value)
+
+  if (!normalizedValue) {
+    return 'listo para revision'
+  }
+
+  if (normalizedValue === 'listo para demo') {
+    return 'listo para revision'
+  }
+
+  if (normalizedValue === 'aprobado mock') {
+    return 'validado local'
+  }
+
+  if (normalizedValue === 'revisado mock') {
+    return 'revisado local'
+  }
+
+  if (normalizedValue === 'resuelta mock') {
+    return 'resuelta local'
+  }
+
+  if (normalizedValue === 'registrada mock') {
+    return 'registrada local'
+  }
+
+  return String(value || '').trim()
 }
 
 function buildSafeFirstDeliveryCollectionFieldHints(collectionKey) {
@@ -812,6 +843,22 @@ function buildSafeFirstDeliveryDynamicActionLabel(actionType, collectionKey) {
     case 'select-detail':
       return 'Ver detalle'
     case 'cycle-selected-state':
+      if (['buques', 'arribos', 'salidas'].includes(normalizedCollectionKey)) {
+        return 'Actualizar estado operativo'
+      }
+      if (
+        ['solicitudesentrada', 'documentacion', 'autorizaciones'].includes(
+          normalizedCollectionKey,
+        )
+      ) {
+        return 'Actualizar revision'
+      }
+      if (normalizedCollectionKey === 'muelles') {
+        return 'Revisar asignacion'
+      }
+      if (normalizedCollectionKey === 'movimientosportuarios') {
+        return 'Actualizar movimiento'
+      }
       if (normalizedCollectionKey === 'sensores') {
         return 'Cambiar estado de sensor'
       }
@@ -820,6 +867,12 @@ function buildSafeFirstDeliveryDynamicActionLabel(actionType, collectionKey) {
       }
       return 'Cambiar estado'
     case 'mark-review':
+      if (normalizedCollectionKey === 'documentacion') {
+        return 'Marcar documentacion revisada'
+      }
+      if (normalizedCollectionKey === 'autorizaciones') {
+        return 'Marcar autorizacion revisada'
+      }
       if (normalizedCollectionKey === 'alertas') {
         return 'Marcar alerta revisada'
       }
@@ -833,24 +886,30 @@ function buildSafeFirstDeliveryDynamicActionLabel(actionType, collectionKey) {
     case 'review-record':
       return normalizedCollectionKey === 'reportes'
         ? 'Revisar reporte mock'
-        : 'Revisar registro mock'
+        : 'Revisar registro local'
     case 'register-note':
       if (normalizedCollectionKey === 'comentarios') {
         return 'Registrar comentario mock'
       }
       if (normalizedCollectionKey === 'observaciones') {
-        return 'Registrar observacion mock'
+        return 'Registrar observacion local'
       }
       if (normalizedCollectionKey === 'notificaciones') {
         return 'Registrar notificacion mock'
       }
       return 'Registrar actividad local'
     case 'create-entry':
+      if (normalizedCollectionKey === 'movimientosportuarios') {
+        return 'Registrar movimiento mock'
+      }
+      if (normalizedCollectionKey === 'solicitudesentrada') {
+        return 'Registrar solicitud local'
+      }
       if (normalizedCollectionKey === 'publicaciones') {
-        return 'Crear publicacion mock'
+        return 'Crear publicacion local'
       }
       if (normalizedCollectionKey === 'eventos') {
-        return 'Registrar evento mock'
+        return 'Registrar evento local'
       }
       if (normalizedCollectionKey === 'operacion') {
         return 'Registrar actividad local'
@@ -994,7 +1053,10 @@ function buildSafeFirstDeliveryDynamicActionProfiles({
         return
       }
 
-      const actionDescriptor = { type: actionType, label: entry.trim() }
+      const actionDescriptor = {
+        type: actionType,
+        label: buildSafeFirstDeliveryDynamicActionLabel(actionType, collectionKey),
+      }
 
       if (actionType === 'create-entry' || actionType === 'register-note') {
         globalActions.push(actionDescriptor)
@@ -1107,25 +1169,358 @@ function buildSafeFirstDeliveryGenericRecords({
   const normalizedCollectionKey = normalizeSafeFirstDeliveryText(collectionKey || '')
   const domainLabel = domain && domain.trim() ? domain.trim() : 'el dominio actual'
   const defaultStates = buildSafeFirstDeliveryStateSamples(stateHints, [
-    'listo para demo',
-    'en revision',
-    'pendiente',
+    'listo para revision',
+    'en seguimiento',
+    'validado local',
   ])
   const requestStates = buildSafeFirstDeliveryStateSamples(stateHints, [
     'nueva',
     'en revision',
-    'resuelta mock',
+    'lista para validar',
   ])
   const statusStates = buildSafeFirstDeliveryStateSamples(stateHints, [
-    'habilitada',
+    'operativa',
     'en revision',
-    'aprobada mock',
+    'habilitada local',
   ])
   const reportStates = buildSafeFirstDeliveryStateSamples(stateHints, [
     'listo para revision',
-    'borrador',
-    'revisado mock',
+    'en armado',
+    'validado local',
   ])
+
+  if (normalizedCollectionKey === 'buques') {
+    return [
+      {
+        id: 'bq-001',
+        nombre: 'MV Patagonia Sur',
+        estado: 'arribo programado',
+        bandera: 'Argentina',
+        operacion: 'Descarga',
+        muelle: 'Muelle Norte 2',
+        eta: '07/05 21:40',
+        resumen: 'Buque granelero con ingreso aprobado y checklist documental casi completo.',
+      },
+      {
+        id: 'bq-002',
+        nombre: 'Atlantic Wave',
+        estado: 'en alistamiento',
+        bandera: 'Panama',
+        operacion: 'Carga',
+        muelle: 'Muelle Este 1',
+        eta: '08/05 03:10',
+        resumen: 'Ventana nocturna reservada para maniobra y control operativo de acceso.',
+      },
+      {
+        id: 'bq-003',
+        nombre: 'Isla Verde',
+        estado: 'en zona de espera',
+        bandera: 'Uruguay',
+        operacion: 'Abastecimiento',
+        zona: 'Espera Alfa',
+        eta: '08/05 08:30',
+        resumen: 'Caso mock para revisar cambios de prioridad y reasignacion de atraque.',
+      },
+    ]
+  }
+
+  if (normalizedCollectionKey === 'solicitudesentrada') {
+    return [
+      {
+        id: 'sol-puerto-101',
+        nombre: 'Solicitud de ingreso 101',
+        estado: 'en revision',
+        buque: 'MV Patagonia Sur',
+        responsable: 'Mesa de trafico',
+        documentacion: '8 de 9 archivos',
+        resumen: 'Ingreso con ETA confirmada y un documento pendiente de validacion final.',
+      },
+      {
+        id: 'sol-puerto-102',
+        nombre: 'Solicitud de ingreso 102',
+        estado: 'lista para validar',
+        buque: 'Atlantic Wave',
+        responsable: 'Operacion muelles',
+        documentacion: 'Completa',
+        resumen: 'Solicitud preparada para aprobar muelle y ventana operativa.',
+      },
+      {
+        id: 'sol-puerto-103',
+        nombre: 'Solicitud de ingreso 103',
+        estado: 'nueva',
+        buque: 'Isla Verde',
+        responsable: 'Centro de control',
+        documentacion: '6 de 9 archivos',
+        resumen: 'Caso nuevo para revisar triage documental y asignacion preliminar.',
+      },
+    ]
+  }
+
+  if (normalizedCollectionKey === 'muelles') {
+    return [
+      {
+        id: 'mue-01',
+        nombre: 'Muelle Norte 2',
+        estado: 'ocupado',
+        calado: '11.5 m',
+        disponibilidad: 'Libre 23:30',
+        responsable: 'Turno noche',
+        resumen: 'Posicion usada para descarga y control de ventana de salida.',
+      },
+      {
+        id: 'mue-02',
+        nombre: 'Muelle Este 1',
+        estado: 'reservado',
+        calado: '10.2 m',
+        disponibilidad: 'Asignado 03:00',
+        responsable: 'Planificacion diaria',
+        resumen: 'Reserva operativa para buques de carga general con ETA nocturna.',
+      },
+      {
+        id: 'mue-03',
+        nombre: 'Muelle Sur 4',
+        estado: 'disponible',
+        calado: '9.8 m',
+        disponibilidad: 'Inmediata',
+        responsable: 'Coordinacion de patio',
+        resumen: 'Alternativa abierta para reparacion o abastecimiento local.',
+      },
+    ]
+  }
+
+  if (normalizedCollectionKey === 'zonasportuarias') {
+    return [
+      {
+        id: 'zon-01',
+        nombre: 'Zona de espera Alfa',
+        estado: 'en seguimiento',
+        ocupacion: '2 de 5 posiciones',
+        responsable: 'Control nautico',
+        resumen: 'Area para pre-arribo con trazabilidad de prioridad y orden de acceso.',
+      },
+      {
+        id: 'zon-02',
+        nombre: 'Patio de inspeccion documental',
+        estado: 'operativa',
+        ocupacion: '6 expedientes activos',
+        responsable: 'Mesa documental',
+        resumen: 'Zona interna para revisar permisos, certificados y observaciones.',
+      },
+      {
+        id: 'zon-03',
+        nombre: 'Zona de abastecimiento Delta',
+        estado: 'habilitada local',
+        ocupacion: '1 operacion en curso',
+        responsable: 'Servicios portuarios',
+        resumen: 'Permite ver flujo de apoyo sin tocar integraciones externas.',
+      },
+    ]
+  }
+
+  if (normalizedCollectionKey === 'arribos') {
+    return [
+      {
+        id: 'arr-01',
+        nombre: 'Arribo MV Patagonia Sur',
+        estado: 'arribo programado',
+        eta: '07/05 21:40',
+        zona: 'Canal Norte',
+        responsable: 'Control nautico',
+        resumen: 'Ingreso coordinado con ventana y muelle ya preasignados.',
+      },
+      {
+        id: 'arr-02',
+        nombre: 'Arribo Atlantic Wave',
+        estado: 'en seguimiento',
+        eta: '08/05 03:10',
+        zona: 'Acceso principal',
+        responsable: 'Trafico maritimo',
+        resumen: 'Caso con validacion nocturna y tablero operativo activo.',
+      },
+    ]
+  }
+
+  if (normalizedCollectionKey === 'salidas') {
+    return [
+      {
+        id: 'sal-01',
+        nombre: 'Salida Costa Serena',
+        estado: 'lista para validar',
+        etd: '07/05 23:55',
+        destino: 'Montevideo',
+        responsable: 'Centro de despacho',
+        resumen: 'Salida con verificacion final de remolque y documentacion.',
+      },
+      {
+        id: 'sal-02',
+        nombre: 'Salida Rio Azul',
+        estado: 'en revision',
+        etd: '08/05 06:20',
+        destino: 'Santos',
+        responsable: 'Operacion muelles',
+        resumen: 'Caso mock para revisar prioridad de salida y alertas pendientes.',
+      },
+    ]
+  }
+
+  if (normalizedCollectionKey === 'operacionesportuarias') {
+    return [
+      {
+        id: 'ope-01',
+        nombre: 'Descarga de granel',
+        estado: 'en seguimiento',
+        buque: 'MV Patagonia Sur',
+        turno: 'Noche',
+        responsable: 'Supervisor de muelle',
+        resumen: 'Operacion principal con tablero local y alertas de ritmo de descarga.',
+      },
+      {
+        id: 'ope-02',
+        nombre: 'Carga de contenedores',
+        estado: 'lista para revision',
+        buque: 'Atlantic Wave',
+        turno: 'Madrugada',
+        responsable: 'Coordinacion de patio',
+        resumen: 'Permite revisar secuencia operativa y reasignacion de recursos mock.',
+      },
+      {
+        id: 'ope-03',
+        nombre: 'Abastecimiento tecnico',
+        estado: 'validado local',
+        buque: 'Isla Verde',
+        turno: 'Manana',
+        responsable: 'Servicios portuarios',
+        resumen: 'Caso cerrado para comparar una operacion ya resuelta dentro del mock.',
+      },
+    ]
+  }
+
+  if (normalizedCollectionKey === 'documentacion') {
+    return [
+      {
+        id: 'doc-01',
+        nombre: 'Manifiesto de carga',
+        estado: 'en revision',
+        buque: 'MV Patagonia Sur',
+        responsable: 'Mesa documental',
+        vencimiento: '07/05 20:45',
+        resumen: 'Documento clave para destrabar aprobacion de ingreso y descarga.',
+      },
+      {
+        id: 'doc-02',
+        nombre: 'Certificado de sanidad',
+        estado: 'lista para validar',
+        buque: 'Atlantic Wave',
+        responsable: 'Control sanitario',
+        vencimiento: '08/05 02:30',
+        resumen: 'Validacion pendiente para habilitar atraque nocturno.',
+      },
+      {
+        id: 'doc-03',
+        nombre: 'Permiso de abastecimiento',
+        estado: 'observado',
+        buque: 'Isla Verde',
+        responsable: 'Servicios portuarios',
+        vencimiento: '08/05 07:10',
+        resumen: 'Caso mock con observacion para revisar detalle y seguimiento.',
+      },
+    ]
+  }
+
+  if (normalizedCollectionKey === 'autorizaciones') {
+    return [
+      {
+        id: 'aut-01',
+        nombre: 'Autorizacion de ingreso',
+        estado: 'lista para validar',
+        buque: 'MV Patagonia Sur',
+        responsable: 'Jefatura operativa',
+        resumen: 'Bloque final antes de habilitar acceso al muelle asignado.',
+      },
+      {
+        id: 'aut-02',
+        nombre: 'Autorizacion de salida',
+        estado: 'en revision',
+        buque: 'Costa Serena',
+        responsable: 'Centro de despacho',
+        resumen: 'Permite revisar aprobaciones y observaciones de ultima hora.',
+      },
+    ]
+  }
+
+  if (normalizedCollectionKey === 'movimientosportuarios') {
+    return [
+      {
+        id: 'mov-01',
+        nombre: 'Cambio de zona a muelle',
+        estado: 'validado local',
+        buque: 'MV Patagonia Sur',
+        responsable: 'Control nautico',
+        hora: '07/05 20:58',
+        resumen: 'Movimiento confirmado para dejar trazabilidad operativa local.',
+      },
+      {
+        id: 'mov-02',
+        nombre: 'Reasignacion de atraque',
+        estado: 'en seguimiento',
+        buque: 'Atlantic Wave',
+        responsable: 'Planificacion diaria',
+        hora: '08/05 01:20',
+        resumen: 'Cambio interno para balancear ocupacion de muelles.',
+      },
+      {
+        id: 'mov-03',
+        nombre: 'Salida de zona de espera',
+        estado: 'lista para revision',
+        buque: 'Isla Verde',
+        responsable: 'Centro de control',
+        hora: '08/05 06:45',
+        resumen: 'Evento mock para revisar historial y orden de movimientos.',
+      },
+    ]
+  }
+
+  if (normalizedCollectionKey === 'accesos') {
+    return [
+      {
+        id: 'acc-01',
+        nombre: 'Acceso de tripulacion',
+        estado: 'habilitada local',
+        responsable: 'Seguridad portuaria',
+        zona: 'Ingreso Norte',
+        resumen: 'Control interno para revisar permisos sin integrar molinetes reales.',
+      },
+      {
+        id: 'acc-02',
+        nombre: 'Acceso de proveedor tecnico',
+        estado: 'en revision',
+        responsable: 'Guardia principal',
+        zona: 'Patio de servicios',
+        resumen: 'Permiso pendiente para abastecimiento y soporte de muelle.',
+      },
+    ]
+  }
+
+  if (normalizedCollectionKey === 'alertas') {
+    return [
+      {
+        id: 'alt-01',
+        nombre: 'ETA fuera de ventana',
+        estado: 'en seguimiento',
+        severidad: 'alta',
+        responsable: 'Control nautico',
+        resumen: 'Desvio detectado en ingreso programado con impacto sobre muelle asignado.',
+      },
+      {
+        id: 'alt-02',
+        nombre: 'Documentacion incompleta',
+        estado: 'lista para revision',
+        severidad: 'media',
+        responsable: 'Mesa documental',
+        resumen: 'Caso mock para revisar priorizacion y cierre operativo local.',
+      },
+    ]
+  }
 
   if (/\bsolicitudes?\b/u.test(normalizedTitle) || normalizedCollectionKey === 'solicitudes') {
     return [
@@ -1209,7 +1604,7 @@ function buildSafeFirstDeliveryGenericRecords({
       {
         id: 'op-1',
         nombre: 'Panel operativo inicial',
-        estado: defaultStates[0] || 'listo para demo',
+        estado: defaultStates[0] || 'listo para revision',
         responsable: 'Coordinacion mock',
         resumen: 'Entrada principal para revisar el flujo local del sistema.',
       },
@@ -1439,7 +1834,7 @@ function buildSafeFirstDeliveryMockCollections({
       {
         id: 'op-1',
         nombre: `Panel inicial de ${domain}`,
-        estado: 'listo para demo',
+        estado: 'listo para revision',
         resumen: 'Base local para revisar el flujo principal sin integraciones reales.',
       },
     ]
@@ -1516,6 +1911,11 @@ function buildSafeFirstDeliveryMockData({
   const normalizedStateHints = Array.isArray(normalizedMaterialization?.stateHints)
     ? normalizedMaterialization.stateHints
     : []
+  const resolvedStateHints = buildSafeFirstDeliveryStateSamples(normalizedStateHints, [
+    'listo para revision',
+    'en seguimiento',
+    'validado local',
+  ])
   const normalizedApprovalThemes = Array.isArray(
     normalizedMaterialization?.approvalThemes,
   )
@@ -1539,7 +1939,7 @@ function buildSafeFirstDeliveryMockData({
     modules: normalizedModules,
     entities: normalizedEntities,
     mockCollections: normalizedMockCollections,
-    stateHints: normalizedStateHints,
+    stateHints: resolvedStateHints,
   })
   const interactionMode =
     resolvedProductType === 'ecommerce' && Array.isArray(collections.productos)
@@ -1572,7 +1972,7 @@ function buildSafeFirstDeliveryMockData({
       localActions: normalizedBehavior,
       entities: normalizedEntities,
       mockCollections: normalizedMockCollections,
-      stateHints: normalizedStateHints,
+      stateHints: resolvedStateHints,
       approvalThemes: normalizedApprovalThemes,
       explicitExclusions: normalizedExclusions,
       successCriteria: normalizedSuccessCriteria,
@@ -1633,27 +2033,28 @@ function buildSafeFirstDeliveryIndexHtml() {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Primera entrega segura</title>
+    <title>Entrega funcional local</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <div class="shell">
       <header class="hero">
         <div class="hero-main">
-          <p class="eyebrow">Primera entrega local mock</p>
-          <h1 id="app-title">Cargando plan seguro...</h1>
+          <p class="eyebrow">Entrega funcional local</p>
+          <h1 id="app-title">Preparando vista local...</h1>
           <p id="app-subtitle" class="subtitle"></p>
-          <div id="app-highlights" class="hero-highlights" aria-label="Resumen del prototipo"></div>
+          <div id="app-highlights" class="hero-highlights" aria-label="Resumen operativo"></div>
         </div>
         <div class="hero-side">
           <div class="hero-note">
-            <span class="badge badge-neutral">Sin integraciones reales</span>
-            <span class="badge badge-neutral">Datos mock editables</span>
+            <span class="badge badge-neutral">Modo local</span>
+            <span class="badge badge-neutral">Datos mock revisables</span>
           </div>
           <section class="hero-status" aria-label="Alcance seguro">
             <p class="eyebrow hero-kicker">Alcance seguro</p>
-            <h2 id="hero-safety-title">Entrega local lista</h2>
+            <h2 id="hero-safety-title">Entrega local preparada</h2>
             <p id="hero-safety-copy" class="panel-copy"></p>
+            <p id="hero-source-note" class="hero-footnote"></p>
           </section>
         </div>
       </header>
@@ -1662,18 +2063,18 @@ function buildSafeFirstDeliveryIndexHtml() {
         <section class="main-column">
           <section class="panel">
             <div class="panel-header">
-              <h2>Recorrido principal</h2>
+              <h2>Resumen general</h2>
               <p id="plan-summary" class="panel-copy"></p>
             </div>
             <div id="app-stats" class="stats-grid" aria-label="Indicadores del mock"></div>
             <nav id="module-nav" class="module-nav" aria-label="Modulos principales"></nav>
             <div class="toolbar workspace-toolbar">
               <label class="field">
-                <span>Buscar</span>
+                <span>Buscar registros</span>
                 <input id="search-input" type="search" placeholder="Buscar en esta entrega local" />
               </label>
               <label class="field field-select">
-                <span>Estado</span>
+                <span>Estado visible</span>
                 <select id="status-filter">
                   <option value="">Todos los estados</option>
                 </select>
@@ -1684,7 +2085,7 @@ function buildSafeFirstDeliveryIndexHtml() {
               <section class="workspace-panel">
                 <div class="panel-header compact-header">
                   <div>
-                    <h3 id="records-title">Registros mock</h3>
+                    <h3 id="records-title">Registros operativos</h3>
                     <p id="records-summary" class="panel-copy"></p>
                   </div>
                 </div>
@@ -1705,7 +2106,7 @@ function buildSafeFirstDeliveryIndexHtml() {
             <section class="workspace-panel">
               <div class="panel-header compact-header">
                 <div>
-                  <h3>Acciones locales</h3>
+                  <h3>Acciones del modulo</h3>
                   <p id="actions-summary" class="panel-copy"></p>
                 </div>
               </div>
@@ -1715,9 +2116,9 @@ function buildSafeFirstDeliveryIndexHtml() {
 
           <section class="panel">
             <div class="panel-header">
-              <h2>Datos mock y estados locales</h2>
+              <h2>Cobertura local revisable</h2>
               <p class="panel-copy">
-                La interfaz funciona localmente y usa una base mock preparada para demo.
+                La interfaz funciona en modo local y usa datos mock revisables para recorrer el flujo principal.
               </p>
             </div>
             <div id="dataset-overview" class="data-grid"></div>
@@ -1731,23 +2132,32 @@ function buildSafeFirstDeliveryIndexHtml() {
           </section>
 
           <section class="panel compact">
-            <h2>Alcance</h2>
-            <ul id="scope-list" class="bullet-list"></ul>
+            <h2>Alcance de esta entrega</h2>
+            <div class="section-stack">
+              <div class="section-block">
+                <p class="subsection-title">Cobertura</p>
+                <ul id="scope-list" class="bullet-list compact-list"></ul>
+              </div>
+              <div class="section-block">
+                <p class="subsection-title">Exclusiones explicitas</p>
+                <ul id="exclusions-list" class="bullet-list bullet-warning compact-list"></ul>
+              </div>
+            </div>
           </section>
 
           <section class="panel compact">
-            <h2>Exclusiones explicitas</h2>
-            <ul id="exclusions-list" class="bullet-list bullet-warning"></ul>
-          </section>
-
-          <section class="panel compact">
-            <h2>Proximos pasos</h2>
-            <ul id="next-steps-list" class="bullet-list"></ul>
-          </section>
-
-          <section class="panel compact">
-            <h2>Aprobaciones futuras</h2>
-            <ul id="approval-list" class="bullet-list"></ul>
+            <h2>Siguientes pasos</h2>
+            <div class="section-stack">
+              <div class="section-block">
+                <p class="subsection-title">Checklist local</p>
+                <ul id="next-steps-list" class="bullet-list compact-list"></ul>
+              </div>
+              <div class="section-block">
+                <p class="subsection-title">Aprobaciones futuras</p>
+                <p class="subsection-copy">Quedan fuera de esta primera entrega local y aparecen solo como referencia operativa.</p>
+                <ul id="approval-list" class="bullet-list compact-list"></ul>
+              </div>
+            </div>
           </section>
         </aside>
       </main>
@@ -1797,17 +2207,17 @@ body {
 }
 
 .shell {
-  width: min(1180px, calc(100% - 32px));
+  width: min(1280px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 32px 0 48px;
+  padding: 28px 0 40px;
 }
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.75fr);
-  gap: 24px;
+  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.78fr);
+  gap: 20px;
   align-items: stretch;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .hero-main {
@@ -1851,17 +2261,17 @@ body {
 }
 
 .hero-highlights {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
   margin-top: 18px;
 }
 
 .hero-chip {
-  min-width: 150px;
+  min-width: 0;
   display: grid;
   gap: 4px;
-  padding: 12px 14px;
+  padding: 12px 13px;
   border-radius: 18px;
   background: rgba(20, 32, 51, 0.05);
   border: 1px solid rgba(20, 32, 51, 0.08);
@@ -1900,6 +2310,12 @@ body {
   font-size: 1.1rem;
 }
 
+.hero-footnote {
+  margin: 12px 0 0;
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -1917,14 +2333,21 @@ body {
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.9fr);
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
   gap: 20px;
+}
+
+.layout > *,
+.workspace-grid > * {
+  min-width: 0;
 }
 
 .main-column,
 .side-column {
   display: grid;
   gap: 20px;
+  align-content: start;
+  align-items: start;
 }
 
 .panel {
@@ -1944,6 +2367,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: 16px;
   margin-bottom: 16px;
 }
@@ -2001,20 +2425,17 @@ body {
 }
 
 .module-nav {
-  display: flex;
-  flex-wrap: nowrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 10px;
   margin-bottom: 18px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  scrollbar-width: thin;
 }
 
 .module-button {
   border: 0;
   border-radius: 18px;
-  min-width: max-content;
-  padding: 12px 16px;
+  min-width: 0;
+  padding: 12px 14px;
   background: rgba(20, 32, 51, 0.07);
   color: var(--ink);
   cursor: pointer;
@@ -2049,14 +2470,15 @@ body {
 }
 
 .workspace-toolbar {
-  align-items: flex-end;
+  align-items: end;
   margin-bottom: 18px;
 }
 
 .field {
   display: grid;
   gap: 6px;
-  min-width: 220px;
+  min-width: min(220px, 100%);
+  flex: 1 1 220px;
 }
 
 .field span {
@@ -2083,7 +2505,7 @@ body {
 
 .workspace-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.9fr);
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.92fr);
   gap: 16px;
 }
 
@@ -2114,7 +2536,7 @@ body {
 }
 
 .record-grid {
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(248px, 1fr));
 }
 
 .detail-stack,
@@ -2127,15 +2549,25 @@ body {
 .record-card {
   border: 1px solid rgba(20, 32, 51, 0.09);
   border-radius: 18px;
-  padding: 16px;
+  padding: 15px;
   background: var(--panel-strong);
   box-shadow: var(--shadow-soft);
+  min-width: 0;
 }
 
 .record-card {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   cursor: pointer;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.record-card:hover {
+  border-color: rgba(179, 92, 46, 0.26);
+  transform: translateY(-1px);
 }
 
 .record-card.is-selected {
@@ -2148,6 +2580,7 @@ body {
 .card h3 {
   margin: 0 0 8px;
   font-size: 1rem;
+  overflow-wrap: anywhere;
 }
 
 .record-card-header,
@@ -2156,6 +2589,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
@@ -2181,18 +2615,20 @@ body {
 .card-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   margin: 10px 0 0;
 }
 
 .tag {
   display: inline-flex;
   align-items: center;
-  padding: 6px 10px;
+  padding: 5px 9px;
   border-radius: 999px;
   background: rgba(179, 92, 46, 0.12);
   color: var(--accent);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  word-break: break-word;
 }
 
 .tag.subtle {
@@ -2248,6 +2684,10 @@ body {
   gap: 10px;
 }
 
+.compact-actions {
+  gap: 8px;
+}
+
 .toolbar.secondary-actions .button {
   background: rgba(20, 32, 51, 0.08);
   color: var(--ink);
@@ -2256,12 +2696,19 @@ body {
 .button {
   border: 0;
   border-radius: 14px;
-  padding: 10px 14px;
+  padding: 9px 13px;
   cursor: pointer;
   background: var(--ink);
   color: white;
   font: inherit;
   box-shadow: 0 10px 24px rgba(20, 32, 51, 0.12);
+}
+
+.compact-actions .button {
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  box-shadow: none;
 }
 
 .button.secondary {
@@ -2281,9 +2728,9 @@ body {
 }
 
 .detail-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: minmax(120px, 0.72fr) minmax(0, 1fr);
+  gap: 12px;
   padding: 10px 12px;
   border-radius: 14px;
   background: rgba(20, 32, 51, 0.05);
@@ -2295,7 +2742,9 @@ body {
 
 .detail-row span {
   color: var(--muted);
-  text-align: right;
+  text-align: left;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .detail-hero-card {
@@ -2332,6 +2781,55 @@ body {
 .activity-item.is-latest {
   background: rgba(179, 92, 46, 0.09);
   border: 1px solid rgba(179, 92, 46, 0.18);
+}
+
+.activity-item.is-technical {
+  background: rgba(20, 32, 51, 0.035);
+  border: 1px dashed rgba(20, 32, 51, 0.12);
+}
+
+.section-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.section-block {
+  display: grid;
+  gap: 10px;
+}
+
+.subsection-title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.subsection-copy {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.compact-list {
+  gap: 8px;
+}
+
+.record-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(20, 32, 51, 0.08);
+}
+
+.record-card-hint {
+  font-size: 0.82rem;
+  color: var(--muted);
 }
 
 .activity-label {
@@ -2375,12 +2873,8 @@ body {
   }
 
   .detail-row {
-    flex-direction: column;
+    grid-template-columns: 1fr;
     gap: 6px;
-  }
-
-  .detail-row span {
-    text-align: left;
   }
 }
 
@@ -2407,12 +2901,12 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .module-nav {
-    margin-inline: -2px;
-    padding-inline: 2px;
+  .record-grid {
+    grid-template-columns: 1fr;
   }
 
-  .record-grid {
+  .module-nav,
+  .hero-highlights {
     grid-template-columns: 1fr;
   }
 }
@@ -2426,7 +2920,7 @@ function buildSafeFirstDeliveryRuntimeModeConfig(interactionMode) {
         kind: 'commerce',
         fallbackLabel: 'ecommerce',
         searchPlaceholder: 'Buscar catalogo, categoria, estado u orden local',
-        initialLog: 'Base mock local de ecommerce lista para revision.',
+        initialLog: 'Base local de ecommerce con datos mock lista para revision.',
         safetySummary:
           'sin integraciones externas, pagos reales, credenciales ni persistencia real',
         detailEmpty:
@@ -2462,9 +2956,9 @@ function buildSafeFirstDeliveryRuntimeModeConfig(interactionMode) {
         stateSequences: {
           reviewTargets: ['ordenes'],
           primaryTargets: ['productos'],
-          review: ['simulada', 'en revision', 'revisada mock'],
+          review: ['simulada', 'en revision', 'validada local'],
           primary: ['borrador', 'publicado', 'pausado'],
-          default: ['listo para demo', 'en revision', 'aprobado mock'],
+          default: ['listo para revision', 'en seguimiento', 'validado local'],
         },
         actionSets: {
           productos: [
@@ -2489,7 +2983,7 @@ function buildSafeFirstDeliveryRuntimeModeConfig(interactionMode) {
           ],
           default: [
             { type: 'select-detail', label: 'Ver detalle' },
-            { type: 'cycle-selected-state', label: 'Actualizar estado mock' },
+            { type: 'cycle-selected-state', label: 'Cambiar estado' },
           ],
         },
         globalActions: {
@@ -2503,7 +2997,7 @@ function buildSafeFirstDeliveryRuntimeModeConfig(interactionMode) {
         kind: 'school-crm',
         fallbackLabel: 'crm escolar',
         searchPlaceholder: 'Buscar alumno, familia, curso, comunicacion o estado',
-        initialLog: 'Base mock local de CRM escolar lista para revision.',
+        initialLog: 'Base local de CRM escolar con datos mock lista para revision.',
         safetySummary:
           'sin datos sensibles reales, autenticacion real, persistencia real ni integraciones institucionales activas',
         detailEmpty:
@@ -2525,10 +3019,10 @@ function buildSafeFirstDeliveryRuntimeModeConfig(interactionMode) {
           followupTargets: ['seguimientos', 'alumnos'],
           noteTargets: ['comunicaciones'],
           reviewTargets: ['reportes'],
-          followup: ['pendiente', 'en curso', 'resuelto mock'],
-          note: ['borrador', 'registrada mock', 'en seguimiento', 'revisada'],
-          review: ['listo para revision', 'revisado mock', 'compartido local'],
-          default: ['listo para demo', 'en revision', 'aprobado mock'],
+          followup: ['pendiente', 'en curso', 'resuelto local'],
+          note: ['borrador', 'registrada local', 'en seguimiento', 'revisada'],
+          review: ['listo para revision', 'validado local', 'compartido local'],
+          default: ['listo para revision', 'en seguimiento', 'validado local'],
         },
         actionSets: {
           alumnos: [
@@ -2539,7 +3033,7 @@ function buildSafeFirstDeliveryRuntimeModeConfig(interactionMode) {
           cursos: [{ type: 'select-detail', label: 'Ver detalle' }],
           comunicaciones: [
             { type: 'select-detail', label: 'Ver detalle' },
-            { type: 'register-note', label: 'Registrar comunicacion mock' },
+            { type: 'register-note', label: 'Registrar comunicacion local' },
             { type: 'toggle-review', label: 'Marcar revision' },
           ],
           seguimientos: [
@@ -2548,17 +3042,17 @@ function buildSafeFirstDeliveryRuntimeModeConfig(interactionMode) {
           ],
           reportes: [
             { type: 'select-detail', label: 'Ver detalle' },
-            { type: 'review-record', label: 'Revisar reporte mock' },
+            { type: 'review-record', label: 'Revisar reporte local' },
           ],
-          operacion: [{ type: 'create-entry', label: 'Registrar seguimiento mock' }],
+          operacion: [{ type: 'create-entry', label: 'Registrar seguimiento local' }],
           default: [
             { type: 'select-detail', label: 'Ver detalle' },
-            { type: 'cycle-selected-state', label: 'Actualizar estado mock' },
+            { type: 'cycle-selected-state', label: 'Cambiar estado' },
           ],
         },
         globalActions: {
-          alumnos: [{ type: 'register-note', label: 'Registrar comunicacion mock' }],
-          operacion: [{ type: 'create-entry', label: 'Registrar seguimiento mock' }],
+          alumnos: [{ type: 'register-note', label: 'Registrar comunicacion local' }],
+          operacion: [{ type: 'create-entry', label: 'Registrar seguimiento local' }],
         },
         noteCollectionKey: 'comunicaciones',
         entryTemplates: {
@@ -2571,17 +3065,17 @@ function buildSafeFirstDeliveryRuntimeModeConfig(interactionMode) {
             nextStepWithReferencePrefix: 'Revisar accion asociada a ',
             nextStepFallback: 'Revisar accion pendiente en la bandeja local',
             summary: 'Seguimiento generado localmente sin datos sensibles reales.',
-            logMessage: 'Se registro un seguimiento mock local.',
+            logMessage: 'Se registro un seguimiento local.',
           },
           note: {
             key: 'comunicaciones',
             idPrefix: 'com-local-',
             namePrefix: 'Comunicacion local ',
             channel: 'nota interna mock',
-            state: 'registrada mock',
+            state: 'registrada local',
             fallbackRecipient: 'Comunidad educativa mock',
             summary: 'Comunicacion generada localmente para revisar el flujo interno.',
-            logMessage: 'Se registro una comunicacion mock local.',
+            logMessage: 'Se registro una comunicacion local.',
           },
         },
       }
@@ -2590,7 +3084,7 @@ function buildSafeFirstDeliveryRuntimeModeConfig(interactionMode) {
         kind: 'generic',
         fallbackLabel: 'sistema interno',
         searchPlaceholder: 'Buscar solicitud, estado, reporte o responsable',
-        initialLog: 'Base mock local de sistema interno lista para revision.',
+        initialLog: 'Base local de sistema interno con datos mock lista para revision.',
         safetySummary:
           'sin autenticacion real, persistencia real ni integraciones externas activas',
         detailEmpty:
@@ -2611,10 +3105,10 @@ function buildSafeFirstDeliveryRuntimeModeConfig(interactionMode) {
           primaryTargets: ['solicitudes'],
           reviewTargets: ['reportes'],
           statusTargets: ['estados'],
-          primary: ['nueva', 'en revision', 'resuelta mock'],
-          review: ['borrador', 'listo para revision', 'revisado mock'],
-          status: ['habilitada', 'en revision', 'aprobada mock'],
-          default: ['listo para demo', 'en revision', 'aprobado mock'],
+          primary: ['nueva', 'en revision', 'resuelta local'],
+          review: ['en armado', 'listo para revision', 'validado local'],
+          status: ['operativa', 'en revision', 'habilitada local'],
+          default: ['listo para revision', 'en seguimiento', 'validado local'],
         },
         actionSets: {
           solicitudes: [
@@ -2628,20 +3122,20 @@ function buildSafeFirstDeliveryRuntimeModeConfig(interactionMode) {
           ],
           reportes: [
             { type: 'select-detail', label: 'Ver detalle' },
-            { type: 'review-record', label: 'Revisar reporte mock' },
+            { type: 'review-record', label: 'Revisar reporte local' },
           ],
           operacion: [
-            { type: 'create-entry', label: 'Crear registro mock' },
+            { type: 'create-entry', label: 'Crear registro local' },
             { type: 'cycle-selected-state', label: 'Cambiar estado' },
           ],
           default: [
             { type: 'select-detail', label: 'Ver detalle' },
-            { type: 'cycle-selected-state', label: 'Actualizar estado mock' },
+            { type: 'cycle-selected-state', label: 'Cambiar estado' },
           ],
         },
         globalActions: {
-          solicitudes: [{ type: 'create-entry', label: 'Crear solicitud mock' }],
-          operacion: [{ type: 'create-entry', label: 'Crear registro mock' }],
+          solicitudes: [{ type: 'create-entry', label: 'Crear solicitud local' }],
+          operacion: [{ type: 'create-entry', label: 'Crear registro local' }],
         },
         noteCollectionKey: 'observaciones',
         entryTemplates: {
@@ -2649,16 +3143,16 @@ function buildSafeFirstDeliveryRuntimeModeConfig(interactionMode) {
             key: 'observaciones',
             idPrefix: 'obs-local-',
             namePrefix: 'Observacion local ',
-            state: 'registrada mock',
+            state: 'registrada local',
             responsible: 'Equipo operativo mock',
             fallbackRecipient: 'Bandeja operativa mock',
             summary: 'Observacion generada localmente para revisar el flujo interno.',
-            logMessage: 'Se registro una observacion mock local.',
+            logMessage: 'Se registro una observacion local.',
           },
           generic: {
             responsible: 'Equipo operativo mock',
-            requestLogMessage: 'Se creo una solicitud mock local.',
-            defaultLogMessage: 'Se creo un registro mock local.',
+            requestLogMessage: 'Se creo una solicitud local.',
+            defaultLogMessage: 'Se creo un registro local.',
           },
         },
       }
@@ -2688,6 +3182,7 @@ const state = {
   statusFilter: '',
   runtimeList: [],
   localLog: [MODE.initialLog],
+  dataSourceNote: 'Datos mock embebidos listos para apertura local directa.',
 };
 
 function normalizeText(value) {
@@ -2698,9 +3193,30 @@ function normalizeText(value) {
 }
 
 function toDisplayLabel(value) {
+  const explicitLabels = {
+    solicitudesentrada: 'Solicitudes de entrada',
+    zonasportuarias: 'Zonas portuarias',
+    operacionesportuarias: 'Operaciones portuarias',
+    movimientosportuarios: 'Historial de movimientos',
+    eta: 'ETA',
+    etd: 'ETD',
+    id: 'ID',
+  };
+  const rawValue = String(value || '').trim();
+  const normalizedValue = normalizeText(rawValue).replace(/\s+/g, '');
+
+  if (explicitLabels[normalizedValue]) {
+    return explicitLabels[normalizedValue];
+  }
+
   return String(value || '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/[-_]/g, ' ')
-    .replace(/\\b\\w/g, (match) => match.toUpperCase());
+    .split(' ')
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
 }
 
 function logAction(message) {
@@ -2729,12 +3245,23 @@ async function loadLocalData() {
     if (payload && typeof payload === 'object') {
       state.data = payload;
       state.activeModuleId = payload.modules?.[0]?.id || state.activeModuleId;
-      logAction('Se cargó mock-data.json como fuente principal.');
+      state.dataSourceNote = 'Datos mock cargados desde el archivo local.';
+      if (state.localLog[0] === MODE.initialLog) {
+        state.localLog[0] =
+          'Base local de ' +
+          (payload.meta?.domain || payload.meta?.productLabel || MODE.fallbackLabel) +
+          ' con datos mock lista para revision.';
+      }
     }
   } catch (error) {
-    logAction(
-      'Se usó la base embebida porque mock-data.json no pudo cargarse por apertura local.',
-    );
+    state.dataSourceNote =
+      'Datos mock embebidos listos para apertura local directa por file://.';
+    if (state.localLog[0] === MODE.initialLog) {
+      state.localLog[0] =
+        'Base local de ' +
+        (state.data?.meta?.domain || state.data?.meta?.productLabel || MODE.fallbackLabel) +
+        ' con datos mock lista para revision.';
+    }
   }
 
   syncRuntimeListFromData();
@@ -2846,6 +3373,52 @@ function countAllMockRecords() {
   }, 0);
 }
 
+function getRecordMetaEntries(record) {
+  const prioritizedKeys = [
+    'estado',
+    'responsable',
+    'prioridad',
+    'buque',
+    'muelle',
+    'zona',
+    'operacion',
+    'documentacion',
+    'eta',
+    'etd',
+    'severidad',
+    'disponibilidad',
+    'ocupacion',
+    'turno',
+    'destino',
+    'bandera',
+    'curso',
+    'familia',
+    'categoria',
+    'precio',
+    'stock',
+  ];
+  const ignoredKeys = new Set(['id', 'nombre', 'resumen']);
+  const entries = Object.entries(record || {}).filter(
+    ([key, value]) =>
+      !ignoredKeys.has(key) && value !== undefined && value !== null && value !== '',
+  );
+
+  entries.sort((leftEntry, rightEntry) => {
+    const leftIndex = prioritizedKeys.indexOf(leftEntry[0]);
+    const rightIndex = prioritizedKeys.indexOf(rightEntry[0]);
+    const safeLeftIndex = leftIndex === -1 ? prioritizedKeys.length : leftIndex;
+    const safeRightIndex = rightIndex === -1 ? prioritizedKeys.length : rightIndex;
+
+    if (safeLeftIndex !== safeRightIndex) {
+      return safeLeftIndex - safeRightIndex;
+    }
+
+    return String(leftEntry[0]).localeCompare(String(rightEntry[0]));
+  });
+
+  return entries;
+}
+
 function inferStatusTone(value) {
   const normalizedValue = normalizeText(value);
 
@@ -2882,6 +3455,19 @@ function createTag(value, className = '') {
   return tag;
 }
 
+function getModuleSourceLabel(module) {
+  return module?.title || toDisplayLabel(module?.collectionKey || 'modulo');
+}
+
+function formatModuleRecordCount(count) {
+  return count === 1 ? '1 registro local' : count + ' registros locales';
+}
+
+function isTechnicalLogEntry(entry) {
+  const normalizedEntry = normalizeText(entry);
+  return normalizedEntry.includes('mock-data.json') || normalizedEntry.includes('base embebida');
+}
+
 function renderHeroHighlights(meta) {
   const container = document.getElementById('app-highlights');
 
@@ -2897,14 +3483,14 @@ function renderHeroHighlights(meta) {
     },
     {
       label: 'Modo',
-      value: 'Local / mock',
+      value: 'Modo local',
     },
     {
       label: 'Modulos',
       value: String(modules.length),
     },
     {
-      label: 'Registros mock',
+      label: 'Registros',
       value: String(countAllMockRecords()),
     },
   ];
@@ -2941,7 +3527,7 @@ function renderAppStats(meta) {
     {
       label: 'Colecciones',
       value: String(Object.keys(collections).length),
-      copy: 'Fuentes mock activas para recorrer el flujo.',
+      copy: 'Fuentes locales con datos mock para recorrer el flujo.',
     },
     {
       label: 'Registros',
@@ -2951,7 +3537,7 @@ function renderAppStats(meta) {
     {
       label: 'Acciones',
       value: String(localActions.length),
-      copy: 'Interacciones simuladas disponibles en esta entrega local.',
+      copy: 'Interacciones revisables disponibles en esta entrega funcional local.',
     },
     {
       label: 'Exclusiones',
@@ -2983,32 +3569,36 @@ function updateTitle() {
   const summaryNode = document.getElementById('plan-summary');
   const safetyTitleNode = document.getElementById('hero-safety-title');
   const safetyCopyNode = document.getElementById('hero-safety-copy');
+  const sourceNoteNode = document.getElementById('hero-source-note');
   const modules = getModules();
   const exclusions = Array.isArray(meta.explicitExclusions) ? meta.explicitExclusions : [];
   const totalRecords = countAllMockRecords();
 
   titleNode.textContent =
-    'Primera entrega segura de ' + (meta.domain || meta.productLabel || MODE.fallbackLabel);
+    'Entrega funcional local de ' + (meta.domain || meta.productLabel || MODE.fallbackLabel);
   subtitleNode.textContent =
-    'Este mock local define una primera fase segura y revisable de ' +
-    (meta.productLabel || meta.domain || MODE.fallbackLabel) +
+    'Recorrido local revisable para ' +
+    (meta.domain || meta.productLabel || MODE.fallbackLabel) +
     ', ' +
     (MODE.safetySummary || 'sin integraciones externas, credenciales ni persistencia real') +
     '.';
   summaryNode.textContent =
     (Array.isArray(meta.scope) && meta.scope[0]
       ? meta.scope[0]
-      : 'Se priorizo un flujo principal navegable con datos mock editables.') +
+      : 'Se priorizo un flujo principal navegable con datos mock revisables.') +
     ' Todo queda acotado a archivos locales.';
-  safetyTitleNode.textContent = 'Entrega funcional local segura y revisable';
+  safetyTitleNode.textContent = 'Modo local revisable';
   safetyCopyNode.textContent =
     'Incluye ' +
     modules.length +
     ' modulo(s), ' +
     totalRecords +
-    ' registro(s) mock y ' +
+    ' registros locales y ' +
     exclusions.length +
     ' exclusion(es) explicitas para mantener el alcance controlado.';
+  if (sourceNoteNode) {
+    sourceNoteNode.textContent = state.dataSourceNote;
+  }
   renderHeroHighlights(meta);
   renderAppStats(meta);
 }
@@ -3046,8 +3636,8 @@ function renderModuleNav() {
       '<span class="module-button-title">' +
       module.title +
       '</span><span class="module-button-meta">' +
-      moduleRecordCount +
-      ' registro(s) mock</span>';
+      formatModuleRecordCount(moduleRecordCount) +
+      '</span>';
     button.setAttribute('aria-current', state.activeModuleId === module.id ? 'true' : 'false');
     button.addEventListener('click', () => {
       state.activeModuleId = module.id;
@@ -3201,7 +3791,7 @@ function renderRecordCard(module, record, isSelected) {
   const header = document.createElement('div');
   header.className = 'record-card-header';
   const title = document.createElement('h3');
-  title.textContent = record.nombre || record.id || 'Registro mock';
+  title.textContent = record.nombre || record.id || 'Registro local';
   header.appendChild(title);
   if (record.estado) {
     header.appendChild(createStatusBadge(record.estado));
@@ -3217,11 +3807,7 @@ function renderRecordCard(module, record, isSelected) {
 
   const meta = document.createElement('div');
   meta.className = 'record-meta';
-  Object.entries(record).forEach(([key, value]) => {
-    if (['id', 'nombre', 'resumen'].includes(key) || value === undefined || value === null || value === '') {
-      return;
-    }
-
+  getRecordMetaEntries(record).slice(0, 4).forEach(([key, value]) => {
     const tag = document.createElement('span');
     tag.className = 'tag';
     tag.textContent = toDisplayLabel(key) + ': ' + formatValue(key, value);
@@ -3229,10 +3815,14 @@ function renderRecordCard(module, record, isSelected) {
   });
   card.appendChild(meta);
 
-  const actionSet = resolveActionSet(module.collectionKey);
-  if (actionSet.length > 0) {
-    card.appendChild(buildActionButtons(actionSet, module, record));
-  }
+  const footer = document.createElement('div');
+  footer.className = 'record-card-footer';
+  footer.appendChild(createTag(getModuleSourceLabel(module), 'subtle'));
+  const hint = document.createElement('span');
+  hint.className = 'record-card-hint';
+  hint.textContent = 'Abrir detalle operativo';
+  footer.appendChild(hint);
+  card.appendChild(footer);
 
   return card;
 }
@@ -3252,7 +3842,11 @@ function renderDetailPanel(module, record) {
   }
 
   detailSummary.textContent =
-    'Vista: ' + (module.screen || module.title) + '. Fuente: ' + module.collectionKey + '.';
+    'Vista principal: ' +
+    (module.screen || module.title) +
+    '. Coleccion local: ' +
+    getModuleSourceLabel(module) +
+    '.';
 
   const headerCard = document.createElement('div');
   headerCard.className = 'card detail-hero-card';
@@ -3261,7 +3855,7 @@ function renderDetailPanel(module, record) {
     (module.title || 'Modulo') +
     '</p>' +
     '<div class="detail-hero-head"><div><h3>' +
-    (record.nombre || record.id || 'Registro mock') +
+    (record.nombre || record.id || 'Registro local') +
     '</h3><p class="detail-summary-copy muted">' +
     (record.resumen || module.summary || 'Detalle local listo para revision manual.') +
     '</p></div></div>';
@@ -3270,7 +3864,7 @@ function renderDetailPanel(module, record) {
   }
   const metaRow = document.createElement('div');
   metaRow.className = 'card-meta';
-  metaRow.appendChild(createTag('Fuente: ' + module.collectionKey, 'subtle'));
+  metaRow.appendChild(createTag('Modulo: ' + getModuleSourceLabel(module), 'subtle'));
   if (record.id) {
     metaRow.appendChild(createTag('ID: ' + record.id, 'subtle'));
   }
@@ -3307,13 +3901,13 @@ function renderActionPanel(module, record) {
   const intro = document.createElement('div');
   intro.className = 'card';
   intro.innerHTML =
-    '<p class="card-kicker">Interaccion segura</p><h3>Acciones disponibles</h3><p class="muted">Estas acciones solo actualizan datos mock locales dentro de esta entrega local segura.</p>';
+    '<p class="card-kicker">Acciones locales</p><h3>Interacciones revisables</h3><p class="muted">Estas acciones actualizan datos mock revisables dentro de esta entrega funcional local.</p>';
   container.appendChild(intro);
 
   summaryNode.textContent =
     record
-      ? 'Registro seleccionado: ' + (record.nombre || record.id || 'registro mock') + '.'
-      : 'Primero selecciona un registro para usar acciones sobre su detalle local.';
+      ? 'Registro seleccionado: ' + (record.nombre || record.id || 'registro local') + '.'
+      : 'Selecciona un registro para habilitar acciones sobre su detalle local.';
 
   if (record) {
     const recordActions = resolveActionSet(module.collectionKey);
@@ -3321,7 +3915,7 @@ function renderActionPanel(module, record) {
       const block = document.createElement('div');
       block.className = 'card action-group';
       block.innerHTML =
-        '<h3>Acciones sobre el registro</h3><p class="muted">Sirven para revisar, editar estado o registrar movimientos locales sobre el item seleccionado.</p>';
+        '<h3>Acciones del registro</h3><p class="muted">Permiten revisar estado, registrar movimientos o dejar avances sobre el item seleccionado.</p>';
       block.appendChild(buildActionButtons(recordActions, module, record));
       container.appendChild(block);
     }
@@ -3337,7 +3931,7 @@ function renderActionPanel(module, record) {
     const block = document.createElement('div');
     block.className = 'card action-group';
     block.innerHTML =
-      '<h3>Acciones del modulo</h3><p class="muted">Sirven para registrar avances o recrear pasos del flujo local sin salir del alcance permitido.</p>';
+      '<h3>Acciones del modulo</h3><p class="muted">Sirven para registrar avances del flujo local sin salir del alcance permitido.</p>';
     block.appendChild(buildActionButtons(globalActions, module, null, 'secondary-actions'));
     container.appendChild(block);
   }
@@ -3357,11 +3951,11 @@ function renderDatasetOverview() {
     const card = document.createElement('div');
     card.className = 'stat-card';
     card.innerHTML =
-      '<p class="card-kicker">Coleccion mock</p><h3>' +
+      '<p class="card-kicker">Coleccion local</p><h3>' +
       toDisplayLabel(key) +
       '</h3><p class="stat-value">' +
       count +
-      '</p><p class="stat-copy">registro(s) listos para revisar en esta entrega local.</p>';
+      '</p><p class="stat-copy">registros listos para revisar en esta entrega funcional local.</p>';
     if (firstState) {
       const meta = document.createElement('div');
       meta.className = 'card-meta';
@@ -3395,10 +3989,17 @@ function renderActivityLog() {
 
   entries.forEach((entry) => {
     const item = document.createElement('li');
-    item.className = 'activity-item' + (entry === entries[0] ? ' is-latest' : '');
+    item.className =
+      'activity-item' +
+      (entry === entries[0] ? ' is-latest' : '') +
+      (isTechnicalLogEntry(entry) ? ' is-technical' : '');
     item.innerHTML =
       '<span class="activity-label">' +
-      (entry === entries[0] ? 'Ultima accion' : 'Actividad local') +
+      (isTechnicalLogEntry(entry)
+        ? 'Origen local'
+        : entry === entries[0]
+          ? 'Ultima accion'
+          : 'Actividad local') +
       '</span><span class="activity-copy">' +
       entry +
       '</span>';
@@ -3497,7 +4098,7 @@ function resolveStateSequence(collectionKey, actionType) {
     : [];
   const fallbackSequence = metaStateHints.length > 0
     ? metaStateHints
-    : ['listo para demo', 'en revision', 'aprobado mock'];
+    : ['listo para revision', 'en revision', 'validado local'];
   const reviewTargets = Array.isArray(sequences.reviewTargets) ? sequences.reviewTargets : [];
   const primaryTargets = Array.isArray(sequences.primaryTargets) ? sequences.primaryTargets : [];
   const statusTargets = Array.isArray(sequences.statusTargets) ? sequences.statusTargets : [];
@@ -3556,7 +4157,7 @@ function cycleRecordState(record, collectionKey, actionType, messagePrefix) {
   const currentIndex = sequence.findIndex((entry) => entry === currentState);
   const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % sequence.length : 0;
   record.estado = sequence[nextIndex];
-  logAction(messagePrefix + ' "' + (record.nombre || record.id || 'registro mock') + '".');
+  logAction(messagePrefix + ' "' + (record.nombre || record.id || 'registro local') + '".');
 }
 
 function buildRuntimeEntry(record) {
@@ -3566,7 +4167,7 @@ function buildRuntimeEntry(record) {
   return {
     id: record.id || 'item-local-' + Date.now(),
     nombre: record.nombre || 'Item local',
-    estado: record.estado || 'listo para demo',
+    estado: record.estado || 'listo para revision',
     resumen: 'Registro temporal agregado al flujo local.',
     [amountKey]: Number(record[amountKey]) || 0,
     [quantityKey]: 1,
@@ -3589,7 +4190,7 @@ function attachToRuntime(record) {
   }
 
   setCollection(MODE.runtimeList.collectionKey, state.runtimeList);
-  logAction('Se agrego "' + (record.nombre || record.id || 'registro mock') + '" al flujo local.');
+  logAction('Se agrego "' + (record.nombre || record.id || 'registro local') + '" al flujo local.');
 }
 
 function removeFromRuntime(record) {
@@ -3599,7 +4200,7 @@ function removeFromRuntime(record) {
 
   state.runtimeList = state.runtimeList.filter((entry) => entry.id !== record.id);
   setCollection(MODE.runtimeList.collectionKey, state.runtimeList);
-  logAction('Se quito "' + (record.nombre || record.id || 'registro mock') + '" del flujo local.');
+  logAction('Se quito "' + (record.nombre || record.id || 'registro local') + '" del flujo local.');
 }
 
 function adjustRuntimeQuantity(record, delta) {
@@ -3622,7 +4223,7 @@ function adjustRuntimeQuantity(record, delta) {
   }
 
   setCollection(MODE.runtimeList.collectionKey, state.runtimeList);
-  logAction('Se actualizo la cantidad local de "' + (target.nombre || target.id || 'registro mock') + '".');
+  logAction('Se actualizo la cantidad local de "' + (target.nombre || target.id || 'registro local') + '".');
 }
 
 function runPrimaryFlow() {
@@ -3669,7 +4270,7 @@ function renamePrimaryRecord() {
     return;
   }
 
-  const baseName = String(record.nombre || 'Registro mock').replace(/ \\(edicion local\\)$/i, '');
+  const baseName = String(record.nombre || 'Registro local').replace(/ \\(edicion local\\)$/i, '');
   record.nombre = baseName + ' (edicion local)';
   logAction('Se actualizo el nombre mock de "' + baseName + '".');
 }
@@ -3685,7 +4286,7 @@ function bumpPrimaryMetric() {
 
   const currentValue = Number(record[currencyKey] || 0);
   record[currencyKey] = Math.max(0, Math.round(currentValue * 1.05));
-  logAction('Se ajusto el valor mock de "' + (record.nombre || record.id || 'registro mock') + '".');
+  logAction('Se ajusto el valor local de "' + (record.nombre || record.id || 'registro local') + '".');
 }
 
 function cyclePrimaryRecordState() {
@@ -3729,7 +4330,7 @@ function buildLocalEntry(collectionKey, referenceRecord) {
             followupTemplate.summary ||
             'Seguimiento generado localmente para revisar el flujo interno.',
         },
-        logMessage: followupTemplate.logMessage || 'Se registro un seguimiento mock local.',
+        logMessage: followupTemplate.logMessage || 'Se registro un seguimiento local.',
       };
     }
 
@@ -3739,7 +4340,7 @@ function buildLocalEntry(collectionKey, referenceRecord) {
         id: (noteTemplate.idPrefix || 'note-local-') + nowSuffix,
         nombre: (noteTemplate.namePrefix || 'Nota local ') + nowSuffix,
         canal: noteTemplate.channel || 'nota interna mock',
-        estado: noteTemplate.state || 'registrada mock',
+        estado: noteTemplate.state || 'registrada local',
         destinatario:
           referenceRecord && referenceRecord.nombre
             ? referenceRecord.nombre
@@ -3747,7 +4348,7 @@ function buildLocalEntry(collectionKey, referenceRecord) {
         resumen:
           noteTemplate.summary || 'Nota generada localmente para revisar el flujo interno.',
       },
-      logMessage: noteTemplate.logMessage || 'Se registro una nota mock local.',
+      logMessage: noteTemplate.logMessage || 'Se registro una nota local.',
     };
   }
 
@@ -3759,7 +4360,7 @@ function buildLocalEntry(collectionKey, referenceRecord) {
         record: {
           id: (noteTemplate.idPrefix || 'obs-local-') + nowSuffix,
           nombre: (noteTemplate.namePrefix || 'Observacion local ') + nowSuffix,
-          estado: noteTemplate.state || 'registrada mock',
+          estado: noteTemplate.state || 'registrada local',
           responsable: noteTemplate.responsible || 'Equipo operativo mock',
           destinatario:
             referenceRecord && referenceRecord.nombre
@@ -3769,7 +4370,7 @@ function buildLocalEntry(collectionKey, referenceRecord) {
             noteTemplate.summary ||
             'Observacion generada localmente para revisar el flujo interno.',
         },
-        logMessage: noteTemplate.logMessage || 'Se registro una observacion mock local.',
+        logMessage: noteTemplate.logMessage || 'Se registro una observacion local.',
       };
     }
 
@@ -3781,25 +4382,25 @@ function buildLocalEntry(collectionKey, referenceRecord) {
         ? stateSequence[0]
         : targetKey === 'solicitudes'
           ? 'nueva'
-          : 'listo para demo';
+          : 'listo para revision';
     const defaultSummary =
       normalizedTargetKey === 'eventos'
-        ? 'Evento mock generado localmente para revisar el tablero operativo.'
+        ? 'Evento local generado con datos mock para revisar el tablero operativo.'
         : normalizedTargetKey === 'publicaciones'
-          ? 'Publicacion mock creada localmente para revisar actividad y estados.'
+          ? 'Publicacion local creada con datos mock para revisar actividad y estados.'
           : normalizedTargetKey === 'documentos'
-            ? 'Documento mock generado localmente para revisar el circuito documental.'
+            ? 'Documento local generado con datos mock para revisar el circuito documental.'
             : 'Alta local generada para revisar el comportamiento del sistema.';
     const logMessage =
       normalizedTargetKey === 'solicitudes'
-        ? genericTemplate.requestLogMessage || 'Se creo una solicitud mock local.'
+        ? genericTemplate.requestLogMessage || 'Se creo una solicitud local.'
         : normalizedTargetKey === 'eventos'
-          ? 'Se registro un evento mock local.'
+          ? 'Se registro un evento local.'
           : normalizedTargetKey === 'publicaciones'
-            ? 'Se creo una publicacion mock local.'
+            ? 'Se creo una publicacion local.'
             : normalizedTargetKey === 'documentos'
-              ? 'Se creo un documento mock local.'
-              : genericTemplate.defaultLogMessage || 'Se creo un registro mock local.';
+              ? 'Se creo un documento local.'
+              : genericTemplate.defaultLogMessage || 'Se creo un registro local.';
 
     return {
       key: targetKey,
@@ -3825,7 +4426,7 @@ function performAction(actionType, module, record) {
     case 'select-detail':
       if (workingRecord) {
         state.selectedRecordId = workingRecord.id;
-        logAction('Se reviso el detalle local de "' + (workingRecord.nombre || workingRecord.id || 'registro mock') + '".');
+        logAction('Se reviso el detalle local de "' + (workingRecord.nombre || workingRecord.id || 'registro local') + '".');
       }
       break;
     case 'attach-runtime':
@@ -3857,7 +4458,7 @@ function performAction(actionType, module, record) {
         workingRecord,
         workingModule.collectionKey,
         actionType,
-        'Se reviso el registro mock',
+        'Se reviso el registro local',
       );
       break;
     case 'mark-followup':
