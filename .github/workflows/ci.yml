@@ -24,36 +24,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Syntax checks
-        shell: pwsh
-        run: |
-          node --check electron/main.cjs
-          node --check electron/local-deterministic-executor.cjs
-          node --check electron/context-hub-client.cjs
-          node --check electron/context-hub-events.cjs
-          node --check electron/context-hub-event-status.cjs
-          node --check electron/context-hub-launcher.cjs
-          node --check electron/fullstack-phase-contracts.cjs
-          node --check electron/workspace-project-detection.cjs
-          node --check scripts/ai-planner-smoke.mjs
-          node --check scripts/ai-operator-e2e-smoke.mjs
-          node --check scripts/ai-release-smoke.mjs
-          node --check scripts/wait-for-vite-dev.mjs
-
-      - name: Lint
-        run: npm run lint
-
-      - name: TypeScript
-        run: npx tsc --noEmit
-
-      - name: Planner smoke
-        run: npm run ai-planner-smoke
-
-      - name: Release smoke
-        run: node scripts/ai-release-smoke.mjs
-
-      - name: Operator E2E smoke
-        run: node scripts/ai-operator-e2e-smoke.mjs
-
-      - name: Build
-        run: npm run build
+      - name: Release candidate quality suite
+        run: npm run quality:ci

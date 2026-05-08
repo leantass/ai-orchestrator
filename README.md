@@ -178,6 +178,32 @@ Prueba rapida en PowerShell:
 - `npm run desktop:bridge`
 - `npm run desktop:codex`
 - `npm run executor:bridge`
+- `npm run quality:ci`
+- `npm run ai-quality`
 - `npm run ai-planner-smoke`
 - `npm run build`
 - `npm run lint`
+
+## Validacion fuerte local
+
+Antes de cerrar una tarea o preparar un merge, correr:
+
+```bash
+npm run quality:ci
+```
+
+La suite local fuerte ejecuta:
+
+- syntax checks criticos
+- `lint`
+- `tsc --noEmit`
+- `ai-planner-smoke`
+- `ai-release-smoke`
+- `ai-operator-e2e-smoke`
+- `build`
+
+No requiere `.env`, no usa secrets, no levanta Electron GUI, no toca Context Hub y no usa el workspace `web-prueba` como parte del comando.
+
+## CI remoto
+
+GitHub Actions corre la misma suite fuerte en `push` a `main` y `pull_request`.

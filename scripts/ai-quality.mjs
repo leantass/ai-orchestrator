@@ -7,6 +7,7 @@ const __dirname = path.dirname(__filename)
 const repoRoot = path.resolve(__dirname, '..')
 
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx'
 const ignoredTopLevelDirs = new Set([
   'node_modules',
   'dist',
@@ -31,9 +32,10 @@ const relevantExtensions = new Set([
   '.json',
   '.css',
   '.html',
+  '.yml',
+  '.yaml',
 ])
-const buildRelevantRoots = new Set(['src', 'electron', 'public'])
-const lintRelevantBasenames = new Set([
+const relevantBasenames = new Set([
   'package.json',
   'package-lock.json',
   'eslint.config.js',
@@ -43,21 +45,58 @@ const lintRelevantBasenames = new Set([
   'tsconfig.app.json',
   'tsconfig.node.json',
 ])
-const buildRelevantBasenames = new Set([
-  'package.json',
-  'package-lock.json',
-  'index.html',
-  'vite.config.ts',
-  'tsconfig.json',
-  'tsconfig.app.json',
-  'tsconfig.node.json',
-])
-const plannerSmokeRelevantFiles = new Set([
-  'electron/main.cjs',
-  'scripts/ai-planner-smoke.mjs',
-  'package.json',
-  'package-lock.json',
-])
+
+const sections = [
+  {
+    id: 'syntax-checks',
+    label: 'Syntax checks',
+    commands: [
+      ['node', ['--check', 'electron/main.cjs']],
+      ['node', ['--check', 'electron/local-deterministic-executor.cjs']],
+      ['node', ['--check', 'electron/context-hub-client.cjs']],
+      ['node', ['--check', 'electron/context-hub-events.cjs']],
+      ['node', ['--check', 'electron/context-hub-event-status.cjs']],
+      ['node', ['--check', 'electron/context-hub-launcher.cjs']],
+      ['node', ['--check', 'electron/fullstack-phase-contracts.cjs']],
+      ['node', ['--check', 'electron/workspace-project-detection.cjs']],
+      ['node', ['--check', 'scripts/ai-planner-smoke.mjs']],
+      ['node', ['--check', 'scripts/ai-operator-e2e-smoke.mjs']],
+      ['node', ['--check', 'scripts/ai-release-smoke.mjs']],
+      ['node', ['--check', 'scripts/wait-for-vite-dev.mjs']],
+      ['node', ['--check', 'scripts/ai-quality.mjs']],
+    ],
+  },
+  {
+    id: 'lint',
+    label: 'Lint',
+    commands: [[npmCommand, ['run', 'lint']]],
+  },
+  {
+    id: 'typescript',
+    label: 'TypeScript',
+    commands: [[npxCommand, ['tsc', '--noEmit']]],
+  },
+  {
+    id: 'planner-smoke',
+    label: 'Planner smoke',
+    commands: [[npmCommand, ['run', 'ai-planner-smoke']]],
+  },
+  {
+    id: 'release-smoke',
+    label: 'Release smoke',
+    commands: [['node', ['scripts/ai-release-smoke.mjs']]],
+  },
+  {
+    id: 'operator-e2e-smoke',
+    label: 'Operator E2E smoke',
+    commands: [['node', ['scripts/ai-operator-e2e-smoke.mjs']]],
+  },
+  {
+    id: 'build',
+    label: 'Build',
+    commands: [[npmCommand, ['run', 'build']]],
+  },
+]
 
 function printUsage() {
   console.log('Uso: node scripts/ai-quality.mjs [--scope=all|changed] [--changed]')
@@ -92,65 +131,6 @@ function parseScope(argv) {
   return scope
 }
 
-function runCommand(command, args) {
-  const printable = [command, ...args].join(' ')
-  console.log(`[ai-quality] Ejecutando: ${printable}`)
-
-  const shouldUseCmdWrapper =
-    process.platform === 'win32' && typeof command === 'string' && command.endsWith('.cmd')
-  const effectiveCommand = shouldUseCmdWrapper ? 'cmd.exe' : command
-  const effectiveArgs = shouldUseCmdWrapper
-    ? ['/d', '/s', '/c', command, ...args]
-    : args
-  const result = spawnSync(effectiveCommand, effectiveArgs, {
-    cwd: repoRoot,
-    stdio: 'inherit',
-    shell: false,
-    windowsHide: true,
-  })
-
-  if (result.error) {
-    console.error(`[ai-quality] Error al ejecutar "${printable}": ${result.error.message}`)
-    process.exit(1)
-  }
-
-  if (result.status !== 0) {
-    console.error(`[ai-quality] El comando fallo con exit code ${result.status}: ${printable}`)
-    process.exit(result.status || 1)
-  }
-}
-
-function captureCommand(command, args) {
-  const shouldUseCmdWrapper =
-    process.platform === 'win32' && typeof command === 'string' && command.endsWith('.cmd')
-  const effectiveCommand = shouldUseCmdWrapper ? 'cmd.exe' : command
-  const effectiveArgs = shouldUseCmdWrapper
-    ? ['/d', '/s', '/c', command, ...args]
-    : args
-  const result = spawnSync(effectiveCommand, effectiveArgs, {
-    cwd: repoRoot,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    shell: false,
-    windowsHide: true,
-  })
-
-  if (result.error) {
-    throw new Error(`No se pudo ejecutar ${command} ${args.join(' ')}: ${result.error.message}`)
-  }
-
-  if (result.status !== 0) {
-    const stderr = typeof result.stderr === 'string' ? result.stderr.trim() : ''
-    throw new Error(
-      `El comando ${command} ${args.join(' ')} fallo con exit code ${result.status}${
-        stderr ? `: ${stderr}` : ''
-      }`,
-    )
-  }
-
-  return typeof result.stdout === 'string' ? result.stdout : ''
-}
-
 function normalizeRepoPath(filePath) {
   return filePath.replaceAll('\\', '/').replace(/^\.\/+/, '').trim()
 }
@@ -183,6 +163,50 @@ function shouldIgnorePath(filePath) {
   return false
 }
 
+function isRelevantChangedFile(filePath) {
+  const normalized = normalizeRepoPath(filePath)
+  const ext = path.extname(normalized).toLowerCase()
+  const basename = path.basename(normalized)
+
+  return relevantExtensions.has(ext) || relevantBasenames.has(basename)
+}
+
+function spawnCommand(command, args, stdioMode) {
+  const shouldUseCmdWrapper =
+    process.platform === 'win32' && typeof command === 'string' && command.endsWith('.cmd')
+  const effectiveCommand = shouldUseCmdWrapper ? 'cmd.exe' : command
+  const effectiveArgs = shouldUseCmdWrapper
+    ? ['/d', '/s', '/c', command, ...args]
+    : args
+
+  return spawnSync(effectiveCommand, effectiveArgs, {
+    cwd: repoRoot,
+    shell: false,
+    windowsHide: true,
+    stdio: stdioMode,
+    encoding: stdioMode === 'inherit' ? undefined : 'utf8',
+  })
+}
+
+function captureCommand(command, args) {
+  const result = spawnCommand(command, args, ['ignore', 'pipe', 'pipe'])
+
+  if (result.error) {
+    throw new Error(`No se pudo ejecutar ${command} ${args.join(' ')}: ${result.error.message}`)
+  }
+
+  if (result.status !== 0) {
+    const stderr = typeof result.stderr === 'string' ? result.stderr.trim() : ''
+    throw new Error(
+      `El comando ${command} ${args.join(' ')} fallo con exit code ${result.status}${
+        stderr ? `: ${stderr}` : ''
+      }`,
+    )
+  }
+
+  return typeof result.stdout === 'string' ? result.stdout : ''
+}
+
 function listChangedFiles() {
   const tracked = captureCommand('git', [
     'diff',
@@ -192,150 +216,73 @@ function listChangedFiles() {
   ])
   const untracked = captureCommand('git', ['ls-files', '--others', '--exclude-standard'])
 
-  const entries = [...tracked.split(/\r?\n/), ...untracked.split(/\r?\n/)]
+  return [...tracked.split(/\r?\n/), ...untracked.split(/\r?\n/)]
     .map((entry) => normalizeRepoPath(entry))
     .filter(Boolean)
     .filter((entry, index, values) => values.indexOf(entry) === index)
     .filter((entry) => !shouldIgnorePath(entry))
-
-  return entries
 }
 
-function shouldRunLint(changedFiles) {
-  return changedFiles.some((filePath) => {
-    const ext = path.extname(filePath).toLowerCase()
-    const basename = path.basename(filePath)
+function runCommand(command, args) {
+  const printable = [command, ...args].join(' ')
+  console.log(`[ai-quality] Ejecutando: ${printable}`)
 
-    return relevantExtensions.has(ext) || lintRelevantBasenames.has(basename)
+  const result = spawnCommand(command, args, 'inherit')
+
+  if (result.error) {
+    console.error(`[ai-quality] Error al ejecutar "${printable}": ${result.error.message}`)
+    process.exit(1)
+  }
+
+  if (result.status !== 0) {
+    console.error(`[ai-quality] El comando fallo con exit code ${result.status}: ${printable}`)
+    process.exit(result.status || 1)
+  }
+}
+
+function printSectionHeader(label) {
+  console.log('')
+  console.log(`[ai-quality] ${label}`)
+  console.log(`[ai-quality] ${'-'.repeat(label.length)}`)
+}
+
+function runSections() {
+  sections.forEach((section) => {
+    printSectionHeader(section.label)
+    section.commands.forEach(([command, args]) => runCommand(command, args))
   })
-}
-
-function shouldRunBuild(changedFiles) {
-  return changedFiles.some((filePath) => {
-    const normalized = normalizeRepoPath(filePath)
-    const topLevel = normalized.split('/')[0]
-    const basename = path.basename(normalized)
-    const ext = path.extname(normalized).toLowerCase()
-
-    return (
-      buildRelevantRoots.has(topLevel) ||
-      buildRelevantBasenames.has(basename) ||
-      (relevantExtensions.has(ext) && topLevel !== 'scripts')
-    )
-  })
-}
-
-function shouldRunPlannerSmoke(scope, changedFiles) {
-  if (scope === 'all') {
-    return true
-  }
-
-  return changedFiles.some((filePath) => plannerSmokeRelevantFiles.has(filePath))
-}
-
-function scheduleChecks(scope, changedFiles) {
-  const checks = []
-  const addCheck = (id, label, command, args) => {
-    if (checks.some((check) => check.id === id)) {
-      return
-    }
-
-    checks.push({ id, label, command, args })
-  }
-
-  if (scope === 'all') {
-    addCheck(
-      'node-check-electron-main',
-      'Validar sintaxis de electron/main.cjs',
-      'node',
-      ['--check', 'electron/main.cjs'],
-    )
-    addCheck(
-      'node-check-local-deterministic',
-      'Validar sintaxis de electron/local-deterministic-executor.cjs',
-      'node',
-      ['--check', 'electron/local-deterministic-executor.cjs'],
-    )
-    addCheck('lint', 'Correr lint del proyecto', npmCommand, ['run', 'lint'])
-    addCheck('build', 'Correr build del proyecto', npmCommand, ['run', 'build'])
-    addCheck(
-      'planner-smoke',
-      'Correr planner smoke del proyecto',
-      npmCommand,
-      ['run', 'ai-planner-smoke'],
-    )
-
-    return checks
-  }
-
-  if (changedFiles.includes('electron/main.cjs')) {
-    addCheck(
-      'node-check-electron-main',
-      'Validar sintaxis de electron/main.cjs',
-      'node',
-      ['--check', 'electron/main.cjs'],
-    )
-  }
-
-  if (changedFiles.includes('electron/local-deterministic-executor.cjs')) {
-    addCheck(
-      'node-check-local-deterministic',
-      'Validar sintaxis de electron/local-deterministic-executor.cjs',
-      'node',
-      ['--check', 'electron/local-deterministic-executor.cjs'],
-    )
-  }
-
-  if (shouldRunLint(changedFiles)) {
-    addCheck('lint', 'Correr lint del proyecto', npmCommand, ['run', 'lint'])
-  }
-
-  if (shouldRunBuild(changedFiles)) {
-    addCheck('build', 'Correr build del proyecto', npmCommand, ['run', 'build'])
-  }
-
-  if (shouldRunPlannerSmoke(scope, changedFiles)) {
-    addCheck(
-      'planner-smoke',
-      'Correr planner smoke del proyecto',
-      npmCommand,
-      ['run', 'ai-planner-smoke'],
-    )
-  }
-
-  return checks
 }
 
 function main() {
   const scope = parseScope(process.argv.slice(2))
-  const changedFiles = scope === 'changed' ? listChangedFiles() : []
 
   if (scope === 'changed') {
+    const changedFiles = listChangedFiles()
+
     if (changedFiles.length === 0) {
       console.log('[ai-quality] No hay archivos modificados relevantes para validar.')
       process.exit(0)
     }
 
-    console.log('[ai-quality] Archivos modificados detectados:')
-    changedFiles.forEach((filePath) => console.log(`- ${filePath}`))
-  }
+    const relevantFiles = changedFiles.filter((filePath) => isRelevantChangedFile(filePath))
 
-  const checks = scheduleChecks(scope, changedFiles)
+    if (relevantFiles.length === 0) {
+      console.log('[ai-quality] No hay cambios de codigo o config que justifiquen la suite fuerte.')
+      process.exit(0)
+    }
 
-  if (checks.length === 0) {
-    console.log('[ai-quality] No hay checks necesarios para el scope actual.')
-    process.exit(0)
+    console.log('[ai-quality] Archivos modificados relevantes detectados:')
+    relevantFiles.forEach((filePath) => console.log(`- ${filePath}`))
   }
 
   console.log(`[ai-quality] Scope: ${scope}`)
-  console.log('[ai-quality] Checks programados:')
-  checks.forEach((check) => console.log(`- ${check.label}`))
+  console.log('[ai-quality] Suite: release candidate local')
 
-  for (const check of checks) {
-    runCommand(check.command, check.args)
-  }
+  runSections()
 
-  console.log(`[ai-quality] OK. Se ejecutaron ${checks.length} checks en modo ${scope}.`)
+  console.log('')
+  console.log('[ai-quality] Release candidate quality checks passed.')
+  console.log(`[ai-quality] OK. Se ejecutaron ${sections.length} secciones en modo ${scope}.`)
 }
 
 main()

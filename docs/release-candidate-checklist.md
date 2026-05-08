@@ -194,6 +194,12 @@ Recién después de validación visual/local tiene sentido tratar la salida como
 - `node --check electron/main.cjs`
 - `node --check electron/local-deterministic-executor.cjs`
 
+Antes de cerrar una tarea, la validacion local fuerte recomendada es:
+
+- `npm run quality:ci`
+
+Esta suite no requiere `.env`, no usa secrets, no levanta Electron GUI, no toca Context Hub y no usa `web-prueba` como parte de la validacion.
+
 ## Criterio de release candidate
 
 JEFE queda en estado de release candidate operable cuando:
@@ -208,3 +214,8 @@ JEFE queda en estado de release candidate operable cuando:
 - MEMORIA / Context Hub suma sin volverse un punto único de falla
 - el resultado final le dice al operador qué hizo, dónde quedó y qué sigue
 - si el workspace ya contiene otro proyecto, JEFE sigue distinguiendo proyecto nuevo vs continuidad sin contaminar el plan activo
+ 
+## Validacion local fuerte y CI
+
+- correr `npm run quality:ci` antes de cerrar tareas tecnicas relevantes
+- el CI remoto puede repetir la misma suite en `push` a `main` y `pull_request`

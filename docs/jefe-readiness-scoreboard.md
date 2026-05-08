@@ -27,6 +27,7 @@ Estado consolidado: release candidate local operativo, con deuda critica conocid
 ## Evidencia tecnica resumida
 
 - `npm run desktop:dev` ya no puede engancharse silenciosamente a otro Vite en `5173`.
+- La suite fuerte local ahora puede correrse con `npm run quality:ci` y el mismo bloque minimo queda versionado en GitHub Actions para `push` a `main` y `pull_request`.
 - El renderer tiene `ErrorBoundary` y fallback de bootstrap para evitar pantalla blanca muda.
 - Paso 4 muestra un panel de MEMORIA con estado vivo, reintento, arranque local y apertura honesta.
 - El panel de MEMORIA ahora muestra tambien el ultimo evento emitido por JEFE hacia Context Hub.
