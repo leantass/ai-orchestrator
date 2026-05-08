@@ -1,6 +1,13 @@
 import type { ReactNode } from 'react'
 
-import { ResultStatusBadge, type MetricTone } from './AppUiPrimitives'
+import {
+  InlineHint,
+  MetricCard,
+  ResultStatusBadge,
+  SurfaceHeaderTag,
+  type AppIconName,
+  type MetricTone,
+} from './AppUiPrimitives'
 import { StepProgress, type StepProgressItem } from './StepProgress'
 
 const joinClasses = (...tokens: Array<string | false | null | undefined>) =>
@@ -18,6 +25,7 @@ export function GuidedFlowShell({
   children,
   footerNote,
   footerActions,
+  overviewMetrics = [],
 }: {
   stepIndex: number
   totalSteps: number
@@ -34,51 +42,93 @@ export function GuidedFlowShell({
   children: ReactNode
   footerNote: string
   footerActions: ReactNode
+  overviewMetrics?: Array<{
+    label: string
+    value: string
+    detail?: string
+    tone?: MetricTone
+    icon?: AppIconName
+  }>
 }) {
   return (
     <section className="space-y-4">
-      <article className="rounded-[30px] border border-white/10 bg-slate-950/70 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.38)] backdrop-blur sm:p-6">
+      <article className="overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.14),transparent_26%),linear-gradient(180deg,rgba(6,11,22,0.96),rgba(8,15,28,0.9))] p-5 shadow-[0_30px_90px_rgba(0,0,0,0.38)] backdrop-blur sm:p-6">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div className="max-w-3xl">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.3em] text-cyan-200/70">
-              {`Paso ${stepIndex + 1} de ${totalSteps}`}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.3em] text-cyan-200/78">
+                {`Paso ${stepIndex + 1} de ${totalSteps}`}
+              </div>
+              <SurfaceHeaderTag>Flujo guiado</SurfaceHeaderTag>
             </div>
             <div className="mt-3 text-2xl font-semibold tracking-tight text-white sm:text-[2rem]">
               {title}
             </div>
             <p className="mt-2 text-sm leading-6 text-slate-400">{description}</p>
           </div>
-          <div className="rounded-[24px] border border-cyan-300/15 bg-cyan-300/8 px-4 py-4 xl:max-w-[320px]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-100/80">
-              Qué sigue ahora
-            </div>
-            <div className="mt-2 text-sm font-semibold text-white">{actionSummaryLabel}</div>
-            <div className="mt-1 text-xs leading-5 text-slate-300">{actionSummaryDetail}</div>
+          <div className="xl:max-w-[340px]">
+            <InlineHint
+              label={actionSummaryLabel}
+              detail={actionSummaryDetail}
+              tone="sky"
+              icon="next"
+            />
           </div>
         </div>
 
-        <div className="mt-5 flex flex-wrap gap-2">
-          {statusBadges.map((badge) => (
-            <div
-              key={`${badge.label}-${badge.value}`}
-              className="rounded-full border border-white/10 bg-white/[0.03] px-2 py-1"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  {badge.label}
-                </span>
-                <ResultStatusBadge label={badge.value} tone={badge.tone} />
-              </div>
-            </div>
-          ))}
-        </div>
+        {overviewMetrics.length > 0 ? (
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {overviewMetrics.map((metric) => (
+              <MetricCard
+                key={`${metric.label}-${metric.value}`}
+                label={metric.label}
+                value={metric.value}
+                detail={metric.detail}
+                tone={metric.tone}
+                icon={metric.icon}
+              />
+            ))}
+          </div>
+        ) : null}
 
-        <div className="mt-5">
-          <StepProgress items={progressItems} />
+        <div className="mt-5 grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="rounded-[26px] border border-white/10 bg-slate-950/45 p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  Recorrido operativo
+                </div>
+                <div className="mt-1 text-sm font-semibold text-white">
+                  Siete pasos visibles, accionables y escaneables
+                </div>
+              </div>
+              <SurfaceHeaderTag>{`${stepIndex + 1}/${totalSteps}`}</SurfaceHeaderTag>
+            </div>
+            <StepProgress items={progressItems} />
+          </div>
+
+          <div className="rounded-[26px] border border-white/10 bg-slate-950/45 p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+              Estado del circuito
+            </div>
+            <div className="mt-3 grid gap-2">
+              {statusBadges.map((badge) => (
+                <div
+                  key={`${badge.label}-${badge.value}`}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3"
+                >
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    {badge.label}
+                  </div>
+                  <ResultStatusBadge label={badge.value} tone={badge.tone} />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </article>
 
-      <div className="rounded-[30px] border border-white/10 bg-slate-950/70 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.38)] backdrop-blur sm:p-6">
+      <div className="rounded-[30px] border border-white/10 bg-slate-950/72 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.34)] backdrop-blur sm:p-6">
         {children}
       </div>
 

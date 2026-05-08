@@ -1,3 +1,10 @@
+import {
+  DashboardIcon,
+  EmptyStateBlock,
+  MetricCard,
+  SurfaceHeaderTag,
+} from './AppUiPrimitives'
+
 type ExistingProjectScriptEntry = {
   name: string
   command: string
@@ -56,18 +63,21 @@ export function ExistingProjectPanel({
   const runtimeTemporaryFilesDetected = project?.runtimeTemporaryFilesDetected || []
 
   return (
-    <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
+    <article className="space-y-4 rounded-[28px] border border-white/10 bg-white/[0.03] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="max-w-2xl">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-            03. Proyecto existente
+        <div className="max-w-3xl">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+              03. Proyecto existente
+            </div>
+            <SurfaceHeaderTag>Read only</SurfaceHeaderTag>
           </div>
-          <div className="mt-2 text-xl font-semibold text-white">
-            Continuidad read-only y ordenada
+          <div className="mt-2 text-2xl font-semibold tracking-tight text-white">
+            Continuidad read only y ordenada
           </div>
           <p className="mt-2 text-sm leading-6 text-slate-400">
-            JEFE inspecciona sin ejecutar scripts y separa señales relevantes de runtime
-            temporal o caché.
+            JEFE inspecciona sin ejecutar scripts y separa senales utiles de runtime
+            temporal o cache para que la continuidad sea clara y segura.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -93,46 +103,62 @@ export function ExistingProjectPanel({
             disabled={busy || !project?.selectedPath}
             className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm font-medium text-slate-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Limpiar selección
+            Limpiar seleccion
           </button>
         </div>
       </div>
 
-      <div className="mt-4 rounded-[24px] border border-white/8 bg-slate-950/50 px-4 py-4">
-        <div className="text-sm font-medium text-slate-100">{summary}</div>
-        <div className="mt-1 text-sm leading-6 text-slate-400">
-          Seguridad: no se leen archivos sensibles, no se ejecutan scripts y no se
-          modifica la carpeta seleccionada.
+      <div className="rounded-[26px] border border-white/8 bg-slate-950/50 p-4">
+        <div className="flex items-start gap-3">
+          <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/12 text-cyan-100">
+            <DashboardIcon name="projects" className="h-4 w-4" />
+          </div>
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Resumen de continuidad
+            </div>
+            <div className="mt-2 text-sm font-semibold leading-6 text-slate-100">{summary}</div>
+            <div className="mt-1 text-xs leading-5 text-slate-400">
+              Seguridad: no se leen archivos sensibles, no se ejecutan scripts y no se
+              modifica la carpeta seleccionada.
+            </div>
+          </div>
         </div>
       </div>
 
       {!project ? (
-        <div className="mt-4 rounded-[24px] border border-dashed border-white/10 bg-slate-950/40 px-4 py-8 text-sm leading-6 text-slate-400">
-          Seleccioná una carpeta para ver framework, package manager, git, scripts y
-          entrypoints de forma resumida.
-        </div>
+        <EmptyStateBlock
+          title="Todavia no hay proyecto existente seleccionado"
+          description="Selecciona una carpeta para ver framework, package manager, git, scripts, entrypoints y artefactos protegidos de forma resumida."
+          icon="projects"
+        />
       ) : (
-        <div className="mt-4 space-y-4">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <MetricTile
+        <div className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+            <MetricCard
               label="Framework"
               value={project.framework || 'Desconocido'}
               detail={project.stack.join(' / ') || 'Sin stack resumido'}
+              tone="sky"
+              icon="build"
             />
-            <MetricTile
+            <MetricCard
               label="Package manager"
               value={project.packageManager || 'Sin lockfile'}
               detail={project.packageJsonPath || 'Sin package.json visible'}
+              icon="files"
             />
-            <MetricTile
+            <MetricCard
               label="Git"
               value={
                 project.gitStatusSummary?.branch ||
                 (project.gitStatusSummary?.detected ? 'Detectado' : 'No detectado')
               }
               detail={project.gitStatusSummary?.summary || 'Sin resumen disponible'}
+              tone={project.gitStatusSummary?.detected ? 'emerald' : 'default'}
+              icon="git"
             />
-            <MetricTile
+            <MetricCard
               label="Manifest JEFE"
               value={
                 project.jefeManifestSummary?.detected
@@ -144,25 +170,48 @@ export function ExistingProjectPanel({
                 project.jefeManifestSummary?.domain ||
                 'Sin manifest local'
               }
+              tone={project.jefeManifestSummary?.detected ? 'violet' : 'default'}
+              icon="flow"
+            />
+            <MetricCard
+              label="Scripts"
+              value={`${project.scripts.length}`}
+              detail="Scripts declarados en package.json"
+              icon="execution"
+            />
+            <MetricCard
+              label="Alertas"
+              value={`${project.warnings.length + project.protectedFilesDetected.length}`}
+              detail="Advertencias y protegidos fuera de alcance"
+              tone={
+                project.protectedFilesDetected.length > 0 || project.warnings.length > 0
+                  ? 'amber'
+                  : 'default'
+              }
+              icon="approval"
             />
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            <ListBlock
-              title="Carpetas importantes"
-              items={project.importantFolders}
-              emptyLabel="No se detectaron carpetas clave."
-            />
-            <ListBlock
-              title="Entrypoints"
-              items={project.entrypoints}
-              emptyLabel="Sin entrypoints detectados."
-            />
-          </div>
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
+            <div className="space-y-4">
+              <InfoChipBlock
+                title="Carpetas importantes"
+                icon="folder"
+                items={project.importantFolders}
+                emptyLabel="No se detectaron carpetas clave."
+              />
+              <InfoChipBlock
+                title="Entrypoints"
+                icon="execution"
+                items={project.entrypoints}
+                emptyLabel="Sin entrypoints detectados."
+              />
+            </div>
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            <ScriptBlock scripts={project.scripts} />
-            <WarningsBlock warnings={project.warnings} />
+            <div className="space-y-4">
+              <ScriptBlock scripts={project.scripts} />
+              <WarningsBlock warnings={project.warnings} />
+            </div>
           </div>
 
           {project.protectedFilesDetected.length > 0 ? (
@@ -177,7 +226,7 @@ export function ExistingProjectPanel({
           {runtimeTemporaryFilesDetected.length > 0 ? (
             <ListCallout
               title="Runtime temporal detectado"
-              description="Se clasificó como caché o artefacto temporal. No cuenta como credencial sensible."
+              description="Se clasifico como cache o artefacto temporal. No cuenta como credencial sensible."
               tone="slate"
               items={runtimeTemporaryFilesDetected}
             />
@@ -188,39 +237,29 @@ export function ExistingProjectPanel({
   )
 }
 
-function MetricTile({
-  label,
-  value,
-  detail,
-}: {
-  label: string
-  value: string
-  detail: string
-}) {
-  return (
-    <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-        {label}
-      </div>
-      <div className="mt-2 text-sm font-semibold text-slate-100">{value}</div>
-      <div className="mt-1 text-xs leading-5 text-slate-400">{detail}</div>
-    </div>
-  )
-}
-
-function ListBlock({
+function InfoChipBlock({
   title,
+  icon,
   items,
   emptyLabel,
 }: {
   title: string
+  icon: Parameters<typeof DashboardIcon>[0]['name']
   items: string[]
   emptyLabel: string
 }) {
   return (
     <div className="rounded-[24px] border border-white/8 bg-slate-950/50 px-4 py-4">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-        {title}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-slate-200">
+            <DashboardIcon name={icon} className="h-4 w-4" />
+          </div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            {title}
+          </div>
+        </div>
+        <SurfaceHeaderTag>{items.length}</SurfaceHeaderTag>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {items.length > 0 ? (
@@ -244,12 +283,15 @@ function ScriptBlock({ scripts }: { scripts: ExistingProjectScriptEntry[] }) {
   return (
     <div className="rounded-[24px] border border-white/8 bg-slate-950/50 px-4 py-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-          Scripts
+        <div className="flex items-center gap-3">
+          <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-slate-200">
+            <DashboardIcon name="execution" className="h-4 w-4" />
+          </div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Scripts
+          </div>
         </div>
-        <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">
-          {scripts.length}
-        </span>
+        <SurfaceHeaderTag>{scripts.length}</SurfaceHeaderTag>
       </div>
       <div className="mt-3 grid gap-2">
         {scripts.length > 0 ? (
@@ -258,7 +300,7 @@ function ScriptBlock({ scripts }: { scripts: ExistingProjectScriptEntry[] }) {
               key={entry.name}
               className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3"
             >
-              <div className="text-sm font-medium text-slate-100">{entry.name}</div>
+              <div className="text-sm font-semibold text-slate-100">{entry.name}</div>
               <div className="mt-1 break-all text-xs leading-5 text-slate-400">
                 {entry.command}
               </div>
@@ -275,8 +317,13 @@ function ScriptBlock({ scripts }: { scripts: ExistingProjectScriptEntry[] }) {
 function WarningsBlock({ warnings }: { warnings: string[] }) {
   return (
     <div className="rounded-[24px] border border-white/8 bg-slate-950/50 px-4 py-4">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-        Advertencias
+      <div className="flex items-center gap-3">
+        <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-slate-200">
+          <DashboardIcon name="approval" className="h-4 w-4" />
+        </div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+          Advertencias
+        </div>
       </div>
       <div className="mt-3 grid gap-2">
         {warnings.length > 0 ? (
@@ -307,15 +354,22 @@ function ListCallout({
   tone: 'amber' | 'slate'
   items: string[]
 }) {
-  const toneClasses =
+  const toneClassName =
     tone === 'amber'
       ? 'border-amber-300/20 bg-amber-300/10 text-amber-50'
       : 'border-white/10 bg-white/[0.03] text-slate-100'
 
   return (
-    <div className={`rounded-[24px] border px-4 py-4 ${toneClasses}`}>
-      <div className="text-sm font-semibold">{title}</div>
-      <div className="mt-1 text-xs leading-5 opacity-80">{description}</div>
+    <div className={`rounded-[24px] border px-4 py-4 ${toneClassName}`}>
+      <div className="flex items-start gap-3">
+        <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/40 text-white">
+          <DashboardIcon name={tone === 'amber' ? 'approval' : 'runtime'} className="h-4 w-4" />
+        </div>
+        <div>
+          <div className="text-sm font-semibold">{title}</div>
+          <div className="mt-1 text-xs leading-5 opacity-80">{description}</div>
+        </div>
+      </div>
       <div className="mt-3 grid gap-2">
         {items.map((entry) => (
           <div
