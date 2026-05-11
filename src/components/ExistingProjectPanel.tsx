@@ -1,6 +1,7 @@
 import {
   ActionTile,
   DashboardIcon,
+  DisclosurePanel,
   EmptyStateBlock,
   MetricCard,
   ResultSectionCard,
@@ -65,7 +66,7 @@ export function ExistingProjectPanel({
   const runtimeTemporaryFilesDetected = project?.runtimeTemporaryFilesDetected || []
 
   return (
-    <article className="space-y-4 rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.12),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.018))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+    <article className="space-y-4 rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.1),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.016))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
       <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.08fr)_minmax(320px,0.92fr)]">
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
@@ -73,29 +74,28 @@ export function ExistingProjectPanel({
               03. Proyecto existente
             </div>
             <SurfaceHeaderTag>Read only</SurfaceHeaderTag>
-            <SurfaceHeaderTag>Continuidad segura</SurfaceHeaderTag>
           </div>
           <div className="text-2xl font-semibold tracking-tight text-white">
-            Continuidad read only y ordenada
+            Continuidad clara y segura
           </div>
           <p className="max-w-3xl text-sm leading-6 text-slate-400">
-            JEFE inspecciona sin ejecutar scripts y separa señales útiles de runtime
-            temporal o cache para que la continuidad sea clara, premium y segura.
+            La vista principal muestra lo suficiente para decidir si continuar. El analisis fino
+            queda guardado como segundo nivel.
           </p>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+          <div className="grid gap-3 md:grid-cols-3">
             <MetricCard
-              label="Framework"
-              value={project?.framework || 'Desconocido'}
-              detail={project?.stack.join(' / ') || 'Sin stack resumido'}
+              label="Resumen"
+              value={summary}
+              detail="No se ejecutan scripts y no se modifica la carpeta seleccionada."
               tone="sky"
-              icon="build"
+              icon="projects"
               emphasis="hero"
             />
             <MetricCard
-              label="Package manager"
-              value={project?.packageManager || 'Sin lockfile'}
-              detail={project?.packageJsonPath || 'Sin package.json visible'}
-              icon="files"
+              label="Framework"
+              value={project?.framework || 'Sin deteccion'}
+              detail={project?.stack.join(' / ') || 'Sin stack resumido'}
+              icon="build"
             />
             <MetricCard
               label="Git"
@@ -107,45 +107,13 @@ export function ExistingProjectPanel({
               tone={project?.gitStatusSummary?.detected ? 'emerald' : 'default'}
               icon="git"
             />
-            <MetricCard
-              label="Manifest JEFE"
-              value={
-                project?.jefeManifestSummary?.detected
-                  ? project.jefeManifestSummary.projectType || 'Detectado'
-                  : 'No detectado'
-              }
-              detail={
-                project?.jefeManifestSummary?.nextRecommendedPhase ||
-                project?.jefeManifestSummary?.domain ||
-                'Sin manifest local'
-              }
-              tone={project?.jefeManifestSummary?.detected ? 'violet' : 'default'}
-              icon="flow"
-            />
-            <MetricCard
-              label="Scripts"
-              value={`${project?.scripts.length || 0}`}
-              detail="Scripts declarados en package.json"
-              icon="execution"
-            />
-            <MetricCard
-              label="Alertas"
-              value={`${(project?.warnings.length || 0) + (project?.protectedFilesDetected.length || 0)}`}
-              detail="Advertencias y protegidos fuera de alcance"
-              tone={
-                (project?.protectedFilesDetected.length || 0) > 0 || (project?.warnings.length || 0) > 0
-                  ? 'amber'
-                  : 'default'
-              }
-              icon="approval"
-            />
           </div>
         </div>
 
         <div className="space-y-3">
           <ActionTile
             label="Seleccionar proyecto existente"
-            detail="Elegí una carpeta para preparar continuidad sin modificarla."
+            detail="Elegir una carpeta para revisar continuidad sin modificarla."
             icon="projects"
             tone="default"
             onClick={onPick}
@@ -153,78 +121,118 @@ export function ExistingProjectPanel({
           />
           <ActionTile
             label="Analizar proyecto"
-            detail="Detectá framework, package manager, git, scripts, entrypoints y artefactos protegidos."
+            detail="Detectar framework, package manager, git y entrypoints."
             icon="brain"
             tone="sky"
             onClick={onAnalyze}
             disabled={busy || !project?.selectedPath}
           />
           <ActionTile
-            label="Limpiar selección"
-            detail="Descartá la continuidad elegida y volvé a solo texto + insumos."
+            label="Limpiar seleccion"
+            detail="Descartar la continuidad elegida y volver a un flujo nuevo."
             icon="settings"
             tone="default"
             onClick={onClear}
             disabled={busy || !project?.selectedPath}
-          />
-          <MetricCard
-            label="Resumen de continuidad"
-            value={summary}
-            detail="Seguridad: no se leen archivos sensibles, no se ejecutan scripts y no se modifica la carpeta seleccionada."
-            tone="default"
-            icon="projects"
-            emphasis="hero"
           />
         </div>
       </div>
 
       {!project ? (
         <EmptyStateBlock
-          title="Todavía no hay proyecto existente seleccionado"
-          description="Seleccioná una carpeta para ver framework, package manager, git, scripts, entrypoints y artefactos protegidos de forma resumida."
+          title="Todavia no hay proyecto existente seleccionado"
+          description="Selecciona una carpeta para ver si conviene continuarla dentro del flujo."
           icon="projects"
         />
       ) : (
         <div className="space-y-4">
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(340px,0.95fr)]">
-            <div className="space-y-4">
-              <InfoChipBlock
-                title="Carpetas importantes"
-                icon="folder"
-                items={project.importantFolders}
-                emptyLabel="No se detectaron carpetas clave."
+          <ResultSectionCard
+            title="Lectura rapida"
+            description="Ruta, package manager y manifest JEFE visibles sin abrumar."
+            icon="projects"
+            badge="Resumen"
+          >
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <MetricCard
+                label="Proyecto"
+                value={project.projectName || 'Proyecto seleccionado'}
+                detail={project.selectedPath}
+                tone="sky"
+                icon="projects"
+                emphasis="hero"
               />
-              <InfoChipBlock
-                title="Entrypoints"
-                icon="execution"
-                items={project.entrypoints}
-                emptyLabel="Sin entrypoints detectados."
+              <MetricCard
+                label="Package manager"
+                value={project.packageManager || 'Sin lockfile'}
+                detail={project.packageJsonPath || 'Sin package.json visible'}
+                icon="files"
+              />
+              <MetricCard
+                label="Manifest JEFE"
+                value={
+                  project.jefeManifestSummary?.detected
+                    ? project.jefeManifestSummary.projectType || 'Detectado'
+                    : 'No detectado'
+                }
+                detail={
+                  project.jefeManifestSummary?.nextRecommendedPhase ||
+                  project.jefeManifestSummary?.domain ||
+                  'Sin manifest local'
+                }
+                tone={project.jefeManifestSummary?.detected ? 'violet' : 'default'}
+                icon="flow"
               />
             </div>
+          </ResultSectionCard>
 
+          <DisclosurePanel
+            title="Ver analisis read-only"
+            description="Scripts, carpetas, entrypoints, advertencias y artefactos protegidos."
+            icon="brain"
+            badge="Tecnico"
+          >
             <div className="space-y-4">
-              <ScriptBlock scripts={project.scripts} />
-              <WarningsBlock warnings={project.warnings} />
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(340px,0.95fr)]">
+                <div className="space-y-4">
+                  <InfoChipBlock
+                    title="Carpetas importantes"
+                    icon="folder"
+                    items={project.importantFolders}
+                    emptyLabel="No se detectaron carpetas clave."
+                  />
+                  <InfoChipBlock
+                    title="Entrypoints"
+                    icon="execution"
+                    items={project.entrypoints}
+                    emptyLabel="Sin entrypoints detectados."
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <ScriptBlock scripts={project.scripts} />
+                  <WarningsBlock warnings={project.warnings} />
+                </div>
+              </div>
+
+              {project.protectedFilesDetected.length > 0 ? (
+                <ListCallout
+                  title="Protegidos detectados"
+                  description="Se mantienen fuera del alcance y no se leen."
+                  tone="amber"
+                  items={project.protectedFilesDetected}
+                />
+              ) : null}
+
+              {runtimeTemporaryFilesDetected.length > 0 ? (
+                <ListCallout
+                  title="Runtime temporal detectado"
+                  description="Se clasifico como cache o artefacto temporal. No cuenta como credencial sensible."
+                  tone="slate"
+                  items={runtimeTemporaryFilesDetected}
+                />
+              ) : null}
             </div>
-          </div>
-
-          {project.protectedFilesDetected.length > 0 ? (
-            <ListCallout
-              title="Protegidos detectados"
-              description="Se mantienen fuera del alcance y no se leen."
-              tone="amber"
-              items={project.protectedFilesDetected}
-            />
-          ) : null}
-
-          {runtimeTemporaryFilesDetected.length > 0 ? (
-            <ListCallout
-              title="Runtime temporal detectado"
-              description="Se clasificó como cache o artefacto temporal. No cuenta como credencial sensible."
-              tone="slate"
-              items={runtimeTemporaryFilesDetected}
-            />
-          ) : null}
+          </DisclosurePanel>
         </div>
       )}
     </article>
@@ -245,7 +253,7 @@ function InfoChipBlock({
   return (
     <ResultSectionCard
       title={title}
-      description="Lectura rápida de carpetas y puntos de entrada para orientar continuidad."
+      description="Lectura rapida para orientar continuidad."
       icon={icon}
       badge={`${items.length}`}
     >
@@ -271,7 +279,7 @@ function ScriptBlock({ scripts }: { scripts: ExistingProjectScriptEntry[] }) {
   return (
     <ResultSectionCard
       title="Scripts"
-      description="Scripts declarados que ayudan a entender la forma de trabajo del proyecto."
+      description="Lectura resumida de package.json."
       icon="execution"
       badge={`${scripts.length}`}
     >
@@ -300,7 +308,7 @@ function WarningsBlock({ warnings }: { warnings: string[] }) {
   return (
     <ResultSectionCard
       title="Advertencias"
-      description="Señales útiles para continuidad, sin dramatizar artefactos de runtime temporal."
+      description="Senales utiles para continuidad, sin dramatizar runtime temporal."
       icon="approval"
       badge={`${warnings.length}`}
       tone={warnings.length > 0 ? 'amber' : 'default'}

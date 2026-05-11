@@ -1,8 +1,8 @@
 import {
+  DisclosurePanel,
   DashboardIcon,
   MetricCard,
   ResultStatusBadge,
-  SurfaceHeaderTag,
   type AppIconName,
   type MetricTone,
 } from './AppUiPrimitives'
@@ -33,17 +33,17 @@ export function SystemStatusPanel({
   const support = items.slice(2)
 
   return (
-    <article className="overflow-hidden rounded-[32px] border border-white/10 bg-slate-950/74 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.38)] backdrop-blur">
+    <article className="overflow-hidden rounded-[30px] border border-white/10 bg-slate-950/74 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.38)] backdrop-blur">
       <div className="flex items-center justify-between gap-3">
         <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
           {title}
         </div>
-        <SurfaceHeaderTag>{items.length} nodos</SurfaceHeaderTag>
+        <ResultStatusBadge label={`${items.length} nodos`} tone="default" />
       </div>
 
       {highlighted.length > 0 ? (
         <div className="mt-4 grid gap-3">
-          {highlighted.map((item) => (
+          {highlighted.map((item, index) => (
             <MetricCard
               key={`${item.label}-${item.value}`}
               label={item.label}
@@ -51,35 +51,48 @@ export function SystemStatusPanel({
               detail={item.detail}
               tone={item.tone}
               icon={item.icon || inferStatusIcon(item.label)}
-              emphasis="hero"
+              emphasis={index === 0 ? 'hero' : 'compact'}
             />
           ))}
         </div>
       ) : null}
 
       {support.length > 0 ? (
-        <div className="mt-4 grid gap-3">
-          {support.map((item) => (
-            <div
-              key={item.label}
-              className="rounded-[22px] border border-white/8 bg-white/[0.03] px-4 py-4"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 gap-3">
-                  <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200">
-                    <DashboardIcon name={item.icon || inferStatusIcon(item.label)} className="h-4 w-4" />
+        <div className="mt-4">
+          <DisclosurePanel
+            title="Ver estado extendido"
+            description="Runtime, reuse y otras senales tecnicas quedan en segundo nivel."
+            icon="services"
+            badge={`${support.length}`}
+          >
+            <div className="grid gap-2">
+              {support.map((item) => (
+                <div
+                  key={item.label}
+                  className="flex items-start justify-between gap-3 rounded-[20px] border border-white/8 bg-white/[0.03] px-4 py-3"
+                >
+                  <div className="flex min-w-0 gap-3">
+                    <div className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200">
+                      <DashboardIcon
+                        name={item.icon || inferStatusIcon(item.label)}
+                        className="h-4 w-4"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        {item.label}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-slate-100">{item.value}</div>
+                      {item.detail ? (
+                        <div className="mt-1 text-xs leading-5 text-slate-400">{item.detail}</div>
+                      ) : null}
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-slate-100">{item.label}</div>
-                    {item.detail ? (
-                      <div className="mt-1 text-xs leading-5 text-slate-400">{item.detail}</div>
-                    ) : null}
-                  </div>
+                  <ResultStatusBadge label={item.value} tone={item.tone} />
                 </div>
-                <ResultStatusBadge label={item.value} tone={item.tone} />
-              </div>
+              ))}
             </div>
-          ))}
+          </DisclosurePanel>
         </div>
       ) : null}
     </article>

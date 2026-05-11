@@ -8,6 +8,7 @@ import {
 } from 'react'
 import {
   ActionTile,
+  DisclosurePanel,
   MetricCard,
   ResultKeyValueGrid,
   ResultSectionCard,
@@ -14265,13 +14266,6 @@ function App() {
           : ('default' as const),
       icon: 'context' as const,
     },
-    {
-      label: 'Decision operativa',
-      value: guidedStepActionSummaryLabel,
-      detail: guidedStepActionSummaryDetail,
-      tone: 'amber' as const,
-      icon: 'next' as const,
-    },
   ]
   const homeFlowItems = GUIDED_WIZARD_STEPS.map((step, index) => ({
     key: step.key,
@@ -14332,36 +14326,12 @@ function App() {
       progress={Math.round(((activeWizardStepIndex + 1) / GUIDED_WIZARD_STEPS.length) * 100)}
     />,
     <MetricCard
-      key="top-flow"
-      label="Flujo"
-      value={flowStageLabel}
-      detail={`${flowModeLabel} / ${flowApprovalPendingLabel}`}
+      key="top-next"
+      label="Siguiente accion"
+      value={guidedStepActionSummaryLabel}
+      detail={guidedStepActionSummaryDetail}
       tone={decisionPending ? 'amber' : 'default'}
-      icon="flow"
-    />,
-    <MetricCard
-      key="top-memory"
-      label="Memoria"
-      value={activeContextHubLabel}
-      detail={`${activeReuseModeLabel} / ${activeReuseDetailLabel}`}
-      tone={activeContextHubStatus?.available ? 'emerald' : 'violet'}
-      icon="memory"
-    />,
-    <MetricCard
-      key="top-runtime"
-      label="Runtime"
-      value={runtimeOnlineLabel}
-      detail={runtimePlatformLabel}
-      tone={runtimeOnlineLabel === 'Online' ? 'emerald' : 'amber'}
-      icon="runtime"
-    />,
-    <MetricCard
-      key="top-approvals"
-      label="Aprobaciones"
-      value={activeApprovalStatusLabel}
-      detail={humanApprovalsBadge}
-      tone={decisionPending ? 'amber' : 'default'}
-      icon="approval"
+      icon="next"
     />,
   ]
   const homeDashboardMetrics = [
@@ -14380,18 +14350,11 @@ function App() {
       icon: 'flow' as const,
     },
     {
-      label: 'Memoria reusable',
-      value: `${activeReuseModeLabel} / ${activeReuseFoundCount} coincidencia(s)`,
-      detail: activeReuseDetailLabel,
-      tone: activeReuseFoundCount > 0 ? ('violet' as const) : ('default' as const),
-      icon: 'memory' as const,
-    },
-    {
-      label: 'Flujo',
-      value: flowStageLabel,
-      detail: `${flowModeLabel} / ${flowApprovalPendingLabel}`,
+      label: 'Siguiente accion',
+      value: guidedStepActionSummaryLabel,
+      detail: guidedStepActionSummaryDetail,
       tone: decisionPending ? ('amber' as const) : ('default' as const),
-      icon: 'activity' as const,
+      icon: 'next' as const,
     },
   ]
   const homeDashboardServices = [
@@ -22239,7 +22202,13 @@ function App() {
                   flowItems={homeFlowItems}
                 />
 
-                <ContextHubControlPanel
+                <DisclosurePanel
+                  title="Ver MEMORIA / Context Hub"
+                  description="El estado extendido de MEMORIA queda disponible, pero ya no domina la home."
+                  icon="memory"
+                  badge="Soporte"
+                >
+                  <ContextHubControlPanel
                   description="Esta zona muestra si MEMORIA está disponible, si JEFE la levantó localmente y cómo seguir sin bloquear la sesión cuando está apagada."
                   stateLabel={contextHubRuntimeLabel}
                   stateTone={contextHubRuntimeTone}
@@ -22262,7 +22231,8 @@ function App() {
                   onRetry={handleRetryContextHubConnection}
                   onOpen={handleOpenContextHub}
                   onStart={handleStartLocalContextHub}
-                />
+                  />
+                </DisclosurePanel>
               </div>
             ) : null}
 

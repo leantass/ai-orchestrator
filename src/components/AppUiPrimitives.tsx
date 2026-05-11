@@ -107,21 +107,21 @@ const iconMap: Record<AppIconName, LucideIcon> = {
 
 const tonePanelClassName: Record<MetricTone, string> = {
   default:
-    'border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.018))]',
+    'border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.028),rgba(255,255,255,0.015))]',
   sky:
-    'border-sky-300/18 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.14),transparent_40%),linear-gradient(180deg,rgba(56,189,248,0.1),rgba(8,15,28,0.68))]',
+    'border-sky-300/18 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.12),transparent_40%),linear-gradient(180deg,rgba(56,189,248,0.08),rgba(8,15,28,0.68))]',
   emerald:
-    'border-emerald-300/18 bg-[radial-gradient(circle_at_top_right,rgba(52,211,153,0.14),transparent_40%),linear-gradient(180deg,rgba(52,211,153,0.09),rgba(8,15,28,0.68))]',
+    'border-emerald-300/18 bg-[radial-gradient(circle_at_top_right,rgba(52,211,153,0.12),transparent_40%),linear-gradient(180deg,rgba(52,211,153,0.08),rgba(8,15,28,0.68))]',
   amber:
-    'border-amber-300/18 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.14),transparent_40%),linear-gradient(180deg,rgba(251,191,36,0.09),rgba(8,15,28,0.68))]',
+    'border-amber-300/18 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.12),transparent_40%),linear-gradient(180deg,rgba(251,191,36,0.08),rgba(8,15,28,0.68))]',
   rose:
-    'border-rose-300/18 bg-[radial-gradient(circle_at_top_right,rgba(251,113,133,0.16),transparent_40%),linear-gradient(180deg,rgba(251,113,133,0.09),rgba(8,15,28,0.68))]',
+    'border-rose-300/18 bg-[radial-gradient(circle_at_top_right,rgba(251,113,133,0.14),transparent_40%),linear-gradient(180deg,rgba(251,113,133,0.08),rgba(8,15,28,0.68))]',
   violet:
-    'border-violet-300/18 bg-[radial-gradient(circle_at_top_right,rgba(167,139,250,0.16),transparent_40%),linear-gradient(180deg,rgba(167,139,250,0.1),rgba(8,15,28,0.68))]',
+    'border-violet-300/18 bg-[radial-gradient(circle_at_top_right,rgba(167,139,250,0.14),transparent_40%),linear-gradient(180deg,rgba(167,139,250,0.09),rgba(8,15,28,0.68))]',
 }
 
 const toneBadgeClassName: Record<MetricTone, string> = {
-  default: 'border-white/10 bg-white/[0.06] text-slate-100',
+  default: 'border-white/10 bg-white/[0.05] text-slate-100',
   sky: 'border-sky-300/20 bg-sky-300/10 text-sky-100',
   emerald: 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100',
   amber: 'border-amber-300/20 bg-amber-300/10 text-amber-100',
@@ -197,24 +197,17 @@ export function SidebarSectionButton({
       onClick={onClick}
       data-active={active}
       className={joinClasses(
-        'group relative w-full overflow-hidden rounded-[24px] border px-4 py-4 text-left transition duration-200',
+        'group relative w-full overflow-hidden rounded-[22px] border px-4 py-3 text-left transition duration-200',
         active
-          ? 'border-cyan-300/30 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.18),transparent_32%),linear-gradient(180deg,rgba(56,189,248,0.12),rgba(8,15,28,0.92))] text-white shadow-[0_18px_48px_rgba(56,189,248,0.13)]'
-          : 'border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.02))] text-slate-200 hover:border-white/20 hover:bg-white/[0.06]',
+          ? 'border-cyan-300/28 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.16),transparent_32%),linear-gradient(180deg,rgba(56,189,248,0.1),rgba(8,15,28,0.9))] text-white shadow-[0_14px_40px_rgba(56,189,248,0.12)]'
+          : 'border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.028),rgba(255,255,255,0.015))] text-slate-200 hover:border-white/18 hover:bg-white/[0.05]',
       )}
     >
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/18 to-transparent" />
-      <div
-        className={joinClasses(
-          'absolute inset-y-3 left-0 w-1 rounded-r-full transition',
-          active ? 'bg-cyan-300/80' : 'bg-transparent group-hover:bg-white/12',
-        )}
-      />
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <div
             className={joinClasses(
-              'mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] border',
+              'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border',
               active
                 ? 'border-cyan-300/22 bg-cyan-300/12 text-cyan-100'
                 : 'border-white/10 bg-slate-950/60 text-slate-300',
@@ -224,15 +217,13 @@ export function SidebarSectionButton({
           </div>
           <div className="min-w-0">
             <div className="text-sm font-semibold">{label}</div>
-            <div className="mt-1 text-xs leading-5 text-slate-400">{description}</div>
+            <div className="mt-1 text-xs leading-5 text-slate-500">
+              {active ? description : description.split('.')[0]}
+            </div>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          {badge ? (
-            <span className="rounded-full border border-white/10 bg-slate-950/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300">
-              {badge}
-            </span>
-          ) : null}
+        <div className="flex items-center gap-2">
+          {badge ? <SurfaceHeaderTag>{badge}</SurfaceHeaderTag> : null}
           <ChevronRight
             className={joinClasses(
               'h-4 w-4 transition',
@@ -311,15 +302,14 @@ export function MetricCard({
   return (
     <article
       className={joinClasses(
-        'relative overflow-hidden rounded-[26px] border px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+        'relative overflow-hidden rounded-[24px] border px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
         tonePanelClassName[tone],
-        emphasis === 'hero' ? 'min-h-[180px] p-5' : 'min-h-[138px]',
+        emphasis === 'hero' ? 'min-h-[150px] p-5' : 'min-h-[116px]',
         className,
       )}
     >
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/16 to-transparent" />
-      <div className="absolute inset-y-0 right-0 w-20 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_60%)] opacity-80" />
-      <div className="relative flex h-full flex-col justify-between gap-4">
+      <div className="relative flex h-full flex-col justify-between gap-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -331,7 +321,7 @@ export function MetricCard({
             <div
               className={joinClasses(
                 'mt-3 font-semibold leading-tight text-slate-50',
-                emphasis === 'hero' ? 'text-[1.15rem] leading-8' : 'text-sm leading-6',
+                emphasis === 'hero' ? 'text-[1.05rem] leading-7' : 'text-sm leading-6',
               )}
             >
               {value}
@@ -339,8 +329,8 @@ export function MetricCard({
           </div>
           <div
             className={joinClasses(
-              'inline-flex shrink-0 items-center justify-center rounded-[18px] border',
-              emphasis === 'hero' ? 'h-12 w-12' : 'h-10 w-10',
+              'inline-flex shrink-0 items-center justify-center rounded-[16px] border',
+              emphasis === 'hero' ? 'h-11 w-11' : 'h-9 w-9',
               toneIconClassName[tone],
             )}
           >
@@ -380,16 +370,15 @@ export function ActionTile({
   const content = (
     <div
       className={joinClasses(
-        'group relative overflow-hidden rounded-[24px] border px-4 py-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition',
+        'group relative overflow-hidden rounded-[22px] border px-4 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition',
         tonePanelClassName[tone],
         disabled ? 'cursor-not-allowed opacity-60' : 'hover:border-white/16 hover:bg-white/[0.06]',
       )}
     >
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/14 to-transparent" />
       <div className="flex items-start gap-3">
         <div
           className={joinClasses(
-            'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] border',
+            'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border',
             toneIconClassName[tone],
           )}
         >
@@ -400,7 +389,7 @@ export function ActionTile({
             <div className="text-sm font-semibold text-white">{label}</div>
             {badge ? <SurfaceHeaderTag>{badge}</SurfaceHeaderTag> : null}
           </div>
-          <div className="mt-2 text-xs leading-5 text-slate-400">{detail}</div>
+          <div className="mt-1.5 text-xs leading-5 text-slate-400">{detail}</div>
         </div>
       </div>
     </div>
@@ -477,7 +466,7 @@ export function ResultSectionCard({
   return (
     <article
       className={joinClasses(
-        'overflow-hidden rounded-[30px] border p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+        'overflow-hidden rounded-[28px] border p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
         tonePanelClassName[tone],
       )}
     >
@@ -507,6 +496,62 @@ export function ResultSectionCard({
       </div>
       <div className="mt-4">{children}</div>
     </article>
+  )
+}
+
+export function DisclosurePanel({
+  title,
+  description,
+  children,
+  icon = 'status',
+  badge,
+  tone = 'default',
+  defaultOpen = false,
+}: {
+  title: string
+  description?: string
+  children: ReactNode
+  icon?: AppIconName
+  badge?: string
+  tone?: MetricTone
+  defaultOpen?: boolean
+}) {
+  return (
+    <details
+      open={defaultOpen}
+      className={joinClasses(
+        'rounded-[24px] border px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]',
+        tonePanelClassName[tone],
+      )}
+    >
+      <summary className="cursor-pointer list-none">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <div
+              className={joinClasses(
+                'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border',
+                toneIconClassName[tone],
+              )}
+            >
+              <DashboardIcon name={icon} className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  {title}
+                </div>
+                {badge ? <SurfaceHeaderTag>{badge}</SurfaceHeaderTag> : null}
+              </div>
+              {description ? (
+                <div className="mt-1 text-sm leading-6 text-slate-400">{description}</div>
+              ) : null}
+            </div>
+          </div>
+          <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-500" strokeWidth={1.8} />
+        </div>
+      </summary>
+      <div className="mt-4">{children}</div>
+    </details>
   )
 }
 
@@ -593,7 +638,7 @@ export function EmptyStateBlock({
   icon?: AppIconName
 }) {
   return (
-    <div className="rounded-[26px] border border-dashed border-white/12 bg-slate-950/40 px-4 py-10 text-center">
+    <div className="rounded-[24px] border border-dashed border-white/12 bg-slate-950/40 px-4 py-8 text-center">
       <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-slate-300">
         <DashboardIcon name={icon} className="h-5 w-5" />
       </div>
@@ -619,7 +664,7 @@ export function InlineHint({
   return (
     <div
       className={joinClasses(
-        'rounded-[26px] border px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]',
+        'rounded-[24px] border px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]',
         tonePanelClassName[tone],
       )}
     >
