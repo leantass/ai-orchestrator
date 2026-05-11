@@ -46,14 +46,18 @@ export function ContextSummaryPanel({
 
   return (
     <article className="overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(6,11,22,0.97),rgba(8,15,28,0.9))] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.28)] backdrop-blur">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-            {title}
+      {title || description ? (
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            {title ? (
+              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                {title}
+              </div>
+            ) : null}
+            {description ? <p className="mt-1 text-sm leading-6 text-slate-400">{description}</p> : null}
           </div>
-          <p className="mt-1 text-sm leading-6 text-slate-400">{description}</p>
         </div>
-      </div>
+      ) : null}
 
       {primaryItem ? (
         <div className="mt-4 rounded-[22px] border border-sky-300/18 bg-[linear-gradient(180deg,rgba(56,189,248,0.08),rgba(8,15,28,0.72))] p-4">
@@ -66,7 +70,7 @@ export function ContextSummaryPanel({
             </div>
             <div className="min-w-0">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100/80">
-                Que sigue
+                {primaryItem.label}
               </div>
               <div className="mt-2 text-sm font-semibold leading-6 text-white">{primaryItem.value}</div>
               {primaryItem.detail ? (
@@ -100,16 +104,17 @@ export function ContextSummaryPanel({
         ) : null}
       </div>
 
-      {remainingItems.length > 0 || actions ? (
+      {actions ? <div className="mt-4 grid gap-2">{actions}</div> : null}
+
+      {remainingItems.length > 0 ? (
         <div className="mt-4">
           <DisclosurePanel
             title="Ver ayuda y detalle"
             description="Contexto extendido, estado y acciones de apoyo a un clic."
             icon="context"
-            badge={`${remainingItems.length + (actions ? 1 : 0)} items`}
+            badge={`${remainingItems.length} items`}
           >
             <div className="grid gap-2">
-              {actions ? <div className="grid gap-2">{actions}</div> : null}
               {remainingItems.map((item) => (
                 <div
                   key={`${item.label}-${item.value}`}

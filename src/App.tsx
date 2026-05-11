@@ -13766,7 +13766,7 @@ function App() {
       label: 'Inicio',
       group: 'Operacion',
       icon: 'home' as const,
-      description: 'Resumen operativo y estado general.',
+      description: 'Estado general.',
       active: activeShellNavKey === 'home',
       onClick: () => {
         setExperienceMode('advanced')
@@ -13778,7 +13778,7 @@ function App() {
       label: 'Flujo guiado',
       group: 'Operacion',
       icon: 'guided' as const,
-      description: 'Recorrido 01 a 07 para operacion paso a paso.',
+      description: 'Paso a paso.',
       active: activeShellNavKey === 'guided',
       badge: `0${activeWizardStepIndex + 1}`,
       onClick: () => setExperienceMode('guided'),
@@ -13788,7 +13788,7 @@ function App() {
       label: 'Panel avanzado',
       group: 'Operacion',
       icon: 'advanced' as const,
-      description: 'Vista tecnica y de diagnostico por secciones.',
+      description: 'Vista tecnica.',
       active: activeShellNavKey === 'advanced',
       onClick: () => {
         setExperienceMode('advanced')
@@ -13855,7 +13855,7 @@ function App() {
       label: 'Proyectos',
       group: 'Plataforma',
       icon: 'projects' as const,
-      description: 'Contexto, continuidad y workspace.',
+      description: 'Contexto y workspace.',
       active: activeShellNavKey === 'projects',
       onClick: () => {
         setExperienceMode('guided')
@@ -13885,57 +13885,78 @@ function App() {
     experienceMode === 'guided'
       ? [
           {
-            title: 'Resumen del contexto',
+            title: 'Paso actual',
             items: [
-              {
-                label: 'Objetivo',
-                value: normalizedGoalInput,
-                detail: currentExecutionContextSummary,
-                icon: 'goal' as const,
-              },
-              {
-                label: 'Proyecto activo',
-                value:
-                  existingProjectContext?.projectName ||
-                  (existingProjectContext?.selectedPath ? 'Seleccionado' : 'Sin proyecto'),
-                detail:
-                  existingProjectContext?.selectedPath || 'Solo texto e insumos por ahora.',
-                icon: 'projects' as const,
-              },
-              {
-                label: 'Modo de trabajo',
-                value: getProjectWorkModeLabel(projectWorkMode),
-                detail: projectWorkModeSummary,
-                icon: 'workspace' as const,
-              },
-              {
-                label: 'Briefing',
-                value:
-                  attachedProjectInputs.length > 0
-                    ? `${attachedProjectInputs.length} insumo(s)`
-                    : 'Sin briefing',
-                detail: attachedProjectInputsSummary,
-                tone:
-                  attachedProjectInputs.length > 0
-                    ? ('violet' as const)
-                    : ('default' as const),
-                icon: 'context' as const,
-              },
+              ...(activeWizardStep === 'goal'
+                ? [
+                    {
+                      label: 'Siguiente paso',
+                      value: 'Escribi el objetivo y avanza al contexto.',
+                      detail: '',
+                      icon: 'next' as const,
+                    },
+                    {
+                      label: 'Estado',
+                      value: goalInput.trim() ? 'Objetivo en edicion' : 'Listo para empezar',
+                      detail: '',
+                      tone: 'sky' as const,
+                      icon: 'status' as const,
+                    },
+                  ]
+                : [
+                    {
+                      label: 'Objetivo',
+                      value: normalizedGoalInput,
+                      detail: currentExecutionContextSummary,
+                      icon: 'goal' as const,
+                    },
+                    {
+                      label: 'Proyecto activo',
+                      value:
+                        existingProjectContext?.projectName ||
+                        (existingProjectContext?.selectedPath ? 'Seleccionado' : 'Sin proyecto'),
+                      detail:
+                        existingProjectContext?.selectedPath || 'Solo texto e insumos por ahora.',
+                      icon: 'projects' as const,
+                    },
+                    {
+                      label: 'Modo de trabajo',
+                      value: getProjectWorkModeLabel(projectWorkMode),
+                      detail: projectWorkModeSummary,
+                      icon: 'workspace' as const,
+                    },
+                    {
+                      label: 'Briefing',
+                      value:
+                        attachedProjectInputs.length > 0
+                          ? `${attachedProjectInputs.length} insumo(s)`
+                          : 'Sin briefing',
+                      detail: attachedProjectInputsSummary,
+                      tone:
+                        attachedProjectInputs.length > 0
+                          ? ('violet' as const)
+                          : ('default' as const),
+                      icon: 'context' as const,
+                    },
+                  ]),
             ],
           },
           {
-            title: 'Proximo paso',
+            title: 'Ayuda',
             items: [
               {
                 label: 'Accion recomendada',
-                value: guidedStepActionSummaryLabel,
-                detail: guidedStepActionSummaryDetail,
+                value:
+                  activeWizardStep === 'goal'
+                    ? 'Escribi el resultado esperado y avanza al contexto.'
+                    : guidedStepActionSummaryLabel,
+                detail: activeWizardStep === 'goal' ? '' : guidedStepActionSummaryDetail,
                 icon: 'next' as const,
               },
               {
                 label: 'Estado',
-                value: sessionStatus,
-                detail: visibleCurrentStepLabel,
+                value: activeWizardStep === 'goal' ? 'Sin bloqueo' : sessionStatus,
+                detail: activeWizardStep === 'goal' ? '' : visibleCurrentStepLabel,
                 icon: 'status' as const,
               },
               {
@@ -18692,9 +18713,9 @@ function App() {
         <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
           <label
             htmlFor="guided-goal-input"
-            className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+            className="sr-only"
           >
-            01. Objetivo
+            Objetivo
           </label>
           <div className="mt-2 text-2xl font-semibold text-white">
             Que queres que haga JEFE?
@@ -18719,12 +18740,6 @@ function App() {
             >
               Preparar contexto
             </PrimaryActionButton>
-            <SecondaryActionButton
-              onClick={() => setExperienceMode('advanced')}
-              className="sm:w-auto"
-            >
-              Panel avanzado
-            </SecondaryActionButton>
           </div>
           <div className="mt-2 text-xs leading-5 text-slate-500">
             Una frase clara alcanza. Despues podes sumar contexto.
@@ -18821,9 +18836,9 @@ function App() {
         <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
           <label
             htmlFor="guided-context-input"
-            className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+            className="sr-only"
           >
-            02. Contexto
+            Contexto
           </label>
           <div className="mt-2 text-2xl font-semibold text-white">
             Agrega contexto e insumos
@@ -19834,9 +19849,19 @@ function App() {
 
   const guidedSecondaryAction =
     activeWizardStep === 'goal' ? (
-      <SecondaryActionButton onClick={() => setExperienceMode('advanced')}>
-        Abrir panel avanzado
-      </SecondaryActionButton>
+      <>
+        <SecondaryActionButton
+          onClick={() => {
+            setExperienceMode('advanced')
+            setActiveSection('corridas')
+          }}
+        >
+          Ver ultima corrida
+        </SecondaryActionButton>
+        <SecondaryActionButton onClick={handleResetSessionMemory}>
+          Reiniciar sesion
+        </SecondaryActionButton>
+      </>
     ) : activeWizardStep === 'context' ? (
       <SecondaryActionButton
         onClick={() => setFlowConsoleVisibility({ open: true, pinned: true })}
@@ -19854,7 +19879,9 @@ function App() {
     ) : null
 
   const guidedFooterNote =
-    activeWizardStep === 'plan'
+    activeWizardStep === 'goal'
+      ? ''
+      : activeWizardStep === 'plan'
       ? plannerIsReviewOnly
         ? 'El CTA principal prepara la siguiente accion segura; todavia no ejecuta archivos.'
         : 'El CTA principal ejecuta la instruccion actual con el modo y el scope activos.'
@@ -19878,43 +19905,17 @@ function App() {
 
   const guidedShell = (
     <AppShell
-      eyebrow="Flujo guiado"
-      title={`Paso ${activeWizardStepIndex + 1} de ${GUIDED_WIZARD_STEPS.length} - ${activeWizardStepConfig.label}`}
+      eyebrow={`Paso ${activeWizardStepIndex + 1} de ${GUIDED_WIZARD_STEPS.length}`}
+      title={activeWizardStepConfig.label}
       description=""
       modeSwitcher={
-        <div className="inline-flex rounded-2xl border border-white/10 bg-white/[0.04] p-1">
-          <button
-            type="button"
-            onClick={() => setExperienceMode('guided')}
-            className={joinClasses(
-              'rounded-xl px-4 py-2 text-sm font-medium transition',
-              experienceMode === 'guided'
-                ? 'bg-cyan-300/15 text-cyan-100'
-                : 'text-slate-300 hover:bg-white/5',
-            )}
-          >
-            Flujo guiado
-          </button>
-          <button
-            type="button"
-            onClick={() => setExperienceMode('advanced')}
-            className={joinClasses(
-              'rounded-xl px-4 py-2 text-sm font-medium transition',
-              experienceMode === 'advanced'
-                ? 'bg-cyan-300/15 text-cyan-100'
-                : 'text-slate-300 hover:bg-white/5',
-            )}
-          >
-            Panel avanzado
-          </button>
-        </div>
-      }
-      quickActions={
         <SecondaryActionButton onClick={() => setExperienceMode('advanced')} className="w-auto">
           Panel avanzado
         </SecondaryActionButton>
       }
       navItems={appShellNavItems}
+      showSidebar={false}
+      showMobileNav={false}
       statusLabel={`${runtimePlatformLabel} / ${runtimeOnlineLabel}`}
       statusDetail={currentWorkspaceSummary}
       statusBadge={activeContextHubStatus?.available ? 'Online' : 'Local'}
@@ -19930,15 +19931,13 @@ function App() {
       }
       rightPanel={
         <ContextSummaryPanel
-          title="Panel contextual"
-          description="Que sigue y ayuda breve, sin robar foco al paso actual."
+          title={activeWizardStep === 'goal' ? 'Que sigue' : 'Panel contextual'}
+          description={activeWizardStep === 'goal' ? '' : 'Ayuda breve, sin robar foco al paso actual.'}
           sections={contextPanelSections}
           actions={guidedSecondaryAction}
         />
       }
-      footer={
-        <span>{guidedFooterNote}</span>
-      }
+      footer={guidedFooterNote ? <span>{guidedFooterNote}</span> : undefined}
     />
   )
 

@@ -59,6 +59,8 @@ export function AppShell({
   modeSwitcher,
   quickActions,
   navItems,
+  showSidebar = true,
+  showMobileNav = true,
   statusLabel,
   statusDetail,
   statusBadge,
@@ -72,6 +74,8 @@ export function AppShell({
   modeSwitcher: ReactNode
   quickActions?: ReactNode
   navItems: AppShellNavItem[]
+  showSidebar?: boolean
+  showMobileNav?: boolean
   statusLabel: string
   statusDetail: string
   statusBadge?: string
@@ -91,7 +95,7 @@ export function AppShell({
   return (
     <div className="min-h-screen bg-transparent text-slate-100">
       <div className="mx-auto flex w-full max-w-[1720px] gap-4 px-4 py-4 sm:px-6 xl:px-8">
-        <aside className="hidden w-[248px] shrink-0 xl:block">
+        <aside className={joinClasses('hidden w-[248px] shrink-0 xl:block', showSidebar ? '' : 'xl:hidden')}>
           <div className="sticky top-4 space-y-4">
             <section className="overflow-hidden rounded-[22px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_34%),linear-gradient(180deg,rgba(5,10,21,0.98),rgba(8,15,28,0.9))] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.3)] backdrop-blur">
               <div className="flex items-start justify-between gap-4">
@@ -210,7 +214,7 @@ export function AppShell({
             </div>
           </header>
 
-          <div className="mt-4 xl:hidden">
+          <div className={joinClasses('mt-4 xl:hidden', showMobileNav ? '' : 'hidden')}>
             <div className="flex gap-2 overflow-x-auto pb-2">
               {navItems.map((item) => (
                 <button

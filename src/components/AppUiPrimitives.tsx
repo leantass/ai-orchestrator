@@ -217,7 +217,7 @@ export function SidebarSectionButton({
           </div>
           <div className="min-w-0">
             <div className="text-sm font-semibold">{label}</div>
-            {active ? (
+            {active && description ? (
               <div className="mt-1 text-xs leading-5 text-slate-500">{description}</div>
             ) : null}
           </div>

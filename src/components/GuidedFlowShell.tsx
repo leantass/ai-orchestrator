@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import { DisclosurePanel, ProgressMeter } from './AppUiPrimitives'
+import { DisclosurePanel } from './AppUiPrimitives'
 import { StepProgress, type StepProgressItem } from './StepProgress'
 
 const joinClasses = (...tokens: Array<string | false | null | undefined>) =>
@@ -20,8 +20,7 @@ export function GuidedFlowShell({
   footerActions?: ReactNode
 }) {
   const completedSteps = progressItems.filter((item) => item.status === 'complete').length
-  const progressPercent =
-    progressItems.length > 0 ? Math.round((completedSteps / progressItems.length) * 100) : 0
+  const showCompactRail = completedSteps > 0 || Boolean(footerActions)
 
   return (
     <section className="space-y-3">
@@ -29,29 +28,20 @@ export function GuidedFlowShell({
         {children}
       </div>
 
-      <div className="rounded-[20px] border border-white/8 bg-slate-950/64 px-4 py-3 shadow-[0_12px_34px_rgba(0,0,0,0.22)] backdrop-blur sm:px-5">
-        <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                {`Paso ${stepIndex + 1} de ${totalSteps}`}
-              </div>
-              <div className="text-xs text-slate-400">{completedSteps} listo(s)</div>
+      {showCompactRail ? (
+        <div className="rounded-[20px] border border-white/8 bg-slate-950/64 px-4 py-3 shadow-[0_12px_34px_rgba(0,0,0,0.22)] backdrop-blur sm:px-5">
+          <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+            <div className="min-w-0 flex-1">
+              {completedSteps > 0 ? (
+                <div className="text-xs text-slate-400">{`${completedSteps} listo(s)`}</div>
+              ) : null}
             </div>
-            <div className="mt-2 max-w-xl">
-              <ProgressMeter
-                compact
-                label="Progreso"
-                value={progressPercent}
-                tone={progressPercent >= 50 ? 'emerald' : 'sky'}
-              />
-            </div>
+            {footerActions ? (
+              <div className={joinClasses('flex flex-wrap gap-3 xl:justify-end')}>{footerActions}</div>
+            ) : null}
           </div>
-          {footerActions ? (
-            <div className={joinClasses('flex flex-wrap gap-3 xl:justify-end')}>{footerActions}</div>
-          ) : null}
         </div>
-      </div>
+      ) : null}
 
       <DisclosurePanel
         title="Ver pasos 01 a 07"
