@@ -106,16 +106,22 @@ const iconMap: Record<AppIconName, LucideIcon> = {
 }
 
 const tonePanelClassName: Record<MetricTone, string> = {
-  default: 'border-white/8 bg-white/[0.03]',
-  sky: 'border-sky-300/20 bg-sky-300/8',
-  emerald: 'border-emerald-300/20 bg-emerald-300/8',
-  amber: 'border-amber-300/20 bg-amber-300/8',
-  rose: 'border-rose-300/20 bg-rose-300/8',
-  violet: 'border-violet-300/20 bg-violet-300/8',
+  default:
+    'border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.018))]',
+  sky:
+    'border-sky-300/18 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.14),transparent_40%),linear-gradient(180deg,rgba(56,189,248,0.1),rgba(8,15,28,0.68))]',
+  emerald:
+    'border-emerald-300/18 bg-[radial-gradient(circle_at_top_right,rgba(52,211,153,0.14),transparent_40%),linear-gradient(180deg,rgba(52,211,153,0.09),rgba(8,15,28,0.68))]',
+  amber:
+    'border-amber-300/18 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.14),transparent_40%),linear-gradient(180deg,rgba(251,191,36,0.09),rgba(8,15,28,0.68))]',
+  rose:
+    'border-rose-300/18 bg-[radial-gradient(circle_at_top_right,rgba(251,113,133,0.16),transparent_40%),linear-gradient(180deg,rgba(251,113,133,0.09),rgba(8,15,28,0.68))]',
+  violet:
+    'border-violet-300/18 bg-[radial-gradient(circle_at_top_right,rgba(167,139,250,0.16),transparent_40%),linear-gradient(180deg,rgba(167,139,250,0.1),rgba(8,15,28,0.68))]',
 }
 
 const toneBadgeClassName: Record<MetricTone, string> = {
-  default: 'border-white/10 bg-white/5 text-slate-100',
+  default: 'border-white/10 bg-white/[0.06] text-slate-100',
   sky: 'border-sky-300/20 bg-sky-300/10 text-sky-100',
   emerald: 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100',
   amber: 'border-amber-300/20 bg-amber-300/10 text-amber-100',
@@ -124,12 +130,21 @@ const toneBadgeClassName: Record<MetricTone, string> = {
 }
 
 const toneIconClassName: Record<MetricTone, string> = {
-  default: 'border-white/10 bg-slate-950/65 text-slate-200',
+  default: 'border-white/10 bg-slate-950/70 text-slate-200',
   sky: 'border-sky-300/20 bg-sky-300/12 text-sky-100',
   emerald: 'border-emerald-300/20 bg-emerald-300/12 text-emerald-100',
   amber: 'border-amber-300/20 bg-amber-300/12 text-amber-100',
   rose: 'border-rose-300/20 bg-rose-300/12 text-rose-100',
   violet: 'border-violet-300/20 bg-violet-300/12 text-violet-100',
+}
+
+const toneProgressClassName: Record<MetricTone, string> = {
+  default: 'from-slate-300/40 via-slate-200/50 to-white/55',
+  sky: 'from-sky-400 via-cyan-200 to-cyan-50',
+  emerald: 'from-emerald-400 via-emerald-200 to-emerald-50',
+  amber: 'from-amber-400 via-amber-200 to-amber-50',
+  rose: 'from-rose-400 via-rose-200 to-rose-50',
+  violet: 'from-violet-400 via-violet-200 to-violet-50',
 }
 
 export function DashboardIcon({
@@ -180,22 +195,29 @@ export function SidebarSectionButton({
     <button
       type="button"
       onClick={onClick}
+      data-active={active}
       className={joinClasses(
-        'group relative w-full overflow-hidden rounded-[22px] border px-4 py-4 text-left transition',
+        'group relative w-full overflow-hidden rounded-[24px] border px-4 py-4 text-left transition duration-200',
         active
-          ? 'border-sky-300/30 bg-[linear-gradient(135deg,rgba(56,189,248,0.16),rgba(15,23,42,0.88))] text-white shadow-[0_18px_48px_rgba(56,189,248,0.12)]'
-          : 'border-white/10 bg-white/[0.03] text-slate-200 hover:border-white/20 hover:bg-white/[0.06]',
+          ? 'border-cyan-300/30 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.18),transparent_32%),linear-gradient(180deg,rgba(56,189,248,0.12),rgba(8,15,28,0.92))] text-white shadow-[0_18px_48px_rgba(56,189,248,0.13)]'
+          : 'border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.02))] text-slate-200 hover:border-white/20 hover:bg-white/[0.06]',
       )}
     >
-      <div className="absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-sky-300/50 to-transparent opacity-0 transition group-hover:opacity-100 group-data-[active=true]:opacity-100" />
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/18 to-transparent" />
+      <div
+        className={joinClasses(
+          'absolute inset-y-3 left-0 w-1 rounded-r-full transition',
+          active ? 'bg-cyan-300/80' : 'bg-transparent group-hover:bg-white/12',
+        )}
+      />
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 gap-3">
           <div
             className={joinClasses(
-              'mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border',
+              'mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] border',
               active
-                ? 'border-sky-300/25 bg-sky-300/12 text-sky-100'
-                : 'border-white/10 bg-slate-950/55 text-slate-300',
+                ? 'border-cyan-300/22 bg-cyan-300/12 text-cyan-100'
+                : 'border-white/10 bg-slate-950/60 text-slate-300',
             )}
           >
             <DashboardIcon name={resolvedIcon} className="h-4 w-4" />
@@ -214,7 +236,7 @@ export function SidebarSectionButton({
           <ChevronRight
             className={joinClasses(
               'h-4 w-4 transition',
-              active ? 'text-sky-100' : 'text-slate-500 group-hover:text-slate-300',
+              active ? 'text-cyan-100' : 'text-slate-500 group-hover:text-slate-300',
             )}
             strokeWidth={1.8}
           />
@@ -266,39 +288,172 @@ export function MetricCard({
   detail,
   tone = 'default',
   icon = 'status',
+  emphasis = 'compact',
+  badge,
+  progress,
+  className,
+  footer,
 }: {
   label: string
   value: string
   detail?: string
   tone?: MetricTone
   icon?: AppIconName
+  emphasis?: 'compact' | 'hero'
+  badge?: string
+  progress?: number
+  className?: string
+  footer?: ReactNode
 }) {
+  const clampedProgress =
+    typeof progress === 'number' ? Math.max(0, Math.min(100, progress)) : null
+
   return (
     <article
       className={joinClasses(
-        'relative overflow-hidden rounded-[24px] border px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]',
+        'relative overflow-hidden rounded-[26px] border px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
         tonePanelClassName[tone],
+        emphasis === 'hero' ? 'min-h-[180px] p-5' : 'min-h-[138px]',
+        className,
       )}
     >
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            {label}
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/16 to-transparent" />
+      <div className="absolute inset-y-0 right-0 w-20 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_60%)] opacity-80" />
+      <div className="relative flex h-full flex-col justify-between gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+                {label}
+              </div>
+              {badge ? <SurfaceHeaderTag>{badge}</SurfaceHeaderTag> : null}
+            </div>
+            <div
+              className={joinClasses(
+                'mt-3 font-semibold leading-tight text-slate-50',
+                emphasis === 'hero' ? 'text-[1.15rem] leading-8' : 'text-sm leading-6',
+              )}
+            >
+              {value}
+            </div>
           </div>
-          <div className="mt-3 text-sm font-semibold leading-6 text-slate-50">{value}</div>
+          <div
+            className={joinClasses(
+              'inline-flex shrink-0 items-center justify-center rounded-[18px] border',
+              emphasis === 'hero' ? 'h-12 w-12' : 'h-10 w-10',
+              toneIconClassName[tone],
+            )}
+          >
+            <DashboardIcon name={icon} className={emphasis === 'hero' ? 'h-5 w-5' : 'h-4 w-4'} />
+          </div>
         </div>
+
+        <div className="space-y-3">
+          {detail ? <div className="text-xs leading-5 text-slate-400">{detail}</div> : null}
+          {clampedProgress !== null ? (
+            <ProgressMeter value={clampedProgress} tone={tone} compact />
+          ) : null}
+          {footer ? <div>{footer}</div> : null}
+        </div>
+      </div>
+    </article>
+  )
+}
+
+export function ActionTile({
+  label,
+  detail,
+  icon = 'next',
+  tone = 'default',
+  badge,
+  onClick,
+  disabled,
+}: {
+  label: string
+  detail: string
+  icon?: AppIconName
+  tone?: MetricTone
+  badge?: string
+  onClick?: () => void
+  disabled?: boolean
+}) {
+  const content = (
+    <div
+      className={joinClasses(
+        'group relative overflow-hidden rounded-[24px] border px-4 py-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition',
+        tonePanelClassName[tone],
+        disabled ? 'cursor-not-allowed opacity-60' : 'hover:border-white/16 hover:bg-white/[0.06]',
+      )}
+    >
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/14 to-transparent" />
+      <div className="flex items-start gap-3">
         <div
           className={joinClasses(
-            'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border',
+            'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] border',
             toneIconClassName[tone],
           )}
         >
           <DashboardIcon name={icon} className="h-4 w-4" />
         </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm font-semibold text-white">{label}</div>
+            {badge ? <SurfaceHeaderTag>{badge}</SurfaceHeaderTag> : null}
+          </div>
+          <div className="mt-2 text-xs leading-5 text-slate-400">{detail}</div>
+        </div>
       </div>
-      {detail ? <div className="mt-3 text-xs leading-5 text-slate-400">{detail}</div> : null}
-    </article>
+    </div>
+  )
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} disabled={disabled} className="w-full">
+        {content}
+      </button>
+    )
+  }
+
+  return content
+}
+
+export function ProgressMeter({
+  value,
+  tone = 'sky',
+  compact = false,
+  label,
+}: {
+  value: number
+  tone?: MetricTone
+  compact?: boolean
+  label?: string
+}) {
+  const clampedValue = Math.max(0, Math.min(100, value))
+
+  return (
+    <div className="space-y-2">
+      {label ? (
+        <div className="flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <span>{label}</span>
+          <span>{`${clampedValue}%`}</span>
+        </div>
+      ) : null}
+      <div
+        className={joinClasses(
+          'rounded-full border border-white/8 bg-slate-950/70 p-1',
+          compact ? 'p-[3px]' : 'p-1',
+        )}
+      >
+        <div
+          className={joinClasses(
+            'rounded-full bg-gradient-to-r transition-all duration-500',
+            compact ? 'h-1.5' : 'h-2.5',
+            toneProgressClassName[tone],
+          )}
+          style={{ width: `${Math.max(clampedValue, 4)}%` }}
+        />
+      </div>
+    </div>
   )
 }
 
@@ -308,23 +463,40 @@ export function ResultSectionCard({
   children,
   icon = 'status',
   actions,
+  tone = 'default',
+  badge,
 }: {
   title: string
   description?: string
   children: ReactNode
   icon?: AppIconName
   actions?: ReactNode
+  tone?: MetricTone
+  badge?: string
 }) {
   return (
-    <article className="rounded-[28px] border border-white/8 bg-white/[0.03] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+    <article
+      className={joinClasses(
+        'overflow-hidden rounded-[30px] border p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+        tonePanelClassName[tone],
+      )}
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
-          <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200">
+          <div
+            className={joinClasses(
+              'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border',
+              toneIconClassName[tone],
+            )}
+          >
             <DashboardIcon name={icon} className="h-4 w-4" />
           </div>
           <div className="flex flex-col gap-1">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              {title}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                {title}
+              </div>
+              {badge ? <SurfaceHeaderTag>{badge}</SurfaceHeaderTag> : null}
             </div>
             {description ? (
               <div className="text-sm leading-6 text-slate-400">{description}</div>
@@ -421,7 +593,7 @@ export function EmptyStateBlock({
   icon?: AppIconName
 }) {
   return (
-    <div className="rounded-[24px] border border-dashed border-white/10 bg-slate-950/35 px-4 py-8 text-center">
+    <div className="rounded-[26px] border border-dashed border-white/12 bg-slate-950/40 px-4 py-10 text-center">
       <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-slate-300">
         <DashboardIcon name={icon} className="h-5 w-5" />
       </div>
@@ -447,7 +619,7 @@ export function InlineHint({
   return (
     <div
       className={joinClasses(
-        'rounded-[24px] border px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]',
+        'rounded-[26px] border px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]',
         tonePanelClassName[tone],
       )}
     >
@@ -471,7 +643,7 @@ export function InlineHint({
 
 export function SurfaceHeaderTag({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+    <span className="inline-flex rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">
       {children}
     </span>
   )

@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from 'react'
 import {
+  ActionTile,
   MetricCard,
   ResultKeyValueGrid,
   ResultSectionCard,
@@ -13905,6 +13906,19 @@ function App() {
                 detail: projectWorkModeSummary,
                 icon: 'workspace' as const,
               },
+              {
+                label: 'Briefing',
+                value:
+                  attachedProjectInputs.length > 0
+                    ? `${attachedProjectInputs.length} insumo(s)`
+                    : 'Sin briefing',
+                detail: attachedProjectInputsSummary,
+                tone:
+                  attachedProjectInputs.length > 0
+                    ? ('violet' as const)
+                    : ('default' as const),
+                icon: 'context' as const,
+              },
             ],
           },
           {
@@ -13921,6 +13935,41 @@ function App() {
                 value: sessionStatus,
                 detail: visibleCurrentStepLabel,
                 icon: 'status' as const,
+              },
+              {
+                label: 'Flujo',
+                value: flowStageLabel,
+                detail: flowApprovalPendingLabel,
+                tone: decisionPending ? ('amber' as const) : ('sky' as const),
+                icon: 'flow' as const,
+              },
+            ],
+          },
+          {
+            title: 'Señales del sistema',
+            items: [
+              {
+                label: 'Planificador',
+                value: plannerBadge,
+                detail: activePlannerStrategyLabel,
+                tone: 'sky' as const,
+                icon: 'plan' as const,
+              },
+              {
+                label: 'MEMORIA',
+                value: activeContextHubLabel,
+                detail: activeContextHubUiDetail,
+                tone: activeContextHubStatus?.available
+                  ? ('emerald' as const)
+                  : ('amber' as const),
+                icon: 'context' as const,
+              },
+              {
+                label: 'Aprobaciones',
+                value: humanApprovalsBadge,
+                detail: activeApprovalStatusLabel,
+                tone: decisionPending ? ('amber' as const) : ('default' as const),
+                icon: 'approval' as const,
               },
             ],
           },
@@ -13941,6 +13990,15 @@ function App() {
                 detail: currentExecutionContextSummary,
                 icon: 'goal' as const,
               },
+              {
+                label: 'Proyecto',
+                value:
+                  existingProjectContext?.projectName ||
+                  (existingProjectContext?.selectedPath ? 'Seleccionado' : 'Sin proyecto'),
+                detail:
+                  existingProjectContext?.selectedPath || 'Solo texto e insumos por ahora.',
+                icon: 'projects' as const,
+              },
             ],
           },
           {
@@ -13959,6 +14017,40 @@ function App() {
                 value: flowStageLabel,
                 detail: activeOperationalE2eStatusLabel,
                 icon: 'runs' as const,
+              },
+              {
+                label: 'Modo',
+                value: getProjectWorkModeLabel(projectWorkMode),
+                detail: projectWorkModeSummary,
+                icon: 'workspace' as const,
+              },
+            ],
+          },
+          {
+            title: 'Sistema',
+            items: [
+              {
+                label: 'Planificador',
+                value: plannerBadge,
+                detail: activePlannerStrategyLabel,
+                tone: 'sky' as const,
+                icon: 'plan' as const,
+              },
+              {
+                label: 'Ejecutor',
+                value: executorRequestStateLabel,
+                detail: visibleCurrentStepLabel,
+                tone: wizardHasExecutionError ? ('rose' as const) : ('amber' as const),
+                icon: 'execution' as const,
+              },
+              {
+                label: 'MEMORIA',
+                value: activeContextHubLabel,
+                detail: activeContextHubUiDetail,
+                tone: activeContextHubStatus?.available
+                  ? ('emerald' as const)
+                  : ('amber' as const),
+                icon: 'context' as const,
               },
             ],
           },
@@ -13984,6 +14076,13 @@ function App() {
       detail: activeReuseDetailLabel,
       tone: 'default' as const,
       icon: 'memory' as const,
+    },
+    {
+      label: 'Runtime',
+      value: runtimeOnlineLabel,
+      detail: runtimePlatformLabel,
+      tone: runtimeOnlineLabel === 'Online' ? ('emerald' as const) : ('amber' as const),
+      icon: 'runtime' as const,
     },
     {
       label: 'MEMORIA',
@@ -14040,10 +14139,23 @@ function App() {
       icon: 'goal' as const,
     },
     {
+      label: 'Confianza',
+      value: activeBrainRoutingConfidence,
+      detail: activeBrainProblemNature,
+      tone: 'violet' as const,
+      icon: 'brain' as const,
+    },
+    {
       label: 'Ruta planificada',
       value: activeExecutionModeLabel,
       detail: activePlannerStrategyLabel,
       icon: 'flow' as const,
+    },
+    {
+      label: 'Alcance permitido',
+      value: plannerExecutionMetadata.executionScope || 'Sin alcance definido',
+      detail: getProjectWorkModeLabel(projectWorkMode),
+      icon: 'shield' as const,
     },
     {
       label: 'Siguiente paso',
@@ -14058,6 +14170,13 @@ function App() {
       detail: activeReuseArtifactSummary || activeContextHubUiDetail,
       tone: activeContextHubStatus?.available ? ('violet' as const) : ('default' as const),
       icon: 'memory' as const,
+    },
+    {
+      label: 'Aprobacion',
+      value: activeApprovalStatusLabel,
+      detail: flowApprovalPendingLabel,
+      tone: decisionPending ? ('amber' as const) : ('default' as const),
+      icon: 'approval' as const,
     },
   ]
   const executionBoardMetrics = [
@@ -14088,6 +14207,16 @@ function App() {
       detail: contextualRuntimeDetail,
       tone: wizardHasExecutionError ? ('rose' as const) : ('default' as const),
       icon: 'runtime' as const,
+    },
+    {
+      label: 'Actividad reciente',
+      value:
+        liveActivityEvents.length > 0
+          ? `${liveActivityEvents.length} evento(s)`
+          : 'Sin eventos',
+      detail: liveActivityEvents[0] || 'Todavia no hay eventos recientes.',
+      tone: liveActivityEvents.length > 0 ? ('violet' as const) : ('default' as const),
+      icon: 'activity' as const,
     },
     {
       label: 'Resultado listo',
@@ -14156,13 +14285,27 @@ function App() {
           ? ('complete' as const)
           : ('pending' as const),
     meta:
-      step.key === 'plan'
-        ? plannerReviewStatusLabel
-        : step.key === 'execution'
-          ? flowStageLabel
-          : step.key === 'result'
-            ? wizardResultAvailabilityLabel
-            : undefined,
+      step.key === 'goal'
+        ? normalizedGoalInput !== DEFAULT_GOAL_INPUT
+          ? 'Objetivo cargado'
+          : 'Falta definir el objetivo'
+        : step.key === 'context'
+          ? attachedProjectInputs.length > 0
+            ? `${attachedProjectInputs.length} insumo(s) y ${existingProjectContext?.selectedPath ? 'continuidad seleccionada' : 'briefing local'}`
+            : existingProjectContext?.selectedPath
+              ? 'Proyecto existente seleccionado'
+              : 'Briefing textual pendiente'
+          : step.key === 'brain'
+            ? getBrainCostModeLabel(brainCostMode)
+            : step.key === 'memory'
+              ? activeReuseModeLabel
+              : step.key === 'plan'
+                ? plannerReviewStatusLabel
+                : step.key === 'execution'
+                  ? flowStageLabel
+                  : step.key === 'result'
+                    ? wizardResultAvailabilityLabel
+                    : undefined,
     onClick: () => {
       setExperienceMode('guided')
       setActiveWizardStep(step.key)
@@ -14176,12 +14319,23 @@ function App() {
       detail={currentExecutionContextSummary}
       tone="sky"
       icon="goal"
+      emphasis="hero"
+    />,
+    <MetricCard
+      key="top-step"
+      label="Paso visible"
+      value={activeWizardStepConfig.label}
+      detail={guidedStepActionSummaryLabel}
+      tone="violet"
+      icon="guided"
+      emphasis="hero"
+      progress={Math.round(((activeWizardStepIndex + 1) / GUIDED_WIZARD_STEPS.length) * 100)}
     />,
     <MetricCard
       key="top-flow"
       label="Flujo"
       value={flowStageLabel}
-      detail={`${activeWizardStepConfig.label} / ${flowModeLabel}`}
+      detail={`${flowModeLabel} / ${flowApprovalPendingLabel}`}
       tone={decisionPending ? 'amber' : 'default'}
       icon="flow"
     />,
@@ -14189,7 +14343,7 @@ function App() {
       key="top-memory"
       label="Memoria"
       value={activeContextHubLabel}
-      detail={activeReuseDetailLabel}
+      detail={`${activeReuseModeLabel} / ${activeReuseDetailLabel}`}
       tone={activeContextHubStatus?.available ? 'emerald' : 'violet'}
       icon="memory"
     />,
@@ -14200,6 +14354,14 @@ function App() {
       detail={runtimePlatformLabel}
       tone={runtimeOnlineLabel === 'Online' ? 'emerald' : 'amber'}
       icon="runtime"
+    />,
+    <MetricCard
+      key="top-approvals"
+      label="Aprobaciones"
+      value={activeApprovalStatusLabel}
+      detail={humanApprovalsBadge}
+      tone={decisionPending ? 'amber' : 'default'}
+      icon="approval"
     />,
   ]
   const homeDashboardMetrics = [
@@ -14248,6 +14410,20 @@ function App() {
       icon: 'execution' as const,
     },
     {
+      label: 'Runtime',
+      value: runtimeOnlineLabel,
+      detail: runtimePlatformLabel,
+      tone: runtimeOnlineLabel === 'Online' ? ('emerald' as const) : ('amber' as const),
+      icon: 'runtime' as const,
+    },
+    {
+      label: 'Reuse',
+      value: activeReuseModeLabel,
+      detail: activeReuseDetailLabel,
+      tone: activeReuseFoundCount > 0 ? ('violet' as const) : ('default' as const),
+      icon: 'memory' as const,
+    },
+    {
       label: 'MEMORIA',
       value: activeContextHubLabel,
       detail: activeContextHubUiDetail,
@@ -14288,11 +14464,18 @@ function App() {
         : 'Todavia no hay respuesta final para mostrar.',
       icon: 'result' as const,
     },
+    {
+      label: 'Siguiente accion',
+      value: guidedStepActionSummaryLabel,
+      detail: guidedStepActionSummaryDetail,
+      icon: 'next' as const,
+    },
   ]
   const resultSummaryItems = [
     {
-      label: 'Resumen corto',
-      value: resultHumanSummary,
+      label: 'Validaciones',
+      value: resultMaterializationValidationsLabel,
+      detail: effectiveResultValidationSummaryText,
     },
     {
       label: 'Carpeta creada',
@@ -14312,9 +14495,9 @@ function App() {
       detail: resultBridgeLabel,
     },
     {
-      label: 'Validaciones',
-      value: resultMaterializationValidationsLabel,
-      detail: effectiveResultValidationSummaryText,
+      label: 'Readiness',
+      value: resultMaterializationReadinessValue,
+      detail: resultMaterializationReadinessLabel,
     },
     {
       label: 'Operaciones',
@@ -14327,7 +14510,7 @@ function App() {
       detail: `Tocados: ${resultTouchedFilesLabel} / Previstos: ${resultPlannedFilesLabel}`,
     },
     {
-      label: 'Cómo abrir la salida',
+      label: 'Como abrir la salida',
       value:
         resultMaterializationIndexPathLabel !== 'No disponible'
           ? `Abrir ${resultMaterializationIndexPathLabel}`
@@ -14338,9 +14521,8 @@ function App() {
           : 'Salida local y revisable dentro del workspace.',
     },
     {
-      label: 'Readiness',
-      value: resultMaterializationReadinessValue,
-      detail: resultMaterializationReadinessLabel,
+      label: 'Resumen corto',
+      value: resultHumanSummary,
     },
   ]
   const resultNextStepItems = shouldShowLocalMaterializationSummary
@@ -18669,6 +18851,110 @@ function App() {
       </div>
     ) : activeWizardStep === 'context' ? (
       <div className="space-y-4">
+        <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]">
+          <article className="overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.16),transparent_26%),radial-gradient(circle_at_72%_14%,rgba(167,139,250,0.1),transparent_20%),linear-gradient(180deg,rgba(9,17,32,0.96),rgba(8,15,28,0.92))] p-5 shadow-[0_26px_80px_rgba(0,0,0,0.28)]">
+            <div className="flex flex-wrap items-center gap-2">
+              <ResultStatusBadge label="Paso 02" tone="sky" />
+              <ResultStatusBadge label="Briefing control center" tone="violet" />
+            </div>
+            <div className="mt-4 max-w-4xl text-2xl font-semibold tracking-tight text-white sm:text-[2rem]">
+              Preparar el contexto antes de planificar
+            </div>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
+              Este tablero concentra objetivo, restricciones, continuidad, insumos y modo de trabajo
+              para que el planner reciba un briefing mas claro y menos fragmentado.
+            </p>
+            <div className="mt-4 grid gap-3 xl:grid-cols-3">
+              <MetricCard
+                label="Objetivo en foco"
+                value={normalizedGoalInput}
+                detail={currentExecutionContextSummary}
+                tone="sky"
+                icon="goal"
+                emphasis="hero"
+              />
+              <MetricCard
+                label="Briefing disponible"
+                value={attachedProjectInputsSummary}
+                detail={
+                  existingProjectContext?.selectedPath
+                    ? 'Hay continuidad seleccionada para analizar en modo read-only.'
+                    : 'Todavia no hay proyecto existente seleccionado.'
+                }
+                tone={attachedProjectInputs.length > 0 ? 'violet' : 'default'}
+                icon="context"
+              />
+              <MetricCard
+                label="Modo operativo"
+                value={getProjectWorkModeLabel(projectWorkMode)}
+                detail={projectWorkModeSummary}
+                tone="amber"
+                icon="workspace"
+              />
+            </div>
+            <div className="mt-4 grid gap-3 xl:grid-cols-3">
+              <ActionTile
+                label="Adjuntar archivos"
+                detail="Sumar referencias, contenido base o documentacion sin salir del briefing."
+                icon="files"
+                tone="sky"
+                onClick={handleAttachInputFiles}
+                disabled={isProjectContextBusy}
+              />
+              <ActionTile
+                label="Adjuntar carpeta"
+                detail="Incorporar una base local completa como insumo operativo o referencia."
+                icon="folder"
+                tone="violet"
+                onClick={handleAttachInputFolder}
+                disabled={isProjectContextBusy}
+              />
+              <ActionTile
+                label="Seleccionar proyecto"
+                detail="Elegir continuidad para inspeccion read-only y orientar el plan."
+                icon="projects"
+                tone="default"
+                onClick={handlePickExistingProject}
+                disabled={isProjectContextBusy}
+              />
+            </div>
+          </article>
+
+          <div className="grid gap-3">
+            <MetricCard
+              label="Participacion del operador"
+              value={
+                userParticipationMode === 'user-will-contribute'
+                  ? 'Aporta activamente'
+                  : userParticipationMode === 'brain-decides-missing'
+                    ? 'Delegada al sistema'
+                    : 'Sin definir'
+              }
+              detail={userParticipationSummary}
+              tone="default"
+              icon="approval"
+              emphasis="hero"
+            />
+            <MetricCard
+              label="Workspace"
+              value={workspacePath || 'No definido'}
+              detail={workspaceStatusLabel}
+              tone="emerald"
+              icon="workspace"
+            />
+            <MetricCard
+              label="Continuidad"
+              value={
+                existingProjectContext?.projectName ||
+                (existingProjectContext?.selectedPath ? 'Proyecto seleccionado' : 'Sin continuidad')
+              }
+              detail={existingProjectContext?.selectedPath || 'Se trabajara solo con texto e insumos.'}
+              tone={existingProjectContext?.selectedPath ? 'violet' : 'default'}
+              icon="projects"
+            />
+          </div>
+        </div>
+
         <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
           <label
             htmlFor="guided-context-input"
@@ -19620,20 +19906,20 @@ function App() {
       }
       quickActions={
         <>
-          <button
-            type="button"
+          <ActionTile
+            label="Consola tecnica"
+            detail="Abrir actividad, trazas y detalle tecnico sin salir del shell principal."
+            icon="activity"
+            tone="default"
             onClick={() => setFlowConsoleVisibility({ open: true, pinned: true })}
-            className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-          >
-            Consola tecnica
-          </button>
-          <button
-            type="button"
+          />
+          <ActionTile
+            label="Panel avanzado"
+            detail="Cambiar al modo tecnico completo para inspeccion y diagnostico profundo."
+            icon="advanced"
+            tone="violet"
             onClick={() => setExperienceMode('advanced')}
-            className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-          >
-            Abrir panel avanzado
-          </button>
+          />
         </>
       }
       navItems={appShellNavItems}
@@ -19719,22 +20005,22 @@ function App() {
             sections={contextPanelSections}
             actions={
               <>
-                <button
-                  type="button"
+                <ActionTile
+                  label="Ver ultima corrida"
+                  detail="Abrir el ultimo cierre operativo sin cambiar de modo."
+                  icon="runs"
+                  tone="sky"
                   onClick={() => setSelectedRunSummary(latestExecutionRunSummary)}
                   disabled={!latestExecutionRunSummary}
-                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
-                >
-                  Ver ultima corrida
-                </button>
-                <button
-                  type="button"
+                />
+                <ActionTile
+                  label="Reiniciar memoria de la sesion"
+                  detail="Limpiar el buffer local cuando hace falta recomponer el contexto."
+                  icon="memory"
+                  tone="default"
                   onClick={handleResetSessionMemory}
                   disabled={isRunning}
-                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
-                >
-                  Reiniciar memoria de la sesion
-                </button>
+                />
               </>
             }
           />
