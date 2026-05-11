@@ -3,9 +3,7 @@ import type { ReactNode } from 'react'
 import {
   DashboardIcon,
   DisclosurePanel,
-  MetricCard,
   ResultStatusBadge,
-  SurfaceHeaderTag,
   type AppIconName,
   type MetricTone,
 } from './AppUiPrimitives'
@@ -47,33 +45,30 @@ export function ContextSummaryPanel({
   const remainingItems = sections.flatMap((section) => section.items).slice(2)
 
   return (
-    <article className="overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.1),transparent_28%),linear-gradient(180deg,rgba(6,11,22,0.97),rgba(8,15,28,0.9))] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.34)] backdrop-blur">
-      <div className="flex items-start justify-between gap-4">
+    <article className="overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(6,11,22,0.97),rgba(8,15,28,0.9))] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.28)] backdrop-blur">
+      <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
             {title}
           </div>
-          <p className="mt-2 text-sm leading-6 text-slate-400">{description}</p>
+          <p className="mt-1 text-sm leading-6 text-slate-400">{description}</p>
         </div>
-        <SurfaceHeaderTag>Resumen</SurfaceHeaderTag>
       </div>
 
       {primaryItem ? (
-        <div className="mt-4 rounded-[22px] border border-sky-300/18 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.14),transparent_38%),linear-gradient(180deg,rgba(56,189,248,0.08),rgba(8,15,28,0.7))] p-4">
+        <div className="mt-4 rounded-[22px] border border-sky-300/18 bg-[linear-gradient(180deg,rgba(56,189,248,0.08),rgba(8,15,28,0.72))] p-4">
           <div className="flex items-start gap-3">
-            <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] border border-sky-300/20 bg-sky-300/14 text-sky-100">
+            <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border border-sky-300/20 bg-sky-300/14 text-sky-100">
               <DashboardIcon
                 name={primaryItem.icon || inferContextIcon(primaryItem.label)}
-                className="h-5 w-5"
+                className="h-4 w-4"
               />
             </div>
             <div className="min-w-0">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100/80">
-                Decision en foco
+                Que sigue
               </div>
-              <div className="mt-2 text-sm font-semibold leading-7 text-white">
-                {primaryItem.value}
-              </div>
+              <div className="mt-2 text-sm font-semibold leading-6 text-white">{primaryItem.value}</div>
               {primaryItem.detail ? (
                 <div className="mt-1 text-xs leading-5 text-slate-200/82">{primaryItem.detail}</div>
               ) : null}
@@ -82,28 +77,39 @@ export function ContextSummaryPanel({
         </div>
       ) : null}
 
-      <div className="mt-4 grid gap-3">
+      <div className="mt-3 grid gap-3">
         {secondaryItem ? (
-          <MetricCard
-            label={secondaryItem.label}
-            value={secondaryItem.value}
-            detail={secondaryItem.detail}
-            tone={secondaryItem.tone || 'default'}
-            icon={secondaryItem.icon || inferContextIcon(secondaryItem.label)}
-          />
+          <div className="rounded-[20px] border border-white/8 bg-white/[0.03] px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  {secondaryItem.label}
+                </div>
+                <div className="mt-1 text-sm font-semibold leading-6 text-slate-100">
+                  {secondaryItem.value}
+                </div>
+                {secondaryItem.detail ? (
+                  <div className="mt-1 text-xs leading-5 text-slate-400">{secondaryItem.detail}</div>
+                ) : null}
+              </div>
+              {secondaryItem.tone ? (
+                <ResultStatusBadge label={secondaryItem.value} tone={secondaryItem.tone} />
+              ) : null}
+            </div>
+          </div>
         ) : null}
-        {actions ? <div className="grid gap-2">{actions}</div> : null}
       </div>
 
-      {remainingItems.length > 0 ? (
+      {remainingItems.length > 0 || actions ? (
         <div className="mt-4">
           <DisclosurePanel
-            title="Ver contexto completo"
-            description="Resumen extendido, ayuda y senales de apoyo a un clic."
+            title="Ver ayuda y detalle"
+            description="Contexto extendido, estado y acciones de apoyo a un clic."
             icon="context"
-            badge={`${remainingItems.length} items`}
+            badge={`${remainingItems.length + (actions ? 1 : 0)} items`}
           >
             <div className="grid gap-2">
+              {actions ? <div className="grid gap-2">{actions}</div> : null}
               {remainingItems.map((item) => (
                 <div
                   key={`${item.label}-${item.value}`}

@@ -29,7 +29,6 @@ import { HomeDashboardPanel } from './components/HomeDashboardPanel'
 import { PlanOverviewPanel } from './components/PlanOverviewPanel'
 import { ProjectInputsPanel } from './components/ProjectInputsPanel'
 import { ResultSummaryPanel } from './components/ResultSummaryPanel'
-import { SystemStatusPanel } from './components/SystemStatusPanel'
 import {
   getPrepareActionButtonLabel,
   getProjectContinuationStatusLabel,
@@ -14058,43 +14057,6 @@ function App() {
             ],
           },
         ]
-  const systemStatusItems = [
-    {
-      label: 'Planificador',
-      value: plannerBadge,
-      detail: activePlannerStrategyLabel,
-      tone: 'sky' as const,
-      icon: 'plan' as const,
-    },
-    {
-      label: 'Ejecutor',
-      value: executorRequestStateLabel,
-      detail: visibleCurrentStepLabel,
-      tone: wizardHasExecutionError ? ('rose' as const) : ('amber' as const),
-      icon: 'execution' as const,
-    },
-    {
-      label: 'Reuse',
-      value: activeReuseModeLabel,
-      detail: activeReuseDetailLabel,
-      tone: 'default' as const,
-      icon: 'memory' as const,
-    },
-    {
-      label: 'Runtime',
-      value: runtimeOnlineLabel,
-      detail: runtimePlatformLabel,
-      tone: runtimeOnlineLabel === 'Online' ? ('emerald' as const) : ('amber' as const),
-      icon: 'runtime' as const,
-    },
-    {
-      label: 'MEMORIA',
-      value: activeContextHubLabel,
-      detail: activeContextHubUiDetail,
-      tone: activeContextHubStatus?.available ? ('emerald' as const) : ('amber' as const),
-      icon: 'context' as const,
-    },
-  ]
   const attachedProjectInputRows = attachedProjectInputs.map((entry) => ({
     id: entry.id,
     kind: entry.kind,
@@ -14235,40 +14197,6 @@ function App() {
     { label: 'Validaciones', status: flowExecutionFinished ? flowExecutionStageStates[4] : 'pending' as const },
     { label: 'Cierre', status: flowExecutionFinished ? 'completed' as const : 'pending' as const },
   ]
-  const guidedOverviewMetrics = [
-    {
-      label: 'Paso actual',
-      value: activeWizardStepConfig.label,
-      detail: activeWizardStepConfig.description,
-      tone: 'sky' as const,
-      icon: 'guided' as const,
-    },
-    {
-      label: 'Objetivo',
-      value: goalInput.trim() ? 'Definido' : 'Pendiente',
-      detail: normalizedGoalInput,
-      tone: goalInput.trim() ? ('emerald' as const) : ('amber' as const),
-      icon: 'goal' as const,
-    },
-    {
-      label: 'Briefing',
-      value:
-        attachedProjectInputs.length > 0
-          ? `${attachedProjectInputs.length} insumo(s)`
-          : existingProjectContext?.selectedPath
-            ? 'Proyecto seleccionado'
-            : 'Sin briefing',
-      detail:
-        existingProjectContext?.projectName ||
-        existingProjectContext?.selectedPath ||
-        'Contexto textual e insumos todavia no consolidados.',
-      tone:
-        attachedProjectInputs.length > 0 || existingProjectContext?.selectedPath
-          ? ('violet' as const)
-          : ('default' as const),
-      icon: 'context' as const,
-    },
-  ]
   const homeFlowItems = GUIDED_WIZARD_STEPS.map((step, index) => ({
     key: step.key,
     index,
@@ -14307,26 +14235,6 @@ function App() {
       setActiveWizardStep(step.key)
     },
   }))
-  const appShellTopMetrics = [
-    <MetricCard
-      key="top-goal"
-      label="Objetivo activo"
-      value={normalizedGoalInput}
-      detail={currentExecutionContextSummary}
-      tone="sky"
-      icon="goal"
-      emphasis="hero"
-    />,
-    <MetricCard
-      key="top-next"
-      label="Siguiente accion"
-      value={guidedStepActionSummaryLabel}
-      detail={guidedStepActionSummaryDetail}
-      tone={decisionPending ? 'amber' : 'violet'}
-      icon="next"
-      progress={Math.round(((activeWizardStepIndex + 1) / GUIDED_WIZARD_STEPS.length) * 100)}
-    />,
-  ]
   const homeDashboardMetrics = [
     {
       label: 'Objetivo actual',
@@ -18798,16 +18706,28 @@ function App() {
             id="guided-goal-input"
             value={goalInput}
             onChange={(event) => setGoalInput(event.target.value)}
-            rows={8}
+            rows={7}
             className="mt-4 min-h-[240px] w-full rounded-[24px] border border-white/10 bg-slate-950/80 px-4 py-4 text-sm leading-7 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300/30"
             placeholder="Ejemplo: Crear una entrega local funcional para una app de turnos médicos con agenda, pacientes, profesionales y reportes."
           />
-          <div className="mt-4 flex flex-wrap gap-2">
-            <ResultStatusBadge label="Paso obligatorio" tone="sky" />
-            <ResultStatusBadge
-              label={goalInput.trim() ? 'Objetivo cargado' : 'Falta definir objetivo'}
-              tone={goalInput.trim() ? 'emerald' : 'amber'}
-            />
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <PrimaryActionButton
+              onClick={handleWizardNext}
+              disabled={!goalInput.trim()}
+              tone="sky"
+              className="sm:w-auto sm:min-w-[220px]"
+            >
+              Preparar contexto
+            </PrimaryActionButton>
+            <SecondaryActionButton
+              onClick={() => setExperienceMode('advanced')}
+              className="sm:w-auto"
+            >
+              Panel avanzado
+            </SecondaryActionButton>
+          </div>
+          <div className="mt-2 text-xs leading-5 text-slate-500">
+            Una frase clara alcanza. Despues podes sumar contexto.
           </div>
         </article>
         <DisclosurePanel
@@ -18831,13 +18751,13 @@ function App() {
       </div>
     ) : activeWizardStep === 'context' ? (
       <div className="space-y-4">
-        <article className="overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.12),transparent_26%),linear-gradient(180deg,rgba(9,17,32,0.96),rgba(8,15,28,0.92))] p-5 shadow-[0_24px_70px_rgba(0,0,0,0.28)]">
+        <article className="hidden">
           <div className="flex flex-wrap items-center gap-2">
             <ResultStatusBadge label="Paso 02" tone="sky" />
             <ResultStatusBadge label="Briefing del proyecto" tone="violet" />
           </div>
           <div className="mt-4 max-w-4xl text-2xl font-semibold tracking-tight text-white">
-            Preparar el contexto antes del plan
+            Preparar el contexto
           </div>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
             Sumá solo lo necesario: contexto adicional, insumos, continuidad y modo de trabajo.
@@ -18898,46 +18818,181 @@ function App() {
           </div>
         </article>
 
-        <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
+        <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
           <label
             htmlFor="guided-context-input"
             className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
           >
-            01. Contexto adicional
+            02. Contexto
           </label>
-          <div className="mt-2 text-xl font-semibold text-white">
-            Alcance, restricciones y notas del operador
+          <div className="mt-2 text-2xl font-semibold text-white">
+            Agrega contexto e insumos
           </div>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+            Suma lo necesario para que JEFE entienda el proyecto.
+          </p>
           <textarea
             id="guided-context-input"
             ref={executionContextInputRef}
             value={executionContextInput}
             onChange={(event) => setExecutionContextInput(event.target.value)}
-            rows={8}
+            rows={5}
             className="mt-4 w-full rounded-[24px] border border-white/10 bg-slate-950/80 px-4 py-4 text-sm leading-7 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300/30"
             placeholder="Sumá restricciones, referencias, alcance, aclaraciones del operador o información operativa útil."
           />
+          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+            <button
+              type="button"
+              onClick={handleAttachInputFiles}
+              disabled={isProjectContextBusy}
+              className="rounded-[22px] border border-white/10 bg-slate-950/60 px-4 py-4 text-left transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <div className="text-sm font-semibold text-white">Adjuntar archivos</div>
+              <div className="mt-1 text-xs leading-5 text-slate-400">
+                Referencias, documentacion o contenido base.
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={handleAttachInputFolder}
+              disabled={isProjectContextBusy}
+              className="rounded-[22px] border border-white/10 bg-slate-950/60 px-4 py-4 text-left transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <div className="text-sm font-semibold text-white">Adjuntar carpeta</div>
+              <div className="mt-1 text-xs leading-5 text-slate-400">
+                Una base local completa como referencia.
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={handlePickExistingProject}
+              disabled={isProjectContextBusy}
+              className="rounded-[22px] border border-white/10 bg-slate-950/60 px-4 py-4 text-left transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <div className="text-sm font-semibold text-white">Seleccionar proyecto existente</div>
+              <div className="mt-1 text-xs leading-5 text-slate-400">
+                Revisar continuidad en modo read-only.
+              </div>
+            </button>
+          </div>
+          {attachedProjectInputRows.length > 0 ? (
+            <div className="mt-4">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                Insumos adjuntos
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {attachedProjectInputRows.slice(0, 4).map((item) => (
+                  <div
+                    key={item.id}
+                    className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-slate-200"
+                  >
+                    <span className="truncate">{item.name}</span>
+                    <ResultStatusBadge label={item.statusLabel} tone="sky" />
+                  </div>
+                ))}
+                {attachedProjectInputRows.length > 4 ? (
+                  <div className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-slate-300">
+                    {`+${attachedProjectInputRows.length - 4} mas`}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+          {existingProjectContext?.selectedPath ? (
+            <div className="mt-4 rounded-[22px] border border-white/8 bg-slate-950/55 px-4 py-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Proyecto existente
+                  </div>
+                  <div className="mt-2 text-sm font-semibold text-slate-100">
+                    {existingProjectContext.projectName || 'Proyecto seleccionado'}
+                  </div>
+                  <div className="mt-1 text-xs leading-5 text-slate-400">
+                    {existingProjectContext.framework ||
+                      existingProjectContext.stack[0] ||
+                      'Stack sin deteccion'}{' '}
+                    {existingProjectContext.gitStatusSummary?.branch
+                      ? ` - ${existingProjectContext.gitStatusSummary.branch}`
+                      : ''}
+                  </div>
+                </div>
+                <ResultStatusBadge label="Analisis seguro listo" tone="emerald" />
+              </div>
+            </div>
+          ) : null}
+          <div className="mt-4">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Modo de trabajo
+            </div>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              {(['auto', 'new-project', 'continue-existing'] as ProjectWorkMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setProjectWorkMode(mode)}
+                  className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
+                    projectWorkMode === mode
+                      ? 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100'
+                      : 'border-white/10 bg-slate-950/60 text-slate-200 hover:bg-white/10'
+                  }`}
+                >
+                  {mode === 'auto'
+                    ? 'Automatico'
+                    : mode === 'new-project'
+                      ? 'Crear proyecto nuevo'
+                      : 'Continuar proyecto existente'}
+                </button>
+              ))}
+            </div>
+            <div className="mt-3 text-xs leading-5 text-slate-500">{projectWorkModeSummary}</div>
+          </div>
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <PrimaryActionButton onClick={handleWizardNext} tone="sky" className="sm:w-auto sm:min-w-[220px]">
+              Continuar
+            </PrimaryActionButton>
+            <SecondaryActionButton
+              onClick={() => setFlowConsoleVisibility({ open: true, pinned: true })}
+              className="sm:w-auto"
+            >
+              Ver detalle tecnico
+            </SecondaryActionButton>
+          </div>
         </article>
 
-        <ProjectInputsPanel
-          summary={attachedProjectInputsSummary}
-          actionMessage={projectContextActionMessage}
-          busy={isProjectContextBusy}
-          items={attachedProjectInputRows}
-          onAttachFiles={handleAttachInputFiles}
-          onAttachFolder={handleAttachInputFolder}
-          onRemove={handleRemoveAttachedProjectInput}
-          onNoteChange={handleAttachedProjectInputNoteChange}
-        />
+        <DisclosurePanel
+          title="Ver insumos adjuntos"
+          description="Lista completa, notas del operador y acciones de quitar."
+          icon="files"
+          badge={`${attachedProjectInputRows.length}`}
+        >
+          <ProjectInputsPanel
+            summary={attachedProjectInputsSummary}
+            actionMessage={projectContextActionMessage}
+            busy={isProjectContextBusy}
+            items={attachedProjectInputRows}
+            onAttachFiles={handleAttachInputFiles}
+            onAttachFolder={handleAttachInputFolder}
+            onRemove={handleRemoveAttachedProjectInput}
+            onNoteChange={handleAttachedProjectInputNoteChange}
+          />
+        </DisclosurePanel>
 
-        <ExistingProjectPanel
-          summary={existingProjectSummary}
-          busy={isProjectContextBusy}
-          project={existingProjectContext}
-          onPick={handlePickExistingProject}
-          onAnalyze={handleAnalyzeExistingProject}
-          onClear={handleClearSelectedProject}
-        />
+        <DisclosurePanel
+          title="Ver analisis del proyecto"
+          description="Scripts, carpetas, entrypoints y protegidos quedan colapsados."
+          icon="projects"
+          badge={existingProjectContext?.selectedPath ? 'Read only' : 'Opcional'}
+        >
+          <ExistingProjectPanel
+            summary={existingProjectSummary}
+            busy={isProjectContextBusy}
+            project={existingProjectContext}
+            onPick={handlePickExistingProject}
+            onAnalyze={handleAnalyzeExistingProject}
+            onClear={handleClearSelectedProject}
+          />
+        </DisclosurePanel>
 
         <DisclosurePanel
           title="Ver modo de trabajo y workspace"
@@ -19763,15 +19818,7 @@ function App() {
     )
 
   const guidedPrimaryAction =
-    activeWizardStep === 'goal' ? (
-      <PrimaryActionButton onClick={handleWizardNext} disabled={!goalInput.trim()} tone="sky">
-        Preparar contexto
-      </PrimaryActionButton>
-    ) : activeWizardStep === 'context' ? (
-      <PrimaryActionButton onClick={handleWizardNext} tone="sky">
-        Continuar
-      </PrimaryActionButton>
-    ) : activeWizardStep === 'brain' ? (
+    activeWizardStep === 'brain' ? (
       <PrimaryActionButton onClick={handleWizardNext} tone="sky">
         Continuar
       </PrimaryActionButton>
@@ -19819,17 +19866,21 @@ function App() {
 
   const guidedFooterActions = (
     <>
-      {activeWizardStep !== 'goal' ? (
-        <SecondaryActionButton onClick={handleWizardBack}>Atrás</SecondaryActionButton>
+      {activeWizardStep !== 'goal' &&
+      activeWizardStep !== 'plan' &&
+      activeWizardStep !== 'execution' &&
+      activeWizardStep !== 'result' ? (
+        <SecondaryActionButton onClick={handleWizardBack} className="sm:w-auto">Atrás</SecondaryActionButton>
       ) : null}
+      {guidedPrimaryAction ? <div className="sm:min-w-[220px]">{guidedPrimaryAction}</div> : null}
     </>
   )
 
   const guidedShell = (
     <AppShell
-      eyebrow="Modo operador simple"
-      title="JEFE te guia paso a paso"
-      description="Primero la accion actual. El detalle tecnico queda disponible solo cuando hace falta."
+      eyebrow="Flujo guiado"
+      title={`Paso ${activeWizardStepIndex + 1} de ${GUIDED_WIZARD_STEPS.length} - ${activeWizardStepConfig.label}`}
+      description=""
       modeSwitcher={
         <div className="inline-flex rounded-2xl border border-white/10 bg-white/[0.04] p-1">
           <button
@@ -19859,125 +19910,34 @@ function App() {
         </div>
       }
       quickActions={
-        <>
-          <SecondaryActionButton
-            onClick={() => setFlowConsoleVisibility({ open: true, pinned: true })}
-            className="w-auto"
-          >
-            Consola técnica
-          </SecondaryActionButton>
-          <SecondaryActionButton onClick={() => setExperienceMode('advanced')} className="w-auto">
-            Panel avanzado
-          </SecondaryActionButton>
-        </>
+        <SecondaryActionButton onClick={() => setExperienceMode('advanced')} className="w-auto">
+          Panel avanzado
+        </SecondaryActionButton>
       }
       navItems={appShellNavItems}
       statusLabel={`${runtimePlatformLabel} / ${runtimeOnlineLabel}`}
       statusDetail={currentWorkspaceSummary}
       statusBadge={activeContextHubStatus?.available ? 'Online' : 'Local'}
-      topMetrics={appShellTopMetrics}
-      operatorPanel={
-        <div className="flex items-center gap-3 px-2 py-1">
-          <div className="rounded-2xl border border-white/10 bg-slate-950/65 px-3 py-2">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Operador
-            </div>
-            <div className="mt-1 text-sm font-semibold text-white">{sessionStatus}</div>
-          </div>
-          <ResultStatusBadge
-            label={decisionPending ? 'Decision pendiente' : runtimeOnlineLabel}
-            tone={decisionPending ? 'amber' : activeContextHubStatus?.available ? 'emerald' : 'default'}
-          />
-        </div>
-      }
-      sidebarInsights={
-        <div className="grid gap-3">
-          <MetricCard
-            label="Paso visible"
-            value={activeWizardStepConfig.label}
-            detail={guidedStepActionSummaryLabel}
-            tone="sky"
-            icon="guided"
-          />
-        </div>
-      }
       mainContent={
         <GuidedFlowShell
           stepIndex={activeWizardStepIndex}
           totalSteps={GUIDED_WIZARD_STEPS.length}
-          title={activeWizardStepConfig.label}
-          description={activeWizardStepConfig.description}
-          overviewMetrics={guidedOverviewMetrics}
-          statusBadges={[
-            {
-              label: 'Planificador',
-              value: plannerBadge,
-              tone: 'sky',
-            },
-            {
-              label: 'Ejecutor',
-              value: executorRequestStateLabel,
-              tone: wizardHasExecutionError ? 'rose' : 'amber',
-            },
-            {
-              label: 'Reuse',
-              value: activeReuseModeLabel,
-              tone: 'violet',
-            },
-            {
-              label: 'MEMORIA',
-              value: activeContextHubLabel,
-              tone: activeContextHubStatus?.available ? 'emerald' : 'amber',
-            },
-          ]}
-          actionSummaryLabel={guidedStepActionSummaryLabel}
-          actionSummaryDetail={guidedStepActionSummaryDetail}
           progressItems={guidedProgressItems}
-          footerNote={guidedFooterNote}
           footerActions={guidedFooterActions}
-          primaryAction={guidedPrimaryAction}
-          secondaryAction={guidedSecondaryAction}
         >
           {guidedStepContent}
         </GuidedFlowShell>
       }
       rightPanel={
-        <div className="space-y-4">
-          <ContextSummaryPanel
-            title="Panel contextual"
-            description="Qué sigue, ayuda breve y contexto mínimo para decidir sin hundirse en detalle técnico."
-            sections={contextPanelSections}
-            actions={
-              <>
-                <ActionTile
-                  label="Ver ultima corrida"
-                  detail="Abrir el ultimo cierre operativo sin cambiar de modo."
-                  icon="runs"
-                  tone="sky"
-                  onClick={() => setSelectedRunSummary(latestExecutionRunSummary)}
-                  disabled={!latestExecutionRunSummary}
-                />
-                <ActionTile
-                  label="Reiniciar memoria de la sesion"
-                  detail="Limpiar el buffer local cuando hace falta recomponer el contexto."
-                  icon="memory"
-                  tone="default"
-                  onClick={handleResetSessionMemory}
-                  disabled={isRunning}
-                />
-              </>
-            }
-          />
-          <SystemStatusPanel items={systemStatusItems} />
-        </div>
+        <ContextSummaryPanel
+          title="Panel contextual"
+          description="Que sigue y ayuda breve, sin robar foco al paso actual."
+          sections={contextPanelSections}
+          actions={guidedSecondaryAction}
+        />
       }
       footer={
-        <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
-          <span>{sessionStatus}</span>
-          <span>
-            {activeExecutionModeLabel} / {activePlannerStrategyLabel} / {runtimeOnlineLabel}
-          </span>
-        </div>
+        <span>{guidedFooterNote}</span>
       }
     />
   )

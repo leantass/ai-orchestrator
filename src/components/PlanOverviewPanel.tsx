@@ -36,8 +36,8 @@ export function PlanOverviewPanel({
   callout?: ReactNode
   technicalDetails?: ReactNode
 }) {
-  const leadMetrics = metrics.slice(0, 2)
-  const supportMetrics = metrics.slice(2)
+  const leadMetrics = metrics.slice(0, 1)
+  const supportMetrics = metrics.slice(1)
 
   return (
     <div className="space-y-4">
@@ -46,7 +46,6 @@ export function PlanOverviewPanel({
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               <ResultStatusBadge label={title} tone="sky" />
-              <ResultStatusBadge label="Plan ejecutivo" tone="violet" />
             </div>
             <div className="rounded-[28px] border border-white/8 bg-slate-950/55 p-4">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -57,7 +56,7 @@ export function PlanOverviewPanel({
               </div>
               <div className="mt-3 text-xs leading-5 text-slate-400">{helperText}</div>
             </div>
-            <div className="grid gap-3 xl:grid-cols-2">
+            <div className="grid gap-3">
               {leadMetrics.map((metric, index) => (
                 <MetricCard
                   key={`${metric.label}-${metric.value}`}
@@ -73,13 +72,7 @@ export function PlanOverviewPanel({
           </div>
 
           <div className="space-y-4">
-            <ResultSectionCard
-              title="Siguiente accion"
-              description="El CTA principal domina. Todo lo demas acompana."
-              icon="next"
-              badge="Accion"
-              tone="sky"
-            >
+            <ResultSectionCard title="Siguiente accion" description="Hace foco en la decision operativa." icon="next" badge="Accion" tone="sky">
               <div className="grid gap-2">
                 {primaryAction}
                 {secondaryActions}

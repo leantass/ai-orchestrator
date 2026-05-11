@@ -2,7 +2,6 @@ import type { ReactNode } from 'react'
 
 import {
   DashboardIcon,
-  DisclosurePanel,
   ResultStatusBadge,
   SidebarSectionButton,
   SurfaceHeaderTag,
@@ -66,9 +65,6 @@ export function AppShell({
   mainContent,
   rightPanel,
   footer,
-  topMetrics,
-  operatorPanel,
-  sidebarInsights,
 }: {
   eyebrow: string
   title: string
@@ -82,9 +78,6 @@ export function AppShell({
   mainContent: ReactNode
   rightPanel?: ReactNode
   footer?: ReactNode
-  topMetrics?: ReactNode
-  operatorPanel?: ReactNode
-  sidebarInsights?: ReactNode
 }) {
   const groupedItems = navItems.reduce<Record<string, AppShellNavItem[]>>((accumulator, item) => {
     const groupKey = item.group || 'Operacion'
@@ -97,38 +90,25 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-transparent text-slate-100">
-      <div className="mx-auto flex w-full max-w-[1840px] gap-4 px-4 py-4 sm:px-6 xl:px-8">
-        <aside className="hidden w-[282px] shrink-0 xl:block">
+      <div className="mx-auto flex w-full max-w-[1720px] gap-4 px-4 py-4 sm:px-6 xl:px-8">
+        <aside className="hidden w-[248px] shrink-0 xl:block">
           <div className="sticky top-4 space-y-4">
-            <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.16),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(167,139,250,0.14),transparent_28%),linear-gradient(180deg,rgba(5,10,21,0.98),rgba(8,15,28,0.9))] p-5 shadow-[0_30px_90px_rgba(0,0,0,0.42)] backdrop-blur">
+            <section className="overflow-hidden rounded-[22px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_34%),linear-gradient(180deg,rgba(5,10,21,0.98),rgba(8,15,28,0.9))] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.3)] backdrop-blur">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="text-[11px] font-semibold uppercase tracking-[0.34em] text-cyan-200/80">
                     JEFE
                   </div>
-                  <div className="mt-3 text-[24px] font-semibold tracking-tight text-white">Modo operador</div>
-                  <p className="mt-3 text-sm leading-6 text-slate-400">
-                    Menos ruido, una accion clara y detalle tecnico a demanda.
-                  </p>
+                  <div className="mt-2 text-base font-semibold tracking-tight text-white">Flujo simple</div>
+                  <p className="mt-1 text-xs leading-5 text-slate-400">Una accion clara por paso.</p>
                 </div>
-                <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">
-                  <DashboardIcon name="flow" className="h-5 w-5" />
+                <div className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">
+                  <DashboardIcon name="flow" className="h-4 w-4" />
                 </div>
               </div>
             </section>
 
-            {sidebarInsights ? (
-              <DisclosurePanel
-                title="Ver foco del flujo"
-                description="Estado rapido del recorrido actual."
-                icon="guided"
-                badge="Resumen"
-              >
-                {sidebarInsights}
-              </DisclosurePanel>
-            ) : null}
-
-            <section className="rounded-[28px] border border-white/10 bg-slate-950/72 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.34)] backdrop-blur">
+            <section className="rounded-[24px] border border-white/10 bg-slate-950/72 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.34)] backdrop-blur">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
                   Navegacion
@@ -191,14 +171,14 @@ export function AppShell({
               </div>
             </section>
 
-            <section className="rounded-[24px] border border-white/10 bg-slate-950/72 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.34)] backdrop-blur">
+            <section className="rounded-[20px] border border-white/10 bg-slate-950/72 p-4 shadow-[0_18px_44px_rgba(0,0,0,0.24)] backdrop-blur">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
                     Sistema
                   </div>
                   <div className="mt-2 text-sm font-semibold text-white">{statusLabel}</div>
-                  <div className="mt-2 text-xs leading-5 text-slate-400">{statusDetail}</div>
+                  <div className="mt-1 text-xs leading-5 text-slate-400">{statusDetail}</div>
                 </div>
                 {statusBadge ? <ResultStatusBadge label={statusBadge} tone="emerald" /> : null}
               </div>
@@ -207,38 +187,26 @@ export function AppShell({
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.12),transparent_24%),radial-gradient(circle_at_70%_10%,rgba(167,139,250,0.08),transparent_18%),linear-gradient(180deg,rgba(6,11,22,0.98),rgba(8,15,28,0.9))] px-5 py-5 shadow-[0_32px_96px_rgba(0,0,0,0.38)] backdrop-blur sm:px-6">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between">
-                <div className="max-w-3xl">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.34em] text-cyan-200/78">
-                      {eyebrow}
-                    </div>
-                    <SurfaceHeaderTag>Uso simple</SurfaceHeaderTag>
+          <header className="overflow-hidden rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(6,11,22,0.98),rgba(8,15,28,0.9))] px-4 py-3 shadow-[0_18px_50px_rgba(0,0,0,0.28)] backdrop-blur sm:px-5">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0 max-w-2xl">
+                {eyebrow ? (
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-cyan-200/72">
+                    {eyebrow}
                   </div>
-                  <div className="mt-3 max-w-3xl text-[2rem] font-semibold tracking-tight text-white sm:text-[2.2rem]">
-                    {title}
-                  </div>
-                  <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400 sm:text-[15px]">
-                    {description}
-                  </p>
+                ) : null}
+                <div className="mt-1 text-base font-semibold tracking-tight text-white sm:text-lg">
+                  {title}
                 </div>
-
-                <div className="flex w-full max-w-[480px] flex-col gap-3 2xl:items-end">
-                  <div className="flex w-full flex-col gap-3 xl:flex-row xl:items-center xl:justify-end">
-                    <div className="w-full xl:max-w-[280px]">{modeSwitcher}</div>
-                    {operatorPanel ? (
-                      <div className="rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-2">
-                        {operatorPanel}
-                      </div>
-                    ) : null}
-                  </div>
-                  {quickActions ? <div className="flex w-full flex-wrap gap-2">{quickActions}</div> : null}
-                </div>
+                {description ? (
+                  <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-400">{description}</p>
+                ) : null}
               </div>
 
-              {topMetrics ? <div className="grid gap-3 lg:grid-cols-2">{topMetrics}</div> : null}
+              <div className="flex w-full flex-col gap-2 lg:max-w-[420px] lg:items-end">
+                <div className="w-full lg:max-w-[260px]">{modeSwitcher}</div>
+                {quickActions ? <div className="flex w-full flex-wrap gap-2 lg:justify-end">{quickActions}</div> : null}
+              </div>
             </div>
           </header>
 
@@ -271,13 +239,13 @@ export function AppShell({
             </div>
           </div>
 
-          <div className="mt-4 grid gap-4 2xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="mt-4 grid gap-4 2xl:grid-cols-[minmax(0,1fr)_300px]">
             <div className="min-w-0">{mainContent}</div>
             {rightPanel ? <aside className="min-w-0">{rightPanel}</aside> : null}
           </div>
 
           {footer ? (
-            <footer className="mt-4 rounded-[24px] border border-white/8 bg-slate-950/60 px-4 py-3 text-sm text-slate-400 shadow-[0_12px_40px_rgba(0,0,0,0.24)] backdrop-blur sm:px-5">
+            <footer className="mt-4 rounded-[20px] border border-white/8 bg-slate-950/60 px-4 py-3 text-sm text-slate-400 shadow-[0_12px_34px_rgba(0,0,0,0.22)] backdrop-blur sm:px-5">
               {footer}
             </footer>
           ) : null}

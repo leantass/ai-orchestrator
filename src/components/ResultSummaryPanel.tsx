@@ -48,8 +48,8 @@ export function ResultSummaryPanel({
   actions?: ReactNode
   technicalSections?: ReactNode
 }) {
-  const heroItems = summaryItems.slice(0, 2)
-  const supportItems = summaryItems.slice(2)
+  const heroItems = summaryItems.slice(0, 1)
+  const supportItems = summaryItems.slice(1)
   const visibleNextSteps = nextStepItems.slice(0, 1)
   const hiddenNextSteps = nextStepItems.slice(1)
 
@@ -72,7 +72,7 @@ export function ResultSummaryPanel({
               </div>
             </div>
 
-            <div className="grid gap-3 xl:grid-cols-2">
+            <div className="grid gap-3">
               {heroItems.map((item, index) => (
                 <MetricCard
                   key={`${item.label}-${item.value}`}

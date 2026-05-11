@@ -51,10 +51,10 @@ export function ExecutionTimeline({
   const completedStages = stages.filter((stage) => stage.status === 'completed').length
   const activeStage = stages.find((stage) => stage.status === 'active')
   const progressPercent = stages.length > 0 ? Math.round((completedStages / stages.length) * 100) : 0
-  const visibleMetrics = metrics.slice(0, 2)
-  const supportMetrics = metrics.slice(2)
-  const visibleActivity = activity.slice(0, 2)
-  const hiddenActivity = activity.slice(2)
+  const visibleMetrics = metrics.slice(0, 1)
+  const supportMetrics = metrics.slice(1)
+  const visibleActivity = activity.slice(0, 1)
+  const hiddenActivity = activity.slice(1)
   const resultPreview = result.length > 280 ? `${result.slice(0, 280)}...` : result
 
   return (
@@ -70,11 +70,10 @@ export function ExecutionTimeline({
               <ResultStatusBadge label="Tablero operativo" tone="violet" />
             </div>
             <div className="text-2xl font-semibold tracking-tight text-white">
-              Seguir la ejecucion sin abrir toda la consola
+              Estado de ejecucion
             </div>
             <p className="text-sm leading-6 text-slate-400">
-              La vista principal prioriza estado, progreso y accion del operador. Los detalles
-              largos siguen disponibles como segundo nivel.
+              Mira la etapa actual y segui solo la accion que corresponde.
             </p>
 
             {blockedMessage ? (
@@ -86,7 +85,7 @@ export function ExecutionTimeline({
               />
             ) : null}
 
-            <div className="grid gap-3 xl:grid-cols-2">
+            <div className="grid gap-3">
               {visibleMetrics.map((metric, index) => (
                 <MetricCard
                   key={`${metric.label}-${metric.value}`}
@@ -102,56 +101,68 @@ export function ExecutionTimeline({
                         ? 'activity'
                         : 'execution')
                   }
-                  emphasis={index === 0 ? 'hero' : 'compact'}
-                  progress={index === 1 ? progressPercent : undefined}
+                  emphasis="hero"
                 />
               ))}
             </div>
 
-            <div className="rounded-[26px] border border-white/8 bg-slate-950/55 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Fases visibles
-                </div>
-                <ResultStatusBadge label={`${progressPercent}%`} tone={activeStage ? 'sky' : 'default'} />
-              </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                {stages.map((stage, index) => (
-                  <div
-                    key={stage.label}
-                    className="rounded-[22px] border border-white/8 bg-white/[0.03] px-4 py-4"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border border-white/10 bg-slate-950/60 text-slate-200">
-                          <DashboardIcon name={stageIcons[index] || 'flow'} className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                            {String(index + 1).padStart(2, '0')}
+            <DisclosurePanel
+              title="Ver fases y actividad"
+              description="La cronologia completa queda fuera del foco principal."
+              icon="activity"
+              badge={`${stages.length + activity.length}`}
+            >
+              <div className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  {stages.map((stage, index) => (
+                    <div
+                      key={stage.label}
+                      className="rounded-[22px] border border-white/8 bg-white/[0.03] px-4 py-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border border-white/10 bg-slate-950/60 text-slate-200">
+                            <DashboardIcon name={stageIcons[index] || 'flow'} className="h-4 w-4" />
                           </div>
-                          <div className="mt-1 text-sm font-semibold text-slate-100">{stage.label}</div>
+                          <div>
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              {String(index + 1).padStart(2, '0')}
+                            </div>
+                            <div className="mt-1 text-sm font-semibold text-slate-100">{stage.label}</div>
+                          </div>
                         </div>
+                        <ResultStatusBadge
+                          label={
+                            stage.status === 'active'
+                              ? 'Activa'
+                              : stage.status === 'completed'
+                                ? 'Lista'
+                                : stage.status === 'error'
+                                  ? 'Error'
+                                  : stage.status === 'not-required'
+                                    ? 'No aplica'
+                                    : 'Pendiente'
+                          }
+                          tone={stageStatusToneMap[stage.status]}
+                        />
                       </div>
-                      <ResultStatusBadge
-                        label={
-                          stage.status === 'active'
-                            ? 'Activa'
-                            : stage.status === 'completed'
-                              ? 'Lista'
-                              : stage.status === 'error'
-                                ? 'Error'
-                                : stage.status === 'not-required'
-                                  ? 'No aplica'
-                                  : 'Pendiente'
-                        }
-                        tone={stageStatusToneMap[stage.status]}
-                      />
                     </div>
+                  ))}
+                </div>
+                {hiddenActivity.length > 0 ? (
+                  <div className="grid gap-2">
+                    {hiddenActivity.map((entry, index) => (
+                      <div
+                        key={`${index + 1}-hidden-${entry}`}
+                        className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3 text-sm leading-6 text-slate-200"
+                      >
+                        {entry}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                ) : null}
               </div>
-            </div>
+            </DisclosurePanel>
           </div>
 
           <div className="space-y-4">
@@ -185,27 +196,6 @@ export function ExecutionTimeline({
                   <div className="text-sm text-slate-400">Aun no hay actividad reciente para mostrar.</div>
                 )}
               </div>
-              {hiddenActivity.length > 0 ? (
-                <div className="mt-4">
-                  <DisclosurePanel
-                    title="Ver actividad completa"
-                    description="Cronologia extendida del tablero."
-                    icon="activity"
-                    badge={`${hiddenActivity.length} mas`}
-                  >
-                    <div className="grid gap-2">
-                      {hiddenActivity.map((entry, index) => (
-                        <div
-                          key={`${index + 1}-hidden-${entry}`}
-                          className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3 text-sm leading-6 text-slate-200"
-                        >
-                          {entry}
-                        </div>
-                      ))}
-                    </div>
-                  </DisclosurePanel>
-                </div>
-              ) : null}
             </ResultSectionCard>
           </div>
         </div>
