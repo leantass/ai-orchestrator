@@ -29,16 +29,16 @@ export function SystemStatusPanel({
     icon?: AppIconName
   }>
 }) {
-  const highlighted = items.slice(0, 2)
-  const support = items.slice(2)
+  const highlighted = items.slice(0, 1)
+  const support = items.slice(1)
 
   return (
-    <article className="overflow-hidden rounded-[30px] border border-white/10 bg-slate-950/74 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.38)] backdrop-blur">
+    <article className="overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/74 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.32)] backdrop-blur">
       <div className="flex items-center justify-between gap-3">
         <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
           {title}
         </div>
-        <ResultStatusBadge label={`${items.length} nodos`} tone="default" />
+        <ResultStatusBadge label={highlighted[0]?.value || `${items.length} nodos`} tone={highlighted[0]?.tone || 'default'} />
       </div>
 
       {highlighted.length > 0 ? (
@@ -60,8 +60,8 @@ export function SystemStatusPanel({
       {support.length > 0 ? (
         <div className="mt-4">
           <DisclosurePanel
-            title="Ver estado extendido"
-            description="Runtime, reuse y otras senales tecnicas quedan en segundo nivel."
+            title="Ver detalle del sistema"
+            description="Runtime, reuse, memoria y soporte tecnico quedan en segundo nivel."
             icon="services"
             badge={`${support.length}`}
           >

@@ -217,9 +217,9 @@ export function SidebarSectionButton({
           </div>
           <div className="min-w-0">
             <div className="text-sm font-semibold">{label}</div>
-            <div className="mt-1 text-xs leading-5 text-slate-500">
-              {active ? description : description.split('.')[0]}
-            </div>
+            {active ? (
+              <div className="mt-1 text-xs leading-5 text-slate-500">{description}</div>
+            ) : null}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -370,7 +370,7 @@ export function ActionTile({
   const content = (
     <div
       className={joinClasses(
-        'group relative overflow-hidden rounded-[22px] border px-4 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition',
+        'group relative overflow-hidden rounded-[20px] border px-3.5 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition',
         tonePanelClassName[tone],
         disabled ? 'cursor-not-allowed opacity-60' : 'hover:border-white/16 hover:bg-white/[0.06]',
       )}
@@ -378,7 +378,7 @@ export function ActionTile({
       <div className="flex items-start gap-3">
         <div
           className={joinClasses(
-            'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border',
+            'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] border',
             toneIconClassName[tone],
           )}
         >
@@ -389,7 +389,7 @@ export function ActionTile({
             <div className="text-sm font-semibold text-white">{label}</div>
             {badge ? <SurfaceHeaderTag>{badge}</SurfaceHeaderTag> : null}
           </div>
-          <div className="mt-1.5 text-xs leading-5 text-slate-400">{detail}</div>
+          <div className="mt-1 text-xs leading-5 text-slate-400">{detail}</div>
         </div>
       </div>
     </div>
@@ -404,6 +404,74 @@ export function ActionTile({
   }
 
   return content
+}
+
+export function PrimaryActionButton({
+  children,
+  onClick,
+  disabled,
+  tone = 'sky',
+  className,
+}: {
+  children: ReactNode
+  onClick?: () => void
+  disabled?: boolean
+  tone?: MetricTone
+  className?: string
+}) {
+  const toneClassName: Record<MetricTone, string> = {
+    default:
+      'border-white/12 bg-white/[0.08] text-white hover:bg-white/[0.12] shadow-[0_18px_40px_rgba(15,23,42,0.38)]',
+    sky: 'border-sky-300/20 bg-sky-300/12 text-sky-50 hover:bg-sky-300/18 shadow-[0_20px_44px_rgba(56,189,248,0.18)]',
+    emerald:
+      'border-emerald-300/20 bg-emerald-300/12 text-emerald-50 hover:bg-emerald-300/18 shadow-[0_20px_44px_rgba(52,211,153,0.16)]',
+    amber:
+      'border-amber-300/20 bg-amber-300/12 text-amber-50 hover:bg-amber-300/18 shadow-[0_20px_44px_rgba(251,191,36,0.16)]',
+    rose: 'border-rose-300/20 bg-rose-300/12 text-rose-50 hover:bg-rose-300/18 shadow-[0_20px_44px_rgba(251,113,133,0.16)]',
+    violet:
+      'border-violet-300/20 bg-violet-300/12 text-violet-50 hover:bg-violet-300/18 shadow-[0_20px_44px_rgba(167,139,250,0.18)]',
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={joinClasses(
+        'w-full rounded-[20px] border px-4 py-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-slate-500',
+        toneClassName[tone],
+        className,
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+export function SecondaryActionButton({
+  children,
+  onClick,
+  disabled,
+  className,
+}: {
+  children: ReactNode
+  onClick?: () => void
+  disabled?: boolean
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={joinClasses(
+        'w-full rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:text-slate-500',
+        className,
+      )}
+    >
+      {children}
+    </button>
+  )
 }
 
 export function ProgressMeter({
@@ -519,38 +587,45 @@ export function DisclosurePanel({
   return (
     <details
       open={defaultOpen}
-      className={joinClasses(
-        'rounded-[24px] border px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]',
-        tonePanelClassName[tone],
-      )}
+      className="group"
     >
-      <summary className="cursor-pointer list-none">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
-            <div
-              className={joinClasses(
-                'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border',
-                toneIconClassName[tone],
-              )}
-            >
-              <DashboardIcon name={icon} className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  {title}
-                </div>
-                {badge ? <SurfaceHeaderTag>{badge}</SurfaceHeaderTag> : null}
+      <div
+        className={joinClasses(
+          'rounded-[24px] border px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]',
+          tonePanelClassName[tone],
+        )}
+      >
+        <summary className="cursor-pointer list-none">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <div
+                className={joinClasses(
+                  'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border',
+                  toneIconClassName[tone],
+                )}
+              >
+                <DashboardIcon name={icon} className="h-4 w-4" />
               </div>
-              {description ? (
-                <div className="mt-1 text-sm leading-6 text-slate-400">{description}</div>
-              ) : null}
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    {title}
+                  </div>
+                  {badge ? <SurfaceHeaderTag>{badge}</SurfaceHeaderTag> : null}
+                </div>
+                {description ? (
+                  <div className="mt-1 text-sm leading-6 text-slate-400">{description}</div>
+                ) : null}
+              </div>
             </div>
+            <ChevronRight
+              className="mt-1 h-4 w-4 shrink-0 text-slate-500 transition group-open:rotate-90"
+              strokeWidth={1.8}
+            />
           </div>
-          <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-500" strokeWidth={1.8} />
-        </div>
-      </summary>
-      <div className="mt-4">{children}</div>
+        </summary>
+        <div className="mt-4">{children}</div>
+      </div>
     </details>
   )
 }

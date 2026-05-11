@@ -10,9 +10,11 @@ import {
   ActionTile,
   DisclosurePanel,
   MetricCard,
+  PrimaryActionButton,
   ResultKeyValueGrid,
   ResultSectionCard,
   ResultStatusBadge,
+  SecondaryActionButton,
   SectionHeader,
   SidebarSectionButton,
   type MetricTone,
@@ -14316,22 +14318,13 @@ function App() {
       emphasis="hero"
     />,
     <MetricCard
-      key="top-step"
-      label="Paso visible"
-      value={activeWizardStepConfig.label}
-      detail={guidedStepActionSummaryLabel}
-      tone="violet"
-      icon="guided"
-      emphasis="hero"
-      progress={Math.round(((activeWizardStepIndex + 1) / GUIDED_WIZARD_STEPS.length) * 100)}
-    />,
-    <MetricCard
       key="top-next"
       label="Siguiente accion"
       value={guidedStepActionSummaryLabel}
       detail={guidedStepActionSummaryDetail}
-      tone={decisionPending ? 'amber' : 'default'}
+      tone={decisionPending ? 'amber' : 'violet'}
       icon="next"
+      progress={Math.round(((activeWizardStepIndex + 1) / GUIDED_WIZARD_STEPS.length) * 100)}
     />,
   ]
   const homeDashboardMetrics = [
@@ -18787,20 +18780,19 @@ function App() {
 
   const guidedStepContent =
     activeWizardStep === 'goal' ? (
-      <div className="grid gap-4">
-        <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
+      <div className="space-y-4">
+        <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
           <label
             htmlFor="guided-goal-input"
             className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
           >
             01. Objetivo
           </label>
-          <div className="mt-2 text-xl font-semibold text-white">
-            Qué tiene que resolver JEFE
+          <div className="mt-2 text-2xl font-semibold text-white">
+            Que queres que haga JEFE?
           </div>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-            El objetivo es el ancla del recorrido. Si queda preciso, el resto del
-            flujo se entiende más rápido y el planner necesita menos aclaraciones.
+            Escribí el resultado esperado y cualquier límite importante.
           </p>
           <textarea
             id="guided-goal-input"
@@ -18808,115 +18800,103 @@ function App() {
             onChange={(event) => setGoalInput(event.target.value)}
             rows={8}
             className="mt-4 min-h-[240px] w-full rounded-[24px] border border-white/10 bg-slate-950/80 px-4 py-4 text-sm leading-7 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300/30"
-            placeholder="Escribí qué querés que JEFE resuelva, qué resultado esperás y cualquier límite importante."
+            placeholder="Ejemplo: Crear una entrega local funcional para una app de turnos médicos con agenda, pacientes, profesionales y reportes."
           />
+          <div className="mt-4 flex flex-wrap gap-2">
+            <ResultStatusBadge label="Paso obligatorio" tone="sky" />
+            <ResultStatusBadge
+              label={goalInput.trim() ? 'Objetivo cargado' : 'Falta definir objetivo'}
+              tone={goalInput.trim() ? 'emerald' : 'amber'}
+            />
+          </div>
         </article>
+        <DisclosurePanel
+          title="Ver ejemplos de objetivo"
+          description="Tres referencias breves para arrancar sin sobrepensar el formato."
+          icon="goal"
+          badge="Opcional"
+        >
+          <div className="grid gap-2">
+            <div className="rounded-[20px] border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200">
+              Crear una entrega local funcional para una veterinaria con turnos, pacientes, historia clínica y caja.
+            </div>
+            <div className="rounded-[20px] border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200">
+              Continuar un proyecto Vite + React existente y sumarle reportes de ventas sin tocar deploy ni integraciones reales.
+            </div>
+            <div className="rounded-[20px] border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200">
+              Preparar una fase segura de review-and-expand para un sistema local de turnos médicos.
+            </div>
+          </div>
+        </DisclosurePanel>
       </div>
     ) : activeWizardStep === 'context' ? (
       <div className="space-y-4">
-        <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]">
-          <article className="overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.16),transparent_26%),radial-gradient(circle_at_72%_14%,rgba(167,139,250,0.1),transparent_20%),linear-gradient(180deg,rgba(9,17,32,0.96),rgba(8,15,28,0.92))] p-5 shadow-[0_26px_80px_rgba(0,0,0,0.28)]">
-            <div className="flex flex-wrap items-center gap-2">
-              <ResultStatusBadge label="Paso 02" tone="sky" />
-              <ResultStatusBadge label="Briefing control center" tone="violet" />
-            </div>
-            <div className="mt-4 max-w-4xl text-2xl font-semibold tracking-tight text-white sm:text-[2rem]">
-              Preparar el contexto antes de planificar
-            </div>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
-              Este tablero concentra objetivo, restricciones, continuidad, insumos y modo de trabajo
-              para que el planner reciba un briefing mas claro y menos fragmentado.
-            </p>
-            <div className="mt-4 grid gap-3 xl:grid-cols-3">
-              <MetricCard
-                label="Objetivo en foco"
-                value={normalizedGoalInput}
-                detail={currentExecutionContextSummary}
-                tone="sky"
-                icon="goal"
-                emphasis="hero"
-              />
-              <MetricCard
-                label="Briefing disponible"
-                value={attachedProjectInputsSummary}
-                detail={
-                  existingProjectContext?.selectedPath
-                    ? 'Hay continuidad seleccionada para analizar en modo read-only.'
-                    : 'Todavia no hay proyecto existente seleccionado.'
-                }
-                tone={attachedProjectInputs.length > 0 ? 'violet' : 'default'}
-                icon="context"
-              />
-              <MetricCard
-                label="Modo operativo"
-                value={getProjectWorkModeLabel(projectWorkMode)}
-                detail={projectWorkModeSummary}
-                tone="amber"
-                icon="workspace"
-              />
-            </div>
-            <div className="mt-4 grid gap-3 xl:grid-cols-3">
-              <ActionTile
-                label="Adjuntar archivos"
-                detail="Sumar referencias, contenido base o documentacion sin salir del briefing."
-                icon="files"
-                tone="sky"
-                onClick={handleAttachInputFiles}
-                disabled={isProjectContextBusy}
-              />
-              <ActionTile
-                label="Adjuntar carpeta"
-                detail="Incorporar una base local completa como insumo operativo o referencia."
-                icon="folder"
-                tone="violet"
-                onClick={handleAttachInputFolder}
-                disabled={isProjectContextBusy}
-              />
-              <ActionTile
-                label="Seleccionar proyecto"
-                detail="Elegir continuidad para inspeccion read-only y orientar el plan."
-                icon="projects"
-                tone="default"
-                onClick={handlePickExistingProject}
-                disabled={isProjectContextBusy}
-              />
-            </div>
-          </article>
-
-          <div className="grid gap-3">
-            <MetricCard
-              label="Participacion del operador"
-              value={
-                userParticipationMode === 'user-will-contribute'
-                  ? 'Aporta activamente'
-                  : userParticipationMode === 'brain-decides-missing'
-                    ? 'Delegada al sistema'
-                    : 'Sin definir'
-              }
-              detail={userParticipationSummary}
+        <article className="overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.12),transparent_26%),linear-gradient(180deg,rgba(9,17,32,0.96),rgba(8,15,28,0.92))] p-5 shadow-[0_24px_70px_rgba(0,0,0,0.28)]">
+          <div className="flex flex-wrap items-center gap-2">
+            <ResultStatusBadge label="Paso 02" tone="sky" />
+            <ResultStatusBadge label="Briefing del proyecto" tone="violet" />
+          </div>
+          <div className="mt-4 max-w-4xl text-2xl font-semibold tracking-tight text-white">
+            Preparar el contexto antes del plan
+          </div>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+            Sumá solo lo necesario: contexto adicional, insumos, continuidad y modo de trabajo.
+          </p>
+          <div className="mt-4 grid gap-3 xl:grid-cols-3">
+            <ActionTile
+              label="Adjuntar archivos"
+              detail="Sumar referencias, contenido base o documentación."
+              icon="files"
+              tone="sky"
+              onClick={handleAttachInputFiles}
+              disabled={isProjectContextBusy}
+            />
+            <ActionTile
+              label="Adjuntar carpeta"
+              detail="Incorporar una base local completa como referencia."
+              icon="folder"
+              tone="violet"
+              onClick={handleAttachInputFolder}
+              disabled={isProjectContextBusy}
+            />
+            <ActionTile
+              label="Seleccionar proyecto existente"
+              detail="Elegir continuidad para revisar en modo read-only."
+              icon="projects"
               tone="default"
-              icon="approval"
+              onClick={handlePickExistingProject}
+              disabled={isProjectContextBusy}
+            />
+          </div>
+          <div className="mt-4 grid gap-3 xl:grid-cols-3">
+            <MetricCard
+              label="Objetivo en foco"
+              value={normalizedGoalInput}
+              detail={currentExecutionContextSummary}
+              tone="sky"
+              icon="goal"
               emphasis="hero"
             />
             <MetricCard
-              label="Workspace"
-              value={workspacePath || 'No definido'}
-              detail={workspaceStatusLabel}
-              tone="emerald"
-              icon="workspace"
+              label="Briefing"
+              value={attachedProjectInputsSummary}
+              detail={
+                existingProjectContext?.selectedPath
+                  ? 'Hay continuidad seleccionada.'
+                  : 'Todavía no hay continuidad seleccionada.'
+              }
+              tone={attachedProjectInputs.length > 0 ? 'violet' : 'default'}
+              icon="context"
             />
             <MetricCard
-              label="Continuidad"
-              value={
-                existingProjectContext?.projectName ||
-                (existingProjectContext?.selectedPath ? 'Proyecto seleccionado' : 'Sin continuidad')
-              }
-              detail={existingProjectContext?.selectedPath || 'Se trabajara solo con texto e insumos.'}
-              tone={existingProjectContext?.selectedPath ? 'violet' : 'default'}
-              icon="projects"
+              label="Modo"
+              value={getProjectWorkModeLabel(projectWorkMode)}
+              detail={projectWorkModeSummary}
+              tone="amber"
+              icon="workspace"
             />
           </div>
-        </div>
+        </article>
 
         <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
           <label
@@ -18959,138 +18939,131 @@ function App() {
           onClear={handleClearSelectedProject}
         />
 
-        <div className="grid gap-4 xl:grid-cols-2">
-          <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-              04. Modo de trabajo
-            </div>
-            <div className="mt-4 grid gap-4">
-              <div>
-                <div className="text-sm font-semibold text-white">Participación del operador</div>
-                <div className="mt-3 grid gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setUserParticipationMode('user-will-contribute')}
-                    className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
-                      userParticipationMode === 'user-will-contribute'
-                        ? 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100'
-                        : 'border-white/10 bg-slate-950/60 text-slate-200 hover:bg-white/10'
-                    }`}
-                  >
-                    Sí, voy a aportar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setUserParticipationMode('brain-decides-missing')}
-                    className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
-                      userParticipationMode === 'brain-decides-missing'
-                        ? 'border-emerald-300/30 bg-emerald-300/10 text-emerald-100'
-                        : 'border-white/10 bg-slate-950/60 text-slate-200 hover:bg-white/10'
-                    }`}
-                  >
-                    No, decidí vos
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setUserParticipationMode(DEFAULT_USER_PARTICIPATION_MODE)}
-                    className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-left text-sm font-medium text-slate-300 transition hover:bg-white/10"
-                  >
-                    Sin definir
-                  </button>
-                </div>
-                <div className="mt-3 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                  {userParticipationSummary}
-                </div>
+        <DisclosurePanel
+          title="Ver modo de trabajo y workspace"
+          description="Participación del operador, ruta elegida y espacio de trabajo."
+          icon="workspace"
+          badge="Opcional"
+        >
+          <div className="grid gap-4 xl:grid-cols-2">
+            <article className="rounded-[24px] border border-white/8 bg-slate-950/50 p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Modo de trabajo
               </div>
+              <div className="mt-4 grid gap-4">
+                <div>
+                  <div className="text-sm font-semibold text-white">Participación del operador</div>
+                  <div className="mt-3 grid gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setUserParticipationMode('user-will-contribute')}
+                      className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
+                        userParticipationMode === 'user-will-contribute'
+                          ? 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100'
+                          : 'border-white/10 bg-slate-950/60 text-slate-200 hover:bg-white/10'
+                      }`}
+                    >
+                      Sí, voy a aportar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUserParticipationMode('brain-decides-missing')}
+                      className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
+                        userParticipationMode === 'brain-decides-missing'
+                          ? 'border-emerald-300/30 bg-emerald-300/10 text-emerald-100'
+                          : 'border-white/10 bg-slate-950/60 text-slate-200 hover:bg-white/10'
+                      }`}
+                    >
+                      No, decidí vos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUserParticipationMode(DEFAULT_USER_PARTICIPATION_MODE)}
+                      className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-left text-sm font-medium text-slate-300 transition hover:bg-white/10"
+                    >
+                      Sin definir
+                    </button>
+                  </div>
+                  <div className="mt-3 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                    {userParticipationSummary}
+                  </div>
+                </div>
 
-              <div>
-                <div className="text-sm font-semibold text-white">Ruta de proyecto</div>
-                <div className="mt-3 grid gap-2">
-                  {(['auto', 'new-project', 'continue-existing'] as ProjectWorkMode[]).map(
-                    (mode) => (
-                      <button
-                        key={mode}
-                        type="button"
-                        onClick={() => setProjectWorkMode(mode)}
-                        className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
-                          projectWorkMode === mode
-                            ? 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100'
-                            : 'border-white/10 bg-slate-950/60 text-slate-200 hover:bg-white/10'
-                        }`}
-                      >
-                        {getProjectWorkModeLabel(mode)}
-                      </button>
-                    ),
-                  )}
-                </div>
-                <div className="mt-3 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                  {projectWorkModeSummary}
+                <div>
+                  <div className="text-sm font-semibold text-white">Ruta de proyecto</div>
+                  <div className="mt-3 grid gap-2">
+                    {(['auto', 'new-project', 'continue-existing'] as ProjectWorkMode[]).map(
+                      (mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => setProjectWorkMode(mode)}
+                          className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
+                            projectWorkMode === mode
+                              ? 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100'
+                              : 'border-white/10 bg-slate-950/60 text-slate-200 hover:bg-white/10'
+                          }`}
+                        >
+                          {getProjectWorkModeLabel(mode)}
+                        </button>
+                      ),
+                    )}
+                  </div>
+                  <div className="mt-3 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                    {projectWorkModeSummary}
+                  </div>
                 </div>
               </div>
-            </div>
-          </article>
+            </article>
 
-          <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-              05. Espacio de trabajo
-            </div>
-            <div className="mt-2 text-xl font-semibold text-white">Dónde va a operar JEFE</div>
-            <textarea
-              id="guided-workspace-path"
-              value={workspacePath}
-              onChange={(event) => setWorkspacePath(event.target.value)}
-              rows={4}
-              className="mt-4 w-full rounded-[24px] border border-white/10 bg-slate-950/80 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300/30"
-            />
-            <div className="mt-3 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-              {workspaceStatusLabel}
-            </div>
-
-            <div className="mt-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-              06. Resumen del contexto
-            </div>
-            <div className="mt-3 grid gap-3">
-              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-slate-500">Insumos</div>
-                <div className="mt-2 text-sm font-medium text-slate-100">
-                  {attachedProjectInputsSummary}
+            <article className="rounded-[24px] border border-white/8 bg-slate-950/50 p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Espacio de trabajo
+              </div>
+              <div className="mt-2 text-xl font-semibold text-white">Dónde va a operar JEFE</div>
+              <textarea
+                id="guided-workspace-path"
+                value={workspacePath}
+                onChange={(event) => setWorkspacePath(event.target.value)}
+                rows={4}
+                className="mt-4 w-full rounded-[24px] border border-white/10 bg-slate-950/80 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300/30"
+              />
+              <div className="mt-3 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+                {workspaceStatusLabel}
+              </div>
+              <div className="mt-4 grid gap-3">
+                <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                  <div className="text-xs uppercase tracking-[0.16em] text-slate-500">Insumos</div>
+                  <div className="mt-2 text-sm font-medium text-slate-100">{attachedProjectInputsSummary}</div>
+                </div>
+                <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
+                  <div className="text-xs uppercase tracking-[0.16em] text-slate-500">Proyecto existente</div>
+                  <div className="mt-2 text-sm font-medium text-slate-100">
+                    {existingProjectContext?.projectName ||
+                      (existingProjectContext?.selectedPath ? 'Seleccionado' : 'No seleccionado')}
+                  </div>
+                  <div
+                    title={existingProjectContext?.selectedPath || ''}
+                    className="mt-1 truncate text-xs text-slate-400"
+                  >
+                    {existingProjectContext?.selectedPath || 'Solo texto e insumos por ahora.'}
+                  </div>
                 </div>
               </div>
-              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                  Proyecto existente
-                </div>
-                <div className="mt-2 text-sm font-medium text-slate-100">
-                  {existingProjectContext?.projectName ||
-                    (existingProjectContext?.selectedPath ? 'Seleccionado' : 'No seleccionado')}
-                </div>
-                <div
-                  title={existingProjectContext?.selectedPath || ''}
-                  className="mt-1 truncate text-xs text-slate-400"
-                >
-                  {existingProjectContext?.selectedPath || 'Solo texto e insumos por ahora.'}
-                </div>
-              </div>
-              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-slate-500">Modo</div>
-                <div className="mt-2 text-sm font-medium text-slate-100">
-                  {getProjectWorkModeLabel(projectWorkMode)}
-                </div>
-                <div className="mt-1 text-xs text-slate-400">{projectWorkModeSummary}</div>
-              </div>
-            </div>
-          </article>
-        </div>
+            </article>
+          </div>
+        </DisclosurePanel>
       </div>
     ) : activeWizardStep === 'brain' ? (
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="space-y-4">
         <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
           <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
             03. Criterio del Cerebro
           </div>
-          <div className="mt-2 text-xl font-semibold text-white">
-            Cómo decide y cuánto resuelve por su cuenta
-          </div>
+          <div className="mt-2 text-xl font-semibold text-white">Cómo decide y cuánto resuelve por su cuenta</div>
+          <p className="mt-2 text-sm leading-6 text-slate-400">
+            Elegí una sola modalidad. El detalle técnico del ruteo queda abajo.
+          </p>
           <div className="mt-4 grid gap-3 lg:grid-cols-2">
             {BRAIN_COST_MODE_OPTIONS.map((option) => (
               <button
@@ -19111,28 +19084,103 @@ function App() {
             ))}
           </div>
         </article>
-        <div className="space-y-4">
+        <div className="grid gap-3 xl:grid-cols-2">
           <MetricCard
             label="Modo activo"
             value={getBrainCostModeLabel(brainCostMode)}
             detail={activeBrainRoutingMode}
             tone="sky"
+            icon="brain"
+            emphasis="hero"
           />
-          <MetricCard
-            label="Proveedor"
-            value={`${activeBrainSelectedProvider} -> ${activeBrainResolvedProvider}`}
-            detail={`Confianza: ${activeBrainRoutingConfidence}`}
-          />
-          <MetricCard
-            label="Naturaleza"
-            value={activeBrainProblemNature}
-            detail={activeBrainRoutingReason}
-          />
+          <DisclosurePanel
+            title="Ver detalle técnico del criterio"
+            description="Proveedor, confianza y naturaleza del problema."
+            icon="brain"
+            badge="Técnico"
+          >
+            <div className="grid gap-3">
+              <MetricCard
+                label="Proveedor"
+                value={`${activeBrainSelectedProvider} -> ${activeBrainResolvedProvider}`}
+                detail={`Confianza: ${activeBrainRoutingConfidence}`}
+                icon="services"
+              />
+              <MetricCard
+                label="Naturaleza"
+                value={activeBrainProblemNature}
+                detail={activeBrainRoutingReason}
+                icon="status"
+              />
+            </div>
+          </DisclosurePanel>
         </div>
       </div>
     ) : activeWizardStep === 'memory' ? (
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-4">
+      <div className="space-y-4">
+        <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
+          <label
+            htmlFor="guided-reuse-mode"
+            className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+          >
+            04. Memoria reutilizable
+          </label>
+          <div className="mt-2 text-xl font-semibold text-white">Reutilización opcional</div>
+          <p className="mt-2 text-sm leading-6 text-slate-400">
+            No hace falta resolver nada técnico para seguir. Si no elegís nada, JEFE usa la búsqueda automática.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <ResultStatusBadge
+              label={`MEMORIA: ${activeContextHubLabel}`}
+              tone={activeContextHubStatus?.available ? 'emerald' : 'amber'}
+            />
+            <ResultStatusBadge label={`Reuse: ${activeReuseModeLabel}`} tone="violet" />
+          </div>
+          <div className="mt-4 grid gap-3 xl:grid-cols-2">
+            <MetricCard
+              label="Selección actual"
+              value={manualReuseModeLabel}
+              detail={selectedReusableArtifactSummary}
+              tone={manualReuseMode === 'auto' ? 'default' : 'sky'}
+              icon="memory"
+              emphasis="hero"
+            />
+            <MetricCard
+              label="Coincidencias"
+              value={`${activeReuseFoundCount}`}
+              detail={activeReuseDetailLabel}
+              tone="violet"
+              icon="context"
+            />
+          </div>
+          <select
+            id="guided-reuse-mode"
+            value={manualReuseMode}
+            onChange={(event) => setManualReuseMode(event.target.value as ManualReuseMode)}
+            className="mt-4 w-full rounded-[24px] border border-white/10 bg-slate-950/80 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition focus:border-cyan-300/30"
+          >
+            <option value="auto">Búsqueda automática</option>
+            <option value="none">No reutilizar</option>
+            <option value="inspiration-only">Usar solo inspiración</option>
+            <option value="reuse-style">Reutilizar estilo</option>
+            <option value="reuse-structure">Reutilizar estructura</option>
+            <option value="reuse-style-and-structure">Reutilizar estilo y estructura</option>
+          </select>
+          <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
+            {manualReusablePreferencePayload
+              ? manualReusablePreferencePayload.artifactId
+                ? `El planificador va a priorizar ${manualReuseModeLabel.toLocaleLowerCase()} desde ${manualReusablePreferencePayload.artifactId}.`
+                : 'La corrida va a seguir sin reutilización por decisión manual.'
+              : 'Si no elegís nada, la corrida sigue con búsqueda automática.'}
+          </div>
+        </article>
+
+        <DisclosurePanel
+          title="Ver detalle de MEMORIA"
+          description="Conexión, eventos y acciones técnicas del Context Hub."
+          icon="memory"
+          badge="Técnico"
+        >
           <ContextHubControlPanel
             description="JEFE puede consultar MEMORIA, reintentar la conexión, abrir la UI real cuando esté disponible o seguir sin bloquear el flujo."
             stateLabel={contextHubRuntimeLabel}
@@ -19157,143 +19205,98 @@ function App() {
             onOpen={handleOpenContextHub}
             onStart={handleStartLocalContextHub}
           />
-          <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
-            <label
-              htmlFor="guided-reuse-mode"
-              className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
-            >
-              04. Memoria reutilizable
-            </label>
-            <div className="mt-2 text-xl font-semibold text-white">Qué querés reutilizar</div>
-            <select
-              id="guided-reuse-mode"
-              value={manualReuseMode}
-              onChange={(event) => setManualReuseMode(event.target.value as ManualReuseMode)}
-              className="mt-4 w-full rounded-[24px] border border-white/10 bg-slate-950/80 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition focus:border-cyan-300/30"
-            >
-              <option value="auto">Búsqueda automática</option>
-              <option value="none">No reutilizar</option>
-              <option value="inspiration-only">Usar solo inspiración</option>
-              <option value="reuse-style">Reutilizar estilo</option>
-              <option value="reuse-structure">Reutilizar estructura</option>
-              <option value="reuse-style-and-structure">Reutilizar estilo y estructura</option>
-            </select>
-            <div className="mt-4 text-sm leading-6 text-slate-300">
-              {manualReusablePreferencePayload
-                ? manualReusablePreferencePayload.artifactId
-                  ? `El planificador va a priorizar ${manualReuseModeLabel.toLocaleLowerCase()} desde ${manualReusablePreferencePayload.artifactId}.`
-                  : 'La corrida va a seguir sin reutilización por decisión manual.'
-                : 'Si no elegís nada, la app sigue con búsqueda automática.'}
-            </div>
-          </article>
-          <article className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                  Artefactos sugeridos
-                </div>
-                <div className="mt-2 text-sm text-slate-400">
-                  Elegí uno si querés orientar el plan. Si no, seguí igual.
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setExperienceMode('advanced')}
-                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-              >
-                Ver panel avanzado
-              </button>
-            </div>
-            <div className="mt-4 grid gap-3 lg:grid-cols-3">
-              {isLoadingReusableArtifacts ? (
-                <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm text-slate-300 lg:col-span-3">
-                  Cargando artefactos reutilizables...
-                </div>
-              ) : reusableArtifactError ? (
-                <div className="rounded-2xl border border-red-300/20 bg-red-300/10 px-4 py-4 text-sm text-red-100 lg:col-span-3">
-                  {reusableArtifactError}
-                </div>
-              ) : reusableWizardArtifacts.length === 0 ? (
-                <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm text-slate-300 lg:col-span-3">
-                  No hay artefactos listos para sugerir en esta vista compacta.
-                </div>
-              ) : (
-                reusableWizardArtifacts.map((artifact) => {
-                  const preview = buildReusableArtifactPreviewModel(artifact)
-                  const isSelected = selectedReusableArtifact?.id === artifact.id
+        </DisclosurePanel>
 
-                  return (
-                    <article
-                      key={artifact.id}
-                      data-reusable-artifact-card={artifact.id}
-                      className={joinClasses(
-                        'rounded-2xl border p-4',
-                        isSelected
-                          ? 'border-cyan-300/30 bg-cyan-300/10'
-                          : 'border-white/8 bg-slate-950/50',
-                      )}
+        <DisclosurePanel
+          title="Ver sugerencias reutilizables"
+          description="Artefactos sugeridos para orientar el plan si hace falta."
+          icon="context"
+          badge={`${reusableWizardArtifacts.length}`}
+        >
+          <div className="mb-4 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setExperienceMode('advanced')}
+              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+            >
+              Ver panel avanzado
+            </button>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-3">
+            {isLoadingReusableArtifacts ? (
+              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm text-slate-300 lg:col-span-3">
+                Cargando artefactos reutilizables...
+              </div>
+            ) : reusableArtifactError ? (
+              <div className="rounded-2xl border border-red-300/20 bg-red-300/10 px-4 py-4 text-sm text-red-100 lg:col-span-3">
+                {reusableArtifactError}
+              </div>
+            ) : reusableWizardArtifacts.length === 0 ? (
+              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm text-slate-300 lg:col-span-3">
+                No hay artefactos listos para sugerir en esta vista compacta.
+              </div>
+            ) : (
+              reusableWizardArtifacts.map((artifact) => {
+                const preview = buildReusableArtifactPreviewModel(artifact)
+                const isSelected = selectedReusableArtifact?.id === artifact.id
+
+                return (
+                  <article
+                    key={artifact.id}
+                    data-reusable-artifact-card={artifact.id}
+                    className={joinClasses(
+                      'rounded-2xl border p-4',
+                      isSelected
+                        ? 'border-cyan-300/30 bg-cyan-300/10'
+                        : 'border-white/8 bg-slate-950/50',
+                    )}
+                  >
+                    <div
+                      data-reusable-artifact-preview={artifact.id}
+                      className="rounded-2xl border border-white/10 p-4"
+                      style={{
+                        background: preview.background,
+                        color: preview.text,
+                      }}
                     >
-                      <div
-                        data-reusable-artifact-preview={artifact.id}
-                        className="rounded-2xl border border-white/10 p-4"
-                        style={{
-                          background: preview.background,
-                          color: preview.text,
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.24em]">
+                        {preview.heroLabel}
+                      </div>
+                      <div className="mt-2 text-lg font-semibold">
+                        {artifact.sectorLabel || artifact.sector || artifact.id}
+                      </div>
+                      <div className="mt-2 text-xs leading-5">{preview.previewBody}</div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        data-reusable-artifact-select={artifact.id}
+                        onClick={() => {
+                          setSelectedReusableArtifact(artifact)
+                          setManualReuseMode((currentValue) =>
+                            currentValue === 'auto'
+                              ? 'reuse-style-and-structure'
+                              : currentValue,
+                          )
                         }}
+                        className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
                       >
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.24em]">
-                          {preview.heroLabel}
-                        </div>
-                        <div className="mt-2 text-lg font-semibold">
-                          {artifact.sectorLabel || artifact.sector || artifact.id}
-                        </div>
-                        <div className="mt-2 text-xs leading-5">{preview.previewBody}</div>
-                      </div>
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          data-reusable-artifact-select={artifact.id}
-                          onClick={() => {
-                            setSelectedReusableArtifact(artifact)
-                            setManualReuseMode((currentValue) =>
-                              currentValue === 'auto'
-                                ? 'reuse-style-and-structure'
-                                : currentValue,
-                            )
-                          }}
-                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-                        >
-                          {isSelected ? 'Seleccionado' : 'Usar este artefacto'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDetailReusableArtifact(artifact)}
-                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-                        >
-                          Ver detalle
-                        </button>
-                      </div>
-                    </article>
-                  )
-                })
-              )}
-            </div>
-          </article>
-        </div>
-        <div className="space-y-4">
-          <MetricCard
-            label="Selección actual"
-            value={manualReuseModeLabel}
-            detail={selectedReusableArtifactSummary}
-            tone={manualReuseMode === 'auto' ? 'default' : 'sky'}
-          />
-          <MetricCard
-            label="Memoria reutilizable"
-            value={`${activeReuseModeLabel} / ${activeReuseFoundCount} coincidencia(s)`}
-            detail={activeReuseDetailLabel}
-            tone="violet"
-          />
-        </div>
+                        {isSelected ? 'Seleccionado' : 'Usar este artefacto'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDetailReusableArtifact(artifact)}
+                        className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                      >
+                        Ver detalle
+                      </button>
+                    </div>
+                  </article>
+                )
+              })
+            )}
+          </div>
+        </DisclosurePanel>
       </div>
     ) : activeWizardStep === 'plan' ? (
       <PlanOverviewPanel
@@ -19306,36 +19309,29 @@ function App() {
         }
         metrics={planOverviewMetrics}
         secondaryActions={
-          <button
-            type="button"
-            onClick={handleWizardGeneratePlan}
-            disabled={isPlanning}
-            className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
-          >
+          <SecondaryActionButton onClick={handleWizardGeneratePlan} disabled={isPlanning}>
             {isPlanning ? 'Generando...' : 'Regenerar plan'}
-          </button>
+          </SecondaryActionButton>
         }
         primaryAction={
           plannerIsReviewOnly ? (
             handlePlannerReviewPrimaryAction && plannerReviewPrimaryActionLabel ? (
-              <button
-                type="button"
+              <PrimaryActionButton
                 onClick={handlePlannerReviewPrimaryAction}
                 disabled={isPlanning}
-                className="rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-medium text-cyan-100 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                tone="sky"
               >
-                {plannerReviewPrimaryActionLabel}
-              </button>
+                Preparar ejecución
+              </PrimaryActionButton>
             ) : null
           ) : (
-            <button
-              type="button"
+            <PrimaryActionButton
               onClick={handleWizardExecute}
               disabled={!canExecuteInstruction || isExecutingTask}
-              className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+              tone="amber"
             >
-              {isExecutingTask ? 'Ejecutando...' : executeCurrentInstructionLabel}
-            </button>
+              {isExecutingTask ? 'Materializando...' : 'Materializar entrega'}
+            </PrimaryActionButton>
           )
         }
         callout={
@@ -19480,23 +19476,22 @@ function App() {
         }
         actions={
           <>
-            <button
-              type="button"
-              onClick={() => setIsFlowConsoleOpen(true)}
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-            >
-              Ver detalle técnico
-            </button>
             {wizardCanShowResult ? (
-              <button
-                type="button"
+              <PrimaryActionButton
                 onClick={handleWizardNext}
                 disabled={!wizardCanShowResult}
-                className="rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-medium text-cyan-100 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                tone="sky"
               >
-                {wizardExecutionResultButtonLabel}
-              </button>
-            ) : null}
+                Ver resultado
+              </PrimaryActionButton>
+            ) : (
+              <PrimaryActionButton onClick={handleWizardBack} tone="sky">
+                Volver al plan
+              </PrimaryActionButton>
+            )}
+            <SecondaryActionButton onClick={() => setIsFlowConsoleOpen(true)}>
+              Ver detalle técnico
+            </SecondaryActionButton>
           </>
         }
       />
@@ -19519,36 +19514,29 @@ function App() {
         actions={
           <>
             {resultMaterializationNextPhaseId ? (
-              <button
-                type="button"
+              <PrimaryActionButton
                 onClick={() => handlePrepareProjectPhase(resultMaterializationNextPhaseId)}
                 disabled={isPlanning || isExecutingTask}
-                className="rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-medium text-cyan-100 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
+                tone="sky"
               >
                 {`Preparar ${resultMaterializationNextPhaseLabel}`}
-              </button>
+              </PrimaryActionButton>
+            ) : (
+              <PrimaryActionButton onClick={handleWizardStartOver} tone="sky">
+                Volver al objetivo
+              </PrimaryActionButton>
+            )}
+            {resultMaterializationNextPhaseId ? (
+              <SecondaryActionButton onClick={handleWizardStartOver}>
+                Volver al objetivo
+              </SecondaryActionButton>
             ) : null}
-            <button
-              type="button"
-              onClick={handleWizardStartOver}
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-            >
-              Volver al objetivo
-            </button>
-            <button
-              type="button"
-              onClick={() => setExperienceMode('advanced')}
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-            >
+            <SecondaryActionButton onClick={() => setExperienceMode('advanced')}>
               Abrir panel avanzado
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsFlowConsoleOpen(true)}
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-            >
+            </SecondaryActionButton>
+            <SecondaryActionButton onClick={() => setIsFlowConsoleOpen(true)}>
               Ver detalle técnico
-            </button>
+            </SecondaryActionButton>
           </>
         }
         technicalSections={
@@ -19774,6 +19762,50 @@ function App() {
       />
     )
 
+  const guidedPrimaryAction =
+    activeWizardStep === 'goal' ? (
+      <PrimaryActionButton onClick={handleWizardNext} disabled={!goalInput.trim()} tone="sky">
+        Preparar contexto
+      </PrimaryActionButton>
+    ) : activeWizardStep === 'context' ? (
+      <PrimaryActionButton onClick={handleWizardNext} tone="sky">
+        Continuar
+      </PrimaryActionButton>
+    ) : activeWizardStep === 'brain' ? (
+      <PrimaryActionButton onClick={handleWizardNext} tone="sky">
+        Continuar
+      </PrimaryActionButton>
+    ) : activeWizardStep === 'memory' ? (
+      <PrimaryActionButton
+        onClick={handleWizardGeneratePlan}
+        disabled={isPlanning || !goalInput.trim()}
+        tone="sky"
+      >
+        {isPlanning ? 'Generando plan...' : 'Generar plan'}
+      </PrimaryActionButton>
+    ) : null
+
+  const guidedSecondaryAction =
+    activeWizardStep === 'goal' ? (
+      <SecondaryActionButton onClick={() => setExperienceMode('advanced')}>
+        Abrir panel avanzado
+      </SecondaryActionButton>
+    ) : activeWizardStep === 'context' ? (
+      <SecondaryActionButton
+        onClick={() => setFlowConsoleVisibility({ open: true, pinned: true })}
+      >
+        Ver detalle técnico
+      </SecondaryActionButton>
+    ) : activeWizardStep === 'brain' ? (
+      <SecondaryActionButton onClick={() => setExperienceMode('advanced')}>
+        Ver panel avanzado
+      </SecondaryActionButton>
+    ) : activeWizardStep === 'memory' ? (
+      <SecondaryActionButton onClick={() => setExperienceMode('advanced')}>
+        Abrir panel avanzado
+      </SecondaryActionButton>
+    ) : null
+
   const guidedFooterNote =
     activeWizardStep === 'plan'
       ? plannerIsReviewOnly
@@ -19788,57 +19820,16 @@ function App() {
   const guidedFooterActions = (
     <>
       {activeWizardStep !== 'goal' ? (
-        <button
-          type="button"
-          onClick={handleWizardBack}
-          className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-        >
-          Atras
-        </button>
-      ) : null}
-
-      {(activeWizardStep === 'goal' ||
-        activeWizardStep === 'context' ||
-        activeWizardStep === 'brain') && (
-        <button
-          type="button"
-          onClick={handleWizardNext}
-          disabled={activeWizardStep === 'goal' && !goalInput.trim()}
-          className="rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-medium text-cyan-100 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-        >
-          Siguiente
-        </button>
-      )}
-
-      {activeWizardStep === 'memory' ? (
-        <button
-          type="button"
-          onClick={handleWizardGeneratePlan}
-          disabled={isPlanning || !goalInput.trim()}
-          className="rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-medium text-cyan-100 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-        >
-          {isPlanning ? 'Generando...' : 'Generar plan'}
-        </button>
-      ) : null}
-
-      {activeWizardStep === 'execution' ? (
-        <button
-          type="button"
-          onClick={handleWizardNext}
-          disabled={!wizardCanShowResult}
-          className="rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-medium text-cyan-100 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-        >
-          {wizardExecutionResultButtonLabel}
-        </button>
+        <SecondaryActionButton onClick={handleWizardBack}>Atrás</SecondaryActionButton>
       ) : null}
     </>
   )
 
   const guidedShell = (
     <AppShell
-      eyebrow="Centro de control guiado"
-      title="JEFE ordena el flujo sin esconder capacidad"
-      description="Shell operativo para entender rapido que hace JEFE, en que paso esta el operador y cual es la siguiente decision."
+      eyebrow="Modo operador simple"
+      title="JEFE te guia paso a paso"
+      description="Primero la accion actual. El detalle tecnico queda disponible solo cuando hace falta."
       modeSwitcher={
         <div className="inline-flex rounded-2xl border border-white/10 bg-white/[0.04] p-1">
           <button
@@ -19869,20 +19860,15 @@ function App() {
       }
       quickActions={
         <>
-          <ActionTile
-            label="Consola tecnica"
-            detail="Abrir actividad, trazas y detalle tecnico sin salir del shell principal."
-            icon="activity"
-            tone="default"
+          <SecondaryActionButton
             onClick={() => setFlowConsoleVisibility({ open: true, pinned: true })}
-          />
-          <ActionTile
-            label="Panel avanzado"
-            detail="Cambiar al modo tecnico completo para inspeccion y diagnostico profundo."
-            icon="advanced"
-            tone="violet"
-            onClick={() => setExperienceMode('advanced')}
-          />
+            className="w-auto"
+          >
+            Consola técnica
+          </SecondaryActionButton>
+          <SecondaryActionButton onClick={() => setExperienceMode('advanced')} className="w-auto">
+            Panel avanzado
+          </SecondaryActionButton>
         </>
       }
       navItems={appShellNavItems}
@@ -19905,20 +19891,13 @@ function App() {
         </div>
       }
       sidebarInsights={
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+        <div className="grid gap-3">
           <MetricCard
             label="Paso visible"
             value={activeWizardStepConfig.label}
             detail={guidedStepActionSummaryLabel}
             tone="sky"
             icon="guided"
-          />
-          <MetricCard
-            label="Decision"
-            value={guidedStepActionSummaryLabel}
-            detail={guidedStepActionSummaryDetail}
-            tone="amber"
-            icon="next"
           />
         </div>
       }
@@ -19956,6 +19935,8 @@ function App() {
           progressItems={guidedProgressItems}
           footerNote={guidedFooterNote}
           footerActions={guidedFooterActions}
+          primaryAction={guidedPrimaryAction}
+          secondaryAction={guidedSecondaryAction}
         >
           {guidedStepContent}
         </GuidedFlowShell>
@@ -19964,7 +19945,7 @@ function App() {
         <div className="space-y-4">
           <ContextSummaryPanel
             title="Panel contextual"
-            description="Resumen de contexto, proxima accion y apoyo para decidir sin hundirse en detalle tecnico."
+            description="Qué sigue, ayuda breve y contexto mínimo para decidir sin hundirse en detalle técnico."
             sections={contextPanelSections}
             actions={
               <>

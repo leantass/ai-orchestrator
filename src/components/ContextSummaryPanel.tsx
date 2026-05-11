@@ -47,7 +47,7 @@ export function ContextSummaryPanel({
   const remainingItems = sections.flatMap((section) => section.items).slice(2)
 
   return (
-    <article className="overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.12),transparent_28%),linear-gradient(180deg,rgba(6,11,22,0.97),rgba(8,15,28,0.9))] p-5 shadow-[0_28px_90px_rgba(0,0,0,0.38)] backdrop-blur">
+    <article className="overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.1),transparent_28%),linear-gradient(180deg,rgba(6,11,22,0.97),rgba(8,15,28,0.9))] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.34)] backdrop-blur">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
@@ -59,7 +59,7 @@ export function ContextSummaryPanel({
       </div>
 
       {primaryItem ? (
-        <div className="mt-4 rounded-[24px] border border-sky-300/18 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.16),transparent_38%),linear-gradient(180deg,rgba(56,189,248,0.1),rgba(8,15,28,0.7))] p-4">
+        <div className="mt-4 rounded-[22px] border border-sky-300/18 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.14),transparent_38%),linear-gradient(180deg,rgba(56,189,248,0.08),rgba(8,15,28,0.7))] p-4">
           <div className="flex items-start gap-3">
             <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] border border-sky-300/20 bg-sky-300/14 text-sky-100">
               <DashboardIcon

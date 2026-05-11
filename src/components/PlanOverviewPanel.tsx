@@ -36,8 +36,8 @@ export function PlanOverviewPanel({
   callout?: ReactNode
   technicalDetails?: ReactNode
 }) {
-  const leadMetrics = metrics.slice(0, 3)
-  const supportMetrics = metrics.slice(3)
+  const leadMetrics = metrics.slice(0, 2)
+  const supportMetrics = metrics.slice(2)
 
   return (
     <div className="space-y-4">
@@ -57,7 +57,7 @@ export function PlanOverviewPanel({
               </div>
               <div className="mt-3 text-xs leading-5 text-slate-400">{helperText}</div>
             </div>
-            <div className="grid gap-3 xl:grid-cols-3">
+            <div className="grid gap-3 xl:grid-cols-2">
               {leadMetrics.map((metric, index) => (
                 <MetricCard
                   key={`${metric.label}-${metric.value}`}

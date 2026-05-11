@@ -75,26 +75,26 @@ export function HomeDashboardPanel({
   const currentFlow = flowItems.find((item) => item.status === 'current')
   const flowProgressPercent =
     flowItems.length > 0 ? Math.round((readyFlowCount / flowItems.length) * 100) : 0
-  const visibleMetrics = metrics.slice(0, 3)
-  const visibleActions = quickActions.slice(0, 3)
-  const extraActions = quickActions.slice(3)
+  const visibleMetrics = metrics.slice(0, 2)
+  const visibleActions = quickActions.slice(0, 2)
+  const extraActions = quickActions.slice(2)
   const visibleSnapshots = snapshotItems.slice(0, 2)
 
   return (
     <div className="space-y-4">
-      <article className="overflow-hidden rounded-[34px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.18),transparent_24%),radial-gradient(circle_at_70%_18%,rgba(167,139,250,0.12),transparent_20%),linear-gradient(180deg,rgba(6,11,22,0.98),rgba(8,15,28,0.9))] p-5 shadow-[0_34px_100px_rgba(0,0,0,0.42)]">
-        <div className="grid gap-5 2xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-          <div className="space-y-5">
+      <article className="overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.16),transparent_24%),radial-gradient(circle_at_70%_18%,rgba(167,139,250,0.1),transparent_20%),linear-gradient(180deg,rgba(6,11,22,0.98),rgba(8,15,28,0.9))] p-5 shadow-[0_28px_80px_rgba(0,0,0,0.38)]">
+        <div className="grid gap-5 2xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+          <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
               <SurfaceHeaderTag>Inicio</SurfaceHeaderTag>
-              <SurfaceHeaderTag>Centro de control</SurfaceHeaderTag>
+              <SurfaceHeaderTag>Operacion simple</SurfaceHeaderTag>
             </div>
-            <div className="max-w-3xl text-3xl font-semibold tracking-tight text-white sm:text-[2.4rem]">
+            <div className="max-w-3xl text-[2rem] font-semibold tracking-tight text-white sm:text-[2.2rem]">
               {title}
             </div>
             <p className="max-w-3xl text-sm leading-6 text-slate-400">{description}</p>
             <div className="flex flex-wrap gap-2">
-              {statusBadges.slice(0, 3).map((badge) => (
+              {statusBadges.slice(0, 2).map((badge) => (
                 <ResultStatusBadge
                   key={`${badge.label}-${badge.value}`}
                   label={`${badge.label}: ${badge.value}`}
@@ -102,7 +102,7 @@ export function HomeDashboardPanel({
                 />
               ))}
             </div>
-            <div className="grid gap-3 lg:grid-cols-3">
+            <div className="grid gap-3 lg:grid-cols-2">
               {visibleMetrics.map((metric, index) => (
                 <MetricCard
                   key={`${metric.label}-${metric.value}`}
@@ -112,7 +112,7 @@ export function HomeDashboardPanel({
                   tone={metric.tone}
                   icon={metric.icon}
                   emphasis={index === 0 ? 'hero' : 'compact'}
-                  progress={index === 2 ? flowProgressPercent : undefined}
+                  progress={index === 1 ? flowProgressPercent : undefined}
                 />
               ))}
             </div>
@@ -122,7 +122,7 @@ export function HomeDashboardPanel({
           <div className="space-y-4">
             <ResultSectionCard
               title="Continuar ahora"
-              description="JEFE pone adelante la etapa actual, la decision inmediata y el CTA de continuidad."
+              description="La home deja visible la etapa actual y la siguiente accion."
               icon="guided"
               badge={currentFlow ? currentFlow.label : 'Sin paso'}
               tone="sky"

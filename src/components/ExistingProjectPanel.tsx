@@ -66,7 +66,7 @@ export function ExistingProjectPanel({
   const runtimeTemporaryFilesDetected = project?.runtimeTemporaryFilesDetected || []
 
   return (
-    <article className="space-y-4 rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.1),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.016))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+    <article className="space-y-4 rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.08),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.016))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
       <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.08fr)_minmax(320px,0.92fr)]">
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
@@ -82,7 +82,7 @@ export function ExistingProjectPanel({
             La vista principal muestra lo suficiente para decidir si continuar. El analisis fino
             queda guardado como segundo nivel.
           </p>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2">
             <MetricCard
               label="Resumen"
               value={summary}
@@ -96,16 +96,6 @@ export function ExistingProjectPanel({
               value={project?.framework || 'Sin deteccion'}
               detail={project?.stack.join(' / ') || 'Sin stack resumido'}
               icon="build"
-            />
-            <MetricCard
-              label="Git"
-              value={
-                project?.gitStatusSummary?.branch ||
-                (project?.gitStatusSummary?.detected ? 'Detectado' : 'No detectado')
-              }
-              detail={project?.gitStatusSummary?.summary || 'Sin resumen disponible'}
-              tone={project?.gitStatusSummary?.detected ? 'emerald' : 'default'}
-              icon="git"
             />
           </div>
         </div>
@@ -152,7 +142,7 @@ export function ExistingProjectPanel({
             icon="projects"
             badge="Resumen"
           >
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <MetricCard
                 label="Proyecto"
                 value={project.projectName || 'Proyecto seleccionado'}
@@ -166,6 +156,16 @@ export function ExistingProjectPanel({
                 value={project.packageManager || 'Sin lockfile'}
                 detail={project.packageJsonPath || 'Sin package.json visible'}
                 icon="files"
+              />
+              <MetricCard
+                label="Git"
+                value={
+                  project.gitStatusSummary?.branch ||
+                  (project.gitStatusSummary?.detected ? 'Detectado' : 'No detectado')
+                }
+                detail={project.gitStatusSummary?.summary || 'Sin resumen disponible'}
+                tone={project.gitStatusSummary?.detected ? 'emerald' : 'default'}
+                icon="git"
               />
               <MetricCard
                 label="Manifest JEFE"
@@ -186,7 +186,7 @@ export function ExistingProjectPanel({
           </ResultSectionCard>
 
           <DisclosurePanel
-            title="Ver analisis read-only"
+            title="Ver analisis completo"
             description="Scripts, carpetas, entrypoints, advertencias y artefactos protegidos."
             icon="brain"
             badge="Tecnico"

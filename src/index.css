@@ -49,9 +49,9 @@ body::before {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(rgba(148, 163, 184, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.03) 1px, transparent 1px);
-  background-size: 32px 32px;
+    linear-gradient(rgba(148, 163, 184, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.015) 1px, transparent 1px);
+  background-size: 40px 40px;
   mask-image: radial-gradient(circle at center, black, transparent 84%);
 }
 
@@ -61,9 +61,9 @@ body::after {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 14%),
-    radial-gradient(circle at 20% 20%, rgba(103, 232, 249, 0.05), transparent 24%),
-    radial-gradient(circle at 80% 16%, rgba(196, 181, 253, 0.05), transparent 22%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 14%),
+    radial-gradient(circle at 20% 20%, rgba(103, 232, 249, 0.035), transparent 24%),
+    radial-gradient(circle at 80% 16%, rgba(196, 181, 253, 0.035), transparent 22%);
   mix-blend-mode: screen;
 }
 

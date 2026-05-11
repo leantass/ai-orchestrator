@@ -50,8 +50,8 @@ export function ProjectInputsPanel({
   const notedCount = items.filter((item) => item.operatorNote.trim() !== '').length
 
   return (
-    <article className="space-y-4 rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.1),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.016))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+    <article className="space-y-4 rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.08),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.016))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.08fr)_minmax(320px,0.92fr)]">
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
             <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
@@ -59,14 +59,11 @@ export function ProjectInputsPanel({
             </div>
             <SurfaceHeaderTag>Briefing</SurfaceHeaderTag>
           </div>
-          <div className="text-2xl font-semibold tracking-tight text-white">
-            Centro de contexto e insumos
-          </div>
+          <div className="text-2xl font-semibold tracking-tight text-white">Insumos y referencias</div>
           <p className="max-w-3xl text-sm leading-6 text-slate-400">
-            La vista principal prioriza lo que ayuda a decidir. El detalle fino queda disponible sin
-            convertir el briefing en un formulario tecnico.
+            Mostra solo lo que ayuda a decidir. El detalle fino sigue disponible sin invadir el paso.
           </p>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2">
             <MetricCard
               label="Resumen"
               value={summary}
@@ -78,15 +75,8 @@ export function ProjectInputsPanel({
             <MetricCard
               label="Archivos y carpetas"
               value={`${fileCount} archivo(s) / ${folderCount} carpeta(s)`}
-              detail="Se leen como metadata segura."
+              detail={`${notedCount} nota(s) del operador.`}
               icon="folder"
-            />
-            <MetricCard
-              label="Notas del operador"
-              value={notedCount > 0 ? `${notedCount}` : '0'}
-              detail="Aclaran rol, prioridad o expectativa de uso."
-              tone={notedCount > 0 ? 'violet' : 'default'}
-              icon="brain"
             />
           </div>
         </div>
@@ -108,8 +98,15 @@ export function ProjectInputsPanel({
             onClick={onAttachFolder}
             disabled={busy}
           />
+          <ActionTile
+            label="Resumen de uso"
+            detail="Cada adjunto queda como metadata segura y reutilizable dentro del briefing."
+            icon="brain"
+            tone="default"
+            disabled
+          />
           {actionMessage ? (
-            <div className="rounded-[22px] border border-cyan-300/15 bg-cyan-300/10 px-4 py-3 text-sm leading-6 text-cyan-50">
+            <div className="rounded-[20px] border border-cyan-300/15 bg-cyan-300/10 px-4 py-3 text-sm leading-6 text-cyan-50">
               {actionMessage}
             </div>
           ) : null}
@@ -139,15 +136,15 @@ export function ProjectInputsPanel({
           icon="files"
         />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {items.map((item) => (
             <details
               key={item.id}
-              className="rounded-[24px] border border-white/8 bg-slate-950/55 px-4 py-4"
+              className="group rounded-[22px] border border-white/8 bg-slate-950/55 px-4 py-4"
             >
               <summary className="cursor-pointer list-none">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">
                         <DashboardIcon
@@ -163,11 +160,16 @@ export function ProjectInputsPanel({
                     <div className="mt-3 truncate text-sm font-semibold text-slate-100">
                       {item.name}
                     </div>
-                    <div className="mt-1 text-xs leading-5 text-slate-400">
-                      {item.operatorNote.trim() || 'Sin nota del operador.'}
+                    <div className="mt-1 truncate text-xs leading-5 text-slate-400">
+                      {item.operatorNote.trim() || item.originalPath}
                     </div>
                   </div>
-                  <ResultStatusBadge label={item.statusLabel} tone={getStatusTone(item.statusLabel)} />
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+                      {item.sizeLabel}
+                    </span>
+                    <ResultStatusBadge label={item.statusLabel} tone={getStatusTone(item.statusLabel)} />
+                  </div>
                 </div>
               </summary>
 
@@ -179,7 +181,7 @@ export function ProjectInputsPanel({
                   icon="files"
                 />
                 <MetricCard
-                  label="Tamano"
+                  label="Tamaño"
                   value={item.sizeLabel}
                   detail="Peso detectado al adjuntar."
                   icon="folder"
@@ -195,7 +197,7 @@ export function ProjectInputsPanel({
                   value={item.operatorNote}
                   onChange={(event) => onNoteChange(item.id, event.target.value)}
                   className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/80 px-3 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300/30"
-                  placeholder="Ejemplo: usar como referencia, logo, documentacion o contenido base."
+                  placeholder="Ejemplo: usar como referencia, logo, documentación o contenido base."
                 />
               </div>
 

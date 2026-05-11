@@ -31,7 +31,7 @@ const toneByStatus: Record<StepProgressItem['status'], MetricTone> = {
 
 export function StepProgress({ items }: { items: StepProgressItem[] }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-7">
+    <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-7">
       {items.map((item) => {
         const iconName = iconByStepKey[item.key] || 'flow'
         const tone = toneByStatus[item.status]
@@ -44,7 +44,7 @@ export function StepProgress({ items }: { items: StepProgressItem[] }) {
             type="button"
             onClick={item.onClick}
             className={joinClasses(
-              'group relative overflow-hidden rounded-[22px] border px-4 py-3 text-left transition duration-200',
+              'group relative overflow-hidden rounded-[20px] border px-3.5 py-3 text-left transition duration-200',
               item.status === 'current'
                 ? 'border-sky-300/28 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.16),transparent_36%),linear-gradient(180deg,rgba(56,189,248,0.1),rgba(8,15,28,0.9))] text-white shadow-[0_16px_44px_rgba(56,189,248,0.12)]'
                 : item.status === 'complete'
@@ -56,7 +56,7 @@ export function StepProgress({ items }: { items: StepProgressItem[] }) {
               <div className="flex min-w-0 items-start gap-3">
                 <div
                   className={joinClasses(
-                    'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border',
+                    'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] border',
                     item.status === 'current'
                       ? 'border-sky-300/20 bg-sky-300/12 text-sky-100'
                       : item.status === 'complete'
@@ -71,9 +71,13 @@ export function StepProgress({ items }: { items: StepProgressItem[] }) {
                     {String(item.index + 1).padStart(2, '0')}
                   </div>
                   <div className="mt-1 text-sm font-semibold">{item.label}</div>
-                  <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">
-                    {item.status === 'current' ? item.description : item.meta || item.description}
-                  </div>
+                  {item.status === 'current' ? (
+                    <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">
+                      {item.description}
+                    </div>
+                  ) : item.meta ? (
+                    <div className="mt-1 line-clamp-1 text-xs leading-5 text-slate-500">{item.meta}</div>
+                  ) : null}
                 </div>
               </div>
               <ResultStatusBadge label={statusLabel} tone={tone} />

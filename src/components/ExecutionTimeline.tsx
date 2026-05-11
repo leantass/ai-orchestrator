@@ -51,10 +51,10 @@ export function ExecutionTimeline({
   const completedStages = stages.filter((stage) => stage.status === 'completed').length
   const activeStage = stages.find((stage) => stage.status === 'active')
   const progressPercent = stages.length > 0 ? Math.round((completedStages / stages.length) * 100) : 0
-  const visibleMetrics = metrics.slice(0, 3)
-  const supportMetrics = metrics.slice(3)
-  const visibleActivity = activity.slice(0, 3)
-  const hiddenActivity = activity.slice(3)
+  const visibleMetrics = metrics.slice(0, 2)
+  const supportMetrics = metrics.slice(2)
+  const visibleActivity = activity.slice(0, 2)
+  const hiddenActivity = activity.slice(2)
   const resultPreview = result.length > 280 ? `${result.slice(0, 280)}...` : result
 
   return (
@@ -86,7 +86,7 @@ export function ExecutionTimeline({
               />
             ) : null}
 
-            <div className="grid gap-3 xl:grid-cols-3">
+            <div className="grid gap-3 xl:grid-cols-2">
               {visibleMetrics.map((metric, index) => (
                 <MetricCard
                   key={`${metric.label}-${metric.value}`}
