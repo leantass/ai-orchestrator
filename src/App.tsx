@@ -9529,6 +9529,7 @@ const buildGoalContextPlanHints = ({
     .replace(/\s+/g, ' ')
     .trim()
   const moduleItems: string[] = []
+  const flowItems: string[] = []
   const exclusionItems: string[] = []
   const futureValidationItems: string[] = []
   let domainLabel = ''
@@ -9546,6 +9547,26 @@ const buildGoalContextPlanHints = ({
     (combinedText.includes('vape') || combinedText.includes('vaporizador'))
   ) {
     domainLabel = 'Gestion local de pedidos de recarga'
+    pushUniqueLabel(moduleItems, 'pedidos de recarga')
+    pushUniqueLabel(moduleItems, 'clientes')
+    pushUniqueLabel(moduleItems, 'dispositivos')
+    pushUniqueLabel(moduleItems, 'estados del pedido')
+    pushUniqueLabel(flowItems, 'recepcion del dispositivo')
+    pushUniqueLabel(flowItems, 'preparacion de recarga')
+    pushUniqueLabel(flowItems, 'listo para devolucion')
+    pushUniqueLabel(flowItems, 'retiro/devolucion')
+    if (includesAny(['observacion', 'observaciones', 'nota', 'notas'])) {
+      pushUniqueLabel(flowItems, 'observaciones internas')
+    }
+    if (includesAny(['costo', 'costos', 'estimado', 'estimados'])) {
+      pushUniqueLabel(flowItems, 'costos estimados')
+    }
+    if (includesAny(['alerta', 'alertas'])) {
+      pushUniqueLabel(flowItems, 'alertas de pedidos pendientes')
+    }
+    if (includesAny(['reporte', 'reportes'])) {
+      pushUniqueLabel(flowItems, 'reportes basicos por estado')
+    }
   }
 
   if (includesAny(['pedido', 'pedidos', 'orden ', 'ordenes', 'solicitud', 'solicitudes'])) {
@@ -9561,7 +9582,7 @@ const buildGoalContextPlanHints = ({
     pushUniqueLabel(moduleItems, 'retiro/devolucion')
   }
   if (includesAny(['estado', 'estados', 'seguimiento'])) {
-    pushUniqueLabel(moduleItems, 'estados')
+    pushUniqueLabel(moduleItems, domainLabel ? 'estados del pedido' : 'estados')
   }
   if (includesAny(['historial'])) {
     pushUniqueLabel(moduleItems, 'historial')
@@ -9580,7 +9601,7 @@ const buildGoalContextPlanHints = ({
     pushUniqueLabel(exclusionItems, 'pagos reales')
   }
   if (includesAny(['sin checkout', 'checkout'])) {
-    pushUniqueLabel(exclusionItems, 'checkout')
+    pushUniqueLabel(exclusionItems, 'checkout real')
   }
   if (includesAny(['sin venta directa', 'venta directa'])) {
     pushUniqueLabel(exclusionItems, 'venta directa')
@@ -9602,6 +9623,7 @@ const buildGoalContextPlanHints = ({
   return {
     domainLabel,
     moduleItems,
+    flowItems,
     exclusionItems,
     futureValidationItems,
   }
@@ -9633,26 +9655,36 @@ const buildOperatorPlanSummary = ({
     metadata.scalableDeliveryPlan?.modules,
     metadata.productArchitecture?.coreModules,
   ).slice(0, 4)
-  const flowItems = collectUniqueSummaryValues(
-    metadata.domainUnderstanding?.coreFlows,
-    metadata.domainUnderstanding?.localActions,
-    metadata.safeFirstDeliveryPlan?.scope,
-    metadata.safeFirstDeliveryPlan?.localBehavior,
-    metadata.scalableDeliveryPlan?.targetStructure,
-  ).slice(0, 4)
-  const exclusionItems = collectUniqueSummaryValues(
-    goalContextHints.exclusionItems,
-    metadata.safeFirstDeliveryPlan?.explicitExclusions,
-    metadata.scalableDeliveryPlan?.explicitExclusions,
-    metadata.domainUnderstanding?.explicitExclusions,
-    metadata.productArchitecture?.outOfScopeForFirstIteration,
-  ).slice(0, 4)
-  const futureValidationItems = collectUniqueSummaryValues(
-    goalContextHints.futureValidationItems,
-    metadata.safeFirstDeliveryPlan?.approvalRequiredLater,
-    metadata.scalableDeliveryPlan?.approvalRequiredLater,
-    metadata.domainUnderstanding?.approvalThemes,
-  ).slice(0, 3)
+  const prefersGoalContextSummary =
+    goalContextHints.domainLabel !== '' ||
+    goalContextHints.flowItems.length > 0 ||
+    goalContextHints.futureValidationItems.length > 0
+  const flowItems = prefersGoalContextSummary
+    ? collectUniqueSummaryValues(goalContextHints.flowItems).slice(0, 4)
+    : collectUniqueSummaryValues(
+        metadata.domainUnderstanding?.coreFlows,
+        metadata.domainUnderstanding?.localActions,
+        metadata.safeFirstDeliveryPlan?.scope,
+        metadata.safeFirstDeliveryPlan?.localBehavior,
+        metadata.scalableDeliveryPlan?.targetStructure,
+      ).slice(0, 4)
+  const exclusionItems = prefersGoalContextSummary
+    ? collectUniqueSummaryValues(goalContextHints.exclusionItems).slice(0, 5)
+    : collectUniqueSummaryValues(
+        goalContextHints.exclusionItems,
+        metadata.safeFirstDeliveryPlan?.explicitExclusions,
+        metadata.scalableDeliveryPlan?.explicitExclusions,
+        metadata.domainUnderstanding?.explicitExclusions,
+        metadata.productArchitecture?.outOfScopeForFirstIteration,
+      ).slice(0, 4)
+  const futureValidationItems = prefersGoalContextSummary
+    ? collectUniqueSummaryValues(goalContextHints.futureValidationItems).slice(0, 3)
+    : collectUniqueSummaryValues(
+        goalContextHints.futureValidationItems,
+        metadata.safeFirstDeliveryPlan?.approvalRequiredLater,
+        metadata.scalableDeliveryPlan?.approvalRequiredLater,
+        metadata.domainUnderstanding?.approvalThemes,
+      ).slice(0, 3)
   const summaryLines: string[] = []
 
   if (domainLabel) {
@@ -13851,8 +13883,19 @@ function App() {
         : 'Finalizada'
     : flowExecutionStages[flowExecutionStageIndex]
   const normalizedGoalInput = goalInput.trim() || 'Sin objetivo definido'
+  const planOverviewGoalContextHints = buildGoalContextPlanHints({
+    goal: normalizedGoalInput,
+    context: currentExecutionContextSummary,
+  })
+  const planOverviewUsesOperatorSummary =
+    plannerIsReviewOnly &&
+    (planOverviewGoalContextHints.domainLabel !== '' ||
+      planOverviewGoalContextHints.moduleItems.length > 0 ||
+      planOverviewGoalContextHints.flowItems.length > 0 ||
+      planOverviewGoalContextHints.exclusionItems.length > 0 ||
+      planOverviewGoalContextHints.futureValidationItems.length > 0)
   const planOverviewInstruction =
-    plannerIsSafeFirstDeliveryReview || plannerIsScalableDeliveryReview
+    planOverviewUsesOperatorSummary
       ? buildOperatorPlanSummary({
           metadata: effectivePlannerExecutionMetadata,
           fallbackInstruction: plannerInstruction,
@@ -13862,10 +13905,9 @@ function App() {
       : hasWizardPlan
         ? plannerInstruction
         : 'Todavia no generaste un plan en esta corrida.'
-  const planOverviewHelperText =
-    plannerIsReviewOnly && (plannerIsSafeFirstDeliveryReview || plannerIsScalableDeliveryReview)
-      ? 'Revisa el resumen. Si esta correcto, prepara la ejecucion local siguiente.'
-      : plannerReviewHelperText
+  const planOverviewHelperText = planOverviewUsesOperatorSummary
+    ? 'Revisa el resumen. Si esta correcto, prepara la ejecucion local siguiente.'
+    : plannerReviewHelperText
   const runtimePlatformLabel =
     typeof navigator === 'undefined'
       ? 'Desktop'
