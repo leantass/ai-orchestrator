@@ -9585,7 +9585,10 @@ const buildGoalContextPlanHints = ({
 
   if (
     combinedText.includes('recarga') &&
-    (combinedText.includes('vape') || combinedText.includes('vaporizador'))
+    (combinedText.includes('vape') ||
+      combinedText.includes('vaporizador') ||
+      combinedText.includes('dispositivo') ||
+      combinedText.includes('dispositivos'))
   ) {
     domainLabel = 'Gestion local de pedidos de recarga'
     pushUniqueLabel(moduleItems, 'pedidos de recarga')
@@ -12210,6 +12213,14 @@ function App() {
     normalizeOptionalString(
       plannerExecutionMetadata.nextExpectedAction,
     ).toLocaleLowerCase() === 'review-safe-first-delivery'
+  const plannerIsProductArchitectureReview =
+    normalizeOptionalString(plannerExecutionMetadata.decisionKey).toLocaleLowerCase() ===
+      'product-architecture-plan' ||
+    normalizeOptionalString(plannerExecutionMetadata.strategy).toLocaleLowerCase() ===
+      'product-architecture-plan' ||
+    normalizeOptionalString(
+      plannerExecutionMetadata.nextExpectedAction,
+    ).toLocaleLowerCase() === 'review-product-architecture'
   const plannerScalableDeliveryLevel = normalizeOptionalString(
     plannerExecutionMetadata.scalableDeliveryPlan?.deliveryLevel,
   ).toLocaleLowerCase()
@@ -12230,6 +12241,8 @@ function App() {
       ? 'Fase segura en revision'
       : plannerIsSafeFirstDeliveryReview
         ? 'Primera entrega en revision'
+        : plannerIsProductArchitectureReview
+          ? 'Arquitectura inicial en revision'
         : plannerIsScalableDeliveryReview
           ? 'Plan escalable en revision'
           : 'Plan en revision'
@@ -12241,12 +12254,16 @@ function App() {
         : `JEFE detecto la fase segura ${plannerProjectPhaseReviewId || 'actual'} para revisarla antes de seguir con la continuidad.`
       : plannerIsSafeFirstDeliveryReview
         ? 'Estas revisando una primera entrega segura. El CTA azul solo prepara la materializacion; todavia no escribe archivos.'
+        : plannerIsProductArchitectureReview
+          ? 'Estas revisando una arquitectura inicial. El CTA azul prepara la primera entrega segura; todavia no ejecuta cambios.'
         : plannerIsScalableDeliveryReview
           ? 'Estas revisando una entrega funcional local mas amplia. El CTA azul prepara la materializacion, pero todavia no ejecuta cambios.'
           : 'Este bloque quedo en revision manual. Primero se entiende y despues se decide si conviene preparar o ejecutar.'
     : 'La instruccion actual ya es ejecutable y el CTA amarillo puede materializar o continuar sobre el workspace.'
   const plannerReviewActionLabel = plannerIsSafeFirstDeliveryReview
     ? 'Revisar primera entrega segura'
+    : plannerIsProductArchitectureReview
+      ? 'Preparar primera entrega segura'
     : plannerIsProjectPhaseReview
       ? plannerProjectPhaseReviewId
         ? `Revisar fase segura: ${plannerProjectPhaseReviewId}`
@@ -12544,6 +12561,10 @@ function App() {
           : 'Ejecutar instrucción actual'
   const isPreparingSafeMaterialization =
     plannerReviewActionInFlight === 'prepare-safe-materialization'
+  const isPreparingSafeFirstDelivery =
+    plannerReviewActionInFlight === 'prepare-safe-first-delivery'
+  const isPlannerReviewActionBusy =
+    plannerReviewActionInFlight !== '' || isPlanning
   const plannerHasPreparedSafeMaterialization =
     !plannerIsReviewOnly &&
     activeExecutionStrategy === 'materialize-safe-first-delivery-plan' &&
@@ -13962,12 +13983,16 @@ function App() {
     : plannerIsReviewOnly
       ? plannerReviewStatusLabel
       : 'Plan generado'
-  const planOverviewHelperText = isPreparingSafeMaterialization
+  const planOverviewHelperText = isPreparingSafeFirstDelivery
+    ? 'JEFE esta preparando la primera entrega segura. Espera la confirmacion antes de volver a tocar el CTA.'
+    : isPreparingSafeMaterialization
     ? 'JEFE esta preparando una instruccion materializable. Espera la confirmacion antes de volver a tocar el CTA.'
     : plannerHasPreparedSafeMaterialization
       ? 'La preparacion termino bien. El siguiente paso es materializar la entrega local segura.'
+      : plannerIsProductArchitectureReview
+        ? 'Revisa la arquitectura inicial. Si esta correcta, prepara la primera entrega segura. El detalle tecnico queda abajo.'
       : planOverviewUsesOperatorSummary
-        ? 'Revisa el resumen. Si esta correcto, prepara la ejecucion local siguiente.'
+        ? 'Revisa el resumen. Si esta correcto, prepara el siguiente paso seguro.'
         : plannerReviewHelperText
   const runtimePlatformLabel =
     typeof navigator === 'undefined'
@@ -14212,9 +14237,12 @@ function App() {
                   ? [
                       {
                         label: 'Siguiente paso',
-                        value: 'Revisa el resumen del plan.',
-                        detail:
-                          'Si esta correcto, prepara la ejecucion. El detalle tecnico queda abajo.',
+                        value: plannerIsProductArchitectureReview
+                          ? 'Revisa la arquitectura inicial.'
+                          : 'Revisa el resumen del plan.',
+                        detail: plannerIsProductArchitectureReview
+                          ? 'Si esta correcta, prepara la primera entrega segura. El detalle tecnico queda abajo.'
+                          : 'Si esta correcto, prepara la ejecucion. El detalle tecnico queda abajo.',
                         icon: 'next' as const,
                       },
                       {
@@ -14284,13 +14312,17 @@ function App() {
                   activeWizardStep === 'goal'
                     ? 'Escribi el resultado esperado y avanza al contexto.'
                     : activeWizardStep === 'plan'
-                      ? 'Si el resumen esta bien, prepara la ejecucion.'
+                      ? plannerIsProductArchitectureReview
+                        ? 'Si el resumen esta bien, prepara la primera entrega segura.'
+                        : 'Si el resumen esta bien, prepara la ejecucion.'
                     : guidedStepActionSummaryLabel,
                 detail:
                   activeWizardStep === 'goal'
                     ? ''
                     : activeWizardStep === 'plan'
-                      ? 'Regenera el plan solo si hace falta ajustar alcance o restricciones.'
+                      ? plannerIsProductArchitectureReview
+                        ? 'Regenera el plan solo si hace falta ajustar arquitectura, alcance o restricciones.'
+                        : 'Regenera el plan solo si hace falta ajustar alcance o restricciones.'
                       : guidedStepActionSummaryDetail,
                 icon: 'next' as const,
               },
@@ -18126,9 +18158,19 @@ function App() {
   }
 
   const handlePrepareSafeFirstDeliveryPlan = async () => {
+    if (
+      isPlanning ||
+      plannerReviewActionLockRef.current === 'prepare-safe-first-delivery'
+    ) {
+      return
+    }
+
     if (!plannerIsReviewOnly || !activeProductArchitecture) {
       return
     }
+
+    plannerReviewActionLockRef.current = 'prepare-safe-first-delivery'
+    setPlannerReviewActionInFlight('prepare-safe-first-delivery')
 
     const preparedPlanningPrompt = buildSafeFirstDeliveryPlanningPrompt({
       architecture: activeProductArchitecture,
@@ -18146,14 +18188,19 @@ function App() {
       'Se preparo una nueva planificacion para la primera entrega segura',
     ])
 
-    await handleGenerateNextStep({
-      goal: preparedPlanningPrompt.goal,
-      context: preparedPlanningPrompt.context,
-      sourceLabel: 'Primera entrega segura preparada',
+    try {
+      await handleGenerateNextStep({
+        goal: preparedPlanningPrompt.goal,
+        context: preparedPlanningPrompt.context,
+        sourceLabel: 'Primera entrega segura preparada',
       sendContent:
         'Se envio al planificador una solicitud acotada para preparar la primera entrega segura sin ejecutar cambios todavÍa.',
       persistPreparedInputs: true,
-    })
+      })
+    } finally {
+      plannerReviewActionLockRef.current = ''
+      setPlannerReviewActionInFlight('')
+    }
   }
 
   const handlePrepareSafeMaterializationPlan = async () => {
@@ -18394,6 +18441,8 @@ function App() {
     ? plannerProjectPhaseReviewCanMaterialize
       ? `Preparar materializacion de fase ${plannerProjectPhaseReviewId}`
       : ''
+    : plannerIsProductArchitectureReview
+      ? 'Preparar primera entrega segura'
     : plannerIsSafeFirstDeliveryReview
       ? 'Preparar ejecucion local segura'
       : plannerIsScalableDeliveryReview
@@ -18408,6 +18457,8 @@ function App() {
       ? plannerProjectPhaseReviewCanMaterialize
         ? () => handleMaterializeProjectPhase(plannerProjectPhaseReviewId)
         : null
+      : plannerIsProductArchitectureReview
+        ? handlePrepareSafeFirstDeliveryPlan
       : plannerIsSafeFirstDeliveryReview
         ? handlePrepareSafeMaterializationPlan
         : plannerIsScalableDeliveryReview
@@ -18417,6 +18468,19 @@ function App() {
               ? handlePrepareFrontendProjectMaterializationPlan
               : null
           : null
+  const plannerReviewPrimaryActionBusyLabel = plannerIsProductArchitectureReview
+    ? 'Preparando primera entrega...'
+    : plannerIsSafeFirstDeliveryReview
+      ? 'Preparando ejecucion...'
+      : plannerIsScalableDeliveryReview
+        ? plannerScalableDeliveryLevel === 'fullstack-local'
+          ? 'Preparando entrega...'
+          : plannerScalableDeliveryLevel === 'frontend-project'
+            ? 'Preparando frontend...'
+            : 'Preparando...'
+        : plannerIsProjectPhaseReview
+          ? 'Preparando materializacion...'
+          : 'Preparando...'
 
   const handleExecuteCurrentInstruction = async (
     overrideInstruction?: string,
@@ -19763,11 +19827,11 @@ function App() {
             handlePlannerReviewPrimaryAction && plannerReviewPrimaryActionLabel ? (
               <PrimaryActionButton
                 onClick={handlePlannerReviewPrimaryAction}
-                disabled={isPlanning || isPreparingSafeMaterialization}
+                disabled={isPlannerReviewActionBusy}
                 tone="sky"
               >
-                {isPreparingSafeMaterialization || isPlanning
-                  ? 'Preparando ejecucion...'
+                {isPlannerReviewActionBusy
+                  ? plannerReviewPrimaryActionBusyLabel
                   : plannerReviewPrimaryActionLabel}
               </PrimaryActionButton>
             ) : null
@@ -22347,10 +22411,12 @@ function App() {
                     <button
                       type="button"
                       onClick={handlePlannerReviewPrimaryAction}
-                      disabled={isPlanning}
+                      disabled={isPlannerReviewActionBusy}
                       className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
                     >
-                      {plannerReviewPrimaryActionLabel}
+                      {isPlannerReviewActionBusy
+                        ? plannerReviewPrimaryActionBusyLabel
+                        : plannerReviewPrimaryActionLabel}
                     </button>
                   ) : (
                     <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200">
@@ -22422,10 +22488,12 @@ function App() {
                           <button
                             type="button"
                             onClick={handlePlannerReviewPrimaryAction}
-                            disabled={isPlanning}
+                            disabled={isPlannerReviewActionBusy}
                             className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
                           >
-                            {plannerReviewPrimaryActionLabel}
+                            {isPlannerReviewActionBusy
+                              ? plannerReviewPrimaryActionBusyLabel
+                              : plannerReviewPrimaryActionLabel}
                           </button>
                         ) : (
                           <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200">
