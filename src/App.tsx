@@ -9499,6 +9499,193 @@ const summarizeInlineText = (value: unknown, maxLength = 120) => {
     : normalizedValue
 }
 
+const collectUniqueSummaryValues = (...inputs: unknown[]) => {
+  const collectedValues: string[] = []
+
+  inputs.forEach((input) => {
+    normalizeOptionalStringArray(input).forEach((entry) => {
+      const normalizedEntry = entry.trim()
+
+      if (!normalizedEntry || collectedValues.includes(normalizedEntry)) {
+        return
+      }
+
+      collectedValues.push(normalizedEntry)
+    })
+  })
+
+  return collectedValues
+}
+
+const buildGoalContextPlanHints = ({
+  goal,
+  context,
+}: {
+  goal: string
+  context: string
+}) => {
+  const combinedText = `${normalizeOptionalString(goal)} ${normalizeOptionalString(context)}`
+    .toLocaleLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+  const moduleItems: string[] = []
+  const exclusionItems: string[] = []
+  const futureValidationItems: string[] = []
+  let domainLabel = ''
+
+  const pushUniqueLabel = (target: string[], label: string) => {
+    if (label && !target.includes(label)) {
+      target.push(label)
+    }
+  }
+  const includesAny = (patterns: string[]) =>
+    patterns.some((pattern) => combinedText.includes(pattern))
+
+  if (
+    combinedText.includes('recarga') &&
+    (combinedText.includes('vape') || combinedText.includes('vaporizador'))
+  ) {
+    domainLabel = 'Gestion local de pedidos de recarga'
+  }
+
+  if (includesAny(['pedido', 'pedidos', 'orden ', 'ordenes', 'solicitud', 'solicitudes'])) {
+    pushUniqueLabel(moduleItems, 'pedidos')
+  }
+  if (includesAny(['cliente', 'clientes'])) {
+    pushUniqueLabel(moduleItems, 'clientes')
+  }
+  if (includesAny(['dispositivo', 'dispositivos', 'equipo', 'equipos', 'vape', 'vaporizador'])) {
+    pushUniqueLabel(moduleItems, 'dispositivos')
+  }
+  if (includesAny(['retiro', 'devolucion', 'devoluciones', 'logistica'])) {
+    pushUniqueLabel(moduleItems, 'retiro/devolucion')
+  }
+  if (includesAny(['estado', 'estados', 'seguimiento'])) {
+    pushUniqueLabel(moduleItems, 'estados')
+  }
+  if (includesAny(['historial'])) {
+    pushUniqueLabel(moduleItems, 'historial')
+  }
+  if (includesAny(['alerta', 'alertas'])) {
+    pushUniqueLabel(moduleItems, 'alertas')
+  }
+  if (includesAny(['reporte', 'reportes'])) {
+    pushUniqueLabel(moduleItems, 'reportes')
+  }
+  if (includesAny(['costo', 'costos', 'estimado', 'estimados'])) {
+    pushUniqueLabel(moduleItems, 'costos estimados')
+  }
+
+  if (includesAny(['sin pagos reales', 'pagos reales'])) {
+    pushUniqueLabel(exclusionItems, 'pagos reales')
+  }
+  if (includesAny(['sin checkout', 'checkout'])) {
+    pushUniqueLabel(exclusionItems, 'checkout')
+  }
+  if (includesAny(['sin venta directa', 'venta directa'])) {
+    pushUniqueLabel(exclusionItems, 'venta directa')
+  }
+  if (includesAny(['sin promocion', 'sin promocion', 'promocion', 'promociones'])) {
+    pushUniqueLabel(exclusionItems, 'promocion comercial')
+  }
+  if (includesAny(['sin base real', 'base real', 'base de datos real'])) {
+    pushUniqueLabel(exclusionItems, 'base de datos real')
+  }
+  if (includesAny(['sin integraciones externas', 'integraciones externas'])) {
+    pushUniqueLabel(exclusionItems, 'integraciones externas')
+  }
+
+  if (includesAny(['edad', 'cumplimiento legal', 'cumplimiento', 'legal'])) {
+    pushUniqueLabel(futureValidationItems, 'edad y cumplimiento legal')
+  }
+
+  return {
+    domainLabel,
+    moduleItems,
+    exclusionItems,
+    futureValidationItems,
+  }
+}
+
+const buildOperatorPlanSummary = ({
+  metadata,
+  fallbackInstruction,
+  goal,
+  context,
+}: {
+  metadata: PlannerExecutionMetadata
+  fallbackInstruction: string
+  goal: string
+  context: string
+}) => {
+  const goalContextHints = buildGoalContextPlanHints({ goal, context })
+  const domainLabel =
+    goalContextHints.domainLabel ||
+    normalizeOptionalString(metadata.domainUnderstanding?.domainLabel) ||
+    normalizeOptionalString(metadata.activeProjectContext?.domain) ||
+    normalizeOptionalString(metadata.businessSectorLabel) ||
+    normalizeOptionalString(metadata.productArchitecture?.domain) ||
+    normalizeOptionalString(metadata.domainUnderstanding?.intentLabel)
+  const moduleItems = collectUniqueSummaryValues(
+    goalContextHints.moduleItems,
+    metadata.domainUnderstanding?.primaryModules,
+    metadata.safeFirstDeliveryPlan?.modules,
+    metadata.scalableDeliveryPlan?.modules,
+    metadata.productArchitecture?.coreModules,
+  ).slice(0, 4)
+  const flowItems = collectUniqueSummaryValues(
+    metadata.domainUnderstanding?.coreFlows,
+    metadata.domainUnderstanding?.localActions,
+    metadata.safeFirstDeliveryPlan?.scope,
+    metadata.safeFirstDeliveryPlan?.localBehavior,
+    metadata.scalableDeliveryPlan?.targetStructure,
+  ).slice(0, 4)
+  const exclusionItems = collectUniqueSummaryValues(
+    goalContextHints.exclusionItems,
+    metadata.safeFirstDeliveryPlan?.explicitExclusions,
+    metadata.scalableDeliveryPlan?.explicitExclusions,
+    metadata.domainUnderstanding?.explicitExclusions,
+    metadata.productArchitecture?.outOfScopeForFirstIteration,
+  ).slice(0, 4)
+  const futureValidationItems = collectUniqueSummaryValues(
+    goalContextHints.futureValidationItems,
+    metadata.safeFirstDeliveryPlan?.approvalRequiredLater,
+    metadata.scalableDeliveryPlan?.approvalRequiredLater,
+    metadata.domainUnderstanding?.approvalThemes,
+  ).slice(0, 3)
+  const summaryLines: string[] = []
+
+  if (domainLabel) {
+    summaryLines.push(summarizeInlineText(domainLabel, 96))
+  }
+
+  if (moduleItems.length > 0) {
+    summaryLines.push(`Incluye ${moduleItems.join(', ')}.`)
+  }
+
+  if (flowItems.length > 0) {
+    summaryLines.push(`Cubre ${flowItems.join(', ')}.`)
+  }
+
+  if (exclusionItems.length > 0) {
+    summaryLines.push(`Sin ${exclusionItems.join(', ')}.`)
+  }
+
+  if (futureValidationItems.length > 0) {
+    summaryLines.push(`Validacion posterior: ${futureValidationItems.join(', ')}.`)
+  }
+
+  if (summaryLines.length > 0) {
+    return summaryLines.join('\n')
+  }
+
+  if (normalizeOptionalString(fallbackInstruction)) {
+    return summarizeInlineText(fallbackInstruction, 220)
+  }
+
+  return 'Todavia no generaste un plan en esta corrida.'
+}
+
 const mergeUniqueStringValues = (
   currentValues: string[],
   incomingValues: unknown,
@@ -13664,6 +13851,21 @@ function App() {
         : 'Finalizada'
     : flowExecutionStages[flowExecutionStageIndex]
   const normalizedGoalInput = goalInput.trim() || 'Sin objetivo definido'
+  const planOverviewInstruction =
+    plannerIsSafeFirstDeliveryReview || plannerIsScalableDeliveryReview
+      ? buildOperatorPlanSummary({
+          metadata: effectivePlannerExecutionMetadata,
+          fallbackInstruction: plannerInstruction,
+          goal: normalizedGoalInput,
+          context: currentExecutionContextSummary,
+        })
+      : hasWizardPlan
+        ? plannerInstruction
+        : 'Todavia no generaste un plan en esta corrida.'
+  const planOverviewHelperText =
+    plannerIsReviewOnly && (plannerIsSafeFirstDeliveryReview || plannerIsScalableDeliveryReview)
+      ? 'Revisa el resumen. Si esta correcto, prepara la ejecucion local siguiente.'
+      : plannerReviewHelperText
   const runtimePlatformLabel =
     typeof navigator === 'undefined'
       ? 'Desktop'
@@ -13903,6 +14105,35 @@ function App() {
                       icon: 'status' as const,
                     },
                   ]
+                : activeWizardStep === 'plan'
+                  ? [
+                      {
+                        label: 'Siguiente paso',
+                        value: 'Revisa el resumen del plan.',
+                        detail:
+                          'Si esta correcto, prepara la ejecucion. El detalle tecnico queda abajo.',
+                        icon: 'next' as const,
+                      },
+                      {
+                        label: 'Detalle',
+                        value: 'No se repite el objetivo completo en este paso.',
+                        detail:
+                          'Hace foco en alcance, exclusiones y siguiente accion.',
+                        icon: 'context' as const,
+                      },
+                      {
+                        label: 'Proyecto activo',
+                        value:
+                          existingProjectContext?.projectName ||
+                          (existingProjectContext?.selectedPath
+                            ? 'Seleccionado'
+                            : 'Sin proyecto'),
+                        detail:
+                          existingProjectContext?.selectedPath ||
+                          'Solo texto e insumos por ahora.',
+                        icon: 'projects' as const,
+                      },
+                    ]
                 : [
                     {
                       label: 'Objetivo',
@@ -13949,14 +14180,31 @@ function App() {
                 value:
                   activeWizardStep === 'goal'
                     ? 'Escribi el resultado esperado y avanza al contexto.'
+                    : activeWizardStep === 'plan'
+                      ? 'Si el resumen esta bien, prepara la ejecucion.'
                     : guidedStepActionSummaryLabel,
-                detail: activeWizardStep === 'goal' ? '' : guidedStepActionSummaryDetail,
+                detail:
+                  activeWizardStep === 'goal'
+                    ? ''
+                    : activeWizardStep === 'plan'
+                      ? 'Regenera el plan solo si hace falta ajustar alcance o restricciones.'
+                      : guidedStepActionSummaryDetail,
                 icon: 'next' as const,
               },
               {
                 label: 'Estado',
-                value: activeWizardStep === 'goal' ? 'Sin bloqueo' : sessionStatus,
-                detail: activeWizardStep === 'goal' ? '' : visibleCurrentStepLabel,
+                value:
+                  activeWizardStep === 'goal'
+                    ? 'Sin bloqueo'
+                    : activeWizardStep === 'plan'
+                      ? plannerReviewStatusLabel
+                      : sessionStatus,
+                detail:
+                  activeWizardStep === 'goal'
+                    ? ''
+                    : activeWizardStep === 'plan'
+                      ? activePlannerStrategyLabel
+                      : visibleCurrentStepLabel,
                 icon: 'status' as const,
               },
               {
@@ -14139,7 +14387,9 @@ function App() {
     },
     {
       label: 'Alcance permitido',
-      value: plannerExecutionMetadata.executionScope || 'Sin alcance definido',
+      value:
+        summarizeExecutionScope(plannerExecutionMetadata.executionScope) ||
+        'Sin alcance definido',
       detail: getProjectWorkModeLabel(projectWorkMode),
       icon: 'shield' as const,
     },
@@ -14720,16 +14970,20 @@ function App() {
   const resetPlannerMaterializationAttemptState = ({
     fallbackMetadata,
     fallbackSnapshot,
+    preservePlannerInstruction = false,
   }: {
     fallbackMetadata: PlannerExecutionMetadata
     fallbackSnapshot?: PlannerRequestSnapshot | null
+    preservePlannerInstruction?: boolean
   }) => {
     setDecisionPending(false)
     setApprovalMessage('')
     setPendingInstruction('')
     setPendingExecutionInstruction('')
     setApprovalSource('')
-    setPlannerInstruction(DEFAULT_PLANNER_INSTRUCTION)
+    if (!preservePlannerInstruction) {
+      setPlannerInstruction(DEFAULT_PLANNER_INSTRUCTION)
+    }
     setPlannerExecutionMetadata(fallbackMetadata)
     setPlannerRequestSnapshot(
       fallbackSnapshot || {
@@ -17861,6 +18115,7 @@ function App() {
     resetPlannerMaterializationAttemptState({
       fallbackMetadata: safePlanReviewMetadata,
       fallbackSnapshot: safePlanReviewSnapshot,
+      preservePlannerInstruction: true,
     })
 
     await handleGenerateNextStep({
@@ -17873,6 +18128,7 @@ function App() {
         resetPlannerMaterializationAttemptState({
           fallbackMetadata: safePlanReviewMetadata,
           fallbackSnapshot: safePlanReviewSnapshot,
+          preservePlannerInstruction: true,
         })
       },
       validateResponse: (_response, metadata) =>
@@ -19371,12 +19627,8 @@ function App() {
     ) : activeWizardStep === 'plan' ? (
       <PlanOverviewPanel
         title={plannerIsReviewOnly ? plannerReviewStatusLabel : 'Plan generado'}
-        helperText={plannerReviewHelperText}
-        instruction={
-          hasWizardPlan
-            ? plannerInstruction
-            : 'Todavía no generaste un plan en esta corrida.'
-        }
+        helperText={planOverviewHelperText}
+        instruction={planOverviewInstruction}
         metrics={planOverviewMetrics}
         secondaryActions={
           <SecondaryActionButton onClick={handleWizardGeneratePlan} disabled={isPlanning}>
@@ -19391,7 +19643,9 @@ function App() {
                 disabled={isPlanning}
                 tone="sky"
               >
-                Preparar ejecución
+                {isPlanning
+                  ? 'Preparando ejecucion...'
+                  : plannerReviewPrimaryActionLabel}
               </PrimaryActionButton>
             ) : null
           ) : (
@@ -19420,6 +19674,16 @@ function App() {
         }
         technicalDetails={
           <>
+            {hasWizardPlan ? (
+              <article className="rounded-[28px] border border-white/8 bg-white/[0.03] p-5">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Instruccion completa del plan
+                </div>
+                <div className="mt-3 whitespace-pre-wrap break-words text-sm leading-7 text-slate-200">
+                  {plannerInstruction}
+                </div>
+              </article>
+            ) : null}
             <div className="grid gap-3 md:grid-cols-2">
               <MetricCard label="decisionKey" value={activeDecisionKeyLabel} />
               <MetricCard
@@ -22378,7 +22642,10 @@ function App() {
                   <MetricCard
                     label="Ruta planificada"
                     value={activeExecutionModeLabel}
-                    detail={plannerExecutionMetadata.executionScope || 'Sin alcance definido'}
+                    detail={
+                      summarizeExecutionScope(plannerExecutionMetadata.executionScope) ||
+                      'Sin alcance definido'
+                    }
                     tone="sky"
                   />
                   <MetricCard
