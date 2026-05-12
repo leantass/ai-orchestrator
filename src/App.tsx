@@ -4829,11 +4829,15 @@ function SafeFirstDeliveryPlanCard({
   compact = false,
   reviewOnly = false,
   onPrepareMaterialization,
+  materializationActionState = 'idle',
+  hideActionButton = false,
 }: {
   plan: SafeFirstDeliveryPlanContract
   compact?: boolean
   reviewOnly?: boolean
   onPrepareMaterialization?: (() => void) | null
+  materializationActionState?: 'idle' | 'preparing' | 'prepared'
+  hideActionButton?: boolean
 }) {
   const canPrepareMaterialization =
     reviewOnly &&
@@ -4841,6 +4845,8 @@ function SafeFirstDeliveryPlanCard({
     (normalizeOptionalStringArray(plan.scope).length > 0 ||
       normalizeOptionalStringArray(plan.modules).length > 0 ||
       normalizeOptionalStringArray(plan.screens).length > 0)
+  const preparingMaterialization = materializationActionState === 'preparing'
+  const preparedMaterialization = materializationActionState === 'prepared'
   const scopeSummary =
     normalizeOptionalStringArray(plan.scope)[0] || 'Sin datos definidos'
   const moduleSummary =
@@ -4856,25 +4862,38 @@ function SafeFirstDeliveryPlanCard({
             Primera entrega segura
           </div>
           <div className="mt-2 text-sm leading-6 text-slate-400">
-            Este bloque resume la primera fase segura propuesta por el Cerebro y no ejecuta cambios todavía.
+            {preparedMaterialization
+              ? 'Este bloque conserva el alcance aprobado y la materializacion ya quedo lista en el CTA principal.'
+              : 'Este bloque resume la primera fase segura propuesta por el Cerebro y no ejecuta cambios todavia.'}
           </div>
           {canPrepareMaterialization ? (
             <div className="mt-2 text-xs leading-5 text-slate-500">
-              Esto genera un plan ejecutable acotado; no ejecuta cambios todavía.
+              {preparingMaterialization
+                ? 'JEFE esta preparando un plan ejecutable acotado para materializar la entrega.'
+                : 'Esto genera un plan ejecutable acotado; no ejecuta cambios todavia.'}
             </div>
           ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-            Revisión manual
+            {preparedMaterialization
+              ? 'Lista para materializar'
+              : preparingMaterialization
+                ? 'Preparando materializacion'
+                : reviewOnly
+                  ? 'Revision manual'
+                  : 'Resumen activo'}
           </span>
-          {canPrepareMaterialization ? (
+          {canPrepareMaterialization && !hideActionButton ? (
             <button
               type="button"
               onClick={onPrepareMaterialization || undefined}
-              className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-medium text-emerald-100 transition hover:bg-emerald-300/15"
+              disabled={preparingMaterialization}
+              className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-medium text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
             >
-              Preparar materialización segura
+              {preparingMaterialization
+                ? 'Preparando materializacion...'
+                : 'Preparar materializacion segura'}
             </button>
           ) : null}
         </div>
@@ -8621,9 +8640,13 @@ const extractDistinctiveSafeFirstDeliveryModules = (
 const buildMaterializationPlanCoherenceIssue = ({
   sourcePlan,
   metadata,
+  goal,
+  context,
 }: {
   sourcePlan: SafeFirstDeliveryPlanContract
   metadata: PlannerExecutionMetadata
+  goal?: string
+  context?: string
 }) => {
   const materializationDecisionDetected =
     isSafeFirstDeliveryMaterializationDecision(metadata.decisionKey) ||
@@ -8636,20 +8659,38 @@ const buildMaterializationPlanCoherenceIssue = ({
   const sourceDistinctiveModules = extractDistinctiveSafeFirstDeliveryModules(
     sourcePlan.modules,
   )
+  const goalContextHints = buildGoalContextPlanHints({
+    goal: normalizeOptionalString(goal),
+    context: normalizeOptionalString(context),
+  })
+  const goalContextDistinctiveModules = extractDistinctiveSafeFirstDeliveryModules([
+    ...goalContextHints.moduleItems,
+    ...goalContextHints.flowItems,
+  ])
   const responseDistinctiveModules = extractDistinctiveSafeFirstDeliveryModules(
     metadata.safeFirstDeliveryMaterialization?.modules ||
       metadata.safeFirstDeliveryPlan?.modules ||
       [],
   )
+  const expectedDistinctiveModules =
+    goalContextDistinctiveModules.length > 0 &&
+    sourceDistinctiveModules.length > 0 &&
+    !sourceDistinctiveModules.some((moduleName) =>
+      goalContextDistinctiveModules.includes(moduleName),
+    )
+      ? goalContextDistinctiveModules
+      : sourceDistinctiveModules.length > 0
+        ? sourceDistinctiveModules
+        : goalContextDistinctiveModules
 
   if (
-    sourceDistinctiveModules.length > 0 &&
+    expectedDistinctiveModules.length > 0 &&
     responseDistinctiveModules.length > 0 &&
-    !sourceDistinctiveModules.some((moduleName) =>
+    !expectedDistinctiveModules.some((moduleName) =>
       responseDistinctiveModules.includes(moduleName),
     )
   ) {
-    return `El plan materializable devuelto no coincide con el plan fuente activo. Fuente: ${sourceDistinctiveModules.join(
+    return `El plan materializable devuelto no coincide con el plan fuente activo. Fuente: ${expectedDistinctiveModules.join(
       ', ',
     )}. Devuelto: ${responseDistinctiveModules.join(', ')}.`
   }
@@ -11770,6 +11811,8 @@ function App() {
   const [projectContextActionMessage, setProjectContextActionMessage] =
     useState('')
   const [isProjectContextBusy, setIsProjectContextBusy] = useState(false)
+  const plannerReviewActionLockRef = useRef('')
+  const [plannerReviewActionInFlight, setPlannerReviewActionInFlight] = useState('')
   const [plannerRequestSnapshot, setPlannerRequestSnapshot] =
     useState<PlannerRequestSnapshot>({
       goal: '',
@@ -12486,7 +12529,7 @@ function App() {
     : activeExecutionStrategy === 'materialize-fullstack-local-plan'
       ? 'Materializar entrega local'
       : activeExecutionStrategy === 'materialize-safe-first-delivery-plan'
-        ? 'Materializar primera entrega'
+        ? 'Materializar entrega'
         : activeExecutionStrategy === 'materialize-module-expansion-plan'
           ? 'Materializar modulo'
           : 'Ejecutar'
@@ -12495,10 +12538,19 @@ function App() {
     : activeExecutionStrategy === 'materialize-fullstack-local-plan'
       ? 'Materializar entrega local'
       : activeExecutionStrategy === 'materialize-safe-first-delivery-plan'
-        ? 'Materializar primera entrega'
+        ? 'Materializar entrega'
         : activeExecutionStrategy === 'materialize-module-expansion-plan'
           ? 'Materializar modulo'
           : 'Ejecutar instrucción actual'
+  const isPreparingSafeMaterialization =
+    plannerReviewActionInFlight === 'prepare-safe-materialization'
+  const plannerHasPreparedSafeMaterialization =
+    !plannerIsReviewOnly &&
+    activeExecutionStrategy === 'materialize-safe-first-delivery-plan' &&
+    (Boolean(effectivePlannerExecutionMetadata.safeFirstDeliveryMaterialization) ||
+      Boolean(effectivePlannerExecutionMetadata.materializationPlan) ||
+      normalizeOptionalString(plannerExecutionMetadata.nextExpectedAction).toLocaleLowerCase() ===
+        'execute-plan')
   const activeLocalProjectRoot = (() => {
     if (normalizeOptionalString(activeProjectPhaseExecutionPlan?.projectRoot)) {
       return normalizeOptionalString(activeProjectPhaseExecutionPlan?.projectRoot)
@@ -13888,7 +13940,7 @@ function App() {
     context: currentExecutionContextSummary,
   })
   const planOverviewUsesOperatorSummary =
-    plannerIsReviewOnly &&
+    (plannerIsReviewOnly || plannerHasPreparedSafeMaterialization) &&
     (planOverviewGoalContextHints.domainLabel !== '' ||
       planOverviewGoalContextHints.moduleItems.length > 0 ||
       planOverviewGoalContextHints.flowItems.length > 0 ||
@@ -13905,9 +13957,18 @@ function App() {
       : hasWizardPlan
         ? plannerInstruction
         : 'Todavia no generaste un plan en esta corrida.'
-  const planOverviewHelperText = planOverviewUsesOperatorSummary
-    ? 'Revisa el resumen. Si esta correcto, prepara la ejecucion local siguiente.'
-    : plannerReviewHelperText
+  const planOverviewTitle = plannerHasPreparedSafeMaterialization
+    ? 'Entrega lista para materializar'
+    : plannerIsReviewOnly
+      ? plannerReviewStatusLabel
+      : 'Plan generado'
+  const planOverviewHelperText = isPreparingSafeMaterialization
+    ? 'JEFE esta preparando una instruccion materializable. Espera la confirmacion antes de volver a tocar el CTA.'
+    : plannerHasPreparedSafeMaterialization
+      ? 'La preparacion termino bien. El siguiente paso es materializar la entrega local segura.'
+      : planOverviewUsesOperatorSummary
+        ? 'Revisa el resumen. Si esta correcto, prepara la ejecucion local siguiente.'
+        : plannerReviewHelperText
   const runtimePlatformLabel =
     typeof navigator === 'undefined'
       ? 'Desktop'
@@ -13946,7 +14007,7 @@ function App() {
           : activeWizardStep === 'memory'
             ? 'La memoria reusable queda visible como apoyo, nunca como bloqueo.'
             : activeWizardStep === 'plan'
-              ? plannerReviewHelperText
+              ? planOverviewHelperText
               : activeWizardStep === 'execution'
                 ? decisionPending
                   ? 'La ejecucion quedo bloqueada por una aprobacion. Resolvela antes de seguir.'
@@ -18096,6 +18157,13 @@ function App() {
   }
 
   const handlePrepareSafeMaterializationPlan = async () => {
+    if (
+      isPlanning ||
+      plannerReviewActionLockRef.current === 'prepare-safe-materialization'
+    ) {
+      return
+    }
+
     if (!plannerIsReviewOnly || !activeSafeFirstDeliveryPlan) {
       resetPlannerMaterializationAttemptState({
         fallbackMetadata: EMPTY_PLANNER_EXECUTION_METADATA,
@@ -18115,6 +18183,8 @@ function App() {
       return
     }
 
+    plannerReviewActionLockRef.current = 'prepare-safe-materialization'
+    setPlannerReviewActionInFlight('prepare-safe-materialization')
     const activeSafeFirstDeliveryPlanFingerprint =
       buildSafeFirstDeliveryPlanFingerprint(activeSafeFirstDeliveryPlan)
     const snapshotMatchesActiveSafePlan =
@@ -18124,10 +18194,10 @@ function App() {
         activeSafeFirstDeliveryPlanFingerprint
     const stableOriginalGoal = snapshotMatchesActiveSafePlan
       ? plannerRequestSnapshot.goal
-      : ''
+      : normalizeOptionalString(goalInput)
     const stableOriginalContext = snapshotMatchesActiveSafePlan
       ? plannerRequestSnapshot.context
-      : ''
+      : normalizeOptionalString(getCurrentExecutionContextValue())
     const safePlanReviewMetadata = buildSafeFirstDeliveryReviewMetadata({
       baseMetadata: effectivePlannerExecutionMetadata,
       plan: activeSafeFirstDeliveryPlan,
@@ -18160,25 +18230,36 @@ function App() {
       preservePlannerInstruction: true,
     })
 
-    await handleGenerateNextStep({
-      goal: preparedPlanningPrompt.goal,
-      context: preparedPlanningPrompt.context,
-      sourceLabel: 'Materialización segura preparada',
-      sendContent:
-        'Se envió al planificador una solicitud acotada para preparar la materialización segura de la primera entrega sin ejecutar cambios todavía.',
-      onPlanningFailure: () => {
-        resetPlannerMaterializationAttemptState({
-          fallbackMetadata: safePlanReviewMetadata,
-          fallbackSnapshot: safePlanReviewSnapshot,
-          preservePlannerInstruction: true,
-        })
-      },
-      validateResponse: (_response, metadata) =>
-        buildMaterializationPlanCoherenceIssue({
-          sourcePlan: activeSafeFirstDeliveryPlan,
-          metadata,
-        }),
-    })
+    try {
+      await handleGenerateNextStep({
+        goal: preparedPlanningPrompt.goal,
+        context: preparedPlanningPrompt.context,
+        sourceLabel: 'Materialización segura preparada',
+        sendContent:
+          'Se envió al planificador una solicitud acotada para preparar la materialización segura de la primera entrega sin ejecutar cambios todavía.',
+        onPlanningFailure: () => {
+          resetPlannerMaterializationAttemptState({
+            fallbackMetadata: safePlanReviewMetadata,
+            fallbackSnapshot: safePlanReviewSnapshot,
+            preservePlannerInstruction: true,
+          })
+        },
+        validateResponse: (_response, metadata) =>
+          buildMaterializationPlanCoherenceIssue({
+            sourcePlan: activeSafeFirstDeliveryPlan,
+            metadata,
+            goal: stableOriginalGoal,
+            context: stableOriginalContext,
+          }),
+      })
+    } finally {
+      if (
+        plannerReviewActionLockRef.current === 'prepare-safe-materialization'
+      ) {
+        plannerReviewActionLockRef.current = ''
+      }
+      setPlannerReviewActionInFlight('')
+    }
   }
 
   const handlePrepareFrontendProjectMaterializationPlan = async () => {
@@ -19668,7 +19749,7 @@ function App() {
       </div>
     ) : activeWizardStep === 'plan' ? (
       <PlanOverviewPanel
-        title={plannerIsReviewOnly ? plannerReviewStatusLabel : 'Plan generado'}
+        title={planOverviewTitle}
         helperText={planOverviewHelperText}
         instruction={planOverviewInstruction}
         metrics={planOverviewMetrics}
@@ -19682,10 +19763,10 @@ function App() {
             handlePlannerReviewPrimaryAction && plannerReviewPrimaryActionLabel ? (
               <PrimaryActionButton
                 onClick={handlePlannerReviewPrimaryAction}
-                disabled={isPlanning}
+                disabled={isPlanning || isPreparingSafeMaterialization}
                 tone="sky"
               >
-                {isPlanning
+                {isPreparingSafeMaterialization || isPlanning
                   ? 'Preparando ejecucion...'
                   : plannerReviewPrimaryActionLabel}
               </PrimaryActionButton>
@@ -19814,6 +19895,14 @@ function App() {
                 plan={activeSafeFirstDeliveryPlan}
                 compact
                 reviewOnly={plannerIsReviewOnly}
+                materializationActionState={
+                  isPreparingSafeMaterialization
+                    ? 'preparing'
+                    : plannerHasPreparedSafeMaterialization
+                      ? 'prepared'
+                      : 'idle'
+                }
+                hideActionButton
                 onPrepareMaterialization={
                   plannerIsReviewOnly ? handlePrepareSafeMaterializationPlan : null
                 }
