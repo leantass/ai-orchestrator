@@ -386,6 +386,14 @@ function inferSafeFirstDeliveryDomain({
   businessSectorLabel,
   productType,
 }) {
+  const combinedText = normalizeSafeFirstDeliveryText(
+    [instruction, businessSector, businessSectorLabel].join(' '),
+  )
+
+  if (detectSafeFirstDeliveryRechargeOrdersIntent(combinedText)) {
+    return 'gestion local de pedidos de recarga'
+  }
+
   const preferredDomain =
     typeof businessSectorLabel === 'string' && businessSectorLabel.trim()
       ? businessSectorLabel.trim()
@@ -429,6 +437,132 @@ function inferSafeFirstDeliveryDomain({
     default:
       return 'producto'
   }
+}
+
+function detectSafeFirstDeliveryRechargeOrdersIntent(normalizedText) {
+  if (typeof normalizedText !== 'string' || !normalizedText.trim()) {
+    return false
+  }
+
+  const hasRechargeCore =
+    /\brecargas?\b|\bvapes?\b|\bvaporizadores?\b/u.test(normalizedText)
+  const hasDeviceCore =
+    /\bdispositivos?\b|\bvapes?\b|\bvaporizadores?\b/u.test(normalizedText)
+  const hasOperationalCore =
+    /\bpedidos?\b|\bsolicitudes?\b|\bclientes?\b|\bestados?\b|\brecepcion\b|\bretiro\b|\bdevolucion\b|\blogistica\b|\bcostos?\b/u.test(
+      normalizedText,
+    )
+
+  return (
+    /\bpedidos?\s+de\s+recarga\b|\bsolicitudes?\s+de\s+recarga\b/u.test(normalizedText) ||
+    (hasRechargeCore && hasDeviceCore) ||
+    (hasRechargeCore && hasOperationalCore)
+  )
+}
+
+function buildRechargeOrdersMaterializationProfile() {
+  return {
+    domainLabel: 'gestion local de pedidos de recarga',
+    productType: 'business-system',
+    folderSlug: 'safe-first-delivery-pedidos-recarga',
+    modules: [
+      'pedidos de recarga',
+      'clientes',
+      'dispositivos',
+      'estados del pedido',
+      'recepcion del dispositivo',
+      'preparacion de recarga',
+      'listo para devolucion',
+      'retiro y devolucion',
+      'observaciones internas',
+      'costos estimados',
+      'alertas de pedidos pendientes',
+      'reportes por estado',
+    ],
+    screens: [
+      'panel de pedidos de recarga',
+      'detalle de pedido',
+      'dispositivos',
+      'recepcion del dispositivo',
+      'preparacion de recarga',
+      'retiro y devolucion',
+      'reportes por estado',
+    ],
+    entities: [
+      'pedido de recarga',
+      'cliente',
+      'dispositivo',
+      'estado del pedido',
+      'recepcion del dispositivo',
+      'preparacion de recarga',
+      'devolucion',
+      'observacion',
+      'costo estimado',
+      'alerta pendiente',
+    ],
+    mockCollections: [
+      'pedidosRecarga',
+      'clientes',
+      'dispositivos',
+      'estadosPedido',
+      'recepcionDispositivo',
+      'preparacionRecarga',
+      'retiroDevolucion',
+      'costosEstimados',
+      'alertasPendientes',
+      'reportesPorEstado',
+    ],
+    localActions: [
+      'Registrar un pedido de recarga mock y revisar su estado local.',
+      'Revisar clientes mock y su historial local de pedidos de recarga.',
+      'Registrar recepcion del dispositivo y actualizar la preparacion de recarga.',
+      'Marcar un pedido listo para devolucion y revisar retiro o devolucion local.',
+      'Revisar costos estimados y alertas de pedidos pendientes en modo local.',
+    ],
+    scopeHighlights: [
+      'Primera version navegable del flujo principal para gestion local de pedidos de recarga.',
+      'Mantener toda la entrega en modo local, mock y sin operacion comercial real.',
+      'Validacion futura de edad y cumplimiento legal como fase posterior.',
+    ],
+    explicitExclusions: [
+      'operacion comercial real',
+      'base de datos real',
+      'integraciones externas reales',
+      'credenciales reales',
+      'auth real',
+      'deploy',
+    ],
+    stateHints: ['pedido recibido', 'en preparacion de recarga', 'listo para devolucion'],
+    approvalThemes: ['edad y cumplimiento legal'],
+  }
+}
+
+function rewriteSafeFirstDeliveryPathSet(pathSet, folderName) {
+  const targetFolderPath = path.normalize(folderName)
+
+  return {
+    targetFolderPath,
+    declaredFolderPath: targetFolderPath,
+    indexPath: path.join(targetFolderPath, 'index.html'),
+    stylesPath: path.join(targetFolderPath, 'styles.css'),
+    scriptPath: path.join(targetFolderPath, 'script.js'),
+    mockDataPath: path.join(targetFolderPath, 'mock-data.json'),
+  }
+}
+
+function mergeUniqueSafeFirstDeliveryValues(values, fallbackValues, limit = 16) {
+  const mergedValues = []
+  pushUniqueSafeFirstDeliveryValues(
+    mergedValues,
+    Array.isArray(values) ? values : [],
+    limit,
+  )
+  pushUniqueSafeFirstDeliveryValues(
+    mergedValues,
+    Array.isArray(fallbackValues) ? fallbackValues : [],
+    limit,
+  )
+  return mergedValues
 }
 
 function buildSafeFirstDeliveryPathSet(executionScope, instruction) {
@@ -560,6 +694,42 @@ function buildModuleCollectionKey(moduleLabel) {
 
   if (!normalizedLabel) {
     return 'resumen'
+  }
+
+  if (/\bpedidos?\s+de\s+recarga\b|\bsolicitudes?\s+de\s+recarga\b/u.test(normalizedLabel)) {
+    return 'pedidosRecarga'
+  }
+
+  if (/\bdispositivos?\b|\bvapes?\b|\bvaporizadores?\b/u.test(normalizedLabel)) {
+    return 'dispositivos'
+  }
+
+  if (/\bestados?\s+del\s+pedido\b/u.test(normalizedLabel)) {
+    return 'estadosPedido'
+  }
+
+  if (/\brecepcion\s+del\s+dispositivo\b/u.test(normalizedLabel)) {
+    return 'recepcionDispositivo'
+  }
+
+  if (/\bpreparacion\s+de\s+recarga\b/u.test(normalizedLabel)) {
+    return 'preparacionRecarga'
+  }
+
+  if (/\blisto\s+para\s+devolucion\b|\bretiro\s+y\s+de\s+devolucion\b|\bretiro\s+y\s+devolucion\b|\bretiro\/devolucion\b/u.test(normalizedLabel)) {
+    return 'retiroDevolucion'
+  }
+
+  if (/\bcostos?\s+estimados?\b/u.test(normalizedLabel)) {
+    return 'costosEstimados'
+  }
+
+  if (/\balertas?\s+de\s+pedidos?\s+pendientes\b/u.test(normalizedLabel)) {
+    return 'alertasPendientes'
+  }
+
+  if (/\breportes?\s+por\s+estado\b/u.test(normalizedLabel)) {
+    return 'reportesPorEstado'
   }
 
   if (/\b(?:catalogo|productos?)\b/u.test(normalizedLabel)) {
@@ -764,6 +934,24 @@ function normalizeSafeFirstDeliveryStateLabel(value) {
 function buildSafeFirstDeliveryCollectionFieldHints(collectionKey) {
   const normalizedKey = normalizeSafeFirstDeliveryText(collectionKey)
 
+  if (/\bpedidosrecarga\b/u.test(normalizedKey)) {
+    return {
+      extraFields: (index) => ({
+        cliente: index === 0 ? 'Micaela Torres' : index === 1 ? 'Juan Perez' : 'Carla Suarez',
+        dispositivo:
+          index === 0 ? 'Vaporizador pod' : index === 1 ? 'Mod recargable' : 'Dispositivo compacto',
+      }),
+    }
+  }
+
+  if (/\bdispositivos\b/u.test(normalizedKey)) {
+    return {
+      extraFields: (index) => ({
+        tipo: index === 0 ? 'pod' : index === 1 ? 'mod' : 'compacto',
+      }),
+    }
+  }
+
   if (
     /\bperfiles?\b|\busuarios?\b|\bresponsables?\b|\boperadores?\b|\broles?\b/u.test(
       normalizedKey,
@@ -846,6 +1034,9 @@ function buildSafeFirstDeliveryDynamicActionLabel(actionType, collectionKey) {
       if (['buques', 'arribos', 'salidas'].includes(normalizedCollectionKey)) {
         return 'Actualizar estado operativo'
       }
+      if (normalizedCollectionKey === 'pedidosrecarga') {
+        return 'Actualizar pedido de recarga'
+      }
       if (
         ['solicitudesentrada', 'documentacion', 'autorizaciones'].includes(
           normalizedCollectionKey,
@@ -901,6 +1092,9 @@ function buildSafeFirstDeliveryDynamicActionLabel(actionType, collectionKey) {
     case 'create-entry':
       if (normalizedCollectionKey === 'movimientosportuarios') {
         return 'Registrar movimiento mock'
+      }
+      if (normalizedCollectionKey === 'pedidosrecarga') {
+        return 'Registrar pedido de recarga'
       }
       if (normalizedCollectionKey === 'solicitudesentrada') {
         return 'Registrar solicitud local'
@@ -1188,6 +1382,104 @@ function buildSafeFirstDeliveryGenericRecords({
     'en armado',
     'validado local',
   ])
+
+  if (normalizedCollectionKey === 'pedidosrecarga') {
+    return [
+      {
+        id: 'ped-rec-001',
+        nombre: 'Pedido de recarga 001',
+        estado: 'pedido recibido',
+        cliente: 'Micaela Torres',
+        dispositivo: 'Vaporizador pod',
+        resumen: 'Ingreso local para revisar recepcion, preparacion y devolucion del dispositivo.',
+      },
+      {
+        id: 'ped-rec-002',
+        nombre: 'Pedido de recarga 002',
+        estado: 'en preparacion de recarga',
+        cliente: 'Juan Perez',
+        dispositivo: 'Mod recargable',
+        resumen: 'Caso intermedio para validar alertas y costo estimado en modo local.',
+      },
+      {
+        id: 'ped-rec-003',
+        nombre: 'Pedido de recarga 003',
+        estado: 'listo para devolucion',
+        cliente: 'Carla Suarez',
+        dispositivo: 'Dispositivo compacto',
+        resumen: 'Ejemplo listo para retiro o devolucion local con observaciones internas.',
+      },
+    ]
+  }
+
+  if (normalizedCollectionKey === 'dispositivos') {
+    return [
+      {
+        id: 'disp-001',
+        nombre: 'Vaporizador pod',
+        estado: 'recibido',
+        tipo: 'pod',
+        resumen: 'Dispositivo mock listo para asociar a un pedido de recarga local.',
+      },
+      {
+        id: 'disp-002',
+        nombre: 'Mod recargable',
+        estado: 'en revision',
+        tipo: 'mod',
+        resumen: 'Caso de seguimiento para preparar recarga y validar observaciones internas.',
+      },
+      {
+        id: 'disp-003',
+        nombre: 'Dispositivo compacto',
+        estado: 'listo para devolucion',
+        tipo: 'compacto',
+        resumen: 'Referencia final para cierre local sin integraciones externas reales.',
+      },
+    ]
+  }
+
+  if (normalizedCollectionKey === 'estadospedido') {
+    return [
+      {
+        id: 'estado-ped-1',
+        nombre: 'Pedido recibido',
+        estado: 'operativa',
+        responsable: 'Recepcion local',
+        resumen: 'Punto inicial para validar recepcion del dispositivo y triage del pedido.',
+      },
+      {
+        id: 'estado-ped-2',
+        nombre: 'En preparacion de recarga',
+        estado: 'en revision',
+        responsable: 'Operacion local',
+        resumen: 'Estado intermedio para revisar recarga, costos estimados y alertas pendientes.',
+      },
+      {
+        id: 'estado-ped-3',
+        nombre: 'Listo para devolucion',
+        estado: 'habilitada local',
+        responsable: 'Entrega local',
+        resumen: 'Estado final para retiro o devolucion sin operacion comercial real.',
+      },
+    ]
+  }
+
+  if (normalizedCollectionKey === 'costosestimados') {
+    return [
+      {
+        id: 'costo-1',
+        nombre: 'Costo estimado base',
+        estado: 'listo para revision',
+        resumen: 'Referencia mock para mostrar costos estimados en modo local y sin facturacion.',
+      },
+      {
+        id: 'costo-2',
+        nombre: 'Costo estimado con retiro',
+        estado: 'en revision',
+        resumen: 'Incluye logistica local de retiro o devolucion sin integraciones externas.',
+      },
+    ]
+  }
 
   if (normalizedCollectionKey === 'buques') {
     return [
@@ -3194,10 +3486,6 @@ function normalizeText(value) {
 
 function toDisplayLabel(value) {
   const explicitLabels = {
-    solicitudesentrada: 'Solicitudes de entrada',
-    zonasportuarias: 'Zonas portuarias',
-    operacionesportuarias: 'Operaciones portuarias',
-    movimientosportuarios: 'Historial de movimientos',
     eta: 'ETA',
     etd: 'ETD',
     id: 'ID',
@@ -4639,10 +4927,32 @@ function buildGenericSafeFirstDeliveryMaterializationPlan({
     normalizeSafeFirstDeliveryMaterializationContract(
       safeFirstDeliveryMaterialization,
     )
+  const rechargeProfile = detectSafeFirstDeliveryRechargeOrdersIntent(
+    normalizeSafeFirstDeliveryText(
+      [
+        combinedText,
+        normalizedMaterialization?.domainLabel || '',
+        ...(Array.isArray(normalizedMaterialization?.modules)
+          ? normalizedMaterialization.modules
+          : []),
+      ].join(' '),
+    ),
+  )
+    ? buildRechargeOrdersMaterializationProfile()
+    : null
+  const resolvedPathSet =
+    rechargeProfile &&
+    !/\bpedidos-recarga\b|\brecarga\b/u.test(
+      normalizeSafeFirstDeliveryText(pathSet.declaredFolderPath || pathSet.targetFolderPath || ''),
+    )
+      ? rewriteSafeFirstDeliveryPathSet(pathSet, rechargeProfile.folderSlug)
+      : pathSet
   const inferredProductType = detectSafeFirstDeliveryProductType(combinedText)
   const productType =
-    typeof normalizedMaterialization?.productType === 'string' &&
-    normalizedMaterialization.productType.trim()
+    rechargeProfile
+      ? rechargeProfile.productType
+      : typeof normalizedMaterialization?.productType === 'string' &&
+        normalizedMaterialization.productType.trim()
       ? normalizedMaterialization.productType.trim()
       : inferredProductType
   const inferredDomain = inferSafeFirstDeliveryDomain({
@@ -4652,25 +4962,64 @@ function buildGenericSafeFirstDeliveryMaterializationPlan({
     productType,
   })
   const domain =
-    typeof normalizedMaterialization?.domainLabel === 'string' &&
-    normalizedMaterialization.domainLabel.trim()
+    rechargeProfile
+      ? rechargeProfile.domainLabel
+      : typeof normalizedMaterialization?.domainLabel === 'string' &&
+        normalizedMaterialization.domainLabel.trim()
       ? normalizedMaterialization.domainLabel.trim()
       : inferredDomain
-  const scope = extractPlannerList(instruction, ['alcance funcional', 'alcance'], [
-    `Primera entrega segura y navegable para ${domain}.`,
-  ])
+  const resolvedMaterialization = rechargeProfile
+    ? {
+        ...(normalizedMaterialization || {}),
+        domainLabel: rechargeProfile.domainLabel,
+        productType: rechargeProfile.productType,
+        modules: mergeUniqueSafeFirstDeliveryValues(
+          rechargeProfile.modules,
+          normalizedMaterialization?.modules,
+        ),
+        screens: mergeUniqueSafeFirstDeliveryValues(
+          rechargeProfile.screens,
+          normalizedMaterialization?.screens,
+        ),
+        entities: mergeUniqueSafeFirstDeliveryValues(
+          rechargeProfile.entities,
+          normalizedMaterialization?.entities,
+        ),
+        mockCollections: mergeUniqueSafeFirstDeliveryValues(
+          rechargeProfile.mockCollections,
+          normalizedMaterialization?.mockCollections,
+        ),
+        localActions: rechargeProfile.localActions,
+        explicitExclusions: rechargeProfile.explicitExclusions,
+        stateHints: mergeUniqueSafeFirstDeliveryValues(
+          rechargeProfile.stateHints,
+          normalizedMaterialization?.stateHints,
+          10,
+        ),
+        approvalThemes: mergeUniqueSafeFirstDeliveryValues(
+          rechargeProfile.approvalThemes,
+          normalizedMaterialization?.approvalThemes,
+          10,
+        ),
+      }
+    : normalizedMaterialization
+  const scope = rechargeProfile
+    ? rechargeProfile.scopeHighlights
+    : extractPlannerList(instruction, ['alcance funcional', 'alcance'], [
+        `Primera entrega segura y navegable para ${domain}.`,
+      ])
   const modules =
-    Array.isArray(normalizedMaterialization?.modules) &&
-    normalizedMaterialization.modules.length > 0
-      ? normalizedMaterialization.modules
+    Array.isArray(resolvedMaterialization?.modules) &&
+    resolvedMaterialization.modules.length > 0
+      ? resolvedMaterialization.modules
       : extractPlannerList(instruction, ['modulos a cubrir', 'modulos'], [
           'modulo principal',
           'panel operativo inicial',
         ])
   const screens =
-    Array.isArray(normalizedMaterialization?.screens) &&
-    normalizedMaterialization.screens.length > 0
-      ? normalizedMaterialization.screens
+    Array.isArray(resolvedMaterialization?.screens) &&
+    resolvedMaterialization.screens.length > 0
+      ? resolvedMaterialization.screens
       : extractPlannerList(instruction, ['pantallas o vistas', 'pantallas', 'vistas'], [
           'vista principal',
           'panel operativo inicial',
@@ -4680,19 +5029,21 @@ function buildGenericSafeFirstDeliveryMaterializationPlan({
     ['datos mock requeridos', 'datos mock', 'datos de muestra'],
     ['Datos de ejemplo consistentes para recorrer el flujo principal.'],
   )
-  const localBehavior =
-    Array.isArray(normalizedMaterialization?.localActions) &&
-    normalizedMaterialization.localActions.length > 0
-      ? normalizedMaterialization.localActions
+  const localBehavior = rechargeProfile
+    ? rechargeProfile.localActions
+    : Array.isArray(resolvedMaterialization?.localActions) &&
+        resolvedMaterialization.localActions.length > 0
+      ? resolvedMaterialization.localActions
       : extractPlannerList(
           instruction,
           ['comportamiento local esperado', 'comportamiento local'],
           ['Navegacion local entre vistas priorizadas con estado temporal.'],
         )
-  const explicitExclusions =
-    Array.isArray(normalizedMaterialization?.explicitExclusions) &&
-    normalizedMaterialization.explicitExclusions.length > 0
-      ? normalizedMaterialization.explicitExclusions
+  const explicitExclusions = rechargeProfile
+    ? rechargeProfile.explicitExclusions
+    : Array.isArray(resolvedMaterialization?.explicitExclusions) &&
+        resolvedMaterialization.explicitExclusions.length > 0
+      ? resolvedMaterialization.explicitExclusions
       : extractPlannerList(
           instruction,
           ['excluir explicitamente', 'exclusiones explicitas', 'exclusiones'],
@@ -4707,11 +5058,17 @@ function buildGenericSafeFirstDeliveryMaterializationPlan({
             'Integraciones externas reales.',
           ],
         )
-  const successCriteria = extractPlannerList(
-    instruction,
-    ['successcriteria', 'success criteria', 'criterios de exito'],
-    Array.isArray(executionScope?.successCriteria) ? executionScope.successCriteria : [],
-  )
+  const successCriteria = rechargeProfile
+    ? [
+        `Materializar solo la carpeta "${resolvedPathSet.declaredFolderPath}" y sus archivos locales permitidos.`,
+        'Entregar una experiencia navegable con datos mock editables para el flujo principal.',
+        'Mantener la entrega en modo local, mock, sin operacion comercial real y sin integraciones externas reales.',
+      ]
+    : extractPlannerList(
+        instruction,
+        ['successcriteria', 'success criteria', 'criterios de exito'],
+        Array.isArray(executionScope?.successCriteria) ? executionScope.successCriteria : [],
+      )
   const mockDataObject = buildSafeFirstDeliveryMockData({
     productType,
     domain,
@@ -4722,16 +5079,16 @@ function buildGenericSafeFirstDeliveryMaterializationPlan({
     mockDataHints,
     explicitExclusions,
     successCriteria,
-    safeFirstDeliveryMaterialization: normalizedMaterialization,
+    safeFirstDeliveryMaterialization: resolvedMaterialization,
   })
   const indexContent = buildSafeFirstDeliveryIndexHtml()
   const stylesContent = buildSafeFirstDeliveryStylesCss()
   const scriptContent = buildSafeFirstDeliveryScriptJs(mockDataObject)
   const mockDataContent = `${JSON.stringify(mockDataObject, null, 2)}\n`
   const targetFolderLabel =
-    pathSet.declaredFolderPath === '.'
+    resolvedPathSet.declaredFolderPath === '.'
       ? 'workspace'
-      : pathSet.declaredFolderPath
+      : resolvedPathSet.declaredFolderPath
 
   return {
     version: LOCAL_MATERIALIZATION_PLAN_VERSION,
@@ -4741,72 +5098,72 @@ function buildGenericSafeFirstDeliveryMaterializationPlan({
     reasoningLayer: 'local-rules',
     materializationLayer: 'local-deterministic',
     operations: [
-      { type: 'create-folder', targetPath: pathSet.declaredFolderPath },
+      { type: 'create-folder', targetPath: resolvedPathSet.declaredFolderPath },
       {
         type: 'replace-file',
-        targetPath: pathSet.indexPath,
+        targetPath: resolvedPathSet.indexPath,
         nextContent: indexContent,
       },
       {
         type: 'replace-file',
-        targetPath: pathSet.stylesPath,
+        targetPath: resolvedPathSet.stylesPath,
         nextContent: stylesContent,
       },
       {
         type: 'replace-file',
-        targetPath: pathSet.scriptPath,
+        targetPath: resolvedPathSet.scriptPath,
         nextContent: scriptContent,
       },
       {
         type: 'replace-file',
-        targetPath: pathSet.mockDataPath,
+        targetPath: resolvedPathSet.mockDataPath,
         nextContent: mockDataContent,
       },
     ],
     validations: [
       {
         type: 'exists',
-        targetPath: pathSet.declaredFolderPath,
+        targetPath: resolvedPathSet.declaredFolderPath,
         expectedKind: 'folder',
       },
       {
         type: 'exists',
-        targetPath: pathSet.indexPath,
+        targetPath: resolvedPathSet.indexPath,
         expectedKind: 'file',
       },
       {
         type: 'exists',
-        targetPath: pathSet.stylesPath,
+        targetPath: resolvedPathSet.stylesPath,
         expectedKind: 'file',
       },
       {
         type: 'exists',
-        targetPath: pathSet.scriptPath,
+        targetPath: resolvedPathSet.scriptPath,
         expectedKind: 'file',
       },
       {
         type: 'exists',
-        targetPath: pathSet.mockDataPath,
+        targetPath: resolvedPathSet.mockDataPath,
         expectedKind: 'file',
       },
       {
         type: 'file-contains',
-        targetPath: pathSet.indexPath,
+        targetPath: resolvedPathSet.indexPath,
         expectedText: './styles.css',
       },
       {
         type: 'file-contains',
-        targetPath: pathSet.indexPath,
+        targetPath: resolvedPathSet.indexPath,
         expectedText: './script.js',
       },
       {
         type: 'file-contains',
-        targetPath: pathSet.scriptPath,
+        targetPath: resolvedPathSet.scriptPath,
         expectedText: './mock-data.json',
       },
       {
         type: 'file-contains',
-        targetPath: pathSet.mockDataPath,
+        targetPath: resolvedPathSet.mockDataPath,
         expectedText: '"meta"',
       },
     ],

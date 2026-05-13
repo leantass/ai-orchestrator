@@ -13,6 +13,7 @@ const mainFilePath = path.join(repoRoot, 'electron', 'main.cjs')
 const mainSource = fs.readFileSync(mainFilePath, 'utf8')
 const {
   LOCAL_MATERIALIZATION_PLAN_VERSION,
+  buildGenericSafeFirstDeliveryMaterializationPlan,
   buildLocalMaterializationTask,
   runLocalDeterministicTask,
 } = require(
@@ -170,6 +171,32 @@ const activeCases = [
       'perfiles',
     ],
     folderAnyOf: ['safe-first-delivery-reservas', 'safe-first-delivery-canchas'],
+  },
+  {
+    id: 'pedidos-recarga',
+    label: 'Pedidos de recarga',
+    goal:
+      'Crear una entrega funcional local para gestion de pedidos de recarga de dispositivos personales tipo vape o vaporizador.',
+    context:
+      'Sistema local y mock para pedidos de recarga, clientes, dispositivos, recepcion del dispositivo, preparacion de recarga, listo para devolucion, retiro o devolucion, observaciones internas, costos estimados, alertas de pedidos pendientes, reportes por estado, sin pagos reales, sin checkout real, sin venta directa, sin base de datos real, sin integraciones externas reales y con validacion futura de edad y cumplimiento legal.',
+    mustInclude: [
+      'pedidos de recarga',
+      'clientes',
+      'dispositivos',
+      'estados del pedido',
+      'retiro y devolucion',
+      'reportes por estado',
+    ],
+    mustExclude: [
+      'operaciones portuarias',
+      'muelles',
+      'arribos',
+      'salidas',
+      'reservas',
+      'checkout simulado',
+      'carrito',
+    ],
+    folderAnyOf: ['safe-first-delivery-pedidos-recarga'],
   },
 ]
 
@@ -2167,6 +2194,129 @@ function runCase(testCase) {
     folderName: structures.folderName,
     allowedTargetPaths: structures.allowedTargetPaths,
     materializeCollections: structures.materializeCollections,
+  }
+}
+
+async function runRechargeMaterializationDomainPurityValidation() {
+  const testCase = activeCases.find((entry) => entry.id === 'pedidos-recarga')
+  const failures = []
+
+  if (!testCase) {
+    return {
+      testCase: {
+        id: 'recharge-materialization-domain-purity',
+        label: 'Materializacion limpia para pedidos de recarga',
+        goal: '',
+      },
+      ok: false,
+      failures: ['No se encontro el caso base de pedidos-recarga para la regresion.'],
+    }
+  }
+
+  const structures = buildCaseStructures(testCase)
+  const materializationPlan = buildGenericSafeFirstDeliveryMaterializationPlan({
+    decisionKey: 'materialize-safe-first-delivery-plan',
+    instruction: structures.materializePlan?.instruction || '',
+    executionScope: structures.materializePlan?.executionScope || {},
+    businessSector: structures.domainUnderstanding?.intentLabel || '',
+    businessSectorLabel: structures.domainUnderstanding?.domainLabel || '',
+    safeFirstDeliveryMaterialization:
+      structures.materializePlan?.safeFirstDeliveryMaterialization || null,
+  })
+
+  if (!materializationPlan) {
+    return {
+      testCase,
+      ok: false,
+      failures: ['No se pudo construir el materializationPlan de pedidos de recarga.'],
+    }
+  }
+
+  const workspacePath = path.join(smokeExecutionWorkspaceRoot, 'recharge-materialization-domain-purity')
+  ensureCleanDirectory(workspacePath)
+
+  const task = buildLocalMaterializationTask({
+    plan: materializationPlan,
+    workspacePath,
+    requestId: 'smoke-recharge-materialization-domain-purity',
+    instruction: structures.materializePlan?.instruction || '',
+    brainStrategy: 'materialize-safe-first-delivery-plan',
+    businessSector: structures.domainUnderstanding?.intentLabel || '',
+    businessSectorLabel: structures.domainUnderstanding?.domainLabel || '',
+    materializationPlanSource: 'planner-smoke',
+  })
+
+  if (!task) {
+    return {
+      testCase,
+      ok: false,
+      failures: ['No se pudo construir la tarea local deterministica de pedidos de recarga.'],
+    }
+  }
+
+  const executionResult = await runLocalDeterministicTask(task)
+  if (executionResult?.ok !== true) {
+    return {
+      testCase,
+      ok: false,
+      failures: [
+        `La materializacion local fallo: ${executionResult?.error || 'sin detalle'}.`,
+      ],
+    }
+  }
+
+  const expectedFolder = path.join(workspacePath, 'safe-first-delivery-pedidos-recarga')
+  const expectedFiles = ['index.html', 'styles.css', 'script.js', 'mock-data.json']
+  const forbiddenTokens = [
+    'operaciones portuarias',
+    'muelles',
+    'arribos',
+    'salidas',
+    'reservas',
+    'checkout real',
+    'pagos reales',
+    'venta directa',
+  ]
+  const requiredTokens = [
+    'pedidos de recarga',
+    'clientes',
+    'dispositivos',
+    'devolucion',
+  ]
+
+  if (!fs.existsSync(expectedFolder)) {
+    failures.push('La materializacion no creo safe-first-delivery-pedidos-recarga.')
+  }
+
+  for (const basename of expectedFiles) {
+    const filePath = path.join(expectedFolder, basename)
+    if (!fs.existsSync(filePath)) {
+      failures.push(`Falta el archivo generado ${basename}.`)
+      continue
+    }
+
+    const content = fs.readFileSync(filePath, 'utf8')
+    forbiddenTokens.forEach((token) => {
+      if (normalizeText(content).includes(normalizeText(token))) {
+        failures.push(`${basename} quedo contaminado con "${token}".`)
+      }
+    })
+  }
+
+  const mockDataPath = path.join(expectedFolder, 'mock-data.json')
+  if (fs.existsSync(mockDataPath)) {
+    const mockDataContent = fs.readFileSync(mockDataPath, 'utf8')
+    requiredTokens.forEach((token) => {
+      if (!normalizeText(mockDataContent).includes(normalizeText(token))) {
+        failures.push(`mock-data.json deberia mencionar ${token}.`)
+      }
+    })
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
   }
 }
 
@@ -8717,6 +8867,7 @@ async function main() {
 
   let frontendMaterializationResult = null
   let fullstackMaterializationResult = null
+  let rechargeMaterializationResult = null
   let projectPhaseExecutionResults = []
   let continuationResults = []
   if (!caseId) {
@@ -8732,6 +8883,13 @@ async function main() {
     fullstackMaterializationResult =
       await runFullstackLocalMaterializationValidation()
     printScalableValidationResult(fullstackMaterializationResult)
+    console.log('-----------------')
+
+    console.log('Recharge Materialization Domain Check')
+    console.log('====================================')
+    rechargeMaterializationResult =
+      await runRechargeMaterializationDomainPurityValidation()
+    printScalableValidationResult(rechargeMaterializationResult)
     console.log('-----------------')
 
     console.log('Project Phase Execution Checks')
@@ -9157,6 +9315,7 @@ async function main() {
   const failedContinuationResults = continuationResults.filter((result) => !result.ok)
   const frontendMaterializationFailed = frontendMaterializationResult?.ok === false
   const fullstackMaterializationFailed = fullstackMaterializationResult?.ok === false
+  const rechargeMaterializationFailed = rechargeMaterializationResult?.ok === false
 
   if (
     failedResults.length === 0 &&
@@ -9166,7 +9325,8 @@ async function main() {
     failedContinuationResults.length === 0 &&
     failedProjectPhaseExecutionResults.length === 0 &&
     !frontendMaterializationFailed &&
-    !fullstackMaterializationFailed
+    !fullstackMaterializationFailed &&
+    !rechargeMaterializationFailed
   ) {
     console.log(`OK. ${passedCount}/${results.length} casos pasaron.`)
     if (scalableResults.length > 0) {
@@ -9187,6 +9347,9 @@ async function main() {
     }
     if (fullstackMaterializationResult) {
       console.log('OK. 1/1 check de materializacion fullstack-local paso.')
+    }
+    if (rechargeMaterializationResult) {
+      console.log('OK. 1/1 check de materializacion de pedidos de recarga paso.')
     }
     if (projectPhaseExecutionResults.length > 0) {
       console.log(
@@ -9255,6 +9418,14 @@ async function main() {
     console.log(
       `- ${fullstackMaterializationResult.testCase.id}: ${
         fullstackMaterializationResult.failures[0] || 'sin detalle'
+      }`,
+    )
+  }
+  if (rechargeMaterializationFailed) {
+    console.log('check de materializacion de pedidos de recarga fallido:')
+    console.log(
+      `- ${rechargeMaterializationResult.testCase.id}: ${
+        rechargeMaterializationResult.failures[0] || 'sin detalle'
       }`,
     )
   }

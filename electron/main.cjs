@@ -7207,6 +7207,10 @@ function extractProductArchitectureDomainLabel(goal, context, productType) {
     return explicitBusinessLabel
   }
 
+  if (detectSafeFirstDeliveryRechargeOrdersIntent(normalizedSourceText)) {
+    return 'gestion local de pedidos de recarga'
+  }
+
   if (productType === 'ecommerce') {
     return 'comercio online'
   }
@@ -7260,6 +7264,131 @@ function detectSafeFirstDeliverySecurityMonitoringIntent(normalizedText) {
   return /\beventos?\s+de\s+seguridad\b/u.test(normalizedText)
 }
 
+function detectSafeFirstDeliveryRechargeOrdersIntent(normalizedText) {
+  if (typeof normalizedText !== 'string' || !normalizedText.trim()) {
+    return false
+  }
+
+  const hasRechargeCore =
+    /\brecargas?\b|\bvapes?\b|\bvaporizadores?\b/u.test(normalizedText)
+  const hasDeviceCore =
+    /\bdispositivos?\b|\bvapes?\b|\bvaporizadores?\b/u.test(normalizedText)
+  const hasOperationalCore =
+    /\bpedidos?\b|\bsolicitudes?\b|\bclientes?\b|\bestados?\b|\brecepcion\b|\bretiro\b|\bdevolucion\b|\blogistica\b|\bcostos?\b/u.test(
+      normalizedText,
+    )
+
+  return (
+    /\bpedidos?\s+de\s+recarga\b|\bsolicitudes?\s+de\s+recarga\b/u.test(normalizedText) ||
+    (hasRechargeCore && hasDeviceCore) ||
+    (hasRechargeCore && hasOperationalCore)
+  )
+}
+
+function buildRechargeOrdersDomainProfile() {
+  return {
+    domainLabel: 'gestion local de pedidos de recarga',
+    productType: 'business-system',
+    modules: [
+      'pedidos de recarga',
+      'clientes',
+      'dispositivos',
+      'estados del pedido',
+      'recepcion del dispositivo',
+      'preparacion de recarga',
+      'listo para devolucion',
+      'retiro y devolucion',
+      'observaciones internas',
+      'costos estimados',
+      'alertas de pedidos pendientes',
+      'reportes por estado',
+    ],
+    screens: [
+      'panel de pedidos de recarga',
+      'detalle de pedido',
+      'dispositivos',
+      'recepcion del dispositivo',
+      'preparacion de recarga',
+      'retiro y devolucion',
+      'reportes por estado',
+    ],
+    mockDataHints: [
+      'Pedidos de recarga mock con cliente, dispositivo, estado y costo estimado.',
+      'Dispositivos mock con tipo, nivel de carga, observaciones y retiro o devolucion.',
+      'Alertas mock para pedidos pendientes y validaciones locales del flujo.',
+    ],
+    localActions: [
+      'Registrar un pedido de recarga mock y revisar su estado local.',
+      'Revisar clientes mock y su historial local de pedidos de recarga.',
+      'Registrar recepcion del dispositivo y actualizar la preparacion de recarga.',
+      'Marcar un pedido listo para devolucion y revisar retiro o devolucion local.',
+      'Revisar costos estimados y alertas de pedidos pendientes sin pagos reales.',
+    ],
+    entities: [
+      'pedido de recarga',
+      'cliente',
+      'dispositivo',
+      'estado del pedido',
+      'recepcion',
+      'preparacion de recarga',
+      'devolucion',
+      'observacion',
+      'costo estimado',
+      'alerta pendiente',
+    ],
+    mockCollections: [
+      'pedidos de recarga',
+      'clientes',
+      'dispositivos',
+      'estados del pedido',
+      'recepcion del dispositivo',
+      'preparacion de recarga',
+      'retiro y devolucion',
+      'costos estimados',
+      'alertas de pedidos pendientes',
+      'reportes por estado',
+    ],
+    stateHints: ['pedido recibido', 'en preparacion de recarga', 'listo para devolucion'],
+    approvalThemes: ['edad y cumplimiento legal'],
+    explicitExclusions: [
+      'pagos reales',
+      'checkout real',
+      'venta directa',
+      'base de datos real',
+      'integraciones externas reales',
+      'credenciales reales',
+      'auth real',
+      'deploy',
+    ],
+    scopeHighlights: [
+      'Primera version navegable del flujo principal para gestion local de pedidos de recarga.',
+      'Sin pagos reales, checkout real, venta directa, base de datos real ni integraciones externas reales.',
+      'Validacion futura de edad y cumplimiento legal como fase posterior.',
+    ],
+  }
+}
+
+function detectPositiveEcommerceIntent(normalizedText) {
+  if (typeof normalizedText !== 'string' || !normalizedText.trim()) {
+    return false
+  }
+
+  const hasCatalogSignals =
+    /\bcatalogo\b|\bproductos\b|\bcarrito\b|\bbackoffice\b/u.test(normalizedText)
+  const hasCheckoutSignals =
+    /\bcheckout\b|\bmercado pago\b|\bpagos\b/u.test(normalizedText)
+  const hasNegatedCommercialSignals = hasExplicitlyNegatedSectorKeywords(normalizedText, [
+    'checkout',
+    'pagos',
+    'mercado pago',
+    'catalogo',
+    'productos',
+    'carrito',
+  ])
+
+  return hasCatalogSignals || (hasCheckoutSignals && !hasNegatedCommercialSignals)
+}
+
 function buildDynamicSafeDeliveryPlanParts(sourceText) {
   const normalizedText = normalizeSectorDetectionText(sourceText)
   const modules = []
@@ -7268,6 +7397,8 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
   const localBehavior = []
   const hasSecurityMonitoringIntent =
     detectSafeFirstDeliverySecurityMonitoringIntent(normalizedText)
+  const hasRechargeOrdersIntent =
+    detectSafeFirstDeliveryRechargeOrdersIntent(normalizedText)
 
   if (!normalizedText) {
     return { modules, mockData, screens, localBehavior }
@@ -7503,9 +7634,13 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
     {
       label: 'clientes',
       patterns: [/\bclientes?\b/u],
-      mockData: 'Clientes mock vinculados a reservas y horarios.',
+      mockData: hasRechargeOrdersIntent
+        ? 'Clientes mock vinculados a pedidos de recarga y dispositivos.'
+        : 'Clientes mock vinculados a reservas y horarios.',
       screen: 'clientes',
-      behavior: 'Revisar clientes mock asociados al flujo de reservas.',
+      behavior: hasRechargeOrdersIntent
+        ? 'Revisar clientes mock y su historial local de pedidos de recarga.'
+        : 'Revisar clientes mock asociados al flujo de reservas.',
     },
     {
       label: 'disponibilidad',
@@ -7577,6 +7712,14 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
     pushUniquePlannerValues(screens, [definition.screen])
     pushUniquePlannerValues(localBehavior, [definition.behavior])
   })
+
+  if (hasRechargeOrdersIntent) {
+    const rechargeProfile = buildRechargeOrdersDomainProfile()
+    pushUniquePlannerValues(modules, rechargeProfile.modules, 16)
+    pushUniquePlannerValues(mockData, rechargeProfile.mockDataHints, 16)
+    pushUniquePlannerValues(screens, rechargeProfile.screens, 16)
+    pushUniquePlannerValues(localBehavior, rechargeProfile.localActions, 16)
+  }
 
   if (
     /\bpublicaciones?\b|\bcomentarios?\b|\bgrupos?\b|\bnotificaciones?\b/u.test(
@@ -7652,6 +7795,27 @@ function detectSafeFirstDeliveryModuleFamily(modules) {
       productType: 'business-system',
       minimumScore: 2,
       matches: ['accesos', 'alertas', 'sensores', 'zonas', 'operadores', 'eventos'],
+    },
+    {
+      key: 'recharge-orders',
+      domainLabel: 'gestion local de pedidos de recarga',
+      productType: 'business-system',
+      minimumScore: 3,
+      requiredMatches: ['pedidos de recarga', 'dispositivos'],
+      matches: [
+        'pedidos de recarga',
+        'clientes',
+        'dispositivos',
+        'estados del pedido',
+        'recepcion del dispositivo',
+        'preparacion de recarga',
+        'listo para devolucion',
+        'retiro y devolucion',
+        'observaciones internas',
+        'costos estimados',
+        'alertas de pedidos pendientes',
+        'reportes por estado',
+      ],
     },
     {
       key: 'port-operations',
@@ -7738,6 +7902,10 @@ function inferDomainUnderstandingProductKind({
   productTypeHint,
   moduleFamily,
 }) {
+  if (detectSafeFirstDeliveryRechargeOrdersIntent(normalizedText)) {
+    return 'business-system'
+  }
+
   if (moduleFamily?.productType) {
     return moduleFamily.productType
   }
@@ -7746,11 +7914,7 @@ function inferDomainUnderstandingProductKind({
     return productTypeHint.trim()
   }
 
-  if (
-    /\bcarrito\b|\bcheckout\b|\bmercado pago\b|\bpagos\b|\bcatalogo\b|\bproductos\b/u.test(
-      normalizedText,
-    )
-  ) {
+  if (detectPositiveEcommerceIntent(normalizedText)) {
     return 'ecommerce'
   }
 
@@ -7794,6 +7958,9 @@ function buildDomainUnderstanding({
   const explicitModuleFamily = detectSafeFirstDeliveryModuleFamily(
     dynamicPlanParts.modules,
   )
+  const isRechargeOrdersSystem =
+    explicitModuleFamily?.key === 'recharge-orders' ||
+    detectSafeFirstDeliveryRechargeOrdersIntent(normalizedText)
   const productKind = inferDomainUnderstandingProductKind({
     normalizedText,
     productTypeHint,
@@ -7812,6 +7979,8 @@ function buildDomainUnderstanding({
       detectSafeFirstDeliveryRequestTrackingIntent(normalizedText))
   const resolvedFamilyKey = isSchoolCrm
     ? 'school-crm'
+    : isRechargeOrdersSystem
+      ? 'recharge-orders'
     : explicitModuleFamily?.key || (productKind === 'ecommerce' ? 'ecommerce' : '')
   const domainLabel =
     (resolvedFamilyKey === 'school-crm' ? 'gestion escolar' : '') ||
@@ -7886,6 +8055,7 @@ function buildDomainUnderstanding({
   const intentFallbackByFamily = {
     ecommerce: 'gestionar catalogo, carrito y ordenes mock',
     'school-crm': 'gestionar seguimiento escolar y comunicaciones',
+    'recharge-orders': 'gestionar pedidos de recarga, dispositivos y devolucion local',
     social: 'gestionar comunidad, perfiles e interacciones',
     security: 'monitorear accesos, alertas y eventos',
     'port-operations': 'gestionar arribos, salidas y operaciones portuarias',
@@ -7939,6 +8109,8 @@ function buildDomainUnderstanding({
     pushUniquePlannerValues(roles, ['administrador', 'moderador', 'miembro'])
   } else if (resolvedFamilyKey === 'security') {
     pushUniquePlannerValues(roles, ['administrador', 'operador', 'supervisor'])
+  } else if (resolvedFamilyKey === 'recharge-orders') {
+    pushUniquePlannerValues(roles, ['administrador', 'operador local', 'cliente'])
   } else if (resolvedFamilyKey === 'port-operations') {
     pushUniquePlannerValues(roles, [
       'administrador',
@@ -7959,6 +8131,15 @@ function buildDomainUnderstanding({
 
   if (/\bpagos?\b|\bcheckout\b|\bmercado pago\b/u.test(normalizedText)) {
     pushUniquePlannerValues(riskThemes, ['pagos'])
+  }
+
+  if (isRechargeOrdersSystem) {
+    pushUniquePlannerValues(riskThemes, ['edad y cumplimiento legal'])
+    pushUniquePlannerValues(explicitExclusions, [
+      'checkout real',
+      'venta directa',
+      'pagos reales',
+    ])
   }
 
   if (
@@ -7996,20 +8177,24 @@ function buildDomainUnderstanding({
     roles,
     coreFlows,
     stateModel: summarizeUniqueExecutorStrings(
-      buildSafeFirstDeliveryMaterializationStateHints({
-        productType: productKind,
-        isSchoolCrm,
-        isRequestTrackingSystem,
-      }),
+      isRechargeOrdersSystem
+        ? buildRechargeOrdersDomainProfile().stateHints
+        : buildSafeFirstDeliveryMaterializationStateHints({
+            productType: productKind,
+            isSchoolCrm,
+            isRequestTrackingSystem,
+          }),
       10,
     ),
     localActions,
     riskThemes,
     approvalThemes: summarizeUniqueExecutorStrings(
-      buildSafeFirstDeliveryMaterializationApprovalThemes({
-        productType: productKind,
-        isSchoolCrm,
-      }),
+      isRechargeOrdersSystem
+        ? buildRechargeOrdersDomainProfile().approvalThemes
+        : buildSafeFirstDeliveryMaterializationApprovalThemes({
+            productType: productKind,
+            isSchoolCrm,
+          }),
       10,
     ),
     explicitExclusions,
@@ -8174,11 +8359,11 @@ function buildSafeFirstDeliveryPlan({
     .join(' ')
   const normalizedText = normalizeSectorDetectionText(combinedText)
   const productType =
-    intent?.productTypeHint && intent.productTypeHint !== 'unknown'
+    detectSafeFirstDeliveryRechargeOrdersIntent(normalizedText)
+      ? 'business-system'
+      : intent?.productTypeHint && intent.productTypeHint !== 'unknown'
       ? intent.productTypeHint
-      : /\bcarrito\b|\bcheckout\b|\bmercado pago\b|\bpagos\b|\bcatalogo\b|\bproductos\b/u.test(
-            normalizedText,
-          )
+      : detectPositiveEcommerceIntent(normalizedText)
         ? 'ecommerce'
         : /\bcrm\b|\balumnos\b|\bfamilias\b|\bcursos\b|\bcomunicaciones\b|\bseguimiento\b/u.test(
               normalizedText,
@@ -8668,6 +8853,7 @@ function buildMaterializeSafeFirstDeliveryFolderName({
     }
 
     const normalizationRules = [
+      { pattern: /\b(?:pedidos-recarga|pedido-recarga|gestion-pedidos-recarga|recarga-dispositivos|vape|vaporizador)\b/u, slug: 'pedidos-recarga' },
       { pattern: /\b(?:social|red-social|comunidades?|comunidad-barrial)\b/u, slug: 'social' },
       { pattern: /\b(?:seguridad|alertas|accesos|sensores|monitoreo-de-seguridad)\b/u, slug: 'seguridad' },
       { pattern: /\b(?:documental|documentos|vencimientos)\b/u, slug: 'documental' },
@@ -8689,6 +8875,7 @@ function buildMaterializeSafeFirstDeliveryFolderName({
   }
   const domainSlug = normalizeFolderSlugCandidate(domain || '')
   const moduleCandidateMap = [
+    { slug: 'pedidos-recarga', pattern: /\b(?:pedidos?\s+de\s+recarga|recargas?|dispositivos?|vapes?|vaporizadores?)\b/u },
     { slug: 'catalogo', pattern: /\bcatalogo\b|\bproductos\b/u },
     { slug: 'alumnos', pattern: /\balumnos\b|\bcursos\b|\bfamilias\b/u },
     { slug: 'ordenes', pattern: /\bordenes\b|\bpedidos\b/u },
@@ -8737,6 +8924,42 @@ function inferSafeFirstDeliveryMaterializationCollectionKey(label) {
 
   if (!normalizedLabel) {
     return ''
+  }
+
+  if (/\bpedidos?\s+de\s+recarga\b|\bsolicitudes?\s+de\s+recarga\b/u.test(normalizedLabel)) {
+    return 'pedidosRecarga'
+  }
+
+  if (/\bdispositivos?\b|\bvapes?\b|\bvaporizadores?\b/u.test(normalizedLabel)) {
+    return 'dispositivos'
+  }
+
+  if (/\bestados?\s+del\s+pedido\b/u.test(normalizedLabel)) {
+    return 'estadosPedido'
+  }
+
+  if (/\brecepcion\s+del\s+dispositivo\b/u.test(normalizedLabel)) {
+    return 'recepcionDispositivo'
+  }
+
+  if (/\bpreparacion\s+de\s+recarga\b/u.test(normalizedLabel)) {
+    return 'preparacionRecarga'
+  }
+
+  if (/\blisto\s+para\s+devolucion\b|\bretiro\s+y\s+devolucion\b|\bretiro\/devolucion\b/u.test(normalizedLabel)) {
+    return 'retiroDevolucion'
+  }
+
+  if (/\bcostos?\s+estimados?\b/u.test(normalizedLabel)) {
+    return 'costosEstimados'
+  }
+
+  if (/\balertas?\s+de\s+pedidos?\s+pendientes\b/u.test(normalizedLabel)) {
+    return 'alertasPendientes'
+  }
+
+  if (/\breportes?\s+por\s+estado\b/u.test(normalizedLabel)) {
+    return 'reportesPorEstado'
   }
 
   if (/\b(?:buques?|barcos?|embarcaciones?)\b/u.test(normalizedLabel)) {
@@ -8987,6 +9210,42 @@ function inferSafeFirstDeliveryMaterializationEntityName(label) {
 
   if (!normalizedLabel) {
     return ''
+  }
+
+  if (/\bpedidos?\s+de\s+recarga\b|\bsolicitudes?\s+de\s+recarga\b/u.test(normalizedLabel)) {
+    return 'pedido de recarga'
+  }
+
+  if (/\bdispositivos?\b|\bvapes?\b|\bvaporizadores?\b/u.test(normalizedLabel)) {
+    return 'dispositivo'
+  }
+
+  if (/\bestados?\s+del\s+pedido\b/u.test(normalizedLabel)) {
+    return 'estado del pedido'
+  }
+
+  if (/\brecepcion\s+del\s+dispositivo\b/u.test(normalizedLabel)) {
+    return 'recepcion del dispositivo'
+  }
+
+  if (/\bpreparacion\s+de\s+recarga\b/u.test(normalizedLabel)) {
+    return 'preparacion de recarga'
+  }
+
+  if (/\blisto\s+para\s+devolucion\b|\bretiro\s+y\s+devolucion\b|\bretiro\/devolucion\b/u.test(normalizedLabel)) {
+    return 'devolucion'
+  }
+
+  if (/\bcostos?\s+estimados?\b/u.test(normalizedLabel)) {
+    return 'costo estimado'
+  }
+
+  if (/\balertas?\s+de\s+pedidos?\s+pendientes\b/u.test(normalizedLabel)) {
+    return 'alerta pendiente'
+  }
+
+  if (/\breportes?\s+por\s+estado\b/u.test(normalizedLabel)) {
+    return 'reporte por estado'
   }
 
   if (/\b(?:buques?|barcos?|embarcaciones?)\b/u.test(normalizedLabel)) {
@@ -9512,6 +9771,35 @@ function buildMaterializeSafeFirstDeliveryPlan({
     .filter((value) => typeof value === 'string' && value.trim())
     .join(' ')
   const normalizedText = normalizeSectorDetectionText(combinedText)
+  const rechargeProfile = detectSafeFirstDeliveryRechargeOrdersIntent(normalizedText)
+    ? buildRechargeOrdersDomainProfile()
+    : null
+  const isRechargeOrdersSystem = Boolean(rechargeProfile)
+  const rechargeExecutionProfile = isRechargeOrdersSystem
+    ? {
+        ...rechargeProfile,
+        localActions: [
+          'Registrar un pedido de recarga mock y revisar su estado local.',
+          'Revisar clientes mock y su historial local de pedidos de recarga.',
+          'Registrar recepcion del dispositivo y actualizar la preparacion de recarga.',
+          'Marcar un pedido listo para devolucion y revisar retiro o devolucion local.',
+          'Revisar costos estimados y alertas de pedidos pendientes en modo local.',
+        ],
+        explicitExclusions: [
+          'operacion comercial real',
+          'base de datos real',
+          'integraciones externas reales',
+          'credenciales reales',
+          'auth real',
+          'deploy',
+        ],
+        scopeHighlights: [
+          'Primera version navegable del flujo principal para gestion local de pedidos de recarga.',
+          'Mantener toda la entrega en modo local, mock y sin operacion comercial real.',
+          'Validacion futura de edad y cumplimiento legal como fase posterior.',
+        ],
+      }
+    : null
   const dynamicPlanParts = buildDynamicSafeDeliveryPlanParts(combinedText)
   const normalizedDomainUnderstanding = normalizeDomainUnderstandingContract(domainUnderstanding)
   const domainUnderstandingMaterializationParts =
@@ -9527,7 +9815,9 @@ function buildMaterializeSafeFirstDeliveryPlan({
       : dynamicPlanParts.modules,
   )
   const inferredProductType =
-    intent?.productTypeHint && intent.productTypeHint !== 'unknown'
+    isRechargeOrdersSystem
+      ? rechargeProfile.productType
+      : intent?.productTypeHint && intent.productTypeHint !== 'unknown'
       ? intent.productTypeHint
       : /\bcarrito\b|\bcheckout\b|\bmercado pago\b|\bpagos\b|\bcatalogo\b|\bproductos\b/u.test(
             normalizedText,
@@ -9553,7 +9843,9 @@ function buildMaterializeSafeFirstDeliveryPlan({
                     ? 'business-system'
                     : 'unknown'
   const productType =
-    normalizedDomainUnderstanding?.productKind &&
+    isRechargeOrdersSystem
+      ? rechargeProfile.productType
+      : normalizedDomainUnderstanding?.productKind &&
     normalizedDomainUnderstanding.productKind !== 'unknown'
       ? normalizedDomainUnderstanding.productKind
       : explicitModuleFamily?.productType || inferredProductType
@@ -9564,6 +9856,7 @@ function buildMaterializeSafeFirstDeliveryPlan({
     inferredProductType,
   )
   const domain =
+    (isRechargeOrdersSystem ? rechargeProfile.domainLabel : '') ||
     sanitizeBusinessSectorLabel(normalizedDomainUnderstanding?.domainLabel || '') ||
     explicitModuleFamily?.domainLabel ||
     inferredDomain
@@ -9642,6 +9935,12 @@ function buildMaterializeSafeFirstDeliveryPlan({
       'registrar comunicacion simulada y actualizar seguimiento local',
       'revisar reportes mock sin datos sensibles reales',
     ])
+  } else if (isRechargeOrdersSystem) {
+    pushUniquePlannerValues(scopeHighlights, rechargeExecutionProfile.scopeHighlights)
+    pushUniquePlannerValues(moduleHighlights, rechargeExecutionProfile.modules)
+    pushUniquePlannerValues(screenHighlights, rechargeExecutionProfile.screens)
+    pushUniquePlannerValues(mockDataHighlights, rechargeExecutionProfile.mockDataHints)
+    pushUniquePlannerValues(localBehaviorHighlights, rechargeExecutionProfile.localActions)
   } else if (hasUsefulDomainUnderstandingModules) {
     pushUniquePlannerValues(
       scopeHighlights,
@@ -9751,6 +10050,8 @@ function buildMaterializeSafeFirstDeliveryPlan({
 
   pushUniquePlannerValues(exclusionHighlights, [
     'pagos reales',
+    'checkout real',
+    'venta directa',
     'credenciales reales',
     'webhooks reales',
     'deploy',
@@ -9764,6 +10065,9 @@ function buildMaterializeSafeFirstDeliveryPlan({
     exclusionHighlights,
     domainUnderstandingMaterializationParts.explicitExclusions,
   )
+  if (isRechargeOrdersSystem) {
+    pushUniquePlannerValues(exclusionHighlights, rechargeExecutionProfile.explicitExclusions)
+  }
   const approvalThemes = hasUsefulDomainUnderstandingModules
     ? summarizeUniqueExecutorStrings(
         [
@@ -9779,6 +10083,12 @@ function buildMaterializeSafeFirstDeliveryPlan({
         productType,
         isSchoolCrm,
       })
+  const resolvedApprovalThemes = isRechargeOrdersSystem
+    ? summarizeUniqueExecutorStrings(
+        [...approvalThemes, ...rechargeExecutionProfile.approvalThemes],
+        12,
+      )
+    : approvalThemes
   const stateHints = hasUsefulDomainUnderstandingModules
     ? summarizeUniqueExecutorStrings(
         [
@@ -9796,17 +10106,24 @@ function buildMaterializeSafeFirstDeliveryPlan({
         isSchoolCrm,
         isRequestTrackingSystem,
       })
+  const resolvedStateHints = isRechargeOrdersSystem
+    ? summarizeUniqueExecutorStrings([...stateHints, ...rechargeProfile.stateHints], 10)
+    : stateHints
   const safeFirstDeliveryMaterialization = buildSafeFirstDeliveryMaterializationContract({
     domainLabel,
     productType,
     modules: moduleHighlights,
-    entities: domainUnderstandingMaterializationParts.entities,
-    mockCollections: domainUnderstandingMaterializationParts.mockCollections,
+    entities: isRechargeOrdersSystem
+      ? rechargeExecutionProfile.entities
+      : domainUnderstandingMaterializationParts.entities,
+    mockCollections: isRechargeOrdersSystem
+      ? rechargeExecutionProfile.mockCollections
+      : domainUnderstandingMaterializationParts.mockCollections,
     screens: screenHighlights,
     localActions: localBehaviorHighlights,
     explicitExclusions: exclusionHighlights,
-    approvalThemes,
-    stateHints,
+    approvalThemes: resolvedApprovalThemes,
+    stateHints: resolvedStateHints,
     mockDataHints: mockDataHighlights,
   })
   const targetFolderName = buildMaterializeSafeFirstDeliveryFolderName({
@@ -9842,7 +10159,9 @@ function buildMaterializeSafeFirstDeliveryPlan({
     [
       `Materializar solo la carpeta "${targetFolderName}" y sus archivos locales permitidos.`,
       'Entregar una experiencia navegable con datos mock editables para el flujo principal.',
-      'Mantener fuera de alcance pagos reales, credenciales, webhooks, deploy, migraciones, auth real, base de datos real e integraciones externas reales.',
+      isRechargeOrdersSystem
+        ? 'Mantener la entrega en modo local, mock, sin operacion comercial real y sin integraciones externas reales.'
+        : 'Mantener fuera de alcance pagos reales, credenciales, webhooks, deploy, migraciones, auth real, base de datos real e integraciones externas reales.',
       workspacePath
         ? `Resolver todo dentro del workspace configurado: ${workspacePath}.`
         : 'Resolver todo dentro del workspace activo del proyecto.',
@@ -10052,12 +10371,14 @@ function buildProductArchitecturePlan({
   const normalizedText = normalizeSectorDetectionText(combinedText)
   const normalizedDomainUnderstanding = normalizeDomainUnderstandingContract(domainUnderstanding)
   const productType =
-    normalizedDomainUnderstanding?.productKind &&
+    detectSafeFirstDeliveryRechargeOrdersIntent(normalizedText)
+      ? 'business-system'
+      : normalizedDomainUnderstanding?.productKind &&
     normalizedDomainUnderstanding.productKind !== 'unknown'
       ? normalizedDomainUnderstanding.productKind
       : intent?.productTypeHint && intent.productTypeHint !== 'unknown'
       ? intent.productTypeHint
-      : /\bcarrito\b|\bcheckout\b|\bmercado pago\b|\bpagos\b/u.test(normalizedText)
+      : detectPositiveEcommerceIntent(normalizedText)
         ? 'ecommerce'
         : /\bcrm\b/u.test(normalizedText)
           ? 'crm'
