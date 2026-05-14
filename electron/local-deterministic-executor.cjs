@@ -537,6 +537,31 @@ function buildRechargeOrdersMaterializationProfile() {
   }
 }
 
+function detectCommercialLandingEcommerceIntent(normalizedText) {
+  if (typeof normalizedText !== 'string' || !normalizedText.trim()) {
+    return false
+  }
+
+  const hasCommerceCore =
+    /\b(?:ecommerce|tienda online|comercio online|catalogo|productos|carrito|checkout|comprar|consultar)\b/u.test(
+      normalizedText,
+    )
+  const hasCommercialPresentationSignals =
+    /\b(?:hero|landing|marketin(?:g|era)?|comercial|conversion|testimonios?|preguntas?\s+frecuentes|faq|beneficios?|filtros?|cards?)\b/u.test(
+      normalizedText,
+    )
+
+  return hasCommerceCore && hasCommercialPresentationSignals
+}
+
+function detectSoccerBallStoreIntent(normalizedText) {
+  if (typeof normalizedText !== 'string' || !normalizedText.trim()) {
+    return false
+  }
+
+  return /\bpelotas?\b/u.test(normalizedText) && /\bfutbol\b|\bfútbol\b/u.test(normalizedText)
+}
+
 function rewriteSafeFirstDeliveryPathSet(pathSet, folderName) {
   const targetFolderPath = path.normalize(folderName)
 
@@ -730,6 +755,30 @@ function buildModuleCollectionKey(moduleLabel) {
 
   if (/\breportes?\s+por\s+estado\b/u.test(normalizedLabel)) {
     return 'reportesPorEstado'
+  }
+
+  if (/\bhero\b|\bhero comercial\b|\blanding principal\b/u.test(normalizedLabel)) {
+    return 'hero'
+  }
+
+  if (/\bcategorias?\b/u.test(normalizedLabel)) {
+    return 'categorias'
+  }
+
+  if (/\bbeneficios?\b/u.test(normalizedLabel)) {
+    return 'beneficios'
+  }
+
+  if (/\btestimonios?\b/u.test(normalizedLabel)) {
+    return 'testimonios'
+  }
+
+  if (/\bpreguntas?\s+frecuentes\b|\bfaq\b/u.test(normalizedLabel)) {
+    return 'faq'
+  }
+
+  if (/\bcta\b|\bllamada\s+a\s+la\s+accion\b|\bllamada\s+a\s+la\s+acción\b/u.test(normalizedLabel)) {
+    return 'cta'
   }
 
   if (/\b(?:catalogo|productos?)\b/u.test(normalizedLabel)) {
@@ -1951,20 +2000,144 @@ function buildSafeFirstDeliveryMockCollections({
   const collections = {}
 
   if (productType === 'ecommerce') {
+    const isCommercialLanding = detectCommercialLandingEcommerceIntent(
+      `${normalizedText} ${normalizedDomain}`,
+    )
+    const isSoccerBallStore = detectSoccerBallStoreIntent(
+      `${normalizedText} ${normalizedDomain}`,
+    )
+
+    if (isCommercialLanding) {
+      collections.hero = [
+        {
+          id: 'hero-1',
+          nombre: isSoccerBallStore
+            ? 'Potencia, control y precision en cada partido'
+            : 'Coleccion comercial destacada',
+          estado: 'destacado',
+          resumen: isSoccerBallStore
+            ? 'Hero principal para la tienda local de pelotas de futbol.'
+            : 'Hero principal pensado para conversion local.',
+        },
+      ]
+      collections.productos = isSoccerBallStore
+        ? [
+            {
+              id: 'prod-1',
+              nombre: 'Pelota Match Pro',
+              categoria: 'Profesionales',
+              precio: 58990,
+              stock: 14,
+              estado: 'destacado',
+              resumen: 'Modelo principal para partidos con grip y vuelo estable.',
+            },
+            {
+              id: 'prod-2',
+              nombre: 'Pelota Training Grip',
+              categoria: 'Entrenamiento',
+              precio: 34990,
+              stock: 22,
+              estado: 'publicado',
+              resumen: 'Pelota resistente para practica intensiva y uso diario.',
+            },
+            {
+              id: 'prod-3',
+              nombre: 'Pelota Kids Start',
+              categoria: 'Infantiles',
+              precio: 22990,
+              stock: 18,
+              estado: 'oferta',
+              resumen: 'Linea inicial con peso liviano y superficie suave.',
+            },
+          ]
+        : [
+            {
+              id: 'prod-1',
+              nombre: 'Producto Hero',
+              categoria: 'Destacados',
+              precio: 58990,
+              stock: 10,
+              estado: 'destacado',
+              resumen: 'Producto principal para validar la portada comercial.',
+            },
+            {
+              id: 'prod-2',
+              nombre: 'Producto Conversion',
+              categoria: 'Ofertas',
+              precio: 34990,
+              stock: 16,
+              estado: 'publicado',
+              resumen: 'Producto mock pensado para validar carrito y checkout simulado.',
+            },
+          ]
+      collections.categorias = isSoccerBallStore
+        ? [
+            { id: 'cat-1', nombre: 'Entrenamiento', estado: 'visible', resumen: 'Uso diario y practica.' },
+            { id: 'cat-2', nombre: 'Partido', estado: 'visible', resumen: 'Partidos recreativos y competitivos.' },
+            { id: 'cat-3', nombre: 'Infantiles', estado: 'visible', resumen: 'Modelos livianos para edades iniciales.' },
+            { id: 'cat-4', nombre: 'Profesionales', estado: 'visible', resumen: 'Pelotas premium para alto rendimiento.' },
+            { id: 'cat-5', nombre: 'Ofertas', estado: 'visible', resumen: 'Modelos destacados con precio promocional mock.' },
+          ]
+        : [
+            { id: 'cat-1', nombre: 'Destacados', estado: 'visible', resumen: 'Coleccion principal de portada.' },
+            { id: 'cat-2', nombre: 'Ofertas', estado: 'visible', resumen: 'Items con CTA comercial reforzado.' },
+          ]
+      collections.beneficios = [
+        { id: 'ben-1', nombre: 'Calidad visible', estado: 'activo', resumen: 'Materiales y terminaciones destacados en la primera visita.' },
+        { id: 'ben-2', nombre: 'Envio o consulta simple', estado: 'activo', resumen: 'Mensaje claro para compra o consulta simulada.' },
+        { id: 'ben-3', nombre: 'Garantia mock', estado: 'activo', resumen: 'Beneficio informativo sin condiciones comerciales reales.' },
+      ]
+      collections.testimonios = [
+        { id: 'tes-1', nombre: 'Cliente mock 1', estado: 'publicado', resumen: '“Se siente premium desde el primer toque y llego justo para el torneo.”' },
+        { id: 'tes-2', nombre: 'Cliente mock 2', estado: 'publicado', resumen: '“La navegacion es clara y el checkout simulado transmite confianza.”' },
+      ]
+      collections.faq = [
+        { id: 'faq-1', nombre: '¿Hay pago real?', estado: 'respondida', resumen: 'No. Esta primera entrega solo simula carrito y checkout.' },
+        { id: 'faq-2', nombre: '¿Se publica online?', estado: 'respondida', resumen: 'No. La experiencia sigue siendo local y usable por file://.' },
+      ]
+      collections.cta = [
+        {
+          id: 'cta-1',
+          nombre: isSoccerBallStore ? 'Comprar o consultar' : 'Explorar y consultar',
+          estado: 'activo',
+          resumen: 'CTA principal para validar conversion local sin venta real ni deploy.',
+        },
+      ]
+      collections.carrito = []
+      collections.ordenes = [
+        {
+          id: 'ord-1001',
+          cliente: 'Compra demo',
+          total: isSoccerBallStore ? 93880 : 201500,
+          estado: 'simulada',
+          resumen: 'Orden local creada sin pagos reales ni integraciones externas.',
+        },
+      ]
+      collections.operacion = [
+        {
+          id: 'op-1',
+          nombre: 'Revision comercial local',
+          estado: 'lista',
+          resumen: 'Permite revisar el recorrido visual y la conversion mock sin operacion administrativa real.',
+        },
+      ]
+      return collections
+    }
+
     collections.productos = [
       {
         id: 'prod-1',
-        nombre: 'Campera Urbana',
-        categoria: 'Abrigos',
+        nombre: 'Producto Destacado',
+        categoria: 'Destacados',
         precio: 89500,
         stock: 12,
         estado: 'publicado',
-        resumen: 'Prenda destacada para la portada del catalogo.',
+        resumen: 'Producto destacado para la portada del catalogo.',
       },
       {
         id: 'prod-2',
-        nombre: 'Zapatilla Nova',
-        categoria: 'Calzado',
+        nombre: 'Producto Conversion',
+        categoria: 'Categoria principal',
         precio: 112000,
         stock: 8,
         estado: 'publicado',
@@ -1972,12 +2145,12 @@ function buildSafeFirstDeliveryMockCollections({
       },
       {
         id: 'prod-3',
-        nombre: 'Mochila Atlas',
-        categoria: 'Accesorios',
+        nombre: 'Producto Oferta',
+        categoria: 'Ofertas',
         precio: 64900,
         stock: 15,
         estado: 'borrador',
-        resumen: 'Item editable desde el backoffice mock.',
+        resumen: 'Item mock para validar jerarquia comercial local.',
       },
     ]
     collections.carrito = []
@@ -1993,7 +2166,7 @@ function buildSafeFirstDeliveryMockCollections({
     collections.operacion = [
       {
         id: 'op-1',
-        nombre: 'Alta de producto mock',
+        nombre: 'Revision de catalogo mock',
         estado: 'lista',
         resumen: 'Permite revisar la gestion basica del catalogo.',
       },
@@ -3211,7 +3384,7 @@ function buildSafeFirstDeliveryRuntimeModeConfig(interactionMode) {
       return {
         kind: 'commerce',
         fallbackLabel: 'ecommerce',
-        searchPlaceholder: 'Buscar catalogo, categoria, estado u orden local',
+        searchPlaceholder: 'Buscar catalogo, categoria, beneficio, testimonio u orden local',
         initialLog: 'Base local de ecommerce con datos mock lista para revision.',
         safetySummary:
           'sin integraciones externas, pagos reales, credenciales ni persistencia real',
@@ -3242,7 +3415,7 @@ function buildSafeFirstDeliveryRuntimeModeConfig(interactionMode) {
           'Definir credenciales reales y configuracion segura para Mercado Pago o la pasarela elegida.',
           'Validar webhooks reales y conciliacion de ordenes antes de conectarse con terceros.',
           'Aprobar persistencia real, migraciones y stock productivo antes de operar con datos reales.',
-          'Definir autenticacion real y permisos para backoffice antes de publicar.',
+          'Definir autenticacion real y permisos para operacion comercial futura antes de publicar.',
           'Revisar despliegue, observabilidad y recuperacion operativa antes de abrir la tienda.',
         ],
         stateSequences: {

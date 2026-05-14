@@ -133,6 +133,28 @@ const activeCases = [
     folderAnyOf: ['safe-first-delivery-ecommerce'],
   },
   {
+    id: 'ecommerce-pelotas-futbol',
+    label: 'Ecommerce pelotas de futbol',
+    goal:
+      'Crear una entrega funcional local para una tienda online moderna de venta de pelotas de futbol con hero comercial, catalogo destacado, categorias, productos, beneficios, testimonios, FAQ, carrito local y checkout simulado.',
+    context:
+      'La prioridad es marketing y conversion. Debe ser una landing comercial deportiva para vender o consultar pelotas de futbol, con categorias entrenamiento, partido, infantiles, profesionales y ofertas, sin deploy, sin publicacion real, sin pagos reales, sin base de datos real, sin credenciales ni integraciones externas reales.',
+    mustInclude: [
+      'hero comercial',
+      'catalogo',
+      'categorias',
+      'productos',
+      'beneficios',
+      'testimonios',
+      'preguntas frecuentes',
+      'cta comercial',
+      'carrito local',
+      'checkout simulado',
+    ],
+    mustExclude: ['reservas', 'profesionales mock', 'agenda inicial', 'backoffice mock', 'panel operativo'],
+    folderAnyOf: ['safe-first-delivery-tienda-pelotas-futbol'],
+  },
+  {
     id: 'crm-escolar',
     label: 'CRM escolar',
     goal:
@@ -2309,6 +2331,225 @@ async function runRechargeMaterializationDomainPurityValidation() {
     requiredTokens.forEach((token) => {
       if (!normalizeText(mockDataContent).includes(normalizeText(token))) {
         failures.push(`mock-data.json deberia mencionar ${token}.`)
+      }
+    })
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+  }
+}
+
+async function runSoccerEcommerceApprovalContinuationValidation() {
+  const testCase = activeCases.find((entry) => entry.id === 'ecommerce-pelotas-futbol')
+  const failures = []
+
+  if (!testCase) {
+    return {
+      testCase: {
+        id: 'soccer-ecommerce-approval-continuation',
+        label: 'Approval local para ecommerce de pelotas',
+        goal: '',
+      },
+      ok: false,
+      failures: ['No se encontro el caso base ecommerce-pelotas-futbol para la regresion.'],
+    }
+  }
+
+  const approvalFeedback =
+    '__orchestrator_feedback__:' +
+    JSON.stringify({
+      type: 'approval-granted',
+      source: 'planner',
+      approvalMode: 'once',
+      instruction:
+        'Continuar solo con una entrega local, mock y segura para esta tienda online.',
+      approvalReason:
+        'El usuario no autoriza deploy ni publicacion real, pero quiere seguir con la entrega local mock.',
+      approvalRequestDecisionKey: 'approve-public-deploy',
+      freeAnswer:
+        'No quiero publicar ni desplegar esta web fuera del entorno local. Quiero seguir solo local, mock y seguro, usable por file://, sin deploy, sin publicacion real, sin pagos reales, sin base de datos real, sin credenciales y sin integraciones externas. El carrito y el checkout deben ser solamente simulados.',
+    })
+
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: testCase.goal,
+    context: testCase.context,
+    workspacePath: smokeExecutionWorkspaceRoot,
+    iteration: 2,
+    previousExecutionResult: approvalFeedback,
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: 'brain-decides-missing',
+    costMode: 'smart',
+    attachedInputs: [],
+    existingProjectContext: null,
+    projectWorkMode: 'auto',
+    reusablePlanningContext: buildReusablePlanningContext(),
+  })
+
+  if (
+    decision?.strategy !== 'safe-first-delivery-plan' &&
+    decision?.strategy !== 'materialize-safe-first-delivery-plan'
+  ) {
+    failures.push(
+      `La continuidad post-approval deberia volver a una ruta segura local. Recibido: ${
+        decision?.strategy || '(vacio)'
+      }.`,
+    )
+  }
+  if (normalizeText(decision?.reason || '').includes('executor')) {
+    failures.push('La razon de la continuidad post-approval no deberia caer otra vez en executor-general.')
+  }
+
+  const domainSummary = normalizeText(
+    [
+      decision?.domainUnderstanding?.domainLabel,
+      ...(Array.isArray(decision?.domainUnderstanding?.primaryModules)
+        ? decision.domainUnderstanding.primaryModules
+        : []),
+      ...(Array.isArray(decision?.domainUnderstanding?.coreFlows)
+        ? decision.domainUnderstanding.coreFlows
+        : []),
+      ...(Array.isArray(decision?.domainUnderstanding?.localActions)
+        ? decision.domainUnderstanding.localActions
+        : []),
+      decision?.instruction,
+    ]
+      .filter(Boolean)
+      .join(' '),
+  )
+
+  ;['reservas', 'flujo de reservas', 'agenda inicial', 'profesionales mock'].forEach(
+    (token) => {
+    if (domainSummary.includes(normalizeText(token))) {
+      failures.push(`La replanificacion post-approval quedo contaminada con "${token}".`)
+    }
+    },
+  )
+
+  ;['pelotas', 'catalogo', 'carrito', 'checkout simulado'].forEach((token) => {
+    if (!domainSummary.includes(normalizeText(token))) {
+      failures.push(`La replanificacion post-approval deberia preservar ${token}.`)
+    }
+  })
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    strategy: decision?.strategy || '',
+    nextExpectedAction: decision?.nextExpectedAction || '',
+  }
+}
+
+async function runSoccerEcommerceMaterializationValidation() {
+  const testCase = activeCases.find((entry) => entry.id === 'ecommerce-pelotas-futbol')
+  const failures = []
+
+  if (!testCase) {
+    return {
+      testCase: {
+        id: 'soccer-ecommerce-materialization',
+        label: 'Materializacion ecommerce de pelotas',
+        goal: '',
+      },
+      ok: false,
+      failures: ['No se encontro el caso base ecommerce-pelotas-futbol para la regresion.'],
+    }
+  }
+
+  const structures = buildCaseStructures(testCase)
+  const materializationPlan = buildGenericSafeFirstDeliveryMaterializationPlan({
+    decisionKey: 'materialize-safe-first-delivery-plan',
+    instruction: structures.materializePlan?.instruction || '',
+    executionScope: structures.materializePlan?.executionScope || {},
+    businessSector: structures.domainUnderstanding?.intentLabel || '',
+    businessSectorLabel: structures.domainUnderstanding?.domainLabel || '',
+    safeFirstDeliveryMaterialization:
+      structures.materializePlan?.safeFirstDeliveryMaterialization || null,
+  })
+
+  if (!materializationPlan) {
+    return {
+      testCase,
+      ok: false,
+      failures: ['No se pudo construir el materializationPlan ecommerce de pelotas.'],
+    }
+  }
+
+  const workspacePath = path.join(smokeExecutionWorkspaceRoot, 'soccer-ecommerce-materialization')
+  ensureCleanDirectory(workspacePath)
+
+  const task = buildLocalMaterializationTask({
+    plan: materializationPlan,
+    workspacePath,
+    requestId: 'smoke-soccer-ecommerce-materialization',
+    instruction: structures.materializePlan?.instruction || '',
+    brainStrategy: 'materialize-safe-first-delivery-plan',
+    businessSector: structures.domainUnderstanding?.intentLabel || '',
+    businessSectorLabel: structures.domainUnderstanding?.domainLabel || '',
+    materializationPlanSource: 'planner-smoke',
+  })
+
+  if (!task) {
+    return {
+      testCase,
+      ok: false,
+      failures: ['No se pudo construir la tarea local deterministica ecommerce de pelotas.'],
+    }
+  }
+
+  const executionResult = await runLocalDeterministicTask(task)
+  if (executionResult?.ok !== true) {
+    return {
+      testCase,
+      ok: false,
+      failures: [
+        `La materializacion local ecommerce de pelotas fallo: ${
+          executionResult?.error || 'sin detalle'
+        }.`,
+      ],
+    }
+  }
+
+  const expectedFolder = path.join(workspacePath, 'safe-first-delivery-tienda-pelotas-futbol')
+  const expectedFiles = ['index.html', 'styles.css', 'script.js', 'mock-data.json']
+  const requiredTokenChecks = {
+    'script.js': ['pelota', 'catalogo', 'carrito', 'checkout simulado'],
+    'mock-data.json': ['pelota', 'testimonios', 'preguntas frecuentes'],
+  }
+  const forbiddenTokens = [
+    'reservas',
+    'flujo de reservas',
+    'agenda',
+    'profesionales mock',
+    'backoffice',
+    'operaciones portuarias',
+  ]
+
+  if (!fs.existsSync(expectedFolder)) {
+    failures.push('La materializacion no creo safe-first-delivery-tienda-pelotas-futbol.')
+  }
+
+  for (const basename of expectedFiles) {
+    const filePath = path.join(expectedFolder, basename)
+    if (!fs.existsSync(filePath)) {
+      failures.push(`Falta el archivo generado ${basename}.`)
+      continue
+    }
+
+    const content = fs.readFileSync(filePath, 'utf8')
+    const requiredTokens = requiredTokenChecks[basename] || []
+    requiredTokens.forEach((token) => {
+      if (!normalizeText(content).includes(normalizeText(token))) {
+        failures.push(`${basename} deberia mencionar ${token}.`)
+      }
+    })
+    forbiddenTokens.forEach((token) => {
+      if (normalizeText(content).includes(normalizeText(token))) {
+        failures.push(`${basename} quedo contaminado con "${token}".`)
       }
     })
   }
@@ -8868,6 +9109,8 @@ async function main() {
   let frontendMaterializationResult = null
   let fullstackMaterializationResult = null
   let rechargeMaterializationResult = null
+  let soccerApprovalContinuationResult = null
+  let soccerMaterializationResult = null
   let projectPhaseExecutionResults = []
   let continuationResults = []
   if (!caseId) {
@@ -8890,6 +9133,20 @@ async function main() {
     rechargeMaterializationResult =
       await runRechargeMaterializationDomainPurityValidation()
     printScalableValidationResult(rechargeMaterializationResult)
+    console.log('-----------------')
+
+    console.log('Soccer Ecommerce Approval Continuation Check')
+    console.log('===========================================')
+    soccerApprovalContinuationResult =
+      await runSoccerEcommerceApprovalContinuationValidation()
+    printScalableValidationResult(soccerApprovalContinuationResult)
+    console.log('-----------------')
+
+    console.log('Soccer Ecommerce Materialization Check')
+    console.log('=====================================')
+    soccerMaterializationResult =
+      await runSoccerEcommerceMaterializationValidation()
+    printScalableValidationResult(soccerMaterializationResult)
     console.log('-----------------')
 
     console.log('Project Phase Execution Checks')
@@ -9316,6 +9573,8 @@ async function main() {
   const frontendMaterializationFailed = frontendMaterializationResult?.ok === false
   const fullstackMaterializationFailed = fullstackMaterializationResult?.ok === false
   const rechargeMaterializationFailed = rechargeMaterializationResult?.ok === false
+  const soccerApprovalContinuationFailed = soccerApprovalContinuationResult?.ok === false
+  const soccerMaterializationFailed = soccerMaterializationResult?.ok === false
 
   if (
     failedResults.length === 0 &&
@@ -9326,7 +9585,9 @@ async function main() {
     failedProjectPhaseExecutionResults.length === 0 &&
     !frontendMaterializationFailed &&
     !fullstackMaterializationFailed &&
-    !rechargeMaterializationFailed
+    !rechargeMaterializationFailed &&
+    !soccerApprovalContinuationFailed &&
+    !soccerMaterializationFailed
   ) {
     console.log(`OK. ${passedCount}/${results.length} casos pasaron.`)
     if (scalableResults.length > 0) {
@@ -9350,6 +9611,12 @@ async function main() {
     }
     if (rechargeMaterializationResult) {
       console.log('OK. 1/1 check de materializacion de pedidos de recarga paso.')
+    }
+    if (soccerApprovalContinuationResult) {
+      console.log('OK. 1/1 check de continuidad post-approval ecommerce de pelotas paso.')
+    }
+    if (soccerMaterializationResult) {
+      console.log('OK. 1/1 check de materializacion ecommerce de pelotas paso.')
     }
     if (projectPhaseExecutionResults.length > 0) {
       console.log(
@@ -9426,6 +9693,22 @@ async function main() {
     console.log(
       `- ${rechargeMaterializationResult.testCase.id}: ${
         rechargeMaterializationResult.failures[0] || 'sin detalle'
+      }`,
+    )
+  }
+  if (soccerApprovalContinuationFailed) {
+    console.log('check de continuidad post-approval ecommerce de pelotas fallido:')
+    console.log(
+      `- ${soccerApprovalContinuationResult.testCase.id}: ${
+        soccerApprovalContinuationResult.failures[0] || 'sin detalle'
+      }`,
+    )
+  }
+  if (soccerMaterializationFailed) {
+    console.log('check de materializacion ecommerce de pelotas fallido:')
+    console.log(
+      `- ${soccerMaterializationResult.testCase.id}: ${
+        soccerMaterializationResult.failures[0] || 'sin detalle'
       }`,
     )
   }

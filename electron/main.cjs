@@ -6294,13 +6294,13 @@ function detectSafeFirstDeliveryPlanningIntent(goal, context) {
     directProductTypeMap.find(({ pattern }) => pattern.test(normalizedText))?.key ||
     (/catalogo|carrito|checkout|mercado pago|productos|backoffice/u.test(normalizedText)
       ? 'ecommerce'
-      : /alumnos|familias|cursos|comunicaciones|seguimiento/u.test(normalizedText)
+      : detectCrmProductTypeIntent(normalizedText)
         ? 'crm'
         : /turnos|clinicas?|salud/u.test(normalizedText)
           ? 'business-system'
           : 'unknown')
   const explicitPhaseIntent =
-    /\b(?:primera entrega segura|primera fase segura|safe first delivery|safe-first-delivery|base navegable inicial|prototipo funcional local|version inicial acotada|entrega inicial acotada|primera entrega funcional local|entrega funcional local segura|version operativa local inicial|planificar una primera entrega segura|planificar la primera entrega segura|preparar la primera entrega segura|preparar la primera fase segura)\b/u.test(
+    /\b(?:primera entrega segura|primera fase segura|safe first delivery|safe-first-delivery|base navegable inicial|prototipo funcional local|version inicial acotada|entrega inicial acotada|primera entrega funcional local|entrega funcional local|entrega funcional local segura|version operativa local inicial|planificar una primera entrega segura|planificar la primera entrega segura|preparar la primera entrega segura|preparar la primera fase segura)\b/u.test(
       normalizedText,
     )
   const explicitFrontendProjectPhaseIntent =
@@ -6448,7 +6448,7 @@ function detectMaterializeSafeFirstDeliveryPlanningIntent(goal, context) {
     directProductTypeMap.find(({ pattern }) => pattern.test(normalizedText))?.key ||
     (/catalogo|carrito|checkout|mercado pago|productos|backoffice/u.test(normalizedText)
       ? 'ecommerce'
-      : /alumnos|familias|cursos|comunicaciones|seguimiento/u.test(normalizedText)
+      : detectCrmProductTypeIntent(normalizedText)
         ? 'crm'
         : /turnos|clinicas?|salud/u.test(normalizedText)
           ? 'business-system'
@@ -6545,7 +6545,7 @@ function detectScalableDeliveryPlanningIntent(goal, context) {
     directProductTypeMap.find(({ pattern }) => pattern.test(normalizedText))?.key ||
     (/catalogo|carrito|checkout|mercado pago|productos|backoffice/u.test(normalizedText)
       ? 'ecommerce'
-      : /alumnos|familias|cursos|comunicaciones|seguimiento/u.test(normalizedText)
+      : detectCrmProductTypeIntent(normalizedText)
         ? 'crm'
         : /turnos|clinicas?|salud/u.test(normalizedText)
           ? 'business-system'
@@ -7374,9 +7374,10 @@ function detectPositiveEcommerceIntent(normalizedText) {
   }
 
   const hasCatalogSignals =
-    /\bcatalogo\b|\bproductos\b|\bcarrito\b|\bbackoffice\b/u.test(normalizedText)
-  const hasCheckoutSignals =
-    /\bcheckout\b|\bmercado pago\b|\bpagos\b/u.test(normalizedText)
+    /\bcatalogo\b|\bproductos\b|\bcarrito\b|\bbackoffice\b|\btienda\s+online\b|\bcomercio\s+online\b|\bcategorias?\b|\bofertas?\b/u.test(
+      normalizedText,
+    )
+  const hasCheckoutSignals = /\bcheckout\b|\bmercado pago\b|\bordenes?\b/u.test(normalizedText)
   const hasNegatedCommercialSignals = hasExplicitlyNegatedSectorKeywords(normalizedText, [
     'checkout',
     'pagos',
@@ -7389,6 +7390,154 @@ function detectPositiveEcommerceIntent(normalizedText) {
   return hasCatalogSignals || (hasCheckoutSignals && !hasNegatedCommercialSignals)
 }
 
+function detectCommercialLandingEcommerceIntent(normalizedText) {
+  if (typeof normalizedText !== 'string' || !normalizedText.trim()) {
+    return false
+  }
+
+  const hasCommerceCore =
+    detectPositiveEcommerceIntent(normalizedText) ||
+    /\bcomprar\b|\btienda\b|\bcatalogo\b|\bproductos?\b|\bcarrito\b|\bcheckout\b|\bcategorias?\b|\bofertas?\b/u.test(
+      normalizedText,
+    )
+  const hasCommercialPresentationSignals =
+    /\bhero\b|\blanding\b|\bmarketin(?:g|era)?\b|\bcomercial\b|\bconversion\b|\btestimonios?\b|\bpreguntas?\s+frecuentes\b|\bfaq\b|\bbeneficios?\b|\bfiltros?\b|\bcards?\b/u.test(
+      normalizedText,
+    )
+
+  return hasCommerceCore && hasCommercialPresentationSignals
+}
+
+function detectLocalMockOnlyIntent(normalizedText) {
+  if (typeof normalizedText !== 'string' || !normalizedText.trim()) {
+    return false
+  }
+
+  const localSafetySignals = [
+    /\blocal\b/u,
+    /\bmock\b/u,
+    /\bsimulad[oa]\b/u,
+    /\bfile:\/\/\b/u,
+    /\bsin deploy\b/u,
+    /\bno deploy\b/u,
+    /\bsin publicaci[oó]n real\b/u,
+    /\bno publicar\b/u,
+    /\bsin pagos reales\b/u,
+    /\bsin integraciones externas reales\b/u,
+    /\bsin base de datos real\b/u,
+  ]
+  const safetyScore = localSafetySignals.reduce(
+    (score, pattern) => (pattern.test(normalizedText) ? score + 1 : score),
+    0,
+  )
+
+  return safetyScore >= 2
+}
+
+function detectSoccerBallStoreIntent(normalizedText) {
+  if (typeof normalizedText !== 'string' || !normalizedText.trim()) {
+    return false
+  }
+
+  return (
+    /\bpelotas?\b/u.test(normalizedText) &&
+    /\bfutbol\b|\bfútbol\b/u.test(normalizedText)
+  )
+}
+
+function buildCommercialEcommerceDomainProfile(sourceText = '') {
+  const normalizedText = normalizeSectorDetectionText(sourceText)
+  const isSoccerBallStore = detectSoccerBallStoreIntent(normalizedText)
+  const domainLabel = isSoccerBallStore
+    ? 'tienda online de pelotas de futbol'
+    : 'tienda online comercial local'
+  const folderSlug = isSoccerBallStore
+    ? 'tienda-pelotas-futbol'
+    : 'tienda-online-comercial'
+  const productLabel = isSoccerBallStore
+    ? 'pelotas de futbol'
+    : 'productos destacados'
+  const categoryLabel = isSoccerBallStore
+    ? 'entrenamiento, partido, infantiles, profesionales y ofertas'
+    : 'categorias comerciales destacadas'
+
+  return {
+    domainLabel,
+    folderSlug,
+    productType: 'ecommerce',
+    modules: [
+      'hero comercial',
+      'catalogo',
+      'categorias',
+      'productos',
+      'beneficios',
+      'testimonios',
+      'preguntas frecuentes',
+      'cta comercial',
+      'carrito local',
+      'checkout simulado',
+    ],
+    screens: [
+      'landing principal',
+      'catalogo destacado',
+      'detalle de producto',
+      'categorias',
+      'carrito local',
+      'checkout simulado',
+      'testimonios',
+      'preguntas frecuentes',
+    ],
+    entities: [
+      'producto',
+      'categoria',
+      'carrito simulado',
+      'orden simulada',
+      'testimonio',
+      'consulta comercial',
+    ],
+    mockCollections: [
+      'hero',
+      'productos',
+      'categorias',
+      'beneficios',
+      'testimonios',
+      'faq',
+      'cta',
+      'carrito',
+      'ordenes',
+    ],
+    localActions: [
+      `Revisar hero comercial, beneficios y CTA principal para ${productLabel}.`,
+      `Explorar catalogo destacado, filtros y categorias de ${categoryLabel}.`,
+      'Agregar productos mock al carrito local y simular checkout sin pagos reales.',
+      'Validar testimonios, preguntas frecuentes y consultas comerciales en modo local.',
+    ],
+    mockDataHints: [
+      `${toTitleCaseWords(productLabel)} mock con nombre, imagen de muestra, precio y atributos visibles.`,
+      `Categorias mock para ${categoryLabel}.`,
+      'Beneficios, testimonios, preguntas frecuentes y CTA mock orientados a conversion local.',
+      'Carrito local y checkout simulado sin pagos reales ni integraciones externas.',
+    ],
+    scopeHighlights: [
+      `Primera entrega funcional local de estilo ecommerce/landing comercial para ${productLabel}.`,
+      'Priorizar hero, catalogo, categorias, beneficios, testimonios, FAQ y CTA por encima de paneles internos.',
+      'Mantener carrito local y checkout solo simulados, sin pagos reales, sin deploy y sin publicacion real.',
+    ],
+    explicitExclusions: [
+      'pagos reales',
+      'checkout real',
+      'publicacion real',
+      'deploy',
+      'base de datos real',
+      'credenciales reales',
+      'integraciones externas reales',
+      'pantalla administrativa como protagonista',
+    ],
+    stateHints: ['destacado', 'en carrito', 'orden simulada'],
+    approvalThemes: ['pagos reales', 'publicacion real'],
+  }
+}
+
 function buildDynamicSafeDeliveryPlanParts(sourceText) {
   const normalizedText = normalizeSectorDetectionText(sourceText)
   const modules = []
@@ -7399,6 +7548,11 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
     detectSafeFirstDeliverySecurityMonitoringIntent(normalizedText)
   const hasRechargeOrdersIntent =
     detectSafeFirstDeliveryRechargeOrdersIntent(normalizedText)
+  const hasCommercialLandingEcommerceIntent =
+    detectCommercialLandingEcommerceIntent(normalizedText)
+  const commercialEcommerceProfile = hasCommercialLandingEcommerceIntent
+    ? buildCommercialEcommerceDomainProfile(normalizedText)
+    : null
 
   if (!normalizedText) {
     return { modules, mockData, screens, localBehavior }
@@ -7633,13 +7787,17 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
     },
     {
       label: 'clientes',
-      patterns: [/\bclientes?\b/u],
+      patterns: hasCommercialLandingEcommerceIntent ? [] : [/\bclientes?\b/u],
       mockData: hasRechargeOrdersIntent
         ? 'Clientes mock vinculados a pedidos de recarga y dispositivos.'
+        : hasCommercialLandingEcommerceIntent
+          ? 'Clientes mock con consultas comerciales, preferencias y compras simuladas.'
         : 'Clientes mock vinculados a reservas y horarios.',
       screen: 'clientes',
       behavior: hasRechargeOrdersIntent
         ? 'Revisar clientes mock y su historial local de pedidos de recarga.'
+        : hasCommercialLandingEcommerceIntent
+          ? 'Revisar consultas comerciales mock y clientes interesados sin operar ventas reales.'
         : 'Revisar clientes mock asociados al flujo de reservas.',
     },
     {
@@ -7658,7 +7816,7 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
     },
     {
       label: 'profesionales',
-      patterns: [/\bprofesionales?\b/u],
+      patterns: hasCommercialLandingEcommerceIntent ? [] : [/\bprofesionales?\b/u],
       mockData: 'Profesionales mock con disponibilidad y estado local.',
       screen: 'profesionales',
       behavior: 'Revisar profesionales mock y su agenda inicial.',
@@ -7721,6 +7879,13 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
     pushUniquePlannerValues(localBehavior, rechargeProfile.localActions, 16)
   }
 
+  if (commercialEcommerceProfile) {
+    pushUniquePlannerValues(modules, commercialEcommerceProfile.modules, 16)
+    pushUniquePlannerValues(mockData, commercialEcommerceProfile.mockDataHints, 16)
+    pushUniquePlannerValues(screens, commercialEcommerceProfile.screens, 16)
+    pushUniquePlannerValues(localBehavior, commercialEcommerceProfile.localActions, 16)
+  }
+
   if (
     /\bpublicaciones?\b|\bcomentarios?\b|\bgrupos?\b|\bnotificaciones?\b/u.test(
       normalizedText,
@@ -7768,6 +7933,25 @@ function detectSafeFirstDeliveryModuleFamily(modules) {
   }
 
   const familyDefinitions = [
+    {
+      key: 'commercial-ecommerce',
+      domainLabel: 'tienda online comercial',
+      productType: 'ecommerce',
+      minimumScore: 3,
+      requiredMatches: ['catalogo', 'productos'],
+      matches: [
+        'hero comercial',
+        'catalogo',
+        'categorias',
+        'productos',
+        'beneficios',
+        'testimonios',
+        'preguntas frecuentes',
+        'cta comercial',
+        'carrito local',
+        'checkout simulado',
+      ],
+    },
     {
       key: 'ecommerce',
       domainLabel: 'comercio online',
@@ -7918,7 +8102,7 @@ function inferDomainUnderstandingProductKind({
     return 'ecommerce'
   }
 
-  if (/\bcrm\b|\balumnos\b|\bfamilias\b|\bcursos\b|\bcomunicaciones\b|\bseguimiento\b/u.test(normalizedText)) {
+  if (detectCrmProductTypeIntent(normalizedText)) {
     return 'crm'
   }
 
@@ -7945,6 +8129,18 @@ function inferDomainUnderstandingProductKind({
   return 'unknown'
 }
 
+function detectCrmProductTypeIntent(normalizedText) {
+  return /\bcrm\b|\balumnos?\b|\bfamilias?\b|\bcursos?\b|\bcomunicaciones?\b|\bseguimiento\s+(?:escolar|academico|academica)\b/u.test(
+    normalizedText,
+  )
+}
+
+function detectSchoolCrmIntent(normalizedText) {
+  return /\bescuel|\balumnos?\b|\bfamilias?\b|\bcursos?\b|\bdocentes?\b|\bpreceptores?\b|\bboletines?\b|\bseguimiento\s+(?:escolar|academico|academica)\b|\bcomunicaciones?\s+(?:escolares|academicas|institucionales)\b/u.test(
+    normalizedText,
+  )
+}
+
 function buildDomainUnderstanding({
   goal,
   context,
@@ -7958,6 +8154,9 @@ function buildDomainUnderstanding({
   const explicitModuleFamily = detectSafeFirstDeliveryModuleFamily(
     dynamicPlanParts.modules,
   )
+  const commercialEcommerceProfile = detectCommercialLandingEcommerceIntent(normalizedText)
+    ? buildCommercialEcommerceDomainProfile(normalizedText)
+    : null
   const isRechargeOrdersSystem =
     explicitModuleFamily?.key === 'recharge-orders' ||
     detectSafeFirstDeliveryRechargeOrdersIntent(normalizedText)
@@ -7968,10 +8167,7 @@ function buildDomainUnderstanding({
   })
   const isSchoolCrm =
     explicitModuleFamily?.key === 'school-crm' ||
-    (productKind === 'crm' &&
-      /\bescuel|\balumnos?\b|\bfamilias?\b|\bcursos?\b|\bcomunicaciones?\b|\bseguimiento\b/u.test(
-        normalizedText,
-      ))
+    (productKind === 'crm' && detectSchoolCrmIntent(normalizedText))
   const isRequestTrackingSystem =
     explicitModuleFamily?.key === 'request-tracking' ||
     (!explicitModuleFamily &&
@@ -7981,9 +8177,14 @@ function buildDomainUnderstanding({
     ? 'school-crm'
     : isRechargeOrdersSystem
       ? 'recharge-orders'
+    : commercialEcommerceProfile
+      ? 'commercial-ecommerce'
     : explicitModuleFamily?.key || (productKind === 'ecommerce' ? 'ecommerce' : '')
   const domainLabel =
     (resolvedFamilyKey === 'school-crm' ? 'gestion escolar' : '') ||
+    (resolvedFamilyKey === 'commercial-ecommerce'
+      ? commercialEcommerceProfile?.domainLabel || ''
+      : '') ||
     explicitModuleFamily?.domainLabel ||
     extractProductArchitectureDomainLabel(goal, context, productKind)
   const distinctiveDynamicModules = dynamicPlanParts.modules.filter((entry) => {
@@ -7994,6 +8195,8 @@ function buildDomainUnderstanding({
   const fallbackModules =
     distinctiveDynamicModules.length > 0
       ? []
+      : resolvedFamilyKey === 'commercial-ecommerce'
+        ? commercialEcommerceProfile?.modules || []
       : resolvedFamilyKey === 'ecommerce'
         ? ['catalogo', 'productos', 'carrito local', 'checkout simulado', 'ordenes', 'reportes']
         : resolvedFamilyKey === 'school-crm'
@@ -8053,6 +8256,8 @@ function buildDomainUnderstanding({
         .filter(Boolean),
     )[0]
   const intentFallbackByFamily = {
+    'commercial-ecommerce':
+      'mostrar un ecommerce local mock con hero, catalogo, carrito simulado y conversion comercial',
     ecommerce: 'gestionar catalogo, carrito y ordenes mock',
     'school-crm': 'gestionar seguimiento escolar y comunicaciones',
     'recharge-orders': 'gestionar pedidos de recarga, dispositivos y devolucion local',
@@ -8140,6 +8345,10 @@ function buildDomainUnderstanding({
       'venta directa',
       'pagos reales',
     ])
+  }
+
+  if (resolvedFamilyKey === 'commercial-ecommerce' && commercialEcommerceProfile) {
+    pushUniquePlannerValues(explicitExclusions, commercialEcommerceProfile.explicitExclusions)
   }
 
   if (
@@ -8298,7 +8507,9 @@ function buildSafeFirstDeliveryPlanPartsFromDomainUnderstanding(domainUnderstand
 
     pushUniquePlannerValues(screens, modules)
     pushUniquePlannerValues(screens, [
-      moduleFamily?.key === 'social'
+      moduleFamily?.key === 'commercial-ecommerce'
+        ? 'landing principal'
+        : moduleFamily?.key === 'social'
         ? 'inicio o feed'
         : moduleFamily?.key === 'security'
           ? 'panel de monitoreo'
@@ -8365,9 +8576,7 @@ function buildSafeFirstDeliveryPlan({
       ? intent.productTypeHint
       : detectPositiveEcommerceIntent(normalizedText)
         ? 'ecommerce'
-        : /\bcrm\b|\balumnos\b|\bfamilias\b|\bcursos\b|\bcomunicaciones\b|\bseguimiento\b/u.test(
-              normalizedText,
-            )
+        : detectCrmProductTypeIntent(normalizedText)
           ? 'crm'
           : /\berp\b|\baduana\b|\bdespachantes?\b/u.test(normalizedText)
             ? 'erp'
@@ -8401,13 +8610,14 @@ function buildSafeFirstDeliveryPlan({
     domainUnderstandingPlanParts.modules.length > 0
   const hasExplicitDynamicModules = dynamicPlanParts.modules.length > 0
   const isSchoolCrm =
-    productType === 'crm' &&
-    /\bescuel|\balumnos?\b|\bfamilias?\b|\bcursos?\b|\bcomunicaciones?\b|\bseguimiento\b|\breportes?\b/u.test(
-      normalizedText,
-    )
+    productType === 'crm' && detectSchoolCrmIntent(normalizedText)
   const isRequestTrackingSystem =
     productType !== 'ecommerce' &&
     detectSafeFirstDeliveryRequestTrackingIntent(normalizedText)
+  const commercialEcommerceProfile =
+    productType === 'ecommerce' && detectCommercialLandingEcommerceIntent(normalizedText)
+      ? buildCommercialEcommerceDomainProfile(normalizedText)
+      : null
   const scope = []
   const modules = []
   const mockData = []
@@ -8465,33 +8675,47 @@ function buildSafeFirstDeliveryPlan({
 
   switch (productType) {
     case 'ecommerce':
-      pushUniquePlannerValues(scope, [
-        'Base navegable del catalogo comercial con seleccion local y panel interno inicial.',
-      ])
-      pushUniquePlannerValues(modules, [
-        'catalogo',
-        'productos',
-        'carrito local',
-        'checkout simulado',
-        'backoffice mock',
-        'ordenes mock',
-      ])
-      pushUniquePlannerValues(mockData, [
-        'Productos, categorias y precios de muestra.',
-        'Ordenes simuladas y estados de compra mock.',
-      ])
-      pushUniquePlannerValues(screens, [
-        'Inicio o catalogo principal.',
-        'Detalle de producto.',
-        'Carrito local.',
-        'Checkout simulado.',
-        'Backoffice inicial de productos.',
-      ])
-      pushUniquePlannerValues(localBehavior, [
-        'Agregar y quitar productos en un carrito local simple.',
-        'Calcular subtotal y resumen de compra sin cobrar dinero real.',
-        'Generar una orden simulada visible en backoffice o resumen local.',
-      ])
+      if (commercialEcommerceProfile) {
+        pushUniquePlannerValues(scope, commercialEcommerceProfile.scopeHighlights)
+        pushUniquePlannerValues(modules, commercialEcommerceProfile.modules)
+        pushUniquePlannerValues(mockData, commercialEcommerceProfile.mockDataHints)
+        pushUniquePlannerValues(screens, commercialEcommerceProfile.screens)
+        pushUniquePlannerValues(localBehavior, commercialEcommerceProfile.localActions)
+        pushUniquePlannerValues(explicitExclusions, commercialEcommerceProfile.explicitExclusions)
+        pushUniquePlannerValues(
+          approvalRequiredLater,
+          commercialEcommerceProfile.approvalThemes.map(
+            (theme) => `Validar ${theme} antes de salir del mock local.`,
+          ),
+        )
+      } else {
+        pushUniquePlannerValues(scope, [
+          'Base navegable del catalogo comercial con seleccion local y checkout simulado.',
+        ])
+        pushUniquePlannerValues(modules, [
+          'catalogo',
+          'productos',
+          'carrito local',
+          'checkout simulado',
+          'ordenes mock',
+        ])
+        pushUniquePlannerValues(mockData, [
+          'Productos, categorias y precios de muestra.',
+          'Ordenes simuladas y estados de compra mock.',
+        ])
+        pushUniquePlannerValues(screens, [
+          'Inicio o catalogo principal.',
+          'Detalle de producto.',
+          'Carrito local.',
+          'Checkout simulado.',
+          'Estado de orden local.',
+        ])
+        pushUniquePlannerValues(localBehavior, [
+          'Agregar y quitar productos en un carrito local simple.',
+          'Calcular subtotal y resumen de compra sin cobrar dinero real.',
+          'Generar una orden simulada visible en el resumen local.',
+        ])
+      }
       pushUniquePlannerValues(approvalRequiredLater, [
         'Pasarela real de pagos, credenciales y webhooks de checkout.',
       ])
@@ -8853,7 +9077,9 @@ function buildMaterializeSafeFirstDeliveryFolderName({
     }
 
     const normalizationRules = [
+      { pattern: /\bcrm\b/u, slug: 'crm' },
       { pattern: /\b(?:pedidos-recarga|pedido-recarga|gestion-pedidos-recarga|recarga-dispositivos|vape|vaporizador)\b/u, slug: 'pedidos-recarga' },
+      { pattern: /\b(?:pelotas?-futbol|pelotas?-de-futbol|tienda-pelotas-futbol|futbol)\b/u, slug: 'tienda-pelotas-futbol' },
       { pattern: /\b(?:social|red-social|comunidades?|comunidad-barrial)\b/u, slug: 'social' },
       { pattern: /\b(?:seguridad|alertas|accesos|sensores|monitoreo-de-seguridad)\b/u, slug: 'seguridad' },
       { pattern: /\b(?:documental|documentos|vencimientos)\b/u, slug: 'documental' },
@@ -8901,8 +9127,13 @@ function buildMaterializeSafeFirstDeliveryFolderName({
   const prioritizedStructuredSlug =
     structuredSlugCandidates.find((entry) => isMeaningfulFolderSlug(entry)) || ''
   const sourceTextSlug = normalizeFolderSlugCandidate(sourceText)
+  const shouldPreferProductTypeSlugFirst =
+    normalizedProductType !== 'ecommerce' ||
+    !(domainSlug && domainSlug !== 'ecommerce' && domainSlug !== 'comercio-online')
   const folderSlug =
-    (productTypeSlug && isMeaningfulFolderSlug(productTypeSlug)
+    (shouldPreferProductTypeSlugFirst &&
+    productTypeSlug &&
+    isMeaningfulFolderSlug(productTypeSlug)
       ? productTypeSlug
       : '') ||
     (domainSlug && isMeaningfulFolderSlug(domainSlug) ? domainSlug : '') ||
@@ -8914,6 +9145,11 @@ function buildMaterializeSafeFirstDeliveryFolderName({
       : '') ||
     (moduleSlug && isMeaningfulFolderSlug(moduleSlug) ? moduleSlug : '') ||
     (sourceTextSlug && isMeaningfulFolderSlug(sourceTextSlug) ? sourceTextSlug : '') ||
+    (!shouldPreferProductTypeSlugFirst &&
+    productTypeSlug &&
+    isMeaningfulFolderSlug(productTypeSlug)
+      ? productTypeSlug
+      : '') ||
     'producto'
 
   return `safe-first-delivery-${folderSlug}`
@@ -9144,6 +9380,30 @@ function inferSafeFirstDeliveryMaterializationCollectionKey(label) {
 
   if (/\breservas?\b/u.test(normalizedLabel)) {
     return 'reservas'
+  }
+
+  if (/\bhero\b|\bhero comercial\b|\blanding principal\b/u.test(normalizedLabel)) {
+    return 'hero'
+  }
+
+  if (/\bcategorias?\b/u.test(normalizedLabel)) {
+    return 'categorias'
+  }
+
+  if (/\bbeneficios?\b/u.test(normalizedLabel)) {
+    return 'beneficios'
+  }
+
+  if (/\btestimonios?\b/u.test(normalizedLabel)) {
+    return 'testimonios'
+  }
+
+  if (/\bpreguntas?\s+frecuentes\b|\bfaq\b/u.test(normalizedLabel)) {
+    return 'faq'
+  }
+
+  if (/\bcta\b|\bllamada\s+a\s+la\s+accion\b|\bllamada\s+a\s+la\s+acción\b/u.test(normalizedLabel)) {
+    return 'cta'
   }
 
   if (/\bclientes?\b/u.test(normalizedLabel)) {
@@ -9610,7 +9870,9 @@ function buildSafeFirstDeliveryMaterializationPartsFromDomainUnderstanding(
   const screens = summarizeUniqueExecutorStrings(
     [
       ...modules,
-      moduleFamily?.key === 'social'
+      moduleFamily?.key === 'commercial-ecommerce'
+        ? 'landing principal'
+        : moduleFamily?.key === 'social'
         ? 'inicio o feed'
         : moduleFamily?.key === 'security'
           ? 'panel de monitoreo'
@@ -9823,9 +10085,7 @@ function buildMaterializeSafeFirstDeliveryPlan({
             normalizedText,
           )
         ? 'ecommerce'
-        : /\bcrm\b|\balumnos\b|\bfamilias\b|\bcursos\b|\bcomunicaciones\b|\bseguimiento\b/u.test(
-              normalizedText,
-            )
+        : detectCrmProductTypeIntent(normalizedText)
           ? 'crm'
           : /\berp\b|\baduana\b|\bdespachantes?\b/u.test(normalizedText)
             ? 'erp'
@@ -9849,6 +10109,10 @@ function buildMaterializeSafeFirstDeliveryPlan({
     normalizedDomainUnderstanding.productKind !== 'unknown'
       ? normalizedDomainUnderstanding.productKind
       : explicitModuleFamily?.productType || inferredProductType
+  const commercialEcommerceProfile =
+    productType === 'ecommerce' && detectCommercialLandingEcommerceIntent(normalizedText)
+      ? buildCommercialEcommerceDomainProfile(normalizedText)
+      : null
   const contextHubAvailable = contextHubPack?.available === true
   const inferredDomain = extractProductArchitectureDomainLabel(
     goal,
@@ -9865,9 +10129,7 @@ function buildMaterializeSafeFirstDeliveryPlan({
     explicitModuleFamily?.key === 'school-crm' ||
     (!explicitModuleFamily &&
       productType === 'crm' &&
-      /\bescuel|\balumnos?\b|\bfamilias?\b|\bcursos?\b|\bcomunicaciones?\b|\bseguimiento\b|\breportes?\b/u.test(
-        normalizedText,
-      ))
+      detectSchoolCrmIntent(normalizedText))
   const isRequestTrackingSystem =
     explicitModuleFamily?.key === 'request-tracking' ||
     (!explicitModuleFamily &&
@@ -9881,30 +10143,40 @@ function buildMaterializeSafeFirstDeliveryPlan({
   const exclusionHighlights = []
 
   if (productType === 'ecommerce') {
-    pushUniquePlannerValues(scopeHighlights, [
-      'Base navegable con catalogo, detalle de producto, carrito local, checkout simulado y backoffice mock inicial.',
-    ])
-    pushUniquePlannerValues(moduleHighlights, [
-      'catalogo',
-      'detalle de producto',
-      'carrito local',
-      'checkout simulado',
-      'backoffice mock',
-    ])
-    pushUniquePlannerValues(screenHighlights, [
-      'catalogo principal',
-      'detalle de producto',
-      'carrito local',
-      'checkout simulado',
-      'panel mock de productos',
-    ])
-    pushUniquePlannerValues(mockDataHighlights, [
-      'productos, categorias, precios y estados de orden mock editables',
-    ])
-    pushUniquePlannerValues(localBehaviorHighlights, [
-      'navegacion entre catalogo, carrito y checkout simulado',
-      'edicion local de productos mock desde backoffice inicial',
-    ])
+    if (commercialEcommerceProfile) {
+      pushUniquePlannerValues(scopeHighlights, commercialEcommerceProfile.scopeHighlights)
+      pushUniquePlannerValues(moduleHighlights, commercialEcommerceProfile.modules)
+      pushUniquePlannerValues(screenHighlights, commercialEcommerceProfile.screens)
+      pushUniquePlannerValues(mockDataHighlights, commercialEcommerceProfile.mockDataHints)
+      pushUniquePlannerValues(localBehaviorHighlights, commercialEcommerceProfile.localActions)
+      pushUniquePlannerValues(exclusionHighlights, commercialEcommerceProfile.explicitExclusions)
+    } else {
+      pushUniquePlannerValues(scopeHighlights, [
+        'Base navegable con catalogo, detalle de producto, carrito local y checkout simulado.',
+      ])
+      pushUniquePlannerValues(moduleHighlights, [
+        'catalogo',
+        'detalle de producto',
+        'carrito local',
+        'checkout simulado',
+        'ordenes',
+        'reportes',
+      ])
+      pushUniquePlannerValues(screenHighlights, [
+        'catalogo principal',
+        'detalle de producto',
+        'carrito local',
+        'checkout simulado',
+        'estado de orden',
+      ])
+      pushUniquePlannerValues(mockDataHighlights, [
+        'productos, categorias, precios y estados de orden mock editables',
+      ])
+      pushUniquePlannerValues(localBehaviorHighlights, [
+        'navegacion entre catalogo, carrito y checkout simulado',
+        'revision local de ordenes mock sin pagos reales',
+      ])
+    }
   } else if (isSchoolCrm) {
     pushUniquePlannerValues(scopeHighlights, [
       'Panel operativo inicial para gestion escolar con alumnos, familias, cursos, comunicaciones, seguimiento y reportes mock.',
@@ -9958,11 +10230,13 @@ function buildMaterializeSafeFirstDeliveryPlan({
       localBehaviorHighlights,
       domainUnderstandingMaterializationParts.localActions,
     )
-    pushUniquePlannerValues(moduleHighlights, ['panel operativo'])
-    pushUniquePlannerValues(screenHighlights, ['panel operativo inicial'])
-    pushUniquePlannerValues(localBehaviorHighlights, [
-      'Revisar el flujo principal con entidades mock y actividad local sin integraciones reales.',
-    ])
+    if (!(productType === 'ecommerce' && commercialEcommerceProfile)) {
+      pushUniquePlannerValues(moduleHighlights, ['panel operativo'])
+      pushUniquePlannerValues(screenHighlights, ['panel operativo inicial'])
+      pushUniquePlannerValues(localBehaviorHighlights, [
+        'Revisar el flujo principal con entidades mock y actividad local sin integraciones reales.',
+      ])
+    }
   } else if (hasExplicitDynamicModules) {
     pushUniquePlannerValues(scopeHighlights, [
       `Primera version navegable del flujo principal para ${domainLabel}.`,
@@ -9971,11 +10245,13 @@ function buildMaterializeSafeFirstDeliveryPlan({
     pushUniquePlannerValues(screenHighlights, dynamicPlanParts.screens)
     pushUniquePlannerValues(mockDataHighlights, dynamicPlanParts.mockData)
     pushUniquePlannerValues(localBehaviorHighlights, dynamicPlanParts.localBehavior)
-    pushUniquePlannerValues(moduleHighlights, ['panel operativo'])
-    pushUniquePlannerValues(screenHighlights, ['panel operativo inicial'])
-    pushUniquePlannerValues(localBehaviorHighlights, [
-      'Revisar el flujo principal con entidades mock y actividad local sin integraciones reales.',
-    ])
+    if (!(productType === 'ecommerce' && commercialEcommerceProfile)) {
+      pushUniquePlannerValues(moduleHighlights, ['panel operativo'])
+      pushUniquePlannerValues(screenHighlights, ['panel operativo inicial'])
+      pushUniquePlannerValues(localBehaviorHighlights, [
+        'Revisar el flujo principal con entidades mock y actividad local sin integraciones reales.',
+      ])
+    }
   } else if (productType === 'crm') {
     pushUniquePlannerValues(scopeHighlights, [
       'Panel operativo inicial con entidades principales, seguimiento basico y reportes mock.',
@@ -10110,20 +10386,24 @@ function buildMaterializeSafeFirstDeliveryPlan({
     ? summarizeUniqueExecutorStrings([...stateHints, ...rechargeProfile.stateHints], 10)
     : stateHints
   const safeFirstDeliveryMaterialization = buildSafeFirstDeliveryMaterializationContract({
-    domainLabel,
+    domainLabel: commercialEcommerceProfile?.domainLabel || domainLabel,
     productType,
     modules: moduleHighlights,
     entities: isRechargeOrdersSystem
       ? rechargeExecutionProfile.entities
-      : domainUnderstandingMaterializationParts.entities,
+      : commercialEcommerceProfile?.entities ||
+        domainUnderstandingMaterializationParts.entities,
     mockCollections: isRechargeOrdersSystem
       ? rechargeExecutionProfile.mockCollections
-      : domainUnderstandingMaterializationParts.mockCollections,
+      : commercialEcommerceProfile?.mockCollections ||
+        domainUnderstandingMaterializationParts.mockCollections,
     screens: screenHighlights,
     localActions: localBehaviorHighlights,
     explicitExclusions: exclusionHighlights,
-    approvalThemes: resolvedApprovalThemes,
-    stateHints: resolvedStateHints,
+    approvalThemes:
+      commercialEcommerceProfile?.approvalThemes || resolvedApprovalThemes,
+    stateHints:
+      commercialEcommerceProfile?.stateHints || resolvedStateHints,
     mockDataHints: mockDataHighlights,
   })
   const targetFolderName = buildMaterializeSafeFirstDeliveryFolderName({
@@ -10133,7 +10413,9 @@ function buildMaterializeSafeFirstDeliveryPlan({
         ? normalizedDomainUnderstanding.productKind
         : productType,
     domain:
-      sanitizeBusinessSectorLabel(normalizedDomainUnderstanding?.domainLabel || '') || domain,
+      commercialEcommerceProfile?.domainLabel ||
+      sanitizeBusinessSectorLabel(normalizedDomainUnderstanding?.domainLabel || '') ||
+      domain,
     modules:
       hasUsefulDomainUnderstandingModules
         ? domainUnderstandingMaterializationParts.modules
@@ -10141,6 +10423,7 @@ function buildMaterializeSafeFirstDeliveryPlan({
     entities: safeFirstDeliveryMaterialization.entities,
     mockCollections: safeFirstDeliveryMaterialization.mockCollections,
     sourceText: [
+      commercialEcommerceProfile?.folderSlug || '',
       sanitizeBusinessSectorLabel(normalizedDomainUnderstanding?.domainLabel || ''),
       sanitizeBusinessSectorLabel(normalizedDomainUnderstanding?.intentLabel || ''),
       combinedText,
@@ -10439,25 +10722,36 @@ function buildProductArchitecturePlan({
       pushUniquePlannerValues(roles, ['cliente', 'catalog-admin', 'admin'])
       pushUniquePlannerValues(
         coreModules,
-        ['catalogo', 'productos', 'carrito', 'checkout', 'ordenes', 'backoffice'],
+        [
+          'hero comercial',
+          'catalogo',
+          'categorias',
+          'productos',
+          'beneficios',
+          'testimonios',
+          'preguntas frecuentes',
+          'cta comercial',
+          'carrito',
+          'checkout simulado',
+        ],
       )
       pushUniquePlannerValues(
         dataEntities,
-        ['producto', 'categoria', 'carrito', 'orden', 'cliente'],
+        ['producto', 'categoria', 'carrito simulado', 'orden simulada', 'testimonio'],
       )
       pushUniquePlannerValues(
         keyFlows,
         [
-          'Explorar catalogo y ver detalle de producto.',
-          'Agregar productos al carrito y revisar totales.',
-          'Iniciar checkout y registrar una orden.',
-          'Gestionar productos y ordenes desde backoffice.',
+          'Explorar hero comercial, catalogo y detalle de producto.',
+          'Filtrar categorias y revisar beneficios, testimonios y FAQ.',
+          'Agregar productos al carrito local y revisar totales mock.',
+          'Simular checkout y consulta comercial sin pagos reales.',
         ],
       )
       pushUniquePlannerValues(safeFirstDelivery, [
-        'Catalogo navegable con productos de muestra y carrito local.',
-        'Backoffice minimo para alta y edicion de productos sin pagos reales.',
-        'Checkout simulado o preparado para futura integracion.',
+        'Landing comercial navegable con hero, catalogo, categorias, beneficios, testimonios y CTA.',
+        'Carrito local y checkout simulado sin pagos reales ni publicacion remota.',
+        'Backoffice y operacion administrativa real quedan para una fase futura, no para la pantalla inicial.',
       ])
       break
     case 'crm':
@@ -10907,6 +11201,27 @@ function parseOrchestratorPlannerFeedback(previousExecutionResult) {
   } catch {
     return null
   }
+}
+
+function buildPlannerFeedbackSupplementalContext(plannerFeedback) {
+  if (!plannerFeedback || typeof plannerFeedback !== 'object') {
+    return ''
+  }
+
+  const feedbackParts = []
+
+  if (
+    typeof plannerFeedback.selectedOption === 'string' &&
+    plannerFeedback.selectedOption.trim()
+  ) {
+    feedbackParts.push(`Decision humana: ${plannerFeedback.selectedOption.trim()}`)
+  }
+
+  if (typeof plannerFeedback.freeAnswer === 'string' && plannerFeedback.freeAnswer.trim()) {
+    feedbackParts.push(`Respuesta humana: ${plannerFeedback.freeAnswer.trim()}`)
+  }
+
+  return feedbackParts.join('\n')
 }
 
 function detectBrainAtomicOperationDescriptor(text) {
@@ -36473,6 +36788,8 @@ async function buildLocalStrategicBrainDecision({
         .map((entry) => normalizeOptionalString(entry))
         .filter(Boolean)
     : buildPlannerSecurityConstraints()
+  const plannerFeedbackSupplementalContext =
+    buildPlannerFeedbackSupplementalContext(plannerFeedback)
   const plannerSupplementalContext =
     normalizeOptionalString(providedPlannerSupplementalContext) ||
     buildPlannerSupplementalContext({
@@ -36481,7 +36798,7 @@ async function buildLocalStrategicBrainDecision({
       projectWorkMode: normalizedProjectWorkMode,
       securityConstraints: normalizedSecurityConstraints,
     })
-  const contextualContext = [context, plannerSupplementalContext]
+  const contextualContext = [context, plannerSupplementalContext, plannerFeedbackSupplementalContext]
     .filter((entry) => typeof entry === 'string' && entry.trim())
     .join('\n\n')
   const userDelegatedMissingInputs =
@@ -36867,6 +37184,14 @@ async function buildLocalStrategicBrainDecision({
       normalizedGoal.includes('sitio') ||
       normalizedGoal.includes('landing') ||
       normalizedGoal.includes('pagina'))
+  const shouldPreferSafeFirstDeliveryForCommercialWebGoal =
+    looksLikeWebBaseGoal &&
+    detectCommercialLandingEcommerceIntent(
+      normalizeSectorDetectionText([goal, normalizedContext].join(' ')),
+    ) &&
+    detectLocalMockOnlyIntent(
+      normalizeSectorDetectionText([goal, normalizedContext].join(' ')),
+    )
   const wantsExtendedWebScaffoldDeliverables = detectExtendedWebScaffoldDeliverables(
     goal,
     context,
@@ -37506,7 +37831,7 @@ async function buildLocalStrategicBrainDecision({
     !safeFirstDeliveryIntent.matches &&
     !scopedFileEditIntent &&
     !localGoalDescriptor &&
-    !looksLikeWebBaseGoal &&
+    (!looksLikeWebBaseGoal || shouldPreferSafeFirstDeliveryForCommercialWebGoal) &&
     compositeSteps.length < 2 &&
     (!previousExecutionResult ||
       iteration === 1 ||
@@ -37560,7 +37885,7 @@ async function buildLocalStrategicBrainDecision({
     !safeFirstDeliveryIntent.matches &&
     !scopedFileEditIntent &&
     !localGoalDescriptor &&
-    !looksLikeWebBaseGoal &&
+    (!looksLikeWebBaseGoal || shouldPreferSafeFirstDeliveryForCommercialWebGoal) &&
     compositeSteps.length < 2 &&
     (!previousExecutionResult ||
       iteration === 1 ||
@@ -37614,7 +37939,7 @@ async function buildLocalStrategicBrainDecision({
     !safeFirstDeliveryIntent.matches &&
     !scopedFileEditIntent &&
     !localGoalDescriptor &&
-    !looksLikeWebBaseGoal &&
+    (!looksLikeWebBaseGoal || shouldPreferSafeFirstDeliveryForCommercialWebGoal) &&
     compositeSteps.length < 2 &&
     (!previousExecutionResult ||
       iteration === 1 ||
@@ -37655,10 +37980,13 @@ async function buildLocalStrategicBrainDecision({
   }
 
   if (
-    materializeSafeFirstDeliveryIntent.matches &&
+    (materializeSafeFirstDeliveryIntent.matches ||
+      (shouldPreferSafeFirstDeliveryForCommercialWebGoal &&
+        approvalAlreadyGranted &&
+        /\bmaterializa(?:r|cion|ción)\b/u.test(normalizedPreviousExecutionResult))) &&
     !scopedFileEditIntent &&
     !localGoalDescriptor &&
-    !looksLikeWebBaseGoal &&
+    (!looksLikeWebBaseGoal || shouldPreferSafeFirstDeliveryForCommercialWebGoal) &&
     compositeSteps.length < 2 &&
     (!previousExecutionResult ||
       iteration === 1 ||
@@ -37693,10 +38021,11 @@ async function buildLocalStrategicBrainDecision({
   }
 
   if (
-    safeFirstDeliveryIntent.matches &&
+    (safeFirstDeliveryIntent.matches ||
+      shouldPreferSafeFirstDeliveryForCommercialWebGoal) &&
     !scopedFileEditIntent &&
     !localGoalDescriptor &&
-    !looksLikeWebBaseGoal &&
+    (!looksLikeWebBaseGoal || shouldPreferSafeFirstDeliveryForCommercialWebGoal) &&
     compositeSteps.length < 2 &&
     (!previousExecutionResult ||
       iteration === 1 ||
@@ -37748,7 +38077,7 @@ async function buildLocalStrategicBrainDecision({
     productArchitectureIntent.matches &&
     !scopedFileEditIntent &&
     !localGoalDescriptor &&
-    !looksLikeWebBaseGoal &&
+    (!looksLikeWebBaseGoal || shouldPreferSafeFirstDeliveryForCommercialWebGoal) &&
     compositeSteps.length < 2 &&
     (!previousExecutionResult ||
       iteration === 1 ||
