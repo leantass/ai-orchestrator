@@ -6574,11 +6574,40 @@ function detectScalableDeliveryPlanningIntent(goal, context) {
     /\bfrontend\b/u.test(normalizedText) ? 'frontend' : '',
     /\bbackend\b/u.test(normalizedText) ? 'backend' : '',
     /\bapi\b/u.test(normalizedText) ? 'api' : '',
+    /\bapi local\b/u.test(normalizedText) ? 'api local' : '',
+    /\bbackend local\b/u.test(normalizedText) ? 'backend local' : '',
     /\bbase de datos local\b/u.test(normalizedText)
       ? 'base de datos local'
       : '',
     /\bdb local\b/u.test(normalizedText) ? 'db local' : '',
+    /\bbase local\b/u.test(normalizedText) ? 'base local' : '',
+    /\bsqlite\b/u.test(normalizedText) ? 'sqlite' : '',
     /\bshared\b/u.test(normalizedText) ? 'shared' : '',
+  ].filter(Boolean)
+  const dataModelSignals = [
+    /\bentidades?\b/u.test(normalizedText) ? 'entidades' : '',
+    /\brelaciones?\b/u.test(normalizedText) ? 'relaciones' : '',
+    /\benvios?\b/u.test(normalizedText) ? 'envios' : '',
+    /\btracking\b/u.test(normalizedText) ? 'tracking' : '',
+    /\blogistica\b/u.test(normalizedText) ? 'logistica' : '',
+    /\bcodigo de seguimiento\b/u.test(normalizedText)
+      ? 'codigo de seguimiento'
+      : '',
+    /\bconsulta publica\b/u.test(normalizedText) ||
+    /\bconsulta pública\b/u.test(normalizedText)
+      ? 'consulta publica'
+      : '',
+    /\bclientes?\b/u.test(normalizedText) ? 'clientes' : '',
+    /\bremitente\b/u.test(normalizedText) ? 'remitente' : '',
+    /\bdestinatario\b/u.test(normalizedText) ? 'destinatario' : '',
+    /\bdirecciones?\b/u.test(normalizedText) ? 'direcciones' : '',
+    /\bestados?\b/u.test(normalizedText) ? 'estados' : '',
+    /\bhistorial(?: de eventos)?\b/u.test(normalizedText)
+      ? 'historial de eventos'
+      : '',
+    /\bincidencias?\b/u.test(normalizedText) ? 'incidencias' : '',
+    /\breportes?\b/u.test(normalizedText) ? 'reportes' : '',
+    /\bseed(?:s|ers)?\b/u.test(normalizedText) ? 'seed' : '',
   ].filter(Boolean)
   const monorepoSignals = [
     /\bmonorepo\b/u.test(normalizedText) ? 'monorepo' : '',
@@ -6592,12 +6621,26 @@ function detectScalableDeliveryPlanningIntent(goal, context) {
     /\bdocumentacion\b/u.test(normalizedText) ? 'documentacion' : '',
   ].filter(Boolean)
   const infraSignals = [
-    /\bdocker\b/u.test(normalizedText) ? 'docker' : '',
-    /\bredis\b/u.test(normalizedText) ? 'redis' : '',
-    /\bbullmq\b/u.test(normalizedText) ? 'bullmq' : '',
-    /\bcron\b/u.test(normalizedText) ? 'cron' : '',
-    /\bpostgres(?:ql)?\b/u.test(normalizedText) ? 'postgres' : '',
-    /\bmigraciones?\b/u.test(normalizedText) ? 'migraciones' : '',
+    /\bdocker\b/u.test(normalizedText) && !/\bsin docker\b/u.test(normalizedText)
+      ? 'docker'
+      : '',
+    /\bredis\b/u.test(normalizedText) && !/\bsin redis\b/u.test(normalizedText)
+      ? 'redis'
+      : '',
+    /\bbullmq\b/u.test(normalizedText) && !/\bsin bullmq\b/u.test(normalizedText)
+      ? 'bullmq'
+      : '',
+    /\bcron\b/u.test(normalizedText) && !/\bsin cron\b/u.test(normalizedText)
+      ? 'cron'
+      : '',
+    /\bpostgres(?:ql)?\b/u.test(normalizedText) &&
+    !/\bsin postgres(?:ql)?\b/u.test(normalizedText)
+      ? 'postgres'
+      : '',
+    /\bmigraciones?\b/u.test(normalizedText) &&
+    !/\bsin migraciones?\b/u.test(normalizedText)
+      ? 'migraciones'
+      : '',
     /\bseed(?:s|ers)?\b/u.test(normalizedText) ? 'seeds' : '',
     /\.env\.example\b/u.test(normalizedText) ? '.env.example' : '',
   ].filter(Boolean)
@@ -6654,20 +6697,32 @@ function detectScalableDeliveryPlanningIntent(goal, context) {
     ((fullstackSignals.includes('frontend') || fullstackSignals.includes('api')) &&
       fullstackSignals.includes('backend') &&
       (fullstackSignals.includes('base de datos local') ||
-        fullstackSignals.includes('db local'))) ||
+        fullstackSignals.includes('db local') ||
+        fullstackSignals.includes('base local') ||
+        fullstackSignals.includes('sqlite'))) ||
+    ((fullstackSignals.includes('backend') ||
+      fullstackSignals.includes('backend local') ||
+      fullstackSignals.includes('api') ||
+      fullstackSignals.includes('api local')) &&
+      (fullstackSignals.includes('base de datos local') ||
+        fullstackSignals.includes('db local') ||
+        fullstackSignals.includes('base local') ||
+        fullstackSignals.includes('sqlite')) &&
+      dataModelSignals.length >= 4) ||
     (localFunctionalDeliverySignals.length > 0 &&
       operationalDomainSignals.length >= 3 &&
-      localOnlySignals.length >= 3)
+      localOnlySignals.length >= 3 &&
+      dataModelSignals.length >= 2)
   const matchesFrontendPlan =
     (frontendSignals.includes('react') || frontendSignals.includes('frontend real')) &&
     frontendSignals.length >= 3
 
-  const deliveryLevel = matchesInfraPlan
-    ? 'infra-local-plan'
-    : matchesMonorepoPlan
+  const deliveryLevel = matchesFullstackPlan
+    ? 'fullstack-local'
+    : matchesInfraPlan
+      ? 'infra-local-plan'
+      : matchesMonorepoPlan
       ? 'monorepo-local'
-      : matchesFullstackPlan
-        ? 'fullstack-local'
         : matchesFrontendPlan
           ? 'frontend-project'
           : 'safe-first-delivery'
@@ -6677,8 +6732,9 @@ function detectScalableDeliveryPlanningIntent(goal, context) {
       : deliveryLevel === 'monorepo-local'
         ? monorepoSignals
         : deliveryLevel === 'fullstack-local'
-          ? summarizeUniqueExecutorStrings([
+        ? summarizeUniqueExecutorStrings([
               ...fullstackSignals,
+              ...dataModelSignals,
               ...localFunctionalDeliverySignals,
               ...operationalDomainSignals,
               ...localOnlySignals,
@@ -6874,6 +6930,48 @@ function detectExplicitLocalFunctionalDeliveryIntent(goal, context) {
   )
 
   return deliveryCount > 0 && operationalCount >= 3 && localOnlyCount >= 3
+}
+
+function detectNoDeployLocalContinuationIntent(...texts) {
+  const normalizedText = normalizeSectorDetectionText(
+    texts
+      .filter((value) => typeof value === 'string' && value.trim())
+      .join(' '),
+  )
+
+  if (!normalizedText) {
+    return false
+  }
+
+  const noDeploySignals = [
+    /\bno deploy\b/u,
+    /\bno publicar\b/u,
+    /\bno publicacion real\b/u,
+    /\bno publicación real\b/u,
+    /\bno desplegar\b/u,
+    /\bno externos\b/u,
+  ]
+  const localContinuationSignals = [
+    /\bseguir local\b/u,
+    /\bbackend local\b/u,
+    /\bapi local\b/u,
+    /\bsqlite\b/u,
+    /\bbase local\b/u,
+    /\bbase de datos local\b/u,
+    /\bsin servicios externos\b/u,
+    /\bsin integraciones externas\b/u,
+  ]
+
+  const noDeployCount = noDeploySignals.reduce(
+    (count, pattern) => (pattern.test(normalizedText) ? count + 1 : count),
+    0,
+  )
+  const localContinuationCount = localContinuationSignals.reduce(
+    (count, pattern) => (pattern.test(normalizedText) ? count + 1 : count),
+    0,
+  )
+
+  return noDeployCount >= 1 && localContinuationCount >= 2
 }
 
 function normalizePathForComparison(value) {
@@ -7366,6 +7464,68 @@ function buildRechargeOrdersDomainProfile() {
       'Primera version navegable del flujo principal para gestion local de pedidos de recarga.',
       'Sin pagos reales, checkout real, venta directa, base de datos real ni integraciones externas reales.',
       'Validacion futura de edad y cumplimiento legal como fase posterior.',
+    ],
+  }
+}
+
+function detectLogisticsTrackingIntent(normalizedText) {
+  if (typeof normalizedText !== 'string' || !normalizedText.trim()) {
+    return false
+  }
+
+  const logisticsCore =
+    /\b(?:tracking|logistica|envios?|codigo de seguimiento|consulta publica|consulta pública)\b/u.test(
+      normalizedText,
+    )
+  const logisticsEntities =
+    /\b(?:clientes?|remitente|destinatario|direcciones?|estados?|historial(?: de eventos)?|incidencias?)\b/u.test(
+      normalizedText,
+    )
+  const logisticsPlatform =
+    /\b(?:backend|api|sqlite|base local|base de datos local)\b/u.test(normalizedText)
+
+  return logisticsCore && (logisticsEntities || logisticsPlatform)
+}
+
+function buildLogisticsTrackingDomainProfile() {
+  return {
+    domainLabel: 'tracking logistico local',
+    productType: 'business-system',
+    modules: [
+      'envios',
+      'clientes',
+      'direcciones',
+      'estados',
+      'eventos de tracking',
+      'incidencias',
+      'consulta publica por codigo',
+      'reportes',
+    ],
+    screens: [
+      'panel logistico',
+      'listado de envios',
+      'detalle de envio',
+      'historial de tracking',
+      'incidencias',
+      'consulta publica',
+      'reportes',
+    ],
+    localActions: [
+      'Revisar envios mock y su trazabilidad local por codigo de seguimiento.',
+      'Consultar clientes, remitente y destinatario mock con sus direcciones locales.',
+      'Actualizar estados mock y registrar eventos de tracking sin servicios externos.',
+      'Registrar incidencias mock y revisar reportes basicos del flujo logistico.',
+    ],
+    entities: [
+      'envios',
+      'clientes',
+      'remitentes',
+      'destinatarios',
+      'direcciones',
+      'estados',
+      'eventos de tracking',
+      'incidencias',
+      'codigos de seguimiento',
     ],
   }
 }
@@ -8031,6 +8191,22 @@ function detectSafeFirstDeliveryModuleFamily(modules) {
       matches: ['documentos', 'operaciones', 'vencimientos', 'observaciones', 'responsables'],
     },
     {
+      key: 'logistics-tracking',
+      domainLabel: 'tracking logistico local',
+      productType: 'business-system',
+      minimumScore: 3,
+      matches: [
+        'envios',
+        'clientes',
+        'direcciones',
+        'estados',
+        'eventos de tracking',
+        'incidencias',
+        'consulta publica por codigo',
+        'reportes',
+      ],
+    },
+    {
       key: 'reservas',
       domainLabel: 'reservas y disponibilidad',
       productType: 'business-system',
@@ -8159,6 +8335,9 @@ function buildDomainUnderstanding({
   const commercialEcommerceProfile = detectCommercialLandingEcommerceIntent(normalizedText)
     ? buildCommercialEcommerceDomainProfile(normalizedText)
     : null
+  const logisticsTrackingProfile = detectLogisticsTrackingIntent(normalizedText)
+    ? buildLogisticsTrackingDomainProfile()
+    : null
   const isRechargeOrdersSystem =
     explicitModuleFamily?.key === 'recharge-orders' ||
     detectSafeFirstDeliveryRechargeOrdersIntent(normalizedText)
@@ -8179,11 +8358,16 @@ function buildDomainUnderstanding({
     ? 'school-crm'
     : isRechargeOrdersSystem
       ? 'recharge-orders'
+    : logisticsTrackingProfile
+      ? 'logistics-tracking'
     : commercialEcommerceProfile
       ? 'commercial-ecommerce'
     : explicitModuleFamily?.key || (productKind === 'ecommerce' ? 'ecommerce' : '')
   const domainLabel =
     (resolvedFamilyKey === 'school-crm' ? 'gestion escolar' : '') ||
+    (resolvedFamilyKey === 'logistics-tracking'
+      ? logisticsTrackingProfile?.domainLabel || ''
+      : '') ||
     (resolvedFamilyKey === 'commercial-ecommerce'
       ? commercialEcommerceProfile?.domainLabel || ''
       : '') ||
@@ -8197,6 +8381,8 @@ function buildDomainUnderstanding({
   const fallbackModules =
     distinctiveDynamicModules.length > 0
       ? []
+      : resolvedFamilyKey === 'logistics-tracking'
+        ? logisticsTrackingProfile?.modules || []
       : resolvedFamilyKey === 'commercial-ecommerce'
         ? commercialEcommerceProfile?.modules || []
       : resolvedFamilyKey === 'ecommerce'
@@ -8241,9 +8427,14 @@ function buildDomainUnderstanding({
         )
       : rawPrimaryModules
   const primaryEntities = summarizeUniqueExecutorStrings(
-    primaryModules
-      .map((entry) => inferSafeFirstDeliveryMaterializationEntityName(entry))
-      .filter(Boolean),
+    [
+      ...(resolvedFamilyKey === 'logistics-tracking'
+        ? logisticsTrackingProfile?.entities || []
+        : []),
+      ...primaryModules
+        .map((entry) => inferSafeFirstDeliveryMaterializationEntityName(entry))
+        .filter(Boolean),
+    ],
     12,
   )
   const secondaryEntities = summarizeUniqueExecutorStrings(
@@ -8279,6 +8470,8 @@ function buildDomainUnderstanding({
     security: 'monitorear accesos, alertas y eventos',
     'port-operations': 'gestionar arribos, salidas y operaciones portuarias',
     documental: 'gestionar documentos, responsables y vencimientos',
+    'logistics-tracking':
+      'gestionar envios, tracking, incidencias y consulta publica por codigo en modo local',
     reservas: 'gestionar reservas y disponibilidad',
     'request-tracking': 'gestionar solicitudes y estados operativos',
   }
@@ -8293,12 +8486,18 @@ function buildDomainUnderstanding({
           ? 'gestionar seguimiento y relaciones operativas'
           : '')
   const roles = []
+  const logisticsLocalFlows =
+    resolvedFamilyKey === 'logistics-tracking' && logisticsTrackingProfile
+      ? logisticsTrackingProfile.localActions
+      : []
   const ecommerceLocalFlows =
     resolvedFamilyKey === 'commercial-ecommerce' && commercialEcommerceProfile
       ? commercialEcommerceProfile.localActions
       : []
   const coreFlows = summarizeUniqueExecutorStrings(
-    ecommerceLocalFlows.length > 0
+    logisticsLocalFlows.length > 0
+      ? logisticsLocalFlows
+      : ecommerceLocalFlows.length > 0
       ? ecommerceLocalFlows
       : dynamicPlanParts.localBehavior.length > 0
       ? dynamicPlanParts.localBehavior
@@ -8312,7 +8511,9 @@ function buildDomainUnderstanding({
     10,
   )
   const localActions = summarizeUniqueExecutorStrings(
-    ecommerceLocalFlows.length > 0
+    logisticsLocalFlows.length > 0
+      ? logisticsLocalFlows
+      : ecommerceLocalFlows.length > 0
       ? ecommerceLocalFlows
       : dynamicPlanParts.localBehavior.length > 0
       ? dynamicPlanParts.localBehavior
@@ -36910,6 +37111,13 @@ async function buildLocalStrategicBrainDecision({
     goal,
     normalizedContext,
   )
+  const noDeployLocalContinuationIntent = detectNoDeployLocalContinuationIntent(
+    goal,
+    normalizedContext,
+    plannerFeedback?.selectedOption,
+    plannerFeedback?.freeAnswer,
+    previousExecutionResult,
+  )
   const scopedFileEditIntent = detectScopedExistingFileEditIntent({
     goal,
     context: normalizedContext,
@@ -37936,6 +38144,51 @@ async function buildLocalStrategicBrainDecision({
         deliveryLevel: 'fullstack-local',
         scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
         localProjectManifest: fullstackLocalMaterializationPlan.localProjectManifest,
+      },
+    )
+  }
+
+  if (
+    approvalAlreadyGranted &&
+    noDeployLocalContinuationIntent &&
+    scalableDeliveryIntent.matches &&
+    scalableDeliveryIntent.deliveryLevel === 'fullstack-local' &&
+    !fullstackLocalMaterializationIntent.matches &&
+    !frontendProjectMaterializationIntent.matches &&
+    !materializeSafeFirstDeliveryIntent.matches &&
+    !safeFirstDeliveryIntent.matches &&
+    !scopedFileEditIntent &&
+    !localGoalDescriptor &&
+    compositeSteps.length < 2
+  ) {
+    const scalableDeliveryPlan = buildScalableDeliveryPlan({
+      goal,
+      context,
+      workspacePath,
+      deliveryLevel: 'fullstack-local',
+      domainUnderstanding,
+      reason:
+        'La respuesta humana rechazo deploy pero mantuvo backend local, API local y base SQLite/local, asi que el fallback debe conservar una ruta fullstack-local revisable.',
+    })
+
+    return buildDecisionWithPlanningContracts(
+      {
+        decisionKey: 'scalable-delivery-plan',
+        strategy: 'scalable-delivery-plan',
+        executionMode: 'planner-only',
+        reason:
+          'La aprobacion humana aclaro que la continuidad debe seguir solo en local con backend y base SQLite/local, por lo que no corresponde degradar a un scaffold visual ni ejecutar archivos todavia.',
+        tasks: scalableDeliveryPlan.tasks,
+        requiresApproval: false,
+        assumptions: scalableDeliveryPlan.assumptions,
+        instruction: scalableDeliveryPlan.instruction,
+        completed: false,
+        nextExpectedAction: 'review-scalable-delivery',
+        scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
+      },
+      {
+        deliveryLevel: 'fullstack-local',
+        scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
       },
     )
   }

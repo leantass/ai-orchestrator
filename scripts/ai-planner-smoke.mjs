@@ -377,6 +377,78 @@ const scalableValidationCases = [
     expectValidationPlan: true,
   },
   {
+    id: 'tracking-logistico-fullstack-local',
+    label: 'Tracking logistico fullstack local',
+    goal:
+      'Hacer un sistema fullstack local de tracking logistico para una empresa de logistica con backend local, base de datos local preferentemente SQLite, API local, frontend administrativo, consulta publica por codigo de seguimiento, entidades y relaciones, envios, clientes remitente destinatario, direcciones, estados, historial de eventos, incidencias, reportes basicos y seed inicial. Sin deploy, sin credenciales, sin servicios externos, sin pagos reales, sin Docker, sin base productiva ni integraciones reales.',
+    context:
+      'Backend local permitido, base local SQLite permitida, API local, frontend administrativo, tracking publico por codigo, entidades y relaciones para envios, estados, eventos e incidencias. Todo local, revisable y sin servicios externos.',
+    expectedDeliveryLevel: 'fullstack-local',
+    expectProjectBlueprint: true,
+    expectedTargetStructureTokens: [
+      'frontend/',
+      'backend/',
+      'shared/',
+      'database/',
+      'scripts/',
+      'docs/',
+    ],
+    expectedDirectoryTokens: [
+      'frontend/src',
+      'backend/src',
+      'shared/contracts',
+      'database/migrations',
+      'scripts',
+      'docs',
+    ],
+    expectedFileTokens: [
+      'frontend/package.json',
+      'backend/package.json',
+      'backend/src/server.js',
+      'shared/contracts/domain.js',
+      'database/schema.sql',
+      'scripts/seed-local.js',
+      'docs/architecture.md',
+    ],
+    expectedLocalConstraintTokens: [
+      'workspace local',
+      'No corresponde instalar dependencias',
+      'No corresponde levantar frontend',
+      'database local queda como esquema o documentación revisable',
+    ],
+    expectedApprovalTokens: [
+      'Instalar dependencias locales del frontend y backend',
+      'Levantar manualmente el frontend local y el backend local',
+      'Crear o migrar una base de datos local real',
+      'Integrar servicios externos',
+    ],
+    expectedBlueprintModules: [
+      'frontend local',
+      'backend local',
+      'database design',
+      'documentacion',
+    ],
+    expectedBlueprintEntities: [
+      'envios',
+      'clientes',
+      'direcciones',
+      'estados',
+      'incidencias',
+    ],
+    expectImplementationRoadmap: true,
+    expectedRoadmapPhaseTokens: [
+      'blueprint-fullstack',
+      'scaffold-fullstack-local',
+      'backend-contracts',
+      'database-design',
+    ],
+    expectedNextActionType: 'prepare-materialization',
+    expectedNextActionStrategy: 'materialize-fullstack-local-plan',
+    expectedNextActionSafeToRunNow: true,
+    expectedNextActionRequiresApproval: false,
+    expectValidationPlan: true,
+  },
+  {
     id: 'monorepo-local',
     label: 'Monorepo local',
     goal:
@@ -2442,6 +2514,124 @@ async function runSoccerEcommerceApprovalContinuationValidation() {
     failures,
     strategy: decision?.strategy || '',
     nextExpectedAction: decision?.nextExpectedAction || '',
+  }
+}
+
+async function runLogisticsFullstackApprovalContinuationValidation() {
+  const testCase = scalableValidationCases.find(
+    (entry) => entry.id === 'tracking-logistico-fullstack-local',
+  )
+  const failures = []
+
+  if (!testCase) {
+    return {
+      testCase: {
+        id: 'tracking-logistico-fullstack-post-approval',
+        label: 'Tracking logistico fullstack post approval',
+        goal: '',
+      },
+      ok: false,
+      failures: [
+        'No se encontro el caso base tracking-logistico-fullstack-local para la regresion.',
+      ],
+    }
+  }
+
+  const approvalFeedback =
+    '__orchestrator_feedback__:' +
+    JSON.stringify({
+      type: 'approval-granted',
+      source: 'planner',
+      approvalMode: 'once',
+      instruction:
+        'Continuar solo con backend local, API local y SQLite local, sin deploy ni servicios externos.',
+      approvalReason:
+        'El usuario rechazo deploy pero mantiene permitido backend local y base SQLite local.',
+      approvalRequestDecisionKey: 'approve-public-deploy',
+      selectedOption: 'No deploy',
+      freeAnswer:
+        'No deploy. Seguir local. Backend local y base local SQLite permitidos. No externos.',
+    })
+
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: testCase.goal,
+    context: testCase.context,
+    workspacePath: smokeExecutionWorkspaceRoot,
+    iteration: 2,
+    previousExecutionResult: approvalFeedback,
+    requiresApproval: true,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: 'brain-decides-missing',
+    costMode: 'max-quality',
+    attachedInputs: [],
+    existingProjectContext: null,
+    projectWorkMode: 'auto',
+    reusablePlanningContext: buildReusablePlanningContext(),
+  })
+
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const nextExpectedAction = String(decision?.nextExpectedAction || '').trim()
+  const domainSummary = normalizeText(
+    [
+      decision?.reason,
+      decision?.instruction,
+      decision?.domainUnderstanding?.domainLabel,
+      ...(Array.isArray(decision?.domainUnderstanding?.primaryModules)
+        ? decision.domainUnderstanding.primaryModules
+        : []),
+      ...(Array.isArray(decision?.domainUnderstanding?.primaryEntities)
+        ? decision.domainUnderstanding.primaryEntities
+        : []),
+      ...(Array.isArray(decision?.domainUnderstanding?.coreFlows)
+        ? decision.domainUnderstanding.coreFlows
+        : []),
+    ]
+      .filter(Boolean)
+      .join(' '),
+  )
+
+  if (strategy === 'web-scaffold-base') {
+    failures.push('La continuidad post-approval fullstack no debe degradar a web-scaffold-base.')
+  }
+  if (executionMode !== 'planner-only') {
+    failures.push(
+      `executionMode incorrecto. Esperado: planner-only. Recibido: ${executionMode || '(vacio)'}.`,
+    )
+  }
+  if (nextExpectedAction !== 'review-scalable-delivery') {
+    failures.push(
+      `nextExpectedAction incorrecto. Esperado: review-scalable-delivery. Recibido: ${nextExpectedAction || '(vacio)'}.`,
+    )
+  }
+  if (strategy !== 'scalable-delivery-plan') {
+    failures.push(
+      `La continuidad post-approval fullstack deberia seguir en scalable-delivery-plan. Recibido: ${strategy || '(vacio)'}.`,
+    )
+  }
+  if (decision?.materializationPlan && typeof decision.materializationPlan === 'object') {
+    failures.push('No deberia haber materializationPlan ejecutable en la continuidad post-approval fullstack.')
+  }
+
+  ;['envios', 'clientes', 'direcciones', 'estados', 'incidencias'].forEach((token) => {
+    if (!domainSummary.includes(normalizeText(token))) {
+      failures.push(`La continuidad post-approval deberia preservar ${token}.`)
+    }
+  })
+
+  ;['web-scaffold-base', 'landing', 'hero principal'].forEach((token) => {
+    if (domainSummary.includes(normalizeText(token))) {
+      failures.push(`La continuidad post-approval no deberia contaminarse con ${token}.`)
+    }
+  })
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction,
   }
 }
 
@@ -9528,6 +9718,7 @@ async function main() {
   let fullstackMaterializationResult = null
   let rechargeMaterializationResult = null
   let soccerApprovalContinuationResult = null
+  let logisticsApprovalContinuationResult = null
   let soccerPreparedMaterializationTransitionResult = null
   let sensitiveApprovalRoutingResult = null
   let soccerMaterializationResult = null
@@ -9560,6 +9751,13 @@ async function main() {
     soccerApprovalContinuationResult =
       await runSoccerEcommerceApprovalContinuationValidation()
     printScalableValidationResult(soccerApprovalContinuationResult)
+    console.log('-----------------')
+
+    console.log('Logistics Fullstack Approval Continuation Check')
+    console.log('==============================================')
+    logisticsApprovalContinuationResult =
+      await runLogisticsFullstackApprovalContinuationValidation()
+    printScalableValidationResult(logisticsApprovalContinuationResult)
     console.log('-----------------')
 
     console.log('Soccer Ecommerce Prepared Materialization Transition Check')
@@ -10008,6 +10206,8 @@ async function main() {
   const fullstackMaterializationFailed = fullstackMaterializationResult?.ok === false
   const rechargeMaterializationFailed = rechargeMaterializationResult?.ok === false
   const soccerApprovalContinuationFailed = soccerApprovalContinuationResult?.ok === false
+  const logisticsApprovalContinuationFailed =
+    logisticsApprovalContinuationResult?.ok === false
   const soccerPreparedMaterializationTransitionFailed =
     soccerPreparedMaterializationTransitionResult?.ok === false
   const sensitiveApprovalRoutingFailed = sensitiveApprovalRoutingResult?.ok === false
@@ -10024,6 +10224,7 @@ async function main() {
     !fullstackMaterializationFailed &&
     !rechargeMaterializationFailed &&
     !soccerApprovalContinuationFailed &&
+    !logisticsApprovalContinuationFailed &&
     !soccerPreparedMaterializationTransitionFailed &&
     !sensitiveApprovalRoutingFailed &&
     !soccerMaterializationFailed
@@ -10053,6 +10254,11 @@ async function main() {
     }
     if (soccerApprovalContinuationResult) {
       console.log('OK. 1/1 check de continuidad post-approval ecommerce de pelotas paso.')
+    }
+    if (logisticsApprovalContinuationResult) {
+      console.log(
+        'OK. 1/1 check de continuidad post-approval fullstack logistico paso.',
+      )
     }
     if (soccerPreparedMaterializationTransitionResult) {
       console.log(
@@ -10148,6 +10354,14 @@ async function main() {
     console.log(
       `- ${soccerApprovalContinuationResult.testCase.id}: ${
         soccerApprovalContinuationResult.failures[0] || 'sin detalle'
+      }`,
+    )
+  }
+  if (logisticsApprovalContinuationFailed) {
+    console.log('check de continuidad post-approval fullstack logistico fallido:')
+    console.log(
+      `- ${logisticsApprovalContinuationResult.testCase.id}: ${
+        logisticsApprovalContinuationResult.failures[0] || 'sin detalle'
       }`,
     )
   }
