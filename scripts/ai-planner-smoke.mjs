@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import http from 'node:http'
+import os from 'node:os'
 import path from 'node:path'
 import vm from 'node:vm'
 import { execFileSync } from 'node:child_process'
@@ -2530,6 +2531,124 @@ async function runSensitiveApprovalRoutingValidation() {
     testCase,
     ok: failures.length === 0,
     failures,
+  }
+}
+
+async function runProjectPhaseMaterializationCoverageGuardValidation() {
+  const testCase = {
+    id: 'project-phase-materialization-coverage-guard',
+    label: 'Project phase materialization coverage guard',
+  }
+  const workspacePath = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'ai-orchestrator-phase-coverage-'),
+  )
+  const failures = []
+
+  try {
+    const materializationPlan = {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'project-phase-materialization',
+      summary: 'Fase 2 reducida de forma incorrecta.',
+      strategy: 'materialize-project-phase-plan',
+      reasoningLayer: 'openai',
+      materializationLayer: 'local-deterministic',
+      operations: [
+        {
+          type: 'replace-file',
+          targetPath: 'data/mock-data.json',
+          nextContent: '{"catalog":[]}\n',
+        },
+        {
+          type: 'replace-file',
+          targetPath: 'data/mock-data.js',
+          nextContent: 'window.ZonaGolMockCatalog = [];\n',
+        },
+        {
+          type: 'replace-file',
+          targetPath: 'src/js/storage.js',
+          nextContent: 'window.ZonaGolStorage = {};\n',
+        },
+        {
+          type: 'replace-file',
+          targetPath: 'src/js/data-loader.js',
+          nextContent: 'window.ZonaGolDataLoader = {};\n',
+        },
+      ],
+      validations: [
+        { type: 'exists', targetPath: 'data/mock-data.json', expectedKind: 'file' },
+        { type: 'exists', targetPath: 'data/mock-data.js', expectedKind: 'file' },
+        { type: 'exists', targetPath: 'src/js/storage.js', expectedKind: 'file' },
+        { type: 'exists', targetPath: 'src/js/data-loader.js', expectedKind: 'file' },
+      ],
+    }
+
+    const task = buildLocalMaterializationTask({
+      plan: materializationPlan,
+      workspacePath,
+      requestId: 'smoke-project-phase-coverage',
+      instruction:
+        'Materializar fase 2 de catalogo y admin local sin perder archivos prometidos.',
+      brainStrategy: 'materialize-project-phase-plan',
+      businessSector: 'tienda-pelotas-futbol-mock',
+      businessSectorLabel: 'tienda pelotas futbol mock',
+      creativeDirection: null,
+      reusableArtifactLookup: null,
+      reusableArtifactsFound: 0,
+      reuseDecision: false,
+      reuseReason: '',
+      reusedArtifactIds: [],
+      reuseMode: 'none',
+      reuseMaterialization: null,
+      materializationPlanSource: 'smoke',
+      expectedTargetPaths: [
+        'data/mock-data.json',
+        'data/mock-data.js',
+        'src/js/storage.js',
+        'src/js/data-loader.js',
+        'src/js/catalog.js',
+        'admin/admin.html',
+        'admin/admin.css',
+        'admin/admin.js',
+        'docs/README-ADMIN.md',
+        'index.html',
+      ],
+    })
+
+    if (!task) {
+      failures.push('No se pudo construir la tarea local para validar cobertura de targetFiles.')
+    } else {
+      const executionResult = await runLocalDeterministicTask(task)
+      if (executionResult?.ok === true) {
+        failures.push(
+          'La materializacion reducida no deberia cerrar en success si faltan catalog.js, admin/ y docs/README-ADMIN.md.',
+        )
+      } else {
+        const missingExpectedTargets = toStringArray(
+          executionResult?.details?.missingExpectedTargets,
+          32,
+        ).map((entry) => normalizePathForComparison(entry))
+        ;['src/js/catalog.js', 'admin/admin.html', 'admin/admin.css', 'admin/admin.js', 'docs/README-ADMIN.md'].forEach(
+          (targetPath) => {
+            if (!missingExpectedTargets.some((entry) => entry.endsWith(targetPath))) {
+              failures.push(
+                `La ejecucion fallida deberia reportar ${targetPath} dentro de missingExpectedTargets.`,
+              )
+            }
+          },
+        )
+      }
+    }
+  } finally {
+    fs.rmSync(workspacePath, { recursive: true, force: true })
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    strategy: 'materialize-project-phase-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
   }
 }
 
@@ -9479,6 +9598,7 @@ async function main() {
       await runMaterializeLocalValidationValidation(),
       await runPrepareReviewAndExpandValidation(),
       await runMaterializeReviewAndExpandValidation(),
+      await runProjectPhaseMaterializationCoverageGuardValidation(),
       await runPrepareModuleExpansionValidation(),
       await runPrepareUnsupportedModuleExpansionValidation(),
       await runPrepareSpecificModuleExpansionValidation({

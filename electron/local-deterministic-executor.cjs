@@ -63,6 +63,24 @@ function summarizeUniquePaths(entries, limit = 200) {
   return uniqueEntries
 }
 
+function normalizeComparableTargetPath(targetPath) {
+  if (typeof targetPath !== 'string' || !targetPath.trim()) {
+    return ''
+  }
+
+  return path.normalize(targetPath.trim()).replace(/\\/g, '/').toLocaleLowerCase()
+}
+
+function inferExpectedKindFromTargetPath(targetPath) {
+  if (typeof targetPath !== 'string' || !targetPath.trim()) {
+    return ''
+  }
+
+  const normalizedPath = targetPath.trim().replace(/\\/g, '/')
+  const lastSegment = normalizedPath.split('/').filter(Boolean).at(-1) || ''
+  return lastSegment.includes('.') ? 'file' : 'folder'
+}
+
 function isPathInsideWorkspace(workspacePath, targetPath) {
   if (
     typeof workspacePath !== 'string' ||
@@ -5553,6 +5571,7 @@ function buildLocalMaterializationTask({
   reuseMode,
   reuseMaterialization,
   materializationPlanSource,
+  expectedTargetPaths,
 }) {
   const normalizedPlan = normalizeMaterializationPlan(plan)
 
@@ -5596,6 +5615,60 @@ function buildLocalMaterializationTask({
     })
   }
 
+  const normalizedExpectedTargets = summarizeUniquePaths(expectedTargetPaths, 128)
+    .map((targetPath) => {
+      const resolvedTarget = resolveWorkspaceTarget(normalizedWorkspacePath, targetPath)
+
+      if (!resolvedTarget) {
+        return null
+      }
+
+      return {
+        targetPath: targetPath.trim(),
+        relativeTargetPath: resolvedTarget.relativeTargetPath,
+        resolvedTargetPath: resolvedTarget.resolvedTargetPath,
+        expectedKind: inferExpectedKindFromTargetPath(targetPath),
+      }
+    })
+    .filter(Boolean)
+
+  const planTargetLookup = new Set(
+    [...operations, ...validations]
+      .map((entry) => normalizeComparableTargetPath(entry.relativeTargetPath))
+      .filter(Boolean),
+  )
+  const existingValidationLookup = new Set(
+    validations
+      .map((entry) => normalizeComparableTargetPath(entry.relativeTargetPath))
+      .filter(Boolean),
+  )
+  const missingExpectedTargets = normalizedExpectedTargets
+    .filter(
+      (entry) =>
+        !planTargetLookup.has(normalizeComparableTargetPath(entry.relativeTargetPath)),
+    )
+    .map((entry) => entry.relativeTargetPath)
+
+  for (const expectedTarget of normalizedExpectedTargets) {
+    const comparableTargetPath = normalizeComparableTargetPath(
+      expectedTarget.relativeTargetPath,
+    )
+
+    if (!comparableTargetPath || existingValidationLookup.has(comparableTargetPath)) {
+      continue
+    }
+
+    validations.push({
+      type: 'exists',
+      targetPath: expectedTarget.targetPath,
+      relativeTargetPath: expectedTarget.relativeTargetPath,
+      resolvedTargetPath: expectedTarget.resolvedTargetPath,
+      expectedKind: expectedTarget.expectedKind || undefined,
+      expectedTargetValidation: true,
+    })
+    existingValidationLookup.add(comparableTargetPath)
+  }
+
   const primaryTargetPath =
     operations[0]?.relativeTargetPath ||
     validations[0]?.relativeTargetPath ||
@@ -5629,6 +5702,8 @@ function buildLocalMaterializationTask({
     reusedArtifactIds: Array.isArray(reusedArtifactIds) ? reusedArtifactIds : [],
     reuseMode: reuseMode || 'none',
     reuseMaterialization: reuseMaterialization || undefined,
+    expectedTargetPaths: normalizedExpectedTargets.map((entry) => entry.relativeTargetPath),
+    missingExpectedTargets,
   }
 }
 
@@ -6057,6 +6132,10 @@ async function runLocalDeterministicTask(task) {
     const filesystemDiff = diffPathStates(beforeStates, afterStates)
 
     if (validationOutcome.ok !== true) {
+      const missingExpectedTargets = Array.isArray(task.missingExpectedTargets)
+        ? task.missingExpectedTargets
+        : []
+
       return {
         ok: false,
         ...(task.requestId ? { requestId: task.requestId } : {}),
@@ -6078,10 +6157,71 @@ async function runLocalDeterministicTask(task) {
             filesystemDiff.createdPaths.length > 0 ||
             filesystemDiff.touchedPaths.length > 0,
           materialState: 'local-deterministic-validation-failed',
-          validationResults: validationOutcome.validationResults,
+          missingExpectedTargets,
+          expectedTargetPaths: task.expectedTargetPaths || [],
+          validationResults: [
+            ...validationOutcome.validationResults,
+            ...missingExpectedTargets
+              .filter(
+                (targetPath) =>
+                  !validationOutcome.validationResults.some(
+                    (entry) =>
+                      String(entry?.targetPath || '').trim() === String(targetPath).trim(),
+                  ),
+              )
+              .map((targetPath) => ({
+                type: 'expected-target-coverage',
+                targetPath,
+                ok: false,
+                reason:
+                  'El target estaba prometido en el alcance preparado, pero no quedo cubierto por el materializationPlan ejecutable.',
+              })),
+          ],
         },
       }
     }
+
+    if (Array.isArray(task.missingExpectedTargets) && task.missingExpectedTargets.length > 0) {
+      return {
+        ok: false,
+        ...(task.requestId ? { requestId: task.requestId } : {}),
+        instruction: task.instruction,
+        reasoningLayer: task.reasoningLayer,
+        materializationLayer: task.materializationLayer,
+        error:
+          'La materializacion local no cubrio todos los archivos prometidos por el plan preparado.',
+        resultPreview:
+          'La materializacion local quedo parcial respecto de los targetPaths prometidos.',
+        details: {
+          reasoningLayer: task.reasoningLayer,
+          materializationLayer: task.materializationLayer,
+          materializationPlanVersion: task.planVersion,
+          materializationPlanSource: task.materializationPlanSource,
+          currentAction: 'validate-plan-coverage',
+          currentTargetPath: task.missingExpectedTargets[0] || undefined,
+          createdPaths: filesystemDiff.createdPaths,
+          touchedPaths: filesystemDiff.touchedPaths,
+          hasMaterialProgress:
+            filesystemDiff.createdPaths.length > 0 ||
+            filesystemDiff.touchedPaths.length > 0,
+          materialState: 'local-deterministic-plan-incomplete',
+          missingExpectedTargets: task.missingExpectedTargets,
+          expectedTargetPaths: task.expectedTargetPaths || [],
+          validationResults: [
+            ...validationOutcome.validationResults,
+            ...task.missingExpectedTargets.map((targetPath) => ({
+              type: 'expected-target-coverage',
+              targetPath,
+              ok: false,
+              reason:
+                'El target estaba prometido en el alcance preparado, pero no quedo cubierto por el materializationPlan ejecutable.',
+            })),
+          ],
+          stepResults,
+        },
+      }
+    }
+
     const summaryTarget = task.relativeTargetPath === '.' ? 'workspace' : task.relativeTargetPath
     const summary =
       task.planSummary ||

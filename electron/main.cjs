@@ -1035,6 +1035,7 @@ function buildLocalDeterministicTaskFromPlan({
   reuseMode,
   reuseMaterialization,
   materializationPlanSource,
+  expectedTargetPaths,
 }) {
   return buildLocalMaterializationTask({
     plan,
@@ -1053,6 +1054,7 @@ function buildLocalDeterministicTaskFromPlan({
     reuseMode,
     reuseMaterialization,
     materializationPlanSource,
+    expectedTargetPaths,
   })
 }
 
@@ -43293,6 +43295,7 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
             : derivedMaterializationPlan
               ? 'derived-local-rules'
               : '',
+          expectedTargetPaths: executionScope?.allowedTargetPaths || [],
         })
 
         if (!forcedLocalTask) {
