@@ -35280,6 +35280,12 @@ function deriveApprovalEquivalenceFamily(...texts) {
     combinedText.includes('solo dentro del workspace local') ||
     combinedText.includes('dentro del workspace local') ||
     combinedText.includes('entorno local')
+  const explicitlyNoRealPayments =
+    combinedText.includes('sin pagos reales') ||
+    combinedText.includes('sin pago real') ||
+    combinedText.includes('checkout simulado') ||
+    combinedText.includes('sin checkout real') ||
+    combinedText.includes('sin venta directa')
   const mentionsDeploy =
     combinedText.includes('deploy') ||
     combinedText.includes('github pages') ||
@@ -35298,8 +35304,17 @@ function deriveApprovalEquivalenceFamily(...texts) {
     combinedText.includes('subir repo') ||
     combinedText.includes('publicar repo') ||
     explicitlyNoDeploy
+  const mentionsRealPayments =
+    combinedText.includes('mercado pago') ||
+    combinedText.includes('stripe') ||
+    combinedText.includes('pagos reales') ||
+    combinedText.includes('pago real') ||
+    combinedText.includes('cobros reales') ||
+    combinedText.includes('payment gateway')
   const hasPositiveDeployIntent = mentionsDeploy && !explicitlyNoDeploy
   const hasPositivePublicRepoIntent = mentionsPublicRepo && !explicitlyNoPublicRepo
+  const hasPositiveRealPaymentsIntent =
+    mentionsRealPayments && !explicitlyNoRealPayments
   const isProvisionalWebScaffoldApproval =
     (combinedText.includes('scaffold') || combinedText.includes('generacion')) &&
     (combinedText.includes('provisional') ||
@@ -35323,6 +35338,10 @@ function deriveApprovalEquivalenceFamily(...texts) {
 
   if (hasPositiveDeployIntent) {
     return 'public-deploy'
+  }
+
+  if (hasPositiveRealPaymentsIntent) {
+    return 'real-payments'
   }
 
   if (hasPositivePublicRepoIntent) {
@@ -35416,6 +35435,20 @@ function buildSensitiveApprovalRequest({ goal, context }) {
         'La accion implica publicar o desplegar fuera del entorno local y requiere una validacion humana explicita.',
       question:
         `Antes de continuar con "${goal}", ¿confirmas que queres publicar o desplegar esta web fuera del entorno local?`,
+      allowFreeAnswer: true,
+      allowBrainDefault: false,
+      impact: 'high',
+      nextExpectedAction: 'user-approval',
+    })
+  }
+
+  if (approvalFamily === 'real-payments') {
+    return buildBrainApprovalRequest({
+      decisionKey: 'approve-real-payments',
+      reason:
+        'La accion implica pasar a pagos reales y requiere una validacion humana explicita antes de tocar gateways, credenciales o cobros reales.',
+      question:
+        `Antes de continuar con "${goal}", ¿confirmas que queres pasar a una fase con pagos reales o integracion comercial sensible?`,
       allowFreeAnswer: true,
       allowBrainDefault: false,
       impact: 'high',
@@ -36770,8 +36803,11 @@ async function buildLocalStrategicBrainDecision({
     impact: 'high',
     nextExpectedAction: 'user-approval',
   })
+  const hasSensitiveApprovalRequest = Boolean(sensitiveApprovalRequest)
   const approvalRequestForDecision =
-    (Boolean(requiresApproval) || Boolean(explicitApprovalPreference)) &&
+    (Boolean(requiresApproval) ||
+      Boolean(explicitApprovalPreference) ||
+      hasSensitiveApprovalRequest) &&
     !approvalAlreadyGranted
       ? explicitApprovalPreference?.approvalRequest ||
         sensitiveApprovalRequest ||
@@ -37286,7 +37322,9 @@ async function buildLocalStrategicBrainDecision({
         approvalRequestForDecision?.question,
       )
     ) &&
-    (Boolean(requiresApproval) || Boolean(explicitApprovalPreference)) &&
+    (Boolean(requiresApproval) ||
+      Boolean(explicitApprovalPreference) ||
+      hasSensitiveApprovalRequest) &&
     !approvalAlreadyGranted
 
   if (approvalRejected) {
@@ -38257,6 +38295,9 @@ async function buildLocalStrategicBrainDecision({
       ...webDecision,
       requiresApproval: effectiveRequiresApproval,
       approvalRequest: approvalRequestForDecision,
+      nextExpectedAction: effectiveRequiresApproval
+        ? 'user-approval'
+        : webDecision.nextExpectedAction || 'execute-plan',
       reason: hasRecoverableExecutionError
         ? 'La ejecución anterior falló y el Cerebro replanifica el scaffold web dentro de la misma estrategia.'
         : approvalAlreadyGranted

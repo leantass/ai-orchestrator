@@ -2444,6 +2444,95 @@ async function runSoccerEcommerceApprovalContinuationValidation() {
   }
 }
 
+async function runSensitiveApprovalRoutingValidation() {
+  const testCase = {
+    id: 'sensitive-approval-routing',
+    label: 'Approval para deploy y pagos reales',
+    goal: 'Validar approval routing para deploy y pagos reales.',
+  }
+  const failures = []
+
+  const deployDecision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: 'Quiero publicar esta web en produccion con deploy real.',
+    context: 'Necesito salida publica y deploy real para una web comercial.',
+    workspacePath: smokeExecutionWorkspaceRoot,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: 'brain-decides-missing',
+    costMode: 'smart',
+    attachedInputs: [],
+    existingProjectContext: null,
+    projectWorkMode: 'auto',
+    reusablePlanningContext: buildReusablePlanningContext(),
+  })
+
+  if (deployDecision?.requiresApproval !== true) {
+    failures.push('El caso de deploy real deberia requerir aprobacion manual.')
+  }
+  if (deployDecision?.nextExpectedAction !== 'user-approval') {
+    failures.push(
+      `El caso de deploy real deberia quedar en user-approval. Recibido: ${
+        deployDecision?.nextExpectedAction || '(vacio)'
+      }.`,
+    )
+  }
+  if (deployDecision?.approvalRequest?.decisionKey !== 'approve-public-deploy') {
+    failures.push(
+      `El caso de deploy real deberia usar approve-public-deploy. Recibido: ${
+        deployDecision?.approvalRequest?.decisionKey || '(vacio)'
+      }.`,
+    )
+  }
+
+  const paymentsDecision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: 'Quiero agregar pagos reales con Mercado Pago.',
+    context: 'El objetivo es cobrar pagos reales en una experiencia comercial.',
+    workspacePath: smokeExecutionWorkspaceRoot,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: 'brain-decides-missing',
+    costMode: 'smart',
+    attachedInputs: [],
+    existingProjectContext: null,
+    projectWorkMode: 'auto',
+    reusablePlanningContext: buildReusablePlanningContext(),
+  })
+
+  if (paymentsDecision?.requiresApproval !== true) {
+    failures.push('El caso de pagos reales deberia requerir aprobacion manual.')
+  }
+  if (paymentsDecision?.nextExpectedAction !== 'user-approval') {
+    failures.push(
+      `El caso de pagos reales deberia quedar en user-approval. Recibido: ${
+        paymentsDecision?.nextExpectedAction || '(vacio)'
+      }.`,
+    )
+  }
+  if (
+    !normalizeText(
+      [
+        paymentsDecision?.approvalRequest?.decisionKey,
+        paymentsDecision?.approvalRequest?.reason,
+        paymentsDecision?.approvalRequest?.question,
+      ]
+        .filter(Boolean)
+        .join(' '),
+    ).includes('pago')
+  ) {
+    failures.push('El caso de pagos reales deberia exponer una aprobacion vinculada a pagos.')
+  }
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+  }
+}
+
 async function runSoccerEcommerceMaterializationValidation() {
   const testCase = activeCases.find((entry) => entry.id === 'ecommerce-pelotas-futbol')
   const failures = []
@@ -9110,6 +9199,7 @@ async function main() {
   let fullstackMaterializationResult = null
   let rechargeMaterializationResult = null
   let soccerApprovalContinuationResult = null
+  let sensitiveApprovalRoutingResult = null
   let soccerMaterializationResult = null
   let projectPhaseExecutionResults = []
   let continuationResults = []
@@ -9140,6 +9230,12 @@ async function main() {
     soccerApprovalContinuationResult =
       await runSoccerEcommerceApprovalContinuationValidation()
     printScalableValidationResult(soccerApprovalContinuationResult)
+    console.log('-----------------')
+
+    console.log('Sensitive Approval Routing Check')
+    console.log('================================')
+    sensitiveApprovalRoutingResult = await runSensitiveApprovalRoutingValidation()
+    printScalableValidationResult(sensitiveApprovalRoutingResult)
     console.log('-----------------')
 
     console.log('Soccer Ecommerce Materialization Check')
@@ -9574,6 +9670,7 @@ async function main() {
   const fullstackMaterializationFailed = fullstackMaterializationResult?.ok === false
   const rechargeMaterializationFailed = rechargeMaterializationResult?.ok === false
   const soccerApprovalContinuationFailed = soccerApprovalContinuationResult?.ok === false
+  const sensitiveApprovalRoutingFailed = sensitiveApprovalRoutingResult?.ok === false
   const soccerMaterializationFailed = soccerMaterializationResult?.ok === false
 
   if (
@@ -9587,6 +9684,7 @@ async function main() {
     !fullstackMaterializationFailed &&
     !rechargeMaterializationFailed &&
     !soccerApprovalContinuationFailed &&
+    !sensitiveApprovalRoutingFailed &&
     !soccerMaterializationFailed
   ) {
     console.log(`OK. ${passedCount}/${results.length} casos pasaron.`)
@@ -9614,6 +9712,9 @@ async function main() {
     }
     if (soccerApprovalContinuationResult) {
       console.log('OK. 1/1 check de continuidad post-approval ecommerce de pelotas paso.')
+    }
+    if (sensitiveApprovalRoutingResult) {
+      console.log('OK. 1/1 check de approval sensible para deploy y pagos reales paso.')
     }
     if (soccerMaterializationResult) {
       console.log('OK. 1/1 check de materializacion ecommerce de pelotas paso.')
@@ -9701,6 +9802,14 @@ async function main() {
     console.log(
       `- ${soccerApprovalContinuationResult.testCase.id}: ${
         soccerApprovalContinuationResult.failures[0] || 'sin detalle'
+      }`,
+    )
+  }
+  if (sensitiveApprovalRoutingFailed) {
+    console.log('check de approval sensible para deploy y pagos reales fallido:')
+    console.log(
+      `- ${sensitiveApprovalRoutingResult.testCase.id}: ${
+        sensitiveApprovalRoutingResult.failures[0] || 'sin detalle'
       }`,
     )
   }
