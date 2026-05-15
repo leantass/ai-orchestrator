@@ -8592,7 +8592,10 @@ const sanitizeSafeFirstDeliveryText = (value: string) =>
     .replace(/órdenes/gi, 'resumenes de pedidos mock')
     .replace(/pagos?\s+reales?/gi, 'cobros reales')
     .replace(/pasarela\s+de\s+pagos/gi, 'pasarela externa')
-    .replace(/autenticaci[oó]n\s+real/gi, 'acceso autenticado real')
+    .replace(/\bauth\s+real\b/gi, 'identidad real')
+    .replace(/autenticaci[oó]n\s+real/gi, 'identidad real')
+    .replace(/\bsin\s+aprobaci[oó]n\b/gi, 'sin validacion final')
+    .replace(/\baprobaciones?\s+futuras?\b/gi, 'validaciones futuras')
     .replace(/base\s+de\s+datos\s+real/gi, 'persistencia real')
     .replace(/\s+/g, ' ')
     .trim()
@@ -9694,6 +9697,7 @@ const buildOperatorPlanSummary = ({
     normalizeOptionalString(metadata.domainUnderstanding?.intentLabel)
   const moduleItems = collectUniqueSummaryValues(
     goalContextHints.moduleItems,
+    metadata.safeFirstDeliveryMaterialization?.modules,
     metadata.domainUnderstanding?.primaryModules,
     metadata.safeFirstDeliveryPlan?.modules,
     metadata.scalableDeliveryPlan?.modules,
@@ -9706,6 +9710,8 @@ const buildOperatorPlanSummary = ({
   const flowItems = prefersGoalContextSummary
     ? collectUniqueSummaryValues(goalContextHints.flowItems).slice(0, 4)
     : collectUniqueSummaryValues(
+        metadata.safeFirstDeliveryMaterialization?.localActions,
+        metadata.safeFirstDeliveryMaterialization?.screens,
         metadata.domainUnderstanding?.coreFlows,
         metadata.domainUnderstanding?.localActions,
         metadata.safeFirstDeliveryPlan?.scope,
@@ -17866,6 +17872,46 @@ function App() {
       setApprovalSource('')
       setPlannerInstruction(response.instruction)
       setCurrentStep(response.instruction)
+      const preparedSafeMaterializationReady =
+        normalizeOptionalString(
+          nextExecutionMetadata.strategy || nextExecutionMetadata.decisionKey,
+        ).toLocaleLowerCase() === 'materialize-safe-first-delivery-plan' &&
+        normalizeOptionalString(nextExecutionMetadata.executionMode).toLocaleLowerCase() ===
+          'executor' &&
+        normalizeOptionalString(
+          nextExecutionMetadata.nextExpectedAction,
+        ).toLocaleLowerCase() === 'execute-plan'
+
+      if (preparedSafeMaterializationReady) {
+        clearVisibleExecutionRuntimeState()
+        setSessionStatus('Plan generado')
+        setCurrentStep(
+          buildPlannedCurrentStepLabel({
+            plannerInstruction: response.instruction,
+            executionMode: nextExecutionMetadata.executionMode,
+          }),
+        )
+        updateLastRunSummary({
+          objective: normalizedPlannerGoal,
+          instruction: response.instruction,
+          result: 'Pendiente de ejecución',
+          approval: 'No requerida',
+          finalStatus: 'Plan materializable listo',
+        })
+        setSessionEvents((currentEvents) => [
+          ...currentEvents,
+          'El planificador devolvió una materialización segura lista para ejecutar',
+        ])
+        addFlowMessage({
+          source: 'orquestador',
+          title: 'Decisión del orquestador',
+          content:
+            'La materialización segura quedó lista para ejecutar y el CTA ya puede pasar a Materializar entrega.',
+          status: 'success',
+        })
+        return
+      }
+
       if (isUserClarificationPlannerResponse(response)) {
         clearVisibleExecutionRuntimeState()
         setSessionStatus('Esperando una nueva definición del usuario')

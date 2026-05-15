@@ -8217,7 +8217,7 @@ function buildDomainUnderstanding({
                 'reportes',
               ]
           : explicitModuleFamily?.matches || []
-  const primaryModules = summarizeUniqueExecutorStrings(
+  const rawPrimaryModules = summarizeUniqueExecutorStrings(
     [
       ...dynamicPlanParts.modules,
       ...fallbackModules,
@@ -8226,6 +8226,18 @@ function buildDomainUnderstanding({
     ].filter(Boolean),
     12,
   )
+  const primaryModules =
+    resolvedFamilyKey === 'commercial-ecommerce'
+      ? summarizeUniqueExecutorStrings(
+          rawPrimaryModules.filter(
+            (entry) =>
+              !['autorizaciones', 'accesos', 'estados'].includes(
+                normalizeSectorDetectionText(entry),
+              ),
+          ),
+          12,
+        )
+      : rawPrimaryModules
   const primaryEntities = summarizeUniqueExecutorStrings(
     primaryModules
       .map((entry) => inferSafeFirstDeliveryMaterializationEntityName(entry))
@@ -8279,8 +8291,14 @@ function buildDomainUnderstanding({
           ? 'gestionar seguimiento y relaciones operativas'
           : '')
   const roles = []
+  const ecommerceLocalFlows =
+    resolvedFamilyKey === 'commercial-ecommerce' && commercialEcommerceProfile
+      ? commercialEcommerceProfile.localActions
+      : []
   const coreFlows = summarizeUniqueExecutorStrings(
-    dynamicPlanParts.localBehavior.length > 0
+    ecommerceLocalFlows.length > 0
+      ? ecommerceLocalFlows
+      : dynamicPlanParts.localBehavior.length > 0
       ? dynamicPlanParts.localBehavior
       : [
           primaryModules.length > 0
@@ -8292,7 +8310,9 @@ function buildDomainUnderstanding({
     10,
   )
   const localActions = summarizeUniqueExecutorStrings(
-    dynamicPlanParts.localBehavior.length > 0
+    ecommerceLocalFlows.length > 0
+      ? ecommerceLocalFlows
+      : dynamicPlanParts.localBehavior.length > 0
       ? dynamicPlanParts.localBehavior
       : coreFlows,
     10,
@@ -39356,6 +39376,22 @@ function getOpenAIBrainConfig() {
   }
 }
 
+function resolveOpenAIBrainTimeoutMs({ config, costMode }) {
+  const baseTimeoutMs =
+    Number.isFinite(config?.timeoutMs) && config.timeoutMs > 0 ? config.timeoutMs : 90000
+  const maxQualityTimeoutMs = Math.max(
+    baseTimeoutMs,
+    Number.parseInt(
+      process.env.AI_ORCHESTRATOR_BRAIN_OPENAI_MAX_QUALITY_TIMEOUT_MS || '180000',
+      10,
+    ) || 180000,
+  )
+
+  return normalizeOptionalString(costMode).toLocaleLowerCase() === 'max-quality'
+    ? maxQualityTimeoutMs
+    : baseTimeoutMs
+}
+
 function buildOpenAIBrainSystemPrompt() {
   return `
 Sos el Cerebro estratégico del ORQUESTADOR DE IA LOCAL.
@@ -40752,7 +40788,12 @@ function createOpenAIStrategicBrainProvider() {
         },
       }
       const abortController = new AbortController()
-      const timeoutId = setTimeout(() => abortController.abort(), config.timeoutMs)
+      const effectiveTimeoutMs = resolveOpenAIBrainTimeoutMs({
+        config,
+        costMode: input?.costMode,
+      })
+      const requestStartedAt = Date.now()
+      const timeoutId = setTimeout(() => abortController.abort(), effectiveTimeoutMs)
 
       try {
         const response = await fetch(config.baseUrl, {
@@ -40790,7 +40831,10 @@ function createOpenAIStrategicBrainProvider() {
         return await normalizeOpenAIBrainDecision(parsedDecision, input)
       } catch (error) {
         if (error?.name === 'AbortError') {
-          throw new Error('OpenAI superó el timeout configurado para el Cerebro.')
+          const elapsedMs = Math.max(0, Date.now() - requestStartedAt)
+          throw new Error(
+            `OpenAI superó el timeout configurado para el Cerebro (~${elapsedMs} ms, limite ${effectiveTimeoutMs} ms).`,
+          )
         }
 
         throw error
@@ -42805,9 +42849,18 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
     adapterKind: brainAdapter.kind,
     primaryProvider: brainPrimaryAdapter?.id || undefined,
     fallbackProvider: brainFallbackAdapter?.id || undefined,
+    hasOpenAIApiKeyConfigured: Boolean(process.env.OPENAI_API_KEY?.trim()),
+    openAIAttemptTimeoutMs:
+      brainPrimaryAdapter?.id === 'openai'
+        ? resolveOpenAIBrainTimeoutMs({
+            config: getOpenAIBrainConfig(),
+            costMode: brainRoutingDecision?.costMode,
+          })
+        : undefined,
     costMode: brainRoutingDecision?.costMode || undefined,
     routingMode: brainRoutingDecision?.routingMode || undefined,
     providerReason: brainRoutingDecision?.reason || undefined,
+    fallbackReason: brainRoutingDecision?.fallbackReason || undefined,
     complexity: brainRoutingDecision?.complexity || undefined,
     ambiguity: brainRoutingDecision?.ambiguity || undefined,
     risk: brainRoutingDecision?.risk || undefined,

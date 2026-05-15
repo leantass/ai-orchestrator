@@ -2533,6 +2533,138 @@ async function runSensitiveApprovalRoutingValidation() {
   }
 }
 
+async function runSoccerEcommercePreparedMaterializationTransitionValidation() {
+  const testCase = activeCases.find((entry) => entry.id === 'ecommerce-pelotas-futbol')
+  const failures = []
+
+  if (!testCase) {
+    return {
+      testCase: {
+        id: 'soccer-ecommerce-prepared-materialization-transition',
+        label: 'Transicion ecommerce de pelotas a materializacion segura',
+        goal: '',
+      },
+      ok: false,
+      failures: ['No se encontro el caso base ecommerce-pelotas-futbol para la regresion.'],
+    }
+  }
+
+  const phaseOneDecision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: testCase.goal,
+    context: testCase.context,
+    workspacePath: smokeExecutionWorkspaceRoot,
+    iteration: 1,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: 'brain-decides-missing',
+    costMode: 'smart',
+    attachedInputs: [],
+    existingProjectContext: null,
+    projectWorkMode: 'auto',
+    reusablePlanningContext: buildReusablePlanningContext(),
+  })
+
+  if (phaseOneDecision?.strategy !== 'safe-first-delivery-plan') {
+    failures.push(
+      `La fase inicial ecommerce de pelotas deberia arrancar en safe-first-delivery-plan. Recibido: ${
+        phaseOneDecision?.strategy || '(vacio)'
+      }.`,
+    )
+  }
+
+  const preparedPrompt = buildSafeFirstDeliveryMaterializationPromptLikeRenderer({
+    plan: phaseOneDecision?.safeFirstDeliveryPlan || null,
+    originalGoal: testCase.goal,
+    originalContext: testCase.context,
+  })
+  const phaseTwoDecision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: preparedPrompt.goal,
+    context: preparedPrompt.context,
+    workspacePath: smokeExecutionWorkspaceRoot,
+    iteration: 2,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: 'brain-decides-missing',
+    costMode: 'smart',
+    attachedInputs: [],
+    existingProjectContext: null,
+    projectWorkMode: 'auto',
+    reusablePlanningContext: buildReusablePlanningContext(),
+  })
+
+  if (phaseTwoDecision?.strategy !== 'materialize-safe-first-delivery-plan') {
+    failures.push(
+      `La preparacion de materializacion ecommerce deberia devolver materialize-safe-first-delivery-plan. Recibido: ${
+        phaseTwoDecision?.strategy || '(vacio)'
+      }.`,
+    )
+  }
+  if (phaseTwoDecision?.executionMode !== 'executor') {
+    failures.push(
+      `La preparacion de materializacion ecommerce deberia quedar en executor. Recibido: ${
+        phaseTwoDecision?.executionMode || '(vacio)'
+      }.`,
+    )
+  }
+  if (phaseTwoDecision?.nextExpectedAction !== 'execute-plan') {
+    failures.push(
+      `La preparacion de materializacion ecommerce deberia quedar lista para execute-plan. Recibido: ${
+        phaseTwoDecision?.nextExpectedAction || '(vacio)'
+      }.`,
+    )
+  }
+
+  const modulesSummary = normalizeText(
+    [
+      phaseTwoDecision?.domainUnderstanding?.domainLabel,
+      ...(Array.isArray(phaseTwoDecision?.domainUnderstanding?.primaryModules)
+        ? phaseTwoDecision.domainUnderstanding.primaryModules
+        : []),
+      ...(Array.isArray(phaseTwoDecision?.domainUnderstanding?.coreFlows)
+        ? phaseTwoDecision.domainUnderstanding.coreFlows
+        : []),
+      ...(Array.isArray(phaseTwoDecision?.domainUnderstanding?.localActions)
+        ? phaseTwoDecision.domainUnderstanding.localActions
+        : []),
+      ...(Array.isArray(phaseTwoDecision?.safeFirstDeliveryMaterialization?.modules)
+        ? phaseTwoDecision.safeFirstDeliveryMaterialization.modules
+        : []),
+      ...(Array.isArray(phaseTwoDecision?.safeFirstDeliveryMaterialization?.screens)
+        ? phaseTwoDecision.safeFirstDeliveryMaterialization.screens
+        : []),
+      phaseTwoDecision?.instruction,
+    ]
+      .filter(Boolean)
+      .join(' '),
+  )
+  ;[
+    'reservas',
+    'agenda inicial',
+    'profesionales mock',
+    'autorizaciones',
+    'accesos',
+    'registrar aprobaciones mock',
+    'trazabilidad local',
+    'cambiar estados mock sin depender de servicios externos',
+  ].forEach((token) => {
+    if (modulesSummary.includes(normalizeText(token))) {
+      failures.push(`La transicion a materializacion ecommerce quedo contaminada con "${token}".`)
+    }
+  })
+
+  return {
+    testCase,
+    ok: failures.length === 0,
+    failures,
+    phaseOneStrategy: phaseOneDecision?.strategy || '',
+    phaseTwoStrategy: phaseTwoDecision?.strategy || '',
+    phaseTwoExecutionMode: phaseTwoDecision?.executionMode || '',
+    phaseTwoNextExpectedAction: phaseTwoDecision?.nextExpectedAction || '',
+  }
+}
+
 async function runSoccerEcommerceMaterializationValidation() {
   const testCase = activeCases.find((entry) => entry.id === 'ecommerce-pelotas-futbol')
   const failures = []
@@ -3495,6 +3627,84 @@ function buildReusablePlanningContext() {
     reusedArtifactIds: [],
     reuseMode: 'none',
     creativeDirection: null,
+  }
+}
+
+function buildSafeFirstDeliveryMaterializationPromptLikeRenderer({
+  plan,
+  originalGoal,
+  originalContext,
+}) {
+  const safeString = (value) => (typeof value === 'string' ? value.trim() : '')
+  const sanitize = (value) =>
+    safeString(value)
+      .replace(/ecommerce/gi, 'experiencia comercial')
+      .replace(/marketplace/gi, 'experiencia de catalogo')
+      .replace(/carrito/gi, 'seleccion local')
+      .replace(/checkout/gi, 'cierre simulado')
+      .replace(/backoffice/gi, 'panel interno mock')
+      .replace(/ordenes/gi, 'resumenes de pedidos mock')
+      .replace(/órdenes/gi, 'resumenes de pedidos mock')
+      .replace(/pagos?\s+reales?/gi, 'cobros reales')
+      .replace(/pasarela\s+de\s+pagos/gi, 'pasarela externa')
+      .replace(/\bauth\s+real\b/gi, 'identidad real')
+      .replace(/autenticaci[oó]n\s+real/gi, 'identidad real')
+      .replace(/\bsin\s+aprobaci[oó]n\b/gi, 'sin validacion final')
+      .replace(/\baprobaciones?\s+futuras?\b/gi, 'validaciones futuras')
+      .replace(/base\s+de\s+datos\s+real/gi, 'persistencia real')
+      .replace(/\s+/g, ' ')
+      .trim()
+  const scopeItems = toStringArray(plan?.scope || []).map(sanitize).filter(Boolean)
+  const moduleItems = toStringArray(plan?.modules || []).map(sanitize).filter(Boolean)
+  const mockDataItems = toStringArray(plan?.mockData || []).map(sanitize).filter(Boolean)
+  const screenItems = toStringArray(plan?.screens || []).map(sanitize).filter(Boolean)
+  const behaviorItems = toStringArray(plan?.localBehavior || []).map(sanitize).filter(Boolean)
+  const exclusionItems = toStringArray(plan?.explicitExclusions || [])
+    .map(sanitize)
+    .filter(Boolean)
+  const successCriteriaItems = toStringArray(plan?.successCriteria || [])
+    .map(sanitize)
+    .filter(Boolean)
+  const scopeSummary =
+    scopeItems.length > 0
+      ? scopeItems.join('; ')
+      : 'una primera entrega segura y navegable del flujo principal'
+
+  return {
+    goal: [
+      'Materializar una primera entrega segura y acotada del objetivo actual dentro de una carpeta nueva del workspace.',
+      scopeSummary,
+      'No devolver otro safe-first-delivery-plan ni otro product-architecture-plan; devolver un plan materializable, acotado y revisable antes de ejecutar.',
+    ].join(' '),
+    context: [
+      `Objetivo original: ${sanitize(originalGoal) || 'No definido'}.`,
+      moduleItems.length > 0
+        ? `Modulos que si entran: ${moduleItems.join(' | ')}.`
+        : '',
+      screenItems.length > 0
+        ? `Pantallas o vistas prioritarias: ${screenItems.join(' | ')}.`
+        : '',
+      mockDataItems.length > 0
+        ? `Datos mock obligatorios: ${mockDataItems.join(' | ')}.`
+        : '',
+      behaviorItems.length > 0
+        ? `Comportamiento local esperado: ${behaviorItems.join(' | ')}.`
+        : '',
+      exclusionItems.length > 0
+        ? `Exclusiones obligatorias: ${exclusionItems.join(' | ')}.`
+        : '',
+      successCriteriaItems.length > 0
+        ? `Criterios de exito: ${successCriteriaItems.join(' | ')}.`
+        : '',
+      'La materializacion debe quedar acotada a archivos locales dentro del workspace, con frontend navegable, datos mock editables y sin conexiones externas reales.',
+      'No usar pagos reales, credenciales reales, webhooks reales, deploy, migraciones, auth real, base de datos real, datos sensibles reales ni integraciones externas reales.',
+      'El siguiente resultado debe ser un plan ejecutable y acotado, con carpeta destino y archivos permitidos claros, pero sin ejecutar cambios automaticamente.',
+      safeString(originalContext)
+        ? `Contexto previo del operador: ${sanitize(safeString(originalContext))}.`
+        : '',
+    ]
+      .filter(Boolean)
+      .join('\n'),
   }
 }
 
@@ -9199,6 +9409,7 @@ async function main() {
   let fullstackMaterializationResult = null
   let rechargeMaterializationResult = null
   let soccerApprovalContinuationResult = null
+  let soccerPreparedMaterializationTransitionResult = null
   let sensitiveApprovalRoutingResult = null
   let soccerMaterializationResult = null
   let projectPhaseExecutionResults = []
@@ -9230,6 +9441,13 @@ async function main() {
     soccerApprovalContinuationResult =
       await runSoccerEcommerceApprovalContinuationValidation()
     printScalableValidationResult(soccerApprovalContinuationResult)
+    console.log('-----------------')
+
+    console.log('Soccer Ecommerce Prepared Materialization Transition Check')
+    console.log('=========================================================')
+    soccerPreparedMaterializationTransitionResult =
+      await runSoccerEcommercePreparedMaterializationTransitionValidation()
+    printScalableValidationResult(soccerPreparedMaterializationTransitionResult)
     console.log('-----------------')
 
     console.log('Sensitive Approval Routing Check')
@@ -9670,6 +9888,8 @@ async function main() {
   const fullstackMaterializationFailed = fullstackMaterializationResult?.ok === false
   const rechargeMaterializationFailed = rechargeMaterializationResult?.ok === false
   const soccerApprovalContinuationFailed = soccerApprovalContinuationResult?.ok === false
+  const soccerPreparedMaterializationTransitionFailed =
+    soccerPreparedMaterializationTransitionResult?.ok === false
   const sensitiveApprovalRoutingFailed = sensitiveApprovalRoutingResult?.ok === false
   const soccerMaterializationFailed = soccerMaterializationResult?.ok === false
 
@@ -9684,6 +9904,7 @@ async function main() {
     !fullstackMaterializationFailed &&
     !rechargeMaterializationFailed &&
     !soccerApprovalContinuationFailed &&
+    !soccerPreparedMaterializationTransitionFailed &&
     !sensitiveApprovalRoutingFailed &&
     !soccerMaterializationFailed
   ) {
@@ -9712,6 +9933,11 @@ async function main() {
     }
     if (soccerApprovalContinuationResult) {
       console.log('OK. 1/1 check de continuidad post-approval ecommerce de pelotas paso.')
+    }
+    if (soccerPreparedMaterializationTransitionResult) {
+      console.log(
+        'OK. 1/1 check de transicion segura ecommerce de pelotas a materializacion paso.',
+      )
     }
     if (sensitiveApprovalRoutingResult) {
       console.log('OK. 1/1 check de approval sensible para deploy y pagos reales paso.')
@@ -9802,6 +10028,14 @@ async function main() {
     console.log(
       `- ${soccerApprovalContinuationResult.testCase.id}: ${
         soccerApprovalContinuationResult.failures[0] || 'sin detalle'
+      }`,
+    )
+  }
+  if (soccerPreparedMaterializationTransitionFailed) {
+    console.log('check de transicion segura ecommerce de pelotas a materializacion fallido:')
+    console.log(
+      `- ${soccerPreparedMaterializationTransitionResult.testCase.id}: ${
+        soccerPreparedMaterializationTransitionResult.failures[0] || 'sin detalle'
       }`,
     )
   }
