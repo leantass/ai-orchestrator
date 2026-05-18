@@ -16859,8 +16859,8 @@ function App() {
       syncBrainRoutingDecision(response.brainRoutingDecision)
       setPlannerExecutionMetadata(nextExecutionMetadata)
       setPlannerRequestSnapshot({
-        goal: plannerGoal,
-        context: plannerContext,
+        goal: goalInput,
+        context: currentExecutionContext,
         decisionKey: nextExecutionMetadata.decisionKey,
         safeFirstDeliveryPlanFingerprint: buildSafeFirstDeliveryPlanFingerprint(
           nextExecutionMetadata.safeFirstDeliveryPlan,
@@ -17260,12 +17260,13 @@ function App() {
             return
           }
 
-          if (isReviewOnlyPlannerResponse(planResponse)) {
-            setIsAutoFlowRunning(false)
-            clearVisibleExecutionRuntimeState()
-            setSessionStatus('Plan listo para revision')
-            setCurrentStep(
-              `El flujo automatico quedo detenido en la iteracion ${iteration} para revisar la arquitectura propuesta`,
+      if (isReviewOnlyPlannerResponse(planResponse)) {
+        setIsAutoFlowRunning(false)
+        clearVisibleExecutionRuntimeState()
+        settlePlannerReviewRun()
+        setSessionStatus('Plan listo para revision')
+        setCurrentStep(
+          `El flujo automatico quedo detenido en la iteracion ${iteration} para revisar la arquitectura propuesta`,
             )
             updateLastRunSummary({
               objective: normalizedGoalInput,
@@ -18254,6 +18255,7 @@ function App() {
 
       if (isReviewOnlyPlannerResponse(response)) {
         clearVisibleExecutionRuntimeState()
+        settlePlannerReviewRun()
         setSessionStatus('Plan listo para revision')
         setCurrentStep('El Cerebro devolvio una arquitectura para revisar antes de ejecutar')
         updateLastRunSummary({

@@ -2954,6 +2954,53 @@ async function runTrackingLogisticsOpenAIWebScaffoldGuardCase() {
   }
 }
 
+async function runTrackingLogisticsPostApprovalReviewStateCase() {
+  const failures = []
+  const appSource = fs.readFileSync(appFilePath, 'utf8')
+
+  pushFailure(
+    failures,
+    /const replanManualFlow = async \([\s\S]{0,5000}?setPlannerRequestSnapshot\(\{\s*[\r\n\s]*goal: goalInput,\s*[\r\n\s]*context: currentExecutionContext,/.test(
+      appSource,
+    ),
+    'replanManualFlow debe persistir goalInput y currentExecutionContext reales para no caer en ReferenceError post-approval.',
+  )
+  pushFailure(
+    failures,
+    /if \(isReviewOnlyPlannerResponse\(response\)\) \{[\s\S]{0,220}?clearVisibleExecutionRuntimeState\(\)[\s\S]{0,120}?settlePlannerReviewRun\(\)[\s\S]{0,220}?setSessionStatus\('Plan listo para revision'\)/.test(
+      appSource,
+    ),
+    'replanManualFlow debe cerrar la corrida review-only antes de dejar la UI en Plan listo para revision.',
+  )
+  pushFailure(
+    failures,
+    /if \(isReviewOnlyPlannerResponse\(planResponse\)\) \{[\s\S]{0,220}?clearVisibleExecutionRuntimeState\(\)[\s\S]{0,120}?settlePlannerReviewRun\(\)[\s\S]{0,220}?setSessionStatus\('Plan listo para revision'\)/.test(
+      appSource,
+    ),
+    'runAutoFlowLoop debe cerrar la corrida review-only antes de dejar la UI en Plan listo para revision.',
+  )
+  pushFailure(
+    failures,
+    /if \(isReviewOnlyPlannerResponse\(response\)\) \{[\s\S]{0,220}?clearVisibleExecutionRuntimeState\(\)[\s\S]{0,120}?settlePlannerReviewRun\(\)[\s\S]{0,220}?setSessionStatus\('Plan listo para revision'\)/.test(
+      appSource,
+    ),
+    'handleGenerateNextStep debe cerrar la corrida review-only antes de dejar la UI en Plan listo para revision.',
+  )
+  pushFailure(
+    failures,
+    !/const replanManualFlow = async \([\s\S]{0,5000}?setPlannerRequestSnapshot\(\{\s*[\r\n\s]*goal: plannerGoal,\s*[\r\n\s]*context: plannerContext,/.test(
+      appSource,
+    ),
+    'replanManualFlow no debe seguir usando plannerGoal/plannerContext fuera de scope.',
+  )
+
+  return {
+    id: 'tracking-logistico-fullstack-post-approval-review-state',
+    label: 'Tracking logistico fullstack post approval review state',
+    failures,
+  }
+}
+
 async function main() {
   ensureCleanDirectory(smokeWorkspaceRoot)
   try {
@@ -3192,6 +3239,7 @@ async function main() {
     results.push(await runUiContractSanityCase())
     results.push(await runUiHelperSanityCase())
     results.push(await runTrackingLogisticsPostApprovalUiStateRealCase())
+    results.push(await runTrackingLogisticsPostApprovalReviewStateCase())
     results.push(await runTrackingLogisticsOpenAIWebScaffoldGuardCase())
     results.push(await runUtf8SurfaceCase())
 
