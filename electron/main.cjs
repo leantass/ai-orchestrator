@@ -1431,6 +1431,12 @@ function buildExecuteTaskRendererPayload(response, fallbackRequestId) {
       : {}),
     ...(result ? { result } : {}),
     ...(error ? { error } : {}),
+    ...(typeof response?.status === 'string' && response.status
+      ? { status: response.status }
+      : {}),
+    ...(typeof response?.reason === 'string' && response.reason
+      ? { reason: response.reason }
+      : {}),
     ...(typeof response?.approvalRequired === 'boolean'
       ? { approvalRequired: response.approvalRequired }
       : {}),
@@ -5014,6 +5020,19 @@ function detectWebScaffoldBaseLocalTask({
     return null
   }
 
+  const fullstackWebScaffoldSafetyBlock = shouldBlockWebScaffoldExecutionForFullstackRequest({
+    goal: instruction,
+    context,
+    instruction,
+    decisionKey: 'web-scaffold-base',
+    strategy: 'web-scaffold-base',
+    executionScope,
+  })
+
+  if (fullstackWebScaffoldSafetyBlock.blocked) {
+    return null
+  }
+
   const normalizedInstruction = instruction.toLocaleLowerCase()
   const hasExplicitBusinessSector =
     typeof businessSector === 'string' &&
@@ -6655,6 +6674,12 @@ function detectScalableDeliveryPlanningIntent(goal, context) {
   ].filter(Boolean)
   const operationalDomainSignals = [
     /\bpanel operativo\b/u.test(normalizedText) ? 'panel operativo' : '',
+    /\bfrontend administrativo\b/u.test(normalizedText) ? 'frontend administrativo' : '',
+    /\bfront(?:end)? admin\b/u.test(normalizedText) ? 'frontend admin' : '',
+    /\bfrontend publico\b/u.test(normalizedText) ||
+    /\bfrontend público\b/u.test(normalizedText)
+      ? 'frontend publico'
+      : '',
     /\breportes?\b/u.test(normalizedText) ? 'reportes' : '',
     /\broles?\b/u.test(normalizedText) ? 'roles' : '',
     /\busuarios?\b/u.test(normalizedText) ? 'usuarios' : '',
@@ -6747,6 +6772,176 @@ function detectScalableDeliveryPlanningIntent(goal, context) {
     productTypeHint: directProductType,
     explicitSignals,
     requiresSensitiveReview: deliveryLevel === 'infra-local-plan',
+  }
+}
+
+function detectStrongFullstackLocalRequestProfile({
+  goal,
+  context,
+  previousExecutionResult,
+  extraTexts = [],
+}) {
+  const aggregateContext = [
+    context,
+    previousExecutionResult,
+    ...(Array.isArray(extraTexts) ? extraTexts : []),
+  ]
+    .filter((value) => typeof value === 'string' && value.trim())
+    .join('\n')
+
+  return detectScalableDeliveryPlanningIntent(goal, aggregateContext)
+}
+
+function looksLikeWebScaffoldExecutionPayload({
+  decisionKey,
+  strategy,
+  instruction,
+  context,
+  executionScope,
+  materializationPlan,
+  extraTexts = [],
+}) {
+  const normalizedDecisionKey = normalizeOptionalString(decisionKey).toLocaleLowerCase()
+  const normalizedStrategy = normalizeOptionalString(strategy).toLocaleLowerCase()
+  const allowedTargetPaths = summarizeUniqueExecutorStrings(
+    executionScope?.allowedTargetPaths,
+    32,
+  )
+  const materializationTargets =
+    materializationPlan && typeof materializationPlan === 'object'
+      ? [
+          normalizeOptionalString(materializationPlan.projectRoot),
+          ...(Array.isArray(materializationPlan.allowedTargetPaths)
+            ? materializationPlan.allowedTargetPaths.map((entry) =>
+                normalizeOptionalString(entry),
+              )
+            : []),
+          ...(Array.isArray(materializationPlan.operations)
+            ? materializationPlan.operations.map((entry) =>
+                normalizeOptionalString(entry?.targetPath),
+              )
+            : []),
+        ]
+      : []
+  const payloadSummary = [
+    normalizedDecisionKey,
+    normalizedStrategy,
+    normalizeOptionalString(instruction),
+    normalizeOptionalString(context),
+    ...allowedTargetPaths,
+    ...materializationTargets,
+    ...(Array.isArray(extraTexts) ? extraTexts : []),
+  ]
+    .filter((value) => typeof value === 'string' && value.trim())
+    .join(' ')
+    .toLocaleLowerCase()
+
+  return (
+    normalizedDecisionKey === 'web-scaffold-base' ||
+    normalizedStrategy === 'web-scaffold-base' ||
+    looksLikeWebScaffoldPlannerInstruction(instruction) ||
+    payloadSummary.includes('index.html') ||
+    payloadSummary.includes('styles.css') ||
+    payloadSummary.includes('script.js') ||
+    payloadSummary.includes('rediseñar la landing') ||
+    payloadSummary.includes('redisenar la landing') ||
+    /\bweb-[a-z0-9-]+\b/u.test(payloadSummary)
+  )
+}
+
+function shouldBlockWebScaffoldExecutionForFullstackRequest({
+  goal,
+  context,
+  previousExecutionResult,
+  decisionKey,
+  strategy,
+  instruction,
+  executionScope,
+  materializationPlan,
+  extraTexts = [],
+}) {
+  const fullstackProfile = detectStrongFullstackLocalRequestProfile({
+    goal,
+    context,
+    previousExecutionResult,
+    extraTexts: [
+      normalizeOptionalString(instruction),
+      normalizeOptionalString(decisionKey),
+      normalizeOptionalString(strategy),
+      ...(Array.isArray(extraTexts) ? extraTexts : []),
+    ],
+  })
+  const hasStrongFullstackSignals =
+    fullstackProfile.matches && fullstackProfile.deliveryLevel === 'fullstack-local'
+  const looksLikeWebScaffold = looksLikeWebScaffoldExecutionPayload({
+    decisionKey,
+    strategy,
+    instruction,
+    context,
+    executionScope,
+    materializationPlan,
+    extraTexts,
+  })
+  const blocked = hasStrongFullstackSignals && looksLikeWebScaffold
+
+  return {
+    blocked,
+    reason: blocked ? 'fullstack request cannot execute web scaffold' : '',
+    profile: fullstackProfile,
+  }
+}
+
+function buildBlockedFullstackWebScaffoldExecutionResponse({
+  requestId,
+  instruction,
+  decisionKey,
+  context,
+  executionScope,
+  reason,
+  materializationPlan,
+}) {
+  const normalizedReason =
+    typeof reason === 'string' && reason.trim()
+      ? reason.trim()
+      : 'fullstack request cannot execute web scaffold'
+
+  return {
+    ok: false,
+    status: 'blocked',
+    reason: normalizedReason,
+    error: normalizedReason,
+    failureType: 'blocked_fullstack_web_scaffold',
+    ...(requestId ? { requestId } : {}),
+    ...(typeof instruction === 'string' && instruction.trim()
+      ? { instruction: instruction.trim() }
+      : {}),
+    details: {
+      status: 'blocked',
+      reason: normalizedReason,
+      decisionKey: normalizeOptionalString(decisionKey) || 'web-scaffold-base',
+      blockedStrategy: 'web-scaffold-base',
+      executionMode: 'executor',
+      contextPreview:
+        typeof context === 'string' && context.trim()
+          ? context.trim().replace(/\s+/g, ' ').slice(0, 240)
+          : '',
+      allowedTargetPaths: summarizeUniqueExecutorStrings(
+        executionScope?.allowedTargetPaths,
+        24,
+      ),
+      materializationTargets:
+        materializationPlan && typeof materializationPlan === 'object'
+          ? summarizeUniqueExecutorStrings(
+              [
+                normalizeOptionalString(materializationPlan.projectRoot),
+                ...(Array.isArray(materializationPlan.allowedTargetPaths)
+                  ? materializationPlan.allowedTargetPaths
+                  : []),
+              ],
+              24,
+            )
+          : [],
+    },
   }
 }
 
@@ -37267,6 +37462,20 @@ async function buildLocalStrategicBrainDecision({
     goal,
     normalizedContext,
   )
+  const strongFullstackRequestProfile = detectStrongFullstackLocalRequestProfile({
+    goal,
+    context: normalizedContext,
+    previousExecutionResult,
+    extraTexts: [
+      plannerFeedback?.instruction,
+      plannerFeedback?.approvalReason,
+      plannerFeedback?.freeAnswer,
+      plannerFeedback?.error,
+    ],
+  })
+  const hasStrongFullstackRequestGuard =
+    strongFullstackRequestProfile.matches &&
+    strongFullstackRequestProfile.deliveryLevel === 'fullstack-local'
   const productArchitectureIntent = detectProductArchitecturePlanningIntent(
     goal,
     normalizedContext,
@@ -38311,8 +38520,7 @@ async function buildLocalStrategicBrainDecision({
   if (
     approvalAlreadyGranted &&
     noDeployLocalContinuationIntent &&
-    scalableDeliveryIntent.matches &&
-    scalableDeliveryIntent.deliveryLevel === 'fullstack-local' &&
+    hasStrongFullstackRequestGuard &&
     !fullstackLocalMaterializationIntent.matches &&
     !frontendProjectMaterializationIntent.matches &&
     !materializeSafeFirstDeliveryIntent.matches &&
@@ -38338,6 +38546,52 @@ async function buildLocalStrategicBrainDecision({
         executionMode: 'planner-only',
         reason:
           'La aprobacion humana aclaro que la continuidad debe seguir solo en local con backend y base SQLite/local, por lo que no corresponde degradar a un scaffold visual ni ejecutar archivos todavia.',
+        tasks: scalableDeliveryPlan.tasks,
+        requiresApproval: false,
+        assumptions: scalableDeliveryPlan.assumptions,
+        instruction: scalableDeliveryPlan.instruction,
+        completed: false,
+        nextExpectedAction: 'review-scalable-delivery',
+        scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
+      },
+      {
+        deliveryLevel: 'fullstack-local',
+        scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
+      },
+    )
+  }
+
+  if (
+    hasStrongFullstackRequestGuard &&
+    !fullstackLocalMaterializationIntent.matches &&
+    !frontendProjectMaterializationIntent.matches &&
+    !materializeSafeFirstDeliveryIntent.matches &&
+    !safeFirstDeliveryIntent.matches &&
+    !scopedFileEditIntent &&
+    !localGoalDescriptor &&
+    compositeSteps.length < 2 &&
+    (!previousExecutionResult ||
+      iteration === 1 ||
+      approvalAlreadyGranted ||
+      hasRecoverableExecutionError)
+  ) {
+    const scalableDeliveryPlan = buildScalableDeliveryPlan({
+      goal,
+      context,
+      workspacePath,
+      deliveryLevel: 'fullstack-local',
+      domainUnderstanding,
+      reason:
+        'El pedido conserva señales fuertes de fullstack local con backend, API y base local, así que el fallback local-rules debe mantenerse en revisión fullstack y nunca degradar a web-scaffold-base.',
+    })
+
+    return buildDecisionWithPlanningContracts(
+      {
+        decisionKey: 'scalable-delivery-plan',
+        strategy: 'scalable-delivery-plan',
+        executionMode: 'planner-only',
+        reason:
+          'El objetivo mantiene un alcance fullstack local fuerte; aunque exista ruido de landing o timeout aguas arriba, el fallback debe volver a review-scalable-delivery y no ejecutar un scaffold web.',
         tasks: scalableDeliveryPlan.tasks,
         requiresApproval: false,
         assumptions: scalableDeliveryPlan.assumptions,
@@ -38712,6 +38966,7 @@ async function buildLocalStrategicBrainDecision({
 
   if (
     looksLikeWebBaseGoal &&
+    !hasStrongFullstackRequestGuard &&
     !wantsExtendedWebScaffoldDeliverables &&
     (!previousExecutionResult ||
       iteration === 1 ||
@@ -40775,13 +41030,19 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
     fallbackScalableDeliveryPlan?.deliveryLevel ||
     normalizeOptionalString(fallbackDecision?.projectBlueprint?.deliveryLevel) ||
     ''
-  const originalScalableDeliveryIntent = detectScalableDeliveryPlanningIntent(
-    input?.goal,
-    input?.context,
-  )
+  const originalScalableDeliveryIntent = detectStrongFullstackLocalRequestProfile({
+    goal: input?.goal,
+    context: input?.context,
+    previousExecutionResult:
+      typeof input?.previousExecutionResult === 'string'
+        ? input.previousExecutionResult
+        : '',
+  })
   const originalFullstackLocalIntent =
     originalScalableDeliveryIntent.matches &&
     originalScalableDeliveryIntent.deliveryLevel === 'fullstack-local'
+  const originalFullstackLocalMaterializationIntent =
+    detectFullstackLocalMaterializationPlanningIntent(input?.goal, input?.context).matches
   const rawLooksLikeWebScaffoldRegression = looksLikeWebScaffoldDecisionPayload(rawDecision)
   const resolvedStrategy =
     typeof rawDecision?.strategy === 'string' && rawDecision.strategy.trim()
@@ -40808,8 +41069,21 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
         'executor' &&
         normalizeOptionalString(rawDecision?.strategy).toLocaleLowerCase() !==
           'materialize-fullstack-local-plan'))
+  const shouldGuardUnexpectedFullstackExecutor =
+    fallbackIsStructuredFullstackLocalDecision &&
+    fallbackDecision?.strategy === 'scalable-delivery-plan' &&
+    normalizeOptionalString(fallbackDecision?.executionMode).toLocaleLowerCase() ===
+      'planner-only' &&
+    originalFullstackLocalIntent &&
+    normalizeOptionalString(rawDecision?.executionMode).toLocaleLowerCase() ===
+      'executor' &&
+    (!originalFullstackLocalMaterializationIntent ||
+      rawLooksLikeWebScaffoldRegression ||
+      normalizeOptionalString(rawDecision?.strategy).toLocaleLowerCase() ===
+        'web-scaffold-base')
   const shouldForceFallbackFullstackLocalContracts =
     shouldGuardOpenAIWebScaffoldRegression ||
+    shouldGuardUnexpectedFullstackExecutor ||
     isStructuredFullstackLocalDecision(resolvedStrategy, resolvedDeliveryLevel)
   const shouldDropStaleApprovalArtifacts =
     shouldForceFallbackFullstackLocalContracts &&
@@ -42997,6 +43271,51 @@ function runExecutorTask({
         return responseWithRuntime
       }
 
+      const fullstackWebScaffoldSafetyBlock = shouldBlockWebScaffoldExecutionForFullstackRequest(
+        {
+          goal: instruction,
+          context,
+          decisionKey:
+            typeof responseWithRuntime?.details?.brainStrategy === 'string'
+              ? responseWithRuntime.details.brainStrategy
+              : '',
+          strategy:
+            typeof responseWithRuntime?.details?.brainStrategy === 'string'
+              ? responseWithRuntime.details.brainStrategy
+              : '',
+          instruction,
+          executionScope,
+          materializationPlan: responseMaterializationPlan,
+        },
+      )
+
+      if (fullstackWebScaffoldSafetyBlock.blocked) {
+        emitEvent?.(
+          'runExecutorTask bloqueó scaffold web degradado',
+          'Electron bloqueó un materializationPlan degradado a web scaffold porque el pedido original sigue siendo fullstack local.',
+          'error',
+          {
+            requestId: requestId || undefined,
+            reason: fullstackWebScaffoldSafetyBlock.reason,
+          },
+        )
+        return attachExecutorRuntimeMetadata(
+          buildBlockedFullstackWebScaffoldExecutionResponse({
+            requestId,
+            instruction,
+            decisionKey:
+              typeof responseWithRuntime?.details?.brainStrategy === 'string'
+                ? responseWithRuntime.details.brainStrategy
+                : '',
+            context,
+            executionScope,
+            reason: fullstackWebScaffoldSafetyBlock.reason,
+            materializationPlan: responseMaterializationPlan,
+          }),
+          runtimeMetadata,
+        )
+      }
+
       const localMaterializationTask = buildLocalDeterministicTaskFromPlan({
         plan: responseMaterializationPlan,
         workspacePath,
@@ -43719,6 +44038,63 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
 
   void (async () => {
     try {
+      const fullstackWebScaffoldSafetyBlock = shouldBlockWebScaffoldExecutionForFullstackRequest({
+        goal: instruction,
+        context,
+        decisionKey,
+        strategy: decisionKey,
+        instruction,
+        executionScope,
+        materializationPlan,
+      })
+
+      if (fullstackWebScaffoldSafetyBlock.blocked) {
+        debugMainLog('execute-task:fullstack-web-scaffold-blocked', {
+          requestId: requestId || undefined,
+          decisionKey: decisionKey || undefined,
+          reason: fullstackWebScaffoldSafetyBlock.reason,
+        })
+        emitExecutionEvent(webContents, {
+          requestId: requestId || undefined,
+          source: 'orquestador',
+          title: 'Ruta bloqueada por safety gate',
+          content:
+            'Electron bloqueó una ejecución degradada a web scaffold porque el pedido original mantiene alcance fullstack local.',
+          status: 'error',
+          raw: JSON.stringify(fullstackWebScaffoldSafetyBlock, null, 2),
+        })
+        const blockedResponse = buildExecuteTaskCompletionPayload(
+          enrichExecutorFailureResponseWithHistory({
+            response: buildBlockedFullstackWebScaffoldExecutionResponse({
+              requestId,
+              instruction,
+              decisionKey,
+              context,
+              executionScope,
+              reason: fullstackWebScaffoldSafetyBlock.reason,
+              materializationPlan,
+            }),
+            requestId,
+            instruction,
+            workspacePath,
+            businessSector,
+            businessSectorLabel,
+            decisionKey,
+          }),
+          requestId,
+        )
+        emitExecutionFailedEventBestEffort({
+          finalResponse: blockedResponse,
+          requestId,
+          instruction,
+          workspacePath,
+          decisionKey,
+          contextHubStatus,
+        })
+        emitExecutionCompleteEvent(webContents, blockedResponse)
+        return
+      }
+
       let forcedLocalTask = null
 
       if (

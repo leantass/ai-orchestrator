@@ -37,7 +37,11 @@ const continuationBasePhaseIds = [
   'local-validation',
   'review-and-expand',
 ]
-const requiredPlannerFunctions = ['buildLocalStrategicBrainDecision']
+const requiredPlannerFunctions = [
+  'buildLocalStrategicBrainDecision',
+  'shouldBlockWebScaffoldExecutionForFullstackRequest',
+  'buildBlockedFullstackWebScaffoldExecutionResponse',
+]
 const veterinaryGoalCase = {
   goal:
     'Hacer un sistema fullstack local para turnos de veterinaria con clientes, mascotas, turnos, recordatorios y reportes.',
@@ -494,6 +498,8 @@ function loadPlannerTestingSurface() {
 ${plannerSurface}
 module.exports = {
   buildLocalStrategicBrainDecision,
+  shouldBlockWebScaffoldExecutionForFullstackRequest,
+  buildBlockedFullstackWebScaffoldExecutionResponse,
 };
 `
 
@@ -3001,6 +3007,236 @@ async function runTrackingLogisticsPostApprovalReviewStateCase() {
   }
 }
 
+async function runTrackingLogisticsTimeoutFallbackNoWebScaffoldCase() {
+  const failures = []
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal:
+      'Sistema fullstack local de tracking logistico para una empresa de logistica con backend local, API local, SQLite o base local, frontend administrativo, consulta publica por codigo, entidades y relaciones, envios, historial de eventos, incidencias y reportes basicos.',
+    context:
+      'No landing. No demo solamente visual. No deploy. No credenciales. No servicios externos. No pagos. No Docker. No base productiva.',
+    workspacePath: smokeWorkspaceRoot,
+    iteration: 1,
+    previousExecutionResult:
+      'OpenAI superó el timeout configurado para el Cerebro (~62000 ms, limite 60000 ms).',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: 'brain-decides-missing',
+    costMode: 'max-quality',
+    attachedInputs: [],
+    existingProjectContext: null,
+    projectWorkMode: 'auto',
+    reusablePlanningContext: buildReusablePlanningContext(),
+  })
+
+  pushFailure(
+    failures,
+    String(decision?.strategy || '').trim() === 'scalable-delivery-plan',
+    'El fallback local-rules post-timeout debe volver a scalable-delivery-plan.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.executionMode || '').trim() === 'planner-only',
+    'El fallback local-rules post-timeout debe quedar en planner-only.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.nextExpectedAction || '').trim() === 'review-scalable-delivery',
+    'El fallback local-rules post-timeout debe volver a review-scalable-delivery.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.decisionKey || '').trim() !== 'web-scaffold-base',
+    'El fallback local-rules post-timeout no debe caer en decisionKey web-scaffold-base.',
+  )
+  pushFailure(
+    failures,
+    !(decision?.materializationPlan && typeof decision.materializationPlan === 'object'),
+    'El fallback local-rules post-timeout no debe devolver materializationPlan de landing.',
+  )
+
+  return {
+    id: 'tracking-logistico-fullstack-timeout-fallback-no-web-scaffold',
+    label: 'Tracking logistico fullstack timeout fallback no web scaffold',
+    failures,
+  }
+}
+
+async function runTrackingLogisticsExecutorBlocksWebScaffoldCase() {
+  const failures = []
+  const mainSource = fs.readFileSync(mainFilePath, 'utf8')
+  const guardDecision = plannerApi.shouldBlockWebScaffoldExecutionForFullstackRequest({
+    goal:
+      'Sistema fullstack local de tracking logistico con backend local, SQLite local, API local, frontend administrativo y consulta publica por codigo.',
+    context:
+      'Entidades y relaciones, envios, historial de eventos, incidencias. No landing. No demo visual solamente.',
+    decisionKey: 'web-scaffold-base',
+    strategy: 'web-scaffold-base',
+    instruction:
+      'Rediseñar la landing y materializar la carpeta web-sistema-de-tracking-logistico con index.html, styles.css y script.js.',
+    executionScope: {
+      allowedTargetPaths: ['web-sistema-de-tracking-logistico/index.html'],
+    },
+    materializationPlan: {
+      projectRoot: 'web-sistema-de-tracking-logistico',
+      allowedTargetPaths: ['web-sistema-de-tracking-logistico'],
+    },
+  })
+  const blockedResponse = plannerApi.buildBlockedFullstackWebScaffoldExecutionResponse({
+    requestId: 'operator-smoke-block',
+    instruction:
+      'Rediseñar la landing y materializar la carpeta web-sistema-de-tracking-logistico con index.html, styles.css y script.js.',
+    decisionKey: 'web-scaffold-base',
+    context:
+      'Backend local, SQLite local, API local, frontend administrativo y consulta publica por codigo.',
+    executionScope: {
+      allowedTargetPaths: ['web-sistema-de-tracking-logistico/index.html'],
+    },
+    materializationPlan: {
+      projectRoot: 'web-sistema-de-tracking-logistico',
+      allowedTargetPaths: ['web-sistema-de-tracking-logistico'],
+    },
+    reason: guardDecision.reason,
+  })
+
+  pushFailure(
+    failures,
+    guardDecision?.blocked === true,
+    'El guard del executor debe bloquear web scaffold cuando el pedido original es fullstack fuerte.',
+  )
+  pushFailure(
+    failures,
+    blockedResponse?.ok === false &&
+      String(blockedResponse?.status || '').trim() === 'blocked' &&
+      String(blockedResponse?.reason || '').trim() === 'fullstack request cannot execute web scaffold',
+    'La respuesta bloqueada del executor debe devolver ok:false, status:blocked y el reason canonico.',
+  )
+  pushFailure(
+    failures,
+    /const fullstackWebScaffoldSafetyBlock = shouldBlockWebScaffoldExecutionForFullstackRequest\(\{[\s\S]{0,320}?decisionKey[\s\S]{0,240}?materializationPlan[\s\S]{0,180}?\}\)/.test(
+      mainSource,
+    ),
+    'execute-task debe evaluar el safety gate fullstack antes de materializar web scaffold.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes("title: 'Ruta bloqueada por safety gate'") &&
+      mainSource.includes('buildBlockedFullstackWebScaffoldExecutionResponse({') &&
+      mainSource.includes('emitExecutionCompleteEvent(webContents, blockedResponse)'),
+    'execute-task debe devolver un blocked seguro cuando detecta web scaffold degradado para un pedido fullstack.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('runExecutorTask bloqueó scaffold web degradado') &&
+      mainSource.includes('materializationPlan: responseMaterializationPlan') &&
+      mainSource.includes('return attachExecutorRuntimeMetadata('),
+    'runExecutorTask debe bloquear también materializationPlan degradado a web scaffold antes de materializar localmente.',
+  )
+
+  return {
+    id: 'tracking-logistico-fullstack-executor-blocks-web-scaffold',
+    label: 'Tracking logistico fullstack executor blocks web scaffold',
+    failures,
+  }
+}
+
+async function runArtifactMemoryNotSavedForBlockedFullstackWebScaffoldCase() {
+  const failures = []
+  const mainSource = fs.readFileSync(mainFilePath, 'utf8')
+
+  pushFailure(
+    failures,
+    /if \(fullstackWebScaffoldSafetyBlock\.blocked\) \{[\s\S]{0,900}?return[\s\S]*?let forcedLocalTask = null/.test(
+      mainSource,
+    ),
+    'El blocked del safety gate debe cortar la ejecucion antes de la ruta rapida local.',
+  )
+  pushFailure(
+    failures,
+    mainSource.indexOf('execute-task:fullstack-web-scaffold-blocked') >= 0 &&
+      mainSource.indexOf('execute-task:artifact-memory-saved') >= 0 &&
+      mainSource.indexOf('execute-task:fullstack-web-scaffold-blocked') <
+        mainSource.indexOf('execute-task:artifact-memory-saved'),
+    'El bloqueo fullstack debe ocurrir antes de cualquier guardado de artifact memory.',
+  )
+  pushFailure(
+    failures,
+    /if \(fastRouteResponse\?\.ok === true\) \{[\s\S]{0,500}?buildReusableArtifactFromWebScaffold/.test(
+      mainSource,
+    ),
+    'La memoria reusable debe seguir condicionada a fastRouteResponse.ok === true.',
+  )
+
+  return {
+    id: 'artifact-memory-not-saved-for-blocked-fullstack-web-scaffold',
+    label: 'Artifact memory not saved for blocked fullstack web scaffold',
+    failures,
+  }
+}
+
+async function runTrackingLogisticsPostApprovalDoesNotMaterializeWebBaseCase() {
+  const failures = []
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal:
+      'Sistema fullstack local de tracking logistico para una empresa de logistica con backend local, API local, SQLite o base local, frontend administrativo, consulta publica por codigo, entidades y relaciones, envios, historial de eventos, incidencias y reportes basicos.',
+    context:
+      'No landing. No demo solamente visual. No deploy. No credenciales. No servicios externos. No pagos. No Docker. No base productiva.',
+    workspacePath: smokeWorkspaceRoot,
+    iteration: 2,
+    previousExecutionResult:
+      '__orchestrator_feedback__:' +
+      JSON.stringify({
+        type: 'approval-granted',
+        source: 'planner',
+        approvalMode: 'once',
+        instruction:
+          'Continuar solo con backend local, API local y SQLite local, sin deploy ni servicios externos.',
+        approvalReason:
+          'El usuario rechazo deploy pero mantiene permitido backend local y base SQLite local.',
+        approvalRequestDecisionKey: 'approve-public-deploy',
+        selectedOption: 'No deploy',
+        freeAnswer:
+          'No deploy. Seguir local. Backend local y SQLite permitidos. No externos.',
+        error:
+          'OpenAI superó el timeout configurado para el Cerebro (~62000 ms, limite 60000 ms).',
+      }),
+    requiresApproval: true,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: 'brain-decides-missing',
+    costMode: 'max-quality',
+    attachedInputs: [],
+    existingProjectContext: null,
+    projectWorkMode: 'auto',
+    reusablePlanningContext: buildReusablePlanningContext(),
+  })
+
+  pushFailure(
+    failures,
+    String(decision?.strategy || '').trim() === 'scalable-delivery-plan',
+    'La continuidad post-approval con timeout no debe salir de scalable-delivery-plan.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.executionMode || '').trim() === 'planner-only',
+    'La continuidad post-approval con timeout no debe materializar ni entrar en executor.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.nextExpectedAction || '').trim() === 'review-scalable-delivery',
+    'La continuidad post-approval con timeout debe volver a review-scalable-delivery.',
+  )
+  pushFailure(
+    failures,
+    !(decision?.materializationPlan && typeof decision.materializationPlan === 'object'),
+    'La continuidad post-approval con timeout no debe devolver materializationPlan web base.',
+  )
+
+  return {
+    id: 'tracking-logistico-fullstack-post-approval-does-not-materialize-web-base',
+    label: 'Tracking logistico fullstack post approval does not materialize web base',
+    failures,
+  }
+}
+
 async function main() {
   ensureCleanDirectory(smokeWorkspaceRoot)
   try {
@@ -3241,6 +3477,10 @@ async function main() {
     results.push(await runTrackingLogisticsPostApprovalUiStateRealCase())
     results.push(await runTrackingLogisticsPostApprovalReviewStateCase())
     results.push(await runTrackingLogisticsOpenAIWebScaffoldGuardCase())
+    results.push(await runTrackingLogisticsTimeoutFallbackNoWebScaffoldCase())
+    results.push(await runTrackingLogisticsExecutorBlocksWebScaffoldCase())
+    results.push(await runArtifactMemoryNotSavedForBlockedFullstackWebScaffoldCase())
+    results.push(await runTrackingLogisticsPostApprovalDoesNotMaterializeWebBaseCase())
     results.push(await runUtf8SurfaceCase())
 
     const failedResults = results.filter((result) => result.failures.length > 0)
