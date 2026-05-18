@@ -51,6 +51,7 @@ const requiredPlannerFunctions = [
   'buildSafeFirstDeliveryPlan',
   'buildMaterializeSafeFirstDeliveryPlan',
   'buildLocalStrategicBrainDecision',
+  'normalizeOpenAIBrainDecision',
   'buildStrategicBrainInput',
 ]
 
@@ -1051,14 +1052,21 @@ function loadPlannerTestingSurface() {
     startMarker: 'function normalizeExecutorAttemptScope(',
     endMarker: 'function buildOpenAIBrainInputPayload(input) {',
   })
+  const normalizeOpenAISurface = extractSegment({
+    name: 'normalizacion openai del planner',
+    startMarker: 'async function normalizeOpenAIBrainDecision(rawDecision, input) {',
+    endMarker: 'function createLocalRulesStrategicBrainProvider() {',
+  })
   const harness = `
 ${plannerSurface}
+${normalizeOpenAISurface}
 module.exports = {
   buildDomainUnderstanding,
   buildProductArchitecturePlan,
   buildSafeFirstDeliveryPlan,
   buildMaterializeSafeFirstDeliveryPlan,
   buildLocalStrategicBrainDecision,
+  normalizeOpenAIBrainDecision,
   buildStrategicBrainInput,
 };
 `
@@ -2572,6 +2580,62 @@ async function runLogisticsFullstackApprovalContinuationValidation() {
   const strategy = String(decision?.strategy || '').trim()
   const executionMode = String(decision?.executionMode || '').trim()
   const nextExpectedAction = String(decision?.nextExpectedAction || '').trim()
+  const nextActionPlan =
+    decision?.nextActionPlan && typeof decision.nextActionPlan === 'object'
+      ? decision.nextActionPlan
+      : null
+  const projectReadinessState =
+    decision?.projectReadinessState && typeof decision.projectReadinessState === 'object'
+      ? decision.projectReadinessState
+      : null
+  const projectContinuationState =
+    decision?.projectContinuationState &&
+    typeof decision.projectContinuationState === 'object'
+      ? decision.projectContinuationState
+      : null
+  const localProjectManifest =
+    decision?.localProjectManifest && typeof decision.localProjectManifest === 'object'
+      ? decision.localProjectManifest
+      : null
+  const scalableDeliveryPlan =
+    decision?.scalableDeliveryPlan && typeof decision.scalableDeliveryPlan === 'object'
+      ? decision.scalableDeliveryPlan
+      : null
+  const planFiles = Array.isArray(scalableDeliveryPlan?.filesToCreate)
+    ? scalableDeliveryPlan.filesToCreate.map((entry) => String(entry?.path || '').trim())
+    : []
+  const planDirectories = Array.isArray(scalableDeliveryPlan?.directories)
+    ? scalableDeliveryPlan.directories.map((entry) => String(entry || '').trim())
+    : []
+  const planStructure = Array.isArray(scalableDeliveryPlan?.targetStructure)
+    ? scalableDeliveryPlan.targetStructure.map((entry) => String(entry || '').trim())
+    : []
+  const planAllowedRoots = Array.isArray(scalableDeliveryPlan?.allowedRootPaths)
+    ? scalableDeliveryPlan.allowedRootPaths.map((entry) => String(entry || '').trim())
+    : []
+  const readinessApprovalAreas = Array.isArray(projectReadinessState?.approvalRequiredAreas)
+    ? projectReadinessState.approvalRequiredAreas.map((entry) => String(entry || '').trim())
+    : []
+  const readinessPlannerOnlyAreas = Array.isArray(projectReadinessState?.plannerOnlyAreas)
+    ? projectReadinessState.plannerOnlyAreas.map((entry) => String(entry || '').trim())
+    : []
+  const runtimeApprovalPreviewTokens = [
+    ...(Array.isArray(decision?.runtimeApprovalState?.commandsPreview)
+      ? decision.runtimeApprovalState.commandsPreview
+      : []),
+    ...(Array.isArray(decision?.approvalRequestPlan?.commandsPreview)
+      ? decision.approvalRequestPlan.commandsPreview
+      : []),
+  ].map((entry) => String(entry || '').trim())
+  const planTargetSummary = [
+    localProjectManifest?.projectRoot,
+    ...planAllowedRoots,
+    ...planDirectories,
+    ...planStructure,
+    ...planFiles,
+  ]
+    .map((entry) => String(entry || '').trim())
+    .filter(Boolean)
   const domainSummary = normalizeText(
     [
       decision?.reason,
@@ -2609,8 +2673,141 @@ async function runLogisticsFullstackApprovalContinuationValidation() {
       `La continuidad post-approval fullstack deberia seguir en scalable-delivery-plan. Recibido: ${strategy || '(vacio)'}.`,
     )
   }
+  if (
+    String(decision?.businessSector || '').trim() &&
+    String(decision?.businessSector || '').trim() !== 'logistics'
+  ) {
+    failures.push(
+      `businessSector incorrecto. Esperado: logistics. Recibido: ${decision?.businessSector || '(vacio)'}.`,
+    )
+  }
+  if (String(scalableDeliveryPlan?.deliveryLevel || '').trim() !== 'fullstack-local') {
+    failures.push('scalableDeliveryPlan.deliveryLevel deberia ser fullstack-local.')
+  }
   if (decision?.materializationPlan && typeof decision.materializationPlan === 'object') {
     failures.push('No deberia haber materializationPlan ejecutable en la continuidad post-approval fullstack.')
+  }
+  if (decision?.approvalRequest) {
+    failures.push('No deberia quedar approvalRequest pendiente despues de la aprobacion humana.')
+  }
+  if (String(decision?.question || '').trim()) {
+    failures.push('No deberia quedar una question de aprobacion pendiente despues de la aprobacion humana.')
+  }
+  if (decision?.approvalRequestPlan) {
+    failures.push('No deberia quedar approvalRequestPlan pendiente despues de la aprobacion humana.')
+  }
+  if (decision?.runtimeApprovalState) {
+    failures.push('No deberia quedar runtimeApprovalState pendiente despues de la aprobacion humana.')
+  }
+  if (!nextActionPlan) {
+    failures.push('nextActionPlan ausente en la continuidad post-approval fullstack.')
+  } else {
+    if (String(nextActionPlan.actionType || '').trim() === 'request-approval') {
+      failures.push('nextActionPlan no debe quedar en request-approval despues de la aprobacion humana.')
+    }
+    if (nextActionPlan.requiresApproval === true) {
+      failures.push('nextActionPlan.requiresApproval no debe quedar en true despues de la aprobacion humana.')
+    }
+    if (
+      String(nextActionPlan.targetStrategy || '').trim() !==
+      'materialize-fullstack-local-plan'
+    ) {
+      failures.push('nextActionPlan.targetStrategy deberia seguir apuntando a materialize-fullstack-local-plan.')
+    }
+    if (
+      normalizeText(nextActionPlan.userFacingLabel || '').includes(
+        normalizeText('Resolver aprobación sensible'),
+      )
+    ) {
+      failures.push('nextActionPlan no deberia pedir Resolver aprobacion sensible como accion actual.')
+    }
+  }
+  if (!projectReadinessState) {
+    failures.push('projectReadinessState ausente en la continuidad post-approval fullstack.')
+  } else {
+    const runtimeReadiness = String(projectReadinessState.runtimeReadiness || '').trim()
+    const nextBestAction = projectReadinessState.nextBestAction || null
+    if (runtimeReadiness === 'approval-preview' || runtimeReadiness === 'approval-pending') {
+      failures.push(`runtimeReadiness no deberia quedar en approval-preview/pending. Recibido: ${runtimeReadiness}.`)
+    }
+    if (
+      readinessApprovalAreas.some((entry) =>
+        normalizeText(entry).includes(normalizeText('Resolver aprobación sensible')),
+      )
+    ) {
+      failures.push('projectReadinessState no deberia exponer Resolver aprobacion sensible como area actual.')
+    }
+    if (
+      readinessPlannerOnlyAreas.length > 0 &&
+      !readinessPlannerOnlyAreas.some((entry) =>
+        normalizeText(entry).includes(normalizeText('Preparar materialización fullstack local')),
+      )
+    ) {
+      failures.push('projectReadinessState deberia seguir mostrando la revision fullstack local como planner-only area.')
+    }
+    if (nextBestAction) {
+      if (nextBestAction.requiresApproval === true) {
+        failures.push('projectReadinessState.nextBestAction no debe requerir aprobacion.')
+      }
+      if (String(nextBestAction.targetStrategy || '').trim() !== 'materialize-fullstack-local-plan') {
+        failures.push('projectReadinessState.nextBestAction deberia seguir apuntando a materialize-fullstack-local-plan.')
+      }
+      if (
+        normalizeText(nextBestAction.title || nextBestAction.description || '').includes(
+          normalizeText('Resolver aprobación sensible'),
+        )
+      ) {
+        failures.push('projectReadinessState.nextBestAction no deberia volver a Resolver aprobacion sensible.')
+      }
+    }
+  }
+  if (projectContinuationState?.nextRecommendedAction?.requiresApproval === true) {
+    failures.push('projectContinuationState.nextRecommendedAction no deberia requerir aprobacion en la continuidad local.')
+  }
+  if (
+    runtimeApprovalPreviewTokens.some((entry) =>
+      normalizeText(entry).includes(normalizeText('gateway de pagos')),
+    )
+  ) {
+    failures.push('commandsPreview no deberia mencionar gateway de pagos en la continuidad local.')
+  }
+  if (
+    runtimeApprovalPreviewTokens.some((entry) =>
+      normalizeText(entry).includes(normalizeText('webhooks')),
+    )
+  ) {
+    failures.push('commandsPreview no deberia mencionar webhooks reales en la continuidad local.')
+  }
+  if (
+    !planTargetSummary.some((entry) =>
+      normalizeText(entry).includes(normalizeText('logitrack-local-v1')),
+    )
+  ) {
+    failures.push('El plan fullstack local deberia targetear logitrack-local-v1.')
+  }
+  if (
+    String(localProjectManifest?.projectRoot || '').trim() &&
+    String(localProjectManifest?.projectRoot || '').trim() !== 'logitrack-local-v1'
+  ) {
+    failures.push(
+      `localProjectManifest.projectRoot incorrecto. Esperado: logitrack-local-v1. Recibido: ${
+        localProjectManifest?.projectRoot || '(vacio)'
+      }.`,
+    )
+  }
+  if (
+    normalizeText(
+      [
+        decision?.approvalRequest?.decisionKey,
+        decision?.approvalRequestPlan?.approvalType,
+        decision?.runtimeApprovalState?.actionId,
+        decision?.runtimeApprovalState?.relatedReadinessArea,
+      ]
+        .filter(Boolean)
+        .join(' '),
+    ).includes(normalizeText('approve-public-deploy'))
+  ) {
+    failures.push('No deberia quedar approve-public-deploy activo en la continuidad local.')
   }
 
   ;['envios', 'clientes', 'direcciones', 'estados', 'incidencias'].forEach((token) => {
@@ -2619,14 +2816,274 @@ async function runLogisticsFullstackApprovalContinuationValidation() {
     }
   })
 
-  ;['web-scaffold-base', 'landing', 'hero principal'].forEach((token) => {
+  ;[
+    'web-scaffold-base',
+    'landing',
+    'hero principal',
+    'index.html',
+    'styles.css',
+    'script.js',
+    'materializar la carpeta',
+    'web-sistema-de-tracking-logistico',
+  ].forEach((token) => {
     if (domainSummary.includes(normalizeText(token))) {
       failures.push(`La continuidad post-approval no deberia contaminarse con ${token}.`)
     }
   })
+  ;[
+    'frontend/admin',
+    'frontend/public',
+    'database/schema.sql',
+    'database/seeds/seed-local.sql',
+    'docs/api.md',
+    'docs/data-model.md',
+  ].forEach((token) => {
+    const normalizedToken = normalizeText(token)
+    const presentInPlan =
+      planFiles.some((entry) => normalizeText(entry).includes(normalizedToken)) ||
+      planDirectories.some((entry) => normalizeText(entry).includes(normalizedToken)) ||
+      planStructure.some((entry) => normalizeText(entry).includes(normalizedToken))
+
+    if (!presentInPlan) {
+      failures.push(`La continuidad post-approval deberia conservar ${token} en el plan fullstack visible.`)
+    }
+  })
 
   return {
-    testCase,
+    testCase: {
+      ...testCase,
+      id: 'tracking-logistico-fullstack-post-approval-ui-state',
+      label: 'Tracking logistico fullstack post approval UI state',
+    },
+    ok: failures.length === 0,
+    failures,
+    strategy,
+    executionMode,
+    nextExpectedAction,
+  }
+}
+
+async function runLogisticsFullstackOpenAIWebScaffoldGuardValidation() {
+  const testCase = scalableValidationCases.find(
+    (entry) => entry.id === 'tracking-logistico-fullstack-local',
+  )
+  const failures = []
+
+  if (!testCase) {
+    return {
+      testCase: {
+        id: 'tracking-logistico-fullstack-openai-web-scaffold-guard',
+        label: 'Tracking logistico fullstack OpenAI web scaffold guard',
+        goal: '',
+      },
+      ok: false,
+      failures: [
+        'No se encontro el caso base tracking-logistico-fullstack-local para la regresion OpenAI.',
+      ],
+    }
+  }
+
+  const approvalFeedback =
+    '__orchestrator_feedback__:' +
+    JSON.stringify({
+      type: 'approval-granted',
+      source: 'planner',
+      approvalMode: 'once',
+      instruction:
+        'Continuar solo con backend local, API local y SQLite local, sin deploy ni servicios externos.',
+      approvalReason:
+        'El usuario rechazo deploy pero mantiene permitido backend local y base SQLite local.',
+      approvalRequestDecisionKey: 'approve-public-deploy',
+      selectedOption: 'No deploy',
+      freeAnswer:
+        'No quiero publicar ni desplegar. Seguir local con backend local, API local y SQLite/base local. No externos.',
+    })
+
+  const strategicInput = plannerApi.buildStrategicBrainInput({
+    goal: testCase.goal,
+    context: testCase.context,
+    workspacePath: smokeExecutionWorkspaceRoot,
+    iteration: 2,
+    previousExecutionResult: approvalFeedback,
+    requiresApproval: true,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: 'brain-decides-missing',
+    costMode: 'max-quality',
+    attachedInputs: [],
+    existingProjectContext: null,
+    projectWorkMode: 'auto',
+    reusablePlanningContext: buildReusablePlanningContext(),
+  })
+
+  const contaminatedOpenAIDecision = {
+    ok: true,
+    decisionKey: 'web-scaffold-base',
+    strategy: 'web-scaffold-base',
+    executionMode: 'executor',
+    requiresApproval: false,
+    question:
+      'Queres publicar o desplegar esta solucion antes de seguir con la materializacion?',
+    approvalRequest: {
+      decisionKey: 'approve-public-deploy',
+      reason: 'La salida publica requiere aprobacion humana.',
+      question: 'Antes de publicar o desplegar, necesito una decision humana.',
+      allowFreeAnswer: true,
+      allowBrainDefault: false,
+      nextExpectedAction: 'user-approval',
+    },
+    instruction:
+      'Rediseñar la landing y materializar la carpeta web-sistema-de-tracking-logistico con index.html, styles.css y script.js.',
+    nextExpectedAction: 'execute-plan',
+    tasks: [
+      {
+        step: 1,
+        title: 'Crear index principal',
+        operation: 'create-file',
+        targetPath: 'web-sistema-de-tracking-logistico/index.html',
+      },
+      {
+        step: 2,
+        title: 'Crear estilos',
+        operation: 'create-file',
+        targetPath: 'web-sistema-de-tracking-logistico/styles.css',
+      },
+      {
+        step: 3,
+        title: 'Crear script principal',
+        operation: 'create-file',
+        targetPath: 'web-sistema-de-tracking-logistico/script.js',
+      },
+    ],
+    materializationPlan: {
+      projectRoot: 'web-sistema-de-tracking-logistico',
+      allowedTargetPaths: ['web-sistema-de-tracking-logistico'],
+      operations: [
+        {
+          type: 'create-file',
+          targetPath: 'web-sistema-de-tracking-logistico/index.html',
+          purpose: 'Landing principal',
+        },
+      ],
+    },
+  }
+
+  const decision = await plannerApi.normalizeOpenAIBrainDecision(
+    contaminatedOpenAIDecision,
+    strategicInput,
+  )
+
+  const strategy = String(decision?.strategy || '').trim()
+  const executionMode = String(decision?.executionMode || '').trim()
+  const nextExpectedAction = String(decision?.nextExpectedAction || '').trim()
+  const instruction = String(decision?.instruction || '').trim()
+  const localProjectManifest =
+    decision?.localProjectManifest && typeof decision.localProjectManifest === 'object'
+      ? decision.localProjectManifest
+      : null
+  const scalableDeliveryPlan =
+    decision?.scalableDeliveryPlan && typeof decision.scalableDeliveryPlan === 'object'
+      ? decision.scalableDeliveryPlan
+      : null
+  const runtimeApprovalPreviewTokens = [
+    ...(Array.isArray(decision?.runtimeApprovalState?.commandsPreview)
+      ? decision.runtimeApprovalState.commandsPreview
+      : []),
+    ...(Array.isArray(decision?.approvalRequestPlan?.commandsPreview)
+      ? decision.approvalRequestPlan.commandsPreview
+      : []),
+  ].map((entry) => String(entry || '').trim())
+  const planTargetSummary = [
+    localProjectManifest?.projectRoot,
+    ...(Array.isArray(scalableDeliveryPlan?.allowedRootPaths)
+      ? scalableDeliveryPlan.allowedRootPaths
+      : []),
+    ...(Array.isArray(scalableDeliveryPlan?.targetDirectories)
+      ? scalableDeliveryPlan.targetDirectories
+      : []),
+    ...(Array.isArray(scalableDeliveryPlan?.targetFiles)
+      ? scalableDeliveryPlan.targetFiles
+      : []),
+    ...(Array.isArray(scalableDeliveryPlan?.targetStructure)
+      ? scalableDeliveryPlan.targetStructure
+      : []),
+  ]
+    .map((entry) => String(entry || '').trim())
+    .filter(Boolean)
+  const normalizedInstruction = normalizeText(instruction)
+  const normalizedTargetSummary = normalizeText(planTargetSummary.join(' '))
+
+  if (strategy !== 'scalable-delivery-plan') {
+    failures.push(
+      `La respuesta OpenAI contaminada deberia normalizar a scalable-delivery-plan. Recibido: ${strategy || '(vacio)'}.`,
+    )
+  }
+  if (executionMode !== 'planner-only') {
+    failures.push(
+      `La respuesta OpenAI contaminada deberia normalizar a planner-only. Recibido: ${executionMode || '(vacio)'}.`,
+    )
+  }
+  if (nextExpectedAction !== 'review-scalable-delivery') {
+    failures.push(
+      `La respuesta OpenAI contaminada deberia volver a review-scalable-delivery. Recibido: ${nextExpectedAction || '(vacio)'}.`,
+    )
+  }
+  if (decision?.requiresApproval === true || decision?.approvalRequest) {
+    failures.push('No deberia quedar approvalRequest pendiente despues de la respuesta humana no deploy.')
+  }
+  if (decision?.runtimeApprovalState || decision?.approvalRequestPlan) {
+    failures.push('No deberia quedar runtimeApprovalState ni approvalRequestPlan activos despues del guard.')
+  }
+  if (String(decision?.decisionKey || '').trim() === 'web-scaffold-base') {
+    failures.push('No deberia quedar decisionKey web-scaffold-base despues del guard.')
+  }
+  if (normalizedInstruction.includes(normalizeText('rediseñar la landing'))) {
+    failures.push('La instruction final no deberia conservar la landing contaminada.')
+  }
+  if (normalizedInstruction.includes(normalizeText('index.html'))) {
+    failures.push('La instruction final no deberia caer en index.html como salida principal.')
+  }
+  if (normalizedTargetSummary.includes(normalizeText('web-sistema-de-tracking-logistico'))) {
+    failures.push('El target final no deberia quedar en web-sistema-de-tracking-logistico.')
+  }
+  if (
+    !planTargetSummary.some((entry) =>
+      normalizeText(entry).includes(normalizeText('logitrack-local-v1')),
+    )
+  ) {
+    failures.push('El guard deberia preservar logitrack-local-v1 como project root.')
+  }
+  ;[
+    'backend/',
+    'frontend/admin',
+    'frontend/public',
+    'database',
+    'docs',
+  ].forEach((token) => {
+    if (!normalizedTargetSummary.includes(normalizeText(token))) {
+      failures.push(`El guard deberia preservar ${token} en el plan fullstack local.`)
+    }
+  })
+  if (
+    runtimeApprovalPreviewTokens.some((entry) =>
+      normalizeText(entry).includes(normalizeText('gateway de pagos')),
+    )
+  ) {
+    failures.push('commandsPreview no deberia mencionar gateway de pagos despues del guard.')
+  }
+  if (
+    runtimeApprovalPreviewTokens.some((entry) =>
+      normalizeText(entry).includes(normalizeText('webhooks')),
+    )
+  ) {
+    failures.push('commandsPreview no deberia mencionar webhooks despues del guard.')
+  }
+
+  return {
+    testCase: {
+      ...testCase,
+      id: 'tracking-logistico-fullstack-openai-web-scaffold-guard',
+      label: 'Tracking logistico fullstack OpenAI web scaffold guard',
+    },
     ok: failures.length === 0,
     failures,
     strategy,
@@ -9719,6 +10176,7 @@ async function main() {
   let rechargeMaterializationResult = null
   let soccerApprovalContinuationResult = null
   let logisticsApprovalContinuationResult = null
+  let logisticsOpenAIWebScaffoldGuardResult = null
   let soccerPreparedMaterializationTransitionResult = null
   let sensitiveApprovalRoutingResult = null
   let soccerMaterializationResult = null
@@ -9758,6 +10216,13 @@ async function main() {
     logisticsApprovalContinuationResult =
       await runLogisticsFullstackApprovalContinuationValidation()
     printScalableValidationResult(logisticsApprovalContinuationResult)
+    console.log('-----------------')
+
+    console.log('Logistics Fullstack OpenAI Web Scaffold Guard Check')
+    console.log('==================================================')
+    logisticsOpenAIWebScaffoldGuardResult =
+      await runLogisticsFullstackOpenAIWebScaffoldGuardValidation()
+    printScalableValidationResult(logisticsOpenAIWebScaffoldGuardResult)
     console.log('-----------------')
 
     console.log('Soccer Ecommerce Prepared Materialization Transition Check')
@@ -10208,6 +10673,8 @@ async function main() {
   const soccerApprovalContinuationFailed = soccerApprovalContinuationResult?.ok === false
   const logisticsApprovalContinuationFailed =
     logisticsApprovalContinuationResult?.ok === false
+  const logisticsOpenAIWebScaffoldGuardFailed =
+    logisticsOpenAIWebScaffoldGuardResult?.ok === false
   const soccerPreparedMaterializationTransitionFailed =
     soccerPreparedMaterializationTransitionResult?.ok === false
   const sensitiveApprovalRoutingFailed = sensitiveApprovalRoutingResult?.ok === false
@@ -10225,6 +10692,7 @@ async function main() {
     !rechargeMaterializationFailed &&
     !soccerApprovalContinuationFailed &&
     !logisticsApprovalContinuationFailed &&
+    !logisticsOpenAIWebScaffoldGuardFailed &&
     !soccerPreparedMaterializationTransitionFailed &&
     !sensitiveApprovalRoutingFailed &&
     !soccerMaterializationFailed
@@ -10258,6 +10726,11 @@ async function main() {
     if (logisticsApprovalContinuationResult) {
       console.log(
         'OK. 1/1 check de continuidad post-approval fullstack logistico paso.',
+      )
+    }
+    if (logisticsOpenAIWebScaffoldGuardResult) {
+      console.log(
+        'OK. 1/1 check de guard OpenAI contra web-scaffold-base en fullstack logistico paso.',
       )
     }
     if (soccerPreparedMaterializationTransitionResult) {
@@ -10362,6 +10835,14 @@ async function main() {
     console.log(
       `- ${logisticsApprovalContinuationResult.testCase.id}: ${
         logisticsApprovalContinuationResult.failures[0] || 'sin detalle'
+      }`,
+    )
+  }
+  if (logisticsOpenAIWebScaffoldGuardFailed) {
+    console.log('check de guard OpenAI contra web-scaffold-base en fullstack logistico fallido:')
+    console.log(
+      `- ${logisticsOpenAIWebScaffoldGuardResult.testCase.id}: ${
+        logisticsOpenAIWebScaffoldGuardResult.failures[0] || 'sin detalle'
       }`,
     )
   }

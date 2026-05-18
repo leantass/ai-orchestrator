@@ -1687,11 +1687,11 @@ async function runUtf8SurfaceCase() {
     'docs/release-candidate-checklist.md',
   ]
   const suspiciousPatterns = [
-    { re: /\uFFFD/g, label: 'carácter de reemplazo' },
+    { re: /\uFFFD/g, label: 'caracter de reemplazo' },
     { re: /\u00C3/g, label: 'secuencia mojibake C3' },
     { re: /\u00C2/g, label: 'secuencia mojibake C2' },
     {
-      re: /[A-Za-zÁÉÍÓÚáéíóúÑñ]+\?[A-Za-zÁÉÍÓÚáéíóúÑñ]+/g,
+      re: /[A-Za-z\u00C1\u00C9\u00CD\u00D3\u00DA\u00E1\u00E9\u00ED\u00F3\u00FA\u00D1\u00F1]+\?[A-Za-z\u00C1\u00C9\u00CD\u00D3\u00DA\u00E1\u00E9\u00ED\u00F3\u00FA\u00D1\u00F1]+/g,
       label: 'palabra visible con ? en el medio',
     },
   ]
@@ -2810,9 +2810,146 @@ async function runUiHelperSanityCase() {
     'El detalle de validaciones debe explicar file-contains con un texto útil.',
   )
 
+  pushFailure(
+    failures,
+    /const settlePlannerReviewRun\s*=\s*\(\)\s*=>\s*\{/.test(appSource),
+    'App.tsx debe definir settlePlannerReviewRun para cerrar approval-pending cuando la replanificacion termina en review-only.',
+  )
+  pushFailure(
+    failures,
+    /settlePlannerReviewRun\(\)\s*[\r\n\s]*setSessionStatus\('Plan listo para revision'\)/.test(
+      appSource,
+    ),
+    'La rama review-only debe cerrar la corrida antes de dejar el estado en Plan listo para revision.',
+  )
+  pushFailure(
+    failures,
+    /if \(response\.completed\)\s*\{[\s\S]{0,400}?settlePlannerReviewRun\(\)[\s\S]{0,200}?setSessionStatus\('Ejecuci.n completada'\)/.test(
+      appSource,
+    ),
+    'La rama completed despues de una replanificacion debe cerrar la corrida activa y no dejar approval-pending colgado.',
+  )
+
   return {
     id: 'operator-ui-helper-sanity',
     label: 'Helpers criticos de continuidad definidos en UI',
+    failures,
+  }
+}
+
+async function runTrackingLogisticsPostApprovalUiStateRealCase() {
+  const failures = []
+  const appSource = fs.readFileSync(appFilePath, 'utf8')
+
+  pushFailure(
+    failures,
+    /const sanitizePlannerDecisionResponse\s*=\s*\(/.test(appSource),
+    'App.tsx debe sanear respuestas planner-only antes de renderizar el estado post-approval.',
+  )
+  pushFailure(
+    failures,
+    /approvalRequired:\s*false[\s\S]{0,200}?requiresApproval:\s*false[\s\S]{0,200}?question:\s*''[\s\S]{0,200}?approvalRequest:\s*undefined/.test(
+      appSource,
+    ),
+    'La sanitizacion post-approval debe limpiar approvalRequired, requiresApproval, question y approvalRequest stale.',
+  )
+  pushFailure(
+    failures,
+    /approvalRequestPlan:\s*null[\s\S]{0,120}?runtimeApprovalState:\s*null/.test(
+      appSource,
+    ),
+    'La sanitizacion post-approval debe bajar approvalRequestPlan y runtimeApprovalState.',
+  )
+  pushFailure(
+    failures,
+    /actionType:\s*replaceWithReviewPlan\s*\?\s*'review-plan'/.test(appSource) &&
+      /review-scalable-delivery/.test(appSource),
+    'La proxima accion stale debe volver a review-plan/review-scalable-delivery.',
+  )
+  pushFailure(
+    failures,
+    /const rawResponse = await window\.aiOrchestrator\?\.planTask\?\.\([\s\S]{0,220}?const response = sanitizePlannerDecisionResponse\(rawResponse\)[\s\S]{0,160}?const plannerApprovalRequired =[\s\S]{0,120}?shouldTreatPlannerResponseAsApprovalRequired\(response\)/.test(
+      appSource,
+    ),
+    'replanManualFlow debe sanear la respuesta antes de decidir aprobacion o error.',
+  )
+  pushFailure(
+    failures,
+    /const rawPlanResponse = await window\.aiOrchestrator\?\.planTask\?\.\([\s\S]{0,220}?const planResponse = sanitizePlannerDecisionResponse\(rawPlanResponse\)[\s\S]{0,160}?const plannerApprovalRequired =[\s\S]{0,140}?shouldTreatPlannerResponseAsApprovalRequired\(planResponse\)/.test(
+      appSource,
+    ),
+    'runAutoFlowLoop debe sanear la replanificacion antes de mostrar pending approval.',
+  )
+  pushFailure(
+    failures,
+    /const rawResponse = await window\.aiOrchestrator\?\.planTask\?\.\(\{[\s\S]{0,260}?const response = sanitizePlannerDecisionResponse\(rawResponse\)[\s\S]{0,160}?const plannerApprovalRequired =[\s\S]{0,120}?shouldTreatPlannerResponseAsApprovalRequired\(response\)/.test(
+      appSource,
+    ),
+    'handleGenerateNextStep debe sanear el payload antes de ramificar por approval.',
+  )
+  pushFailure(
+    failures,
+    /status:\s*plannerApprovalRequired\s*\?\s*'warning'\s*:\s*'success'/.test(
+      appSource,
+    ),
+    'La UI debe derivar el estado visual desde plannerApprovalRequired ya saneado.',
+  )
+  pushFailure(
+    failures,
+    /if \(shouldIgnoreStaleApprovalRequestPayload\(sanitizedPayload\)\)\s*\{\s*return null/.test(
+      appSource,
+    ),
+    'approvalRequest stale debe ignorarse cuando la nueva respuesta ya volvio a review-only.',
+  )
+
+  return {
+    id: 'tracking-logistico-fullstack-post-approval-ui-state-real',
+    label: 'Tracking logistico fullstack post approval UI state real',
+    failures,
+  }
+}
+
+async function runTrackingLogisticsOpenAIWebScaffoldGuardCase() {
+  const failures = []
+  const mainSource = fs.readFileSync(mainFilePath, 'utf8')
+
+  pushFailure(
+    failures,
+    /function looksLikeWebScaffoldDecisionPayload\(rawDecision\)/.test(mainSource),
+    'electron/main.cjs debe definir un detector de payload degradado tipo web-scaffold-base.',
+  )
+  pushFailure(
+    failures,
+    /const shouldGuardOpenAIWebScaffoldRegression =[\s\S]{0,500}?fallbackDecision\?\.strategy === 'scalable-delivery-plan'[\s\S]{0,500}?originalFullstackLocalIntent[\s\S]{0,500}?rawLooksLikeWebScaffoldRegression/.test(
+      mainSource,
+    ),
+    'normalizeOpenAIBrainDecision debe activar un guard fuerte contra degradacion OpenAI a web-scaffold-base.',
+  )
+  pushFailure(
+    failures,
+    /const shouldForceFallbackFullstackLocalContracts =[\s\S]{0,180}?shouldGuardOpenAIWebScaffoldRegression/.test(
+      mainSource,
+    ),
+    'El guard de web-scaffold-base debe forzar los contratos fallback fullstack-local.',
+  )
+  pushFailure(
+    failures,
+    /question:\s*brainDecision\.requiresApproval === true \? brainDecision\.question : ''/.test(
+      mainSource,
+    ),
+    'La salida final no debe exponer question stale cuando ya no hay approval activa.',
+  )
+  pushFailure(
+    failures,
+    /approvalRequest:\s*[\r\n\s]*brainDecision\.requiresApproval === true \? brainDecision\.approvalRequest : null/.test(
+      mainSource,
+    ),
+    'La salida final no debe exponer approvalRequest stale cuando ya no hay approval activa.',
+  )
+
+  return {
+    id: 'tracking-logistico-fullstack-openai-web-scaffold-guard',
+    label: 'Tracking logistico fullstack OpenAI web scaffold guard',
     failures,
   }
 }
@@ -3054,6 +3191,8 @@ async function main() {
     results.push(await runFinalReadinessCase())
     results.push(await runUiContractSanityCase())
     results.push(await runUiHelperSanityCase())
+    results.push(await runTrackingLogisticsPostApprovalUiStateRealCase())
+    results.push(await runTrackingLogisticsOpenAIWebScaffoldGuardCase())
     results.push(await runUtf8SurfaceCase())
 
     const failedResults = results.filter((result) => result.failures.length > 0)

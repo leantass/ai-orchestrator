@@ -1084,6 +1084,7 @@ type PlannerDecisionResponse = {
   completed?: boolean
   iterationLabel?: string
   approvalRequired?: boolean
+  requiresApproval?: boolean
   approvalReason?: string
   businessSector?: string
   businessSectorLabel?: string
@@ -3699,6 +3700,8 @@ const normalizeDomainUnderstandingContract = (
 }
 
 const extractPlannerExecutionMetadata = (payload?: {
+  approvalRequired?: boolean
+  requiresApproval?: boolean
   decisionKey?: string
   businessSector?: string
   businessSectorLabel?: string
@@ -3740,7 +3743,12 @@ const extractPlannerExecutionMetadata = (payload?: {
   activeProjectContext?: ActiveProjectContextContract | null
   tasks?: unknown[]
   assumptions?: string[]
-} | null): PlannerExecutionMetadata => ({
+} | null): PlannerExecutionMetadata => {
+  payload = sanitizePlannerDecisionResponse(
+    payload as PlannerDecisionResponse | null,
+  ) as typeof payload
+
+  return ({
   decisionKey:
     typeof payload?.decisionKey === 'string' ? payload.decisionKey.trim() : '',
   businessSector:
@@ -4034,7 +4042,8 @@ const extractPlannerExecutionMetadata = (payload?: {
         .filter((assumption) => typeof assumption === 'string' && assumption.trim())
         .map((assumption) => assumption.trim())
     : [],
-})
+  })
+}
 
 const normalizeReusableArtifactRecord = (
   artifact?: Partial<ReusableArtifactRecord> | null,
@@ -11298,22 +11307,309 @@ const buildParticipationResolvedDecisions = (
   ]
 }
 
-const extractApprovalRequest = (
-  payload?: {
+const APPROVAL_POLLUTION_PATTERN =
+  /approve-public-deploy|request-approval|resolver aprobaci[oó]n sensible|deploy|publicar|gateway de pagos|conciliaci[oó]n|webhooks?/i
+
+const sanitizeApprovalPollutionLabel = (value: unknown, fallback: string) => {
+  const normalizedValue = normalizeOptionalString(value)
+  return APPROVAL_POLLUTION_PATTERN.test(normalizedValue) ? fallback : normalizedValue
+}
+
+const sanitizeApprovalPollutionAction = (
+  value: ContinuationActionContract | null,
+): ContinuationActionContract | null => {
+  const action = normalizeContinuationActionContract(value)
+  if (!action) {
+    return null
+  }
+
+  const actionSummary = [
+    action.id,
+    action.title,
+    action.description,
+    action.category,
+    action.approvalType,
+    action.blocker,
+    action.expectedOutcome,
+  ]
+    .map((entry) => normalizeOptionalString(entry))
+    .filter(Boolean)
+    .join(' ')
+
+  if (action.requiresApproval === true || APPROVAL_POLLUTION_PATTERN.test(actionSummary)) {
+    return null
+  }
+
+  return {
+    ...action,
+    blocked: false,
+    blocker: '',
+    approvalType: '',
+    requiresApproval: false,
+  }
+}
+
+const sanitizeApprovalPollutionNextActionPlan = (
+  value: NextActionPlanContract | null,
+): NextActionPlanContract | null => {
+  const nextActionPlan = normalizeNextActionPlanContract(value)
+  if (!nextActionPlan) {
+    return null
+  }
+
+  const actionType = normalizeOptionalString(nextActionPlan.actionType)
+  const nextActionSummary = [
+    actionType,
+    nextActionPlan.userFacingLabel,
+    nextActionPlan.technicalLabel,
+    nextActionPlan.recommendedAction,
+    nextActionPlan.reason,
+  ]
+    .map((entry) => normalizeOptionalString(entry))
+    .filter(Boolean)
+    .join(' ')
+  const replaceWithReviewPlan =
+    actionType === 'request-approval' || APPROVAL_POLLUTION_PATTERN.test(nextActionSummary)
+
+  return {
+    ...nextActionPlan,
+    actionType: replaceWithReviewPlan ? 'review-plan' : nextActionPlan.actionType,
+    recommendedAction: replaceWithReviewPlan
+      ? 'Revisar blueprint fullstack local y preparar scaffold local.'
+      : nextActionPlan.recommendedAction,
+    reason: replaceWithReviewPlan
+      ? 'La replanificacion quedo lista para revision local sin aprobaciones sensibles activas.'
+      : nextActionPlan.reason,
+    requiresApproval: false,
+    userFacingLabel: replaceWithReviewPlan
+      ? 'Revisar plan'
+      : sanitizeApprovalPollutionLabel(nextActionPlan.userFacingLabel, 'Revisar plan'),
+    technicalLabel: replaceWithReviewPlan
+      ? 'review-scalable-delivery'
+      : sanitizeApprovalPollutionLabel(
+          nextActionPlan.technicalLabel,
+          'review-scalable-delivery',
+        ),
+  }
+}
+
+const sanitizeApprovalPollutionProjectContinuationState = (
+  value: ProjectContinuationStateContract | null,
+): ProjectContinuationStateContract | null => {
+  const projectContinuationState = normalizeProjectContinuationStateContract(value)
+  if (!projectContinuationState) {
+    return null
+  }
+
+  const availableSafeActions = Array.isArray(projectContinuationState.availableSafeActions)
+    ? projectContinuationState.availableSafeActions
+        .map((entry) => sanitizeApprovalPollutionAction(entry))
+        .filter((entry): entry is ContinuationActionContract => Boolean(entry))
+    : []
+  const availablePlanningActions = Array.isArray(
+    projectContinuationState.availablePlanningActions,
+  )
+    ? projectContinuationState.availablePlanningActions
+        .map((entry) => sanitizeApprovalPollutionAction(entry))
+        .filter((entry): entry is ContinuationActionContract => Boolean(entry))
+    : []
+  const blockedActions = Array.isArray(projectContinuationState.blockedActions)
+    ? projectContinuationState.blockedActions
+        .map((entry) => sanitizeApprovalPollutionAction(entry))
+        .filter((entry): entry is ContinuationActionContract => Boolean(entry))
+    : []
+  const nextRecommendedAction = sanitizeApprovalPollutionAction(
+    projectContinuationState.nextRecommendedAction || null,
+  )
+
+  return {
+    ...projectContinuationState,
+    availableSafeActions,
+    availablePlanningActions,
+    approvalRequiredActions: [],
+    blockedActions,
+    nextRecommendedAction: nextRecommendedAction || undefined,
+    operatorMessage: sanitizeApprovalPollutionLabel(
+      projectContinuationState.operatorMessage,
+      'El plan quedo listo para revision local.',
+    ),
+  }
+}
+
+const sanitizeApprovalPollutionProjectReadinessState = (
+  value: ProjectReadinessStateContract | null,
+): ProjectReadinessStateContract | null => {
+  const projectReadinessState = normalizeProjectReadinessStateContract(value)
+  if (!projectReadinessState) {
+    return null
+  }
+
+  const runtimeReadiness = normalizeOptionalString(projectReadinessState.runtimeReadiness)
+  const realExecutionReadiness = normalizeOptionalString(
+    projectReadinessState.realExecutionReadiness,
+  )
+
+  return {
+    ...projectReadinessState,
+    approvalRequiredAreas: [],
+    pendingApprovals: [],
+    lastApprovalRequest: '',
+    runtimeReadiness:
+      runtimeReadiness === 'approval-preview' ||
+      runtimeReadiness === 'approval-pending' ||
+      runtimeReadiness === 'preview'
+        ? 'not-requested'
+        : projectReadinessState.runtimeReadiness,
+    realExecutionReadiness:
+      /approval|pending/i.test(realExecutionReadiness) &&
+      !/ready|allowed/i.test(realExecutionReadiness)
+        ? 'not-requested'
+        : projectReadinessState.realExecutionReadiness,
+    blockedRuntimeActions: Array.isArray(projectReadinessState.blockedRuntimeActions)
+      ? projectReadinessState.blockedRuntimeActions.filter(
+          (entry) => !APPROVAL_POLLUTION_PATTERN.test(normalizeOptionalString(entry)),
+        )
+      : [],
+    nextBestAction: sanitizeApprovalPollutionAction(
+      projectReadinessState.nextBestAction || null,
+    ),
+    operatorSummary: sanitizeApprovalPollutionLabel(
+      projectReadinessState.operatorSummary,
+      'El plan quedo en revision normal.',
+    ),
+  }
+}
+
+const shouldTreatPlannerResponseAsApprovalRequired = (
+  value?: {
+    approvalRequired?: boolean
+    requiresApproval?: boolean
+    nextExpectedAction?: string
+    executionMode?: string
+    strategy?: string
+    decisionKey?: string
+  } | null,
+) => {
+  if (!value) {
+    return false
+  }
+
+  if (
+    isReviewOnlyPlannerResponse(value) &&
+    (value.approvalRequired === false || value.requiresApproval === false)
+  ) {
+    return false
+  }
+
+  return value.approvalRequired === true || value.requiresApproval === true
+}
+
+const shouldIgnoreStaleApprovalRequestPayload = (
+  value?: {
+    approvalRequired?: boolean
+    requiresApproval?: boolean
+    nextExpectedAction?: string
+    executionMode?: string
+    strategy?: string
+    decisionKey?: string
     approvalRequest?: ApprovalRequestContract
     question?: string
     approvalReason?: string
     reason?: string
+    approvalRequestPlan?: ApprovalRequestPlanContract | null
+    runtimeApprovalState?: RuntimeApprovalStateContract | null
   } | null,
-): ApprovalRequestContract | null => {
-  if (payload?.approvalRequest && typeof payload.approvalRequest === 'object') {
-    return payload.approvalRequest
+) => {
+  if (!value || shouldTreatPlannerResponseAsApprovalRequired(value)) {
+    return false
   }
 
-  const question = normalizeOptionalString(payload?.question)
+  if (!isReviewOnlyPlannerResponse(value)) {
+    return false
+  }
+
+  return Boolean(
+    value.approvalRequest ||
+      normalizeOptionalString(value.question) ||
+      normalizeOptionalString(value.approvalReason) ||
+      normalizeOptionalString(value.reason) ||
+      value.approvalRequestPlan ||
+      value.runtimeApprovalState,
+  )
+}
+
+const sanitizePlannerDecisionResponse = (
+  value?: PlannerDecisionResponse | null,
+): PlannerDecisionResponse | null | undefined => {
+  if (!value) {
+    return value
+  }
+
+  if (!isReviewOnlyPlannerResponse(value) || shouldTreatPlannerResponseAsApprovalRequired(value)) {
+    return value
+  }
+
+  return {
+    ...value,
+    approvalRequired: false,
+    requiresApproval: false,
+    question: '',
+    approvalReason: '',
+    approvalRequest: undefined,
+    nextActionPlan: sanitizeApprovalPollutionNextActionPlan(value.nextActionPlan || null),
+    continuationActionPlan: sanitizeApprovalPollutionAction(
+      value.continuationActionPlan || null,
+    ),
+    projectContinuationState: sanitizeApprovalPollutionProjectContinuationState(
+      value.projectContinuationState || null,
+    ),
+    projectReadinessState: sanitizeApprovalPollutionProjectReadinessState(
+      value.projectReadinessState || null,
+    ),
+    approvalRequestPlan: null,
+    runtimeApprovalState: null,
+  }
+}
+
+const extractApprovalRequest = (
+  payload?: {
+    approvalRequired?: boolean
+    requiresApproval?: boolean
+    nextExpectedAction?: string
+    executionMode?: string
+    strategy?: string
+    decisionKey?: string
+    approvalRequest?: ApprovalRequestContract
+    question?: string
+    approvalReason?: string
+    reason?: string
+    nextActionPlan?: NextActionPlanContract | null
+    continuationActionPlan?: ContinuationActionContract | null
+    projectContinuationState?: ProjectContinuationStateContract | null
+    projectReadinessState?: ProjectReadinessStateContract | null
+    approvalRequestPlan?: ApprovalRequestPlanContract | null
+    runtimeApprovalState?: RuntimeApprovalStateContract | null
+  } | null,
+): ApprovalRequestContract | null => {
+  const sanitizedPayload = sanitizePlannerDecisionResponse(
+    payload as PlannerDecisionResponse | null,
+  ) as typeof payload
+
+  if (
+    sanitizedPayload?.approvalRequest &&
+    typeof sanitizedPayload.approvalRequest === 'object'
+  ) {
+    return sanitizedPayload.approvalRequest
+  }
+
+  if (shouldIgnoreStaleApprovalRequestPayload(sanitizedPayload)) {
+    return null
+  }
+
+  const question = normalizeOptionalString(sanitizedPayload?.question)
   const reason =
-    normalizeOptionalString(payload?.approvalReason) ||
-    normalizeOptionalString(payload?.reason)
+    normalizeOptionalString(sanitizedPayload?.approvalReason) ||
+    normalizeOptionalString(sanitizedPayload?.reason)
 
   if (!question && !reason) {
     return null
@@ -15689,6 +15985,13 @@ function App() {
       nextLastRunSummary,
     })
   }
+  const settlePlannerReviewRun = () => {
+    finalizeActiveExecutionRun({
+      status: 'success',
+      failureType: '',
+      failureContext: null,
+    })
+  }
   const closeManualExecutionState = ({
     requestId,
     source,
@@ -16515,12 +16818,15 @@ function App() {
     })
 
     try {
-      const response = await window.aiOrchestrator?.planTask?.(
+      const rawResponse = await window.aiOrchestrator?.planTask?.(
         buildPlannerRequestPayload({
           context: currentExecutionContext,
           previousExecutionResult,
         }),
       )
+      const response = sanitizePlannerDecisionResponse(rawResponse)
+      const plannerApprovalRequired =
+        shouldTreatPlannerResponseAsApprovalRequired(response)
 
       if (!response?.ok || !response.instruction) {
         addFlowMessage({
@@ -16567,10 +16873,10 @@ function App() {
         title: 'Respuesta del planificador',
         content: response.instruction,
         raw: formatStructuredContent(response),
-        status: response.approvalRequired ? 'warning' : 'success',
+        status: plannerApprovalRequired ? 'warning' : 'success',
       })
 
-      if (response.approvalRequired) {
+      if (plannerApprovalRequired) {
         if (approvedByProjectRule) {
           await replanManualFlow(
             buildPlannerFeedbackPayload({
@@ -16608,6 +16914,7 @@ function App() {
       setCurrentStep(response.instruction)
       if (isUserClarificationPlannerResponse(response)) {
         clearVisibleExecutionRuntimeState()
+        settlePlannerReviewRun()
         setSessionStatus('Esperando una nueva definición del usuario')
         setCurrentStep('El Cerebro necesita una nueva definición antes de ejecutar')
         updateLastRunSummary({
@@ -16631,6 +16938,7 @@ function App() {
 
       if (isReviewOnlyPlannerResponse(response)) {
         clearVisibleExecutionRuntimeState()
+        settlePlannerReviewRun()
         setSessionStatus('Plan listo para revision')
         setCurrentStep('El Cerebro devolvio una arquitectura para revisar antes de ejecutar')
         updateLastRunSummary({
@@ -16669,6 +16977,7 @@ function App() {
           requestState: 'success',
           result: response.instruction,
         })
+        settlePlannerReviewRun()
         setSessionStatus('Ejecución completada')
         setCurrentStep('El Cerebro cerró la corrida sin necesitar otra ejecución')
         updateLastRunSummary({
@@ -16753,12 +17062,15 @@ function App() {
             ])
           }
 
-          const planResponse = await window.aiOrchestrator?.planTask?.(
+          const rawPlanResponse = await window.aiOrchestrator?.planTask?.(
             buildPlannerRequestPayload({
               iteration,
               previousExecutionResult: previousExecutionResult || undefined,
             }),
           )
+          const planResponse = sanitizePlannerDecisionResponse(rawPlanResponse)
+          const plannerApprovalRequired =
+            shouldTreatPlannerResponseAsApprovalRequired(planResponse)
 
           if (!planResponse?.ok || !planResponse.instruction) {
             addFlowMessage({
@@ -16797,10 +17109,10 @@ function App() {
             title: 'Respuesta del planificador',
             content: planResponse.instruction,
             raw: formatStructuredContent(planResponse),
-            status: planResponse.approvalRequired ? 'warning' : 'success',
+            status: plannerApprovalRequired ? 'warning' : 'success',
           })
 
-          if (planResponse.approvalRequired) {
+          if (plannerApprovalRequired) {
             if (
               matchesProjectApprovalPolicy({
                 policy: projectApprovalPolicy,
@@ -17709,12 +18021,15 @@ function App() {
     })
 
     try {
-      const response = await window.aiOrchestrator?.planTask?.({
+      const rawResponse = await window.aiOrchestrator?.planTask?.({
         ...buildPlannerRequestPayload({
           goal: plannerGoal,
           context: plannerContext || undefined,
         }),
       })
+      const response = sanitizePlannerDecisionResponse(rawResponse)
+      const plannerApprovalRequired =
+        shouldTreatPlannerResponseAsApprovalRequired(response)
 
       if (!response?.ok || !response.instruction) {
         options?.onPlanningFailure?.()
@@ -17738,7 +18053,7 @@ function App() {
         title: 'Respuesta del planificador',
         content: response.instruction,
         raw: formatStructuredContent(response),
-        status: response.approvalRequired ? 'warning' : 'success',
+        status: plannerApprovalRequired ? 'warning' : 'success',
       })
       const nextExecutionMetadata = resolvePlannerExecutionMetadata(response)
       const validationIssue = options?.validateResponse?.(
@@ -17788,7 +18103,7 @@ function App() {
       setLastObservedExecutionMode('')
       recordPlannerExecutionSummary(nextExecutionMetadata)
 
-      if (response.approvalRequired) {
+      if (plannerApprovalRequired) {
         if (
           matchesProjectApprovalPolicy({
             policy: projectApprovalPolicy,

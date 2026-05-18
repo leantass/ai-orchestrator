@@ -11931,6 +11931,13 @@ function buildScalableProjectRootFolderName({
   }
 
   if (
+    normalizedDeliveryLevel === 'fullstack-local' &&
+    detectLogisticsTrackingIntent(combinedText)
+  ) {
+    return 'logitrack-local-v1'
+  }
+
+  if (
     normalizedDeliveryLevel === 'frontend-project' &&
     /\breservas?\b/u.test(combinedText) &&
     /\bcanchas?\b/u.test(combinedText)
@@ -12214,6 +12221,7 @@ function buildBlueprintModules({
         'scripts',
         'scripts locales',
         'docs',
+        'documentacion',
       ],
       16,
     )
@@ -12239,6 +12247,13 @@ function buildBlueprintModules({
 
   if (deliveryLevel === 'frontend-project' && /\breservas?\b|\bcanchas?\b/u.test(normalizedText)) {
     pushUniquePlannerValues(modules, ['agenda local', 'disponibilidad'], 16)
+  }
+
+  if (deliveryLevel === 'fullstack-local') {
+    return summarizeUniqueExecutorStrings(
+      ['frontend local', 'backend local', 'database design', 'documentacion', ...modules],
+      16,
+    )
   }
 
   return summarizeUniqueExecutorStrings(modules, 16)
@@ -14658,6 +14673,8 @@ function buildScalableDeliveryPlan({
       pushUniquePlannerValues(targetStructure, [
         `${rootFolder}/`,
         `${rootFolder}/frontend/`,
+        `${rootFolder}/frontend/admin/`,
+        `${rootFolder}/frontend/public/`,
         `${rootFolder}/backend/`,
         `${rootFolder}/shared/`,
         `${rootFolder}/database/`,
@@ -14667,6 +14684,8 @@ function buildScalableDeliveryPlan({
       pushUniquePlannerValues(allowedRootPaths, [
         rootFolder,
         `${rootFolder}/frontend`,
+        `${rootFolder}/frontend/admin`,
+        `${rootFolder}/frontend/public`,
         `${rootFolder}/backend`,
         `${rootFolder}/shared`,
         `${rootFolder}/database`,
@@ -14677,6 +14696,8 @@ function buildScalableDeliveryPlan({
         directories,
         [
           `${rootFolder}/frontend`,
+          `${rootFolder}/frontend/admin`,
+          `${rootFolder}/frontend/public`,
           `${rootFolder}/backend`,
           `${rootFolder}/shared`,
           `${rootFolder}/database`,
@@ -14699,8 +14720,12 @@ function buildScalableDeliveryPlan({
       )
       pushUniquePlannerValues(modules, [
         'frontend local',
+        'frontend admin',
+        'frontend publico',
         'backend local',
+        'api local',
         'shared contracts',
+        'sqlite/base local revisable',
         'database local revisable',
         'scripts operativos',
         'documentacion',
@@ -14720,6 +14745,16 @@ function buildScalableDeliveryPlan({
         {
           path: `${rootFolder}/frontend/package.json`,
           purpose: 'Definir el frontend local sin instalar dependencias todavía.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/frontend/admin/README.md`,
+          purpose: 'Describir la base del frontend administrativo local para operaciones internas.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/frontend/public/README.md`,
+          purpose: 'Describir la consulta pública local por código de seguimiento sin exponer servicios reales.',
           required: true,
         },
         {
@@ -14773,6 +14808,11 @@ function buildScalableDeliveryPlan({
           required: true,
         },
         {
+          path: `${rootFolder}/database/seeds/seed-local.sql`,
+          purpose: 'Seed SQL local de referencia para poblar datos demo sin ejecutarlo todavía.',
+          required: true,
+        },
+        {
           path: `${rootFolder}/database/README.md`,
           purpose: 'Aclarar que la database local queda como diseño revisable hasta aprobar una fase ejecutable.',
           required: true,
@@ -14785,6 +14825,16 @@ function buildScalableDeliveryPlan({
         {
           path: `${rootFolder}/docs/architecture.md`,
           purpose: 'Explicar la estructura fullstack local, capas, módulos y límites.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/docs/api.md`,
+          purpose: 'Documentar contratos y endpoints API locales previstos para backend y consulta pública.',
+          required: true,
+        },
+        {
+          path: `${rootFolder}/docs/data-model.md`,
+          purpose: 'Describir entidades, relaciones y decisiones del modelo de datos local.',
           required: true,
         },
         {
@@ -31715,6 +31765,116 @@ function resolveReusableAwareInstruction({
   return normalizedFallbackInstruction || normalizedRawInstruction
 }
 
+function looksLikeWebScaffoldPlannerInstruction(instruction) {
+  const normalizedInstruction =
+    typeof instruction === 'string' ? instruction.trim().toLocaleLowerCase() : ''
+
+  if (!normalizedInstruction) {
+    return false
+  }
+
+  return (
+    normalizedInstruction.includes('landing') ||
+    normalizedInstruction.includes('hero') ||
+    normalizedInstruction.includes('web institucional') ||
+    normalizedInstruction.includes('sitio institucional') ||
+    normalizedInstruction.includes('index.html') ||
+    normalizedInstruction.includes('styles.css') ||
+    normalizedInstruction.includes('script.js') ||
+    normalizedInstruction.includes('materializar la carpeta') ||
+    normalizedInstruction.includes('scaffoldear una landing') ||
+    normalizedInstruction.includes(
+      'revisar la estructura existente, identificar el entrypoint principal',
+    ) ||
+    /\bweb-[a-z0-9-]+\b/u.test(normalizedInstruction)
+  )
+}
+
+function looksLikeWebScaffoldDecisionPayload(rawDecision) {
+  if (!rawDecision || typeof rawDecision !== 'object') {
+    return false
+  }
+
+  const normalizedStrategy = normalizeOptionalString(rawDecision.strategy).toLocaleLowerCase()
+  const normalizedDecisionKey = normalizeOptionalString(
+    rawDecision.decisionKey,
+  ).toLocaleLowerCase()
+  const normalizedExecutionMode = normalizeOptionalString(
+    rawDecision.executionMode,
+  ).toLocaleLowerCase()
+  const instruction = typeof rawDecision.instruction === 'string' ? rawDecision.instruction : ''
+  const taskPayloadSummary = Array.isArray(rawDecision.tasks)
+    ? rawDecision.tasks
+        .map((entry) =>
+          [
+            normalizeOptionalString(entry?.title),
+            normalizeOptionalString(entry?.operation),
+            normalizeOptionalString(entry?.targetPath),
+          ]
+            .filter(Boolean)
+            .join(' '),
+        )
+        .filter(Boolean)
+        .join(' ')
+    : ''
+  const materializationPayloadSummary =
+    rawDecision.materializationPlan && typeof rawDecision.materializationPlan === 'object'
+      ? [
+          normalizeOptionalString(rawDecision.materializationPlan.projectRoot),
+          ...(Array.isArray(rawDecision.materializationPlan.allowedTargetPaths)
+            ? rawDecision.materializationPlan.allowedTargetPaths.map((entry) =>
+                normalizeOptionalString(entry),
+              )
+            : []),
+          ...(Array.isArray(rawDecision.materializationPlan.operations)
+            ? rawDecision.materializationPlan.operations.flatMap((entry) => [
+                normalizeOptionalString(entry?.targetPath),
+                normalizeOptionalString(entry?.purpose),
+                normalizeOptionalString(entry?.contentPreview),
+              ])
+            : []),
+        ]
+          .filter(Boolean)
+          .join(' ')
+      : ''
+  const normalizedPayloadText = [
+    normalizedStrategy,
+    normalizedDecisionKey,
+    normalizedExecutionMode,
+    instruction,
+    taskPayloadSummary,
+    materializationPayloadSummary,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLocaleLowerCase()
+
+  return (
+    normalizedStrategy === 'web-scaffold-base' ||
+    normalizedDecisionKey === 'web-scaffold-base' ||
+    looksLikeWebScaffoldPlannerInstruction(instruction) ||
+    normalizedPayloadText.includes('index.html') ||
+    normalizedPayloadText.includes('styles.css') ||
+    normalizedPayloadText.includes('script.js') ||
+    normalizedPayloadText.includes('rediseñar la landing') ||
+    normalizedPayloadText.includes('redisenar la landing') ||
+    /\bweb-[a-z0-9-]+\b/u.test(normalizedPayloadText)
+  )
+}
+
+function isStructuredFullstackLocalDecision(strategy, deliveryLevel) {
+  const normalizedStrategy =
+    typeof strategy === 'string' ? strategy.trim().toLocaleLowerCase() : ''
+  const normalizedDeliveryLevel =
+    typeof deliveryLevel === 'string' ? deliveryLevel.trim().toLocaleLowerCase() : ''
+
+  return (
+    (normalizedStrategy === 'scalable-delivery-plan' &&
+      normalizedDeliveryLevel === 'fullstack-local') ||
+    normalizedStrategy === 'materialize-fullstack-local-plan'
+  )
+}
+
 async function buildReusableArtifactPlanningContext({
   userDataPath,
   goal,
@@ -40586,6 +40746,10 @@ function extractOpenAIResponseText(responsePayload) {
 
 async function normalizeOpenAIBrainDecision(rawDecision, input) {
   const fallbackDecision = await buildLocalStrategicBrainDecision(input)
+  const plannerFeedback = parseOrchestratorPlannerFeedback(
+    typeof input?.previousExecutionResult === 'string' ? input.previousExecutionResult : '',
+  )
+  const approvalAlreadyGranted = plannerFeedback?.type === 'approval-granted'
   const resolvedDecisionMap = buildResolvedDecisionMap(
     input.projectState,
     input.userParticipationMode,
@@ -40601,7 +40765,57 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
     context: input.context,
     sectorConfig: resolvedSectorConfig,
   })
-  const normalizedApprovalRequest =
+  const fallbackScalableDeliveryPlan = normalizeScalableDeliveryPlanContract(
+    fallbackDecision?.scalableDeliveryPlan,
+  )
+  const rawScalableDeliveryPlan = normalizeScalableDeliveryPlanContract(
+    rawDecision?.scalableDeliveryPlan,
+  )
+  const fallbackDeliveryLevel =
+    fallbackScalableDeliveryPlan?.deliveryLevel ||
+    normalizeOptionalString(fallbackDecision?.projectBlueprint?.deliveryLevel) ||
+    ''
+  const originalScalableDeliveryIntent = detectScalableDeliveryPlanningIntent(
+    input?.goal,
+    input?.context,
+  )
+  const originalFullstackLocalIntent =
+    originalScalableDeliveryIntent.matches &&
+    originalScalableDeliveryIntent.deliveryLevel === 'fullstack-local'
+  const rawLooksLikeWebScaffoldRegression = looksLikeWebScaffoldDecisionPayload(rawDecision)
+  const resolvedStrategy =
+    typeof rawDecision?.strategy === 'string' && rawDecision.strategy.trim()
+      ? rawDecision.strategy.trim()
+      : fallbackDecision.strategy
+  const resolvedDeliveryLevel =
+    rawScalableDeliveryPlan?.deliveryLevel ||
+    fallbackScalableDeliveryPlan?.deliveryLevel ||
+    normalizeOptionalString(rawDecision?.projectBlueprint?.deliveryLevel) ||
+    normalizeOptionalString(fallbackDecision?.projectBlueprint?.deliveryLevel) ||
+    ''
+  const fallbackIsStructuredFullstackLocalDecision = isStructuredFullstackLocalDecision(
+    fallbackDecision?.strategy,
+    fallbackDeliveryLevel,
+  )
+  const shouldGuardOpenAIWebScaffoldRegression =
+    fallbackIsStructuredFullstackLocalDecision &&
+    fallbackDecision?.strategy === 'scalable-delivery-plan' &&
+    normalizeOptionalString(fallbackDecision?.executionMode).toLocaleLowerCase() ===
+      'planner-only' &&
+    originalFullstackLocalIntent &&
+    (rawLooksLikeWebScaffoldRegression ||
+      (normalizeOptionalString(rawDecision?.executionMode).toLocaleLowerCase() ===
+        'executor' &&
+        normalizeOptionalString(rawDecision?.strategy).toLocaleLowerCase() !==
+          'materialize-fullstack-local-plan'))
+  const shouldForceFallbackFullstackLocalContracts =
+    shouldGuardOpenAIWebScaffoldRegression ||
+    isStructuredFullstackLocalDecision(resolvedStrategy, resolvedDeliveryLevel)
+  const shouldDropStaleApprovalArtifacts =
+    shouldForceFallbackFullstackLocalContracts &&
+    approvalAlreadyGranted &&
+    fallbackDecision?.requiresApproval !== true
+  const rawApprovalRequest =
     rawDecision?.approvalRequest && typeof rawDecision.approvalRequest === 'object'
       ? buildBrainApprovalRequest({
           decisionKey: rawDecision.approvalRequest.decisionKey,
@@ -40614,7 +40828,10 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
           impact: rawDecision.approvalRequest.impact,
           nextExpectedAction: rawDecision.approvalRequest.nextExpectedAction,
         })
-      : fallbackDecision.approvalRequest
+      : null
+  const normalizedApprovalRequest = shouldDropStaleApprovalArtifacts
+    ? null
+    : rawApprovalRequest || fallbackDecision.approvalRequest
   const effectiveReusablePlanningContext =
     input?.reusablePlanningContext && typeof input.reusablePlanningContext === 'object'
       ? input.reusablePlanningContext
@@ -40663,19 +40880,44 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
           },
         }
       : fallbackDecision.creativeDirection || seededCreativeDirection
+  const rawInstruction =
+    typeof rawDecision?.instruction === 'string' ? rawDecision.instruction : ''
+  const rawNextActionPlan = normalizeNextActionPlanContract(rawDecision?.nextActionPlan)
+  const shouldUseFallbackInstruction =
+    shouldForceFallbackFullstackLocalContracts &&
+    (approvalAlreadyGranted || looksLikeWebScaffoldPlannerInstruction(rawInstruction))
+  const shouldUseFallbackNextActionPlan =
+    shouldForceFallbackFullstackLocalContracts &&
+    (shouldDropStaleApprovalArtifacts ||
+      rawNextActionPlan?.requiresApproval === true ||
+      normalizeOptionalString(rawNextActionPlan?.actionType).toLocaleLowerCase() ===
+        'request-approval' ||
+      normalizeOptionalString(rawNextActionPlan?.targetStrategy).toLocaleLowerCase() ===
+        'web-scaffold-base')
+  const shouldUseFallbackStructuredFullstackDecision =
+    shouldForceFallbackFullstackLocalContracts &&
+    (shouldDropStaleApprovalArtifacts ||
+      shouldUseFallbackInstruction ||
+      shouldUseFallbackNextActionPlan)
   const normalizedDecision = buildBrainDecisionContract({
     ...fallbackDecision,
     decisionKey:
-      typeof rawDecision?.decisionKey === 'string' && rawDecision.decisionKey.trim()
+      shouldUseFallbackStructuredFullstackDecision
+        ? fallbackDecision.decisionKey
+        : typeof rawDecision?.decisionKey === 'string' && rawDecision.decisionKey.trim()
         ? rawDecision.decisionKey.trim()
         : fallbackDecision.decisionKey,
     strategy:
-      typeof rawDecision?.strategy === 'string' && rawDecision.strategy.trim()
+      shouldUseFallbackStructuredFullstackDecision
+        ? fallbackDecision.strategy
+        : typeof rawDecision?.strategy === 'string' && rawDecision.strategy.trim()
         ? rawDecision.strategy.trim()
         : fallbackDecision.strategy,
     executionMode:
-      typeof rawDecision?.executionMode === 'string' &&
-      rawDecision.executionMode.trim()
+      shouldUseFallbackStructuredFullstackDecision
+        ? fallbackDecision.executionMode
+        : typeof rawDecision?.executionMode === 'string' &&
+            rawDecision.executionMode.trim()
         ? rawDecision.executionMode.trim()
         : fallbackDecision.executionMode,
     businessSector:
@@ -40689,36 +40931,52 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
         ? rawDecision.businessSectorLabel.trim()
         : fallbackDecision.businessSectorLabel,
     reason:
-      typeof rawDecision?.reason === 'string' && rawDecision.reason.trim()
+      shouldUseFallbackStructuredFullstackDecision
+        ? fallbackDecision.reason
+        : typeof rawDecision?.reason === 'string' && rawDecision.reason.trim()
         ? rawDecision.reason.trim()
         : fallbackDecision.reason,
     question:
-      typeof rawDecision?.question === 'string' ? rawDecision.question.trim() : '',
+      shouldUseFallbackStructuredFullstackDecision || shouldDropStaleApprovalArtifacts
+        ? typeof fallbackDecision?.question === 'string'
+          ? fallbackDecision.question.trim()
+          : ''
+        : typeof rawDecision?.question === 'string'
+          ? rawDecision.question.trim()
+          : '',
     tasks:
+      !shouldUseFallbackStructuredFullstackDecision &&
       Array.isArray(rawDecision?.tasks) && rawDecision.tasks.length > 0
         ? rawDecision.tasks
         : fallbackDecision.tasks,
-    requiresApproval:
-      rawDecision?.requiresApproval === true ||
-      (normalizedApprovalRequest &&
-        typeof normalizedApprovalRequest.question === 'string' &&
-        normalizedApprovalRequest.question.trim() &&
-        rawDecision?.completed !== true),
+    requiresApproval: shouldDropStaleApprovalArtifacts
+      ? false
+      : rawDecision?.requiresApproval === true ||
+        (normalizedApprovalRequest &&
+          typeof normalizedApprovalRequest.question === 'string' &&
+          normalizedApprovalRequest.question.trim() &&
+          rawDecision?.completed !== true),
     approvalRequest: normalizedApprovalRequest,
     assumptions:
+      !shouldUseFallbackStructuredFullstackDecision &&
       Array.isArray(rawDecision?.assumptions) && rawDecision.assumptions.length > 0
         ? rawDecision.assumptions
         : fallbackDecision.assumptions,
-    instruction: resolveReusableAwareInstruction({
-      rawInstruction:
-        typeof rawDecision?.instruction === 'string' ? rawDecision.instruction : '',
-      fallbackInstruction: fallbackDecision.instruction,
-      reusablePlanningContext: effectiveReusablePlanningContext,
-    }),
-    completed: rawDecision?.completed === true,
+    instruction: shouldUseFallbackStructuredFullstackDecision || shouldUseFallbackInstruction
+      ? fallbackDecision.instruction
+      : resolveReusableAwareInstruction({
+          rawInstruction,
+          fallbackInstruction: fallbackDecision.instruction,
+          reusablePlanningContext: effectiveReusablePlanningContext,
+        }),
+    completed: shouldUseFallbackStructuredFullstackDecision
+      ? fallbackDecision.completed === true
+      : rawDecision?.completed === true,
     nextExpectedAction:
-      typeof rawDecision?.nextExpectedAction === 'string' &&
-      rawDecision.nextExpectedAction.trim()
+      shouldUseFallbackStructuredFullstackDecision
+        ? fallbackDecision.nextExpectedAction
+        : typeof rawDecision?.nextExpectedAction === 'string' &&
+            rawDecision.nextExpectedAction.trim()
         ? rawDecision.nextExpectedAction.trim()
         : fallbackDecision.nextExpectedAction,
     creativeDirection: mergedCreativeDirection,
@@ -40774,81 +41032,106 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
         ? rawDecision.safeFirstDeliveryMaterialization
         : fallbackDecision.safeFirstDeliveryMaterialization,
     scalableDeliveryPlan:
+      !shouldUseFallbackStructuredFullstackDecision &&
       rawDecision?.scalableDeliveryPlan &&
       typeof rawDecision.scalableDeliveryPlan === 'object'
         ? rawDecision.scalableDeliveryPlan
         : fallbackDecision.scalableDeliveryPlan,
     projectBlueprint:
+      !shouldUseFallbackStructuredFullstackDecision &&
       rawDecision?.projectBlueprint && typeof rawDecision.projectBlueprint === 'object'
         ? rawDecision.projectBlueprint
         : fallbackDecision.projectBlueprint,
     questionPolicy:
+      !shouldUseFallbackStructuredFullstackDecision &&
       rawDecision?.questionPolicy && typeof rawDecision.questionPolicy === 'object'
         ? rawDecision.questionPolicy
         : fallbackDecision.questionPolicy,
     implementationRoadmap:
+      !shouldUseFallbackStructuredFullstackDecision &&
       rawDecision?.implementationRoadmap &&
       typeof rawDecision.implementationRoadmap === 'object'
         ? rawDecision.implementationRoadmap
         : fallbackDecision.implementationRoadmap,
     nextActionPlan:
-      rawDecision?.nextActionPlan && typeof rawDecision.nextActionPlan === 'object'
+      !shouldUseFallbackStructuredFullstackDecision &&
+      !shouldUseFallbackNextActionPlan &&
+      rawDecision?.nextActionPlan &&
+      typeof rawDecision.nextActionPlan === 'object'
         ? rawDecision.nextActionPlan
         : fallbackDecision.nextActionPlan,
     validationPlan:
+      !shouldUseFallbackStructuredFullstackDecision &&
       rawDecision?.validationPlan && typeof rawDecision.validationPlan === 'object'
         ? rawDecision.validationPlan
         : fallbackDecision.validationPlan,
     phaseExpansionPlan:
+      !shouldUseFallbackStructuredFullstackDecision &&
       rawDecision?.phaseExpansionPlan &&
       typeof rawDecision.phaseExpansionPlan === 'object'
         ? rawDecision.phaseExpansionPlan
         : fallbackDecision.phaseExpansionPlan,
     projectPhaseExecutionPlan:
+      !shouldUseFallbackStructuredFullstackDecision &&
       rawDecision?.projectPhaseExecutionPlan &&
       typeof rawDecision.projectPhaseExecutionPlan === 'object'
         ? rawDecision.projectPhaseExecutionPlan
         : fallbackDecision.projectPhaseExecutionPlan,
     localProjectManifest:
+      !shouldUseFallbackStructuredFullstackDecision &&
       rawDecision?.localProjectManifest &&
       typeof rawDecision.localProjectManifest === 'object'
         ? rawDecision.localProjectManifest
         : fallbackDecision.localProjectManifest,
     expansionOptions:
+      !shouldUseFallbackStructuredFullstackDecision &&
       rawDecision?.expansionOptions && typeof rawDecision.expansionOptions === 'object'
         ? rawDecision.expansionOptions
         : fallbackDecision.expansionOptions,
     moduleExpansionPlan:
+      !shouldUseFallbackStructuredFullstackDecision &&
       rawDecision?.moduleExpansionPlan &&
       typeof rawDecision.moduleExpansionPlan === 'object'
         ? rawDecision.moduleExpansionPlan
         : fallbackDecision.moduleExpansionPlan,
     continuationActionPlan:
+      !shouldUseFallbackStructuredFullstackDecision &&
       rawDecision?.continuationActionPlan &&
       typeof rawDecision.continuationActionPlan === 'object'
         ? rawDecision.continuationActionPlan
         : fallbackDecision.continuationActionPlan,
     projectContinuationState:
+      !shouldUseFallbackStructuredFullstackDecision &&
       rawDecision?.projectContinuationState &&
       typeof rawDecision.projectContinuationState === 'object'
         ? rawDecision.projectContinuationState
         : fallbackDecision.projectContinuationState,
     projectReadinessState:
+      !shouldUseFallbackStructuredFullstackDecision &&
       rawDecision?.projectReadinessState &&
       typeof rawDecision.projectReadinessState === 'object'
         ? rawDecision.projectReadinessState
         : fallbackDecision.projectReadinessState,
     approvalRequestPlan:
+      !shouldUseFallbackStructuredFullstackDecision &&
+      !shouldDropStaleApprovalArtifacts &&
       rawDecision?.approvalRequestPlan &&
       typeof rawDecision.approvalRequestPlan === 'object'
         ? rawDecision.approvalRequestPlan
-        : fallbackDecision.approvalRequestPlan,
+        : shouldDropStaleApprovalArtifacts || shouldUseFallbackStructuredFullstackDecision
+          ? null
+          : fallbackDecision.approvalRequestPlan,
     runtimeApprovalState:
+      !shouldUseFallbackStructuredFullstackDecision &&
+      !shouldDropStaleApprovalArtifacts &&
       rawDecision?.runtimeApprovalState &&
       typeof rawDecision.runtimeApprovalState === 'object'
         ? rawDecision.runtimeApprovalState
-        : fallbackDecision.runtimeApprovalState,
+        : shouldDropStaleApprovalArtifacts || shouldUseFallbackStructuredFullstackDecision
+          ? null
+          : fallbackDecision.runtimeApprovalState,
     materializationPlan:
+      !shouldUseFallbackStructuredFullstackDecision &&
       rawDecision?.materializationPlan &&
       typeof rawDecision.materializationPlan === 'object'
         ? rawDecision.materializationPlan
@@ -43261,8 +43544,9 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
     reason: brainDecision.reason,
     tasks: brainDecision.tasks,
     assumptions: brainDecision.assumptions,
-    question: brainDecision.question,
-    approvalRequest: brainDecision.approvalRequest,
+    question: brainDecision.requiresApproval === true ? brainDecision.question : '',
+    approvalRequest:
+      brainDecision.requiresApproval === true ? brainDecision.approvalRequest : null,
     nextExpectedAction: brainDecision.nextExpectedAction,
     domainUnderstanding: brainDecision.domainUnderstanding,
     scalableDeliveryPlan: brainDecision.scalableDeliveryPlan,
