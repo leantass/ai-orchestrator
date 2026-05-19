@@ -3423,9 +3423,9 @@ async function runTrackingLogisticsValidMaterializationNotBlockedCase() {
   )
   pushFailure(
     failures,
-    mainSource.includes('function looksLikeValidFullstackLocalMaterializationPayload({') &&
-      mainSource.includes(
-        'const looksLikeValidFullstackLocalMaterialization =\n    looksLikeValidFullstackLocalMaterializationPayload({',
+    /function\s+looksLikeValidFullstackLocalMaterializationPayload\s*\(\s*\{/u.test(mainSource) &&
+      /function\s+shouldBlockWebScaffoldExecutionForFullstackRequest\s*\(\s*\{[\s\S]*?const\s+looksLikeValidFullstackLocalMaterialization\s*=\s*looksLikeValidFullstackLocalMaterializationPayload\s*\(\s*\{/u.test(
+        mainSource,
       ),
     'electron/main.cjs debe exponer un detector positivo de materializacion fullstack valida y usarlo desde shouldBlockWebScaffoldExecutionForFullstackRequest.',
   )
