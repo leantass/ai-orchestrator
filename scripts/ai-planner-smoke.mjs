@@ -55,6 +55,7 @@ const requiredPlannerFunctions = [
   'buildStrategicBrainInput',
   'shouldBlockWebScaffoldExecutionForFullstackRequest',
   'buildBlockedFullstackWebScaffoldExecutionResponse',
+  'inspectFullstackLocalMaterializationContract',
 ]
 
 const activeCases = [
@@ -1079,6 +1080,7 @@ module.exports = {
   buildStrategicBrainInput,
   shouldBlockWebScaffoldExecutionForFullstackRequest,
   buildBlockedFullstackWebScaffoldExecutionResponse,
+  inspectFullstackLocalMaterializationContract,
 };
 `
 
@@ -1130,6 +1132,25 @@ module.exports = {
 }
 
 const plannerApi = loadPlannerTestingSurface()
+
+function inspectDecisionMaterializationContract({
+  decision,
+  goal,
+  context,
+}) {
+  return plannerApi.inspectFullstackLocalMaterializationContract({
+    goal,
+    context,
+    decisionKey: decision?.decisionKey,
+    strategy: decision?.strategy,
+    executionMode: decision?.executionMode,
+    nextExpectedAction: decision?.nextExpectedAction,
+    executionScope: decision?.executionScope,
+    materializationPlan: decision?.materializationPlan,
+    localProjectManifest: decision?.localProjectManifest,
+    existingProjectDetection: decision?.existingProjectDetection,
+  })
+}
 
 function toStringArray(value, limit = 20) {
   return summarizeUniqueStrings(value, limit)
@@ -3324,6 +3345,7 @@ async function runTrackingLogisticsValidMaterializationNotBlockedValidation() {
         'logistics-tracker-local/scripts',
       ],
       operations: [
+        { targetPath: 'logistics-tracker-local/README.md' },
         { targetPath: 'logistics-tracker-local/backend/package.json' },
         { targetPath: 'logistics-tracker-local/backend/src/server.js' },
         { targetPath: 'logistics-tracker-local/backend/src/routes/shipments.js' },
@@ -3335,6 +3357,8 @@ async function runTrackingLogisticsValidMaterializationNotBlockedValidation() {
         { targetPath: 'logistics-tracker-local/frontend/admin/index.html' },
         { targetPath: 'logistics-tracker-local/frontend/admin/app.js' },
         { targetPath: 'logistics-tracker-local/frontend/admin/styles.css' },
+        { targetPath: 'logistics-tracker-local/docs/API.md' },
+        { targetPath: 'logistics-tracker-local/docs/ARCHITECTURE.md' },
         { targetPath: 'logistics-tracker-local/docs/api.md' },
         { targetPath: 'logistics-tracker-local/docs/db_schema.md' },
         { targetPath: 'logistics-tracker-local/docs/architecture.md' },
@@ -3343,6 +3367,7 @@ async function runTrackingLogisticsValidMaterializationNotBlockedValidation() {
       ],
     },
   })
+  const contractInspection = guardDecision?.contractInspection
 
   if (guardDecision?.blocked) {
     failures.push('Una materializacion fullstack valida no deberia bloquearse por el safety gate web scaffold.')
@@ -3352,6 +3377,43 @@ async function runTrackingLogisticsValidMaterializationNotBlockedValidation() {
   }
   if (guardDecision?.looksLikeValidFullstackLocalMaterialization !== true) {
     failures.push('El guard deberia reconocer la estructura como fullstack local valida antes de decidir bloqueo.')
+  }
+  if (!contractInspection || contractInspection.ok !== true) {
+    failures.push(
+      `El guard deberia reutilizar un contrato canonico valido. Recibido: ${contractInspection?.reason || '(sin reason)'}.`,
+    )
+  }
+  ;[
+    'database/schema.sql',
+    'database/seed.sql',
+    'docs/API.md',
+    'docs/DB_SCHEMA.md|docs/DATA_MODEL.md',
+    'backend/src/routes/shipments.js',
+    'backend/src/routes/tracking.js',
+  ].forEach((token) => {
+    const normalizedToken = normalizePathForComparison(token)
+    const presentInContract =
+      token.includes('|')
+        ? token
+            .split('|')
+            .map((entry) => normalizePathForComparison(entry))
+            .some((candidate) =>
+              Array.isArray(contractInspection?.expectedTargetPaths) &&
+              contractInspection.expectedTargetPaths.some((entry) =>
+                normalizePathForComparison(entry).endsWith(candidate),
+              ),
+            )
+        : Array.isArray(contractInspection?.expectedTargetPaths) &&
+          contractInspection.expectedTargetPaths.some((entry) =>
+            normalizePathForComparison(entry).endsWith(normalizedToken),
+          )
+
+    if (!presentInContract) {
+      failures.push(`El contrato canonico deberia exigir ${token}.`)
+    }
+  })
+  if (contractInspection?.usesJsonAsPrimaryPersistence) {
+    failures.push('El contrato canonico no deberia marcar JSON como persistencia principal en una materializacion valida.')
   }
 
   return {
@@ -3754,6 +3816,11 @@ async function runTrackingLogisticsMaterializationContractValidation() {
     decision?.materializationPlan && typeof decision.materializationPlan === 'object'
       ? decision.materializationPlan
       : null
+  const contractInspection = inspectDecisionMaterializationContract({
+    decision,
+    goal: result.testCase?.goal || '',
+    context: result.testCase?.context || '',
+  })
   const allowedTargetPaths = summarizeUniqueStrings(
     [
       ...(Array.isArray(decision?.executionScope?.allowedTargetPaths)
@@ -3771,6 +3838,11 @@ async function runTrackingLogisticsMaterializationContractValidation() {
 
   if (!materializationPlan) {
     failures.push('materializationPlan ausente para el contrato fullstack logistico.')
+  }
+  if (!contractInspection || contractInspection.ok !== true) {
+    failures.push(
+      `El contrato canonico deberia validar la materializacion logistica. Recibido: ${contractInspection?.reason || '(sin reason)'}.`,
+    )
   }
 
   ;[
@@ -3794,6 +3866,16 @@ async function runTrackingLogisticsMaterializationContractValidation() {
   })
   if (allowedTargetPaths.some((entry) => entry.endsWith(normalizePathForComparison('database/shipments.json')))) {
     failures.push('allowedTargetPaths no deberia usar database/shipments.json como persistencia principal.')
+  }
+  if (Array.isArray(contractInspection?.missingRequiredPaths) && contractInspection.missingRequiredPaths.length > 0) {
+    failures.push(
+      `El validador canonico no deberia marcar faltantes en el contrato logistico valido: ${contractInspection.missingRequiredPaths.join(', ')}.`,
+    )
+  }
+  if (Array.isArray(contractInspection?.forbiddenSignalsFound) && contractInspection.forbiddenSignalsFound.length > 0) {
+    failures.push(
+      `El validador canonico no deberia detectar contaminaciones en el contrato logistico valido: ${contractInspection.forbiddenSignalsFound.join(', ')}.`,
+    )
   }
   ;['web-sistema-de-tracking', 'script.js'].forEach((token) => {
     if (
@@ -3917,6 +3999,11 @@ async function runExistingProjectDetectionNewProjectIsolationValidation() {
 async function runTrackingLogisticsMaterializationRequiresSqlContractValidation() {
   const result = await requestTrackingLogisticsPreparedMaterializationDecision()
   const failures = [...(Array.isArray(result.failures) ? result.failures : [])]
+  const contractInspection = inspectDecisionMaterializationContract({
+    decision: result.decision,
+    goal: result.testCase?.goal || '',
+    context: result.testCase?.context || '',
+  })
   const materializationPlan =
     result.decision?.materializationPlan && typeof result.decision.materializationPlan === 'object'
       ? result.decision.materializationPlan
@@ -3950,6 +4037,21 @@ async function runTrackingLogisticsMaterializationRequiresSqlContractValidation(
   if (targetSummary.includes(normalizeText('database/shipments.json'))) {
     failures.push('database/shipments.json no puede reemplazar al contrato SQL principal.')
   }
+  if (!contractInspection || contractInspection.ok !== true) {
+    failures.push(
+      `El contrato canonico deberia aceptar este plan con SQL local. Recibido: ${contractInspection?.reason || '(sin reason)'}.`,
+    )
+  }
+  ;['database/schema.sql', 'database/seed.sql'].forEach((token) => {
+    if (
+      !Array.isArray(contractInspection?.expectedTargetPaths) ||
+      !contractInspection.expectedTargetPaths.some((entry) =>
+        normalizePathForComparison(entry).endsWith(normalizePathForComparison(token)),
+      )
+    ) {
+      failures.push(`El contrato canonico deberia exigir ${token}.`)
+    }
+  })
 
   return {
     testCase: {
@@ -4044,6 +4146,11 @@ async function runTrackingLogisticsMaterializationRejectsJsonOnlyValidation() {
     contaminatedDecision,
     strategicInput,
   )
+  const contractInspection = inspectDecisionMaterializationContract({
+    decision,
+    goal: testCase.goal,
+    context: testCase.context,
+  })
 
   const normalizedDecision = normalizeText(JSON.stringify(decision || {}))
   if (
@@ -4054,6 +4161,20 @@ async function runTrackingLogisticsMaterializationRejectsJsonOnlyValidation() {
   }
   if (normalizedDecision.includes(normalizeText('database/shipments.json'))) {
     failures.push('El fallback no debe conservar database/shipments.json como persistencia principal.')
+  }
+  if (contractInspection?.ok === true) {
+    failures.push('El contrato canonico no deberia aceptar una materializacion JSON-only.')
+  }
+  if (
+    String(decision?.strategy || '').trim() === 'materialize-fullstack-local-plan' &&
+    !String(contractInspection?.reason || '')
+      .toLocaleLowerCase()
+      .includes('database/schema.sql') &&
+    !String(contractInspection?.reason || '')
+      .toLocaleLowerCase()
+      .includes('database/seed.sql')
+  ) {
+    failures.push('El contrato canonico deberia explicar que falta schema.sql y/o seed.sql en una propuesta JSON-only.')
   }
 
   return {

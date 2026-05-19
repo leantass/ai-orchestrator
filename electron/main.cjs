@@ -6824,14 +6824,36 @@ function collectExecutionPayloadPaths({
 }
 
 function looksLikeValidFullstackLocalMaterializationPayload({
+  goal,
   decisionKey,
   strategy,
   instruction,
   context,
   executionScope,
   materializationPlan,
+  precomputedContractInspection,
   extraTexts = [],
 }) {
+  const contractInspection =
+    precomputedContractInspection && typeof precomputedContractInspection === 'object'
+      ? precomputedContractInspection
+      : inspectFullstackLocalMaterializationContract({
+          goal: normalizeOptionalString(goal) || normalizeOptionalString(instruction),
+          context,
+          decisionKey,
+          strategy,
+          executionMode: 'executor',
+          nextExpectedAction: 'execute-plan',
+          executionScope,
+          materializationPlan,
+          localProjectManifest: null,
+          existingProjectDetection: null,
+        })
+
+  if (contractInspection?.ok === true) {
+    return true
+  }
+
   const normalizedDecisionKey = normalizeOptionalString(decisionKey).toLocaleLowerCase()
   const normalizedStrategy = normalizeOptionalString(strategy).toLocaleLowerCase()
   const normalizedPlanStrategy = normalizeOptionalString(
@@ -7010,14 +7032,28 @@ function shouldBlockWebScaffoldExecutionForFullstackRequest({
   })
   const hasStrongFullstackSignals =
     fullstackProfile.matches && fullstackProfile.deliveryLevel === 'fullstack-local'
+  const contractInspection = inspectFullstackLocalMaterializationContract({
+    goal,
+    context,
+    decisionKey,
+    strategy,
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    executionScope,
+    materializationPlan,
+    localProjectManifest: null,
+    existingProjectDetection: null,
+  })
   const looksLikeValidFullstackLocalMaterialization =
     looksLikeValidFullstackLocalMaterializationPayload({
+      goal,
       decisionKey,
       strategy,
       instruction,
       context,
       executionScope,
       materializationPlan,
+      precomputedContractInspection: contractInspection,
       extraTexts,
     })
   const looksLikeWebScaffold = looksLikeWebScaffoldExecutionPayload({
@@ -7039,6 +7075,7 @@ function shouldBlockWebScaffoldExecutionForFullstackRequest({
     reason: blocked ? 'fullstack request cannot execute web scaffold' : '',
     profile: fullstackProfile,
     looksLikeValidFullstackLocalMaterialization,
+    contractInspection,
   }
 }
 
@@ -16156,6 +16193,169 @@ function buildFullstackLocalContractPaths({ rootFolder, fullstackContractProfile
   }
 }
 
+const CANONICAL_LOGISTICS_FULLSTACK_ROOT_ALIASES = [
+  'logistics-tracking-local',
+  'logistics-tracker-local',
+  'logi-track-local',
+]
+const LEGACY_LOGISTICS_FULLSTACK_ROOT_ALIASES = ['logitrack-local-v1']
+
+function buildCanonicalFullstackLocalMaterializationContract({
+  rootFolder,
+  fullstackContractProfile,
+}) {
+  const normalizedRootFolder =
+    typeof rootFolder === 'string' && rootFolder.trim()
+      ? rootFolder.trim()
+      : 'fullstack-local'
+  const profile =
+    fullstackContractProfile && typeof fullstackContractProfile === 'object'
+      ? fullstackContractProfile
+      : {
+          archetype: 'operations',
+          frontendFeatureBasename: 'appointments',
+          backendRouteBasename: 'appointments',
+          backendModuleBasename: 'appointments',
+        }
+  const contractPaths = buildFullstackLocalContractPaths({
+    rootFolder: normalizedRootFolder,
+    fullstackContractProfile: profile,
+  })
+  const rootReadmePath = path.join(normalizedRootFolder, 'README.md')
+  const backendPackageJsonPath = path.join(normalizedRootFolder, 'backend', 'package.json')
+  const backendSrcServerPath = path.join(
+    normalizedRootFolder,
+    'backend',
+    'src',
+    'server.js',
+  )
+  const backendLegacyServerPath = path.join(normalizedRootFolder, 'backend', 'server.js')
+  const sharedConstantsPath = path.join(normalizedRootFolder, 'shared', 'constants.js')
+  const scriptsSeedPath = path.join(normalizedRootFolder, 'scripts', 'seed-local.js')
+  const scriptsReadmePath = path.join(normalizedRootFolder, 'scripts', 'README.md')
+  const databaseShipmentsJsonPath = path.join(
+    normalizedRootFolder,
+    'database',
+    'shipments.json',
+  )
+
+  if (profile.archetype === 'logistics-tracking') {
+    const requiredPathGroups = [
+      { label: 'README.md', candidates: [rootReadmePath] },
+      { label: 'docs/API.md', candidates: [contractPaths.docsApiPath] },
+      {
+        label: 'docs/ARCHITECTURE.md',
+        candidates: [contractPaths.docsArchitecturePath],
+      },
+      {
+        label: 'docs/DB_SCHEMA.md|docs/DATA_MODEL.md',
+        candidates: [contractPaths.docsDbSchemaPath, contractPaths.docsDataModelPath],
+      },
+      { label: 'backend/package.json', candidates: [backendPackageJsonPath] },
+      {
+        label: 'backend/src/server.js|backend/server.js',
+        candidates: [backendSrcServerPath, backendLegacyServerPath],
+      },
+      {
+        label: 'backend/src/routes/shipments.js',
+        candidates: [contractPaths.backendPrimaryRoutePath],
+      },
+      {
+        label: 'backend/src/routes/tracking.js',
+        candidates: [contractPaths.backendTrackingRoutePath],
+      },
+      { label: 'database/schema.sql', candidates: [contractPaths.databaseSchemaPath] },
+      { label: 'database/seed.sql', candidates: [contractPaths.databaseSeedPath] },
+      {
+        label: 'frontend/admin/index.html',
+        candidates: [contractPaths.frontendAdminIndexPath],
+      },
+      {
+        label: 'frontend/admin/app.js',
+        candidates: [contractPaths.frontendAdminAppPath],
+      },
+      {
+        label: 'frontend/public/index.html',
+        candidates: [contractPaths.frontendPublicIndexPath],
+      },
+      {
+        label: 'frontend/public/app.js',
+        candidates: [contractPaths.frontendPublicAppPath],
+      },
+      {
+        label: 'shared/constants.js|shared/statuses.js',
+        candidates: [sharedConstantsPath, contractPaths.sharedStatusesPath],
+      },
+      {
+        label: 'scripts/seed-local.js|scripts/README.md',
+        candidates: [scriptsSeedPath, scriptsReadmePath],
+      },
+    ]
+
+    return {
+      contractKind: 'logistics-fullstack-local',
+      rootFolder: normalizedRootFolder,
+      allowedRootBasenames: [
+        ...CANONICAL_LOGISTICS_FULLSTACK_ROOT_ALIASES,
+        ...LEGACY_LOGISTICS_FULLSTACK_ROOT_ALIASES,
+      ],
+      preferredRootBasenames: CANONICAL_LOGISTICS_FULLSTACK_ROOT_ALIASES.slice(),
+      forbiddenSignals: [
+        'web-scaffold-base',
+        'web-sistema-de-tracking',
+        'veterinaria',
+        'appointments',
+        'turnos',
+        'pacientes',
+        'mascotas',
+        'reservas',
+        'fullstack-local-veterinaria',
+      ],
+      primaryPersistencePaths: [
+        contractPaths.databaseSchemaPath,
+        contractPaths.databaseSeedPath,
+      ],
+      jsonPrimaryPersistencePaths: [databaseShipmentsJsonPath],
+      requiredPathGroups,
+      requiredPaths: requiredPathGroups.map((entry) => entry.label),
+      expectedTargetPaths: requiredPathGroups.map((entry) => entry.candidates[0]).filter(Boolean),
+    }
+  }
+
+  const genericRequiredPathGroups = [
+    { label: 'README.md', candidates: [rootReadmePath] },
+    { label: 'backend/package.json', candidates: [backendPackageJsonPath] },
+    {
+      label: 'backend/src/server.js|backend/server.js',
+      candidates: [backendSrcServerPath, backendLegacyServerPath],
+    },
+    { label: 'database/schema.sql', candidates: [contractPaths.databaseSchemaPath] },
+    {
+      label: 'frontend/admin/index.html',
+      candidates: [contractPaths.frontendAdminIndexPath],
+    },
+    {
+      label: 'frontend/public/index.html',
+      candidates: [contractPaths.frontendPublicIndexPath],
+    },
+  ]
+
+  return {
+    contractKind: 'generic-fullstack-local',
+    rootFolder: normalizedRootFolder,
+    allowedRootBasenames: [],
+    preferredRootBasenames: [],
+    forbiddenSignals: ['web-scaffold-base'],
+    primaryPersistencePaths: [contractPaths.databaseSchemaPath],
+    jsonPrimaryPersistencePaths: [databaseShipmentsJsonPath],
+    requiredPathGroups: genericRequiredPathGroups,
+    requiredPaths: genericRequiredPathGroups.map((entry) => entry.label),
+    expectedTargetPaths: genericRequiredPathGroups
+      .map((entry) => entry.candidates[0])
+      .filter(Boolean),
+  }
+}
+
 function collectMaterializationContractTargetPaths({ executionScope, materializationPlan }) {
   return summarizeUniqueExecutorStrings(
     [
@@ -16173,13 +16373,16 @@ function collectMaterializationContractTargetPaths({ executionScope, materializa
         : []),
     ].filter((entry) => typeof entry === 'string' && entry.trim()),
     200,
-  ).map((entry) => normalizePathForComparison(entry))
+  ).map((entry) => normalizePathForComparison(entry).toLocaleLowerCase())
 }
 
 function inspectFullstackLocalMaterializationContract({
   goal,
   context,
+  decisionKey,
   strategy,
+  executionMode,
+  nextExpectedAction,
   executionScope,
   materializationPlan,
   localProjectManifest,
@@ -16192,7 +16395,7 @@ function inspectFullstackLocalMaterializationContract({
   const rootFolder =
     normalizeOptionalString(materializationPlan?.projectRoot) ||
     normalizeOptionalString(localProjectManifest?.projectRoot) ||
-    targetPaths[0] ||
+    (targetPaths[0] ? targetPaths[0].split('/').filter(Boolean)[0] || '' : '') ||
     ''
   const fileHints = [
     ...targetPaths,
@@ -16218,46 +16421,86 @@ function inspectFullstackLocalMaterializationContract({
     detectLogisticsTrackingIntent(
       normalizeSectorDetectionText([goal, context, fileHints.join(' ')].join(' ')),
     )
-  const contractPaths = buildFullstackLocalContractPaths({
+  const contractDefinition = buildCanonicalFullstackLocalMaterializationContract({
     rootFolder: rootFolder || 'logistics-tracker-local',
     fullstackContractProfile: profile,
   })
   const normalizedTargetSummary = targetPaths.join(' ')
-  const requiredMarkers = usesLogisticsContract
-    ? [
-        normalizePathForComparison(contractPaths.frontendAdminIndexPath),
-        normalizePathForComparison(contractPaths.frontendAdminAppPath),
-        normalizePathForComparison(contractPaths.frontendPublicIndexPath),
-        normalizePathForComparison(contractPaths.frontendPublicAppPath),
-        normalizePathForComparison(contractPaths.backendPrimaryRoutePath),
-        normalizePathForComparison(contractPaths.backendTrackingRoutePath),
-        normalizePathForComparison(contractPaths.databaseSchemaPath),
-        normalizePathForComparison(contractPaths.databaseSeedPath),
-        normalizePathForComparison(contractPaths.docsApiPath),
-      ]
-    : [
-        normalizePathForComparison(contractPaths.databaseSchemaPath),
-        normalizePathForComparison(contractPaths.databaseLegacySeedPath),
-      ]
-  const missingRequiredMarkers = requiredMarkers.filter(
-    (entry) => entry && !normalizedTargetSummary.includes(entry),
-  )
-  const hasCanonicalDataModelDoc =
-    normalizedTargetSummary.includes(normalizePathForComparison(contractPaths.docsDbSchemaPath)) ||
-    normalizedTargetSummary.includes(normalizePathForComparison(contractPaths.docsDataModelPath))
-  const hasSqlContract =
-    normalizedTargetSummary.includes(normalizePathForComparison(contractPaths.databaseSchemaPath)) &&
-    (normalizedTargetSummary.includes(normalizePathForComparison(contractPaths.databaseSeedPath)) ||
+  const resolvedExpectedTargetPaths = contractDefinition.requiredPathGroups
+    .map((group) =>
+      group.candidates.find((entry) =>
+        normalizedTargetSummary.includes(
+          normalizePathForComparison(entry).toLocaleLowerCase(),
+        ),
+      ) || group.candidates[0],
+    )
+    .filter(Boolean)
+  const missingRequiredPaths = contractDefinition.requiredPathGroups
+    .filter(
+      (group) =>
+        !group.candidates.some((entry) =>
+          normalizedTargetSummary.includes(
+            normalizePathForComparison(entry).toLocaleLowerCase(),
+          ),
+        ),
+    )
+    .map((group) => group.label)
+  const hasCanonicalDataModelDoc = contractDefinition.requiredPathGroups
+    .find((entry) => entry.label === 'docs/DB_SCHEMA.md|docs/DATA_MODEL.md')
+    ?.candidates.some((entry) =>
       normalizedTargetSummary.includes(
-        normalizePathForComparison(contractPaths.databaseLegacySeedPath),
-      ))
+        normalizePathForComparison(entry).toLocaleLowerCase(),
+      ),
+    )
+  const hasSqlContract =
+    normalizedTargetSummary.includes(
+      normalizePathForComparison(
+        path.join(rootFolder || 'logistics-tracker-local', 'database', 'schema.sql'),
+      ).toLocaleLowerCase(),
+    ) &&
+    normalizedTargetSummary.includes(
+      normalizePathForComparison(
+        path.join(rootFolder || 'logistics-tracker-local', 'database', 'seed.sql'),
+      ).toLocaleLowerCase(),
+    )
   const usesJsonAsPrimaryPersistence =
-    targetPaths.some((entry) => entry.endsWith('/database/shipments.json')) &&
-    !hasSqlContract
+    contractDefinition.jsonPrimaryPersistencePaths.some((entry) =>
+      targetPaths.some((targetPath) =>
+        targetPath.endsWith(normalizePathForComparison(entry).toLocaleLowerCase()),
+      ),
+    ) && !hasSqlContract
+  const normalizedRootBasename = normalizePathForComparison(path.basename(rootFolder || '')).toLocaleLowerCase()
+  const rootAliasMismatch =
+    usesLogisticsContract &&
+    Array.isArray(contractDefinition.allowedRootBasenames) &&
+    contractDefinition.allowedRootBasenames.length > 0 &&
+    !contractDefinition.allowedRootBasenames.some(
+      (entry) => normalizePathForComparison(entry).toLocaleLowerCase() === normalizedRootBasename,
+    )
+  const normalizedDecisionSummary = normalizeSectorDetectionText(
+    [
+      goal,
+      context,
+      normalizeOptionalString(decisionKey),
+      normalizeOptionalString(strategy),
+      normalizeOptionalString(executionMode),
+      normalizeOptionalString(nextExpectedAction),
+      normalizeOptionalString(materializationPlan?.projectRoot),
+      normalizeOptionalString(localProjectManifest?.projectRoot),
+      normalizeOptionalString(existingProjectDetection?.projectRoot),
+      ...targetPaths,
+    ]
+      .filter(Boolean)
+      .join(' '),
+  )
   const contaminationText = normalizeSectorDetectionText(
     [
       goal,
       context,
+      normalizeOptionalString(decisionKey),
+      normalizeOptionalString(strategy),
+      normalizeOptionalString(executionMode),
+      normalizeOptionalString(nextExpectedAction),
       normalizeOptionalString(localProjectManifest?.domain),
       normalizeOptionalString(existingProjectDetection?.projectRoot),
       ...(Array.isArray(localProjectManifest?.modules) ? localProjectManifest.modules : []),
@@ -16270,32 +16513,72 @@ function inspectFullstackLocalMaterializationContract({
       .filter(Boolean)
       .join(' '),
   )
-  const contaminationTokens = usesLogisticsContract
-    ? [
-        'veterinaria',
-        'appointments',
-        'turnos',
-        'pacientes',
-        'mascotas',
-        'reservas',
-        'fullstack-local-veterinaria',
-      ].filter((token) => contaminationText.includes(normalizeSectorDetectionText(token)))
-    : []
+  const forbiddenSignalsFound = [
+    ...(usesLogisticsContract &&
+    String(strategy || '').trim() !== 'materialize-fullstack-local-plan'
+      ? ['strategy-not-materialize-fullstack-local-plan']
+      : []),
+    ...(usesLogisticsContract && String(executionMode || '').trim() !== 'executor'
+      ? ['executionMode-not-executor']
+      : []),
+    ...(usesLogisticsContract && String(nextExpectedAction || '').trim() !== 'execute-plan'
+      ? ['nextExpectedAction-not-execute-plan']
+      : []),
+    ...(rootAliasMismatch ? ['unexpected-root-path'] : []),
+    ...contractDefinition.forbiddenSignals.filter((token) =>
+      contaminationText.includes(normalizeSectorDetectionText(token)),
+    ),
+    ...(normalizedDecisionSummary.includes(normalizeSectorDetectionText('index.html')) &&
+    normalizedDecisionSummary.includes(normalizeSectorDetectionText('styles.css')) &&
+    normalizedDecisionSummary.includes(normalizeSectorDetectionText('script.js')) &&
+    !normalizedDecisionSummary.includes(normalizeSectorDetectionText('backend/src/server.js')) &&
+    !normalizedDecisionSummary.includes(normalizeSectorDetectionText('database/schema.sql'))
+      ? ['landing-only-surface']
+      : []),
+  ]
+  let reason = 'Contrato fullstack local válido.'
+
+  if (String(strategy || '').trim() !== 'materialize-fullstack-local-plan') {
+    reason =
+      'El contrato fullstack local debe usar strategy materialize-fullstack-local-plan.'
+  } else if (String(executionMode || '').trim() !== 'executor') {
+    reason = 'El contrato fullstack local debe usar executionMode executor.'
+  } else if (String(nextExpectedAction || '').trim() !== 'execute-plan') {
+    reason = 'El contrato fullstack local debe usar nextExpectedAction execute-plan.'
+  } else if (usesJsonAsPrimaryPersistence || !hasSqlContract) {
+    reason = 'Falta contrato SQL local: database/schema.sql y database/seed.sql.'
+  } else if (missingRequiredPaths.length > 0) {
+    reason = `Faltan rutas obligatorias del contrato: ${missingRequiredPaths.join(', ')}.`
+  } else if (forbiddenSignalsFound.length > 0) {
+    reason = `Se detectaron señales incompatibles con el contrato fullstack: ${forbiddenSignalsFound.join(', ')}.`
+  }
+  const ok =
+    String(strategy || '').trim() === 'materialize-fullstack-local-plan' &&
+    String(executionMode || '').trim() === 'executor' &&
+    String(nextExpectedAction || '').trim() === 'execute-plan' &&
+    missingRequiredPaths.length === 0 &&
+    hasSqlContract &&
+    (!usesLogisticsContract || hasCanonicalDataModelDoc) &&
+    forbiddenSignalsFound.length === 0 &&
+    !usesJsonAsPrimaryPersistence
 
   return {
+    ok,
+    reason,
+    missingRequiredPaths,
+    forbiddenSignalsFound,
+    usesJsonAsPrimaryPersistence,
+    rootPath: rootFolder,
+    contractKind: contractDefinition.contractKind,
+    expectedTargetPaths: resolvedExpectedTargetPaths,
+    allowedRootBasenames: contractDefinition.allowedRootBasenames,
+    preferredRootBasenames: contractDefinition.preferredRootBasenames,
     usesLogisticsContract,
     hasSqlContract,
     hasCanonicalDataModelDoc,
-    missingRequiredMarkers,
-    contaminationTokens,
-    usesJsonAsPrimaryPersistence,
-    valid:
-      String(strategy || '').trim() === 'materialize-fullstack-local-plan' &&
-      missingRequiredMarkers.length === 0 &&
-      hasSqlContract &&
-      (!usesLogisticsContract || hasCanonicalDataModelDoc) &&
-      contaminationTokens.length === 0 &&
-      !usesJsonAsPrimaryPersistence,
+    missingRequiredMarkers: missingRequiredPaths,
+    contaminationTokens: forbiddenSignalsFound,
+    valid: ok,
   }
 }
 
@@ -43181,7 +43464,10 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
       ? inspectFullstackLocalMaterializationContract({
           goal: input?.goal,
           context: input?.context,
+          decisionKey: rawDecision?.decisionKey,
           strategy: rawDecision?.strategy,
+          executionMode: rawDecision?.executionMode,
+          nextExpectedAction: rawDecision?.nextExpectedAction,
           executionScope: rawDecision?.executionScope,
           materializationPlan: rawDecision?.materializationPlan,
           localProjectManifest: rawDecision?.localProjectManifest,
@@ -43191,7 +43477,7 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
   const shouldUseFallbackInvalidMaterializationContract =
     originalFullstackLocalIntent &&
     rawMaterializationContractInspection &&
-    rawMaterializationContractInspection.valid !== true
+    rawMaterializationContractInspection.ok !== true
   const shouldUseFallbackStructuredFullstackDecision =
     (shouldForceFallbackFullstackLocalContracts ||
       shouldUseFallbackInvalidMaterializationContract) &&

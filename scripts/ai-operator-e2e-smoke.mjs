@@ -41,6 +41,7 @@ const requiredPlannerFunctions = [
   'buildLocalStrategicBrainDecision',
   'shouldBlockWebScaffoldExecutionForFullstackRequest',
   'buildBlockedFullstackWebScaffoldExecutionResponse',
+  'inspectFullstackLocalMaterializationContract',
 ]
 const veterinaryGoalCase = {
   goal:
@@ -180,6 +181,29 @@ function cleanupSmokeWorkspaceRoot() {
   if (remainingEntries.length === 0) {
     fs.rmSync(smokeParentPath, { recursive: true, force: true })
   }
+}
+
+function listRelativeWorkspaceFiles(rootPath) {
+  const files = []
+
+  function visit(currentPath) {
+    for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
+      const resolvedPath = path.join(currentPath, entry.name)
+
+      if (entry.isDirectory()) {
+        visit(resolvedPath)
+        continue
+      }
+
+      files.push(normalizePathForComparison(path.relative(rootPath, resolvedPath)))
+    }
+  }
+
+  if (fs.existsSync(rootPath)) {
+    visit(rootPath)
+  }
+
+  return files.sort()
 }
 
 function extractOrderedStaticScriptSources(html) {
@@ -500,6 +524,7 @@ module.exports = {
   buildLocalStrategicBrainDecision,
   shouldBlockWebScaffoldExecutionForFullstackRequest,
   buildBlockedFullstackWebScaffoldExecutionResponse,
+  inspectFullstackLocalMaterializationContract,
 };
 `
 
@@ -564,6 +589,25 @@ function buildReusablePlanningContext() {
     reuseMode: 'none',
     creativeDirection: null,
   }
+}
+
+function inspectDecisionMaterializationContract({
+  decision,
+  goal,
+  context,
+}) {
+  return plannerApi.inspectFullstackLocalMaterializationContract({
+    goal,
+    context,
+    decisionKey: decision?.decisionKey,
+    strategy: decision?.strategy,
+    executionMode: decision?.executionMode,
+    nextExpectedAction: decision?.nextExpectedAction,
+    executionScope: decision?.executionScope,
+    materializationPlan: decision?.materializationPlan,
+    localProjectManifest: decision?.localProjectManifest,
+    existingProjectDetection: decision?.existingProjectDetection,
+  })
 }
 
 function buildFullstackLocalMaterializationPrompt({ goal, scalablePlan }) {
@@ -3007,7 +3051,13 @@ async function runTrackingLogisticsPostApprovalReviewStateCase() {
   }
 }
 
-async function requestTrackingLogisticsPreparedMaterializationDecision() {
+async function requestTrackingLogisticsPreparedMaterializationDecision({
+  workspacePath = smokeWorkspaceRoot,
+} = {}) {
+  const goal =
+    'Sistema fullstack local de tracking logistico para una empresa de logistica con backend local, API local, SQLite o base local, frontend administrativo, consulta publica por codigo, entidades y relaciones, envios, historial de eventos, incidencias y reportes basicos.'
+  const context =
+    'No landing. No demo solamente visual. No deploy. No credenciales. No servicios externos. No pagos. No Docker. No base productiva.'
   const approvalFeedback =
     '__orchestrator_feedback__:' +
     JSON.stringify({
@@ -3025,11 +3075,9 @@ async function requestTrackingLogisticsPreparedMaterializationDecision() {
     })
 
   const baseDecision = await plannerApi.buildLocalStrategicBrainDecision({
-    goal:
-      'Sistema fullstack local de tracking logistico para una empresa de logistica con backend local, API local, SQLite o base local, frontend administrativo, consulta publica por codigo, entidades y relaciones, envios, historial de eventos, incidencias y reportes basicos.',
-    context:
-      'No landing. No demo solamente visual. No deploy. No credenciales. No servicios externos. No pagos. No Docker. No base productiva.',
-    workspacePath: smokeWorkspaceRoot,
+    goal,
+    context,
+    workspacePath,
     iteration: 2,
     previousExecutionResult: approvalFeedback,
     requiresApproval: true,
@@ -3088,7 +3136,7 @@ async function requestTrackingLogisticsPreparedMaterializationDecision() {
     ]
       .filter(Boolean)
       .join('\n'),
-    workspacePath: smokeWorkspaceRoot,
+    workspacePath,
     iteration: 3,
     previousExecutionResult: approvalFeedback,
     requiresApproval: false,
@@ -3101,7 +3149,7 @@ async function requestTrackingLogisticsPreparedMaterializationDecision() {
     reusablePlanningContext: buildReusablePlanningContext(),
   })
 
-  return { baseDecision, decision, failures: [] }
+  return { goal, context, baseDecision, decision, failures: [] }
 }
 
 async function runTrackingLogisticsPrepareFunctionalDeliveryTransitionCase() {
@@ -3429,6 +3477,7 @@ async function runTrackingLogisticsValidMaterializationNotBlockedCase() {
         'logistics-tracker-local/scripts',
       ],
       operations: [
+        { targetPath: 'logistics-tracker-local/README.md' },
         { targetPath: 'logistics-tracker-local/backend/package.json' },
         { targetPath: 'logistics-tracker-local/backend/src/server.js' },
         { targetPath: 'logistics-tracker-local/backend/src/routes/shipments.js' },
@@ -3440,6 +3489,8 @@ async function runTrackingLogisticsValidMaterializationNotBlockedCase() {
         { targetPath: 'logistics-tracker-local/frontend/admin/index.html' },
         { targetPath: 'logistics-tracker-local/frontend/admin/app.js' },
         { targetPath: 'logistics-tracker-local/frontend/admin/styles.css' },
+        { targetPath: 'logistics-tracker-local/docs/API.md' },
+        { targetPath: 'logistics-tracker-local/docs/ARCHITECTURE.md' },
         { targetPath: 'logistics-tracker-local/docs/api.md' },
         { targetPath: 'logistics-tracker-local/docs/db_schema.md' },
         { targetPath: 'logistics-tracker-local/docs/architecture.md' },
@@ -3449,6 +3500,7 @@ async function runTrackingLogisticsValidMaterializationNotBlockedCase() {
       ],
     },
   })
+  const contractInspection = guardDecision?.contractInspection
 
   pushFailure(
     failures,
@@ -3460,6 +3512,42 @@ async function runTrackingLogisticsValidMaterializationNotBlockedCase() {
     guardDecision?.looksLikeValidFullstackLocalMaterialization === true,
     'El guard debe reconocer la estructura como fullstack local valida antes de decidir bloqueo.',
   )
+  pushFailure(
+    failures,
+    contractInspection?.ok === true,
+    `El guard debe apoyarse en un contrato canonico valido. Recibido: ${contractInspection?.reason || '(sin reason)'}.`,
+  )
+  ;[
+    'database/schema.sql',
+    'database/seed.sql',
+    'docs/API.md',
+    'docs/DB_SCHEMA.md|docs/DATA_MODEL.md',
+    'backend/src/routes/shipments.js',
+    'backend/src/routes/tracking.js',
+  ].forEach((token) => {
+    const normalizedToken = normalizePathForComparison(token)
+    const presentInContract =
+      token.includes('|')
+        ? token
+            .split('|')
+            .map((entry) => normalizePathForComparison(entry))
+            .some((candidate) =>
+              Array.isArray(contractInspection?.expectedTargetPaths) &&
+              contractInspection.expectedTargetPaths.some((entry) =>
+                normalizePathForComparison(entry).endsWith(candidate),
+              ),
+            )
+        : Array.isArray(contractInspection?.expectedTargetPaths) &&
+          contractInspection.expectedTargetPaths.some((entry) =>
+            normalizePathForComparison(entry).endsWith(normalizedToken),
+          )
+
+    pushFailure(
+      failures,
+      presentInContract,
+      `El contrato canonico debe exigir ${token}.`,
+    )
+  })
   pushFailure(
     failures,
     /function\s+looksLikeValidFullstackLocalMaterializationPayload\s*\(\s*\{/u.test(mainSource) &&
@@ -3511,9 +3599,21 @@ async function runArtifactMemoryNotSavedForBlockedFullstackWebScaffoldCase() {
 }
 
 async function runValidFullstackMaterializationCanReachLocalMaterializationCase() {
-  const result = await requestTrackingLogisticsPreparedMaterializationDecision()
+  const planningWorkspacePath = path.join(
+    smokeWorkspaceRoot,
+    'tracking-logistics-valid-fullstack-materialization-planning',
+  )
+  ensureCleanDirectory(planningWorkspacePath)
+  const result = await requestTrackingLogisticsPreparedMaterializationDecision({
+    workspacePath: planningWorkspacePath,
+  })
   const failures = [...(Array.isArray(result.failures) ? result.failures : [])]
   const decision = result.decision
+  const contractInspection = inspectDecisionMaterializationContract({
+    decision,
+    goal: result.goal,
+    context: result.context,
+  })
   const workspacePath = path.join(
     smokeWorkspaceRoot,
     'tracking-logistics-valid-fullstack-materialization-pass-through',
@@ -3547,6 +3647,11 @@ async function runValidFullstackMaterializationCanReachLocalMaterializationCase(
       guardDecision?.blocked === false,
       'Una materializacion fullstack valida debe pasar mas alla del safety gate.',
     )
+    pushFailure(
+      failures,
+      contractInspection?.ok === true,
+      `La materializacion valida debe pasar el contrato canonico antes de ejecutar. Recibido: ${contractInspection?.reason || '(sin reason)'}.`,
+    )
 
     const task = buildLocalMaterializationTask({
       plan: decision?.materializationPlan || null,
@@ -3567,6 +3672,9 @@ async function runValidFullstackMaterializationCanReachLocalMaterializationCase(
       reuseMode: decision?.reuseMode || 'none',
       reuseMaterialization: null,
       materializationPlanSource: decision?.materializationPlanSource || 'planner',
+      expectedTargetPaths: Array.isArray(contractInspection?.expectedTargetPaths)
+        ? contractInspection.expectedTargetPaths
+        : [],
     })
 
     pushFailure(
@@ -3599,9 +3707,16 @@ async function runValidFullstackMaterializationCanReachLocalMaterializationCase(
       ;[
         'database/schema.sql',
         'database/seed.sql',
+        'docs/api.md',
         'docs/db_schema.md',
         'frontend/admin/index.html',
+        'frontend/admin/app.js',
         'frontend/public/index.html',
+        'frontend/public/app.js',
+        'backend/src/server.js',
+        'backend/src/routes/shipments.js',
+        'backend/src/routes/tracking.js',
+        'shared/statuses.js',
       ].forEach((token) => {
         pushFailure(
           failures,
@@ -3609,14 +3724,231 @@ async function runValidFullstackMaterializationCanReachLocalMaterializationCase(
           `La materializacion valida debe poder crear ${token} dentro del workspace temporal controlado.`,
         )
       })
+      ;['node_modules', '.env', 'dockerfile', 'docker-compose', 'deploy'].forEach((token) => {
+        pushFailure(
+          failures,
+          !createdPaths.some((entry) => entry.includes(normalizePathForComparison(token))),
+          `La materializacion valida no debe crear ${token} dentro del workspace temporal.`,
+        )
+      })
     }
   } finally {
     fs.rmSync(workspacePath, { recursive: true, force: true })
+    fs.rmSync(planningWorkspacePath, { recursive: true, force: true })
   }
 
   return {
     id: 'valid-fullstack-materialization-can-reach-local-materialization',
     label: 'Valid fullstack materialization can reach local materialization',
+    failures,
+  }
+}
+
+async function runTrackingLogisticsFullstackEndToEndScenarioCase() {
+  const planningWorkspacePath = path.join(
+    smokeWorkspaceRoot,
+    'tracking-logistico-fullstack-end-to-end-planning',
+  )
+  ensureCleanDirectory(planningWorkspacePath)
+  const result = await requestTrackingLogisticsPreparedMaterializationDecision({
+    workspacePath: planningWorkspacePath,
+  })
+  const failures = [...(Array.isArray(result.failures) ? result.failures : [])]
+  const baseDecision = result.baseDecision
+  const decision = result.decision
+  const contractInspection = inspectDecisionMaterializationContract({
+    decision,
+    goal: result.goal,
+    context: result.context,
+  })
+  const workspacePath = path.join(
+    smokeWorkspaceRoot,
+    'tracking-logistico-fullstack-end-to-end-scenario',
+  )
+  ensureCleanDirectory(workspacePath)
+
+  try {
+    pushFailure(
+      failures,
+      String(baseDecision?.strategy || '').trim() === 'scalable-delivery-plan',
+      'La fase 1 del escenario E2E debe devolver scalable-delivery-plan.',
+    )
+    pushFailure(
+      failures,
+      String(baseDecision?.executionMode || '').trim() === 'planner-only',
+      'La fase 1 del escenario E2E debe devolver planner-only.',
+    )
+    pushFailure(
+      failures,
+      String(baseDecision?.nextExpectedAction || '').trim() === 'review-scalable-delivery',
+      'La fase 1 del escenario E2E debe devolver review-scalable-delivery.',
+    )
+    pushFailure(
+      failures,
+      String(decision?.strategy || '').trim() === 'materialize-fullstack-local-plan',
+      'La fase 2 del escenario E2E debe devolver materialize-fullstack-local-plan.',
+    )
+    pushFailure(
+      failures,
+      String(decision?.executionMode || '').trim() === 'executor',
+      'La fase 2 del escenario E2E debe devolver executionMode executor.',
+    )
+    pushFailure(
+      failures,
+      String(decision?.nextExpectedAction || '').trim() === 'execute-plan',
+      'La fase 2 del escenario E2E debe devolver nextExpectedAction execute-plan.',
+    )
+    pushFailure(
+      failures,
+      !(decision?.approvalRequest || decision?.requiresApproval === true),
+      'El escenario E2E no debe reabrir approvals pendientes al preparar la entrega.',
+    )
+    pushFailure(
+      failures,
+      contractInspection?.ok === true,
+      `El escenario E2E debe pasar el contrato canonico antes de materializar. Recibido: ${contractInspection?.reason || '(sin reason)'}.`,
+    )
+    pushFailure(
+      failures,
+      contractInspection?.usesJsonAsPrimaryPersistence !== true,
+      'El escenario E2E no debe usar JSON como persistencia principal.',
+    )
+    ;['appointments', 'turnos', 'pacientes', 'mascotas', 'veterinaria', 'reservas'].forEach(
+      (token) => {
+        pushFailure(
+          failures,
+          !Array.isArray(contractInspection?.forbiddenSignalsFound) ||
+            !contractInspection.forbiddenSignalsFound.includes(token),
+          `El contrato canonico no debe detectar contaminación ${token} en el escenario E2E.`,
+        )
+      },
+    )
+
+    const task = buildLocalMaterializationTask({
+      plan: decision?.materializationPlan || null,
+      workspacePath,
+      requestId: 'tracking-logistico-fullstack-end-to-end-scenario',
+      instruction: decision?.instruction || '',
+      brainStrategy: decision?.strategy || '',
+      businessSector: decision?.businessSector || '',
+      businessSectorLabel: decision?.businessSectorLabel || '',
+      creativeDirection: decision?.creativeDirection || null,
+      reusableArtifactLookup: decision?.reusableArtifactLookup || null,
+      reusableArtifactsFound: decision?.reusableArtifactsFound || 0,
+      reuseDecision: decision?.reuseDecision === true,
+      reuseReason: decision?.reuseReason || '',
+      reusedArtifactIds: Array.isArray(decision?.reusedArtifactIds)
+        ? decision.reusedArtifactIds
+        : [],
+      reuseMode: decision?.reuseMode || 'none',
+      reuseMaterialization: null,
+      materializationPlanSource: decision?.materializationPlanSource || 'planner',
+      expectedTargetPaths: Array.isArray(contractInspection?.expectedTargetPaths)
+        ? contractInspection.expectedTargetPaths
+        : [],
+    })
+
+    pushFailure(
+      failures,
+      !!task,
+      'El escenario E2E debe poder construir una tarea local determinística desde el plan materializable.',
+    )
+
+    if (task) {
+      const executionResult = await runLocalDeterministicTask(task)
+      const createdPaths = Array.isArray(executionResult?.details?.createdPaths)
+        ? executionResult.details.createdPaths.map((entry) => normalizePathForComparison(entry))
+        : []
+      const workspaceFiles = listRelativeWorkspaceFiles(workspacePath)
+      const rootFolder = normalizePathForComparison(
+        contractInspection?.rootPath || decision?.materializationPlan?.projectRoot || '',
+      )
+      const contaminationPool = normalizeText(
+        workspaceFiles
+          .filter((entry) => entry.endsWith('.md') || entry.endsWith('.js') || entry.endsWith('.sql'))
+          .map((entry) => {
+            const absolutePath = path.join(workspacePath, entry)
+            return fs.readFileSync(absolutePath, 'utf8')
+          })
+          .join('\n'),
+      )
+
+      pushFailure(
+        failures,
+        executionResult?.ok === true,
+        'El escenario E2E debe materializar correctamente en el workspace temporal controlado.',
+      )
+      pushFailure(
+        failures,
+        String(executionResult?.failureType || '').trim() !== 'blocked_fullstack_web_scaffold',
+        'El escenario E2E no debe terminar con blocked_fullstack_web_scaffold.',
+      )
+      pushFailure(
+        failures,
+        !workspaceFiles.some((entry) => entry.includes('web-sistema-de-tracking')),
+        'El escenario E2E no debe crear carpetas web-sistema-de-tracking degradadas.',
+      )
+      pushFailure(
+        failures,
+        !!rootFolder && workspaceFiles.some((entry) => entry.startsWith(`${rootFolder}/`)),
+        'El escenario E2E debe materializar dentro de un root local controlado.',
+      )
+      ;[
+        'readme.md',
+        'docs/api.md',
+        'docs/architecture.md',
+        'docs/db_schema.md',
+        'backend/package.json',
+        'backend/src/server.js',
+        'backend/src/routes/shipments.js',
+        'backend/src/routes/tracking.js',
+        'database/schema.sql',
+        'database/seed.sql',
+        'frontend/admin/index.html',
+        'frontend/admin/app.js',
+        'frontend/public/index.html',
+        'frontend/public/app.js',
+        'shared/statuses.js',
+      ].forEach((token) => {
+        pushFailure(
+          failures,
+          workspaceFiles.some((entry) => entry.endsWith(normalizePathForComparison(token))),
+          `El escenario E2E debe materializar ${token} dentro del workspace temporal.`,
+        )
+      })
+      ;['node_modules', '.env', 'dockerfile', 'docker-compose', 'deploy', 'database/shipments.json'].forEach(
+        (token) => {
+          pushFailure(
+            failures,
+            !workspaceFiles.some((entry) => entry.includes(normalizePathForComparison(token))),
+            `El escenario E2E no debe crear ${token}.`,
+          )
+        },
+      )
+      ;['appointments', 'turnos', 'pacientes', 'mascotas', 'veterinaria', 'reservas'].forEach(
+        (token) => {
+          pushFailure(
+            failures,
+            !contaminationPool.includes(normalizeText(token)),
+            `El escenario E2E no debe contaminar archivos materializados con ${token}.`,
+          )
+        },
+      )
+      pushFailure(
+        failures,
+        createdPaths.some((entry) => entry.endsWith('/database/schema.sql')) &&
+          createdPaths.some((entry) => entry.endsWith('/database/seed.sql')),
+        'El escenario E2E debe crear schema.sql y seed.sql como parte del contrato SQL local.',
+      )
+    }
+  } finally {
+    fs.rmSync(workspacePath, { recursive: true, force: true })
+    fs.rmSync(planningWorkspacePath, { recursive: true, force: true })
+  }
+
+  return {
+    id: 'tracking-logistico-fullstack-end-to-end-scenario',
+    label: 'Tracking logistico fullstack end to end scenario',
     failures,
   }
 }
@@ -3688,6 +4020,11 @@ async function runTrackingLogisticsPostApprovalDoesNotMaterializeWebBaseCase() {
 async function runTrackingLogisticsMaterializationRequiresSqlContractCase() {
   const result = await requestTrackingLogisticsPreparedMaterializationDecision()
   const failures = [...(Array.isArray(result.failures) ? result.failures : [])]
+  const contractInspection = inspectDecisionMaterializationContract({
+    decision: result.decision,
+    goal: result.goal,
+    context: result.context,
+  })
   const materializationPlan =
     result.decision?.materializationPlan && typeof result.decision.materializationPlan === 'object'
       ? result.decision.materializationPlan
@@ -3726,6 +4063,11 @@ async function runTrackingLogisticsMaterializationRequiresSqlContractCase() {
     failures,
     !targetSummary.includes(normalizeText('database/shipments.json')),
     'database/shipments.json no puede reemplazar al contrato SQL principal.',
+  )
+  pushFailure(
+    failures,
+    contractInspection?.ok === true,
+    `El plan materializable logístico debe pasar el contrato canonico. Recibido: ${contractInspection?.reason || '(sin reason)'}.`,
   )
 
   return {
@@ -3775,6 +4117,17 @@ async function runTrackingLogisticsMaterializationRejectsJsonOnlyCase() {
     projectWorkMode: 'auto',
     reusablePlanningContext: buildReusablePlanningContext(),
   })
+  const contractInspection = inspectDecisionMaterializationContract({
+    decision,
+    goal:
+      'Preparar una entrega fullstack local para tracking logistico con backend local, API local, SQLite o base local, frontend administrativo y consulta publica por codigo.',
+    context: [
+      'No landing. No demo solamente visual. No deploy. No credenciales. No servicios externos. No pagos. No Docker. No base productiva.',
+      'Intento invalido de prueba: usar database/shipments.json como almacenamiento principal.',
+      'No incluir database/schema.sql ni database/seed.sql.',
+      'No validar este contrato como materialize-fullstack-local-plan listo para ejecutar.',
+    ].join('\n'),
+  })
 
   const normalizedDecision = normalizeText(JSON.stringify(decision || {}))
 
@@ -3801,9 +4154,22 @@ async function runTrackingLogisticsMaterializationRejectsJsonOnlyCase() {
       /const\s+shouldUseFallbackInvalidMaterializationContract\s*=/.test(mainSource) &&
       /inspectFullstackLocalMaterializationContract\s*\(\s*\{[\s\S]*?strategy:\s*rawDecision\?\.strategy[\s\S]*?materializationPlan:\s*rawDecision\?\.materializationPlan[\s\S]*?existingProjectDetection:\s*rawDecision\?\.existingProjectDetection[\s\S]*?\}\s*\)/.test(
         mainSource,
-      ),
+    ),
     'La normalizacion debe inspeccionar el contrato de materializacion fullstack antes de aceptar un plan materializable.',
   )
+  if (String(decision?.strategy || '').trim() === 'materialize-fullstack-local-plan') {
+    pushFailure(
+      failures,
+      contractInspection?.ok === true,
+      'Si el planner corrige una propuesta JSON-only a un plan materializable, debe convertirla a un contrato SQL válido.',
+    )
+  } else {
+    pushFailure(
+      failures,
+      contractInspection?.ok !== true,
+      'Si el planner no convierte la propuesta JSON-only, el contrato canonico no debe aceptarla.',
+    )
+  }
 
   return {
     id: 'tracking-logistico-fullstack-materialization-rejects-json-only',
@@ -4124,6 +4490,7 @@ async function main() {
     results.push(await runTrackingLogisticsNewProjectDoesNotUseVeterinaryManifestCase())
     results.push(await runArtifactMemoryNotSavedForBlockedFullstackWebScaffoldCase())
     results.push(await runValidFullstackMaterializationCanReachLocalMaterializationCase())
+    results.push(await runTrackingLogisticsFullstackEndToEndScenarioCase())
     results.push(await runTrackingLogisticsPostApprovalDoesNotMaterializeWebBaseCase())
     results.push(await runTrackingLogisticsPrepareFunctionalDeliveryTransitionCase())
     results.push(await runTrackingLogisticsMaterializationContractCase())
