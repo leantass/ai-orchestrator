@@ -3359,6 +3359,84 @@ async function runTrackingLogisticsExecutorBlocksWebScaffoldCase() {
   }
 }
 
+async function runTrackingLogisticsValidMaterializationNotBlockedCase() {
+  const failures = []
+  const mainSource = fs.readFileSync(mainFilePath, 'utf8')
+  const guardDecision = plannerApi.shouldBlockWebScaffoldExecutionForFullstackRequest({
+    goal:
+      'Sistema fullstack local de tracking logistico con backend local, SQLite local, API local, frontend administrativo, frontend publico y consulta publica por codigo.',
+    context:
+      'Entidades y relaciones, envios, historial de eventos, incidencias y reportes basicos. No landing. No demo visual solamente.',
+    decisionKey: 'materialize-fullstack-logistics-tracker-local-v1',
+    strategy: 'materialize-fullstack-local-plan',
+    instruction:
+      'Materializar una entrega fullstack local valida con backend, database, frontend admin/public, shared, scripts y docs, sin deploy ni servicios externos.',
+    executionScope: {
+      allowedTargetPaths: [
+        'logistics-tracker-local/backend',
+        'logistics-tracker-local/frontend/admin',
+        'logistics-tracker-local/frontend/public',
+        'logistics-tracker-local/database',
+        'logistics-tracker-local/docs',
+        'logistics-tracker-local/shared',
+        'logistics-tracker-local/scripts',
+      ],
+    },
+    materializationPlan: {
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'logistics-tracker-local',
+      allowedTargetPaths: [
+        'logistics-tracker-local/backend',
+        'logistics-tracker-local/frontend/admin',
+        'logistics-tracker-local/frontend/public',
+        'logistics-tracker-local/database',
+        'logistics-tracker-local/docs',
+        'logistics-tracker-local/shared',
+        'logistics-tracker-local/scripts',
+      ],
+      operations: [
+        { targetPath: 'logistics-tracker-local/backend/package.json' },
+        { targetPath: 'logistics-tracker-local/backend/src/server.js' },
+        { targetPath: 'logistics-tracker-local/database/schema.sql' },
+        { targetPath: 'logistics-tracker-local/database/seeds/seed-local.sql' },
+        { targetPath: 'logistics-tracker-local/frontend/public/index.html' },
+        { targetPath: 'logistics-tracker-local/frontend/public/app.js' },
+        { targetPath: 'logistics-tracker-local/frontend/admin/index.html' },
+        { targetPath: 'logistics-tracker-local/frontend/admin/styles.css' },
+        { targetPath: 'logistics-tracker-local/docs/api.md' },
+        { targetPath: 'logistics-tracker-local/docs/architecture.md' },
+        { targetPath: 'logistics-tracker-local/shared/contracts/domain.js' },
+        { targetPath: 'logistics-tracker-local/scripts/seed-local.js' },
+      ],
+    },
+  })
+
+  pushFailure(
+    failures,
+    guardDecision?.blocked === false,
+    'El guard del executor no debe bloquear una materializacion fullstack valida solo por tener HTML/CSS/JS en frontend.',
+  )
+  pushFailure(
+    failures,
+    guardDecision?.looksLikeValidFullstackLocalMaterialization === true,
+    'El guard debe reconocer la estructura como fullstack local valida antes de decidir bloqueo.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('function looksLikeValidFullstackLocalMaterializationPayload({') &&
+      mainSource.includes(
+        'const looksLikeValidFullstackLocalMaterialization =\n    looksLikeValidFullstackLocalMaterializationPayload({',
+      ),
+    'electron/main.cjs debe exponer un detector positivo de materializacion fullstack valida y usarlo desde shouldBlockWebScaffoldExecutionForFullstackRequest.',
+  )
+
+  return {
+    id: 'tracking-logistico-fullstack-valid-materialization-not-blocked',
+    label: 'Tracking logistico fullstack valid materialization not blocked',
+    failures,
+  }
+}
+
 async function runArtifactMemoryNotSavedForBlockedFullstackWebScaffoldCase() {
   const failures = []
   const mainSource = fs.readFileSync(mainFilePath, 'utf8')
@@ -3389,6 +3467,101 @@ async function runArtifactMemoryNotSavedForBlockedFullstackWebScaffoldCase() {
   return {
     id: 'artifact-memory-not-saved-for-blocked-fullstack-web-scaffold',
     label: 'Artifact memory not saved for blocked fullstack web scaffold',
+    failures,
+  }
+}
+
+async function runValidFullstackMaterializationCanReachLocalMaterializationCase() {
+  const result = await requestTrackingLogisticsPreparedMaterializationDecision()
+  const failures = [...(Array.isArray(result.failures) ? result.failures : [])]
+  const decision = result.decision
+  const workspacePath = path.join(
+    smokeWorkspaceRoot,
+    'tracking-logistics-valid-fullstack-materialization-pass-through',
+  )
+  ensureCleanDirectory(workspacePath)
+
+  try {
+    pushFailure(
+      failures,
+      String(decision?.strategy || '').trim() === 'materialize-fullstack-local-plan',
+      'La decision base para materializacion valida debe seguir en materialize-fullstack-local-plan.',
+    )
+
+    const guardDecision = plannerApi.shouldBlockWebScaffoldExecutionForFullstackRequest({
+      goal:
+        'Sistema fullstack local de tracking logistico para una empresa de logistica con backend local, API local, SQLite o base local, frontend administrativo, consulta publica por codigo, entidades y relaciones, envios, historial de eventos, incidencias y reportes basicos.',
+      context:
+        'No landing. No demo solamente visual. No deploy. No credenciales. No servicios externos. No pagos. No Docker. No base productiva.',
+      decisionKey: decision?.decisionKey || '',
+      strategy: decision?.strategy || '',
+      instruction: decision?.instruction || '',
+      executionScope: decision?.executionScope || null,
+      materializationPlan:
+        decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+          ? decision.materializationPlan
+          : null,
+    })
+
+    pushFailure(
+      failures,
+      guardDecision?.blocked === false,
+      'Una materializacion fullstack valida debe pasar mas alla del safety gate.',
+    )
+
+    const task = buildLocalMaterializationTask({
+      plan: decision?.materializationPlan || null,
+      workspacePath,
+      requestId: 'valid-fullstack-materialization-pass-through',
+      instruction: decision?.instruction || '',
+      brainStrategy: decision?.strategy || '',
+      businessSector: decision?.businessSector || '',
+      businessSectorLabel: decision?.businessSectorLabel || '',
+      creativeDirection: decision?.creativeDirection || null,
+      reusableArtifactLookup: decision?.reusableArtifactLookup || null,
+      reusableArtifactsFound: decision?.reusableArtifactsFound || 0,
+      reuseDecision: decision?.reuseDecision === true,
+      reuseReason: decision?.reuseReason || '',
+      reusedArtifactIds: Array.isArray(decision?.reusedArtifactIds)
+        ? decision.reusedArtifactIds
+        : [],
+      reuseMode: decision?.reuseMode || 'none',
+      reuseMaterialization: null,
+      materializationPlanSource: decision?.materializationPlanSource || 'planner',
+    })
+
+    pushFailure(
+      failures,
+      !!task,
+      'Una materializacion fullstack valida debe poder construir una tarea local deterministica.',
+    )
+
+    if (task) {
+      const executionResult = await runLocalDeterministicTask(task)
+      pushFailure(
+        failures,
+        executionResult?.ok === true,
+        'Una materializacion fullstack valida debe poder llegar a la capa local deterministic sin bloqueo de web scaffold.',
+      )
+      pushFailure(
+        failures,
+        String(executionResult?.failureType || '').trim() !== 'blocked_fullstack_web_scaffold',
+        'La capa local deterministic no debe devolver blocked_fullstack_web_scaffold para una materializacion fullstack valida.',
+      )
+      pushFailure(
+        failures,
+        Array.isArray(executionResult?.details?.createdPaths) &&
+          executionResult.details.createdPaths.length > 0,
+        'La materializacion valida debe crear archivos dentro del workspace temporal controlado.',
+      )
+    }
+  } finally {
+    fs.rmSync(workspacePath, { recursive: true, force: true })
+  }
+
+  return {
+    id: 'valid-fullstack-materialization-can-reach-local-materialization',
+    label: 'Valid fullstack materialization can reach local materialization',
     failures,
   }
 }
@@ -3699,7 +3872,9 @@ async function main() {
     results.push(await runTrackingLogisticsOpenAIWebScaffoldGuardCase())
     results.push(await runTrackingLogisticsTimeoutFallbackNoWebScaffoldCase())
     results.push(await runTrackingLogisticsExecutorBlocksWebScaffoldCase())
+    results.push(await runTrackingLogisticsValidMaterializationNotBlockedCase())
     results.push(await runArtifactMemoryNotSavedForBlockedFullstackWebScaffoldCase())
+    results.push(await runValidFullstackMaterializationCanReachLocalMaterializationCase())
     results.push(await runTrackingLogisticsPostApprovalDoesNotMaterializeWebBaseCase())
     results.push(await runTrackingLogisticsPrepareFunctionalDeliveryTransitionCase())
     results.push(await runTrackingLogisticsMaterializationContractCase())

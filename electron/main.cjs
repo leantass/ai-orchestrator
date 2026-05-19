@@ -6792,6 +6792,155 @@ function detectStrongFullstackLocalRequestProfile({
   return detectScalableDeliveryPlanningIntent(goal, aggregateContext)
 }
 
+function collectExecutionPayloadPaths({
+  executionScope,
+  materializationPlan,
+}) {
+  return summarizeUniqueExecutorStrings(
+    [
+      ...(Array.isArray(executionScope?.allowedTargetPaths)
+        ? executionScope.allowedTargetPaths
+        : []),
+      ...(materializationPlan && typeof materializationPlan === 'object'
+        ? [
+            normalizeOptionalString(materializationPlan.projectRoot),
+            ...(Array.isArray(materializationPlan.allowedTargetPaths)
+              ? materializationPlan.allowedTargetPaths.map((entry) =>
+                  normalizeOptionalString(entry),
+                )
+              : []),
+            ...(Array.isArray(materializationPlan.operations)
+              ? materializationPlan.operations.flatMap((entry) => [
+                  normalizeOptionalString(entry?.targetPath),
+                  normalizeOptionalString(entry?.sourcePath),
+                  normalizeOptionalString(entry?.path),
+                ])
+              : []),
+          ]
+        : []),
+    ],
+    160,
+  ).map((entry) => normalizePathForComparison(entry))
+}
+
+function looksLikeValidFullstackLocalMaterializationPayload({
+  decisionKey,
+  strategy,
+  instruction,
+  context,
+  executionScope,
+  materializationPlan,
+  extraTexts = [],
+}) {
+  const normalizedDecisionKey = normalizeOptionalString(decisionKey).toLocaleLowerCase()
+  const normalizedStrategy = normalizeOptionalString(strategy).toLocaleLowerCase()
+  const normalizedPlanStrategy = normalizeOptionalString(
+    materializationPlan?.strategy,
+  ).toLocaleLowerCase()
+  const payloadPaths = collectExecutionPayloadPaths({
+    executionScope,
+    materializationPlan,
+  })
+  const payloadSummary = [
+    normalizedDecisionKey,
+    normalizedStrategy,
+    normalizedPlanStrategy,
+    normalizeOptionalString(instruction),
+    normalizeOptionalString(context),
+    ...(Array.isArray(extraTexts) ? extraTexts : []),
+  ]
+    .filter((value) => typeof value === 'string' && value.trim())
+    .join(' ')
+    .toLocaleLowerCase()
+  const wantsFullstackMaterialization =
+    normalizedStrategy === 'materialize-fullstack-local-plan' ||
+    normalizedPlanStrategy === 'materialize-fullstack-local-plan' ||
+    normalizedDecisionKey.includes('materialize-fullstack') ||
+    payloadSummary.includes('materialize-fullstack-local-plan') ||
+    (payloadSummary.includes('fullstack-local') &&
+      payloadSummary.includes('execute-plan')) ||
+    (payloadSummary.includes('fullstack local') &&
+      payloadSummary.includes('materializar'))
+  const hasBackend =
+    payloadPaths.some(
+      (entry) =>
+        entry.endsWith('/backend') ||
+        entry.includes('/backend/') ||
+        entry.endsWith('/backend/package.json') ||
+        entry.endsWith('/backend/src/server.js'),
+    ) || payloadSummary.includes('backend/src/server.js')
+  const hasFrontendAdmin = payloadPaths.some(
+    (entry) =>
+      entry.endsWith('/frontend/admin') ||
+      entry.includes('/frontend/admin/') ||
+      entry.endsWith('/frontend/admin/index.html'),
+  )
+  const hasFrontendPublic = payloadPaths.some(
+    (entry) =>
+      entry.endsWith('/frontend/public') ||
+      entry.includes('/frontend/public/') ||
+      entry.endsWith('/frontend/public/index.html'),
+  )
+  const hasDatabase =
+    payloadPaths.some(
+      (entry) =>
+        entry.endsWith('/database') ||
+        entry.includes('/database/') ||
+        entry.endsWith('/database/schema.sql') ||
+        entry.endsWith('/database/seed.sql') ||
+        entry.endsWith('/database/seed-local.sql') ||
+        entry.endsWith('/database/seeds/seed-local.sql'),
+    ) ||
+    payloadSummary.includes('database/schema.sql')
+  const hasSchemaOrSeed =
+    payloadPaths.some(
+      (entry) =>
+        entry.endsWith('/database/schema.sql') ||
+        entry.endsWith('/database/seed.sql') ||
+        entry.endsWith('/database/seed-local.sql') ||
+        entry.endsWith('/database/seeds/seed-local.sql'),
+    ) ||
+    payloadSummary.includes('database/schema.sql') ||
+    payloadSummary.includes('database/seed.sql') ||
+    payloadSummary.includes('database/seeds/seed-local.sql')
+  const hasDocs =
+    payloadPaths.some(
+      (entry) =>
+        entry.endsWith('/docs') ||
+        entry.includes('/docs/') ||
+        entry.endsWith('/docs/architecture.md') ||
+        entry.endsWith('/docs/api.md') ||
+        entry.endsWith('/docs/data-model.md'),
+    ) ||
+    payloadSummary.includes('docs/architecture.md') ||
+    payloadSummary.includes('docs/api.md') ||
+    payloadSummary.includes('docs/data-model.md')
+  const hasSharedOrScripts = payloadPaths.some(
+    (entry) =>
+      entry.endsWith('/shared') ||
+      entry.includes('/shared/') ||
+      entry.endsWith('/scripts') ||
+      entry.includes('/scripts/'),
+  )
+  const hasStructuredOperations =
+    Array.isArray(materializationPlan?.operations) &&
+    materializationPlan.operations.length >= 12
+  const hasStructuredFullstackSurface =
+    hasBackend &&
+    hasFrontendAdmin &&
+    hasFrontendPublic &&
+    hasDatabase &&
+    hasSchemaOrSeed &&
+    hasDocs &&
+    hasSharedOrScripts
+
+  return (
+    wantsFullstackMaterialization &&
+    hasStructuredFullstackSurface &&
+    (hasStructuredOperations || payloadPaths.length >= 10)
+  )
+}
+
 function looksLikeWebScaffoldExecutionPayload({
   decisionKey,
   strategy,
@@ -6807,22 +6956,10 @@ function looksLikeWebScaffoldExecutionPayload({
     executionScope?.allowedTargetPaths,
     32,
   )
-  const materializationTargets =
-    materializationPlan && typeof materializationPlan === 'object'
-      ? [
-          normalizeOptionalString(materializationPlan.projectRoot),
-          ...(Array.isArray(materializationPlan.allowedTargetPaths)
-            ? materializationPlan.allowedTargetPaths.map((entry) =>
-                normalizeOptionalString(entry),
-              )
-            : []),
-          ...(Array.isArray(materializationPlan.operations)
-            ? materializationPlan.operations.map((entry) =>
-                normalizeOptionalString(entry?.targetPath),
-              )
-            : []),
-        ]
-      : []
+  const materializationTargets = collectExecutionPayloadPaths({
+    executionScope,
+    materializationPlan,
+  })
   const payloadSummary = [
     normalizedDecisionKey,
     normalizedStrategy,
@@ -6873,6 +7010,16 @@ function shouldBlockWebScaffoldExecutionForFullstackRequest({
   })
   const hasStrongFullstackSignals =
     fullstackProfile.matches && fullstackProfile.deliveryLevel === 'fullstack-local'
+  const looksLikeValidFullstackLocalMaterialization =
+    looksLikeValidFullstackLocalMaterializationPayload({
+      decisionKey,
+      strategy,
+      instruction,
+      context,
+      executionScope,
+      materializationPlan,
+      extraTexts,
+    })
   const looksLikeWebScaffold = looksLikeWebScaffoldExecutionPayload({
     decisionKey,
     strategy,
@@ -6882,12 +7029,16 @@ function shouldBlockWebScaffoldExecutionForFullstackRequest({
     materializationPlan,
     extraTexts,
   })
-  const blocked = hasStrongFullstackSignals && looksLikeWebScaffold
+  const blocked =
+    hasStrongFullstackSignals &&
+    looksLikeWebScaffold &&
+    !looksLikeValidFullstackLocalMaterialization
 
   return {
     blocked,
     reason: blocked ? 'fullstack request cannot execute web scaffold' : '',
     profile: fullstackProfile,
+    looksLikeValidFullstackLocalMaterialization,
   }
 }
 

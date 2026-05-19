@@ -3282,6 +3282,81 @@ async function runLogisticsFullstackExecutorBlocksWebScaffoldValidation() {
   }
 }
 
+async function runTrackingLogisticsValidMaterializationNotBlockedValidation() {
+  const failures = []
+  const guardDecision = plannerApi.shouldBlockWebScaffoldExecutionForFullstackRequest({
+    goal:
+      'Sistema fullstack local de tracking logistico con backend local, SQLite local, API local, frontend administrativo, frontend publico y consulta publica por codigo.',
+    context:
+      'Entidades y relaciones, envios, historial de eventos, incidencias y reportes basicos. No landing. No demo visual solamente.',
+    decisionKey: 'materialize-fullstack-logistics-tracker-local-v1',
+    strategy: 'materialize-fullstack-local-plan',
+    instruction:
+      'Materializar una entrega fullstack local valida con backend, database, frontend admin/public, shared, scripts y docs, sin deploy ni servicios externos.',
+    executionScope: {
+      allowedTargetPaths: [
+        'logistics-tracker-local/backend',
+        'logistics-tracker-local/frontend/admin',
+        'logistics-tracker-local/frontend/public',
+        'logistics-tracker-local/database',
+        'logistics-tracker-local/docs',
+        'logistics-tracker-local/shared',
+        'logistics-tracker-local/scripts',
+      ],
+    },
+    materializationPlan: {
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'logistics-tracker-local',
+      allowedTargetPaths: [
+        'logistics-tracker-local/backend',
+        'logistics-tracker-local/frontend/admin',
+        'logistics-tracker-local/frontend/public',
+        'logistics-tracker-local/database',
+        'logistics-tracker-local/docs',
+        'logistics-tracker-local/shared',
+        'logistics-tracker-local/scripts',
+      ],
+      operations: [
+        { targetPath: 'logistics-tracker-local/backend/package.json' },
+        { targetPath: 'logistics-tracker-local/backend/src/server.js' },
+        { targetPath: 'logistics-tracker-local/database/schema.sql' },
+        { targetPath: 'logistics-tracker-local/database/seeds/seed-local.sql' },
+        { targetPath: 'logistics-tracker-local/frontend/public/index.html' },
+        { targetPath: 'logistics-tracker-local/frontend/public/app.js' },
+        { targetPath: 'logistics-tracker-local/frontend/admin/index.html' },
+        { targetPath: 'logistics-tracker-local/frontend/admin/styles.css' },
+        { targetPath: 'logistics-tracker-local/docs/api.md' },
+        { targetPath: 'logistics-tracker-local/docs/architecture.md' },
+        { targetPath: 'logistics-tracker-local/shared/contracts/domain.js' },
+        { targetPath: 'logistics-tracker-local/scripts/seed-local.js' },
+      ],
+    },
+  })
+
+  if (guardDecision?.blocked) {
+    failures.push('Una materializacion fullstack valida no deberia bloquearse por el safety gate web scaffold.')
+  }
+  if (String(guardDecision?.reason || '').trim()) {
+    failures.push('Una materializacion fullstack valida no deberia exponer reason de bloqueo.')
+  }
+  if (guardDecision?.looksLikeValidFullstackLocalMaterialization !== true) {
+    failures.push('El guard deberia reconocer la estructura como fullstack local valida antes de decidir bloqueo.')
+  }
+
+  return {
+    testCase: {
+      id: 'tracking-logistico-fullstack-valid-materialization-not-blocked',
+      label: 'Tracking logistico fullstack valid materialization not blocked',
+      goal: 'Permitir materializacion fullstack valida con frontend estatico dentro del scaffold',
+    },
+    ok: failures.length === 0,
+    failures,
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+  }
+}
+
 async function runLogisticsFullstackPostApprovalNoWebBaseMaterializationValidation() {
   const testCase = scalableValidationCases.find(
     (entry) => entry.id === 'tracking-logistico-fullstack-local',
@@ -10908,6 +10983,7 @@ async function main() {
   let logisticsOpenAIWebScaffoldGuardResult = null
   let logisticsTimeoutFallbackNoWebScaffoldResult = null
   let logisticsExecutorBlocksWebScaffoldResult = null
+  let logisticsValidMaterializationNotBlockedResult = null
   let logisticsPostApprovalNoWebBaseMaterializationResult = null
   let logisticsPrepareFunctionalDeliveryTransitionResult = null
   let logisticsNoDomainContaminationResult = null
@@ -10973,6 +11049,13 @@ async function main() {
     logisticsExecutorBlocksWebScaffoldResult =
       await runLogisticsFullstackExecutorBlocksWebScaffoldValidation()
     printScalableValidationResult(logisticsExecutorBlocksWebScaffoldResult)
+    console.log('-----------------')
+
+    console.log('Logistics Fullstack Valid Materialization Not Blocked Check')
+    console.log('===========================================================')
+    logisticsValidMaterializationNotBlockedResult =
+      await runTrackingLogisticsValidMaterializationNotBlockedValidation()
+    printScalableValidationResult(logisticsValidMaterializationNotBlockedResult)
     console.log('-----------------')
 
     console.log('Logistics Fullstack Post Approval No Web Base Materialization Check')
@@ -11464,6 +11547,8 @@ async function main() {
     logisticsTimeoutFallbackNoWebScaffoldResult?.ok === false
   const logisticsExecutorBlocksWebScaffoldFailed =
     logisticsExecutorBlocksWebScaffoldResult?.ok === false
+  const logisticsValidMaterializationNotBlockedFailed =
+    logisticsValidMaterializationNotBlockedResult?.ok === false
   const logisticsPostApprovalNoWebBaseMaterializationFailed =
     logisticsPostApprovalNoWebBaseMaterializationResult?.ok === false
   const logisticsPrepareFunctionalDeliveryTransitionFailed =
@@ -11494,6 +11579,7 @@ async function main() {
     !logisticsOpenAIWebScaffoldGuardFailed &&
     !logisticsTimeoutFallbackNoWebScaffoldFailed &&
     !logisticsExecutorBlocksWebScaffoldFailed &&
+    !logisticsValidMaterializationNotBlockedFailed &&
     !logisticsPostApprovalNoWebBaseMaterializationFailed &&
     !logisticsPrepareFunctionalDeliveryTransitionFailed &&
     !logisticsNoDomainContaminationFailed &&
@@ -11547,6 +11633,11 @@ async function main() {
     if (logisticsExecutorBlocksWebScaffoldResult) {
       console.log(
         'OK. 1/1 check de bloqueo del executor contra web-scaffold-base degradado en fullstack logistico paso.',
+      )
+    }
+    if (logisticsValidMaterializationNotBlockedResult) {
+      console.log(
+        'OK. 1/1 check de materializacion fullstack valida no bloqueada por el safety gate paso.',
       )
     }
     if (logisticsPostApprovalNoWebBaseMaterializationResult) {
@@ -11700,6 +11791,14 @@ async function main() {
     console.log(
       `- ${logisticsExecutorBlocksWebScaffoldResult.testCase.id}: ${
         logisticsExecutorBlocksWebScaffoldResult.failures[0] || 'sin detalle'
+      }`,
+    )
+  }
+  if (logisticsValidMaterializationNotBlockedFailed) {
+    console.log('check de materializacion fullstack valida no bloqueada por el safety gate fallido:')
+    console.log(
+      `- ${logisticsValidMaterializationNotBlockedResult.testCase.id}: ${
+        logisticsValidMaterializationNotBlockedResult.failures[0] || 'sin detalle'
       }`,
     )
   }
