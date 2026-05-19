@@ -3054,6 +3054,19 @@ async function runTrackingLogisticsPostApprovalReviewStateCase() {
 async function runTrackingLogisticsPreparedPlanUpdatesUiCase() {
   const failures = []
   const appSource = fs.readFileSync(appFilePath, 'utf8')
+  const preparedFullstackIndex = appSource.indexOf(
+    'const plannerHasPreparedFullstackLocalMaterialization =',
+  )
+  const preparedExecutorIndex = appSource.indexOf(
+    'const plannerHasPreparedExecutorMaterialization =',
+  )
+  const scalableDeliveryVisibilityIndex = appSource.indexOf(
+    'const shouldShowScalableDeliveryPlan =',
+  )
+  const planOverviewTitleIndex = appSource.indexOf('const planOverviewTitle =')
+  const planOverviewHelperTextIndex = appSource.indexOf(
+    'const planOverviewHelperText =',
+  )
 
   pushFailure(
     failures,
@@ -3096,6 +3109,15 @@ async function runTrackingLogisticsPreparedPlanUpdatesUiCase() {
       appSource,
     ),
     'La rama materializable fullstack local debe dejar trazas explicitas de que el CTA pasa a Materializar entrega.',
+  )
+  pushFailure(
+    failures,
+    preparedFullstackIndex >= 0 &&
+      preparedExecutorIndex > preparedFullstackIndex &&
+      scalableDeliveryVisibilityIndex > preparedFullstackIndex &&
+      planOverviewTitleIndex > preparedFullstackIndex &&
+      planOverviewHelperTextIndex > preparedFullstackIndex,
+    'plannerHasPreparedFullstackLocalMaterialization debe declararse antes de cualquier derivación visible que lo use para evitar TDZ en el renderer.',
   )
 
   return {

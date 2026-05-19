@@ -12885,6 +12885,29 @@ function App() {
   const activeScalableDeliveryLevel = normalizeOptionalString(
     activeScalableDeliveryPlan?.deliveryLevel,
   ).toLocaleLowerCase()
+  const activeExecutionStrategy = normalizeOptionalString(
+    plannerExecutionMetadata.strategy || plannerExecutionMetadata.decisionKey,
+  ).toLocaleLowerCase()
+  const plannerHasPreparedSafeMaterialization =
+    !plannerIsReviewOnly &&
+    activeExecutionStrategy === 'materialize-safe-first-delivery-plan' &&
+    (Boolean(effectivePlannerExecutionMetadata.safeFirstDeliveryMaterialization) ||
+      Boolean(effectivePlannerExecutionMetadata.materializationPlan) ||
+      normalizeOptionalString(plannerExecutionMetadata.nextExpectedAction).toLocaleLowerCase() ===
+        'execute-plan')
+  const plannerHasPreparedFullstackLocalMaterialization =
+    !plannerIsReviewOnly &&
+    activeExecutionStrategy === 'materialize-fullstack-local-plan' &&
+    normalizeOptionalString(plannerExecutionMetadata.executionMode).toLocaleLowerCase() ===
+      'executor' &&
+    normalizeOptionalString(
+      plannerExecutionMetadata.nextExpectedAction,
+    ).toLocaleLowerCase() === 'execute-plan' &&
+    (plannerScalableDeliveryLevel === 'fullstack-local' ||
+      Boolean(effectivePlannerExecutionMetadata.materializationPlan))
+  const plannerHasPreparedExecutorMaterialization =
+    plannerHasPreparedSafeMaterialization ||
+    plannerHasPreparedFullstackLocalMaterialization
   const shouldShowScalableDeliveryPlan =
     plannerIsScalableDeliveryReview &&
     !plannerHasPreparedFullstackLocalMaterialization &&
@@ -12951,9 +12974,6 @@ function App() {
       'materialize-project-phase-plan'
       ? normalizeOptionalString(activeProjectPhaseExecutionPlan?.phaseId)
       : ''
-  const activeExecutionStrategy = normalizeOptionalString(
-    plannerExecutionMetadata.strategy || plannerExecutionMetadata.decisionKey,
-  ).toLocaleLowerCase()
   const executeCurrentInstructionLabel = activeExecutableProjectPhaseId
     ? `Materializar ${activeExecutableProjectPhaseId}`
     : activeExecutionStrategy === 'materialize-fullstack-local-plan'
@@ -12978,26 +12998,6 @@ function App() {
     plannerReviewActionInFlight === 'prepare-safe-first-delivery'
   const isPlannerReviewActionBusy =
     plannerReviewActionInFlight !== '' || isPlanning
-  const plannerHasPreparedSafeMaterialization =
-    !plannerIsReviewOnly &&
-    activeExecutionStrategy === 'materialize-safe-first-delivery-plan' &&
-    (Boolean(effectivePlannerExecutionMetadata.safeFirstDeliveryMaterialization) ||
-      Boolean(effectivePlannerExecutionMetadata.materializationPlan) ||
-      normalizeOptionalString(plannerExecutionMetadata.nextExpectedAction).toLocaleLowerCase() ===
-        'execute-plan')
-  const plannerHasPreparedFullstackLocalMaterialization =
-    !plannerIsReviewOnly &&
-    activeExecutionStrategy === 'materialize-fullstack-local-plan' &&
-    normalizeOptionalString(plannerExecutionMetadata.executionMode).toLocaleLowerCase() ===
-      'executor' &&
-    normalizeOptionalString(
-      plannerExecutionMetadata.nextExpectedAction,
-    ).toLocaleLowerCase() === 'execute-plan' &&
-    (plannerScalableDeliveryLevel === 'fullstack-local' ||
-      Boolean(effectivePlannerExecutionMetadata.materializationPlan))
-  const plannerHasPreparedExecutorMaterialization =
-    plannerHasPreparedSafeMaterialization ||
-    plannerHasPreparedFullstackLocalMaterialization
   const activeLocalProjectRoot = (() => {
     if (normalizeOptionalString(activeProjectPhaseExecutionPlan?.projectRoot)) {
       return normalizeOptionalString(activeProjectPhaseExecutionPlan?.projectRoot)
