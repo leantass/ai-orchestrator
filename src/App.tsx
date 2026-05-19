@@ -8943,6 +8943,62 @@ const buildFullstackLocalMaterializationCoherenceIssue = ({
     return 'El plan materializable fullstack no devolvio materializationPlan.'
   }
 
+  const materializationTargets = [
+    ...(Array.isArray(metadata.executionScope?.allowedTargetPaths)
+      ? metadata.executionScope.allowedTargetPaths
+      : []),
+    ...(Array.isArray(metadata.materializationPlan?.allowedTargetPaths)
+      ? metadata.materializationPlan.allowedTargetPaths
+      : []),
+    ...(Array.isArray(metadata.materializationPlan?.operations)
+      ? metadata.materializationPlan.operations.flatMap((entry) => [
+          normalizeOptionalString(entry?.targetPath),
+          normalizeOptionalString(entry?.sourcePath),
+        ])
+      : []),
+  ].filter(Boolean)
+  const normalizedTargetSummary = materializationTargets
+    .map((entry) => normalizeOptionalString(entry).toLocaleLowerCase())
+    .join(' ')
+  const expectedPaths = [
+    ...normalizeOptionalStringArray(sourcePlan.allowedRootPaths),
+    ...normalizeOptionalStringArray(sourcePlan.directories),
+    ...(Array.isArray(sourcePlan.filesToCreate)
+      ? sourcePlan.filesToCreate
+          .map((entry) => normalizeOptionalString(entry?.path))
+          .filter(Boolean)
+      : []),
+  ]
+  const missingExpectedPaths = expectedPaths.filter(
+    (entry) => !normalizedTargetSummary.includes(entry.toLocaleLowerCase()),
+  )
+
+  if (missingExpectedPaths.length > 0) {
+    return `El plan materializable fullstack no preservo paths prometidos por el scalableDeliveryPlan. Faltan: ${missingExpectedPaths
+      .slice(0, 8)
+      .join(', ')}.`
+  }
+
+  const requiredFullstackMarkers = [
+    'frontend/admin',
+    'frontend/public',
+    'backend',
+    'shared',
+    'database/schema.sql',
+    'database/seeds/seed-local.sql',
+    'docs/api.md',
+    'docs/data-model.md',
+  ]
+  const missingRequiredMarkers = requiredFullstackMarkers.filter(
+    (entry) => !normalizedTargetSummary.includes(entry),
+  )
+
+  if (missingRequiredMarkers.length > 0) {
+    return `El plan materializable fullstack no devolvio el contrato minimo esperado. Faltan: ${missingRequiredMarkers.join(
+      ', ',
+    )}.`
+  }
+
   const sourceRootPath = normalizeOptionalStringArray(sourcePlan.allowedRootPaths)[0]
   const returnedRootPath =
     normalizeOptionalStringArray(metadata.executionScope?.allowedTargetPaths)[0]
@@ -9051,9 +9107,12 @@ const buildFullstackLocalMaterializationPrompt = ({
   return {
     goal: [
       'Preparar la materializacion controlada de un fullstack-local local y revisable dentro de una carpeta nueva del workspace.',
+      'Esto corresponde a un proyecto nuevo y no a una continuidad read-only de un proyecto existente.',
       'No devolver otro scalable-delivery-plan.',
       'No devolver materialize-safe-first-delivery-plan.',
       'No devolver materialize-frontend-project-plan.',
+      'No devolver prepare-continuation-action-plan.',
+      'No devolver prepare-project-phase-plan.',
       'Devolver un materialize-fullstack-local-plan ejecutable por el executor local deterministico.',
     ].join(' '),
     context: [
@@ -9064,8 +9123,13 @@ const buildFullstackLocalMaterializationPrompt = ({
       'sourceStrategy: scalable-delivery-plan.',
       'sourceNextExpectedAction: review-scalable-delivery.',
       'deliveryLevel: fullstack-local.',
+      'projectIntent: new-project-intent.',
       'acción requerida: materializar fullstack-local.',
       'modo esperado: scaffold fullstack local, estatico y revisable.',
+      'strategyEsperada: materialize-fullstack-local-plan.',
+      'executionModeEsperado: executor.',
+      'nextExpectedActionEsperado: execute-plan.',
+      'requiresApprovalEsperado: false.',
       `allowedRootPaths: ${allowedRootPaths.join(', ') || targetRoot}.`,
       targetStructure.length > 0
         ? `targetStructure: ${targetStructure.join(' | ')}.`
@@ -9079,7 +9143,8 @@ const buildFullstackLocalMaterializationPrompt = ({
       successCriteria.length > 0
         ? `successCriteria: ${successCriteria.join(' | ')}.`
         : '',
-      'Materializar solo un scaffold local con README.md, package.json raiz, frontend/, backend/, shared/, database/, scripts/ y docs/.',
+      'Materializar solo un scaffold local con README.md, package.json raiz, frontend/, frontend/admin/, frontend/public/, backend/, shared/, database/, scripts/ y docs/.',
+      'Incluir frontend administrativo, frontend publico revisable, docs/api.md y docs/data-model.md.',
       'Sin npm install, sin node_modules, sin backend real activo, sin base de datos real activa, sin Docker, sin deploy y sin integraciones externas.',
       `Usar la carpeta objetivo ${targetRoot} como raiz del scaffold.`,
     ]

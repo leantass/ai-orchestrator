@@ -135,7 +135,7 @@ function continuationActionMatchesId(action, expectedId) {
 }
 
 function normalizePathForComparison(value) {
-  return String(value || '').replace(/\\/g, '/')
+  return String(value || '').replace(/\\/g, '/').toLocaleLowerCase()
 }
 
 function summarizeUniqueStrings(entries, limit = 16) {
@@ -602,7 +602,7 @@ function buildFullstackLocalMaterializationPrompt({ goal, scalablePlan }) {
       explicitExclusions.length > 0
         ? `explicitExclusions: ${explicitExclusions.join(' | ')}`
         : '',
-      'Archivos requeridos: README.md, package.json, frontend/package.json, frontend/index.html, frontend/src/main.js, frontend/src/styles.css, frontend/src/mock-data.js, frontend/src/components/App.js, backend/package.json, backend/src/server.js, backend/src/routes/health.js, backend/src/modules/appointments.js, backend/src/lib/response.js, shared/contracts/domain.js, shared/types/contracts.js, database/README.md, database/schema.sql, database/seeds/seed-local.sql, scripts/README.md, scripts/seed-local.js, docs/architecture.md, docs/local-runbook.md.',
+      'Archivos requeridos: README.md, package.json, frontend/package.json, frontend/admin/README.md, frontend/public/README.md, frontend/index.html, frontend/src/main.js, frontend/src/routes/index.js, frontend/src/features/appointments.js, frontend/src/styles.css, frontend/src/mock-data.js, frontend/src/components/App.js, backend/package.json, backend/src/server.js, backend/src/routes/health.js, backend/src/routes/appointments.js, backend/src/modules/appointments.js, backend/src/lib/response.js, shared/contracts/domain.js, shared/types/contracts.js, database/README.md, database/schema.sql, database/seeds/seed-local.sql, scripts/README.md, scripts/seed-local.js, docs/architecture.md, docs/api.md, docs/data-model.md, docs/local-runbook.md.',
       'Devolver un materialize-fullstack-local-plan ejecutable por el executor local deterministico.',
       'No instalar dependencias, no crear node_modules, no crear .env real y no levantar servicios.',
     ]
@@ -1235,7 +1235,7 @@ async function runExistingWorkspaceProjectDetectionCase() {
   pushFailure(
     failures,
     expectedAllowedPathTokens.every((token) =>
-      allowedTargetPaths.some((entry) => entry.endsWith(token)),
+      allowedTargetPaths.some((entry) => entry.endsWith(normalizePathForComparison(token))),
     ),
     'Los allowedTargetPaths deben seguir acotados a frontend/src, docs/local-runbook.md y jefe-project.json.',
   )
@@ -1871,7 +1871,7 @@ async function runPhaseMaterializationFlowCase() {
   pushFailure(
     failures,
     frontendTouchedPaths.some((entry) => entry.endsWith('/frontend/src/mock-data.js')) &&
-      frontendTouchedPaths.some((entry) => entry.endsWith('/frontend/src/components/App.js')) &&
+      frontendTouchedPaths.some((entry) => entry.endsWith('/frontend/src/components/app.js')) &&
       frontendTouchedPaths.some((entry) => entry.endsWith('/frontend/src/styles.css')) &&
       !frontendTouchedPaths.some((entry) =>
         /\/backend\/|\/database\/|\/shared\/|package\.json$|node_modules|\/\.env$|docker|deploy/i.test(
@@ -3007,6 +3007,226 @@ async function runTrackingLogisticsPostApprovalReviewStateCase() {
   }
 }
 
+async function requestTrackingLogisticsPreparedMaterializationDecision() {
+  const approvalFeedback =
+    '__orchestrator_feedback__:' +
+    JSON.stringify({
+      type: 'approval-granted',
+      source: 'planner',
+      approvalMode: 'once',
+      instruction:
+        'Continuar solo con backend local, API local y SQLite local, sin deploy ni servicios externos.',
+      approvalReason:
+        'El usuario rechazo deploy pero mantiene permitido backend local y base SQLite local.',
+      approvalRequestDecisionKey: 'approve-public-deploy',
+      selectedOption: 'No deploy',
+      freeAnswer:
+        'No deploy. Seguir local con backend local, API local y SQLite/base local. No externos.',
+    })
+
+  const baseDecision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal:
+      'Sistema fullstack local de tracking logistico para una empresa de logistica con backend local, API local, SQLite o base local, frontend administrativo, consulta publica por codigo, entidades y relaciones, envios, historial de eventos, incidencias y reportes basicos.',
+    context:
+      'No landing. No demo solamente visual. No deploy. No credenciales. No servicios externos. No pagos. No Docker. No base productiva.',
+    workspacePath: smokeWorkspaceRoot,
+    iteration: 2,
+    previousExecutionResult: approvalFeedback,
+    requiresApproval: true,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: 'brain-decides-missing',
+    costMode: 'max-quality',
+    attachedInputs: [],
+    existingProjectContext: null,
+    projectWorkMode: 'auto',
+    reusablePlanningContext: buildReusablePlanningContext(),
+  })
+
+  const scalablePlan =
+    baseDecision?.scalableDeliveryPlan &&
+    typeof baseDecision.scalableDeliveryPlan === 'object'
+      ? baseDecision.scalableDeliveryPlan
+      : null
+
+  if (!scalablePlan) {
+    return {
+      baseDecision,
+      decision: null,
+      failures: ['La base reviewed fullstack local no devolvio scalableDeliveryPlan para preparar la entrega funcional local.'],
+    }
+  }
+
+  const allowedRootPaths = summarizeUniqueStrings(scalablePlan?.allowedRootPaths, 8)
+  const directories = summarizeUniqueStrings(scalablePlan?.directories, 24)
+  const filesToCreate = Array.isArray(scalablePlan?.filesToCreate)
+    ? scalablePlan.filesToCreate
+        .map((entry) => (entry && typeof entry === 'object' ? String(entry.path || '').trim() : ''))
+        .filter(Boolean)
+        .slice(0, 24)
+    : []
+
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal:
+      'Preparar entrega funcional local para el sistema fullstack local de tracking logistico.',
+    context: [
+      'cta: Preparar entrega funcional local.',
+      'plannerReviewState: review-scalable-delivery.',
+      'deliveryLevel: fullstack-local.',
+      'projectIntent: new-project-intent.',
+      'approvalAlreadyGranted: true.',
+      'strategyEsperada: materialize-fullstack-local-plan.',
+      'executionModeEsperado: executor.',
+      'nextExpectedActionEsperado: execute-plan.',
+      allowedRootPaths.length > 0 ? `allowedRootPaths: ${allowedRootPaths.join(', ')}` : '',
+      directories.length > 0 ? `directories: ${directories.join(', ')}` : '',
+      filesToCreate.length > 0 ? `filesToCreate: ${filesToCreate.join(', ')}` : '',
+      'Archivos requeridos: frontend/admin/README.md, frontend/public/README.md, frontend/src/routes/index.js, frontend/src/features/shipments.js, backend/src/routes/shipments.js, backend/src/modules/shipments.js, database/schema.sql, database/seeds/seed-local.sql, docs/api.md, docs/data-model.md.',
+      'No devolver prepare-continuation-action-plan.',
+      'No devolver prepare-project-phase-plan.',
+      'No devolver web-scaffold-base.',
+      'No ejecutar todavia.',
+    ]
+      .filter(Boolean)
+      .join('\n'),
+    workspacePath: smokeWorkspaceRoot,
+    iteration: 3,
+    previousExecutionResult: approvalFeedback,
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: 'brain-decides-missing',
+    costMode: 'max-quality',
+    attachedInputs: [],
+    existingProjectContext: null,
+    projectWorkMode: 'auto',
+    reusablePlanningContext: buildReusablePlanningContext(),
+  })
+
+  return { baseDecision, decision, failures: [] }
+}
+
+async function runTrackingLogisticsPrepareFunctionalDeliveryTransitionCase() {
+  const result = await requestTrackingLogisticsPreparedMaterializationDecision()
+  const failures = [...(Array.isArray(result.failures) ? result.failures : [])]
+  const decision = result.decision
+  const materializationPlan =
+    decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+      ? decision.materializationPlan
+      : null
+  const targetSummary = summarizeUniqueStrings([
+    decision?.materializationPlan?.projectRoot,
+    ...(Array.isArray(materializationPlan?.allowedTargetPaths)
+      ? materializationPlan.allowedTargetPaths
+      : []),
+    ...(Array.isArray(materializationPlan?.operations)
+      ? materializationPlan.operations.map((entry) => entry?.targetPath || '')
+      : []),
+  ], 160).map((entry) => normalizePathForComparison(entry))
+
+  pushFailure(
+    failures,
+    String(decision?.strategy || '').trim() === 'materialize-fullstack-local-plan',
+    'Preparar entrega funcional local debe devolver materialize-fullstack-local-plan.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.executionMode || '').trim() === 'executor',
+    'Preparar entrega funcional local debe devolver executionMode executor.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.nextExpectedAction || '').trim() === 'execute-plan',
+    'Preparar entrega funcional local debe devolver nextExpectedAction execute-plan.',
+  )
+  pushFailure(
+    failures,
+    !(decision?.approvalRequest || decision?.requiresApproval === true),
+    'La transicion fullstack no debe reabrir approvals pendientes.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.strategy || '').trim() !== 'prepare-continuation-action-plan' &&
+      String(decision?.decisionKey || '').trim() !== 'web-scaffold-base',
+    'La transicion fullstack no debe caer en continuation action ni en web-scaffold-base.',
+  )
+  ;[
+    'frontend/admin/readme.md',
+    'frontend/public/readme.md',
+    'frontend/src/routes/index.js',
+    'frontend/src/features/shipments.js',
+    'backend/src/routes/shipments.js',
+    'backend/src/modules/shipments.js',
+    'database/schema.sql',
+    'database/seeds/seed-local.sql',
+    'docs/api.md',
+    'docs/data-model.md',
+  ].forEach((token) => {
+    pushFailure(
+      failures,
+      targetSummary.some((entry) => entry.endsWith(normalizePathForComparison(token))),
+      `La transicion fullstack debe incluir ${token}.`,
+    )
+  })
+
+  return {
+    id: 'tracking-logistico-fullstack-prepare-functional-delivery-transition',
+    label: 'Tracking logistico fullstack prepare functional delivery transition',
+    failures,
+  }
+}
+
+async function runTrackingLogisticsMaterializationContractCase() {
+  const result = await requestTrackingLogisticsPreparedMaterializationDecision()
+  const failures = [...(Array.isArray(result.failures) ? result.failures : [])]
+  const decision = result.decision
+  const materializationPlan =
+    decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+      ? decision.materializationPlan
+      : null
+  const contentPool = normalizeText(
+    [
+      decision?.reason,
+      decision?.instruction,
+      decision?.domainUnderstanding?.domainLabel,
+      ...(Array.isArray(decision?.domainUnderstanding?.primaryModules)
+        ? decision.domainUnderstanding.primaryModules
+        : []),
+      ...(Array.isArray(decision?.domainUnderstanding?.primaryEntities)
+        ? decision.domainUnderstanding.primaryEntities
+        : []),
+      ...(Array.isArray(materializationPlan?.operations)
+        ? materializationPlan.operations.flatMap((entry) => [
+            entry?.targetPath || '',
+            typeof entry?.nextContent === 'string' ? entry.nextContent.slice(0, 1200) : '',
+          ])
+        : []),
+    ]
+      .filter(Boolean)
+      .join(' '),
+  )
+
+  ;['veterinaria', 'turnos medicos', 'reservas', 'prepare-continuation-action-plan'].forEach(
+    (token) => {
+      pushFailure(
+        failures,
+        !contentPool.includes(normalizeText(token)),
+        `La materializacion logistica no debe contaminarse con ${token}.`,
+      )
+    },
+  )
+  pushFailure(
+    failures,
+    contentPool.includes(normalizeText('envios')) &&
+      contentPool.includes(normalizeText('tracking')),
+    'La materializacion logistica debe conservar envios y tracking en el contrato.',
+  )
+
+  return {
+    id: 'tracking-logistico-fullstack-materialization-contract',
+    label: 'Tracking logistico fullstack materialization contract',
+    failures,
+  }
+}
+
 async function runTrackingLogisticsTimeoutFallbackNoWebScaffoldCase() {
   const failures = []
   const decision = await plannerApi.buildLocalStrategicBrainDecision({
@@ -3481,6 +3701,8 @@ async function main() {
     results.push(await runTrackingLogisticsExecutorBlocksWebScaffoldCase())
     results.push(await runArtifactMemoryNotSavedForBlockedFullstackWebScaffoldCase())
     results.push(await runTrackingLogisticsPostApprovalDoesNotMaterializeWebBaseCase())
+    results.push(await runTrackingLogisticsPrepareFunctionalDeliveryTransitionCase())
+    results.push(await runTrackingLogisticsMaterializationContractCase())
     results.push(await runUtf8SurfaceCase())
 
     const failedResults = results.filter((result) => result.failures.length > 0)
