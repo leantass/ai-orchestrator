@@ -1,4 +1,4 @@
-import fs from 'node:fs'
+﻿import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { createRequire } from 'node:module'
@@ -3080,7 +3080,7 @@ async function requestTrackingLogisticsPreparedMaterializationDecision() {
       allowedRootPaths.length > 0 ? `allowedRootPaths: ${allowedRootPaths.join(', ')}` : '',
       directories.length > 0 ? `directories: ${directories.join(', ')}` : '',
       filesToCreate.length > 0 ? `filesToCreate: ${filesToCreate.join(', ')}` : '',
-      'Archivos requeridos: frontend/admin/README.md, frontend/public/README.md, frontend/src/routes/index.js, frontend/src/features/shipments.js, backend/src/routes/shipments.js, backend/src/modules/shipments.js, database/schema.sql, database/seeds/seed-local.sql, docs/api.md, docs/data-model.md.',
+      'Archivos requeridos: frontend/admin/index.html, frontend/admin/app.js, frontend/public/index.html, frontend/public/app.js, backend/src/server.js, backend/src/routes/shipments.js, backend/src/routes/tracking.js, database/schema.sql, database/seed.sql, docs/API.md, docs/DB_SCHEMA.md.',
       'No devolver prepare-continuation-action-plan.',
       'No devolver prepare-project-phase-plan.',
       'No devolver web-scaffold-base.',
@@ -3151,14 +3151,16 @@ async function runTrackingLogisticsPrepareFunctionalDeliveryTransitionCase() {
   ;[
     'frontend/admin/readme.md',
     'frontend/public/readme.md',
-    'frontend/src/routes/index.js',
-    'frontend/src/features/shipments.js',
+    'frontend/admin/index.html',
+    'frontend/admin/app.js',
+    'frontend/public/index.html',
+    'frontend/public/app.js',
     'backend/src/routes/shipments.js',
-    'backend/src/modules/shipments.js',
+    'backend/src/routes/tracking.js',
     'database/schema.sql',
-    'database/seeds/seed-local.sql',
+    'database/seed.sql',
     'docs/api.md',
-    'docs/data-model.md',
+    'docs/db_schema.md',
   ].forEach((token) => {
     pushFailure(
       failures,
@@ -3183,28 +3185,39 @@ async function runTrackingLogisticsMaterializationContractCase() {
       ? decision.materializationPlan
       : null
   const contentPool = normalizeText(
-    [
-      decision?.reason,
-      decision?.instruction,
-      decision?.domainUnderstanding?.domainLabel,
-      ...(Array.isArray(decision?.domainUnderstanding?.primaryModules)
-        ? decision.domainUnderstanding.primaryModules
-        : []),
-      ...(Array.isArray(decision?.domainUnderstanding?.primaryEntities)
-        ? decision.domainUnderstanding.primaryEntities
-        : []),
-      ...(Array.isArray(materializationPlan?.operations)
-        ? materializationPlan.operations.flatMap((entry) => [
-            entry?.targetPath || '',
-            typeof entry?.nextContent === 'string' ? entry.nextContent.slice(0, 1200) : '',
-          ])
-        : []),
-    ]
-      .filter(Boolean)
-      .join(' '),
+    normalizePathForComparison(
+      [
+        decision?.reason,
+        decision?.instruction,
+        decision?.domainUnderstanding?.domainLabel,
+        ...(Array.isArray(decision?.domainUnderstanding?.primaryModules)
+          ? decision.domainUnderstanding.primaryModules
+          : []),
+        ...(Array.isArray(decision?.domainUnderstanding?.primaryEntities)
+          ? decision.domainUnderstanding.primaryEntities
+          : []),
+        ...(Array.isArray(materializationPlan?.operations)
+          ? materializationPlan.operations.flatMap((entry) => [
+              entry?.targetPath || '',
+              typeof entry?.nextContent === 'string' ? entry.nextContent.slice(0, 1200) : '',
+            ])
+          : []),
+      ]
+        .filter(Boolean)
+        .join(' '),
+    ),
   )
 
-  ;['veterinaria', 'turnos medicos', 'reservas', 'prepare-continuation-action-plan'].forEach(
+  ;[
+    'veterinaria',
+    'turnos medicos',
+    'appointments',
+    'pacientes',
+    'mascotas',
+    'reservas',
+    'prepare-continuation-action-plan',
+    'fullstack-local-veterinaria',
+  ].forEach(
     (token) => {
       pushFailure(
         failures,
@@ -3218,6 +3231,27 @@ async function runTrackingLogisticsMaterializationContractCase() {
     contentPool.includes(normalizeText('envios')) &&
       contentPool.includes(normalizeText('tracking')),
     'La materializacion logistica debe conservar envios y tracking en el contrato.',
+  )
+  ;[
+    'database/schema.sql',
+    'database/seed.sql',
+    'docs/api.md',
+    'docs/db_schema.md',
+    'frontend/admin/index.html',
+    'frontend/public/index.html',
+    'backend/src/routes/shipments.js',
+    'backend/src/routes/tracking.js',
+  ].forEach((token) => {
+    pushFailure(
+      failures,
+      contentPool.includes(normalizeText(token)),
+      `La materializacion logistica debe incluir ${token} dentro del contrato final.`,
+    )
+  })
+  pushFailure(
+    failures,
+    !contentPool.includes(normalizeText('database/shipments.json')),
+    'La materializacion logistica no debe usar database/shipments.json como persistencia principal.',
   )
 
   return {
@@ -3397,15 +3431,20 @@ async function runTrackingLogisticsValidMaterializationNotBlockedCase() {
       operations: [
         { targetPath: 'logistics-tracker-local/backend/package.json' },
         { targetPath: 'logistics-tracker-local/backend/src/server.js' },
+        { targetPath: 'logistics-tracker-local/backend/src/routes/shipments.js' },
+        { targetPath: 'logistics-tracker-local/backend/src/routes/tracking.js' },
         { targetPath: 'logistics-tracker-local/database/schema.sql' },
-        { targetPath: 'logistics-tracker-local/database/seeds/seed-local.sql' },
+        { targetPath: 'logistics-tracker-local/database/seed.sql' },
         { targetPath: 'logistics-tracker-local/frontend/public/index.html' },
         { targetPath: 'logistics-tracker-local/frontend/public/app.js' },
         { targetPath: 'logistics-tracker-local/frontend/admin/index.html' },
+        { targetPath: 'logistics-tracker-local/frontend/admin/app.js' },
         { targetPath: 'logistics-tracker-local/frontend/admin/styles.css' },
         { targetPath: 'logistics-tracker-local/docs/api.md' },
+        { targetPath: 'logistics-tracker-local/docs/db_schema.md' },
         { targetPath: 'logistics-tracker-local/docs/architecture.md' },
         { targetPath: 'logistics-tracker-local/shared/contracts/domain.js' },
+        { targetPath: 'logistics-tracker-local/shared/statuses.js' },
         { targetPath: 'logistics-tracker-local/scripts/seed-local.js' },
       ],
     },
@@ -3554,6 +3593,22 @@ async function runValidFullstackMaterializationCanReachLocalMaterializationCase(
           executionResult.details.createdPaths.length > 0,
         'La materializacion valida debe crear archivos dentro del workspace temporal controlado.',
       )
+      const createdPaths = Array.isArray(executionResult?.details?.createdPaths)
+        ? executionResult.details.createdPaths.map((entry) => normalizePathForComparison(entry))
+        : []
+      ;[
+        'database/schema.sql',
+        'database/seed.sql',
+        'docs/db_schema.md',
+        'frontend/admin/index.html',
+        'frontend/public/index.html',
+      ].forEach((token) => {
+        pushFailure(
+          failures,
+          createdPaths.some((entry) => entry.endsWith(normalizePathForComparison(token))),
+          `La materializacion valida debe poder crear ${token} dentro del workspace temporal controlado.`,
+        )
+      })
     }
   } finally {
     fs.rmSync(workspacePath, { recursive: true, force: true })
@@ -3626,6 +3681,197 @@ async function runTrackingLogisticsPostApprovalDoesNotMaterializeWebBaseCase() {
   return {
     id: 'tracking-logistico-fullstack-post-approval-does-not-materialize-web-base',
     label: 'Tracking logistico fullstack post approval does not materialize web base',
+    failures,
+  }
+}
+
+async function runTrackingLogisticsMaterializationRequiresSqlContractCase() {
+  const result = await requestTrackingLogisticsPreparedMaterializationDecision()
+  const failures = [...(Array.isArray(result.failures) ? result.failures : [])]
+  const materializationPlan =
+    result.decision?.materializationPlan && typeof result.decision.materializationPlan === 'object'
+      ? result.decision.materializationPlan
+      : null
+  const targetSummary = normalizeText(
+    normalizePathForComparison(
+      [
+        ...(Array.isArray(materializationPlan?.allowedTargetPaths)
+          ? materializationPlan.allowedTargetPaths
+          : []),
+        ...(Array.isArray(materializationPlan?.operations)
+          ? materializationPlan.operations.flatMap((entry) => [
+              entry?.targetPath || '',
+              typeof entry?.nextContent === 'string' ? entry.nextContent.slice(0, 800) : '',
+            ])
+          : []),
+      ]
+        .filter(Boolean)
+        .join(' '),
+    ),
+  )
+
+  ;[
+    'database/schema.sql',
+    'database/seed.sql',
+    'docs/api.md',
+    'docs/db_schema.md',
+  ].forEach((token) => {
+    pushFailure(
+      failures,
+      targetSummary.includes(normalizeText(token)),
+      `El plan materializable logístico debe exigir ${token}.`,
+    )
+  })
+  pushFailure(
+    failures,
+    !targetSummary.includes(normalizeText('database/shipments.json')),
+    'database/shipments.json no puede reemplazar al contrato SQL principal.',
+  )
+
+  return {
+    id: 'tracking-logistico-fullstack-materialization-requires-sql-contract',
+    label: 'Tracking logistico fullstack materialization requires SQL contract',
+    failures,
+  }
+}
+
+async function runTrackingLogisticsMaterializationRejectsJsonOnlyCase() {
+  const failures = []
+  const mainSource = fs.readFileSync(mainFilePath, 'utf8')
+  const approvalFeedback =
+    '__orchestrator_feedback__:' +
+    JSON.stringify({
+      type: 'approval-granted',
+      source: 'planner',
+      approvalMode: 'once',
+      instruction:
+        'Continuar solo con backend local, API local y SQLite local, sin deploy ni servicios externos.',
+      approvalReason:
+        'El usuario rechazo deploy pero mantiene permitido backend local y base SQLite local.',
+      approvalRequestDecisionKey: 'approve-public-deploy',
+      selectedOption: 'No deploy',
+      freeAnswer:
+        'No deploy. Seguir local con backend local y SQLite/base local. No externos.',
+    })
+
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal:
+      'Preparar una entrega fullstack local para tracking logistico con backend local, API local, SQLite o base local, frontend administrativo y consulta publica por codigo.',
+    context: [
+      'No landing. No demo solamente visual. No deploy. No credenciales. No servicios externos. No pagos. No Docker. No base productiva.',
+      'Intento invalido de prueba: usar database/shipments.json como almacenamiento principal.',
+      'No incluir database/schema.sql ni database/seed.sql.',
+      'No validar este contrato como materialize-fullstack-local-plan listo para ejecutar.',
+    ].join('\\n'),
+    workspacePath: smokeWorkspaceRoot,
+    iteration: 3,
+    previousExecutionResult: approvalFeedback,
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: 'brain-decides-missing',
+    costMode: 'max-quality',
+    attachedInputs: [],
+    existingProjectContext: null,
+    projectWorkMode: 'auto',
+    reusablePlanningContext: buildReusablePlanningContext(),
+  })
+
+  const normalizedDecision = normalizeText(JSON.stringify(decision || {}))
+
+  pushFailure(
+    failures,
+    String(decision?.strategy || '').trim() !== 'materialize-fullstack-local-plan' ||
+      normalizedDecision.includes(normalizeText('database/schema.sql')),
+    'Una propuesta JSON-only no debe quedar aceptada como materializacion logistica si no incorpora schema.sql.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.strategy || '').trim() !== 'materialize-fullstack-local-plan' ||
+      normalizedDecision.includes(normalizeText('database/seed.sql')),
+    'Una propuesta JSON-only no debe quedar aceptada como materializacion logistica si no incorpora seed.sql.',
+  )
+  pushFailure(
+    failures,
+    !normalizedDecision.includes(normalizeText('database/shipments.json')),
+    'El plan materializable logistico no debe conservar database/shipments.json como persistencia principal.',
+  )
+  pushFailure(
+    failures,
+    /function\s+inspectFullstackLocalMaterializationContract\s*\(/.test(mainSource) &&
+      /const\s+shouldUseFallbackInvalidMaterializationContract\s*=/.test(mainSource) &&
+      /inspectFullstackLocalMaterializationContract\s*\(\s*\{[\s\S]*?strategy:\s*rawDecision\?\.strategy[\s\S]*?materializationPlan:\s*rawDecision\?\.materializationPlan[\s\S]*?existingProjectDetection:\s*rawDecision\?\.existingProjectDetection[\s\S]*?\}\s*\)/.test(
+        mainSource,
+      ),
+    'La normalizacion debe inspeccionar el contrato de materializacion fullstack antes de aceptar un plan materializable.',
+  )
+
+  return {
+    id: 'tracking-logistico-fullstack-materialization-rejects-json-only',
+    label: 'Tracking logistico fullstack materialization rejects JSON only',
+    failures,
+  }
+}
+async function runTrackingLogisticsNewProjectDoesNotUseVeterinaryManifestCase() {
+  const detectedProjectPath = path.join(smokeWorkspaceRoot, 'fullstack-local-veterinaria')
+  ensureCleanDirectory(detectedProjectPath)
+  fs.writeFileSync(
+    path.join(detectedProjectPath, 'jefe-project.json'),
+    `${JSON.stringify(
+      {
+        version: 1,
+        projectType: 'fullstack-local',
+        domain: 'Veterinaria local',
+        deliveryLevel: 'fullstack-local',
+        materializationLayer: 'local-deterministic',
+        projectRoot: 'fullstack-local-veterinaria',
+        nextRecommendedPhase: 'review-and-expand',
+        phases: [],
+      },
+      null,
+      2,
+    )}\n`,
+    'utf8',
+  )
+  fs.writeFileSync(
+    path.join(detectedProjectPath, 'README.md'),
+    '# Fullstack local veterinaria\n',
+    'utf8',
+  )
+  const result = await requestTrackingLogisticsPreparedMaterializationDecision()
+  const failures = [...(Array.isArray(result.failures) ? result.failures : [])]
+  const decision = result.decision
+  const contaminationPool = normalizeText(
+    JSON.stringify({
+      localProjectManifest: decision?.localProjectManifest || null,
+      implementationRoadmap: decision?.implementationRoadmap || null,
+      phaseExpansionPlan: decision?.phaseExpansionPlan || null,
+    }),
+  )
+
+  pushFailure(
+    failures,
+    String(decision?.activeProjectContext?.mode || '').trim() === 'new-project',
+    'El tracking logístico nuevo debe quedar en activeProjectContext.mode=new-project.',
+  )
+  pushFailure(
+    failures,
+    decision?.existingProjectDetection?.detected === true &&
+      decision?.existingProjectDetection?.applicable === false,
+    'El proyecto existente detectado debe quedar marcado como detected pero applicable=false.',
+  )
+  ;['appointments', 'turnos', 'pacientes', 'mascotas', 'fullstack-local-veterinaria'].forEach(
+    (token) => {
+      pushFailure(
+        failures,
+        !contaminationPool.includes(normalizeText(token)),
+        `El proyecto nuevo logístico no debe reutilizar ${token} desde el manifest veterinario.`,
+      )
+    },
+  )
+
+  return {
+    id: 'tracking-logistico-new-project-does-not-use-veterinary-manifest',
+    label: 'Tracking logistico new project does not use veterinary manifest',
     failures,
   }
 }
@@ -3873,6 +4119,9 @@ async function main() {
     results.push(await runTrackingLogisticsTimeoutFallbackNoWebScaffoldCase())
     results.push(await runTrackingLogisticsExecutorBlocksWebScaffoldCase())
     results.push(await runTrackingLogisticsValidMaterializationNotBlockedCase())
+    results.push(await runTrackingLogisticsMaterializationRequiresSqlContractCase())
+    results.push(await runTrackingLogisticsMaterializationRejectsJsonOnlyCase())
+    results.push(await runTrackingLogisticsNewProjectDoesNotUseVeterinaryManifestCase())
     results.push(await runArtifactMemoryNotSavedForBlockedFullstackWebScaffoldCase())
     results.push(await runValidFullstackMaterializationCanReachLocalMaterializationCase())
     results.push(await runTrackingLogisticsPostApprovalDoesNotMaterializeWebBaseCase())

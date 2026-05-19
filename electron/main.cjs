@@ -13393,6 +13393,39 @@ function buildImplementationRoadmap({
     16,
   )
   const baseRiskLevel = normalizedBlueprint?.riskLevel || 'medium'
+  const fullstackContractProfile = inferFullstackLocalContractProfileFromPlanningArtifacts({
+    goal,
+    context,
+    rootFolder: rootPaths[0] || projectSlug,
+    domainLabel: domain,
+    modules: normalizedScalablePlan?.modules || normalizedBlueprint?.modules || [],
+    fileHints: [
+      ...((normalizedScalablePlan?.filesToCreate || []).map((entry) => entry.path) || []),
+    ],
+  })
+  const fullstackContractPaths = buildFullstackLocalContractPaths({
+    rootFolder: rootPaths[0] || projectSlug,
+    fullstackContractProfile,
+  })
+  const usesLogisticsFullstackContract =
+    fullstackContractProfile.archetype === 'logistics-tracking' ||
+    detectLogisticsTrackingIntent(
+      normalizeSectorDetectionText(
+        [
+          goal,
+          context,
+          domain,
+          rootPaths[0] || projectSlug,
+          ...(normalizedScalablePlan?.modules || []),
+          ...((normalizedScalablePlan?.filesToCreate || []).map((entry) => entry.path) || []),
+        ]
+          .filter(Boolean)
+          .join(' '),
+      ),
+    )
+  const logisticsReviewPhaseId = usesLogisticsFullstackContract
+    ? 'admin-public-surfaces'
+    : 'frontend-mock-flow'
   const phases = []
   const pushPhase = (phase) => {
     if (!phase || typeof phase !== 'object' || !phase.id || !phase.title) {
@@ -13556,41 +13589,59 @@ function buildImplementationRoadmap({
       ],
     })
     pushPhase({
-      id: 'frontend-mock-flow',
-      title: 'Flujo mock de frontend',
-      goal: 'Representar el flujo principal del dominio en el frontend local usando datos mock.',
+      id: logisticsReviewPhaseId,
+      title: usesLogisticsFullstackContract
+        ? 'Experiencia admin y tracking local'
+        : 'Flujo mock de frontend',
+      goal: usesLogisticsFullstackContract
+        ? 'Representar el panel admin y la consulta pública por código como superficies locales revisables.'
+        : 'Representar el flujo principal del dominio en el frontend local usando datos mock.',
       deliveryLevel: 'fullstack-local',
       status: strategy === 'materialize-fullstack-local-plan' ? 'planned' : 'planned',
       executableNow: false,
       approvalRequired: false,
       riskLevel: 'low',
-      expectedOutputs: [
-        'frontend/src/mock-data.js',
-        'frontend/src/components/App.js',
-        'frontend/src/styles.css',
-      ],
+      expectedOutputs: usesLogisticsFullstackContract
+        ? [
+            normalizePathForComparison(fullstackContractPaths.frontendAdminIndexPath),
+            normalizePathForComparison(fullstackContractPaths.frontendAdminAppPath),
+            normalizePathForComparison(fullstackContractPaths.frontendPublicIndexPath),
+            normalizePathForComparison(fullstackContractPaths.frontendPublicAppPath),
+          ]
+        : ['frontend/src/mock-data.js', 'frontend/src/components/App.js', 'frontend/src/styles.css'],
       allowedRootPaths: rootPaths,
       dependencies: ['scaffold-fullstack-local'],
-      validationStrategy: [
-        'Revisar rutas y highlights mock',
-        'Confirmar que no dependa de backend real',
-      ],
+      validationStrategy: usesLogisticsFullstackContract
+        ? [
+            'Revisar panel admin local y consulta pública por trackingCode.',
+            'Confirmar que no dependa de backend real ni fetchs externos.',
+          ]
+        : ['Revisar rutas y highlights mock', 'Confirmar que no dependa de backend real'],
     })
     pushPhase({
       id: 'backend-contracts',
       title: 'Contratos de backend',
-      goal: 'Dejar contratos y rutas mínimas del backend como referencia sin servidor activo.',
+      goal: usesLogisticsFullstackContract
+        ? 'Dejar contratos y rutas mínimas de envíos, tracking e incidencias como referencia sin servidor activo.'
+        : 'Dejar contratos y rutas mínimas del backend como referencia sin servidor activo.',
       deliveryLevel: 'fullstack-local',
       status: strategy === 'materialize-fullstack-local-plan' ? 'planned' : 'planned',
       executableNow: false,
       approvalRequired: false,
       riskLevel: 'medium',
-      expectedOutputs: [
-        'backend/src/server.js',
-        'backend/src/routes/health.js',
-        'backend/src/modules/appointments.js',
-        'shared/contracts/domain.js',
-      ],
+      expectedOutputs: usesLogisticsFullstackContract
+        ? [
+            'backend/src/server.js',
+            normalizePathForComparison(fullstackContractPaths.backendPrimaryRoutePath),
+            normalizePathForComparison(fullstackContractPaths.backendTrackingRoutePath),
+            normalizePathForComparison(fullstackContractPaths.sharedStatusesPath),
+          ]
+        : [
+            'backend/src/server.js',
+            'backend/src/routes/health.js',
+            'backend/src/modules/appointments.js',
+            'shared/contracts/domain.js',
+          ],
       allowedRootPaths: rootPaths,
       dependencies: ['scaffold-fullstack-local'],
       validationStrategy: [
@@ -13607,15 +13658,20 @@ function buildImplementationRoadmap({
       executableNow: false,
       approvalRequired: false,
       riskLevel: 'medium',
-      expectedOutputs: [
-        'database/schema.sql',
-        'database/seeds/seed-local.sql',
-        'scripts/seed-local.js',
-      ],
+      expectedOutputs: usesLogisticsFullstackContract
+        ? [
+            normalizePathForComparison(fullstackContractPaths.databaseSchemaPath),
+            normalizePathForComparison(fullstackContractPaths.databaseSeedPath),
+            normalizePathForComparison(fullstackContractPaths.docsDbSchemaPath),
+            'scripts/seed-local.js',
+          ]
+        : ['database/schema.sql', 'database/seeds/seed-local.sql', 'scripts/seed-local.js'],
       allowedRootPaths: rootPaths,
       dependencies: ['scaffold-fullstack-local'],
       validationStrategy: [
-        'Confirmar ausencia de migraciones reales ejecutadas',
+        usesLogisticsFullstackContract
+          ? 'Confirmar presencia de schema.sql y seed.sql como contrato SQL local.'
+          : 'Confirmar ausencia de migraciones reales ejecutadas',
         'Revisar runbook local',
       ],
     })
@@ -13634,7 +13690,7 @@ function buildImplementationRoadmap({
         'arquitectura y runbook revisados',
       ],
       allowedRootPaths: rootPaths,
-      dependencies: ['frontend-mock-flow', 'backend-contracts', 'database-design'],
+      dependencies: [logisticsReviewPhaseId, 'backend-contracts', 'database-design'],
       validationStrategy: [
         'node --check en backend/shared/scripts',
         'Confirmar no node_modules, no .env, no Dockerfile',
@@ -13894,6 +13950,39 @@ function buildValidationPlan({
     normalizedRoadmap?.projectSlug ||
     normalizedDeliveryLevel ||
     'workspace-local'
+  const fullstackContractProfile = inferFullstackLocalContractProfileFromPlanningArtifacts({
+    goal: normalizeOptionalString(normalizedRoadmap?.domain),
+    context: normalizeOptionalString(normalizedLocalProjectManifest?.domain),
+    rootFolder,
+    domainLabel:
+      normalizeOptionalString(normalizedLocalProjectManifest?.domain) ||
+      normalizeOptionalString(normalizedRoadmap?.domain),
+    modules: normalizedScalablePlan?.modules || normalizedLocalProjectManifest?.modules || [],
+    fileHints: (normalizedScalablePlan?.filesToCreate || []).map((entry) => entry.path),
+  })
+  const fullstackContractPaths = buildFullstackLocalContractPaths({
+    rootFolder,
+    fullstackContractProfile,
+  })
+  const logisticsContractModules =
+    normalizedScalablePlan?.modules || normalizedLocalProjectManifest?.modules || []
+  const logisticsContractFileHints =
+    (normalizedScalablePlan?.filesToCreate || []).map((entry) => entry.path)
+  const usesLogisticsFullstackContract =
+    fullstackContractProfile.archetype === 'logistics-tracking' ||
+    detectLogisticsTrackingIntent(
+      normalizeSectorDetectionText(
+        [
+          rootFolder,
+          normalizeOptionalString(normalizedLocalProjectManifest?.domain),
+          normalizeOptionalString(normalizedRoadmap?.domain),
+          ...logisticsContractModules,
+          ...logisticsContractFileHints,
+        ]
+          .filter(Boolean)
+          .join(' '),
+      ),
+    )
 
   if (
     (strategy === 'prepare-project-phase-plan' ||
@@ -13952,15 +14041,25 @@ function buildValidationPlan({
     return {
       scope: `${rootFolder}:fullstack-local-materialization`,
       level: 'full',
-      commands: [
-        `node --check ${path.posix.join(rootFolder, 'backend/src/server.js')}`,
-        `node --check ${path.posix.join(rootFolder, 'backend/src/routes/health.js')}`,
-        `node --check ${path.posix.join(rootFolder, 'backend/src/modules/appointments.js')}`,
-        `node --check ${path.posix.join(rootFolder, 'backend/src/lib/response.js')}`,
-        `node --check ${path.posix.join(rootFolder, 'shared/contracts/domain.js')}`,
-        `node --check ${path.posix.join(rootFolder, 'shared/types/contracts.js')}`,
-        `node --check ${path.posix.join(rootFolder, 'scripts/seed-local.js')}`,
-      ],
+      commands: usesLogisticsFullstackContract
+        ? [
+            `node --check ${path.posix.join(rootFolder, 'backend/src/server.js')}`,
+            `node --check ${path.posix.join(rootFolder, 'backend/src/routes/shipments.js')}`,
+            `node --check ${path.posix.join(rootFolder, 'backend/src/routes/tracking.js')}`,
+            `node --check ${path.posix.join(rootFolder, 'backend/src/lib/response.js')}`,
+            `node --check ${path.posix.join(rootFolder, 'shared/contracts/domain.js')}`,
+            `node --check ${path.posix.join(rootFolder, 'shared/statuses.js')}`,
+            `node --check ${path.posix.join(rootFolder, 'scripts/seed-local.js')}`,
+          ]
+        : [
+            `node --check ${path.posix.join(rootFolder, 'backend/src/server.js')}`,
+            `node --check ${path.posix.join(rootFolder, 'backend/src/routes/health.js')}`,
+            `node --check ${path.posix.join(rootFolder, 'backend/src/modules/appointments.js')}`,
+            `node --check ${path.posix.join(rootFolder, 'backend/src/lib/response.js')}`,
+            `node --check ${path.posix.join(rootFolder, 'shared/contracts/domain.js')}`,
+            `node --check ${path.posix.join(rootFolder, 'shared/types/contracts.js')}`,
+            `node --check ${path.posix.join(rootFolder, 'scripts/seed-local.js')}`,
+          ],
       fileChecks: [
         { path: `${rootFolder}/jefe-project.json`, expectation: 'Debe existir como manifiesto local revisable del proyecto.' },
         { path: `${rootFolder}/frontend`, expectation: 'Debe existir como capa visual local revisable.' },
@@ -13970,7 +14069,30 @@ function buildValidationPlan({
         { path: `${rootFolder}/scripts`, expectation: 'Debe existir con ayudas operativas no ejecutadas.' },
         { path: `${rootFolder}/docs`, expectation: 'Debe existir con architecture.md y local-runbook.md.' },
         { path: `${rootFolder}/database/schema.sql`, expectation: 'Debe existir como diseño editable de la base local.' },
-        { path: `${rootFolder}/database/seeds/seed-local.sql`, expectation: 'Debe existir como seed local no ejecutado.' },
+        ...(usesLogisticsFullstackContract
+          ? [
+              {
+                path: normalizePathForComparison(fullstackContractPaths.databaseSeedPath),
+                expectation: 'Debe existir como contrato SQL canónico de datos locales.',
+              },
+              {
+                path: normalizePathForComparison(fullstackContractPaths.docsApiPath),
+                expectation: 'Debe documentar endpoints locales de envíos y tracking.',
+              },
+              {
+                path: normalizePathForComparison(fullstackContractPaths.docsDbSchemaPath),
+                expectation: 'Debe documentar entidades, relaciones y contrato SQL local.',
+              },
+              {
+                path: normalizePathForComparison(fullstackContractPaths.frontendAdminIndexPath),
+                expectation: 'Debe existir como entrada del panel admin local.',
+              },
+              {
+                path: normalizePathForComparison(fullstackContractPaths.frontendPublicIndexPath),
+                expectation: 'Debe existir como entrada de consulta pública por código.',
+              },
+            ]
+          : [{ path: `${rootFolder}/database/seeds/seed-local.sql`, expectation: 'Debe existir como seed local no ejecutado.' }]),
         { path: `${rootFolder}/docs/architecture.md`, expectation: 'Debe explicar capas y límites del scaffold.' },
         { path: `${rootFolder}/docs/local-runbook.md`, expectation: 'Debe dejar clara la futura fase aprobada.' },
       ],
@@ -13989,7 +14111,9 @@ function buildValidationPlan({
         'No activar base de datos real.',
       ],
       manualChecks: [
-        'Revisar contratos compartidos y schema.sql como diseño local.',
+        usesLogisticsFullstackContract
+          ? 'Revisar schema.sql y seed.sql como contrato SQL local obligatorio del tracking logístico.'
+          : 'Revisar contratos compartidos y schema.sql como diseño local.',
         'Confirmar ausencia de Docker, deploy y credenciales reales.',
         normalizedLocalProjectManifest
           ? `Confirmar que jefe-project.json siga recomendando la fase ${normalizedLocalProjectManifest.nextRecommendedPhase || 'frontend-mock-flow'}.`
@@ -14079,6 +14203,18 @@ function buildPhaseExpansionPlan({
     normalizeModuleExpansionPlanContract(moduleExpansionPlan)
   const rootFolder =
     summarizeUniqueExecutorStrings(normalizedScalablePlan?.allowedRootPaths, 1)[0] || ''
+  const fullstackContractProfile = inferFullstackLocalContractProfileFromPlanningArtifacts({
+    rootFolder,
+    domainLabel: rootFolder,
+    modules: normalizedScalablePlan?.modules || [],
+    fileHints: (normalizedScalablePlan?.filesToCreate || []).map((entry) => entry.path),
+  })
+  const fullstackContractPaths = buildFullstackLocalContractPaths({
+    rootFolder,
+    fullstackContractProfile,
+  })
+  const usesLogisticsFullstackContract =
+    fullstackContractProfile.archetype === 'logistics-tracking'
 
   if (
     strategy === 'materialize-project-phase-plan' &&
@@ -14247,23 +14383,39 @@ function buildPhaseExpansionPlan({
 
   if (strategy === 'materialize-fullstack-local-plan') {
     return {
-      phaseId: 'frontend-mock-flow',
-      goal: 'Mejorar el flujo mock de turnos en frontend manteniendo backend y database como referencia local.',
-      targetFiles: [
-        `${rootFolder}/frontend/src/mock-data.js`,
-        `${rootFolder}/frontend/src/components/App.js`,
-        `${rootFolder}/frontend/src/styles.css`,
-      ],
-      changesExpected: [
-        'Refinar agenda mock',
-        'Mejorar estados visibles del flujo de turnos',
-        'Conservar el scaffold fullstack dentro del scope local',
-      ],
+      phaseId: 'review-and-expand',
+      goal: usesLogisticsFullstackContract
+        ? 'Revisar el scaffold logístico materializado, validar el contrato SQL local y decidir la siguiente expansión segura.'
+        : 'Revisar el scaffold fullstack materializado y decidir la siguiente expansión segura sin activar runtime real.',
+      targetFiles: usesLogisticsFullstackContract
+        ? [
+            normalizePathForComparison(fullstackContractPaths.frontendAdminIndexPath),
+            normalizePathForComparison(fullstackContractPaths.frontendPublicIndexPath),
+            normalizePathForComparison(fullstackContractPaths.docsApiPath),
+            normalizePathForComparison(fullstackContractPaths.docsDbSchemaPath),
+            `${rootFolder}/jefe-project.json`,
+          ]
+        : [
+            `${rootFolder}/frontend/src/mock-data.js`,
+            `${rootFolder}/frontend/src/components/App.js`,
+            `${rootFolder}/frontend/src/styles.css`,
+          ],
+      changesExpected: usesLogisticsFullstackContract
+        ? [
+            'Validar panel admin y tracking público local.',
+            'Confirmar que schema.sql y seed.sql cubran shipments, tracking e incidencias.',
+            'Mantener todo el scaffold dentro del scope local y revisable.',
+          ]
+        : [
+            'Refinar agenda mock',
+            'Mejorar estados visibles del flujo de turnos',
+            'Conservar el scaffold fullstack dentro del scope local',
+          ],
       risks: [
         'Introducir dependencias implícitas con backend real o DB activa.',
       ],
       validationPlan: normalizedValidationPlan,
-      executableNow: true,
+      executableNow: false,
       approvalRequired: false,
       nextExpectedAction: 'review-phase-expansion',
     }
@@ -14987,6 +15139,12 @@ function buildScalableDeliveryPlan({
     domainUnderstanding: normalizedDomainUnderstanding,
     modules,
   })
+  const fullstackContractPaths = buildFullstackLocalContractPaths({
+    rootFolder,
+    fullstackContractProfile,
+  })
+  const usesLogisticsFullstackContract =
+    fullstackContractProfile.archetype === 'logistics-tracking'
 
   switch (normalizedDeliveryLevel) {
     case 'frontend-project':
@@ -15128,11 +15286,55 @@ function buildScalableDeliveryPlan({
           purpose: 'Describir la base del frontend administrativo local para operaciones internas.',
           required: true,
         },
+        ...(usesLogisticsFullstackContract
+          ? [
+              {
+                path: fullstackContractPaths.frontendAdminIndexPath,
+                purpose:
+                  'Definir la entrada HTML local del panel administrativo de tracking logístico.',
+                required: true,
+              },
+              {
+                path: fullstackContractPaths.frontendAdminAppPath,
+                purpose:
+                  'Representar el panel administrativo local de envíos, estados e incidencias.',
+                required: true,
+              },
+              {
+                path: fullstackContractPaths.frontendAdminStylesPath,
+                purpose:
+                  'Aportar estilos locales revisables del panel administrativo sin bundlers.',
+                required: true,
+              },
+            ]
+          : []),
         {
           path: `${rootFolder}/frontend/public/README.md`,
           purpose: 'Describir la consulta pública local por código de seguimiento sin exponer servicios reales.',
           required: true,
         },
+        ...(usesLogisticsFullstackContract
+          ? [
+              {
+                path: fullstackContractPaths.frontendPublicIndexPath,
+                purpose:
+                  'Definir la entrada HTML local de consulta pública por trackingCode.',
+                required: true,
+              },
+              {
+                path: fullstackContractPaths.frontendPublicAppPath,
+                purpose:
+                  'Representar la consulta pública local por código y el timeline de tracking.',
+                required: true,
+              },
+              {
+                path: fullstackContractPaths.frontendPublicStylesPath,
+                purpose:
+                  'Aportar estilos locales revisables de la experiencia pública por código.',
+                required: true,
+              },
+            ]
+          : []),
         {
           path: `${rootFolder}/frontend/src/main.js`,
           purpose: 'Punto de entrada propuesto para el frontend local y su shell inicial.',
@@ -15168,6 +15370,22 @@ function buildScalableDeliveryPlan({
           purpose: 'Documentar una ruta local del dominio principal sin exponer servicios reales.',
           required: true,
         },
+        ...(usesLogisticsFullstackContract
+          ? [
+              {
+                path: fullstackContractPaths.backendTrackingRoutePath,
+                purpose:
+                  'Definir la ruta pública local de tracking por código sin servicios reales.',
+                required: true,
+              },
+              {
+                path: fullstackContractPaths.backendReportsRoutePath,
+                purpose:
+                  'Documentar reportes locales básicos de envíos e incidencias sin exportación real.',
+                required: false,
+              },
+            ]
+          : []),
         {
           path: `${rootFolder}/backend/src/modules/${fullstackContractProfile.backendModuleBasename}.js`,
           purpose: 'Separar el dominio principal del backend local en módulos revisables.',
@@ -15178,6 +15396,16 @@ function buildScalableDeliveryPlan({
           purpose: 'Modelos compartidos entre frontend y backend local.',
           required: true,
         },
+        ...(usesLogisticsFullstackContract
+          ? [
+              {
+                path: fullstackContractPaths.sharedStatusesPath,
+                purpose:
+                  'Centralizar estados de envíos, eventos e incidencias como contrato compartido.',
+                required: true,
+              },
+            ]
+          : []),
         {
           path: `${rootFolder}/shared/types/contracts.js`,
           purpose: 'Centralizar contratos o tipos simples compartidos entre capas locales.',
@@ -15188,6 +15416,16 @@ function buildScalableDeliveryPlan({
           purpose: 'Esquema local revisable sin tocar bases productivas ni crear un servicio activo.',
           required: true,
         },
+        ...(usesLogisticsFullstackContract
+          ? [
+              {
+                path: fullstackContractPaths.databaseSeedPath,
+                purpose:
+                  'Seed SQL local canónico del tracking logístico, no ejecutado y listo para revisión.',
+                required: true,
+              },
+            ]
+          : []),
         {
           path: `${rootFolder}/database/seeds/seed-local.sql`,
           purpose: 'Seed SQL local de referencia para poblar datos demo sin ejecutarlo todavía.',
@@ -15208,16 +15446,46 @@ function buildScalableDeliveryPlan({
           purpose: 'Explicar la estructura fullstack local, capas, módulos y límites.',
           required: true,
         },
+        ...(usesLogisticsFullstackContract
+          ? [
+              {
+                path: fullstackContractPaths.docsArchitecturePath,
+                purpose:
+                  'Dejar una versión canónica del documento de arquitectura para la entrega logística.',
+                required: true,
+              },
+            ]
+          : []),
         {
           path: `${rootFolder}/docs/api.md`,
           purpose: 'Documentar contratos y endpoints API locales previstos para backend y consulta pública.',
           required: true,
         },
+        ...(usesLogisticsFullstackContract
+          ? [
+              {
+                path: fullstackContractPaths.docsApiPath,
+                purpose:
+                  'Dejar la especificación canónica de endpoints de envíos, tracking y reportes locales.',
+                required: true,
+              },
+            ]
+          : []),
         {
           path: `${rootFolder}/docs/data-model.md`,
           purpose: 'Describir entidades, relaciones y decisiones del modelo de datos local.',
           required: true,
         },
+        ...(usesLogisticsFullstackContract
+          ? [
+              {
+                path: fullstackContractPaths.docsDbSchemaPath,
+                purpose:
+                  'Documentar el contrato SQL local, entidades y relaciones del tracking logístico.',
+                required: true,
+              },
+            ]
+          : []),
         {
           path: `${rootFolder}/docs/local-runbook.md`,
           purpose: 'Dejar documentados pasos manuales futuros para instalación, arranque y datos de prueba bajo aprobación.',
@@ -15248,6 +15516,12 @@ function buildScalableDeliveryPlan({
         'El plan separa con claridad frontend, backend, shared, database, scripts y docs dentro de un root fullstack local.',
         'Los filesToCreate proponen artefactos revisables para cada capa sin materializarlos todavía.',
         'No se devuelve materializationPlan ejecutable ni nextExpectedAction de ejecución para fullstack-local en esta fase.',
+        ...(usesLogisticsFullstackContract
+          ? [
+              'El contrato logístico exige SQL local canónico con database/schema.sql y database/seed.sql.',
+              'La consulta pública por trackingCode y el panel admin quedan reflejados en frontend/public y frontend/admin.',
+            ]
+          : []),
       ])
       break
     case 'monorepo-local':
@@ -15687,18 +15961,16 @@ function detectFullstackLocalDemoArchetype({
     .join(' ')
   const combinedText = normalizeSectorDetectionText(understandingText)
 
+  if (detectLogisticsTrackingIntent(combinedText)) {
+    return 'logistics-tracking'
+  }
+
   if (
     /\bveterinaria\b|\bveterinari[oa]s?\b|\bmascotas?\b|\bvacunas?\b|\bpet\b/u.test(
       combinedText,
     )
   ) {
     return 'veterinary'
-  }
-
-  if (
-    detectLogisticsTrackingIntent(combinedText)
-  ) {
-    return 'logistics-tracking'
   }
 
   if (
@@ -15774,6 +16046,257 @@ function detectFullstackLocalDemoArchetype({
   }
 
   return 'operations'
+}
+
+function inferFullstackLocalContractProfileFromPlanningArtifacts({
+  goal = '',
+  context = '',
+  rootFolder = '',
+  domainLabel = '',
+  modules = [],
+  fileHints = [],
+}) {
+  const normalizedModules = summarizeUniqueExecutorStrings(modules, 24)
+  const normalizedFileHints = summarizeUniqueExecutorStrings(fileHints, 40)
+  const inferredArchetype = detectFullstackLocalDemoArchetype({
+    normalizedText: normalizeSectorDetectionText(
+      [
+        goal,
+        context,
+        rootFolder,
+        domainLabel,
+        normalizedModules.join(' '),
+        normalizedFileHints.join(' '),
+      ]
+        .filter(Boolean)
+        .join(' '),
+    ),
+    domainUnderstanding: {
+      domainLabel,
+      primaryModules: normalizedModules,
+      primaryEntities: normalizedFileHints,
+    },
+    modules: [...normalizedModules, ...normalizedFileHints],
+  })
+
+  return resolveFullstackLocalContractProfile({
+    goal,
+    context: [context, domainLabel, rootFolder, normalizedFileHints.join(' ')].filter(Boolean).join(' '),
+    domainUnderstanding: {
+      domainLabel,
+      primaryModules: normalizedModules,
+      primaryEntities: normalizedFileHints,
+    },
+    modules: normalizedModules,
+    archetype: inferredArchetype,
+  })
+}
+
+function buildFullstackLocalContractPaths({ rootFolder, fullstackContractProfile }) {
+  const normalizedRootFolder =
+    typeof rootFolder === 'string' && rootFolder.trim() ? rootFolder.trim() : 'fullstack-local'
+  const profile =
+    fullstackContractProfile && typeof fullstackContractProfile === 'object'
+      ? fullstackContractProfile
+      : {
+          archetype: 'operations',
+          frontendFeatureBasename: 'appointments',
+          backendRouteBasename: 'appointments',
+          backendModuleBasename: 'appointments',
+        }
+
+  return {
+    frontendAdminIndexPath: path.join(normalizedRootFolder, 'frontend', 'admin', 'index.html'),
+    frontendAdminAppPath: path.join(normalizedRootFolder, 'frontend', 'admin', 'app.js'),
+    frontendAdminStylesPath: path.join(normalizedRootFolder, 'frontend', 'admin', 'styles.css'),
+    frontendPublicIndexPath: path.join(normalizedRootFolder, 'frontend', 'public', 'index.html'),
+    frontendPublicAppPath: path.join(normalizedRootFolder, 'frontend', 'public', 'app.js'),
+    frontendPublicStylesPath: path.join(normalizedRootFolder, 'frontend', 'public', 'styles.css'),
+    backendPrimaryRoutePath: path.join(
+      normalizedRootFolder,
+      'backend',
+      'src',
+      'routes',
+      `${profile.backendRouteBasename || 'appointments'}.js`,
+    ),
+    backendTrackingRoutePath: path.join(
+      normalizedRootFolder,
+      'backend',
+      'src',
+      'routes',
+      'tracking.js',
+    ),
+    backendReportsRoutePath: path.join(
+      normalizedRootFolder,
+      'backend',
+      'src',
+      'routes',
+      'reports.js',
+    ),
+    backendPrimaryModulePath: path.join(
+      normalizedRootFolder,
+      'backend',
+      'src',
+      'modules',
+      `${profile.backendModuleBasename || 'appointments'}.js`,
+    ),
+    sharedStatusesPath: path.join(normalizedRootFolder, 'shared', 'statuses.js'),
+    databaseSchemaPath: path.join(normalizedRootFolder, 'database', 'schema.sql'),
+    databaseSeedPath: path.join(normalizedRootFolder, 'database', 'seed.sql'),
+    databaseLegacySeedPath: path.join(
+      normalizedRootFolder,
+      'database',
+      'seeds',
+      'seed-local.sql',
+    ),
+    docsApiPath: path.join(normalizedRootFolder, 'docs', 'API.md'),
+    docsArchitecturePath: path.join(normalizedRootFolder, 'docs', 'ARCHITECTURE.md'),
+    docsDbSchemaPath: path.join(normalizedRootFolder, 'docs', 'DB_SCHEMA.md'),
+    docsDataModelPath: path.join(normalizedRootFolder, 'docs', 'DATA_MODEL.md'),
+  }
+}
+
+function collectMaterializationContractTargetPaths({ executionScope, materializationPlan }) {
+  return summarizeUniqueExecutorStrings(
+    [
+      ...(Array.isArray(executionScope?.allowedTargetPaths)
+        ? executionScope.allowedTargetPaths
+        : []),
+      ...(Array.isArray(materializationPlan?.allowedTargetPaths)
+        ? materializationPlan.allowedTargetPaths
+        : []),
+      ...(Array.isArray(materializationPlan?.operations)
+        ? materializationPlan.operations.flatMap((entry) => [
+            entry?.targetPath || '',
+            entry?.sourcePath || '',
+          ])
+        : []),
+    ].filter((entry) => typeof entry === 'string' && entry.trim()),
+    200,
+  ).map((entry) => normalizePathForComparison(entry))
+}
+
+function inspectFullstackLocalMaterializationContract({
+  goal,
+  context,
+  strategy,
+  executionScope,
+  materializationPlan,
+  localProjectManifest,
+  existingProjectDetection,
+}) {
+  const targetPaths = collectMaterializationContractTargetPaths({
+    executionScope,
+    materializationPlan,
+  })
+  const rootFolder =
+    normalizeOptionalString(materializationPlan?.projectRoot) ||
+    normalizeOptionalString(localProjectManifest?.projectRoot) ||
+    targetPaths[0] ||
+    ''
+  const fileHints = [
+    ...targetPaths,
+    ...(Array.isArray(materializationPlan?.operations)
+      ? materializationPlan.operations.map((entry) =>
+          typeof entry?.nextContent === 'string' ? entry.nextContent.slice(0, 400) : '',
+        )
+      : []),
+  ]
+  const profile = inferFullstackLocalContractProfileFromPlanningArtifacts({
+    goal,
+    context,
+    rootFolder,
+    domainLabel: normalizeOptionalString(localProjectManifest?.domain),
+    modules:
+      Array.isArray(localProjectManifest?.modules) && localProjectManifest.modules.length > 0
+        ? localProjectManifest.modules
+        : [],
+    fileHints,
+  })
+  const usesLogisticsContract =
+    profile.archetype === 'logistics-tracking' ||
+    detectLogisticsTrackingIntent(
+      normalizeSectorDetectionText([goal, context, fileHints.join(' ')].join(' ')),
+    )
+  const contractPaths = buildFullstackLocalContractPaths({
+    rootFolder: rootFolder || 'logistics-tracker-local',
+    fullstackContractProfile: profile,
+  })
+  const normalizedTargetSummary = targetPaths.join(' ')
+  const requiredMarkers = usesLogisticsContract
+    ? [
+        normalizePathForComparison(contractPaths.frontendAdminIndexPath),
+        normalizePathForComparison(contractPaths.frontendAdminAppPath),
+        normalizePathForComparison(contractPaths.frontendPublicIndexPath),
+        normalizePathForComparison(contractPaths.frontendPublicAppPath),
+        normalizePathForComparison(contractPaths.backendPrimaryRoutePath),
+        normalizePathForComparison(contractPaths.backendTrackingRoutePath),
+        normalizePathForComparison(contractPaths.databaseSchemaPath),
+        normalizePathForComparison(contractPaths.databaseSeedPath),
+        normalizePathForComparison(contractPaths.docsApiPath),
+      ]
+    : [
+        normalizePathForComparison(contractPaths.databaseSchemaPath),
+        normalizePathForComparison(contractPaths.databaseLegacySeedPath),
+      ]
+  const missingRequiredMarkers = requiredMarkers.filter(
+    (entry) => entry && !normalizedTargetSummary.includes(entry),
+  )
+  const hasCanonicalDataModelDoc =
+    normalizedTargetSummary.includes(normalizePathForComparison(contractPaths.docsDbSchemaPath)) ||
+    normalizedTargetSummary.includes(normalizePathForComparison(contractPaths.docsDataModelPath))
+  const hasSqlContract =
+    normalizedTargetSummary.includes(normalizePathForComparison(contractPaths.databaseSchemaPath)) &&
+    (normalizedTargetSummary.includes(normalizePathForComparison(contractPaths.databaseSeedPath)) ||
+      normalizedTargetSummary.includes(
+        normalizePathForComparison(contractPaths.databaseLegacySeedPath),
+      ))
+  const usesJsonAsPrimaryPersistence =
+    targetPaths.some((entry) => entry.endsWith('/database/shipments.json')) &&
+    !hasSqlContract
+  const contaminationText = normalizeSectorDetectionText(
+    [
+      goal,
+      context,
+      normalizeOptionalString(localProjectManifest?.domain),
+      normalizeOptionalString(existingProjectDetection?.projectRoot),
+      ...(Array.isArray(localProjectManifest?.modules) ? localProjectManifest.modules : []),
+      ...(Array.isArray(materializationPlan?.operations)
+        ? materializationPlan.operations.map((entry) =>
+            typeof entry?.nextContent === 'string' ? entry.nextContent.slice(0, 1000) : '',
+          )
+        : []),
+    ]
+      .filter(Boolean)
+      .join(' '),
+  )
+  const contaminationTokens = usesLogisticsContract
+    ? [
+        'veterinaria',
+        'appointments',
+        'turnos',
+        'pacientes',
+        'mascotas',
+        'reservas',
+        'fullstack-local-veterinaria',
+      ].filter((token) => contaminationText.includes(normalizeSectorDetectionText(token)))
+    : []
+
+  return {
+    usesLogisticsContract,
+    hasSqlContract,
+    hasCanonicalDataModelDoc,
+    missingRequiredMarkers,
+    contaminationTokens,
+    usesJsonAsPrimaryPersistence,
+    valid:
+      String(strategy || '').trim() === 'materialize-fullstack-local-plan' &&
+      missingRequiredMarkers.length === 0 &&
+      hasSqlContract &&
+      (!usesLogisticsContract || hasCanonicalDataModelDoc) &&
+      contaminationTokens.length === 0 &&
+      !usesJsonAsPrimaryPersistence,
+  }
 }
 
 function resolveFullstackLocalContractProfile({
@@ -17250,7 +17773,7 @@ function buildLogisticsTrackingFullstackLocalDemoData({
       { id: 'dashboard', label: 'Dashboard', hint: 'Resumen operativo' },
       { id: 'clients', label: 'Clientes', hint: 'Remitentes y destinatarios' },
       { id: 'resources', label: 'Envios', hint: 'Estado y prioridad' },
-      { id: 'appointments', label: 'Eventos', hint: 'Historial de tracking' },
+      { id: 'events', label: 'Eventos', hint: 'Historial de tracking' },
       { id: 'reminders', label: 'Incidencias', hint: 'Pendientes y desvíos' },
       { id: 'reports', label: 'Reportes', hint: 'Indicadores mock' },
     ],
@@ -17316,7 +17839,7 @@ function buildLogisticsTrackingFullstackLocalDemoData({
         searchableKeys: ['name', 'surface', 'schedule', 'status', 'note'],
       }),
       buildFullstackLocalDemoView({
-        id: 'appointments', label: 'Eventos', title: 'Historial de tracking', description: 'Eventos mock del envío con cambio de estado solo local.',
+        id: 'events', label: 'Eventos', title: 'Historial de tracking', description: 'Eventos mock del envío con cambio de estado solo local.',
         datasetKey: 'trackingEvents',
         columns: [{ key: 'slot', label: 'Hora' }, { key: 'clientName', label: 'Envio' }, { key: 'reason', label: 'Evento' }, { key: 'status', label: 'Estado', kind: 'badge' }],
         detailFields: [{ key: 'professional', label: 'Responsable' }, { key: 'room', label: 'Ubicación' }, { key: 'notes', label: 'Notas' }],
@@ -17334,7 +17857,7 @@ function buildLogisticsTrackingFullstackLocalDemoData({
     ],
     quickActions: [
       { id: 'qa-log-1', label: 'Ver envios', targetView: 'resources', feedback: 'Se abrió el listado local de envíos.' },
-      { id: 'qa-log-2', label: 'Abrir eventos', targetView: 'appointments', feedback: 'Se mostró el historial local de tracking.' },
+      { id: 'qa-log-2', label: 'Abrir eventos', targetView: 'events', feedback: 'Se mostró el historial local de tracking.' },
       { id: 'qa-log-3', label: 'Revisar incidencias', targetView: 'reminders', feedback: 'Quedaron visibles las incidencias operativas.' },
     ],
     interactionHighlights: [
@@ -17342,7 +17865,7 @@ function buildLogisticsTrackingFullstackLocalDemoData({
       'Cambiar estados mock de tracking sin backend real ni webhooks.',
       'Revisar incidencias y reportes básicos sin salir del modo local seguro.',
     ],
-    statusOptions: { appointments: ['todos', 'pendiente', 'confirmado', 'en revisión', 'entregado', 'incidencia'] },
+    statusOptions: { events: ['todos', 'pendiente', 'confirmado', 'en revisión', 'entregado', 'incidencia'] },
     domainEntities: ['clientes', 'envios', 'eventos de tracking', 'incidencias', 'codigos de seguimiento', 'reportes'],
     modules: ['frontend administrativo', 'consulta publica por codigo', 'envios', 'tracking', 'incidencias', 'reportes'],
   })
@@ -19055,16 +19578,31 @@ function buildFullstackLocalInteractiveFrontendMainContent() {
 }
 
 function buildFullstackLocalDatasetCollectionMap(fullstackLocalDemoData) {
-  const datasetKeys = new Set([
-    'team',
-    'clients',
-    'pets',
-    'appointments',
-    'reminders',
-    'inventory',
-    'reports',
-    'activity',
-  ])
+  const fullstackContractProfile = resolveFullstackLocalContractProfile({
+    archetype: fullstackLocalDemoData?.overview?.archetype || '',
+  })
+  const datasetKeys = new Set(
+    fullstackContractProfile.archetype === 'logistics-tracking'
+      ? [
+          'team',
+          'clients',
+          'resources',
+          'trackingEvents',
+          'reminders',
+          'reports',
+          'activity',
+        ]
+      : [
+          'team',
+          'clients',
+          'pets',
+          'appointments',
+          'reminders',
+          'inventory',
+          'reports',
+          'activity',
+        ],
+  )
 
   for (const view of Array.isArray(fullstackLocalDemoData?.views)
     ? fullstackLocalDemoData.views
@@ -19102,7 +19640,7 @@ function buildFullstackLocalBackendDomainModuleContent(fullstackLocalDemoData) {
   if (isLogisticsTracking) {
     const shipmentStatuses = summarizeUniqueExecutorStrings(
       [
-        ...(fullstackLocalDemoData?.statusOptions?.appointments || []),
+        ...(fullstackLocalDemoData?.statusOptions?.events || []),
         ...(fullstackLocalDemoData?.trackingEvents || []).map((entry) => entry?.status || ''),
         ...(fullstackLocalDemoData?.resources || []).map((entry) => entry?.status || ''),
       ],
@@ -19718,7 +20256,7 @@ function createServerContract() {
         listMockShipments()[0] && listMockShipments()[0].id,
         ${JSON.stringify(
           summarizeUniqueExecutorStrings(
-            (fullstackLocalDemoData?.statusOptions?.appointments || []).filter(Boolean),
+            (fullstackLocalDemoData?.statusOptions?.events || []).filter(Boolean),
             2,
           )[0] || 'en revision',
         )},
@@ -19859,10 +20397,19 @@ function buildFullstackLocalSharedDomainObject(fullstackLocalDemoData) {
       id: entry?.id || '',
       label: entry?.label || '',
     })),
-    appointmentStatuses:
-      fullstackLocalDemoData?.statusOptions?.appointments || [],
-    primaryStatuses:
-      fullstackLocalDemoData?.statusOptions?.appointments || [],
+    ...(isLogisticsTracking
+      ? {
+          trackingEventStatuses:
+            fullstackLocalDemoData?.statusOptions?.events || [],
+          primaryStatuses:
+            fullstackLocalDemoData?.statusOptions?.events || [],
+        }
+      : {
+          appointmentStatuses:
+            fullstackLocalDemoData?.statusOptions?.appointments || [],
+          primaryStatuses:
+            fullstackLocalDemoData?.statusOptions?.appointments || [],
+        }),
     primaryFeatureLabel: fullstackContractProfile.primaryFeatureLabel,
     primaryRoutePath: fullstackContractProfile.primaryRoutePath,
     publicRoutePath: fullstackContractProfile.publicRoutePath,
@@ -19909,6 +20456,38 @@ function buildFullstackLocalSharedRouteContracts(fullstackLocalDemoData) {
 }
 
 function buildFullstackLocalSharedStatusContracts(fullstackLocalDemoData) {
+  const fullstackContractProfile = resolveFullstackLocalContractProfile({
+    archetype: fullstackLocalDemoData?.overview?.archetype || '',
+  })
+
+  if (fullstackContractProfile.archetype === 'logistics-tracking') {
+    return {
+      events: summarizeUniqueExecutorStrings(
+        [
+          ...(fullstackLocalDemoData?.statusOptions?.events || []),
+          ...(Array.isArray(fullstackLocalDemoData?.trackingEvents)
+            ? fullstackLocalDemoData.trackingEvents.map((entry) => entry?.status || '')
+            : []),
+        ],
+        12,
+      ),
+      reminders: summarizeUniqueExecutorStrings(
+        (Array.isArray(fullstackLocalDemoData?.reminders)
+          ? fullstackLocalDemoData.reminders.map((entry) => entry?.status || '')
+          : []
+        ),
+        12,
+      ),
+      shipments: summarizeUniqueExecutorStrings(
+        (Array.isArray(fullstackLocalDemoData?.resources)
+          ? fullstackLocalDemoData.resources.map((entry) => entry?.status || '')
+          : []
+        ),
+        12,
+      ),
+    }
+  }
+
   return {
     appointments: summarizeUniqueExecutorStrings(
       [
@@ -20903,6 +21482,11 @@ function buildFullstackLocalDocumentationBundle({
   modules,
 }) {
   const overview = fullstackLocalDemoData?.overview || {}
+  const fullstackContractProfile = resolveFullstackLocalContractProfile({
+    archetype: overview.archetype || '',
+  })
+  const isLogisticsTracking =
+    fullstackContractProfile.archetype === 'logistics-tracking'
   const archetypeLabel =
     buildFullstackLocalArchetypeDisplayLabel(overview.archetype) ||
     overview.archetypeLabel ||
@@ -20949,13 +21533,24 @@ function buildFullstackLocalDocumentationBundle({
     ).map((entry) => entry?.title || entry?.detail || ''),
     12,
   )
-  const nextSafePhases = [
-    overview.nextRecommendedPhase || 'frontend-mock-flow',
-    'backend-contracts',
-    'database-design',
-    'local-validation',
-    'review-and-expand',
-  ].filter((entry, index, entries) => entry && entries.indexOf(entry) === index)
+  const nextSafePhases = (
+    isLogisticsTracking
+      ? [overview.nextRecommendedPhase || 'review-and-expand']
+      : [
+          overview.nextRecommendedPhase || 'frontend-mock-flow',
+          'backend-contracts',
+          'database-design',
+          'local-validation',
+          'review-and-expand',
+        ]
+  ).filter((entry, index, entries) => entry && entries.indexOf(entry) === index)
+  const openEntryPoints = isLogisticsTracking
+    ? ['frontend/admin/index.html', 'frontend/public/index.html']
+    : ['frontend/index.html']
+  const openEntryPointsText = openEntryPoints.map((entry) => `\`${entry}\``).join(' y ')
+  const localSurfaceLabel = isLogisticsTracking
+    ? 'panel admin y consulta pública por código'
+    : 'entrega local principal'
 
   return {
     readmeContent: `# ${appTitle}
@@ -20968,7 +21563,7 @@ Scaffold fullstack local, seguro y revisable generado por JEFE.
 - Datos mock ricos orientados al dominio
 - Interacciones client-side sin servidor
 - Backend, shared, database y docs como referencia revisable
-- Compatibilidad con abrir \`frontend/index.html\` por \`file://\`
+- Compatibilidad con abrir ${openEntryPointsText} por \`file://\`
 
 ## Que podes mostrar en la entrega local
 
@@ -20988,9 +21583,9 @@ ${interactionHighlights.map((entry) => `- ${entry}`).join('\n') || '- Búsqueda,
 
 ## Cómo abrirla
 
-1. Abrí \`frontend/index.html\` con doble click.
+1. Abrí ${openEntryPointsText} con doble click.
 2. Confirmá que cargue por \`file://\`, sin servidor y sin instalar dependencias.
-3. Probá navegación, filtros, búsqueda, selección y cambios de estado mock.
+3. Probá navegación, filtros, búsqueda, selección y cambios de estado mock del ${localSurfaceLabel}.
 
 ## Alcance
 
@@ -21042,6 +21637,7 @@ Dejar una primera entrega funcional local, segura, revisable y abrible por \`fil
 ## Capas
 
 - frontend/: entrega estática con navegación, métricas, listas y detalle local
+- frontend/admin y frontend/public: superficies separadas cuando el contrato requiere panel interno y tracking público local
 - backend/: contratos y helpers puros sin \`listen()\`
 - shared/: contratos del dominio reutilizables
 - database/: diseño SQL local no ejecutado
@@ -21088,7 +21684,7 @@ El proyecto quedo como entrega funcional local segura y revisable.
 
 ## Como abrir la entrega local
 
-1. Abrí \`frontend/index.html\` con doble click o desde el navegador.
+1. Abrí ${openEntryPointsText} con doble click o desde el navegador.
 2. Confirmá que la UI cargue por \`file://\`, sin servidor y sin \`npm install\`.
 3. Probá navegación, búsqueda, filtros y acciones locales mock.
 4. Verificá que el dominio visible coincida con el pedido y no se mezcle con otra vertical.
@@ -21689,10 +22285,35 @@ function buildFullstackLocalMaterializationPlan({
     modules,
     archetype: inferredArchetype,
   })
+  const fullstackContractPaths = buildFullstackLocalContractPaths({
+    rootFolder,
+    fullstackContractProfile,
+  })
+  const usesLogisticsFullstackContract =
+    fullstackContractProfile.archetype === 'logistics-tracking'
   const frontendFeaturePath = path.join(
     frontendFeaturesFolder,
     `${fullstackContractProfile.frontendFeatureBasename}.js`,
   )
+  const genericFrontendFolders = usesLogisticsFullstackContract
+    ? []
+    : [
+        frontendSrcFolder,
+        frontendRoutesFolder,
+        frontendFeaturesFolder,
+        frontendComponentsFolder,
+      ]
+  const genericFrontendFiles = usesLogisticsFullstackContract
+    ? []
+    : [
+        frontendIndexHtmlPath,
+        frontendMainJsPath,
+        frontendRoutesPath,
+        frontendFeaturePath,
+        frontendStylesPath,
+        frontendMockDataPath,
+        frontendAppComponentPath,
+      ]
   const backendPrimaryRoutePath = path.join(
     backendRoutesFolder,
     `${fullstackContractProfile.backendRouteBasename}.js`,
@@ -21706,10 +22327,7 @@ function buildFullstackLocalMaterializationPlan({
     frontendFolder,
     frontendAdminFolder,
     frontendPublicFolder,
-    frontendSrcFolder,
-    frontendRoutesFolder,
-    frontendFeaturesFolder,
-    frontendComponentsFolder,
+    ...genericFrontendFolders,
     backendFolder,
     backendSrcFolder,
     backendRoutesFolder,
@@ -21727,13 +22345,7 @@ function buildFullstackLocalMaterializationPlan({
     frontendPackageJsonPath,
     frontendAdminReadmePath,
     frontendPublicReadmePath,
-    frontendIndexHtmlPath,
-    frontendMainJsPath,
-    frontendRoutesPath,
-    frontendFeaturePath,
-    frontendStylesPath,
-    frontendMockDataPath,
-    frontendAppComponentPath,
+    ...genericFrontendFiles,
     backendPackageJsonPath,
     backendServerPath,
     backendHealthRoutePath,
@@ -21744,12 +22356,29 @@ function buildFullstackLocalMaterializationPlan({
     sharedContractsPath,
     databaseReadmePath,
     databaseSchemaPath,
+    ...(usesLogisticsFullstackContract ? [fullstackContractPaths.databaseSeedPath] : []),
     databaseSeedPath,
     scriptsReadmePath,
     scriptsSeedPath,
     docsArchitecturePath,
     docsApiPath,
     docsDataModelPath,
+    ...(usesLogisticsFullstackContract
+      ? [
+          fullstackContractPaths.frontendAdminIndexPath,
+          fullstackContractPaths.frontendAdminAppPath,
+          fullstackContractPaths.frontendAdminStylesPath,
+          fullstackContractPaths.frontendPublicIndexPath,
+          fullstackContractPaths.frontendPublicAppPath,
+          fullstackContractPaths.frontendPublicStylesPath,
+          fullstackContractPaths.backendTrackingRoutePath,
+          fullstackContractPaths.backendReportsRoutePath,
+          fullstackContractPaths.sharedStatusesPath,
+          fullstackContractPaths.docsArchitecturePath,
+          fullstackContractPaths.docsApiPath,
+          fullstackContractPaths.docsDbSchemaPath,
+        ]
+      : []),
     docsRunbookPath,
     projectManifestPath,
   ]
@@ -21763,7 +22392,7 @@ function buildFullstackLocalMaterializationPlan({
     normalizedText: normalizedDomainText,
     domainUnderstanding: normalizedDomainUnderstanding,
     modules,
-    nextRecommendedPhase: 'frontend-mock-flow',
+    nextRecommendedPhase: usesLogisticsFullstackContract ? 'review-and-expand' : 'frontend-mock-flow',
   })
   const fullstackLocalArchetype =
     fullstackLocalDemoData?.overview?.archetype || 'operations'
@@ -21792,44 +22421,78 @@ function buildFullstackLocalMaterializationPlan({
     successCriteria,
     enforceNarrowScope: true,
   })
-  const localProjectManifest = buildLocalProjectManifest({
+  const scaffoldFiles = [
+    rootReadmePath,
+    rootPackageJsonPath,
+    frontendPackageJsonPath,
+    frontendAdminReadmePath,
+    frontendPublicReadmePath,
+    ...genericFrontendFiles,
+    backendPackageJsonPath,
+    backendServerPath,
+    backendHealthRoutePath,
+    backendPrimaryRoutePath,
+    backendPrimaryModulePath,
+    backendResponseLibPath,
+    sharedDomainPath,
+    sharedContractsPath,
+    databaseReadmePath,
+    databaseSchemaPath,
+    ...(usesLogisticsFullstackContract ? [fullstackContractPaths.databaseSeedPath] : []),
+    databaseSeedPath,
+    scriptsReadmePath,
+    scriptsSeedPath,
+    docsArchitecturePath,
+    docsApiPath,
+    docsDataModelPath,
+    ...(usesLogisticsFullstackContract
+      ? [
+          fullstackContractPaths.frontendAdminIndexPath,
+          fullstackContractPaths.frontendAdminAppPath,
+          fullstackContractPaths.frontendAdminStylesPath,
+          fullstackContractPaths.frontendPublicIndexPath,
+          fullstackContractPaths.frontendPublicAppPath,
+          fullstackContractPaths.frontendPublicStylesPath,
+          fullstackContractPaths.backendTrackingRoutePath,
+          fullstackContractPaths.backendReportsRoutePath,
+          fullstackContractPaths.sharedStatusesPath,
+          fullstackContractPaths.docsArchitecturePath,
+          fullstackContractPaths.docsApiPath,
+          fullstackContractPaths.docsDbSchemaPath,
+        ]
+      : []),
+    docsRunbookPath,
+  ]
+  const reviewPhaseFiles = usesLogisticsFullstackContract
+    ? [
+        fullstackContractPaths.frontendAdminIndexPath,
+        fullstackContractPaths.frontendPublicIndexPath,
+        fullstackContractPaths.backendPrimaryRoutePath,
+        fullstackContractPaths.backendTrackingRoutePath,
+        fullstackContractPaths.databaseSchemaPath,
+        fullstackContractPaths.databaseSeedPath,
+        fullstackContractPaths.docsApiPath,
+        fullstackContractPaths.docsDbSchemaPath,
+        scriptsSeedPath,
+        projectManifestPath,
+      ]
+    : []
+  let localProjectManifest = buildLocalProjectManifest({
     rootFolder,
     domain: appTitle,
     deliveryLevel: 'fullstack-local',
     forbiddenPaths: ['node_modules', '.env', 'docker-compose.yml', 'Dockerfile', 'deploy'],
-    scaffoldFiles: [
-      rootReadmePath,
-      rootPackageJsonPath,
-      frontendPackageJsonPath,
-      frontendAdminReadmePath,
-      frontendPublicReadmePath,
-      frontendIndexHtmlPath,
-      frontendMainJsPath,
-      frontendRoutesPath,
-      frontendFeaturePath,
-      frontendStylesPath,
-      frontendMockDataPath,
-      frontendAppComponentPath,
-      backendPackageJsonPath,
-      backendServerPath,
-      backendHealthRoutePath,
-      backendPrimaryRoutePath,
-      backendPrimaryModulePath,
-      backendResponseLibPath,
-      sharedDomainPath,
-      sharedContractsPath,
-      databaseReadmePath,
-      databaseSchemaPath,
-      databaseSeedPath,
-      scriptsReadmePath,
-      scriptsSeedPath,
-      docsArchitecturePath,
-      docsApiPath,
-      docsDataModelPath,
-      docsRunbookPath,
-    ],
-    nextRecommendedPhase: 'frontend-mock-flow',
+    scaffoldFiles,
+    nextRecommendedPhase: usesLogisticsFullstackContract ? 'review-and-expand' : 'frontend-mock-flow',
   })
+  if (usesLogisticsFullstackContract) {
+    localProjectManifest = buildLogisticsFullstackMaterializedManifest({
+      manifest: localProjectManifest,
+      rootFolder,
+      scaffoldFiles,
+      reviewFiles: reviewPhaseFiles,
+    })
+  }
   const localProjectManifestContent = `${JSON.stringify(localProjectManifest, null, 2)}\n`
   const rootPackageJsonContent = `${JSON.stringify(
     {
@@ -21906,6 +22569,103 @@ Esta carpeta describe la consulta publica local por codigo para ${appTitle}.
 - Mostrar tracking o estado publico mock sin exponer servicios reales.
 - No publicar, no desplegar y no conectar APIs externas.
 - Mantener la experiencia en modo local y revisable.
+`
+  const logisticsAdminIndexHtmlContent = `<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${appTitle} | Panel admin local</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-surface="admin">
+    <main id="app"></main>
+    <script src="./app.js"></script>
+  </body>
+</html>
+`
+  const logisticsPublicIndexHtmlContent = `<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${appTitle} | Tracking local</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-surface="public">
+    <main id="app"></main>
+    <script src="./app.js"></script>
+  </body>
+</html>
+`
+  const logisticsAdminAppJsContent = `const adminPlan = ${JSON.stringify(
+    {
+      title: `${appTitle} · Panel administrativo local`,
+      subtitle:
+        'Vista local y revisable de envíos, estados, incidencias y reportes básicos, sin backend real.',
+      metrics: fullstackLocalDemoData?.metrics || [],
+      alerts: fullstackLocalDemoData?.alerts || [],
+      events: fullstackLocalDemoData?.trackingEvents || [],
+      entities: fullstackLocalDemoData?.domainEntities || [],
+    },
+    null,
+    2,
+  )}
+
+const root = document.getElementById('app')
+if (root) {
+  root.innerHTML = [
+    '<section class="hero"><span class="eyebrow">Admin local</span><h1>' + adminPlan.title + '</h1><p>' + adminPlan.subtitle + '</p></section>',
+    '<section class="grid">' +
+      adminPlan.metrics.map((entry) => '<article class="card"><strong>' + entry.label + '</strong><span>' + entry.value + '</span><p>' + entry.detail + '</p></article>').join('') +
+    '</section>',
+    '<section class="columns"><article class="card"><h2>Entidades</h2><ul>' +
+      adminPlan.entities.map((entry) => '<li>' + entry + '</li>').join('') +
+    '</ul></article><article class="card"><h2>Eventos de tracking</h2><ul>' +
+      adminPlan.events.map((entry) => '<li><strong>' + (entry.patient || entry.shipment || entry.label || entry.id || 'Evento') + '</strong> <span>' + (entry.status || entry.eventStatus || '') + '</span></li>').join('') +
+    '</ul></article></section>',
+    '<section class="card"><h2>Alertas</h2><ul>' +
+      adminPlan.alerts.map((entry) => '<li><strong>' + entry.title + '</strong><p>' + entry.detail + '</p></li>').join('') +
+    '</ul></section>',
+  ].join('')
+}
+`
+  const logisticsPublicAppJsContent = `const publicTrackingPlan = ${JSON.stringify(
+    {
+      title: `${appTitle} · Consulta pública por código`,
+      subtitle:
+        'Simulación local para revisar trackingCode, historial de estados e incidencias sin servicios externos.',
+      constraints: fullstackLocalDemoData?.constraints || [],
+      events: fullstackLocalDemoData?.trackingEvents || [],
+    },
+    null,
+    2,
+  )}
+
+const root = document.getElementById('app')
+if (root) {
+  root.innerHTML = [
+    '<section class="hero"><span class="eyebrow">Tracking público local</span><h1>' + publicTrackingPlan.title + '</h1><p>' + publicTrackingPlan.subtitle + '</p></section>',
+    '<section class="card search-card"><label for="tracking-code">Código de seguimiento</label><input id="tracking-code" value="TRK-001" readonly /><p>Mock local, sin API real ni base activa.</p></section>',
+    '<section class="card"><h2>Timeline local</h2><ul>' +
+      publicTrackingPlan.events.map((entry) => '<li><strong>' + (entry.patient || entry.shipment || entry.label || entry.id || 'Evento') + '</strong><span>' + (entry.status || entry.eventStatus || '') + '</span></li>').join('') +
+    '</ul></section>',
+    '<section class="card"><h2>Restricciones</h2><ul>' +
+      publicTrackingPlan.constraints.map((entry) => '<li>' + entry + '</li>').join('') +
+    '</ul></section>',
+  ].join('')
+}
+`
+  const logisticsSurfaceStylesContent = `.hero { padding: 24px; border-radius: 18px; background: linear-gradient(135deg, #0f2438, #1c4f6d); color: #f5fbff; margin-bottom: 20px; }
+.eyebrow { display: inline-block; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.8; margin-bottom: 8px; }
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 20px; }
+.columns { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-bottom: 20px; }
+.card { background: #ffffff; border: 1px solid #d9e5ef; border-radius: 16px; padding: 18px; box-shadow: 0 14px 30px rgba(15, 36, 56, 0.08); }
+.card h2 { margin-top: 0; }
+.card ul { margin: 0; padding-left: 18px; }
+.card li { margin-bottom: 8px; }
+.search-card input { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid #aac3d6; background: #f7fbfe; font: inherit; }
+body { margin: 0; padding: 24px; background: #eef5f9; color: #163247; font-family: 'Segoe UI', sans-serif; }
 `
   const frontendStylesContent = buildFullstackLocalInteractiveFrontendStyles()
   const frontendMockDataContent = buildBrowserWindowDataScript(
@@ -21987,9 +22747,24 @@ module.exports = {
     buildFullstackLocalSharedDomainContent(fullstackLocalDemoData)
   const sharedContractsContent =
     buildFullstackLocalSharedContractsContent(fullstackLocalDemoData)
+  const sharedStatusesContent = usesLogisticsFullstackContract
+    ? `const SHIPMENT_STATUSES = ['pendiente', 'en preparación', 'en tránsito', 'entregado', 'incidencia']
+const INCIDENT_STATUSES = ['pendiente', 'en revisión', 'resuelto']
+const TRACKING_EVENT_TYPES = ['alta', 'salida de depósito', 'en tránsito', 'incidencia', 'entrega']
+
+module.exports = {
+  SHIPMENT_STATUSES,
+  INCIDENT_STATUSES,
+  TRACKING_EVENT_TYPES,
+}
+`
+    : ''
   const databaseReadmeContent = databaseArtifacts.readmeContent
   const databaseSchemaContent = databaseArtifacts.schemaContent
   const databaseSeedContent = databaseArtifacts.seedContent
+  const databaseCanonicalSeedContent = usesLogisticsFullstackContract
+    ? databaseArtifacts.seedContent
+    : ''
   const scriptsReadmeContent = `# Scripts locales
 
 Estos scripts quedan como referencia y no se ejecutaron automáticamente.
@@ -22010,6 +22785,9 @@ module.exports = {
 }
 `
   const docsArchitectureContent = documentationBundle.architectureContent
+  const docsCanonicalArchitectureContent = usesLogisticsFullstackContract
+    ? documentationBundle.architectureContent
+    : ''
   const docsApiContent = `# API local prevista
 
 ## Alcance
@@ -22030,6 +22808,7 @@ ${fullstackContractProfile.publicRoutePath ? `- \`GET ${fullstackContractProfile
 - Sin auth real, sin sesiones persistentes, sin integraciones externas.
 - Sin deploy, sin Docker, sin credenciales y sin servicios activos.
 `
+  const docsCanonicalApiContent = usesLogisticsFullstackContract ? docsApiContent : ''
   const docsDataModelContent = `# Modelo de datos local
 
 ## Entidades principales
@@ -22050,6 +22829,28 @@ ${buildFullstackLocalEntityRelationships(fullstackLocalDemoData)
 - Sin migraciones ejecutadas ni conexiones reales.
 - Los seeds permanecen en \`database/seeds/seed-local.sql\` y no se ejecutan automaticamente.
 `
+  const docsCanonicalDbSchemaContent = usesLogisticsFullstackContract
+    ? `# Contrato SQL local
+
+## Archivos obligatorios
+
+- \`database/schema.sql\`
+- \`database/seed.sql\`
+- \`database/seeds/seed-local.sql\` como compatibilidad local adicional
+
+## Entidades esperadas
+
+${summarizeUniqueExecutorStrings(fullstackLocalDemoData?.domainEntities, 16)
+  .map((entry) => `- ${entry}`)
+  .join('\n')}
+
+## Notas
+
+- SQLite o base local solamente como referencia revisable.
+- No se ejecutan migraciones, seeds ni servicios.
+- JSON puede existir como fixture auxiliar de frontend, pero no reemplaza el contrato SQL local.
+`
+    : ''
   const docsRunbookContent = documentationBundle.runbookContent
   const databaseSchemaValidationMarker =
     fullstackContractProfile.validationSchemaMarker ||
@@ -22122,10 +22923,7 @@ ${buildFullstackLocalEntityRelationships(fullstackLocalDemoData)
         { type: 'create-folder', targetPath: frontendFolder },
         { type: 'create-folder', targetPath: frontendAdminFolder },
         { type: 'create-folder', targetPath: frontendPublicFolder },
-        { type: 'create-folder', targetPath: frontendSrcFolder },
-        { type: 'create-folder', targetPath: frontendRoutesFolder },
-        { type: 'create-folder', targetPath: frontendFeaturesFolder },
-        { type: 'create-folder', targetPath: frontendComponentsFolder },
+        ...genericFrontendFolders.map((targetPath) => ({ type: 'create-folder', targetPath })),
         { type: 'create-folder', targetPath: backendFolder },
         { type: 'create-folder', targetPath: backendSrcFolder },
         { type: 'create-folder', targetPath: backendRoutesFolder },
@@ -22143,13 +22941,17 @@ ${buildFullstackLocalEntityRelationships(fullstackLocalDemoData)
         { type: 'replace-file', targetPath: frontendPackageJsonPath, nextContent: frontendPackageJsonContent },
         { type: 'replace-file', targetPath: frontendAdminReadmePath, nextContent: frontendAdminReadmeContent },
         { type: 'replace-file', targetPath: frontendPublicReadmePath, nextContent: frontendPublicReadmeContent },
-        { type: 'replace-file', targetPath: frontendIndexHtmlPath, nextContent: frontendIndexHtmlContent },
-        { type: 'replace-file', targetPath: frontendMainJsPath, nextContent: frontendMainJsContent },
-        { type: 'replace-file', targetPath: frontendRoutesPath, nextContent: frontendRoutesContent },
-        { type: 'replace-file', targetPath: frontendFeaturePath, nextContent: frontendFeatureContent },
-        { type: 'replace-file', targetPath: frontendStylesPath, nextContent: frontendStylesContent },
-        { type: 'replace-file', targetPath: frontendMockDataPath, nextContent: frontendMockDataContent },
-        { type: 'replace-file', targetPath: frontendAppComponentPath, nextContent: frontendAppComponentContent },
+        ...(usesLogisticsFullstackContract
+          ? []
+          : [
+              { type: 'replace-file', targetPath: frontendIndexHtmlPath, nextContent: frontendIndexHtmlContent },
+              { type: 'replace-file', targetPath: frontendMainJsPath, nextContent: frontendMainJsContent },
+              { type: 'replace-file', targetPath: frontendRoutesPath, nextContent: frontendRoutesContent },
+              { type: 'replace-file', targetPath: frontendFeaturePath, nextContent: frontendFeatureContent },
+              { type: 'replace-file', targetPath: frontendStylesPath, nextContent: frontendStylesContent },
+              { type: 'replace-file', targetPath: frontendMockDataPath, nextContent: frontendMockDataContent },
+              { type: 'replace-file', targetPath: frontendAppComponentPath, nextContent: frontendAppComponentContent },
+            ]),
         { type: 'replace-file', targetPath: backendPackageJsonPath, nextContent: backendPackageJsonContent },
         { type: 'replace-file', targetPath: backendServerPath, nextContent: backendServerContent },
         { type: 'replace-file', targetPath: backendHealthRoutePath, nextContent: backendHealthRouteContent },
@@ -22160,12 +22962,111 @@ ${buildFullstackLocalEntityRelationships(fullstackLocalDemoData)
         { type: 'replace-file', targetPath: sharedContractsPath, nextContent: sharedContractsContent },
         { type: 'replace-file', targetPath: databaseReadmePath, nextContent: databaseReadmeContent },
         { type: 'replace-file', targetPath: databaseSchemaPath, nextContent: databaseSchemaContent },
+        ...(usesLogisticsFullstackContract
+          ? [
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.frontendAdminIndexPath,
+                nextContent: logisticsAdminIndexHtmlContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.frontendAdminAppPath,
+                nextContent: logisticsAdminAppJsContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.frontendAdminStylesPath,
+                nextContent: logisticsSurfaceStylesContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.frontendPublicIndexPath,
+                nextContent: logisticsPublicIndexHtmlContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.frontendPublicAppPath,
+                nextContent: logisticsPublicAppJsContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.frontendPublicStylesPath,
+                nextContent: logisticsSurfaceStylesContent,
+              },
+            ]
+          : []),
         { type: 'replace-file', targetPath: databaseSeedPath, nextContent: databaseSeedContent },
+        ...(usesLogisticsFullstackContract
+          ? [
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.databaseSeedPath,
+                nextContent: databaseCanonicalSeedContent,
+              },
+            ]
+          : []),
         { type: 'replace-file', targetPath: scriptsReadmePath, nextContent: scriptsReadmeContent },
         { type: 'replace-file', targetPath: scriptsSeedPath, nextContent: scriptsSeedContent },
         { type: 'replace-file', targetPath: docsArchitecturePath, nextContent: docsArchitectureContent },
         { type: 'replace-file', targetPath: docsApiPath, nextContent: docsApiContent },
         { type: 'replace-file', targetPath: docsDataModelPath, nextContent: docsDataModelContent },
+        ...(usesLogisticsFullstackContract
+          ? [
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.sharedStatusesPath,
+                nextContent: sharedStatusesContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.backendTrackingRoutePath,
+                nextContent: `const routeContract = {
+  method: 'GET',
+  path: ${JSON.stringify(fullstackContractProfile.publicRoutePath || '/tracking/:code')},
+  purpose: ${JSON.stringify(fullstackContractProfile.publicRoutePurpose || 'Consultar tracking publico mock por codigo sin servicios reales.')},
+  localOnly: true,
+  activeRuntime: false,
+}
+
+module.exports = {
+  routeContract,
+}
+`,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.backendReportsRoutePath,
+                nextContent: `const routeContract = {
+  method: 'GET',
+  path: '/reports',
+  purpose: 'Resumen local de envíos, incidencias y métricas básicas sin exportación real.',
+  localOnly: true,
+  activeRuntime: false,
+}
+
+module.exports = {
+  routeContract,
+}
+`,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.docsArchitecturePath,
+                nextContent: docsCanonicalArchitectureContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.docsApiPath,
+                nextContent: docsCanonicalApiContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.docsDbSchemaPath,
+                nextContent: docsCanonicalDbSchemaContent,
+              },
+            ]
+          : []),
         { type: 'replace-file', targetPath: docsRunbookPath, nextContent: docsRunbookContent },
         { type: 'replace-file', targetPath: projectManifestPath, nextContent: localProjectManifestContent },
       ],
@@ -22176,18 +23077,23 @@ ${buildFullstackLocalEntityRelationships(fullstackLocalDemoData)
         { type: 'exists', targetPath: frontendFolder, expectedKind: 'folder' },
         { type: 'exists', targetPath: frontendAdminFolder, expectedKind: 'folder' },
         { type: 'exists', targetPath: frontendPublicFolder, expectedKind: 'folder' },
-        { type: 'exists', targetPath: frontendRoutesFolder, expectedKind: 'folder' },
-        { type: 'exists', targetPath: frontendFeaturesFolder, expectedKind: 'folder' },
+        ...genericFrontendFolders
+          .filter((targetPath) => targetPath !== frontendSrcFolder)
+          .map((targetPath) => ({ type: 'exists', targetPath, expectedKind: 'folder' })),
         { type: 'exists', targetPath: frontendPackageJsonPath, expectedKind: 'file' },
         { type: 'exists', targetPath: frontendAdminReadmePath, expectedKind: 'file' },
         { type: 'exists', targetPath: frontendPublicReadmePath, expectedKind: 'file' },
-        { type: 'exists', targetPath: frontendIndexHtmlPath, expectedKind: 'file' },
-        { type: 'exists', targetPath: frontendMainJsPath, expectedKind: 'file' },
-        { type: 'exists', targetPath: frontendRoutesPath, expectedKind: 'file' },
-        { type: 'exists', targetPath: frontendFeaturePath, expectedKind: 'file' },
-        { type: 'exists', targetPath: frontendStylesPath, expectedKind: 'file' },
-        { type: 'exists', targetPath: frontendMockDataPath, expectedKind: 'file' },
-        { type: 'exists', targetPath: frontendAppComponentPath, expectedKind: 'file' },
+        ...(usesLogisticsFullstackContract
+          ? []
+          : [
+              { type: 'exists', targetPath: frontendIndexHtmlPath, expectedKind: 'file' },
+              { type: 'exists', targetPath: frontendMainJsPath, expectedKind: 'file' },
+              { type: 'exists', targetPath: frontendRoutesPath, expectedKind: 'file' },
+              { type: 'exists', targetPath: frontendFeaturePath, expectedKind: 'file' },
+              { type: 'exists', targetPath: frontendStylesPath, expectedKind: 'file' },
+              { type: 'exists', targetPath: frontendMockDataPath, expectedKind: 'file' },
+              { type: 'exists', targetPath: frontendAppComponentPath, expectedKind: 'file' },
+            ]),
         { type: 'exists', targetPath: backendFolder, expectedKind: 'folder' },
         { type: 'exists', targetPath: backendPackageJsonPath, expectedKind: 'file' },
         { type: 'exists', targetPath: backendServerPath, expectedKind: 'file' },
@@ -22200,6 +23106,55 @@ ${buildFullstackLocalEntityRelationships(fullstackLocalDemoData)
         { type: 'exists', targetPath: databaseReadmePath, expectedKind: 'file' },
         { type: 'exists', targetPath: databaseSchemaPath, expectedKind: 'file' },
         { type: 'exists', targetPath: databaseSeedPath, expectedKind: 'file' },
+        ...(usesLogisticsFullstackContract
+          ? [
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.databaseSeedPath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.frontendAdminIndexPath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.frontendAdminAppPath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.frontendPublicIndexPath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.frontendPublicAppPath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.backendTrackingRoutePath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.sharedStatusesPath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.docsApiPath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.docsDbSchemaPath,
+                expectedKind: 'file',
+              },
+            ]
+          : []),
         { type: 'exists', targetPath: scriptsReadmePath, expectedKind: 'file' },
         { type: 'exists', targetPath: scriptsSeedPath, expectedKind: 'file' },
         { type: 'exists', targetPath: docsArchitecturePath, expectedKind: 'file' },
@@ -22207,19 +23162,23 @@ ${buildFullstackLocalEntityRelationships(fullstackLocalDemoData)
         { type: 'exists', targetPath: docsDataModelPath, expectedKind: 'file' },
         { type: 'exists', targetPath: docsRunbookPath, expectedKind: 'file' },
         { type: 'exists', targetPath: projectManifestPath, expectedKind: 'file' },
-        { type: 'file-contains', targetPath: frontendIndexHtmlPath, expectedText: './src/mock-data.js' },
-        { type: 'file-contains', targetPath: frontendIndexHtmlPath, expectedText: './src/components/App.js' },
-        { type: 'file-contains', targetPath: frontendIndexHtmlPath, expectedText: './src/main.js' },
-        { type: 'file-contains', targetPath: frontendMainJsPath, expectedText: 'window.fullstackPlan' },
-        { type: 'file-contains', targetPath: frontendMainJsPath, expectedText: 'window.renderApp' },
-        { type: 'file-contains', targetPath: frontendMainJsPath, expectedText: 'appointmentStatusOverrides' },
-        { type: 'file-contains', targetPath: frontendRoutesPath, expectedText: 'routeManifest' },
-        { type: 'file-contains', targetPath: frontendFeaturePath, expectedText: 'featureContract' },
-        { type: 'file-contains', targetPath: frontendMockDataPath, expectedText: 'window.fullstackPlan' },
-        { type: 'file-contains', targetPath: frontendMockDataPath, expectedText: 'nextRecommendedPhase' },
-        { type: 'file-contains', targetPath: frontendAppComponentPath, expectedText: 'window.renderApp = renderApp' },
-        { type: 'file-contains', targetPath: frontendAppComponentPath, expectedText: 'data-view-id' },
-        { type: 'file-contains', targetPath: frontendStylesPath, expectedText: '.nav-button' },
+        ...(usesLogisticsFullstackContract
+          ? []
+          : [
+              { type: 'file-contains', targetPath: frontendIndexHtmlPath, expectedText: './src/mock-data.js' },
+              { type: 'file-contains', targetPath: frontendIndexHtmlPath, expectedText: './src/components/App.js' },
+              { type: 'file-contains', targetPath: frontendIndexHtmlPath, expectedText: './src/main.js' },
+              { type: 'file-contains', targetPath: frontendMainJsPath, expectedText: 'window.fullstackPlan' },
+              { type: 'file-contains', targetPath: frontendMainJsPath, expectedText: 'window.renderApp' },
+              { type: 'file-contains', targetPath: frontendMainJsPath, expectedText: 'appointmentStatusOverrides' },
+              { type: 'file-contains', targetPath: frontendRoutesPath, expectedText: 'routeManifest' },
+              { type: 'file-contains', targetPath: frontendFeaturePath, expectedText: 'featureContract' },
+              { type: 'file-contains', targetPath: frontendMockDataPath, expectedText: 'window.fullstackPlan' },
+              { type: 'file-contains', targetPath: frontendMockDataPath, expectedText: 'nextRecommendedPhase' },
+              { type: 'file-contains', targetPath: frontendAppComponentPath, expectedText: 'window.renderApp = renderApp' },
+              { type: 'file-contains', targetPath: frontendAppComponentPath, expectedText: 'data-view-id' },
+              { type: 'file-contains', targetPath: frontendStylesPath, expectedText: '.nav-button' },
+            ]),
         { type: 'file-contains', targetPath: backendServerPath, expectedText: 'fullstack-local' },
         { type: 'file-contains', targetPath: backendPrimaryRoutePath, expectedText: 'routeContract' },
         { type: 'file-contains', targetPath: backendPrimaryModulePath, expectedText: 'listMockClients' },
@@ -22227,7 +23186,46 @@ ${buildFullstackLocalEntityRelationships(fullstackLocalDemoData)
         { type: 'file-contains', targetPath: docsApiPath, expectedText: fullstackContractProfile.primaryRoutePath },
         { type: 'file-contains', targetPath: docsDataModelPath, expectedText: 'Entidades principales' },
         { type: 'file-contains', targetPath: docsRunbookPath, expectedText: 'Como abrir la entrega local' },
-        { type: 'file-contains', targetPath: projectManifestPath, expectedText: '"nextRecommendedPhase": "frontend-mock-flow"' },
+        ...(usesLogisticsFullstackContract
+          ? [
+              {
+                type: 'file-contains',
+                targetPath: fullstackContractPaths.databaseSeedPath,
+                expectedText: 'insert into shipments',
+              },
+              {
+                type: 'file-contains',
+                targetPath: fullstackContractPaths.docsDbSchemaPath,
+                expectedText: 'database/seed.sql',
+              },
+              {
+                type: 'file-contains',
+                targetPath: fullstackContractPaths.frontendAdminIndexPath,
+                expectedText: './app.js',
+              },
+              {
+                type: 'file-contains',
+                targetPath: fullstackContractPaths.frontendPublicIndexPath,
+                expectedText: './app.js',
+              },
+              {
+                type: 'file-contains',
+                targetPath: fullstackContractPaths.backendTrackingRoutePath,
+                expectedText: '/tracking/:code',
+              },
+              {
+                type: 'file-contains',
+                targetPath: projectManifestPath,
+                expectedText: '"nextRecommendedPhase": "review-and-expand"',
+              },
+            ]
+          : [
+              {
+                type: 'file-contains',
+                targetPath: projectManifestPath,
+                expectedText: '"nextRecommendedPhase": "frontend-mock-flow"',
+              },
+            ]),
       ],
     },
     localProjectManifest,
@@ -29437,6 +30435,70 @@ El proyecto sigue en modo local y revisable. Se materializó la fase \`review-an
     documentationBundle: demoArtifacts.documentationBundle,
     nextRecommendedPhase,
     nextRecommendedActionId: nextRecommendedAction?.id || '',
+  }
+}
+
+function buildLogisticsFullstackMaterializedManifest({
+  manifest,
+  rootFolder,
+  scaffoldFiles,
+  reviewFiles,
+}) {
+  const normalizedManifest =
+    normalizeLocalProjectManifestContract(manifest) || manifest
+
+  if (!normalizedManifest || !rootFolder) {
+    return manifest
+  }
+
+  return {
+    ...normalizedManifest,
+    phases: [
+      buildFullstackLocalManifestPhaseEntry({
+        rootFolder,
+        phaseId: 'fullstack-local-scaffold',
+        status: 'done',
+        createdAt: 'local-deterministic-plan',
+        updatedAt: 'local-deterministic-plan',
+        files: summarizeUniqueExecutorStrings(scaffoldFiles, 48),
+      }),
+      buildFullstackLocalManifestPhaseEntry({
+        rootFolder,
+        phaseId: 'review-and-expand',
+        status: 'available',
+        createdAt: 'pending-phase-expansion',
+        files: summarizeUniqueExecutorStrings(reviewFiles, 24),
+      }),
+    ].filter(Boolean),
+    modules: summarizeUniqueExecutorStrings(
+      [
+        ...(Array.isArray(normalizedManifest.modules) ? normalizedManifest.modules : []),
+        'frontend administrativo',
+        'consulta publica por codigo',
+        'envios',
+        'tracking',
+        'incidencias',
+        'reportes',
+      ],
+      16,
+    ),
+    nextRecommendedPhase: 'review-and-expand',
+    nextRecommendedAction: 'review-and-expand',
+    availableActions: ['review-and-expand'],
+    lastCompletedPhase: 'fullstack-local-scaffold',
+    readinessLevel: 'scaffold-materialized',
+    lastValidationSummary:
+      'Base fullstack logística materializada con contrato SQL local. La siguiente fase segura es review-and-expand.',
+    recommendedDemoScript: [
+      'Revisar `docs/API.md` y `docs/DB_SCHEMA.md` antes de tocar runtime real.',
+      'Abrir `frontend/admin/index.html` y `frontend/public/index.html` por `file://` para validar la primera entrega local.',
+      'Confirmar que `database/schema.sql` y `database/seed.sql` sigan siendo el contrato SQL principal.',
+      'Mantener el proyecto sin node_modules, .env, Docker, deploy ni integraciones externas.',
+    ],
+    warnings: [
+      'Esto sigue siendo local y revisable, no producción.',
+      'La siguiente fase segura es review-and-expand sobre el contrato logístico ya materializado.',
+    ],
   }
 }
 
@@ -42111,9 +43173,30 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
         'request-approval' ||
       normalizeOptionalString(rawNextActionPlan?.targetStrategy).toLocaleLowerCase() ===
         'web-scaffold-base')
+  const rawMaterializationContractInspection =
+    normalizeOptionalString(rawDecision?.strategy).toLocaleLowerCase() ===
+      'materialize-fullstack-local-plan' &&
+    rawDecision?.materializationPlan &&
+    typeof rawDecision.materializationPlan === 'object'
+      ? inspectFullstackLocalMaterializationContract({
+          goal: input?.goal,
+          context: input?.context,
+          strategy: rawDecision?.strategy,
+          executionScope: rawDecision?.executionScope,
+          materializationPlan: rawDecision?.materializationPlan,
+          localProjectManifest: rawDecision?.localProjectManifest,
+          existingProjectDetection: rawDecision?.existingProjectDetection,
+        })
+      : null
+  const shouldUseFallbackInvalidMaterializationContract =
+    originalFullstackLocalIntent &&
+    rawMaterializationContractInspection &&
+    rawMaterializationContractInspection.valid !== true
   const shouldUseFallbackStructuredFullstackDecision =
-    shouldForceFallbackFullstackLocalContracts &&
+    (shouldForceFallbackFullstackLocalContracts ||
+      shouldUseFallbackInvalidMaterializationContract) &&
     (shouldDropStaleApprovalArtifacts ||
+      shouldUseFallbackInvalidMaterializationContract ||
       shouldUseFallbackInstruction ||
       shouldUseFallbackNextActionPlan)
   const normalizedDecision = buildBrainDecisionContract({
@@ -42198,7 +43281,9 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
         : fallbackDecision.nextExpectedAction,
     creativeDirection: mergedCreativeDirection,
     executionScope:
-      normalizeExecutorExecutionScope(rawDecision?.executionScope) ||
+      shouldUseFallbackStructuredFullstackDecision
+        ? normalizeExecutorExecutionScope(fallbackDecision.executionScope)
+        : normalizeExecutorExecutionScope(rawDecision?.executionScope) ||
       normalizeExecutorExecutionScope(fallbackDecision.executionScope),
     reusableArtifactLookup:
       !shouldPreserveFallbackReusableDecision &&

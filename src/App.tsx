@@ -8985,9 +8985,8 @@ const buildFullstackLocalMaterializationCoherenceIssue = ({
     'backend',
     'shared',
     'database/schema.sql',
-    'database/seeds/seed-local.sql',
+    'database/seed.sql',
     'docs/api.md',
-    'docs/data-model.md',
   ]
   const missingRequiredMarkers = requiredFullstackMarkers.filter(
     (entry) => !normalizedTargetSummary.includes(entry),
@@ -8995,6 +8994,48 @@ const buildFullstackLocalMaterializationCoherenceIssue = ({
 
   if (missingRequiredMarkers.length > 0) {
     return `El plan materializable fullstack no devolvio el contrato minimo esperado. Faltan: ${missingRequiredMarkers.join(
+      ', ',
+    )}.`
+  }
+
+  if (
+    !normalizedTargetSummary.includes('docs/db_schema.md') &&
+    !normalizedTargetSummary.includes('docs/data_model.md') &&
+    !normalizedTargetSummary.includes('docs/data-model.md')
+  ) {
+    return 'El plan materializable fullstack no devolvio documentacion suficiente del modelo de datos. Falta docs/DB_SCHEMA.md o docs/DATA_MODEL.md.'
+  }
+
+  const contaminationPool = normalizeText(
+    [
+      metadata.reason,
+      metadata.instruction,
+      metadata.activeProjectContext?.domain,
+      metadata.activeProjectContext?.note,
+      metadata.existingProjectDetection?.projectRoot,
+      metadata.existingProjectDetection?.domain,
+      metadata.localProjectManifest?.domain,
+      ...(metadata.localProjectManifest?.modules || []),
+      ...(metadata.materializationPlan?.operations || []).flatMap((entry) => [
+        normalizeOptionalString(entry?.targetPath),
+        typeof entry?.nextContent === 'string' ? entry.nextContent.slice(0, 600) : '',
+      ]),
+    ]
+      .filter(Boolean)
+      .join(' '),
+  )
+  const contaminationTokens = [
+    'veterinaria',
+    'appointments',
+    'turnos',
+    'pacientes',
+    'mascotas',
+    'reservas',
+    'fullstack-local-veterinaria',
+  ].filter((token) => contaminationPool.includes(normalizeText(token)))
+
+  if (contaminationTokens.length > 0) {
+    return `El plan materializable fullstack quedo contaminado con otro dominio. Tokens detectados: ${contaminationTokens.join(
       ', ',
     )}.`
   }
@@ -9143,8 +9184,12 @@ const buildFullstackLocalMaterializationPrompt = ({
       successCriteria.length > 0
         ? `successCriteria: ${successCriteria.join(' | ')}.`
         : '',
+      'Si el workspace detecta un proyecto existente pero applicable=false o projectIntent=new-project-intent, ignorarlo por completo dentro del contrato materializable.',
+      'No reutilizar manifest, roadmap, phaseExpansionPlan, modulos ni dominio de proyectos detectados fuera de alcance como fullstack-local-veterinaria.',
       'Materializar solo un scaffold local con README.md, package.json raiz, frontend/, frontend/admin/, frontend/public/, backend/, shared/, database/, scripts/ y docs/.',
-      'Incluir frontend administrativo, frontend publico revisable, docs/api.md y docs/data-model.md.',
+      'Incluir frontend administrativo, frontend publico revisable, docs/API.md y docs/DB_SCHEMA.md o docs/DATA_MODEL.md.',
+      'Exigir database/schema.sql y database/seed.sql como contrato SQL local obligatorio. database/shipments.json o cualquier JSON similar solo puede ser auxiliar y nunca la persistencia principal.',
+      'Para tracking logistico incluir backend/src/routes/shipments.js, backend/src/routes/tracking.js, frontend/admin/index.html, frontend/admin/app.js, frontend/public/index.html y frontend/public/app.js.',
       'Sin npm install, sin node_modules, sin backend real activo, sin base de datos real activa, sin Docker, sin deploy y sin integraciones externas.',
       `Usar la carpeta objetivo ${targetRoot} como raiz del scaffold.`,
     ]
