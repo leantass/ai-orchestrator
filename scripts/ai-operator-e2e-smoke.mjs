@@ -3051,6 +3051,91 @@ async function runTrackingLogisticsPostApprovalReviewStateCase() {
   }
 }
 
+async function runTrackingLogisticsPreparedPlanUpdatesUiCase() {
+  const failures = []
+  const appSource = fs.readFileSync(appFilePath, 'utf8')
+
+  pushFailure(
+    failures,
+    /const plannerHasPreparedFullstackLocalMaterialization =[\s\S]{0,500}?activeExecutionStrategy === 'materialize-fullstack-local-plan'[\s\S]{0,260}?executionMode\)\.toLocaleLowerCase\(\) ===[\r\n\s]*'executor'[\s\S]{0,260}?nextExpectedAction[\s\S]{0,260}?toLocaleLowerCase\(\) === 'execute-plan'/.test(
+      appSource,
+    ),
+    'La UI debe detectar materialize-fullstack-local-plan valido como estado preparado para materializar.',
+  )
+  pushFailure(
+    failures,
+    /const plannerHasPreparedExecutorMaterialization =[\s\S]{0,120}?plannerHasPreparedSafeMaterialization[\s\S]{0,120}?plannerHasPreparedFullstackLocalMaterialization/.test(
+      appSource,
+    ),
+    'La UI debe unificar el estado preparado para materializar entre safe-first y fullstack local.',
+  )
+  pushFailure(
+    failures,
+    /const shouldShowScalableDeliveryPlan =[\s\S]{0,120}?plannerIsScalableDeliveryReview[\s\S]{0,120}?!plannerHasPreparedFullstackLocalMaterialization/.test(
+      appSource,
+    ),
+    'La UI no debe seguir mostrando el scalableDeliveryPlan cuando ya hay una materialización fullstack local preparada.',
+  )
+  pushFailure(
+    failures,
+    /const planOverviewTitle = plannerHasPreparedExecutorMaterialization[\s\S]{0,120}\?\s*'Entrega lista para materializar'/.test(
+      appSource,
+    ),
+    'El overview del plan debe pasar a Entrega lista para materializar cuando el plan materializable ya quedó activo.',
+  )
+  pushFailure(
+    failures,
+    /const preparedFullstackLocalMaterializationReady =[\s\S]{0,800}?if \([\s\S]{0,120}?preparedSafeMaterializationReady[\s\S]{0,120}?\|\|[\s\S]{0,120}?preparedFullstackLocalMaterializationReady[\s\S]{0,600}?setSessionStatus\('Plan generado'\)/.test(
+      appSource,
+    ),
+    'handleGenerateNextStep debe aplicar un materialize-fullstack-local-plan valido como Plan generado.',
+  )
+  pushFailure(
+    failures,
+    /preparedFullstackLocalMaterializationReady[\s\S]{0,500}?Materializar entrega/.test(
+      appSource,
+    ),
+    'La rama materializable fullstack local debe dejar trazas explicitas de que el CTA pasa a Materializar entrega.',
+  )
+
+  return {
+    id: 'tracking-logistico-fullstack-prepared-plan-updates-ui',
+    label: 'Tracking logistico fullstack prepared plan updates UI',
+    failures,
+  }
+}
+
+async function runMaterializeFullstackLocalPlanResponseOverridesReviewStateCase() {
+  const failures = []
+  const appSource = fs.readFileSync(appFilePath, 'utf8')
+
+  pushFailure(
+    failures,
+    /const plannerIsScalableDeliveryReview =[\s\S]{0,500}?\(plannerIsReviewOnly && plannerHasDedicatedScalableDeliveryLevel\)/.test(
+      appSource,
+    ),
+    'plannerIsScalableDeliveryReview solo debe usar deliveryLevel como señal de review si la respuesta actual sigue siendo planner-only.',
+  )
+  pushFailure(
+    failures,
+    !/const plannerIsScalableDeliveryReview =[\s\S]{0,500}?\|\|\s*plannerHasDedicatedScalableDeliveryLevel/.test(
+      appSource,
+    ),
+    'Una respuesta materializable valida no debe quedar stale por plannerHasDedicatedScalableDeliveryLevel sin revisar executionMode actual.',
+  )
+  pushFailure(
+    failures,
+    /const canExecuteInstruction =[\s\S]{0,200}?!plannerIsReviewOnly/.test(appSource),
+    'El CTA Materializar entrega debe seguir dependiendo de salir del estado review-only.',
+  )
+
+  return {
+    id: 'materialize-fullstack-local-plan-response-overrides-review-state',
+    label: 'Materialize fullstack local plan response overrides review state',
+    failures,
+  }
+}
+
 async function requestTrackingLogisticsPreparedMaterializationDecision({
   workspacePath = smokeWorkspaceRoot,
 } = {}) {
@@ -4481,6 +4566,8 @@ async function main() {
     results.push(await runUiHelperSanityCase())
     results.push(await runTrackingLogisticsPostApprovalUiStateRealCase())
     results.push(await runTrackingLogisticsPostApprovalReviewStateCase())
+    results.push(await runTrackingLogisticsPreparedPlanUpdatesUiCase())
+    results.push(await runMaterializeFullstackLocalPlanResponseOverridesReviewStateCase())
     results.push(await runTrackingLogisticsOpenAIWebScaffoldGuardCase())
     results.push(await runTrackingLogisticsTimeoutFallbackNoWebScaffoldCase())
     results.push(await runTrackingLogisticsExecutorBlocksWebScaffoldCase())

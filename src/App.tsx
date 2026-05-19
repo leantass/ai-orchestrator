@@ -12647,7 +12647,7 @@ function App() {
     normalizeOptionalString(
       plannerExecutionMetadata.nextExpectedAction,
     ).toLocaleLowerCase() === 'review-scalable-delivery' ||
-    plannerHasDedicatedScalableDeliveryLevel
+    (plannerIsReviewOnly && plannerHasDedicatedScalableDeliveryLevel)
   const plannerReviewStatusLabel = plannerIsReviewOnly
     ? plannerIsProjectPhaseReview
       ? 'Fase segura en revision'
@@ -12887,6 +12887,7 @@ function App() {
   ).toLocaleLowerCase()
   const shouldShowScalableDeliveryPlan =
     plannerIsScalableDeliveryReview &&
+    !plannerHasPreparedFullstackLocalMaterialization &&
     activeScalableDeliveryLevel !== '' &&
     activeScalableDeliveryLevel !== 'safe-first-delivery'
   const shouldShowProjectBlueprint =
@@ -12984,6 +12985,19 @@ function App() {
       Boolean(effectivePlannerExecutionMetadata.materializationPlan) ||
       normalizeOptionalString(plannerExecutionMetadata.nextExpectedAction).toLocaleLowerCase() ===
         'execute-plan')
+  const plannerHasPreparedFullstackLocalMaterialization =
+    !plannerIsReviewOnly &&
+    activeExecutionStrategy === 'materialize-fullstack-local-plan' &&
+    normalizeOptionalString(plannerExecutionMetadata.executionMode).toLocaleLowerCase() ===
+      'executor' &&
+    normalizeOptionalString(
+      plannerExecutionMetadata.nextExpectedAction,
+    ).toLocaleLowerCase() === 'execute-plan' &&
+    (plannerScalableDeliveryLevel === 'fullstack-local' ||
+      Boolean(effectivePlannerExecutionMetadata.materializationPlan))
+  const plannerHasPreparedExecutorMaterialization =
+    plannerHasPreparedSafeMaterialization ||
+    plannerHasPreparedFullstackLocalMaterialization
   const activeLocalProjectRoot = (() => {
     if (normalizeOptionalString(activeProjectPhaseExecutionPlan?.projectRoot)) {
       return normalizeOptionalString(activeProjectPhaseExecutionPlan?.projectRoot)
@@ -14373,7 +14387,7 @@ function App() {
     context: currentExecutionContextSummary,
   })
   const planOverviewUsesOperatorSummary =
-    (plannerIsReviewOnly || plannerHasPreparedSafeMaterialization) &&
+    (plannerIsReviewOnly || plannerHasPreparedExecutorMaterialization) &&
     (planOverviewGoalContextHints.domainLabel !== '' ||
       planOverviewGoalContextHints.moduleItems.length > 0 ||
       planOverviewGoalContextHints.flowItems.length > 0 ||
@@ -14390,7 +14404,7 @@ function App() {
       : hasWizardPlan
         ? plannerInstruction
         : 'Todavia no generaste un plan en esta corrida.'
-  const planOverviewTitle = plannerHasPreparedSafeMaterialization
+  const planOverviewTitle = plannerHasPreparedExecutorMaterialization
     ? 'Entrega lista para materializar'
     : plannerIsReviewOnly
       ? plannerReviewStatusLabel
@@ -14401,11 +14415,13 @@ function App() {
     ? 'JEFE esta preparando una instruccion materializable. Espera la confirmacion antes de volver a tocar el CTA.'
     : plannerHasPreparedSafeMaterialization
       ? 'La preparacion termino bien. El siguiente paso es materializar la entrega local segura.'
+      : plannerHasPreparedFullstackLocalMaterialization
+        ? 'La preparacion termino bien. El siguiente paso es materializar la entrega fullstack local.'
       : plannerIsProductArchitectureReview
         ? 'Revisa la arquitectura inicial. Si esta correcta, prepara la primera entrega segura. El detalle tecnico queda abajo.'
-      : planOverviewUsesOperatorSummary
-        ? 'Revisa el resumen. Si esta correcto, prepara el siguiente paso seguro.'
-        : plannerReviewHelperText
+        : planOverviewUsesOperatorSummary
+          ? 'Revisa el resumen. Si esta correcto, prepara el siguiente paso seguro.'
+          : plannerReviewHelperText
   const runtimePlatformLabel =
     typeof navigator === 'undefined'
       ? 'Desktop'
@@ -18298,17 +18314,29 @@ function App() {
       setApprovalSource('')
       setPlannerInstruction(response.instruction)
       setCurrentStep(response.instruction)
+      const preparedMaterializationStrategy = normalizeOptionalString(
+        nextExecutionMetadata.strategy || nextExecutionMetadata.decisionKey,
+      ).toLocaleLowerCase()
       const preparedSafeMaterializationReady =
-        normalizeOptionalString(
-          nextExecutionMetadata.strategy || nextExecutionMetadata.decisionKey,
-        ).toLocaleLowerCase() === 'materialize-safe-first-delivery-plan' &&
+        preparedMaterializationStrategy === 'materialize-safe-first-delivery-plan' &&
         normalizeOptionalString(nextExecutionMetadata.executionMode).toLocaleLowerCase() ===
           'executor' &&
         normalizeOptionalString(
           nextExecutionMetadata.nextExpectedAction,
         ).toLocaleLowerCase() === 'execute-plan'
+      const preparedFullstackLocalMaterializationReady =
+        preparedMaterializationStrategy === 'materialize-fullstack-local-plan' &&
+        normalizeOptionalString(nextExecutionMetadata.executionMode).toLocaleLowerCase() ===
+          'executor' &&
+        normalizeOptionalString(
+          nextExecutionMetadata.nextExpectedAction,
+        ).toLocaleLowerCase() === 'execute-plan' &&
+        Boolean(nextExecutionMetadata.materializationPlan)
 
-      if (preparedSafeMaterializationReady) {
+      if (
+        preparedSafeMaterializationReady ||
+        preparedFullstackLocalMaterializationReady
+      ) {
         clearVisibleExecutionRuntimeState()
         setSessionStatus('Plan generado')
         setCurrentStep(
@@ -18326,13 +18354,17 @@ function App() {
         })
         setSessionEvents((currentEvents) => [
           ...currentEvents,
-          'El planificador devolvió una materialización segura lista para ejecutar',
+          preparedFullstackLocalMaterializationReady
+            ? 'El planificador devolvio una materializacion fullstack local lista para ejecutar'
+            : 'El planificador devolvió una materialización segura lista para ejecutar',
         ])
         addFlowMessage({
           source: 'orquestador',
           title: 'Decisión del orquestador',
           content:
-            'La materialización segura quedó lista para ejecutar y el CTA ya puede pasar a Materializar entrega.',
+            preparedFullstackLocalMaterializationReady
+              ? 'La materializacion fullstack local quedo lista para ejecutar y el CTA ya puede pasar a Materializar entrega.'
+              : 'La materialización segura quedó lista para ejecutar y el CTA ya puede pasar a Materializar entrega.',
           status: 'success',
         })
         return
