@@ -12647,14 +12647,58 @@ function App() {
   const plannerScalableTargetDeliveryLevel = normalizeOptionalString(
     plannerExecutionMetadata.nextActionPlan?.targetDeliveryLevel,
   ).toLocaleLowerCase()
+  const plannerScalableReviewHintSurface = [
+    plannerExecutionMetadata.nextActionPlan?.currentState,
+    plannerExecutionMetadata.nextActionPlan?.userFacingLabel,
+    plannerExecutionMetadata.nextActionPlan?.recommendedAction,
+    plannerExecutionMetadata.nextActionPlan?.reason,
+    plannerExecutionMetadata.nextActionPlan?.technicalLabel,
+    plannerExecutionMetadata.nextActionPlan?.targetStrategy,
+    plannerExecutionMetadata.nextActionPlan?.targetDeliveryLevel,
+  ]
+    .map((value) => normalizeOptionalString(value).toLocaleLowerCase())
+    .filter(Boolean)
+    .join(' ')
+  const plannerScalableStructureSurface = [
+    ...normalizeOptionalStringArray(
+      plannerExecutionMetadata.scalableDeliveryPlan?.targetStructure,
+    ),
+    ...normalizeOptionalStringArray(
+      plannerExecutionMetadata.scalableDeliveryPlan?.directories,
+    ),
+    ...normalizeOptionalStringArray(
+      plannerExecutionMetadata.scalableDeliveryPlan?.filesToCreate?.map((entry) =>
+        entry && typeof entry === 'object' ? entry.path : '',
+      ),
+    ),
+  ].map((value) => normalizeOptionalString(value).toLocaleLowerCase())
+  const plannerScalableLooksLikeFullstackLocal =
+    plannerScalableReviewHintSurface.includes('fullstack local') ||
+    plannerScalableReviewHintSurface.includes('fullstack-local') ||
+    plannerScalableReviewHintSurface.includes('materialize-fullstack-local-plan') ||
+    plannerScalableReviewHintSurface.includes('fullstack-local-planner-review') ||
+    (plannerScalableStructureSurface.some((value) => value.includes('backend')) &&
+      plannerScalableStructureSurface.some(
+        (value) =>
+          value.includes('database') ||
+          value.includes('schema.sql') ||
+          value.includes('seed.sql'),
+      ) &&
+      plannerScalableStructureSurface.some((value) => value.includes('frontend')))
+  const plannerScalableLooksLikeFrontendProject =
+    plannerScalableReviewHintSurface.includes('frontend project') ||
+    plannerScalableReviewHintSurface.includes('frontend-project') ||
+    plannerScalableReviewHintSurface.includes('materialize-frontend-project-plan')
   const plannerCanPrepareFullstackLocalFromScalableReview =
     plannerScalableDeliveryLevel === 'fullstack-local' ||
     (plannerScalableTargetStrategy === 'materialize-fullstack-local-plan' &&
-      plannerScalableTargetDeliveryLevel === 'fullstack-local')
+      plannerScalableTargetDeliveryLevel === 'fullstack-local') ||
+    plannerScalableLooksLikeFullstackLocal
   const plannerCanPrepareFrontendProjectFromScalableReview =
     plannerScalableDeliveryLevel === 'frontend-project' ||
     (plannerScalableTargetStrategy === 'materialize-frontend-project-plan' &&
-      plannerScalableTargetDeliveryLevel === 'frontend-project')
+      plannerScalableTargetDeliveryLevel === 'frontend-project') ||
+    plannerScalableLooksLikeFrontendProject
   const plannerScalableReviewPreparationKind =
     plannerCanPrepareFullstackLocalFromScalableReview
       ? 'fullstack-local'
@@ -18919,10 +18963,7 @@ function App() {
       return
     }
 
-    if (
-      normalizeOptionalString(activeScalableDeliveryPlan.deliveryLevel).toLocaleLowerCase() !==
-      'fullstack-local'
-    ) {
+    if (plannerScalableReviewPreparationKind !== 'fullstack-local') {
       setSessionStatus('Plan escalable todavía no materializable')
       setCurrentStep(
         'La materialización fullstack local solo está disponible para deliveryLevel fullstack-local',

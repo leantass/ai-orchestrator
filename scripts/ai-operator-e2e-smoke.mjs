@@ -3185,6 +3185,19 @@ async function runTrackingLogisticsScalableReviewShowsPrepareCtaCase() {
   )
   pushFailure(
     failures,
+    /const plannerScalableReviewHintSurface =[\s\S]{0,300}?currentState[\s\S]{0,220}?userFacingLabel[\s\S]{0,220}?recommendedAction[\s\S]{0,220}?targetStrategy[\s\S]{0,220}?targetDeliveryLevel/.test(
+      appSource,
+    ) &&
+      /const plannerScalableStructureSurface =[\s\S]{0,280}?targetStructure[\s\S]{0,220}?directories[\s\S]{0,280}?filesToCreate/.test(
+        appSource,
+      ) &&
+      /const plannerScalableLooksLikeFullstackLocal =[\s\S]{0,500}?plannerScalableReviewHintSurface\.includes\('materialize-fullstack-local-plan'\)[\s\S]{0,700}?value\.includes\('backend'\)[\s\S]{0,500}?value\.includes\('database'\)[\s\S]{0,300}?value\.includes\('schema\.sql'\)[\s\S]{0,300}?value\.includes\('seed\.sql'\)[\s\S]{0,400}?value\.includes\('frontend'\)/.test(
+        appSource,
+      ),
+    'El renderer debe inferir el CTA fullstack local también desde el payload real de OpenAI: hints del nextActionPlan y estructura backend/database/frontend del scalableDeliveryPlan.',
+  )
+  pushFailure(
+    failures,
     /const plannerScalableReviewPreparationKind =[\s\S]{0,240}\? 'fullstack-local'[\s\S]{0,180}\? 'frontend-project'/.test(
       appSource,
     ),
@@ -3203,6 +3216,13 @@ async function runTrackingLogisticsScalableReviewShowsPrepareCtaCase() {
       appSource,
     ),
     'La card del scalableDeliveryPlan debe recibir el kind de preparación derivado para no perder el CTA por un deliveryLevel faltante en el plan.',
+  )
+  pushFailure(
+    failures,
+    /const handlePrepareFullstackLocalMaterializationPlan = async \(\) => \{[\s\S]{0,800}?if \(plannerScalableReviewPreparationKind !== 'fullstack-local'\)/.test(
+      appSource,
+    ),
+    'El handler real del CTA debe usar la misma inferencia de preparación que el renderer, para no mostrar el botón y bloquearlo al hacer click en el caso real.',
   )
 
   return {
