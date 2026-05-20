@@ -4981,15 +4981,20 @@ function ScalableDeliveryPlanCard({
   compact = false,
   reviewOnly = false,
   nextExpectedAction,
+  prepareMaterializationKind = '',
   onPrepareMaterialization,
 }: {
   plan: ScalableDeliveryPlanContract
   compact?: boolean
   reviewOnly?: boolean
   nextExpectedAction?: string
+  prepareMaterializationKind?: string
   onPrepareMaterialization?: (() => void) | null
 }) {
   const normalizedDeliveryLevel = normalizeOptionalString(plan.deliveryLevel)
+  const normalizedPrepareMaterializationKind = normalizeOptionalString(
+    prepareMaterializationKind,
+  ).toLocaleLowerCase()
   const planReason =
     normalizeOptionalString(plan.reason) || 'Sin motivo resumido disponible.'
   const typeLabel = getScalableDeliveryPlanTypeLabel(normalizedDeliveryLevel)
@@ -4997,11 +5002,11 @@ function ScalableDeliveryPlanCard({
   const nextActionLabel = getNextExpectedActionLabel(nextExpectedAction)
   const canPrepareFrontendMaterialization =
     reviewOnly &&
-    normalizedDeliveryLevel.toLocaleLowerCase() === 'frontend-project' &&
+    normalizedPrepareMaterializationKind === 'frontend-project' &&
     typeof onPrepareMaterialization === 'function'
   const canPrepareFullstackMaterialization =
     reviewOnly &&
-    normalizedDeliveryLevel.toLocaleLowerCase() === 'fullstack-local' &&
+    normalizedPrepareMaterializationKind === 'fullstack-local' &&
     typeof onPrepareMaterialization === 'function'
   const prepareMaterializationLabel = canPrepareFrontendMaterialization
     ? 'Preparar materialización frontend'
@@ -12636,6 +12641,26 @@ function App() {
   const plannerScalableDeliveryLevel = normalizeOptionalString(
     plannerExecutionMetadata.scalableDeliveryPlan?.deliveryLevel,
   ).toLocaleLowerCase()
+  const plannerScalableTargetStrategy = normalizeOptionalString(
+    plannerExecutionMetadata.nextActionPlan?.targetStrategy,
+  ).toLocaleLowerCase()
+  const plannerScalableTargetDeliveryLevel = normalizeOptionalString(
+    plannerExecutionMetadata.nextActionPlan?.targetDeliveryLevel,
+  ).toLocaleLowerCase()
+  const plannerCanPrepareFullstackLocalFromScalableReview =
+    plannerScalableDeliveryLevel === 'fullstack-local' ||
+    (plannerScalableTargetStrategy === 'materialize-fullstack-local-plan' &&
+      plannerScalableTargetDeliveryLevel === 'fullstack-local')
+  const plannerCanPrepareFrontendProjectFromScalableReview =
+    plannerScalableDeliveryLevel === 'frontend-project' ||
+    (plannerScalableTargetStrategy === 'materialize-frontend-project-plan' &&
+      plannerScalableTargetDeliveryLevel === 'frontend-project')
+  const plannerScalableReviewPreparationKind =
+    plannerCanPrepareFullstackLocalFromScalableReview
+      ? 'fullstack-local'
+      : plannerCanPrepareFrontendProjectFromScalableReview
+        ? 'frontend-project'
+        : ''
   const plannerHasDedicatedScalableDeliveryLevel =
     plannerScalableDeliveryLevel !== '' &&
     plannerScalableDeliveryLevel !== 'safe-first-delivery'
@@ -18951,9 +18976,9 @@ function App() {
     : plannerIsSafeFirstDeliveryReview
       ? 'Preparar ejecucion local segura'
       : plannerIsScalableDeliveryReview
-        ? plannerScalableDeliveryLevel === 'fullstack-local'
+        ? plannerScalableReviewPreparationKind === 'fullstack-local'
           ? 'Preparar entrega funcional local'
-          : plannerScalableDeliveryLevel === 'frontend-project'
+          : plannerScalableReviewPreparationKind === 'frontend-project'
             ? 'Preparar frontend local ejecutable'
             : ''
         : ''
@@ -18967,9 +18992,9 @@ function App() {
       : plannerIsSafeFirstDeliveryReview
         ? handlePrepareSafeMaterializationPlan
         : plannerIsScalableDeliveryReview
-          ? plannerScalableDeliveryLevel === 'fullstack-local'
+          ? plannerScalableReviewPreparationKind === 'fullstack-local'
             ? handlePrepareFullstackLocalMaterializationPlan
-            : plannerScalableDeliveryLevel === 'frontend-project'
+            : plannerScalableReviewPreparationKind === 'frontend-project'
               ? handlePrepareFrontendProjectMaterializationPlan
               : null
           : null
@@ -18978,9 +19003,9 @@ function App() {
     : plannerIsSafeFirstDeliveryReview
       ? 'Preparando ejecucion...'
       : plannerIsScalableDeliveryReview
-        ? plannerScalableDeliveryLevel === 'fullstack-local'
+        ? plannerScalableReviewPreparationKind === 'fullstack-local'
           ? 'Preparando entrega...'
-          : plannerScalableDeliveryLevel === 'frontend-project'
+          : plannerScalableReviewPreparationKind === 'frontend-project'
             ? 'Preparando frontend...'
             : 'Preparando...'
         : plannerIsProjectPhaseReview
@@ -20483,13 +20508,14 @@ function App() {
                 compact
                 reviewOnly={plannerIsReviewOnly}
                 nextExpectedAction={plannerExecutionMetadata.nextExpectedAction}
+                prepareMaterializationKind={plannerScalableReviewPreparationKind}
                 onPrepareMaterialization={
                   plannerIsReviewOnly
-                    ? normalizeOptionalString(
-                          activeScalableDeliveryPlan.deliveryLevel,
-                        ).toLocaleLowerCase() === 'fullstack-local'
+                    ? plannerScalableReviewPreparationKind === 'fullstack-local'
                       ? handlePrepareFullstackLocalMaterializationPlan
-                      : handlePrepareFrontendProjectMaterializationPlan
+                      : plannerScalableReviewPreparationKind === 'frontend-project'
+                        ? handlePrepareFrontendProjectMaterializationPlan
+                        : null
                     : null
                 }
               />
@@ -23502,13 +23528,15 @@ function App() {
                     nextExpectedAction={
                       plannerExecutionMetadata.nextExpectedAction
                     }
+                    prepareMaterializationKind={plannerScalableReviewPreparationKind}
                     onPrepareMaterialization={
                       plannerIsReviewOnly
-                        ? normalizeOptionalString(
-                              activeScalableDeliveryPlan.deliveryLevel,
-                            ).toLocaleLowerCase() === 'fullstack-local'
+                        ? plannerScalableReviewPreparationKind === 'fullstack-local'
                           ? handlePrepareFullstackLocalMaterializationPlan
-                          : handlePrepareFrontendProjectMaterializationPlan
+                          : plannerScalableReviewPreparationKind ===
+                              'frontend-project'
+                            ? handlePrepareFrontendProjectMaterializationPlan
+                            : null
                         : null
                     }
                   />

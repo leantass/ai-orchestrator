@@ -3158,6 +3158,60 @@ async function runMaterializeFullstackLocalPlanResponseOverridesReviewStateCase(
   }
 }
 
+async function runTrackingLogisticsScalableReviewShowsPrepareCtaCase() {
+  const failures = []
+  const appSource = fs.readFileSync(appFilePath, 'utf8')
+
+  pushFailure(
+    failures,
+    /const plannerScalableTargetStrategy =[\s\S]{0,220}?nextActionPlan\?\.targetStrategy/.test(
+      appSource,
+    ),
+    'La UI debe leer nextActionPlan.targetStrategy como fallback para decidir el CTA del plan escalable.',
+  )
+  pushFailure(
+    failures,
+    /const plannerScalableTargetDeliveryLevel =[\s\S]{0,220}?nextActionPlan\?\.targetDeliveryLevel/.test(
+      appSource,
+    ),
+    'La UI debe leer nextActionPlan.targetDeliveryLevel como fallback para decidir el CTA del plan escalable.',
+  )
+  pushFailure(
+    failures,
+    /const plannerCanPrepareFullstackLocalFromScalableReview =[\s\S]{0,320}?plannerScalableDeliveryLevel === 'fullstack-local'[\s\S]{0,220}?plannerScalableTargetStrategy === 'materialize-fullstack-local-plan'[\s\S]{0,220}?plannerScalableTargetDeliveryLevel === 'fullstack-local'/.test(
+      appSource,
+    ),
+    'El renderer debe habilitar la preparación fullstack local aunque el scalableDeliveryPlan no traiga deliveryLevel pero nextActionPlan sí marque materialize-fullstack-local-plan/fullstack-local.',
+  )
+  pushFailure(
+    failures,
+    /const plannerScalableReviewPreparationKind =[\s\S]{0,240}\? 'fullstack-local'[\s\S]{0,180}\? 'frontend-project'/.test(
+      appSource,
+    ),
+    'La UI debe consolidar un kind de preparación reutilizable para el CTA principal y la card del plan escalable.',
+  )
+  pushFailure(
+    failures,
+    /plannerIsScalableDeliveryReview[\s\S]{0,220}\? plannerScalableReviewPreparationKind === 'fullstack-local'[\s\S]{0,120}\? 'Preparar entrega funcional local'/.test(
+      appSource,
+    ),
+    'El CTA principal del Paso 5 debe mostrar Preparar entrega funcional local cuando el review escalable apunta a materialización fullstack local.',
+  )
+  pushFailure(
+    failures,
+    /<ScalableDeliveryPlanCard[\s\S]{0,260}prepareMaterializationKind=\{plannerScalableReviewPreparationKind\}/.test(
+      appSource,
+    ),
+    'La card del scalableDeliveryPlan debe recibir el kind de preparación derivado para no perder el CTA por un deliveryLevel faltante en el plan.',
+  )
+
+  return {
+    id: 'tracking-logistico-scalable-review-shows-prepare-cta',
+    label: 'Tracking logistico scalable review shows prepare CTA',
+    failures,
+  }
+}
+
 async function requestTrackingLogisticsPreparedMaterializationDecision({
   workspacePath = smokeWorkspaceRoot,
 } = {}) {
@@ -4590,6 +4644,7 @@ async function main() {
     results.push(await runTrackingLogisticsPostApprovalReviewStateCase())
     results.push(await runTrackingLogisticsPreparedPlanUpdatesUiCase())
     results.push(await runMaterializeFullstackLocalPlanResponseOverridesReviewStateCase())
+    results.push(await runTrackingLogisticsScalableReviewShowsPrepareCtaCase())
     results.push(await runTrackingLogisticsOpenAIWebScaffoldGuardCase())
     results.push(await runTrackingLogisticsTimeoutFallbackNoWebScaffoldCase())
     results.push(await runTrackingLogisticsExecutorBlocksWebScaffoldCase())
