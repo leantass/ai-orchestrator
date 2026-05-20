@@ -3,12 +3,17 @@ import path from 'node:path'
 import vm from 'node:vm'
 import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import {
+  derivePlannerMaterializationUiState,
+  inspectPreparedFullstackLocalMaterialization,
+} from '../src/planner-ui-state.js'
 
 const require = createRequire(import.meta.url)
 const currentFilePath = fileURLToPath(import.meta.url)
 const repoRoot = path.resolve(path.dirname(currentFilePath), '..')
 const mainFilePath = path.join(repoRoot, 'electron', 'main.cjs')
 const appFilePath = path.join(repoRoot, 'src', 'App.tsx')
+const plannerUiStateFilePath = path.join(repoRoot, 'src', 'planner-ui-state.js')
 const mainSource = fs.readFileSync(mainFilePath, 'utf8')
 const {
   LOCAL_MATERIALIZATION_PLAN_VERSION,
@@ -3054,6 +3059,10 @@ async function runTrackingLogisticsPostApprovalReviewStateCase() {
 async function runTrackingLogisticsPreparedPlanUpdatesUiCase() {
   const failures = []
   const appSource = fs.readFileSync(appFilePath, 'utf8')
+  const helperSource = fs.readFileSync(plannerUiStateFilePath, 'utf8')
+  const preparedFullstackResponseIndex = appSource.indexOf(
+    'const plannerHasPreparedFullstackLocalMaterializationResponse =',
+  )
   const preparedFullstackIndex = appSource.indexOf(
     'const plannerHasPreparedFullstackLocalMaterialization =',
   )
@@ -3070,21 +3079,33 @@ async function runTrackingLogisticsPreparedPlanUpdatesUiCase() {
 
   pushFailure(
     failures,
-    /const preparedFullstackLocalMaterializationInspection =[\s\S]{0,220}?inspectPreparedFullstackLocalMaterialization\(\{[\s\S]{0,120}?effectivePlannerExecutionMetadata[\s\S]{0,120}?activeScalableDeliveryPlan[\s\S]{0,120}?\}\)[\s\S]{0,220}?const plannerHasPreparedFullstackLocalMaterialization =[\s\S]{0,120}?!plannerIsReviewOnly && preparedFullstackLocalMaterializationInspection\.ok/.test(
-      appSource,
-    ),
-    'La UI debe detectar materialize-fullstack-local-plan valido como estado preparado para materializar.',
+    helperSource.includes(
+      "export const isPreparedFullstackLocalMaterializationResponse = (value) => {",
+    ) &&
+      helperSource.includes("normalizedStrategy === 'materialize-fullstack-local-plan'") &&
+      helperSource.includes("normalizedExecutionMode === 'executor'") &&
+      helperSource.includes("normalizedNextExpectedAction === 'execute-plan'") &&
+      helperSource.includes("normalizedDecisionKey.startsWith('materialize-fullstack-local-')") &&
+      helperSource.includes('value?.approvalRequired !== true') &&
+      helperSource.includes('value?.requiresApproval !== true') &&
+      /const plannerHasPreparedFullstackLocalMaterializationResponse =[\s\S]{0,160}?isPreparedFullstackLocalMaterializationResponse\(plannerExecutionMetadata\)/.test(
+        appSource,
+      ) &&
+      /const plannerHasPreparedFullstackLocalMaterialization =[\s\S]{0,220}?plannerMaterializationUiState\.fullstackMaterializationResponseReady[\s\S]{0,220}?!plannerMaterializationUiState\.effectiveReviewOnly/.test(
+        appSource,
+      ),
+    'La UI debe detectar la respuesta materialize-fullstack-local-plan activa aun antes de completar el contrato canonico.',
   )
   pushFailure(
     failures,
-    /const plannerHasPreparedExecutorMaterialization =[\s\S]{0,120}?plannerHasPreparedSafeMaterialization[\s\S]{0,120}?plannerHasPreparedFullstackLocalMaterialization/.test(
+    /const plannerHasPreparedExecutorMaterialization =[\s\S]{0,160}?plannerHasPreparedSafeMaterialization[\s\S]{0,160}?plannerHasCanonicalFullstackLocalMaterialization/.test(
       appSource,
     ),
-    'La UI debe unificar el estado preparado para materializar entre safe-first y fullstack local.',
+    'La UI debe reservar el estado ejecutable para safe-first o contratos fullstack canonicos completos.',
   )
   pushFailure(
     failures,
-    /const shouldShowScalableDeliveryPlan =[\s\S]{0,120}?plannerIsScalableDeliveryReview[\s\S]{0,120}?!plannerHasPreparedFullstackLocalMaterialization/.test(
+    /const shouldShowScalableDeliveryPlan =[\s\S]{0,160}?plannerMaterializationUiState\.shouldShowScalableDeliveryPlan/.test(
       appSource,
     ),
     'La UI no debe seguir mostrando el scalableDeliveryPlan cuando ya hay una materialización fullstack local preparada.',
@@ -3098,9 +3119,19 @@ async function runTrackingLogisticsPreparedPlanUpdatesUiCase() {
   )
   pushFailure(
     failures,
-    /const preparedFullstackLocalMaterializationReady =[\s\S]{0,800}?if \([\s\S]{0,120}?preparedSafeMaterializationReady[\s\S]{0,120}?\|\|[\s\S]{0,120}?preparedFullstackLocalMaterializationReady[\s\S]{0,600}?setSessionStatus\('Plan generado'\)/.test(
+    /const planOverviewTitle = plannerHasPreparedExecutorMaterialization[\s\S]{0,220}: plannerHasPreparedFullstackLocalMaterialization[\s\S]{0,120}\?\s*'Entrega preparada con diagnostico pendiente'/.test(
       appSource,
     ),
+    'La UI debe distinguir una materializacion fullstack activa pero incompleta antes de mostrar Entrega lista para materializar.',
+  )
+  pushFailure(
+    failures,
+    appSource.includes('derivePlannerMaterializationUiState({') &&
+      appSource.includes('plannerExecutionMetadata: nextExecutionMetadata') &&
+      appSource.includes('effectivePlannerExecutionMetadata: nextExecutionMetadata') &&
+      /if \([\s\S]{0,140}?preparedSafeMaterializationReady[\s\S]{0,140}?\|\|[\s\S]{0,140}?preparedFullstackLocalMaterializationReady[\s\S]{0,800}?setSessionStatus\('Plan generado'\)/.test(
+        appSource,
+      ),
     'handleGenerateNextStep debe aplicar un materialize-fullstack-local-plan valido como Plan generado.',
   )
   pushFailure(
@@ -3108,16 +3139,17 @@ async function runTrackingLogisticsPreparedPlanUpdatesUiCase() {
     /preparedFullstackLocalMaterializationReady[\s\S]{0,500}?Materializar entrega/.test(
       appSource,
     ),
-    'La rama materializable fullstack local debe dejar trazas explicitas de que el CTA pasa a Materializar entrega.',
+    'La rama materializable fullstack local debe dejar trazas explicitas del estado Materializar entrega, incluso cuando el contrato quede bloqueado por diagnostico.',
   )
   pushFailure(
     failures,
-    preparedFullstackIndex >= 0 &&
+    preparedFullstackResponseIndex >= 0 &&
+      preparedFullstackIndex > preparedFullstackResponseIndex &&
       preparedExecutorIndex > preparedFullstackIndex &&
       scalableDeliveryVisibilityIndex > preparedFullstackIndex &&
       planOverviewTitleIndex > preparedFullstackIndex &&
       planOverviewHelperTextIndex > preparedFullstackIndex,
-    'plannerHasPreparedFullstackLocalMaterialization debe declararse antes de cualquier derivación visible que lo use para evitar TDZ en el renderer.',
+    'Las banderas de respuesta materializable fullstack deben declararse antes de cualquier derivación visible que las use para evitar TDZ en el renderer.',
   )
 
   return {
@@ -3130,10 +3162,11 @@ async function runTrackingLogisticsPreparedPlanUpdatesUiCase() {
 async function runTrackingLogisticsCanonicalPreparedContractUiCase() {
   const failures = []
   const appSource = fs.readFileSync(appFilePath, 'utf8')
+  const helperSource = fs.readFileSync(plannerUiStateFilePath, 'utf8')
 
   pushFailure(
     failures,
-    /const inspectPreparedFullstackLocalMaterialization = \(\{/.test(appSource),
+    /export const inspectPreparedFullstackLocalMaterialization = \(\{/.test(helperSource),
     'La UI debe concentrar la inspeccion del contrato materializable fullstack local en un helper reutilizable.',
   )
   pushFailure(
@@ -3150,17 +3183,23 @@ async function runTrackingLogisticsCanonicalPreparedContractUiCase() {
   )
   pushFailure(
     failures,
-    /const preparedFullstackLocalMaterializationInspection =[\s\S]{0,220}?inspectPreparedFullstackLocalMaterialization\(\{[\s\S]{0,120}?effectivePlannerExecutionMetadata[\s\S]{0,120}?activeScalableDeliveryPlan[\s\S]{0,120}?\}\)[\s\S]{0,220}?const plannerHasPreparedFullstackLocalMaterialization =[\s\S]{0,120}?!plannerIsReviewOnly && preparedFullstackLocalMaterializationInspection\.ok/.test(
+    /const plannerMaterializationUiState =[\s\S]{0,220}?derivePlannerMaterializationUiState\(/.test(
       appSource,
-    ),
-    'El estado preparado del renderer debe depender de la inspeccion canonica del contrato fullstack materializable.',
+    ) &&
+      /const preparedFullstackLocalMaterializationInspection =[\s\S]{0,160}?plannerMaterializationUiState\.contractInspection/.test(
+        appSource,
+      ) &&
+      /const plannerHasCanonicalFullstackLocalMaterialization =[\s\S]{0,160}?plannerMaterializationUiState\.fullstackMaterializationContractReady/.test(
+        appSource,
+      ),
+    'El renderer debe conservar una señal canonica separada para el contrato fullstack materializable.',
   )
   pushFailure(
     failures,
-    /const preparedFullstackLocalMaterializationReady =[\s\S]{0,260}?inspectPreparedFullstackLocalMaterialization\(\{[\s\S]{0,120}?nextExecutionMetadata[\s\S]{0,120}?activeScalableDeliveryPlan[\s\S]{0,120}?\}\)\.ok/.test(
+    /const preparedFullstackLocalMaterializationInspection =[\s\S]{0,260}?inspectPreparedFullstackLocalMaterialization\(\{[\s\S]{0,120}?nextExecutionMetadata[\s\S]{0,120}?activeScalableDeliveryPlan[\s\S]{0,120}?\}\)/.test(
       appSource,
     ),
-    'handleGenerateNextStep debe aplicar una respuesta materializable fullstack usando la misma inspeccion canonica que consume el renderer.',
+    'handleGenerateNextStep debe seguir usando la misma inspeccion canonica para diagnosticar el contrato fullstack materializable.',
   )
 
   return {
@@ -3170,28 +3209,350 @@ async function runTrackingLogisticsCanonicalPreparedContractUiCase() {
   }
 }
 
-async function runMaterializeFullstackLocalPlanResponseOverridesReviewStateCase() {
+async function runTrackingLogisticsHeaderOnlyMaterializeFallbackExitsReviewCase() {
   const failures = []
-  const appSource = fs.readFileSync(appFilePath, 'utf8')
+  const result = await requestTrackingLogisticsPreparedMaterializationDecision()
+  const scalableMetadata =
+    result.baseDecision && typeof result.baseDecision === 'object'
+      ? result.baseDecision
+      : null
+
+  if (!scalableMetadata?.scalableDeliveryPlan) {
+    return {
+      id: 'tracking-logistico-header-only-materialize-fallback-exits-review',
+      label: 'Tracking logistico header-only materialize fallback exits review',
+      failures: [
+        'No se pudo obtener un scalableDeliveryPlan base para simular el fallback header-only del renderer.',
+      ],
+    }
+  }
+
+  const headerOnlyMaterializeMetadata = {
+    ...scalableMetadata,
+    decisionKey: 'materialize-fullstack-local-plan',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    approvalRequired: false,
+    requiresApproval: false,
+    reason: 'OpenAI superó timeout; local-rules devolvió la cabecera materializable.',
+    tasks: Array.isArray(scalableMetadata.tasks)
+      ? scalableMetadata.tasks.slice(0, 3)
+      : [{ title: 'Preparar scaffold local' }],
+    executionScope: null,
+    materializationPlan: null,
+    brainAdapter: { id: 'local-rules' },
+    brainRoutingDecision: {
+      selectedProvider: 'local-rules',
+      fallbackUsed: true,
+      fallbackReason: 'OpenAI superó timeout',
+    },
+  }
+  const scalableUiState = derivePlannerMaterializationUiState({
+    plannerExecutionMetadata: scalableMetadata,
+    effectivePlannerExecutionMetadata: scalableMetadata,
+  })
+  const materializeUiState = derivePlannerMaterializationUiState({
+    plannerExecutionMetadata: headerOnlyMaterializeMetadata,
+    effectivePlannerExecutionMetadata: headerOnlyMaterializeMetadata,
+  })
 
   pushFailure(
     failures,
-    /const plannerIsScalableDeliveryReview =[\s\S]{0,500}?\(plannerIsReviewOnly && plannerHasDedicatedScalableDeliveryLevel\)/.test(
-      appSource,
-    ),
-    'plannerIsScalableDeliveryReview solo debe usar deliveryLevel como señal de review si la respuesta actual sigue siendo planner-only.',
+    scalableUiState.effectiveReviewOnly === true,
+    'La fase 1 debe seguir en review-only mientras la decision base sea scalable-delivery-plan.',
   )
   pushFailure(
     failures,
-    !/const plannerIsScalableDeliveryReview =[\s\S]{0,500}?\|\|\s*plannerHasDedicatedScalableDeliveryLevel/.test(
-      appSource,
-    ),
-    'Una respuesta materializable valida no debe quedar stale por plannerHasDedicatedScalableDeliveryLevel sin revisar executionMode actual.',
+    scalableUiState.shouldShowScalableDeliveryPlan === true,
+    'La fase 1 debe seguir mostrando el scalableDeliveryPlan revisable.',
   )
   pushFailure(
     failures,
-    /const canExecuteInstruction =[\s\S]{0,200}?!plannerIsReviewOnly/.test(appSource),
-    'El CTA Materializar entrega debe seguir dependiendo de salir del estado review-only.',
+    materializeUiState.fullstackMaterializationResponseReady === true,
+    'La fase 2 debe reconocer la cabecera materializable fullstack aunque el fallback no haya completado el contrato canonico.',
+  )
+  pushFailure(
+    failures,
+    materializeUiState.fullstackMaterializationContractReady === false,
+    'La simulacion header-only debe conservar el contrato incompleto para reproducir el bug real del renderer.',
+  )
+  pushFailure(
+    failures,
+    materializeUiState.effectiveReviewOnly === false,
+    'La UI no debe seguir en review-only cuando ya entro una respuesta executor materialize-fullstack-local-plan.',
+  )
+  pushFailure(
+    failures,
+    materializeUiState.shouldShowScalableDeliveryPlan === false,
+    'La UI no debe seguir mostrando el scalableDeliveryPlan anterior cuando la respuesta materializable ya quedo activa.',
+  )
+  pushFailure(
+    failures,
+    materializeUiState.materializeCtaVisible === true,
+    'La UI final debe mostrar el estado materializable aunque el fallback solo haya traido la cabecera.',
+  )
+  pushFailure(
+    failures,
+    materializeUiState.materializeCtaEnabled === false,
+    'La UI no debe habilitar Materializar entrega si el fallback solo trajo una cabecera materializable sin contrato canonico.',
+  )
+  pushFailure(
+    failures,
+    typeof materializeUiState.materializeCtaDisabledReason === 'string' &&
+      materializeUiState.materializeCtaDisabledReason.trim().length > 0,
+    'La UI debe exponer un diagnostico explicito cuando la materializacion fullstack quede incompleta.',
+  )
+  pushFailure(
+    failures,
+    materializeUiState.uiState === 'materialization-incomplete',
+    'La fase 2 header-only debe quedar en un estado materializable incompleto, no en review escalable ni en ejecucion habilitada.',
+  )
+
+  return {
+    id: 'tracking-logistico-header-only-materialize-fallback-exits-review',
+    label: 'Tracking logistico header-only materialize fallback exits review',
+    failures,
+  }
+}
+
+async function runTrackingLogisticsDerivedExecutePlanMaterializeCase() {
+  const failures = []
+  const scalableMetadata = {
+    decisionKey: 'logitrack-fullstack-local-v1',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    businessSector: 'logistics',
+    creativeProfile: 'admin-console-practical',
+    requiresApproval: false,
+    scalableDeliveryPlan: {
+      reason: 'Tracking logistico fullstack local revisable.',
+      directories: ['backend/src/routes', 'frontend/admin', 'frontend/public', 'database', 'docs', 'shared'],
+      filesToCreate: [
+        { path: 'backend/src/server.js' },
+        { path: 'frontend/admin/index.html' },
+        { path: 'database/schema.sql' },
+      ],
+      targetStructure: ['backend', 'frontend', 'database', 'docs', 'shared'],
+      allowedRootPaths: ['logitrack-local-v1'],
+    },
+    tasks: [
+      { title: 'API', targetPath: 'backend/src/server.js' },
+      { title: 'Tracking', targetPath: 'backend/src/routes/tracking.js' },
+      { title: 'DB', targetPath: 'database/schema.sql' },
+    ],
+  }
+  const phaseTwoMetadata = {
+    ...scalableMetadata,
+    decisionKey: 'materialize-fullstack-local-logitrack-v1-001',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: '',
+    requiresApproval: false,
+    approvalRequired: false,
+    businessSector: 'logistics',
+    creativeProfile: 'system-default',
+  }
+  const scalableUiState = derivePlannerMaterializationUiState({
+    plannerExecutionMetadata: scalableMetadata,
+    effectivePlannerExecutionMetadata: scalableMetadata,
+  })
+  const materializeUiState = derivePlannerMaterializationUiState({
+    plannerExecutionMetadata: phaseTwoMetadata,
+    effectivePlannerExecutionMetadata: phaseTwoMetadata,
+  })
+
+  pushFailure(
+    failures,
+    scalableUiState.prepareCtaVisible === true,
+    'El Caso A debe seguir mostrando Preparar entrega funcional local antes del click.',
+  )
+  pushFailure(
+    failures,
+    materializeUiState.fullstackMaterializationResponseReady === true,
+    'La fase 2 debe reconocer una respuesta materializable activa aunque nextExpectedAction venga ausente pero derivable.',
+  )
+  pushFailure(
+    failures,
+    materializeUiState.effectiveReviewOnly === false,
+    'La fase 2 derivable no debe seguir en review-only.',
+  )
+  pushFailure(
+    failures,
+    materializeUiState.shouldShowScalableDeliveryPlan === false,
+    'La fase 2 derivable no debe volver a mostrar el scalable-delivery-plan como estado activo.',
+  )
+  pushFailure(
+    failures,
+    materializeUiState.materializeCtaVisible === true,
+    'La fase 2 derivable debe pasar a estado materializable visible.',
+  )
+  pushFailure(
+    failures,
+    materializeUiState.uiState === 'materialization-incomplete',
+    'Sin contrato canónico completo, la fase 2 derivable debe quedar en materialization-incomplete y no volver al review escalable.',
+  )
+  pushFailure(
+    failures,
+    materializeUiState.materializeCtaEnabled === false,
+    'La fase 2 derivable no debe habilitar Materializar entrega si todavía no hay contrato canónico.',
+  )
+
+  return {
+    id: 'tracking-logistico-derived-execute-plan-materialize',
+    label: 'Tracking logistico derived execute plan materialize',
+    failures,
+  }
+}
+
+async function runTrackingLogisticsCompleteMaterializeEnablesCtaCase() {
+  const failures = []
+  const result = await requestTrackingLogisticsPreparedMaterializationDecision()
+  const decision = result.decision && typeof result.decision === 'object' ? result.decision : null
+
+  if (!decision) {
+    return {
+      id: 'tracking-logistico-complete-materialize-enables-cta',
+      label: 'Tracking logistico complete materialize enables CTA',
+      failures: [
+        'No se pudo obtener la decision materialize-fullstack-local-plan para validar el estado ejecutable.',
+      ],
+    }
+  }
+
+  const materializeUiState = derivePlannerMaterializationUiState({
+    plannerExecutionMetadata: decision,
+    effectivePlannerExecutionMetadata: decision,
+  })
+
+  pushFailure(
+    failures,
+    materializeUiState.fullstackMaterializationResponseReady === true,
+    'La fase materializable completa debe reconocer la respuesta executor fullstack local.',
+  )
+  pushFailure(
+    failures,
+    materializeUiState.fullstackMaterializationContractReady === true,
+    'La fase materializable completa debe pasar la validacion canonica del contrato.',
+  )
+  pushFailure(
+    failures,
+    materializeUiState.effectiveReviewOnly === false,
+    'La fase materializable completa no debe seguir en review-only.',
+  )
+  pushFailure(
+    failures,
+    materializeUiState.shouldShowScalableDeliveryPlan === false,
+    'La fase materializable completa no debe seguir mostrando el scalableDeliveryPlan anterior.',
+  )
+  pushFailure(
+    failures,
+    materializeUiState.materializeCtaVisible === true,
+    'La fase materializable completa debe mostrar Materializar entrega.',
+  )
+  pushFailure(
+    failures,
+    materializeUiState.materializeCtaEnabled === true,
+    'La fase materializable completa debe habilitar Materializar entrega solo cuando el contrato canonico este completo.',
+  )
+  pushFailure(
+    failures,
+    materializeUiState.uiState === 'materialization-ready',
+    'La fase materializable completa debe quedar en estado materialization-ready.',
+  )
+
+  return {
+    id: 'tracking-logistico-complete-materialize-enables-cta',
+    label: 'Tracking logistico complete materialize enables CTA',
+    failures,
+  }
+}
+
+async function runTrackingLogisticsIgnoredDetectedProjectDoesNotBlockMaterializeCase() {
+  const failures = []
+  const result = await requestTrackingLogisticsPreparedMaterializationDecision()
+  const decision = result.decision && typeof result.decision === 'object' ? result.decision : null
+
+  if (!decision) {
+    return {
+      id: 'tracking-logistico-ignored-detected-project-does-not-block-materialize',
+      label: 'Tracking logistico ignored detected project does not block materialize',
+      failures: [
+        'No se pudo obtener la decision materialize-fullstack-local-plan para validar la contaminación de proyecto detectado fuera de alcance.',
+      ],
+    }
+  }
+
+  const contaminatedDecision = {
+    ...cloneJson(decision),
+    existingProjectDetection: {
+      detected: true,
+      applicable: false,
+      projectRoot: 'C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\web-prueba\\fullstack-local-veterinaria',
+      domain: 'fullstack-local-veterinaria',
+      reason: 'Proyecto detectado pero fuera de alcance para esta corrida.',
+    },
+    localProjectManifest: {
+      domain: 'fullstack-local-veterinaria',
+      modules: ['turnos', 'pacientes', 'mascotas'],
+    },
+  }
+  const inspection = inspectPreparedFullstackLocalMaterialization({
+    metadata: contaminatedDecision,
+    sourcePlan:
+      contaminatedDecision.scalableDeliveryPlan &&
+      typeof contaminatedDecision.scalableDeliveryPlan === 'object'
+        ? contaminatedDecision.scalableDeliveryPlan
+        : null,
+  })
+
+  pushFailure(
+    failures,
+    inspection.ok === true,
+    'Un proyecto detectado pero marcado como applicable=false no debe contaminar ni bloquear una materializacion fullstack valida.',
+  )
+  pushFailure(
+    failures,
+    Array.isArray(inspection.forbiddenSignalsFound) &&
+      inspection.forbiddenSignalsFound.length === 0,
+    'La inspeccion canonica no debe marcar veterinaria como contaminación si ese proyecto ya quedó fuera de alcance.',
+  )
+
+  return {
+    id: 'tracking-logistico-ignored-detected-project-does-not-block-materialize',
+    label: 'Tracking logistico ignored detected project does not block materialize',
+    failures,
+  }
+}
+
+async function runMaterializeFullstackLocalPlanResponseOverridesReviewStateCase() {
+  const failures = []
+  const appSource = fs.readFileSync(appFilePath, 'utf8')
+  const plannerUiStateSource = fs.readFileSync(plannerUiStateFilePath, 'utf8')
+
+  pushFailure(
+    failures,
+    /const plannerIsScalableDeliveryReview =\s*plannerReviewUiState\.isScalableReview === true/.test(
+      appSource,
+    ) &&
+      /const plannerMaterializationUiState =[\s\S]{0,220}?derivePlannerMaterializationUiState\(/.test(
+        appSource,
+      ),
+    'App.tsx debe consumir el estado review escalable desde el helper central para no duplicar reglas y no dejar stale el renderer.',
+  )
+  pushFailure(
+    failures,
+    plannerUiStateSource.includes("normalizedExecutionMode !== 'executor'") &&
+      plannerUiStateSource.includes('!responseReady'),
+    'El helper debe distinguir review planner-only de respuesta materializable activa para que materialize-fullstack-local-plan salga del review escalable.',
+  )
+  pushFailure(
+    failures,
+    /const canExecuteInstruction =[\s\S]{0,260}?!plannerIsReviewOnly[\s\S]{0,260}!plannerHasPreparedFullstackLocalMaterialization[\s\S]{0,260}\|\|[\s\S]{0,260}plannerHasCanonicalFullstackLocalMaterialization/.test(
+      appSource,
+    ),
+    'El CTA Materializar entrega debe depender de salir del review-only y de tener contrato canonico completo cuando la respuesta sea materialize-fullstack-local-plan.',
   )
 
   return {
@@ -3204,68 +3565,102 @@ async function runMaterializeFullstackLocalPlanResponseOverridesReviewStateCase(
 async function runTrackingLogisticsScalableReviewShowsPrepareCtaCase() {
   const failures = []
   const appSource = fs.readFileSync(appFilePath, 'utf8')
+  const plannerUiStateSource = fs.readFileSync(plannerUiStateFilePath, 'utf8')
+  const scalableReviewMetadata = {
+    decisionKey: 'logitrack-fullstack-local-v1',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    businessSector: 'logistics',
+    creativeProfile: 'admin-console-practical',
+    requiresApproval: false,
+    scalableDeliveryPlan: {
+      reason: 'Tracking logistico fullstack local revisable antes de preparar la materializacion.',
+      directories: ['backend/src/routes', 'frontend/admin', 'frontend/public', 'database', 'docs', 'shared'],
+      filesToCreate: [
+        { path: 'backend/src/server.js' },
+        { path: 'backend/src/routes/shipments.js' },
+        { path: 'frontend/admin/index.html' },
+        { path: 'frontend/public/index.html' },
+        { path: 'database/schema.sql' },
+      ],
+      targetStructure: ['backend', 'frontend', 'database', 'docs', 'shared'],
+      allowedRootPaths: ['logitrack-fullstack-local-v1'],
+    },
+    tasks: [
+      { title: 'API de envios', targetPath: 'backend/src/server.js' },
+      { title: 'Rutas de tracking', targetPath: 'backend/src/routes/tracking.js' },
+      { title: 'Panel admin', targetPath: 'frontend/admin/index.html' },
+      { title: 'Consulta publica', targetPath: 'frontend/public/index.html' },
+      { title: 'Base local', targetPath: 'database/schema.sql' },
+    ],
+  }
+  const scalableReviewUiState = derivePlannerMaterializationUiState({
+    plannerExecutionMetadata: scalableReviewMetadata,
+    effectivePlannerExecutionMetadata: scalableReviewMetadata,
+  })
 
   pushFailure(
     failures,
-    /const plannerScalableTargetStrategy =[\s\S]{0,220}?nextActionPlan\?\.targetStrategy/.test(
-      appSource,
-    ),
-    'La UI debe leer nextActionPlan.targetStrategy como fallback para decidir el CTA del plan escalable.',
+    scalableReviewUiState.effectiveReviewOnly === true,
+    'El review inicial fullstack local debe seguir en planner-only/review-only antes de preparar la entrega.',
   )
   pushFailure(
     failures,
-    /const plannerScalableTargetDeliveryLevel =[\s\S]{0,220}?nextActionPlan\?\.targetDeliveryLevel/.test(
-      appSource,
-    ),
-    'La UI debe leer nextActionPlan.targetDeliveryLevel como fallback para decidir el CTA del plan escalable.',
+    scalableReviewUiState.isScalableReview === true,
+    'El payload real review-scalable-delivery debe quedar reconocido como review escalable activo.',
   )
   pushFailure(
     failures,
-    /const plannerCanPrepareFullstackLocalFromScalableReview =[\s\S]{0,320}?plannerScalableDeliveryLevel === 'fullstack-local'[\s\S]{0,220}?plannerScalableTargetStrategy === 'materialize-fullstack-local-plan'[\s\S]{0,220}?plannerScalableTargetDeliveryLevel === 'fullstack-local'/.test(
-      appSource,
-    ),
-    'El renderer debe habilitar la preparación fullstack local aunque el scalableDeliveryPlan no traiga deliveryLevel pero nextActionPlan sí marque materialize-fullstack-local-plan/fullstack-local.',
+    scalableReviewUiState.looksLikeFullstackLocalReview === true,
+    'La UI debe detectar el review fullstack local aun cuando OpenAI no complete deliveryLevel ni nextActionPlan, usando decisionKey, estructura y tareas.',
   )
   pushFailure(
     failures,
-    /const plannerScalableReviewHintSurface =[\s\S]{0,300}?currentState[\s\S]{0,220}?userFacingLabel[\s\S]{0,220}?recommendedAction[\s\S]{0,220}?targetStrategy[\s\S]{0,220}?targetDeliveryLevel/.test(
-      appSource,
-    ) &&
-      /const plannerScalableStructureSurface =[\s\S]{0,280}?targetStructure[\s\S]{0,220}?directories[\s\S]{0,280}?filesToCreate/.test(
-        appSource,
-      ) &&
-      /const plannerScalableLooksLikeFullstackLocal =[\s\S]{0,500}?plannerScalableReviewHintSurface\.includes\('materialize-fullstack-local-plan'\)[\s\S]{0,700}?value\.includes\('backend'\)[\s\S]{0,500}?value\.includes\('database'\)[\s\S]{0,300}?value\.includes\('schema\.sql'\)[\s\S]{0,300}?value\.includes\('seed\.sql'\)[\s\S]{0,400}?value\.includes\('frontend'\)/.test(
-        appSource,
-      ),
-    'El renderer debe inferir el CTA fullstack local también desde el payload real de OpenAI: hints del nextActionPlan y estructura backend/database/frontend del scalableDeliveryPlan.',
+    scalableReviewUiState.canPrepareFullstackLocal === true,
+    'El review escalable fullstack local debe habilitar la preparación segura antes de cualquier materialización.',
   )
   pushFailure(
     failures,
-    /const plannerScalableReviewPreparationKind =[\s\S]{0,240}\? 'fullstack-local'[\s\S]{0,180}\? 'frontend-project'/.test(
-      appSource,
-    ),
-    'La UI debe consolidar un kind de preparación reutilizable para el CTA principal y la card del plan escalable.',
+    scalableReviewUiState.prepareCtaVisible === true,
+    'El CTA Preparar entrega funcional local debe quedar visible en el review inicial válido.',
   )
   pushFailure(
     failures,
-    /plannerIsScalableDeliveryReview[\s\S]{0,220}\? plannerScalableReviewPreparationKind === 'fullstack-local'[\s\S]{0,120}\? 'Preparar entrega funcional local'/.test(
-      appSource,
-    ),
-    'El CTA principal del Paso 5 debe mostrar Preparar entrega funcional local cuando el review escalable apunta a materialización fullstack local.',
+    scalableReviewUiState.prepareCtaLabel === 'Preparar entrega funcional local',
+    'El review escalable fullstack local debe mostrar el label Preparar entrega funcional local.',
   )
   pushFailure(
     failures,
-    /<ScalableDeliveryPlanCard[\s\S]{0,260}prepareMaterializationKind=\{plannerScalableReviewPreparationKind\}/.test(
-      appSource,
-    ),
-    'La card del scalableDeliveryPlan debe recibir el kind de preparación derivado para no perder el CTA por un deliveryLevel faltante en el plan.',
+    scalableReviewUiState.materializeCtaVisible === false,
+    'El review escalable inicial no debe mostrar Materializar entrega todavía.',
   )
   pushFailure(
     failures,
-    /const handlePrepareFullstackLocalMaterializationPlan = async \(\) => \{[\s\S]{0,800}?if \(plannerScalableReviewPreparationKind !== 'fullstack-local'\)/.test(
-      appSource,
-    ),
-    'El handler real del CTA debe usar la misma inferencia de preparación que el renderer, para no mostrar el botón y bloquearlo al hacer click en el caso real.',
+    scalableReviewUiState.materializeCtaEnabled === false,
+    'El review escalable inicial no debe habilitar Materializar entrega todavía.',
+  )
+  pushFailure(
+    failures,
+    scalableReviewUiState.uiState === 'review-scalable-delivery',
+    'El caso A debe mantener el uiState review-scalable-delivery hasta preparar la entrega.',
+  )
+  pushFailure(
+    failures,
+    plannerUiStateSource.includes('currentMetadata?.decisionKey') &&
+      plannerUiStateSource.includes('currentMetadata?.businessSector') &&
+      plannerUiStateSource.includes('task.targetPath'),
+    'El helper del renderer debe considerar decisionKey, businessSector y tareas reales para no perder el CTA de preparación cuando OpenAI omite deliveryLevel o nextActionPlan.',
+  )
+  pushFailure(
+    failures,
+    /prepareMaterializationKind=\{plannerScalableReviewPreparationKind\}/.test(appSource),
+    'La card del scalableDeliveryPlan debe recibir el kind de preparación derivado para no perder el CTA cuando falten campos opcionales del plan.',
+  )
+  pushFailure(
+    failures,
+    /if \(plannerScalableReviewPreparationKind !== 'fullstack-local'\)/.test(appSource),
+    'El handler real del CTA debe usar la misma inferencia de preparación que el renderer para evitar botones visibles pero no accionables.',
   )
 
   return {
@@ -4707,6 +5102,10 @@ async function main() {
     results.push(await runTrackingLogisticsPostApprovalReviewStateCase())
     results.push(await runTrackingLogisticsPreparedPlanUpdatesUiCase())
     results.push(await runTrackingLogisticsCanonicalPreparedContractUiCase())
+    results.push(await runTrackingLogisticsCompleteMaterializeEnablesCtaCase())
+    results.push(await runTrackingLogisticsIgnoredDetectedProjectDoesNotBlockMaterializeCase())
+    results.push(await runTrackingLogisticsHeaderOnlyMaterializeFallbackExitsReviewCase())
+    results.push(await runTrackingLogisticsDerivedExecutePlanMaterializeCase())
     results.push(await runMaterializeFullstackLocalPlanResponseOverridesReviewStateCase())
     results.push(await runTrackingLogisticsScalableReviewShowsPrepareCtaCase())
     results.push(await runTrackingLogisticsOpenAIWebScaffoldGuardCase())

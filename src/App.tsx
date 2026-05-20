@@ -38,6 +38,12 @@ import {
   getRuntimeApprovalTone,
   getValidationStatusLabel,
 } from './project-state-labels'
+import {
+  derivePlannerNextExpectedActionForUi,
+  derivePlannerMaterializationUiState,
+  inspectPreparedFullstackLocalMaterialization,
+  isPreparedFullstackLocalMaterializationResponse,
+} from './planner-ui-state.js'
 
 type FlowMessage = {
   id: number
@@ -1131,6 +1137,9 @@ type PlannerDecisionResponse = {
   materializationPlan?: MaterializationPlanContract | null
   existingProjectDetection?: ExistingProjectDetectionContract | null
   activeProjectContext?: ActiveProjectContextContract | null
+  brainAdapter?: {
+    id?: string
+  }
   brainRoutingDecision?: BrainRoutingDecision
   tasks?: unknown[]
   assumptions?: string[]
@@ -3899,9 +3908,7 @@ const extractPlannerExecutionMetadata = (payload?: {
     typeof payload?.executionMode === 'string' ? payload.executionMode.trim() : '',
   reason: typeof payload?.reason === 'string' ? payload.reason.trim() : '',
   nextExpectedAction:
-    typeof payload?.nextExpectedAction === 'string'
-      ? payload.nextExpectedAction.trim()
-      : '',
+    derivePlannerNextExpectedActionForUi(payload),
   productArchitecture: normalizeProductArchitectureContract(
     payload?.productArchitecture,
   ),
@@ -8921,173 +8928,21 @@ const buildFullstackLocalMaterializationCoherenceIssue = ({
     metadata,
     sourcePlan,
   })
+  const materializationResponseReady =
+    isPreparedFullstackLocalMaterializationResponse(metadata)
 
   if (!contractInspection.ok) {
-    return contractInspection.reason
+    const shouldRejectActiveResponse =
+      materializationResponseReady !== true ||
+      (contractInspection.forbiddenSignalsFound || []).length > 0 ||
+      normalizeOptionalString(contractInspection.reason)
+        .toLocaleLowerCase()
+        .includes('root permitido')
+
+    return shouldRejectActiveResponse ? contractInspection.reason : ''
   }
 
   return ''
-}
-
-const inspectPreparedFullstackLocalMaterialization = ({
-  metadata,
-  sourcePlan,
-}: {
-  metadata: PlannerExecutionMetadata
-  sourcePlan?: ScalableDeliveryPlanContract | null
-}) => {
-  const materializationDecisionDetected =
-    normalizeOptionalString(metadata.decisionKey).toLocaleLowerCase() ===
-      'materialize-fullstack-local-plan' ||
-    normalizeOptionalString(metadata.strategy).toLocaleLowerCase() ===
-      'materialize-fullstack-local-plan'
-
-  if (!materializationDecisionDetected) {
-    return {
-      ok: false,
-      reason: 'El planificador no devolvio un materialize-fullstack-local-plan valido.',
-    }
-  }
-
-  if (
-    normalizeOptionalString(metadata.executionMode).toLocaleLowerCase() !== 'executor'
-  ) {
-    return {
-      ok: false,
-      reason: 'El plan materializable fullstack no quedo marcado para executor.',
-    }
-  }
-
-  if (
-    normalizeOptionalString(metadata.nextExpectedAction).toLocaleLowerCase() !==
-    'execute-plan'
-  ) {
-    return {
-      ok: false,
-      reason: 'El plan materializable fullstack no quedo listo para execute-plan.',
-    }
-  }
-
-  if (!metadata.executionScope?.allowedTargetPaths?.length) {
-    return {
-      ok: false,
-      reason: 'El plan materializable fullstack no devolvio allowedTargetPaths.',
-    }
-  }
-
-  if (!metadata.materializationPlan) {
-    return {
-      ok: false,
-      reason: 'El plan materializable fullstack no devolvio materializationPlan.',
-    }
-  }
-
-  const materializationTargets = [
-    ...(Array.isArray(metadata.executionScope?.allowedTargetPaths)
-      ? metadata.executionScope.allowedTargetPaths
-      : []),
-    ...(Array.isArray(metadata.materializationPlan?.allowedTargetPaths)
-      ? metadata.materializationPlan.allowedTargetPaths
-      : []),
-    ...(Array.isArray(metadata.materializationPlan?.operations)
-      ? metadata.materializationPlan.operations.flatMap((entry) => [
-          normalizeOptionalString(entry?.targetPath),
-          normalizeOptionalString(entry?.sourcePath),
-        ])
-      : []),
-  ].filter(Boolean)
-  const normalizedTargetSummary = materializationTargets
-    .map((entry) => normalizeOptionalString(entry).toLocaleLowerCase())
-    .join(' ')
-  const requiredFullstackMarkers = [
-    'frontend/admin',
-    'frontend/public',
-    'backend',
-    'shared',
-    'database/schema.sql',
-    'database/seed.sql',
-    'docs/api.md',
-  ]
-  const missingRequiredMarkers = requiredFullstackMarkers.filter(
-    (entry) => !normalizedTargetSummary.includes(entry),
-  )
-
-  if (missingRequiredMarkers.length > 0) {
-    return {
-      ok: false,
-      reason: `El plan materializable fullstack no devolvio el contrato minimo esperado. Faltan: ${missingRequiredMarkers.join(
-        ', ',
-      )}.`,
-    }
-  }
-
-  if (
-    !normalizedTargetSummary.includes('docs/db_schema.md') &&
-    !normalizedTargetSummary.includes('docs/data_model.md') &&
-    !normalizedTargetSummary.includes('docs/data-model.md')
-  ) {
-    return {
-      ok: false,
-      reason: 'El plan materializable fullstack no devolvio documentacion suficiente del modelo de datos. Falta docs/DB_SCHEMA.md o docs/DATA_MODEL.md.',
-    }
-  }
-
-  const contaminationPool = normalizeText(
-    [
-      metadata.reason,
-      metadata.activeProjectContext?.domain,
-      metadata.activeProjectContext?.note,
-      metadata.existingProjectDetection?.projectRoot,
-      metadata.existingProjectDetection?.domain,
-      metadata.localProjectManifest?.domain,
-      ...(metadata.localProjectManifest?.modules || []),
-      ...(metadata.materializationPlan?.operations || []).flatMap((entry) => [
-        normalizeOptionalString(entry?.targetPath),
-        typeof entry?.nextContent === 'string' ? entry.nextContent.slice(0, 600) : '',
-      ]),
-    ]
-      .filter(Boolean)
-      .join(' '),
-  )
-  const contaminationTokens = [
-    'veterinaria',
-    'appointments',
-    'turnos',
-    'pacientes',
-    'mascotas',
-    'reservas',
-    'fullstack-local-veterinaria',
-  ].filter((token) => contaminationPool.includes(normalizeText(token)))
-
-  if (contaminationTokens.length > 0) {
-    return {
-      ok: false,
-      reason: `El plan materializable fullstack quedo contaminado con otro dominio. Tokens detectados: ${contaminationTokens.join(
-        ', ',
-      )}.`,
-    }
-  }
-
-  const sourceRootPath = normalizeOptionalStringArray(sourcePlan?.allowedRootPaths)[0]
-  const returnedRootPath =
-    normalizeOptionalStringArray(metadata.executionScope?.allowedTargetPaths)[0]
-
-  if (
-    sourceRootPath &&
-    returnedRootPath &&
-    normalizeOptionalString(sourceRootPath).toLocaleLowerCase() !==
-      normalizeOptionalString(returnedRootPath).toLocaleLowerCase()
-  ) {
-    return {
-      ok: false,
-      reason: `El root permitido del plan materializable no coincide con el plan fullstack activo. Fuente: ${sourceRootPath}. Devuelto: ${returnedRootPath}.`,
-    }
-  }
-
-  return {
-    ok: true,
-    reason: '',
-  }
 }
 
 const buildFrontendProjectMaterializationPrompt = ({
@@ -12615,7 +12470,15 @@ function App() {
   const plannerNeedsUserClarification = isUserClarificationPlannerResponse(
     plannerExecutionMetadata,
   )
-  const plannerIsReviewOnly = isReviewOnlyPlannerResponse(plannerExecutionMetadata)
+  const plannerHasPreparedFullstackLocalMaterializationResponse =
+    isPreparedFullstackLocalMaterializationResponse(plannerExecutionMetadata)
+  const plannerIsReviewOnly =
+    isReviewOnlyPlannerResponse(plannerExecutionMetadata) &&
+    !plannerHasPreparedFullstackLocalMaterializationResponse
+  const plannerReviewUiState = derivePlannerMaterializationUiState({
+    plannerExecutionMetadata,
+    effectivePlannerExecutionMetadata: plannerExecutionMetadata,
+  })
   const plannerProjectPhaseReviewPlan =
     plannerExecutionMetadata.projectPhaseExecutionPlan &&
     typeof plannerExecutionMetadata.projectPhaseExecutionPlan === 'object'
@@ -12667,85 +12530,18 @@ function App() {
     normalizeOptionalString(
       plannerExecutionMetadata.nextExpectedAction,
     ).toLocaleLowerCase() === 'review-product-architecture'
-  const plannerScalableDeliveryLevel = normalizeOptionalString(
-    plannerExecutionMetadata.scalableDeliveryPlan?.deliveryLevel,
-  ).toLocaleLowerCase()
-  const plannerScalableTargetStrategy = normalizeOptionalString(
-    plannerExecutionMetadata.nextActionPlan?.targetStrategy,
-  ).toLocaleLowerCase()
-  const plannerScalableTargetDeliveryLevel = normalizeOptionalString(
-    plannerExecutionMetadata.nextActionPlan?.targetDeliveryLevel,
-  ).toLocaleLowerCase()
-  const plannerScalableReviewHintSurface = [
-    plannerExecutionMetadata.nextActionPlan?.currentState,
-    plannerExecutionMetadata.nextActionPlan?.userFacingLabel,
-    plannerExecutionMetadata.nextActionPlan?.recommendedAction,
-    plannerExecutionMetadata.nextActionPlan?.reason,
-    plannerExecutionMetadata.nextActionPlan?.technicalLabel,
-    plannerExecutionMetadata.nextActionPlan?.targetStrategy,
-    plannerExecutionMetadata.nextActionPlan?.targetDeliveryLevel,
-  ]
-    .map((value) => normalizeOptionalString(value).toLocaleLowerCase())
-    .filter(Boolean)
-    .join(' ')
-  const plannerScalableStructureSurface = [
-    ...normalizeOptionalStringArray(
-      plannerExecutionMetadata.scalableDeliveryPlan?.targetStructure,
-    ),
-    ...normalizeOptionalStringArray(
-      plannerExecutionMetadata.scalableDeliveryPlan?.directories,
-    ),
-    ...normalizeOptionalStringArray(
-      plannerExecutionMetadata.scalableDeliveryPlan?.filesToCreate?.map((entry) =>
-        entry && typeof entry === 'object' ? entry.path : '',
-      ),
-    ),
-  ].map((value) => normalizeOptionalString(value).toLocaleLowerCase())
-  const plannerScalableLooksLikeFullstackLocal =
-    plannerScalableReviewHintSurface.includes('fullstack local') ||
-    plannerScalableReviewHintSurface.includes('fullstack-local') ||
-    plannerScalableReviewHintSurface.includes('materialize-fullstack-local-plan') ||
-    plannerScalableReviewHintSurface.includes('fullstack-local-planner-review') ||
-    (plannerScalableStructureSurface.some((value) => value.includes('backend')) &&
-      plannerScalableStructureSurface.some(
-        (value) =>
-          value.includes('database') ||
-          value.includes('schema.sql') ||
-          value.includes('seed.sql'),
-      ) &&
-      plannerScalableStructureSurface.some((value) => value.includes('frontend')))
-  const plannerScalableLooksLikeFrontendProject =
-    plannerScalableReviewHintSurface.includes('frontend project') ||
-    plannerScalableReviewHintSurface.includes('frontend-project') ||
-    plannerScalableReviewHintSurface.includes('materialize-frontend-project-plan')
-  const plannerCanPrepareFullstackLocalFromScalableReview =
-    plannerScalableDeliveryLevel === 'fullstack-local' ||
-    (plannerScalableTargetStrategy === 'materialize-fullstack-local-plan' &&
-      plannerScalableTargetDeliveryLevel === 'fullstack-local') ||
-    plannerScalableLooksLikeFullstackLocal
-  const plannerCanPrepareFrontendProjectFromScalableReview =
-    plannerScalableDeliveryLevel === 'frontend-project' ||
-    (plannerScalableTargetStrategy === 'materialize-frontend-project-plan' &&
-      plannerScalableTargetDeliveryLevel === 'frontend-project') ||
-    plannerScalableLooksLikeFrontendProject
-  const plannerScalableReviewPreparationKind =
-    plannerCanPrepareFullstackLocalFromScalableReview
-      ? 'fullstack-local'
-      : plannerCanPrepareFrontendProjectFromScalableReview
-        ? 'frontend-project'
-        : ''
-  const plannerHasDedicatedScalableDeliveryLevel =
-    plannerScalableDeliveryLevel !== '' &&
-    plannerScalableDeliveryLevel !== 'safe-first-delivery'
   const plannerIsScalableDeliveryReview =
-    normalizeOptionalString(plannerExecutionMetadata.decisionKey).toLocaleLowerCase() ===
-      'scalable-delivery-plan' ||
-    normalizeOptionalString(plannerExecutionMetadata.strategy).toLocaleLowerCase() ===
-      'scalable-delivery-plan' ||
-    normalizeOptionalString(
-      plannerExecutionMetadata.nextExpectedAction,
-    ).toLocaleLowerCase() === 'review-scalable-delivery' ||
-    (plannerIsReviewOnly && plannerHasDedicatedScalableDeliveryLevel)
+    plannerReviewUiState.isScalableReview === true
+  const plannerScalableLooksLikeFullstackLocal =
+    plannerReviewUiState.looksLikeFullstackLocalReview === true
+  const plannerScalableLooksLikeFrontendProject =
+    plannerReviewUiState.looksLikeFrontendProjectReview === true
+  const plannerCanPrepareFullstackLocalFromScalableReview =
+    plannerReviewUiState.canPrepareFullstackLocal === true
+  const plannerCanPrepareFrontendProjectFromScalableReview =
+    plannerReviewUiState.canPrepareFrontendProject === true
+  const plannerScalableReviewPreparationKind =
+    plannerReviewUiState.prepareCtaKind || ''
   const plannerReviewStatusLabel = plannerIsReviewOnly
     ? plannerIsProjectPhaseReview
       ? 'Fase segura en revision'
@@ -12800,12 +12596,6 @@ function App() {
           : plannerIsReviewOnly
             ? 'En revisión'
             : 'En espera'
-  const canExecuteInstruction =
-    plannerInstruction.trim() !== '' &&
-    plannerInstruction !== DEFAULT_PLANNER_INSTRUCTION &&
-    !plannerNeedsUserClarification &&
-    !plannerIsReviewOnly
-
   const visiblePendingInstruction =
     approvalSource === 'executor'
       ? pendingExecutionInstruction
@@ -12980,9 +12770,6 @@ function App() {
   const activeProjectContext = effectivePlannerExecutionMetadata.activeProjectContext
   const existingProjectApplicable =
     activeExistingProjectDetection?.applicable !== false
-  const activeScalableDeliveryLevel = normalizeOptionalString(
-    activeScalableDeliveryPlan?.deliveryLevel,
-  ).toLocaleLowerCase()
   const activeExecutionStrategy = normalizeOptionalString(
     plannerExecutionMetadata.strategy || plannerExecutionMetadata.decisionKey,
   ).toLocaleLowerCase()
@@ -12993,21 +12780,47 @@ function App() {
       Boolean(effectivePlannerExecutionMetadata.materializationPlan) ||
       normalizeOptionalString(plannerExecutionMetadata.nextExpectedAction).toLocaleLowerCase() ===
         'execute-plan')
+  const plannerMaterializationUiState = derivePlannerMaterializationUiState({
+    plannerExecutionMetadata,
+    effectivePlannerExecutionMetadata,
+  })
   const preparedFullstackLocalMaterializationInspection =
-    inspectPreparedFullstackLocalMaterialization({
-      metadata: effectivePlannerExecutionMetadata,
-      sourcePlan: activeScalableDeliveryPlan,
-    })
+    plannerMaterializationUiState.contractInspection
   const plannerHasPreparedFullstackLocalMaterialization =
-    !plannerIsReviewOnly && preparedFullstackLocalMaterializationInspection.ok
+    plannerMaterializationUiState.fullstackMaterializationResponseReady &&
+    !plannerMaterializationUiState.effectiveReviewOnly
+  const plannerHasCanonicalFullstackLocalMaterialization =
+    plannerMaterializationUiState.fullstackMaterializationContractReady
   const plannerHasPreparedExecutorMaterialization =
     plannerHasPreparedSafeMaterialization ||
-    plannerHasPreparedFullstackLocalMaterialization
+    plannerHasCanonicalFullstackLocalMaterialization
+  const plannerMaterializeCtaVisible = plannerHasPreparedSafeMaterialization
+    ? true
+    : plannerMaterializationUiState.materializeCtaVisible
+  const plannerMaterializeCtaEnabled = plannerHasPreparedSafeMaterialization
+    ? true
+    : plannerMaterializationUiState.materializeCtaEnabled
+  const plannerMaterializeCtaDisabledReason = plannerHasPreparedSafeMaterialization
+    ? ''
+    : plannerMaterializationUiState.materializeCtaDisabledReason
+  const plannerMaterializationUiStateLabel = plannerHasPreparedSafeMaterialization
+    ? 'materialization-ready'
+    : plannerMaterializationUiState.uiState
+  const preparedFullstackLocalMaterializationMissingPathsLabel = (
+    preparedFullstackLocalMaterializationInspection.missingRequiredPaths || []
+  ).join(' | ')
+  const preparedFullstackLocalMaterializationForbiddenSignalsLabel = (
+    preparedFullstackLocalMaterializationInspection.forbiddenSignalsFound || []
+  ).join(' | ')
   const shouldShowScalableDeliveryPlan =
-    plannerIsScalableDeliveryReview &&
-    !plannerHasPreparedFullstackLocalMaterialization &&
-    activeScalableDeliveryLevel !== '' &&
-    activeScalableDeliveryLevel !== 'safe-first-delivery'
+    plannerMaterializationUiState.shouldShowScalableDeliveryPlan
+  const canExecuteInstruction =
+    plannerInstruction.trim() !== '' &&
+    plannerInstruction !== DEFAULT_PLANNER_INSTRUCTION &&
+    !plannerNeedsUserClarification &&
+    !plannerIsReviewOnly &&
+    (!plannerHasPreparedFullstackLocalMaterialization ||
+      plannerHasCanonicalFullstackLocalMaterialization)
   const shouldShowProjectBlueprint =
     Boolean(activeProjectBlueprint) &&
     normalizeOptionalString(activeProjectBlueprint?.deliveryLevel).toLocaleLowerCase() !==
@@ -13391,6 +13204,97 @@ function App() {
     typeof lastBrainRoutingDecision?.confidence === 'number'
       ? `${Math.round(lastBrainRoutingDecision.confidence * 100)}%`
       : 'No disponible'
+  useEffect(() => {
+    if (
+      !plannerIsScalableDeliveryReview &&
+      !plannerHasPreparedFullstackLocalMaterializationResponse &&
+      !plannerHasPreparedSafeMaterialization
+    ) {
+      return
+    }
+
+    const materializationDebugSnapshot = {
+      decisionKey: normalizeOptionalString(
+        plannerExecutionMetadata.decisionKey || plannerExecutionMetadata.strategy,
+      ),
+      strategy: normalizeOptionalString(plannerExecutionMetadata.strategy),
+      executionMode: normalizeOptionalString(plannerExecutionMetadata.executionMode),
+      nextExpectedAction: normalizeOptionalString(plannerExecutionMetadata.nextExpectedAction),
+      adapterId: normalizeOptionalString(lastBrainRoutingDecision?.resolvedProvider),
+      fallbackUsed: lastBrainRoutingDecision?.fallbackUsed === true,
+      hasMaterializationPlan:
+        preparedFullstackLocalMaterializationInspection.hasMaterializationPlan === true,
+      hasExecutionScope:
+        preparedFullstackLocalMaterializationInspection.hasExecutionScope === true,
+      allowedTargetPathsCount:
+        preparedFullstackLocalMaterializationInspection.allowedTargetPathsCount || 0,
+      missingRequiredPaths: preparedFullstackLocalMaterializationMissingPathsLabel
+        ? preparedFullstackLocalMaterializationMissingPathsLabel.split(' | ')
+        : [],
+      forbiddenSignalsFound: preparedFullstackLocalMaterializationForbiddenSignalsLabel
+        ? preparedFullstackLocalMaterializationForbiddenSignalsLabel.split(' | ')
+        : [],
+      contractOk: preparedFullstackLocalMaterializationInspection.ok === true,
+      isScalableReview: plannerIsScalableDeliveryReview,
+      looksLikeFullstackLocalReview: plannerScalableLooksLikeFullstackLocal,
+      looksLikeFrontendProjectReview: plannerScalableLooksLikeFrontendProject,
+      canPrepareFullstackLocal: plannerCanPrepareFullstackLocalFromScalableReview,
+      canPrepareFrontendProject: plannerCanPrepareFrontendProjectFromScalableReview,
+      materializationResponseReady:
+        plannerMaterializationUiState.fullstackMaterializationResponseReady === true,
+      shouldShowScalableDeliveryPlan,
+      prepareCtaVisible:
+        plannerIsScalableDeliveryReview && plannerScalableReviewPreparationKind !== '',
+      prepareCtaLabel:
+        plannerIsScalableDeliveryReview && plannerScalableReviewPreparationKind !== ''
+          ? plannerScalableReviewPreparationKind === 'fullstack-local'
+            ? 'Preparar entrega funcional local'
+            : plannerScalableReviewPreparationKind === 'frontend-project'
+              ? 'Preparar frontend local ejecutable'
+              : ''
+          : '',
+      uiState: plannerMaterializationUiStateLabel,
+      materializeCtaVisible: plannerMaterializeCtaVisible,
+      materializeCtaEnabled: plannerMaterializeCtaEnabled,
+      materializeCtaDisabledReason: plannerMaterializeCtaDisabledReason,
+    }
+
+    if (!shouldEmitPlannerUiDebug()) {
+      return
+    }
+
+    console.log('[planner-materialization-contract]', materializationDebugSnapshot)
+    console.log('[planner-materialization-readiness]', materializationDebugSnapshot)
+    console.log('[planner-ui-state]', materializationDebugSnapshot)
+  }, [
+    lastBrainRoutingDecision?.fallbackUsed,
+    lastBrainRoutingDecision?.resolvedProvider,
+    plannerExecutionMetadata.decisionKey,
+    plannerExecutionMetadata.executionMode,
+    plannerExecutionMetadata.nextExpectedAction,
+    plannerExecutionMetadata.strategy,
+    plannerHasPreparedFullstackLocalMaterializationResponse,
+    plannerHasPreparedSafeMaterialization,
+    plannerCanPrepareFrontendProjectFromScalableReview,
+    plannerCanPrepareFullstackLocalFromScalableReview,
+    plannerIsScalableDeliveryReview,
+    plannerMaterializationUiState.fullstackMaterializationResponseReady,
+    plannerMaterializationUiStateLabel,
+    plannerMaterializeCtaDisabledReason,
+    plannerMaterializeCtaEnabled,
+    plannerMaterializeCtaVisible,
+    plannerScalableLooksLikeFrontendProject,
+    plannerScalableLooksLikeFullstackLocal,
+    plannerScalableReviewPreparationKind,
+    preparedFullstackLocalMaterializationInspection.allowedTargetPathsCount,
+    preparedFullstackLocalMaterializationInspection.hasExecutionScope,
+    preparedFullstackLocalMaterializationInspection.hasMaterializationPlan,
+    preparedFullstackLocalMaterializationInspection.ok,
+    preparedFullstackLocalMaterializationInspection.reason,
+    preparedFullstackLocalMaterializationForbiddenSignalsLabel,
+    preparedFullstackLocalMaterializationMissingPathsLabel,
+    shouldShowScalableDeliveryPlan,
+  ])
   const activeReuseFoundCount = Math.max(
     effectivePlannerExecutionMetadata.reusableArtifactsFound,
     effectivePlannerExecutionMetadata.reusableArtifactLookup?.foundCount || 0,
@@ -14501,9 +14405,11 @@ function App() {
         : 'Todavia no generaste un plan en esta corrida.'
   const planOverviewTitle = plannerHasPreparedExecutorMaterialization
     ? 'Entrega lista para materializar'
-    : plannerIsReviewOnly
-      ? plannerReviewStatusLabel
-      : 'Plan generado'
+    : plannerHasPreparedFullstackLocalMaterialization
+      ? 'Entrega preparada con diagnostico pendiente'
+      : plannerIsReviewOnly
+        ? plannerReviewStatusLabel
+        : 'Plan generado'
   const planOverviewHelperText = isPreparingSafeFirstDelivery
     ? 'JEFE esta preparando la primera entrega segura. Espera la confirmacion antes de volver a tocar el CTA.'
     : isPreparingSafeMaterialization
@@ -14511,7 +14417,9 @@ function App() {
     : plannerHasPreparedSafeMaterialization
       ? 'La preparacion termino bien. El siguiente paso es materializar la entrega local segura.'
       : plannerHasPreparedFullstackLocalMaterialization
-        ? 'La preparacion termino bien. El siguiente paso es materializar la entrega fullstack local.'
+        ? plannerHasCanonicalFullstackLocalMaterialization
+          ? 'La preparacion termino bien. El siguiente paso es materializar la entrega fullstack local.'
+          : `La respuesta activa ya paso a materialize-fullstack-local-plan, pero el contrato ejecutable todavia esta incompleto. El CTA Materializar entrega sigue bloqueado. Diagnostico renderer: ${plannerMaterializeCtaDisabledReason || preparedFullstackLocalMaterializationInspection.reason || 'contrato canonico incompleto'}.`
       : plannerIsProductArchitectureReview
         ? 'Revisa la arquitectura inicial. Si esta correcta, prepara la primera entrega segura. El detalle tecnico queda abajo.'
         : planOverviewUsesOperatorSummary
@@ -15543,6 +15451,29 @@ function App() {
     }
 
     console.log(`[renderer-debug] ${label}`, details)
+  }
+  function shouldEmitPlannerUiDebug() {
+    if (import.meta.env.DEV) {
+      return true
+    }
+
+    try {
+      return window.localStorage.getItem('JEFE_DEBUG_PLANNER_UI') === '1'
+    } catch {
+      return false
+    }
+  }
+  function logPlannerUiDebug(prefix: string, details?: unknown) {
+    if (!shouldEmitPlannerUiDebug()) {
+      return
+    }
+
+    if (details === undefined) {
+      console.log(`[${prefix}]`)
+      return
+    }
+
+    console.log(`[${prefix}]`, details)
   }
   const parseStructuredRaw = (raw?: string) => {
     if (!raw) {
@@ -18421,10 +18352,84 @@ function App() {
         ).toLocaleLowerCase() === 'execute-plan'
       const preparedFullstackLocalMaterializationReady =
         preparedMaterializationStrategy === 'materialize-fullstack-local-plan' &&
-        inspectPreparedFullstackLocalMaterialization({
-          metadata: nextExecutionMetadata,
-          sourcePlan: activeScalableDeliveryPlan,
-        }).ok
+        isPreparedFullstackLocalMaterializationResponse(nextExecutionMetadata)
+      const preparedFullstackLocalMaterializationInspection =
+        preparedFullstackLocalMaterializationReady
+          ? inspectPreparedFullstackLocalMaterialization({
+              metadata: nextExecutionMetadata,
+              sourcePlan: activeScalableDeliveryPlan,
+            })
+          : null
+      const preparedFullstackLocalMaterializationUiState =
+        preparedFullstackLocalMaterializationReady
+          ? derivePlannerMaterializationUiState({
+              plannerExecutionMetadata: nextExecutionMetadata,
+              effectivePlannerExecutionMetadata: nextExecutionMetadata,
+            })
+          : null
+
+      logPlannerUiDebug('planner-next-step', {
+        previousStrategy: normalizeOptionalString(plannerExecutionMetadata.strategy),
+        previousExecutionMode: normalizeOptionalString(
+          plannerExecutionMetadata.executionMode,
+        ),
+        previousNextExpectedAction: normalizeOptionalString(
+          plannerExecutionMetadata.nextExpectedAction,
+        ),
+        previousDecisionKey: normalizeOptionalString(plannerExecutionMetadata.decisionKey),
+        decisionKey: normalizeOptionalString(nextExecutionMetadata.decisionKey),
+        newStrategy: normalizeOptionalString(nextExecutionMetadata.strategy),
+        newExecutionMode: normalizeOptionalString(nextExecutionMetadata.executionMode),
+        newNextExpectedAction: normalizeOptionalString(
+          nextExecutionMetadata.nextExpectedAction,
+        ),
+        requiresApproval: nextExecutionMetadata.requiresApproval === true,
+        adapterId:
+          normalizeOptionalString(response.brainAdapter?.id) ||
+          normalizeOptionalString(response.brainRoutingDecision?.resolvedProvider),
+        fallbackUsed: response.brainRoutingDecision?.fallbackUsed === true,
+        materializationResponseReady:
+          preparedFullstackLocalMaterializationUiState?.fullstackMaterializationResponseReady ===
+          true,
+        hasMaterializationPlan:
+          preparedFullstackLocalMaterializationInspection?.hasMaterializationPlan === true,
+        hasExecutionScope:
+          preparedFullstackLocalMaterializationInspection?.hasExecutionScope === true,
+        allowedTargetPathsCount:
+          preparedFullstackLocalMaterializationInspection?.allowedTargetPathsCount || 0,
+        missingRequiredPaths:
+          preparedFullstackLocalMaterializationInspection?.missingRequiredPaths || [],
+        forbiddenSignalsFound:
+          preparedFullstackLocalMaterializationInspection?.forbiddenSignalsFound || [],
+        contractOk: preparedFullstackLocalMaterializationInspection?.ok === true,
+        uiState: preparedFullstackLocalMaterializationUiState?.uiState || 'n/a',
+        shouldShowScalableDeliveryPlan:
+          preparedFullstackLocalMaterializationUiState?.shouldShowScalableDeliveryPlan ===
+          true,
+        prepareCtaVisible:
+          preparedFullstackLocalMaterializationUiState?.prepareCtaVisible === true,
+        materializeCtaVisible:
+          preparedFullstackLocalMaterializationUiState?.materializeCtaVisible === true,
+        materializeCtaEnabled:
+          preparedFullstackLocalMaterializationUiState?.materializeCtaEnabled === true,
+        materializeCtaDisabledReason:
+          preparedFullstackLocalMaterializationUiState?.materializeCtaDisabledReason || '',
+      })
+
+      if (
+        preparedFullstackLocalMaterializationReady &&
+        preparedFullstackLocalMaterializationInspection &&
+        !preparedFullstackLocalMaterializationInspection.ok
+      ) {
+        debugRendererLog(
+          'materialize-fullstack-local-plan:response-active-with-noncanonical-contract',
+          {
+            metadata: nextExecutionMetadata,
+            sourcePlan: activeScalableDeliveryPlan,
+            reason: preparedFullstackLocalMaterializationInspection.reason,
+          },
+        )
+      }
 
       if (
         preparedSafeMaterializationReady ||
@@ -18443,12 +18448,18 @@ function App() {
           instruction: response.instruction,
           result: 'Pendiente de ejecución',
           approval: 'No requerida',
-          finalStatus: 'Plan materializable listo',
+          finalStatus:
+            preparedFullstackLocalMaterializationReady &&
+            preparedFullstackLocalMaterializationInspection?.ok === false
+              ? 'Plan materializable detectado con contrato incompleto'
+              : 'Plan materializable listo',
         })
         setSessionEvents((currentEvents) => [
           ...currentEvents,
           preparedFullstackLocalMaterializationReady
-            ? 'El planificador devolvio una materializacion fullstack local lista para ejecutar'
+            ? preparedFullstackLocalMaterializationInspection?.ok === false
+              ? 'El planificador devolvio una materializacion fullstack local activa; la UI salio del review escalable pero mantuvo bloqueado el CTA Materializar entrega hasta completar el contrato canonico'
+              : 'El planificador devolvio una materializacion fullstack local lista para ejecutar'
             : 'El planificador devolvió una materialización segura lista para ejecutar',
         ])
         addFlowMessage({
@@ -18456,9 +18467,15 @@ function App() {
           title: 'Decisión del orquestador',
           content:
             preparedFullstackLocalMaterializationReady
-              ? 'La materializacion fullstack local quedo lista para ejecutar y el CTA ya puede pasar a Materializar entrega.'
+              ? preparedFullstackLocalMaterializationInspection?.ok === false
+                ? `La respuesta fullstack local ya quedo activa como estado materializable, pero el CTA Materializar entrega sigue bloqueado. Diagnostico renderer: ${preparedFullstackLocalMaterializationInspection.reason}.`
+                : 'La materializacion fullstack local quedo lista para ejecutar y el CTA ya puede pasar a Materializar entrega.'
               : 'La materialización segura quedó lista para ejecutar y el CTA ya puede pasar a Materializar entrega.',
-          status: 'success',
+          status:
+            preparedFullstackLocalMaterializationReady &&
+            preparedFullstackLocalMaterializationInspection?.ok === false
+              ? 'warning'
+              : 'success',
         })
         return
       }
