@@ -8917,6 +8917,25 @@ const buildFullstackLocalMaterializationCoherenceIssue = ({
   sourcePlan: ScalableDeliveryPlanContract
   metadata: PlannerExecutionMetadata
 }) => {
+  const contractInspection = inspectPreparedFullstackLocalMaterialization({
+    metadata,
+    sourcePlan,
+  })
+
+  if (!contractInspection.ok) {
+    return contractInspection.reason
+  }
+
+  return ''
+}
+
+const inspectPreparedFullstackLocalMaterialization = ({
+  metadata,
+  sourcePlan,
+}: {
+  metadata: PlannerExecutionMetadata
+  sourcePlan?: ScalableDeliveryPlanContract | null
+}) => {
   const materializationDecisionDetected =
     normalizeOptionalString(metadata.decisionKey).toLocaleLowerCase() ===
       'materialize-fullstack-local-plan' ||
@@ -8924,28 +8943,43 @@ const buildFullstackLocalMaterializationCoherenceIssue = ({
       'materialize-fullstack-local-plan'
 
   if (!materializationDecisionDetected) {
-    return 'El planificador no devolvio un materialize-fullstack-local-plan valido.'
+    return {
+      ok: false,
+      reason: 'El planificador no devolvio un materialize-fullstack-local-plan valido.',
+    }
   }
 
   if (
     normalizeOptionalString(metadata.executionMode).toLocaleLowerCase() !== 'executor'
   ) {
-    return 'El plan materializable fullstack no quedo marcado para executor.'
+    return {
+      ok: false,
+      reason: 'El plan materializable fullstack no quedo marcado para executor.',
+    }
   }
 
   if (
     normalizeOptionalString(metadata.nextExpectedAction).toLocaleLowerCase() !==
     'execute-plan'
   ) {
-    return 'El plan materializable fullstack no quedo listo para execute-plan.'
+    return {
+      ok: false,
+      reason: 'El plan materializable fullstack no quedo listo para execute-plan.',
+    }
   }
 
   if (!metadata.executionScope?.allowedTargetPaths?.length) {
-    return 'El plan materializable fullstack no devolvio allowedTargetPaths.'
+    return {
+      ok: false,
+      reason: 'El plan materializable fullstack no devolvio allowedTargetPaths.',
+    }
   }
 
   if (!metadata.materializationPlan) {
-    return 'El plan materializable fullstack no devolvio materializationPlan.'
+    return {
+      ok: false,
+      reason: 'El plan materializable fullstack no devolvio materializationPlan.',
+    }
   }
 
   const materializationTargets = [
@@ -8965,25 +8999,6 @@ const buildFullstackLocalMaterializationCoherenceIssue = ({
   const normalizedTargetSummary = materializationTargets
     .map((entry) => normalizeOptionalString(entry).toLocaleLowerCase())
     .join(' ')
-  const expectedPaths = [
-    ...normalizeOptionalStringArray(sourcePlan.allowedRootPaths),
-    ...normalizeOptionalStringArray(sourcePlan.directories),
-    ...(Array.isArray(sourcePlan.filesToCreate)
-      ? sourcePlan.filesToCreate
-          .map((entry) => normalizeOptionalString(entry?.path))
-          .filter(Boolean)
-      : []),
-  ]
-  const missingExpectedPaths = expectedPaths.filter(
-    (entry) => !normalizedTargetSummary.includes(entry.toLocaleLowerCase()),
-  )
-
-  if (missingExpectedPaths.length > 0) {
-    return `El plan materializable fullstack no preservo paths prometidos por el scalableDeliveryPlan. Faltan: ${missingExpectedPaths
-      .slice(0, 8)
-      .join(', ')}.`
-  }
-
   const requiredFullstackMarkers = [
     'frontend/admin',
     'frontend/public',
@@ -8998,9 +9013,12 @@ const buildFullstackLocalMaterializationCoherenceIssue = ({
   )
 
   if (missingRequiredMarkers.length > 0) {
-    return `El plan materializable fullstack no devolvio el contrato minimo esperado. Faltan: ${missingRequiredMarkers.join(
-      ', ',
-    )}.`
+    return {
+      ok: false,
+      reason: `El plan materializable fullstack no devolvio el contrato minimo esperado. Faltan: ${missingRequiredMarkers.join(
+        ', ',
+      )}.`,
+    }
   }
 
   if (
@@ -9008,13 +9026,15 @@ const buildFullstackLocalMaterializationCoherenceIssue = ({
     !normalizedTargetSummary.includes('docs/data_model.md') &&
     !normalizedTargetSummary.includes('docs/data-model.md')
   ) {
-    return 'El plan materializable fullstack no devolvio documentacion suficiente del modelo de datos. Falta docs/DB_SCHEMA.md o docs/DATA_MODEL.md.'
+    return {
+      ok: false,
+      reason: 'El plan materializable fullstack no devolvio documentacion suficiente del modelo de datos. Falta docs/DB_SCHEMA.md o docs/DATA_MODEL.md.',
+    }
   }
 
   const contaminationPool = normalizeText(
     [
       metadata.reason,
-      metadata.instruction,
       metadata.activeProjectContext?.domain,
       metadata.activeProjectContext?.note,
       metadata.existingProjectDetection?.projectRoot,
@@ -9040,12 +9060,15 @@ const buildFullstackLocalMaterializationCoherenceIssue = ({
   ].filter((token) => contaminationPool.includes(normalizeText(token)))
 
   if (contaminationTokens.length > 0) {
-    return `El plan materializable fullstack quedo contaminado con otro dominio. Tokens detectados: ${contaminationTokens.join(
-      ', ',
-    )}.`
+    return {
+      ok: false,
+      reason: `El plan materializable fullstack quedo contaminado con otro dominio. Tokens detectados: ${contaminationTokens.join(
+        ', ',
+      )}.`,
+    }
   }
 
-  const sourceRootPath = normalizeOptionalStringArray(sourcePlan.allowedRootPaths)[0]
+  const sourceRootPath = normalizeOptionalStringArray(sourcePlan?.allowedRootPaths)[0]
   const returnedRootPath =
     normalizeOptionalStringArray(metadata.executionScope?.allowedTargetPaths)[0]
 
@@ -9055,10 +9078,16 @@ const buildFullstackLocalMaterializationCoherenceIssue = ({
     normalizeOptionalString(sourceRootPath).toLocaleLowerCase() !==
       normalizeOptionalString(returnedRootPath).toLocaleLowerCase()
   ) {
-    return `El root permitido del plan materializable no coincide con el plan fullstack activo. Fuente: ${sourceRootPath}. Devuelto: ${returnedRootPath}.`
+    return {
+      ok: false,
+      reason: `El root permitido del plan materializable no coincide con el plan fullstack activo. Fuente: ${sourceRootPath}. Devuelto: ${returnedRootPath}.`,
+    }
   }
 
-  return ''
+  return {
+    ok: true,
+    reason: '',
+  }
 }
 
 const buildFrontendProjectMaterializationPrompt = ({
@@ -12964,16 +12993,13 @@ function App() {
       Boolean(effectivePlannerExecutionMetadata.materializationPlan) ||
       normalizeOptionalString(plannerExecutionMetadata.nextExpectedAction).toLocaleLowerCase() ===
         'execute-plan')
+  const preparedFullstackLocalMaterializationInspection =
+    inspectPreparedFullstackLocalMaterialization({
+      metadata: effectivePlannerExecutionMetadata,
+      sourcePlan: activeScalableDeliveryPlan,
+    })
   const plannerHasPreparedFullstackLocalMaterialization =
-    !plannerIsReviewOnly &&
-    activeExecutionStrategy === 'materialize-fullstack-local-plan' &&
-    normalizeOptionalString(plannerExecutionMetadata.executionMode).toLocaleLowerCase() ===
-      'executor' &&
-    normalizeOptionalString(
-      plannerExecutionMetadata.nextExpectedAction,
-    ).toLocaleLowerCase() === 'execute-plan' &&
-    (plannerScalableDeliveryLevel === 'fullstack-local' ||
-      Boolean(effectivePlannerExecutionMetadata.materializationPlan))
+    !plannerIsReviewOnly && preparedFullstackLocalMaterializationInspection.ok
   const plannerHasPreparedExecutorMaterialization =
     plannerHasPreparedSafeMaterialization ||
     plannerHasPreparedFullstackLocalMaterialization
@@ -18395,12 +18421,10 @@ function App() {
         ).toLocaleLowerCase() === 'execute-plan'
       const preparedFullstackLocalMaterializationReady =
         preparedMaterializationStrategy === 'materialize-fullstack-local-plan' &&
-        normalizeOptionalString(nextExecutionMetadata.executionMode).toLocaleLowerCase() ===
-          'executor' &&
-        normalizeOptionalString(
-          nextExecutionMetadata.nextExpectedAction,
-        ).toLocaleLowerCase() === 'execute-plan' &&
-        Boolean(nextExecutionMetadata.materializationPlan)
+        inspectPreparedFullstackLocalMaterialization({
+          metadata: nextExecutionMetadata,
+          sourcePlan: activeScalableDeliveryPlan,
+        }).ok
 
       if (
         preparedSafeMaterializationReady ||

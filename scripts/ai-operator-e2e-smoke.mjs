@@ -3070,7 +3070,7 @@ async function runTrackingLogisticsPreparedPlanUpdatesUiCase() {
 
   pushFailure(
     failures,
-    /const plannerHasPreparedFullstackLocalMaterialization =[\s\S]{0,500}?activeExecutionStrategy === 'materialize-fullstack-local-plan'[\s\S]{0,260}?executionMode\)\.toLocaleLowerCase\(\) ===[\r\n\s]*'executor'[\s\S]{0,260}?nextExpectedAction[\s\S]{0,260}?toLocaleLowerCase\(\) === 'execute-plan'/.test(
+    /const preparedFullstackLocalMaterializationInspection =[\s\S]{0,220}?inspectPreparedFullstackLocalMaterialization\(\{[\s\S]{0,120}?effectivePlannerExecutionMetadata[\s\S]{0,120}?activeScalableDeliveryPlan[\s\S]{0,120}?\}\)[\s\S]{0,220}?const plannerHasPreparedFullstackLocalMaterialization =[\s\S]{0,120}?!plannerIsReviewOnly && preparedFullstackLocalMaterializationInspection\.ok/.test(
       appSource,
     ),
     'La UI debe detectar materialize-fullstack-local-plan valido como estado preparado para materializar.',
@@ -3123,6 +3123,49 @@ async function runTrackingLogisticsPreparedPlanUpdatesUiCase() {
   return {
     id: 'tracking-logistico-fullstack-prepared-plan-updates-ui',
     label: 'Tracking logistico fullstack prepared plan updates UI',
+    failures,
+  }
+}
+
+async function runTrackingLogisticsCanonicalPreparedContractUiCase() {
+  const failures = []
+  const appSource = fs.readFileSync(appFilePath, 'utf8')
+
+  pushFailure(
+    failures,
+    /const inspectPreparedFullstackLocalMaterialization = \(\{/.test(appSource),
+    'La UI debe concentrar la inspeccion del contrato materializable fullstack local en un helper reutilizable.',
+  )
+  pushFailure(
+    failures,
+    /const buildFullstackLocalMaterializationCoherenceIssue =[\s\S]{0,260}?inspectPreparedFullstackLocalMaterialization\(\{[\s\S]{0,120}?metadata,[\s\S]{0,120}?sourcePlan[\s\S]{0,120}?\}\)/.test(
+      appSource,
+    ),
+    'La coherencia fullstack del renderer debe delegar en la inspeccion canonica del contrato materializable.',
+  )
+  pushFailure(
+    failures,
+    !/const missingExpectedPaths =/.test(appSource),
+    'La validacion del renderer no debe exigir una preservacion 1:1 de todos los paths prometidos por el scalable plan si el contrato canonico fullstack ya es valido.',
+  )
+  pushFailure(
+    failures,
+    /const preparedFullstackLocalMaterializationInspection =[\s\S]{0,220}?inspectPreparedFullstackLocalMaterialization\(\{[\s\S]{0,120}?effectivePlannerExecutionMetadata[\s\S]{0,120}?activeScalableDeliveryPlan[\s\S]{0,120}?\}\)[\s\S]{0,220}?const plannerHasPreparedFullstackLocalMaterialization =[\s\S]{0,120}?!plannerIsReviewOnly && preparedFullstackLocalMaterializationInspection\.ok/.test(
+      appSource,
+    ),
+    'El estado preparado del renderer debe depender de la inspeccion canonica del contrato fullstack materializable.',
+  )
+  pushFailure(
+    failures,
+    /const preparedFullstackLocalMaterializationReady =[\s\S]{0,260}?inspectPreparedFullstackLocalMaterialization\(\{[\s\S]{0,120}?nextExecutionMetadata[\s\S]{0,120}?activeScalableDeliveryPlan[\s\S]{0,120}?\}\)\.ok/.test(
+      appSource,
+    ),
+    'handleGenerateNextStep debe aplicar una respuesta materializable fullstack usando la misma inspeccion canonica que consume el renderer.',
+  )
+
+  return {
+    id: 'tracking-logistico-fullstack-canonical-prepared-contract-ui',
+    label: 'Tracking logistico fullstack canonical prepared contract UI',
     failures,
   }
 }
@@ -4663,6 +4706,7 @@ async function main() {
     results.push(await runTrackingLogisticsPostApprovalUiStateRealCase())
     results.push(await runTrackingLogisticsPostApprovalReviewStateCase())
     results.push(await runTrackingLogisticsPreparedPlanUpdatesUiCase())
+    results.push(await runTrackingLogisticsCanonicalPreparedContractUiCase())
     results.push(await runMaterializeFullstackLocalPlanResponseOverridesReviewStateCase())
     results.push(await runTrackingLogisticsScalableReviewShowsPrepareCtaCase())
     results.push(await runTrackingLogisticsOpenAIWebScaffoldGuardCase())
