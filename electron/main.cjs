@@ -17150,6 +17150,17 @@ function buildFullstackLocalDemoBase({
   appointments = [],
   reminders = [],
   inventory = [],
+  resources = [],
+  trackingEvents = [],
+  categories = [],
+  courses = [],
+  courseModules = [],
+  lessons = [],
+  students = [],
+  enrollments = [],
+  plans = [],
+  payments = [],
+  progress = [],
   reports = [],
   activity = [],
   views = [],
@@ -17185,6 +17196,17 @@ function buildFullstackLocalDemoBase({
     appointments,
     reminders,
     inventory,
+    resources,
+    trackingEvents,
+    categories,
+    courses,
+    courseModules,
+    lessons,
+    students,
+    enrollments,
+    plans,
+    payments,
+    progress,
     reports,
     activity,
     views,
@@ -17786,6 +17808,8 @@ function buildTemplateFullstackLocalDemoData({
   domainEntities,
   modules,
 }) {
+  const normalizedDatasets = datasets && typeof datasets === 'object' ? datasets : {}
+
   return buildFullstackLocalDemoBase({
     appTitle,
     archetype,
@@ -17798,13 +17822,36 @@ function buildTemplateFullstackLocalDemoData({
     alerts,
     constraints,
     team,
+    clients: Array.isArray(normalizedDatasets.clients) ? normalizedDatasets.clients : [],
+    pets: Array.isArray(normalizedDatasets.pets) ? normalizedDatasets.pets : [],
+    appointments: Array.isArray(normalizedDatasets.appointments)
+      ? normalizedDatasets.appointments
+      : [],
+    reminders: Array.isArray(normalizedDatasets.reminders) ? normalizedDatasets.reminders : [],
+    inventory: Array.isArray(normalizedDatasets.inventory) ? normalizedDatasets.inventory : [],
+    resources: Array.isArray(normalizedDatasets.resources) ? normalizedDatasets.resources : [],
+    trackingEvents: Array.isArray(normalizedDatasets.trackingEvents)
+      ? normalizedDatasets.trackingEvents
+      : [],
+    categories: Array.isArray(normalizedDatasets.categories) ? normalizedDatasets.categories : [],
+    courses: Array.isArray(normalizedDatasets.courses) ? normalizedDatasets.courses : [],
+    courseModules: Array.isArray(normalizedDatasets.modules) ? normalizedDatasets.modules : [],
+    lessons: Array.isArray(normalizedDatasets.lessons) ? normalizedDatasets.lessons : [],
+    students: Array.isArray(normalizedDatasets.students) ? normalizedDatasets.students : [],
+    enrollments: Array.isArray(normalizedDatasets.enrollments)
+      ? normalizedDatasets.enrollments
+      : [],
+    plans: Array.isArray(normalizedDatasets.plans) ? normalizedDatasets.plans : [],
+    payments: Array.isArray(normalizedDatasets.payments) ? normalizedDatasets.payments : [],
+    progress: Array.isArray(normalizedDatasets.progress) ? normalizedDatasets.progress : [],
+    reports: Array.isArray(normalizedDatasets.reports) ? normalizedDatasets.reports : [],
+    activity: Array.isArray(normalizedDatasets.activity) ? normalizedDatasets.activity : [],
     views,
     quickActions,
     interactionHighlights,
     statusOptions,
     domainEntities,
     modules,
-    ...(datasets || {}),
   })
 }
 
@@ -18350,29 +18397,59 @@ function buildOnlineCoursesFullstackLocalDemoData({
       { id: 'EDU-OPS-001', name: 'Operación académica local', role: 'Administración', shift: '09:00 a 18:00', status: 'Activa', focus: 'Cursos, planes y reportes mock' },
     ],
     datasets: {
+      categories: [
+        { id: 'CAT-001', name: 'Frontend', slug: 'frontend', status: 'published', note: 'Base para clases gratuitas y premium.' },
+        { id: 'CAT-002', name: 'Backend', slug: 'backend', status: 'published', note: 'APIs locales, contratos y servicios mock.' },
+        { id: 'CAT-003', name: 'Growth', slug: 'growth', status: 'published', note: 'Analítica de cohortes y beneficios Oro.' },
+      ],
       courses: [
-        { id: 'CRS-001', title: 'React desde cero', category: 'Frontend', plan: 'Free', status: 'Publicado', lessons: '16 clases', note: 'Incluye clases gratuitas y premium.' },
-        { id: 'CRS-002', title: 'Node y APIs locales', category: 'Backend', plan: 'Plata', status: 'Publicado', lessons: '22 clases', note: 'Acceso completo para Plata y Oro.' },
+        { id: 'CRS-001', title: 'React desde cero', category: 'Frontend', plan: 'Free', status: 'Publicado', lessons: '16 clases', access: '4 gratis + 12 premium', note: 'Incluye onboarding visual, clases abiertas y bloque premium para continuidad.' },
+        { id: 'CRS-002', title: 'Node y APIs locales', category: 'Backend', plan: 'Plata', status: 'Publicado', lessons: '22 clases', access: '2 intro + 20 premium', note: 'Acceso completo para Plata y Oro con foco en rutas, contratos y servicios mock.' },
+        { id: 'CRS-003', title: 'Analítica para cohortes', category: 'Growth', plan: 'Oro', status: 'En revisión', lessons: '18 clases', access: '0 gratis + 18 premium', note: 'Curso avanzado para cohortes Oro con reportes simulados y tableros ampliados.' },
+      ],
+      modules: [
+        { id: 'MOD-001', course: 'React desde cero', title: 'Fundamentos del catálogo', position: 1, note: 'Clase abierta para plan Free.' },
+        { id: 'MOD-002', course: 'React desde cero', title: 'Componentes premium', position: 2, note: 'Bloque premium para continuidad.' },
+        { id: 'MOD-003', course: 'Node y APIs locales', title: 'Rutas y contratos', position: 1, note: 'Disponible para Plata y Oro.' },
+        { id: 'MOD-004', course: 'Analítica para cohortes', title: 'Métricas y cohorts', position: 1, note: 'Disponible sólo para Oro.' },
+      ],
+      lessons: [
+        { id: 'LES-001', course: 'React desde cero', title: 'Introducción al campus local', accessTier: 'free', lessonType: 'video', status: 'published' },
+        { id: 'LES-002', course: 'React desde cero', title: 'Componentes premium y layouts', accessTier: 'premium', lessonType: 'video', status: 'published' },
+        { id: 'LES-003', course: 'Node y APIs locales', title: 'Diseño de rutas locales', accessTier: 'plata', lessonType: 'video', status: 'published' },
+        { id: 'LES-004', course: 'Node y APIs locales', title: 'Mock de Mercado Pago sin secretos', accessTier: 'plata', lessonType: 'lab', status: 'published' },
+        { id: 'LES-005', course: 'Analítica para cohortes', title: 'Reportes Oro y cohortes activas', accessTier: 'oro', lessonType: 'workshop', status: 'draft' },
+      ],
+      plans: [
+        { id: 'PLN-FREE', name: 'Free', billing: '$0', access: 'Solo clases gratuitas y vistas introductorias.', status: 'active' },
+        { id: 'PLN-PLATA', name: 'Plata', billing: '$24.900', access: 'Cursos seleccionados, progreso completo y pagos mock.', status: 'active' },
+        { id: 'PLN-ORO', name: 'Oro', billing: '$44.900', access: 'Acceso total, reportes avanzados y beneficios simulados.', status: 'active' },
       ],
       students: [
-        { id: 'STD-001', name: 'Lucía Mena', plan: 'Plata', status: 'Activa', progress: '42%', note: 'Completó el módulo 1 y avanzó en clases premium.' },
-        { id: 'STD-002', name: 'Tomás Rivas', plan: 'Free', status: 'Limitado', progress: '12%', note: 'Sólo ve clases gratuitas.' },
+        { id: 'STD-001', name: 'Lucía Mena', plan: 'Plata', status: 'Activa', progress: '42%', access: 'Cursos seleccionados + progreso completo', note: 'Completó el módulo 1 y avanzó en clases premium.' },
+        { id: 'STD-002', name: 'Tomás Rivas', plan: 'Free', status: 'Limitado', progress: '12%', access: 'Sólo clases gratuitas', note: 'Ve introducciones y teasers sin desbloquear premium.' },
+        { id: 'STD-003', name: 'Camila Torres', plan: 'Oro', status: 'Activa', progress: '67%', access: 'Todos los cursos + reportes avanzados', note: 'Tiene acceso a cohortes y panel ampliado.' },
       ],
       enrollments: [
         { id: 'ENR-001', student: 'Lucía Mena', course: 'Node y APIs locales', status: 'approved', plan: 'Plata', note: 'Acceso habilitado a progreso completo.' },
         { id: 'ENR-002', student: 'Tomás Rivas', course: 'React desde cero', status: 'pending', plan: 'Free', note: 'Acceso limitado a clases gratuitas.' },
+        { id: 'ENR-003', student: 'Camila Torres', course: 'Analítica para cohortes', status: 'approved', plan: 'Oro', note: 'Acceso completo a cohortes y reportes avanzados.' },
       ],
       payments: [
         { id: 'PAY-001', student: 'Lucía Mena', plan: 'Plata', status: 'approved', amount: '$24.900', note: 'Procesado por mock-mercado-pago local.' },
         { id: 'PAY-002', student: 'Tomás Rivas', plan: 'Free', status: 'pending', amount: '$0', note: 'Sin cobro real ni checkout externo.' },
+        { id: 'PAY-003', student: 'Camila Torres', plan: 'Oro', status: 'rejected', amount: '$44.900', note: 'Intento rechazado en sandbox local para probar recupero.' },
+        { id: 'PAY-004', student: 'Camila Torres', plan: 'Oro', status: 'cancelled', amount: '$44.900', note: 'Renovación cancelada manualmente en la simulación local.' },
       ],
       progress: [
         { id: 'PRG-001', student: 'Lucía Mena', course: 'Node y APIs locales', status: 'en curso', completion: '42%', note: '9 de 22 clases marcadas como vistas.' },
         { id: 'PRG-002', student: 'Tomás Rivas', course: 'React desde cero', status: 'free-only', completion: '12%', note: 'Sólo avance sobre contenido gratuito.' },
+        { id: 'PRG-003', student: 'Camila Torres', course: 'Analítica para cohortes', status: 'avanzado', completion: '67%', note: 'Terminó los módulos base y quedó en reportes premium.' },
       ],
       reports: [
         { id: 'REP-001', name: 'Cursos más activos', value: '3', detail: 'Tres cursos concentran el 70% de las inscripciones mock.', status: 'Estable' },
         { id: 'REP-002', name: 'Ingresos simulados', value: '$148.500', detail: 'Suma local de pagos approved sin pasarela real.', status: 'Mock' },
+        { id: 'REP-003', name: 'Lecciones gratuitas vs premium', value: '6 / 50', detail: 'Resumen local de clases abiertas contra contenido restringido por plan.', status: 'Revisable' },
       ],
       activity: [
         { id: 'ACT-001', time: '10:15', title: 'Inscripción aprobada', detail: 'Lucía Mena accedió al curso Node y APIs locales.', tone: 'sky' },
@@ -20550,8 +20627,12 @@ function buildFullstackLocalDatasetCollectionMap(fullstackLocalDemoData) {
 
   const datasetMap = {}
   for (const datasetKey of datasetKeys) {
-    if (Array.isArray(fullstackLocalDemoData?.[datasetKey])) {
-      datasetMap[datasetKey] = fullstackLocalDemoData[datasetKey]
+    const datasetValue =
+      datasetKey === 'modules'
+        ? fullstackLocalDemoData?.courseModules
+        : fullstackLocalDemoData?.[datasetKey]
+    if (Array.isArray(datasetValue)) {
+      datasetMap[datasetKey] = datasetValue
     }
   }
 
@@ -22173,7 +22254,7 @@ Esta carpeta queda como diseño revisable para la plataforma de cursos online lo
 
 - No se creó una base de datos real.
 - No se ejecutaron migraciones.
-- \`schema.sql\` y \`seeds/seed-local.sql\` describen cursos, planes, inscripciones, pagos mock y progreso.
+- \`schema.sql\`, \`seed.sql\` y \`seeds/seed-local.sql\` describen cursos, planes, inscripciones, pagos mock y progreso.
 `,
       schemaContent: `-- Esquema local revisable para ${appTitle}
 -- No ejecutar automáticamente.
@@ -23790,6 +23871,38 @@ function buildFullstackLocalMaterializationPlan({
   })
   const fullstackLocalArchetype =
     fullstackLocalDemoData?.overview?.archetype || 'operations'
+  const canonicalOnlineCoursesDemoData = usesOnlineCoursesFullstackContract
+    ? buildOnlineCoursesFullstackLocalDemoData({
+        appTitle,
+        nextRecommendedPhase: 'review-and-expand',
+      })
+    : null
+  const pickOnlineCoursesDataset = (datasetKey) => {
+    if (!usesOnlineCoursesFullstackContract) {
+      return []
+    }
+
+    if (
+      Array.isArray(fullstackLocalDemoData?.[datasetKey]) &&
+      fullstackLocalDemoData[datasetKey].length > 0
+    ) {
+      return fullstackLocalDemoData[datasetKey]
+    }
+
+    if (
+      Array.isArray(canonicalOnlineCoursesDemoData?.[datasetKey]) &&
+      canonicalOnlineCoursesDemoData[datasetKey].length > 0
+    ) {
+      return canonicalOnlineCoursesDemoData[datasetKey]
+    }
+
+    return []
+  }
+  const onlineCoursesCourses = pickOnlineCoursesDataset('courses')
+  const onlineCoursesStudents = pickOnlineCoursesDataset('students')
+  const onlineCoursesPayments = pickOnlineCoursesDataset('payments')
+  const onlineCoursesProgress = pickOnlineCoursesDataset('progress')
+  const onlineCoursesReports = pickOnlineCoursesDataset('reports')
   const databaseArtifacts = buildFullstackLocalDatabaseArtifacts({
     archetype: fullstackLocalArchetype,
     appTitle,
@@ -24153,8 +24266,18 @@ if (root) {
 .columns { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-bottom: 20px; }
 .card { background: #ffffff; border: 1px solid #d9e5ef; border-radius: 16px; padding: 18px; box-shadow: 0 14px 30px rgba(15, 36, 56, 0.08); }
 .card h2 { margin-top: 0; }
-.card ul { margin: 0; padding-left: 18px; }
-.card li { margin-bottom: 8px; }
+.card ul { margin: 0; padding-left: 0; list-style: none; }
+.card li { margin-bottom: 12px; }
+.card li:last-child { margin-bottom: 0; }
+.card-title { display: block; margin: 0 0 8px; font-size: 1.02rem; line-height: 1.35; }
+.meta-line { display: block; margin: 0 0 6px; color: #36546a; line-height: 1.45; }
+.meta-label { font-weight: 600; color: #163247; }
+.badge { display: inline-block; margin: 0 0 8px; padding: 4px 10px; border-radius: 999px; background: #e4f0f8; color: #174161; font-size: 0.82rem; font-weight: 600; }
+.metric-card { display: flex; flex-direction: column; gap: 6px; }
+.metric-label { font-size: 0.92rem; color: #476579; }
+.metric-value { display: block; font-size: 1.8rem; line-height: 1; color: #163247; }
+.metric-detail { margin: 0; color: #4f6a7d; line-height: 1.45; }
+.card-note { margin: 10px 0 0; color: #4f6a7d; line-height: 1.5; }
 .search-card input { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid #aac3d6; background: #f7fbfe; font: inherit; }
 body { margin: 0; padding: 24px; background: #eef5f9; color: #163247; font-family: 'Segoe UI', sans-serif; }
 `
@@ -24207,8 +24330,8 @@ body { margin: 0; padding: 24px; background: #eef5f9; color: #163247; font-famil
         'Vista local y revisable de cursos, categorías, planes, pagos mock y reportes, sin backend real.',
       metrics: fullstackLocalDemoData?.metrics || [],
       alerts: fullstackLocalDemoData?.alerts || [],
-      courses: fullstackLocalDemoData?.courses || [],
-      reports: fullstackLocalDemoData?.reports || [],
+      courses: onlineCoursesCourses,
+      reports: onlineCoursesReports,
     },
     null,
     2,
@@ -24218,8 +24341,8 @@ const root = document.getElementById('app')
 if (root) {
   root.innerHTML = [
     '<section class="hero"><span class="eyebrow">Admin local</span><h1>' + adminPlan.title + '</h1><p>' + adminPlan.subtitle + '</p></section>',
-    '<section class="grid">' + adminPlan.metrics.map((entry) => '<article class="card"><strong>' + entry.label + '</strong><span>' + entry.value + '</span><p>' + entry.detail + '</p></article>').join('') + '</section>',
-    '<section class="columns"><article class="card"><h2>Cursos</h2><ul>' + adminPlan.courses.map((entry) => '<li><strong>' + entry.title + '</strong> <span>' + entry.status + '</span></li>').join('') + '</ul></article><article class="card"><h2>Reportes</h2><ul>' + adminPlan.reports.map((entry) => '<li><strong>' + entry.name + '</strong><p>' + entry.detail + '</p></li>').join('') + '</ul></article></section>',
+    '<section class="grid">' + adminPlan.metrics.map((entry) => '<article class="card metric-card"><span class="metric-label">' + entry.label + '</span><strong class="metric-value">' + entry.value + '</strong><p class="metric-detail">' + entry.detail + '</p></article>').join('') + '</section>',
+    '<section class="columns"><article class="card"><h2>Cursos</h2><ul>' + adminPlan.courses.map((entry) => '<li><strong class="card-title">' + entry.title + '</strong><span class="badge">Estado: ' + entry.status + '</span><p class="meta-line"><span class="meta-label">Plan requerido:</span> ' + entry.plan + '</p><p class="meta-line"><span class="meta-label">Clases:</span> ' + entry.lessons + '</p><p class="card-note">' + entry.note + '</p></li>').join('') + '</ul></article><article class="card"><h2>Reportes</h2><ul>' + adminPlan.reports.map((entry) => '<li><strong class="card-title">' + entry.name + '</strong><p class="meta-line"><span class="meta-label">Valor:</span> ' + entry.value + '</p><p class="card-note">' + entry.detail + '</p></li>').join('') + '</ul></article></section>',
     '<section class="card"><h2>Alertas</h2><ul>' + adminPlan.alerts.map((entry) => '<li><strong>' + entry.title + '</strong><p>' + entry.detail + '</p></li>').join('') + '</ul></section>',
   ].join('')
 }
@@ -24229,7 +24352,7 @@ if (root) {
       title: `${appTitle} · Catálogo público local`,
       subtitle:
         'Simulación local del catálogo de cursos, categorías y planes sin servicios externos ni checkout real.',
-      courses: fullstackLocalDemoData?.courses || [],
+      courses: onlineCoursesCourses,
       constraints: fullstackLocalDemoData?.constraints || [],
     },
     null,
@@ -24240,7 +24363,7 @@ const root = document.getElementById('app')
 if (root) {
   root.innerHTML = [
     '<section class="hero"><span class="eyebrow">Público local</span><h1>' + publicPlan.title + '</h1><p>' + publicPlan.subtitle + '</p></section>',
-    '<section class="columns">' + publicPlan.courses.map((entry) => '<article class="card"><strong>' + entry.title + '</strong><span>' + entry.category + '</span><p>' + entry.note + '</p><small>Plan base: ' + entry.plan + '</small></article>').join('') + '</section>',
+    '<section class="columns">' + publicPlan.courses.map((entry) => '<article class="card"><strong class="card-title">' + entry.title + '</strong><p class="meta-line"><span class="meta-label">Categoría:</span> ' + entry.category + '</p><p class="meta-line"><span class="meta-label">Plan base:</span> ' + entry.plan + '</p><p class="meta-line"><span class="meta-label">Clases:</span> ' + entry.access + '</p><p class="card-note">' + entry.note + '</p></article>').join('') + '</section>',
     '<section class="card"><h2>Restricciones</h2><ul>' + publicPlan.constraints.map((entry) => '<li>' + entry + '</li>').join('') + '</ul></section>',
   ].join('')
 }
@@ -24250,9 +24373,9 @@ if (root) {
       title: `${appTitle} · Panel del alumno local`,
       subtitle:
         'Vista local y revisable de inscripciones, progreso y pagos mock, sin auth real ni servicios externos.',
-      students: fullstackLocalDemoData?.students || [],
-      progress: fullstackLocalDemoData?.progress || [],
-      payments: fullstackLocalDemoData?.payments || [],
+      students: onlineCoursesStudents,
+      progress: onlineCoursesProgress,
+      payments: onlineCoursesPayments,
     },
     null,
     2,
@@ -24262,8 +24385,8 @@ const root = document.getElementById('app')
 if (root) {
   root.innerHTML = [
     '<section class="hero"><span class="eyebrow">Alumno local</span><h1>' + studentPlan.title + '</h1><p>' + studentPlan.subtitle + '</p></section>',
-    '<section class="columns"><article class="card"><h2>Alumnos mock</h2><ul>' + studentPlan.students.map((entry) => '<li><strong>' + entry.name + '</strong> <span>' + entry.plan + '</span></li>').join('') + '</ul></article><article class="card"><h2>Progreso</h2><ul>' + studentPlan.progress.map((entry) => '<li><strong>' + entry.course + '</strong> <span>' + entry.completion + '</span></li>').join('') + '</ul></article></section>',
-    '<section class="card"><h2>Pagos mock</h2><ul>' + studentPlan.payments.map((entry) => '<li><strong>' + entry.plan + '</strong> <span>' + entry.status + '</span><p>' + entry.note + '</p></li>').join('') + '</ul></section>',
+    '<section class="columns"><article class="card"><h2>Alumnos mock</h2><ul>' + studentPlan.students.map((entry) => '<li><strong class="card-title">' + entry.name + '</strong><p class="meta-line"><span class="meta-label">Plan:</span> ' + entry.plan + '</p><p class="meta-line"><span class="meta-label">Acceso:</span> ' + entry.access + '</p></li>').join('') + '</ul></article><article class="card"><h2>Progreso</h2><ul>' + studentPlan.progress.map((entry) => '<li><strong class="card-title">' + entry.course + '</strong><p class="meta-line"><span class="meta-label">Avance:</span> ' + entry.completion + '</p><p class="card-note">' + entry.note + '</p></li>').join('') + '</ul></article></section>',
+    '<section class="card"><h2>Pagos mock</h2><ul>' + studentPlan.payments.map((entry) => '<li><strong class="card-title">' + entry.plan + '</strong><p class="meta-line"><span class="meta-label">Estado:</span> ' + entry.status + '</p><p class="meta-line"><span class="meta-label">Monto:</span> ' + entry.amount + '</p><p class="card-note">' + entry.note + '</p></li>').join('') + '</ul></section>',
   ].join('')
 }
 `
@@ -24424,8 +24547,8 @@ module.exports = {
   const databaseReadmeContent = databaseArtifacts.readmeContent
   const databaseSchemaContent = databaseArtifacts.schemaContent
   const databaseSeedContent = databaseArtifacts.seedContent
-  const databaseCanonicalSeedContent = usesLogisticsFullstackContract
-    ? databaseArtifacts.seedContent
+  const databaseCanonicalSeedContent = usesCanonicalSpecializedFullstackContract
+    ? `-- Contrato SQL canónico local.\n-- Mantener este archivo sincronizado con database/seeds/seed-local.sql.\n\n${databaseArtifacts.seedContent}`
     : ''
   const scriptsReadmeContent = `# Scripts locales
 
@@ -24519,7 +24642,7 @@ ${buildFullstackLocalEntityRelationships(fullstackLocalDemoData)
 
 - SQLite o base local solo como referencia revisable.
 - Sin migraciones ejecutadas ni conexiones reales.
-- Los seeds permanecen en \`database/seeds/seed-local.sql\` y no se ejecutan automaticamente.
+- Los seeds se documentan en \`database/seed.sql\` y \`database/seeds/seed-local.sql\`, sin ejecutarse automaticamente.
 `
   const docsCanonicalDbSchemaContent = usesCanonicalSpecializedFullstackContract
     ? `# Contrato SQL local

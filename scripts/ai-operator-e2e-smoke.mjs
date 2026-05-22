@@ -4039,6 +4039,21 @@ async function runOnlineCoursesMaterializationContractCase() {
     plannerExecutionMetadata: decision,
     effectivePlannerExecutionMetadata: decision,
   })
+  const materializationOperations = Array.isArray(decision?.materializationPlan?.operations)
+    ? decision.materializationPlan.operations
+    : []
+  const getOperationContent = (relativePath) =>
+    String(
+      materializationOperations.find((entry) =>
+        normalizePathForComparison(entry?.targetPath || '').endsWith(
+          normalizePathForComparison(relativePath),
+        ),
+      )?.nextContent || '',
+    )
+  const publicAppContent = getOperationContent('frontend/public/app.js')
+  const adminAppContent = getOperationContent('frontend/admin/app.js')
+  const studentAppContent = getOperationContent('frontend/student/app.js')
+  const canonicalSeedContent = getOperationContent('database/seed.sql')
   const contractInspection = inspectDecisionMaterializationContract({
     decision,
     goal: result.goal,
@@ -4162,6 +4177,91 @@ async function runOnlineCoursesMaterializationContractCase() {
     materializationUiState.materializeCtaEnabled === true &&
       materializationUiState.uiState === 'materialization-ready',
     'El helper del renderer debe considerar materialization-ready al contrato completo de cursos online.',
+  )
+  pushFailure(
+    failures,
+    !/"courses":\s*\[\s*\]/.test(publicAppContent),
+    'frontend/public/app.js no debe materializarse con courses vacío.',
+  )
+  pushFailure(
+    failures,
+    publicAppContent.includes('React desde cero') &&
+      publicAppContent.includes('Node y APIs locales') &&
+      publicAppContent.includes('Analítica para cohortes') &&
+      publicAppContent.includes('Free') &&
+      publicAppContent.includes('Plata') &&
+      publicAppContent.includes('Oro'),
+    'frontend/public/app.js debe incluir cursos mock Free, Plata y Oro.',
+  )
+  pushFailure(
+    failures,
+    publicAppContent.includes('class="card-title"') &&
+      publicAppContent.includes('Categoría:') &&
+      publicAppContent.includes('Plan base:') &&
+      publicAppContent.includes('Clases:'),
+    'frontend/public/app.js debe separar título, categoría, plan y clases con bloques legibles.',
+  )
+  pushFailure(
+    failures,
+    !/"courses":\s*\[\s*\]/.test(adminAppContent),
+    'frontend/admin/app.js no debe materializarse con courses vacío.',
+  )
+  pushFailure(
+    failures,
+    adminAppContent.includes('22 clases') &&
+      adminAppContent.includes('18 clases') &&
+      adminAppContent.includes('Recordá'),
+    'frontend/admin/app.js debe mostrar cursos mock con clases y alertas legibles.',
+  )
+  pushFailure(
+    failures,
+    adminAppContent.includes('class="metric-value"') &&
+      adminAppContent.includes('Estado:') &&
+      adminAppContent.includes('Plan requerido:') &&
+      adminAppContent.includes('Clases:'),
+    'frontend/admin/app.js debe separar métricas y metadatos de cursos con bloques claros.',
+  )
+  pushFailure(
+    failures,
+    !/"students":\s*\[\s*\]/.test(studentAppContent) &&
+      !/"progress":\s*\[\s*\]/.test(studentAppContent) &&
+      !/"payments":\s*\[\s*\]/.test(studentAppContent),
+    'frontend/student/app.js no debe materializarse con students, progress o payments vacíos.',
+  )
+  pushFailure(
+    failures,
+    studentAppContent.includes('"approved"') &&
+      studentAppContent.includes('"pending"') &&
+      studentAppContent.includes('"rejected"') &&
+      studentAppContent.includes('"cancelled"'),
+    'frontend/student/app.js debe incluir los cuatro estados mock de pago.',
+  )
+  pushFailure(
+    failures,
+    studentAppContent.includes('class="card-title"') &&
+      studentAppContent.includes('Plan:') &&
+      studentAppContent.includes('Avance:') &&
+      studentAppContent.includes('Estado:') &&
+      studentAppContent.includes('Monto:'),
+    'frontend/student/app.js debe separar nombre, avance, plan y estado de pagos con bloques legibles.',
+  )
+  pushFailure(
+    failures,
+    canonicalSeedContent.trim().length > 0 &&
+      canonicalSeedContent.includes('insert into courses') &&
+      canonicalSeedContent.includes('insert into payments'),
+    'database/seed.sql debe tener contenido útil y no quedar vacío.',
+  )
+  ;['Público', 'Catálogo', 'Simulación', 'categorías', 'aprobación', 'Recordá'].forEach(
+    (token) => {
+      pushFailure(
+        failures,
+        [publicAppContent, adminAppContent, studentAppContent].some((entry) =>
+          entry.includes(token),
+        ),
+        `Las superficies de cursos online deben conservar el texto legible "${token}".`,
+      )
+    },
   )
 
   return {
