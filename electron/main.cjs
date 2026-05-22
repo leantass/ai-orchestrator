@@ -15315,6 +15315,17 @@ function buildScalableDeliveryPlan({
     sanitizeBusinessSectorLabel(normalizedDomainUnderstanding?.domainLabel || '') ||
     extractProductArchitectureDomainLabel(goal, context, '') ||
     'proyecto local'
+  const explicitRootPathCandidates =
+    normalizedDeliveryLevel === 'safe-first-delivery'
+      ? []
+      : splitPlannerContextValues(
+          extractPlannerContextLineValue(
+            [goal, context],
+            ['allowedRootPaths', 'rootPath objetivo', 'carpeta objetivo', 'rootPath'],
+          ),
+        )
+          .map((entry) => entry.replace(/^['"]+|['".]+$/g, '').replace(/[\\/]+$/g, ''))
+          .filter(Boolean)
   const rootFolder =
     normalizedDeliveryLevel === 'safe-first-delivery'
       ? buildMaterializeSafeFirstDeliveryFolderName({
@@ -15330,7 +15341,8 @@ function buildScalableDeliveryPlan({
           mockCollections: [],
           sourceText: [goal, context, domainLabel].filter(Boolean).join(' '),
         })
-      : buildScalableProjectRootFolderName({
+      : explicitRootPathCandidates[0] ||
+        buildScalableProjectRootFolderName({
           deliveryLevel: normalizedDeliveryLevel,
           goal,
           context,
@@ -45721,11 +45733,38 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
           existingProjectDetection: workspaceAwareDecision?.existingProjectDetection,
         })
       : null
+  const fallbackCanonicalMaterializationRoot = normalizeWorkspaceProjectRoot(
+    normalizeOptionalString(fallbackDecision?.targetRoot) ||
+      normalizeOptionalString(fallbackDecision?.sourceRoot) ||
+      normalizeOptionalString(fallbackDecision?.materializationPlan?.projectRoot) ||
+      summarizeUniqueExecutorStrings(
+        normalizeExecutorExecutionScope(fallbackDecision?.executionScope)?.allowedTargetPaths,
+        1,
+      )[0] ||
+      summarizeUniqueExecutorStrings(fallbackDecision?.scalableDeliveryPlan?.allowedRootPaths, 1)[0] ||
+      '',
+  )
+  const workspaceAwareMaterializationRoot = normalizeWorkspaceProjectRoot(
+    normalizeOptionalString(workspaceAwareDecision?.targetRoot) ||
+      normalizeOptionalString(workspaceAwareDecision?.materializationPlan?.projectRoot) ||
+      summarizeUniqueExecutorStrings(
+        normalizeExecutorExecutionScope(workspaceAwareDecision?.executionScope)?.allowedTargetPaths,
+        1,
+      )[0] ||
+      '',
+  )
+  const workspaceAwareRootMismatchWithFallback =
+    shouldForceFallbackFullstackLocalContracts &&
+    fallbackMaterializationReady &&
+    fallbackCanonicalMaterializationRoot &&
+    workspaceAwareMaterializationRoot &&
+    fallbackCanonicalMaterializationRoot !== workspaceAwareMaterializationRoot
   const shouldRepairWorkspaceAwareMaterialization =
     shouldForceFallbackFullstackLocalContracts &&
     fallbackMaterializationReady &&
     workspaceAwareMaterializationInspection &&
-    workspaceAwareMaterializationInspection.ok !== true
+    (workspaceAwareMaterializationInspection.ok !== true ||
+      workspaceAwareRootMismatchWithFallback)
   const stabilizedWorkspaceAwareDecision = shouldRepairWorkspaceAwareMaterialization
     ? buildBrainDecisionContract({
         ...workspaceAwareDecision,
@@ -45763,7 +45802,9 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
           normalizeOptionalString(fallbackDecision?.targetRoot) ||
           workspaceAwareDecision.targetRoot,
         reason:
-          'La respuesta materializable se normalizó al contrato canónico local porque OpenAI devolvió un scaffold fullstack incompleto o incoherente para el executor.',
+          workspaceAwareRootMismatchWithFallback
+            ? 'La respuesta materializable se normalizó al contrato canónico local porque OpenAI devolvió un root distinto al root fullstack activo.'
+            : 'La respuesta materializable se normalizó al contrato canónico local porque OpenAI devolvió un scaffold fullstack incompleto o incoherente para el executor.',
       })
     : workspaceAwareDecision
   const equivalentApprovalRejected =

@@ -4027,6 +4027,14 @@ async function runOnlineCoursesMaterializationContractCase() {
   const result = await requestOnlineCoursesPreparedMaterializationDecision()
   const failures = [...(Array.isArray(result.failures) ? result.failures : [])]
   const decision = result.decision
+  const allowedTargetPaths = [
+    ...(Array.isArray(decision?.executionScope?.allowedTargetPaths)
+      ? decision.executionScope.allowedTargetPaths
+      : []),
+    ...(Array.isArray(decision?.materializationPlan?.allowedTargetPaths)
+      ? decision.materializationPlan.allowedTargetPaths
+      : []),
+  ].map((entry) => normalizePathForComparison(entry))
   const materializationUiState = derivePlannerMaterializationUiState({
     plannerExecutionMetadata: decision,
     effectivePlannerExecutionMetadata: decision,
@@ -4046,14 +4054,9 @@ async function runOnlineCoursesMaterializationContractCase() {
         decision?.materializationPlan?.contractDefinition?.contractKind ||
         contractInspection?.contractKind ||
         '',
-      allowedTargetPaths: [
-        ...(Array.isArray(decision?.executionScope?.allowedTargetPaths)
-          ? decision.executionScope.allowedTargetPaths
-          : []),
-        ...(Array.isArray(decision?.materializationPlan?.allowedTargetPaths)
-          ? decision.materializationPlan.allowedTargetPaths
-          : []),
-      ].map((entry) => normalizePathForComparison(entry)),
+      sourceRoot: decision?.sourceRoot || '',
+      targetRoot: decision?.targetRoot || decision?.materializationPlan?.projectRoot || '',
+      allowedTargetPaths,
       operations: Array.isArray(decision?.materializationPlan?.operations)
         ? decision.materializationPlan.operations.map((entry) =>
             normalizePathForComparison(entry?.targetPath || ''),
@@ -4096,10 +4099,25 @@ async function runOnlineCoursesMaterializationContractCase() {
   )
   pushFailure(
     failures,
+    String(decision?.sourceRoot || '').trim() === 'edu-platform-local',
+    `La materialización de cursos online debe heredar sourceRoot=edu-platform-local. Recibido: ${decision?.sourceRoot || '(vacío)'}.`,
+  )
+  pushFailure(
+    failures,
+    String(decision?.targetRoot || '').trim() === 'edu-platform-local',
+    `La materialización de cursos online debe heredar targetRoot=edu-platform-local. Recibido: ${decision?.targetRoot || '(vacío)'}.`,
+  )
+  pushFailure(
+    failures,
     normalizeText(decision?.targetRoot || decision?.materializationPlan?.projectRoot || '').includes(
       'edu-platform-local',
     ),
     'La materialización de cursos online debe mantener un root coherente tipo edu-platform-local.',
+  )
+  pushFailure(
+    failures,
+    allowedTargetPaths.some((entry) => entry.includes('edu-platform-local/')),
+    'allowedTargetPaths debe quedar anclado a edu-platform-local.',
   )
   ;[
     'frontend/admin/index.html',
@@ -4131,6 +4149,11 @@ async function runOnlineCoursesMaterializationContractCase() {
   )
   pushFailure(
     failures,
+    !targetSummary.includes(normalizeText('online-courses-platform')),
+    'La materialización de cursos online no debe cambiar el root a online-courses-platform.',
+  )
+  pushFailure(
+    failures,
     contractInspection?.ok === true,
     `El contrato canónico de cursos online debe quedar OK. Recibido: ${contractInspection?.reason || '(sin reason)'}.`,
   )
@@ -4144,6 +4167,80 @@ async function runOnlineCoursesMaterializationContractCase() {
   return {
     id: 'online-courses-materialization-contract',
     label: 'Online courses materialization contract',
+    failures,
+  }
+}
+
+async function runOnlineCoursesRootMismatchBlockedCase() {
+  const result = await requestOnlineCoursesPreparedMaterializationDecision()
+  const failures = [...(Array.isArray(result.failures) ? result.failures : [])]
+  const decision = result.decision && typeof result.decision === 'object' ? result.decision : null
+
+  if (!decision) {
+    return {
+      id: 'online-courses-root-mismatch-blocked',
+      label: 'Online courses root mismatch blocked',
+      failures: [
+        'No se pudo obtener la decision materializable de cursos online para simular el root mismatch.',
+      ],
+    }
+  }
+
+  const originalRoot =
+    String(decision?.targetRoot || decision?.materializationPlan?.projectRoot || '').trim() ||
+    'edu-platform-local'
+  const mismatchedRoot = path.join(smokeWorkspaceRoot, 'online-courses-platform')
+  const mismatchedDecision = {
+    ...decision,
+    targetRoot: mismatchedRoot,
+    executionScope:
+      decision?.executionScope && typeof decision.executionScope === 'object'
+        ? {
+            ...decision.executionScope,
+            allowedTargetPaths: [mismatchedRoot, path.join(mismatchedRoot, '**')],
+          }
+        : decision?.executionScope,
+    materializationPlan:
+      decision?.materializationPlan && typeof decision.materializationPlan === 'object'
+        ? {
+            ...decision.materializationPlan,
+            projectRoot: mismatchedRoot,
+            allowedTargetPaths: [mismatchedRoot, path.join(mismatchedRoot, '**')],
+          }
+        : decision?.materializationPlan,
+  }
+  const uiState = derivePlannerMaterializationUiState({
+    plannerExecutionMetadata: mismatchedDecision,
+    effectivePlannerExecutionMetadata: mismatchedDecision,
+  })
+
+  pushFailure(
+    failures,
+    uiState.uiState === 'materialization-incomplete',
+    'Un root mismatch debe dejar la UI en materialization-incomplete.',
+  )
+  pushFailure(
+    failures,
+    uiState.materializeCtaEnabled === false,
+    'Un root mismatch no debe habilitar Materializar entrega.',
+  )
+  pushFailure(
+    failures,
+    typeof uiState.materializeCtaDisabledReason === 'string' &&
+      uiState.materializeCtaDisabledReason.includes(
+        'El root permitido del plan materializable no coincide con el plan fullstack activo.',
+      ),
+    `El root mismatch debe exponer el diagnóstico correcto. Recibido: ${uiState.materializeCtaDisabledReason || '(vacío)'}.`,
+  )
+  pushFailure(
+    failures,
+    String(mismatchedDecision.targetRoot || '').trim() !== originalRoot,
+    'La simulación del mismatch debe usar un targetRoot distinto al root canónico.',
+  )
+
+  return {
+    id: 'online-courses-root-mismatch-blocked',
+    label: 'Online courses root mismatch blocked',
     failures,
   }
 }
@@ -6055,6 +6152,7 @@ async function main() {
     results.push(await runTrackingLogisticsScalableReviewShowsPrepareCtaCase())
     results.push(await runOnlineCoursesScalableReviewShowsPrepareCtaCase())
     results.push(await runOnlineCoursesMaterializationContractCase())
+    results.push(await runOnlineCoursesRootMismatchBlockedCase())
     results.push(await runOnlineCoursesInvalidOpenAIMaterializationFallsBackCase())
     results.push(await runOnlineCoursesPaymentsMockSafetyCase())
     results.push(await runOnlineCoursesApprovalLaterReturnsScalableReviewCase())
