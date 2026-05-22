@@ -6482,8 +6482,8 @@ function detectMaterializeSafeFirstDeliveryPlanningIntent(goal, context) {
     normalizedText.includes('deliverylevel: frontend-project') ||
     normalizedText.includes('accion requerida: materializar frontend-project') ||
     normalizedText.includes('materialize-frontend-project-plan') ||
-    normalizedText.includes('sourceStrategy: scalable-delivery-plan') ||
-    normalizedText.includes('sourceNextExpectedAction: review-scalable-delivery') ||
+    normalizedText.includes('sourcestrategy: scalable-delivery-plan') ||
+    normalizedText.includes('sourcenextexpectedaction: review-scalable-delivery') ||
     normalizedText.includes('no devolver materialize-safe-first-delivery-plan') ||
     (normalizedText.includes('frontend-project') &&
       normalizedText.includes('package.json') &&
@@ -7226,7 +7226,7 @@ function detectFullstackLocalMaterializationPlanningIntent(goal, context) {
       normalizedText.includes('preparar materializacion')) ||
     (normalizedText.includes('preparar entrega funcional local') &&
       normalizedText.includes('review-scalable-delivery')) ||
-    (normalizedText.includes('sourceStrategy: scalable-delivery-plan') &&
+    (normalizedText.includes('sourcestrategy: scalable-delivery-plan') &&
       normalizedText.includes('execute-plan') &&
       normalizedText.includes('executor'))
   const mentionsStaticFullstackTargets =
@@ -7481,16 +7481,45 @@ function finalizeWorkspaceProjectDecision({
     const resolvedActiveProjectRoot = inferDecisionPrimaryProjectRoot(baseDecision)
     const resolvedActiveProjectRootNormalized =
       normalizeWorkspaceProjectRoot(resolvedActiveProjectRoot)
+    const explicitNewProjectIntentRequested =
+      normalizeSectorDetectionText(
+        [
+          goal,
+          context,
+          normalizeOptionalString(baseDecision?.projectIntent),
+          normalizeOptionalString(baseDecision?.activeProjectContext?.mode),
+        ]
+          .filter(Boolean)
+          .join(' '),
+      ).includes('new-project-intent') ||
+      normalizeOptionalString(baseDecision?.projectIntent).toLocaleLowerCase() ===
+        'new-project-intent' ||
+      normalizeOptionalString(baseDecision?.activeProjectContext?.mode).toLocaleLowerCase() ===
+        'new-project'
+    const decisionExistingProjectApplicable =
+      existingProjectApplicable &&
+      !explicitNewProjectIntentRequested &&
+      !(
+        existingProjectRoot &&
+        resolvedActiveProjectRootNormalized &&
+        resolvedActiveProjectRootNormalized !== existingProjectRoot
+      )
+    const decisionIgnoredExistingProjectReason =
+      !decisionExistingProjectApplicable && existingProjectDetected
+        ? `Se detectó ${existingProjectRoot}, pero el pedido actual describe un proyecto nuevo y queda fuera de alcance para esta corrida.`
+        : ignoredExistingProjectReason
 
     return buildBrainDecisionContract({
       ...baseDecision,
       existingProjectDetection: existingProjectDetected
         ? {
             detected: true,
-            applicable: existingProjectApplicable,
+            applicable: decisionExistingProjectApplicable,
             intent:
               normalizedProjectWorkMode === 'continue-existing'
-                ? 'continue-existing-project-intent'
+                ? decisionExistingProjectApplicable
+                  ? 'continue-existing-project-intent'
+                  : 'new-project-intent'
                 : workspaceIntentLabel,
             projectRoot: existingProjectRoot,
             domain:
@@ -7514,7 +7543,7 @@ function finalizeWorkspaceProjectDecision({
               normalizeOptionalString(
                 normalizedSelectedExistingProjectContext?.jefeManifestSummary?.nextRecommendedPhase,
               ) || normalizedExistingManifest?.nextRecommendedPhase || '',
-            reason: ignoredExistingProjectReason,
+            reason: decisionIgnoredExistingProjectReason,
           }
         : {
             detected: false,
@@ -7525,7 +7554,7 @@ function finalizeWorkspaceProjectDecision({
         mode: resolvedActiveProjectRootNormalized
           ? existingProjectDetected &&
             resolvedActiveProjectRootNormalized === existingProjectRoot &&
-            existingProjectApplicable
+            decisionExistingProjectApplicable
             ? 'existing-project'
             : 'new-project'
           : 'none',
@@ -7716,6 +7745,10 @@ function extractProductArchitectureDomainLabel(goal, context, productType) {
     return 'gestion local de pedidos de recarga'
   }
 
+  if (detectOnlineCoursesIntent(normalizedSourceText)) {
+    return 'plataforma de cursos online'
+  }
+
   if (productType === 'ecommerce') {
     return 'comercio online'
   }
@@ -7878,20 +7911,59 @@ function detectLogisticsTrackingIntent(normalizedText) {
     return false
   }
 
+  const sanitizedText = normalizedText
+    .replace(/\bno\s+mezclar\b[^.\n\r]*/gu, ' ')
+    .replace(/\bsin\s+mezclar\b[^.\n\r]*/gu, ' ')
+
   const logisticsCore =
-    /\b(?:tracking|logistica|envios?)\b/u.test(normalizedText)
+    /\b(?:tracking|logistica|envios?)\b/u.test(sanitizedText)
   const logisticsPublicFlow =
     /\b(?:codigo de seguimiento|consulta publica por codigo|consulta pública por código|tracking publico|tracking público)\b/u.test(
-      normalizedText,
+      sanitizedText,
     )
   const logisticsEntities =
     /\b(?:clientes?|remitente|destinatario|direcciones?|estados?|historial(?: de eventos)?|incidencias?)\b/u.test(
-      normalizedText,
+      sanitizedText,
     )
   const logisticsPlatform =
-    /\b(?:backend|api|sqlite|base local|base de datos local)\b/u.test(normalizedText)
+    /\b(?:backend|api|sqlite|base local|base de datos local)\b/u.test(sanitizedText)
 
   return (logisticsCore || logisticsPublicFlow) && (logisticsEntities || logisticsPlatform)
+}
+
+function detectOnlineCoursesIntent(normalizedText) {
+  if (typeof normalizedText !== 'string' || !normalizedText.trim()) {
+    return false
+  }
+
+  const sanitizedText = normalizedText
+    .replace(/\bno\s+mezclar\b[^.\n\r]*/gu, ' ')
+    .replace(/\bsin\s+mezclar\b[^.\n\r]*/gu, ' ')
+
+  const learningCore =
+    /\b(?:cursos?|clases?|lecciones?|panel alumno|panel de alumno)\b/u.test(
+      sanitizedText,
+    )
+  const learningActors =
+    /\b(?:alumnos?|estudiantes?|instructores?|inscripciones?)\b/u.test(sanitizedText)
+  const commercialAccessSignals =
+    /\b(?:planes?|free|plata|oro|premium|gratuitas?|progress|progreso)\b/u.test(
+      sanitizedText,
+    )
+  const onlinePlatformSignals =
+    /\b(?:cursos? online|plataforma web de cursos|plataforma de cursos|e-learning|elearning|panel alumno|panel de alumno)\b/u.test(
+      sanitizedText,
+    )
+  const learningPlatform =
+    /\b(?:backend|api|sqlite|base local|base de datos local|frontend admin|frontend publico|frontend público)\b/u.test(
+      sanitizedText,
+    )
+
+  return (
+    learningCore &&
+    (learningActors || learningPlatform) &&
+    (commercialAccessSignals || onlinePlatformSignals)
+  )
 }
 
 function buildLogisticsTrackingDomainProfile() {
@@ -7933,6 +8005,51 @@ function buildLogisticsTrackingDomainProfile() {
       'eventos de tracking',
       'incidencias',
       'codigos de seguimiento',
+    ],
+  }
+}
+
+function buildOnlineCoursesDomainProfile() {
+  return {
+    domainLabel: 'plataforma de cursos online',
+    productType: 'business-system',
+    modules: [
+      'catalogo de cursos',
+      'categorias',
+      'modulos',
+      'clases',
+      'panel admin',
+      'panel alumno',
+      'planes free plata oro',
+      'inscripciones',
+      'pagos mock',
+      'progreso',
+      'reportes',
+    ],
+    screens: [
+      'frontend publico',
+      'catalogo de cursos',
+      'detalle del curso',
+      'panel administrativo',
+      'panel del alumno',
+      'reportes',
+    ],
+    localActions: [
+      'Publicar cursos, categorias, modulos y clases en modo local revisable.',
+      'Registrar alumnos mock, inscripciones, progreso y acceso por plan sin credenciales reales.',
+      'Simular pagos locales con un adaptador mock de Mercado Pago sin tokens ni llamadas reales.',
+      'Revisar reportes basicos de cursos, alumnos, planes e ingresos simulados.',
+    ],
+    entities: [
+      'cursos',
+      'categorias',
+      'modulos',
+      'clases',
+      'alumnos',
+      'planes',
+      'inscripciones',
+      'pagos',
+      'progreso',
     ],
   }
 }
@@ -8503,6 +8620,26 @@ function detectSafeFirstDeliveryModuleFamily(modules) {
 
   const familyDefinitions = [
     {
+      key: 'online-courses',
+      domainLabel: 'plataforma de cursos online',
+      productType: 'business-system',
+      minimumScore: 3,
+      requiredMatches: ['cursos'],
+      matches: [
+        'cursos',
+        'categorias',
+        'modulos',
+        'clases',
+        'alumnos',
+        'inscripciones',
+        'planes free plata oro',
+        'pagos mock',
+        'progreso',
+        'panel alumno',
+        'reportes',
+      ],
+    },
+    {
       key: 'commercial-ecommerce',
       domainLabel: 'tienda online comercial',
       productType: 'ecommerce',
@@ -8675,6 +8812,10 @@ function inferDomainUnderstandingProductKind({
     return 'business-system'
   }
 
+  if (detectOnlineCoursesIntent(normalizedText)) {
+    return 'business-system'
+  }
+
   if (moduleFamily?.productType) {
     return moduleFamily.productType
   }
@@ -8745,9 +8886,14 @@ function buildDomainUnderstanding({
   const logisticsTrackingProfile = detectLogisticsTrackingIntent(normalizedText)
     ? buildLogisticsTrackingDomainProfile()
     : null
+  const onlineCoursesProfile = detectOnlineCoursesIntent(normalizedText)
+    ? buildOnlineCoursesDomainProfile()
+    : null
   const isRechargeOrdersSystem =
     explicitModuleFamily?.key === 'recharge-orders' ||
     detectSafeFirstDeliveryRechargeOrdersIntent(normalizedText)
+  const isOnlineCourses =
+    explicitModuleFamily?.key === 'online-courses' || onlineCoursesProfile
   const productKind = inferDomainUnderstandingProductKind({
     normalizedText,
     productTypeHint,
@@ -8761,7 +8907,9 @@ function buildDomainUnderstanding({
     (!explicitModuleFamily &&
       productKind !== 'ecommerce' &&
       detectSafeFirstDeliveryRequestTrackingIntent(normalizedText))
-  const resolvedFamilyKey = isSchoolCrm
+  const resolvedFamilyKey = isOnlineCourses
+    ? 'online-courses'
+    : isSchoolCrm
     ? 'school-crm'
     : isRechargeOrdersSystem
       ? 'recharge-orders'
@@ -8771,6 +8919,9 @@ function buildDomainUnderstanding({
       ? 'commercial-ecommerce'
     : explicitModuleFamily?.key || (productKind === 'ecommerce' ? 'ecommerce' : '')
   const domainLabel =
+    (resolvedFamilyKey === 'online-courses'
+      ? onlineCoursesProfile?.domainLabel || 'plataforma de cursos online'
+      : '') ||
     (resolvedFamilyKey === 'school-crm' ? 'gestion escolar' : '') ||
     (resolvedFamilyKey === 'logistics-tracking'
       ? logisticsTrackingProfile?.domainLabel || ''
@@ -8794,6 +8945,8 @@ function buildDomainUnderstanding({
         ? commercialEcommerceProfile?.modules || []
       : resolvedFamilyKey === 'ecommerce'
         ? ['catalogo', 'productos', 'carrito local', 'checkout simulado', 'ordenes', 'reportes']
+        : resolvedFamilyKey === 'online-courses'
+          ? onlineCoursesProfile?.modules || []
         : resolvedFamilyKey === 'school-crm'
           ? ['alumnos', 'familias', 'cursos', 'comunicaciones', 'seguimiento', 'reportes']
           : resolvedFamilyKey === 'port-operations'
@@ -8814,7 +8967,7 @@ function buildDomainUnderstanding({
           : explicitModuleFamily?.matches || []
   const rawPrimaryModules = summarizeUniqueExecutorStrings(
     [
-      ...dynamicPlanParts.modules,
+      ...(resolvedFamilyKey === 'online-courses' ? [] : dynamicPlanParts.modules),
       ...fallbackModules,
       resolvedFamilyKey === 'security' ? 'reportes' : '',
       /\breportes?\b/u.test(normalizedText) ? 'reportes' : '',
@@ -8832,9 +8985,30 @@ function buildDomainUnderstanding({
           ),
           12,
         )
+      : resolvedFamilyKey === 'online-courses'
+        ? summarizeUniqueExecutorStrings(
+            rawPrimaryModules.filter(
+              (entry) =>
+                ![
+                  'hero comercial',
+                  'beneficios',
+                  'testimonios',
+                  'preguntas frecuentes',
+                  'productos',
+                  'carrito local',
+                  'checkout simulado',
+                  'stock',
+                  'inventario',
+                ].includes(normalizeSectorDetectionText(entry)),
+            ),
+            12,
+          )
       : rawPrimaryModules
   const primaryEntities = summarizeUniqueExecutorStrings(
     [
+      ...(resolvedFamilyKey === 'online-courses'
+        ? onlineCoursesProfile?.entities || []
+        : []),
       ...(resolvedFamilyKey === 'logistics-tracking'
         ? logisticsTrackingProfile?.entities || []
         : []),
@@ -8871,6 +9045,8 @@ function buildDomainUnderstanding({
     'commercial-ecommerce':
       'mostrar un ecommerce local mock con hero, catalogo, carrito simulado y conversion comercial',
     ecommerce: 'gestionar catalogo, carrito y ordenes mock',
+    'online-courses':
+      'gestionar cursos online, alumnos, planes, pagos mock y progreso del alumno',
     'school-crm': 'gestionar seguimiento escolar y comunicaciones',
     'recharge-orders': 'gestionar pedidos de recarga, dispositivos y devolucion local',
     social: 'gestionar comunidad, perfiles e interacciones',
@@ -8897,12 +9073,18 @@ function buildDomainUnderstanding({
     resolvedFamilyKey === 'logistics-tracking' && logisticsTrackingProfile
       ? logisticsTrackingProfile.localActions
       : []
+  const onlineCoursesLocalFlows =
+    resolvedFamilyKey === 'online-courses' && onlineCoursesProfile
+      ? onlineCoursesProfile.localActions
+      : []
   const ecommerceLocalFlows =
     resolvedFamilyKey === 'commercial-ecommerce' && commercialEcommerceProfile
       ? commercialEcommerceProfile.localActions
       : []
   const coreFlows = summarizeUniqueExecutorStrings(
-    logisticsLocalFlows.length > 0
+    onlineCoursesLocalFlows.length > 0
+      ? onlineCoursesLocalFlows
+      : logisticsLocalFlows.length > 0
       ? logisticsLocalFlows
       : ecommerceLocalFlows.length > 0
       ? ecommerceLocalFlows
@@ -8918,7 +9100,9 @@ function buildDomainUnderstanding({
     10,
   )
   const localActions = summarizeUniqueExecutorStrings(
-    logisticsLocalFlows.length > 0
+    onlineCoursesLocalFlows.length > 0
+      ? onlineCoursesLocalFlows
+      : logisticsLocalFlows.length > 0
       ? logisticsLocalFlows
       : ecommerceLocalFlows.length > 0
       ? ecommerceLocalFlows
@@ -8956,6 +9140,8 @@ function buildDomainUnderstanding({
     pushUniquePlannerValues(roles, ['administrador', 'responsable', 'operador'])
   } else if (resolvedFamilyKey === 'reservas') {
     pushUniquePlannerValues(roles, ['administrador', 'cliente', 'operador'])
+  } else if (resolvedFamilyKey === 'online-courses') {
+    pushUniquePlannerValues(roles, ['administrador', 'alumno', 'instructor'])
   } else if (resolvedFamilyKey === 'school-crm') {
     pushUniquePlannerValues(roles, ['administrador', 'docente', 'familia'])
   } else if (productKind === 'ecommerce') {
@@ -11851,6 +12037,16 @@ function buildPlannerFeedbackSupplementalContext(plannerFeedback) {
     feedbackParts.push(`Respuesta humana: ${plannerFeedback.freeAnswer.trim()}`)
   }
 
+  if (
+    plannerFeedback.type === 'approval-deferred' ||
+    plannerFeedback.approvalDecision === 'deferred' ||
+    plannerFeedback.approvalDecision === 'draft'
+  ) {
+    feedbackParts.push(
+      'La decision humana difirio pagos reales; continuar solo con mock local, sin credenciales, sin .env y sin llamadas externas.',
+    )
+  }
+
   return feedbackParts.join('\n')
 }
 
@@ -12335,6 +12531,13 @@ function buildScalableProjectRootFolderName({
       ))
   ) {
     return 'fullstack-local-turnos-medicos'
+  }
+
+  if (
+    normalizedDeliveryLevel === 'fullstack-local' &&
+    detectOnlineCoursesIntent(combinedText)
+  ) {
+    return 'edu-platform-local'
   }
 
   if (
@@ -12951,6 +13154,7 @@ function buildQuestionPolicy({
   userParticipationMode,
   dataSensitivity,
   integrations,
+  resolvedDecisionMap,
 }) {
   const normalizedMode = normalizeUserParticipationMode(userParticipationMode)
   const combinedText = normalizeSectorDetectionText([goal, context].join(' '))
@@ -12994,6 +13198,8 @@ function buildQuestionPolicy({
   const blockingQuestions = []
   const optionalQuestions = []
   const delegatedDecisions = []
+  const normalizedResolvedDecisionMap =
+    resolvedDecisionMap instanceof Map ? resolvedDecisionMap : new Map()
   const externalIntegrationsDetected = integrations.some(
     (integration) => integration.approvalRequired === true,
   )
@@ -13060,8 +13266,22 @@ function buildQuestionPolicy({
   const asksForRealInfrastructure =
     realInfrastructurePattern.test(sensitiveDetectionText) &&
     !explicitlyExcludesSensitiveTerm(realInfrastructurePattern)
+  const resolvedRealPaymentsDecision = getResolvedDecisionRecord(
+    normalizedResolvedDecisionMap,
+    'approve-real-payments',
+    'approval-family:real-payments',
+  )
+  const realPaymentsAlreadyResolved =
+    Boolean(resolvedRealPaymentsDecision) &&
+    (isDeferredResolvedDecision(resolvedRealPaymentsDecision) ||
+      ['approved', 'rejected', 'resolved'].includes(
+        normalizeOptionalString(resolvedRealPaymentsDecision?.status).toLocaleLowerCase(),
+      ) ||
+      ['approved', 'rejected', 'deferred', 'draft'].includes(
+        normalizeOptionalString(resolvedRealPaymentsDecision?.decision).toLocaleLowerCase(),
+      ))
 
-  if (asksForRealPayments) {
+  if (asksForRealPayments && !realPaymentsAlreadyResolved) {
     pushUniquePlannerValues(blockingQuestions, [
       '¿Querés cobros reales ahora o preferís dejar pagos como aprobación futura y seguir con mocks locales?',
     ])
@@ -14919,6 +15139,7 @@ function buildPlanningArchitectureBundle({
   expansionOptions,
   moduleExpansionPlan,
   continuationActionPlan,
+  resolvedDecisionMap,
 }) {
   const provisionalBlueprint = buildProjectBlueprint({
     goal,
@@ -14942,6 +15163,7 @@ function buildPlanningArchitectureBundle({
     userParticipationMode,
     dataSensitivity: provisionalBlueprint.dataSensitivity,
     integrations: provisionalBlueprint.integrations,
+    resolvedDecisionMap,
   })
   const projectBlueprint = buildProjectBlueprint({
     goal,
@@ -15998,6 +16220,10 @@ function detectFullstackLocalDemoArchetype({
     .join(' ')
   const combinedText = normalizeSectorDetectionText(understandingText)
 
+  if (detectOnlineCoursesIntent(combinedText)) {
+    return 'online-courses'
+  }
+
   if (detectLogisticsTrackingIntent(combinedText)) {
     return 'logistics-tracking'
   }
@@ -16146,9 +16372,15 @@ function buildFullstackLocalContractPaths({ rootFolder, fullstackContractProfile
     frontendAdminIndexPath: path.join(normalizedRootFolder, 'frontend', 'admin', 'index.html'),
     frontendAdminAppPath: path.join(normalizedRootFolder, 'frontend', 'admin', 'app.js'),
     frontendAdminStylesPath: path.join(normalizedRootFolder, 'frontend', 'admin', 'styles.css'),
+    frontendAdminReadmePath: path.join(normalizedRootFolder, 'frontend', 'admin', 'README.md'),
     frontendPublicIndexPath: path.join(normalizedRootFolder, 'frontend', 'public', 'index.html'),
     frontendPublicAppPath: path.join(normalizedRootFolder, 'frontend', 'public', 'app.js'),
     frontendPublicStylesPath: path.join(normalizedRootFolder, 'frontend', 'public', 'styles.css'),
+    frontendPublicReadmePath: path.join(normalizedRootFolder, 'frontend', 'public', 'README.md'),
+    frontendStudentIndexPath: path.join(normalizedRootFolder, 'frontend', 'student', 'index.html'),
+    frontendStudentAppPath: path.join(normalizedRootFolder, 'frontend', 'student', 'app.js'),
+    frontendStudentStylesPath: path.join(normalizedRootFolder, 'frontend', 'student', 'styles.css'),
+    frontendStudentReadmePath: path.join(normalizedRootFolder, 'frontend', 'student', 'README.md'),
     backendPrimaryRoutePath: path.join(
       normalizedRootFolder,
       'backend',
@@ -16170,12 +16402,86 @@ function buildFullstackLocalContractPaths({ rootFolder, fullstackContractProfile
       'routes',
       'reports.js',
     ),
+    backendCategoriesRoutePath: path.join(
+      normalizedRootFolder,
+      'backend',
+      'src',
+      'routes',
+      'categories.js',
+    ),
+    backendModulesRoutePath: path.join(
+      normalizedRootFolder,
+      'backend',
+      'src',
+      'routes',
+      'modules.js',
+    ),
+    backendLessonsRoutePath: path.join(
+      normalizedRootFolder,
+      'backend',
+      'src',
+      'routes',
+      'lessons.js',
+    ),
+    backendStudentsRoutePath: path.join(
+      normalizedRootFolder,
+      'backend',
+      'src',
+      'routes',
+      'students.js',
+    ),
+    backendEnrollmentsRoutePath: path.join(
+      normalizedRootFolder,
+      'backend',
+      'src',
+      'routes',
+      'enrollments.js',
+    ),
+    backendPlansRoutePath: path.join(
+      normalizedRootFolder,
+      'backend',
+      'src',
+      'routes',
+      'plans.js',
+    ),
+    backendPaymentsRoutePath: path.join(
+      normalizedRootFolder,
+      'backend',
+      'src',
+      'routes',
+      'payments.js',
+    ),
+    backendProgressRoutePath: path.join(
+      normalizedRootFolder,
+      'backend',
+      'src',
+      'routes',
+      'progress.js',
+    ),
     backendPrimaryModulePath: path.join(
       normalizedRootFolder,
       'backend',
       'src',
       'modules',
       `${profile.backendModuleBasename || 'appointments'}.js`,
+    ),
+    backendMockMercadoPagoServicePath: path.join(
+      normalizedRootFolder,
+      'backend',
+      'src',
+      'services',
+      'mock-mercado-pago.js',
+    ),
+    sharedPlansPath: path.join(normalizedRootFolder, 'shared', 'plans.js'),
+    sharedPaymentStatusesPath: path.join(
+      normalizedRootFolder,
+      'shared',
+      'payment-statuses.js',
+    ),
+    sharedCourseStatusesPath: path.join(
+      normalizedRootFolder,
+      'shared',
+      'course-statuses.js',
     ),
     sharedStatusesPath: path.join(normalizedRootFolder, 'shared', 'statuses.js'),
     databaseSchemaPath: path.join(normalizedRootFolder, 'database', 'schema.sql'),
@@ -16190,6 +16496,8 @@ function buildFullstackLocalContractPaths({ rootFolder, fullstackContractProfile
     docsArchitecturePath: path.join(normalizedRootFolder, 'docs', 'ARCHITECTURE.md'),
     docsDbSchemaPath: path.join(normalizedRootFolder, 'docs', 'DB_SCHEMA.md'),
     docsDataModelPath: path.join(normalizedRootFolder, 'docs', 'DATA_MODEL.md'),
+    docsPaymentsMockPath: path.join(normalizedRootFolder, 'docs', 'PAYMENTS_MOCK.md'),
+    docsLocalValidationPath: path.join(normalizedRootFolder, 'docs', 'LOCAL_VALIDATION.md'),
   }
 }
 
@@ -16199,6 +16507,11 @@ const CANONICAL_LOGISTICS_FULLSTACK_ROOT_ALIASES = [
   'logi-track-local',
 ]
 const LEGACY_LOGISTICS_FULLSTACK_ROOT_ALIASES = ['logitrack-local-v1']
+const CANONICAL_ONLINE_COURSES_FULLSTACK_ROOT_ALIASES = [
+  'edu-platform-local',
+  'courses-platform-local',
+  'online-courses-local',
+]
 
 function buildCanonicalFullstackLocalMaterializationContract({
   rootFolder,
@@ -16322,6 +16635,142 @@ function buildCanonicalFullstackLocalMaterializationContract({
     }
   }
 
+  if (profile.archetype === 'online-courses') {
+    const requiredPathGroups = [
+      { label: 'README.md', candidates: [rootReadmePath] },
+      { label: 'backend/package.json', candidates: [backendPackageJsonPath] },
+      {
+        label: 'backend/src/server.js|backend/server.js',
+        candidates: [backendSrcServerPath, backendLegacyServerPath],
+      },
+      {
+        label: 'backend/src/routes/courses.js',
+        candidates: [contractPaths.backendPrimaryRoutePath],
+      },
+      {
+        label: 'backend/src/routes/categories.js',
+        candidates: [contractPaths.backendCategoriesRoutePath],
+      },
+      {
+        label: 'backend/src/routes/modules.js',
+        candidates: [contractPaths.backendModulesRoutePath],
+      },
+      {
+        label: 'backend/src/routes/lessons.js',
+        candidates: [contractPaths.backendLessonsRoutePath],
+      },
+      {
+        label: 'backend/src/routes/students.js',
+        candidates: [contractPaths.backendStudentsRoutePath],
+      },
+      {
+        label: 'backend/src/routes/enrollments.js',
+        candidates: [contractPaths.backendEnrollmentsRoutePath],
+      },
+      {
+        label: 'backend/src/routes/plans.js',
+        candidates: [contractPaths.backendPlansRoutePath],
+      },
+      {
+        label: 'backend/src/routes/payments.js',
+        candidates: [contractPaths.backendPaymentsRoutePath],
+      },
+      {
+        label: 'backend/src/routes/progress.js',
+        candidates: [contractPaths.backendProgressRoutePath],
+      },
+      {
+        label: 'backend/src/services/mock-mercado-pago.js',
+        candidates: [contractPaths.backendMockMercadoPagoServicePath],
+      },
+      { label: 'database/schema.sql', candidates: [contractPaths.databaseSchemaPath] },
+      { label: 'database/seed.sql', candidates: [contractPaths.databaseSeedPath] },
+      {
+        label: 'frontend/admin/index.html',
+        candidates: [contractPaths.frontendAdminIndexPath],
+      },
+      {
+        label: 'frontend/admin/app.js',
+        candidates: [contractPaths.frontendAdminAppPath],
+      },
+      {
+        label: 'frontend/public/index.html',
+        candidates: [contractPaths.frontendPublicIndexPath],
+      },
+      {
+        label: 'frontend/public/app.js',
+        candidates: [contractPaths.frontendPublicAppPath],
+      },
+      {
+        label: 'frontend/student/index.html',
+        candidates: [contractPaths.frontendStudentIndexPath],
+      },
+      {
+        label: 'frontend/student/app.js',
+        candidates: [contractPaths.frontendStudentAppPath],
+      },
+      { label: 'shared/plans.js', candidates: [contractPaths.sharedPlansPath] },
+      {
+        label: 'shared/payment-statuses.js',
+        candidates: [contractPaths.sharedPaymentStatusesPath],
+      },
+      {
+        label: 'shared/course-statuses.js',
+        candidates: [contractPaths.sharedCourseStatusesPath],
+      },
+      { label: 'docs/API.md', candidates: [contractPaths.docsApiPath] },
+      {
+        label: 'docs/ARCHITECTURE.md',
+        candidates: [contractPaths.docsArchitecturePath],
+      },
+      {
+        label: 'docs/DB_SCHEMA.md|docs/DATA_MODEL.md',
+        candidates: [contractPaths.docsDbSchemaPath, contractPaths.docsDataModelPath],
+      },
+      {
+        label: 'docs/PAYMENTS_MOCK.md',
+        candidates: [contractPaths.docsPaymentsMockPath],
+      },
+      {
+        label: 'docs/LOCAL_VALIDATION.md',
+        candidates: [contractPaths.docsLocalValidationPath],
+      },
+      {
+        label: 'scripts/seed-local.js|scripts/README.md',
+        candidates: [scriptsSeedPath, scriptsReadmePath],
+      },
+    ]
+
+    return {
+      contractKind: 'online-courses-fullstack-local',
+      rootFolder: normalizedRootFolder,
+      allowedRootBasenames: CANONICAL_ONLINE_COURSES_FULLSTACK_ROOT_ALIASES.slice(),
+      preferredRootBasenames: CANONICAL_ONLINE_COURSES_FULLSTACK_ROOT_ALIASES.slice(),
+      forbiddenSignals: [
+        'web-scaffold-base',
+        'shipments',
+        'tracking',
+        'veterinaria',
+        'appointments',
+        'turnos',
+        'pacientes',
+        'mascotas',
+        'productos',
+        'stock',
+        'inventario',
+        'fullstack-local-veterinaria',
+      ],
+      primaryPersistencePaths: [
+        contractPaths.databaseSchemaPath,
+        contractPaths.databaseSeedPath,
+      ],
+      jsonPrimaryPersistencePaths: [],
+      requiredPathGroups,
+      requiredPaths: requiredPathGroups.map((entry) => entry.label),
+      expectedTargetPaths: requiredPathGroups.map((entry) => entry.candidates[0]).filter(Boolean),
+    }
+  }
+
   const genericRequiredPathGroups = [
     { label: 'README.md', candidates: [rootReadmePath] },
     { label: 'backend/package.json', candidates: [backendPackageJsonPath] },
@@ -16416,11 +16865,18 @@ function inspectFullstackLocalMaterializationContract({
         : [],
     fileHints,
   })
-  const usesLogisticsContract =
+  const usesCanonicalSpecializedContract =
     profile.archetype === 'logistics-tracking' ||
+    profile.archetype === 'online-courses' ||
     detectLogisticsTrackingIntent(
       normalizeSectorDetectionText([goal, context, fileHints.join(' ')].join(' ')),
     )
+  const selectedDomain =
+    profile.archetype === 'online-courses'
+      ? 'online-courses'
+      : profile.archetype === 'logistics-tracking'
+        ? 'logistics-tracking'
+        : profile.archetype || 'generic'
   const contractDefinition = buildCanonicalFullstackLocalMaterializationContract({
     rootFolder: rootFolder || 'logistics-tracker-local',
     fullstackContractProfile: profile,
@@ -16471,7 +16927,7 @@ function inspectFullstackLocalMaterializationContract({
     ) && !hasSqlContract
   const normalizedRootBasename = normalizePathForComparison(path.basename(rootFolder || '')).toLocaleLowerCase()
   const rootAliasMismatch =
-    usesLogisticsContract &&
+    usesCanonicalSpecializedContract &&
     Array.isArray(contractDefinition.allowedRootBasenames) &&
     contractDefinition.allowedRootBasenames.length > 0 &&
     !contractDefinition.allowedRootBasenames.some(
@@ -16493,35 +16949,47 @@ function inspectFullstackLocalMaterializationContract({
       .filter(Boolean)
       .join(' '),
   )
+  const normalizedDetectedProjectRoot = normalizePathForComparison(
+    normalizeOptionalString(existingProjectDetection?.projectRoot),
+  ).toLocaleLowerCase()
+  const shouldIgnoreDetectedProjectSignals =
+    existingProjectDetection?.applicable === false ||
+    (normalizedDetectedProjectRoot &&
+      !targetPaths.some((entry) => entry.includes(normalizedDetectedProjectRoot)))
   const contaminationText = normalizeSectorDetectionText(
     [
-      goal,
-      context,
       normalizeOptionalString(decisionKey),
       normalizeOptionalString(strategy),
       normalizeOptionalString(executionMode),
       normalizeOptionalString(nextExpectedAction),
       normalizeOptionalString(localProjectManifest?.domain),
-      normalizeOptionalString(existingProjectDetection?.projectRoot),
+      ...(shouldIgnoreDetectedProjectSignals
+        ? []
+        : [
+            normalizeOptionalString(existingProjectDetection?.projectRoot),
+            normalizeOptionalString(existingProjectDetection?.domain),
+          ]),
       ...(Array.isArray(localProjectManifest?.modules) ? localProjectManifest.modules : []),
+      ...targetPaths,
       ...(Array.isArray(materializationPlan?.operations)
-        ? materializationPlan.operations.map((entry) =>
+        ? materializationPlan.operations.flatMap((entry) => [
+            normalizeOptionalString(entry?.targetPath),
             typeof entry?.nextContent === 'string' ? entry.nextContent.slice(0, 1000) : '',
-          )
+          ])
         : []),
     ]
       .filter(Boolean)
       .join(' '),
   )
   const forbiddenSignalsFound = [
-    ...(usesLogisticsContract &&
+    ...(usesCanonicalSpecializedContract &&
     String(strategy || '').trim() !== 'materialize-fullstack-local-plan'
       ? ['strategy-not-materialize-fullstack-local-plan']
       : []),
-    ...(usesLogisticsContract && String(executionMode || '').trim() !== 'executor'
+    ...(usesCanonicalSpecializedContract && String(executionMode || '').trim() !== 'executor'
       ? ['executionMode-not-executor']
       : []),
-    ...(usesLogisticsContract && String(nextExpectedAction || '').trim() !== 'execute-plan'
+    ...(usesCanonicalSpecializedContract && String(nextExpectedAction || '').trim() !== 'execute-plan'
       ? ['nextExpectedAction-not-execute-plan']
       : []),
     ...(rootAliasMismatch ? ['unexpected-root-path'] : []),
@@ -16558,7 +17026,7 @@ function inspectFullstackLocalMaterializationContract({
     String(nextExpectedAction || '').trim() === 'execute-plan' &&
     missingRequiredPaths.length === 0 &&
     hasSqlContract &&
-    (!usesLogisticsContract || hasCanonicalDataModelDoc) &&
+    (!usesCanonicalSpecializedContract || hasCanonicalDataModelDoc) &&
     forbiddenSignalsFound.length === 0 &&
     !usesJsonAsPrimaryPersistence
 
@@ -16573,7 +17041,8 @@ function inspectFullstackLocalMaterializationContract({
     expectedTargetPaths: resolvedExpectedTargetPaths,
     allowedRootBasenames: contractDefinition.allowedRootBasenames,
     preferredRootBasenames: contractDefinition.preferredRootBasenames,
-    usesLogisticsContract,
+    usesLogisticsContract: profile.archetype === 'logistics-tracking',
+    selectedDomain,
     hasSqlContract,
     hasCanonicalDataModelDoc,
     missingRequiredMarkers: missingRequiredPaths,
@@ -16620,6 +17089,21 @@ function resolveFullstackLocalContractProfile({
       publicRoutePath: '/tracking/:code',
       publicRoutePurpose: 'Consultar tracking publico mock por codigo sin servicios reales.',
       validationSchemaMarker: 'create table shipments',
+    }
+  }
+
+  if (resolvedArchetype === 'online-courses') {
+    return {
+      archetype: resolvedArchetype,
+      frontendFeatureBasename: 'courses',
+      backendModuleBasename: 'courses',
+      backendRouteBasename: 'courses',
+      primaryFeatureLabel: 'cursos, acceso y progreso',
+      primaryRoutePath: '/courses',
+      primaryRoutePurpose: 'Listar cursos mock y su acceso por plan en modo local.',
+      publicRoutePath: '/catalog',
+      publicRoutePurpose: 'Explorar el catálogo público local de cursos sin servicios externos.',
+      validationSchemaMarker: 'create table courses',
     }
   }
 
@@ -17812,6 +18296,143 @@ function buildEcommerceFullstackLocalDemoData({
   })
 }
 
+function buildOnlineCoursesFullstackLocalDemoData({
+  appTitle,
+  nextRecommendedPhase,
+}) {
+  return buildTemplateFullstackLocalDemoData({
+    appTitle,
+    archetype: 'online-courses',
+    heroKicker: 'Cursos online local',
+    subtitle:
+      'Entrega funcional local para catálogo de cursos, panel admin, panel alumno, planes y pagos mock seguros.',
+    domainSummary:
+      'Incluye cursos, categorías, módulos, clases, progreso, inscripciones y simulación local de pagos sin credenciales ni servicios externos.',
+    nextRecommendedPhase,
+    navItems: [
+      { id: 'dashboard', label: 'Dashboard', hint: 'Resumen académico y comercial' },
+      { id: 'courses', label: 'Cursos', hint: 'Catálogo y publicación' },
+      { id: 'students', label: 'Alumnos', hint: 'Acceso y estado' },
+      { id: 'enrollments', label: 'Inscripciones', hint: 'Planes y acceso' },
+      { id: 'payments', label: 'Pagos mock', hint: 'Mercado Pago local' },
+      { id: 'progress', label: 'Progreso', hint: 'Avance por clase' },
+      { id: 'reports', label: 'Reportes', hint: 'Métricas básicas' },
+    ],
+    metrics: [
+      { id: 'courses', label: 'Cursos publicados', value: '18', tone: 'sky', detail: '12 activos y 6 en preparación' },
+      { id: 'students', label: 'Alumnos mock', value: '146', tone: 'emerald', detail: 'Con acceso por plan y progreso local' },
+      { id: 'payments', label: 'Pagos simulados', value: '23', tone: 'amber', detail: 'Estados pending, approved, rejected y cancelled' },
+      { id: 'progress', label: 'Clases completadas', value: '68%', tone: 'violet', detail: 'Promedio de avance en cohortes activas' },
+    ],
+    alerts: [
+      { id: 'a1', tone: 'amber', title: 'Pago mock pendiente', detail: 'Hay suscripciones Plata pendientes de aprobación local.' },
+      { id: 'a2', tone: 'sky', title: 'Curso con lecciones premium', detail: 'Recordá validar acceso por plan antes de una integración real.' },
+    ],
+    constraints: [
+      'Sin .env ni credenciales reales',
+      'Sin llamadas reales a Mercado Pago',
+      'Sin backend real ni base real activa',
+      'Sin Docker, deploy ni servicios externos',
+    ],
+    team: [
+      { id: 'EDU-OPS-001', name: 'Operación académica local', role: 'Administración', shift: '09:00 a 18:00', status: 'Activa', focus: 'Cursos, planes y reportes mock' },
+    ],
+    datasets: {
+      courses: [
+        { id: 'CRS-001', title: 'React desde cero', category: 'Frontend', plan: 'Free', status: 'Publicado', lessons: '16 clases', note: 'Incluye clases gratuitas y premium.' },
+        { id: 'CRS-002', title: 'Node y APIs locales', category: 'Backend', plan: 'Plata', status: 'Publicado', lessons: '22 clases', note: 'Acceso completo para Plata y Oro.' },
+      ],
+      students: [
+        { id: 'STD-001', name: 'Lucía Mena', plan: 'Plata', status: 'Activa', progress: '42%', note: 'Completó el módulo 1 y avanzó en clases premium.' },
+        { id: 'STD-002', name: 'Tomás Rivas', plan: 'Free', status: 'Limitado', progress: '12%', note: 'Sólo ve clases gratuitas.' },
+      ],
+      enrollments: [
+        { id: 'ENR-001', student: 'Lucía Mena', course: 'Node y APIs locales', status: 'approved', plan: 'Plata', note: 'Acceso habilitado a progreso completo.' },
+        { id: 'ENR-002', student: 'Tomás Rivas', course: 'React desde cero', status: 'pending', plan: 'Free', note: 'Acceso limitado a clases gratuitas.' },
+      ],
+      payments: [
+        { id: 'PAY-001', student: 'Lucía Mena', plan: 'Plata', status: 'approved', amount: '$24.900', note: 'Procesado por mock-mercado-pago local.' },
+        { id: 'PAY-002', student: 'Tomás Rivas', plan: 'Free', status: 'pending', amount: '$0', note: 'Sin cobro real ni checkout externo.' },
+      ],
+      progress: [
+        { id: 'PRG-001', student: 'Lucía Mena', course: 'Node y APIs locales', status: 'en curso', completion: '42%', note: '9 de 22 clases marcadas como vistas.' },
+        { id: 'PRG-002', student: 'Tomás Rivas', course: 'React desde cero', status: 'free-only', completion: '12%', note: 'Sólo avance sobre contenido gratuito.' },
+      ],
+      reports: [
+        { id: 'REP-001', name: 'Cursos más activos', value: '3', detail: 'Tres cursos concentran el 70% de las inscripciones mock.', status: 'Estable' },
+        { id: 'REP-002', name: 'Ingresos simulados', value: '$148.500', detail: 'Suma local de pagos approved sin pasarela real.', status: 'Mock' },
+      ],
+      activity: [
+        { id: 'ACT-001', time: '10:15', title: 'Inscripción aprobada', detail: 'Lucía Mena accedió al curso Node y APIs locales.', tone: 'sky' },
+      ],
+    },
+    views: [
+      buildFullstackLocalDemoView({ id: 'dashboard', label: 'Dashboard', title: 'Panel de cursos online', description: 'Resumen local de catálogo, alumnos, pagos mock y progreso.', kind: 'dashboard', supportsSearch: false }),
+      buildFullstackLocalDemoView({
+        id: 'courses', label: 'Cursos', title: 'Cursos', description: 'Catálogo local de cursos y estado de publicación.',
+        datasetKey: 'courses',
+        columns: [
+          { key: 'title', label: 'Curso' }, { key: 'category', label: 'Categoría' }, { key: 'plan', label: 'Plan' }, { key: 'status', label: 'Estado', kind: 'badge' },
+        ],
+        detailFields: [{ key: 'lessons', label: 'Clases' }, { key: 'note', label: 'Notas' }],
+        searchableKeys: ['title', 'category', 'plan', 'status'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'students', label: 'Alumnos', title: 'Alumnos', description: 'Estado de alumnos mock y acceso por plan.',
+        datasetKey: 'students',
+        columns: [
+          { key: 'name', label: 'Alumno' }, { key: 'plan', label: 'Plan' }, { key: 'progress', label: 'Progreso' }, { key: 'status', label: 'Estado', kind: 'badge' },
+        ],
+        detailFields: [{ key: 'note', label: 'Notas' }],
+        searchableKeys: ['name', 'plan', 'progress', 'status'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'enrollments', label: 'Inscripciones', title: 'Inscripciones', description: 'Acceso local a cursos según plan.',
+        datasetKey: 'enrollments',
+        columns: [
+          { key: 'student', label: 'Alumno' }, { key: 'course', label: 'Curso' }, { key: 'plan', label: 'Plan' }, { key: 'status', label: 'Estado', kind: 'badge' },
+        ],
+        detailFields: [{ key: 'note', label: 'Notas' }],
+        searchableKeys: ['student', 'course', 'plan', 'status'],
+        supportsStatusFilter: true,
+      }),
+      buildFullstackLocalDemoView({
+        id: 'payments', label: 'Pagos mock', title: 'Pagos mock', description: 'Estados locales simulados para futuras integraciones de cobro.',
+        datasetKey: 'payments',
+        columns: [
+          { key: 'student', label: 'Alumno' }, { key: 'plan', label: 'Plan' }, { key: 'amount', label: 'Monto' }, { key: 'status', label: 'Estado', kind: 'badge' },
+        ],
+        detailFields: [{ key: 'note', label: 'Notas' }],
+        searchableKeys: ['student', 'plan', 'status'],
+        supportsStatusFilter: true,
+      }),
+      buildFullstackLocalDemoView({
+        id: 'progress', label: 'Progreso', title: 'Progreso', description: 'Avance del alumno por curso y clase.',
+        datasetKey: 'progress',
+        columns: [
+          { key: 'student', label: 'Alumno' }, { key: 'course', label: 'Curso' }, { key: 'completion', label: 'Avance' }, { key: 'status', label: 'Estado', kind: 'badge' },
+        ],
+        detailFields: [{ key: 'note', label: 'Notas' }],
+        searchableKeys: ['student', 'course', 'completion', 'status'],
+      }),
+      buildFullstackLocalDemoView({ id: 'reports', label: 'Reportes', title: 'Reportes', description: 'Métricas mock de cursos, alumnos y pagos simulados.', datasetKey: 'reports', kind: 'reports', supportsSearch: false }),
+    ],
+    quickActions: [
+      { id: 'qa-1', label: 'Ver cursos', targetView: 'courses', feedback: 'Se abrió el catálogo local de cursos.' },
+      { id: 'qa-2', label: 'Abrir pagos mock', targetView: 'payments', feedback: 'Quedaron visibles los estados locales del mock de Mercado Pago.' },
+      { id: 'qa-3', label: 'Revisar progreso', targetView: 'progress', feedback: 'Se mostró el avance local por alumno y curso.' },
+    ],
+    interactionHighlights: [
+      'Filtrar cursos, alumnos e inscripciones en modo local revisable.',
+      'Revisar acceso por plan Free, Plata y Oro sin auth ni pagos reales.',
+      'Validar estados pending, approved, rejected y cancelled del mock de pagos.',
+    ],
+    statusOptions: { appointments: ['todos', 'pending', 'approved', 'rejected', 'cancelled', 'en curso', 'free-only'] },
+    domainEntities: ['courses', 'categories', 'modules', 'lessons', 'students', 'plans', 'enrollments', 'payments', 'progress'],
+    modules: ['catalogo de cursos', 'categorias', 'modulos y clases', 'panel admin', 'panel alumno', 'planes', 'pagos mock', 'progreso', 'reportes'],
+  })
+}
+
 function buildSchoolCrmFullstackLocalDemoData({
   appTitle,
   nextRecommendedPhase,
@@ -18569,6 +19190,11 @@ function buildFullstackLocalDemoData({
       })
     case 'ecommerce':
       return buildEcommerceFullstackLocalDemoData({
+        appTitle,
+        nextRecommendedPhase,
+      })
+    case 'online-courses':
+      return buildOnlineCoursesFullstackLocalDemoData({
         appTitle,
         nextRecommendedPhase,
       })
@@ -19875,6 +20501,21 @@ function buildFullstackLocalDatasetCollectionMap(fullstackLocalDemoData) {
           'reports',
           'activity',
         ]
+      : fullstackContractProfile.archetype === 'online-courses'
+        ? [
+            'team',
+            'courses',
+            'categories',
+            'modules',
+            'lessons',
+            'students',
+            'enrollments',
+            'plans',
+            'payments',
+            'progress',
+            'reports',
+            'activity',
+          ]
       : [
           'team',
           'clients',
@@ -19919,6 +20560,111 @@ function buildFullstackLocalBackendDomainModuleContent(fullstackLocalDemoData) {
   })
   const isLogisticsTracking =
     fullstackContractProfile.archetype === 'logistics-tracking'
+  const isOnlineCourses =
+    fullstackContractProfile.archetype === 'online-courses'
+
+  if (isOnlineCourses) {
+    const domainMockBundle = buildFullstackLocalDatasetCollectionMap(fullstackLocalDemoData)
+
+    return `const domainMockBundle = ${JSON.stringify(domainMockBundle, null, 2)}
+const PLAN_ACCESS_RULES = {
+  Free: ['free'],
+  Plata: ['free', 'plata'],
+  Oro: ['free', 'plata', 'oro'],
+}
+const PAYMENT_STATUSES = ['pending', 'approved', 'rejected', 'cancelled']
+
+function cloneValue(value) {
+  return JSON.parse(JSON.stringify(value))
+}
+
+function listCollection(datasetKey) {
+  const collection = domainMockBundle && Object.prototype.hasOwnProperty.call(domainMockBundle, datasetKey)
+    ? domainMockBundle[datasetKey]
+    : []
+
+  return Array.isArray(collection) ? cloneValue(collection) : []
+}
+
+function listDatasetKeys() {
+  return Object.keys(domainMockBundle || {})
+}
+
+function listMockClients() {
+  return listCollection('students')
+}
+
+function listMockCourses() {
+  return listCollection('courses')
+}
+
+function listMockCategories() {
+  return listCollection('categories')
+}
+
+function listMockModules() {
+  return listCollection('modules')
+}
+
+function listMockLessons() {
+  return listCollection('lessons')
+}
+
+function listMockStudents() {
+  return listCollection('students')
+}
+
+function listMockEnrollments() {
+  return listCollection('enrollments')
+}
+
+function listMockPlans() {
+  return listCollection('plans')
+}
+
+function listMockPayments() {
+  return listCollection('payments')
+}
+
+function listMockProgress() {
+  return listCollection('progress')
+}
+
+function listMockReports() {
+  return listCollection('reports')
+}
+
+function createMockMercadoPagoPayment({ studentId, planName, amountLabel, status = 'pending' }) {
+  return {
+    provider: 'mock-mercado-pago',
+    studentId,
+    planName,
+    amountLabel,
+    status: PAYMENT_STATUSES.includes(status) ? status : 'pending',
+    externalCall: false,
+    credentialsRequired: false,
+  }
+}
+
+module.exports = {
+  PLAN_ACCESS_RULES,
+  PAYMENT_STATUSES,
+  listDatasetKeys,
+  listMockClients,
+  listMockCourses,
+  listMockCategories,
+  listMockModules,
+  listMockLessons,
+  listMockStudents,
+  listMockEnrollments,
+  listMockPlans,
+  listMockPayments,
+  listMockProgress,
+  listMockReports,
+  createMockMercadoPagoPayment,
+}
+`
+  }
 
   if (isLogisticsTracking) {
     const shipmentStatuses = summarizeUniqueExecutorStrings(
@@ -20472,6 +21218,8 @@ function buildFullstackLocalBackendServerContent(fullstackLocalDemoData) {
   const fullstackContractProfile = resolveFullstackLocalContractProfile({
     archetype: fullstackLocalDemoData?.overview?.archetype || '',
   })
+  const isOnlineCourses =
+    fullstackContractProfile.archetype === 'online-courses'
   const isLogisticsTracking =
     fullstackContractProfile.archetype === 'logistics-tracking'
   const datasetMap = buildFullstackLocalDatasetCollectionMap(fullstackLocalDemoData)
@@ -20481,6 +21229,87 @@ function buildFullstackLocalBackendServerContent(fullstackLocalDemoData) {
       Array.isArray(entries) ? entries.length : 0,
     ]),
   )
+
+  if (isOnlineCourses) {
+    return `const { healthRoute } = require('./routes/health')
+const {
+  listMockCourses,
+  listMockCategories,
+  listMockModules,
+  listMockLessons,
+  listMockStudents,
+  listMockEnrollments,
+  listMockPlans,
+  listMockPayments,
+  listMockProgress,
+  listMockReports,
+  listDatasetKeys,
+  createMockMercadoPagoPayment,
+} = require('./modules/${fullstackContractProfile.backendModuleBasename}')
+const { PAYMENT_STATUSES } = require('./services/mock-mercado-pago')
+
+function createRouteContracts() {
+  return [
+    { method: 'GET', path: '/health', purpose: 'Chequeo conceptual del entorno local.' },
+    { method: 'GET', path: '/courses', purpose: 'Listar cursos locales publicados o draft.' },
+    { method: 'GET', path: '/categories', purpose: 'Listar categorias del catálogo local.' },
+    { method: 'GET', path: '/modules', purpose: 'Listar modulos por curso en modo local.' },
+    { method: 'GET', path: '/lessons', purpose: 'Listar clases gratuitas o premium sin runtime real.' },
+    { method: 'GET', path: '/students', purpose: 'Listar alumnos mock y sus planes.' },
+    { method: 'GET', path: '/enrollments', purpose: 'Listar inscripciones locales por curso.' },
+    { method: 'GET', path: '/plans', purpose: 'Listar planes Free, Plata y Oro.' },
+    { method: 'GET', path: '/payments', purpose: 'Listar pagos simulados del mock local.' },
+    { method: 'GET', path: '/progress', purpose: 'Listar avance de alumnos por clase.' },
+  ]
+}
+
+function createServerContract() {
+  return {
+    kind: 'fullstack-local',
+    archetype: ${JSON.stringify(fullstackLocalDemoData?.overview?.archetype || 'online-courses')},
+    activeServer: false,
+    canListen: false,
+    routes: createRouteContracts(),
+    counts: {
+      courses: listMockCourses().length,
+      categories: listMockCategories().length,
+      modules: listMockModules().length,
+      lessons: listMockLessons().length,
+      students: listMockStudents().length,
+      enrollments: listMockEnrollments().length,
+      plans: listMockPlans().length,
+      payments: listMockPayments().length,
+      progress: listMockProgress().length,
+      reports: listMockReports().length,
+    },
+    collections: ${JSON.stringify(collectionCounts, null, 2)},
+    availableDatasets: listDatasetKeys(),
+    reviewFlows: [
+      'listar cursos y categorias mock',
+      'revisar acceso por planes Free, Plata y Oro',
+      'validar pagos simulados sin checkout real',
+      'recorrer progreso por alumno y clase',
+      'leer reportes locales de cursos y alumnos',
+    ],
+    sampleOperations: {
+      mockPayment: createMockMercadoPagoPayment({
+        studentId: listMockStudents()[0] && listMockStudents()[0].id,
+        planCode: 'plata',
+        amountLabel: '$24.900',
+        status: PAYMENT_STATUSES.includes('approved') ? 'approved' : 'pending',
+      }),
+    },
+    health: healthRoute(),
+  }
+}
+
+module.exports = {
+  createRouteContracts,
+  createServerContract,
+  createServerManifest: createServerContract,
+}
+`
+  }
 
   if (isLogisticsTracking) {
     return `const { healthRoute } = require('./routes/health')
@@ -20687,6 +21516,14 @@ function buildFullstackLocalSharedDomainObject(fullstackLocalDemoData) {
           primaryStatuses:
             fullstackLocalDemoData?.statusOptions?.events || [],
         }
+      : fullstackContractProfile.archetype === 'online-courses'
+        ? {
+            paymentStatuses: ['pending', 'approved', 'rejected', 'cancelled'],
+            enrollmentStatuses:
+              fullstackLocalDemoData?.statusOptions?.appointments || [],
+            primaryStatuses:
+              fullstackLocalDemoData?.statusOptions?.appointments || [],
+          }
       : {
           appointmentStatuses:
             fullstackLocalDemoData?.statusOptions?.appointments || [],
@@ -20712,7 +21549,13 @@ function buildFullstackLocalSharedDomainObject(fullstackLocalDemoData) {
           trackingEvents: 'trackingEvents',
           incidents: 'reminders',
         }
-      : {},
+      : fullstackContractProfile.archetype === 'online-courses'
+        ? {
+            catalog: 'courses',
+            learners: 'students',
+            subscriptions: 'payments',
+          }
+        : {},
     interactionHighlights:
       fullstackLocalDemoData?.interactionHighlights || [],
     activeServices: false,
@@ -20771,6 +21614,37 @@ function buildFullstackLocalSharedStatusContracts(fullstackLocalDemoData) {
     }
   }
 
+  if (fullstackContractProfile.archetype === 'online-courses') {
+    return {
+      payments: summarizeUniqueExecutorStrings(
+        [
+          ...(Array.isArray(fullstackLocalDemoData?.payments)
+            ? fullstackLocalDemoData.payments.map((entry) => entry?.status || '')
+            : []),
+          'pending',
+          'approved',
+          'rejected',
+          'cancelled',
+        ],
+        12,
+      ),
+      progress: summarizeUniqueExecutorStrings(
+        (Array.isArray(fullstackLocalDemoData?.progress)
+          ? fullstackLocalDemoData.progress.map((entry) => entry?.status || '')
+          : []
+        ),
+        12,
+      ),
+      enrollments: summarizeUniqueExecutorStrings(
+        (Array.isArray(fullstackLocalDemoData?.enrollments)
+          ? fullstackLocalDemoData.enrollments.map((entry) => entry?.status || '')
+          : []
+        ),
+        12,
+      ),
+    }
+  }
+
   return {
     appointments: summarizeUniqueExecutorStrings(
       [
@@ -20821,6 +21695,47 @@ function buildFullstackLocalEntityRelationships(fullstackLocalDemoData) {
         to: 'incidents',
         relation: 'one-to-many',
         detail: 'Las incidencias quedan asociadas al envio afectado y su seguimiento local.',
+      },
+    ]
+  }
+
+  if (fullstackContractProfile.archetype === 'online-courses') {
+    return [
+      {
+        from: 'plans',
+        to: 'courses',
+        relation: 'one-to-many',
+        detail: 'Cada plan define el nivel de acceso a cursos y clases premium.',
+      },
+      {
+        from: 'courses',
+        to: 'modules',
+        relation: 'one-to-many',
+        detail: 'Cada curso se organiza en módulos que agrupan clases locales.',
+      },
+      {
+        from: 'modules',
+        to: 'lessons',
+        relation: 'one-to-many',
+        detail: 'Los módulos contienen clases gratuitas o premium.',
+      },
+      {
+        from: 'students',
+        to: 'enrollments',
+        relation: 'one-to-many',
+        detail: 'Un alumno puede registrarse en varios cursos según su plan.',
+      },
+      {
+        from: 'students',
+        to: 'payments',
+        relation: 'one-to-many',
+        detail: 'Los pagos mock registran estados locales sin pasarela real.',
+      },
+      {
+        from: 'enrollments',
+        to: 'progress',
+        relation: 'one-to-many',
+        detail: 'Cada inscripción acumula avance por clase y curso.',
       },
     ]
   }
@@ -21234,6 +22149,144 @@ insert into courts (id, name, surface, availability_window, status, notes) value
 insert into bookings (id, customer_id, court_id, scheduled_at, reason, status, notes) values
   ('RES-001', 'CUS-001', 'CRT-001', '2026-05-05 20:00', 'Fútbol 5', 'confirmado', 'Equipo completo confirmado'),
   ('RES-002', 'CUS-002', 'CRT-002', '2026-05-06 18:00', 'Entrenamiento', 'pendiente', 'Falta confirmar duración');
+`,
+    }
+  }
+
+  if (archetype === 'online-courses') {
+    return {
+      readmeContent: `# Database local
+
+Esta carpeta queda como diseño revisable para la plataforma de cursos online local.
+
+- No se creó una base de datos real.
+- No se ejecutaron migraciones.
+- \`schema.sql\` y \`seeds/seed-local.sql\` describen cursos, planes, inscripciones, pagos mock y progreso.
+`,
+      schemaContent: `-- Esquema local revisable para ${appTitle}
+-- No ejecutar automáticamente.
+
+create table categories (
+  id text primary key,
+  name text not null,
+  slug text not null unique,
+  status text not null
+);
+
+create table courses (
+  id text primary key,
+  category_id text not null,
+  title text not null,
+  slug text not null unique,
+  access_plan text not null,
+  course_status text not null,
+  notes text,
+  foreign key (category_id) references categories(id)
+);
+
+create table course_modules (
+  id text primary key,
+  course_id text not null,
+  title text not null,
+  position integer not null,
+  foreign key (course_id) references courses(id)
+);
+
+create table lessons (
+  id text primary key,
+  module_id text not null,
+  title text not null,
+  lesson_type text not null,
+  access_tier text not null,
+  position integer not null,
+  foreign key (module_id) references course_modules(id)
+);
+
+create table plans (
+  id text primary key,
+  plan_name text not null,
+  billing_label text not null,
+  grants_full_access integer not null default 0
+);
+
+create table students (
+  id text primary key,
+  full_name text not null,
+  email text not null,
+  plan_id text not null,
+  student_status text not null,
+  foreign key (plan_id) references plans(id)
+);
+
+create table enrollments (
+  id text primary key,
+  student_id text not null,
+  course_id text not null,
+  enrollment_status text not null,
+  access_mode text not null,
+  foreign key (student_id) references students(id),
+  foreign key (course_id) references courses(id)
+);
+
+create table payments (
+  id text primary key,
+  student_id text not null,
+  plan_id text not null,
+  provider text not null,
+  payment_status text not null,
+  amount_label text not null,
+  foreign key (student_id) references students(id),
+  foreign key (plan_id) references plans(id)
+);
+
+create table progress (
+  id text primary key,
+  enrollment_id text not null,
+  lesson_id text not null,
+  completion_percent integer not null,
+  progress_status text not null,
+  foreign key (enrollment_id) references enrollments(id),
+  foreign key (lesson_id) references lessons(id)
+);
+`,
+      seedContent: `-- Seed local y revisable. No ejecutar automáticamente.
+
+insert into categories (id, name, slug, status) values
+  ('CAT-001', 'Frontend', 'frontend', 'published'),
+  ('CAT-002', 'Backend', 'backend', 'published');
+
+insert into courses (id, category_id, title, slug, access_plan, course_status, notes) values
+  ('CRS-001', 'CAT-001', 'React desde cero', 'react-desde-cero', 'free', 'published', 'Incluye clases gratuitas y premium.'),
+  ('CRS-002', 'CAT-002', 'Node y APIs locales', 'node-apis-locales', 'plata', 'published', 'Acceso completo para Plata y Oro.');
+
+insert into course_modules (id, course_id, title, position) values
+  ('MOD-001', 'CRS-001', 'Fundamentos', 1),
+  ('MOD-002', 'CRS-002', 'APIs y contratos', 1);
+
+insert into lessons (id, module_id, title, lesson_type, access_tier, position) values
+  ('LES-001', 'MOD-001', 'Introducción a componentes', 'video', 'free', 1),
+  ('LES-002', 'MOD-002', 'Diseño de rutas locales', 'video', 'plata', 1);
+
+insert into plans (id, plan_name, billing_label, grants_full_access) values
+  ('PLN-FREE', 'Free', '$0', 0),
+  ('PLN-PLATA', 'Plata', '$24.900', 0),
+  ('PLN-ORO', 'Oro', '$44.900', 1);
+
+insert into students (id, full_name, email, plan_id, student_status) values
+  ('STD-001', 'Lucía Mena', 'lucia@mock.local', 'PLN-PLATA', 'active'),
+  ('STD-002', 'Tomás Rivas', 'tomas@mock.local', 'PLN-FREE', 'limited');
+
+insert into enrollments (id, student_id, course_id, enrollment_status, access_mode) values
+  ('ENR-001', 'STD-001', 'CRS-002', 'approved', 'selected-course'),
+  ('ENR-002', 'STD-002', 'CRS-001', 'pending', 'free-only');
+
+insert into payments (id, student_id, plan_id, provider, payment_status, amount_label) values
+  ('PAY-001', 'STD-001', 'PLN-PLATA', 'mock-mercado-pago', 'approved', '$24.900'),
+  ('PAY-002', 'STD-002', 'PLN-FREE', 'mock-mercado-pago', 'pending', '$0');
+
+insert into progress (id, enrollment_id, lesson_id, completion_percent, progress_status) values
+  ('PRG-001', 'ENR-001', 'LES-002', 42, 'in-progress'),
+  ('PRG-002', 'ENR-002', 'LES-001', 12, 'free-only');
 `,
     }
   }
@@ -21770,6 +22823,8 @@ function buildFullstackLocalDocumentationBundle({
   })
   const isLogisticsTracking =
     fullstackContractProfile.archetype === 'logistics-tracking'
+  const isOnlineCourses =
+    fullstackContractProfile.archetype === 'online-courses'
   const archetypeLabel =
     buildFullstackLocalArchetypeDisplayLabel(overview.archetype) ||
     overview.archetypeLabel ||
@@ -21817,7 +22872,7 @@ function buildFullstackLocalDocumentationBundle({
     12,
   )
   const nextSafePhases = (
-    isLogisticsTracking
+    isLogisticsTracking || isOnlineCourses
       ? [overview.nextRecommendedPhase || 'review-and-expand']
       : [
           overview.nextRecommendedPhase || 'frontend-mock-flow',
@@ -21829,10 +22884,18 @@ function buildFullstackLocalDocumentationBundle({
   ).filter((entry, index, entries) => entry && entries.indexOf(entry) === index)
   const openEntryPoints = isLogisticsTracking
     ? ['frontend/admin/index.html', 'frontend/public/index.html']
-    : ['frontend/index.html']
+    : isOnlineCourses
+      ? [
+          'frontend/admin/index.html',
+          'frontend/public/index.html',
+          'frontend/student/index.html',
+        ]
+      : ['frontend/index.html']
   const openEntryPointsText = openEntryPoints.map((entry) => `\`${entry}\``).join(' y ')
   const localSurfaceLabel = isLogisticsTracking
     ? 'panel admin y consulta pública por código'
+    : isOnlineCourses
+      ? 'catálogo público, panel admin y panel alumno'
     : 'entrega local principal'
 
   return {
@@ -21920,7 +22983,7 @@ Dejar una primera entrega funcional local, segura, revisable y abrible por \`fil
 ## Capas
 
 - frontend/: entrega estática con navegación, métricas, listas y detalle local
-- frontend/admin y frontend/public: superficies separadas cuando el contrato requiere panel interno y tracking público local
+- ${isOnlineCourses ? 'frontend/admin, frontend/public y frontend/student: superficies separadas para panel admin, catálogo público y panel alumno local' : 'frontend/admin y frontend/public: superficies separadas cuando el contrato requiere panel interno y tracking público local'}
 - backend/: contratos y helpers puros sin \`listen()\`
 - shared/: contratos del dominio reutilizables
 - database/: diseño SQL local no ejecutado
@@ -21979,7 +23042,7 @@ El proyecto quedo como entrega funcional local segura y revisable.
 - listas y detalle
 - cambios de estado locales
 - recordatorios y reportes
-- stock o seguimiento operativo según dominio
+- ${isOnlineCourses ? 'pagos mock, planes y progreso por alumno según dominio' : 'stock o seguimiento operativo según dominio'}
 
 ## Qué sigue fuera de alcance
 
@@ -22493,6 +23556,7 @@ function buildFullstackLocalMaterializationPlan({
   const frontendFolder = path.join(rootFolder, 'frontend')
   const frontendAdminFolder = path.join(frontendFolder, 'admin')
   const frontendPublicFolder = path.join(frontendFolder, 'public')
+  const frontendStudentFolder = path.join(frontendFolder, 'student')
   const frontendSrcFolder = path.join(frontendFolder, 'src')
   const frontendRoutesFolder = path.join(frontendSrcFolder, 'routes')
   const frontendFeaturesFolder = path.join(frontendSrcFolder, 'features')
@@ -22502,6 +23566,7 @@ function buildFullstackLocalMaterializationPlan({
   const backendRoutesFolder = path.join(backendSrcFolder, 'routes')
   const backendModulesFolder = path.join(backendSrcFolder, 'modules')
   const backendLibFolder = path.join(backendSrcFolder, 'lib')
+  const backendServicesFolder = path.join(backendSrcFolder, 'services')
   const sharedFolder = path.join(rootFolder, 'shared')
   const sharedContractsFolder = path.join(sharedFolder, 'contracts')
   const sharedTypesFolder = path.join(sharedFolder, 'types')
@@ -22574,11 +23639,15 @@ function buildFullstackLocalMaterializationPlan({
   })
   const usesLogisticsFullstackContract =
     fullstackContractProfile.archetype === 'logistics-tracking'
+  const usesOnlineCoursesFullstackContract =
+    fullstackContractProfile.archetype === 'online-courses'
+  const usesCanonicalSpecializedFullstackContract =
+    usesLogisticsFullstackContract || usesOnlineCoursesFullstackContract
   const frontendFeaturePath = path.join(
     frontendFeaturesFolder,
     `${fullstackContractProfile.frontendFeatureBasename}.js`,
   )
-  const genericFrontendFolders = usesLogisticsFullstackContract
+  const genericFrontendFolders = usesCanonicalSpecializedFullstackContract
     ? []
     : [
         frontendSrcFolder,
@@ -22586,7 +23655,7 @@ function buildFullstackLocalMaterializationPlan({
         frontendFeaturesFolder,
         frontendComponentsFolder,
       ]
-  const genericFrontendFiles = usesLogisticsFullstackContract
+  const genericFrontendFiles = usesCanonicalSpecializedFullstackContract
     ? []
     : [
         frontendIndexHtmlPath,
@@ -22610,12 +23679,14 @@ function buildFullstackLocalMaterializationPlan({
     frontendFolder,
     frontendAdminFolder,
     frontendPublicFolder,
+    ...(usesOnlineCoursesFullstackContract ? [frontendStudentFolder] : []),
     ...genericFrontendFolders,
     backendFolder,
     backendSrcFolder,
     backendRoutesFolder,
     backendModulesFolder,
     backendLibFolder,
+    ...(usesOnlineCoursesFullstackContract ? [backendServicesFolder] : []),
     sharedFolder,
     sharedContractsFolder,
     sharedTypesFolder,
@@ -22646,7 +23717,7 @@ function buildFullstackLocalMaterializationPlan({
     docsArchitecturePath,
     docsApiPath,
     docsDataModelPath,
-    ...(usesLogisticsFullstackContract
+    ...(usesCanonicalSpecializedFullstackContract
       ? [
           fullstackContractPaths.frontendAdminIndexPath,
           fullstackContractPaths.frontendAdminAppPath,
@@ -22654,12 +23725,38 @@ function buildFullstackLocalMaterializationPlan({
           fullstackContractPaths.frontendPublicIndexPath,
           fullstackContractPaths.frontendPublicAppPath,
           fullstackContractPaths.frontendPublicStylesPath,
-          fullstackContractPaths.backendTrackingRoutePath,
-          fullstackContractPaths.backendReportsRoutePath,
-          fullstackContractPaths.sharedStatusesPath,
           fullstackContractPaths.docsArchitecturePath,
           fullstackContractPaths.docsApiPath,
           fullstackContractPaths.docsDbSchemaPath,
+        ]
+      : []),
+    ...(usesLogisticsFullstackContract
+      ? [
+          fullstackContractPaths.backendTrackingRoutePath,
+          fullstackContractPaths.backendReportsRoutePath,
+          fullstackContractPaths.sharedStatusesPath,
+        ]
+      : []),
+    ...(usesOnlineCoursesFullstackContract
+      ? [
+          fullstackContractPaths.frontendStudentIndexPath,
+          fullstackContractPaths.frontendStudentAppPath,
+          fullstackContractPaths.frontendStudentStylesPath,
+          fullstackContractPaths.frontendStudentReadmePath,
+          fullstackContractPaths.backendCategoriesRoutePath,
+          fullstackContractPaths.backendModulesRoutePath,
+          fullstackContractPaths.backendLessonsRoutePath,
+          fullstackContractPaths.backendStudentsRoutePath,
+          fullstackContractPaths.backendEnrollmentsRoutePath,
+          fullstackContractPaths.backendPlansRoutePath,
+          fullstackContractPaths.backendPaymentsRoutePath,
+          fullstackContractPaths.backendProgressRoutePath,
+          fullstackContractPaths.backendMockMercadoPagoServicePath,
+          fullstackContractPaths.sharedPlansPath,
+          fullstackContractPaths.sharedPaymentStatusesPath,
+          fullstackContractPaths.sharedCourseStatusesPath,
+          fullstackContractPaths.docsPaymentsMockPath,
+          fullstackContractPaths.docsLocalValidationPath,
         ]
       : []),
     docsRunbookPath,
@@ -22675,7 +23772,9 @@ function buildFullstackLocalMaterializationPlan({
     normalizedText: normalizedDomainText,
     domainUnderstanding: normalizedDomainUnderstanding,
     modules,
-    nextRecommendedPhase: usesLogisticsFullstackContract ? 'review-and-expand' : 'frontend-mock-flow',
+    nextRecommendedPhase: usesCanonicalSpecializedFullstackContract
+      ? 'review-and-expand'
+      : 'frontend-mock-flow',
   })
   const fullstackLocalArchetype =
     fullstackLocalDemoData?.overview?.archetype || 'operations'
@@ -22728,7 +23827,7 @@ function buildFullstackLocalMaterializationPlan({
     docsArchitecturePath,
     docsApiPath,
     docsDataModelPath,
-    ...(usesLogisticsFullstackContract
+    ...(usesCanonicalSpecializedFullstackContract
       ? [
           fullstackContractPaths.frontendAdminIndexPath,
           fullstackContractPaths.frontendAdminAppPath,
@@ -22736,12 +23835,37 @@ function buildFullstackLocalMaterializationPlan({
           fullstackContractPaths.frontendPublicIndexPath,
           fullstackContractPaths.frontendPublicAppPath,
           fullstackContractPaths.frontendPublicStylesPath,
-          fullstackContractPaths.backendTrackingRoutePath,
-          fullstackContractPaths.backendReportsRoutePath,
-          fullstackContractPaths.sharedStatusesPath,
           fullstackContractPaths.docsArchitecturePath,
           fullstackContractPaths.docsApiPath,
           fullstackContractPaths.docsDbSchemaPath,
+        ]
+      : []),
+    ...(usesLogisticsFullstackContract
+      ? [
+          fullstackContractPaths.backendTrackingRoutePath,
+          fullstackContractPaths.backendReportsRoutePath,
+          fullstackContractPaths.sharedStatusesPath,
+        ]
+      : []),
+    ...(usesOnlineCoursesFullstackContract
+      ? [
+          fullstackContractPaths.frontendStudentIndexPath,
+          fullstackContractPaths.frontendStudentAppPath,
+          fullstackContractPaths.frontendStudentStylesPath,
+          fullstackContractPaths.backendCategoriesRoutePath,
+          fullstackContractPaths.backendModulesRoutePath,
+          fullstackContractPaths.backendLessonsRoutePath,
+          fullstackContractPaths.backendStudentsRoutePath,
+          fullstackContractPaths.backendEnrollmentsRoutePath,
+          fullstackContractPaths.backendPlansRoutePath,
+          fullstackContractPaths.backendPaymentsRoutePath,
+          fullstackContractPaths.backendProgressRoutePath,
+          fullstackContractPaths.backendMockMercadoPagoServicePath,
+          fullstackContractPaths.sharedPlansPath,
+          fullstackContractPaths.sharedPaymentStatusesPath,
+          fullstackContractPaths.sharedCourseStatusesPath,
+          fullstackContractPaths.docsPaymentsMockPath,
+          fullstackContractPaths.docsLocalValidationPath,
         ]
       : []),
     docsRunbookPath,
@@ -22759,6 +23883,23 @@ function buildFullstackLocalMaterializationPlan({
         scriptsSeedPath,
         projectManifestPath,
       ]
+    : usesOnlineCoursesFullstackContract
+      ? [
+          fullstackContractPaths.frontendAdminIndexPath,
+          fullstackContractPaths.frontendPublicIndexPath,
+          fullstackContractPaths.frontendStudentIndexPath,
+          fullstackContractPaths.backendPrimaryRoutePath,
+          fullstackContractPaths.backendPaymentsRoutePath,
+          fullstackContractPaths.backendProgressRoutePath,
+          fullstackContractPaths.backendMockMercadoPagoServicePath,
+          fullstackContractPaths.databaseSchemaPath,
+          fullstackContractPaths.databaseSeedPath,
+          fullstackContractPaths.docsApiPath,
+          fullstackContractPaths.docsDbSchemaPath,
+          fullstackContractPaths.docsPaymentsMockPath,
+          fullstackContractPaths.docsLocalValidationPath,
+          projectManifestPath,
+        ]
     : []
   let localProjectManifest = buildLocalProjectManifest({
     rootFolder,
@@ -22766,7 +23907,9 @@ function buildFullstackLocalMaterializationPlan({
     deliveryLevel: 'fullstack-local',
     forbiddenPaths: ['node_modules', '.env', 'docker-compose.yml', 'Dockerfile', 'deploy'],
     scaffoldFiles,
-    nextRecommendedPhase: usesLogisticsFullstackContract ? 'review-and-expand' : 'frontend-mock-flow',
+    nextRecommendedPhase: usesCanonicalSpecializedFullstackContract
+      ? 'review-and-expand'
+      : 'frontend-mock-flow',
   })
   if (usesLogisticsFullstackContract) {
     localProjectManifest = buildLogisticsFullstackMaterializedManifest({
@@ -22775,6 +23918,33 @@ function buildFullstackLocalMaterializationPlan({
       scaffoldFiles,
       reviewFiles: reviewPhaseFiles,
     })
+  } else if (usesOnlineCoursesFullstackContract) {
+    localProjectManifest = {
+      ...localProjectManifest,
+      projectRoot: rootFolder,
+      nextRecommendedPhase: 'review-and-expand',
+      phases: buildFullstackLocalManifestPhaseBlueprints({
+        phaseIds: FULLSTACK_LOCAL_BASE_PHASES.map((entry) => entry.id),
+        manifestRoot: rootFolder,
+        completedPhaseIds: [
+          'fullstack-local-scaffold',
+          'frontend-mock-flow',
+          'backend-contracts',
+          'database-design',
+          'local-validation',
+        ],
+        nextRecommendedPhase: 'review-and-expand',
+      }),
+      trackedFiles: reviewPhaseFiles,
+      modules: summarizeUniqueExecutorStrings(
+        fullstackLocalDemoData?.modules || [],
+        16,
+      ),
+      warnings: [
+        'Todo sigue siendo local y revisable, sin runtime real.',
+        'Mercado Pago permanece en modo mock local, sin tokens ni llamadas externas.',
+      ],
+    }
   }
   const localProjectManifestContent = `${JSON.stringify(localProjectManifest, null, 2)}\n`
   const rootPackageJsonContent = `${JSON.stringify(
@@ -22837,7 +24007,16 @@ function buildFullstackLocalMaterializationPlan({
 </html>
 `
   const rootReadmeContent = documentationBundle.readmeContent
-  const frontendAdminReadmeContent = `# Frontend admin local
+  const frontendAdminReadmeContent = usesOnlineCoursesFullstackContract
+    ? `# Frontend admin local
+
+Esta carpeta describe la experiencia administrativa local para ${appTitle}.
+
+- Revisar cursos, categorías, módulos, clases, planes y reportes mock.
+- No instalar dependencias ni levantar servicios desde esta fase.
+- El contenido sigue siendo local, editable y acotado al workspace.
+`
+    : `# Frontend admin local
 
 Esta carpeta describe la experiencia administrativa local para ${appTitle}.
 
@@ -22845,13 +24024,30 @@ Esta carpeta describe la experiencia administrativa local para ${appTitle}.
 - No instalar dependencias ni levantar servicios desde esta fase.
 - El contenido sigue siendo local, editable y acotado al workspace.
 `
-  const frontendPublicReadmeContent = `# Frontend publico local
+  const frontendPublicReadmeContent = usesOnlineCoursesFullstackContract
+    ? `# Frontend publico local
+
+Esta carpeta describe el catálogo público local para ${appTitle}.
+
+- Mostrar cursos, categorías y planes sin exponer servicios reales.
+- No publicar, no desplegar y no conectar APIs externas.
+- Mantener la experiencia en modo local y revisable.
+`
+    : `# Frontend publico local
 
 Esta carpeta describe la consulta publica local por codigo para ${appTitle}.
 
 - Mostrar tracking o estado publico mock sin exponer servicios reales.
 - No publicar, no desplegar y no conectar APIs externas.
 - Mantener la experiencia en modo local y revisable.
+`
+  const frontendStudentReadmeContent = `# Frontend alumno local
+
+Esta carpeta describe el panel del alumno local para ${appTitle}.
+
+- Revisar inscripciones, progreso por clase y estado del plan sin auth real.
+- No instalar dependencias ni levantar servicios.
+- La simulación de pagos queda limitada a mock local documentado.
 `
   const logisticsAdminIndexHtmlContent = `<!doctype html>
 <html lang="es">
@@ -22950,6 +24146,115 @@ if (root) {
 .search-card input { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid #aac3d6; background: #f7fbfe; font: inherit; }
 body { margin: 0; padding: 24px; background: #eef5f9; color: #163247; font-family: 'Segoe UI', sans-serif; }
 `
+  const onlineCoursesAdminIndexHtmlContent = `<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${appTitle} | Admin local</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-surface="admin">
+    <main id="app"></main>
+    <script src="./app.js"></script>
+  </body>
+</html>
+`
+  const onlineCoursesPublicIndexHtmlContent = `<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${appTitle} | Público local</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-surface="public">
+    <main id="app"></main>
+    <script src="./app.js"></script>
+  </body>
+</html>
+`
+  const onlineCoursesStudentIndexHtmlContent = `<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${appTitle} | Alumno local</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-surface="student">
+    <main id="app"></main>
+    <script src="./app.js"></script>
+  </body>
+</html>
+`
+  const onlineCoursesAdminAppJsContent = `const adminPlan = ${JSON.stringify(
+    {
+      title: `${appTitle} · Panel administrativo local`,
+      subtitle:
+        'Vista local y revisable de cursos, categorías, planes, pagos mock y reportes, sin backend real.',
+      metrics: fullstackLocalDemoData?.metrics || [],
+      alerts: fullstackLocalDemoData?.alerts || [],
+      courses: fullstackLocalDemoData?.courses || [],
+      reports: fullstackLocalDemoData?.reports || [],
+    },
+    null,
+    2,
+  )}
+
+const root = document.getElementById('app')
+if (root) {
+  root.innerHTML = [
+    '<section class="hero"><span class="eyebrow">Admin local</span><h1>' + adminPlan.title + '</h1><p>' + adminPlan.subtitle + '</p></section>',
+    '<section class="grid">' + adminPlan.metrics.map((entry) => '<article class="card"><strong>' + entry.label + '</strong><span>' + entry.value + '</span><p>' + entry.detail + '</p></article>').join('') + '</section>',
+    '<section class="columns"><article class="card"><h2>Cursos</h2><ul>' + adminPlan.courses.map((entry) => '<li><strong>' + entry.title + '</strong> <span>' + entry.status + '</span></li>').join('') + '</ul></article><article class="card"><h2>Reportes</h2><ul>' + adminPlan.reports.map((entry) => '<li><strong>' + entry.name + '</strong><p>' + entry.detail + '</p></li>').join('') + '</ul></article></section>',
+    '<section class="card"><h2>Alertas</h2><ul>' + adminPlan.alerts.map((entry) => '<li><strong>' + entry.title + '</strong><p>' + entry.detail + '</p></li>').join('') + '</ul></section>',
+  ].join('')
+}
+`
+  const onlineCoursesPublicAppJsContent = `const publicPlan = ${JSON.stringify(
+    {
+      title: `${appTitle} · Catálogo público local`,
+      subtitle:
+        'Simulación local del catálogo de cursos, categorías y planes sin servicios externos ni checkout real.',
+      courses: fullstackLocalDemoData?.courses || [],
+      constraints: fullstackLocalDemoData?.constraints || [],
+    },
+    null,
+    2,
+  )}
+
+const root = document.getElementById('app')
+if (root) {
+  root.innerHTML = [
+    '<section class="hero"><span class="eyebrow">Público local</span><h1>' + publicPlan.title + '</h1><p>' + publicPlan.subtitle + '</p></section>',
+    '<section class="columns">' + publicPlan.courses.map((entry) => '<article class="card"><strong>' + entry.title + '</strong><span>' + entry.category + '</span><p>' + entry.note + '</p><small>Plan base: ' + entry.plan + '</small></article>').join('') + '</section>',
+    '<section class="card"><h2>Restricciones</h2><ul>' + publicPlan.constraints.map((entry) => '<li>' + entry + '</li>').join('') + '</ul></section>',
+  ].join('')
+}
+`
+  const onlineCoursesStudentAppJsContent = `const studentPlan = ${JSON.stringify(
+    {
+      title: `${appTitle} · Panel del alumno local`,
+      subtitle:
+        'Vista local y revisable de inscripciones, progreso y pagos mock, sin auth real ni servicios externos.',
+      students: fullstackLocalDemoData?.students || [],
+      progress: fullstackLocalDemoData?.progress || [],
+      payments: fullstackLocalDemoData?.payments || [],
+    },
+    null,
+    2,
+  )}
+
+const root = document.getElementById('app')
+if (root) {
+  root.innerHTML = [
+    '<section class="hero"><span class="eyebrow">Alumno local</span><h1>' + studentPlan.title + '</h1><p>' + studentPlan.subtitle + '</p></section>',
+    '<section class="columns"><article class="card"><h2>Alumnos mock</h2><ul>' + studentPlan.students.map((entry) => '<li><strong>' + entry.name + '</strong> <span>' + entry.plan + '</span></li>').join('') + '</ul></article><article class="card"><h2>Progreso</h2><ul>' + studentPlan.progress.map((entry) => '<li><strong>' + entry.course + '</strong> <span>' + entry.completion + '</span></li>').join('') + '</ul></article></section>',
+    '<section class="card"><h2>Pagos mock</h2><ul>' + studentPlan.payments.map((entry) => '<li><strong>' + entry.plan + '</strong> <span>' + entry.status + '</span><p>' + entry.note + '</p></li>').join('') + '</ul></section>',
+  ].join('')
+}
+`
   const frontendStylesContent = buildFullstackLocalInteractiveFrontendStyles()
   const frontendMockDataContent = buildBrowserWindowDataScript(
     'fullstackPlan',
@@ -23008,6 +24313,28 @@ module.exports = {
   ok,
 }
 `
+  const backendMockMercadoPagoServiceContent = usesOnlineCoursesFullstackContract
+    ? `const PAYMENT_STATUSES = ['pending', 'approved', 'rejected', 'cancelled']
+
+function createMockPreference(input = {}) {
+  return {
+    provider: 'mock-mercado-pago',
+    mode: 'sandbox-local',
+    externalCall: false,
+    credentialsRequired: false,
+    studentId: input.studentId || '',
+    planCode: input.planCode || 'free',
+    amountLabel: input.amountLabel || '$0',
+    status: PAYMENT_STATUSES.includes(input.status) ? input.status : 'pending',
+  }
+}
+
+module.exports = {
+  PAYMENT_STATUSES,
+  createMockPreference,
+}
+`
+    : ''
   const backendHealthRouteContent =
     buildFullstackLocalBackendHealthRouteContent(fullstackLocalDemoData)
   const backendPrimaryModuleContent =
@@ -23042,6 +24369,46 @@ module.exports = {
 }
 `
     : ''
+  const sharedPlansContent = usesOnlineCoursesFullstackContract
+    ? `const PLAN_RULES = {
+  Free: {
+    code: 'free',
+    access: ['free-lessons'],
+    description: 'Acceso limitado a clases gratuitas.',
+  },
+  Plata: {
+    code: 'plata',
+    access: ['free-lessons', 'selected-courses', 'full-progress'],
+    description: 'Acceso a cursos seleccionados y progreso completo.',
+  },
+  Oro: {
+    code: 'oro',
+    access: ['free-lessons', 'selected-courses', 'all-courses', 'full-progress', 'advanced-reports'],
+    description: 'Acceso completo y beneficios simulados.',
+  },
+}
+
+module.exports = {
+  PLAN_RULES,
+}
+`
+    : ''
+  const sharedPaymentStatusesContent = usesOnlineCoursesFullstackContract
+    ? `const PAYMENT_STATUSES = ['pending', 'approved', 'rejected', 'cancelled']
+
+module.exports = {
+  PAYMENT_STATUSES,
+}
+`
+    : ''
+  const sharedCourseStatusesContent = usesOnlineCoursesFullstackContract
+    ? `const COURSE_STATUSES = ['draft', 'published', 'archived']
+
+module.exports = {
+  COURSE_STATUSES,
+}
+`
+    : ''
   const databaseReadmeContent = databaseArtifacts.readmeContent
   const databaseSchemaContent = databaseArtifacts.schemaContent
   const databaseSeedContent = databaseArtifacts.seedContent
@@ -23068,10 +24435,38 @@ module.exports = {
 }
 `
   const docsArchitectureContent = documentationBundle.architectureContent
-  const docsCanonicalArchitectureContent = usesLogisticsFullstackContract
+  const docsCanonicalArchitectureContent = usesCanonicalSpecializedFullstackContract
     ? documentationBundle.architectureContent
     : ''
-  const docsApiContent = `# API local prevista
+  const docsApiContent = usesOnlineCoursesFullstackContract
+    ? `# API local prevista
+
+## Alcance
+
+- strategy esperada: \`materialize-fullstack-local-plan\`
+- executionMode esperado: \`executor\`
+- nextExpectedAction esperado: \`execute-plan\`
+- runtime real: deshabilitado
+
+## Endpoints locales revisables
+
+- \`GET /health\`: contrato de salud conceptual.
+- \`GET /courses\`: listado mock de cursos y acceso por plan.
+- \`GET /categories\`: categorías del catálogo local.
+- \`GET /modules\`: módulos por curso.
+- \`GET /lessons\`: clases gratuitas y premium.
+- \`GET /students\`: alumnos mock y plan activo.
+- \`GET /enrollments\`: inscripciones y acceso por plan.
+- \`GET /plans\`: reglas Free, Plata y Oro.
+- \`GET /payments\`: pagos simulados por mock-mercado-pago.
+- \`GET /progress\`: avance del alumno por clase.
+
+## Restricciones
+
+- Sin auth real, sin sesiones persistentes, sin integraciones externas.
+- Sin deploy, sin Docker, sin credenciales y sin servicios activos.
+`
+    : `# API local prevista
 
 ## Alcance
 
@@ -23091,7 +24486,9 @@ ${fullstackContractProfile.publicRoutePath ? `- \`GET ${fullstackContractProfile
 - Sin auth real, sin sesiones persistentes, sin integraciones externas.
 - Sin deploy, sin Docker, sin credenciales y sin servicios activos.
 `
-  const docsCanonicalApiContent = usesLogisticsFullstackContract ? docsApiContent : ''
+  const docsCanonicalApiContent = usesCanonicalSpecializedFullstackContract
+    ? docsApiContent
+    : ''
   const docsDataModelContent = `# Modelo de datos local
 
 ## Entidades principales
@@ -23112,7 +24509,7 @@ ${buildFullstackLocalEntityRelationships(fullstackLocalDemoData)
 - Sin migraciones ejecutadas ni conexiones reales.
 - Los seeds permanecen en \`database/seeds/seed-local.sql\` y no se ejecutan automaticamente.
 `
-  const docsCanonicalDbSchemaContent = usesLogisticsFullstackContract
+  const docsCanonicalDbSchemaContent = usesCanonicalSpecializedFullstackContract
     ? `# Contrato SQL local
 
 ## Archivos obligatorios
@@ -23134,6 +24531,53 @@ ${summarizeUniqueExecutorStrings(fullstackLocalDemoData?.domainEntities, 16)
 - JSON puede existir como fixture auxiliar de frontend, pero no reemplaza el contrato SQL local.
 `
     : ''
+  const docsPaymentsMockContent = usesOnlineCoursesFullstackContract
+    ? `# Pagos mock locales
+
+## Objetivo
+
+Modelar una integración futura con Mercado Pago sin credenciales, sin checkout real y sin llamadas externas.
+
+## Adaptador local
+
+- Archivo: \`backend/src/services/mock-mercado-pago.js\`
+- Modo: \`review-only\`
+- HTTP externo: deshabilitado
+- Tokens: no se usan
+- Archivos locales con secretos: fuera de alcance
+
+## Estados soportados
+
+- \`pending\`
+- \`approved\`
+- \`rejected\`
+- \`cancelled\`
+
+## Notas
+
+- Los pagos son solo datos mock y documentación de integración futura.
+- Cualquier integración real requiere aprobación humana explícita.
+`
+    : ''
+  const docsLocalValidationContent = usesOnlineCoursesFullstackContract
+    ? `# Local validation
+
+## Qué revisar
+
+1. Abrir \`frontend/public/index.html\`, \`frontend/admin/index.html\` y \`frontend/student/index.html\` por \`file://\`.
+2. Confirmar que el catálogo, panel admin y panel alumno muestren cursos, alumnos, pagos mock y progreso.
+3. Revisar \`database/schema.sql\` y \`database/seed.sql\` como contrato SQL local.
+4. Validar que \`backend/src/services/mock-mercado-pago.js\` no tenga tokens, fetch ni llamadas externas.
+5. Confirmar que los planes \`Free\`, \`Plata\` y \`Oro\` gobiernen el acceso de forma mock.
+
+## Qué no hacer
+
+- No crear archivos locales con secretos
+- No instalar dependencias
+- No levantar runtime real
+- No usar APIs externas reales
+`
+    : ''
   const docsRunbookContent = documentationBundle.runbookContent
   const databaseSchemaValidationMarker =
     fullstackContractProfile.validationSchemaMarker ||
@@ -23143,6 +24587,8 @@ ${summarizeUniqueExecutorStrings(fullstackLocalDemoData?.domainEntities, 16)
         ? 'create table patients'
         : fullstackLocalArchetype === 'sports-booking'
           ? 'create table courts'
+          : fullstackLocalArchetype === 'online-courses'
+            ? 'create table courses'
           : fullstackLocalArchetype === 'ecommerce'
             ? 'create table products'
             : fullstackLocalArchetype === 'school-crm'
@@ -23197,6 +24643,10 @@ ${summarizeUniqueExecutorStrings(fullstackLocalDemoData?.domainEntities, 16)
     materializationPlan: {
       version: LOCAL_MATERIALIZATION_PLAN_VERSION,
       kind: 'fullstack-local-materialization',
+      contractDefinition: buildCanonicalFullstackLocalMaterializationContract({
+        rootFolder,
+        fullstackContractProfile,
+      }),
       summary: `Scaffold fullstack local creado en "${rootFolder}".`,
       strategy: 'materialize-fullstack-local-plan',
       reasoningLayer: 'local-rules',
@@ -23206,12 +24656,18 @@ ${summarizeUniqueExecutorStrings(fullstackLocalDemoData?.domainEntities, 16)
         { type: 'create-folder', targetPath: frontendFolder },
         { type: 'create-folder', targetPath: frontendAdminFolder },
         { type: 'create-folder', targetPath: frontendPublicFolder },
+        ...(usesOnlineCoursesFullstackContract
+          ? [{ type: 'create-folder', targetPath: frontendStudentFolder }]
+          : []),
         ...genericFrontendFolders.map((targetPath) => ({ type: 'create-folder', targetPath })),
         { type: 'create-folder', targetPath: backendFolder },
         { type: 'create-folder', targetPath: backendSrcFolder },
         { type: 'create-folder', targetPath: backendRoutesFolder },
         { type: 'create-folder', targetPath: backendModulesFolder },
         { type: 'create-folder', targetPath: backendLibFolder },
+        ...(usesOnlineCoursesFullstackContract
+          ? [{ type: 'create-folder', targetPath: backendServicesFolder }]
+          : []),
         { type: 'create-folder', targetPath: sharedFolder },
         { type: 'create-folder', targetPath: sharedContractsFolder },
         { type: 'create-folder', targetPath: sharedTypesFolder },
@@ -23224,7 +24680,7 @@ ${summarizeUniqueExecutorStrings(fullstackLocalDemoData?.domainEntities, 16)
         { type: 'replace-file', targetPath: frontendPackageJsonPath, nextContent: frontendPackageJsonContent },
         { type: 'replace-file', targetPath: frontendAdminReadmePath, nextContent: frontendAdminReadmeContent },
         { type: 'replace-file', targetPath: frontendPublicReadmePath, nextContent: frontendPublicReadmeContent },
-        ...(usesLogisticsFullstackContract
+        ...(usesCanonicalSpecializedFullstackContract
           ? []
           : [
               { type: 'replace-file', targetPath: frontendIndexHtmlPath, nextContent: frontendIndexHtmlContent },
@@ -23279,6 +24735,60 @@ ${summarizeUniqueExecutorStrings(fullstackLocalDemoData?.domainEntities, 16)
               },
             ]
           : []),
+        ...(usesOnlineCoursesFullstackContract
+          ? [
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.frontendStudentReadmePath,
+                nextContent: frontendStudentReadmeContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.frontendAdminIndexPath,
+                nextContent: onlineCoursesAdminIndexHtmlContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.frontendAdminAppPath,
+                nextContent: onlineCoursesAdminAppJsContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.frontendAdminStylesPath,
+                nextContent: logisticsSurfaceStylesContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.frontendPublicIndexPath,
+                nextContent: onlineCoursesPublicIndexHtmlContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.frontendPublicAppPath,
+                nextContent: onlineCoursesPublicAppJsContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.frontendPublicStylesPath,
+                nextContent: logisticsSurfaceStylesContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.frontendStudentIndexPath,
+                nextContent: onlineCoursesStudentIndexHtmlContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.frontendStudentAppPath,
+                nextContent: onlineCoursesStudentAppJsContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.frontendStudentStylesPath,
+                nextContent: logisticsSurfaceStylesContent,
+              },
+            ]
+          : []),
         { type: 'replace-file', targetPath: databaseSeedPath, nextContent: databaseSeedContent },
         ...(usesLogisticsFullstackContract
           ? [
@@ -23286,6 +24796,188 @@ ${summarizeUniqueExecutorStrings(fullstackLocalDemoData?.domainEntities, 16)
                 type: 'replace-file',
                 targetPath: fullstackContractPaths.databaseSeedPath,
                 nextContent: databaseCanonicalSeedContent,
+              },
+            ]
+          : []),
+        ...(usesOnlineCoursesFullstackContract
+          ? [
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.databaseSeedPath,
+                nextContent: databaseCanonicalSeedContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.sharedPlansPath,
+                nextContent: sharedPlansContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.sharedPaymentStatusesPath,
+                nextContent: sharedPaymentStatusesContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.sharedCourseStatusesPath,
+                nextContent: sharedCourseStatusesContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.backendCategoriesRoutePath,
+                nextContent: `const routeContract = {
+  method: 'GET',
+  path: '/categories',
+  purpose: 'Listar categorias locales del catálogo de cursos.',
+  localOnly: true,
+  activeRuntime: false,
+}
+
+module.exports = {
+  routeContract,
+}
+`,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.backendModulesRoutePath,
+                nextContent: `const routeContract = {
+  method: 'GET',
+  path: '/modules',
+  purpose: 'Listar modulos locales por curso.',
+  localOnly: true,
+  activeRuntime: false,
+}
+
+module.exports = {
+  routeContract,
+}
+`,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.backendLessonsRoutePath,
+                nextContent: `const routeContract = {
+  method: 'GET',
+  path: '/lessons',
+  purpose: 'Listar clases locales y su acceso gratuito o premium.',
+  localOnly: true,
+  activeRuntime: false,
+}
+
+module.exports = {
+  routeContract,
+}
+`,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.backendStudentsRoutePath,
+                nextContent: `const routeContract = {
+  method: 'GET',
+  path: '/students',
+  purpose: 'Listar alumnos mock y su plan activo.',
+  localOnly: true,
+  activeRuntime: false,
+}
+
+module.exports = {
+  routeContract,
+}
+`,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.backendEnrollmentsRoutePath,
+                nextContent: `const routeContract = {
+  method: 'GET',
+  path: '/enrollments',
+  purpose: 'Listar inscripciones locales y acceso por plan.',
+  localOnly: true,
+  activeRuntime: false,
+}
+
+module.exports = {
+  routeContract,
+}
+`,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.backendPlansRoutePath,
+                nextContent: `const routeContract = {
+  method: 'GET',
+  path: '/plans',
+  purpose: 'Exponer reglas mock de Free, Plata y Oro.',
+  localOnly: true,
+  activeRuntime: false,
+}
+
+module.exports = {
+  routeContract,
+}
+`,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.backendPaymentsRoutePath,
+                nextContent: `const routeContract = {
+  method: 'GET',
+  path: '/payments',
+  purpose: 'Listar pagos simulados y estados mock sin pasarela real.',
+  localOnly: true,
+  activeRuntime: false,
+}
+
+module.exports = {
+  routeContract,
+}
+`,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.backendProgressRoutePath,
+                nextContent: `const routeContract = {
+  method: 'GET',
+  path: '/progress',
+  purpose: 'Listar progreso local por curso, modulo y clase.',
+  localOnly: true,
+  activeRuntime: false,
+}
+
+module.exports = {
+  routeContract,
+}
+`,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.backendMockMercadoPagoServicePath,
+                nextContent: backendMockMercadoPagoServiceContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.docsArchitecturePath,
+                nextContent: docsCanonicalArchitectureContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.docsApiPath,
+                nextContent: docsCanonicalApiContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.docsDbSchemaPath,
+                nextContent: docsCanonicalDbSchemaContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.docsPaymentsMockPath,
+                nextContent: docsPaymentsMockContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.docsLocalValidationPath,
+                nextContent: docsLocalValidationContent,
               },
             ]
           : []),
@@ -23360,13 +25052,25 @@ module.exports = {
         { type: 'exists', targetPath: frontendFolder, expectedKind: 'folder' },
         { type: 'exists', targetPath: frontendAdminFolder, expectedKind: 'folder' },
         { type: 'exists', targetPath: frontendPublicFolder, expectedKind: 'folder' },
+        ...(usesOnlineCoursesFullstackContract
+          ? [{ type: 'exists', targetPath: frontendStudentFolder, expectedKind: 'folder' }]
+          : []),
         ...genericFrontendFolders
           .filter((targetPath) => targetPath !== frontendSrcFolder)
           .map((targetPath) => ({ type: 'exists', targetPath, expectedKind: 'folder' })),
         { type: 'exists', targetPath: frontendPackageJsonPath, expectedKind: 'file' },
         { type: 'exists', targetPath: frontendAdminReadmePath, expectedKind: 'file' },
         { type: 'exists', targetPath: frontendPublicReadmePath, expectedKind: 'file' },
-        ...(usesLogisticsFullstackContract
+        ...(usesOnlineCoursesFullstackContract
+          ? [
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.frontendStudentReadmePath,
+                expectedKind: 'file',
+              },
+            ]
+          : []),
+        ...(usesCanonicalSpecializedFullstackContract
           ? []
           : [
               { type: 'exists', targetPath: frontendIndexHtmlPath, expectedKind: 'file' },
@@ -23384,6 +25088,15 @@ module.exports = {
         { type: 'exists', targetPath: backendPrimaryRoutePath, expectedKind: 'file' },
         { type: 'exists', targetPath: backendPrimaryModulePath, expectedKind: 'file' },
         { type: 'exists', targetPath: backendResponseLibPath, expectedKind: 'file' },
+        ...(usesOnlineCoursesFullstackContract
+          ? [
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.backendMockMercadoPagoServicePath,
+                expectedKind: 'file',
+              },
+            ]
+          : []),
         { type: 'exists', targetPath: sharedDomainPath, expectedKind: 'file' },
         { type: 'exists', targetPath: sharedContractsPath, expectedKind: 'file' },
         { type: 'exists', targetPath: databaseReadmePath, expectedKind: 'file' },
@@ -23438,6 +25151,85 @@ module.exports = {
               },
             ]
           : []),
+        ...(usesOnlineCoursesFullstackContract
+          ? [
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.frontendStudentIndexPath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.frontendStudentAppPath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.backendCategoriesRoutePath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.backendModulesRoutePath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.backendLessonsRoutePath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.backendStudentsRoutePath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.backendEnrollmentsRoutePath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.backendPlansRoutePath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.backendPaymentsRoutePath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.backendProgressRoutePath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.sharedPlansPath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.sharedPaymentStatusesPath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.sharedCourseStatusesPath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.docsPaymentsMockPath,
+                expectedKind: 'file',
+              },
+              {
+                type: 'exists',
+                targetPath: fullstackContractPaths.docsLocalValidationPath,
+                expectedKind: 'file',
+              },
+            ]
+          : []),
         { type: 'exists', targetPath: scriptsReadmePath, expectedKind: 'file' },
         { type: 'exists', targetPath: scriptsSeedPath, expectedKind: 'file' },
         { type: 'exists', targetPath: docsArchitecturePath, expectedKind: 'file' },
@@ -23445,7 +25237,7 @@ module.exports = {
         { type: 'exists', targetPath: docsDataModelPath, expectedKind: 'file' },
         { type: 'exists', targetPath: docsRunbookPath, expectedKind: 'file' },
         { type: 'exists', targetPath: projectManifestPath, expectedKind: 'file' },
-        ...(usesLogisticsFullstackContract
+        ...(usesCanonicalSpecializedFullstackContract
           ? []
           : [
               { type: 'file-contains', targetPath: frontendIndexHtmlPath, expectedText: './src/mock-data.js' },
@@ -23502,6 +25294,54 @@ module.exports = {
                 expectedText: '"nextRecommendedPhase": "review-and-expand"',
               },
             ]
+          : usesOnlineCoursesFullstackContract
+            ? [
+                {
+                  type: 'file-contains',
+                  targetPath: fullstackContractPaths.frontendAdminIndexPath,
+                  expectedText: './app.js',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: fullstackContractPaths.frontendPublicIndexPath,
+                  expectedText: './app.js',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: fullstackContractPaths.frontendStudentIndexPath,
+                  expectedText: './app.js',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: fullstackContractPaths.backendPaymentsRoutePath,
+                  expectedText: '/payments',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: fullstackContractPaths.backendProgressRoutePath,
+                  expectedText: '/progress',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: fullstackContractPaths.backendMockMercadoPagoServicePath,
+                  expectedText: 'mock-mercado-pago',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: fullstackContractPaths.docsPaymentsMockPath,
+                  expectedText: 'approved',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: fullstackContractPaths.docsLocalValidationPath,
+                  expectedText: 'frontend/student/index.html',
+                },
+                {
+                  type: 'file-contains',
+                  targetPath: projectManifestPath,
+                  expectedText: '"nextRecommendedPhase": "review-and-expand"',
+                },
+              ]
           : [
               {
                 type: 'file-contains',
@@ -23512,6 +25352,15 @@ module.exports = {
       ],
     },
     localProjectManifest,
+    selectedDomain: fullstackContractProfile.archetype,
+    detectedVertical: fullstackContractProfile.archetype,
+    selectedContractKind: usesOnlineCoursesFullstackContract
+      ? 'online-courses-fullstack-local'
+      : usesLogisticsFullstackContract
+        ? 'logistics-fullstack-local'
+        : 'generic-fullstack-local',
+    sourceRoot: summarizeUniqueExecutorStrings(normalizedScalablePlan?.allowedRootPaths, 1)[0] || '',
+    targetRoot: rootFolder,
   }
 }
 
@@ -29698,6 +31547,9 @@ function isGenericFullstackLocalDomainLabel(value) {
 }
 
 function buildFullstackLocalArchetypeAppTitle(archetype) {
+  if (archetype === 'online-courses') {
+    return 'Cursos online local'
+  }
   if (archetype === 'veterinary') {
     return 'Veterinaria local'
   }
@@ -29730,6 +31582,9 @@ function buildFullstackLocalArchetypeAppTitle(archetype) {
 }
 
 function buildFullstackLocalArchetypeDisplayLabel(archetype) {
+  if (archetype === 'online-courses') {
+    return 'Cursos online'
+  }
   if (archetype === 'veterinary') {
     return 'Veterinaria'
   }
@@ -29769,6 +31624,8 @@ function fullstackLocalDomainLabelMatchesArchetype(label, archetype) {
   }
 
   const compatibilityPatterns = {
+    'online-courses':
+      /\bcursos?\b|\bclases?\b|\blecciones?\b|\bmodulos?\b|\bmódulos?\b|\balumnos?\b|\bestudiantes?\b|\binscripciones?\b|\bplanes?\b|\bmercado pago\b|\bprogreso\b/u,
     veterinary: /\bveterinaria\b|\bveterinari[oa]s?\b|\bmascotas?\b|\bvacunas?\b|\bpet\b/u,
     'medical-clinic':
       /\bturnos?\b|\bclinicas?\b|\bsalud\b|\bmedic[oa]s?\b|\bpacientes?\b|\bconsultorio\b/u,
@@ -33380,13 +35237,41 @@ function buildBrainDecisionContract({
   materializationPlan,
   existingProjectDetection,
   activeProjectContext,
+  selectedDomain,
+  detectedVertical,
+  selectedContractKind,
+  sourceRoot,
+  targetRoot,
   finalResult,
+  stripStaleApprovalArtifacts = false,
 }) {
   const resolvedRequiresApproval = requiresApproval === true
   const resolvedApprovalRequest =
     resolvedRequiresApproval && approvalRequest && typeof approvalRequest === 'object'
       ? approvalRequest
       : null
+  const normalizedNextActionPlan = normalizeNextActionPlanContract(nextActionPlan)
+  const sanitizedNextActionPlan =
+    stripStaleApprovalArtifacts &&
+    !resolvedRequiresApproval &&
+    normalizedNextActionPlan &&
+    (normalizedNextActionPlan.requiresApproval === true ||
+      normalizeOptionalString(normalizedNextActionPlan.actionType).toLocaleLowerCase() ===
+        'request-approval')
+      ? {
+          ...normalizedNextActionPlan,
+          actionType:
+            normalizeOptionalString(nextExpectedAction).toLocaleLowerCase().startsWith('review-')
+              ? 'review-plan'
+              : 'review-plan',
+          requiresApproval: false,
+          safeToRunNow: false,
+          userFacingLabel:
+            normalizeOptionalString(normalizedNextActionPlan.userFacingLabel) ||
+            'Revisar plan',
+          technicalLabel: 'review-ready',
+        }
+      : normalizedNextActionPlan
   const resolvedReason =
     resolvedApprovalRequest?.reason ||
     (typeof reason === 'string' ? reason : '')
@@ -33400,7 +35285,7 @@ function buildBrainDecisionContract({
     buildProjectContinuationState({
       strategy,
       localProjectManifest,
-      nextActionPlan,
+      nextActionPlan: sanitizedNextActionPlan,
       projectPhaseExecutionPlan,
       moduleExpansionPlan,
       continuationActionPlan,
@@ -33414,10 +35299,14 @@ function buildBrainDecisionContract({
     approvalRequest: resolvedApprovalRequest,
   })
   const normalizedRuntimeApprovalState = normalizeRuntimeApprovalStateContract({
-    ...(computedRuntimeApprovalState && typeof computedRuntimeApprovalState === 'object'
+    ...((resolvedRequiresApproval || stripStaleApprovalArtifacts !== true) &&
+    computedRuntimeApprovalState &&
+    typeof computedRuntimeApprovalState === 'object'
       ? computedRuntimeApprovalState
       : {}),
-    ...(runtimeApprovalState && typeof runtimeApprovalState === 'object'
+    ...((resolvedRequiresApproval || stripStaleApprovalArtifacts !== true) &&
+    runtimeApprovalState &&
+    typeof runtimeApprovalState === 'object'
       ? runtimeApprovalState
       : {}),
   })
@@ -33426,7 +35315,7 @@ function buildBrainDecisionContract({
       strategy,
       scalableDeliveryPlan: normalizedScalablePlan,
       localProjectManifest,
-      nextActionPlan,
+      nextActionPlan: sanitizedNextActionPlan,
       validationPlan,
       projectContinuationState: normalizedContinuationState,
       runtimeApprovalState: normalizedRuntimeApprovalState,
@@ -33456,15 +35345,17 @@ function buildBrainDecisionContract({
     }) || runtimeSyncedManifest,
   )
   const normalizedApprovalRequestPlan =
-    normalizeApprovalRequestPlanContract(approvalRequestPlan) ||
-    buildApprovalRequestPlan({
-      continuationActionPlan,
-      projectContinuationState: normalizedContinuationState,
-      projectReadinessState: normalizedReadinessState,
-      localProjectManifest: enrichedLocalProjectManifest,
-      approvalRequest: resolvedApprovalRequest,
-      runtimeApprovalState: normalizedRuntimeApprovalState,
-    })
+    resolvedRequiresApproval || stripStaleApprovalArtifacts !== true
+      ? normalizeApprovalRequestPlanContract(approvalRequestPlan) ||
+        buildApprovalRequestPlan({
+          continuationActionPlan,
+          projectContinuationState: normalizedContinuationState,
+          projectReadinessState: normalizedReadinessState,
+          localProjectManifest: enrichedLocalProjectManifest,
+          approvalRequest: resolvedApprovalRequest,
+          runtimeApprovalState: normalizedRuntimeApprovalState,
+        })
+      : null
 
   return {
     decisionKey: decisionKey || strategy || 'brain-decision',
@@ -33535,9 +35426,7 @@ function buildBrainDecisionContract({
           ),
         }
       : {}),
-    ...(normalizeNextActionPlanContract(nextActionPlan)
-      ? { nextActionPlan: normalizeNextActionPlanContract(nextActionPlan) }
-      : {}),
+    ...(sanitizedNextActionPlan ? { nextActionPlan: sanitizedNextActionPlan } : {}),
     ...(normalizeValidationPlanContract(validationPlan)
       ? { validationPlan: normalizeValidationPlanContract(validationPlan) }
       : {}),
@@ -33583,6 +35472,11 @@ function buildBrainDecisionContract({
     ...(activeProjectContext && typeof activeProjectContext === 'object'
       ? { activeProjectContext }
       : {}),
+    ...(selectedDomain ? { selectedDomain } : {}),
+    ...(detectedVertical ? { detectedVertical } : {}),
+    ...(selectedContractKind ? { selectedContractKind } : {}),
+    ...(sourceRoot ? { sourceRoot } : {}),
+    ...(targetRoot ? { targetRoot } : {}),
     ...(materializationPlan && typeof materializationPlan === 'object'
       ? { materializationPlan }
       : {}),
@@ -34721,6 +36615,15 @@ function buildResolvedDecisionMap(projectState, userParticipationMode) {
         decision?.source === 'executor'
           ? decision.source
           : 'system',
+      decision:
+        decision?.decision === 'approved' ||
+        decision?.decision === 'rejected' ||
+        decision?.decision === 'deferred' ||
+        decision?.decision === 'draft'
+          ? decision.decision
+          : '',
+      label: typeof decision?.label === 'string' ? decision.label.trim() : '',
+      scope: typeof decision?.scope === 'string' ? decision.scope.trim() : '',
       summary: typeof decision?.summary === 'string' ? decision.summary.trim() : '',
       selectedOption:
         typeof decision?.selectedOption === 'string'
@@ -34728,6 +36631,16 @@ function buildResolvedDecisionMap(projectState, userParticipationMode) {
           : '',
       freeAnswer:
         typeof decision?.freeAnswer === 'string' ? decision.freeAnswer.trim() : '',
+      allowsNow: Array.isArray(decision?.allowsNow)
+        ? decision.allowsNow
+            .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+            .filter(Boolean)
+        : [],
+      forbidsNow: Array.isArray(decision?.forbidsNow)
+        ? decision.forbidsNow
+            .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+            .filter(Boolean)
+        : [],
       approvalFamily: normalizeApprovalFamilyKey(decision?.approvalFamily),
       updatedAt:
         typeof decision?.updatedAt === 'string' ? decision.updatedAt.trim() : '',
@@ -34775,6 +36688,14 @@ function getResolvedDecisionRecord(resolvedDecisionMap, ...decisionKeys) {
   }
 
   return null
+}
+
+function isDeferredResolvedDecision(record) {
+  if (!record || typeof record !== 'object') {
+    return false
+  }
+
+  return record.decision === 'deferred' || record.decision === 'draft'
 }
 
 function getModuleExpansionActiveMaterializableIds({
@@ -39646,6 +41567,11 @@ async function buildLocalStrategicBrainDecision({
     previousExecutionResult.toLocaleLowerCase()
   const plannerFeedback = parseOrchestratorPlannerFeedback(previousExecutionResult)
   const approvalAlreadyGranted = plannerFeedback?.type === 'approval-granted'
+  const approvalDeferred =
+    plannerFeedback?.type === 'approval-deferred' ||
+    plannerFeedback?.approvalDecision === 'deferred' ||
+    plannerFeedback?.approvalDecision === 'draft'
+  const approvalFeedbackResolved = approvalAlreadyGranted || approvalDeferred
   const approvalRejected = plannerFeedback?.type === 'approval-rejected'
   const hasRecoverableExecutionError = plannerFeedback?.type === 'execution-error'
   const normalizedExecutorFailureContext = normalizeExecutorFailureContextForBrain(
@@ -39670,7 +41596,7 @@ async function buildLocalStrategicBrainDecision({
     (Boolean(requiresApproval) ||
       Boolean(explicitApprovalPreference) ||
       hasSensitiveApprovalRequest) &&
-    !approvalAlreadyGranted
+    !approvalFeedbackResolved
       ? explicitApprovalPreference?.approvalRequest ||
         sensitiveApprovalRequest ||
         fallbackApprovalRequest
@@ -39705,6 +41631,12 @@ async function buildLocalStrategicBrainDecision({
     projectState,
     normalizedUserParticipationMode,
   )
+  const deferredRealPaymentsDecision = getResolvedDecisionRecord(
+    resolvedDecisionMap,
+    'approve-real-payments',
+    'approval-family:real-payments',
+  )
+  const realPaymentsDeferred = isDeferredResolvedDecision(deferredRealPaymentsDecision)
   const normalizedContext =
     typeof contextualContext === 'string' ? contextualContext.trim() : ''
   const normalizedManualReusablePreference =
@@ -39829,6 +41761,7 @@ async function buildLocalStrategicBrainDecision({
       buildBrainDecisionContract({
         ...payload,
         domainUnderstanding,
+        stripStaleApprovalArtifacts: approvalFeedbackResolved,
       }),
     )
   const buildDecisionWithPlanningContracts = (
@@ -39842,6 +41775,7 @@ async function buildLocalStrategicBrainDecision({
       expansionOptions,
       moduleExpansionPlan,
       continuationActionPlan,
+      ...additionalMetadata
     } = {},
   ) => {
     const planningContracts = buildPlanningArchitectureBundle({
@@ -39865,11 +41799,13 @@ async function buildLocalStrategicBrainDecision({
       expansionOptions,
       moduleExpansionPlan,
       continuationActionPlan,
+      resolvedDecisionMap,
     })
 
     return finalizeDecisionForWorkspace(
       buildBrainDecisionContract({
         ...payload,
+        ...additionalMetadata,
         domainUnderstanding,
         projectBlueprint: planningContracts.projectBlueprint,
         questionPolicy: planningContracts.questionPolicy,
@@ -40155,7 +42091,7 @@ async function buildLocalStrategicBrainDecision({
     approvalRequestForDecision?.decisionKey,
     approvalRequestForDecision?.reason,
     approvalRequestForDecision?.question,
-  )
+  ) || realPaymentsDeferred
   const approvalDecisionRejected = hasRejectedDecision(
     resolvedDecisionMap,
     approvalRequestForDecision?.decisionKey,
@@ -40208,7 +42144,7 @@ async function buildLocalStrategicBrainDecision({
     (Boolean(requiresApproval) ||
       Boolean(explicitApprovalPreference) ||
       hasSensitiveApprovalRequest) &&
-    !approvalAlreadyGranted
+    !approvalFeedbackResolved
 
   if (approvalRejected) {
     const rejectionDetails = [
@@ -40251,7 +42187,7 @@ async function buildLocalStrategicBrainDecision({
 
   if (
     approvalDecisionRejected &&
-    !approvalAlreadyGranted &&
+    !approvalFeedbackResolved &&
     !approvalRejected &&
     !hasCriticalHumanBlocker
   ) {
@@ -40600,7 +42536,7 @@ async function buildLocalStrategicBrainDecision({
     compositeSteps.length < 2 &&
     (!previousExecutionResult ||
       iteration === 1 ||
-      approvalAlreadyGranted ||
+      approvalFeedbackResolved ||
       hasRecoverableExecutionError)
 
   if (shouldContinueExistingWorkspaceProject) {
@@ -40760,7 +42696,7 @@ async function buildLocalStrategicBrainDecision({
     compositeSteps.length < 2 &&
     (!previousExecutionResult ||
       iteration === 1 ||
-      approvalAlreadyGranted ||
+      approvalFeedbackResolved ||
       hasRecoverableExecutionError)
   ) {
     const scalableDeliveryPlan = buildScalableDeliveryPlan({
@@ -40801,12 +42737,17 @@ async function buildLocalStrategicBrainDecision({
         deliveryLevel: 'fullstack-local',
         scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
         localProjectManifest: fullstackLocalMaterializationPlan.localProjectManifest,
+        selectedDomain: fullstackLocalMaterializationPlan.selectedDomain,
+        detectedVertical: fullstackLocalMaterializationPlan.detectedVertical,
+        selectedContractKind: fullstackLocalMaterializationPlan.selectedContractKind,
+        sourceRoot: fullstackLocalMaterializationPlan.sourceRoot,
+        targetRoot: fullstackLocalMaterializationPlan.targetRoot,
       },
     )
   }
 
   if (
-    approvalAlreadyGranted &&
+    approvalFeedbackResolved &&
     noDeployLocalContinuationIntent &&
     hasStrongFullstackRequestGuard &&
     !fullstackLocalMaterializationIntent.matches &&
@@ -40860,7 +42801,7 @@ async function buildLocalStrategicBrainDecision({
     compositeSteps.length < 2 &&
     (!previousExecutionResult ||
       iteration === 1 ||
-      approvalAlreadyGranted ||
+      approvalFeedbackResolved ||
       hasRecoverableExecutionError)
   ) {
     const scalableDeliveryPlan = buildScalableDeliveryPlan({
@@ -40904,7 +42845,7 @@ async function buildLocalStrategicBrainDecision({
     compositeSteps.length < 2 &&
     (!previousExecutionResult ||
       iteration === 1 ||
-      approvalAlreadyGranted ||
+      approvalFeedbackResolved ||
       hasRecoverableExecutionError)
   ) {
     const scalableDeliveryPlan = buildScalableDeliveryPlan({
@@ -40958,7 +42899,7 @@ async function buildLocalStrategicBrainDecision({
     compositeSteps.length < 2 &&
     (!previousExecutionResult ||
       iteration === 1 ||
-      approvalAlreadyGranted ||
+      approvalFeedbackResolved ||
       hasRecoverableExecutionError)
   ) {
     const scalableDeliveryPlan = buildScalableDeliveryPlan({
@@ -40997,7 +42938,7 @@ async function buildLocalStrategicBrainDecision({
   if (
     (materializeSafeFirstDeliveryIntent.matches ||
       (shouldPreferSafeFirstDeliveryForCommercialWebGoal &&
-        approvalAlreadyGranted &&
+        approvalFeedbackResolved &&
         /\bmaterializa(?:r|cion|ción)\b/u.test(normalizedPreviousExecutionResult))) &&
     !scopedFileEditIntent &&
     !localGoalDescriptor &&
@@ -41005,7 +42946,7 @@ async function buildLocalStrategicBrainDecision({
     compositeSteps.length < 2 &&
     (!previousExecutionResult ||
       iteration === 1 ||
-      approvalAlreadyGranted ||
+      approvalFeedbackResolved ||
       hasRecoverableExecutionError)
   ) {
     const materializeSafeFirstDeliveryPlan = buildMaterializeSafeFirstDeliveryPlan({
@@ -41044,7 +42985,7 @@ async function buildLocalStrategicBrainDecision({
     compositeSteps.length < 2 &&
     (!previousExecutionResult ||
       iteration === 1 ||
-      approvalAlreadyGranted ||
+      approvalFeedbackResolved ||
       hasRecoverableExecutionError)
   ) {
     const safeFirstDeliveryPlan = buildSafeFirstDeliveryPlan({
@@ -41096,7 +43037,7 @@ async function buildLocalStrategicBrainDecision({
     compositeSteps.length < 2 &&
     (!previousExecutionResult ||
       iteration === 1 ||
-      approvalAlreadyGranted ||
+      approvalFeedbackResolved ||
       hasRecoverableExecutionError)
   ) {
     const productArchitecturePlan = buildProductArchitecturePlan({
@@ -41168,7 +43109,7 @@ async function buildLocalStrategicBrainDecision({
     compositeSteps.length < 2 &&
     (!previousExecutionResult ||
       iteration === 1 ||
-      approvalAlreadyGranted ||
+      approvalFeedbackResolved ||
       hasRecoverableExecutionError)
   ) {
     const contextHubAvailable = contextHubPack?.available === true
@@ -41226,7 +43167,7 @@ async function buildLocalStrategicBrainDecision({
     scopedFileEditIntent &&
     (!previousExecutionResult ||
       iteration === 1 ||
-      approvalAlreadyGranted ||
+      approvalFeedbackResolved ||
       hasRecoverableExecutionError)
   ) {
     return buildDecision({
@@ -41258,7 +43199,7 @@ async function buildLocalStrategicBrainDecision({
     !wantsExtendedWebScaffoldDeliverables &&
     (!previousExecutionResult ||
       iteration === 1 ||
-      approvalAlreadyGranted ||
+      approvalFeedbackResolved ||
       hasRecoverableExecutionError)
   ) {
     const webDecision = buildLocalWebScaffoldBaseBrainDecision({
@@ -41278,7 +43219,7 @@ async function buildLocalStrategicBrainDecision({
         : webDecision.nextExpectedAction || 'execute-plan',
       reason: hasRecoverableExecutionError
         ? 'La ejecución anterior falló y el Cerebro replanifica el scaffold web dentro de la misma estrategia.'
-        : approvalAlreadyGranted
+        : approvalFeedbackResolved
           ? 'Ya existe una aprobación registrada; el Cerebro puede seguir con el scaffold web sin volver a abrir ese stop.'
           : userDelegatedMissingInputs
             ? 'El usuario delegó los faltantes menores, así que el Cerebro puede avanzar con defaults razonables dentro de la estrategia web.'
@@ -41290,7 +43231,7 @@ async function buildLocalStrategicBrainDecision({
     compositeSteps.length >= 2 &&
     (!previousExecutionResult ||
       iteration === 1 ||
-      approvalAlreadyGranted ||
+      approvalFeedbackResolved ||
       hasRecoverableExecutionError)
   ) {
     return buildDecision({
@@ -41299,7 +43240,7 @@ async function buildLocalStrategicBrainDecision({
       executionMode: 'local-fast-composite',
       reason: hasRecoverableExecutionError
         ? 'La ejecución anterior falló y el Cerebro replanifica la misma secuencia local para corregir o reintentar.'
-        : approvalAlreadyGranted
+        : approvalFeedbackResolved
           ? 'Ya existe una aprobación registrada y el Cerebro puede continuar con la secuencia local sin volver a pedirla.'
           : 'El pedido ya viene descompuesto en varios pasos locales claros, así que se puede planificar como una secuencia compuesta.',
       tasks: compositeSteps.map((stepText, index) => {
@@ -41331,7 +43272,7 @@ async function buildLocalStrategicBrainDecision({
     localGoalDescriptor &&
     (!previousExecutionResult ||
       iteration === 1 ||
-      approvalAlreadyGranted ||
+      approvalFeedbackResolved ||
       hasRecoverableExecutionError)
   ) {
     return buildDecision({
@@ -41340,7 +43281,7 @@ async function buildLocalStrategicBrainDecision({
       executionMode: 'local-fast',
       reason: hasRecoverableExecutionError
         ? 'La ejecución anterior falló y el Cerebro replanifica la misma operación puntual para corregirla o reintentarla.'
-        : approvalAlreadyGranted
+        : approvalFeedbackResolved
           ? 'Ya existe una aprobación registrada y el Cerebro puede seguir con la operación puntual sin volver a pedirla.'
           : 'El objetivo parece una operación puntual sobre archivo o carpeta, apta para la capa local rápida.',
       tasks: [
@@ -43293,6 +45234,11 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
     typeof input?.previousExecutionResult === 'string' ? input.previousExecutionResult : '',
   )
   const approvalAlreadyGranted = plannerFeedback?.type === 'approval-granted'
+  const approvalDeferred =
+    plannerFeedback?.type === 'approval-deferred' ||
+    plannerFeedback?.approvalDecision === 'deferred' ||
+    plannerFeedback?.approvalDecision === 'draft'
+  const approvalFeedbackResolved = approvalAlreadyGranted || approvalDeferred
   const resolvedDecisionMap = buildResolvedDecisionMap(
     input.projectState,
     input.userParticipationMode,
@@ -43375,7 +45321,7 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
     isStructuredFullstackLocalDecision(resolvedStrategy, resolvedDeliveryLevel)
   const shouldDropStaleApprovalArtifacts =
     shouldForceFallbackFullstackLocalContracts &&
-    approvalAlreadyGranted &&
+    approvalFeedbackResolved &&
     fallbackDecision?.requiresApproval !== true
   const rawApprovalRequest =
     rawDecision?.approvalRequest && typeof rawDecision.approvalRequest === 'object'
@@ -43447,7 +45393,7 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
   const rawNextActionPlan = normalizeNextActionPlanContract(rawDecision?.nextActionPlan)
   const shouldUseFallbackInstruction =
     shouldForceFallbackFullstackLocalContracts &&
-    (approvalAlreadyGranted || looksLikeWebScaffoldPlannerInstruction(rawInstruction))
+    (approvalFeedbackResolved || looksLikeWebScaffoldPlannerInstruction(rawInstruction))
   const shouldUseFallbackNextActionPlan =
     shouldForceFallbackFullstackLocalContracts &&
     (shouldDropStaleApprovalArtifacts ||
@@ -43475,7 +45421,7 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
         })
       : null
   const shouldUseFallbackInvalidMaterializationContract =
-    originalFullstackLocalIntent &&
+    shouldForceFallbackFullstackLocalContracts &&
     rawMaterializationContractInspection &&
     rawMaterializationContractInspection.ok !== true
   const shouldUseFallbackStructuredFullstackDecision =
@@ -43487,6 +45433,7 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
       shouldUseFallbackNextActionPlan)
   const normalizedDecision = buildBrainDecisionContract({
     ...fallbackDecision,
+    stripStaleApprovalArtifacts: shouldDropStaleApprovalArtifacts,
     decisionKey:
       shouldUseFallbackStructuredFullstackDecision
         ? fallbackDecision.decisionKey
@@ -43750,21 +45697,90 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
     inferredProjectState: normalizedInferredProjectState,
     workspaceProjectIntent: normalizedWorkspaceProjectIntent,
   })
+  const fallbackMaterializationReady =
+    normalizeOptionalString(fallbackDecision?.strategy).toLocaleLowerCase() ===
+      'materialize-fullstack-local-plan' &&
+    fallbackDecision?.materializationPlan &&
+    typeof fallbackDecision.materializationPlan === 'object' &&
+    normalizeExecutorExecutionScope(fallbackDecision?.executionScope)
+  const workspaceAwareMaterializationInspection =
+    normalizeOptionalString(workspaceAwareDecision?.strategy).toLocaleLowerCase() ===
+      'materialize-fullstack-local-plan' &&
+    workspaceAwareDecision?.materializationPlan &&
+    typeof workspaceAwareDecision.materializationPlan === 'object'
+      ? inspectFullstackLocalMaterializationContract({
+          goal: input?.goal,
+          context: input?.context,
+          decisionKey: workspaceAwareDecision?.decisionKey,
+          strategy: workspaceAwareDecision?.strategy,
+          executionMode: workspaceAwareDecision?.executionMode,
+          nextExpectedAction: workspaceAwareDecision?.nextExpectedAction,
+          executionScope: workspaceAwareDecision?.executionScope,
+          materializationPlan: workspaceAwareDecision?.materializationPlan,
+          localProjectManifest: workspaceAwareDecision?.localProjectManifest,
+          existingProjectDetection: workspaceAwareDecision?.existingProjectDetection,
+        })
+      : null
+  const shouldRepairWorkspaceAwareMaterialization =
+    shouldForceFallbackFullstackLocalContracts &&
+    fallbackMaterializationReady &&
+    workspaceAwareMaterializationInspection &&
+    workspaceAwareMaterializationInspection.ok !== true
+  const stabilizedWorkspaceAwareDecision = shouldRepairWorkspaceAwareMaterialization
+    ? buildBrainDecisionContract({
+        ...workspaceAwareDecision,
+        instruction:
+          typeof fallbackDecision?.instruction === 'string' &&
+          fallbackDecision.instruction.trim()
+            ? fallbackDecision.instruction.trim()
+            : workspaceAwareDecision.instruction,
+        tasks:
+          Array.isArray(fallbackDecision?.tasks) && fallbackDecision.tasks.length > 0
+            ? fallbackDecision.tasks
+            : workspaceAwareDecision.tasks,
+        assumptions:
+          Array.isArray(fallbackDecision?.assumptions) &&
+          fallbackDecision.assumptions.length > 0
+            ? fallbackDecision.assumptions
+            : workspaceAwareDecision.assumptions,
+        executionScope: normalizeExecutorExecutionScope(fallbackDecision.executionScope),
+        materializationPlan: fallbackDecision.materializationPlan,
+        localProjectManifest:
+          fallbackDecision?.localProjectManifest || workspaceAwareDecision.localProjectManifest,
+        selectedDomain:
+          normalizeOptionalString(fallbackDecision?.selectedDomain) ||
+          workspaceAwareDecision.selectedDomain,
+        detectedVertical:
+          normalizeOptionalString(fallbackDecision?.detectedVertical) ||
+          workspaceAwareDecision.detectedVertical,
+        selectedContractKind:
+          normalizeOptionalString(fallbackDecision?.selectedContractKind) ||
+          workspaceAwareDecision.selectedContractKind,
+        sourceRoot:
+          normalizeOptionalString(fallbackDecision?.sourceRoot) ||
+          workspaceAwareDecision.sourceRoot,
+        targetRoot:
+          normalizeOptionalString(fallbackDecision?.targetRoot) ||
+          workspaceAwareDecision.targetRoot,
+        reason:
+          'La respuesta materializable se normalizó al contrato canónico local porque OpenAI devolvió un scaffold fullstack incompleto o incoherente para el executor.',
+      })
+    : workspaceAwareDecision
   const equivalentApprovalRejected =
-    workspaceAwareDecision.requiresApproval === true &&
+    stabilizedWorkspaceAwareDecision.requiresApproval === true &&
     (hasRejectedDecision(
       resolvedDecisionMap,
-      workspaceAwareDecision.approvalRequest?.decisionKey,
+      stabilizedWorkspaceAwareDecision.approvalRequest?.decisionKey,
     ) ||
       hasEquivalentApprovalRejected(
         resolvedDecisionMap,
         input.goal,
         input.context,
-        workspaceAwareDecision.reason,
-        workspaceAwareDecision.question,
-        workspaceAwareDecision.approvalRequest?.decisionKey,
-        workspaceAwareDecision.approvalRequest?.reason,
-        workspaceAwareDecision.approvalRequest?.question,
+        stabilizedWorkspaceAwareDecision.reason,
+        stabilizedWorkspaceAwareDecision.question,
+        stabilizedWorkspaceAwareDecision.approvalRequest?.decisionKey,
+        stabilizedWorkspaceAwareDecision.approvalRequest?.reason,
+        stabilizedWorkspaceAwareDecision.approvalRequest?.question,
       ))
 
   if (equivalentApprovalRejected) {
@@ -43778,26 +45794,26 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
     })
   }
   const shouldSuppressMinorApproval =
-    workspaceAwareDecision.requiresApproval === true &&
+    stabilizedWorkspaceAwareDecision.requiresApproval === true &&
     (hasEquivalentApprovalResolved(
       resolvedDecisionMap,
       input.goal,
       input.context,
-      workspaceAwareDecision.reason,
-      workspaceAwareDecision.question,
-      workspaceAwareDecision.approvalRequest?.decisionKey,
-      workspaceAwareDecision.approvalRequest?.reason,
-      workspaceAwareDecision.approvalRequest?.question,
+      stabilizedWorkspaceAwareDecision.reason,
+      stabilizedWorkspaceAwareDecision.question,
+      stabilizedWorkspaceAwareDecision.approvalRequest?.decisionKey,
+      stabilizedWorkspaceAwareDecision.approvalRequest?.reason,
+      stabilizedWorkspaceAwareDecision.approvalRequest?.question,
     ) ||
       normalizeUserParticipationMode(input.userParticipationMode) ===
         'brain-decides-missing') &&
     !detectRemoteOrCriticalAction(
       input.goal,
       input.context,
-      workspaceAwareDecision.reason,
-      workspaceAwareDecision.question,
-      workspaceAwareDecision.approvalRequest?.reason,
-      workspaceAwareDecision.approvalRequest?.question,
+      stabilizedWorkspaceAwareDecision.reason,
+      stabilizedWorkspaceAwareDecision.question,
+      stabilizedWorkspaceAwareDecision.approvalRequest?.reason,
+      stabilizedWorkspaceAwareDecision.approvalRequest?.question,
     ) &&
     (shouldSuppressPlaceholderAssetApproval({
       resolvedDecisionMap,
@@ -43805,16 +45821,16 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
       texts: [
         input.goal,
         input.context,
-        workspaceAwareDecision.reason,
-        workspaceAwareDecision.question,
-        workspaceAwareDecision.approvalRequest?.decisionKey,
-        workspaceAwareDecision.approvalRequest?.reason,
-        workspaceAwareDecision.approvalRequest?.question,
+        stabilizedWorkspaceAwareDecision.reason,
+        stabilizedWorkspaceAwareDecision.question,
+        stabilizedWorkspaceAwareDecision.approvalRequest?.decisionKey,
+        stabilizedWorkspaceAwareDecision.approvalRequest?.reason,
+        stabilizedWorkspaceAwareDecision.approvalRequest?.question,
       ],
     }) ||
       hasResolvedDecision(
         resolvedDecisionMap,
-        workspaceAwareDecision.approvalRequest?.decisionKey,
+        stabilizedWorkspaceAwareDecision.approvalRequest?.decisionKey,
         'technical-defaults',
         'placeholder-content',
         'provisional-assets',
@@ -43833,11 +45849,11 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
       ))
 
   if (!shouldSuppressMinorApproval) {
-    return workspaceAwareDecision
+    return stabilizedWorkspaceAwareDecision
   }
 
   return buildBrainDecisionContract({
-    ...workspaceAwareDecision,
+    ...stabilizedWorkspaceAwareDecision,
     requiresApproval: false,
     approvalRequest: null,
     question: '',
@@ -46196,8 +48212,10 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
     continuationActionPlan: brainDecision.continuationActionPlan,
     projectContinuationState: brainDecision.projectContinuationState,
     projectReadinessState: brainDecision.projectReadinessState,
-    approvalRequestPlan: brainDecision.approvalRequestPlan,
-    runtimeApprovalState: brainDecision.runtimeApprovalState,
+    approvalRequestPlan:
+      brainDecision.requiresApproval === true ? brainDecision.approvalRequestPlan : null,
+    runtimeApprovalState:
+      brainDecision.requiresApproval === true ? brainDecision.runtimeApprovalState : null,
     materializationPlan: brainDecision.materializationPlan,
     existingProjectDetection: brainDecision.existingProjectDetection,
     activeProjectContext: brainDecision.activeProjectContext,

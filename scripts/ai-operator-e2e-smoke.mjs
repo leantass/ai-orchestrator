@@ -44,6 +44,7 @@ const continuationBasePhaseIds = [
 ]
 const requiredPlannerFunctions = [
   'buildLocalStrategicBrainDecision',
+  'normalizeOpenAIBrainDecision',
   'shouldBlockWebScaffoldExecutionForFullstackRequest',
   'buildBlockedFullstackWebScaffoldExecutionResponse',
   'inspectFullstackLocalMaterializationContract',
@@ -83,6 +84,16 @@ const schoolGoalCase = {
     'Hacer un sistema fullstack local escolar con alumnos, familias, cursos, seguimiento academico y reportes locales.',
   context: '',
   projectLabel: 'gestion escolar',
+}
+const onlineCoursesGoalCase = {
+  goal:
+    'Crear una primera entrega fullstack local para una plataforma web de cursos online con backend local, base local SQLite, frontend publico, frontend admin, panel de alumno, cursos, categorias, modulos, clases, planes Free Plata y Oro, inscripciones, progreso y pagos mock de Mercado Pago.',
+  context: [
+    'No landing. No demo solamente visual.',
+    'Mercado Pago solo como mock o sandbox local, sin tokens, sin .env y sin llamadas reales.',
+    'Sin deploy, sin Docker, sin servicios externos y sin credenciales reales.',
+  ].join(' '),
+  projectLabel: 'plataforma de cursos online',
 }
 const realEstateGoalCase = {
   goal:
@@ -259,9 +270,20 @@ function buildVmRootElement() {
   }
 }
 
-function executeStaticFrontendBundle(projectRootPath) {
+function resolvePrimaryFrontendIndexPath(projectRootPath) {
   const frontendRootPath = path.join(projectRootPath, 'frontend')
-  const indexHtmlPath = path.join(frontendRootPath, 'index.html')
+  const candidatePaths = [
+    path.join(frontendRootPath, 'index.html'),
+    path.join(frontendRootPath, 'public', 'index.html'),
+    path.join(frontendRootPath, 'admin', 'index.html'),
+    path.join(frontendRootPath, 'student', 'index.html'),
+  ]
+
+  return candidatePaths.find((entry) => fs.existsSync(entry)) || candidatePaths[0]
+}
+
+function executeStaticFrontendBundle(projectRootPath) {
+  const indexHtmlPath = resolvePrimaryFrontendIndexPath(projectRootPath)
   const indexHtml = fs.readFileSync(indexHtmlPath, 'utf8')
   const scriptSources = extractOrderedStaticScriptSources(indexHtml)
   const rootElement = buildVmRootElement()
@@ -289,9 +311,10 @@ function executeStaticFrontendBundle(projectRootPath) {
   windowObject.globalThis = sandbox
 
   const context = vm.createContext(sandbox)
+  const indexHtmlDirectoryPath = path.dirname(indexHtmlPath)
 
   for (const scriptSource of scriptSources) {
-    const scriptPath = path.join(frontendRootPath, scriptSource)
+    const scriptPath = path.resolve(indexHtmlDirectoryPath, scriptSource)
     const scriptContent = fs.readFileSync(scriptPath, 'utf8')
     vm.runInContext(scriptContent, context, { filename: scriptPath })
   }
@@ -306,13 +329,15 @@ function executeStaticFrontendBundle(projectRootPath) {
 
 function readStaticFrontendArtifacts(projectRootPath) {
   const frontendRootPath = path.join(projectRootPath, 'frontend')
-  const indexHtmlPath = path.join(frontendRootPath, 'index.html')
+  const indexHtmlPath = resolvePrimaryFrontendIndexPath(projectRootPath)
   const mainJsPath = path.join(frontendRootPath, 'src', 'main.js')
   const mockDataPath = path.join(frontendRootPath, 'src', 'mock-data.js')
   const appPath = path.join(frontendRootPath, 'src', 'components', 'App.js')
   const stylesPath = path.join(frontendRootPath, 'src', 'styles.css')
   const readmePath = path.join(projectRootPath, 'README.md')
   const runbookPath = path.join(projectRootPath, 'docs', 'local-runbook.md')
+  const readFileIfExists = (targetPath) =>
+    fs.existsSync(targetPath) ? fs.readFileSync(targetPath, 'utf8') : ''
 
   return {
     frontendRootPath,
@@ -323,13 +348,13 @@ function readStaticFrontendArtifacts(projectRootPath) {
     stylesPath,
     readmePath,
     runbookPath,
-    indexHtml: fs.readFileSync(indexHtmlPath, 'utf8'),
-    mainJs: fs.readFileSync(mainJsPath, 'utf8'),
-    mockDataJs: fs.readFileSync(mockDataPath, 'utf8'),
-    appJs: fs.readFileSync(appPath, 'utf8'),
-    stylesCss: fs.readFileSync(stylesPath, 'utf8'),
-    readmeContent: fs.readFileSync(readmePath, 'utf8'),
-    runbookContent: fs.readFileSync(runbookPath, 'utf8'),
+    indexHtml: readFileIfExists(indexHtmlPath),
+    mainJs: readFileIfExists(mainJsPath),
+    mockDataJs: readFileIfExists(mockDataPath),
+    appJs: readFileIfExists(appPath),
+    stylesCss: readFileIfExists(stylesPath),
+    readmeContent: readFileIfExists(readmePath),
+    runbookContent: readFileIfExists(runbookPath),
   }
 }
 
@@ -521,12 +546,13 @@ function loadPlannerTestingSurface() {
   const plannerSurface = extractSegment({
     name: 'superficie local de planner',
     startMarker: 'function normalizeExecutorAttemptScope(',
-    endMarker: 'function buildOpenAIBrainInputPayload(input) {',
+    endMarker: 'function createLocalRulesStrategicBrainProvider() {',
   })
   const harness = `
 ${plannerSurface}
 module.exports = {
   buildLocalStrategicBrainDecision,
+  normalizeOpenAIBrainDecision,
   shouldBlockWebScaffoldExecutionForFullstackRequest,
   buildBlockedFullstackWebScaffoldExecutionResponse,
   inspectFullstackLocalMaterializationContract,
@@ -615,7 +641,49 @@ function inspectDecisionMaterializationContract({
   })
 }
 
-function buildFullstackLocalMaterializationPrompt({ goal, scalablePlan }) {
+function detectOnlineCoursesIntentFromPlanPrompt({
+  goal,
+  context = '',
+  scalablePlan,
+}) {
+  const planFiles = Array.isArray(scalablePlan?.filesToCreate)
+    ? scalablePlan.filesToCreate
+        .map((entry) => (entry && typeof entry === 'object' ? String(entry.path || '').trim() : ''))
+        .filter(Boolean)
+        .join(' ')
+    : ''
+  const inspectionSurface = normalizeText(
+    [
+      goal,
+      context,
+      scalablePlan?.domainLabel,
+      scalablePlan?.businessSector,
+      scalablePlan?.projectType,
+      scalablePlan?.deliveryLevel,
+      ...(Array.isArray(scalablePlan?.modules) ? scalablePlan.modules : []),
+      ...(Array.isArray(scalablePlan?.allowedRootPaths)
+        ? scalablePlan.allowedRootPaths
+        : []),
+      planFiles,
+    ].join(' '),
+  )
+  const learningCore =
+    /\b(?:cursos?|clases?|lecciones?|panel alumno)\b/u.test(inspectionSurface)
+  const learningActors =
+    /\b(?:alumnos?|estudiantes?|instructores?|inscripciones?)\b/u.test(inspectionSurface)
+  const commercialSignals =
+    /\b(?:planes?|free|plata|oro|premium|progreso)\b/u.test(
+      inspectionSurface,
+    )
+  const onlinePlatformSignals =
+    /\b(?:cursos? online|plataforma web de cursos|plataforma de cursos|frontend\/student|panel alumno)\b/u.test(
+      inspectionSurface,
+    )
+
+  return learningCore && (learningActors || onlinePlatformSignals) && (commercialSignals || onlinePlatformSignals)
+}
+
+function buildFullstackLocalMaterializationPrompt({ goal, context = '', scalablePlan }) {
   const allowedRootPaths = summarizeUniqueStrings(scalablePlan?.allowedRootPaths, 8)
   const targetStructure = summarizeUniqueStrings(scalablePlan?.targetStructure, 16)
   const directories = summarizeUniqueStrings(scalablePlan?.directories, 24)
@@ -633,12 +701,83 @@ function buildFullstackLocalMaterializationPrompt({ goal, scalablePlan }) {
     scalablePlan?.explicitExclusions,
     16,
   )
+  const isOnlineCoursesPlan = detectOnlineCoursesIntentFromPlanPrompt({
+    goal,
+    context,
+    scalablePlan,
+  })
+  const isLogisticsPlan = /\b(?:logistica|logistico|tracking|envios?|consulta publica por codigo)\b/u.test(
+    normalizeText(
+      [
+        goal,
+        context,
+        scalablePlan?.domainLabel,
+        ...(Array.isArray(scalablePlan?.modules) ? scalablePlan.modules : []),
+      ].join(' '),
+    ),
+  )
+  if (!isOnlineCoursesPlan && !isLogisticsPlan) {
+    return {
+      goal: `Materializar fullstack-local revisado para "${goal}".`,
+      context: [
+        'deliveryLevel: fullstack-local.',
+        'accion requerida: materializar fullstack-local.',
+        allowedRootPaths.length > 0
+          ? `allowedRootPaths: ${allowedRootPaths.join(', ')}`
+          : '',
+        targetStructure.length > 0 ? `targetStructure: ${targetStructure.join(', ')}` : '',
+        directories.length > 0 ? `directories: ${directories.join(', ')}` : '',
+        filesToCreate.length > 0 ? `filesToCreate: ${filesToCreate.join(', ')}` : '',
+        localOnlyConstraints.length > 0
+          ? `localOnlyConstraints: ${localOnlyConstraints.join(' | ')}`
+          : '',
+        explicitExclusions.length > 0
+          ? `explicitExclusions: ${explicitExclusions.join(' | ')}`
+          : '',
+        'Archivos requeridos: README.md, package.json, frontend/package.json, frontend/admin/README.md, frontend/public/README.md, frontend/index.html, frontend/src/main.js, frontend/src/routes/index.js, frontend/src/features/appointments.js, frontend/src/styles.css, frontend/src/mock-data.js, frontend/src/components/App.js, backend/package.json, backend/src/server.js, backend/src/routes/health.js, backend/src/routes/appointments.js, backend/src/modules/appointments.js, backend/src/lib/response.js, shared/contracts/domain.js, shared/types/contracts.js, database/README.md, database/schema.sql, database/seeds/seed-local.sql, scripts/README.md, scripts/seed-local.js, docs/architecture.md, docs/api.md, docs/data-model.md, docs/local-runbook.md.',
+        'Devolver un materialize-fullstack-local-plan ejecutable por el executor local deterministico.',
+        'No instalar dependencias, no crear node_modules, no crear .env real y no levantar servicios.',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    }
+  }
+  const domainGuidance = isOnlineCoursesPlan
+    ? [
+        'Mantener un contrato canonico coherente de cursos online y no reciclar logistica, tracking, veterinaria ni ecommerce generico de productos.',
+        'Usar la misma raiz objetivo para todo el contrato materializable y no arrastrar roots previos fuera de alcance.',
+        'Archivos requeridos: README.md, package.json, backend/package.json, backend/src/server.js, backend/src/routes/courses.js, backend/src/routes/categories.js, backend/src/routes/modules.js, backend/src/routes/lessons.js, backend/src/routes/students.js, backend/src/routes/enrollments.js, backend/src/routes/plans.js, backend/src/routes/payments.js, backend/src/routes/progress.js, backend/src/services/mock-mercado-pago.js, shared/plans.js, shared/payment-statuses.js, shared/course-statuses.js, database/schema.sql, database/seed.sql, frontend/admin/index.html, frontend/admin/app.js, frontend/public/index.html, frontend/public/app.js, frontend/student/index.html, frontend/student/app.js, scripts/seed-local.js o scripts/README.md, docs/API.md, docs/ARCHITECTURE.md, docs/DB_SCHEMA.md, docs/PAYMENTS_MOCK.md y docs/LOCAL_VALIDATION.md.',
+        'Mercado Pago debe quedar solo como mock local documentado con estados pending, approved, rejected y cancelled, sin .env, sin tokens y sin llamadas externas.',
+      ]
+    : [
+        'Archivos requeridos: README.md, package.json, backend/package.json, backend/src/server.js, backend/src/routes/shipments.js, backend/src/routes/tracking.js, shared/statuses.js, database/schema.sql, database/seed.sql, frontend/admin/index.html, frontend/admin/app.js, frontend/public/index.html, frontend/public/app.js, scripts/seed-local.js o scripts/README.md, docs/API.md, docs/ARCHITECTURE.md y docs/DB_SCHEMA.md.',
+        'No devolver logistica contaminada con veterinaria, appointments ni proyectos previos fuera de alcance.',
+      ]
 
   return {
-    goal: `Materializar fullstack-local revisado para "${goal}".`,
+    goal: [
+      'Preparar la materializacion controlada de un fullstack-local local y revisable dentro de una carpeta nueva del workspace.',
+      'Esto corresponde a un proyecto nuevo y no a una continuidad read-only de un proyecto existente.',
+      'No devolver otro scalable-delivery-plan.',
+      'No devolver materialize-safe-first-delivery-plan.',
+      'No devolver materialize-frontend-project-plan.',
+      'No devolver prepare-continuation-action-plan.',
+      'No devolver prepare-project-phase-plan.',
+      `Devolver un materialize-fullstack-local-plan ejecutable por el executor local deterministico para "${goal}".`,
+    ].join(' '),
     context: [
+      `Objetivo original: ${goal}.`,
+      context ? `Contexto previo del operador: ${context}.` : '',
+      'sourceStrategy: scalable-delivery-plan.',
+      'sourceNextExpectedAction: review-scalable-delivery.',
       'deliveryLevel: fullstack-local.',
       'accion requerida: materializar fullstack-local.',
+      'projectIntent: new-project-intent.',
+      'modo esperado: scaffold fullstack local, estatico y revisable.',
+      'strategyEsperada: materialize-fullstack-local-plan.',
+      'executionModeEsperado: executor.',
+      'nextExpectedActionEsperado: execute-plan.',
+      'requiresApprovalEsperado: false.',
       allowedRootPaths.length > 0
         ? `allowedRootPaths: ${allowedRootPaths.join(', ')}`
         : '',
@@ -651,8 +790,9 @@ function buildFullstackLocalMaterializationPrompt({ goal, scalablePlan }) {
       explicitExclusions.length > 0
         ? `explicitExclusions: ${explicitExclusions.join(' | ')}`
         : '',
-      'Archivos requeridos: README.md, package.json, frontend/package.json, frontend/admin/README.md, frontend/public/README.md, frontend/index.html, frontend/src/main.js, frontend/src/routes/index.js, frontend/src/features/appointments.js, frontend/src/styles.css, frontend/src/mock-data.js, frontend/src/components/App.js, backend/package.json, backend/src/server.js, backend/src/routes/health.js, backend/src/routes/appointments.js, backend/src/modules/appointments.js, backend/src/lib/response.js, shared/contracts/domain.js, shared/types/contracts.js, database/README.md, database/schema.sql, database/seeds/seed-local.sql, scripts/README.md, scripts/seed-local.js, docs/architecture.md, docs/api.md, docs/data-model.md, docs/local-runbook.md.',
-      'Devolver un materialize-fullstack-local-plan ejecutable por el executor local deterministico.',
+      'Si el workspace detecta un proyecto existente pero applicable=false o projectIntent=new-project-intent, ignorarlo por completo dentro del contrato materializable.',
+      'No reutilizar manifest, roadmap, phaseExpansionPlan, modulos ni dominio de proyectos detectados fuera de alcance como fullstack-local-veterinaria.',
+      ...domainGuidance,
       'No instalar dependencias, no crear node_modules, no crear .env real y no levantar servicios.',
     ]
       .filter(Boolean)
@@ -735,6 +875,7 @@ async function buildFullstackFixture({
 
   const prompt = buildFullstackLocalMaterializationPrompt({
     goal,
+    context,
     scalablePlan,
   })
   const phaseTwoDecision = await requestPlannerDecision({
@@ -2930,7 +3071,7 @@ async function runTrackingLogisticsPostApprovalUiStateRealCase() {
   )
   pushFailure(
     failures,
-    /const rawPlanResponse = await window\.aiOrchestrator\?\.planTask\?\.\([\s\S]{0,220}?const planResponse = sanitizePlannerDecisionResponse\(rawPlanResponse\)[\s\S]{0,160}?const plannerApprovalRequired =[\s\S]{0,140}?shouldTreatPlannerResponseAsApprovalRequired\(planResponse\)/.test(
+    /const rawPlanResponse = await window\.aiOrchestrator\?\.planTask\?\.\([\s\S]{0,520}?const planResponse = sanitizePlannerDecisionResponse\(rawPlanResponse\)[\s\S]{0,260}?const plannerApprovalRequired =[\s\S]{0,220}?shouldTreatPlannerResponseAsApprovalRequired\(planResponse\)/.test(
       appSource,
     ),
     'runAutoFlowLoop debe sanear la replanificacion antes de mostrar pending approval.',
@@ -3015,10 +3156,11 @@ async function runTrackingLogisticsPostApprovalReviewStateCase() {
 
   pushFailure(
     failures,
-    /const replanManualFlow = async \([\s\S]{0,5000}?setPlannerRequestSnapshot\(\{\s*[\r\n\s]*goal: goalInput,\s*[\r\n\s]*context: currentExecutionContext,/.test(
-      appSource,
-    ),
-    'replanManualFlow debe persistir goalInput y currentExecutionContext reales para no caer en ReferenceError post-approval.',
+    /const replanGoal =/.test(appSource) &&
+      /setPlannerRequestSnapshot\(\{\s*[\r\n\s]*goal: replanGoal,\s*[\r\n\s]*context: currentExecutionContext,/.test(
+        appSource,
+      ),
+    'replanManualFlow debe persistir el goal/context efectivos del replan para no perder la continuacion post-approval.',
   )
   pushFailure(
     failures,
@@ -3497,6 +3639,11 @@ async function runTrackingLogisticsIgnoredDetectedProjectDoesNotBlockMaterialize
       domain: 'fullstack-local-veterinaria',
       modules: ['turnos', 'pacientes', 'mascotas'],
     },
+    activeProjectContext: {
+      mode: 'new-project',
+      source: 'new-project-plan',
+      note: 'Se detectó fullstack-local-veterinaria, pero el pedido actual describe un proyecto nuevo y queda fuera de alcance para esta corrida.',
+    },
   }
   const inspection = inspectPreparedFullstackLocalMaterialization({
     metadata: contaminatedDecision,
@@ -3670,6 +3817,820 @@ async function runTrackingLogisticsScalableReviewShowsPrepareCtaCase() {
   }
 }
 
+async function requestOnlineCoursesPreparedMaterializationDecision({
+  workspacePath = smokeWorkspaceRoot,
+  previousExecutionResult = '',
+  projectState = { resolvedDecisions: [] },
+} = {}) {
+  const goal = onlineCoursesGoalCase.goal
+  const context = onlineCoursesGoalCase.context
+  const baseDecision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal,
+    context,
+    workspacePath,
+    iteration: 2,
+    previousExecutionResult,
+    requiresApproval: false,
+    projectState,
+    userParticipationMode: 'brain-decides-missing',
+    costMode: 'max-quality',
+    attachedInputs: [],
+    existingProjectContext: null,
+    projectWorkMode: 'auto',
+    reusablePlanningContext: buildReusablePlanningContext(),
+  })
+
+  const scalablePlan =
+    baseDecision?.scalableDeliveryPlan &&
+    typeof baseDecision.scalableDeliveryPlan === 'object'
+      ? baseDecision.scalableDeliveryPlan
+      : null
+
+  if (!scalablePlan) {
+    return {
+      goal,
+      context,
+      baseDecision,
+      decision: null,
+      failures: [
+        'La base reviewed online-courses no devolvió scalableDeliveryPlan para preparar la entrega funcional local.',
+      ],
+    }
+  }
+
+  const prompt = buildFullstackLocalMaterializationPrompt({
+    goal,
+    context,
+    scalablePlan,
+  })
+
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: prompt.goal,
+    context: [prompt.context, 'No ejecutar todavía.'].filter(Boolean).join('\n'),
+    workspacePath,
+    iteration: 3,
+    previousExecutionResult,
+    requiresApproval: false,
+    projectState,
+    userParticipationMode: 'brain-decides-missing',
+    costMode: 'max-quality',
+    attachedInputs: [],
+    existingProjectContext: null,
+    projectWorkMode: 'auto',
+    reusablePlanningContext: buildReusablePlanningContext(),
+  })
+
+  return { goal, context, baseDecision, decision, failures: [] }
+}
+
+function buildDeferredRealPaymentsResolvedDecisions({
+  decision = 'deferred',
+  selectedOption = 'Prepararlo más adelante',
+  freeAnswer = 'Continuar mock, pagos reales después.',
+} = {}) {
+  const sharedRecord = {
+    status: 'resolved',
+    source: 'user',
+    decision,
+    label:
+      decision === 'draft'
+        ? 'Redactar borrador de approval futuro'
+        : 'Prepararlo más adelante',
+    scope: 'real-payments',
+    summary:
+      decision === 'draft'
+        ? 'La integracion real de Mercado Pago queda como borrador futuro; la entrega actual sigue con mock local.'
+        : 'La integracion real de Mercado Pago queda diferida; la entrega actual sigue con mock local.',
+    responseMode: selectedOption ? 'mixed' : 'free-answer',
+    approvalFamily: 'real-payments',
+    selectedOption,
+    freeAnswer,
+    allowsNow: [
+      'local-mock-payments',
+      'mock-mercado-pago-adapter',
+      'seed/mock payment statuses',
+    ],
+    forbidsNow: [
+      'real-payments',
+      'real-webhooks',
+      'real-secrets',
+      '.env',
+      'external-api-calls',
+    ],
+    updatedAt: '2026-05-22T00:00:00.000Z',
+  }
+
+  return [
+    {
+      key: 'approve-real-payments',
+      ...sharedRecord,
+    },
+    {
+      key: 'approval-family:real-payments',
+      ...sharedRecord,
+    },
+  ]
+}
+
+async function runOnlineCoursesScalableReviewShowsPrepareCtaCase() {
+  const failures = []
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: onlineCoursesGoalCase.goal,
+    context: onlineCoursesGoalCase.context,
+    workspacePath: smokeWorkspaceRoot,
+    iteration: 2,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: 'brain-decides-missing',
+    costMode: 'max-quality',
+    attachedInputs: [],
+    existingProjectContext: null,
+    projectWorkMode: 'auto',
+    reusablePlanningContext: buildReusablePlanningContext(),
+  })
+  const scalableReviewUiState = derivePlannerMaterializationUiState({
+    plannerExecutionMetadata: decision,
+    effectivePlannerExecutionMetadata: decision,
+  })
+  const scalablePlan =
+    decision?.scalableDeliveryPlan && typeof decision.scalableDeliveryPlan === 'object'
+      ? decision.scalableDeliveryPlan
+      : null
+  const reviewSurface = normalizeText(
+    JSON.stringify({
+      strategy: decision?.strategy,
+      decisionKey: decision?.decisionKey,
+      nextExpectedAction: decision?.nextExpectedAction,
+      reason: decision?.reason,
+      domainUnderstanding: decision?.domainUnderstanding,
+      scalableDeliveryPlan: decision?.scalableDeliveryPlan,
+    }),
+  )
+  const rootPath = summarizeUniqueStrings(scalablePlan?.allowedRootPaths, 1)[0] || ''
+
+  pushFailure(
+    failures,
+    String(decision?.strategy || '').trim() === 'scalable-delivery-plan',
+    'Cursos online debe seguir empezando en scalable-delivery-plan.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.executionMode || '').trim() === 'planner-only',
+    'Cursos online no debe saltar directo a executor en el review inicial.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.nextExpectedAction || '').trim() === 'review-scalable-delivery',
+    'Cursos online debe quedar en review-scalable-delivery antes del click.',
+  )
+  pushFailure(
+    failures,
+    scalableReviewUiState.prepareCtaVisible === true,
+    'Cursos online debe mostrar Preparar entrega funcional local en Paso 5.',
+  )
+  pushFailure(
+    failures,
+    scalableReviewUiState.prepareCtaLabel === 'Preparar entrega funcional local',
+    'Cursos online debe conservar el label Preparar entrega funcional local.',
+  )
+  pushFailure(
+    failures,
+    normalizeText(rootPath).includes('edu-platform-local'),
+    `Cursos online debe usar un root coherente tipo edu-platform-local. Recibido: ${rootPath || '(vacío)'}.`,
+  )
+  ;['logitrack-local-v1', 'shipments', 'tracking', 'veterinaria', 'appointments'].forEach(
+    (token) => {
+      pushFailure(
+        failures,
+        !reviewSurface.includes(normalizeText(token)),
+        `El review escalable de cursos online no debe contaminarse con ${token}.`,
+      )
+    },
+  )
+  ;['cursos', 'alumnos', 'planes', 'progreso'].forEach((token) => {
+    pushFailure(
+      failures,
+      reviewSurface.includes(normalizeText(token)),
+      `El review escalable de cursos online debe incluir ${token}.`,
+    )
+  })
+
+  return {
+    id: 'online-courses-scalable-review-shows-prepare-cta',
+    label: 'Online courses scalable review shows prepare CTA',
+    failures,
+  }
+}
+
+async function runOnlineCoursesMaterializationContractCase() {
+  const result = await requestOnlineCoursesPreparedMaterializationDecision()
+  const failures = [...(Array.isArray(result.failures) ? result.failures : [])]
+  const decision = result.decision
+  const materializationUiState = derivePlannerMaterializationUiState({
+    plannerExecutionMetadata: decision,
+    effectivePlannerExecutionMetadata: decision,
+  })
+  const contractInspection = inspectDecisionMaterializationContract({
+    decision,
+    goal: result.goal,
+    context: result.context,
+  })
+  const targetSummary = normalizeText(
+    JSON.stringify({
+      projectRoot: decision?.materializationPlan?.projectRoot,
+      selectedDomain:
+        decision?.selectedDomain || contractInspection?.selectedDomain || '',
+      selectedContractKind:
+        decision?.selectedContractKind ||
+        decision?.materializationPlan?.contractDefinition?.contractKind ||
+        contractInspection?.contractKind ||
+        '',
+      allowedTargetPaths: [
+        ...(Array.isArray(decision?.executionScope?.allowedTargetPaths)
+          ? decision.executionScope.allowedTargetPaths
+          : []),
+        ...(Array.isArray(decision?.materializationPlan?.allowedTargetPaths)
+          ? decision.materializationPlan.allowedTargetPaths
+          : []),
+      ].map((entry) => normalizePathForComparison(entry)),
+      operations: Array.isArray(decision?.materializationPlan?.operations)
+        ? decision.materializationPlan.operations.map((entry) =>
+            normalizePathForComparison(entry?.targetPath || ''),
+          )
+        : [],
+    }),
+  )
+
+  pushFailure(
+    failures,
+    String(decision?.strategy || '').trim() === 'materialize-fullstack-local-plan',
+    'Cursos online post-click debe devolver materialize-fullstack-local-plan.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.executionMode || '').trim() === 'executor',
+    'Cursos online post-click debe devolver executionMode executor.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.nextExpectedAction || '').trim() === 'execute-plan',
+    'Cursos online post-click debe devolver nextExpectedAction execute-plan.',
+  )
+  pushFailure(
+    failures,
+    String(
+      decision?.selectedDomain || contractInspection?.selectedDomain || '',
+    ).trim() === 'online-courses',
+    `La materialización de cursos online debe marcar selectedDomain=online-courses. Recibido: ${decision?.selectedDomain || contractInspection?.selectedDomain || '(vacío)'}.`,
+  )
+  pushFailure(
+    failures,
+    String(
+      decision?.selectedContractKind ||
+        decision?.materializationPlan?.contractDefinition?.contractKind ||
+        contractInspection?.contractKind ||
+        '',
+    ).trim() === 'online-courses-fullstack-local',
+    'La materialización de cursos online debe marcar selectedContractKind=online-courses-fullstack-local.',
+  )
+  pushFailure(
+    failures,
+    normalizeText(decision?.targetRoot || decision?.materializationPlan?.projectRoot || '').includes(
+      'edu-platform-local',
+    ),
+    'La materialización de cursos online debe mantener un root coherente tipo edu-platform-local.',
+  )
+  ;[
+    'frontend/admin/index.html',
+    'frontend/public/index.html',
+    'frontend/student/index.html',
+    'backend/src/routes/courses.js',
+    'backend/src/routes/payments.js',
+    'backend/src/services/mock-mercado-pago.js',
+    'shared/plans.js',
+    'shared/payment-statuses.js',
+    'shared/course-statuses.js',
+    'docs/payments_mock.md',
+    'docs/local_validation.md',
+  ].forEach((token) => {
+    pushFailure(
+      failures,
+      targetSummary.includes(normalizeText(token)),
+      `La materialización de cursos online debe incluir ${token}.`,
+    )
+  })
+  ;['logitrack-local-v1', 'shipments', 'tracking', 'veterinaria', 'appointments'].forEach(
+    (token) => {
+      pushFailure(
+        failures,
+        !targetSummary.includes(normalizeText(token)),
+        `La materialización de cursos online no debe contaminarse con ${token}.`,
+      )
+    },
+  )
+  pushFailure(
+    failures,
+    contractInspection?.ok === true,
+    `El contrato canónico de cursos online debe quedar OK. Recibido: ${contractInspection?.reason || '(sin reason)'}.`,
+  )
+  pushFailure(
+    failures,
+    materializationUiState.materializeCtaEnabled === true &&
+      materializationUiState.uiState === 'materialization-ready',
+    'El helper del renderer debe considerar materialization-ready al contrato completo de cursos online.',
+  )
+
+  return {
+    id: 'online-courses-materialization-contract',
+    label: 'Online courses materialization contract',
+    failures,
+  }
+}
+
+async function runOnlineCoursesInvalidOpenAIMaterializationFallsBackCase() {
+  const failures = []
+  const baseDecision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: onlineCoursesGoalCase.goal,
+    context: onlineCoursesGoalCase.context,
+    workspacePath: smokeWorkspaceRoot,
+    iteration: 2,
+    previousExecutionResult: '',
+    requiresApproval: false,
+    projectState: { resolvedDecisions: [] },
+    userParticipationMode: 'brain-decides-missing',
+    costMode: 'max-quality',
+    attachedInputs: [],
+    existingProjectContext: null,
+    projectWorkMode: 'auto',
+    reusablePlanningContext: buildReusablePlanningContext(),
+  })
+  const scalablePlan =
+    baseDecision?.scalableDeliveryPlan &&
+    typeof baseDecision.scalableDeliveryPlan === 'object'
+      ? baseDecision.scalableDeliveryPlan
+      : null
+
+  if (!scalablePlan) {
+    return {
+      id: 'online-courses-invalid-openai-materialization-falls-back',
+      label: 'Online courses invalid OpenAI materialization falls back',
+      failures: [
+        'La base de cursos online no devolvió scalableDeliveryPlan para construir la fase materializable.',
+      ],
+    }
+  }
+
+  const prompt = buildFullstackLocalMaterializationPrompt({
+    goal: onlineCoursesGoalCase.goal,
+    context: onlineCoursesGoalCase.context,
+    scalablePlan,
+  })
+  const invalidRawDecision = {
+    decisionKey: 'materialize-fullstack-local-online-courses-v1',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    requiresApproval: false,
+    businessSector: 'education-tech',
+    businessSectorLabel: 'EdTech - Cursos online',
+    tasks: [
+      {
+        step: 1,
+        title: 'Materializar scaffold local de cursos online',
+        operation: 'create-or-edit-files',
+        targetPath: 'online-courses-local',
+      },
+    ],
+    executionScope: {
+      allowedTargetPaths: [
+        path.join(smokeWorkspaceRoot, 'online-courses-local'),
+        path.join(smokeWorkspaceRoot, 'online-courses-local', '**'),
+      ],
+      blockedTargetPaths: [
+        path.join(smokeWorkspaceRoot, '.env'),
+        path.join(smokeWorkspaceRoot, 'node_modules'),
+      ],
+      successCriteria: ['Dejar un scaffold fullstack local revisable.'],
+    },
+    materializationPlan: {
+      version: 'test-invalid-openai',
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: path.join(smokeWorkspaceRoot, 'online-courses-local'),
+      allowedTargetPaths: [
+        path.join(smokeWorkspaceRoot, 'online-courses-local'),
+        path.join(smokeWorkspaceRoot, 'online-courses-local', '**'),
+      ],
+      operations: [
+        {
+          type: 'replace-file',
+          targetPath: path.join(
+            smokeWorkspaceRoot,
+            'online-courses-local',
+            'frontend',
+            'public',
+            'src',
+            'main.js',
+          ),
+          nextContent: 'window.renderApp = true\n',
+        },
+        {
+          type: 'replace-file',
+          targetPath: path.join(
+            smokeWorkspaceRoot,
+            'online-courses-local',
+            'frontend',
+            'admin',
+            'src',
+            'main.js',
+          ),
+          nextContent: 'window.renderAdmin = true\n',
+        },
+        {
+          type: 'replace-file',
+          targetPath: path.join(
+            smokeWorkspaceRoot,
+            'online-courses-local',
+            'frontend',
+            'student',
+            'src',
+            'main.js',
+          ),
+          nextContent: 'window.renderStudent = true\n',
+        },
+        {
+          type: 'replace-file',
+          targetPath: path.join(
+            smokeWorkspaceRoot,
+            'online-courses-local',
+            'scripts',
+            'seed-runner.md',
+          ),
+          nextContent: '# seed runner\n',
+        },
+        {
+          type: 'replace-file',
+          targetPath: path.join(
+            smokeWorkspaceRoot,
+            'online-courses',
+            'online-courses-local',
+            'docs',
+            'LOCAL_VALIDATION.md',
+          ),
+          nextContent: '# local validation\n',
+        },
+      ],
+    },
+  }
+
+  const normalizedDecision = await plannerApi.normalizeOpenAIBrainDecision(
+    invalidRawDecision,
+    {
+      goal: prompt.goal,
+      context: [prompt.context, 'No ejecutar todavía.'].filter(Boolean).join('\n'),
+      workspacePath: smokeWorkspaceRoot,
+      iteration: 3,
+      previousExecutionResult: '',
+      requiresApproval: false,
+      projectState: { resolvedDecisions: [] },
+      userParticipationMode: 'brain-decides-missing',
+      costMode: 'max-quality',
+      attachedInputs: [],
+      existingProjectContext: null,
+      projectWorkMode: 'auto',
+      reusablePlanningContext: buildReusablePlanningContext(),
+    },
+  )
+  const contractInspection = inspectDecisionMaterializationContract({
+    decision: normalizedDecision,
+    goal: prompt.goal,
+    context: [prompt.context, 'No ejecutar todavía.'].filter(Boolean).join('\n'),
+  })
+  const normalizedSurface = normalizeText(
+    JSON.stringify({
+      selectedDomain: normalizedDecision?.selectedDomain,
+      selectedContractKind: normalizedDecision?.selectedContractKind,
+      targetRoot: normalizedDecision?.targetRoot,
+      executionScope: normalizedDecision?.executionScope,
+      materializationPlan: normalizedDecision?.materializationPlan,
+    }),
+  )
+
+  pushFailure(
+    failures,
+    String(normalizedDecision?.selectedDomain || '').trim() === 'online-courses',
+    'Una materialización OpenAI inválida de cursos online debe volver al dominio canónico online-courses.',
+  )
+  pushFailure(
+    failures,
+    String(normalizedDecision?.selectedContractKind || '').trim() ===
+      'online-courses-fullstack-local',
+    'Una materialización OpenAI inválida de cursos online debe volver al contrato canónico online-courses-fullstack-local.',
+  )
+  pushFailure(
+    failures,
+    normalizeText(normalizedDecision?.targetRoot || '').includes('edu-platform-local'),
+    'Una materialización OpenAI inválida de cursos online debe recuperar el root canónico edu-platform-local.',
+  )
+  pushFailure(
+    failures,
+    contractInspection?.ok === true,
+    `La normalización debe reemplazar el payload inválido por un contrato canónico OK. Recibido: ${contractInspection?.reason || '(sin reason)'}.`,
+  )
+  ;[
+    'backend/src/server.js',
+    'frontend/public/app.js',
+    'frontend/admin/app.js',
+    'frontend/student/app.js',
+    'scripts/seed-local.js',
+    'docs/local_validation.md',
+  ].forEach((token) => {
+    pushFailure(
+      failures,
+      normalizedSurface.includes(normalizeText(token)),
+      `La normalización fallback debe recuperar ${token}.`,
+    )
+  })
+  ;[
+    'frontend/public/src/main.js',
+    'frontend/admin/src/main.js',
+    'frontend/student/src/main.js',
+    'scripts/seed-runner.md',
+    'online-courses/online-courses-local',
+  ].forEach((token) => {
+    pushFailure(
+      failures,
+      !normalizedSurface.includes(normalizeText(token)),
+      `La normalización fallback no debe conservar ${token}.`,
+    )
+  })
+
+  return {
+    id: 'online-courses-invalid-openai-materialization-falls-back',
+    label: 'Online courses invalid OpenAI materialization falls back',
+    failures,
+  }
+}
+
+async function runOnlineCoursesPaymentsMockSafetyCase() {
+  const result = await requestOnlineCoursesPreparedMaterializationDecision()
+  const failures = [...(Array.isArray(result.failures) ? result.failures : [])]
+  const decision = result.decision
+  const normalizedDecision = normalizeText(JSON.stringify(decision || {}))
+
+  ;[
+    'mock-mercado-pago',
+    'pending',
+    'approved',
+    'rejected',
+    'cancelled',
+    'payment-statuses',
+    'payments_mock',
+  ].forEach((token) => {
+    pushFailure(
+      failures,
+      normalizedDecision.includes(normalizeText(token)),
+      `La materialización de cursos online debe documentar ${token}.`,
+    )
+  })
+  ;['access token', 'client_secret', 'bearer ', 'api.mercadopago', 'fetch('].forEach(
+    (token) => {
+      pushFailure(
+        failures,
+        !normalizedDecision.includes(normalizeText(token)),
+        `La simulación de Mercado Pago no debe incluir ${token}.`,
+      )
+    },
+  )
+
+  return {
+    id: 'online-courses-payments-mock-safety',
+    label: 'Online courses payments mock safety',
+    failures,
+  }
+}
+
+async function runOnlineCoursesApprovalLaterContinuesToMaterializationCase() {
+  const previousExecutionResult =
+    '__orchestrator_feedback__:' +
+    JSON.stringify({
+      type: 'approval-deferred',
+      approvalDecision: 'deferred',
+      source: 'planner',
+      approvalMode: 'once',
+      instruction:
+        'Continuar con la entrega local mock y dejar pagos reales para una fase futura documentada.',
+      approvalReason:
+        'La integracion real de Mercado Pago queda diferida; solo puede continuar el mock local.',
+      approvalRequestDecisionKey: 'approve-real-payments',
+      selectedOption: 'Prepararlo más adelante',
+      freeAnswer: 'Continuar mock, pagos reales después.',
+    })
+  const projectState = {
+    resolvedDecisions: buildDeferredRealPaymentsResolvedDecisions(),
+  }
+  const result = await requestOnlineCoursesPreparedMaterializationDecision({
+    previousExecutionResult,
+    projectState,
+  })
+  const failures = [...(Array.isArray(result.failures) ? result.failures : [])]
+  const decision = result.decision
+  const contractInspection = inspectDecisionMaterializationContract({
+    decision,
+    goal: result.goal,
+    context: result.context,
+  })
+  const uiState = derivePlannerMaterializationUiState({
+    plannerExecutionMetadata: decision,
+    effectivePlannerExecutionMetadata: decision,
+  })
+
+  pushFailure(
+    failures,
+    String(decision?.strategy || '').trim() === 'materialize-fullstack-local-plan',
+    'Después de elegir later, cursos online debe continuar hacia materialize-fullstack-local-plan.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.executionMode || '').trim() === 'executor',
+    'Después de elegir later, cursos online debe quedar en executionMode executor.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.nextExpectedAction || '').trim() === 'execute-plan',
+    'Después de elegir later, cursos online debe quedar en nextExpectedAction execute-plan.',
+  )
+  pushFailure(
+    failures,
+    decision?.requiresApproval !== true &&
+      !decision?.approvalRequest &&
+      !decision?.approvalRequestPlan &&
+      !decision?.runtimeApprovalState,
+    'Después de elegir later no debe quedar approvalRequest ni runtimeApprovalState activos.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.selectedDomain || '').trim() === 'online-courses',
+    'Después de elegir later, cursos online debe conservar selectedDomain=online-courses.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.selectedContractKind || '').trim() === 'online-courses-fullstack-local',
+    'Después de elegir later, cursos online debe conservar selectedContractKind=online-courses-fullstack-local.',
+  )
+  pushFailure(
+    failures,
+    contractInspection?.ok === true,
+    `Después de elegir later, el contrato canónico de cursos online debe quedar OK. Recibido: ${contractInspection?.reason || '(sin reason)'}.`,
+  )
+  pushFailure(
+    failures,
+    uiState?.uiState === 'materialization-ready' &&
+      uiState?.materializeCtaVisible === true &&
+      uiState?.materializeCtaEnabled === true &&
+      uiState?.shouldShowScalableDeliveryPlan !== true,
+    'Después de elegir later, la UI debe quedar en materialization-ready con Materializar entrega habilitado y sin volver al scalable review.',
+  )
+
+  return {
+    id: 'online-courses-approval-later-continues-to-materialization',
+    label: 'Online courses approval later continues to materialization',
+    failures,
+  }
+}
+
+async function runOnlineCoursesApprovalFreeAnswerDeferredCase() {
+  const previousExecutionResult =
+    '__orchestrator_feedback__:' +
+    JSON.stringify({
+      type: 'approval-deferred',
+      approvalDecision: 'deferred',
+      source: 'planner',
+      approvalMode: 'once',
+      instruction:
+        'Continuar con mock local; pagos reales, secretos y webhooks quedan para despues.',
+      approvalReason:
+        'El usuario pidio seguir con mock local y postergar la integracion comercial sensible.',
+      approvalRequestDecisionKey: 'approve-real-payments',
+      freeAnswer: 'Continuar mock, pagos reales después.',
+    })
+  const projectState = {
+    resolvedDecisions: buildDeferredRealPaymentsResolvedDecisions({
+      selectedOption: '',
+      freeAnswer: 'Continuar mock, pagos reales después.',
+    }),
+  }
+  const result = await requestOnlineCoursesPreparedMaterializationDecision({
+    previousExecutionResult,
+    projectState,
+  })
+  const failures = [...(Array.isArray(result.failures) ? result.failures : [])]
+  const decision = result.decision
+
+  pushFailure(
+    failures,
+    String(decision?.strategy || '').trim() === 'materialize-fullstack-local-plan',
+    'Una respuesta libre del tipo "continuar mock, pagos reales después" debe seguir a materialize-fullstack-local-plan.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.selectedDomain || '').trim() === 'online-courses',
+    'La respuesta libre diferida debe conservar el dominio online-courses.',
+  )
+  pushFailure(
+    failures,
+    decision?.requiresApproval !== true &&
+      !decision?.approvalRequest &&
+      !decision?.approvalRequestPlan &&
+      !decision?.runtimeApprovalState,
+    'La respuesta libre diferida no debe reabrir el mismo approval de pagos reales.',
+  )
+
+  return {
+    id: 'online-courses-approval-free-answer-deferred',
+    label: 'Online courses approval free answer deferred',
+    failures,
+  }
+}
+
+async function runOnlineCoursesApprovalLaterReturnsScalableReviewCase() {
+  const previousExecutionResult =
+    '__orchestrator_feedback__:' +
+    JSON.stringify({
+      type: 'approval-deferred',
+      approvalDecision: 'deferred',
+      source: 'planner',
+      approvalMode: 'once',
+      instruction:
+        'Mantener pagos reales para más adelante y continuar solo con el plan local mock.',
+      approvalReason:
+        'La integracion real de Mercado Pago queda diferida; seguir con mock local y sin credenciales.',
+      approvalRequestDecisionKey: 'approve-real-payments',
+      selectedOption: 'Prepararlo más adelante',
+      freeAnswer: 'Continuar mock, pagos reales después.',
+    })
+  const resolvedDecisions = buildDeferredRealPaymentsResolvedDecisions()
+  const decision = await plannerApi.buildLocalStrategicBrainDecision({
+    goal: onlineCoursesGoalCase.goal,
+    context: onlineCoursesGoalCase.context,
+    workspacePath: smokeWorkspaceRoot,
+    iteration: 2,
+    previousExecutionResult,
+    requiresApproval: true,
+    projectState: { resolvedDecisions },
+    userParticipationMode: 'brain-decides-missing',
+    costMode: 'max-quality',
+    attachedInputs: [],
+    existingProjectContext: null,
+    projectWorkMode: 'auto',
+    reusablePlanningContext: buildReusablePlanningContext(),
+  })
+  const failures = []
+  const uiState = derivePlannerMaterializationUiState({
+    plannerExecutionMetadata: decision,
+    effectivePlannerExecutionMetadata: decision,
+  })
+
+  pushFailure(
+    failures,
+    String(decision?.strategy || '').trim() === 'scalable-delivery-plan',
+    'Después de elegir later en el review inicial, cursos online debe volver a scalable-delivery-plan revisable.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.executionMode || '').trim() === 'planner-only',
+    'Después de elegir later en el review inicial, cursos online debe quedar en planner-only.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.nextExpectedAction || '').trim() === 'review-scalable-delivery',
+    'Después de elegir later en el review inicial, cursos online debe volver a review-scalable-delivery.',
+  )
+  pushFailure(
+    failures,
+    decision?.requiresApproval !== true &&
+      !decision?.approvalRequest &&
+      !decision?.approvalRequestPlan &&
+      !decision?.runtimeApprovalState,
+    'Después de elegir later en el review inicial no debe seguir activo el mismo approval.',
+  )
+  pushFailure(
+    failures,
+    uiState?.isScalableReview === true &&
+      uiState?.prepareCtaVisible === true &&
+      uiState?.prepareCtaLabel === 'Preparar entrega funcional local' &&
+      uiState?.materializeCtaEnabled !== true,
+    'Después de elegir later en el review inicial, la UI debe volver a Paso 5 con Preparar entrega funcional local visible y sin Materializar entrega habilitado todavía.',
+  )
+
+  return {
+    id: 'online-courses-approval-later-returns-scalable-review',
+    label: 'Online courses approval later returns scalable review',
+    failures,
+  }
+}
+
 async function requestTrackingLogisticsPreparedMaterializationDecision({
   workspacePath = smokeWorkspaceRoot,
 } = {}) {
@@ -3723,35 +4684,19 @@ async function requestTrackingLogisticsPreparedMaterializationDecision({
     }
   }
 
-  const allowedRootPaths = summarizeUniqueStrings(scalablePlan?.allowedRootPaths, 8)
-  const directories = summarizeUniqueStrings(scalablePlan?.directories, 24)
-  const filesToCreate = Array.isArray(scalablePlan?.filesToCreate)
-    ? scalablePlan.filesToCreate
-        .map((entry) => (entry && typeof entry === 'object' ? String(entry.path || '').trim() : ''))
-        .filter(Boolean)
-        .slice(0, 24)
-    : []
+  const prompt = buildFullstackLocalMaterializationPrompt({
+    goal,
+    context,
+    scalablePlan,
+  })
 
   const decision = await plannerApi.buildLocalStrategicBrainDecision({
-    goal:
-      'Preparar entrega funcional local para el sistema fullstack local de tracking logistico.',
+    goal: prompt.goal,
     context: [
-      'cta: Preparar entrega funcional local.',
-      'plannerReviewState: review-scalable-delivery.',
-      'deliveryLevel: fullstack-local.',
-      'projectIntent: new-project-intent.',
+      prompt.context,
       'approvalAlreadyGranted: true.',
-      'strategyEsperada: materialize-fullstack-local-plan.',
-      'executionModeEsperado: executor.',
-      'nextExpectedActionEsperado: execute-plan.',
-      allowedRootPaths.length > 0 ? `allowedRootPaths: ${allowedRootPaths.join(', ')}` : '',
-      directories.length > 0 ? `directories: ${directories.join(', ')}` : '',
-      filesToCreate.length > 0 ? `filesToCreate: ${filesToCreate.join(', ')}` : '',
-      'Archivos requeridos: frontend/admin/index.html, frontend/admin/app.js, frontend/public/index.html, frontend/public/app.js, backend/src/server.js, backend/src/routes/shipments.js, backend/src/routes/tracking.js, database/schema.sql, database/seed.sql, docs/API.md, docs/DB_SCHEMA.md.',
-      'No devolver prepare-continuation-action-plan.',
-      'No devolver prepare-project-phase-plan.',
       'No devolver web-scaffold-base.',
-      'No ejecutar todavia.',
+      'No ejecutar todavía.',
     ]
       .filter(Boolean)
       .join('\n'),
@@ -5108,6 +6053,13 @@ async function main() {
     results.push(await runTrackingLogisticsDerivedExecutePlanMaterializeCase())
     results.push(await runMaterializeFullstackLocalPlanResponseOverridesReviewStateCase())
     results.push(await runTrackingLogisticsScalableReviewShowsPrepareCtaCase())
+    results.push(await runOnlineCoursesScalableReviewShowsPrepareCtaCase())
+    results.push(await runOnlineCoursesMaterializationContractCase())
+    results.push(await runOnlineCoursesInvalidOpenAIMaterializationFallsBackCase())
+    results.push(await runOnlineCoursesPaymentsMockSafetyCase())
+    results.push(await runOnlineCoursesApprovalLaterReturnsScalableReviewCase())
+    results.push(await runOnlineCoursesApprovalLaterContinuesToMaterializationCase())
+    results.push(await runOnlineCoursesApprovalFreeAnswerDeferredCase())
     results.push(await runTrackingLogisticsOpenAIWebScaffoldGuardCase())
     results.push(await runTrackingLogisticsTimeoutFallbackNoWebScaffoldCase())
     results.push(await runTrackingLogisticsExecutorBlocksWebScaffoldCase())

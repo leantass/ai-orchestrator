@@ -1009,10 +1009,15 @@ type ResolvedDecisionRecord = {
   key: string
   status: 'delegated' | 'approved' | 'rejected' | 'resolved'
   source: 'system' | 'user' | 'planner' | 'executor'
+  decision?: 'approved' | 'rejected' | 'deferred' | 'draft'
+  label?: string
+  scope?: string
   summary?: string
   responseMode?: 'binary' | 'options' | 'free-answer' | 'mixed'
   selectedOption?: string
   freeAnswer?: string
+  allowsNow?: string[]
+  forbidsNow?: string[]
   approvalFamily?: string
   updatedAt?: string
 }
@@ -1147,9 +1152,10 @@ type PlannerDecisionResponse = {
 }
 
 type OrchestratorPlannerFeedback = {
-  type: 'approval-granted' | 'approval-rejected' | 'execution-error'
+  type: 'approval-granted' | 'approval-rejected' | 'approval-deferred' | 'execution-error'
   source: 'planner' | 'executor'
   approvalMode?: 'once' | 'project-rule'
+  approvalDecision?: 'approved' | 'rejected' | 'deferred' | 'draft'
   instruction?: string
   error?: string
   approvalReason?: string
@@ -8945,6 +8951,53 @@ const buildFullstackLocalMaterializationCoherenceIssue = ({
   return ''
 }
 
+const detectOnlineCoursesIntentFromPlan = ({
+  plan,
+  originalGoal,
+  originalContext,
+}: {
+  plan: ScalableDeliveryPlanContract
+  originalGoal: string
+  originalContext: string
+}) => {
+  const planFiles = Array.isArray(plan.filesToCreate)
+    ? plan.filesToCreate
+        .map((entry) => normalizeOptionalString(entry.path))
+        .filter(Boolean)
+        .join(' ')
+    : ''
+  const inspectionSurface = normalizeOptionalString(
+    [
+      originalGoal,
+      originalContext,
+      plan.domainLabel,
+      plan.businessSector,
+      plan.projectType,
+      plan.deliveryLevel,
+      ...normalizeOptionalStringArray(plan.modules),
+      ...normalizeOptionalStringArray(plan.allowedRootPaths),
+      planFiles,
+    ].join(' '),
+  ).toLocaleLowerCase()
+
+  const learningCore =
+    /\b(?:cursos?|clases?|lecciones?|modulos?|módulos?|panel alumno|panel de alumno)\b/u.test(
+      inspectionSurface,
+    )
+  const learningActors =
+    /\b(?:alumnos?|estudiantes?|instructores?|inscripciones?)\b/u.test(inspectionSurface)
+  const commercialSignals =
+    /\b(?:planes?|free|plata|oro|premium|mercado pago|pagos?|suscripciones?|progreso|progress)\b/u.test(
+      inspectionSurface,
+    )
+  const onlinePlatformSignals =
+    /\b(?:cursos? online|plataforma web de cursos|plataforma de cursos|frontend\/student|panel alumno|panel de alumno)\b/u.test(
+      inspectionSurface,
+    )
+
+  return learningCore && (learningActors || onlinePlatformSignals) && (commercialSignals || onlinePlatformSignals)
+}
+
 const buildFrontendProjectMaterializationPrompt = ({
   plan,
   originalGoal,
@@ -9033,6 +9086,27 @@ const buildFullstackLocalMaterializationPrompt = ({
     allowedRootPaths[0] ||
     normalizeOptionalString(targetStructure[0]).replace(/[\\/]+$/g, '') ||
     'fullstack-local'
+  const isOnlineCoursesPlan = detectOnlineCoursesIntentFromPlan({
+    plan,
+    originalGoal,
+    originalContext,
+  })
+  const contractSpecificGuidance = isOnlineCoursesPlan
+    ? [
+        'Mantener un contrato canonico coherente de cursos online y no reciclar logistica, tracking, veterinaria ni ecommerce generico de productos.',
+        'Usar la misma raiz objetivo para todo el contrato materializable y no arrastrar roots previos fuera de alcance.',
+        'Materializar frontend publico, frontend admin y panel alumno dentro de frontend/public, frontend/admin y frontend/student.',
+        'Incluir backend/src/routes/courses.js, categories.js, modules.js, lessons.js, students.js, enrollments.js, plans.js, payments.js y progress.js.',
+        'Incluir backend/src/services/mock-mercado-pago.js como adaptador local seguro sin tokens, sin fetch, sin .env y sin llamadas reales.',
+        'Incluir shared/plans.js, shared/payment-statuses.js, shared/course-statuses.js, database/schema.sql, database/seed.sql, docs/API.md, docs/ARCHITECTURE.md, docs/DB_SCHEMA.md, docs/PAYMENTS_MOCK.md y docs/LOCAL_VALIDATION.md.',
+        'Mercado Pago debe quedar solo como simulacion local documentada con estados pending, approved, rejected y cancelled.',
+      ]
+    : [
+        'Materializar solo un scaffold local con README.md, package.json raiz, frontend/, frontend/admin/, frontend/public/, backend/, shared/, database/, scripts/ y docs/.',
+        'Incluir frontend administrativo, frontend publico revisable, docs/API.md y docs/DB_SCHEMA.md o docs/DATA_MODEL.md.',
+        'Exigir database/schema.sql y database/seed.sql como contrato SQL local obligatorio. database/shipments.json o cualquier JSON similar solo puede ser auxiliar y nunca la persistencia principal.',
+        'Para tracking logistico incluir backend/src/routes/shipments.js, backend/src/routes/tracking.js, frontend/admin/index.html, frontend/admin/app.js, frontend/public/index.html y frontend/public/app.js.',
+      ]
 
   return {
     goal: [
@@ -9075,10 +9149,7 @@ const buildFullstackLocalMaterializationPrompt = ({
         : '',
       'Si el workspace detecta un proyecto existente pero applicable=false o projectIntent=new-project-intent, ignorarlo por completo dentro del contrato materializable.',
       'No reutilizar manifest, roadmap, phaseExpansionPlan, modulos ni dominio de proyectos detectados fuera de alcance como fullstack-local-veterinaria.',
-      'Materializar solo un scaffold local con README.md, package.json raiz, frontend/, frontend/admin/, frontend/public/, backend/, shared/, database/, scripts/ y docs/.',
-      'Incluir frontend administrativo, frontend publico revisable, docs/API.md y docs/DB_SCHEMA.md o docs/DATA_MODEL.md.',
-      'Exigir database/schema.sql y database/seed.sql como contrato SQL local obligatorio. database/shipments.json o cualquier JSON similar solo puede ser auxiliar y nunca la persistencia principal.',
-      'Para tracking logistico incluir backend/src/routes/shipments.js, backend/src/routes/tracking.js, frontend/admin/index.html, frontend/admin/app.js, frontend/public/index.html y frontend/public/app.js.',
+      ...contractSpecificGuidance,
       'Sin npm install, sin node_modules, sin backend real activo, sin base de datos real activa, sin Docker, sin deploy y sin integraciones externas.',
       `Usar la carpeta objetivo ${targetRoot} como raiz del scaffold.`,
     ]
@@ -10868,6 +10939,63 @@ const normalizeResolvedDecisionKey = (value: unknown) =>
 const normalizeApprovalFamilyKey = (value: unknown) =>
   typeof value === 'string' ? value.trim().toLocaleLowerCase() : ''
 
+const REAL_PAYMENTS_DEFERRED_ALLOWS_NOW = [
+  'local-mock-payments',
+  'mock-mercado-pago-adapter',
+  'seed/mock payment statuses',
+]
+
+const REAL_PAYMENTS_DEFERRED_FORBIDS_NOW = [
+  'real-payments',
+  'real-webhooks',
+  'real-secrets',
+  '.env',
+  'external-api-calls',
+]
+
+const detectDraftApprovalIntent = (...texts: unknown[]) => {
+  const combinedText = texts
+    .filter((value): value is string => typeof value === 'string' && value.trim() !== '')
+    .join(' ')
+    .toLocaleLowerCase()
+
+  if (!combinedText) {
+    return false
+  }
+
+  return (
+    combinedText.includes('redactar borrador') ||
+    combinedText.includes('borrador de approval') ||
+    combinedText.includes('draft approval') ||
+    combinedText.includes('approval futuro')
+  )
+}
+
+const detectDeferredApprovalIntent = (...texts: unknown[]) => {
+  const combinedText = texts
+    .filter((value): value is string => typeof value === 'string' && value.trim() !== '')
+    .join(' ')
+    .toLocaleLowerCase()
+
+  if (!combinedText) {
+    return false
+  }
+
+  return (
+    combinedText.includes('prepararlo mas adelante') ||
+    combinedText.includes('prepararlo más adelante') ||
+    combinedText.includes('mas adelante') ||
+    combinedText.includes('más adelante') ||
+    combinedText.includes('pagos reales despues') ||
+    combinedText.includes('pagos reales después') ||
+    combinedText.includes('real payments later') ||
+    combinedText.includes('continuar mock') ||
+    combinedText.includes('seguir mock') ||
+    combinedText.includes('mock ahora') ||
+    combinedText.includes('luego vemos pagos reales')
+  )
+}
+
 const deriveApprovalEquivalenceFamily = (...texts: unknown[]) => {
   // Mantener en sync con electron/main.cjs.
   // Si renderer y main separan familias distintas, la UI puede persistir una
@@ -10907,6 +11035,19 @@ const deriveApprovalEquivalenceFamily = (...texts: unknown[]) => {
     combinedText.includes('publicar repo') ||
     combinedText.includes('subir repo') ||
     explicitlyNoDeploy
+  const explicitlyNoRealPayments =
+    combinedText.includes('sin pagos reales') ||
+    combinedText.includes('sin pago real') ||
+    combinedText.includes('checkout simulado') ||
+    combinedText.includes('sin checkout real') ||
+    combinedText.includes('sin venta directa')
+  const mentionsRealPayments =
+    combinedText.includes('mercado pago') ||
+    combinedText.includes('stripe') ||
+    combinedText.includes('pagos reales') ||
+    combinedText.includes('pago real') ||
+    combinedText.includes('cobros reales') ||
+    combinedText.includes('payment gateway')
   const isProvisionalWebScaffoldApproval =
     (combinedText.includes('scaffold') || combinedText.includes('generacion')) &&
     (combinedText.includes('provisional') ||
@@ -10921,6 +11062,10 @@ const deriveApprovalEquivalenceFamily = (...texts: unknown[]) => {
 
   if (mentionsDeploy && !explicitlyNoDeploy) {
     return 'public-deploy'
+  }
+
+  if (mentionsRealPayments && !explicitlyNoRealPayments) {
+    return 'real-payments'
   }
 
   if (mentionsPublicRepo) {
@@ -11838,6 +11983,18 @@ const getStoredResolvedDecisions = (): ResolvedDecisionRecord[] => {
             record?.source === 'executor'
               ? record.source
               : 'system',
+          ...(record?.decision === 'approved' ||
+          record?.decision === 'rejected' ||
+          record?.decision === 'deferred' ||
+          record?.decision === 'draft'
+            ? { decision: record.decision }
+            : {}),
+          ...(normalizeOptionalString(record?.label)
+            ? { label: normalizeOptionalString(record.label) }
+            : {}),
+          ...(normalizeOptionalString(record?.scope)
+            ? { scope: normalizeOptionalString(record.scope) }
+            : {}),
           ...(normalizeOptionalString(record?.summary)
             ? { summary: normalizeOptionalString(record.summary) }
             : {}),
@@ -11849,6 +12006,20 @@ const getStoredResolvedDecisions = (): ResolvedDecisionRecord[] => {
             : {}),
           ...(normalizeOptionalString(record?.freeAnswer)
             ? { freeAnswer: normalizeOptionalString(record.freeAnswer) }
+            : {}),
+          ...(Array.isArray(record?.allowsNow)
+            ? {
+                allowsNow: record.allowsNow
+                  .map((entry) => normalizeOptionalString(entry))
+                  .filter(Boolean),
+              }
+            : {}),
+          ...(Array.isArray(record?.forbidsNow)
+            ? {
+                forbidsNow: record.forbidsNow
+                  .map((entry) => normalizeOptionalString(entry))
+                  .filter(Boolean),
+              }
             : {}),
           ...(normalizeApprovalFamilyKey(record?.approvalFamily)
             ? { approvalFamily: normalizeApprovalFamilyKey(record.approvalFamily) }
@@ -12632,13 +12803,16 @@ function App() {
       : userParticipationMode === 'brain-decides-missing'
         ? 'El Cerebro debe decidir faltantes menores y avanzar solo salvo bloqueos críticos.'
         : 'Todavía no se definió si el usuario va a aportar insumos durante el proceso.'
-  const plannerProjectState: PlannerProjectState = {
+  const buildPlannerProjectState = (
+    nextResolvedDecisions: ResolvedDecisionRecord[] = resolvedDecisions,
+  ): PlannerProjectState => ({
     ...(userParticipationMode ? { userParticipationMode } : {}),
     resolvedDecisions: mergeResolvedDecisionRecords(
       buildParticipationResolvedDecisions(userParticipationMode),
-      resolvedDecisions,
+      nextResolvedDecisions,
     ),
-  }
+  })
+  const plannerProjectState = buildPlannerProjectState()
   const currentWorkspaceSummary = workspacePath.trim()
     ? workspacePath.trim()
     : 'Sin espacio de trabajo definido'
@@ -12691,19 +12865,21 @@ function App() {
     workspacePath: nextWorkspacePath,
     iteration,
     previousExecutionResult,
+    projectStateOverride,
   }: {
     goal?: string
     context?: string
     workspacePath?: string
     iteration?: number
     previousExecutionResult?: string
+    projectStateOverride?: PlannerProjectState
   } = {}) => ({
     goal: normalizeOptionalString(goal) || goalInput,
     context: normalizeOptionalString(context) || executionContextInput.trim() || undefined,
     workspacePath:
       normalizeOptionalString(nextWorkspacePath) || workspacePath.trim() || undefined,
     userParticipationMode: userParticipationMode || undefined,
-    projectState: plannerProjectState,
+    projectState: projectStateOverride || plannerProjectState,
     costMode: brainCostMode,
     ...(Number.isInteger(iteration) ? { iteration } : {}),
     ...(normalizeOptionalString(previousExecutionResult)
@@ -12770,6 +12946,15 @@ function App() {
   const activeProjectContext = effectivePlannerExecutionMetadata.activeProjectContext
   const existingProjectApplicable =
     activeExistingProjectDetection?.applicable !== false
+  const shouldShowIgnoredExistingProjectCallout =
+    activeExistingProjectDetection?.detected === true &&
+    activeExistingProjectDetection.applicable === false &&
+    !(
+      activeProjectContext?.mode === 'new-project' &&
+      normalizeOptionalString(activeExistingProjectDetection.reason)
+        .toLocaleLowerCase()
+        .includes('fuera de alcance')
+    )
   const activeExecutionStrategy = normalizeOptionalString(
     plannerExecutionMetadata.strategy || plannerExecutionMetadata.decisionKey,
   ).toLocaleLowerCase()
@@ -13234,6 +13419,23 @@ function App() {
       forbiddenSignalsFound: preparedFullstackLocalMaterializationForbiddenSignalsLabel
         ? preparedFullstackLocalMaterializationForbiddenSignalsLabel.split(' | ')
         : [],
+      selectedDomain:
+        normalizeOptionalString(plannerExecutionMetadata.selectedDomain) ||
+        normalizeOptionalString(
+          plannerExecutionMetadata.materializationPlan?.contractDefinition?.contractKind,
+        ),
+      detectedVertical: normalizeOptionalString(plannerExecutionMetadata.detectedVertical),
+      selectedContractKind:
+        normalizeOptionalString(plannerExecutionMetadata.selectedContractKind) ||
+        normalizeOptionalString(
+          plannerExecutionMetadata.materializationPlan?.contractDefinition?.contractKind,
+        ),
+      sourceRoot: normalizeOptionalString(plannerExecutionMetadata.sourceRoot),
+      targetRoot:
+        normalizeOptionalString(plannerExecutionMetadata.targetRoot) ||
+        normalizeOptionalString(
+          plannerExecutionMetadata.materializationPlan?.projectRoot,
+        ),
       contractOk: preparedFullstackLocalMaterializationInspection.ok === true,
       isScalableReview: plannerIsScalableDeliveryReview,
       looksLikeFullstackLocalReview: plannerScalableLooksLikeFullstackLocal,
@@ -15867,6 +16069,100 @@ function App() {
 
     return executionContextInput.trim()
   }
+  const resolveCurrentApprovalFamily = () =>
+    deriveApprovalEquivalenceFamily(
+      activeApprovalRequest?.decisionKey,
+      activeApprovalRequest?.reason,
+      activeApprovalRequest?.question,
+      approvalMessage,
+      pendingInstruction,
+      pendingExecutionInstruction,
+    )
+  const resolveCurrentApprovalContinuationRequest = () => {
+    if (
+      approvalSource === 'planner' &&
+      normalizeOptionalString(plannerRequestSnapshot.goal)
+    ) {
+      return {
+        goal: normalizeOptionalString(plannerRequestSnapshot.goal),
+        context: normalizeOptionalString(plannerRequestSnapshot.context),
+      }
+    }
+
+    return {
+      goal: normalizeOptionalString(goalInput),
+      context: normalizeOptionalString(getCurrentExecutionContextValue()),
+    }
+  }
+  const resolveCurrentApprovalDecisionProfile = (
+    decisionType: 'approval-granted' | 'approval-rejected',
+  ) => {
+    const approvalFamily = resolveCurrentApprovalFamily()
+    const selectedOption = normalizeOptionalString(approvalSelectedOption)
+    const freeAnswer = normalizeOptionalString(approvalFreeAnswer)
+    const combinedDecisionText = [selectedOption, freeAnswer].filter(Boolean).join(' ')
+    const isRealPaymentsFamily = approvalFamily === 'real-payments'
+    const isDraftDecision =
+      decisionType === 'approval-granted' &&
+      isRealPaymentsFamily &&
+      detectDraftApprovalIntent(selectedOption, freeAnswer)
+    const isDeferredDecision =
+      decisionType === 'approval-granted' &&
+      isRealPaymentsFamily &&
+      !isDraftDecision &&
+      detectDeferredApprovalIntent(selectedOption, freeAnswer)
+    const feedbackType =
+      decisionType === 'approval-rejected'
+        ? 'approval-rejected'
+        : isDeferredDecision || isDraftDecision
+          ? 'approval-deferred'
+          : 'approval-granted'
+    const decisionLabel =
+      selectedOption ||
+      (isDraftDecision
+        ? 'Redactar borrador de approval futuro'
+        : isDeferredDecision
+          ? 'Prepararlo más adelante'
+          : decisionType === 'approval-rejected'
+            ? 'Rechazar'
+            : 'Aprobar una vez')
+    const decisionValue =
+      decisionType === 'approval-rejected'
+        ? 'rejected'
+        : isDraftDecision
+          ? 'draft'
+          : isDeferredDecision
+            ? 'deferred'
+            : 'approved'
+
+    return {
+      approvalFamily,
+      feedbackType,
+      decisionValue,
+      decisionLabel,
+      summary:
+        decisionType === 'approval-rejected'
+          ? activeApprovalRequest?.reason || approvalMessage || DEFAULT_APPROVAL_MESSAGE
+          : isDraftDecision
+            ? 'La integracion real de Mercado Pago queda documentada como borrador futuro; la entrega actual sigue con mock local y sin credenciales.'
+            : isDeferredDecision
+              ? 'La integracion real de Mercado Pago queda diferida; la entrega actual sigue con mock local y sin credenciales.'
+              : activeApprovalRequest?.reason || approvalMessage || DEFAULT_APPROVAL_MESSAGE,
+      scope: isRealPaymentsFamily ? 'real-payments' : '',
+      allowsNow:
+        isRealPaymentsFamily && (isDeferredDecision || isDraftDecision)
+          ? REAL_PAYMENTS_DEFERRED_ALLOWS_NOW
+          : [],
+      forbidsNow:
+        isRealPaymentsFamily && (isDeferredDecision || isDraftDecision)
+          ? REAL_PAYMENTS_DEFERRED_FORBIDS_NOW
+          : [],
+      selectedOption,
+      freeAnswer,
+      combinedDecisionText,
+      continuationRequest: resolveCurrentApprovalContinuationRequest(),
+    } as const
+  }
   const openApprovalCheckpoint = ({
     source,
     instruction,
@@ -15916,61 +16212,75 @@ function App() {
     type,
     approvalMode,
   }: {
-    type: 'approval-granted' | 'approval-rejected'
+    type: 'approval-granted' | 'approval-rejected' | 'approval-deferred'
     approvalMode: 'once' | 'project-rule'
   }) => {
     const approvalInstruction =
       approvalSource === 'executor'
         ? pendingExecutionInstruction.trim()
         : pendingInstruction.trim()
+    const decisionProfile =
+      type === 'approval-rejected'
+        ? resolveCurrentApprovalDecisionProfile('approval-rejected')
+        : resolveCurrentApprovalDecisionProfile('approval-granted')
 
     return buildPlannerFeedbackPayload({
       type,
       source: approvalSource || 'planner',
       approvalMode,
+      approvalDecision: decisionProfile.decisionValue,
       instruction: approvalInstruction,
       approvalReason:
         activeApprovalRequest?.reason || approvalMessage || DEFAULT_APPROVAL_MESSAGE,
       approvalRequestDecisionKey: activeApprovalRequest?.decisionKey,
       responseMode: activeApprovalInteractionMode,
-      ...(approvalSelectedOption.trim()
-        ? { selectedOption: approvalSelectedOption.trim() }
-        : {}),
-      ...(approvalFreeAnswer.trim()
-        ? { freeAnswer: approvalFreeAnswer.trim() }
-        : {}),
+      ...(decisionProfile.selectedOption ? { selectedOption: decisionProfile.selectedOption } : {}),
+      ...(decisionProfile.freeAnswer ? { freeAnswer: decisionProfile.freeAnswer } : {}),
     })
   }
-  const rememberCurrentApprovalDecision = (
-    decisionType: 'approval-granted' | 'approval-rejected',
-  ) => {
+  const rememberCurrentApprovalDecision = (decisionProfile: {
+    approvalFamily: string
+    decisionValue: 'approved' | 'rejected' | 'deferred' | 'draft'
+    decisionLabel: string
+    summary: string
+    scope: string
+    allowsNow: string[]
+    forbidsNow: string[]
+    selectedOption: string
+    freeAnswer: string
+  }) => {
     const decisionKey = normalizeResolvedDecisionKey(activeApprovalRequest?.decisionKey)
-    const approvalFamily = deriveApprovalEquivalenceFamily(
-      activeApprovalRequest?.decisionKey,
-      activeApprovalRequest?.reason,
-      activeApprovalRequest?.question,
-      approvalMessage,
-      pendingInstruction,
-      pendingExecutionInstruction,
-    )
+    const approvalFamily = decisionProfile.approvalFamily
 
     if ((!decisionKey || decisionKey === 'legacy-approval') && !approvalFamily) {
-      return
+      return []
     }
 
     const sharedDecisionPayload = {
-      status: (decisionType === 'approval-rejected' ? 'rejected' : 'approved') as const,
+      status: (
+        decisionProfile.decisionValue === 'rejected'
+          ? 'rejected'
+          : decisionProfile.decisionValue === 'approved'
+            ? 'approved'
+            : 'resolved'
+      ) as const,
       source: (approvalSource || 'planner') as ResolvedDecisionRecord['source'],
-      summary:
-        activeApprovalRequest?.reason || approvalMessage || DEFAULT_APPROVAL_MESSAGE,
+      decision: decisionProfile.decisionValue,
+      label: decisionProfile.decisionLabel,
+      ...(decisionProfile.scope ? { scope: decisionProfile.scope } : {}),
+      summary: decisionProfile.summary,
       responseMode: activeApprovalInteractionMode,
       ...(approvalFamily ? { approvalFamily } : {}),
       updatedAt: new Date().toISOString(),
-      ...(approvalSelectedOption.trim()
-        ? { selectedOption: approvalSelectedOption.trim() }
+      ...(decisionProfile.selectedOption
+        ? { selectedOption: decisionProfile.selectedOption }
         : {}),
-      ...(approvalFreeAnswer.trim()
-        ? { freeAnswer: approvalFreeAnswer.trim() }
+      ...(decisionProfile.freeAnswer ? { freeAnswer: decisionProfile.freeAnswer } : {}),
+      ...(decisionProfile.allowsNow.length > 0
+        ? { allowsNow: decisionProfile.allowsNow }
+        : {}),
+      ...(decisionProfile.forbidsNow.length > 0
+        ? { forbidsNow: decisionProfile.forbidsNow }
         : {}),
     }
 
@@ -15991,12 +16301,14 @@ function App() {
     }
 
     if (decisionsToPersist.length === 0) {
-      return
+      return []
     }
 
     setResolvedDecisions((currentDecisions) =>
       mergeResolvedDecisionRecords(currentDecisions, decisionsToPersist),
     )
+
+    return decisionsToPersist
   }
   const resetManualExecutionPendingState = () => {
     setDecisionPending(false)
@@ -16928,11 +17240,20 @@ function App() {
   const replanManualFlow = async (
     previousExecutionResult: string,
     approvedByProjectRule = projectPolicyAllowed,
+    continuationOverride?: {
+      goal?: string
+      context?: string
+      projectStateOverride?: PlannerProjectState
+    },
   ) => {
     // Este camino existe para devolverle al Cerebro el contexto más reciente
     // (approval, rechazo o falla) sin reiniciar la sesión ni perder el hilo
     // operativo que ya vio el usuario en pantalla.
-    const currentExecutionContext = getCurrentExecutionContextValue()
+    const currentExecutionContext =
+      normalizeOptionalString(continuationOverride?.context) ||
+      getCurrentExecutionContextValue()
+    const replanGoal =
+      normalizeOptionalString(continuationOverride?.goal) || normalizeOptionalString(goalInput)
 
     setFlowConsoleVisibility({ open: true, pinned: true })
     setIsPlanning(true)
@@ -16962,8 +17283,10 @@ function App() {
       content: 'Se envió una nueva consulta al Cerebro con el contexto actualizado.',
       raw: formatStructuredContent(
         buildPlannerRequestPayload({
+          goal: replanGoal,
           context: currentExecutionContext,
           previousExecutionResult,
+          projectStateOverride: continuationOverride?.projectStateOverride,
         }),
       ),
       status: 'info',
@@ -16972,8 +17295,10 @@ function App() {
     try {
       const rawResponse = await window.aiOrchestrator?.planTask?.(
         buildPlannerRequestPayload({
+          goal: replanGoal,
           context: currentExecutionContext,
           previousExecutionResult,
+          projectStateOverride: continuationOverride?.projectStateOverride,
         }),
       )
       const response = sanitizePlannerDecisionResponse(rawResponse)
@@ -17011,7 +17336,7 @@ function App() {
       syncBrainRoutingDecision(response.brainRoutingDecision)
       setPlannerExecutionMetadata(nextExecutionMetadata)
       setPlannerRequestSnapshot({
-        goal: goalInput,
+        goal: replanGoal,
         context: currentExecutionContext,
         decisionKey: nextExecutionMetadata.decisionKey,
         safeFirstDeliveryPlanFingerprint: buildSafeFirstDeliveryPlanFingerprint(
@@ -17162,11 +17487,13 @@ function App() {
     startIteration: number,
     initialInstruction?: string,
     initialPreviousExecutionResult?: string,
+    initialProjectStateOverride?: PlannerProjectState,
   ) => {
     let iteration = startIteration
     let nextInstruction = normalizeOptionalString(initialInstruction)
     let previousExecutionResult = normalizeOptionalString(initialPreviousExecutionResult)
     let currentPlannerExecutionMetadata = plannerExecutionMetadata
+    let currentProjectStateOverride = initialProjectStateOverride
 
     try {
       while (iteration <= 3) {
@@ -17202,6 +17529,7 @@ function App() {
               buildPlannerRequestPayload({
                 iteration,
                 previousExecutionResult: previousExecutionResult || undefined,
+                projectStateOverride: currentProjectStateOverride,
               }),
             ),
             status: 'info',
@@ -17218,6 +17546,7 @@ function App() {
             buildPlannerRequestPayload({
               iteration,
               previousExecutionResult: previousExecutionResult || undefined,
+              projectStateOverride: currentProjectStateOverride,
             }),
           )
           const planResponse = sanitizePlannerDecisionResponse(rawPlanResponse)
@@ -17253,6 +17582,7 @@ function App() {
               currentPlannerExecutionMetadata.safeFirstDeliveryPlan,
             ),
           })
+          currentProjectStateOverride = undefined
           setLastObservedExecutionMode('')
           recordPlannerExecutionSummary(currentPlannerExecutionMetadata)
           plannerMarkedCompleted = planResponse.completed === true
@@ -17852,12 +18182,17 @@ function App() {
 
   const handleApproveOnce = async () => {
     const shouldResumeAutoFlow = autoFlowAwaitingApproval === approvalSource
+    const approvalDecisionProfile = resolveCurrentApprovalDecisionProfile('approval-granted')
     const approvalFeedback = buildApprovalResponseFeedback({
-      type: 'approval-granted',
+      type: approvalDecisionProfile.feedbackType,
       approvalMode: 'once',
     })
-
-    rememberCurrentApprovalDecision('approval-granted')
+    const persistedDecisionRecords = rememberCurrentApprovalDecision(approvalDecisionProfile)
+    const nextResolvedDecisions = mergeResolvedDecisionRecords(
+      resolvedDecisions,
+      persistedDecisionRecords,
+    )
+    const projectStateOverride = buildPlannerProjectState(nextResolvedDecisions)
     setDecisionPending(false)
     setProjectApprovalPolicy(null)
     resetApprovalInteractionState()
@@ -17875,12 +18210,20 @@ function App() {
 
     if (shouldResumeAutoFlow) {
       setIsAutoFlowRunning(true)
-      await runAutoFlowLoop(autoFlowIteration || 1, undefined, approvalFeedback)
+      await runAutoFlowLoop(
+        autoFlowIteration || 1,
+        undefined,
+        approvalFeedback,
+        projectStateOverride,
+      )
       return
     }
 
     setIsAutoFlowRunning(false)
-    await replanManualFlow(approvalFeedback, false)
+    await replanManualFlow(approvalFeedback, false, {
+      ...approvalDecisionProfile.continuationRequest,
+      projectStateOverride,
+    })
     return
   }
   const handleAllowForProject = async () => {
@@ -17890,12 +18233,17 @@ function App() {
     }
 
     const shouldResumeAutoFlow = autoFlowAwaitingApproval === approvalSource
+    const approvalDecisionProfile = resolveCurrentApprovalDecisionProfile('approval-granted')
     const approvalFeedback = buildApprovalResponseFeedback({
-      type: 'approval-granted',
+      type: approvalDecisionProfile.feedbackType,
       approvalMode: 'project-rule',
     })
-
-    rememberCurrentApprovalDecision('approval-granted')
+    const persistedDecisionRecords = rememberCurrentApprovalDecision(approvalDecisionProfile)
+    const nextResolvedDecisions = mergeResolvedDecisionRecords(
+      resolvedDecisions,
+      persistedDecisionRecords,
+    )
+    const projectStateOverride = buildPlannerProjectState(nextResolvedDecisions)
     setDecisionPending(false)
     setProjectApprovalPolicy(persistibleProjectApprovalPolicy)
     resetApprovalInteractionState()
@@ -17913,12 +18261,20 @@ function App() {
 
     if (shouldResumeAutoFlow) {
       setIsAutoFlowRunning(true)
-      await runAutoFlowLoop(autoFlowIteration || 1, undefined, approvalFeedback)
+      await runAutoFlowLoop(
+        autoFlowIteration || 1,
+        undefined,
+        approvalFeedback,
+        projectStateOverride,
+      )
       return
     }
 
     setIsAutoFlowRunning(false)
-    await replanManualFlow(approvalFeedback, true)
+    await replanManualFlow(approvalFeedback, true, {
+      ...approvalDecisionProfile.continuationRequest,
+      projectStateOverride,
+    })
     return
   }
   const handleRunMockCycle = () => {
@@ -17948,12 +18304,17 @@ function App() {
 
   const handleRejectApproval = async () => {
     const shouldResumeAutoFlow = autoFlowAwaitingApproval === approvalSource
+    const rejectionDecisionProfile = resolveCurrentApprovalDecisionProfile('approval-rejected')
     const rejectionFeedback = buildApprovalResponseFeedback({
       type: 'approval-rejected',
       approvalMode: 'once',
     })
-
-    rememberCurrentApprovalDecision('approval-rejected')
+    const persistedDecisionRecords = rememberCurrentApprovalDecision(rejectionDecisionProfile)
+    const nextResolvedDecisions = mergeResolvedDecisionRecords(
+      resolvedDecisions,
+      persistedDecisionRecords,
+    )
+    const projectStateOverride = buildPlannerProjectState(nextResolvedDecisions)
     setDecisionPending(false)
     setProjectApprovalPolicy(null)
     resetApprovalInteractionState()
@@ -17971,12 +18332,20 @@ function App() {
 
     if (shouldResumeAutoFlow) {
       setIsAutoFlowRunning(true)
-      await runAutoFlowLoop(autoFlowIteration || 1, undefined, rejectionFeedback)
+      await runAutoFlowLoop(
+        autoFlowIteration || 1,
+        undefined,
+        rejectionFeedback,
+        projectStateOverride,
+      )
       return
     }
 
     setIsAutoFlowRunning(false)
-    await replanManualFlow(rejectionFeedback, false)
+    await replanManualFlow(rejectionFeedback, false, {
+      ...rejectionDecisionProfile.continuationRequest,
+      projectStateOverride,
+    })
   }
 
   const handleResetSessionMemory = () => {
@@ -18401,6 +18770,26 @@ function App() {
           preparedFullstackLocalMaterializationInspection?.missingRequiredPaths || [],
         forbiddenSignalsFound:
           preparedFullstackLocalMaterializationInspection?.forbiddenSignalsFound || [],
+        selectedDomain: normalizeOptionalString(nextExecutionMetadata.selectedDomain),
+        detectedVertical: normalizeOptionalString(nextExecutionMetadata.detectedVertical),
+        selectedContractKind: normalizeOptionalString(
+          nextExecutionMetadata.selectedContractKind,
+        ),
+        sourceRoot: normalizeOptionalString(nextExecutionMetadata.sourceRoot),
+        targetRoot:
+          normalizeOptionalString(nextExecutionMetadata.targetRoot) ||
+          normalizeOptionalString(nextExecutionMetadata.materializationPlan?.projectRoot),
+        rootMismatch:
+          normalizeOptionalString(nextExecutionMetadata.sourceRoot) !== '' &&
+          normalizeOptionalString(
+            nextExecutionMetadata.targetRoot ||
+              nextExecutionMetadata.materializationPlan?.projectRoot,
+          ) !== '' &&
+          normalizeOptionalString(nextExecutionMetadata.sourceRoot).toLocaleLowerCase() !==
+            normalizeOptionalString(
+              nextExecutionMetadata.targetRoot ||
+                nextExecutionMetadata.materializationPlan?.projectRoot,
+            ).toLocaleLowerCase(),
         contractOk: preparedFullstackLocalMaterializationInspection?.ok === true,
         uiState: preparedFullstackLocalMaterializationUiState?.uiState || 'n/a',
         shouldShowScalableDeliveryPlan:
@@ -20458,8 +20847,7 @@ function App() {
           )
         }
         callout={
-          activeExistingProjectDetection?.detected &&
-          activeExistingProjectDetection.applicable === false ? (
+          shouldShowIgnoredExistingProjectCallout ? (
             <article className="rounded-[28px] border border-amber-300/20 bg-amber-300/10 p-5">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100">
                 Proyecto detectado pero ignorado

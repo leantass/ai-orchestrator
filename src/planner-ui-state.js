@@ -12,6 +12,274 @@ const normalizeText = (value) =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLocaleLowerCase()
 
+const detectOnlineCoursesIntentForUi = (value) => {
+  const normalizedValue = normalizeText(value)
+    .replace(/\bno\s+mezclar\b[^.\n\r]*/gu, ' ')
+    .replace(/\bsin\s+mezclar\b[^.\n\r]*/gu, ' ')
+  if (!normalizedValue) {
+    return false
+  }
+
+  const learningCore =
+    /\b(?:cursos?|clases?|lecciones?|panel alumno)\b/u.test(normalizedValue)
+  const learningActors =
+    /\b(?:alumnos?|estudiantes?|inscripciones?)\b/u.test(normalizedValue)
+  const commercialAccessSignals =
+    /\b(?:planes?|free|plata|oro|progreso|premium|gratuitas?)\b/u.test(
+      normalizedValue,
+    )
+  const onlinePlatformSignals =
+    /\b(?:cursos? online|plataforma web de cursos|plataforma de cursos|panel alumno|frontend\/student)\b/u.test(
+      normalizedValue,
+    )
+
+  return learningCore && (learningActors || onlinePlatformSignals) && (commercialAccessSignals || onlinePlatformSignals)
+}
+
+const normalizeContractPathCandidateForUi = (value) =>
+  normalizeOptionalString(value).replace(/\\/g, '/').toLocaleLowerCase()
+
+const normalizeContractDefinitionForUi = (value) => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const requiredPathGroups = Array.isArray(value.requiredPathGroups)
+    ? value.requiredPathGroups
+        .map((group) => {
+          if (!group || typeof group !== 'object') {
+            return null
+          }
+
+          const candidates = normalizeOptionalStringArray(group.candidates).map(
+            normalizeContractPathCandidateForUi,
+          )
+
+          if (candidates.length === 0) {
+            return null
+          }
+
+          return {
+            label: normalizeOptionalString(group.label) || candidates[0],
+            candidates,
+          }
+        })
+        .filter(Boolean)
+    : []
+
+  return {
+    ...value,
+    contractKind: normalizeOptionalString(value.contractKind),
+    requiredPathGroups,
+    forbiddenSignals: normalizeOptionalStringArray(value.forbiddenSignals),
+  }
+}
+
+const buildFallbackMaterializationContractDefinitionForUi = ({
+  metadata,
+  normalizedTargetSummary,
+}) => {
+  const explicitContractDefinition =
+    metadata?.materializationContract &&
+    typeof metadata.materializationContract === 'object'
+      ? metadata.materializationContract
+      : metadata?.materializationPlan?.contractDefinition &&
+          typeof metadata.materializationPlan.contractDefinition === 'object'
+        ? metadata.materializationPlan.contractDefinition
+        : null
+
+  if (explicitContractDefinition) {
+    return normalizeContractDefinitionForUi(explicitContractDefinition)
+  }
+
+  const explicitContractKind = normalizeOptionalString(
+    metadata?.selectedContractKind || metadata?.materializationPlan?.contractKind,
+  ).toLocaleLowerCase()
+  const explicitDomain = normalizeOptionalString(metadata?.selectedDomain).toLocaleLowerCase()
+
+  const inspectionSurface = normalizeText(
+    [
+      metadata?.decisionKey,
+      metadata?.strategy,
+      metadata?.selectedDomain,
+      metadata?.selectedContractKind,
+      metadata?.businessSector,
+      metadata?.domainUnderstanding?.domainLabel,
+      metadata?.materializationPlan?.projectRoot,
+      normalizedTargetSummary,
+    ].join(' '),
+  )
+  const onlineCoursesDetected =
+    explicitContractKind === 'online-courses-fullstack-local' ||
+    explicitDomain === 'online-courses' ||
+    detectOnlineCoursesIntentForUi(inspectionSurface)
+
+  if (onlineCoursesDetected) {
+    const requiredPathGroups = [
+      {
+        label: 'backend/src/server.js|backend/server.js',
+        candidates: ['backend/src/server.js', 'backend/server.js'],
+      },
+      { label: 'backend/src/routes/courses.js', candidates: ['backend/src/routes/courses.js'] },
+      {
+        label: 'backend/src/routes/categories.js',
+        candidates: ['backend/src/routes/categories.js'],
+      },
+      { label: 'backend/src/routes/modules.js', candidates: ['backend/src/routes/modules.js'] },
+      { label: 'backend/src/routes/lessons.js', candidates: ['backend/src/routes/lessons.js'] },
+      {
+        label: 'backend/src/routes/students.js',
+        candidates: ['backend/src/routes/students.js'],
+      },
+      {
+        label: 'backend/src/routes/enrollments.js',
+        candidates: ['backend/src/routes/enrollments.js'],
+      },
+      { label: 'backend/src/routes/plans.js', candidates: ['backend/src/routes/plans.js'] },
+      {
+        label: 'backend/src/routes/payments.js',
+        candidates: ['backend/src/routes/payments.js'],
+      },
+      {
+        label: 'backend/src/routes/progress.js',
+        candidates: ['backend/src/routes/progress.js'],
+      },
+      {
+        label: 'backend/src/services/mock-mercado-pago.js',
+        candidates: ['backend/src/services/mock-mercado-pago.js'],
+      },
+      { label: 'database/schema.sql', candidates: ['database/schema.sql'] },
+      {
+        label: 'database/seed.sql',
+        candidates: ['database/seed.sql', 'database/seeds/seed-local.sql'],
+      },
+      { label: 'frontend/admin/index.html', candidates: ['frontend/admin/index.html'] },
+      { label: 'frontend/admin/app.js', candidates: ['frontend/admin/app.js'] },
+      { label: 'frontend/public/index.html', candidates: ['frontend/public/index.html'] },
+      { label: 'frontend/public/app.js', candidates: ['frontend/public/app.js'] },
+      {
+        label: 'frontend/student/index.html',
+        candidates: ['frontend/student/index.html'],
+      },
+      { label: 'frontend/student/app.js', candidates: ['frontend/student/app.js'] },
+      { label: 'shared/plans.js', candidates: ['shared/plans.js'] },
+      {
+        label: 'shared/payment-statuses.js',
+        candidates: ['shared/payment-statuses.js'],
+      },
+      {
+        label: 'shared/course-statuses.js',
+        candidates: ['shared/course-statuses.js'],
+      },
+      { label: 'docs/API.md', candidates: ['docs/api.md'] },
+      { label: 'docs/ARCHITECTURE.md', candidates: ['docs/architecture.md'] },
+      {
+        label: 'docs/DB_SCHEMA.md|docs/DATA_MODEL.md',
+        candidates: ['docs/db_schema.md', 'docs/data_model.md', 'docs/data-model.md'],
+      },
+      { label: 'docs/PAYMENTS_MOCK.md', candidates: ['docs/payments_mock.md'] },
+      {
+        label: 'docs/LOCAL_VALIDATION.md',
+        candidates: ['docs/local_validation.md'],
+      },
+      {
+        label: 'scripts/seed-local.js|scripts/README.md',
+        candidates: ['scripts/seed-local.js', 'scripts/readme.md'],
+      },
+    ]
+
+    return normalizeContractDefinitionForUi({
+      contractKind: 'online-courses-fullstack-local',
+      requiredPathGroups,
+      forbiddenSignals: [
+        'shipments',
+        'tracking',
+        'veterinaria',
+        'appointments',
+        'turnos',
+        'pacientes',
+        'mascotas',
+        'productos',
+        'stock',
+        'inventario',
+      ],
+    })
+  }
+
+  const requiredPathGroups = [
+    {
+      label: 'backend/src/server.js|backend/server.js',
+      candidates: ['backend/src/server.js', 'backend/server.js'],
+    },
+    {
+      label: 'backend/src/routes/shipments.js',
+      candidates: ['backend/src/routes/shipments.js'],
+    },
+    {
+      label: 'backend/src/routes/tracking.js',
+      candidates: ['backend/src/routes/tracking.js'],
+    },
+    {
+      label: 'database/schema.sql',
+      candidates: ['database/schema.sql'],
+    },
+    {
+      label: 'database/seed.sql',
+      candidates: ['database/seed.sql', 'database/seeds/seed-local.sql'],
+    },
+    {
+      label: 'frontend/admin/index.html',
+      candidates: ['frontend/admin/index.html'],
+    },
+    {
+      label: 'frontend/admin/app.js',
+      candidates: ['frontend/admin/app.js'],
+    },
+    {
+      label: 'frontend/public/index.html',
+      candidates: ['frontend/public/index.html'],
+    },
+    {
+      label: 'frontend/public/app.js',
+      candidates: ['frontend/public/app.js'],
+    },
+    {
+      label: 'docs/API.md',
+      candidates: ['docs/api.md'],
+    },
+    {
+      label: 'docs/ARCHITECTURE.md',
+      candidates: ['docs/architecture.md'],
+    },
+    {
+      label: 'docs/DB_SCHEMA.md|docs/DATA_MODEL.md',
+      candidates: ['docs/db_schema.md', 'docs/data_model.md', 'docs/data-model.md'],
+    },
+    {
+      label: 'shared/constants.js|shared/statuses.js',
+      candidates: ['shared/constants.js', 'shared/statuses.js'],
+    },
+    {
+      label: 'scripts/seed-local.js|scripts/README.md',
+      candidates: ['scripts/seed-local.js', 'scripts/readme.md'],
+    },
+  ]
+
+  return normalizeContractDefinitionForUi({
+    contractKind: 'logistics-fullstack-local',
+    requiredPathGroups,
+    forbiddenSignals: [
+      'veterinaria',
+      'appointments',
+      'turnos',
+      'pacientes',
+      'mascotas',
+      'reservas',
+      'fullstack-local-veterinaria',
+    ],
+  })
+}
+
 const buildInspectionFailure = (baseDetails, reason, extra = {}) => ({
   ...baseDetails,
   ...extra,
@@ -130,6 +398,9 @@ export const inspectPreparedFullstackLocalMaterialization = ({
     hasExecutionScope,
     hasMaterializationPlan,
     allowedTargetPathsCount: allowedTargetPaths.length,
+    contractKind: normalizeOptionalString(
+      metadata?.selectedContractKind || metadata?.materializationPlan?.contractDefinition?.contractKind,
+    ),
     rootPath:
       normalizeOptionalString(metadata?.materializationPlan?.projectRoot) ||
       allowedTargetPaths[0] ||
@@ -186,64 +457,13 @@ export const inspectPreparedFullstackLocalMaterialization = ({
   const normalizedTargetSummary = materializationTargets
     .map((entry) => normalizeOptionalString(entry).replace(/\\/g, '/').toLocaleLowerCase())
     .join(' ')
-  const requiredPathGroups = [
-    {
-      label: 'backend/src/server.js|backend/server.js',
-      candidates: ['backend/src/server.js', 'backend/server.js'],
-    },
-    {
-      label: 'backend/src/routes/shipments.js',
-      candidates: ['backend/src/routes/shipments.js'],
-    },
-    {
-      label: 'backend/src/routes/tracking.js',
-      candidates: ['backend/src/routes/tracking.js'],
-    },
-    {
-      label: 'database/schema.sql',
-      candidates: ['database/schema.sql'],
-    },
-    {
-      label: 'database/seed.sql',
-      candidates: ['database/seed.sql', 'database/seeds/seed-local.sql'],
-    },
-    {
-      label: 'frontend/admin/index.html',
-      candidates: ['frontend/admin/index.html'],
-    },
-    {
-      label: 'frontend/admin/app.js',
-      candidates: ['frontend/admin/app.js'],
-    },
-    {
-      label: 'frontend/public/index.html',
-      candidates: ['frontend/public/index.html'],
-    },
-    {
-      label: 'frontend/public/app.js',
-      candidates: ['frontend/public/app.js'],
-    },
-    {
-      label: 'docs/API.md',
-      candidates: ['docs/api.md'],
-    },
-    {
-      label: 'docs/ARCHITECTURE.md',
-      candidates: ['docs/architecture.md'],
-    },
-    {
-      label: 'docs/DB_SCHEMA.md|docs/DATA_MODEL.md',
-      candidates: ['docs/db_schema.md', 'docs/data_model.md', 'docs/data-model.md'],
-    },
-    {
-      label: 'shared/constants.js|shared/statuses.js',
-      candidates: ['shared/constants.js', 'shared/statuses.js'],
-    },
-    {
-      label: 'scripts/seed-local.js|scripts/README.md',
-      candidates: ['scripts/seed-local.js', 'scripts/readme.md'],
-    },
-  ]
+  const contractDefinition = buildFallbackMaterializationContractDefinitionForUi({
+    metadata,
+    normalizedTargetSummary,
+  })
+  const requiredPathGroups = Array.isArray(contractDefinition?.requiredPathGroups)
+    ? contractDefinition.requiredPathGroups
+    : []
   const missingRequiredPaths = requiredPathGroups
     .filter(
       (group) =>
@@ -276,14 +496,19 @@ export const inspectPreparedFullstackLocalMaterialization = ({
     (normalizedDetectedProjectRoot !== '' &&
       !normalizedTargetSummary.includes(normalizedDetectedProjectRoot))
   const contaminationSourceSignals = [
-    metadata?.reason,
+    metadata?.decisionKey,
+    metadata?.strategy,
+    metadata?.executionMode,
+    metadata?.nextExpectedAction,
+    metadata?.selectedDomain,
+    metadata?.detectedVertical,
+    metadata?.selectedContractKind,
     metadata?.activeProjectContext?.domain,
-    metadata?.activeProjectContext?.note,
     metadata?.domainUnderstanding?.domainLabel,
     ...(Array.isArray(metadata?.tasks)
       ? metadata.tasks.flatMap((entry) =>
           entry && typeof entry === 'object'
-            ? [entry.title, entry.operation, entry.description, entry.targetPath]
+            ? [entry.targetPath]
             : [],
         )
       : []),
@@ -309,15 +534,9 @@ export const inspectPreparedFullstackLocalMaterialization = ({
       .filter(Boolean)
       .join(' '),
   )
-  const forbiddenSignalsFound = [
-    'veterinaria',
-    'appointments',
-    'turnos',
-    'pacientes',
-    'mascotas',
-    'reservas',
-    'fullstack-local-veterinaria',
-  ].filter((token) => contaminationPool.includes(normalizeText(token)))
+  const forbiddenSignalsFound = normalizeOptionalStringArray(
+    contractDefinition?.forbiddenSignals,
+  ).filter((token) => contaminationPool.includes(normalizeText(token)))
   const sourceRootPath = normalizeOptionalStringArray(sourcePlan?.allowedRootPaths)[0]
   const returnedRootPath = allowedTargetPaths[0] || ''
 
