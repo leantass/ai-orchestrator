@@ -32,6 +32,10 @@ const {
   selectBestWorkspaceProjectCandidate,
   shouldIgnoreWorkspaceDirectoryEntry,
 } = require(path.join(repoRoot, 'electron', 'workspace-project-detection.cjs'))
+const {
+  buildGeneratedDomainContractDiagnostics,
+  extractGeneratedDomainContractCandidate,
+} = require(path.join(repoRoot, 'electron', 'generated-domain-contract.cjs'))
 
 const smokeWorkspaceRoot = path.join(repoRoot, '.tmp', 'ai-operator-e2e-smoke')
 const continuationBasePhaseIds = [
@@ -575,6 +579,8 @@ module.exports = {
     classifyWorkspaceProjectIntent,
     selectBestWorkspaceProjectCandidate,
     shouldIgnoreWorkspaceDirectoryEntry,
+    buildGeneratedDomainContractDiagnostics,
+    extractGeneratedDomainContractCandidate,
     setTimeout,
     clearTimeout,
     setInterval,

@@ -9,6 +9,7 @@ const {
   deriveRequiredPathGroupsFromContract,
   deriveForbiddenSearchPatternsFromContract,
   isContractSafeForLocalMaterialization,
+  buildGeneratedDomainContractDiagnostics,
 } = require('../electron/generated-domain-contract.cjs')
 
 function createValidInventedContract() {
@@ -225,6 +226,121 @@ function runMockPaymentAllowedCase() {
   )
 }
 
+function runDecisionWithoutGeneratedDomainContractCase() {
+  const decision = {
+    decisionKey: 'invented-domain-plan',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    executionScope: {
+      allowedTargetPaths: ['legacy-root', 'legacy-root/README.md'],
+    },
+  }
+  const diagnostics = buildGeneratedDomainContractDiagnostics(decision, '.')
+  assert.deepEqual(diagnostics, { present: false }, 'Sin generatedDomainContract debe devolver present=false.')
+}
+
+function runDecisionWithValidGeneratedDomainContractCase() {
+  const contract = createValidInventedContract()
+  const decision = {
+    decisionKey: 'invented-domain-materialize',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    executionScope: {
+      allowedTargetPaths: ['legacy-root', 'legacy-root/README.md'],
+    },
+    generatedDomainContract: contract,
+  }
+  const originalExecutionScope = JSON.stringify(decision.executionScope)
+  const diagnostics = buildGeneratedDomainContractDiagnostics(decision, '.')
+  assert.equal(diagnostics.present, true, 'Un contrato presente debe marcar present=true.')
+  assert.equal(diagnostics.valid, true, 'Un contrato valido debe marcar valid=true.')
+  assert.equal(
+    diagnostics.safeForLocalMaterialization,
+    true,
+    'Un contrato valido y mock-only debe marcar safeForLocalMaterialization=true.',
+  )
+  assert.equal(diagnostics.domainSlug, 'carnivorous-plant-nursery')
+  assert.equal(diagnostics.rootSlug, 'carnivorous-plants-local')
+  assert.equal(diagnostics.sourceRoot, 'carnivorous-plants-local')
+  assert.equal(diagnostics.targetRoot, 'carnivorous-plants-local')
+  assert.ok(diagnostics.frontendSurfacesCount >= 3)
+  assert.ok(diagnostics.backendRoutesCount >= 6)
+  assert.ok(diagnostics.databaseTablesCount >= 5)
+  assert.ok(diagnostics.allowedTargetPathsCount > 0)
+  assert.equal(
+    JSON.stringify(decision.executionScope),
+    originalExecutionScope,
+    'El diagnostico paralelo no debe mutar executionScope legacy.',
+  )
+}
+
+function runDecisionWithRootMismatchCase() {
+  const contract = createValidInventedContract()
+  contract.root.targetRoot = 'other-root-local'
+  const diagnostics = buildGeneratedDomainContractDiagnostics(
+    {
+      generatedDomainContract: contract,
+      executionScope: {
+        allowedTargetPaths: ['legacy-root'],
+      },
+    },
+    '.',
+  )
+  assert.equal(diagnostics.present, true)
+  assert.equal(
+    diagnostics.valid,
+    false,
+    'Un root mismatch debe dejar valid=false en el diagnostico.',
+  )
+  assert.equal(
+    diagnostics.safeForLocalMaterialization,
+    false,
+    'Un root mismatch debe dejar safeForLocalMaterialization=false.',
+  )
+  assert.ok(
+    diagnostics.errors.some((entry) => entry.includes('sourceRoot') && entry.includes('targetRoot')),
+    'El diagnostico debe reportar root mismatch.',
+  )
+}
+
+function runDecisionWithForbiddenEnvCase() {
+  const contract = createValidInventedContract()
+  contract.materialization.requiredFiles.push('.env')
+  const diagnostics = buildGeneratedDomainContractDiagnostics(
+    {
+      generatedDomainContract: contract,
+    },
+    '.',
+  )
+  assert.equal(diagnostics.present, true)
+  assert.equal(diagnostics.safeForLocalMaterialization, false)
+  assert.ok(
+    diagnostics.errors.some((entry) => entry.includes('archivos prohibidos')),
+    'El diagnostico debe reportar .env prohibido.',
+  )
+}
+
+function runDecisionWithExternalApiCase() {
+  const contract = createValidInventedContract()
+  contract.materialization.operations.push({
+    type: 'replace-file',
+    targetPath: 'backend/src/services/real-payment.js',
+    nextContent: "fetch('https://api.mercadopago.com/v1/payments')\n",
+  })
+  const diagnostics = buildGeneratedDomainContractDiagnostics(
+    {
+      generatedDomainContractV1: contract,
+    },
+    '.',
+  )
+  assert.equal(diagnostics.present, true)
+  assert.equal(diagnostics.safeForLocalMaterialization, false)
+  assert.ok(
+    diagnostics.errors.some((entry) => entry.includes('integracion real') || entry.includes('secreto')),
+    'El diagnostico debe reportar API real externa.',
+  )
+}
+
 function main() {
   runValidContractCase()
   runRootMismatchCase()
@@ -232,7 +348,12 @@ function main() {
   runForbiddenEnvCase()
   runExternalApiCase()
   runMockPaymentAllowedCase()
-  console.log('OK. GeneratedDomainContract smoke paso 6/6 checks.')
+  runDecisionWithoutGeneratedDomainContractCase()
+  runDecisionWithValidGeneratedDomainContractCase()
+  runDecisionWithRootMismatchCase()
+  runDecisionWithForbiddenEnvCase()
+  runDecisionWithExternalApiCase()
+  console.log('OK. GeneratedDomainContract smoke paso 11/11 checks.')
 }
 
 main()

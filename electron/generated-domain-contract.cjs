@@ -10,6 +10,12 @@ const DEFAULT_FORBIDDEN_SEARCH_PATTERNS = [
   'https://api.mercadopago',
   'api.mercadopago.com',
 ]
+const GENERATED_DOMAIN_CONTRACT_CANDIDATE_FIELDS = [
+  'generatedDomainContract',
+  'generatedDomainContractV1',
+  'domainContract',
+  'contract',
+]
 const RESERVED_ROOT_SEGMENTS = new Set([
   '',
   '.',
@@ -65,6 +71,44 @@ function collectPathList(entries, projector) {
 
 function unique(values) {
   return [...new Set(values.filter(Boolean))]
+}
+
+function looksLikeGeneratedDomainContractCandidate(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false
+  }
+
+  return [
+    'contractVersion',
+    'deliveryLevel',
+    'domain',
+    'root',
+    'frontendSurfaces',
+    'backend',
+    'database',
+    'materialization',
+    'validation',
+    'approvals',
+  ].some((field) => Object.prototype.hasOwnProperty.call(value, field))
+}
+
+function extractGeneratedDomainContractCandidate(decision) {
+  const source = asObject(decision)
+
+  for (const fieldName of GENERATED_DOMAIN_CONTRACT_CANDIDATE_FIELDS) {
+    const candidateValue = source[fieldName]
+    if (looksLikeGeneratedDomainContractCandidate(candidateValue)) {
+      return {
+        fieldName,
+        contract: candidateValue,
+      }
+    }
+  }
+
+  return {
+    fieldName: '',
+    contract: null,
+  }
 }
 
 function normalizeRouteEntry(entry) {
@@ -422,6 +466,75 @@ function isContractSafeForLocalMaterialization(contract) {
   }
 }
 
+function buildGeneratedDomainContractDiagnostics(decision, workspacePath) {
+  const { fieldName, contract } = extractGeneratedDomainContractCandidate(decision)
+
+  if (!contract) {
+    return {
+      present: false,
+    }
+  }
+
+  try {
+    const normalizedContract = normalizeGeneratedDomainContract(contract)
+    const validation = validateGeneratedDomainContract(normalizedContract)
+    const safety = isContractSafeForLocalMaterialization(normalizedContract)
+    const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+      normalizedContract,
+      workspacePath,
+    )
+    const requiredPathGroups = deriveRequiredPathGroupsFromContract(normalizedContract)
+    const forbiddenSearchPatterns =
+      deriveForbiddenSearchPatternsFromContract(normalizedContract)
+
+    return {
+      present: true,
+      sourceField: fieldName,
+      normalized: true,
+      valid: validation.ok === true,
+      safeForLocalMaterialization: safety.ok === true,
+      errors: unique([...(validation.errors || []), ...(safety.errors || [])]),
+      warnings: unique(validation.warnings || []),
+      domainSlug: normalizedContract.domain.slug,
+      rootSlug: normalizedContract.root.slug,
+      sourceRoot: normalizedContract.root.sourceRoot,
+      targetRoot: normalizedContract.root.targetRoot,
+      frontendSurfacesCount: normalizedContract.frontendSurfaces.length,
+      backendRoutesCount: normalizedContract.backend.routes.length,
+      databaseTablesCount: normalizedContract.database.tables.length,
+      operationsCount: normalizedContract.materialization.operations.length,
+      allowedTargetPathsCount: allowedTargetPaths.length,
+      requiredPathGroupsCount: requiredPathGroups.length,
+      forbiddenSearchPatternsCount: forbiddenSearchPatterns.length,
+      allowedTargetPaths,
+      requiredPathGroups,
+      forbiddenSearchPatterns,
+      normalizedContract,
+    }
+  } catch (error) {
+    return {
+      present: true,
+      sourceField: fieldName,
+      normalized: false,
+      valid: false,
+      safeForLocalMaterialization: false,
+      errors: [error instanceof Error ? error.message : String(error)],
+      warnings: [],
+      frontendSurfacesCount: 0,
+      backendRoutesCount: 0,
+      databaseTablesCount: 0,
+      operationsCount: 0,
+      allowedTargetPathsCount: 0,
+      requiredPathGroupsCount: 0,
+      forbiddenSearchPatternsCount: 0,
+      allowedTargetPaths: [],
+      requiredPathGroups: [],
+      forbiddenSearchPatterns: [],
+      normalizedContract: null,
+    }
+  }
+}
+
 module.exports = {
   normalizeGeneratedDomainContract,
   validateGeneratedDomainContract,
@@ -429,4 +542,6 @@ module.exports = {
   deriveRequiredPathGroupsFromContract,
   deriveForbiddenSearchPatternsFromContract,
   isContractSafeForLocalMaterialization,
+  buildGeneratedDomainContractDiagnostics,
+  extractGeneratedDomainContractCandidate,
 }

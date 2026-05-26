@@ -45,6 +45,10 @@ const {
   analyzeExistingProject,
   buildAttachedInputMetadataList,
 } = require(path.join(repoRoot, 'electron', 'project-context.cjs'))
+const {
+  buildGeneratedDomainContractDiagnostics,
+  extractGeneratedDomainContractCandidate,
+} = require(path.join(repoRoot, 'electron', 'generated-domain-contract.cjs'))
 const requiredPlannerFunctions = [
   'buildDomainUnderstanding',
   'buildProductArchitecturePlan',
@@ -1101,6 +1105,8 @@ module.exports = {
     selectBestWorkspaceProjectCandidate,
     shouldIgnoreWorkspaceDirectoryEntry,
     buildUnavailableContextHubPack,
+    buildGeneratedDomainContractDiagnostics,
+    extractGeneratedDomainContractCandidate,
     setTimeout,
     clearTimeout,
     setInterval,

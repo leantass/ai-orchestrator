@@ -139,6 +139,10 @@ const {
   analyzeExistingProject,
   buildAttachedInputMetadataList,
 } = require('./project-context.cjs')
+const {
+  buildGeneratedDomainContractDiagnostics,
+  extractGeneratedDomainContractCandidate,
+} = require('./generated-domain-contract.cjs')
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL)
 const defaultExecutorBridgePath = path.join(
@@ -274,6 +278,44 @@ function debugMainLog(label, details) {
   }
 
   writeToGuardedStream(process.stderr, mainStderrGuard, message)
+}
+
+function summarizeGeneratedDomainContractDiagnosticsForDebug(diagnostics) {
+  if (!diagnostics || typeof diagnostics !== 'object') {
+    return {
+      present: false,
+    }
+  }
+
+  return {
+    present: diagnostics.present === true,
+    valid: diagnostics.valid === true,
+    safeForLocalMaterialization: diagnostics.safeForLocalMaterialization === true,
+    domainSlug:
+      typeof diagnostics.domainSlug === 'string' && diagnostics.domainSlug.trim()
+        ? diagnostics.domainSlug.trim()
+        : undefined,
+    rootSlug:
+      typeof diagnostics.rootSlug === 'string' && diagnostics.rootSlug.trim()
+        ? diagnostics.rootSlug.trim()
+        : undefined,
+    sourceRoot:
+      typeof diagnostics.sourceRoot === 'string' && diagnostics.sourceRoot.trim()
+        ? diagnostics.sourceRoot.trim()
+        : undefined,
+    targetRoot:
+      typeof diagnostics.targetRoot === 'string' && diagnostics.targetRoot.trim()
+        ? diagnostics.targetRoot.trim()
+        : undefined,
+    errorsCount: Array.isArray(diagnostics.errors) ? diagnostics.errors.length : 0,
+    warningsCount: Array.isArray(diagnostics.warnings) ? diagnostics.warnings.length : 0,
+    allowedTargetPathsCount: Number.isInteger(diagnostics.allowedTargetPathsCount)
+      ? diagnostics.allowedTargetPathsCount
+      : 0,
+    requiredPathGroupsCount: Number.isInteger(diagnostics.requiredPathGroupsCount)
+      ? diagnostics.requiredPathGroupsCount
+      : 0,
+  }
 }
 
 function normalizeEventStringValue(value) {
@@ -35377,6 +35419,8 @@ function buildBrainDecisionContract({
   selectedContractKind,
   sourceRoot,
   targetRoot,
+  generatedDomainContract,
+  workspacePath,
   finalResult,
   stripStaleApprovalArtifacts = false,
 }) {
@@ -35491,6 +35535,15 @@ function buildBrainDecisionContract({
           runtimeApprovalState: normalizedRuntimeApprovalState,
         })
       : null
+  const {
+    normalizedContract: normalizedGeneratedDomainContract = null,
+    ...generatedDomainContractDiagnostics
+  } = buildGeneratedDomainContractDiagnostics(
+    generatedDomainContract && typeof generatedDomainContract === 'object'
+      ? { generatedDomainContract }
+      : {},
+    workspacePath,
+  )
 
   return {
     decisionKey: decisionKey || strategy || 'brain-decision',
@@ -35612,6 +35665,11 @@ function buildBrainDecisionContract({
     ...(selectedContractKind ? { selectedContractKind } : {}),
     ...(sourceRoot ? { sourceRoot } : {}),
     ...(targetRoot ? { targetRoot } : {}),
+    ...(normalizedGeneratedDomainContract &&
+    typeof normalizedGeneratedDomainContract === 'object'
+      ? { generatedDomainContract: normalizedGeneratedDomainContract }
+      : {}),
+    generatedDomainContractDiagnostics,
     ...(materializationPlan && typeof materializationPlan === 'object'
       ? { materializationPlan }
       : {}),
@@ -45365,6 +45423,10 @@ function extractOpenAIResponseText(responsePayload) {
 
 async function normalizeOpenAIBrainDecision(rawDecision, input) {
   const fallbackDecision = await buildLocalStrategicBrainDecision(input)
+  const rawGeneratedDomainContractCandidate =
+    extractGeneratedDomainContractCandidate(rawDecision)
+  const fallbackGeneratedDomainContractCandidate =
+    extractGeneratedDomainContractCandidate(fallbackDecision)
   const plannerFeedback = parseOrchestratorPlannerFeedback(
     typeof input?.previousExecutionResult === 'string' ? input.previousExecutionResult : '',
   )
@@ -45806,6 +45868,10 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
       typeof rawDecision.materializationPlan === 'object'
         ? rawDecision.materializationPlan
         : fallbackDecision.materializationPlan,
+    generatedDomainContract:
+      rawGeneratedDomainContractCandidate.contract ||
+      fallbackGeneratedDomainContractCandidate.contract,
+    workspacePath: input.workspacePath,
     domainUnderstanding:
       rawDecision?.domainUnderstanding &&
       typeof rawDecision.domainUnderstanding === 'object'
@@ -45924,6 +45990,10 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
         targetRoot:
           normalizeOptionalString(fallbackDecision?.targetRoot) ||
           workspaceAwareDecision.targetRoot,
+        generatedDomainContract:
+          rawGeneratedDomainContractCandidate.contract ||
+          fallbackGeneratedDomainContractCandidate.contract,
+        workspacePath: input.workspacePath,
         reason:
           workspaceAwareRootMismatchWithFallback
             ? 'La respuesta materializable se normalizó al contrato canónico local porque OpenAI devolvió un root distinto al root fullstack activo.'
@@ -46024,6 +46094,10 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
     reason:
       'El usuario ya delegó los faltantes menores o la decisión ya estaba resuelta, así que el Cerebro sigue sin reabrir ese approval.',
     nextExpectedAction: 'execute-plan',
+    generatedDomainContract:
+      rawGeneratedDomainContractCandidate.contract ||
+      fallbackGeneratedDomainContractCandidate.contract,
+    workspacePath: input.workspacePath,
   })
 }
 
@@ -48232,7 +48306,22 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
     completed: brainDecision.completed === true,
     requiresApproval: brainDecision.requiresApproval === true,
     tasksCount: Array.isArray(brainDecision.tasks) ? brainDecision.tasks.length : 0,
+    generatedDomainContractPresent:
+      brainDecision.generatedDomainContractDiagnostics?.present === true,
+    generatedDomainContractValid:
+      brainDecision.generatedDomainContractDiagnostics?.valid === true,
+    generatedDomainContractSafe:
+      brainDecision.generatedDomainContractDiagnostics?.safeForLocalMaterialization === true,
   })
+
+  if (brainDecision.generatedDomainContractDiagnostics?.present === true) {
+    debugMainLog(
+      'generated-domain-contract:diagnostics',
+      summarizeGeneratedDomainContractDiagnosticsForDebug(
+        brainDecision.generatedDomainContractDiagnostics,
+      ),
+    )
+  }
 
   const planningFinishedEventPayload = buildPlanningFinishedEventPayload({
     goal,
@@ -48320,6 +48409,9 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       approvalRequestPlan: brainDecision.approvalRequestPlan,
       runtimeApprovalState: brainDecision.runtimeApprovalState,
       materializationPlan: brainDecision.materializationPlan,
+      generatedDomainContract: brainDecision.generatedDomainContract,
+      generatedDomainContractDiagnostics:
+        brainDecision.generatedDomainContractDiagnostics,
       existingProjectDetection: brainDecision.existingProjectDetection,
       activeProjectContext: brainDecision.activeProjectContext,
       contextHubStatus,
@@ -48381,6 +48473,9 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
     runtimeApprovalState:
       brainDecision.requiresApproval === true ? brainDecision.runtimeApprovalState : null,
     materializationPlan: brainDecision.materializationPlan,
+    generatedDomainContract: brainDecision.generatedDomainContract,
+    generatedDomainContractDiagnostics:
+      brainDecision.generatedDomainContractDiagnostics,
     existingProjectDetection: brainDecision.existingProjectDetection,
     activeProjectContext: brainDecision.activeProjectContext,
     contextHubStatus,
