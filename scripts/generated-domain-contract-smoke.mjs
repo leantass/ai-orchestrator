@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
+import vm from 'node:vm'
 import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
 
 const require = createRequire(import.meta.url)
+const currentFilePath = fileURLToPath(import.meta.url)
+const repoRoot = path.resolve(path.dirname(currentFilePath), '..')
+const mainFilePath = path.join(repoRoot, 'electron', 'main.cjs')
+const mainSource = fs.readFileSync(mainFilePath, 'utf8')
 const {
   normalizeGeneratedDomainContract,
   validateGeneratedDomainContract,
@@ -11,6 +19,82 @@ const {
   isContractSafeForLocalMaterialization,
   buildGeneratedDomainContractDiagnostics,
 } = require('../electron/generated-domain-contract.cjs')
+const {
+  LOCAL_MATERIALIZATION_PLAN_VERSION,
+} = require(path.join(repoRoot, 'electron', 'local-deterministic-executor.cjs'))
+const {
+  FULLSTACK_LOCAL_BASE_PHASES,
+  getFullstackLocalBasePhaseDefinition,
+  buildFullstackLocalManifestPhaseBlueprints,
+} = require(path.join(repoRoot, 'electron', 'fullstack-phase-contracts.cjs'))
+const {
+  classifyWorkspaceProjectIntent,
+  selectBestWorkspaceProjectCandidate,
+  shouldIgnoreWorkspaceDirectoryEntry,
+} = require(path.join(repoRoot, 'electron', 'workspace-project-detection.cjs'))
+
+function extractSegment({ startMarker, endMarker }) {
+  const start = mainSource.indexOf(startMarker)
+  if (start === -1) {
+    throw new Error(`No se encontro el anchor inicial ${JSON.stringify(startMarker)}.`)
+  }
+
+  const end = mainSource.indexOf(endMarker, start)
+  if (end === -1) {
+    throw new Error(`No se encontro el anchor final ${JSON.stringify(endMarker)}.`)
+  }
+
+  return mainSource.slice(start, end)
+}
+
+function loadGeneratedDomainObservationHarness() {
+  const plannerSurface = extractSegment({
+    startMarker: 'function normalizeExecutorAttemptScope(',
+    endMarker: 'function buildOpenAIBrainInputPayload(input) {',
+  })
+  const harness = `
+${plannerSurface}
+module.exports = {
+  buildBrainDecisionContract,
+  buildOpenAIBrainSystemPrompt,
+  buildOpenAIBrainSchema,
+};
+`
+
+  const sandbox = {
+    module: { exports: {} },
+    exports: {},
+    require,
+    console,
+    process,
+    Buffer,
+    fs,
+    path,
+    LOCAL_MATERIALIZATION_PLAN_VERSION,
+    FULLSTACK_LOCAL_BASE_PHASES,
+    getFullstackLocalBasePhaseDefinition,
+    buildFullstackLocalManifestPhaseBlueprints,
+    classifyWorkspaceProjectIntent,
+    selectBestWorkspaceProjectCandidate,
+    shouldIgnoreWorkspaceDirectoryEntry,
+    buildGeneratedDomainContractDiagnostics,
+    extractGeneratedDomainContractCandidate:
+      require('../electron/generated-domain-contract.cjs').extractGeneratedDomainContractCandidate,
+    setTimeout,
+    clearTimeout,
+    setInterval,
+    clearInterval,
+  }
+
+  vm.createContext(sandbox)
+  vm.runInContext(harness, sandbox, {
+    filename: 'generated-domain-contract-smoke-harness.cjs',
+  })
+
+  return sandbox.module.exports || {}
+}
+
+const observationHarness = loadGeneratedDomainObservationHarness()
 
 function createValidInventedContract() {
   return {
@@ -136,6 +220,30 @@ function createValidInventedContract() {
       },
     ],
   }
+}
+
+function createWindowsDoubleSlashRootContract({ absoluteOperationPaths = false } = {}) {
+  const rootPath = 'C://Users//letas//Desktop//Proyectos//Desarrollo//web-prueba//criaderos-carnivoras'
+  const contract = createValidInventedContract()
+  contract.domain = {
+    label: 'Criaderos de carnivoras',
+    slug: 'criaderos-carnivoras',
+    summary: 'Gestion local de visitas, cuidados, ventas mock y reportes.',
+  }
+  contract.root = {
+    slug: 'criaderos-carnivoras',
+    sourceRoot: rootPath,
+    targetRoot: rootPath,
+  }
+
+  if (absoluteOperationPaths) {
+    contract.materialization.operations = contract.materialization.operations.map((entry) => ({
+      ...entry,
+      targetPath: `${rootPath}/${entry.targetPath}`,
+    }))
+  }
+
+  return contract
 }
 
 function runValidContractCase() {
@@ -341,8 +449,134 @@ function runDecisionWithExternalApiCase() {
   )
 }
 
+function runWindowsDoubleSlashPathCase() {
+  const diagnostics = buildGeneratedDomainContractDiagnostics(
+    {
+      generatedDomainContract: createWindowsDoubleSlashRootContract({
+        absoluteOperationPaths: true,
+      }),
+    },
+    '.',
+  )
+
+  assert.equal(diagnostics.present, true)
+  assert.equal(diagnostics.valid, true, `No deberia fallar por C:// solo: ${diagnostics.errors.join(' | ')}`)
+  assert.equal(
+    diagnostics.safeForLocalMaterialization,
+    true,
+    `No deberia fallar por roots/operations absolutos normalizables: ${diagnostics.errors.join(' | ')}`,
+  )
+  assert.equal(diagnostics.rootSlug, 'criaderos-carnivoras')
+  assert.equal(diagnostics.sourceRoot, 'criaderos-carnivoras')
+  assert.equal(diagnostics.targetRoot, 'criaderos-carnivoras')
+}
+
+function runSystemPathOutsideWorkspaceCase() {
+  const contract = createValidInventedContract()
+  contract.root = {
+    slug: 'system32-local',
+    sourceRoot: 'C://Windows//System32',
+    targetRoot: 'C://Windows//System32',
+  }
+  const diagnostics = buildGeneratedDomainContractDiagnostics(
+    {
+      generatedDomainContract: contract,
+    },
+    '.',
+  )
+
+  assert.equal(diagnostics.present, true)
+  assert.equal(diagnostics.valid, false)
+  assert.equal(diagnostics.safeForLocalMaterialization, false)
+  assert.ok(
+    diagnostics.errors.some((entry) => entry.includes('segmento reservado') || entry.includes('absoluto')),
+    'C://Windows//System32 debe seguir fallando por seguridad.',
+  )
+}
+
+function runOpenAIPromptContractRequestCase() {
+  const prompt = String(observationHarness.buildOpenAIBrainSystemPrompt?.() || '')
+  assert.ok(prompt.includes('generatedDomainContract'), 'El prompt debe pedir generatedDomainContract.')
+  assert.ok(
+    prompt.includes('dominio como datos'),
+    'El prompt debe pedir que el dominio se trate como datos y no como rubro hardcodeado.',
+  )
+  assert.ok(
+    prompt.includes('sourceRoot y targetRoot'),
+    'El prompt debe exigir coherencia entre sourceRoot y targetRoot.',
+  )
+  assert.ok(
+    prompt.includes('Mock-only esta permitido'),
+    'El prompt debe aclarar que mock-only esta permitido para integraciones locales.',
+  )
+}
+
+function runOpenAISchemaContractFieldCase() {
+  const schema = observationHarness.buildOpenAIBrainSchema?.()
+  const contractSchema = schema?.properties?.generatedDomainContract
+  assert.ok(contractSchema, 'El schema de OpenAI debe aceptar generatedDomainContract.')
+  assert.equal(contractSchema.type, 'object')
+  assert.ok(contractSchema.properties?.domain, 'El schema debe incluir domain.')
+  assert.ok(contractSchema.properties?.root, 'El schema debe incluir root.')
+  assert.ok(contractSchema.properties?.frontendSurfaces, 'El schema debe incluir frontendSurfaces.')
+  assert.ok(contractSchema.properties?.materialization, 'El schema debe incluir materialization.')
+  assert.ok(contractSchema.properties?.validation, 'El schema debe incluir validation.')
+}
+
+function runBrainDecisionContractObservationCase() {
+  const generatedDomainContract = createValidInventedContract()
+  const baseDecision = {
+    decisionKey: 'invented-domain-plan',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    reason: 'Observacion paralela del contrato universal.',
+    instruction: 'Mantener el plan legacy y adjuntar diagnostico del contrato generado.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    materializationPlan: {
+      planVersion: 'legacy-observation-only',
+      operations: [],
+    },
+    executionScope: {
+      objectiveScope: 'legacy-planner-scope',
+      allowedTargetPaths: ['legacy-root', 'legacy-root/README.md'],
+    },
+    workspacePath: repoRoot,
+  }
+
+  const withoutContract = observationHarness.buildBrainDecisionContract(baseDecision)
+  const withContract = observationHarness.buildBrainDecisionContract({
+    ...baseDecision,
+    generatedDomainContract,
+  })
+
+  assert.equal(withoutContract.generatedDomainContractDiagnostics?.present, false)
+  assert.equal(withContract.generatedDomainContractDiagnostics?.present, true)
+  assert.equal(withContract.generatedDomainContractDiagnostics?.valid, true)
+  assert.equal(withContract.generatedDomainContractDiagnostics?.safeForLocalMaterialization, true)
+  assert.equal(withContract.strategy, withoutContract.strategy)
+  assert.equal(withContract.executionMode, withoutContract.executionMode)
+  assert.equal(withContract.nextExpectedAction, withoutContract.nextExpectedAction)
+  assert.deepEqual(
+    withContract.materializationPlan,
+    withoutContract.materializationPlan,
+    'generatedDomainContract no debe reemplazar materializationPlan.',
+  )
+  assert.deepEqual(
+    withContract.executionScope,
+    withoutContract.executionScope,
+    'generatedDomainContract no debe reemplazar executionScope.',
+  )
+  assert.ok(withContract.generatedDomainContract, 'El payload final debe conservar generatedDomainContract.')
+}
+
 function main() {
   runValidContractCase()
+  runWindowsDoubleSlashPathCase()
+  runSystemPathOutsideWorkspaceCase()
   runRootMismatchCase()
   runOutOfScopeOperationCase()
   runForbiddenEnvCase()
@@ -353,7 +587,10 @@ function main() {
   runDecisionWithRootMismatchCase()
   runDecisionWithForbiddenEnvCase()
   runDecisionWithExternalApiCase()
-  console.log('OK. GeneratedDomainContract smoke paso 11/11 checks.')
+  runOpenAIPromptContractRequestCase()
+  runOpenAISchemaContractFieldCase()
+  runBrainDecisionContractObservationCase()
+  console.log('OK. GeneratedDomainContract smoke paso 16/16 checks.')
 }
 
 main()

@@ -42,6 +42,24 @@ function asNonEmptyString(value, fallback = '') {
   return typeof value === 'string' && value.trim() ? value.trim() : fallback
 }
 
+function canonicalizePathString(value) {
+  const raw = asNonEmptyString(value)
+  if (!raw) {
+    return ''
+  }
+
+  const withForwardSlashes = raw.replace(/\\/g, '/')
+  if (/^[a-zA-Z]:/.test(withForwardSlashes)) {
+    const drivePrefix = withForwardSlashes.slice(0, 2)
+    const remainder = withForwardSlashes.slice(2).replace(/^\/+/, '').replace(/\/+/g, '/')
+    return remainder ? `${drivePrefix}/${remainder}` : `${drivePrefix}/`
+  }
+
+  const hasLeadingSlash = withForwardSlashes.startsWith('/')
+  const normalizedBody = withForwardSlashes.replace(/^\/+/, '').replace(/\/+/g, '/')
+  return hasLeadingSlash ? `/${normalizedBody}` : normalizedBody
+}
+
 function slugify(value, fallback = 'generated-domain') {
   const normalized = asNonEmptyString(value, fallback)
     .normalize('NFKD')
@@ -54,12 +72,100 @@ function slugify(value, fallback = 'generated-domain') {
 }
 
 function normalizeRelativePath(value) {
-  const normalized = asNonEmptyString(value).replace(/\\/g, '/').replace(/^\/+/, '')
+  const normalized = canonicalizePathString(value).replace(/^\/+/, '')
   return normalized
 }
 
 function isAbsoluteLikePath(value) {
-  return /^[a-zA-Z]:[\\/]/.test(value) || value.startsWith('/') || value.startsWith('\\\\')
+  const normalized = canonicalizePathString(value)
+  return /^[a-zA-Z]:\//.test(normalized) || normalized.startsWith('/') || normalized.startsWith('\\\\')
+}
+
+function getAbsolutePathSegments(value) {
+  const normalized = canonicalizePathString(value)
+  if (/^[a-zA-Z]:\//.test(normalized)) {
+    return normalized
+      .slice(3)
+      .split('/')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+  }
+
+  return normalized
+    .replace(/^\/+/, '')
+    .split('/')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+}
+
+function isDangerousAbsoluteRootPath(value) {
+  const normalized = canonicalizePathString(value)
+  const segments = getAbsolutePathSegments(normalized).map((entry) => entry.toLowerCase())
+
+  if (!isAbsoluteLikePath(normalized) || segments.length === 0) {
+    return true
+  }
+
+  const firstSegment = segments[0]
+  if (firstSegment === 'windows' || firstSegment === 'usr' || firstSegment === 'etc') {
+    return true
+  }
+
+  if (firstSegment === 'users' && segments.length === 1) {
+    return true
+  }
+
+  if (firstSegment === 'program files' || firstSegment === 'program files (x86)') {
+    return true
+  }
+
+  return false
+}
+
+function buildAbsoluteRootCandidates(values) {
+  return unique(
+    values
+      .map((entry) => canonicalizePathString(entry))
+      .filter((entry) => isAbsoluteLikePath(entry) && !isDangerousAbsoluteRootPath(entry)),
+  )
+}
+
+function normalizeContractScopedPath(value, absoluteRootCandidates = []) {
+  const normalized = canonicalizePathString(value)
+  if (!normalized) {
+    return ''
+  }
+
+  const normalizedLower = normalized.toLowerCase()
+  for (const candidate of absoluteRootCandidates) {
+    const candidateNormalized = canonicalizePathString(candidate)
+    const candidateLower = candidateNormalized.toLowerCase()
+    if (normalizedLower === candidateLower) {
+      return ''
+    }
+    if (normalizedLower.startsWith(`${candidateLower}/`)) {
+      return normalizeRelativePath(normalized.slice(candidateNormalized.length + 1))
+    }
+  }
+
+  return normalizeRelativePath(normalized)
+}
+
+function normalizeContractRootPath(value, rootSlug, absoluteRootCandidates = []) {
+  const normalized = canonicalizePathString(value)
+  if (!normalized) {
+    return rootSlug
+  }
+
+  if (!isAbsoluteLikePath(normalized)) {
+    return normalizeRelativePath(normalized) || rootSlug
+  }
+
+  if (!isDangerousAbsoluteRootPath(normalized) && absoluteRootCandidates.includes(normalized)) {
+    return rootSlug
+  }
+
+  return normalized
 }
 
 function collectPathList(entries, projector) {
@@ -136,9 +242,18 @@ function normalizeGeneratedDomainContract(input) {
 
   const domainLabel = asNonEmptyString(domain.label, 'Generated domain')
   const domainSlug = slugify(domain.slug || domainLabel, 'generated-domain')
-  const rootSlug = slugify(root.slug || `${domainSlug}-local`, `${domainSlug}-local`)
-  const sourceRoot = normalizeRelativePath(root.sourceRoot || rootSlug) || rootSlug
-  const targetRoot = normalizeRelativePath(root.targetRoot || rootSlug) || rootSlug
+  const rawSourceRoot = canonicalizePathString(root.sourceRoot || '')
+  const rawTargetRoot = canonicalizePathString(root.targetRoot || '')
+  const rawRootFallback =
+    rawTargetRoot || rawSourceRoot || canonicalizePathString(root.slug || `${domainSlug}-local`)
+  const rawRootBasename = getAbsolutePathSegments(rawRootFallback).slice(-1)[0] || ''
+  const rootSlug = slugify(
+    root.slug || rawRootBasename || `${domainSlug}-local`,
+    `${domainSlug}-local`,
+  )
+  const absoluteRootCandidates = buildAbsoluteRootCandidates([rawSourceRoot, rawTargetRoot])
+  const sourceRoot = normalizeContractRootPath(rawSourceRoot || rootSlug, rootSlug, absoluteRootCandidates)
+  const targetRoot = normalizeContractRootPath(rawTargetRoot || rootSlug, rootSlug, absoluteRootCandidates)
 
   const normalized = {
     contractVersion: asNonEmptyString(source.contractVersion, DEFAULT_CONTRACT_VERSION),
@@ -164,22 +279,50 @@ function normalizeGeneratedDomainContract(input) {
       return {
         key,
         label: asNonEmptyString(value.label, key),
-        path: surfacePath,
+        path: normalizeContractScopedPath(surfacePath, absoluteRootCandidates) || `frontend/${key}`,
         screens: asArray(value.screens),
       }
     }),
     backend: {
-      packageFile: normalizeRelativePath(
+      packageFile: normalizeContractScopedPath(
         backend.packageFile || backend.packageJson || 'backend/package.json',
+        absoluteRootCandidates,
       ),
-      entryFile: normalizeRelativePath(backend.entryFile || 'backend/src/server.js'),
-      routes: asArray(backend.routes).map(normalizeRouteEntry),
-      services: asArray(backend.services).map(normalizeRouteEntry),
-      modules: asArray(backend.modules).map(normalizeRouteEntry),
+      entryFile: normalizeContractScopedPath(
+        backend.entryFile || 'backend/src/server.js',
+        absoluteRootCandidates,
+      ),
+      routes: asArray(backend.routes).map((entry) => {
+        const route = normalizeRouteEntry(entry)
+        return {
+          ...route,
+          path: normalizeContractScopedPath(route.path, absoluteRootCandidates),
+        }
+      }),
+      services: asArray(backend.services).map((entry) => {
+        const service = normalizeRouteEntry(entry)
+        return {
+          ...service,
+          path: normalizeContractScopedPath(service.path, absoluteRootCandidates),
+        }
+      }),
+      modules: asArray(backend.modules).map((entry) => {
+        const moduleEntry = normalizeRouteEntry(entry)
+        return {
+          ...moduleEntry,
+          path: normalizeContractScopedPath(moduleEntry.path, absoluteRootCandidates),
+        }
+      }),
     },
     database: {
-      schemaFile: normalizeRelativePath(database.schemaFile || 'database/schema.sql'),
-      seedFile: normalizeRelativePath(database.seedFile || 'database/seed.sql'),
+      schemaFile: normalizeContractScopedPath(
+        database.schemaFile || 'database/schema.sql',
+        absoluteRootCandidates,
+      ),
+      seedFile: normalizeContractScopedPath(
+        database.seedFile || 'database/seed.sql',
+        absoluteRootCandidates,
+      ),
       tables: asArray(database.tables),
       relationships: asArray(database.relationships),
       seedData: asArray(database.seedData),
@@ -187,14 +330,14 @@ function normalizeGeneratedDomainContract(input) {
     shared: {
       files: collectPathList(shared.files, (entry) =>
         typeof entry === 'string' ? entry : asObject(entry).path || asObject(entry).file || '',
-      ),
+      ).map((entry) => normalizeContractScopedPath(entry, absoluteRootCandidates)),
     },
     docs: collectPathList(source.docs, (entry) =>
       typeof entry === 'string' ? entry : asObject(entry).path || asObject(entry).file || '',
-    ),
+    ).map((entry) => normalizeContractScopedPath(entry, absoluteRootCandidates)),
     scripts: collectPathList(source.scripts, (entry) =>
       typeof entry === 'string' ? entry : asObject(entry).path || asObject(entry).file || '',
-    ),
+    ).map((entry) => normalizeContractScopedPath(entry, absoluteRootCandidates)),
     integrations: asArray(source.integrations).map((entry) => {
       const value = asObject(entry)
       return {
@@ -220,24 +363,32 @@ function normalizeGeneratedDomainContract(input) {
       requiredFiles: unique(
         collectPathList(materialization.requiredFiles, (entry) =>
           typeof entry === 'string' ? entry : asObject(entry).path || asObject(entry).file || '',
-        ),
+        ).map((entry) => normalizeContractScopedPath(entry, absoluteRootCandidates)),
       ),
       operations: asArray(materialization.operations).map((entry) => {
         const value = asObject(entry)
         return {
           type: asNonEmptyString(value.type, 'replace-file'),
-          targetPath: normalizeRelativePath(value.targetPath || ''),
+          targetPath: normalizeContractScopedPath(value.targetPath || '', absoluteRootCandidates),
           nextContent: typeof value.nextContent === 'string' ? value.nextContent : '',
         }
       }),
       allowedTargetPaths: unique(
-        collectPathList(materialization.allowedTargetPaths, (entry) => entry),
+        collectPathList(materialization.allowedTargetPaths, (entry) => entry).map((entry) =>
+          normalizeContractScopedPath(entry, absoluteRootCandidates),
+        ),
       ),
     },
     validation: {
       syntaxChecks: unique(asArray(validation.syntaxChecks).map((entry) => asNonEmptyString(entry))),
       requiredPathGroups: asArray(validation.requiredPathGroups)
-        .map((group) => unique(asArray(group).map((entry) => normalizeRelativePath(entry)).filter(Boolean)))
+        .map((group) =>
+          unique(
+            asArray(group)
+              .map((entry) => normalizeContractScopedPath(entry, absoluteRootCandidates))
+              .filter(Boolean),
+          ),
+        )
         .filter((group) => group.length > 0),
       forbiddenSearchPatterns: unique(
         asArray(validation.forbiddenSearchPatterns).length > 0
@@ -269,7 +420,9 @@ function normalizeGeneratedDomainContract(input) {
     normalized.materialization.allowedTargetPaths = unique([
       normalized.root.targetRoot,
       ...normalized.materialization.requiredFiles.map((entry) =>
-        normalizeRelativePath(path.posix.join(normalized.root.targetRoot, trimRootPrefix(normalized, entry))),
+        normalizeRelativePath(
+          path.posix.join(normalized.root.targetRoot, trimRootPrefix(normalized, entry)),
+        ),
       ),
     ])
   }

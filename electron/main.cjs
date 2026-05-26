@@ -44506,6 +44506,14 @@ Reglas:
 - Usá scalable-delivery-plan cuando el usuario pida explícitamente una entrega más grande y local, por ejemplo frontend real con estructura de proyecto, fullstack local con backend y base de datos local, monorepo local con apps/packages/workers o infraestructura local con Docker/Redis/cron/Postgres. En ese caso usá executionMode="planner-only", nextExpectedAction="review-scalable-delivery", requiresApproval=false, devolvé scalableDeliveryPlan completo y no crees archivos todavía.
 - Usá materialize-frontend-project-plan solo cuando el objetivo ya pida materializar un frontend-project revisado. En ese caso usá executionMode="executor", nextExpectedAction="execute-plan", requiresApproval=false, devolvé executionScope y materializationPlan acotados a una carpeta nueva del workspace con package.json, index.html, README.md y src/ estático, sin npm install, sin node_modules, sin bundler, sin backend real, sin base de datos real ni integraciones externas.
 - Usá materialize-fullstack-local-plan solo cuando el objetivo ya pida materializar un fullstack-local revisado. En ese caso usá executionMode="executor", nextExpectedAction="execute-plan", requiresApproval=false, devolvé executionScope y materializationPlan acotados a una carpeta nueva del workspace con frontend/, backend/, shared/, database/, scripts/ y docs/, sin npm install, sin node_modules, sin levantar servicios, sin base de datos real activa, sin Docker ni integraciones externas.
+- Cuando la decision trate sobre arquitectura local grande, fullstack-local o una materializacion local revisable, devolvé tambien generatedDomainContract como contrato universal observacional. Ese contrato NO reemplaza el materializationPlan actual: solo agrega una descripcion estructurada del dominio para diagnostico y futura migracion.
+- generatedDomainContract debe tratar el dominio como datos y no como una lista de rubros conocidos. Usá contractVersion, deliveryLevel, domain, root, roles, entities, states, workflows, frontendSurfaces, backend, database, shared, docs, scripts, integrations, safety, materialization, validation y approvals.
+- Preferí que generatedDomainContract.root.slug sea relativo y estable, por ejemplo "plant-nursery-local". Si completás sourceRoot y targetRoot, preferí valores relativos alineados con root.slug en vez de rutas absolutas del sistema operativo.
+- generatedDomainContract.root.slug, sourceRoot y targetRoot deben ser coherentes entre si, quedar dentro de una raiz local segura y usar la misma raiz para sourceRoot y targetRoot cuando la propuesta sea materializable.
+- generatedDomainContract.integrations debe marcar integraciones reales como bloqueadas salvo aprobacion explicita futura. Mock-only esta permitido cuando el objetivo sea local y seguro.
+- generatedDomainContract.safety y generatedDomainContract.validation deben prohibir .env, secretos, tokens reales, llamadas externas reales, webhooks reales, deploy, Docker, node_modules y bases productivas.
+- generatedDomainContract.materialization.requiredFiles y allowedTargetPaths deben quedar alineados con frontendSurfaces, backend, database, shared, docs y scripts.
+- Si por algun motivo conocés una ruta absoluta local, no la uses como fuente principal del contrato. En ese caso priorizá root.slug y paths relativos, y dejá que JEFE derive localmente allowedTargetPaths desde workspacePath cuando corresponda.
 - Usá prepare-project-phase-plan cuando el objetivo pida continuar un proyecto local ya generado y preparar una fase segura posterior. En ese caso usá executionMode="planner-only", nextExpectedAction="review-project-phase", requiresApproval=false y devolvé projectPhaseExecutionPlan acotado a archivos permitidos de esa fase.
 - Usá materialize-project-phase-plan solo cuando el objetivo ya pida materializar una fase segura local de un proyecto existente. En ese caso usá executionMode="executor", nextExpectedAction="execute-plan", requiresApproval=false, devolvé executionScope y materializationPlan acotados a los allowedTargetPaths de la fase y nunca habilites backend real, database real, Docker, node_modules ni deploy.
 - Usá prepare-module-expansion-plan cuando el objetivo pida preparar una expansión de módulo sobre un proyecto local ya validado. En ese caso usá executionMode="planner-only", nextExpectedAction="review-module-expansion", requiresApproval=false y devolvé moduleExpansionPlan acotado a los archivos y capas permitidas.
@@ -44551,6 +44559,205 @@ Reglas:
 - No devuelvas texto libre fuera del JSON.
 - Mantené el contrato uniforme del Cerebro.
 `.trim()
+}
+
+function buildOpenAIGeneratedDomainContractSchema() {
+  return {
+    type: 'object',
+    additionalProperties: true,
+    properties: {
+      contractVersion: { type: 'string' },
+      deliveryLevel: { type: 'string' },
+      domain: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          label: { type: 'string' },
+          slug: { type: 'string' },
+          summary: { type: 'string' },
+        },
+      },
+      root: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          slug: { type: 'string' },
+          sourceRoot: { type: 'string' },
+          targetRoot: { type: 'string' },
+        },
+      },
+      roles: {
+        type: 'array',
+        items: {
+          anyOf: [
+            { type: 'string' },
+            {
+              type: 'object',
+              additionalProperties: true,
+              properties: {
+                key: { type: 'string' },
+                label: { type: 'string' },
+              },
+            },
+          ],
+        },
+      },
+      entities: {
+        type: 'array',
+        items: {
+          anyOf: [
+            { type: 'string' },
+            {
+              type: 'object',
+              additionalProperties: true,
+              properties: {
+                key: { type: 'string' },
+                label: { type: 'string' },
+              },
+            },
+          ],
+        },
+      },
+      states: {
+        type: 'object',
+        additionalProperties: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+      },
+      workflows: {
+        type: 'array',
+        items: {
+          anyOf: [
+            { type: 'string' },
+            {
+              type: 'object',
+              additionalProperties: true,
+              properties: {
+                key: { type: 'string' },
+                steps: { type: 'array', items: { type: 'string' } },
+              },
+            },
+          ],
+        },
+      },
+      frontendSurfaces: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            key: { type: 'string' },
+            label: { type: 'string' },
+            path: { type: 'string' },
+            screens: { type: 'array', items: { type: 'string' } },
+          },
+        },
+      },
+      backend: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          packageFile: { type: 'string' },
+          entryFile: { type: 'string' },
+          routes: { type: 'array', items: { type: 'string' } },
+          services: { type: 'array', items: { type: 'string' } },
+          modules: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      database: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          schemaFile: { type: 'string' },
+          seedFile: { type: 'string' },
+          tables: { type: 'array', items: { type: 'string' } },
+          relationships: { type: 'array', items: { type: 'string' } },
+          seedData: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      shared: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          files: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      docs: { type: 'array', items: { type: 'string' } },
+      scripts: { type: 'array', items: { type: 'string' } },
+      integrations: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            name: { type: 'string' },
+            mode: { type: 'string' },
+            realIntegrationAllowedNow: { type: 'boolean' },
+          },
+        },
+      },
+      safety: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          forbiddenFiles: { type: 'array', items: { type: 'string' } },
+          forbiddenSignals: { type: 'array', items: { type: 'string' } },
+          explicitExclusions: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      materialization: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          requiredFiles: { type: 'array', items: { type: 'string' } },
+          operations: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: true,
+              properties: {
+                type: { type: 'string' },
+                targetPath: { type: 'string' },
+                nextContent: { type: 'string' },
+              },
+            },
+          },
+          allowedTargetPaths: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      validation: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          syntaxChecks: { type: 'array', items: { type: 'string' } },
+          requiredPathGroups: {
+            type: 'array',
+            items: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+          },
+          forbiddenSearchPatterns: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      approvals: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            key: { type: 'string' },
+            scope: { type: 'string' },
+            status: { type: 'string' },
+            decision: { type: 'string' },
+            allowsNow: { type: 'array', items: { type: 'string' } },
+            forbidsNow: { type: 'array', items: { type: 'string' } },
+          },
+        },
+      },
+    },
+  }
 }
 
 function buildOpenAIBrainSchema() {
@@ -45349,6 +45556,7 @@ function buildOpenAIBrainSchema() {
           explicitExclusions: { type: 'array', items: { type: 'string' } },
         },
       },
+      generatedDomainContract: buildOpenAIGeneratedDomainContractSchema(),
     },
     required: [
       'decisionKey',
