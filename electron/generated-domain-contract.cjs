@@ -16,6 +16,19 @@ const GENERATED_DOMAIN_CONTRACT_CANDIDATE_FIELDS = [
   'domainContract',
   'contract',
 ]
+const FULLSTACK_LOCAL_DELIVERY_LEVEL_ALIASES = new Set([
+  'fullstack-local',
+  'fullstack-local-large',
+  'fullstack-local-platform',
+  'local-fullstack',
+  'local-fullstack-delivery',
+  'safe-fullstack-local',
+  'scalable-fullstack-local',
+])
+const FULLSTACK_LOCAL_DELIVERY_LEVEL_SIGNAL_GATED_ALIASES = new Set([
+  'scalable-delivery-plan',
+  'planner-only-scalable-delivery',
+])
 const RESERVED_ROOT_SEGMENTS = new Set([
   '',
   '.',
@@ -71,9 +84,17 @@ function slugify(value, fallback = 'generated-domain') {
   return normalized || fallback
 }
 
+function stripLeadingCurrentDirectoryPrefix(value) {
+  let normalized = asNonEmptyString(value)
+  while (normalized === '.' || normalized.startsWith('./')) {
+    normalized = normalized === '.' ? '' : normalized.slice(2)
+  }
+  return normalized
+}
+
 function normalizeRelativePath(value) {
   const normalized = canonicalizePathString(value).replace(/^\/+/, '')
-  return normalized
+  return stripLeadingCurrentDirectoryPrefix(normalized)
 }
 
 function isAbsoluteLikePath(value) {
@@ -229,6 +250,122 @@ function normalizeRouteEntry(entry) {
   }
 }
 
+function normalizeGeneratedDomainDeliveryLevelToken(value, fallback = '') {
+  const normalized = asNonEmptyString(value, fallback)
+    .normalize('NFKD')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+  return normalized || fallback
+}
+
+function hasGeneratedDomainFullstackLocalSignals(contract) {
+  const normalizedContract = asObject(contract)
+  const backend = asObject(normalizedContract.backend)
+  const database = asObject(normalizedContract.database)
+  const safety = asObject(normalizedContract.safety)
+  const materialization = asObject(normalizedContract.materialization)
+  const validation = asObject(normalizedContract.validation)
+  const root = asObject(normalizedContract.root)
+  const approvals = asArray(normalizedContract.approvals).map((entry) => asObject(entry))
+  const integrations = asArray(normalizedContract.integrations).map((entry) => asObject(entry))
+  const forbiddenFiles = asArray(safety.forbiddenFiles).map((entry) =>
+    normalizeRelativePath(entry).toLowerCase(),
+  )
+  const explicitExclusions = asArray(safety.explicitExclusions).map((entry) =>
+    asNonEmptyString(entry).trim().toLowerCase(),
+  )
+  const forbiddenSignals = asArray(safety.forbiddenSignals).map((entry) =>
+    asNonEmptyString(entry).trim().toLowerCase(),
+  )
+  const approvalForbids = approvals.flatMap((entry) =>
+    asArray(entry.forbidsNow).map((item) => asNonEmptyString(item).trim().toLowerCase()),
+  )
+  const safetyBlockers = unique([...explicitExclusions, ...forbiddenSignals, ...approvalForbids])
+
+  const hasFrontendSurfaceSignal = asArray(normalizedContract.frontendSurfaces).length > 0
+  const hasBackendSignal =
+    asArray(backend.routes).length > 0 ||
+    asArray(backend.services).length > 0 ||
+    asArray(backend.modules).length > 0
+  const hasDatabaseSignal = asArray(database.tables).length > 0
+  const hasMaterializationSignal =
+    asArray(materialization.requiredFiles).length > 0 ||
+    asArray(materialization.operations).length > 0
+  const hasRequiredPathGroupsSignal = asArray(validation.requiredPathGroups).length > 0
+  const hasCoherentRootSignal =
+    asNonEmptyString(root.sourceRoot) &&
+    asNonEmptyString(root.targetRoot) &&
+    normalizeRelativePath(root.sourceRoot) === normalizeRelativePath(root.targetRoot)
+  const hasLocalSafetySignal =
+    integrations.every(
+      (entry) =>
+        asNonEmptyString(entry.mode, 'mock-only').toLowerCase() === 'mock-only' &&
+        entry.realIntegrationAllowedNow !== true,
+    ) &&
+    (forbiddenFiles.includes('.env') || approvalForbids.includes('.env')) &&
+    safetyBlockers.some((entry) =>
+      [
+        'deploy',
+        'production',
+        'real-payments',
+        'external-service',
+        'external-services',
+        'real-webhooks',
+      ].includes(
+        entry,
+      ),
+    )
+
+  return (
+    hasFrontendSurfaceSignal &&
+    hasBackendSignal &&
+    hasDatabaseSignal &&
+    hasMaterializationSignal &&
+    hasRequiredPathGroupsSignal &&
+    hasCoherentRootSignal &&
+    hasLocalSafetySignal
+  )
+}
+
+function resolveGeneratedDomainDeliveryLevelNormalization(value, contract) {
+  const normalizedValue = normalizeGeneratedDomainDeliveryLevelToken(value, DEFAULT_DELIVERY_LEVEL)
+  const warnings = []
+
+  if (!normalizedValue || FULLSTACK_LOCAL_DELIVERY_LEVEL_ALIASES.has(normalizedValue)) {
+    return {
+      deliveryLevel: DEFAULT_DELIVERY_LEVEL,
+      warnings,
+    }
+  }
+
+  if (
+    FULLSTACK_LOCAL_DELIVERY_LEVEL_SIGNAL_GATED_ALIASES.has(normalizedValue) &&
+    hasGeneratedDomainFullstackLocalSignals(contract)
+  ) {
+    if (normalizedValue === 'planner-only-scalable-delivery') {
+      warnings.push(
+        'deliveryLevel planner-only-scalable-delivery normalizado a fullstack-local por señales fullstack-local suficientes.',
+      )
+    }
+
+    return {
+      deliveryLevel: DEFAULT_DELIVERY_LEVEL,
+      warnings,
+    }
+  }
+
+  return {
+    deliveryLevel: normalizedValue,
+    warnings,
+  }
+}
+
+function normalizeGeneratedDomainDeliveryLevel(value, contract) {
+  return resolveGeneratedDomainDeliveryLevelNormalization(value, contract).deliveryLevel
+}
+
 function normalizeGeneratedDomainContract(input) {
   const source = asObject(input)
   const domain = asObject(source.domain)
@@ -257,7 +394,10 @@ function normalizeGeneratedDomainContract(input) {
 
   const normalized = {
     contractVersion: asNonEmptyString(source.contractVersion, DEFAULT_CONTRACT_VERSION),
-    deliveryLevel: asNonEmptyString(source.deliveryLevel, DEFAULT_DELIVERY_LEVEL),
+    deliveryLevel: normalizeGeneratedDomainDeliveryLevelToken(
+      source.deliveryLevel,
+      DEFAULT_DELIVERY_LEVEL,
+    ),
     domain: {
       label: domainLabel,
       slug: domainSlug,
@@ -406,6 +546,7 @@ function normalizeGeneratedDomainContract(input) {
         forbidsNow: unique(asArray(value.forbidsNow).map((item) => asNonEmptyString(item))),
       }
     }),
+    normalizationWarnings: [],
   }
 
   if (normalized.materialization.requiredFiles.length === 0) {
@@ -426,6 +567,13 @@ function normalizeGeneratedDomainContract(input) {
       ),
     ])
   }
+
+  const deliveryLevelResolution = resolveGeneratedDomainDeliveryLevelNormalization(
+    source.deliveryLevel,
+    normalized,
+  )
+  normalized.deliveryLevel = deliveryLevelResolution.deliveryLevel
+  normalized.normalizationWarnings = unique(deliveryLevelResolution.warnings)
 
   return normalized
 }
@@ -500,13 +648,15 @@ function deriveForbiddenSearchPatternsFromContract(contract) {
 function validateGeneratedDomainContract(contract) {
   const normalized = contract && contract.contractVersion ? contract : normalizeGeneratedDomainContract(contract)
   const errors = []
-  const warnings = []
+  const warnings = unique(asArray(normalized.normalizationWarnings).map((entry) => asNonEmptyString(entry)))
 
   if (!normalized.contractVersion) {
     errors.push('contractVersion es requerido.')
   }
   if (normalized.deliveryLevel !== DEFAULT_DELIVERY_LEVEL) {
-    errors.push(`deliveryLevel debe ser ${DEFAULT_DELIVERY_LEVEL}.`)
+    errors.push(
+      `deliveryLevel incompatible. Recibido: ${normalized.deliveryLevel || '(vacio)'}. Esperado: ${DEFAULT_DELIVERY_LEVEL} o un alias compatible de fullstack local.`,
+    )
   }
   if (!normalized.domain.label || !normalized.domain.slug) {
     errors.push('domain.label y domain.slug son requeridos.')
@@ -689,6 +839,7 @@ function buildGeneratedDomainContractDiagnostics(decision, workspacePath) {
 }
 
 module.exports = {
+  normalizeGeneratedDomainDeliveryLevel,
   normalizeGeneratedDomainContract,
   validateGeneratedDomainContract,
   deriveAllowedTargetPathsFromContract,

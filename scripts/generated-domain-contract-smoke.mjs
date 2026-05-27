@@ -11,6 +11,7 @@ const repoRoot = path.resolve(path.dirname(currentFilePath), '..')
 const mainFilePath = path.join(repoRoot, 'electron', 'main.cjs')
 const mainSource = fs.readFileSync(mainFilePath, 'utf8')
 const {
+  normalizeGeneratedDomainDeliveryLevel,
   normalizeGeneratedDomainContract,
   validateGeneratedDomainContract,
   deriveAllowedTargetPathsFromContract,
@@ -49,15 +50,21 @@ function extractSegment({ startMarker, endMarker }) {
 
 function loadGeneratedDomainObservationHarness() {
   const plannerSurface = extractSegment({
-    startMarker: 'function normalizeExecutorAttemptScope(',
-    endMarker: 'function buildOpenAIBrainInputPayload(input) {',
+    startMarker: 'function summarizeGeneratedDomainContractDiagnosticsForDebug(diagnostics) {',
+    endMarker: 'function createLocalRulesStrategicBrainProvider() {',
   })
-  const harness = `
+const harness = `
 ${plannerSurface}
 module.exports = {
+  applyGeneratedDomainContractObservationToDecision,
+  buildGeneratedDomainContractObservationFailureResult,
   buildBrainDecisionContract,
+  buildGeneratedDomainContractObservationSystemPrompt,
+  classifyGeneratedDomainContractObservationThrownError,
   buildOpenAIBrainSystemPrompt,
   buildOpenAIBrainSchema,
+  summarizeGeneratedDomainContractDiagnosticsForDebug,
+  summarizeGeneratedDomainContractObservationForDebug,
 };
 `
 
@@ -246,6 +253,113 @@ function createWindowsDoubleSlashRootContract({ absoluteOperationPaths = false }
   return contract
 }
 
+function createDotRelativeRootContract(rootValue = './plant-nursery-local') {
+  const contract = createValidInventedContract()
+  contract.root = {
+    slug: 'plant-nursery-local',
+    sourceRoot: rootValue,
+    targetRoot: rootValue,
+  }
+  contract.materialization.requiredFiles = [
+    `${rootValue}/frontend/public/index.html`,
+    `${rootValue}/backend/src/server.js`,
+  ]
+  contract.materialization.allowedTargetPaths = [
+    `${rootValue}/frontend/public/index.html`,
+    `${rootValue}/backend/src/server.js`,
+  ]
+  contract.materialization.operations = [
+    {
+      type: 'replace-file',
+      targetPath: `${rootValue}/frontend/public/index.html`,
+      nextContent: "export const nursery = 'mock-local'\n",
+    },
+  ]
+  contract.validation.requiredPathGroups = [
+    [`${rootValue}/frontend/public/index.html`],
+    [`${rootValue}/backend/src/server.js`],
+  ]
+  return contract
+}
+
+function createDiagnosticsPreviewInvalidContract() {
+  const contract = createValidInventedContract()
+  contract.frontendSurfaces = []
+  contract.root = {
+    slug: 'preview-debug-local',
+    sourceRoot: 'preview-debug-local',
+    targetRoot:
+      'C:/Users/letas/Desktop/Proyectos/Desarrollo/orquestadoria/ai-orchestrator/tmp/generated-domain-contract-preview/with/a/very/long/absolute/root/path',
+  }
+  contract.materialization.requiredFiles = [
+    `${contract.root.targetRoot}/frontend/public/index.html`,
+    `${contract.root.targetRoot}/.env.local`,
+  ]
+  contract.materialization.allowedTargetPaths = [
+    `${contract.root.targetRoot}/frontend/public/index.html`,
+    `${contract.root.targetRoot}/.env.local`,
+  ]
+  contract.materialization.operations = [
+    {
+      type: 'replace-file',
+      targetPath:
+        'C:/Users/letas/Desktop/Proyectos/Desarrollo/orquestadoria/ai-orchestrator/tmp/generated-domain-contract-preview/secrets/sk-live-1234567890123456789012345678901234567890/backend/src/server.js',
+      nextContent: "export const preview = 'invalid-contract'\n",
+    },
+    {
+      type: 'replace-file',
+      targetPath: `${contract.root.targetRoot}/.env.local`,
+      nextContent: 'OPENAI_API_KEY=sk-live-1234567890123456789012345678901234567890\n',
+    },
+  ]
+  contract.validation.requiredPathGroups = [[`${contract.root.targetRoot}/frontend/public/index.html`]]
+  return contract
+}
+
+function createSparseDeliveryLevelContract(deliveryLevel) {
+  return {
+    contractVersion: '1.0',
+    deliveryLevel,
+    domain: {
+      label: 'Sparse contract',
+      slug: 'sparse-contract',
+      summary: 'Contrato acotado sin señales suficientes de fullstack local.',
+    },
+    root: {
+      slug: 'sparse-contract-local',
+      sourceRoot: 'sparse-contract-local',
+      targetRoot: 'sparse-contract-local',
+    },
+    roles: [],
+    entities: [],
+    states: {},
+    workflows: [],
+    frontendSurfaces: [],
+    backend: {},
+    database: {},
+    shared: {},
+    docs: [],
+    scripts: [],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env', 'Dockerfile', 'docker-compose.yml'],
+      forbiddenSignals: [],
+      explicitExclusions: [],
+    },
+    materialization: {
+      requiredFiles: [],
+      operations: [],
+      allowedTargetPaths: [],
+    },
+    validation: {
+      syntaxChecks: [],
+      requiredPathGroups: [],
+      forbiddenSearchPatterns: [],
+    },
+    approvals: [],
+  }
+}
+
 function runValidContractCase() {
   const contract = createValidInventedContract()
   const normalized = normalizeGeneratedDomainContract(contract)
@@ -269,6 +383,207 @@ function runValidContractCase() {
     forbiddenPatterns.includes('api.mercadopago.com'),
     'forbiddenSearchPatterns debe incluir patrones reales de pago.',
   )
+}
+
+function runDeliveryLevelExactCase() {
+  const contract = createValidInventedContract()
+  contract.deliveryLevel = 'fullstack-local'
+  const normalized = normalizeGeneratedDomainContract(contract)
+  const validation = validateGeneratedDomainContract(normalized)
+
+  assert.equal(normalized.deliveryLevel, 'fullstack-local')
+  assert.equal(validation.ok, true, `deliveryLevel exacto deberia validar: ${validation.errors.join(' | ')}`)
+}
+
+function runCompatibleDeliveryLevelsCase() {
+  const values = ['fullstack-local-large', 'fullstack-local-platform', 'local-fullstack']
+
+  for (const deliveryLevel of values) {
+    const contract = createValidInventedContract()
+    contract.deliveryLevel = deliveryLevel
+    const normalized = normalizeGeneratedDomainContract(contract)
+    const validation = validateGeneratedDomainContract(normalized)
+    const safety = isContractSafeForLocalMaterialization(normalized)
+
+    assert.equal(
+      normalized.deliveryLevel,
+      'fullstack-local',
+      `${deliveryLevel} deberia normalizar a fullstack-local.`,
+    )
+    assert.equal(validation.ok, true, `${deliveryLevel} deberia validar: ${validation.errors.join(' | ')}`)
+    assert.equal(safety.ok, true, `${deliveryLevel} deberia seguir siendo seguro: ${safety.errors.join(' | ')}`)
+  }
+}
+
+function runScalableDeliveryPlanWithFullstackSignalsCase() {
+  const contract = createValidInventedContract()
+  contract.deliveryLevel = 'scalable-delivery-plan'
+  const normalized = normalizeGeneratedDomainContract(contract)
+  const validation = validateGeneratedDomainContract(normalized)
+  const safety = isContractSafeForLocalMaterialization(normalized)
+
+  assert.equal(
+    normalizeGeneratedDomainDeliveryLevel(contract.deliveryLevel, normalized),
+    'fullstack-local',
+    'scalable-delivery-plan con señales fuertes deberia normalizarse.',
+  )
+  assert.equal(normalized.deliveryLevel, 'fullstack-local')
+  assert.equal(validation.ok, true, `scalable-delivery-plan deberia validar: ${validation.errors.join(' | ')}`)
+  assert.equal(safety.ok, true, `scalable-delivery-plan deberia seguir siendo seguro: ${safety.errors.join(' | ')}`)
+}
+
+function runPlannerOnlyScalableDeliveryWithFullstackSignalsCase() {
+  const contract = createValidInventedContract()
+  contract.deliveryLevel = 'planner-only-scalable-delivery'
+  const normalized = normalizeGeneratedDomainContract(contract)
+  const validation = validateGeneratedDomainContract(normalized)
+  const safety = isContractSafeForLocalMaterialization(normalized)
+  const diagnostics = buildGeneratedDomainContractDiagnostics(
+    {
+      generatedDomainContract: contract,
+    },
+    repoRoot,
+  )
+
+  assert.equal(
+    normalizeGeneratedDomainDeliveryLevel(contract.deliveryLevel, normalized),
+    'fullstack-local',
+    'planner-only-scalable-delivery con señales fuertes deberia normalizarse.',
+  )
+  assert.equal(normalized.deliveryLevel, 'fullstack-local')
+  assert.equal(
+    validation.ok,
+    true,
+    `planner-only-scalable-delivery deberia validar: ${validation.errors.join(' | ')}`,
+  )
+  assert.equal(
+    safety.ok,
+    true,
+    `planner-only-scalable-delivery deberia seguir siendo seguro: ${safety.errors.join(' | ')}`,
+  )
+  assert.ok(
+    validation.warnings.some((entry) =>
+      entry.includes('planner-only-scalable-delivery normalizado a fullstack-local'),
+    ),
+    'La normalizacion mezclada deberia dejar un warning no bloqueante.',
+  )
+  assert.equal(diagnostics.valid, true)
+  assert.equal(diagnostics.safeForLocalMaterialization, true)
+  assert.ok(
+    diagnostics.warnings.some((entry) =>
+      entry.includes('planner-only-scalable-delivery normalizado a fullstack-local'),
+    ),
+    'El diagnostico debe conservar el warning de normalizacion.',
+  )
+}
+
+function runPlannerOnlyScalableDeliveryWithoutSignalsCase() {
+  const contract = createSparseDeliveryLevelContract('planner-only-scalable-delivery')
+  const normalized = normalizeGeneratedDomainContract(contract)
+  const validation = validateGeneratedDomainContract(normalized)
+
+  assert.equal(
+    normalizeGeneratedDomainDeliveryLevel(contract.deliveryLevel, contract),
+    'planner-only-scalable-delivery',
+    'planner-only-scalable-delivery no debe aceptarse como alias libre.',
+  )
+  assert.equal(
+    normalized.deliveryLevel,
+    'planner-only-scalable-delivery',
+    'Sin señales fuertes, planner-only-scalable-delivery debe quedar incompatible.',
+  )
+  assert.equal(
+    validation.ok,
+    false,
+    'planner-only-scalable-delivery sin señales fullstack debe fallar.',
+  )
+  assert.ok(
+    validation.errors.some(
+      (entry) =>
+        entry.includes('deliveryLevel incompatible') &&
+        entry.includes('planner-only-scalable-delivery') &&
+        entry.includes('fullstack-local'),
+    ),
+    'La validacion debe explicar la mezcla incompatible recibida.',
+  )
+}
+
+function runScalableDeliveryPlanWithoutSignalsCase() {
+  const contract = createSparseDeliveryLevelContract('scalable-delivery-plan')
+  const normalized = normalizeGeneratedDomainContract(contract)
+  const validation = validateGeneratedDomainContract(normalized)
+
+  assert.equal(
+    normalizeGeneratedDomainDeliveryLevel(contract.deliveryLevel, contract),
+    'scalable-delivery-plan',
+    'Sin señales fuertes, scalable-delivery-plan no debe colarse como fullstack-local.',
+  )
+  assert.equal(normalized.deliveryLevel, 'scalable-delivery-plan')
+  assert.equal(validation.ok, false, 'scalable-delivery-plan sin señales fullstack debe fallar.')
+  assert.ok(
+    validation.errors.some(
+      (entry) =>
+        entry.includes('deliveryLevel incompatible') &&
+        entry.includes('scalable-delivery-plan') &&
+        entry.includes('fullstack-local'),
+    ),
+    'La validacion debe explicar el deliveryLevel incompatible recibido.',
+  )
+}
+
+function runIncompatibleDeliveryLevelsCase() {
+  const values = [
+    'safe-first-delivery',
+    'landing-page',
+    'production',
+    'external-service',
+    'frontend-only',
+  ]
+
+  for (const deliveryLevel of values) {
+    const contract = createValidInventedContract()
+    contract.deliveryLevel = deliveryLevel
+    const normalized = normalizeGeneratedDomainContract(contract)
+    const validation = validateGeneratedDomainContract(normalized)
+
+    assert.equal(
+      normalized.deliveryLevel,
+      deliveryLevel,
+      `${deliveryLevel} no deberia normalizarse como fullstack-local.`,
+    )
+    assert.equal(validation.ok, false, `${deliveryLevel} debe seguir fallando.`)
+    assert.ok(
+      validation.errors.some(
+        (entry) =>
+          entry.includes('deliveryLevel incompatible') &&
+          entry.includes(deliveryLevel) &&
+          entry.includes('fullstack-local'),
+      ),
+      `${deliveryLevel} debe reportar el valor recibido y lo esperado.`,
+    )
+  }
+}
+
+function runDangerousDeliveryLevelsCase() {
+  const values = ['real-payments', 'deploy']
+
+  for (const deliveryLevel of values) {
+    const contract = createValidInventedContract()
+    contract.deliveryLevel = deliveryLevel
+    const normalized = normalizeGeneratedDomainContract(contract)
+    const validation = validateGeneratedDomainContract(normalized)
+
+    assert.equal(validation.ok, false, `${deliveryLevel} debe fallar.`)
+    assert.ok(
+      validation.errors.some(
+        (entry) =>
+          entry.includes('deliveryLevel incompatible') &&
+          entry.includes(deliveryLevel) &&
+          entry.includes('fullstack-local'),
+      ),
+      `${deliveryLevel} debe seguir bloqueado con error claro.`,
+    )
+  }
 }
 
 function runRootMismatchCase() {
@@ -471,6 +786,75 @@ function runWindowsDoubleSlashPathCase() {
   assert.equal(diagnostics.targetRoot, 'criaderos-carnivoras')
 }
 
+function runRelativeDotRootCase() {
+  const diagnostics = buildGeneratedDomainContractDiagnostics(
+    {
+      generatedDomainContract: createDotRelativeRootContract('./plant-nursery-local'),
+    },
+    'C:/Users/letas/Desktop/Proyectos/Desarrollo/web-prueba',
+  )
+
+  assert.equal(diagnostics.valid, true, `./root deberia validarse: ${diagnostics.errors.join(' | ')}`)
+  assert.equal(
+    diagnostics.safeForLocalMaterialization,
+    true,
+    `./root deberia pasar safety: ${diagnostics.errors.join(' | ')}`,
+  )
+  assert.equal(diagnostics.sourceRoot, 'plant-nursery-local')
+  assert.equal(diagnostics.targetRoot, 'plant-nursery-local')
+  assert.equal(diagnostics.errors.length, 0, 'La normalizacion de ./root no debe dejar errores.')
+}
+
+function runRelativeBackslashRootCase() {
+  const diagnostics = buildGeneratedDomainContractDiagnostics(
+    {
+      generatedDomainContract: createDotRelativeRootContract('.\\plant-nursery-local'),
+    },
+    'C:/Users/letas/Desktop/Proyectos/Desarrollo/web-prueba',
+  )
+
+  assert.equal(diagnostics.valid, true, `.\\root deberia validarse: ${diagnostics.errors.join(' | ')}`)
+  assert.equal(
+    diagnostics.safeForLocalMaterialization,
+    true,
+    `.\\root deberia pasar safety: ${diagnostics.errors.join(' | ')}`,
+  )
+  assert.equal(diagnostics.sourceRoot, 'plant-nursery-local')
+  assert.equal(diagnostics.targetRoot, 'plant-nursery-local')
+  assert.equal(diagnostics.errors.length, 0, 'La normalizacion de .\\root no debe dejar errores.')
+}
+
+function runRelativeTraversalCase() {
+  const parentTraversalValidation = validateGeneratedDomainContract(
+    createDotRelativeRootContract('../plant-nursery-local'),
+  )
+  const deepTraversalValidation = validateGeneratedDomainContract(
+    createDotRelativeRootContract('../../secret'),
+  )
+
+  assert.equal(parentTraversalValidation.ok, false, 'Un root relativo con ../ debe fallar.')
+  assert.equal(deepTraversalValidation.ok, false, 'Un root relativo con ../../ debe fallar.')
+  assert.ok(
+    parentTraversalValidation.errors.some((entry) => entry.includes('workspace')),
+    'El root con ../ debe reportar escape del workspace.',
+  )
+  assert.ok(
+    deepTraversalValidation.errors.some((entry) => entry.includes('workspace')),
+    'El root con ../../ debe reportar escape del workspace.',
+  )
+}
+
+function runRelativeRootMismatchCase() {
+  const contract = createDotRelativeRootContract('./plant-nursery-local')
+  contract.root.targetRoot = './other-root'
+  const validation = validateGeneratedDomainContract(contract)
+  assert.equal(validation.ok, false, 'Un root mismatch relativo debe fallar.')
+  assert.ok(
+    validation.errors.some((entry) => entry.includes('sourceRoot') && entry.includes('targetRoot')),
+    'El root mismatch relativo debe reportarse.',
+  )
+}
+
 function runSystemPathOutsideWorkspaceCase() {
   const contract = createValidInventedContract()
   contract.root = {
@@ -494,8 +878,23 @@ function runSystemPathOutsideWorkspaceCase() {
   )
 }
 
+function runRelativeSystemPathCase() {
+  const validation = validateGeneratedDomainContract(
+    createDotRelativeRootContract('./C:/Windows/System32'),
+  )
+
+  assert.equal(validation.ok, false, 'Un root relativo disfrazando C:/Windows/System32 debe fallar.')
+  assert.ok(
+    validation.errors.some((entry) => entry.includes('peligroso') || entry.includes('workspace')),
+    'El root relativo disfrazando system path debe reportarse.',
+  )
+}
+
 function runOpenAIPromptContractRequestCase() {
   const prompt = String(observationHarness.buildOpenAIBrainSystemPrompt?.() || '')
+  const observationPrompt = String(
+    observationHarness.buildGeneratedDomainContractObservationSystemPrompt?.(prompt) || '',
+  )
   assert.ok(prompt.includes('generatedDomainContract'), 'El prompt debe pedir generatedDomainContract.')
   assert.ok(
     prompt.includes('dominio como datos'),
@@ -509,6 +908,18 @@ function runOpenAIPromptContractRequestCase() {
     prompt.includes('Mock-only esta permitido'),
     'El prompt debe aclarar que mock-only esta permitido para integraciones locales.',
   )
+  assert.ok(
+    prompt.includes('generatedDomainContract.deliveryLevel debe ser exactamente "fullstack-local"'),
+    'El prompt base debe pedir deliveryLevel exacto fullstack-local.',
+  )
+  assert.ok(
+    prompt.includes('No uses strategy, executionMode, planner-only, scalable-delivery-plan'),
+    'El prompt base debe prohibir mezclar strategy/executionMode como deliveryLevel.',
+  )
+  assert.ok(
+    observationPrompt.includes('No uses planner-only, scalable-delivery-plan, strategy ni executionMode como deliveryLevel del contrato.'),
+    'El prompt de observacion debe reforzar la prohibicion de etiquetas mezcladas.',
+  )
 }
 
 function runOpenAISchemaContractFieldCase() {
@@ -521,6 +932,14 @@ function runOpenAISchemaContractFieldCase() {
   assert.ok(contractSchema.properties?.frontendSurfaces, 'El schema debe incluir frontendSurfaces.')
   assert.ok(contractSchema.properties?.materialization, 'El schema debe incluir materialization.')
   assert.ok(contractSchema.properties?.validation, 'El schema debe incluir validation.')
+  assert.ok(
+    contractSchema.properties?.deliveryLevel?.description?.includes('exactamente fullstack-local'),
+    'El schema debe reforzar deliveryLevel exacto fullstack-local.',
+  )
+  assert.ok(
+    contractSchema.properties?.deliveryLevel?.description?.includes('planner-only'),
+    'El schema debe prohibir mezclar planner-only como deliveryLevel.',
+  )
 }
 
 function runBrainDecisionContractObservationCase() {
@@ -573,10 +992,273 @@ function runBrainDecisionContractObservationCase() {
   assert.ok(withContract.generatedDomainContract, 'El payload final debe conservar generatedDomainContract.')
 }
 
+function createLegacyObservationDecision() {
+  return observationHarness.buildBrainDecisionContract({
+    decisionKey: 'legacy-observation-plan',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    reason: 'Mantener el planner legacy mientras se observa el contrato universal.',
+    instruction: 'No reemplazar materializationPlan ni executionScope.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    materializationPlan: {
+      planVersion: 'legacy-observation-only',
+      operations: [],
+    },
+    executionScope: {
+      objectiveScope: 'legacy-planner-scope',
+      allowedTargetPaths: ['legacy-root', 'legacy-root/README.md'],
+    },
+    workspacePath: repoRoot,
+  })
+}
+
+function runPlannerObservationMergeOkCase() {
+  const legacyDecision = createLegacyObservationDecision()
+  const contract = createValidInventedContract()
+  const observationResult = {
+    attempted: true,
+    ok: true,
+    status: 'ok',
+    elapsedMs: 4200,
+    generatedDomainContract: normalizeGeneratedDomainContract(contract),
+    generatedDomainContractDiagnostics: buildGeneratedDomainContractDiagnostics(
+      {
+        generatedDomainContract: contract,
+      },
+      repoRoot,
+    ),
+  }
+  const merged = observationHarness.applyGeneratedDomainContractObservationToDecision({
+    legacyDecision,
+    observationResult,
+  })
+
+  assert.equal(merged.strategy, legacyDecision.strategy)
+  assert.equal(merged.executionMode, legacyDecision.executionMode)
+  assert.equal(merged.nextExpectedAction, legacyDecision.nextExpectedAction)
+  assert.deepEqual(merged.materializationPlan, legacyDecision.materializationPlan)
+  assert.deepEqual(merged.executionScope, legacyDecision.executionScope)
+  assert.equal(merged.generatedDomainContractObservation?.status, 'ok')
+  assert.equal(merged.generatedDomainContractDiagnostics?.present, true)
+  assert.equal(merged.generatedDomainContractDiagnostics?.valid, true)
+  assert.ok(merged.generatedDomainContract)
+}
+
+function runPlannerObservationMergeTimeoutCase() {
+  const legacyDecision = createLegacyObservationDecision()
+  const merged = observationHarness.applyGeneratedDomainContractObservationToDecision({
+    legacyDecision,
+    observationResult: {
+      attempted: true,
+      ok: false,
+      status: 'timeout',
+      elapsedMs: 75000,
+      generatedDomainContractDiagnostics: { present: false },
+    },
+  })
+
+  assert.equal(merged.generatedDomainContract, undefined)
+  assert.equal(merged.generatedDomainContractObservation?.status, 'timeout')
+  assert.equal(merged.generatedDomainContractDiagnostics?.present, false)
+  assert.deepEqual(merged.materializationPlan, legacyDecision.materializationPlan)
+  assert.deepEqual(merged.executionScope, legacyDecision.executionScope)
+}
+
+function runPlannerObservationLegacyAlreadyHasContractCase() {
+  const contract = createValidInventedContract()
+  const legacyDecision = observationHarness.buildBrainDecisionContract({
+    ...createLegacyObservationDecision(),
+    generatedDomainContract: contract,
+    workspacePath: repoRoot,
+  })
+  const merged = observationHarness.applyGeneratedDomainContractObservationToDecision({
+    legacyDecision,
+    observationResult: {
+      attempted: true,
+      ok: true,
+      status: 'ok',
+      elapsedMs: 1200,
+      generatedDomainContract: normalizeGeneratedDomainContract(contract),
+      generatedDomainContractDiagnostics: buildGeneratedDomainContractDiagnostics(
+        {
+          generatedDomainContract: contract,
+        },
+        repoRoot,
+      ),
+    },
+  })
+
+  assert.equal(merged.generatedDomainContractDiagnostics?.present, true)
+  assert.equal(merged.generatedDomainContractDiagnostics?.valid, true)
+  assert.equal(
+    merged.generatedDomainContractObservation?.status,
+    'skipped',
+    'Si legacy ya trae contrato valido, la observacion no debe sobrescribirlo.',
+  )
+}
+
+function runPlannerObservationInvalidCase() {
+  const legacyDecision = createLegacyObservationDecision()
+  const merged = observationHarness.applyGeneratedDomainContractObservationToDecision({
+    legacyDecision,
+    observationResult: {
+      attempted: true,
+      ok: false,
+      status: 'diagnostics-invalid',
+      elapsedMs: 3300,
+      generatedDomainContractDiagnostics: { present: false },
+    },
+  })
+
+  assert.equal(merged.strategy, legacyDecision.strategy)
+  assert.equal(merged.executionMode, legacyDecision.executionMode)
+  assert.equal(merged.nextExpectedAction, legacyDecision.nextExpectedAction)
+  assert.equal(merged.generatedDomainContractObservation?.status, 'diagnostics-invalid')
+  assert.equal(merged.generatedDomainContractDiagnostics?.present, false)
+}
+
+function runPlannerObservationNoConfigStatusCase() {
+  const result = observationHarness.buildGeneratedDomainContractObservationFailureResult({
+    status: 'openai-unavailable',
+    elapsedMs: 12,
+    requestId: 'obs-no-config',
+    errorKind: 'config-missing',
+    errorPreview: 'OPENAI_API_KEY no configurada.',
+  })
+
+  assert.equal(result.status, 'openai-unavailable')
+  assert.equal(result.errorKind, 'config-missing')
+  assert.equal(result.generatedDomainContractDiagnostics?.present, false)
+}
+
+function runPlannerObservationTimeoutStatusCase() {
+  const result = observationHarness.classifyGeneratedDomainContractObservationThrownError({
+    name: 'AbortError',
+    message: 'This operation was aborted',
+  })
+
+  assert.equal(result.status, 'timeout')
+  assert.equal(result.errorKind, 'abort')
+}
+
+function runPlannerObservationOpenAIErrorStatusCase() {
+  const result = observationHarness.buildGeneratedDomainContractObservationFailureResult({
+    status: 'openai-error',
+    elapsedMs: 2200,
+    requestId: 'obs-http',
+    errorKind: 'http',
+    errorPreview: 'OpenAI Responses API devolvio 502 Bad Gateway.',
+    httpStatus: 502,
+  })
+
+  assert.equal(result.status, 'openai-error')
+  assert.equal(result.errorKind, 'http')
+  assert.equal(result.httpStatus, 502)
+}
+
+function runPlannerObservationDebugSummaryCase() {
+  const summary = observationHarness.summarizeGeneratedDomainContractObservationForDebug({
+    attempted: true,
+    ok: false,
+    status: 'openai-error',
+    elapsedMs: 61000,
+    errorKind: 'TypeError',
+    errorPreview: 'fetch failed',
+    generatedDomainContractDiagnostics: { present: false },
+  })
+
+  assert.equal(summary.status, 'openai-error')
+  assert.equal(summary.errorKind, 'TypeError')
+  assert.equal(summary.errorPreview, 'fetch failed')
+}
+
+function runDiagnosticsDebugPreviewCase() {
+  const diagnostics = buildGeneratedDomainContractDiagnostics(
+    {
+      generatedDomainContract: createDiagnosticsPreviewInvalidContract(),
+    },
+    repoRoot,
+  )
+
+  assert.equal(diagnostics.present, true)
+  assert.ok(diagnostics.errors.length > 0, 'El contrato invalido debe producir errores.')
+  assert.ok(diagnostics.warnings.length > 0, 'El contrato invalido debe producir warnings.')
+
+  const previewDiagnostics = {
+    ...diagnostics,
+    errors: [
+      ...diagnostics.errors,
+      'headers: {"Authorization":"Bearer sk-live-abcdefghijklmnopqrstuvwxyz123456"} body: {"token":"sk-live-abcdefghijklmnopqrstuvwxyz123456","nested":"value"} payload={"apiKey":"sk-live-abcdefghijklmnopqrstuvwxyz123456"}',
+      'Operacion fuera de scope o absoluta: C:/Users/letas/Desktop/Proyectos/Desarrollo/orquestadoria/ai-orchestrator/tmp/generated-domain-contract-preview/with/a/very/long/absolute/path/to/materialization/contracts/generated-domain-contract/debug-preview/backend/src/server.js',
+      `Detalle extendido del contrato invalido ${'x'.repeat(320)}`,
+    ],
+    warnings: [
+      ...diagnostics.warnings,
+      'warning con token=sk-test-abcdefghijklmnopqrstuvwxyz123456 y path /Users/letas/Desktop/Proyectos/Desarrollo/orquestadoria/ai-orchestrator/tmp/generated-domain-contract-preview/frontend/public/index.html',
+    ],
+  }
+  const summary =
+    observationHarness.summarizeGeneratedDomainContractDiagnosticsForDebug(previewDiagnostics)
+
+  assert.ok(summary.errorsCount > 0, 'El summary debe reportar errorsCount > 0.')
+  assert.equal(typeof summary.firstError, 'string')
+  assert.ok(summary.firstError.length > 0, 'El summary debe exponer firstError.')
+  assert.ok(Array.isArray(summary.errorsPreview), 'El summary debe exponer errorsPreview.')
+  assert.ok(summary.errorsPreview.length <= 3, 'errorsPreview debe truncarse a 3 entradas.')
+  assert.equal(typeof summary.firstWarning, 'string')
+  assert.ok(summary.firstWarning.length > 0, 'El summary debe exponer firstWarning.')
+  assert.ok(Array.isArray(summary.warningsPreview), 'El summary debe exponer warningsPreview.')
+  assert.ok(summary.warningsPreview.length <= 3, 'warningsPreview debe truncarse a 3 entradas.')
+
+  for (const entry of [...summary.errorsPreview, ...summary.warningsPreview]) {
+    assert.ok(entry.length <= 240, 'Cada preview debe truncarse a 240 caracteres.')
+    assert.ok(!entry.includes('sk-live-'), 'Ningun preview debe exponer API keys.')
+    assert.ok(!entry.includes('sk-test-'), 'Ningun preview debe exponer tokens.')
+    assert.ok(!entry.includes('Bearer sk-'), 'Ningun preview debe exponer bearer tokens.')
+    assert.ok(!entry.includes(repoRoot.replace(/\\/g, '/')), 'Los paths absolutos largos deben compactarse.')
+  }
+
+  assert.ok(
+    summary.errorsPreview.some((entry) => entry.includes('[redacted]')),
+    'Al menos un error preview debe mostrar sanitizacion.',
+  )
+
+  const observationSummary = observationHarness.summarizeGeneratedDomainContractObservationForDebug({
+    attempted: true,
+    ok: false,
+    status: 'diagnostics-invalid',
+    elapsedMs: 1500,
+    generatedDomainContractDiagnostics: previewDiagnostics,
+  })
+
+  assert.equal(observationSummary.status, 'diagnostics-invalid')
+  assert.equal(observationSummary.firstError, summary.firstError)
+  assert.deepEqual(observationSummary.errorsPreview, summary.errorsPreview)
+  assert.equal(observationSummary.firstWarning, summary.firstWarning)
+  assert.deepEqual(observationSummary.warningsPreview, summary.warningsPreview)
+}
+
 function main() {
   runValidContractCase()
+  runDeliveryLevelExactCase()
+  runCompatibleDeliveryLevelsCase()
+  runScalableDeliveryPlanWithFullstackSignalsCase()
+  runPlannerOnlyScalableDeliveryWithFullstackSignalsCase()
+  runPlannerOnlyScalableDeliveryWithoutSignalsCase()
+  runScalableDeliveryPlanWithoutSignalsCase()
+  runIncompatibleDeliveryLevelsCase()
+  runDangerousDeliveryLevelsCase()
   runWindowsDoubleSlashPathCase()
+  runRelativeDotRootCase()
+  runRelativeBackslashRootCase()
+  runRelativeTraversalCase()
+  runRelativeRootMismatchCase()
   runSystemPathOutsideWorkspaceCase()
+  runRelativeSystemPathCase()
   runRootMismatchCase()
   runOutOfScopeOperationCase()
   runForbiddenEnvCase()
@@ -590,7 +1272,16 @@ function main() {
   runOpenAIPromptContractRequestCase()
   runOpenAISchemaContractFieldCase()
   runBrainDecisionContractObservationCase()
-  console.log('OK. GeneratedDomainContract smoke paso 16/16 checks.')
+  runPlannerObservationMergeOkCase()
+  runPlannerObservationMergeTimeoutCase()
+  runPlannerObservationLegacyAlreadyHasContractCase()
+  runPlannerObservationInvalidCase()
+  runPlannerObservationNoConfigStatusCase()
+  runPlannerObservationTimeoutStatusCase()
+  runPlannerObservationOpenAIErrorStatusCase()
+  runPlannerObservationDebugSummaryCase()
+  runDiagnosticsDebugPreviewCase()
+  console.log('OK. GeneratedDomainContract smoke paso 38/38 checks.')
 }
 
 main()

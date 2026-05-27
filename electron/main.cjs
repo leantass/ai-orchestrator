@@ -287,6 +287,9 @@ function summarizeGeneratedDomainContractDiagnosticsForDebug(diagnostics) {
     }
   }
 
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(diagnostics.errors)
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(diagnostics.warnings)
+
   return {
     present: diagnostics.present === true,
     valid: diagnostics.valid === true,
@@ -309,6 +312,10 @@ function summarizeGeneratedDomainContractDiagnosticsForDebug(diagnostics) {
         : undefined,
     errorsCount: Array.isArray(diagnostics.errors) ? diagnostics.errors.length : 0,
     warningsCount: Array.isArray(diagnostics.warnings) ? diagnostics.warnings.length : 0,
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+    ...(errorSummary.preview.length > 0 ? { errorsPreview: errorSummary.preview } : {}),
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(warningSummary.preview.length > 0 ? { warningsPreview: warningSummary.preview } : {}),
     allowedTargetPathsCount: Number.isInteger(diagnostics.allowedTargetPathsCount)
       ? diagnostics.allowedTargetPathsCount
       : 0,
@@ -316,6 +323,189 @@ function summarizeGeneratedDomainContractDiagnosticsForDebug(diagnostics) {
       ? diagnostics.requiredPathGroupsCount
       : 0,
   }
+}
+
+function compactGeneratedDomainContractDebugAbsolutePath(value) {
+  const normalized =
+    typeof value === 'string' ? value.trim().replace(/\\/gu, '/') : ''
+  if (!normalized || normalized.length <= 48) {
+    return normalized
+  }
+
+  const segments = normalized.split('/').filter(Boolean)
+  if (segments.length <= 3) {
+    return normalized
+  }
+
+  if (/^[A-Za-z]:\//u.test(normalized)) {
+    return `${normalized.slice(0, 2)}/.../${segments.slice(-3).join('/')}`
+  }
+
+  if (normalized.startsWith('/')) {
+    return `/.../${segments.slice(-3).join('/')}`
+  }
+
+  return `.../${segments.slice(-3).join('/')}`
+}
+
+function compactGeneratedDomainContractDebugAbsolutePaths(value) {
+  const normalized = typeof value === 'string' ? value : ''
+  if (!normalized) {
+    return ''
+  }
+
+  const withWindowsPathsCompacted = normalized.replace(
+    /[A-Za-z]:[\\/](?:[^\\/\s"'`]+[\\/])*[^\\/\s"'`]+/gu,
+    (entry) => compactGeneratedDomainContractDebugAbsolutePath(entry),
+  )
+
+  return withWindowsPathsCompacted.replace(
+    /(^|[\s("'`])\/(?:[^\/\s"'`]+\/){2,}[^\/\s"'`]+/gu,
+    (entry, prefix) =>
+      `${prefix}${compactGeneratedDomainContractDebugAbsolutePath(entry.slice(prefix.length))}`,
+  )
+}
+
+function sanitizeGeneratedDomainContractDebugPreview(value, maxLength = 240) {
+  const normalized =
+    typeof value === 'string'
+      ? value
+      : value === null || value === undefined
+        ? ''
+        : String(value)
+  if (!normalized.trim()) {
+    return ''
+  }
+
+  let sanitized = normalized.replace(/\s+/gu, ' ').trim()
+
+  sanitized = sanitized.replace(
+    /\bheaders?\b\s*[:=]\s*(?:\{[^{}]*\}|\[[^[\]]*\]|"[^"]*"|'[^']*'|[^\s,;]+)/giu,
+    'headers:[redacted]',
+  )
+  sanitized = sanitized.replace(
+    /\bbod(?:y|ies)\b\s*[:=]\s*(?:\{[^{}]*\}|\[[^[\]]*\]|"[^"]*"|'[^']*'|[^\s,;]+)/giu,
+    'body:[redacted]',
+  )
+  sanitized = sanitized.replace(
+    /\bpayload\b\s*[:=]\s*(?:\{[^{}]*\}|\[[^[\]]*\]|"[^"]*"|'[^']*'|[^\s,;]+)/giu,
+    'payload:[redacted]',
+  )
+  sanitized = sanitized.replace(
+    /\b((?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|token|secret|password|authorization))\b(\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu,
+    (_match, key, separator) => `${key}${separator}[redacted]`,
+  )
+  sanitized = sanitized.replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+\b/giu, 'Bearer [redacted]')
+  sanitized = sanitized.replace(/\bsk-[A-Za-z0-9_-]{8,}\b/gu, '[redacted-api-key]')
+  sanitized = compactGeneratedDomainContractDebugAbsolutePaths(sanitized)
+
+  return buildOutputPreview(sanitized, maxLength)
+}
+
+function summarizeGeneratedDomainContractDebugEntries(entries, maxEntries = 3) {
+  if (!Array.isArray(entries) || maxEntries <= 0) {
+    return {
+      firstEntry: undefined,
+      preview: [],
+    }
+  }
+
+  const preview = []
+  const seen = new Set()
+
+  for (const entry of entries) {
+    const sanitized = sanitizeGeneratedDomainContractDebugPreview(entry, 240)
+    if (!sanitized || seen.has(sanitized)) {
+      continue
+    }
+
+    seen.add(sanitized)
+    preview.push(sanitized)
+
+    if (preview.length >= maxEntries) {
+      break
+    }
+  }
+
+  return {
+    firstEntry: preview[0],
+    preview,
+  }
+}
+
+function summarizeGeneratedDomainContractObservationForDebug(observation) {
+  if (!observation || typeof observation !== 'object') {
+    return {
+      attempted: false,
+      ok: false,
+      status: 'skipped',
+    }
+  }
+
+  const diagnostics =
+    observation.generatedDomainContractDiagnostics &&
+    typeof observation.generatedDomainContractDiagnostics === 'object'
+      ? observation.generatedDomainContractDiagnostics
+      : null
+
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(diagnostics?.errors)
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(diagnostics?.warnings)
+
+  return {
+    requestId:
+      typeof observation.requestId === 'string' && observation.requestId.trim()
+        ? observation.requestId.trim()
+        : undefined,
+    attempted: observation.attempted === true,
+    ok: observation.ok === true,
+    status:
+      typeof observation.status === 'string' && observation.status.trim()
+        ? observation.status.trim()
+        : 'skipped',
+    elapsedMs:
+      Number.isFinite(observation.elapsedMs) && observation.elapsedMs >= 0
+        ? observation.elapsedMs
+        : 0,
+    errorKind:
+      typeof observation.errorKind === 'string' && observation.errorKind.trim()
+        ? observation.errorKind.trim()
+        : undefined,
+    errorPreview:
+      typeof observation.errorPreview === 'string' && observation.errorPreview.trim()
+        ? buildSafeGeneratedDomainContractObservationErrorPreview(observation.errorPreview)
+        : undefined,
+    present: diagnostics?.present === true,
+    valid: diagnostics?.valid === true,
+    safeForLocalMaterialization: diagnostics?.safeForLocalMaterialization === true,
+    domainSlug:
+      typeof diagnostics?.domainSlug === 'string' && diagnostics.domainSlug.trim()
+        ? diagnostics.domainSlug.trim()
+        : undefined,
+    rootSlug:
+      typeof diagnostics?.rootSlug === 'string' && diagnostics.rootSlug.trim()
+        ? diagnostics.rootSlug.trim()
+        : undefined,
+    sourceRoot:
+      typeof diagnostics?.sourceRoot === 'string' && diagnostics.sourceRoot.trim()
+        ? diagnostics.sourceRoot.trim()
+        : undefined,
+    targetRoot:
+      typeof diagnostics?.targetRoot === 'string' && diagnostics.targetRoot.trim()
+        ? diagnostics.targetRoot.trim()
+        : undefined,
+    errorsCount: Array.isArray(diagnostics?.errors) ? diagnostics.errors.length : 0,
+    warningsCount: Array.isArray(diagnostics?.warnings)
+      ? diagnostics.warnings.length
+      : 0,
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+    ...(errorSummary.preview.length > 0 ? { errorsPreview: errorSummary.preview } : {}),
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(warningSummary.preview.length > 0 ? { warningsPreview: warningSummary.preview } : {}),
+  }
+}
+
+function buildSafeGeneratedDomainContractObservationErrorPreview(value) {
+  return sanitizeGeneratedDomainContractDebugPreview(value, 180)
 }
 
 function normalizeEventStringValue(value) {
@@ -35368,6 +35558,124 @@ module.exports = {
   }
 }
 
+function hasUsableGeneratedDomainContractInDecision(decision) {
+  return Boolean(
+    decision?.generatedDomainContractDiagnostics?.present === true &&
+      decision?.generatedDomainContractDiagnostics?.valid === true &&
+      decision?.generatedDomainContractDiagnostics?.safeForLocalMaterialization === true,
+  )
+}
+
+function buildGeneratedDomainContractObservationRecord(observation) {
+  const source =
+    observation && typeof observation === 'object'
+      ? observation
+      : {
+          attempted: false,
+          ok: false,
+          status: 'skipped',
+          elapsedMs: 0,
+          generatedDomainContractDiagnostics: { present: false },
+        }
+
+  return {
+    attempted: source.attempted === true,
+    ok: source.ok === true,
+    status:
+      typeof source.status === 'string' && source.status.trim()
+        ? source.status.trim()
+        : 'skipped',
+    elapsedMs:
+      Number.isFinite(source.elapsedMs) && source.elapsedMs >= 0 ? source.elapsedMs : 0,
+    ...(typeof source.requestId === 'string' && source.requestId.trim()
+      ? { requestId: source.requestId.trim() }
+      : {}),
+  }
+}
+
+function buildPendingGeneratedDomainContractObservationResult({
+  requestId,
+  startedAt,
+}) {
+  return {
+    attempted: true,
+    ok: false,
+    status: 'skipped',
+    elapsedMs:
+      Number.isFinite(startedAt) && startedAt > 0 ? Math.max(0, Date.now() - startedAt) : 0,
+    requestId: normalizeOptionalString(requestId) || undefined,
+    generatedDomainContractDiagnostics: { present: false },
+  }
+}
+
+function applyGeneratedDomainContractObservationToDecision({
+  legacyDecision,
+  observationResult,
+}) {
+  const decision =
+    legacyDecision && typeof legacyDecision === 'object' ? { ...legacyDecision } : {}
+
+  if (hasUsableGeneratedDomainContractInDecision(decision)) {
+    return {
+      ...decision,
+      generatedDomainContractObservation: buildGeneratedDomainContractObservationRecord({
+        attempted: false,
+        ok: false,
+        status: 'skipped',
+        elapsedMs: 0,
+        requestId: observationResult?.requestId,
+      }),
+    }
+  }
+
+  const normalizedObservation = observationResult || {
+    attempted: false,
+    ok: false,
+    status: 'skipped',
+    elapsedMs: 0,
+    generatedDomainContractDiagnostics: { present: false },
+  }
+
+  const mergedDecision = {
+    ...decision,
+    generatedDomainContractObservation:
+      buildGeneratedDomainContractObservationRecord(normalizedObservation),
+  }
+
+  if (
+    normalizedObservation.ok === true &&
+    normalizedObservation.generatedDomainContract &&
+    typeof normalizedObservation.generatedDomainContract === 'object' &&
+    !(
+      mergedDecision.generatedDomainContract &&
+      typeof mergedDecision.generatedDomainContract === 'object'
+    )
+  ) {
+    mergedDecision.generatedDomainContract = normalizedObservation.generatedDomainContract
+  }
+
+  if (
+    normalizedObservation.generatedDomainContractDiagnostics &&
+    typeof normalizedObservation.generatedDomainContractDiagnostics === 'object' &&
+    !(
+      mergedDecision.generatedDomainContractDiagnostics?.present === true &&
+      typeof mergedDecision.generatedDomainContractDiagnostics === 'object'
+    )
+  ) {
+    mergedDecision.generatedDomainContractDiagnostics =
+      normalizedObservation.generatedDomainContractDiagnostics
+  } else if (
+    !(
+      mergedDecision.generatedDomainContractDiagnostics &&
+      typeof mergedDecision.generatedDomainContractDiagnostics === 'object'
+    )
+  ) {
+    mergedDecision.generatedDomainContractDiagnostics = { present: false }
+  }
+
+  return mergedDecision
+}
+
 function buildBrainDecisionContract({
   decisionKey,
   strategy,
@@ -44508,6 +44816,9 @@ Reglas:
 - Usá materialize-fullstack-local-plan solo cuando el objetivo ya pida materializar un fullstack-local revisado. En ese caso usá executionMode="executor", nextExpectedAction="execute-plan", requiresApproval=false, devolvé executionScope y materializationPlan acotados a una carpeta nueva del workspace con frontend/, backend/, shared/, database/, scripts/ y docs/, sin npm install, sin node_modules, sin levantar servicios, sin base de datos real activa, sin Docker ni integraciones externas.
 - Cuando la decision trate sobre arquitectura local grande, fullstack-local o una materializacion local revisable, devolvé tambien generatedDomainContract como contrato universal observacional. Ese contrato NO reemplaza el materializationPlan actual: solo agrega una descripcion estructurada del dominio para diagnostico y futura migracion.
 - generatedDomainContract debe tratar el dominio como datos y no como una lista de rubros conocidos. Usá contractVersion, deliveryLevel, domain, root, roles, entities, states, workflows, frontendSurfaces, backend, database, shared, docs, scripts, integrations, safety, materialization, validation y approvals.
+- generatedDomainContract.deliveryLevel debe ser exactamente "fullstack-local" para estos contratos observacionales.
+- No uses strategy, executionMode, planner-only, scalable-delivery-plan ni etiquetas de flujo como valor de generatedDomainContract.deliveryLevel.
+- strategy y executionMode pertenecen a la decision del planner; generatedDomainContract.deliveryLevel describe el tipo de entrega del contrato universal.
 - Preferí que generatedDomainContract.root.slug sea relativo y estable, por ejemplo "plant-nursery-local". Si completás sourceRoot y targetRoot, preferí valores relativos alineados con root.slug en vez de rutas absolutas del sistema operativo.
 - generatedDomainContract.root.slug, sourceRoot y targetRoot deben ser coherentes entre si, quedar dentro de una raiz local segura y usar la misma raiz para sourceRoot y targetRoot cuando la propuesta sea materializable.
 - generatedDomainContract.integrations debe marcar integraciones reales como bloqueadas salvo aprobacion explicita futura. Mock-only esta permitido cuando el objetivo sea local y seguro.
@@ -44567,7 +44878,11 @@ function buildOpenAIGeneratedDomainContractSchema() {
     additionalProperties: true,
     properties: {
       contractVersion: { type: 'string' },
-      deliveryLevel: { type: 'string' },
+      deliveryLevel: {
+        type: 'string',
+        description:
+          'Para generatedDomainContract debe ser exactamente fullstack-local. No usar strategy, executionMode, planner-only ni scalable-delivery-plan como deliveryLevel.',
+      },
       domain: {
         type: 'object',
         additionalProperties: true,
@@ -45573,6 +45888,94 @@ function buildOpenAIBrainSchema() {
   }
 }
 
+function buildOpenAIGeneratedDomainContractObservationResponseSchema() {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      generatedDomainContract: buildOpenAIGeneratedDomainContractSchema(),
+    },
+    required: ['generatedDomainContract'],
+  }
+}
+
+function buildGeneratedDomainContractObservationSystemPrompt(basePrompt) {
+  return `${basePrompt}
+
+Modo especial de esta corrida:
+- Esta es una observacion paralela contract-only.
+- No devuelvas strategy, executionMode, tasks, nextExpectedAction ni materializationPlan legacy.
+- Devolvé un unico objeto JSON con la propiedad generatedDomainContract.
+- generatedDomainContract.deliveryLevel debe ser exactamente "fullstack-local".
+- No uses planner-only, scalable-delivery-plan, strategy ni executionMode como deliveryLevel del contrato.
+- strategy y executionMode pertenecen a la decision del planner, no al contrato universal.
+- El dominio debe tratarse como datos y no como lista de rubros conocidos.
+- Preferí root.slug, sourceRoot y targetRoot relativos y coherentes.
+- No materialices nada. No propongas comandos. No escribas archivos reales.
+- Integraciones reales bloqueadas. Mock-only permitido.
+- No incluyas tokens, secretos, .env, Docker, deploy ni APIs reales.
+`.trim()
+}
+
+function buildGeneratedDomainContractObservationUserPrompt({
+  goal,
+  context,
+  workspacePath,
+}) {
+  return JSON.stringify(
+    {
+      goal: typeof goal === 'string' ? goal : '',
+      context: typeof context === 'string' ? context : '',
+      workspacePath:
+        typeof workspacePath === 'string' && workspacePath.trim()
+          ? workspacePath.trim()
+          : '',
+      constraints: [
+        'Entrega fullstack-local observacional solamente.',
+        'generatedDomainContract.deliveryLevel debe ser exactamente "fullstack-local".',
+        'No usar strategy, executionMode, planner-only ni scalable-delivery-plan como deliveryLevel.',
+        'Sin materializationPlan legacy.',
+        'Sin scaffold completo.',
+        'Sin Docker, .env, node_modules, deploy ni servicios externos reales.',
+        'Pagos e integraciones en mock-only.',
+      ],
+      expectedOutput: {
+        generatedDomainContract: {
+          contractVersion: '1.0',
+          deliveryLevel: 'fullstack-local',
+          domain: {
+            label: '...',
+            slug: '...',
+            summary: '...',
+          },
+          root: {
+            slug: '...',
+            sourceRoot: '...',
+            targetRoot: '...',
+          },
+          roles: [],
+          entities: [],
+          states: {},
+          workflows: [],
+          frontendSurfaces: [],
+          backend: {},
+          database: {},
+          shared: {},
+          docs: [],
+          scripts: [],
+          integrations: [],
+          safety: {},
+          materialization: {},
+          validation: {},
+          approvals: [],
+        },
+      },
+    },
+    null,
+    2,
+  )
+}
+
 function buildOpenAIBrainInputPayload(input) {
   return {
     roleModel: {
@@ -45627,6 +46030,279 @@ function extractOpenAIResponseText(responsePayload) {
   }
 
   return ''
+}
+
+function resolveOpenAIGeneratedDomainContractObservationTimeoutMs({
+  config,
+  costMode,
+}) {
+  const plannerTimeoutMs = resolveOpenAIBrainTimeoutMs({ config, costMode })
+  const configuredTimeoutMs = Math.max(
+    5000,
+    Number.parseInt(
+      process.env.AI_ORCHESTRATOR_BRAIN_OPENAI_CONTRACT_OBSERVATION_TIMEOUT_MS || '75000',
+      10,
+    ) || 75000,
+  )
+
+  return Math.min(plannerTimeoutMs, configuredTimeoutMs, 75000)
+}
+
+function buildGeneratedDomainContractObservationFailureResult({
+  status,
+  elapsedMs,
+  requestId,
+  errorKind,
+  errorPreview,
+  httpStatus,
+}) {
+  return {
+    attempted: true,
+    ok: false,
+    status,
+    elapsedMs: Number.isFinite(elapsedMs) && elapsedMs >= 0 ? elapsedMs : 0,
+    requestId: normalizeOptionalString(requestId) || undefined,
+    ...(typeof errorKind === 'string' && errorKind.trim()
+      ? { errorKind: errorKind.trim() }
+      : {}),
+    ...(typeof errorPreview === 'string' && errorPreview.trim()
+      ? { errorPreview: buildSafeGeneratedDomainContractObservationErrorPreview(errorPreview) }
+      : {}),
+    ...(Number.isInteger(httpStatus) && httpStatus > 0 ? { httpStatus } : {}),
+    generatedDomainContractDiagnostics: { present: false },
+  }
+}
+
+function classifyGeneratedDomainContractObservationThrownError(error) {
+  if (error?.name === 'AbortError') {
+    return {
+      status: 'timeout',
+      errorKind: 'abort',
+      errorPreview:
+        error instanceof Error ? error.message : buildSafeGeneratedDomainContractObservationErrorPreview(String(error)),
+    }
+  }
+
+  return {
+    status: 'openai-error',
+    errorKind:
+      typeof error?.name === 'string' && error.name.trim()
+        ? error.name.trim()
+        : 'runtime-error',
+    errorPreview:
+      error instanceof Error
+        ? error.message
+        : buildSafeGeneratedDomainContractObservationErrorPreview(String(error)),
+  }
+}
+
+async function observeGeneratedDomainContractForPlannerDecision({
+  goal,
+  context,
+  workspacePath,
+  legacyDecision,
+  costMode,
+  requestId,
+}) {
+  const startedAt = Date.now()
+  const safeEmptyDiagnostics = { present: false }
+  const config = getOpenAIBrainConfig()
+
+  if (
+    legacyDecision?.generatedDomainContractDiagnostics?.present === true &&
+    legacyDecision?.generatedDomainContractDiagnostics?.valid === true &&
+    legacyDecision?.generatedDomainContractDiagnostics?.safeForLocalMaterialization === true
+  ) {
+    return {
+      attempted: false,
+      ok: false,
+      status: 'skipped',
+      elapsedMs: 0,
+      requestId: normalizeOptionalString(requestId) || undefined,
+      generatedDomainContractDiagnostics: safeEmptyDiagnostics,
+    }
+  }
+
+  if (!config.apiKey) {
+    return buildGeneratedDomainContractObservationFailureResult({
+      status: 'openai-unavailable',
+      elapsedMs: 0,
+      requestId,
+      errorKind: 'config-missing',
+      errorPreview: 'OPENAI_API_KEY no configurada para la observacion contract-only.',
+    })
+  }
+
+  const requestBody = {
+    model: config.model,
+    input: [
+      {
+        role: 'system',
+        content: [
+          {
+            type: 'input_text',
+            text: buildGeneratedDomainContractObservationSystemPrompt(
+              buildOpenAIBrainSystemPrompt(),
+            ),
+          },
+        ],
+      },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'input_text',
+            text: buildGeneratedDomainContractObservationUserPrompt({
+              goal,
+              context,
+              workspacePath,
+            }),
+          },
+        ],
+      },
+    ],
+    reasoning: {
+      effort: config.reasoningEffort,
+    },
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'generated_domain_contract_planner_observation',
+        strict: false,
+        schema: buildOpenAIGeneratedDomainContractObservationResponseSchema(),
+      },
+    },
+  }
+  const timeoutMs = resolveOpenAIGeneratedDomainContractObservationTimeoutMs({
+    config,
+    costMode,
+  })
+  const abortController = new AbortController()
+  const timeoutId = setTimeout(() => abortController.abort(), timeoutMs)
+
+  try {
+    const response = await fetch(config.baseUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.apiKey}`,
+        ...(config.organization ? { 'OpenAI-Organization': config.organization } : {}),
+        ...(config.project ? { 'OpenAI-Project': config.project } : {}),
+      },
+      body: JSON.stringify(requestBody),
+      signal: abortController.signal,
+    })
+    const responseText = await response.text()
+
+    if (!response.ok) {
+      return buildGeneratedDomainContractObservationFailureResult({
+        status: 'openai-error',
+        elapsedMs: Math.max(0, Date.now() - startedAt),
+        requestId,
+        errorKind: 'http',
+        errorPreview: buildOutputPreview(responseText, 180),
+        httpStatus: response.status,
+      })
+    }
+
+    let parsedPayload = null
+    try {
+      parsedPayload = JSON.parse(responseText)
+    } catch {
+      return {
+        attempted: true,
+        ok: false,
+        status: 'invalid-json',
+        elapsedMs: Math.max(0, Date.now() - startedAt),
+        requestId: normalizeOptionalString(requestId) || undefined,
+        generatedDomainContractDiagnostics: safeEmptyDiagnostics,
+      }
+    }
+
+    const responseJsonText = extractOpenAIResponseText(parsedPayload)
+
+    if (!responseJsonText.trim()) {
+      return {
+        attempted: true,
+        ok: false,
+        status: 'missing-contract',
+        elapsedMs: Math.max(0, Date.now() - startedAt),
+        requestId: normalizeOptionalString(requestId) || undefined,
+        generatedDomainContractDiagnostics: safeEmptyDiagnostics,
+      }
+    }
+
+    let parsedResponse = null
+    try {
+      parsedResponse = JSON.parse(responseJsonText)
+    } catch {
+      return {
+        attempted: true,
+        ok: false,
+        status: 'invalid-json',
+        elapsedMs: Math.max(0, Date.now() - startedAt),
+        requestId: normalizeOptionalString(requestId) || undefined,
+        generatedDomainContractDiagnostics: safeEmptyDiagnostics,
+      }
+    }
+
+    const generatedDomainContract =
+      parsedResponse?.generatedDomainContract &&
+      typeof parsedResponse.generatedDomainContract === 'object'
+        ? parsedResponse.generatedDomainContract
+        : null
+
+    if (!generatedDomainContract) {
+      return {
+        attempted: true,
+        ok: false,
+        status: 'missing-contract',
+        elapsedMs: Math.max(0, Date.now() - startedAt),
+        requestId: normalizeOptionalString(requestId) || undefined,
+        generatedDomainContractDiagnostics: safeEmptyDiagnostics,
+      }
+    }
+
+    const normalizedContract = normalizeGeneratedDomainContract(generatedDomainContract)
+    const validation = validateGeneratedDomainContract(normalizedContract)
+    const safety = isContractSafeForLocalMaterialization(normalizedContract)
+    const {
+      normalizedContract: diagnosticsNormalizedContract = normalizedContract,
+      ...generatedDomainContractDiagnostics
+    } = buildGeneratedDomainContractDiagnostics(
+      {
+        generatedDomainContract,
+      },
+      workspacePath,
+    )
+    const ok =
+      generatedDomainContractDiagnostics.present === true &&
+      generatedDomainContractDiagnostics.valid === true &&
+      generatedDomainContractDiagnostics.safeForLocalMaterialization === true &&
+      validation.ok === true &&
+      safety.ok === true
+
+    return {
+      attempted: true,
+      ok,
+      status: ok ? 'ok' : 'diagnostics-invalid',
+      elapsedMs: Math.max(0, Date.now() - startedAt),
+      requestId: normalizeOptionalString(requestId) || undefined,
+      generatedDomainContract: diagnosticsNormalizedContract,
+      generatedDomainContractDiagnostics,
+    }
+  } catch (error) {
+    const classification = classifyGeneratedDomainContractObservationThrownError(error)
+    return buildGeneratedDomainContractObservationFailureResult({
+      status: classification.status,
+      elapsedMs: Math.max(0, Date.now() - startedAt),
+      requestId,
+      errorKind: classification.errorKind,
+      errorPreview: classification.errorPreview,
+    })
+  } finally {
+    clearTimeout(timeoutId)
+  }
 }
 
 async function normalizeOpenAIBrainDecision(rawDecision, input) {
@@ -46443,6 +47119,137 @@ function createStrategicBrainProviderRegistry() {
   }
 }
 
+function shouldStartGeneratedDomainContractObservation({
+  strategicBrainInput,
+  primaryProvider,
+}) {
+  if (normalizeOptionalString(primaryProvider?.providerId) !== 'openai') {
+    return false
+  }
+
+  const strongFullstackProfile = detectStrongFullstackLocalRequestProfile({
+    goal: strategicBrainInput?.goal,
+    context: strategicBrainInput?.context,
+    previousExecutionResult: strategicBrainInput?.previousExecutionResult,
+  })
+  const materializationIntent = detectFullstackLocalMaterializationPlanningIntent(
+    strategicBrainInput?.goal,
+    strategicBrainInput?.context,
+  )
+
+  return strongFullstackProfile.matches || materializationIntent.matches
+}
+
+function startGeneratedDomainContractObservationTask({
+  strategicBrainInput,
+  primaryProvider,
+  requestId,
+}) {
+  if (
+    !shouldStartGeneratedDomainContractObservation({
+      strategicBrainInput,
+      primaryProvider,
+    })
+  ) {
+    return null
+  }
+
+  const state = {
+    settled: false,
+    result: null,
+    startedAt: Date.now(),
+    requestId: normalizeOptionalString(requestId) || '',
+  }
+
+  const promise = observeGeneratedDomainContractForPlannerDecision({
+    goal: strategicBrainInput.goal,
+    context: strategicBrainInput.context,
+    workspacePath: strategicBrainInput.workspacePath,
+    legacyDecision: null,
+    costMode: strategicBrainInput.costMode,
+    requestId: state.requestId,
+  })
+    .then((result) => {
+      state.settled = true
+      state.result = result
+
+      debugMainLog(
+        'generated-domain-contract:observation',
+        summarizeGeneratedDomainContractObservationForDebug(result),
+      )
+
+      return result
+    })
+    .catch((error) => {
+      const fallbackResult = {
+        attempted: true,
+        ok: false,
+        status: 'openai-error',
+        elapsedMs: Math.max(0, Date.now() - state.startedAt),
+        requestId: state.requestId || undefined,
+        errorKind:
+          typeof error?.name === 'string' && error.name.trim()
+            ? error.name.trim()
+            : 'runtime-error',
+        errorPreview:
+          error instanceof Error
+            ? buildSafeGeneratedDomainContractObservationErrorPreview(error.message)
+            : buildSafeGeneratedDomainContractObservationErrorPreview(String(error)),
+        generatedDomainContractDiagnostics: { present: false },
+      }
+
+      state.settled = true
+      state.result = fallbackResult
+
+      debugMainLog('generated-domain-contract:observation', {
+        ...summarizeGeneratedDomainContractObservationForDebug(fallbackResult),
+        error: error instanceof Error ? error.message : String(error),
+      })
+
+      return fallbackResult
+    })
+
+  return {
+    started: true,
+    state,
+    promise,
+  }
+}
+
+function finalizeGeneratedDomainContractObservation({
+  legacyDecision,
+  observationHandle,
+}) {
+  if (!observationHandle || observationHandle.started !== true) {
+    return legacyDecision
+  }
+
+  if (hasUsableGeneratedDomainContractInDecision(legacyDecision)) {
+    return applyGeneratedDomainContractObservationToDecision({
+      legacyDecision,
+      observationResult: {
+        attempted: false,
+        ok: false,
+        status: 'skipped',
+        elapsedMs: 0,
+        requestId: observationHandle.state?.requestId || undefined,
+        generatedDomainContractDiagnostics: { present: false },
+      },
+    })
+  }
+
+  return applyGeneratedDomainContractObservationToDecision({
+    legacyDecision,
+    observationResult:
+      observationHandle.state?.settled === true
+        ? observationHandle.state.result
+        : buildPendingGeneratedDomainContractObservationResult({
+            requestId: observationHandle.state?.requestId,
+            startedAt: observationHandle.state?.startedAt,
+          }),
+  })
+}
+
 async function requestStrategicBrainDecision(input) {
   const strategicBrainInput = buildStrategicBrainInput(input)
   const precomputedWebSector = resolveWebScaffoldSectorConfig({
@@ -46480,6 +47287,12 @@ async function requestStrategicBrainDecision(input) {
     providerRegistry[routingDecision.fallbackProvider]
       ? providerRegistry[routingDecision.fallbackProvider]
       : null
+  const generatedDomainContractObservationHandle =
+    startGeneratedDomainContractObservationTask({
+      strategicBrainInput,
+      primaryProvider,
+      requestId: input?.requestId,
+    })
 
   try {
     if (typeof primaryProvider.isAvailable === 'function' && !primaryProvider.isAvailable()) {
@@ -46488,7 +47301,10 @@ async function requestStrategicBrainDecision(input) {
       )
     }
 
-    const decision = await primaryProvider.decide(strategicBrainInput)
+    const decision = finalizeGeneratedDomainContractObservation({
+      legacyDecision: await primaryProvider.decide(strategicBrainInput),
+      observationHandle: generatedDomainContractObservationHandle,
+    })
 
     return {
       routingDecision: {
@@ -46504,7 +47320,10 @@ async function requestStrategicBrainDecision(input) {
     }
   } catch (error) {
     if (fallbackProvider && fallbackProvider.providerId !== primaryProvider.providerId) {
-      const fallbackDecision = await fallbackProvider.decide(strategicBrainInput)
+      const fallbackDecision = finalizeGeneratedDomainContractObservation({
+        legacyDecision: await fallbackProvider.decide(strategicBrainInput),
+        observationHandle: generatedDomainContractObservationHandle,
+      })
 
       return {
         routingDecision: {
@@ -48520,6 +49339,12 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       brainDecision.generatedDomainContractDiagnostics?.valid === true,
     generatedDomainContractSafe:
       brainDecision.generatedDomainContractDiagnostics?.safeForLocalMaterialization === true,
+    generatedDomainContractObservationAttempted:
+      brainDecision.generatedDomainContractObservation?.attempted === true,
+    generatedDomainContractObservationOk:
+      brainDecision.generatedDomainContractObservation?.ok === true,
+    generatedDomainContractObservationStatus:
+      brainDecision.generatedDomainContractObservation?.status || undefined,
   })
 
   if (brainDecision.generatedDomainContractDiagnostics?.present === true) {
@@ -48528,6 +49353,20 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       summarizeGeneratedDomainContractDiagnosticsForDebug(
         brainDecision.generatedDomainContractDiagnostics,
       ),
+    )
+  }
+
+  if (
+    brainDecision.generatedDomainContractObservation &&
+    typeof brainDecision.generatedDomainContractObservation === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-contract:observation',
+      summarizeGeneratedDomainContractObservationForDebug({
+        ...brainDecision.generatedDomainContractObservation,
+        generatedDomainContractDiagnostics:
+          brainDecision.generatedDomainContractDiagnostics,
+      }),
     )
   }
 
@@ -48620,6 +49459,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       generatedDomainContract: brainDecision.generatedDomainContract,
       generatedDomainContractDiagnostics:
         brainDecision.generatedDomainContractDiagnostics,
+      generatedDomainContractObservation:
+        brainDecision.generatedDomainContractObservation,
       existingProjectDetection: brainDecision.existingProjectDetection,
       activeProjectContext: brainDecision.activeProjectContext,
       contextHubStatus,
@@ -48684,6 +49525,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
     generatedDomainContract: brainDecision.generatedDomainContract,
     generatedDomainContractDiagnostics:
       brainDecision.generatedDomainContractDiagnostics,
+    generatedDomainContractObservation:
+      brainDecision.generatedDomainContractObservation,
     existingProjectDetection: brainDecision.existingProjectDetection,
     activeProjectContext: brainDecision.activeProjectContext,
     contextHubStatus,
