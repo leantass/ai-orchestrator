@@ -140,6 +140,9 @@ const {
   buildAttachedInputMetadataList,
 } = require('./project-context.cjs')
 const {
+  normalizeGeneratedDomainContract,
+  validateGeneratedDomainContract,
+  isContractSafeForLocalMaterialization,
   buildGeneratedDomainContractDiagnostics,
   extractGeneratedDomainContractCandidate,
 } = require('./generated-domain-contract.cjs')

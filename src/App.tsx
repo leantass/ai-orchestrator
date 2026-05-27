@@ -39,10 +39,13 @@ import {
   getValidationStatusLabel,
 } from './project-state-labels'
 import {
+  canPrepareProjectContinuityNextActionForUi,
   derivePlannerNextExpectedActionForUi,
   derivePlannerMaterializationUiState,
+  getProjectContinuityPrimaryActionLabelForUi,
   inspectPreparedFullstackLocalMaterialization,
   isPreparedFullstackLocalMaterializationResponse,
+  resolveProjectContinuityNextRecommendedActionForUi,
 } from './planner-ui-state.js'
 
 type FlowMessage = {
@@ -829,6 +832,8 @@ type ProjectWorkMode = 'auto' | 'new-project' | 'continue-existing'
 type MaterializationPlanContract = Record<string, unknown>
 
 type PlannerExecutionMetadata = {
+  approvalRequired: boolean
+  requiresApproval: boolean
   decisionKey: string
   businessSector: string
   businessSectorLabel: string
@@ -875,6 +880,30 @@ type PlannerExecutionMetadata = {
   materializationPlan: MaterializationPlanContract | null
   existingProjectDetection: ExistingProjectDetectionContract | null
   activeProjectContext: ActiveProjectContextContract | null
+  generatedDomainContract: Record<string, unknown> | null
+  generatedDomainContractDiagnostics: {
+    present: boolean
+    valid?: boolean
+    safeForLocalMaterialization?: boolean
+    domainSlug?: string
+    rootSlug?: string
+    sourceRoot?: string
+    targetRoot?: string
+    errorsCount?: number
+    warningsCount?: number
+    firstError?: string
+    firstWarning?: string
+    errorsPreview?: string[]
+    warningsPreview?: string[]
+  } | null
+  generatedDomainContractObservation: {
+    attempted?: boolean
+    ok?: boolean
+    status?: string
+    errorKind?: string
+    errorPreview?: string
+    elapsedMs?: number
+  } | null
 }
 
 type PlannerRequestSnapshot = {
@@ -1142,6 +1171,9 @@ type PlannerDecisionResponse = {
   materializationPlan?: MaterializationPlanContract | null
   existingProjectDetection?: ExistingProjectDetectionContract | null
   activeProjectContext?: ActiveProjectContextContract | null
+  generatedDomainContract?: Record<string, unknown> | null
+  generatedDomainContractDiagnostics?: PlannerExecutionMetadata['generatedDomainContractDiagnostics']
+  generatedDomainContractObservation?: PlannerExecutionMetadata['generatedDomainContractObservation']
   brainAdapter?: {
     id?: string
   }
@@ -1344,6 +1376,8 @@ const DEFAULT_LAST_RUN_SUMMARY = {
 }
 const DEFAULT_FLOW_MESSAGES: FlowMessage[] = []
 const EMPTY_PLANNER_EXECUTION_METADATA: PlannerExecutionMetadata = {
+  approvalRequired: false,
+  requiresApproval: false,
   decisionKey: '',
   businessSector: '',
   businessSectorLabel: '',
@@ -1385,6 +1419,9 @@ const EMPTY_PLANNER_EXECUTION_METADATA: PlannerExecutionMetadata = {
   materializationPlan: null,
   existingProjectDetection: null,
   activeProjectContext: null,
+  generatedDomainContract: null,
+  generatedDomainContractDiagnostics: null,
+  generatedDomainContractObservation: null,
 }
 
 const buildSafeFirstDeliveryReviewMetadata = ({
@@ -1421,6 +1458,9 @@ const buildSafeFirstDeliveryReviewMetadata = ({
   materializationPlan: baseMetadata.materializationPlan,
   existingProjectDetection: baseMetadata.existingProjectDetection,
   activeProjectContext: baseMetadata.activeProjectContext,
+  generatedDomainContract: baseMetadata.generatedDomainContract,
+  generatedDomainContractDiagnostics: baseMetadata.generatedDomainContractDiagnostics,
+  generatedDomainContractObservation: baseMetadata.generatedDomainContractObservation,
   decisionKey: 'safe-first-delivery-plan',
   strategy: 'safe-first-delivery-plan',
   executionMode: 'planner-only',
@@ -3756,6 +3796,9 @@ const extractPlannerExecutionMetadata = (payload?: {
   materializationPlan?: MaterializationPlanContract | null
   existingProjectDetection?: ExistingProjectDetectionContract | null
   activeProjectContext?: ActiveProjectContextContract | null
+  generatedDomainContract?: Record<string, unknown> | null
+  generatedDomainContractDiagnostics?: PlannerExecutionMetadata['generatedDomainContractDiagnostics']
+  generatedDomainContractObservation?: PlannerExecutionMetadata['generatedDomainContractObservation']
   tasks?: unknown[]
   assumptions?: string[]
 } | null): PlannerExecutionMetadata => {
@@ -3764,6 +3807,8 @@ const extractPlannerExecutionMetadata = (payload?: {
   ) as typeof payload
 
   return ({
+  approvalRequired: payload?.approvalRequired === true,
+  requiresApproval: payload?.requiresApproval === true,
   decisionKey:
     typeof payload?.decisionKey === 'string' ? payload.decisionKey.trim() : '',
   businessSector:
@@ -4025,6 +4070,91 @@ const extractPlannerExecutionMetadata = (payload?: {
             : {}),
           ...(typeof payload.activeProjectContext.note === 'string'
             ? { note: payload.activeProjectContext.note.trim() }
+            : {}),
+        }
+      : null,
+  generatedDomainContract:
+    payload?.generatedDomainContract &&
+    typeof payload.generatedDomainContract === 'object'
+      ? payload.generatedDomainContract
+      : null,
+  generatedDomainContractDiagnostics:
+    payload?.generatedDomainContractDiagnostics &&
+    typeof payload.generatedDomainContractDiagnostics === 'object'
+      ? {
+          present: payload.generatedDomainContractDiagnostics.present === true,
+          ...(typeof payload.generatedDomainContractDiagnostics.valid === 'boolean'
+            ? { valid: payload.generatedDomainContractDiagnostics.valid }
+            : {}),
+          ...(typeof payload.generatedDomainContractDiagnostics.safeForLocalMaterialization === 'boolean'
+            ? {
+                safeForLocalMaterialization:
+                  payload.generatedDomainContractDiagnostics.safeForLocalMaterialization,
+              }
+            : {}),
+          ...(typeof payload.generatedDomainContractDiagnostics.domainSlug === 'string'
+            ? { domainSlug: payload.generatedDomainContractDiagnostics.domainSlug.trim() }
+            : {}),
+          ...(typeof payload.generatedDomainContractDiagnostics.rootSlug === 'string'
+            ? { rootSlug: payload.generatedDomainContractDiagnostics.rootSlug.trim() }
+            : {}),
+          ...(typeof payload.generatedDomainContractDiagnostics.sourceRoot === 'string'
+            ? { sourceRoot: payload.generatedDomainContractDiagnostics.sourceRoot.trim() }
+            : {}),
+          ...(typeof payload.generatedDomainContractDiagnostics.targetRoot === 'string'
+            ? { targetRoot: payload.generatedDomainContractDiagnostics.targetRoot.trim() }
+            : {}),
+          ...(Number.isInteger(payload.generatedDomainContractDiagnostics.errorsCount)
+            ? { errorsCount: payload.generatedDomainContractDiagnostics.errorsCount }
+            : {}),
+          ...(Number.isInteger(payload.generatedDomainContractDiagnostics.warningsCount)
+            ? { warningsCount: payload.generatedDomainContractDiagnostics.warningsCount }
+            : {}),
+          ...(typeof payload.generatedDomainContractDiagnostics.firstError === 'string'
+            ? { firstError: payload.generatedDomainContractDiagnostics.firstError.trim() }
+            : {}),
+          ...(typeof payload.generatedDomainContractDiagnostics.firstWarning === 'string'
+            ? { firstWarning: payload.generatedDomainContractDiagnostics.firstWarning.trim() }
+            : {}),
+          ...(Array.isArray(payload.generatedDomainContractDiagnostics.errorsPreview)
+            ? {
+                errorsPreview:
+                  payload.generatedDomainContractDiagnostics.errorsPreview.filter(
+                    (entry) => typeof entry === 'string' && entry.trim(),
+                  ),
+              }
+            : {}),
+          ...(Array.isArray(payload.generatedDomainContractDiagnostics.warningsPreview)
+            ? {
+                warningsPreview:
+                  payload.generatedDomainContractDiagnostics.warningsPreview.filter(
+                    (entry) => typeof entry === 'string' && entry.trim(),
+                  ),
+              }
+            : {}),
+        }
+      : null,
+  generatedDomainContractObservation:
+    payload?.generatedDomainContractObservation &&
+    typeof payload.generatedDomainContractObservation === 'object'
+      ? {
+          ...(typeof payload.generatedDomainContractObservation.attempted === 'boolean'
+            ? { attempted: payload.generatedDomainContractObservation.attempted }
+            : {}),
+          ...(typeof payload.generatedDomainContractObservation.ok === 'boolean'
+            ? { ok: payload.generatedDomainContractObservation.ok }
+            : {}),
+          ...(typeof payload.generatedDomainContractObservation.status === 'string'
+            ? { status: payload.generatedDomainContractObservation.status.trim() }
+            : {}),
+          ...(typeof payload.generatedDomainContractObservation.errorKind === 'string'
+            ? { errorKind: payload.generatedDomainContractObservation.errorKind.trim() }
+            : {}),
+          ...(typeof payload.generatedDomainContractObservation.errorPreview === 'string'
+            ? { errorPreview: payload.generatedDomainContractObservation.errorPreview.trim() }
+            : {}),
+          ...(Number.isFinite(payload.generatedDomainContractObservation.elapsedMs)
+            ? { elapsedMs: payload.generatedDomainContractObservation.elapsedMs }
             : {}),
         }
       : null,
@@ -6780,6 +6910,14 @@ function ProjectContinuityCenterCard({
       Boolean(moduleExpansionPlan) ||
       Boolean(continuationActionPlan))
   const nextRecommendedAction =
+    resolveProjectContinuityNextRecommendedActionForUi({
+      projectContinuationState,
+      projectReadinessState,
+      continuationActionPlan,
+      moduleExpansionPlan,
+      projectPhaseExecutionPlan,
+      localProjectManifest,
+    }) ||
     projectContinuationState?.nextRecommendedAction ||
     continuationActionPlan ||
     (moduleExpansionPlan?.moduleId
@@ -12638,6 +12776,60 @@ function App() {
       ? 'Regla del proyecto activa'
       : 'Sin aprobación pendiente'
 
+  const manualReusablePreferencePayload = buildManualReusablePreferencePayload({
+    mode: manualReuseMode,
+    selectedArtifact: selectedReusableArtifact,
+  })
+  const effectivePlannerExecutionMetadata =
+    applyManualReusablePreferenceToPlannerExecutionMetadata({
+      metadata: plannerExecutionMetadata,
+      mode: manualReuseMode,
+      selectedArtifact: selectedReusableArtifact,
+    })
+  const resolvePlannerExecutionMetadata = (
+    payload?: PlannerDecisionResponse | null,
+  ) =>
+    applyManualReusablePreferenceToPlannerExecutionMetadata({
+      metadata: extractPlannerExecutionMetadata(payload),
+      mode: manualReuseMode,
+      selectedArtifact: selectedReusableArtifact,
+    })
+  const activeProductArchitecture = effectivePlannerExecutionMetadata.productArchitecture
+  const activeSafeFirstDeliveryPlan =
+    effectivePlannerExecutionMetadata.safeFirstDeliveryPlan
+  const activeScalableDeliveryPlan =
+    effectivePlannerExecutionMetadata.scalableDeliveryPlan
+  const activeProjectBlueprint = effectivePlannerExecutionMetadata.projectBlueprint
+  const activeQuestionPolicy = effectivePlannerExecutionMetadata.questionPolicy
+  const activeImplementationRoadmap =
+    effectivePlannerExecutionMetadata.implementationRoadmap
+  const activeNextActionPlan = effectivePlannerExecutionMetadata.nextActionPlan
+  const activeValidationPlan = effectivePlannerExecutionMetadata.validationPlan
+  const activePhaseExpansionPlan =
+    effectivePlannerExecutionMetadata.phaseExpansionPlan
+  const activeProjectPhaseExecutionPlan =
+    effectivePlannerExecutionMetadata.projectPhaseExecutionPlan
+  const activeLocalProjectManifest =
+    effectivePlannerExecutionMetadata.localProjectManifest
+  const activeExpansionOptions = effectivePlannerExecutionMetadata.expansionOptions
+  const activeModuleExpansionPlan =
+    effectivePlannerExecutionMetadata.moduleExpansionPlan
+  const activeContinuationActionPlan =
+    effectivePlannerExecutionMetadata.continuationActionPlan
+  const activeProjectContinuationState =
+    effectivePlannerExecutionMetadata.projectContinuationState
+  const activeProjectReadinessState =
+    effectivePlannerExecutionMetadata.projectReadinessState
+  const activeApprovalRequestPlan =
+    effectivePlannerExecutionMetadata.approvalRequestPlan
+  const activeRuntimeApprovalState =
+    effectivePlannerExecutionMetadata.runtimeApprovalState
+  const activeExistingProjectDetection =
+    effectivePlannerExecutionMetadata.existingProjectDetection
+  const activeProjectContext = effectivePlannerExecutionMetadata.activeProjectContext
+  const existingProjectApplicable =
+    activeExistingProjectDetection?.applicable !== false
+
   const plannerNeedsUserClarification = isUserClarificationPlannerResponse(
     plannerExecutionMetadata,
   )
@@ -12713,6 +12905,27 @@ function App() {
     plannerReviewUiState.canPrepareFrontendProject === true
   const plannerScalableReviewPreparationKind =
     plannerReviewUiState.prepareCtaKind || ''
+  const plannerContinuationReviewAction =
+    resolveProjectContinuityNextRecommendedActionForUi({
+      projectContinuationState: activeProjectContinuationState,
+      projectReadinessState: activeProjectReadinessState,
+      continuationActionPlan: activeContinuationActionPlan,
+      moduleExpansionPlan: activeModuleExpansionPlan,
+      projectPhaseExecutionPlan: activeProjectPhaseExecutionPlan,
+      localProjectManifest: activeLocalProjectManifest,
+    })
+  const plannerCanPrepareContinuationReviewAction =
+    plannerIsReviewOnly &&
+    existingProjectApplicable &&
+    !plannerIsProjectPhaseReview &&
+    !plannerIsSafeFirstDeliveryReview &&
+    !plannerIsProductArchitectureReview &&
+    !plannerIsScalableDeliveryReview &&
+    canPrepareProjectContinuityNextActionForUi(plannerContinuationReviewAction)
+  const plannerContinuationReviewPrimaryActionLabel =
+    plannerCanPrepareContinuationReviewAction
+      ? getProjectContinuityPrimaryActionLabelForUi(plannerContinuationReviewAction)
+      : ''
   const plannerReviewStatusLabel = plannerIsReviewOnly
     ? plannerIsProjectPhaseReview
       ? 'Fase segura en revision'
@@ -12731,10 +12944,12 @@ function App() {
         : `JEFE detecto la fase segura ${plannerProjectPhaseReviewId || 'actual'} para revisarla antes de seguir con la continuidad.`
       : plannerIsSafeFirstDeliveryReview
         ? 'Estas revisando una primera entrega segura. El CTA azul solo prepara la materializacion; todavia no escribe archivos.'
-        : plannerIsProductArchitectureReview
+      : plannerIsProductArchitectureReview
           ? 'Estas revisando una arquitectura inicial. El CTA azul prepara la primera entrega segura; todavia no ejecuta cambios.'
         : plannerIsScalableDeliveryReview
           ? 'Estas revisando una entrega funcional local mas amplia. El CTA azul prepara la materializacion, pero todavia no ejecuta cambios.'
+          : plannerCanPrepareContinuationReviewAction
+            ? 'Estas revisando la siguiente continuidad segura. El CTA azul solo prepara el siguiente paso; todavia no escribe archivos.'
           : 'Este bloque quedo en revision manual. Primero se entiende y despues se decide si conviene preparar o ejecutar.'
     : 'La instruccion actual ya es ejecutable y el CTA amarillo puede materializar o continuar sobre el workspace.'
   const plannerReviewActionLabel = plannerIsSafeFirstDeliveryReview
@@ -12745,6 +12960,8 @@ function App() {
       ? plannerProjectPhaseReviewId
         ? `Revisar fase segura: ${plannerProjectPhaseReviewId}`
         : 'Revisar fase segura'
+      : plannerCanPrepareContinuationReviewAction
+        ? plannerContinuationReviewPrimaryActionLabel || 'Preparar siguiente paso seguro'
       : plannerIsScalableDeliveryReview
         ? 'Plan escalable revisable'
         : 'Revisar arquitectura'
@@ -12893,59 +13110,6 @@ function App() {
     existingProjectContext: plannerExistingProjectContextPayload || undefined,
     projectWorkMode,
   })
-  const manualReusablePreferencePayload = buildManualReusablePreferencePayload({
-    mode: manualReuseMode,
-    selectedArtifact: selectedReusableArtifact,
-  })
-  const effectivePlannerExecutionMetadata =
-    applyManualReusablePreferenceToPlannerExecutionMetadata({
-      metadata: plannerExecutionMetadata,
-      mode: manualReuseMode,
-      selectedArtifact: selectedReusableArtifact,
-    })
-  const resolvePlannerExecutionMetadata = (
-    payload?: PlannerDecisionResponse | null,
-  ) =>
-    applyManualReusablePreferenceToPlannerExecutionMetadata({
-      metadata: extractPlannerExecutionMetadata(payload),
-      mode: manualReuseMode,
-      selectedArtifact: selectedReusableArtifact,
-    })
-  const activeProductArchitecture = effectivePlannerExecutionMetadata.productArchitecture
-  const activeSafeFirstDeliveryPlan =
-    effectivePlannerExecutionMetadata.safeFirstDeliveryPlan
-  const activeScalableDeliveryPlan =
-    effectivePlannerExecutionMetadata.scalableDeliveryPlan
-  const activeProjectBlueprint = effectivePlannerExecutionMetadata.projectBlueprint
-  const activeQuestionPolicy = effectivePlannerExecutionMetadata.questionPolicy
-  const activeImplementationRoadmap =
-    effectivePlannerExecutionMetadata.implementationRoadmap
-  const activeNextActionPlan = effectivePlannerExecutionMetadata.nextActionPlan
-  const activeValidationPlan = effectivePlannerExecutionMetadata.validationPlan
-  const activePhaseExpansionPlan =
-    effectivePlannerExecutionMetadata.phaseExpansionPlan
-  const activeProjectPhaseExecutionPlan =
-    effectivePlannerExecutionMetadata.projectPhaseExecutionPlan
-  const activeLocalProjectManifest =
-    effectivePlannerExecutionMetadata.localProjectManifest
-  const activeExpansionOptions = effectivePlannerExecutionMetadata.expansionOptions
-  const activeModuleExpansionPlan =
-    effectivePlannerExecutionMetadata.moduleExpansionPlan
-  const activeContinuationActionPlan =
-    effectivePlannerExecutionMetadata.continuationActionPlan
-  const activeProjectContinuationState =
-    effectivePlannerExecutionMetadata.projectContinuationState
-  const activeProjectReadinessState =
-    effectivePlannerExecutionMetadata.projectReadinessState
-  const activeApprovalRequestPlan =
-    effectivePlannerExecutionMetadata.approvalRequestPlan
-  const activeRuntimeApprovalState =
-    effectivePlannerExecutionMetadata.runtimeApprovalState
-  const activeExistingProjectDetection =
-    effectivePlannerExecutionMetadata.existingProjectDetection
-  const activeProjectContext = effectivePlannerExecutionMetadata.activeProjectContext
-  const existingProjectApplicable =
-    activeExistingProjectDetection?.applicable !== false
   const shouldShowIgnoredExistingProjectCallout =
     activeExistingProjectDetection?.detected === true &&
     activeExistingProjectDetection.applicable === false &&
@@ -14872,9 +15036,13 @@ function App() {
                         label: 'Siguiente paso',
                         value: plannerIsProductArchitectureReview
                           ? 'Revisa la arquitectura inicial.'
+                          : plannerCanPrepareContinuationReviewAction
+                            ? 'Revisa el siguiente paso seguro.'
                           : 'Revisa el resumen del plan.',
                         detail: plannerIsProductArchitectureReview
                           ? 'Si esta correcta, prepara la primera entrega segura. El detalle tecnico queda abajo.'
+                          : plannerCanPrepareContinuationReviewAction
+                            ? 'Si esta correcto, prepara el siguiente paso seguro. El detalle tecnico queda abajo.'
                           : 'Si esta correcto, prepara la ejecucion. El detalle tecnico queda abajo.',
                         icon: 'next' as const,
                       },
@@ -14947,6 +15115,8 @@ function App() {
                     : activeWizardStep === 'plan'
                       ? plannerIsProductArchitectureReview
                         ? 'Si el resumen esta bien, prepara la primera entrega segura.'
+                        : plannerCanPrepareContinuationReviewAction
+                          ? 'Si el resumen esta bien, prepara el siguiente paso seguro.'
                         : 'Si el resumen esta bien, prepara la ejecucion.'
                     : guidedStepActionSummaryLabel,
                 detail:
@@ -19446,6 +19616,8 @@ function App() {
       ? 'Preparar primera entrega segura'
     : plannerIsSafeFirstDeliveryReview
       ? 'Preparar ejecucion local segura'
+      : plannerCanPrepareContinuationReviewAction
+        ? plannerContinuationReviewPrimaryActionLabel
       : plannerIsScalableDeliveryReview
         ? plannerScalableReviewPreparationKind === 'fullstack-local'
           ? 'Preparar entrega funcional local'
@@ -19462,6 +19634,8 @@ function App() {
         ? handlePrepareSafeFirstDeliveryPlan
       : plannerIsSafeFirstDeliveryReview
         ? handlePrepareSafeMaterializationPlan
+        : plannerCanPrepareContinuationReviewAction && plannerContinuationReviewAction
+          ? () => handlePrepareContinuationAction(plannerContinuationReviewAction)
         : plannerIsScalableDeliveryReview
           ? plannerScalableReviewPreparationKind === 'fullstack-local'
             ? handlePrepareFullstackLocalMaterializationPlan
@@ -19473,6 +19647,8 @@ function App() {
     ? 'Preparando primera entrega...'
     : plannerIsSafeFirstDeliveryReview
       ? 'Preparando ejecucion...'
+      : plannerCanPrepareContinuationReviewAction
+        ? 'Preparando siguiente paso...'
       : plannerIsScalableDeliveryReview
         ? plannerScalableReviewPreparationKind === 'fullstack-local'
           ? 'Preparando entrega...'

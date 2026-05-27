@@ -63,6 +63,7 @@ module.exports = {
   classifyGeneratedDomainContractObservationThrownError,
   buildOpenAIBrainSystemPrompt,
   buildOpenAIBrainSchema,
+  observeGeneratedDomainContractForPlannerDecision,
   summarizeGeneratedDomainContractDiagnosticsForDebug,
   summarizeGeneratedDomainContractObservationForDebug,
 };
@@ -84,9 +85,14 @@ module.exports = {
     classifyWorkspaceProjectIntent,
     selectBestWorkspaceProjectCandidate,
     shouldIgnoreWorkspaceDirectoryEntry,
+    normalizeGeneratedDomainContract,
+    validateGeneratedDomainContract,
+    isContractSafeForLocalMaterialization,
     buildGeneratedDomainContractDiagnostics,
     extractGeneratedDomainContractCandidate:
       require('../electron/generated-domain-contract.cjs').extractGeneratedDomainContractCandidate,
+    AbortController,
+    fetch: globalThis.fetch,
     setTimeout,
     clearTimeout,
     setInterval,
@@ -98,10 +104,16 @@ module.exports = {
     filename: 'generated-domain-contract-smoke-harness.cjs',
   })
 
-  return sandbox.module.exports || {}
+  return {
+    api: sandbox.module.exports || {},
+    sandbox,
+  }
 }
 
-const observationHarness = loadGeneratedDomainObservationHarness()
+const {
+  api: observationHarness,
+  sandbox: observationHarnessSandbox,
+} = loadGeneratedDomainObservationHarness()
 
 function createValidInventedContract() {
   return {
@@ -1176,6 +1188,69 @@ function runPlannerObservationDebugSummaryCase() {
   assert.equal(summary.errorPreview, 'fetch failed')
 }
 
+async function runPlannerObservationNormalizeAvailabilityCase() {
+  assert.equal(
+    typeof observationHarness.observeGeneratedDomainContractForPlannerDecision,
+    'function',
+    'El harness debe exponer la ruta real de observacion contract-only.',
+  )
+
+  const contract = createValidInventedContract()
+  const originalApiKey = process.env.OPENAI_API_KEY
+  const originalBaseUrl = process.env.AI_ORCHESTRATOR_BRAIN_OPENAI_BASE_URL
+  const originalFetch = observationHarnessSandbox.fetch
+
+  process.env.OPENAI_API_KEY = 'sk-test-local-generated-domain-contract'
+  process.env.AI_ORCHESTRATOR_BRAIN_OPENAI_BASE_URL = 'https://example.invalid/v1/responses'
+  observationHarnessSandbox.fetch = async () => ({
+    ok: true,
+    status: 200,
+    text: async () =>
+      JSON.stringify({
+        output_text: JSON.stringify({
+          generatedDomainContract: contract,
+        }),
+      }),
+  })
+
+  try {
+    const result = await observationHarness.observeGeneratedDomainContractForPlannerDecision({
+      goal: 'Preparar una escuela de oficios barrial local segura.',
+      context:
+        'Cursos, alumnos, docentes, reportes, becas mock y pagos simulados sin integraciones externas.',
+      workspacePath: repoRoot,
+      legacyDecision: createLegacyObservationDecision(),
+      costMode: 'standard',
+      requestId: 'obs-normalize-available',
+    })
+
+    assert.equal(
+      result.status,
+      'ok',
+      'La observacion local con fetch stub debe completar la normalizacion sin ReferenceError.',
+    )
+    assert.equal(result.ok, true)
+    assert.equal(result.generatedDomainContractDiagnostics?.present, true)
+    assert.equal(result.generatedDomainContractDiagnostics?.valid, true)
+    assert.equal(result.generatedDomainContractDiagnostics?.safeForLocalMaterialization, true)
+    assert.ok(result.generatedDomainContract)
+  } finally {
+    if (originalApiKey === undefined) {
+      delete process.env.OPENAI_API_KEY
+    } else {
+      process.env.OPENAI_API_KEY = originalApiKey
+    }
+
+    if (originalBaseUrl === undefined) {
+      delete process.env.AI_ORCHESTRATOR_BRAIN_OPENAI_BASE_URL
+    } else {
+      process.env.AI_ORCHESTRATOR_BRAIN_OPENAI_BASE_URL = originalBaseUrl
+    }
+
+    observationHarnessSandbox.fetch = originalFetch
+  }
+}
+
 function runDiagnosticsDebugPreviewCase() {
   const diagnostics = buildGeneratedDomainContractDiagnostics(
     {
@@ -1242,7 +1317,7 @@ function runDiagnosticsDebugPreviewCase() {
   assert.deepEqual(observationSummary.warningsPreview, summary.warningsPreview)
 }
 
-function main() {
+async function main() {
   runValidContractCase()
   runDeliveryLevelExactCase()
   runCompatibleDeliveryLevelsCase()
@@ -1280,8 +1355,12 @@ function main() {
   runPlannerObservationTimeoutStatusCase()
   runPlannerObservationOpenAIErrorStatusCase()
   runPlannerObservationDebugSummaryCase()
+  await runPlannerObservationNormalizeAvailabilityCase()
   runDiagnosticsDebugPreviewCase()
-  console.log('OK. GeneratedDomainContract smoke paso 38/38 checks.')
+  console.log('OK. GeneratedDomainContract smoke paso 39/39 checks.')
 }
 
-main()
+main().catch((error) => {
+  console.error(error instanceof Error ? error.stack || error.message : String(error))
+  process.exitCode = 1
+})

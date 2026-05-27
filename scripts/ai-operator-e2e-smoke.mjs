@@ -4,8 +4,11 @@ import vm from 'node:vm'
 import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
+  canPrepareProjectContinuityNextActionForUi,
   derivePlannerMaterializationUiState,
+  getProjectContinuityPrimaryActionLabelForUi,
   inspectPreparedFullstackLocalMaterialization,
+  resolveProjectContinuityNextRecommendedActionForUi,
 } from '../src/planner-ui-state.js'
 
 const require = createRequire(import.meta.url)
@@ -4029,6 +4032,301 @@ async function runOnlineCoursesScalableReviewShowsPrepareCtaCase() {
   }
 }
 
+async function runEducationTrainingGeneratedDomainContractShowsPrepareCtaCase() {
+  const failures = []
+  const appSource = fs.readFileSync(appFilePath, 'utf8')
+  const plannerUiStateSource = fs.readFileSync(plannerUiStateFilePath, 'utf8')
+  const scalableReviewMetadata = {
+    decisionKey: 'escuela-oficios-barrial-v1',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    businessSector: 'education-training',
+    requiresApproval: false,
+    approvalRequired: false,
+    contextHubStatus: {
+      source: 'context-hub',
+      endpoint: '/v1/packs/suggested',
+      available: false,
+      reason: 'unavailable',
+    },
+    scalableDeliveryPlan: {
+      reason:
+        'Entrega funcional local revisable para escuela de oficios barrial antes de preparar la materializacion segura.',
+    },
+    generatedDomainContract: {
+      deliveryLevel: 'fullstack-local',
+      domain: { slug: 'escuela-oficios-barrial' },
+      root: {
+        slug: 'escuela-oficios-local',
+        sourceRoot: 'escuela-oficios-local',
+        targetRoot: 'escuela-oficios-local',
+      },
+      materialization: {
+        requiredFiles: [
+          'backend/src/server.js',
+          'frontend/admin/index.html',
+          'database/schema.sql',
+        ],
+      },
+      validation: {
+        requiredPathGroups: [
+          { candidates: ['backend/src/server.js'] },
+          { candidates: ['frontend/admin/index.html'] },
+          { candidates: ['database/schema.sql'] },
+        ],
+      },
+    },
+    generatedDomainContractDiagnostics: {
+      present: true,
+      valid: true,
+      safeForLocalMaterialization: true,
+      sourceRoot: 'escuela-oficios-local',
+      targetRoot: 'escuela-oficios-local',
+      rootSlug: 'escuela-oficios-local',
+      errorsCount: 0,
+      warningsCount: 0,
+    },
+  }
+  const scalableReviewUiState = derivePlannerMaterializationUiState({
+    plannerExecutionMetadata: scalableReviewMetadata,
+    effectivePlannerExecutionMetadata: scalableReviewMetadata,
+  })
+
+  pushFailure(
+    failures,
+    scalableReviewUiState.effectiveReviewOnly === true,
+    'Escuela de oficios debe seguir en planner-only/review-only antes de preparar la entrega.',
+  )
+  pushFailure(
+    failures,
+    scalableReviewUiState.isScalableReview === true,
+    'Un generatedDomainContract valido en review-scalable-delivery debe seguir reconocido como review escalable.',
+  )
+  pushFailure(
+    failures,
+    scalableReviewUiState.looksLikeFullstackLocalReview === true,
+    'El generatedDomainContract valido y seguro debe marcar el review como fullstack local aunque falten pistas clasicas en scalableDeliveryPlan.',
+  )
+  pushFailure(
+    failures,
+    scalableReviewUiState.canPrepareFullstackLocal === true,
+    'Escuela de oficios debe habilitar Preparar entrega funcional local cuando el generatedDomainContract ya es valido y seguro.',
+  )
+  pushFailure(
+    failures,
+    scalableReviewUiState.prepareCtaVisible === true,
+    'El review escalable con generatedDomainContract valido debe mostrar un CTA de avance seguro.',
+  )
+  pushFailure(
+    failures,
+    scalableReviewUiState.prepareCtaLabel === 'Preparar entrega funcional local',
+    'El CTA principal debe seguir usando el label Preparar entrega funcional local.',
+  )
+  pushFailure(
+    failures,
+    scalableReviewUiState.materializeCtaVisible === false,
+    'El CTA de generatedDomainContract valido no debe materializar automaticamente en el review.',
+  )
+  pushFailure(
+    failures,
+    scalableReviewUiState.uiState === 'review-scalable-delivery',
+    'El review con generatedDomainContract valido debe permanecer en review-scalable-delivery hasta el siguiente click.',
+  )
+  pushFailure(
+    failures,
+    plannerUiStateSource.includes('generatedDomainContractDiagnostics') &&
+      plannerUiStateSource.includes('safeForLocalMaterialization') &&
+      plannerUiStateSource.includes('hasPendingApproval === false'),
+    'El helper central debe usar generatedDomainContractDiagnostics valid/safe y respetar approvals antes de habilitar el CTA.',
+  )
+  pushFailure(
+    failures,
+    appSource.includes('generatedDomainContractDiagnostics') &&
+      appSource.includes('generatedDomainContractObservation'),
+    'App.tsx debe preservar el generatedDomainContract y sus diagnosticos dentro de PlannerExecutionMetadata para que el CTA no dependa solo del plan legacy.',
+  )
+
+  return {
+    id: 'education-training-generated-domain-contract-shows-prepare-cta',
+    label: 'Education training generated domain contract shows prepare CTA',
+    failures,
+  }
+}
+
+async function runGeneratedDomainContractValidReviewShowsNextSafeActionCase() {
+  const failures = []
+  const scalableReviewMetadata = {
+    decisionKey: 'general-reviewable-domain-v1',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    businessSector: 'community-services',
+    requiresApproval: false,
+    approvalRequired: false,
+    scalableDeliveryPlan: {
+      reason: 'Revision segura previa a preparar la entrega local.',
+    },
+    generatedDomainContractDiagnostics: {
+      present: true,
+      valid: true,
+      safeForLocalMaterialization: true,
+      sourceRoot: 'community-services-local',
+      targetRoot: 'community-services-local',
+      errorsCount: 0,
+      warningsCount: 0,
+    },
+  }
+  const scalableReviewUiState = derivePlannerMaterializationUiState({
+    plannerExecutionMetadata: scalableReviewMetadata,
+    effectivePlannerExecutionMetadata: scalableReviewMetadata,
+  })
+
+  pushFailure(
+    failures,
+    scalableReviewUiState.prepareCtaVisible === true &&
+      scalableReviewUiState.prepareCtaKind === 'fullstack-local',
+    'Cualquier generatedDomainContract valido/seguro en review-scalable-delivery debe mostrar una accion segura de avance.',
+  )
+  pushFailure(
+    failures,
+    scalableReviewUiState.materializeCtaVisible === false,
+    'La accion segura de avance no debe transformarse en materializacion directa.',
+  )
+
+  return {
+    id: 'generated-domain-contract-valid-review-shows-next-safe-action',
+    label: 'Generated domain contract valid review shows next safe action',
+    failures,
+  }
+}
+
+async function runPrepareContinuationActionPlanShowsPrimaryCtaCase() {
+  const failures = []
+  const appSource = fs.readFileSync(appFilePath, 'utf8')
+  const continuationReviewMetadata = {
+    decisionKey: 'escuela-oficios-continuation-v1',
+    strategy: 'prepare-continuation-action-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-plan',
+    requiresApproval: false,
+    approvalRequired: false,
+    existingProjectDetection: {
+      detected: true,
+      applicable: true,
+      projectRoot: 'escuela-oficios-local',
+    },
+    activeProjectContext: {
+      mode: 'existing-project',
+      projectRoot: 'escuela-oficios-local',
+      domain: 'gestion integral de escuela de oficios barrial',
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'escuela-oficios-local',
+      domain: 'gestion integral de escuela de oficios barrial',
+      phases: [
+        { id: 'frontend-mock-flow', title: 'Frontend mock flow' },
+        { id: 'review-and-expand', title: 'Review and expand' },
+      ],
+      nextRecommendedPhase: 'review-and-expand',
+    },
+    continuationActionPlan: {
+      id: 'continuar-reportes-y-horarios',
+      title: 'Continuar reportes y horarios mock',
+      description:
+        'Preparar la siguiente accion segura para reportes, horarios y panel operativo local.',
+      targetStrategy: 'prepare-continuation-action-plan',
+      safeToPrepare: true,
+      safeToMaterialize: false,
+      requiresApproval: false,
+      blocked: false,
+      projectRoot: 'escuela-oficios-local',
+      deliveryLevel: 'fullstack-local',
+    },
+    projectContinuationState: {
+      projectStatus: 'review-only',
+      operatorMessage:
+        'Hay una siguiente accion segura lista para preparar sin tocar archivos reales.',
+      nextRecommendedAction: {
+        id: 'continuar-reportes-y-horarios',
+        title: 'Continuar reportes y horarios mock',
+        description:
+          'Preparar la siguiente accion segura para reportes, horarios y panel operativo local.',
+        targetStrategy: 'prepare-continuation-action-plan',
+        safeToPrepare: true,
+        safeToMaterialize: false,
+        requiresApproval: false,
+        blocked: false,
+        projectRoot: 'escuela-oficios-local',
+        deliveryLevel: 'fullstack-local',
+      },
+    },
+  }
+  const nextRecommendedAction = resolveProjectContinuityNextRecommendedActionForUi({
+    projectContinuationState: continuationReviewMetadata.projectContinuationState,
+    projectReadinessState: null,
+    continuationActionPlan: continuationReviewMetadata.continuationActionPlan,
+    moduleExpansionPlan: null,
+    projectPhaseExecutionPlan: null,
+    localProjectManifest: continuationReviewMetadata.localProjectManifest,
+  })
+  const canPrepare = canPrepareProjectContinuityNextActionForUi(nextRecommendedAction)
+  const primaryLabel = getProjectContinuityPrimaryActionLabelForUi(nextRecommendedAction)
+
+  pushFailure(
+    failures,
+    canPrepare === true,
+    'prepare-continuation-action-plan debe resolver una siguiente accion segura preparable.',
+  )
+  pushFailure(
+    failures,
+    primaryLabel === 'Preparar siguiente paso seguro',
+    `El CTA primario de continuation review debe ser Preparar siguiente paso seguro. Recibido: ${primaryLabel || '(vacio)'}.`,
+  )
+  pushFailure(
+    failures,
+    /plannerCanPrepareContinuationReviewAction/.test(appSource) &&
+      /plannerContinuationReviewPrimaryActionLabel/.test(appSource),
+    'App.tsx debe derivar un CTA primario especifico para continuity review en vez de caer solo en Regenerar plan.',
+  )
+  pushFailure(
+    failures,
+    appSource.indexOf('const activeProjectContinuationState =') !== -1 &&
+      appSource.indexOf('const plannerContinuationReviewAction =') !== -1 &&
+      appSource.indexOf('const activeProjectContinuationState =') <
+        appSource.indexOf('const plannerContinuationReviewAction ='),
+    'App.tsx debe inicializar activeProjectContinuationState antes de plannerContinuationReviewAction para no romper el renderer por TDZ.',
+  )
+  pushFailure(
+    failures,
+    /plannerCanPrepareContinuationReviewAction && plannerContinuationReviewAction[\s\S]{0,120}\? \(\) => handlePrepareContinuationAction\(plannerContinuationReviewAction\)/.test(
+      appSource,
+    ),
+    'El CTA primario de continuation review debe usar handlePrepareContinuationAction y no ejecutar ni materializar directo.',
+  )
+  pushFailure(
+    failures,
+    /plannerCanPrepareContinuationReviewAction[\s\S]{0,120}\? plannerContinuationReviewPrimaryActionLabel/.test(
+      appSource,
+    ),
+    'El label visible del boton primario debe salir de la rama real de continuation review.',
+  )
+  pushFailure(
+    failures,
+    !/plannerCanPrepareContinuationReviewAction[\s\S]{0,240}handleMaterializeContinuationAction/.test(
+      appSource,
+    ),
+    'La rama primaria de continuation review no debe disparar materializacion automatica.',
+  )
+
+  return {
+    id: 'prepare-continuation-action-plan-shows-primary-cta',
+    label: 'Prepare continuation action plan shows primary CTA',
+    failures,
+  }
+}
+
 async function runOnlineCoursesMaterializationContractCase() {
   const result = await requestOnlineCoursesPreparedMaterializationDecision()
   const failures = [...(Array.isArray(result.failures) ? result.failures : [])]
@@ -6257,6 +6555,9 @@ async function main() {
     results.push(await runMaterializeFullstackLocalPlanResponseOverridesReviewStateCase())
     results.push(await runTrackingLogisticsScalableReviewShowsPrepareCtaCase())
     results.push(await runOnlineCoursesScalableReviewShowsPrepareCtaCase())
+    results.push(await runEducationTrainingGeneratedDomainContractShowsPrepareCtaCase())
+    results.push(await runGeneratedDomainContractValidReviewShowsNextSafeActionCase())
+    results.push(await runPrepareContinuationActionPlanShowsPrimaryCtaCase())
     results.push(await runOnlineCoursesMaterializationContractCase())
     results.push(await runOnlineCoursesRootMismatchBlockedCase())
     results.push(await runOnlineCoursesInvalidOpenAIMaterializationFallsBackCase())

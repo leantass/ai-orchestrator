@@ -6,6 +6,328 @@ const normalizeOptionalStringArray = (value) =>
     ? value.map((entry) => normalizeOptionalString(entry)).filter(Boolean)
     : []
 
+const normalizeContinuationActionCandidateForUi = (value) => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const normalizedValue = {
+    ...(normalizeOptionalString(value.id) ? { id: normalizeOptionalString(value.id) } : {}),
+    ...(normalizeOptionalString(value.title)
+      ? { title: normalizeOptionalString(value.title) }
+      : {}),
+    ...(normalizeOptionalString(value.description)
+      ? { description: normalizeOptionalString(value.description) }
+      : {}),
+    ...(normalizeOptionalString(value.category)
+      ? { category: normalizeOptionalString(value.category) }
+      : {}),
+    ...(normalizeOptionalString(value.targetStrategy)
+      ? { targetStrategy: normalizeOptionalString(value.targetStrategy) }
+      : {}),
+    ...(typeof value.safeToPrepare === 'boolean'
+      ? { safeToPrepare: value.safeToPrepare }
+      : {}),
+    ...(typeof value.safeToMaterialize === 'boolean'
+      ? { safeToMaterialize: value.safeToMaterialize }
+      : {}),
+    ...(typeof value.requiresApproval === 'boolean'
+      ? { requiresApproval: value.requiresApproval }
+      : {}),
+    ...(typeof value.blocked === 'boolean' ? { blocked: value.blocked } : {}),
+    ...(normalizeOptionalString(value.blocker)
+      ? { blocker: normalizeOptionalString(value.blocker) }
+      : {}),
+    ...(normalizeOptionalString(value.approvalType)
+      ? { approvalType: normalizeOptionalString(value.approvalType) }
+      : {}),
+    ...(normalizeOptionalString(value.expectedOutcome)
+      ? { expectedOutcome: normalizeOptionalString(value.expectedOutcome) }
+      : {}),
+    ...(typeof value.recommended === 'boolean'
+      ? { recommended: value.recommended }
+      : {}),
+    ...(Number.isFinite(value.priority) ? { priority: value.priority } : {}),
+    ...(normalizeOptionalString(value.phaseId)
+      ? { phaseId: normalizeOptionalString(value.phaseId) }
+      : {}),
+    ...(normalizeOptionalString(value.moduleId)
+      ? { moduleId: normalizeOptionalString(value.moduleId) }
+      : {}),
+    ...(normalizeOptionalString(value.riskLevel)
+      ? { riskLevel: normalizeOptionalString(value.riskLevel) }
+      : {}),
+    ...(normalizeOptionalString(value.projectRoot)
+      ? { projectRoot: normalizeOptionalString(value.projectRoot) }
+      : {}),
+    ...(normalizeOptionalString(value.deliveryLevel)
+      ? { deliveryLevel: normalizeOptionalString(value.deliveryLevel) }
+      : {}),
+    ...(normalizeOptionalString(value.reason)
+      ? { reason: normalizeOptionalString(value.reason) }
+      : {}),
+    ...(normalizeOptionalStringArray(value.targetFiles).length > 0
+      ? { targetFiles: normalizeOptionalStringArray(value.targetFiles) }
+      : {}),
+    ...(normalizeOptionalStringArray(value.allowedTargetPaths).length > 0
+      ? { allowedTargetPaths: normalizeOptionalStringArray(value.allowedTargetPaths) }
+      : {}),
+    ...(normalizeOptionalStringArray(value.explicitExclusions).length > 0
+      ? { explicitExclusions: normalizeOptionalStringArray(value.explicitExclusions) }
+      : {}),
+    ...(normalizeOptionalStringArray(value.successCriteria).length > 0
+      ? { successCriteria: normalizeOptionalStringArray(value.successCriteria) }
+      : {}),
+  }
+
+  return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
+}
+
+const buildPreparedModuleExpansionReviewActionForUi = (moduleExpansionPlan) => {
+  if (!moduleExpansionPlan || typeof moduleExpansionPlan !== 'object') {
+    return null
+  }
+
+  const moduleId = normalizeOptionalString(moduleExpansionPlan.moduleId)
+  if (!moduleId) {
+    return null
+  }
+
+  return normalizeContinuationActionCandidateForUi({
+    id: `prepared-module-${moduleId}`,
+    title:
+      normalizeOptionalString(moduleExpansionPlan.moduleName) ||
+      moduleId ||
+      'Modulo preparado',
+    description:
+      normalizeOptionalString(moduleExpansionPlan.reason) ||
+      'Hay una expansion preparada para revisar.',
+    category: normalizeOptionalString(moduleExpansionPlan.expansionType),
+    targetStrategy:
+      moduleExpansionPlan.safeToMaterialize === true
+        ? 'materialize-module-expansion-plan'
+        : 'prepare-module-expansion-plan',
+    safeToPrepare: moduleExpansionPlan.safeToPrepare !== false,
+    safeToMaterialize: moduleExpansionPlan.safeToMaterialize === true,
+    requiresApproval: moduleExpansionPlan.approvalRequired === true,
+    blocked: normalizeOptionalStringArray(moduleExpansionPlan.blockers).length > 0,
+    blocker: normalizeOptionalStringArray(moduleExpansionPlan.blockers)[0] || '',
+    moduleId,
+    riskLevel: normalizeOptionalString(moduleExpansionPlan.riskLevel),
+    projectRoot: normalizeOptionalString(moduleExpansionPlan.projectRoot),
+    reason: normalizeOptionalString(moduleExpansionPlan.reason),
+    targetFiles: moduleExpansionPlan.targetFiles || [],
+    allowedTargetPaths: moduleExpansionPlan.allowedTargetPaths || [],
+    explicitExclusions: moduleExpansionPlan.explicitExclusions || [],
+    successCriteria: moduleExpansionPlan.successCriteria || [],
+    expectedOutcome:
+      'Dejar la expansion del modulo lista para revision o materializacion segura.',
+  })
+}
+
+const buildPreparedProjectPhaseReviewActionForUi = ({
+  projectPhaseExecutionPlan,
+  manifestPhases,
+}) => {
+  if (!projectPhaseExecutionPlan || typeof projectPhaseExecutionPlan !== 'object') {
+    return null
+  }
+
+  const phaseId = normalizeOptionalString(projectPhaseExecutionPlan.phaseId)
+  if (!phaseId) {
+    return null
+  }
+
+  const phaseTitle =
+    normalizeOptionalString(
+      (Array.isArray(manifestPhases) ? manifestPhases : []).find(
+        (phase) => normalizeOptionalString(phase?.id) === phaseId,
+      )?.title,
+    ) ||
+    phaseId ||
+    'Fase preparada'
+
+  return normalizeContinuationActionCandidateForUi({
+    id: `prepared-phase-${phaseId}`,
+    title: phaseTitle,
+    description:
+      normalizeOptionalString(projectPhaseExecutionPlan.reason) ||
+      'Hay una fase preparada para revisar.',
+    category: 'project-phase',
+    targetStrategy:
+      normalizeOptionalString(projectPhaseExecutionPlan.targetStrategy) ||
+      'prepare-project-phase-plan',
+    safeToPrepare: true,
+    safeToMaterialize: projectPhaseExecutionPlan.executableNow === true,
+    requiresApproval: projectPhaseExecutionPlan.approvalRequired === true,
+    blocked: normalizeOptionalStringArray(projectPhaseExecutionPlan.blockers).length > 0,
+    blocker: normalizeOptionalStringArray(projectPhaseExecutionPlan.blockers)[0] || '',
+    phaseId,
+    riskLevel: normalizeOptionalString(projectPhaseExecutionPlan.riskLevel),
+    projectRoot: normalizeOptionalString(projectPhaseExecutionPlan.projectRoot),
+    reason: normalizeOptionalString(projectPhaseExecutionPlan.reason),
+    targetFiles: projectPhaseExecutionPlan.targetFiles || [],
+    allowedTargetPaths: projectPhaseExecutionPlan.allowedTargetPaths || [],
+    explicitExclusions: projectPhaseExecutionPlan.explicitExclusions || [],
+    successCriteria: projectPhaseExecutionPlan.successCriteria || [],
+    expectedOutcome: 'Dejar la fase lista para revision o materializacion segura.',
+  })
+}
+
+export const resolveProjectContinuityNextRecommendedActionForUi = ({
+  projectContinuationState,
+  projectReadinessState,
+  continuationActionPlan,
+  moduleExpansionPlan,
+  projectPhaseExecutionPlan,
+  localProjectManifest,
+}) => {
+  const manifestPhases = Array.isArray(localProjectManifest?.phases)
+    ? localProjectManifest.phases
+    : []
+
+  return (
+    normalizeContinuationActionCandidateForUi(projectContinuationState?.nextRecommendedAction) ||
+    normalizeContinuationActionCandidateForUi(continuationActionPlan) ||
+    normalizeContinuationActionCandidateForUi(projectReadinessState?.nextBestAction) ||
+    buildPreparedModuleExpansionReviewActionForUi(moduleExpansionPlan) ||
+    buildPreparedProjectPhaseReviewActionForUi({
+      projectPhaseExecutionPlan,
+      manifestPhases,
+    }) ||
+    null
+  )
+}
+
+export const canPrepareProjectContinuityNextActionForUi = (action) =>
+  Boolean(action) &&
+  action.safeToPrepare !== false &&
+  action.requiresApproval !== true &&
+  action.blocked !== true
+
+export const getProjectContinuityPrimaryActionLabelForUi = (action) => {
+  if (!action || typeof action !== 'object') {
+    return ''
+  }
+
+  const targetStrategy = normalizeOptionalString(action.targetStrategy).toLocaleLowerCase()
+  const phaseId = normalizeOptionalString(action.phaseId)
+  const moduleId = normalizeOptionalString(action.moduleId)
+  const deliveryLevel = normalizeOptionalString(action.deliveryLevel).toLocaleLowerCase()
+
+  if (
+    phaseId ||
+    targetStrategy === 'prepare-project-phase-plan' ||
+    targetStrategy === 'materialize-project-phase-plan'
+  ) {
+    return 'Preparar siguiente fase segura'
+  }
+
+  if (
+    moduleId ||
+    targetStrategy === 'prepare-module-expansion-plan' ||
+    targetStrategy === 'materialize-module-expansion-plan'
+  ) {
+    return 'Preparar siguiente expansion segura'
+  }
+
+  if (
+    targetStrategy === 'materialize-fullstack-local-plan' ||
+    (action.safeToMaterialize === true && deliveryLevel === 'fullstack-local')
+  ) {
+    return 'Preparar materializacion local segura'
+  }
+
+  return 'Preparar siguiente paso seguro'
+}
+
+const resolveGeneratedDomainContractDiagnosticsForUi = ({
+  currentMetadata,
+  effectiveMetadata,
+}) => {
+  const candidate =
+    effectiveMetadata?.generatedDomainContractDiagnostics &&
+    typeof effectiveMetadata.generatedDomainContractDiagnostics === 'object'
+      ? effectiveMetadata.generatedDomainContractDiagnostics
+      : currentMetadata?.generatedDomainContractDiagnostics &&
+          typeof currentMetadata.generatedDomainContractDiagnostics === 'object'
+        ? currentMetadata.generatedDomainContractDiagnostics
+        : null
+
+  if (!candidate) {
+    return null
+  }
+
+  return candidate
+}
+
+const resolveGeneratedDomainContractForUi = ({ currentMetadata, effectiveMetadata }) => {
+  const candidate =
+    effectiveMetadata?.generatedDomainContract &&
+    typeof effectiveMetadata.generatedDomainContract === 'object'
+      ? effectiveMetadata.generatedDomainContract
+      : currentMetadata?.generatedDomainContract &&
+          typeof currentMetadata.generatedDomainContract === 'object'
+        ? currentMetadata.generatedDomainContract
+        : null
+
+  if (!candidate) {
+    return null
+  }
+
+  return candidate
+}
+
+const hasConsistentGeneratedDomainContractRootForUi = ({
+  generatedDomainContract,
+  generatedDomainContractDiagnostics,
+}) => {
+  const contractRoot =
+    generatedDomainContract?.root && typeof generatedDomainContract.root === 'object'
+      ? generatedDomainContract.root
+      : null
+  const sourceRoot = normalizeOptionalString(
+    contractRoot?.sourceRoot ||
+      generatedDomainContract?.sourceRoot ||
+      generatedDomainContractDiagnostics?.sourceRoot,
+  )
+  const targetRoot = normalizeOptionalString(
+    contractRoot?.targetRoot ||
+      generatedDomainContract?.targetRoot ||
+      generatedDomainContractDiagnostics?.targetRoot,
+  )
+
+  if (!sourceRoot || !targetRoot) {
+    return true
+  }
+
+  return normalizeText(sourceRoot) === normalizeText(targetRoot)
+}
+
+const hasSafeGeneratedDomainContractReviewSignalForUi = ({
+  currentMetadata,
+  effectiveMetadata,
+}) => {
+  const generatedDomainContractDiagnostics = resolveGeneratedDomainContractDiagnosticsForUi({
+    currentMetadata,
+    effectiveMetadata,
+  })
+  const generatedDomainContract = resolveGeneratedDomainContractForUi({
+    currentMetadata,
+    effectiveMetadata,
+  })
+
+  return (
+    generatedDomainContractDiagnostics?.present === true &&
+    generatedDomainContractDiagnostics?.valid === true &&
+    generatedDomainContractDiagnostics?.safeForLocalMaterialization === true &&
+    hasConsistentGeneratedDomainContractRootForUi({
+      generatedDomainContract,
+      generatedDomainContractDiagnostics,
+    })
+  )
+}
+
 const normalizeText = (value) =>
   normalizeOptionalString(value)
     .normalize('NFD')
@@ -651,6 +973,14 @@ export const derivePlannerMaterializationUiState = ({
           typeof currentMetadata.projectContinuationState === 'object'
         ? currentMetadata.projectContinuationState
         : null
+  const generatedDomainContractDiagnostics = resolveGeneratedDomainContractDiagnosticsForUi({
+    currentMetadata,
+    effectiveMetadata,
+  })
+  const generatedDomainContract = resolveGeneratedDomainContractForUi({
+    currentMetadata,
+    effectiveMetadata,
+  })
   const tasks = Array.isArray(effectiveMetadata?.tasks)
     ? effectiveMetadata.tasks
     : Array.isArray(currentMetadata?.tasks)
@@ -669,6 +999,11 @@ export const derivePlannerMaterializationUiState = ({
   const normalizedExecutionMode = normalizeOptionalString(
     currentMetadata?.executionMode || effectiveMetadata?.executionMode,
   ).toLocaleLowerCase()
+  const hasPendingApproval =
+    currentMetadata?.approvalRequired === true ||
+    effectiveMetadata?.approvalRequired === true ||
+    currentMetadata?.requiresApproval === true ||
+    effectiveMetadata?.requiresApproval === true
   const scalableDeliveryLevel = normalizeOptionalString(
     scalableDeliveryPlan?.deliveryLevel ||
       nextActionPlan?.targetDeliveryLevel ||
@@ -692,6 +1027,9 @@ export const derivePlannerMaterializationUiState = ({
     currentMetadata?.businessSector,
     currentMetadata?.creativeProfile,
     currentMetadata?.nextExpectedAction,
+    generatedDomainContract?.deliveryLevel,
+    generatedDomainContract?.root?.slug,
+    generatedDomainContractDiagnostics?.rootSlug,
     scalableDeliveryPlan?.deliveryLevel,
     scalableDeliveryPlan?.reason,
     nextActionPlan?.currentState,
@@ -721,6 +1059,20 @@ export const derivePlannerMaterializationUiState = ({
     ...normalizeOptionalStringArray(scalableDeliveryPlan?.targetStructure),
     ...normalizeOptionalStringArray(scalableDeliveryPlan?.directories),
     ...normalizeOptionalStringArray(scalableDeliveryPlan?.allowedRootPaths),
+    normalizeOptionalString(generatedDomainContract?.root?.sourceRoot),
+    normalizeOptionalString(generatedDomainContract?.root?.targetRoot),
+    ...normalizeOptionalStringArray(
+      Array.isArray(generatedDomainContract?.materialization?.requiredFiles)
+        ? generatedDomainContract.materialization.requiredFiles
+        : [],
+    ),
+    ...normalizeOptionalStringArray(
+      Array.isArray(generatedDomainContract?.validation?.requiredPathGroups)
+        ? generatedDomainContract.validation.requiredPathGroups.flatMap((group) =>
+            Array.isArray(group?.candidates) ? group.candidates : [],
+          )
+        : [],
+    ),
     ...normalizeOptionalStringArray(
       Array.isArray(scalableDeliveryPlan?.filesToCreate)
         ? scalableDeliveryPlan.filesToCreate.map((entry) =>
@@ -751,6 +1103,12 @@ export const derivePlannerMaterializationUiState = ({
         value.includes('routes') ||
         value.includes('pages'),
     )
+  const generatedDomainContractSafeReviewSignal =
+    hasPendingApproval === false &&
+    hasSafeGeneratedDomainContractReviewSignalForUi({
+      currentMetadata,
+      effectiveMetadata,
+    })
   const looksLikeFullstackLocalReview =
     scalableDeliveryLevel === 'fullstack-local' ||
     targetDeliveryLevel === 'fullstack-local' ||
@@ -760,7 +1118,8 @@ export const derivePlannerMaterializationUiState = ({
     reviewHintSurface.includes('materialize-fullstack-local-plan') ||
     reviewHintSurface.includes('backend local') ||
     reviewHintSurface.includes('sqlite') ||
-    structureLooksLikeFullstackLocal
+    structureLooksLikeFullstackLocal ||
+    generatedDomainContractSafeReviewSignal
   const looksLikeFrontendProjectReview =
     scalableDeliveryLevel === 'frontend-project' ||
     targetDeliveryLevel === 'frontend-project' ||
@@ -784,7 +1143,9 @@ export const derivePlannerMaterializationUiState = ({
       Boolean(scalableDeliveryPlan) &&
       scalableDeliveryLevel !== 'safe-first-delivery')
   const canPrepareFullstackLocal =
-    plannerIsScalableDeliveryReview && looksLikeFullstackLocalReview
+    plannerIsScalableDeliveryReview &&
+    hasPendingApproval === false &&
+    looksLikeFullstackLocalReview
   const canPrepareFrontendProject =
     plannerIsScalableDeliveryReview && looksLikeFrontendProjectReview
   const prepareCtaKind = canPrepareFullstackLocal
