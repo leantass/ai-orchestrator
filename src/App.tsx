@@ -39,6 +39,7 @@ import {
   getValidationStatusLabel,
 } from './project-state-labels'
 import {
+  canGenerateContinuationReviewFallbackForUi,
   canPrepareProjectContinuityNextActionForUi,
   derivePlannerNextExpectedActionForUi,
   derivePlannerMaterializationUiState,
@@ -12926,6 +12927,17 @@ function App() {
     plannerCanPrepareContinuationReviewAction
       ? getProjectContinuityPrimaryActionLabelForUi(plannerContinuationReviewAction)
       : ''
+  const plannerCanFallbackGenerateContinuationReviewAction =
+    plannerIsReviewOnly &&
+    !plannerCanPrepareContinuationReviewAction &&
+    !plannerIsProjectPhaseReview &&
+    !plannerIsSafeFirstDeliveryReview &&
+    !plannerIsProductArchitectureReview &&
+    !plannerIsScalableDeliveryReview &&
+    canGenerateContinuationReviewFallbackForUi({
+      plannerExecutionMetadata,
+      effectivePlannerExecutionMetadata: plannerExecutionMetadata,
+    })
   const plannerReviewStatusLabel = plannerIsReviewOnly
     ? plannerIsProjectPhaseReview
       ? 'Fase segura en revision'
@@ -12947,9 +12959,11 @@ function App() {
       : plannerIsProductArchitectureReview
           ? 'Estas revisando una arquitectura inicial. El CTA azul prepara la primera entrega segura; todavia no ejecuta cambios.'
         : plannerIsScalableDeliveryReview
-          ? 'Estas revisando una entrega funcional local mas amplia. El CTA azul prepara la materializacion, pero todavia no ejecuta cambios.'
+        ? 'Estas revisando una entrega funcional local mas amplia. El CTA azul prepara la materializacion, pero todavia no ejecuta cambios.'
           : plannerCanPrepareContinuationReviewAction
             ? 'Estas revisando la siguiente continuidad segura. El CTA azul solo prepara el siguiente paso; todavia no escribe archivos.'
+            : plannerCanFallbackGenerateContinuationReviewAction
+              ? 'Estas revisando una continuidad segura sin accion preparada en el payload. El CTA azul solo genera el siguiente paso; todavia no escribe archivos.'
           : 'Este bloque quedo en revision manual. Primero se entiende y despues se decide si conviene preparar o ejecutar.'
     : 'La instruccion actual ya es ejecutable y el CTA amarillo puede materializar o continuar sobre el workspace.'
   const plannerReviewActionLabel = plannerIsSafeFirstDeliveryReview
@@ -12962,6 +12976,8 @@ function App() {
         : 'Revisar fase segura'
       : plannerCanPrepareContinuationReviewAction
         ? plannerContinuationReviewPrimaryActionLabel || 'Preparar siguiente paso seguro'
+      : plannerCanFallbackGenerateContinuationReviewAction
+        ? 'Generar siguiente paso'
       : plannerIsScalableDeliveryReview
         ? 'Plan escalable revisable'
         : 'Revisar arquitectura'
@@ -15038,11 +15054,15 @@ function App() {
                           ? 'Revisa la arquitectura inicial.'
                           : plannerCanPrepareContinuationReviewAction
                             ? 'Revisa el siguiente paso seguro.'
+                            : plannerCanFallbackGenerateContinuationReviewAction
+                              ? 'Genera el siguiente paso seguro.'
                           : 'Revisa el resumen del plan.',
                         detail: plannerIsProductArchitectureReview
                           ? 'Si esta correcta, prepara la primera entrega segura. El detalle tecnico queda abajo.'
                           : plannerCanPrepareContinuationReviewAction
                             ? 'Si esta correcto, prepara el siguiente paso seguro. El detalle tecnico queda abajo.'
+                            : plannerCanFallbackGenerateContinuationReviewAction
+                              ? 'Si esta correcto, genera el siguiente paso seguro. El detalle tecnico queda abajo.'
                           : 'Si esta correcto, prepara la ejecucion. El detalle tecnico queda abajo.',
                         icon: 'next' as const,
                       },
@@ -15117,6 +15137,8 @@ function App() {
                         ? 'Si el resumen esta bien, prepara la primera entrega segura.'
                         : plannerCanPrepareContinuationReviewAction
                           ? 'Si el resumen esta bien, prepara el siguiente paso seguro.'
+                        : plannerCanFallbackGenerateContinuationReviewAction
+                          ? 'Si el resumen esta bien, genera el siguiente paso seguro.'
                         : 'Si el resumen esta bien, prepara la ejecucion.'
                     : guidedStepActionSummaryLabel,
                 detail:
@@ -19618,6 +19640,8 @@ function App() {
       ? 'Preparar ejecucion local segura'
       : plannerCanPrepareContinuationReviewAction
         ? plannerContinuationReviewPrimaryActionLabel
+      : plannerCanFallbackGenerateContinuationReviewAction
+        ? 'Generar siguiente paso'
       : plannerIsScalableDeliveryReview
         ? plannerScalableReviewPreparationKind === 'fullstack-local'
           ? 'Preparar entrega funcional local'
@@ -19636,6 +19660,8 @@ function App() {
         ? handlePrepareSafeMaterializationPlan
         : plannerCanPrepareContinuationReviewAction && plannerContinuationReviewAction
           ? () => handlePrepareContinuationAction(plannerContinuationReviewAction)
+        : plannerCanFallbackGenerateContinuationReviewAction
+          ? () => handleGenerateNextStep()
         : plannerIsScalableDeliveryReview
           ? plannerScalableReviewPreparationKind === 'fullstack-local'
             ? handlePrepareFullstackLocalMaterializationPlan
@@ -19649,6 +19675,8 @@ function App() {
       ? 'Preparando ejecucion...'
       : plannerCanPrepareContinuationReviewAction
         ? 'Preparando siguiente paso...'
+      : plannerCanFallbackGenerateContinuationReviewAction
+        ? 'Generando siguiente paso...'
       : plannerIsScalableDeliveryReview
         ? plannerScalableReviewPreparationKind === 'fullstack-local'
           ? 'Preparando entrega...'

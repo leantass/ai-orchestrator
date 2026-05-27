@@ -19,6 +19,7 @@ const {
   deriveForbiddenSearchPatternsFromContract,
   isContractSafeForLocalMaterialization,
   buildGeneratedDomainContractDiagnostics,
+  buildGeneratedDomainContractComparison,
 } = require('../electron/generated-domain-contract.cjs')
 const {
   LOCAL_MATERIALIZATION_PLAN_VERSION,
@@ -89,6 +90,7 @@ module.exports = {
     validateGeneratedDomainContract,
     isContractSafeForLocalMaterialization,
     buildGeneratedDomainContractDiagnostics,
+    buildGeneratedDomainContractComparison,
     extractGeneratedDomainContractCandidate:
       require('../electron/generated-domain-contract.cjs').extractGeneratedDomainContractCandidate,
     AbortController,
@@ -988,6 +990,12 @@ function runBrainDecisionContractObservationCase() {
   assert.equal(withContract.generatedDomainContractDiagnostics?.present, true)
   assert.equal(withContract.generatedDomainContractDiagnostics?.valid, true)
   assert.equal(withContract.generatedDomainContractDiagnostics?.safeForLocalMaterialization, true)
+  assert.equal(withContract.generatedDomainContractComparison?.present, true)
+  assert.equal(withContract.generatedDomainContractComparison?.compared, true)
+  assert.ok(
+    ['compared', 'partial'].includes(withContract.generatedDomainContractComparison?.status),
+    'El payload final debe adjuntar generatedDomainContractComparison sin romper el plan legacy.',
+  )
   assert.equal(withContract.strategy, withoutContract.strategy)
   assert.equal(withContract.executionMode, withoutContract.executionMode)
   assert.equal(withContract.nextExpectedAction, withoutContract.nextExpectedAction)
@@ -1188,6 +1196,133 @@ function runPlannerObservationDebugSummaryCase() {
   assert.equal(summary.errorPreview, 'fetch failed')
 }
 
+function createComparisonAlignedLegacyDecision() {
+  const contract = createValidInventedContract()
+
+  return {
+    decisionKey: 'carnivorous-plant-nursery-fullstack-local-v1',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    businessSector: 'carnivorous plant nursery',
+    reason:
+      'Fullstack local para carnivorous plant nursery con frontend publico, panel admin, panel care, backend local y database sqlite.',
+    instruction:
+      'Sin deploy, sin Docker, sin credenciales, sin servicios externos y con pagos solo mock.',
+    sourceRoot: contract.root.sourceRoot,
+    targetRoot: contract.root.targetRoot,
+    tasks: [
+      'Preparar frontend publico para catalogo de plantas carnivorous.',
+      'Preparar panel admin para reportes y ventas mock.',
+      'Preparar panel care para alertas de riego y mantenimiento.',
+      'Definir backend routes y services locales.',
+      'Definir database sqlite con schema y seed local.',
+    ],
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      reason:
+        'Entrega revisable con backend local, database sqlite, frontend publico, admin y care panel.',
+      projectRoot: contract.root.targetRoot,
+      allowedRootPaths: [
+        contract.root.targetRoot,
+        `${contract.root.targetRoot}/frontend/public/index.html`,
+        `${contract.root.targetRoot}/frontend/admin/index.html`,
+        `${contract.root.targetRoot}/frontend/care/index.html`,
+        `${contract.root.targetRoot}/backend/src/server.js`,
+      ],
+      directories: [
+        `${contract.root.targetRoot}/frontend/public`,
+        `${contract.root.targetRoot}/frontend/admin`,
+        `${contract.root.targetRoot}/frontend/care`,
+        `${contract.root.targetRoot}/backend/src`,
+        `${contract.root.targetRoot}/database`,
+      ],
+      filesToCreate: [
+        { path: `${contract.root.targetRoot}/frontend/public/index.html` },
+        { path: `${contract.root.targetRoot}/frontend/admin/index.html` },
+        { path: `${contract.root.targetRoot}/frontend/care/index.html` },
+        { path: `${contract.root.targetRoot}/backend/src/server.js` },
+        { path: `${contract.root.targetRoot}/database/schema.sql` },
+      ],
+      explicitExclusions: [
+        'Sin deploy',
+        'Sin Docker',
+        'Sin credenciales',
+        'Sin servicios externos',
+      ],
+    },
+    executionScope: {
+      projectRoot: contract.root.targetRoot,
+      allowedTargetPaths: [
+        contract.root.targetRoot,
+        `${contract.root.targetRoot}/frontend/public/index.html`,
+        `${contract.root.targetRoot}/frontend/admin/index.html`,
+        `${contract.root.targetRoot}/frontend/care/index.html`,
+        `${contract.root.targetRoot}/backend/src/server.js`,
+        `${contract.root.targetRoot}/database/schema.sql`,
+      ],
+    },
+    generatedDomainContract: contract,
+  }
+}
+
+function runGeneratedDomainContractComparisonComparedCase() {
+  const comparison = buildGeneratedDomainContractComparison(
+    createComparisonAlignedLegacyDecision(),
+    repoRoot,
+  )
+
+  assert.equal(comparison.present, true)
+  assert.equal(comparison.compared, true)
+  assert.equal(comparison.status, 'compared')
+  assert.equal(comparison.errorsCount, 0)
+  assert.equal(comparison.warningsCount, 0)
+  assert.equal(comparison.roots.aligned, true)
+  assert.equal(comparison.backend.aligned, true)
+  assert.equal(comparison.database.aligned, true)
+  assert.equal(comparison.safety.aligned, true)
+}
+
+function runGeneratedDomainContractComparisonPartialCase() {
+  const contract = createValidInventedContract()
+  const comparison = buildGeneratedDomainContractComparison(
+    {
+      decisionKey: 'partial-generated-domain-contract-review',
+      strategy: 'scalable-delivery-plan',
+      executionMode: 'planner-only',
+      nextExpectedAction: 'review-scalable-delivery',
+      businessSector: 'education',
+      reason: 'Plan legacy todavia incompleto para una entrega futura.',
+      generatedDomainContract: contract,
+    },
+    repoRoot,
+  )
+
+  assert.equal(comparison.present, true)
+  assert.equal(comparison.compared, true)
+  assert.equal(comparison.status, 'partial')
+  assert.ok(comparison.warningsCount > 0)
+  assert.equal(comparison.errorsCount, 0)
+}
+
+function runGeneratedDomainContractComparisonNotAvailableCase() {
+  const comparison = buildGeneratedDomainContractComparison(
+    {
+      decisionKey: 'legacy-only-plan',
+      strategy: 'scalable-delivery-plan',
+      executionMode: 'planner-only',
+      nextExpectedAction: 'review-scalable-delivery',
+    },
+    repoRoot,
+  )
+
+  assert.equal(comparison.present, false)
+  assert.equal(comparison.compared, false)
+  assert.equal(comparison.status, 'not-available')
+  assert.equal(comparison.warningsCount, 0)
+  assert.equal(comparison.errorsCount, 0)
+}
+
 async function runPlannerObservationNormalizeAvailabilityCase() {
   assert.equal(
     typeof observationHarness.observeGeneratedDomainContractForPlannerDecision,
@@ -1346,6 +1481,9 @@ async function main() {
   runDecisionWithExternalApiCase()
   runOpenAIPromptContractRequestCase()
   runOpenAISchemaContractFieldCase()
+  runGeneratedDomainContractComparisonComparedCase()
+  runGeneratedDomainContractComparisonPartialCase()
+  runGeneratedDomainContractComparisonNotAvailableCase()
   runBrainDecisionContractObservationCase()
   runPlannerObservationMergeOkCase()
   runPlannerObservationMergeTimeoutCase()
@@ -1357,7 +1495,7 @@ async function main() {
   runPlannerObservationDebugSummaryCase()
   await runPlannerObservationNormalizeAvailabilityCase()
   runDiagnosticsDebugPreviewCase()
-  console.log('OK. GeneratedDomainContract smoke paso 39/39 checks.')
+  console.log('OK. GeneratedDomainContract smoke paso 42/42 checks.')
 }
 
 main().catch((error) => {

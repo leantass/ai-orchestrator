@@ -144,6 +144,7 @@ const {
   validateGeneratedDomainContract,
   isContractSafeForLocalMaterialization,
   buildGeneratedDomainContractDiagnostics,
+  buildGeneratedDomainContractComparison,
   extractGeneratedDomainContractCandidate,
 } = require('./generated-domain-contract.cjs')
 
@@ -504,6 +505,59 @@ function summarizeGeneratedDomainContractObservationForDebug(observation) {
     ...(errorSummary.preview.length > 0 ? { errorsPreview: errorSummary.preview } : {}),
     ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
     ...(warningSummary.preview.length > 0 ? { warningsPreview: warningSummary.preview } : {}),
+  }
+}
+
+function summarizeGeneratedDomainContractComparisonForDebug(comparison) {
+  if (!comparison || typeof comparison !== 'object') {
+    return {
+      present: false,
+      compared: false,
+      status: 'not-available',
+    }
+  }
+
+  const warnings = Array.isArray(comparison.warnings) ? comparison.warnings : []
+  const errors = Array.isArray(comparison.errors) ? comparison.errors : []
+
+  return {
+    present: comparison.present === true,
+    compared: comparison.compared === true,
+    status:
+      typeof comparison.status === 'string' && comparison.status.trim()
+        ? comparison.status.trim()
+        : 'not-available',
+    safeForDiagnostics: comparison.safeForDiagnostics === true,
+    domainAligned: comparison.domain?.aligned === true,
+    rootsAligned: comparison.roots?.aligned === true,
+    backendAligned: comparison.backend?.aligned === true,
+    databaseAligned: comparison.database?.aligned === true,
+    safetyAligned: comparison.safety?.aligned === true,
+    materializationAligned: comparison.materialization?.aligned === true,
+    warningsCount: warnings.length,
+    errorsCount: errors.length,
+    ...(typeof comparison.domain?.contractSlug === 'string' &&
+    comparison.domain.contractSlug.trim()
+      ? { contractSlug: comparison.domain.contractSlug.trim() }
+      : {}),
+    ...(typeof comparison.roots?.contractRoot === 'string' &&
+    comparison.roots.contractRoot.trim()
+      ? { contractRoot: comparison.roots.contractRoot.trim() }
+      : {}),
+    ...(typeof comparison.roots?.legacyRoot === 'string' &&
+    comparison.roots.legacyRoot.trim()
+      ? { legacyRoot: comparison.roots.legacyRoot.trim() }
+      : {}),
+    ...(warnings.length > 0
+      ? {
+          firstWarning: sanitizeGeneratedDomainContractDebugPreview(warnings[0], 180),
+        }
+      : {}),
+    ...(errors.length > 0
+      ? {
+          firstError: sanitizeGeneratedDomainContractDebugPreview(errors[0], 180),
+        }
+      : {}),
   }
 }
 
@@ -35676,6 +35730,19 @@ function applyGeneratedDomainContractObservationToDecision({
     mergedDecision.generatedDomainContractDiagnostics = { present: false }
   }
 
+  if (
+    normalizedObservation.generatedDomainContractComparison &&
+    typeof normalizedObservation.generatedDomainContractComparison === 'object' &&
+    !(
+      mergedDecision.generatedDomainContractComparison &&
+      typeof mergedDecision.generatedDomainContractComparison === 'object' &&
+      mergedDecision.generatedDomainContractComparison.compared === true
+    )
+  ) {
+    mergedDecision.generatedDomainContractComparison =
+      normalizedObservation.generatedDomainContractComparison
+  }
+
   return mergedDecision
 }
 
@@ -35855,6 +35922,37 @@ function buildBrainDecisionContract({
       : {},
     workspacePath,
   )
+  const normalizedExecutionScope = normalizeExecutorExecutionScope(executionScope)
+  const resolvedNextExpectedAction =
+    nextExpectedAction ||
+    resolvedApprovalRequest?.nextExpectedAction ||
+    (completed === true ? 'final-result' : 'execute-plan')
+  const generatedDomainContractComparison = buildGeneratedDomainContractComparison(
+    {
+      decisionKey: decisionKey || strategy || 'brain-decision',
+      strategy,
+      executionMode,
+      businessSector,
+      businessSectorLabel,
+      reason: resolvedReason,
+      question: resolvedQuestion,
+      instruction,
+      tasks: Array.isArray(tasks) ? tasks : [],
+      nextExpectedAction: resolvedNextExpectedAction,
+      executionScope: normalizedExecutionScope,
+      scalableDeliveryPlan: normalizedScalablePlan,
+      nextActionPlan: sanitizedNextActionPlan,
+      validationPlan,
+      projectBlueprint,
+      domainUnderstanding,
+      materializationPlan,
+      localProjectManifest: enrichedLocalProjectManifest,
+      sourceRoot,
+      targetRoot,
+      generatedDomainContract: normalizedGeneratedDomainContract,
+    },
+    workspacePath,
+  )
 
   return {
     decisionKey: decisionKey || strategy || 'brain-decision',
@@ -35865,9 +35963,7 @@ function buildBrainDecisionContract({
     ...(creativeDirection && typeof creativeDirection === 'object'
       ? { creativeDirection }
       : {}),
-    ...(normalizeExecutorExecutionScope(executionScope)
-      ? { executionScope: normalizeExecutorExecutionScope(executionScope) }
-      : {}),
+    ...(normalizedExecutionScope ? { executionScope: normalizedExecutionScope } : {}),
     ...(reusableArtifactLookup && typeof reusableArtifactLookup === 'object'
       ? { reusableArtifactLookup }
       : {}),
@@ -35892,10 +35988,7 @@ function buildBrainDecisionContract({
     assumptions: Array.isArray(assumptions) ? assumptions : [],
     instruction,
     completed: completed === true,
-    nextExpectedAction:
-      nextExpectedAction ||
-      resolvedApprovalRequest?.nextExpectedAction ||
-      (completed === true ? 'final-result' : 'execute-plan'),
+    nextExpectedAction: resolvedNextExpectedAction,
     ...(productArchitecture && typeof productArchitecture === 'object'
       ? { productArchitecture }
       : {}),
@@ -35981,6 +36074,7 @@ function buildBrainDecisionContract({
       ? { generatedDomainContract: normalizedGeneratedDomainContract }
       : {}),
     generatedDomainContractDiagnostics,
+    generatedDomainContractComparison,
     ...(materializationPlan && typeof materializationPlan === 'object'
       ? { materializationPlan }
       : {}),
@@ -46293,6 +46387,14 @@ async function observeGeneratedDomainContractForPlannerDecision({
       requestId: normalizeOptionalString(requestId) || undefined,
       generatedDomainContract: diagnosticsNormalizedContract,
       generatedDomainContractDiagnostics,
+      generatedDomainContractComparison: buildGeneratedDomainContractComparison(
+        {
+          ...(legacyDecision && typeof legacyDecision === 'object' ? legacyDecision : {}),
+          generatedDomainContract: diagnosticsNormalizedContract,
+          generatedDomainContractDiagnostics,
+        },
+        workspacePath,
+      ),
     }
   } catch (error) {
     const classification = classifyGeneratedDomainContractObservationThrownError(error)
@@ -49360,6 +49462,18 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
   }
 
   if (
+    brainDecision.generatedDomainContractComparison &&
+    typeof brainDecision.generatedDomainContractComparison === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-contract:comparison',
+      summarizeGeneratedDomainContractComparisonForDebug(
+        brainDecision.generatedDomainContractComparison,
+      ),
+    )
+  }
+
+  if (
     brainDecision.generatedDomainContractObservation &&
     typeof brainDecision.generatedDomainContractObservation === 'object'
   ) {
@@ -49462,6 +49576,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       generatedDomainContract: brainDecision.generatedDomainContract,
       generatedDomainContractDiagnostics:
         brainDecision.generatedDomainContractDiagnostics,
+      generatedDomainContractComparison:
+        brainDecision.generatedDomainContractComparison,
       generatedDomainContractObservation:
         brainDecision.generatedDomainContractObservation,
       existingProjectDetection: brainDecision.existingProjectDetection,
@@ -49526,10 +49642,12 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       brainDecision.requiresApproval === true ? brainDecision.runtimeApprovalState : null,
     materializationPlan: brainDecision.materializationPlan,
     generatedDomainContract: brainDecision.generatedDomainContract,
-    generatedDomainContractDiagnostics:
-      brainDecision.generatedDomainContractDiagnostics,
-    generatedDomainContractObservation:
-      brainDecision.generatedDomainContractObservation,
+      generatedDomainContractDiagnostics:
+        brainDecision.generatedDomainContractDiagnostics,
+      generatedDomainContractComparison:
+        brainDecision.generatedDomainContractComparison,
+      generatedDomainContractObservation:
+        brainDecision.generatedDomainContractObservation,
     existingProjectDetection: brainDecision.existingProjectDetection,
     activeProjectContext: brainDecision.activeProjectContext,
     contextHubStatus,

@@ -46,6 +46,7 @@ const {
   buildAttachedInputMetadataList,
 } = require(path.join(repoRoot, 'electron', 'project-context.cjs'))
 const {
+  buildGeneratedDomainContractComparison,
   buildGeneratedDomainContractDiagnostics,
   extractGeneratedDomainContractCandidate,
 } = require(path.join(repoRoot, 'electron', 'generated-domain-contract.cjs'))
@@ -1105,6 +1106,7 @@ module.exports = {
     selectBestWorkspaceProjectCandidate,
     shouldIgnoreWorkspaceDirectoryEntry,
     buildUnavailableContextHubPack,
+    buildGeneratedDomainContractComparison,
     buildGeneratedDomainContractDiagnostics,
     extractGeneratedDomainContractCandidate,
     setTimeout,

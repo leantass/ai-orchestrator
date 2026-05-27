@@ -241,6 +241,52 @@ export const getProjectContinuityPrimaryActionLabelForUi = (action) => {
   return 'Preparar siguiente paso seguro'
 }
 
+export const canGenerateContinuationReviewFallbackForUi = ({
+  plannerExecutionMetadata,
+  effectivePlannerExecutionMetadata,
+}) => {
+  const currentMetadata =
+    plannerExecutionMetadata && typeof plannerExecutionMetadata === 'object'
+      ? plannerExecutionMetadata
+      : null
+  const effectiveMetadata =
+    effectivePlannerExecutionMetadata &&
+    typeof effectivePlannerExecutionMetadata === 'object'
+      ? effectivePlannerExecutionMetadata
+      : currentMetadata
+  const normalizedDecisionKey = normalizeOptionalString(
+    currentMetadata?.decisionKey || effectiveMetadata?.decisionKey,
+  ).toLocaleLowerCase()
+  const normalizedStrategy = normalizeOptionalString(
+    currentMetadata?.strategy || effectiveMetadata?.strategy,
+  ).toLocaleLowerCase()
+  const normalizedExecutionMode = normalizeOptionalString(
+    currentMetadata?.executionMode || effectiveMetadata?.executionMode,
+  ).toLocaleLowerCase()
+  const normalizedNextExpectedAction = normalizeOptionalString(
+    currentMetadata?.nextExpectedAction || effectiveMetadata?.nextExpectedAction,
+  ).toLocaleLowerCase()
+  const hasPendingApproval =
+    currentMetadata?.approvalRequired === true ||
+    effectiveMetadata?.approvalRequired === true ||
+    currentMetadata?.requiresApproval === true ||
+    effectiveMetadata?.requiresApproval === true
+  const isContinuationReview =
+    normalizedDecisionKey === 'prepare-continuation-action-plan' ||
+    normalizedStrategy === 'prepare-continuation-action-plan' ||
+    normalizedNextExpectedAction === 'review-continuation-action'
+
+  return (
+    isContinuationReview &&
+    normalizedExecutionMode === 'planner-only' &&
+    hasPendingApproval === false &&
+    hasSafeGeneratedDomainContractReviewSignalForUi({
+      currentMetadata,
+      effectiveMetadata,
+    })
+  )
+}
+
 const resolveGeneratedDomainContractDiagnosticsForUi = ({
   currentMetadata,
   effectiveMetadata,

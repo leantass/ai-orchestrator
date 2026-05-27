@@ -29,6 +29,23 @@ const FULLSTACK_LOCAL_DELIVERY_LEVEL_SIGNAL_GATED_ALIASES = new Set([
   'scalable-delivery-plan',
   'planner-only-scalable-delivery',
 ])
+const GENERATED_DOMAIN_COMPARISON_GENERIC_TOKENS = new Set([
+  'app',
+  'flow',
+  'fullstack',
+  'generated',
+  'gestion',
+  'local',
+  'mock',
+  'panel',
+  'plan',
+  'project',
+  'review',
+  'safe',
+  'scalable',
+  'secure',
+  'system',
+])
 const RESERVED_ROOT_SEGMENTS = new Set([
   '',
   '.',
@@ -838,6 +855,567 @@ function buildGeneratedDomainContractDiagnostics(decision, workspacePath) {
   }
 }
 
+function pushUniqueMessage(target, message) {
+  const normalized = typeof message === 'string' ? message.trim().replace(/\s+/g, ' ') : ''
+  if (!normalized || target.includes(normalized)) {
+    return
+  }
+
+  target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
+}
+
+function tokenizeComparisonText(value) {
+  return unique(
+    asNonEmptyString(value)
+      .normalize('NFKD')
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+      .split(/[\s-]+/u)
+      .map((entry) => entry.trim())
+      .filter(
+        (entry) =>
+          entry &&
+          entry.length >= 3 &&
+          !GENERATED_DOMAIN_COMPARISON_GENERIC_TOKENS.has(entry),
+      ),
+  )
+}
+
+function collectLegacyTaskTextEntries(tasks) {
+  return asArray(tasks).flatMap((entry) => {
+    if (typeof entry === 'string') {
+      return [entry]
+    }
+
+    const value = asObject(entry)
+    return [
+      value.title,
+      value.label,
+      value.summary,
+      value.description,
+      value.name,
+      value.feature,
+      value.module,
+    ]
+  })
+}
+
+function collectLegacyPlanSignalTexts(decision) {
+  const source = asObject(decision)
+  const scalablePlan = asObject(source.scalableDeliveryPlan)
+  const nextActionPlan = asObject(source.nextActionPlan)
+  const projectBlueprint = asObject(source.projectBlueprint)
+  const executionScope = asObject(source.executionScope)
+  const materializationPlan = asObject(source.materializationPlan)
+  const domainUnderstanding = asObject(source.domainUnderstanding)
+
+  return unique(
+    [
+      source.decisionKey,
+      source.strategy,
+      source.executionMode,
+      source.nextExpectedAction,
+      source.businessSector,
+      source.businessSectorLabel,
+      source.reason,
+      source.question,
+      source.instruction,
+      source.selectedDomain,
+      source.detectedVertical,
+      scalablePlan.title,
+      scalablePlan.summary,
+      scalablePlan.reason,
+      scalablePlan.deliveryLevel,
+      scalablePlan.projectRoot,
+      scalablePlan.rootSlug,
+      scalablePlan.targetRoot,
+      nextActionPlan.title,
+      nextActionPlan.summary,
+      nextActionPlan.reason,
+      nextActionPlan.targetStrategy,
+      nextActionPlan.targetDeliveryLevel,
+      nextActionPlan.projectRoot,
+      projectBlueprint.title,
+      projectBlueprint.summary,
+      projectBlueprint.deliveryLevel,
+      projectBlueprint.projectRoot,
+      domainUnderstanding.summary,
+      domainUnderstanding.problem,
+      domainUnderstanding.solution,
+      executionScope.objectiveScope,
+      executionScope.projectRoot,
+      materializationPlan.summary,
+      materializationPlan.kind,
+      materializationPlan.strategy,
+      ...collectLegacyTaskTextEntries(source.tasks),
+      ...asArray(scalablePlan.directories),
+      ...asArray(scalablePlan.targetStructure),
+      ...asArray(scalablePlan.allowedRootPaths),
+      ...asArray(scalablePlan.explicitExclusions),
+      ...asArray(projectBlueprint.modules),
+      ...asArray(projectBlueprint.features),
+      ...asArray(projectBlueprint.entities),
+    ]
+      .map((entry) => asNonEmptyString(entry))
+      .filter(Boolean),
+  )
+}
+
+function collectLegacyAllowedTargetPathEntries(decision) {
+  const source = asObject(decision)
+  const scalablePlan = asObject(source.scalableDeliveryPlan)
+  const executionScope = asObject(source.executionScope)
+  const materializationPlan = asObject(source.materializationPlan)
+
+  return unique([
+    ...asArray(executionScope.allowedTargetPaths).map((entry) => asNonEmptyString(entry)),
+    ...asArray(scalablePlan.allowedRootPaths).map((entry) => asNonEmptyString(entry)),
+    ...asArray(scalablePlan.directories).map((entry) => asNonEmptyString(entry)),
+    ...asArray(scalablePlan.filesToCreate).map((entry) =>
+      asNonEmptyString(asObject(entry).path || entry),
+    ),
+    ...asArray(materializationPlan.allowedTargetPaths).map((entry) => asNonEmptyString(entry)),
+    ...asArray(materializationPlan.operations).map((entry) =>
+      asNonEmptyString(asObject(entry).targetPath),
+    ),
+    ...asArray(materializationPlan.validations).map((entry) =>
+      asNonEmptyString(asObject(entry).targetPath),
+    ),
+  ])
+}
+
+function extractLegacyRootCandidate(decision) {
+  const source = asObject(decision)
+  const scalablePlan = asObject(source.scalableDeliveryPlan)
+  const nextActionPlan = asObject(source.nextActionPlan)
+  const executionScope = asObject(source.executionScope)
+  const materializationPlan = asObject(source.materializationPlan)
+  const localProjectManifest = asObject(source.localProjectManifest)
+
+  const rootCandidates = [
+    source.targetRoot,
+    source.sourceRoot,
+    scalablePlan.projectRoot,
+    scalablePlan.targetRoot,
+    nextActionPlan.projectRoot,
+    executionScope.projectRoot,
+    materializationPlan.projectRoot,
+    localProjectManifest.projectRoot,
+  ]
+
+  for (const entry of rootCandidates) {
+    const normalized = canonicalizePathString(entry)
+    if (!normalized || isAbsoluteLikePath(normalized) || normalized.includes('..')) {
+      continue
+    }
+
+    const relative = normalizeRelativePath(normalized)
+    if (relative) {
+      return relative
+    }
+  }
+
+  return ''
+}
+
+function detectLegacySignalPresence(textEntries, exactPhrases, tokenGroups) {
+  const normalizedTextEntries = asArray(textEntries)
+  const combinedText = normalizedTextEntries.join(' ').toLowerCase()
+  const tokenSet = new Set(normalizedTextEntries.flatMap((entry) => tokenizeComparisonText(entry)))
+
+  if (asArray(exactPhrases).some((phrase) => combinedText.includes(phrase.toLowerCase()))) {
+    return true
+  }
+
+  return asArray(tokenGroups).some((group) =>
+    asArray(group).every((token) => tokenSet.has(token.toLowerCase())),
+  )
+}
+
+function buildGeneratedDomainContractComparison(decision, workspacePath) {
+  const emptyComparison = {
+    comparisonVersion: '0.1',
+    present: false,
+    compared: false,
+    status: 'not-available',
+    safeForDiagnostics: true,
+    domain: {
+      contractSlug: '',
+      legacySector: '',
+      aligned: false,
+      notes: [],
+    },
+    roots: {
+      contractRoot: '',
+      legacyRoot: '',
+      aligned: false,
+      warnings: [],
+    },
+    surfaces: {
+      contractCount: 0,
+      legacySignalsCount: 0,
+      missingInLegacy: [],
+      aligned: false,
+      notes: [],
+    },
+    backend: {
+      contractPresent: false,
+      legacySignalsPresent: false,
+      aligned: false,
+      notes: [],
+    },
+    database: {
+      contractPresent: false,
+      legacySignalsPresent: false,
+      aligned: false,
+      notes: [],
+    },
+    safety: {
+      contractSafe: false,
+      legacySafetySignalsPresent: false,
+      aligned: false,
+      warnings: [],
+    },
+    materialization: {
+      contractAllowedTargetPathsCount: 0,
+      legacyAllowedTargetPathsCount: 0,
+      aligned: false,
+      warnings: [],
+    },
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  const { contract } = extractGeneratedDomainContractCandidate(decision)
+  if (!contract) {
+    return emptyComparison
+  }
+
+  try {
+    const diagnostics = buildGeneratedDomainContractDiagnostics(decision, workspacePath)
+    const normalizedContract =
+      diagnostics.normalizedContract && typeof diagnostics.normalizedContract === 'object'
+        ? diagnostics.normalizedContract
+        : normalizeGeneratedDomainContract(contract)
+    const comparison = {
+      ...emptyComparison,
+      present: true,
+      compared: true,
+      status: 'compared',
+      domain: {
+        contractSlug: normalizedContract.domain.slug || '',
+        legacySector: asNonEmptyString(
+          asObject(decision).businessSector || asObject(decision).businessSectorLabel,
+        ),
+        aligned: false,
+        notes: [],
+      },
+      roots: {
+        contractRoot: normalizeRelativePath(normalizedContract.root.targetRoot),
+        legacyRoot: '',
+        aligned: false,
+        warnings: [],
+      },
+      surfaces: {
+        contractCount: normalizedContract.frontendSurfaces.length,
+        legacySignalsCount: 0,
+        missingInLegacy: [],
+        aligned: false,
+        notes: [],
+      },
+      backend: {
+        contractPresent:
+          Boolean(normalizedContract.backend.entryFile) ||
+          normalizedContract.backend.routes.length > 0 ||
+          normalizedContract.backend.services.length > 0 ||
+          normalizedContract.backend.modules.length > 0,
+        legacySignalsPresent: false,
+        aligned: false,
+        notes: [],
+      },
+      database: {
+        contractPresent:
+          Boolean(normalizedContract.database.schemaFile) ||
+          Boolean(normalizedContract.database.seedFile) ||
+          normalizedContract.database.tables.length > 0,
+        legacySignalsPresent: false,
+        aligned: false,
+        notes: [],
+      },
+      safety: {
+        contractSafe: diagnostics.safeForLocalMaterialization === true,
+        legacySafetySignalsPresent: false,
+        aligned: false,
+        warnings: [],
+      },
+      materialization: {
+        contractAllowedTargetPathsCount: diagnostics.allowedTargetPathsCount || 0,
+        legacyAllowedTargetPathsCount: 0,
+        aligned: false,
+        warnings: [],
+      },
+      warnings: [],
+      errors: [],
+      warningsCount: 0,
+      errorsCount: 0,
+    }
+
+    if (diagnostics.valid !== true) {
+      pushUniqueMessage(
+        comparison.warnings,
+        'El generatedDomainContract no es valido segun el validador local.',
+      )
+    }
+    if (diagnostics.safeForLocalMaterialization !== true) {
+      pushUniqueMessage(
+        comparison.warnings,
+        'El generatedDomainContract no esta marcado como seguro para materializacion local.',
+      )
+    }
+
+    const legacyTextEntries = collectLegacyPlanSignalTexts(decision)
+    const legacyTokenSet = new Set(
+      legacyTextEntries.flatMap((entry) => tokenizeComparisonText(entry)),
+    )
+    const contractSlugTokens = tokenizeComparisonText(comparison.domain.contractSlug)
+    const overlappingDomainTokens = contractSlugTokens.filter((token) =>
+      legacyTokenSet.has(token),
+    )
+    comparison.domain.aligned =
+      overlappingDomainTokens.length > 0 || Boolean(comparison.domain.legacySector)
+    if (overlappingDomainTokens.length > 0) {
+      comparison.domain.notes.push(
+        `Coincidencias de dominio: ${overlappingDomainTokens.join(', ')}.`,
+      )
+    } else if (comparison.domain.legacySector) {
+      comparison.domain.notes.push(
+        'Sin coincidencia textual directa con domain.slug; se conserva businessSector legacy como señal de contexto.',
+      )
+    } else {
+      comparison.domain.notes.push(
+        'El plan legacy no expone businessSector ni señales textuales suficientes para comparar dominio.',
+      )
+      pushUniqueMessage(
+        comparison.warnings,
+        'El plan legacy no expone suficientes señales de dominio para comparar con generatedDomainContract.',
+      )
+    }
+
+    comparison.roots.legacyRoot = extractLegacyRootCandidate(decision)
+    if (comparison.roots.contractRoot && comparison.roots.legacyRoot) {
+      comparison.roots.aligned =
+        comparison.roots.contractRoot === comparison.roots.legacyRoot
+      if (!comparison.roots.aligned) {
+        pushUniqueMessage(
+          comparison.roots.warnings,
+          'El root del contrato difiere del root relativo expuesto por el plan legacy.',
+        )
+        pushUniqueMessage(
+          comparison.warnings,
+          'El root del generatedDomainContract no coincide con el root relativo del plan legacy.',
+        )
+      }
+    } else if (comparison.roots.contractRoot) {
+      pushUniqueMessage(
+        comparison.roots.warnings,
+        'El plan legacy no expone un root relativo comparable.',
+      )
+      pushUniqueMessage(
+        comparison.warnings,
+        'No hay root relativo legacy suficiente para comparar con generatedDomainContract.',
+      )
+    }
+
+    const contractSurfaceIdentifiers = unique(
+      normalizedContract.frontendSurfaces
+        .map((surface) =>
+          asNonEmptyString(surface.key || surface.label || path.posix.basename(surface.path)),
+        )
+        .filter(Boolean),
+    )
+    const frontendSignalsPresent = detectLegacySignalPresence(
+      legacyTextEntries,
+      ['frontend', 'panel-operativo', 'panel operativo', 'frontend-publico', 'frontend publico'],
+      [['frontend'], ['publico'], ['admin'], ['panel']],
+    )
+    const missingInLegacy = contractSurfaceIdentifiers.filter((identifier) => {
+      const tokens = tokenizeComparisonText(identifier)
+      if (tokens.length === 0) {
+        return false
+      }
+
+      return !tokens.some((token) => legacyTokenSet.has(token))
+    })
+    comparison.surfaces.legacySignalsCount =
+      contractSurfaceIdentifiers.length - missingInLegacy.length + (frontendSignalsPresent ? 1 : 0)
+    comparison.surfaces.missingInLegacy = missingInLegacy
+    comparison.surfaces.aligned =
+      contractSurfaceIdentifiers.length === 0 ||
+      missingInLegacy.length === 0 ||
+      frontendSignalsPresent
+    if (contractSurfaceIdentifiers.length === 0) {
+      comparison.surfaces.notes.push(
+        'El contrato no declara frontendSurfaces; la comparacion de superficies queda neutral.',
+      )
+    } else if (missingInLegacy.length > 0) {
+      comparison.surfaces.notes.push(
+        `Superficies sin señal directa en legacy: ${missingInLegacy.join(', ')}.`,
+      )
+      pushUniqueMessage(
+        comparison.warnings,
+        'Hay frontendSurfaces del generatedDomainContract sin señal directa en el plan legacy.',
+      )
+    }
+
+    comparison.backend.legacySignalsPresent = detectLegacySignalPresence(
+      legacyTextEntries,
+      ['backend local', 'api local'],
+      [['backend'], ['api'], ['route'], ['service'], ['server']],
+    )
+    comparison.backend.aligned =
+      comparison.backend.contractPresent === false || comparison.backend.legacySignalsPresent
+    if (comparison.backend.contractPresent && !comparison.backend.legacySignalsPresent) {
+      comparison.backend.notes.push(
+        'El contrato declara backend pero el plan legacy no deja señales claras de backend.',
+      )
+      pushUniqueMessage(
+        comparison.warnings,
+        'El generatedDomainContract declara backend y el plan legacy no deja señales equivalentes.',
+      )
+    }
+
+    comparison.database.legacySignalsPresent = detectLegacySignalPresence(
+      legacyTextEntries,
+      ['base local sqlite', 'base de datos local'],
+      [['database'], ['sqlite'], ['schema'], ['table'], ['seed']],
+    )
+    comparison.database.aligned =
+      comparison.database.contractPresent === false || comparison.database.legacySignalsPresent
+    if (comparison.database.contractPresent && !comparison.database.legacySignalsPresent) {
+      comparison.database.notes.push(
+        'El contrato declara database pero el plan legacy no deja señales claras de database.',
+      )
+      pushUniqueMessage(
+        comparison.warnings,
+        'El generatedDomainContract declara database y el plan legacy no deja señales equivalentes.',
+      )
+    }
+
+    comparison.safety.legacySafetySignalsPresent = detectLegacySignalPresence(
+      legacyTextEntries,
+      [
+        'sin pagos reales',
+        'sin credenciales',
+        'sin deploy',
+        'sin docker',
+        'sin servicios externos',
+        'sin integraciones externas',
+        'mock',
+        'sandbox',
+      ],
+      [['deploy'], ['docker'], ['credenciales'], ['mock'], ['sandbox'], ['externos']],
+    )
+    comparison.safety.aligned =
+      comparison.safety.contractSafe === true &&
+      comparison.safety.legacySafetySignalsPresent === true
+    if (comparison.safety.contractSafe && !comparison.safety.legacySafetySignalsPresent) {
+      pushUniqueMessage(
+        comparison.safety.warnings,
+        'El plan legacy no explicita suficientes señales de safety comparables con el contrato.',
+      )
+      pushUniqueMessage(
+        comparison.warnings,
+        'Faltan señales explícitas de safety en el plan legacy para comparar con generatedDomainContract.',
+      )
+    }
+
+    const legacyAllowedTargetPaths = collectLegacyAllowedTargetPathEntries(decision)
+    comparison.materialization.legacyAllowedTargetPathsCount = legacyAllowedTargetPaths.length
+    const legacyHasUnsafeTraversalPath = legacyAllowedTargetPaths.some((entry) =>
+      canonicalizePathString(entry).includes('..'),
+    )
+    const legacyHasDangerousAbsolutePath = legacyAllowedTargetPaths.some((entry) =>
+      isAbsoluteLikePath(entry) && isDangerousAbsoluteRootPath(entry),
+    )
+    const legacyHasForbiddenFileSignal = legacyAllowedTargetPaths.some((entry) => {
+      const basename = path.posix.basename(canonicalizePathString(entry)).toLowerCase()
+      return basename === '.env' || basename === 'dockerfile'
+    })
+    if (legacyHasUnsafeTraversalPath) {
+      pushUniqueMessage(
+        comparison.materialization.warnings,
+        'El plan legacy expone paths con traversal relativo fuera de scope.',
+      )
+      pushUniqueMessage(
+        comparison.warnings,
+        'El plan legacy expone paths con traversal relativo fuera de scope.',
+      )
+    }
+    if (legacyHasDangerousAbsolutePath) {
+      pushUniqueMessage(
+        comparison.materialization.warnings,
+        'El plan legacy expone rutas absolutas peligrosas para diagnostico.',
+      )
+      pushUniqueMessage(
+        comparison.warnings,
+        'El plan legacy expone rutas absolutas peligrosas para diagnostico.',
+      )
+    }
+    if (legacyHasForbiddenFileSignal) {
+      pushUniqueMessage(
+        comparison.materialization.warnings,
+        'El plan legacy menciona archivos prohibidos como .env o Dockerfile.',
+      )
+      pushUniqueMessage(
+        comparison.warnings,
+        'El plan legacy menciona archivos prohibidos para una entrega local segura.',
+      )
+    }
+    comparison.materialization.aligned =
+      comparison.materialization.contractAllowedTargetPathsCount > 0 &&
+      comparison.materialization.legacyAllowedTargetPathsCount > 0 &&
+      comparison.roots.aligned === true &&
+      !legacyHasUnsafeTraversalPath &&
+      !legacyHasDangerousAbsolutePath
+    if (comparison.materialization.contractAllowedTargetPathsCount > 0 &&
+      comparison.materialization.legacyAllowedTargetPathsCount === 0) {
+      pushUniqueMessage(
+        comparison.materialization.warnings,
+        'El plan legacy no expone allowedTargetPaths comparables en esta fase.',
+      )
+      pushUniqueMessage(
+        comparison.warnings,
+        'El plan legacy no expone allowedTargetPaths comparables para el generatedDomainContract.',
+      )
+    }
+
+    comparison.warningsCount = comparison.warnings.length
+    comparison.errorsCount = comparison.errors.length
+    comparison.status =
+      comparison.errors.length > 0
+        ? 'error'
+        : comparison.warnings.length > 0
+          ? 'partial'
+          : 'compared'
+
+    return comparison
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : asNonEmptyString(String(error), 'error')
+
+    return {
+      ...emptyComparison,
+      present: true,
+      status: 'error',
+      safeForDiagnostics: true,
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
 module.exports = {
   normalizeGeneratedDomainDeliveryLevel,
   normalizeGeneratedDomainContract,
@@ -847,5 +1425,6 @@ module.exports = {
   deriveForbiddenSearchPatternsFromContract,
   isContractSafeForLocalMaterialization,
   buildGeneratedDomainContractDiagnostics,
+  buildGeneratedDomainContractComparison,
   extractGeneratedDomainContractCandidate,
 }

@@ -4,6 +4,7 @@ import vm from 'node:vm'
 import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
+  canGenerateContinuationReviewFallbackForUi,
   canPrepareProjectContinuityNextActionForUi,
   derivePlannerMaterializationUiState,
   getProjectContinuityPrimaryActionLabelForUi,
@@ -36,6 +37,7 @@ const {
   shouldIgnoreWorkspaceDirectoryEntry,
 } = require(path.join(repoRoot, 'electron', 'workspace-project-detection.cjs'))
 const {
+  buildGeneratedDomainContractComparison,
   buildGeneratedDomainContractDiagnostics,
   extractGeneratedDomainContractCandidate,
 } = require(path.join(repoRoot, 'electron', 'generated-domain-contract.cjs'))
@@ -582,6 +584,7 @@ module.exports = {
     classifyWorkspaceProjectIntent,
     selectBestWorkspaceProjectCandidate,
     shouldIgnoreWorkspaceDirectoryEntry,
+    buildGeneratedDomainContractComparison,
     buildGeneratedDomainContractDiagnostics,
     extractGeneratedDomainContractCandidate,
     setTimeout,
@@ -4201,6 +4204,79 @@ async function runGeneratedDomainContractValidReviewShowsNextSafeActionCase() {
   }
 }
 
+async function runGeneratedDomainContractComparisonPayloadCase() {
+  const failures = []
+  const comparison = buildGeneratedDomainContractComparison(
+    {
+      decisionKey: 'school-of-trades-comparison-v1',
+      strategy: 'scalable-delivery-plan',
+      executionMode: 'planner-only',
+      nextExpectedAction: 'review-scalable-delivery',
+      businessSector: 'education-training',
+      reason:
+        'Entrega funcional local segura con backend local, database sqlite, frontend admin y reportes mock sin deploy.',
+      sourceRoot: 'school-of-trades-local',
+      targetRoot: 'school-of-trades-local',
+      generatedDomainContract: {
+        deliveryLevel: 'fullstack-local',
+        domain: { slug: 'school-of-trades', label: 'School of Trades' },
+        root: {
+          slug: 'school-of-trades-local',
+          sourceRoot: 'school-of-trades-local',
+          targetRoot: 'school-of-trades-local',
+        },
+        frontendSurfaces: [{ key: 'admin', label: 'Admin', path: 'frontend/admin' }],
+        backend: {
+          entryFile: 'backend/src/server.js',
+          routes: [{ path: 'backend/src/routes/reports.js' }],
+        },
+        database: {
+          schemaFile: 'database/schema.sql',
+          tables: ['courses', 'students', 'teachers'],
+        },
+        materialization: {
+          requiredFiles: [
+            'frontend/admin/index.html',
+            'backend/src/server.js',
+            'database/schema.sql',
+          ],
+        },
+        validation: {
+          requiredPathGroups: [
+            { candidates: ['frontend/admin/index.html'] },
+            { candidates: ['backend/src/server.js'] },
+            { candidates: ['database/schema.sql'] },
+          ],
+        },
+      },
+    },
+    repoRoot,
+  )
+
+  pushFailure(
+    failures,
+    comparison.present === true && comparison.compared === true,
+    'La comparacion generatedDomainContract vs legacy debe quedar disponible como diagnostico puro.',
+  )
+  pushFailure(
+    failures,
+    ['compared', 'partial'].includes(comparison.status),
+    'La comparacion diagnostica debe devolver un status estable sin romper el flujo.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generated-domain-contract:comparison') &&
+      mainSource.includes('generatedDomainContractComparison'),
+    'main.cjs debe adjuntar generatedDomainContractComparison al payload y loguear generated-domain-contract:comparison.',
+  )
+
+  return {
+    id: 'generated-domain-contract-comparison-payload',
+    label: 'Generated domain contract comparison payload',
+    failures,
+  }
+}
+
 async function runPrepareContinuationActionPlanShowsPrimaryCtaCase() {
   const failures = []
   const appSource = fs.readFileSync(appFilePath, 'utf8')
@@ -4323,6 +4399,85 @@ async function runPrepareContinuationActionPlanShowsPrimaryCtaCase() {
   return {
     id: 'prepare-continuation-action-plan-shows-primary-cta',
     label: 'Prepare continuation action plan shows primary CTA',
+    failures,
+  }
+}
+
+async function runPrepareContinuationActionPlanFallbackCtaCase() {
+  const failures = []
+  const appSource = fs.readFileSync(appFilePath, 'utf8')
+  const continuationReviewMetadata = {
+    decisionKey: 'prepare-continuation-action-plan',
+    strategy: 'prepare-continuation-action-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-continuation-action',
+    businessSector: 'education-training',
+    requiresApproval: false,
+    approvalRequired: false,
+    tasks: ['Definir siguiente modulo', 'Revisar continuidad segura'],
+    generatedDomainContractDiagnostics: {
+      present: true,
+      valid: true,
+      safeForLocalMaterialization: true,
+      rootSlug: 'oficios-escuela-local',
+      sourceRoot: 'oficios-escuela-local',
+      targetRoot: 'oficios-escuela-local',
+      errorsCount: 0,
+      warningsCount: 0,
+    },
+    generatedDomainContractComparison: {
+      present: true,
+      compared: true,
+      status: 'partial',
+      safeForDiagnostics: true,
+      warningsCount: 4,
+      errorsCount: 0,
+    },
+  }
+  const reviewUiState = derivePlannerMaterializationUiState({
+    plannerExecutionMetadata: continuationReviewMetadata,
+    effectivePlannerExecutionMetadata: continuationReviewMetadata,
+  })
+  const canFallbackGenerate = canGenerateContinuationReviewFallbackForUi({
+    plannerExecutionMetadata: continuationReviewMetadata,
+    effectivePlannerExecutionMetadata: continuationReviewMetadata,
+  })
+
+  pushFailure(
+    failures,
+    reviewUiState.effectiveReviewOnly === true,
+    'prepare-continuation-action-plan real debe seguir en review-only.',
+  )
+  pushFailure(
+    failures,
+    reviewUiState.isScalableReview === false,
+    'El review de continuidad no debe confundirse con review escalable.',
+  )
+  pushFailure(
+    failures,
+    canFallbackGenerate === true,
+    'Sin continuationActionPlan rico, el review-continuation-action seguro debe habilitar fallback de Generar siguiente paso.',
+  )
+  pushFailure(
+    failures,
+    /plannerCanFallbackGenerateContinuationReviewAction/.test(appSource) &&
+      /Generar siguiente paso/.test(appSource) &&
+      /plannerCanFallbackGenerateContinuationReviewAction[\s\S]{0,140}\? \(\) => handleGenerateNextStep\(\)/.test(
+        appSource,
+      ),
+    'El CTA fallback de continuation review debe usar handleGenerateNextStep sin materializar.',
+  )
+  pushFailure(
+    failures,
+    !/plannerCanFallbackGenerateContinuationReviewAction[\s\S]{0,220}handleMaterialize/.test(
+      appSource,
+    ),
+    'El fallback de continuation review no debe disparar materializacion automatica.',
+  )
+
+  return {
+    id: 'prepare-continuation-action-plan-fallback-cta',
+    label: 'Prepare continuation action plan fallback CTA',
     failures,
   }
 }
@@ -6557,7 +6712,9 @@ async function main() {
     results.push(await runOnlineCoursesScalableReviewShowsPrepareCtaCase())
     results.push(await runEducationTrainingGeneratedDomainContractShowsPrepareCtaCase())
     results.push(await runGeneratedDomainContractValidReviewShowsNextSafeActionCase())
+    results.push(await runGeneratedDomainContractComparisonPayloadCase())
     results.push(await runPrepareContinuationActionPlanShowsPrimaryCtaCase())
+    results.push(await runPrepareContinuationActionPlanFallbackCtaCase())
     results.push(await runOnlineCoursesMaterializationContractCase())
     results.push(await runOnlineCoursesRootMismatchBlockedCase())
     results.push(await runOnlineCoursesInvalidOpenAIMaterializationFallsBackCase())
