@@ -897,6 +897,36 @@ type PlannerExecutionMetadata = {
     errorsPreview?: string[]
     warningsPreview?: string[]
   } | null
+  generatedDomainContractComparison: {
+    present: boolean
+    compared: boolean
+    status?: string
+    safeForDiagnostics?: boolean
+    domain?: {
+      contractSlug?: string
+      aligned?: boolean
+    } | null
+    roots?: {
+      contractRoot?: string
+      aligned?: boolean
+    } | null
+    backend?: {
+      aligned?: boolean
+    } | null
+    database?: {
+      aligned?: boolean
+    } | null
+    safety?: {
+      aligned?: boolean
+    } | null
+    materialization?: {
+      aligned?: boolean
+    } | null
+    warningsCount?: number
+    errorsCount?: number
+    warnings?: string[]
+    errors?: string[]
+  } | null
   generatedDomainContractObservation: {
     attempted?: boolean
     ok?: boolean
@@ -1174,6 +1204,7 @@ type PlannerDecisionResponse = {
   activeProjectContext?: ActiveProjectContextContract | null
   generatedDomainContract?: Record<string, unknown> | null
   generatedDomainContractDiagnostics?: PlannerExecutionMetadata['generatedDomainContractDiagnostics']
+  generatedDomainContractComparison?: PlannerExecutionMetadata['generatedDomainContractComparison']
   generatedDomainContractObservation?: PlannerExecutionMetadata['generatedDomainContractObservation']
   brainAdapter?: {
     id?: string
@@ -1422,6 +1453,7 @@ const EMPTY_PLANNER_EXECUTION_METADATA: PlannerExecutionMetadata = {
   activeProjectContext: null,
   generatedDomainContract: null,
   generatedDomainContractDiagnostics: null,
+  generatedDomainContractComparison: null,
   generatedDomainContractObservation: null,
 }
 
@@ -1461,6 +1493,7 @@ const buildSafeFirstDeliveryReviewMetadata = ({
   activeProjectContext: baseMetadata.activeProjectContext,
   generatedDomainContract: baseMetadata.generatedDomainContract,
   generatedDomainContractDiagnostics: baseMetadata.generatedDomainContractDiagnostics,
+  generatedDomainContractComparison: baseMetadata.generatedDomainContractComparison,
   generatedDomainContractObservation: baseMetadata.generatedDomainContractObservation,
   decisionKey: 'safe-first-delivery-plan',
   strategy: 'safe-first-delivery-plan',
@@ -4131,6 +4164,134 @@ const extractPlannerExecutionMetadata = (payload?: {
                   payload.generatedDomainContractDiagnostics.warningsPreview.filter(
                     (entry) => typeof entry === 'string' && entry.trim(),
                   ),
+              }
+            : {}),
+        }
+      : null,
+  generatedDomainContractComparison:
+    payload?.generatedDomainContractComparison &&
+    typeof payload.generatedDomainContractComparison === 'object'
+      ? {
+          present: payload.generatedDomainContractComparison.present === true,
+          compared: payload.generatedDomainContractComparison.compared === true,
+          ...(typeof payload.generatedDomainContractComparison.status === 'string'
+            ? { status: payload.generatedDomainContractComparison.status.trim() }
+            : {}),
+          ...(typeof payload.generatedDomainContractComparison.safeForDiagnostics === 'boolean'
+            ? {
+                safeForDiagnostics:
+                  payload.generatedDomainContractComparison.safeForDiagnostics,
+              }
+            : {}),
+          ...(payload.generatedDomainContractComparison.domain &&
+          typeof payload.generatedDomainContractComparison.domain === 'object'
+            ? {
+                domain: {
+                  ...(typeof payload.generatedDomainContractComparison.domain.contractSlug ===
+                  'string'
+                    ? {
+                        contractSlug:
+                          payload.generatedDomainContractComparison.domain.contractSlug.trim(),
+                      }
+                    : {}),
+                  ...(typeof payload.generatedDomainContractComparison.domain.aligned ===
+                  'boolean'
+                    ? {
+                        aligned: payload.generatedDomainContractComparison.domain.aligned,
+                      }
+                    : {}),
+                },
+              }
+            : {}),
+          ...(payload.generatedDomainContractComparison.roots &&
+          typeof payload.generatedDomainContractComparison.roots === 'object'
+            ? {
+                roots: {
+                  ...(typeof payload.generatedDomainContractComparison.roots.contractRoot ===
+                  'string'
+                    ? {
+                        contractRoot:
+                          payload.generatedDomainContractComparison.roots.contractRoot.trim(),
+                      }
+                    : {}),
+                  ...(typeof payload.generatedDomainContractComparison.roots.aligned === 'boolean'
+                    ? {
+                        aligned: payload.generatedDomainContractComparison.roots.aligned,
+                      }
+                    : {}),
+                },
+              }
+            : {}),
+          ...(payload.generatedDomainContractComparison.backend &&
+          typeof payload.generatedDomainContractComparison.backend === 'object'
+            ? {
+                backend: {
+                  ...(typeof payload.generatedDomainContractComparison.backend.aligned ===
+                  'boolean'
+                    ? {
+                        aligned: payload.generatedDomainContractComparison.backend.aligned,
+                      }
+                    : {}),
+                },
+              }
+            : {}),
+          ...(payload.generatedDomainContractComparison.database &&
+          typeof payload.generatedDomainContractComparison.database === 'object'
+            ? {
+                database: {
+                  ...(typeof payload.generatedDomainContractComparison.database.aligned ===
+                  'boolean'
+                    ? {
+                        aligned: payload.generatedDomainContractComparison.database.aligned,
+                      }
+                    : {}),
+                },
+              }
+            : {}),
+          ...(payload.generatedDomainContractComparison.safety &&
+          typeof payload.generatedDomainContractComparison.safety === 'object'
+            ? {
+                safety: {
+                  ...(typeof payload.generatedDomainContractComparison.safety.aligned === 'boolean'
+                    ? {
+                        aligned: payload.generatedDomainContractComparison.safety.aligned,
+                      }
+                    : {}),
+                },
+              }
+            : {}),
+          ...(payload.generatedDomainContractComparison.materialization &&
+          typeof payload.generatedDomainContractComparison.materialization === 'object'
+            ? {
+                materialization: {
+                  ...(typeof payload.generatedDomainContractComparison.materialization.aligned ===
+                  'boolean'
+                    ? {
+                        aligned:
+                          payload.generatedDomainContractComparison.materialization.aligned,
+                      }
+                    : {}),
+                },
+              }
+            : {}),
+          ...(Number.isInteger(payload.generatedDomainContractComparison.warningsCount)
+            ? { warningsCount: payload.generatedDomainContractComparison.warningsCount }
+            : {}),
+          ...(Number.isInteger(payload.generatedDomainContractComparison.errorsCount)
+            ? { errorsCount: payload.generatedDomainContractComparison.errorsCount }
+            : {}),
+          ...(Array.isArray(payload.generatedDomainContractComparison.warnings)
+            ? {
+                warnings: payload.generatedDomainContractComparison.warnings.filter(
+                  (entry) => typeof entry === 'string' && entry.trim(),
+                ),
+              }
+            : {}),
+          ...(Array.isArray(payload.generatedDomainContractComparison.errors)
+            ? {
+                errors: payload.generatedDomainContractComparison.errors.filter(
+                  (entry) => typeof entry === 'string' && entry.trim(),
+                ),
               }
             : {}),
         }
@@ -12828,6 +12989,183 @@ function App() {
   const activeExistingProjectDetection =
     effectivePlannerExecutionMetadata.existingProjectDetection
   const activeProjectContext = effectivePlannerExecutionMetadata.activeProjectContext
+  const activeGeneratedDomainContractComparison =
+    effectivePlannerExecutionMetadata.generatedDomainContractComparison
+  const activeGeneratedDomainContractDiagnostics =
+    effectivePlannerExecutionMetadata.generatedDomainContractDiagnostics
+  const generatedDomainContractComparisonStatus = normalizeOptionalString(
+    activeGeneratedDomainContractComparison?.status,
+  )
+  const generatedDomainContractComparisonFirstWarning =
+    activeGeneratedDomainContractComparison?.warnings?.[0] || ''
+  const generatedDomainContractComparisonFirstError =
+    activeGeneratedDomainContractComparison?.errors?.[0] || ''
+  const generatedDomainContractComparisonContractSlug =
+    normalizeOptionalString(activeGeneratedDomainContractComparison?.domain?.contractSlug) ||
+    normalizeOptionalString(activeGeneratedDomainContractDiagnostics?.domainSlug)
+  const generatedDomainContractComparisonContractRoot =
+    normalizeOptionalString(activeGeneratedDomainContractComparison?.roots?.contractRoot) ||
+    normalizeOptionalString(activeGeneratedDomainContractDiagnostics?.targetRoot) ||
+    normalizeOptionalString(activeGeneratedDomainContractDiagnostics?.rootSlug)
+  const shouldShowGeneratedDomainContractComparisonTechnicalCard =
+    Boolean(activeGeneratedDomainContractComparison) &&
+    (activeGeneratedDomainContractComparison?.present === true ||
+      generatedDomainContractComparisonStatus === 'not-available')
+  const generatedDomainContractComparisonStatusLabel =
+    generatedDomainContractComparisonStatus === 'compared'
+      ? 'Comparacion completa'
+      : generatedDomainContractComparisonStatus === 'partial'
+        ? 'Comparacion parcial'
+        : generatedDomainContractComparisonStatus === 'error'
+          ? 'Error diagnostico'
+          : 'Comparacion no disponible'
+  const generatedDomainContractComparisonStatusToneClass =
+    generatedDomainContractComparisonStatus === 'compared'
+      ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100'
+      : generatedDomainContractComparisonStatus === 'partial'
+        ? 'border-amber-300/20 bg-amber-300/10 text-amber-100'
+        : generatedDomainContractComparisonStatus === 'error'
+          ? 'border-rose-300/20 bg-rose-300/10 text-rose-100'
+          : 'border-white/10 bg-white/5 text-slate-300'
+  const generatedDomainContractComparisonTechnicalCard =
+    shouldShowGeneratedDomainContractComparisonTechnicalCard ? (
+      <article className="rounded-[28px] border border-white/8 bg-white/[0.03] p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Comparacion contrato vs plan legacy
+            </div>
+            <div className="mt-2 text-base font-semibold text-white">
+              Diagnostico observacional
+            </div>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+              No gobierna la materializacion. Los warnings no bloquean esta fase y
+              solo ayudan a revisar cuanto coincide el contrato generado con el
+              plan legacy actual.
+            </p>
+          </div>
+          <div
+            className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${generatedDomainContractComparisonStatusToneClass}`}
+          >
+            {generatedDomainContractComparisonStatusLabel}
+          </div>
+        </div>
+        <div className="mt-4">
+          <ResultKeyValueGrid
+            items={[
+              {
+                label: 'Present',
+                value: activeGeneratedDomainContractComparison?.present === true ? 'Si' : 'No',
+              },
+              {
+                label: 'Compared',
+                value:
+                  activeGeneratedDomainContractComparison?.compared === true ? 'Si' : 'No',
+              },
+              {
+                label: 'Status',
+                value: generatedDomainContractComparisonStatus || 'not-available',
+              },
+              {
+                label: 'Safe for diagnostics',
+                value:
+                  activeGeneratedDomainContractComparison?.safeForDiagnostics === true
+                    ? 'Si'
+                    : activeGeneratedDomainContractComparison?.safeForDiagnostics === false
+                      ? 'No'
+                      : 'No disponible',
+              },
+              {
+                label: 'Contract slug',
+                value: generatedDomainContractComparisonContractSlug || 'No disponible',
+              },
+              {
+                label: 'Contract root',
+                value: generatedDomainContractComparisonContractRoot || 'No disponible',
+              },
+              {
+                label: 'Domain aligned',
+                value:
+                  activeGeneratedDomainContractComparison?.domain?.aligned === true
+                    ? 'Si'
+                    : activeGeneratedDomainContractComparison?.domain?.aligned === false
+                      ? 'No'
+                      : 'No disponible',
+              },
+              {
+                label: 'Roots aligned',
+                value:
+                  activeGeneratedDomainContractComparison?.roots?.aligned === true
+                    ? 'Si'
+                    : activeGeneratedDomainContractComparison?.roots?.aligned === false
+                      ? 'No'
+                      : 'No disponible',
+              },
+              {
+                label: 'Backend aligned',
+                value:
+                  activeGeneratedDomainContractComparison?.backend?.aligned === true
+                    ? 'Si'
+                    : activeGeneratedDomainContractComparison?.backend?.aligned === false
+                      ? 'No'
+                      : 'No disponible',
+              },
+              {
+                label: 'Database aligned',
+                value:
+                  activeGeneratedDomainContractComparison?.database?.aligned === true
+                    ? 'Si'
+                    : activeGeneratedDomainContractComparison?.database?.aligned === false
+                      ? 'No'
+                      : 'No disponible',
+              },
+              {
+                label: 'Safety aligned',
+                value:
+                  activeGeneratedDomainContractComparison?.safety?.aligned === true
+                    ? 'Si'
+                    : activeGeneratedDomainContractComparison?.safety?.aligned === false
+                      ? 'No'
+                      : 'No disponible',
+              },
+              {
+                label: 'Materialization aligned',
+                value:
+                  activeGeneratedDomainContractComparison?.materialization?.aligned === true
+                    ? 'Si'
+                    : activeGeneratedDomainContractComparison?.materialization?.aligned === false
+                      ? 'No'
+                      : 'No disponible',
+              },
+              {
+                label: 'Warnings',
+                value: Number.isInteger(activeGeneratedDomainContractComparison?.warningsCount)
+                  ? `${activeGeneratedDomainContractComparison?.warningsCount} warning(s)`
+                  : 'No disponible',
+              },
+              {
+                label: 'Errors',
+                value: Number.isInteger(activeGeneratedDomainContractComparison?.errorsCount)
+                  ? `${activeGeneratedDomainContractComparison?.errorsCount} error(s)`
+                  : 'No disponible',
+              },
+            ]}
+          />
+        </div>
+        {generatedDomainContractComparisonFirstWarning ? (
+          <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm leading-6 text-amber-50">
+            <span className="font-semibold">Primer warning:</span>{' '}
+            {generatedDomainContractComparisonFirstWarning}
+          </div>
+        ) : null}
+        {generatedDomainContractComparisonFirstError ? (
+          <div className="mt-3 rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm leading-6 text-rose-50">
+            <span className="font-semibold">Primer error:</span>{' '}
+            {generatedDomainContractComparisonFirstError}
+          </div>
+        ) : null}
+      </article>
+    ) : null
   const existingProjectApplicable =
     activeExistingProjectDetection?.applicable !== false
 
@@ -21091,6 +21429,7 @@ function App() {
                 }
               />
             </div>
+            {generatedDomainContractComparisonTechnicalCard}
             {activeProductArchitecture ? (
               <ProductArchitectureCard
                 architecture={activeProductArchitecture}
@@ -24119,6 +24458,8 @@ function App() {
                     </article>
                   </div>
                 </div>
+
+                {generatedDomainContractComparisonTechnicalCard}
 
                 {activeProductArchitecture ? (
                   <ProductArchitectureCard

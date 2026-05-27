@@ -4277,6 +4277,98 @@ async function runGeneratedDomainContractComparisonPayloadCase() {
   }
 }
 
+async function runGeneratedDomainContractComparisonTechnicalPanelCase() {
+  const failures = []
+  const appSource = fs.readFileSync(appFilePath, 'utf8')
+  const scalableReviewMetadata = {
+    decisionKey: 'school-of-trades-comparison-panel-v1',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    requiresApproval: false,
+    approvalRequired: false,
+    generatedDomainContractDiagnostics: {
+      present: true,
+      valid: true,
+      safeForLocalMaterialization: true,
+      domainSlug: 'school-of-trades',
+      rootSlug: 'school-of-trades-local',
+      sourceRoot: 'school-of-trades-local',
+      targetRoot: 'school-of-trades-local',
+      errorsCount: 0,
+      warningsCount: 0,
+    },
+    generatedDomainContractComparison: {
+      present: true,
+      compared: true,
+      status: 'partial',
+      safeForDiagnostics: true,
+      domain: {
+        contractSlug: 'school-of-trades',
+        aligned: true,
+      },
+      roots: {
+        contractRoot: 'school-of-trades-local',
+        aligned: false,
+      },
+      backend: {
+        aligned: false,
+      },
+      database: {
+        aligned: false,
+      },
+      safety: {
+        aligned: true,
+      },
+      materialization: {
+        aligned: false,
+      },
+      warningsCount: 5,
+      errorsCount: 0,
+      warnings: [
+        'No hay root relativo legacy suficiente para comparar con generatedDomainContract.',
+      ],
+      errors: [],
+    },
+  }
+  const scalableReviewUiState = derivePlannerMaterializationUiState({
+    plannerExecutionMetadata: scalableReviewMetadata,
+    effectivePlannerExecutionMetadata: scalableReviewMetadata,
+  })
+
+  pushFailure(
+    failures,
+    scalableReviewUiState.prepareCtaVisible === true &&
+      scalableReviewUiState.prepareCtaKind === 'fullstack-local',
+    'generatedDomainContractComparison partial debe seguir siendo diagnostico y no bloquear el CTA seguro del review escalable.',
+  )
+  pushFailure(
+    failures,
+    scalableReviewUiState.materializeCtaVisible === false,
+    'generatedDomainContractComparison partial no debe convertir el review en materializacion directa.',
+  )
+  pushFailure(
+    failures,
+    appSource.includes('generatedDomainContractComparison:') &&
+      appSource.includes('Comparacion contrato vs plan legacy') &&
+      appSource.includes('Diagnostico observacional') &&
+      appSource.includes('No gobierna la materializacion'),
+    'App.tsx debe preservar generatedDomainContractComparison y mostrarlo como diagnostico tecnico de lectura.',
+  )
+  pushFailure(
+    failures,
+    appSource.includes('Los warnings no bloquean esta') &&
+      appSource.includes('generatedDomainContractComparisonStatusLabel'),
+    'La UI tecnica debe tratar comparison.status partial como warning observacional y no como bloqueo.',
+  )
+
+  return {
+    id: 'generated-domain-contract-comparison-technical-panel',
+    label: 'Generated domain contract comparison technical panel',
+    failures,
+  }
+}
+
 async function runPrepareContinuationActionPlanShowsPrimaryCtaCase() {
   const failures = []
   const appSource = fs.readFileSync(appFilePath, 'utf8')
@@ -6713,6 +6805,7 @@ async function main() {
     results.push(await runEducationTrainingGeneratedDomainContractShowsPrepareCtaCase())
     results.push(await runGeneratedDomainContractValidReviewShowsNextSafeActionCase())
     results.push(await runGeneratedDomainContractComparisonPayloadCase())
+    results.push(await runGeneratedDomainContractComparisonTechnicalPanelCase())
     results.push(await runPrepareContinuationActionPlanShowsPrimaryCtaCase())
     results.push(await runPrepareContinuationActionPlanFallbackCtaCase())
     results.push(await runOnlineCoursesMaterializationContractCase())
