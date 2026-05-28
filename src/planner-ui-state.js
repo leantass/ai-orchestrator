@@ -6,6 +6,8 @@ const normalizeOptionalStringArray = (value) =>
     ? value.map((entry) => normalizeOptionalString(entry)).filter(Boolean)
     : []
 
+const uniqueStringsForUi = (values) => [...new Set(normalizeOptionalStringArray(values))]
+
 const normalizeContinuationActionCandidateForUi = (value) => {
   if (!value || typeof value !== 'object') {
     return null
@@ -380,30 +382,6 @@ const normalizeText = (value) =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLocaleLowerCase()
 
-const detectOnlineCoursesIntentForUi = (value) => {
-  const normalizedValue = normalizeText(value)
-    .replace(/\bno\s+mezclar\b[^.\n\r]*/gu, ' ')
-    .replace(/\bsin\s+mezclar\b[^.\n\r]*/gu, ' ')
-  if (!normalizedValue) {
-    return false
-  }
-
-  const learningCore =
-    /\b(?:cursos?|clases?|lecciones?|panel alumno)\b/u.test(normalizedValue)
-  const learningActors =
-    /\b(?:alumnos?|estudiantes?|inscripciones?)\b/u.test(normalizedValue)
-  const commercialAccessSignals =
-    /\b(?:planes?|free|plata|oro|progreso|premium|gratuitas?)\b/u.test(
-      normalizedValue,
-    )
-  const onlinePlatformSignals =
-    /\b(?:cursos? online|plataforma web de cursos|plataforma de cursos|panel alumno|frontend\/student)\b/u.test(
-      normalizedValue,
-    )
-
-  return learningCore && (learningActors || onlinePlatformSignals) && (commercialAccessSignals || onlinePlatformSignals)
-}
-
 const normalizeContractPathCandidateForUi = (value) =>
   normalizeOptionalString(value).replace(/\\/g, '/').toLocaleLowerCase()
 
@@ -443,10 +421,66 @@ const normalizeContractDefinitionForUi = (value) => {
   }
 }
 
-const buildFallbackMaterializationContractDefinitionForUi = ({
-  metadata,
-  normalizedTargetSummary,
-}) => {
+const normalizeGeneratedDomainRequiredPathGroupForUi = (group) => {
+  const sourceGroup = group && typeof group === 'object' ? group : null
+  const candidates = Array.isArray(group)
+    ? group
+    : sourceGroup && Array.isArray(sourceGroup.candidates)
+      ? sourceGroup.candidates
+      : []
+  const normalizedCandidates = candidates
+    .map((entry) => normalizeContractPathCandidateForUi(entry))
+    .filter(Boolean)
+
+  if (normalizedCandidates.length === 0) {
+    return null
+  }
+
+  return {
+    label: normalizeOptionalString(sourceGroup?.label) || normalizedCandidates[0],
+    candidates: normalizedCandidates,
+  }
+}
+
+const buildGeneratedDomainContractDefinitionForUi = (value) => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const materialization =
+    value.materialization && typeof value.materialization === 'object'
+      ? value.materialization
+      : {}
+  const validation =
+    value.validation && typeof value.validation === 'object' ? value.validation : {}
+  const safety = value.safety && typeof value.safety === 'object' ? value.safety : {}
+  const requiredPathGroups = Array.isArray(validation.requiredPathGroups)
+    ? validation.requiredPathGroups
+        .map((group) => normalizeGeneratedDomainRequiredPathGroupForUi(group))
+        .filter(Boolean)
+    : []
+  const fallbackRequiredFiles = normalizeOptionalStringArray(materialization.requiredFiles)
+    .map((entry) => normalizeContractPathCandidateForUi(entry))
+    .filter(Boolean)
+    .map((entry) => ({
+      label: entry,
+      candidates: [entry],
+    }))
+  const forbiddenSignals = uniqueStringsForUi([
+    ...normalizeOptionalStringArray(safety.forbiddenSignals),
+    ...normalizeOptionalStringArray(safety.explicitExclusions),
+  ])
+
+  return normalizeContractDefinitionForUi({
+    contractKind:
+      normalizeOptionalString(value.deliveryLevel) || 'generated-domain-contract',
+    requiredPathGroups:
+      requiredPathGroups.length > 0 ? requiredPathGroups : fallbackRequiredFiles,
+    forbiddenSignals,
+  })
+}
+
+const resolveMaterializationContractDefinitionForUi = ({ metadata }) => {
   const explicitContractDefinition =
     metadata?.materializationContract &&
     typeof metadata.materializationContract === 'object'
@@ -460,192 +494,7 @@ const buildFallbackMaterializationContractDefinitionForUi = ({
     return normalizeContractDefinitionForUi(explicitContractDefinition)
   }
 
-  const explicitContractKind = normalizeOptionalString(
-    metadata?.selectedContractKind || metadata?.materializationPlan?.contractKind,
-  ).toLocaleLowerCase()
-  const explicitDomain = normalizeOptionalString(metadata?.selectedDomain).toLocaleLowerCase()
-
-  const inspectionSurface = normalizeText(
-    [
-      metadata?.decisionKey,
-      metadata?.strategy,
-      metadata?.selectedDomain,
-      metadata?.selectedContractKind,
-      metadata?.businessSector,
-      metadata?.domainUnderstanding?.domainLabel,
-      metadata?.materializationPlan?.projectRoot,
-      normalizedTargetSummary,
-    ].join(' '),
-  )
-  const onlineCoursesDetected =
-    explicitContractKind === 'online-courses-fullstack-local' ||
-    explicitDomain === 'online-courses' ||
-    detectOnlineCoursesIntentForUi(inspectionSurface)
-
-  if (onlineCoursesDetected) {
-    const requiredPathGroups = [
-      {
-        label: 'backend/src/server.js|backend/server.js',
-        candidates: ['backend/src/server.js', 'backend/server.js'],
-      },
-      { label: 'backend/src/routes/courses.js', candidates: ['backend/src/routes/courses.js'] },
-      {
-        label: 'backend/src/routes/categories.js',
-        candidates: ['backend/src/routes/categories.js'],
-      },
-      { label: 'backend/src/routes/modules.js', candidates: ['backend/src/routes/modules.js'] },
-      { label: 'backend/src/routes/lessons.js', candidates: ['backend/src/routes/lessons.js'] },
-      {
-        label: 'backend/src/routes/students.js',
-        candidates: ['backend/src/routes/students.js'],
-      },
-      {
-        label: 'backend/src/routes/enrollments.js',
-        candidates: ['backend/src/routes/enrollments.js'],
-      },
-      { label: 'backend/src/routes/plans.js', candidates: ['backend/src/routes/plans.js'] },
-      {
-        label: 'backend/src/routes/payments.js',
-        candidates: ['backend/src/routes/payments.js'],
-      },
-      {
-        label: 'backend/src/routes/progress.js',
-        candidates: ['backend/src/routes/progress.js'],
-      },
-      {
-        label: 'backend/src/services/mock-mercado-pago.js',
-        candidates: ['backend/src/services/mock-mercado-pago.js'],
-      },
-      { label: 'database/schema.sql', candidates: ['database/schema.sql'] },
-      {
-        label: 'database/seed.sql',
-        candidates: ['database/seed.sql', 'database/seeds/seed-local.sql'],
-      },
-      { label: 'frontend/admin/index.html', candidates: ['frontend/admin/index.html'] },
-      { label: 'frontend/admin/app.js', candidates: ['frontend/admin/app.js'] },
-      { label: 'frontend/public/index.html', candidates: ['frontend/public/index.html'] },
-      { label: 'frontend/public/app.js', candidates: ['frontend/public/app.js'] },
-      {
-        label: 'frontend/student/index.html',
-        candidates: ['frontend/student/index.html'],
-      },
-      { label: 'frontend/student/app.js', candidates: ['frontend/student/app.js'] },
-      { label: 'shared/plans.js', candidates: ['shared/plans.js'] },
-      {
-        label: 'shared/payment-statuses.js',
-        candidates: ['shared/payment-statuses.js'],
-      },
-      {
-        label: 'shared/course-statuses.js',
-        candidates: ['shared/course-statuses.js'],
-      },
-      { label: 'docs/API.md', candidates: ['docs/api.md'] },
-      { label: 'docs/ARCHITECTURE.md', candidates: ['docs/architecture.md'] },
-      {
-        label: 'docs/DB_SCHEMA.md|docs/DATA_MODEL.md',
-        candidates: ['docs/db_schema.md', 'docs/data_model.md', 'docs/data-model.md'],
-      },
-      { label: 'docs/PAYMENTS_MOCK.md', candidates: ['docs/payments_mock.md'] },
-      {
-        label: 'docs/LOCAL_VALIDATION.md',
-        candidates: ['docs/local_validation.md'],
-      },
-      {
-        label: 'scripts/seed-local.js|scripts/README.md',
-        candidates: ['scripts/seed-local.js', 'scripts/readme.md'],
-      },
-    ]
-
-    return normalizeContractDefinitionForUi({
-      contractKind: 'online-courses-fullstack-local',
-      requiredPathGroups,
-      forbiddenSignals: [
-        'shipments',
-        'tracking',
-        'veterinaria',
-        'appointments',
-        'turnos',
-        'pacientes',
-        'mascotas',
-        'productos',
-        'stock',
-        'inventario',
-      ],
-    })
-  }
-
-  const requiredPathGroups = [
-    {
-      label: 'backend/src/server.js|backend/server.js',
-      candidates: ['backend/src/server.js', 'backend/server.js'],
-    },
-    {
-      label: 'backend/src/routes/shipments.js',
-      candidates: ['backend/src/routes/shipments.js'],
-    },
-    {
-      label: 'backend/src/routes/tracking.js',
-      candidates: ['backend/src/routes/tracking.js'],
-    },
-    {
-      label: 'database/schema.sql',
-      candidates: ['database/schema.sql'],
-    },
-    {
-      label: 'database/seed.sql',
-      candidates: ['database/seed.sql', 'database/seeds/seed-local.sql'],
-    },
-    {
-      label: 'frontend/admin/index.html',
-      candidates: ['frontend/admin/index.html'],
-    },
-    {
-      label: 'frontend/admin/app.js',
-      candidates: ['frontend/admin/app.js'],
-    },
-    {
-      label: 'frontend/public/index.html',
-      candidates: ['frontend/public/index.html'],
-    },
-    {
-      label: 'frontend/public/app.js',
-      candidates: ['frontend/public/app.js'],
-    },
-    {
-      label: 'docs/API.md',
-      candidates: ['docs/api.md'],
-    },
-    {
-      label: 'docs/ARCHITECTURE.md',
-      candidates: ['docs/architecture.md'],
-    },
-    {
-      label: 'docs/DB_SCHEMA.md|docs/DATA_MODEL.md',
-      candidates: ['docs/db_schema.md', 'docs/data_model.md', 'docs/data-model.md'],
-    },
-    {
-      label: 'shared/constants.js|shared/statuses.js',
-      candidates: ['shared/constants.js', 'shared/statuses.js'],
-    },
-    {
-      label: 'scripts/seed-local.js|scripts/README.md',
-      candidates: ['scripts/seed-local.js', 'scripts/readme.md'],
-    },
-  ]
-
-  return normalizeContractDefinitionForUi({
-    contractKind: 'logistics-fullstack-local',
-    requiredPathGroups,
-    forbiddenSignals: [
-      'veterinaria',
-      'appointments',
-      'turnos',
-      'pacientes',
-      'mascotas',
-      'reservas',
-      'fullstack-local-veterinaria',
-    ],
-  })
+  return buildGeneratedDomainContractDefinitionForUi(metadata?.generatedDomainContract)
 }
 
 const buildInspectionFailure = (baseDetails, reason, extra = {}) => ({
@@ -825,10 +674,20 @@ export const inspectPreparedFullstackLocalMaterialization = ({
   const normalizedTargetSummary = materializationTargets
     .map((entry) => normalizeOptionalString(entry).replace(/\\/g, '/').toLocaleLowerCase())
     .join(' ')
-  const contractDefinition = buildFallbackMaterializationContractDefinitionForUi({
-    metadata,
-    normalizedTargetSummary,
-  })
+  const contractDefinition = resolveMaterializationContractDefinitionForUi({ metadata })
+  const normalizedContractKind =
+    normalizeOptionalString(contractDefinition?.contractKind) || baseDetails.contractKind
+
+  if (!contractDefinition) {
+    return buildInspectionFailure(
+      {
+        ...baseDetails,
+        contractKind: normalizedContractKind,
+      },
+      'Falta generatedDomainContract o materializationContract universal para validar la preparacion local.',
+    )
+  }
+
   const requiredPathGroups = Array.isArray(contractDefinition?.requiredPathGroups)
     ? contractDefinition.requiredPathGroups
     : []
@@ -913,6 +772,7 @@ export const inspectPreparedFullstackLocalMaterialization = ({
       baseDetails,
       'Falta contrato SQL local: database/schema.sql y database/seed.sql.',
       {
+        contractKind: normalizedContractKind,
         missingRequiredPaths: missingRequiredPaths.includes('database/schema.sql')
           ? missingRequiredPaths
           : [...missingRequiredPaths, 'database/schema.sql', 'database/seed.sql'],
@@ -927,6 +787,7 @@ export const inspectPreparedFullstackLocalMaterialization = ({
         ', ',
       )}.`,
       {
+        contractKind: normalizedContractKind,
         missingRequiredPaths,
       },
     )
@@ -937,6 +798,7 @@ export const inspectPreparedFullstackLocalMaterialization = ({
       baseDetails,
       'El plan materializable fullstack no devolvio documentacion suficiente del modelo de datos. Falta docs/DB_SCHEMA.md o docs/DATA_MODEL.md.',
       {
+        contractKind: normalizedContractKind,
         missingRequiredPaths: ['docs/DB_SCHEMA.md|docs/DATA_MODEL.md'],
       },
     )
@@ -949,6 +811,7 @@ export const inspectPreparedFullstackLocalMaterialization = ({
         ', ',
       )}.`,
       {
+        contractKind: normalizedContractKind,
         forbiddenSignalsFound,
       },
     )
@@ -968,6 +831,7 @@ export const inspectPreparedFullstackLocalMaterialization = ({
 
   return {
     ...baseDetails,
+    contractKind: normalizedContractKind,
     ok: true,
     contractOk: true,
     reason: 'Contrato fullstack local válido.',

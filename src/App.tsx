@@ -13195,19 +13195,24 @@ function App() {
   const plannerProjectPhaseReviewAllowedTargetPaths = normalizeOptionalStringArray(
     plannerProjectPhaseReviewPlan?.allowedTargetPaths,
   )
-  const plannerIsProjectPhaseReview =
+  const plannerHasExplicitProjectPhaseReviewSignal =
     normalizeOptionalString(plannerExecutionMetadata.decisionKey).toLocaleLowerCase() ===
       'prepare-project-phase-plan' ||
     normalizeOptionalString(plannerExecutionMetadata.strategy).toLocaleLowerCase() ===
       'prepare-project-phase-plan' ||
     normalizeOptionalString(
       plannerExecutionMetadata.nextExpectedAction,
-    ).toLocaleLowerCase() === 'review-project-phase' ||
-    (plannerIsReviewOnly &&
+    ).toLocaleLowerCase() === 'review-project-phase'
+  const plannerHasImplicitProjectPhaseReviewSignal =
+    plannerReviewUiState.isScalableReview !== true &&
+    plannerIsReviewOnly &&
       normalizeOptionalString(
         plannerProjectPhaseReviewPlan?.deliveryLevel,
       ).toLocaleLowerCase() === 'fullstack-local' &&
-      plannerProjectPhaseReviewId !== '')
+      plannerProjectPhaseReviewId !== ''
+  const plannerIsProjectPhaseReview =
+    plannerHasExplicitProjectPhaseReviewSignal ||
+    plannerHasImplicitProjectPhaseReviewSignal
   const plannerProjectPhaseReviewCanMaterialize =
     plannerIsProjectPhaseReview &&
     plannerProjectPhaseReviewId !== '' &&

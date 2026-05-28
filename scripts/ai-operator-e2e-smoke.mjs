@@ -3560,6 +3560,93 @@ async function runTrackingLogisticsDerivedExecutePlanMaterializeCase() {
   }
 }
 
+async function runRendererDoesNotInventOnlineCoursesMaterializationContractCase() {
+  const failures = []
+  const plannerUiStateSource = fs.readFileSync(plannerUiStateFilePath, 'utf8')
+  const metadata = {
+    decisionKey: 'materialize-fullstack-local-generic-v1',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    requiresApproval: false,
+    approvalRequired: false,
+    businessSector: 'education-training',
+    executionScope: {
+      allowedTargetPaths: ['generic-local', 'generic-local/**'],
+    },
+    materializationPlan: {
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'generic-local',
+      allowedTargetPaths: ['generic-local', 'generic-local/**'],
+      operations: [
+        { targetPath: 'generic-local/backend/src/server.js' },
+        { targetPath: 'generic-local/database/schema.sql' },
+      ],
+    },
+  }
+  const inspection = inspectPreparedFullstackLocalMaterialization({
+    metadata,
+    sourcePlan: null,
+  })
+  const uiState = derivePlannerMaterializationUiState({
+    plannerExecutionMetadata: metadata,
+    effectivePlannerExecutionMetadata: metadata,
+  })
+  const inspectionSurface = normalizeText(JSON.stringify(inspection || {}))
+
+  pushFailure(
+    failures,
+    !plannerUiStateSource.includes('online-courses-fullstack-local'),
+    'planner-ui-state.js no debe reconstruir contractKind online-courses-fullstack-local en runtime del renderer.',
+  )
+  pushFailure(
+    failures,
+    !plannerUiStateSource.includes('edu-platform-local'),
+    'planner-ui-state.js no debe inventar roots tipo edu-platform-local en el renderer.',
+  )
+  pushFailure(
+    failures,
+    !plannerUiStateSource.includes('backend/src/routes/courses.js'),
+    'planner-ui-state.js no debe imponer requiredPathGroups específicos de cursos online.',
+  )
+  pushFailure(
+    failures,
+    inspection?.ok === false,
+    'Sin generatedDomainContract ni materializationContract explícito, la inspección debe quedar incompleta.',
+  )
+  pushFailure(
+    failures,
+    inspection?.contractKind === '',
+    `Sin contrato universal, el renderer no debe inventar contractKind por dominio. Recibido: ${inspection?.contractKind || '(vacío)'}.`,
+  )
+  pushFailure(
+    failures,
+    normalizeText(inspection?.reason || '').includes('generateddomaincontract') ||
+      normalizeText(inspection?.reason || '').includes('materializationcontract universal'),
+    'La inspección incompleta debe explicar que falta un contrato universal explícito.',
+  )
+  pushFailure(
+    failures,
+    !inspectionSurface.includes('online-courses') && !inspectionSurface.includes('edu-platform-local'),
+    'La inspección genérica no debe contaminarse con online-courses ni roots canónicos inventados.',
+  )
+  pushFailure(
+    failures,
+    uiState?.fullstackMaterializationResponseReady === true &&
+      uiState?.fullstackMaterializationContractReady === false &&
+      uiState?.materializeCtaVisible === true &&
+      uiState?.materializeCtaEnabled === false &&
+      uiState?.uiState === 'materialization-incomplete',
+    'La UI debe seguir mostrando la fase materializable como incompleta cuando falta contrato universal, sin volver al review ni habilitar materialización.',
+  )
+
+  return {
+    id: 'renderer-does-not-invent-online-courses-materialization-contract',
+    label: 'Renderer does not invent online courses materialization contract',
+    failures,
+  }
+}
+
 async function runTrackingLogisticsCompleteMaterializeEnablesCtaCase() {
   const failures = []
   const result = await requestTrackingLogisticsPreparedMaterializationDecision()
@@ -4200,6 +4287,85 @@ async function runGeneratedDomainContractValidReviewShowsNextSafeActionCase() {
   return {
     id: 'generated-domain-contract-valid-review-shows-next-safe-action',
     label: 'Generated domain contract valid review shows next safe action',
+    failures,
+  }
+}
+
+async function runScalableReviewDoesNotDegradeToProjectPhaseReviewCase() {
+  const failures = []
+  const appSource = fs.readFileSync(appFilePath, 'utf8')
+  const scalableReviewMetadata = {
+    decisionKey: 'fullstack-local-scalable-plan-v1',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    businessSector: 'auto_services_local_workshops',
+    requiresApproval: false,
+    approvalRequired: false,
+    tasks: [
+      { title: 'Panel operativo', targetPath: 'frontend/admin/app.js' },
+      { title: 'API local', targetPath: 'backend/src/server.js' },
+      { title: 'SQLite local', targetPath: 'database/schema.sql' },
+    ],
+    generatedDomainContractDiagnostics: {
+      present: true,
+      valid: true,
+      safeForLocalMaterialization: true,
+      domainSlug: 'talleres-mecanicos',
+      rootSlug: 'talleres-mecanicos-local',
+      sourceRoot: 'talleres-mecanicos-local',
+      targetRoot: 'talleres-mecanicos-local',
+      errorsCount: 0,
+      warningsCount: 0,
+      allowedTargetPathsCount: 52,
+      requiredPathGroupsCount: 47,
+    },
+    generatedDomainContractComparison: {
+      present: true,
+      compared: true,
+      status: 'partial',
+      safeForDiagnostics: true,
+      warningsCount: 2,
+      errorsCount: 0,
+    },
+    projectPhaseExecutionPlan: {
+      phaseId: 'frontend-mock-flow',
+      deliveryLevel: 'fullstack-local',
+      targetStrategy: 'prepare-project-phase-plan',
+      projectRoot: 'otro-proyecto-local',
+      executableNow: false,
+      approvalRequired: false,
+      allowedTargetPaths: [],
+    },
+  }
+  const scalableReviewUiState = derivePlannerMaterializationUiState({
+    plannerExecutionMetadata: scalableReviewMetadata,
+    effectivePlannerExecutionMetadata: scalableReviewMetadata,
+  })
+
+  pushFailure(
+    failures,
+    scalableReviewUiState.isScalableReview === true &&
+      scalableReviewUiState.canPrepareFullstackLocal === true &&
+      scalableReviewUiState.prepareCtaVisible === true &&
+      scalableReviewUiState.prepareCtaLabel === 'Preparar entrega funcional local',
+    'Un review escalable con generatedDomainContractDiagnostics válidos debe conservar el CTA seguro aunque exista un projectPhaseExecutionPlan colgado en metadata.',
+  )
+  pushFailure(
+    failures,
+    scalableReviewUiState.materializeCtaVisible === false,
+    'El review escalable no debe saltar a materialización directa por tener diagnostics completos.',
+  )
+  pushFailure(
+    failures,
+    appSource.includes('const plannerHasImplicitProjectPhaseReviewSignal =') &&
+      appSource.includes('plannerReviewUiState.isScalableReview !== true'),
+    'App.tsx debe impedir que un projectPhaseExecutionPlan implícito tape un review escalable válido.',
+  )
+
+  return {
+    id: 'scalable-review-does-not-degrade-to-project-phase-review',
+    label: 'Scalable review does not degrade to project phase review',
     failures,
   }
 }
@@ -6799,11 +6965,13 @@ async function main() {
     results.push(await runTrackingLogisticsIgnoredDetectedProjectDoesNotBlockMaterializeCase())
     results.push(await runTrackingLogisticsHeaderOnlyMaterializeFallbackExitsReviewCase())
     results.push(await runTrackingLogisticsDerivedExecutePlanMaterializeCase())
+    results.push(await runRendererDoesNotInventOnlineCoursesMaterializationContractCase())
     results.push(await runMaterializeFullstackLocalPlanResponseOverridesReviewStateCase())
     results.push(await runTrackingLogisticsScalableReviewShowsPrepareCtaCase())
     results.push(await runOnlineCoursesScalableReviewShowsPrepareCtaCase())
     results.push(await runEducationTrainingGeneratedDomainContractShowsPrepareCtaCase())
     results.push(await runGeneratedDomainContractValidReviewShowsNextSafeActionCase())
+    results.push(await runScalableReviewDoesNotDegradeToProjectPhaseReviewCase())
     results.push(await runGeneratedDomainContractComparisonPayloadCase())
     results.push(await runGeneratedDomainContractComparisonTechnicalPanelCase())
     results.push(await runPrepareContinuationActionPlanShowsPrimaryCtaCase())
