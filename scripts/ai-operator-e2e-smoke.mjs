@@ -37,6 +37,7 @@ const {
   shouldIgnoreWorkspaceDirectoryEntry,
 } = require(path.join(repoRoot, 'electron', 'workspace-project-detection.cjs'))
 const {
+  buildGeneratedDomainCapabilityProfile,
   buildGeneratedDomainContractComparison,
   buildGeneratedDomainContractDiagnostics,
   extractGeneratedDomainContractCandidate,
@@ -591,6 +592,7 @@ module.exports = {
     classifyWorkspaceProjectIntent,
     selectBestWorkspaceProjectCandidate,
     shouldIgnoreWorkspaceDirectoryEntry,
+    buildGeneratedDomainCapabilityProfile,
     buildGeneratedDomainContractComparison,
     buildGeneratedDomainContractDiagnostics,
     extractGeneratedDomainContractCandidate,
@@ -4551,6 +4553,127 @@ async function runGeneratedDomainContractComparisonPayloadCase() {
   }
 }
 
+async function runGeneratedDomainCapabilityProfilePayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'mechanic-workshops-local', label: 'Mechanic Workshops Local' },
+    root: {
+      slug: 'mechanic-workshops-local',
+      sourceRoot: 'mechanic-workshops-local',
+      targetRoot: 'mechanic-workshops-local',
+    },
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['dashboard'] },
+    ],
+    entities: ['appointments', 'reports', 'inventory_items'],
+    workflows: ['appointments', 'reporting', 'inventory-sync'],
+    backend: {
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/appointments.js' }],
+      services: [{ path: 'backend/src/services/mock-payment.js' }],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      tables: ['appointments', 'reports', 'inventory_items'],
+    },
+    integrations: [{ name: 'payment-provider', mode: 'mock-only', realIntegrationAllowedNow: false }],
+    safety: {
+      forbiddenFiles: ['.env', 'Dockerfile'],
+      forbiddenSignals: ['ACCESS_TOKEN', 'client_secret'],
+      explicitExclusions: ['deploy', 'docker', 'real-payments', 'servicios externos'],
+    },
+    materialization: {
+      requiredFiles: [
+        'frontend/public/index.html',
+        'frontend/admin/index.html',
+        'backend/src/server.js',
+        'database/schema.sql',
+      ],
+      operations: [
+        {
+          type: 'replace-file',
+          targetPath: 'backend/src/server.js',
+          nextContent: "export const server = 'mock-local'\n",
+        },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        ['frontend/public/index.html'],
+        ['frontend/admin/index.html'],
+        ['backend/src/server.js'],
+        ['database/schema.sql'],
+      ],
+      forbiddenSearchPatterns: ['ACCESS_TOKEN', 'client_secret'],
+    },
+    approvals: [
+      {
+        key: 'payment-provider-real',
+        scope: 'real-payments',
+        status: 'deferred',
+        allowsNow: ['mock-payments'],
+        forbidsNow: ['real-payments', '.env'],
+      },
+    ],
+  }
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'generated-capability-profile-observability',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    reason: 'Adjuntar el capability profile universal sin cambiar el comportamiento del planner.',
+    instruction: 'Mantener el flujo en revision.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainCapabilityProfile?.present === true &&
+      decision.generatedDomainCapabilityProfile?.built === true &&
+      ['built', 'partial'].includes(decision.generatedDomainCapabilityProfile?.status),
+    'buildBrainDecisionContract debe adjuntar generatedDomainCapabilityProfile al payload cuando haya generatedDomainContract.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainCapabilityProfile?.behaviorChanged === false,
+    'generatedDomainCapabilityProfile debe declarar behaviorChanged=false.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainCapabilityProfile?.delivery?.fullstackLocal === true &&
+      decision.generatedDomainCapabilityProfile?.backend?.present === true &&
+      decision.generatedDomainCapabilityProfile?.database?.present === true,
+    'El capability profile universal debe reflejar las capacidades estructurales del contrato sin depender del dominio.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generated-domain-contract:capability-profile') &&
+      mainSource.includes('generatedDomainCapabilityProfile') &&
+      mainSource.includes('summarizeGeneratedDomainCapabilityProfileForDebug'),
+    'main.cjs debe adjuntar generatedDomainCapabilityProfile y loguear generated-domain-contract:capability-profile.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'scalable-delivery-plan' &&
+      decision.executionMode === 'planner-only' &&
+      decision.nextExpectedAction === 'review-scalable-delivery',
+    'generatedDomainCapabilityProfile no debe cambiar strategy, executionMode ni nextExpectedAction.',
+  )
+
+  return {
+    id: 'generated-domain-capability-profile-payload',
+    label: 'Generated domain capability profile payload',
+    failures,
+  }
+}
+
 async function runLegacyDomainResolutionDiagnosticsPayloadCase() {
   const failures = []
   const decision = plannerApi.buildBrainDecisionContract({
@@ -7181,6 +7304,7 @@ async function main() {
     results.push(await runScalableReviewDoesNotDegradeToProjectPhaseReviewCase())
     results.push(await runProductArchitectureReviewDoesNotDegradeToProjectPhaseReviewCase())
     results.push(await runGeneratedDomainContractComparisonPayloadCase())
+    results.push(await runGeneratedDomainCapabilityProfilePayloadCase())
     results.push(await runLegacyDomainResolutionDiagnosticsPayloadCase())
     results.push(await runGeneratedDomainContractComparisonTechnicalPanelCase())
     results.push(await runPrepareContinuationActionPlanShowsPrimaryCtaCase())

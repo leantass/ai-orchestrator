@@ -144,6 +144,7 @@ const {
   validateGeneratedDomainContract,
   isContractSafeForLocalMaterialization,
   buildGeneratedDomainContractDiagnostics,
+  buildGeneratedDomainCapabilityProfile,
   buildGeneratedDomainContractComparison,
   extractGeneratedDomainContractCandidate,
 } = require('./generated-domain-contract.cjs')
@@ -548,6 +549,62 @@ function summarizeGeneratedDomainContractComparisonForDebug(comparison) {
     comparison.roots.legacyRoot.trim()
       ? { legacyRoot: comparison.roots.legacyRoot.trim() }
       : {}),
+    ...(warnings.length > 0
+      ? {
+          firstWarning: sanitizeGeneratedDomainContractDebugPreview(warnings[0], 180),
+        }
+      : {}),
+    ...(errors.length > 0
+      ? {
+          firstError: sanitizeGeneratedDomainContractDebugPreview(errors[0], 180),
+        }
+      : {}),
+  }
+}
+
+function summarizeGeneratedDomainCapabilityProfileForDebug(profile) {
+  if (!profile || typeof profile !== 'object') {
+    return {
+      present: false,
+      built: false,
+      status: 'not-available',
+    }
+  }
+
+  const warnings = Array.isArray(profile.warnings) ? profile.warnings : []
+  const errors = Array.isArray(profile.errors) ? profile.errors : []
+  const activeWorkflows = Object.entries(
+    profile.workflows && typeof profile.workflows === 'object' ? profile.workflows : {},
+  )
+    .filter(([, enabled]) => enabled === true)
+    .map(([key]) => key)
+    .slice(0, 8)
+
+  return {
+    present: profile.present === true,
+    built: profile.built === true,
+    status:
+      typeof profile.status === 'string' && profile.status.trim()
+        ? profile.status.trim()
+        : 'not-available',
+    deliveryLevel:
+      typeof profile.delivery?.level === 'string' && profile.delivery.level.trim()
+        ? profile.delivery.level.trim()
+        : undefined,
+    fullstackLocal: profile.delivery?.fullstackLocal === true,
+    surfacesCount: Number.isInteger(profile.surfaces?.count) ? profile.surfaces.count : 0,
+    backendPresent: profile.backend?.present === true,
+    databasePresent: profile.database?.present === true,
+    activeWorkflows,
+    safeForLocalMaterialization: profile.safety?.safeForLocalMaterialization === true,
+    allowedTargetPathsCount: Number.isInteger(profile.materialization?.allowedTargetPathsCount)
+      ? profile.materialization.allowedTargetPathsCount
+      : 0,
+    requiredPathGroupsCount: Number.isInteger(profile.materialization?.requiredPathGroupsCount)
+      ? profile.materialization.requiredPathGroupsCount
+      : 0,
+    warningsCount: warnings.length,
+    errorsCount: errors.length,
     ...(warnings.length > 0
       ? {
           firstWarning: sanitizeGeneratedDomainContractDebugPreview(warnings[0], 180),
@@ -36294,6 +36351,10 @@ function buildBrainDecisionContract({
     },
     workspacePath,
   )
+  const generatedDomainCapabilityProfile = buildGeneratedDomainCapabilityProfile(
+    normalizedGeneratedDomainContract,
+    generatedDomainContractDiagnostics,
+  )
   const legacyDomainResolutionDiagnostics = buildLegacyDomainResolutionDiagnostics({
     safeFirstDeliveryPlan,
     scalableDeliveryPlan,
@@ -36423,6 +36484,7 @@ function buildBrainDecisionContract({
       ? { generatedDomainContract: normalizedGeneratedDomainContract }
       : {}),
     generatedDomainContractDiagnostics,
+    generatedDomainCapabilityProfile,
     generatedDomainContractComparison,
     legacyDomainResolutionDiagnostics,
     ...(materializationPlan && typeof materializationPlan === 'object'
@@ -49824,6 +49886,18 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
   }
 
   if (
+    brainDecision.generatedDomainCapabilityProfile &&
+    typeof brainDecision.generatedDomainCapabilityProfile === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-contract:capability-profile',
+      summarizeGeneratedDomainCapabilityProfileForDebug(
+        brainDecision.generatedDomainCapabilityProfile,
+      ),
+    )
+  }
+
+  if (
     brainDecision.legacyDomainResolutionDiagnostics &&
     typeof brainDecision.legacyDomainResolutionDiagnostics === 'object'
   ) {
@@ -49938,6 +50012,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       generatedDomainContract: brainDecision.generatedDomainContract,
       generatedDomainContractDiagnostics:
         brainDecision.generatedDomainContractDiagnostics,
+      generatedDomainCapabilityProfile:
+        brainDecision.generatedDomainCapabilityProfile,
       generatedDomainContractComparison:
         brainDecision.generatedDomainContractComparison,
       legacyDomainResolutionDiagnostics:
@@ -50008,6 +50084,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
     generatedDomainContract: brainDecision.generatedDomainContract,
     generatedDomainContractDiagnostics:
       brainDecision.generatedDomainContractDiagnostics,
+    generatedDomainCapabilityProfile:
+      brainDecision.generatedDomainCapabilityProfile,
     generatedDomainContractComparison:
       brainDecision.generatedDomainContractComparison,
     legacyDomainResolutionDiagnostics:

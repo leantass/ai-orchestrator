@@ -864,6 +864,453 @@ function pushUniqueMessage(target, message) {
   target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
 }
 
+function collectGeneratedDomainCapabilitySignalTexts(contract) {
+  const normalizedContract = asObject(contract)
+  const frontendSurfaces = asArray(normalizedContract.frontendSurfaces)
+  const backend = asObject(normalizedContract.backend)
+  const database = asObject(normalizedContract.database)
+  const shared = asObject(normalizedContract.shared)
+  const safety = asObject(normalizedContract.safety)
+  const materialization = asObject(normalizedContract.materialization)
+  const validation = asObject(normalizedContract.validation)
+
+  return unique(
+    [
+      normalizedContract.contractVersion,
+      normalizedContract.deliveryLevel,
+      asObject(normalizedContract.domain).label,
+      asObject(normalizedContract.domain).summary,
+      ...asArray(normalizedContract.roles),
+      ...asArray(normalizedContract.entities),
+      ...Object.keys(asObject(normalizedContract.states)),
+      ...asArray(normalizedContract.workflows),
+      ...frontendSurfaces.flatMap((surface) => {
+        const value = asObject(surface)
+        return [value.key, value.label, value.path, ...asArray(value.screens)]
+      }),
+      backend.packageFile,
+      backend.entryFile,
+      ...asArray(backend.routes).flatMap((entry) => {
+        const value = asObject(entry)
+        return [value.path, value.name, value.label]
+      }),
+      ...asArray(backend.services).flatMap((entry) => {
+        const value = asObject(entry)
+        return [value.path, value.name, value.label]
+      }),
+      ...asArray(backend.modules).flatMap((entry) => {
+        const value = asObject(entry)
+        return [value.path, value.name, value.label]
+      }),
+      database.schemaFile,
+      database.seedFile,
+      ...asArray(database.tables),
+      ...asArray(database.relationships),
+      ...asArray(database.seedData),
+      ...asArray(shared.files),
+      ...asArray(normalizedContract.docs),
+      ...asArray(normalizedContract.scripts),
+      ...asArray(normalizedContract.integrations).flatMap((entry) => {
+        const value = asObject(entry)
+        return [value.name, value.mode, value.notes]
+      }),
+      ...asArray(safety.forbiddenFiles),
+      ...asArray(safety.forbiddenSignals),
+      ...asArray(safety.explicitExclusions),
+      ...asArray(materialization.requiredFiles),
+      ...asArray(materialization.allowedTargetPaths),
+      ...asArray(materialization.operations).flatMap((entry) => {
+        const value = asObject(entry)
+        return [value.type, value.targetPath]
+      }),
+      ...asArray(validation.syntaxChecks),
+      ...asArray(validation.forbiddenSearchPatterns),
+      ...asArray(validation.requiredPathGroups).flatMap((group) => asArray(group)),
+      ...asArray(normalizedContract.approvals).flatMap((entry) => {
+        const value = asObject(entry)
+        return [
+          value.key,
+          value.scope,
+          value.status,
+          ...asArray(value.allowsNow),
+          ...asArray(value.forbidsNow),
+        ]
+      }),
+    ]
+      .map((entry) => asNonEmptyString(entry))
+      .filter(Boolean),
+  )
+}
+
+function detectGeneratedDomainCapabilitySignal(textEntries, patterns) {
+  const combinedText = asArray(textEntries)
+    .map((entry) => asNonEmptyString(entry))
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+
+  return asArray(patterns).some((pattern) => pattern.test(combinedText))
+}
+
+function countGeneratedDomainCapabilityEntries(entries) {
+  return asArray(entries).filter((entry) => {
+    if (typeof entry === 'string') {
+      return asNonEmptyString(entry) !== ''
+    }
+
+    if (entry && typeof entry === 'object') {
+      return Object.keys(entry).length > 0
+    }
+
+    return false
+  }).length
+}
+
+function buildGeneratedDomainCapabilityProfile(generatedDomainContract, diagnostics = null) {
+  const emptyProfile = {
+    capabilityProfileVersion: '0.1',
+    present: false,
+    built: false,
+    status: 'not-available',
+    source: 'generated-domain-contract',
+    behaviorChanged: false,
+    delivery: {
+      level: null,
+      fullstackLocal: false,
+      frontendOnly: false,
+      plannerOnly: false,
+      localOnly: false,
+      deployRequested: false,
+    },
+    surfaces: {
+      public: false,
+      admin: false,
+      operator: false,
+      user: false,
+      mobile: false,
+      desktop: false,
+      game: false,
+      api: false,
+      count: 0,
+      names: [],
+    },
+    backend: {
+      present: false,
+      routesCount: 0,
+      servicesCount: 0,
+    },
+    database: {
+      present: false,
+      tablesCount: 0,
+      entitiesCount: 0,
+      local: false,
+    },
+    workflows: {
+      scheduling: false,
+      reporting: false,
+      mockPayments: false,
+      realPayments: false,
+      inventory: false,
+      tracking: false,
+      content: false,
+      documentReview: false,
+      messaging: false,
+      authentication: false,
+      authorization: false,
+    },
+    safety: {
+      safeForLocalMaterialization: false,
+      forbidsSecrets: false,
+      forbidsDeploy: false,
+      forbidsRealPayments: false,
+      forbidsExternalServices: false,
+      forbidsDocker: false,
+    },
+    materialization: {
+      allowedTargetPathsCount: 0,
+      requiredPathGroupsCount: 0,
+      hasAllowedTargets: false,
+      hasRequiredGroups: false,
+    },
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  if (!generatedDomainContract || typeof generatedDomainContract !== 'object') {
+    return emptyProfile
+  }
+
+  try {
+    const normalizedContract =
+      diagnostics?.normalizedContract && typeof diagnostics.normalizedContract === 'object'
+        ? diagnostics.normalizedContract
+        : normalizeGeneratedDomainContract(generatedDomainContract)
+    const resolvedDiagnostics =
+      diagnostics && typeof diagnostics === 'object'
+        ? diagnostics
+        : buildGeneratedDomainContractDiagnostics(
+            { generatedDomainContract: normalizedContract },
+            '.',
+          )
+    const capabilityTexts = collectGeneratedDomainCapabilitySignalTexts(normalizedContract)
+    const frontendSurfaces = asArray(normalizedContract.frontendSurfaces)
+    const backend = asObject(normalizedContract.backend)
+    const database = asObject(normalizedContract.database)
+    const safety = asObject(normalizedContract.safety)
+    const approvals = asArray(normalizedContract.approvals)
+    const integrations = asArray(normalizedContract.integrations)
+    const allowedTargetPathsCount = Number.isInteger(resolvedDiagnostics.allowedTargetPathsCount)
+      ? resolvedDiagnostics.allowedTargetPathsCount
+      : deriveAllowedTargetPathsFromContract(normalizedContract, '.').length
+    const requiredPathGroupsCount = Number.isInteger(resolvedDiagnostics.requiredPathGroupsCount)
+      ? resolvedDiagnostics.requiredPathGroupsCount
+      : deriveRequiredPathGroupsFromContract(normalizedContract).length
+    const deliveryLevel = asNonEmptyString(normalizedContract.deliveryLevel)
+    const backendPresent =
+      Boolean(asNonEmptyString(backend.entryFile)) ||
+      countGeneratedDomainCapabilityEntries(backend.routes) > 0 ||
+      countGeneratedDomainCapabilityEntries(backend.services) > 0 ||
+      countGeneratedDomainCapabilityEntries(backend.modules) > 0
+    const databasePresent =
+      Boolean(asNonEmptyString(database.schemaFile)) ||
+      Boolean(asNonEmptyString(database.seedFile)) ||
+      asArray(database.tables).length > 0
+    const surfaceNames = unique(
+      frontendSurfaces
+        .map((surface) =>
+          asNonEmptyString(
+            asObject(surface).key ||
+              asObject(surface).label ||
+              path.posix.basename(asNonEmptyString(asObject(surface).path)),
+          ),
+        )
+        .filter(Boolean),
+    )
+    const activeSurfaceNames = unique(
+      backendPresent ? [...surfaceNames, 'api'] : surfaceNames,
+    )
+    const forbidsDeploy = detectGeneratedDomainCapabilitySignal(
+      [
+        ...asArray(safety.explicitExclusions),
+        ...asArray(safety.forbiddenSignals),
+        ...approvals.flatMap((entry) => asArray(asObject(entry).forbidsNow)),
+      ],
+      [/\bdeploy\b/u],
+    )
+    const hasPaymentSignal = detectGeneratedDomainCapabilitySignal(capabilityTexts, [
+      /\b(?:payment|payments|billing|invoice|checkout|charge|charges|cobro|cobros|pago|pagos)\b/u,
+    ])
+    const mockPayments =
+      hasPaymentSignal &&
+      (integrations.some(
+        (entry) => asNonEmptyString(asObject(entry).mode).toLowerCase() === 'mock-only',
+      ) ||
+        approvals.some((entry) =>
+          asArray(asObject(entry).allowsNow).some(
+            (value) => asNonEmptyString(value).toLowerCase() === 'mock-payments',
+          ),
+        ) ||
+        approvals.some((entry) =>
+          asArray(asObject(entry).forbidsNow).some(
+            (value) => asNonEmptyString(value).toLowerCase() === 'real-payments',
+          ),
+        ))
+    const realPayments =
+      hasPaymentSignal &&
+      (integrations.some((entry) => asObject(entry).realIntegrationAllowedNow === true) ||
+        approvals.some((entry) =>
+          asArray(asObject(entry).allowsNow).some(
+            (value) => asNonEmptyString(value).toLowerCase() === 'real-payments',
+          ),
+        ))
+    const profile = {
+      ...emptyProfile,
+      present: true,
+      built: true,
+      status: 'built',
+      delivery: {
+        level: deliveryLevel || null,
+        fullstackLocal: deliveryLevel === 'fullstack-local',
+        frontendOnly: deliveryLevel === 'frontend-project',
+        plannerOnly: false,
+        localOnly:
+          deliveryLevel.includes('local') ||
+          resolvedDiagnostics.safeForLocalMaterialization === true ||
+          forbidsDeploy,
+        deployRequested: !forbidsDeploy && detectGeneratedDomainCapabilitySignal(capabilityTexts, [/\bdeploy\b/u]),
+      },
+      surfaces: {
+        public: detectGeneratedDomainCapabilitySignal(capabilityTexts, [
+          /\b(?:public|landing|site|marketing|catalog)\b/u,
+        ]),
+        admin: detectGeneratedDomainCapabilitySignal(capabilityTexts, [
+          /\b(?:admin|backoffice|dashboard)\b/u,
+        ]),
+        operator: detectGeneratedDomainCapabilitySignal(capabilityTexts, [
+          /\b(?:operator|operations|operaciones|ops)\b/u,
+        ]),
+        user: detectGeneratedDomainCapabilitySignal(capabilityTexts, [
+          /\b(?:user|users|account|accounts|profile|profiles|member|members)\b/u,
+        ]),
+        mobile: detectGeneratedDomainCapabilitySignal(capabilityTexts, [
+          /\b(?:mobile|android|ios|react-native)\b/u,
+        ]),
+        desktop: detectGeneratedDomainCapabilitySignal(capabilityTexts, [
+          /\b(?:desktop|electron)\b/u,
+        ]),
+        game: detectGeneratedDomainCapabilitySignal(capabilityTexts, [
+          /\b(?:game|games|play|player|players|score|scores|level|levels)\b/u,
+        ]),
+        api: backendPresent,
+        count: activeSurfaceNames.length,
+        names: activeSurfaceNames,
+      },
+      backend: {
+        present: backendPresent,
+        routesCount: countGeneratedDomainCapabilityEntries(backend.routes),
+        servicesCount: countGeneratedDomainCapabilityEntries(backend.services),
+      },
+      database: {
+        present: databasePresent,
+        tablesCount: asArray(database.tables).length,
+        entitiesCount: asArray(normalizedContract.entities).length,
+        local: databasePresent && deliveryLevel.includes('local'),
+      },
+      workflows: {
+        scheduling: detectGeneratedDomainCapabilitySignal(capabilityTexts, [
+          /\b(?:schedule|scheduling|calendar|appointment|appointments|booking|bookings|turno|turnos|agenda)\b/u,
+        ]),
+        reporting: detectGeneratedDomainCapabilitySignal(capabilityTexts, [
+          /\b(?:report|reports|reporting|analytics|dashboard|dashboards|metric|metrics|kpi|kpis)\b/u,
+        ]),
+        mockPayments,
+        realPayments,
+        inventory: detectGeneratedDomainCapabilitySignal(capabilityTexts, [
+          /\b(?:inventory|stock|stocks|sku|warehouse|warehouses|inventario|almacen)\b/u,
+        ]),
+        tracking: detectGeneratedDomainCapabilitySignal(capabilityTexts, [
+          /\b(?:tracking|timeline|timelines|status|statuses|event|events|seguimiento|estado|estados)\b/u,
+        ]),
+        content: detectGeneratedDomainCapabilitySignal(capabilityTexts, [
+          /\b(?:content|lesson|lessons|article|articles|media|asset|assets|contenido|leccion|lecciones|articulo|articulos)\b/u,
+        ]),
+        documentReview: detectGeneratedDomainCapabilitySignal(capabilityTexts, [
+          /\b(?:document|documents|file|files|review|reviews|archivo|archivos|revision|revisiones)\b/u,
+        ]),
+        messaging: detectGeneratedDomainCapabilitySignal(capabilityTexts, [
+          /\b(?:message|messages|messaging|notification|notifications|email|emails|sms|chat|inbox)\b/u,
+        ]),
+        authentication: detectGeneratedDomainCapabilitySignal(capabilityTexts, [
+          /\b(?:auth|authentication|login|signin|sign-in|session|sessions|identity|credential|credentials)\b/u,
+        ]),
+        authorization: detectGeneratedDomainCapabilitySignal(capabilityTexts, [
+          /\b(?:authorization|permission|permissions|role|roles|scope|scopes|policy|policies|access)\b/u,
+        ]),
+      },
+      safety: {
+        safeForLocalMaterialization: resolvedDiagnostics.safeForLocalMaterialization === true,
+        forbidsSecrets: detectGeneratedDomainCapabilitySignal(
+          [
+            ...asArray(safety.forbiddenFiles),
+            ...asArray(safety.forbiddenSignals),
+            ...asArray(asObject(normalizedContract.validation).forbiddenSearchPatterns),
+            ...approvals.flatMap((entry) => asArray(asObject(entry).forbidsNow)),
+          ],
+          [
+            /\b(?:\.env|access[_-]?token|client[_-]?secret|secret|password|bearer|api[_-]?key|credential|credentials)\b/u,
+          ],
+        ),
+        forbidsDeploy,
+        forbidsRealPayments:
+          approvals.some((entry) =>
+            asArray(asObject(entry).forbidsNow).some(
+              (value) => asNonEmptyString(value).toLowerCase() === 'real-payments',
+            ),
+          ) ||
+          detectGeneratedDomainCapabilitySignal(
+            [...asArray(safety.explicitExclusions), ...asArray(safety.forbiddenSignals)],
+            [/\b(?:real-payments|real payment|real payments|pagos reales)\b/u],
+          ),
+        forbidsExternalServices: detectGeneratedDomainCapabilitySignal(
+          [...asArray(safety.explicitExclusions), ...asArray(safety.forbiddenSignals)],
+          [/\b(?:external|externos|externas|third-party|webhook|api externa|servicios externos)\b/u],
+        ),
+        forbidsDocker: detectGeneratedDomainCapabilitySignal(
+          [...asArray(safety.forbiddenFiles), ...asArray(safety.explicitExclusions)],
+          [/\b(?:docker|dockerfile|docker-compose)\b/u],
+        ),
+      },
+      materialization: {
+        allowedTargetPathsCount,
+        requiredPathGroupsCount,
+        hasAllowedTargets: allowedTargetPathsCount > 0,
+        hasRequiredGroups: requiredPathGroupsCount > 0,
+      },
+      warnings: [],
+      errors: [],
+    }
+
+    asArray(resolvedDiagnostics.warnings).forEach((entry) => {
+      pushUniqueMessage(profile.warnings, entry)
+    })
+
+    if (resolvedDiagnostics.valid !== true) {
+      pushUniqueMessage(
+        profile.warnings,
+        'El generatedDomainContract no es valido segun el validador local.',
+      )
+    }
+    if (resolvedDiagnostics.safeForLocalMaterialization !== true) {
+      pushUniqueMessage(
+        profile.warnings,
+        'El generatedDomainContract no esta marcado como seguro para materializacion local.',
+      )
+    }
+    if (!profile.backend.present && profile.surfaces.count === 0) {
+      pushUniqueMessage(
+        profile.warnings,
+        'El generatedDomainContract no declara surfaces frontend ni backend suficientes para perfilar capacidades.',
+      )
+    }
+    if (!profile.materialization.hasAllowedTargets) {
+      pushUniqueMessage(
+        profile.warnings,
+        'El generatedDomainContract no expone allowedTargetPaths comparables.',
+      )
+    }
+    if (!profile.materialization.hasRequiredGroups) {
+      pushUniqueMessage(
+        profile.warnings,
+        'El generatedDomainContract no expone requiredPathGroups comparables.',
+      )
+    }
+
+    profile.warningsCount = profile.warnings.length
+    profile.errorsCount = profile.errors.length
+    profile.status =
+      profile.errors.length > 0
+        ? 'error'
+        : profile.warnings.length > 0
+          ? 'partial'
+          : 'built'
+
+    return profile
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : asNonEmptyString(String(error), 'error')
+
+    return {
+      ...emptyProfile,
+      present: true,
+      status: 'error',
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
 function tokenizeComparisonText(value) {
   return unique(
     asNonEmptyString(value)
@@ -1425,6 +1872,7 @@ module.exports = {
   deriveForbiddenSearchPatternsFromContract,
   isContractSafeForLocalMaterialization,
   buildGeneratedDomainContractDiagnostics,
+  buildGeneratedDomainCapabilityProfile,
   buildGeneratedDomainContractComparison,
   extractGeneratedDomainContractCandidate,
 }

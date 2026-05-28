@@ -19,6 +19,7 @@ const {
   deriveForbiddenSearchPatternsFromContract,
   isContractSafeForLocalMaterialization,
   buildGeneratedDomainContractDiagnostics,
+  buildGeneratedDomainCapabilityProfile,
   buildGeneratedDomainContractComparison,
 } = require('../electron/generated-domain-contract.cjs')
 const {
@@ -61,6 +62,7 @@ module.exports = {
   buildGeneratedDomainContractObservationFailureResult,
   buildBrainDecisionContract,
   buildLegacyDomainResolutionDiagnostics,
+  buildGeneratedDomainCapabilityProfile,
   buildGeneratedDomainContractObservationSystemPrompt,
   classifyGeneratedDomainContractObservationThrownError,
   buildOpenAIBrainSystemPrompt,
@@ -95,6 +97,7 @@ module.exports = {
     validateGeneratedDomainContract,
     isContractSafeForLocalMaterialization,
     buildGeneratedDomainContractDiagnostics,
+    buildGeneratedDomainCapabilityProfile,
     buildGeneratedDomainContractComparison,
     extractGeneratedDomainContractCandidate:
       require('../electron/generated-domain-contract.cjs').extractGeneratedDomainContractCandidate,
@@ -1451,6 +1454,52 @@ function runGeneratedDomainContractComparisonNotAvailableCase() {
   assert.equal(comparison.errorsCount, 0)
 }
 
+function runGeneratedDomainCapabilityProfileBuiltCase() {
+  const contract = createValidInventedContract()
+  const diagnostics = buildGeneratedDomainContractDiagnostics(
+    { generatedDomainContract: contract },
+    repoRoot,
+  )
+  const profile = buildGeneratedDomainCapabilityProfile(contract, diagnostics)
+
+  assert.equal(profile.present, true)
+  assert.equal(profile.built, true)
+  assert.equal(profile.status, 'built')
+  assert.equal(profile.behaviorChanged, false)
+  assert.equal(profile.delivery.fullstackLocal, true)
+  assert.equal(profile.backend.present, true)
+  assert.equal(profile.database.present, true)
+  assert.equal(profile.materialization.hasAllowedTargets, true)
+  assert.equal(profile.materialization.hasRequiredGroups, true)
+  assert.equal(profile.safety.safeForLocalMaterialization, true)
+}
+
+function runGeneratedDomainCapabilityProfileNotAvailableCase() {
+  const profile = buildGeneratedDomainCapabilityProfile(null)
+
+  assert.equal(profile.present, false)
+  assert.equal(profile.built, false)
+  assert.equal(profile.status, 'not-available')
+  assert.equal(profile.errorsCount, 0)
+}
+
+function runGeneratedDomainCapabilityProfilePartialCase() {
+  const contract = createSparseDeliveryLevelContract('fullstack-local')
+  const diagnostics = buildGeneratedDomainContractDiagnostics(
+    { generatedDomainContract: contract },
+    repoRoot,
+  )
+  const profile = buildGeneratedDomainCapabilityProfile(contract, diagnostics)
+
+  assert.equal(profile.present, true)
+  assert.equal(profile.built, true)
+  assert.ok(
+    profile.status === 'partial' || (profile.status === 'built' && profile.warningsCount > 0),
+    'El capability profile parcial debe construirse sin romper el flujo.',
+  )
+  assert.equal(profile.errorsCount, 0)
+}
+
 async function runPlannerObservationNormalizeAvailabilityCase() {
   assert.equal(
     typeof observationHarness.observeGeneratedDomainContractForPlannerDecision,
@@ -1612,6 +1661,9 @@ async function main() {
   runGeneratedDomainContractComparisonComparedCase()
   runGeneratedDomainContractComparisonPartialCase()
   runGeneratedDomainContractComparisonNotAvailableCase()
+  runGeneratedDomainCapabilityProfileBuiltCase()
+  runGeneratedDomainCapabilityProfileNotAvailableCase()
+  runGeneratedDomainCapabilityProfilePartialCase()
   runBrainDecisionContractObservationCase()
   runLegacyDomainResolutionDiagnosticsUsedCase()
   runLegacyDomainResolutionDiagnosticsWithGeneratedContractCase()
@@ -1626,7 +1678,7 @@ async function main() {
   runPlannerObservationDebugSummaryCase()
   await runPlannerObservationNormalizeAvailabilityCase()
   runDiagnosticsDebugPreviewCase()
-  console.log('OK. GeneratedDomainContract smoke paso 45/45 checks.')
+  console.log('OK. GeneratedDomainContract smoke paso 48/48 checks.')
 }
 
 main().catch((error) => {
