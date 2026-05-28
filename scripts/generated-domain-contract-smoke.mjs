@@ -60,13 +60,18 @@ module.exports = {
   applyGeneratedDomainContractObservationToDecision,
   buildGeneratedDomainContractObservationFailureResult,
   buildBrainDecisionContract,
+  buildLegacyDomainResolutionDiagnostics,
   buildGeneratedDomainContractObservationSystemPrompt,
   classifyGeneratedDomainContractObservationThrownError,
   buildOpenAIBrainSystemPrompt,
   buildOpenAIBrainSchema,
+  buildSafeFirstDeliveryPlan,
+  buildScalableDeliveryPlan,
+  buildFullstackLocalMaterializationPlan,
   observeGeneratedDomainContractForPlannerDecision,
   summarizeGeneratedDomainContractDiagnosticsForDebug,
   summarizeGeneratedDomainContractObservationForDebug,
+  summarizeLegacyDomainResolutionDiagnosticsForDebug,
 };
 `
 
@@ -1012,6 +1017,129 @@ function runBrainDecisionContractObservationCase() {
   assert.ok(withContract.generatedDomainContract, 'El payload final debe conservar generatedDomainContract.')
 }
 
+function runLegacyDomainResolutionDiagnosticsUsedCase() {
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'legacy-safe-first-used',
+    strategy: 'safe-first-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-safe-first-delivery',
+    reason: 'Mantener una primera entrega segura local sin ejecutar archivos.',
+    instruction: 'Planificar la primera entrega segura.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    safeFirstDeliveryPlan: {
+      modules: ['cursos', 'alumnos', 'pagos mock'],
+      mockData: ['Cursos mock y progreso del alumno en memoria local.'],
+      screens: ['catalogo de cursos', 'panel alumno'],
+      localBehavior: ['Cambiar progreso mock sin servicios externos.'],
+      explicitExclusions: ['Sin checkout real'],
+      approvalRequiredLater: ['Credenciales reales'],
+      successCriteria: ['El resultado sigue siendo solo planner-only.'],
+      legacyDomainResolution: {
+        safeFirstDeliveryFamilyKey: 'online-courses',
+        usedLegacyFamily: true,
+      },
+    },
+    workspacePath: repoRoot,
+  })
+  const diagnostics = decision.legacyDomainResolutionDiagnostics
+  const debugSummary =
+    observationHarness.summarizeLegacyDomainResolutionDiagnosticsForDebug(diagnostics)
+
+  assert.equal(diagnostics?.present, true)
+  assert.equal(diagnostics?.used, true)
+  assert.equal(diagnostics?.status, 'used')
+  assert.equal(diagnostics?.behaviorChanged, false)
+  assert.equal(diagnostics?.safeFirstDeliveryFamily?.used, true)
+  assert.equal(diagnostics?.safeFirstDeliveryFamily?.familyKey, 'online-courses')
+  assert.equal(debugSummary.used, true)
+  assert.equal(debugSummary.safeFirstDeliveryFamilyUsed, true)
+  assert.equal(debugSummary.safeFirstDeliveryFamilyKey, 'online-courses')
+  assert.equal(decision.strategy, 'safe-first-delivery-plan')
+  assert.equal(decision.executionMode, 'planner-only')
+  assert.equal(decision.nextExpectedAction, 'review-safe-first-delivery')
+}
+
+function runLegacyDomainResolutionDiagnosticsWithGeneratedContractCase() {
+  const generatedDomainContract = createValidInventedContract()
+  const scalableDeliveryPlan = observationHarness.buildScalableDeliveryPlan({
+    goal:
+      'Hacer un sistema fullstack local para una plataforma web de cursos online con frontend publico, panel admin, panel alumno y pagos mock.',
+    context:
+      'Sin deploy, sin Docker, sin servicios externos ni credenciales reales.',
+    workspacePath: repoRoot,
+    deliveryLevel: 'fullstack-local',
+    domainUnderstanding: {
+      domainLabel: 'Plataforma de cursos online',
+      primaryModules: ['cursos', 'alumnos', 'pagos mock', 'reportes'],
+      primaryEntities: ['courses', 'students', 'payments'],
+    },
+    reason: 'Preparar un review escalable fullstack-local.',
+  })
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'legacy-scalable-with-generated-contract',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    reason: 'Mantener el review escalable y adjuntar diagnostico legacy.',
+    instruction: 'No materializar nada todavía.',
+    completed: false,
+    requiresApproval: false,
+    tasks: scalableDeliveryPlan.tasks,
+    assumptions: scalableDeliveryPlan.assumptions,
+    scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const diagnostics = decision.legacyDomainResolutionDiagnostics
+
+  assert.equal(diagnostics?.present, true)
+  assert.equal(diagnostics?.used, true)
+  assert.equal(diagnostics?.status, 'used')
+  assert.equal(diagnostics?.generatedDomainContractPresent, true)
+  assert.equal(diagnostics?.generatedDomainContractValid, true)
+  assert.equal(diagnostics?.generatedDomainContractSafe, true)
+  assert.equal(diagnostics?.fullstackLocalArchetype?.used, true)
+  assert.equal(diagnostics?.fullstackLocalArchetype?.archetype, 'online-courses')
+  assert.ok(
+    Array.isArray(diagnostics?.warnings) &&
+      diagnostics.warnings.some((entry) =>
+        String(entry).includes('generatedDomainContract valido y seguro'),
+      ),
+    'El diagnostico legacy debe advertir cuando sigue activo aun con contrato universal valido.',
+  )
+  assert.equal(decision.strategy, 'scalable-delivery-plan')
+  assert.equal(decision.executionMode, 'planner-only')
+  assert.equal(decision.nextExpectedAction, 'review-scalable-delivery')
+}
+
+function runLegacyDomainResolutionDiagnosticsNotUsedCase() {
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'legacy-not-used',
+    strategy: 'product-architecture-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-product-architecture',
+    reason: 'Arquitectura inicial sin legado de familias ni materializacion.',
+    instruction: 'Mantener el analisis en modo review.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    workspacePath: repoRoot,
+  })
+  const diagnostics = decision.legacyDomainResolutionDiagnostics
+
+  assert.equal(diagnostics?.present, true)
+  assert.equal(diagnostics?.used, false)
+  assert.equal(diagnostics?.status, 'not-used')
+  assert.equal(diagnostics?.safeFirstDeliveryFamily?.used, false)
+  assert.equal(diagnostics?.fullstackLocalArchetype?.used, false)
+  assert.equal(diagnostics?.canonicalMaterializationContract?.used, false)
+  assert.equal(diagnostics?.materializationPlanProfile?.used, false)
+}
+
 function createLegacyObservationDecision() {
   return observationHarness.buildBrainDecisionContract({
     decisionKey: 'legacy-observation-plan',
@@ -1485,6 +1613,9 @@ async function main() {
   runGeneratedDomainContractComparisonPartialCase()
   runGeneratedDomainContractComparisonNotAvailableCase()
   runBrainDecisionContractObservationCase()
+  runLegacyDomainResolutionDiagnosticsUsedCase()
+  runLegacyDomainResolutionDiagnosticsWithGeneratedContractCase()
+  runLegacyDomainResolutionDiagnosticsNotUsedCase()
   runPlannerObservationMergeOkCase()
   runPlannerObservationMergeTimeoutCase()
   runPlannerObservationLegacyAlreadyHasContractCase()
@@ -1495,7 +1626,7 @@ async function main() {
   runPlannerObservationDebugSummaryCase()
   await runPlannerObservationNormalizeAvailabilityCase()
   runDiagnosticsDebugPreviewCase()
-  console.log('OK. GeneratedDomainContract smoke paso 42/42 checks.')
+  console.log('OK. GeneratedDomainContract smoke paso 45/45 checks.')
 }
 
 main().catch((error) => {

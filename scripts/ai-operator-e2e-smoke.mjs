@@ -552,15 +552,22 @@ function extractSegment({ name, startMarker, endMarker }) {
 }
 
 function loadPlannerTestingSurface() {
+  const debugDiagnosticsSurface = extractSegment({
+    name: 'diagnosticos legacy de main-debug',
+    startMarker: 'function summarizeGeneratedDomainContractDiagnosticsForDebug(diagnostics) {',
+    endMarker: 'function buildSafeGeneratedDomainContractObservationErrorPreview(value) {',
+  })
   const plannerSurface = extractSegment({
     name: 'superficie local de planner',
     startMarker: 'function normalizeExecutorAttemptScope(',
     endMarker: 'function createLocalRulesStrategicBrainProvider() {',
   })
   const harness = `
+${debugDiagnosticsSurface}
 ${plannerSurface}
 module.exports = {
   buildLocalStrategicBrainDecision,
+  buildBrainDecisionContract,
   normalizeOpenAIBrainDecision,
   shouldBlockWebScaffoldExecutionForFullstackRequest,
   buildBlockedFullstackWebScaffoldExecutionResponse,
@@ -4370,6 +4377,107 @@ async function runScalableReviewDoesNotDegradeToProjectPhaseReviewCase() {
   }
 }
 
+async function runProductArchitectureReviewDoesNotDegradeToProjectPhaseReviewCase() {
+  const failures = []
+  const appSource = fs.readFileSync(appFilePath, 'utf8')
+  const productArchitectureReviewMetadata = {
+    decisionKey: 'arch-plan-online-courses-v1',
+    strategy: 'product-architecture-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-product-architecture',
+    businessSector: 'education-elearning',
+    requiresApproval: false,
+    approvalRequired: false,
+    tasks: [
+      { title: 'Arquitectura inicial', targetPath: 'docs/architecture/overview.md' },
+      { title: 'Mapa de modulos', targetPath: 'docs/architecture/modules.md' },
+    ],
+    generatedDomainContractDiagnostics: {
+      present: true,
+      valid: true,
+      safeForLocalMaterialization: true,
+      domainSlug: 'online-courses-local',
+      rootSlug: 'online-courses-local',
+      sourceRoot: 'online-courses-local',
+      targetRoot: 'online-courses-local',
+      errorsCount: 0,
+      warningsCount: 0,
+      allowedTargetPathsCount: 49,
+      requiredPathGroupsCount: 48,
+    },
+    generatedDomainContractComparison: {
+      present: true,
+      compared: true,
+      status: 'partial',
+      errorsCount: 0,
+    },
+    legacyDomainResolutionDiagnostics: {
+      present: true,
+      used: false,
+      status: 'not-used',
+      behaviorChanged: false,
+      generatedDomainContractPresent: true,
+      generatedDomainContractValid: true,
+      generatedDomainContractSafe: true,
+      warningsCount: 0,
+      errorsCount: 0,
+    },
+    projectPhaseExecutionPlan: {
+      phaseId: 'legacy-phase-shadow',
+      deliveryLevel: 'fullstack-local',
+      targetStrategy: 'prepare-project-phase-plan',
+      projectRoot: 'legacy-shadow-project',
+      executableNow: false,
+      approvalRequired: false,
+      allowedTargetPaths: [],
+    },
+  }
+  const productArchitectureReviewUiState = derivePlannerMaterializationUiState({
+    plannerExecutionMetadata: productArchitectureReviewMetadata,
+    effectivePlannerExecutionMetadata: productArchitectureReviewMetadata,
+  })
+
+  pushFailure(
+    failures,
+    productArchitectureReviewUiState.effectiveReviewOnly === true,
+    'El payload real de product-architecture review debe seguir en modo review-only.',
+  )
+  pushFailure(
+    failures,
+    /const plannerHasImplicitProjectPhaseReviewSignal =[\s\S]*!plannerIsSafeFirstDeliveryReview &&[\s\S]*!plannerIsProductArchitectureReview &&[\s\S]*plannerReviewUiState\.isScalableReview !== true/.test(
+      appSource,
+    ),
+    'App.tsx debe impedir que un projectPhaseExecutionPlan implícito tape un review de product-architecture o safe-first válido.',
+  )
+  pushFailure(
+    failures,
+    /const plannerReviewPrimaryActionLabel =[\s\S]*plannerIsProductArchitectureReview[\s\S]*'Preparar primera entrega segura'/.test(
+      appSource,
+    ),
+    'El review de product-architecture debe conservar el CTA principal "Preparar primera entrega segura".',
+  )
+  pushFailure(
+    failures,
+    /const handlePlannerReviewPrimaryAction =[\s\S]*plannerIsProductArchitectureReview[\s\S]*handlePrepareSafeFirstDeliveryPlan/.test(
+      appSource,
+    ),
+    'El CTA de product-architecture debe seguir apuntando a handlePrepareSafeFirstDeliveryPlan sin materializar automaticamente.',
+  )
+  pushFailure(
+    failures,
+    !/legacyDomainResolutionDiagnostics[\s\S]{0,600}plannerIsProductArchitectureReview/.test(
+      appSource,
+    ),
+    'legacyDomainResolutionDiagnostics no debe alterar la rama de review de product-architecture en App.tsx.',
+  )
+
+  return {
+    id: 'product-architecture-review-does-not-degrade-to-project-phase-review',
+    label: 'Product architecture review does not degrade to project phase review',
+    failures,
+  }
+}
+
 async function runGeneratedDomainContractComparisonPayloadCase() {
   const failures = []
   const comparison = buildGeneratedDomainContractComparison(
@@ -4439,6 +4547,105 @@ async function runGeneratedDomainContractComparisonPayloadCase() {
   return {
     id: 'generated-domain-contract-comparison-payload',
     label: 'Generated domain contract comparison payload',
+    failures,
+  }
+}
+
+async function runLegacyDomainResolutionDiagnosticsPayloadCase() {
+  const failures = []
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'legacy-domain-resolution-observability',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    reason: 'Adjuntar observabilidad legacy sin cambiar comportamiento.',
+    instruction: 'Mantener el plan legacy y marcar solo diagnostics.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      modules: ['cursos', 'alumnos', 'pagos mock'],
+      allowedRootPaths: ['edu-platform-local'],
+      legacyDomainResolution: {
+        fullstackLocalArchetype: 'online-courses',
+        usedLegacyArchetype: true,
+        materializationPlanProfileKey: 'online-courses',
+        usedLegacyMaterializationProfile: true,
+      },
+    },
+    selectedDomain: 'online-courses',
+    selectedContractKind: 'online-courses-fullstack-local',
+    generatedDomainContract: {
+      deliveryLevel: 'fullstack-local',
+      domain: { slug: 'school-of-trades', label: 'School of Trades' },
+      root: {
+        slug: 'school-of-trades-local',
+        sourceRoot: 'school-of-trades-local',
+        targetRoot: 'school-of-trades-local',
+      },
+      frontendSurfaces: [{ key: 'admin', label: 'Admin', path: 'frontend/admin' }],
+      backend: {
+        entryFile: 'backend/src/server.js',
+        routes: [{ path: 'backend/src/routes/reports.js' }],
+      },
+      database: {
+        schemaFile: 'database/schema.sql',
+        tables: ['courses', 'students', 'teachers'],
+      },
+      materialization: {
+        requiredFiles: [
+          'frontend/admin/index.html',
+          'backend/src/server.js',
+          'database/schema.sql',
+        ],
+      },
+      validation: {
+        requiredPathGroups: [
+          { candidates: ['frontend/admin/index.html'] },
+          { candidates: ['backend/src/server.js'] },
+          { candidates: ['database/schema.sql'] },
+        ],
+      },
+    },
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.legacyDomainResolutionDiagnostics?.present === true,
+    'buildBrainDecisionContract debe adjuntar legacyDomainResolutionDiagnostics al payload cuando exista contexto legacy.',
+  )
+  pushFailure(
+    failures,
+    decision.legacyDomainResolutionDiagnostics?.used === true &&
+      decision.legacyDomainResolutionDiagnostics?.status === 'used',
+    'El diagnostico legacy debe marcar used/status=used cuando entra un resolver legacy observacional.',
+  )
+  pushFailure(
+    failures,
+    decision.legacyDomainResolutionDiagnostics?.behaviorChanged === false,
+    'legacyDomainResolutionDiagnostics debe declarar behaviorChanged=false.',
+  )
+  pushFailure(
+    failures,
+    decision.legacyDomainResolutionDiagnostics?.generatedDomainContractPresent === true &&
+      decision.legacyDomainResolutionDiagnostics?.generatedDomainContractValid === true &&
+      decision.legacyDomainResolutionDiagnostics?.generatedDomainContractSafe === true,
+    'El diagnostico legacy debe informar generatedDomainContract present/valid/safe sin romper el flujo.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('legacy-domain-resolution:diagnostics') &&
+      mainSource.includes('legacyDomainResolutionDiagnostics') &&
+      mainSource.includes('summarizeLegacyDomainResolutionDiagnosticsForDebug'),
+    'main.cjs debe adjuntar legacyDomainResolutionDiagnostics al payload y loguear legacy-domain-resolution:diagnostics.',
+  )
+
+  return {
+    id: 'legacy-domain-resolution-diagnostics-payload',
+    label: 'Legacy domain resolution diagnostics payload',
     failures,
   }
 }
@@ -6972,7 +7179,9 @@ async function main() {
     results.push(await runEducationTrainingGeneratedDomainContractShowsPrepareCtaCase())
     results.push(await runGeneratedDomainContractValidReviewShowsNextSafeActionCase())
     results.push(await runScalableReviewDoesNotDegradeToProjectPhaseReviewCase())
+    results.push(await runProductArchitectureReviewDoesNotDegradeToProjectPhaseReviewCase())
     results.push(await runGeneratedDomainContractComparisonPayloadCase())
+    results.push(await runLegacyDomainResolutionDiagnosticsPayloadCase())
     results.push(await runGeneratedDomainContractComparisonTechnicalPanelCase())
     results.push(await runPrepareContinuationActionPlanShowsPrimaryCtaCase())
     results.push(await runPrepareContinuationActionPlanFallbackCtaCase())

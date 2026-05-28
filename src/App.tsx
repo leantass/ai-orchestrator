@@ -13195,6 +13195,22 @@ function App() {
   const plannerProjectPhaseReviewAllowedTargetPaths = normalizeOptionalStringArray(
     plannerProjectPhaseReviewPlan?.allowedTargetPaths,
   )
+  const plannerIsSafeFirstDeliveryReview =
+    normalizeOptionalString(plannerExecutionMetadata.decisionKey).toLocaleLowerCase() ===
+      'safe-first-delivery-plan' ||
+    normalizeOptionalString(plannerExecutionMetadata.strategy).toLocaleLowerCase() ===
+      'safe-first-delivery-plan' ||
+    normalizeOptionalString(
+      plannerExecutionMetadata.nextExpectedAction,
+    ).toLocaleLowerCase() === 'review-safe-first-delivery'
+  const plannerIsProductArchitectureReview =
+    normalizeOptionalString(plannerExecutionMetadata.decisionKey).toLocaleLowerCase() ===
+      'product-architecture-plan' ||
+    normalizeOptionalString(plannerExecutionMetadata.strategy).toLocaleLowerCase() ===
+      'product-architecture-plan' ||
+    normalizeOptionalString(
+      plannerExecutionMetadata.nextExpectedAction,
+    ).toLocaleLowerCase() === 'review-product-architecture'
   const plannerHasExplicitProjectPhaseReviewSignal =
     normalizeOptionalString(plannerExecutionMetadata.decisionKey).toLocaleLowerCase() ===
       'prepare-project-phase-plan' ||
@@ -13204,6 +13220,8 @@ function App() {
       plannerExecutionMetadata.nextExpectedAction,
     ).toLocaleLowerCase() === 'review-project-phase'
   const plannerHasImplicitProjectPhaseReviewSignal =
+    !plannerIsSafeFirstDeliveryReview &&
+    !plannerIsProductArchitectureReview &&
     plannerReviewUiState.isScalableReview !== true &&
     plannerIsReviewOnly &&
       normalizeOptionalString(
@@ -13221,22 +13239,6 @@ function App() {
     plannerProjectPhaseReviewPlan?.approvalRequired !== true &&
     plannerProjectPhaseReviewTargetStrategy === 'materialize-project-phase-plan' &&
     plannerProjectPhaseReviewAllowedTargetPaths.length > 0
-  const plannerIsSafeFirstDeliveryReview =
-    normalizeOptionalString(plannerExecutionMetadata.decisionKey).toLocaleLowerCase() ===
-      'safe-first-delivery-plan' ||
-    normalizeOptionalString(plannerExecutionMetadata.strategy).toLocaleLowerCase() ===
-      'safe-first-delivery-plan' ||
-    normalizeOptionalString(
-      plannerExecutionMetadata.nextExpectedAction,
-    ).toLocaleLowerCase() === 'review-safe-first-delivery'
-  const plannerIsProductArchitectureReview =
-    normalizeOptionalString(plannerExecutionMetadata.decisionKey).toLocaleLowerCase() ===
-      'product-architecture-plan' ||
-    normalizeOptionalString(plannerExecutionMetadata.strategy).toLocaleLowerCase() ===
-      'product-architecture-plan' ||
-    normalizeOptionalString(
-      plannerExecutionMetadata.nextExpectedAction,
-    ).toLocaleLowerCase() === 'review-product-architecture'
   const plannerIsScalableDeliveryReview =
     plannerReviewUiState.isScalableReview === true
   const plannerScalableLooksLikeFullstackLocal =

@@ -561,6 +561,283 @@ function summarizeGeneratedDomainContractComparisonForDebug(comparison) {
   }
 }
 
+function buildLegacyDomainResolutionDiagnostics({
+  safeFirstDeliveryPlan,
+  scalableDeliveryPlan,
+  materializationPlan,
+  selectedDomain,
+  selectedContractKind,
+  generatedDomainContractDiagnostics,
+}) {
+  try {
+    const safeFirstLegacy =
+      safeFirstDeliveryPlan?.legacyDomainResolution &&
+      typeof safeFirstDeliveryPlan.legacyDomainResolution === 'object'
+        ? safeFirstDeliveryPlan.legacyDomainResolution
+        : null
+    const scalableLegacy =
+      scalableDeliveryPlan?.legacyDomainResolution &&
+      typeof scalableDeliveryPlan.legacyDomainResolution === 'object'
+        ? scalableDeliveryPlan.legacyDomainResolution
+        : null
+    const materializationLegacy =
+      materializationPlan?.legacyDomainResolution &&
+      typeof materializationPlan.legacyDomainResolution === 'object'
+        ? materializationPlan.legacyDomainResolution
+        : null
+
+    const safeFirstDeliveryFamilyKey =
+      normalizeOptionalString(safeFirstLegacy?.safeFirstDeliveryFamilyKey) || ''
+    const fullstackLocalArchetype =
+      normalizeOptionalString(materializationLegacy?.fullstackLocalArchetype) ||
+      normalizeOptionalString(scalableLegacy?.fullstackLocalArchetype) ||
+      ''
+    const canonicalMaterializationContractKind =
+      normalizeOptionalString(
+        materializationLegacy?.canonicalMaterializationContractKind,
+      ) ||
+      normalizeOptionalString(selectedContractKind) ||
+      ''
+    const canonicalSelectedDomain =
+      normalizeOptionalString(materializationLegacy?.selectedDomain) ||
+      normalizeOptionalString(selectedDomain) ||
+      ''
+    const materializationPlanProfileKey =
+      normalizeOptionalString(materializationLegacy?.materializationPlanProfileKey) ||
+      normalizeOptionalString(scalableLegacy?.materializationPlanProfileKey) ||
+      normalizeOptionalString(fullstackLocalArchetype) ||
+      ''
+
+    const safeFirstDeliveryFamilyUsed =
+      safeFirstLegacy?.usedLegacyFamily === true && Boolean(safeFirstDeliveryFamilyKey)
+    const fullstackLocalArchetypeUsed =
+      (materializationLegacy?.usedLegacyArchetype === true ||
+        scalableLegacy?.usedLegacyArchetype === true) &&
+      Boolean(fullstackLocalArchetype) &&
+      fullstackLocalArchetype !== 'operations'
+    const canonicalMaterializationContractUsed =
+      materializationLegacy?.usedCanonicalMaterializationContract === true &&
+      Boolean(canonicalMaterializationContractKind) &&
+      canonicalMaterializationContractKind !== 'generic-fullstack-local'
+    const materializationPlanProfileUsed =
+      (materializationLegacy?.usedLegacyMaterializationProfile === true ||
+        scalableLegacy?.usedLegacyMaterializationProfile === true) &&
+      Boolean(materializationPlanProfileKey) &&
+      materializationPlanProfileKey !== 'operations'
+
+    const warnings = summarizeUniqueExecutorStrings(
+      [
+        safeFirstDeliveryFamilyUsed
+          ? `Se uso safeFirstDeliveryFamily legacy: ${safeFirstDeliveryFamilyKey}.`
+          : '',
+        fullstackLocalArchetypeUsed
+          ? `Se uso fullstackLocalArchetype legacy: ${fullstackLocalArchetype}.`
+          : '',
+        canonicalMaterializationContractUsed
+          ? `Se uso canonicalMaterializationContract legacy: ${canonicalMaterializationContractKind}.`
+          : '',
+        materializationPlanProfileUsed
+          ? `Se uso materializationPlanProfile legacy: ${materializationPlanProfileKey}.`
+          : '',
+        generatedDomainContractDiagnostics?.present === true &&
+        generatedDomainContractDiagnostics?.valid === true &&
+        generatedDomainContractDiagnostics?.safeForLocalMaterialization === true &&
+        (safeFirstDeliveryFamilyUsed ||
+          fullstackLocalArchetypeUsed ||
+          canonicalMaterializationContractUsed ||
+          materializationPlanProfileUsed)
+          ? 'Se uso resolucion legacy aun con generatedDomainContract valido y seguro.'
+          : '',
+      ].filter(Boolean),
+      12,
+    )
+
+    const errors = []
+    const used =
+      safeFirstDeliveryFamilyUsed ||
+      fullstackLocalArchetypeUsed ||
+      canonicalMaterializationContractUsed ||
+      materializationPlanProfileUsed
+
+    return {
+      present: true,
+      used,
+      status: errors.length > 0 ? 'error' : used ? 'used' : 'not-used',
+      source: 'legacy-domain-resolution',
+      behaviorChanged: false,
+      generatedDomainContractPresent:
+        generatedDomainContractDiagnostics?.present === true,
+      generatedDomainContractValid: generatedDomainContractDiagnostics?.valid === true,
+      generatedDomainContractSafe:
+        generatedDomainContractDiagnostics?.safeForLocalMaterialization === true,
+      safeFirstDeliveryFamily: {
+        used: safeFirstDeliveryFamilyUsed,
+        familyKey: safeFirstDeliveryFamilyKey || null,
+        source: safeFirstDeliveryFamilyUsed ? 'legacy' : 'not-used',
+        influence: safeFirstDeliveryFamilyUsed
+          ? [
+              'safeFirstDeliveryPlan.modules',
+              'safeFirstDeliveryPlan.mockData',
+              'safeFirstDeliveryPlan.screens',
+              'safeFirstDeliveryPlan.localBehavior',
+              'safeFirstDeliveryPlan.explicitExclusions',
+            ]
+          : [],
+      },
+      fullstackLocalArchetype: {
+        used: fullstackLocalArchetypeUsed,
+        archetype: fullstackLocalArchetype || null,
+        source: fullstackLocalArchetypeUsed ? 'legacy' : 'not-used',
+        influence: fullstackLocalArchetypeUsed
+          ? [
+              'scalableDeliveryPlan.allowedRootPaths',
+              'scalableDeliveryPlan.modules',
+              'fullstackLocalContractProfile',
+              'fullstackLocalDemoData',
+            ]
+          : [],
+      },
+      canonicalMaterializationContract: {
+        used: canonicalMaterializationContractUsed,
+        contractKind: canonicalMaterializationContractKind || null,
+        selectedDomain: canonicalSelectedDomain || null,
+        source: canonicalMaterializationContractUsed ? 'legacy' : 'not-used',
+        influence: canonicalMaterializationContractUsed
+          ? [
+              'materializationPlan.contractDefinition',
+              'materializationPlan.allowedTargetPaths',
+              'selectedDomain',
+              'selectedContractKind',
+            ]
+          : [],
+      },
+      materializationPlanProfile: {
+        used: materializationPlanProfileUsed,
+        profileKey: materializationPlanProfileKey || null,
+        source: materializationPlanProfileUsed ? 'legacy' : 'not-used',
+        influence: materializationPlanProfileUsed
+          ? [
+              'materializationPlan.projectRoot',
+              'materializationPlan.allowedTargetPaths',
+              'materializationPlan.operations',
+            ]
+          : [],
+      },
+      warnings,
+      errors,
+      warningsCount: warnings.length,
+      errorsCount: errors.length,
+    }
+  } catch (error) {
+    const errorPreview = sanitizeGeneratedDomainContractDebugPreview(
+      error instanceof Error ? error.stack || error.message : String(error),
+      180,
+    )
+
+    return {
+      present: true,
+      used: false,
+      status: 'error',
+      source: 'legacy-domain-resolution',
+      behaviorChanged: false,
+      generatedDomainContractPresent:
+        generatedDomainContractDiagnostics?.present === true,
+      generatedDomainContractValid: generatedDomainContractDiagnostics?.valid === true,
+      generatedDomainContractSafe:
+        generatedDomainContractDiagnostics?.safeForLocalMaterialization === true,
+      safeFirstDeliveryFamily: {
+        used: false,
+        familyKey: null,
+        source: 'not-used',
+        influence: [],
+      },
+      fullstackLocalArchetype: {
+        used: false,
+        archetype: null,
+        source: 'not-used',
+        influence: [],
+      },
+      canonicalMaterializationContract: {
+        used: false,
+        contractKind: null,
+        selectedDomain: null,
+        source: 'not-used',
+        influence: [],
+      },
+      materializationPlanProfile: {
+        used: false,
+        profileKey: null,
+        source: 'not-used',
+        influence: [],
+      },
+      warnings: [],
+      errors: errorPreview ? [errorPreview] : ['legacy-domain-resolution-error'],
+      warningsCount: 0,
+      errorsCount: errorPreview ? 1 : 0,
+    }
+  }
+}
+
+function summarizeLegacyDomainResolutionDiagnosticsForDebug(diagnostics) {
+  if (!diagnostics || typeof diagnostics !== 'object') {
+    return {
+      present: false,
+      used: false,
+      status: 'not-used',
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(
+    diagnostics.warnings,
+  )
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(diagnostics.errors)
+
+  return {
+    present: diagnostics.present === true,
+    used: diagnostics.used === true,
+    status:
+      typeof diagnostics.status === 'string' && diagnostics.status.trim()
+        ? diagnostics.status.trim()
+        : 'not-used',
+    generatedDomainContractPresent:
+      diagnostics.generatedDomainContractPresent === true,
+    generatedDomainContractValid:
+      diagnostics.generatedDomainContractValid === true,
+    generatedDomainContractSafe:
+      diagnostics.generatedDomainContractSafe === true,
+    safeFirstDeliveryFamilyUsed:
+      diagnostics.safeFirstDeliveryFamily?.used === true,
+    safeFirstDeliveryFamilyKey:
+      typeof diagnostics.safeFirstDeliveryFamily?.familyKey === 'string' &&
+      diagnostics.safeFirstDeliveryFamily.familyKey.trim()
+        ? diagnostics.safeFirstDeliveryFamily.familyKey.trim()
+        : undefined,
+    fullstackLocalArchetypeUsed:
+      diagnostics.fullstackLocalArchetype?.used === true,
+    fullstackLocalArchetype:
+      typeof diagnostics.fullstackLocalArchetype?.archetype === 'string' &&
+      diagnostics.fullstackLocalArchetype.archetype.trim()
+        ? diagnostics.fullstackLocalArchetype.archetype.trim()
+        : undefined,
+    canonicalMaterializationContractUsed:
+      diagnostics.canonicalMaterializationContract?.used === true,
+    selectedDomain:
+      typeof diagnostics.canonicalMaterializationContract?.selectedDomain === 'string' &&
+      diagnostics.canonicalMaterializationContract.selectedDomain.trim()
+        ? diagnostics.canonicalMaterializationContract.selectedDomain.trim()
+        : undefined,
+    selectedContractKind:
+      typeof diagnostics.canonicalMaterializationContract?.contractKind === 'string' &&
+      diagnostics.canonicalMaterializationContract.contractKind.trim()
+        ? diagnostics.canonicalMaterializationContract.contractKind.trim()
+        : undefined,
+    warningsCount: Array.isArray(diagnostics.warnings) ? diagnostics.warnings.length : 0,
+    errorsCount: Array.isArray(diagnostics.errors) ? diagnostics.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
 function buildSafeGeneratedDomainContractObservationErrorPreview(value) {
   return sanitizeGeneratedDomainContractDebugPreview(value, 180)
 }
@@ -10047,6 +10324,17 @@ function buildSafeFirstDeliveryPlan({
     ])
   }
 
+  const detectedLegacySafeFirstFamily =
+    commercialEcommerceProfile
+      ? 'commercial-ecommerce'
+      : productType === 'ecommerce'
+        ? 'ecommerce'
+        : isSchoolCrm
+          ? 'school-crm'
+          : isRequestTrackingSystem
+            ? 'request-tracking'
+            : detectSafeFirstDeliveryModuleFamily(modules)?.key || ''
+
   return {
     tasks: [
       {
@@ -10097,6 +10385,10 @@ function buildSafeFirstDeliveryPlan({
       explicitExclusions,
       approvalRequiredLater,
       successCriteria,
+      legacyDomainResolution: {
+        safeFirstDeliveryFamilyKey: detectedLegacySafeFirstFamily,
+        usedLegacyFamily: Boolean(detectedLegacySafeFirstFamily),
+      },
     },
   }
 }
@@ -15705,6 +15997,14 @@ function buildScalableDeliveryPlan({
   })
   const usesLogisticsFullstackContract =
     fullstackContractProfile.archetype === 'logistics-tracking'
+  const legacyFullstackLocalArchetype =
+    normalizedDeliveryLevel === 'fullstack-local' &&
+    typeof fullstackContractProfile?.archetype === 'string'
+      ? fullstackContractProfile.archetype.trim()
+      : ''
+  const usesLegacyMaterializationProfile =
+    Boolean(legacyFullstackLocalArchetype) &&
+    legacyFullstackLocalArchetype !== 'operations'
 
   switch (normalizedDeliveryLevel) {
     case 'frontend-project':
@@ -16384,6 +16684,12 @@ function buildScalableDeliveryPlan({
       explicitExclusions: summarizeUniqueExecutorStrings(explicitExclusions, 16),
       approvalRequiredLater: summarizeUniqueExecutorStrings(approvalRequiredLater, 16),
       successCriteria: summarizeUniqueExecutorStrings(successCriteria, 16),
+      legacyDomainResolution: {
+        fullstackLocalArchetype: legacyFullstackLocalArchetype,
+        usedLegacyArchetype: usesLegacyMaterializationProfile,
+        materializationPlanProfileKey: legacyFullstackLocalArchetype,
+        usedLegacyMaterializationProfile: usesLegacyMaterializationProfile,
+      },
     },
   }
 }
@@ -17349,6 +17655,24 @@ function inspectFullstackLocalMaterializationContract({
     missingRequiredMarkers: missingRequiredPaths,
     contaminationTokens: forbiddenSignalsFound,
     valid: ok,
+    legacyDomainResolution: {
+      fullstackLocalArchetype: profile.archetype || '',
+      usedLegacyArchetype:
+        typeof profile.archetype === 'string' &&
+        profile.archetype.trim() &&
+        profile.archetype.trim() !== 'operations',
+      canonicalMaterializationContractKind: contractDefinition.contractKind || '',
+      usedCanonicalMaterializationContract:
+        typeof contractDefinition.contractKind === 'string' &&
+        contractDefinition.contractKind.trim() &&
+        contractDefinition.contractKind.trim() !== 'generic-fullstack-local',
+      selectedDomain,
+      materializationPlanProfileKey: profile.archetype || '',
+      usedLegacyMaterializationProfile:
+        typeof profile.archetype === 'string' &&
+        profile.archetype.trim() &&
+        profile.archetype.trim() !== 'operations',
+    },
   }
 }
 
@@ -24025,6 +24349,10 @@ function buildFullstackLocalMaterializationPlan({
     fullstackContractProfile.archetype === 'online-courses'
   const usesCanonicalSpecializedFullstackContract =
     usesLogisticsFullstackContract || usesOnlineCoursesFullstackContract
+  const usesLegacyMaterializationProfile =
+    typeof fullstackContractProfile?.archetype === 'string' &&
+    fullstackContractProfile.archetype.trim() &&
+    fullstackContractProfile.archetype.trim() !== 'operations'
   const frontendFeaturePath = path.join(
     frontendFeaturesFolder,
     `${fullstackContractProfile.frontendFeatureBasename}.js`,
@@ -25071,6 +25399,19 @@ Modelar una integración futura con Mercado Pago sin credenciales, sin checkout 
         rootFolder,
         fullstackContractProfile,
       }),
+      legacyDomainResolution: {
+        fullstackLocalArchetype: fullstackContractProfile.archetype || '',
+        usedLegacyArchetype: usesLegacyMaterializationProfile,
+        canonicalMaterializationContractKind: usesOnlineCoursesFullstackContract
+          ? 'online-courses-fullstack-local'
+          : usesLogisticsFullstackContract
+            ? 'logistics-fullstack-local'
+            : 'generic-fullstack-local',
+        usedCanonicalMaterializationContract: usesCanonicalSpecializedFullstackContract,
+        selectedDomain: fullstackContractProfile.archetype || 'generic',
+        materializationPlanProfileKey: fullstackContractProfile.archetype || '',
+        usedLegacyMaterializationProfile: usesLegacyMaterializationProfile,
+      },
       summary: `Scaffold fullstack local creado en "${rootFolder}".`,
       strategy: 'materialize-fullstack-local-plan',
       reasoningLayer: 'local-rules',
@@ -35953,6 +36294,14 @@ function buildBrainDecisionContract({
     },
     workspacePath,
   )
+  const legacyDomainResolutionDiagnostics = buildLegacyDomainResolutionDiagnostics({
+    safeFirstDeliveryPlan,
+    scalableDeliveryPlan,
+    materializationPlan,
+    selectedDomain,
+    selectedContractKind,
+    generatedDomainContractDiagnostics,
+  })
 
   return {
     decisionKey: decisionKey || strategy || 'brain-decision',
@@ -36075,6 +36424,7 @@ function buildBrainDecisionContract({
       : {}),
     generatedDomainContractDiagnostics,
     generatedDomainContractComparison,
+    legacyDomainResolutionDiagnostics,
     ...(materializationPlan && typeof materializationPlan === 'object'
       ? { materializationPlan }
       : {}),
@@ -49474,6 +49824,18 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
   }
 
   if (
+    brainDecision.legacyDomainResolutionDiagnostics &&
+    typeof brainDecision.legacyDomainResolutionDiagnostics === 'object'
+  ) {
+    debugMainLog(
+      'legacy-domain-resolution:diagnostics',
+      summarizeLegacyDomainResolutionDiagnosticsForDebug(
+        brainDecision.legacyDomainResolutionDiagnostics,
+      ),
+    )
+  }
+
+  if (
     brainDecision.generatedDomainContractObservation &&
     typeof brainDecision.generatedDomainContractObservation === 'object'
   ) {
@@ -49578,6 +49940,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
         brainDecision.generatedDomainContractDiagnostics,
       generatedDomainContractComparison:
         brainDecision.generatedDomainContractComparison,
+      legacyDomainResolutionDiagnostics:
+        brainDecision.legacyDomainResolutionDiagnostics,
       generatedDomainContractObservation:
         brainDecision.generatedDomainContractObservation,
       existingProjectDetection: brainDecision.existingProjectDetection,
@@ -49642,12 +50006,14 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       brainDecision.requiresApproval === true ? brainDecision.runtimeApprovalState : null,
     materializationPlan: brainDecision.materializationPlan,
     generatedDomainContract: brainDecision.generatedDomainContract,
-      generatedDomainContractDiagnostics:
-        brainDecision.generatedDomainContractDiagnostics,
-      generatedDomainContractComparison:
-        brainDecision.generatedDomainContractComparison,
-      generatedDomainContractObservation:
-        brainDecision.generatedDomainContractObservation,
+    generatedDomainContractDiagnostics:
+      brainDecision.generatedDomainContractDiagnostics,
+    generatedDomainContractComparison:
+      brainDecision.generatedDomainContractComparison,
+    legacyDomainResolutionDiagnostics:
+      brainDecision.legacyDomainResolutionDiagnostics,
+    generatedDomainContractObservation:
+      brainDecision.generatedDomainContractObservation,
     existingProjectDetection: brainDecision.existingProjectDetection,
     activeProjectContext: brainDecision.activeProjectContext,
     contextHubStatus,

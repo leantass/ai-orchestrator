@@ -1062,6 +1062,11 @@ function extractSegment({ name, startMarker, endMarker }) {
 }
 
 function loadPlannerTestingSurface() {
+  const debugDiagnosticsSurface = extractSegment({
+    name: 'diagnosticos legacy de main-debug',
+    startMarker: 'function summarizeGeneratedDomainContractDiagnosticsForDebug(diagnostics) {',
+    endMarker: 'function buildSafeGeneratedDomainContractObservationErrorPreview(value) {',
+  })
   const plannerSurface = extractSegment({
     name: 'superficie local de planner',
     startMarker: 'function normalizeExecutorAttemptScope(',
@@ -1073,6 +1078,7 @@ function loadPlannerTestingSurface() {
     endMarker: 'function createLocalRulesStrategicBrainProvider() {',
   })
   const harness = `
+${debugDiagnosticsSurface}
 ${plannerSurface}
 ${normalizeOpenAISurface}
 module.exports = {
