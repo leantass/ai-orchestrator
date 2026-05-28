@@ -4773,6 +4773,117 @@ async function runLegacyDomainResolutionDiagnosticsPayloadCase() {
   }
 }
 
+async function runLegacyCapabilityAlignmentDiagnosticsPayloadCase() {
+  const failures = []
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'legacy-capability-alignment-observability',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    reason: 'Adjuntar alineacion legacy vs capability sin cambiar comportamiento.',
+    instruction: 'Mantener el review y no materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      modules: ['catalogo', 'reportes', 'inventario'],
+      allowedRootPaths: ['fairs-local'],
+      legacyDomainResolution: {
+        fullstackLocalArchetype: 'operations',
+        usedLegacyArchetype: false,
+        materializationPlanProfileKey: 'logistics-tracking',
+        usedLegacyMaterializationProfile: true,
+      },
+    },
+    selectedDomain: 'logistics-tracking',
+    selectedContractKind: 'generic-fullstack-local',
+    generatedDomainContract: {
+      deliveryLevel: 'fullstack-local',
+      domain: { slug: 'neighborhood-fairs', label: 'Neighborhood Fairs' },
+      root: {
+        slug: 'fairs-local',
+        sourceRoot: 'fairs-local',
+        targetRoot: 'fairs-local',
+      },
+      frontendSurfaces: [
+        { key: 'public', label: 'Public', path: 'frontend/public', screens: ['agenda'] },
+        { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['dashboard'] },
+      ],
+      workflows: ['scheduling', 'reporting', 'inventory', 'tracking'],
+      backend: {
+        entryFile: 'backend/src/server.js',
+        routes: [{ path: 'backend/src/routes/fairs.js' }],
+      },
+      database: {
+        schemaFile: 'database/schema.sql',
+        tables: ['fairs', 'stands', 'inventory'],
+      },
+      materialization: {
+        requiredFiles: [
+          'frontend/public/index.html',
+          'frontend/admin/index.html',
+          'backend/src/server.js',
+          'database/schema.sql',
+        ],
+      },
+      validation: {
+        requiredPathGroups: [
+          { candidates: ['frontend/public/index.html'] },
+          { candidates: ['frontend/admin/index.html'] },
+          { candidates: ['backend/src/server.js'] },
+          { candidates: ['database/schema.sql'] },
+        ],
+      },
+      safety: {
+        forbiddenFiles: ['.env'],
+        forbiddenSignals: ['ACCESS_TOKEN'],
+        explicitExclusions: ['deploy', 'real-payments'],
+      },
+    },
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.legacyCapabilityAlignmentDiagnostics?.present === true &&
+      decision.legacyCapabilityAlignmentDiagnostics?.compared === true,
+    'buildBrainDecisionContract debe adjuntar legacyCapabilityAlignmentDiagnostics al payload.',
+  )
+  pushFailure(
+    failures,
+    ['divergent', 'partial'].includes(decision.legacyCapabilityAlignmentDiagnostics?.status) &&
+      decision.legacyCapabilityAlignmentDiagnostics?.alignment?.migrationCandidate === true,
+    'La alineacion debe marcar migracion candidata cuando legacy sigue activo con capability profile suficiente.',
+  )
+  pushFailure(
+    failures,
+    decision.legacyCapabilityAlignmentDiagnostics?.behaviorChanged === false,
+    'legacyCapabilityAlignmentDiagnostics debe declarar behaviorChanged=false.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('legacy-capability-alignment:diagnostics') &&
+      mainSource.includes('legacyCapabilityAlignmentDiagnostics') &&
+      mainSource.includes('summarizeLegacyCapabilityAlignmentDiagnosticsForDebug'),
+    'main.cjs debe adjuntar legacyCapabilityAlignmentDiagnostics y loguear legacy-capability-alignment:diagnostics.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'scalable-delivery-plan' &&
+      decision.executionMode === 'planner-only' &&
+      decision.nextExpectedAction === 'review-scalable-delivery',
+    'legacyCapabilityAlignmentDiagnostics no debe cambiar strategy, executionMode ni nextExpectedAction.',
+  )
+
+  return {
+    id: 'legacy-capability-alignment-diagnostics-payload',
+    label: 'Legacy capability alignment diagnostics payload',
+    failures,
+  }
+}
+
 async function runGeneratedDomainContractComparisonTechnicalPanelCase() {
   const failures = []
   const appSource = fs.readFileSync(appFilePath, 'utf8')
@@ -7306,6 +7417,7 @@ async function main() {
     results.push(await runGeneratedDomainContractComparisonPayloadCase())
     results.push(await runGeneratedDomainCapabilityProfilePayloadCase())
     results.push(await runLegacyDomainResolutionDiagnosticsPayloadCase())
+    results.push(await runLegacyCapabilityAlignmentDiagnosticsPayloadCase())
     results.push(await runGeneratedDomainContractComparisonTechnicalPanelCase())
     results.push(await runPrepareContinuationActionPlanShowsPrimaryCtaCase())
     results.push(await runPrepareContinuationActionPlanFallbackCtaCase())

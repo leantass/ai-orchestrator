@@ -62,6 +62,7 @@ module.exports = {
   buildGeneratedDomainContractObservationFailureResult,
   buildBrainDecisionContract,
   buildLegacyDomainResolutionDiagnostics,
+  buildLegacyCapabilityAlignmentDiagnostics,
   buildGeneratedDomainCapabilityProfile,
   buildGeneratedDomainContractObservationSystemPrompt,
   classifyGeneratedDomainContractObservationThrownError,
@@ -73,6 +74,7 @@ module.exports = {
   observeGeneratedDomainContractForPlannerDecision,
   summarizeGeneratedDomainContractDiagnosticsForDebug,
   summarizeGeneratedDomainContractObservationForDebug,
+  summarizeLegacyCapabilityAlignmentDiagnosticsForDebug,
   summarizeLegacyDomainResolutionDiagnosticsForDebug,
 };
 `
@@ -1143,6 +1145,149 @@ function runLegacyDomainResolutionDiagnosticsNotUsedCase() {
   assert.equal(diagnostics?.materializationPlanProfile?.used, false)
 }
 
+function runLegacyCapabilityAlignmentDiagnosticsAlignedCase() {
+  const generatedDomainContract = createValidInventedContract()
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'legacy-capability-alignment-aligned',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    reason: 'Observar alineacion sin activar resolvers legacy.',
+    instruction: 'Mantener el review sin materializar.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const diagnostics = decision.legacyCapabilityAlignmentDiagnostics
+  const debugSummary =
+    observationHarness.summarizeLegacyCapabilityAlignmentDiagnosticsForDebug(diagnostics)
+
+  assert.equal(diagnostics?.present, true)
+  assert.equal(diagnostics?.compared, true)
+  assert.equal(diagnostics?.status, 'aligned')
+  assert.equal(diagnostics?.behaviorChanged, false)
+  assert.equal(diagnostics?.alignment?.capabilityProfileSufficient, true)
+  assert.equal(diagnostics?.alignment?.legacyUsedDespiteCapabilityProfile, false)
+  assert.equal(diagnostics?.alignment?.migrationCandidate, false)
+  assert.equal(diagnostics?.errorsCount, 0)
+  assert.equal(debugSummary.legacyUsed, false)
+}
+
+function runLegacyCapabilityAlignmentDiagnosticsDivergentCase() {
+  const generatedDomainContract = createValidInventedContract()
+  const scalableDeliveryPlan = observationHarness.buildScalableDeliveryPlan({
+    goal:
+      'Hacer un sistema fullstack local para una plataforma web con frontend publico, panel admin, backend local y base de datos local.',
+    context:
+      'Sin deploy, sin Docker, sin servicios externos ni credenciales reales.',
+    workspacePath: repoRoot,
+    deliveryLevel: 'fullstack-local',
+    domainUnderstanding: {
+      domainLabel: 'Plataforma local fullstack',
+      primaryModules: ['catalogo', 'reportes', 'inventario'],
+      primaryEntities: ['products', 'reports', 'inventory_items'],
+    },
+    reason: 'Preparar observabilidad sobre la alineacion capability vs legacy.',
+  })
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'legacy-capability-alignment-divergent',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    reason: 'Observar cuando el legacy sigue activo aunque el contrato universal ya alcanza.',
+    instruction: 'No cambiar el comportamiento del planner.',
+    completed: false,
+    requiresApproval: false,
+    tasks: scalableDeliveryPlan.tasks,
+    assumptions: scalableDeliveryPlan.assumptions,
+    scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const diagnostics = decision.legacyCapabilityAlignmentDiagnostics
+
+  assert.equal(diagnostics?.present, true)
+  assert.equal(diagnostics?.compared, true)
+  assert.equal(diagnostics?.status, 'divergent')
+  assert.equal(diagnostics?.behaviorChanged, false)
+  assert.equal(diagnostics?.alignment?.capabilityProfileSufficient, true)
+  assert.equal(diagnostics?.alignment?.legacyUsedDespiteCapabilityProfile, true)
+  assert.equal(diagnostics?.alignment?.migrationCandidate, true)
+  assert.ok(
+    Array.isArray(diagnostics?.warnings) &&
+      diagnostics.warnings.some((entry) =>
+        String(entry).includes(
+          'Legacy domain resolver was used even though generatedDomainCapabilityProfile appears sufficient.',
+        ),
+      ),
+    'La alineacion debe advertir cuando legacy sigue activo aun con capability profile suficiente.',
+  )
+  assert.ok((diagnostics?.warningsCount || 0) > 0)
+  assert.equal(diagnostics?.errorsCount, 0)
+}
+
+function runLegacyCapabilityAlignmentDiagnosticsLegacyFallbackCase() {
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'legacy-capability-alignment-fallback',
+    strategy: 'safe-first-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-safe-first-delivery',
+    reason: 'Observar fallback legacy cuando no existe generatedDomainContract.',
+    instruction: 'Mantener solo observabilidad.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    safeFirstDeliveryPlan: {
+      modules: ['catalogo', 'pedidos'],
+      mockData: ['Datos mock locales.'],
+      screens: ['catalogo'],
+      localBehavior: ['Editar datos mock.'],
+      explicitExclusions: ['Sin deploy'],
+      legacyDomainResolution: {
+        safeFirstDeliveryFamilyKey: 'ecommerce',
+        usedLegacyFamily: true,
+      },
+    },
+    workspacePath: repoRoot,
+  })
+  const diagnostics = decision.legacyCapabilityAlignmentDiagnostics
+
+  assert.equal(diagnostics?.present, true)
+  assert.equal(diagnostics?.compared, true)
+  assert.equal(diagnostics?.status, 'partial')
+  assert.equal(diagnostics?.behaviorChanged, false)
+  assert.equal(diagnostics?.alignment?.capabilityProfileSufficient, false)
+  assert.equal(diagnostics?.alignment?.legacyFallbackLikelyNeeded, true)
+  assert.equal(diagnostics?.alignment?.migrationCandidate, false)
+  assert.ok(
+    Array.isArray(diagnostics?.warnings) &&
+      diagnostics.warnings.some((entry) =>
+        String(entry).includes(
+          'Legacy domain resolver is acting as fallback because generated capability profile is unavailable.',
+        ),
+      ),
+    'La alineacion debe marcar fallback legacy cuando falta el capability profile.',
+  )
+}
+
+function runLegacyCapabilityAlignmentDiagnosticsNotAvailableCase() {
+  const diagnostics = observationHarness.buildLegacyCapabilityAlignmentDiagnostics({
+    generatedDomainCapabilityProfile: null,
+    legacyDomainResolutionDiagnostics: null,
+  })
+
+  assert.equal(diagnostics?.present, true)
+  assert.equal(diagnostics?.compared, false)
+  assert.equal(diagnostics?.status, 'not-available')
+  assert.equal(diagnostics?.behaviorChanged, false)
+  assert.equal(diagnostics?.warningsCount, 0)
+  assert.equal(diagnostics?.errorsCount, 0)
+}
+
 function createLegacyObservationDecision() {
   return observationHarness.buildBrainDecisionContract({
     decisionKey: 'legacy-observation-plan',
@@ -1668,6 +1813,10 @@ async function main() {
   runLegacyDomainResolutionDiagnosticsUsedCase()
   runLegacyDomainResolutionDiagnosticsWithGeneratedContractCase()
   runLegacyDomainResolutionDiagnosticsNotUsedCase()
+  runLegacyCapabilityAlignmentDiagnosticsAlignedCase()
+  runLegacyCapabilityAlignmentDiagnosticsDivergentCase()
+  runLegacyCapabilityAlignmentDiagnosticsLegacyFallbackCase()
+  runLegacyCapabilityAlignmentDiagnosticsNotAvailableCase()
   runPlannerObservationMergeOkCase()
   runPlannerObservationMergeTimeoutCase()
   runPlannerObservationLegacyAlreadyHasContractCase()
@@ -1678,7 +1827,7 @@ async function main() {
   runPlannerObservationDebugSummaryCase()
   await runPlannerObservationNormalizeAvailabilityCase()
   runDiagnosticsDebugPreviewCase()
-  console.log('OK. GeneratedDomainContract smoke paso 48/48 checks.')
+  console.log('OK. GeneratedDomainContract smoke paso 52/52 checks.')
 }
 
 main().catch((error) => {

@@ -895,6 +895,251 @@ function summarizeLegacyDomainResolutionDiagnosticsForDebug(diagnostics) {
   }
 }
 
+function buildLegacyCapabilityAlignmentDiagnostics({
+  generatedDomainCapabilityProfile,
+  legacyDomainResolutionDiagnostics,
+}) {
+  const emptyDiagnostics = {
+    present: true,
+    compared: false,
+    status: 'not-available',
+    source: 'generated-domain-capability-profile-vs-legacy-domain-resolution',
+    behaviorChanged: false,
+    generatedCapabilityProfile: {
+      present: false,
+      built: false,
+      status: null,
+      fullstackLocal: false,
+      backendPresent: false,
+      databasePresent: false,
+      surfacesCount: 0,
+      workflows: [],
+    },
+    legacyResolution: {
+      present: false,
+      used: false,
+      status: null,
+      safeFirstDeliveryFamilyUsed: false,
+      safeFirstDeliveryFamilyKey: null,
+      fullstackLocalArchetypeUsed: false,
+      fullstackLocalArchetype: null,
+      canonicalMaterializationContractUsed: false,
+      selectedDomain: null,
+      selectedContractKind: null,
+    },
+    alignment: {
+      capabilityProfileSufficient: false,
+      legacyUsedDespiteCapabilityProfile: false,
+      legacyFallbackLikelyNeeded: false,
+      legacySilent: false,
+      migrationCandidate: false,
+    },
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  try {
+    const capabilityProfile =
+      generatedDomainCapabilityProfile && typeof generatedDomainCapabilityProfile === 'object'
+        ? generatedDomainCapabilityProfile
+        : null
+    const legacyDiagnostics =
+      legacyDomainResolutionDiagnostics &&
+      typeof legacyDomainResolutionDiagnostics === 'object'
+        ? legacyDomainResolutionDiagnostics
+        : null
+    const activeWorkflows = Object.entries(
+      capabilityProfile?.workflows && typeof capabilityProfile.workflows === 'object'
+        ? capabilityProfile.workflows
+        : {},
+    )
+      .filter(([, enabled]) => enabled === true)
+      .map(([key]) => key)
+      .slice(0, 12)
+    const surfacesCount = Number.isInteger(capabilityProfile?.surfaces?.count)
+      ? capabilityProfile.surfaces.count
+      : 0
+    const allowedTargetPathsCount = Number.isInteger(
+      capabilityProfile?.materialization?.allowedTargetPathsCount,
+    )
+      ? capabilityProfile.materialization.allowedTargetPathsCount
+      : 0
+    const requiredPathGroupsCount = Number.isInteger(
+      capabilityProfile?.materialization?.requiredPathGroupsCount,
+    )
+      ? capabilityProfile.materialization.requiredPathGroupsCount
+      : 0
+    const capabilityProfilePresent = capabilityProfile?.present === true
+    const capabilityProfileBuilt = capabilityProfile?.built === true
+    const capabilityProfileStatus =
+      typeof capabilityProfile?.status === 'string' && capabilityProfile.status.trim()
+        ? capabilityProfile.status.trim()
+        : null
+    const legacyPresent = legacyDiagnostics?.present === true
+    const legacyUsed = legacyDiagnostics?.used === true
+    const legacyStatus =
+      typeof legacyDiagnostics?.status === 'string' && legacyDiagnostics.status.trim()
+        ? legacyDiagnostics.status.trim()
+        : null
+    const capabilityProfileSufficient =
+      capabilityProfilePresent &&
+      capabilityProfileBuilt &&
+      Array.isArray(capabilityProfile?.errors) &&
+      capabilityProfile.errors.length === 0 &&
+      ((capabilityProfile?.delivery?.fullstackLocal === true &&
+        capabilityProfile?.backend?.present === true &&
+        capabilityProfile?.database?.present === true &&
+        allowedTargetPathsCount > 0 &&
+        requiredPathGroupsCount > 0) ||
+        surfacesCount > 0 ||
+        activeWorkflows.length > 0)
+    const legacyUsedDespiteCapabilityProfile = capabilityProfileSufficient && legacyUsed
+    const legacyFallbackLikelyNeeded = !capabilityProfileBuilt && legacyUsed
+    const legacySilent =
+      capabilityProfilePresent && capabilityProfileBuilt && !capabilityProfileSufficient && !legacyUsed
+    const migrationCandidate = legacyUsedDespiteCapabilityProfile
+    const warnings = summarizeUniqueExecutorStrings(
+      [
+        legacyUsedDespiteCapabilityProfile
+          ? 'Legacy domain resolver was used even though generatedDomainCapabilityProfile appears sufficient.'
+          : '',
+        legacyFallbackLikelyNeeded
+          ? 'Legacy domain resolver is acting as fallback because generated capability profile is unavailable.'
+          : '',
+        legacySilent
+          ? 'generatedDomainCapabilityProfile appears incomplete while legacy domain resolution stayed inactive.'
+          : '',
+        capabilityProfileStatus === 'partial' && !legacyUsedDespiteCapabilityProfile
+          ? 'generatedDomainCapabilityProfile sigue en estado partial; la alineacion no gobierna decisiones en esta fase.'
+          : '',
+      ].filter(Boolean),
+      12,
+    )
+    const errors = []
+    const compared = capabilityProfilePresent || legacyPresent
+    let status = 'not-available'
+
+    if (legacyUsedDespiteCapabilityProfile) {
+      status = 'divergent'
+    } else if (capabilityProfileSufficient && !legacyUsed) {
+      status = 'aligned'
+    } else if (legacyFallbackLikelyNeeded || legacySilent || warnings.length > 0) {
+      status = 'partial'
+    } else if (compared) {
+      status = 'aligned'
+    }
+
+    return {
+      ...emptyDiagnostics,
+      compared,
+      status,
+      generatedCapabilityProfile: {
+        present: capabilityProfilePresent,
+        built: capabilityProfileBuilt,
+        status: capabilityProfileStatus,
+        fullstackLocal: capabilityProfile?.delivery?.fullstackLocal === true,
+        backendPresent: capabilityProfile?.backend?.present === true,
+        databasePresent: capabilityProfile?.database?.present === true,
+        surfacesCount,
+        workflows: activeWorkflows,
+      },
+      legacyResolution: {
+        present: legacyPresent,
+        used: legacyUsed,
+        status: legacyStatus,
+        safeFirstDeliveryFamilyUsed: legacyDiagnostics?.safeFirstDeliveryFamily?.used === true,
+        safeFirstDeliveryFamilyKey:
+          normalizeOptionalString(legacyDiagnostics?.safeFirstDeliveryFamily?.familyKey) || null,
+        fullstackLocalArchetypeUsed:
+          legacyDiagnostics?.fullstackLocalArchetype?.used === true,
+        fullstackLocalArchetype:
+          normalizeOptionalString(legacyDiagnostics?.fullstackLocalArchetype?.archetype) || null,
+        canonicalMaterializationContractUsed:
+          legacyDiagnostics?.canonicalMaterializationContract?.used === true,
+        selectedDomain:
+          normalizeOptionalString(
+            legacyDiagnostics?.canonicalMaterializationContract?.selectedDomain,
+          ) || null,
+        selectedContractKind:
+          normalizeOptionalString(
+            legacyDiagnostics?.canonicalMaterializationContract?.contractKind,
+          ) || null,
+      },
+      alignment: {
+        capabilityProfileSufficient,
+        legacyUsedDespiteCapabilityProfile,
+        legacyFallbackLikelyNeeded,
+        legacySilent,
+        migrationCandidate,
+      },
+      warnings,
+      errors,
+      warningsCount: warnings.length,
+      errorsCount: errors.length,
+    }
+  } catch (error) {
+    const errorPreview = sanitizeGeneratedDomainContractDebugPreview(
+      error instanceof Error ? error.stack || error.message : String(error),
+      180,
+    )
+
+    return {
+      ...emptyDiagnostics,
+      status: 'error',
+      errors: errorPreview ? [errorPreview] : ['legacy-capability-alignment-error'],
+      errorsCount: errorPreview ? 1 : 0,
+    }
+  }
+}
+
+function summarizeLegacyCapabilityAlignmentDiagnosticsForDebug(diagnostics) {
+  if (!diagnostics || typeof diagnostics !== 'object') {
+    return {
+      present: false,
+      compared: false,
+      status: 'not-available',
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(
+    diagnostics.warnings,
+  )
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(diagnostics.errors)
+
+  return {
+    present: diagnostics.present === true,
+    compared: diagnostics.compared === true,
+    status:
+      typeof diagnostics.status === 'string' && diagnostics.status.trim()
+        ? diagnostics.status.trim()
+        : 'not-available',
+    behaviorChanged: diagnostics.behaviorChanged === true,
+    capabilityProfileBuilt: diagnostics.generatedCapabilityProfile?.built === true,
+    capabilityProfileStatus:
+      typeof diagnostics.generatedCapabilityProfile?.status === 'string' &&
+      diagnostics.generatedCapabilityProfile.status.trim()
+        ? diagnostics.generatedCapabilityProfile.status.trim()
+        : undefined,
+    fullstackLocal: diagnostics.generatedCapabilityProfile?.fullstackLocal === true,
+    backendPresent: diagnostics.generatedCapabilityProfile?.backendPresent === true,
+    databasePresent: diagnostics.generatedCapabilityProfile?.databasePresent === true,
+    legacyUsed: diagnostics.legacyResolution?.used === true,
+    safeFirstDeliveryFamilyUsed:
+      diagnostics.legacyResolution?.safeFirstDeliveryFamilyUsed === true,
+    fullstackLocalArchetypeUsed:
+      diagnostics.legacyResolution?.fullstackLocalArchetypeUsed === true,
+    canonicalMaterializationContractUsed:
+      diagnostics.legacyResolution?.canonicalMaterializationContractUsed === true,
+    migrationCandidate: diagnostics.alignment?.migrationCandidate === true,
+    warningsCount: Array.isArray(diagnostics.warnings) ? diagnostics.warnings.length : 0,
+    errorsCount: Array.isArray(diagnostics.errors) ? diagnostics.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
 function buildSafeGeneratedDomainContractObservationErrorPreview(value) {
   return sanitizeGeneratedDomainContractDebugPreview(value, 180)
 }
@@ -36363,6 +36608,11 @@ function buildBrainDecisionContract({
     selectedContractKind,
     generatedDomainContractDiagnostics,
   })
+  const legacyCapabilityAlignmentDiagnostics =
+    buildLegacyCapabilityAlignmentDiagnostics({
+      generatedDomainCapabilityProfile,
+      legacyDomainResolutionDiagnostics,
+    })
 
   return {
     decisionKey: decisionKey || strategy || 'brain-decision',
@@ -36487,6 +36737,7 @@ function buildBrainDecisionContract({
     generatedDomainCapabilityProfile,
     generatedDomainContractComparison,
     legacyDomainResolutionDiagnostics,
+    legacyCapabilityAlignmentDiagnostics,
     ...(materializationPlan && typeof materializationPlan === 'object'
       ? { materializationPlan }
       : {}),
@@ -49910,6 +50161,18 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
   }
 
   if (
+    brainDecision.legacyCapabilityAlignmentDiagnostics &&
+    typeof brainDecision.legacyCapabilityAlignmentDiagnostics === 'object'
+  ) {
+    debugMainLog(
+      'legacy-capability-alignment:diagnostics',
+      summarizeLegacyCapabilityAlignmentDiagnosticsForDebug(
+        brainDecision.legacyCapabilityAlignmentDiagnostics,
+      ),
+    )
+  }
+
+  if (
     brainDecision.generatedDomainContractObservation &&
     typeof brainDecision.generatedDomainContractObservation === 'object'
   ) {
@@ -50018,6 +50281,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
         brainDecision.generatedDomainContractComparison,
       legacyDomainResolutionDiagnostics:
         brainDecision.legacyDomainResolutionDiagnostics,
+      legacyCapabilityAlignmentDiagnostics:
+        brainDecision.legacyCapabilityAlignmentDiagnostics,
       generatedDomainContractObservation:
         brainDecision.generatedDomainContractObservation,
       existingProjectDetection: brainDecision.existingProjectDetection,
@@ -50090,6 +50355,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       brainDecision.generatedDomainContractComparison,
     legacyDomainResolutionDiagnostics:
       brainDecision.legacyDomainResolutionDiagnostics,
+    legacyCapabilityAlignmentDiagnostics:
+      brainDecision.legacyCapabilityAlignmentDiagnostics,
     generatedDomainContractObservation:
       brainDecision.generatedDomainContractObservation,
     existingProjectDetection: brainDecision.existingProjectDetection,
