@@ -63,6 +63,7 @@ module.exports = {
   buildBrainDecisionContract,
   buildLegacyDomainResolutionDiagnostics,
   buildLegacyCapabilityAlignmentDiagnostics,
+  buildLegacyMigrationCandidateReport,
   buildGeneratedDomainCapabilityProfile,
   buildGeneratedDomainContractObservationSystemPrompt,
   classifyGeneratedDomainContractObservationThrownError,
@@ -75,6 +76,7 @@ module.exports = {
   summarizeGeneratedDomainContractDiagnosticsForDebug,
   summarizeGeneratedDomainContractObservationForDebug,
   summarizeLegacyCapabilityAlignmentDiagnosticsForDebug,
+  summarizeLegacyMigrationCandidateReportForDebug,
   summarizeLegacyDomainResolutionDiagnosticsForDebug,
 };
 `
@@ -1288,6 +1290,136 @@ function runLegacyCapabilityAlignmentDiagnosticsNotAvailableCase() {
   assert.equal(diagnostics?.errorsCount, 0)
 }
 
+function runLegacyMigrationCandidateReportNoActionCase() {
+  const generatedDomainContract = createValidInventedContract()
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'legacy-migration-report-no-action',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    reason: 'Observar un caso alineado sin uso legacy.',
+    instruction: 'Mantener el review sin cambios.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const report = decision.legacyMigrationCandidateReport
+  const debugSummary =
+    observationHarness.summarizeLegacyMigrationCandidateReportForDebug(report)
+
+  assert.equal(report?.present, true)
+  assert.equal(report?.evaluated, true)
+  assert.equal(report?.status, 'no-action')
+  assert.equal(report?.behaviorChanged, false)
+  assert.equal(report?.recommendation?.action, 'observe')
+  assert.equal(report?.capabilityProfile?.sufficient, true)
+  assert.equal(report?.legacy?.used, false)
+  assert.equal(report?.warningsCount, 0)
+  assert.equal(debugSummary.recommendedAction, 'observe')
+}
+
+function runLegacyMigrationCandidateReportCandidateCase() {
+  const generatedDomainContract = createValidInventedContract()
+  const scalableDeliveryPlan = observationHarness.buildScalableDeliveryPlan({
+    goal:
+      'Hacer un sistema fullstack local para una plataforma web con frontend publico, panel admin, backend local y base de datos local.',
+    context:
+      'Sin deploy, sin Docker, sin servicios externos ni credenciales reales.',
+    workspacePath: repoRoot,
+    deliveryLevel: 'fullstack-local',
+    domainUnderstanding: {
+      domainLabel: 'Plataforma local fullstack',
+      primaryModules: ['catalogo', 'reportes', 'inventario'],
+      primaryEntities: ['products', 'reports', 'inventory_items'],
+    },
+    reason: 'Forzar uso legacy observacional con capability profile suficiente.',
+  })
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'legacy-migration-report-candidate',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    reason: 'Detectar candidato de migracion sin cambiar comportamiento.',
+    instruction: 'Solo observar.',
+    completed: false,
+    requiresApproval: false,
+    tasks: scalableDeliveryPlan.tasks,
+    assumptions: scalableDeliveryPlan.assumptions,
+    scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const report = decision.legacyMigrationCandidateReport
+
+  assert.equal(report?.present, true)
+  assert.equal(report?.evaluated, true)
+  assert.equal(report?.status, 'candidate')
+  assert.equal(report?.behaviorChanged, false)
+  assert.equal(report?.recommendation?.action, 'prepare-capability-preference')
+  assert.equal(report?.alignment?.migrationCandidate, true)
+  assert.ok((report?.warningsCount || 0) > 0)
+}
+
+function runLegacyMigrationCandidateReportFallbackNeededCase() {
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'legacy-migration-report-fallback-needed',
+    strategy: 'safe-first-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-safe-first-delivery',
+    reason: 'Observar fallback legacy cuando falta capability profile.',
+    instruction: 'No cambiar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    safeFirstDeliveryPlan: {
+      modules: ['catalogo', 'pedidos'],
+      mockData: ['Datos mock locales.'],
+      screens: ['catalogo'],
+      localBehavior: ['Editar datos mock.'],
+      explicitExclusions: ['Sin deploy'],
+      legacyDomainResolution: {
+        safeFirstDeliveryFamilyKey: 'ecommerce',
+        usedLegacyFamily: true,
+      },
+    },
+    workspacePath: repoRoot,
+  })
+  const report = decision.legacyMigrationCandidateReport
+
+  assert.equal(report?.present, true)
+  assert.equal(report?.evaluated, true)
+  assert.equal(report?.status, 'fallback-needed')
+  assert.equal(report?.behaviorChanged, false)
+  assert.equal(report?.recommendation?.action, 'keep-legacy-fallback')
+  assert.equal(report?.alignment?.legacyFallbackLikelyNeeded, true)
+}
+
+function runLegacyMigrationCandidateReportErrorCase() {
+  const report = observationHarness.buildLegacyMigrationCandidateReport({
+    generatedDomainCapabilityProfile: {},
+    legacyDomainResolutionDiagnostics: {},
+    legacyCapabilityAlignmentDiagnostics: {
+      present: true,
+      compared: true,
+      status: 'error',
+      behaviorChanged: false,
+      alignment: {},
+      errors: ['alignment exploded in observation'],
+    },
+  })
+
+  assert.equal(report?.present, true)
+  assert.equal(report?.evaluated, true)
+  assert.equal(report?.status, 'error')
+  assert.equal(report?.behaviorChanged, false)
+  assert.equal(report?.recommendation?.action, 'investigate')
+  assert.ok((report?.errorsCount || 0) > 0)
+}
+
 function createLegacyObservationDecision() {
   return observationHarness.buildBrainDecisionContract({
     decisionKey: 'legacy-observation-plan',
@@ -1817,6 +1949,10 @@ async function main() {
   runLegacyCapabilityAlignmentDiagnosticsDivergentCase()
   runLegacyCapabilityAlignmentDiagnosticsLegacyFallbackCase()
   runLegacyCapabilityAlignmentDiagnosticsNotAvailableCase()
+  runLegacyMigrationCandidateReportNoActionCase()
+  runLegacyMigrationCandidateReportCandidateCase()
+  runLegacyMigrationCandidateReportFallbackNeededCase()
+  runLegacyMigrationCandidateReportErrorCase()
   runPlannerObservationMergeOkCase()
   runPlannerObservationMergeTimeoutCase()
   runPlannerObservationLegacyAlreadyHasContractCase()
@@ -1827,7 +1963,7 @@ async function main() {
   runPlannerObservationDebugSummaryCase()
   await runPlannerObservationNormalizeAvailabilityCase()
   runDiagnosticsDebugPreviewCase()
-  console.log('OK. GeneratedDomainContract smoke paso 52/52 checks.')
+  console.log('OK. GeneratedDomainContract smoke paso 56/56 checks.')
 }
 
 main().catch((error) => {

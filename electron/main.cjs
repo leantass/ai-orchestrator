@@ -1140,6 +1140,283 @@ function summarizeLegacyCapabilityAlignmentDiagnosticsForDebug(diagnostics) {
   }
 }
 
+function buildLegacyMigrationCandidateReport({
+  generatedDomainCapabilityProfile,
+  legacyDomainResolutionDiagnostics,
+  legacyCapabilityAlignmentDiagnostics,
+}) {
+  const emptyReport = {
+    present: true,
+    evaluated: false,
+    status: 'not-available',
+    source: 'legacy-capability-alignment',
+    behaviorChanged: false,
+    capabilityProfile: {
+      present: false,
+      built: false,
+      sufficient: false,
+      fullstackLocal: false,
+      backendPresent: false,
+      databasePresent: false,
+      surfacesCount: 0,
+      workflowsCount: 0,
+    },
+    legacy: {
+      present: false,
+      used: false,
+      safeFirstDeliveryFamilyUsed: false,
+      fullstackLocalArchetypeUsed: false,
+      canonicalMaterializationContractUsed: false,
+    },
+    alignment: {
+      present: false,
+      compared: false,
+      status: null,
+      migrationCandidate: false,
+      legacyUsedDespiteCapabilityProfile: false,
+      legacyFallbackLikelyNeeded: false,
+    },
+    recommendation: {
+      action: 'none',
+      reason: '',
+      nextSafeStep: '',
+    },
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  try {
+    const capabilityProfile =
+      generatedDomainCapabilityProfile &&
+      typeof generatedDomainCapabilityProfile === 'object'
+        ? generatedDomainCapabilityProfile
+        : null
+    const legacyDiagnostics =
+      legacyDomainResolutionDiagnostics &&
+      typeof legacyDomainResolutionDiagnostics === 'object'
+        ? legacyDomainResolutionDiagnostics
+        : null
+    const alignmentDiagnostics =
+      legacyCapabilityAlignmentDiagnostics &&
+      typeof legacyCapabilityAlignmentDiagnostics === 'object'
+        ? legacyCapabilityAlignmentDiagnostics
+        : null
+    const workflowsCount = Object.values(
+      capabilityProfile?.workflows && typeof capabilityProfile.workflows === 'object'
+        ? capabilityProfile.workflows
+        : {},
+    ).filter((value) => value === true).length
+    const capabilityProfilePresent = capabilityProfile?.present === true
+    const capabilityProfileBuilt = capabilityProfile?.built === true
+    const capabilityProfileSufficient =
+      alignmentDiagnostics?.alignment?.capabilityProfileSufficient === true
+    const legacyPresent = legacyDiagnostics?.present === true
+    const legacyUsed = legacyDiagnostics?.used === true
+    const alignmentPresent = alignmentDiagnostics?.present === true
+    const alignmentCompared = alignmentDiagnostics?.compared === true
+    const alignmentStatus =
+      typeof alignmentDiagnostics?.status === 'string' && alignmentDiagnostics.status.trim()
+        ? alignmentDiagnostics.status.trim()
+        : null
+    const migrationCandidate =
+      alignmentDiagnostics?.alignment?.migrationCandidate === true
+    const legacyUsedDespiteCapabilityProfile =
+      alignmentDiagnostics?.alignment?.legacyUsedDespiteCapabilityProfile === true
+    const legacyFallbackLikelyNeeded =
+      alignmentDiagnostics?.alignment?.legacyFallbackLikelyNeeded === true
+    const warnings = []
+    const errors = []
+    const appendWarning = (message) => {
+      const normalized =
+        typeof message === 'string'
+          ? message.trim()
+          : message === null || message === undefined
+            ? ''
+            : String(message).trim()
+      if (!normalized) {
+        return
+      }
+      const bounded =
+        normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`
+      if (!warnings.includes(bounded)) {
+        warnings.push(bounded)
+      }
+    }
+    let status = 'not-available'
+    let action = 'none'
+    let reason = ''
+    let nextSafeStep = ''
+
+    if (!capabilityProfilePresent && !legacyPresent && !alignmentPresent) {
+      status = 'not-available'
+      action = 'none'
+      reason = 'No hay datos suficientes para evaluar candidatos de migracion legacy.'
+      nextSafeStep = 'Seguir observando hasta contar con capability profile o legacy diagnostics.'
+    } else if (alignmentStatus === 'error') {
+      status = 'error'
+      action = 'investigate'
+      reason = 'La alineacion legacy vs capability devolvio error observacional.'
+      nextSafeStep = 'Revisar el diagnostico de alineacion y mantener el flujo sin cambios.'
+      asArray(alignmentDiagnostics?.errors).forEach((entry) => {
+        pushUniqueMessage(errors, entry)
+      })
+    } else if (migrationCandidate && legacyUsedDespiteCapabilityProfile) {
+      status = 'candidate'
+      action = 'prepare-capability-preference'
+      reason =
+        'Hay capability profile suficiente, pero el legacy resolver sigue participando en la decision.'
+      nextSafeStep =
+        'Preparar una futura preferencia por capability profile manteniendo fallback legacy.'
+      appendWarning(
+        'Legacy resolver was used despite sufficient generated capability profile.',
+      )
+    } else if (legacyUsed && !capabilityProfileBuilt) {
+      status = 'fallback-needed'
+      action = 'keep-legacy-fallback'
+      reason =
+        'El legacy resolver sigue cubriendo un caso donde el capability profile no esta disponible o no pudo construirse.'
+      nextSafeStep =
+        'Mantener el fallback legacy y seguir mejorando la cobertura del generatedDomainCapabilityProfile.'
+      appendWarning(
+        'Legacy resolver is still needed because generated capability profile is unavailable or insufficient.',
+      )
+    } else if (
+      capabilityProfileSufficient &&
+      !legacyUsed &&
+      alignmentCompared &&
+      alignmentStatus === 'aligned'
+    ) {
+      status = 'no-action'
+      action = 'observe'
+      reason =
+        'El capability profile parece suficiente y el legacy resolver no participo en este flujo.'
+      nextSafeStep = 'Seguir observando antes de preferir señales estructurales en runtime.'
+    } else if (
+      alignmentStatus === 'divergent' ||
+      (alignmentCompared &&
+        (alignmentDiagnostics?.alignment?.legacySilent === true ||
+          (alignmentStatus === 'partial' &&
+            !migrationCandidate &&
+            !legacyFallbackLikelyNeeded &&
+            legacyUsed !== false)))
+    ) {
+      status = 'blocked'
+      action = 'investigate'
+      reason =
+        'La alineacion observacional encontro una divergencia que necesita inspeccion antes de planear la migracion.'
+      nextSafeStep = 'Revisar el payload observado y mantener el legacy sin cambios funcionales.'
+      appendWarning(
+        'La alineacion observacional requiere investigacion antes de proponer preferencia por capability profile.',
+      )
+    } else if (alignmentCompared || capabilityProfilePresent || legacyPresent) {
+      status = 'no-action'
+      action = 'observe'
+      reason = 'No hay una accion de migracion segura recomendada en esta fase observacional.'
+      nextSafeStep = 'Seguir recolectando evidencia antes de cambiar preferencia o fallback.'
+    }
+
+    return {
+      ...emptyReport,
+      evaluated: capabilityProfilePresent || legacyPresent || alignmentPresent,
+      status,
+      capabilityProfile: {
+        present: capabilityProfilePresent,
+        built: capabilityProfileBuilt,
+        sufficient: capabilityProfileSufficient,
+        fullstackLocal: capabilityProfile?.delivery?.fullstackLocal === true,
+        backendPresent: capabilityProfile?.backend?.present === true,
+        databasePresent: capabilityProfile?.database?.present === true,
+        surfacesCount: Number.isInteger(capabilityProfile?.surfaces?.count)
+          ? capabilityProfile.surfaces.count
+          : 0,
+        workflowsCount,
+      },
+      legacy: {
+        present: legacyPresent,
+        used: legacyUsed,
+        safeFirstDeliveryFamilyUsed:
+          legacyDiagnostics?.safeFirstDeliveryFamily?.used === true,
+        fullstackLocalArchetypeUsed:
+          legacyDiagnostics?.fullstackLocalArchetype?.used === true,
+        canonicalMaterializationContractUsed:
+          legacyDiagnostics?.canonicalMaterializationContract?.used === true,
+      },
+      alignment: {
+        present: alignmentPresent,
+        compared: alignmentCompared,
+        status: alignmentStatus,
+        migrationCandidate,
+        legacyUsedDespiteCapabilityProfile,
+        legacyFallbackLikelyNeeded,
+      },
+      recommendation: {
+        action,
+        reason,
+        nextSafeStep,
+      },
+      warnings,
+      errors,
+      warningsCount: warnings.length,
+      errorsCount: errors.length,
+    }
+  } catch (error) {
+    const errorPreview = sanitizeGeneratedDomainContractDebugPreview(
+      error instanceof Error ? error.stack || error.message : String(error),
+      180,
+    )
+
+    return {
+      ...emptyReport,
+      evaluated: true,
+      status: 'error',
+      recommendation: {
+        action: 'investigate',
+        reason: 'El reporte observacional de migracion legacy devolvio error interno.',
+        nextSafeStep: 'Revisar el reporte y mantener el comportamiento actual sin cambios.',
+      },
+      errors: errorPreview ? [errorPreview] : ['legacy-migration-candidate-report-error'],
+      errorsCount: errorPreview ? 1 : 0,
+    }
+  }
+}
+
+function summarizeLegacyMigrationCandidateReportForDebug(report) {
+  if (!report || typeof report !== 'object') {
+    return {
+      present: false,
+      evaluated: false,
+      status: 'not-available',
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(report.warnings)
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(report.errors)
+
+  return {
+    present: report.present === true,
+    evaluated: report.evaluated === true,
+    status:
+      typeof report.status === 'string' && report.status.trim()
+        ? report.status.trim()
+        : 'not-available',
+    behaviorChanged: report.behaviorChanged === true,
+    capabilityProfileBuilt: report.capabilityProfile?.built === true,
+    capabilityProfileSufficient: report.capabilityProfile?.sufficient === true,
+    legacyUsed: report.legacy?.used === true,
+    migrationCandidate: report.alignment?.migrationCandidate === true,
+    recommendedAction:
+      typeof report.recommendation?.action === 'string' && report.recommendation.action.trim()
+        ? report.recommendation.action.trim()
+        : 'none',
+    warningsCount: Array.isArray(report.warnings) ? report.warnings.length : 0,
+    errorsCount: Array.isArray(report.errors) ? report.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
 function buildSafeGeneratedDomainContractObservationErrorPreview(value) {
   return sanitizeGeneratedDomainContractDebugPreview(value, 180)
 }
@@ -36613,6 +36890,11 @@ function buildBrainDecisionContract({
       generatedDomainCapabilityProfile,
       legacyDomainResolutionDiagnostics,
     })
+  const legacyMigrationCandidateReport = buildLegacyMigrationCandidateReport({
+    generatedDomainCapabilityProfile,
+    legacyDomainResolutionDiagnostics,
+    legacyCapabilityAlignmentDiagnostics,
+  })
 
   return {
     decisionKey: decisionKey || strategy || 'brain-decision',
@@ -36738,6 +37020,7 @@ function buildBrainDecisionContract({
     generatedDomainContractComparison,
     legacyDomainResolutionDiagnostics,
     legacyCapabilityAlignmentDiagnostics,
+    legacyMigrationCandidateReport,
     ...(materializationPlan && typeof materializationPlan === 'object'
       ? { materializationPlan }
       : {}),
@@ -50173,6 +50456,18 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
   }
 
   if (
+    brainDecision.legacyMigrationCandidateReport &&
+    typeof brainDecision.legacyMigrationCandidateReport === 'object'
+  ) {
+    debugMainLog(
+      'legacy-migration-candidate:report',
+      summarizeLegacyMigrationCandidateReportForDebug(
+        brainDecision.legacyMigrationCandidateReport,
+      ),
+    )
+  }
+
+  if (
     brainDecision.generatedDomainContractObservation &&
     typeof brainDecision.generatedDomainContractObservation === 'object'
   ) {
@@ -50283,6 +50578,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
         brainDecision.legacyDomainResolutionDiagnostics,
       legacyCapabilityAlignmentDiagnostics:
         brainDecision.legacyCapabilityAlignmentDiagnostics,
+      legacyMigrationCandidateReport:
+        brainDecision.legacyMigrationCandidateReport,
       generatedDomainContractObservation:
         brainDecision.generatedDomainContractObservation,
       existingProjectDetection: brainDecision.existingProjectDetection,
@@ -50357,6 +50654,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       brainDecision.legacyDomainResolutionDiagnostics,
     legacyCapabilityAlignmentDiagnostics:
       brainDecision.legacyCapabilityAlignmentDiagnostics,
+    legacyMigrationCandidateReport:
+      brainDecision.legacyMigrationCandidateReport,
     generatedDomainContractObservation:
       brainDecision.generatedDomainContractObservation,
     existingProjectDetection: brainDecision.existingProjectDetection,

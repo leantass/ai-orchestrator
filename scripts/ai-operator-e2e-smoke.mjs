@@ -4884,6 +4884,118 @@ async function runLegacyCapabilityAlignmentDiagnosticsPayloadCase() {
   }
 }
 
+async function runLegacyMigrationCandidateReportPayloadCase() {
+  const failures = []
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'legacy-migration-candidate-observability',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    reason: 'Adjuntar reporte observacional de migracion legacy sin cambiar comportamiento.',
+    instruction: 'Mantener el review y no materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      modules: ['catalogo', 'reportes', 'inventario'],
+      allowedRootPaths: ['club-nexus-local'],
+      legacyDomainResolution: {
+        fullstackLocalArchetype: 'operations',
+        usedLegacyArchetype: false,
+        materializationPlanProfileKey: 'logistics-tracking',
+        usedLegacyMaterializationProfile: true,
+      },
+    },
+    selectedDomain: 'logistics-tracking',
+    selectedContractKind: 'generic-fullstack-local',
+    generatedDomainContract: {
+      deliveryLevel: 'fullstack-local',
+      domain: { slug: 'neighborhood-clubs', label: 'Neighborhood Clubs' },
+      root: {
+        slug: 'club-nexus-local',
+        sourceRoot: 'club-nexus-local',
+        targetRoot: 'club-nexus-local',
+      },
+      frontendSurfaces: [
+        { key: 'public', label: 'Public', path: 'frontend/public', screens: ['agenda'] },
+        { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['dashboard'] },
+      ],
+      workflows: ['scheduling', 'reporting', 'inventory', 'messaging'],
+      backend: {
+        entryFile: 'backend/src/server.js',
+        routes: [{ path: 'backend/src/routes/clubs.js' }],
+      },
+      database: {
+        schemaFile: 'database/schema.sql',
+        tables: ['clubs', 'members', 'inventory'],
+      },
+      materialization: {
+        requiredFiles: [
+          'frontend/public/index.html',
+          'frontend/admin/index.html',
+          'backend/src/server.js',
+          'database/schema.sql',
+        ],
+      },
+      validation: {
+        requiredPathGroups: [
+          { candidates: ['frontend/public/index.html'] },
+          { candidates: ['frontend/admin/index.html'] },
+          { candidates: ['backend/src/server.js'] },
+          { candidates: ['database/schema.sql'] },
+        ],
+      },
+      safety: {
+        forbiddenFiles: ['.env'],
+        forbiddenSignals: ['ACCESS_TOKEN'],
+        explicitExclusions: ['deploy', 'real-payments'],
+      },
+    },
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.legacyMigrationCandidateReport?.present === true &&
+      decision.legacyMigrationCandidateReport?.evaluated === true,
+    'buildBrainDecisionContract debe adjuntar legacyMigrationCandidateReport al payload.',
+  )
+  pushFailure(
+    failures,
+    ['candidate', 'blocked'].includes(decision.legacyMigrationCandidateReport?.status) &&
+      decision.legacyMigrationCandidateReport?.recommendation?.action ===
+        'prepare-capability-preference',
+    'El reporte de migracion debe recomendar prepare-capability-preference cuando detecta un candidato real.',
+  )
+  pushFailure(
+    failures,
+    decision.legacyMigrationCandidateReport?.behaviorChanged === false,
+    'legacyMigrationCandidateReport debe declarar behaviorChanged=false.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('legacy-migration-candidate:report') &&
+      mainSource.includes('legacyMigrationCandidateReport') &&
+      mainSource.includes('summarizeLegacyMigrationCandidateReportForDebug'),
+    'main.cjs debe adjuntar legacyMigrationCandidateReport y loguear legacy-migration-candidate:report.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'scalable-delivery-plan' &&
+      decision.executionMode === 'planner-only' &&
+      decision.nextExpectedAction === 'review-scalable-delivery',
+    'legacyMigrationCandidateReport no debe cambiar strategy, executionMode ni nextExpectedAction.',
+  )
+
+  return {
+    id: 'legacy-migration-candidate-report-payload',
+    label: 'Legacy migration candidate report payload',
+    failures,
+  }
+}
+
 async function runGeneratedDomainContractComparisonTechnicalPanelCase() {
   const failures = []
   const appSource = fs.readFileSync(appFilePath, 'utf8')
@@ -7418,6 +7530,7 @@ async function main() {
     results.push(await runGeneratedDomainCapabilityProfilePayloadCase())
     results.push(await runLegacyDomainResolutionDiagnosticsPayloadCase())
     results.push(await runLegacyCapabilityAlignmentDiagnosticsPayloadCase())
+    results.push(await runLegacyMigrationCandidateReportPayloadCase())
     results.push(await runGeneratedDomainContractComparisonTechnicalPanelCase())
     results.push(await runPrepareContinuationActionPlanShowsPrimaryCtaCase())
     results.push(await runPrepareContinuationActionPlanFallbackCtaCase())
