@@ -65,6 +65,7 @@ module.exports = {
   buildLegacyCapabilityAlignmentDiagnostics,
   buildLegacyMigrationCandidateReport,
   buildGeneratedDomainCapabilityProfile,
+  inspectFullstackLocalMaterializationContract,
   buildGeneratedDomainContractObservationSystemPrompt,
   classifyGeneratedDomainContractObservationThrownError,
   buildOpenAIBrainSystemPrompt,
@@ -75,6 +76,7 @@ module.exports = {
   observeGeneratedDomainContractForPlannerDecision,
   summarizeGeneratedDomainContractDiagnosticsForDebug,
   summarizeGeneratedDomainContractObservationForDebug,
+  summarizeFullstackLocalInspectionSourceDiagnosticsForDebug,
   summarizeLegacyCapabilityAlignmentDiagnosticsForDebug,
   summarizeLegacyMigrationCandidateReportForDebug,
   summarizeLegacyDomainResolutionDiagnosticsForDebug,
@@ -99,6 +101,9 @@ module.exports = {
     shouldIgnoreWorkspaceDirectoryEntry,
     normalizeGeneratedDomainContract,
     validateGeneratedDomainContract,
+    deriveAllowedTargetPathsFromContract,
+    deriveRequiredPathGroupsFromContract,
+    deriveForbiddenSearchPatternsFromContract,
     isContractSafeForLocalMaterialization,
     buildGeneratedDomainContractDiagnostics,
     buildGeneratedDomainCapabilityProfile,
@@ -1420,6 +1425,207 @@ function runLegacyMigrationCandidateReportErrorCase() {
   assert.ok((report?.errorsCount || 0) > 0)
 }
 
+function buildInspectionReadyMaterializationPlan(contract, { includeExplicitContract = false } = {}) {
+  const normalizedContract = normalizeGeneratedDomainContract(contract)
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(normalizedContract, '.')
+  const requiredPathGroups = deriveRequiredPathGroupsFromContract(normalizedContract)
+  const explicitRequiredPathGroups = requiredPathGroups.map((entry, index) => ({
+    label: Array.isArray(entry) ? entry.join('|') : `group-${index + 1}`,
+    candidates: Array.isArray(entry) ? entry.filter(Boolean) : [],
+  }))
+
+  return {
+    version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+    kind: 'fullstack-local-materialization',
+    strategy: 'materialize-fullstack-local-plan',
+    projectRoot: normalizedContract.root.targetRoot,
+    allowedTargetPaths,
+    ...(includeExplicitContract
+      ? {
+          contractDefinition: {
+            contractKind: 'explicit-materialization-contract',
+            rootFolder: normalizedContract.root.targetRoot,
+            allowedRootBasenames: [normalizedContract.root.targetRoot],
+            preferredRootBasenames: [normalizedContract.root.targetRoot],
+            forbiddenSignals: ['web-scaffold-base'],
+            primaryPersistencePaths: [
+              normalizedContract.database.schemaFile,
+              normalizedContract.database.seedFile,
+            ],
+            jsonPrimaryPersistencePaths: [],
+            requiredPathGroups: explicitRequiredPathGroups,
+            requiredPaths: explicitRequiredPathGroups.map((entry) => entry.label),
+            expectedTargetPaths: explicitRequiredPathGroups
+              .map((entry) => entry.candidates[0])
+              .filter(Boolean),
+          },
+        }
+      : {}),
+    operations: allowedTargetPaths.map((targetPath) => ({
+      type: 'create-or-edit-file',
+      targetPath,
+      nextContent: `// ${targetPath}\n`,
+    })),
+  }
+}
+
+function runCapabilityPreferredInspectionUsesGeneratedContractCase() {
+  const generatedDomainContract = createValidInventedContract()
+  const materializationPlan = buildInspectionReadyMaterializationPlan(generatedDomainContract)
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'capability-preferred-inspection-generated-contract',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Preferir generatedDomainContract valido para inspeccion fullstack local.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    executionScope: {
+      allowedTargetPaths: materializationPlan.allowedTargetPaths,
+    },
+    materializationPlan,
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const diagnostics = decision.fullstackLocalInspectionSourceDiagnostics
+  const contractInspection = observationHarness.inspectFullstackLocalMaterializationContract({
+    goal: 'Inspeccionar scaffold fullstack local con contrato universal.',
+    context: '',
+    decisionKey: decision.decisionKey,
+    strategy: decision.strategy,
+    executionMode: decision.executionMode,
+    nextExpectedAction: decision.nextExpectedAction,
+    executionScope: decision.executionScope,
+    materializationPlan: decision.materializationPlan,
+    localProjectManifest: decision.localProjectManifest,
+    existingProjectDetection: decision.existingProjectDetection,
+    generatedDomainContract: decision.generatedDomainContract,
+    generatedDomainContractDiagnostics: decision.generatedDomainContractDiagnostics,
+    generatedDomainCapabilityProfile: decision.generatedDomainCapabilityProfile,
+  })
+
+  assert.equal(diagnostics?.present, true)
+  assert.equal(diagnostics?.source, 'generated-domain-contract')
+  assert.equal(diagnostics?.generatedDomainContractUsed, true)
+  assert.equal(diagnostics?.legacyCanonicalContractUsed, false)
+  assert.equal(diagnostics?.behaviorChanged, false)
+  assert.equal(contractInspection?.fullstackLocalInspectionSourceDiagnostics?.source, 'generated-domain-contract')
+  assert.equal(decision.strategy, 'materialize-fullstack-local-plan')
+  assert.equal(decision.executionMode, 'executor')
+  assert.equal(decision.nextExpectedAction, 'execute-plan')
+}
+
+function runCapabilityPreferredInspectionUsesExplicitContractCase() {
+  const generatedDomainContract = createValidInventedContract()
+  const materializationPlan = buildInspectionReadyMaterializationPlan(generatedDomainContract, {
+    includeExplicitContract: true,
+  })
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'capability-preferred-inspection-explicit-contract',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Respetar contractDefinition explicito antes del contrato universal.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    executionScope: {
+      allowedTargetPaths: materializationPlan.allowedTargetPaths,
+    },
+    materializationPlan,
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  assert.equal(decision.fullstackLocalInspectionSourceDiagnostics?.present, true)
+  assert.equal(
+    decision.fullstackLocalInspectionSourceDiagnostics?.source,
+    'explicit-materialization-contract',
+  )
+  assert.equal(
+    decision.fullstackLocalInspectionSourceDiagnostics?.explicitMaterializationContractUsed,
+    true,
+  )
+  assert.equal(
+    decision.fullstackLocalInspectionSourceDiagnostics?.legacyCanonicalContractUsed,
+    false,
+  )
+}
+
+function runCapabilityPreferredInspectionUsesLegacyFallbackCase() {
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'capability-preferred-inspection-legacy-fallback',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Mantener fallback legacy cuando falta generatedDomainContract.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    executionScope: {
+      allowedTargetPaths: [
+        'generic-ops-local',
+        'generic-ops-local/backend/src/server.js',
+        'generic-ops-local/database/schema.sql',
+      ],
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'generic-ops-local',
+      allowedTargetPaths: [
+        'generic-ops-local',
+        'generic-ops-local/backend/src/server.js',
+        'generic-ops-local/database/schema.sql',
+      ],
+      operations: [
+        { type: 'create-folder', targetPath: 'generic-ops-local' },
+        { type: 'create-or-edit-file', targetPath: 'generic-ops-local/backend/src/server.js' },
+      ],
+    },
+    workspacePath: repoRoot,
+  })
+
+  assert.equal(decision.fullstackLocalInspectionSourceDiagnostics?.present, true)
+  assert.equal(decision.fullstackLocalInspectionSourceDiagnostics?.source, 'legacy-canonical-contract')
+  assert.equal(decision.fullstackLocalInspectionSourceDiagnostics?.fallbackUsed, true)
+  assert.equal(decision.fullstackLocalInspectionSourceDiagnostics?.behaviorChanged, false)
+}
+
+function runCapabilityPreferredInspectionUnavailableCase() {
+  const inspection = observationHarness.inspectFullstackLocalMaterializationContract({
+    goal: '',
+    context: '',
+    decisionKey: 'capability-preferred-inspection-unavailable',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    executionScope: null,
+    materializationPlan: null,
+    localProjectManifest: null,
+    existingProjectDetection: null,
+    generatedDomainContract: null,
+    generatedDomainContractDiagnostics: null,
+    generatedDomainCapabilityProfile: null,
+  })
+  const debugSummary =
+    observationHarness.summarizeFullstackLocalInspectionSourceDiagnosticsForDebug(
+      inspection.fullstackLocalInspectionSourceDiagnostics,
+    )
+
+  assert.equal(inspection?.fullstackLocalInspectionSourceDiagnostics?.source, 'unavailable')
+  assert.equal(inspection?.ok, false)
+  assert.equal(debugSummary.source, 'unavailable')
+}
+
 function createLegacyObservationDecision() {
   return observationHarness.buildBrainDecisionContract({
     decisionKey: 'legacy-observation-plan',
@@ -1953,6 +2159,10 @@ async function main() {
   runLegacyMigrationCandidateReportCandidateCase()
   runLegacyMigrationCandidateReportFallbackNeededCase()
   runLegacyMigrationCandidateReportErrorCase()
+  runCapabilityPreferredInspectionUsesGeneratedContractCase()
+  runCapabilityPreferredInspectionUsesExplicitContractCase()
+  runCapabilityPreferredInspectionUsesLegacyFallbackCase()
+  runCapabilityPreferredInspectionUnavailableCase()
   runPlannerObservationMergeOkCase()
   runPlannerObservationMergeTimeoutCase()
   runPlannerObservationLegacyAlreadyHasContractCase()
@@ -1963,7 +2173,7 @@ async function main() {
   runPlannerObservationDebugSummaryCase()
   await runPlannerObservationNormalizeAvailabilityCase()
   runDiagnosticsDebugPreviewCase()
-  console.log('OK. GeneratedDomainContract smoke paso 56/56 checks.')
+  console.log('OK. GeneratedDomainContract smoke paso 60/60 checks.')
 }
 
 main().catch((error) => {

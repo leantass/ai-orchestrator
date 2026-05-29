@@ -142,6 +142,9 @@ const {
 const {
   normalizeGeneratedDomainContract,
   validateGeneratedDomainContract,
+  deriveAllowedTargetPathsFromContract,
+  deriveRequiredPathGroupsFromContract,
+  deriveForbiddenSearchPatternsFromContract,
   isContractSafeForLocalMaterialization,
   buildGeneratedDomainContractDiagnostics,
   buildGeneratedDomainCapabilityProfile,
@@ -1412,6 +1415,36 @@ function summarizeLegacyMigrationCandidateReportForDebug(report) {
         : 'none',
     warningsCount: Array.isArray(report.warnings) ? report.warnings.length : 0,
     errorsCount: Array.isArray(report.errors) ? report.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
+function summarizeFullstackLocalInspectionSourceDiagnosticsForDebug(diagnostics) {
+  if (!diagnostics || typeof diagnostics !== 'object') {
+    return {
+      present: false,
+      source: 'unavailable',
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(diagnostics.warnings)
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(diagnostics.errors)
+
+  return {
+    present: diagnostics.present === true,
+    source:
+      typeof diagnostics.source === 'string' && diagnostics.source.trim()
+        ? diagnostics.source.trim()
+        : 'unavailable',
+    generatedDomainContractUsed: diagnostics.generatedDomainContractUsed === true,
+    explicitMaterializationContractUsed:
+      diagnostics.explicitMaterializationContractUsed === true,
+    legacyCanonicalContractUsed: diagnostics.legacyCanonicalContractUsed === true,
+    fallbackUsed: diagnostics.fallbackUsed === true,
+    behaviorChanged: diagnostics.behaviorChanged === true,
+    warningsCount: Array.isArray(diagnostics.warnings) ? diagnostics.warnings.length : 0,
+    errorsCount: Array.isArray(diagnostics.errors) ? diagnostics.errors.length : 0,
     ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
     ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
   }
@@ -7993,6 +8026,9 @@ function looksLikeValidFullstackLocalMaterializationPayload({
           materializationPlan,
           localProjectManifest: null,
           existingProjectDetection: null,
+          generatedDomainContract: null,
+          generatedDomainContractDiagnostics: null,
+          generatedDomainCapabilityProfile: null,
         })
 
   if (contractInspection?.ok === true) {
@@ -8188,6 +8224,9 @@ function shouldBlockWebScaffoldExecutionForFullstackRequest({
     materializationPlan,
     localProjectManifest: null,
     existingProjectDetection: null,
+    generatedDomainContract: null,
+    generatedDomainContractDiagnostics: null,
+    generatedDomainCapabilityProfile: null,
   })
   const looksLikeValidFullstackLocalMaterialization =
     looksLikeValidFullstackLocalMaterializationPayload({
@@ -18011,6 +18050,229 @@ function collectMaterializationContractTargetPaths({ executionScope, materializa
   ).map((entry) => normalizePathForComparison(entry).toLocaleLowerCase())
 }
 
+function isUsableFullstackLocalInspectionDefinition(contractDefinition) {
+  return (
+    contractDefinition &&
+    typeof contractDefinition === 'object' &&
+    Array.isArray(contractDefinition.requiredPathGroups) &&
+    contractDefinition.requiredPathGroups.length > 0 &&
+    (Array.isArray(contractDefinition.expectedTargetPaths)
+      ? contractDefinition.expectedTargetPaths.length > 0
+      : contractDefinition.requiredPathGroups.some(
+          (group) => Array.isArray(group?.candidates) && group.candidates.length > 0,
+        ))
+  )
+}
+
+function buildGeneratedDomainContractInspectionDefinition({
+  generatedDomainContract,
+  generatedDomainContractDiagnostics,
+  generatedDomainCapabilityProfile,
+}) {
+  if (!generatedDomainContract || typeof generatedDomainContract !== 'object') {
+    return null
+  }
+
+  try {
+    const resolvedDiagnostics =
+      generatedDomainContractDiagnostics &&
+      typeof generatedDomainContractDiagnostics === 'object' &&
+      generatedDomainContractDiagnostics.present === true
+        ? generatedDomainContractDiagnostics
+        : buildGeneratedDomainContractDiagnostics({ generatedDomainContract }, '.')
+    const normalizedContract =
+      resolvedDiagnostics?.normalizedContract &&
+      typeof resolvedDiagnostics.normalizedContract === 'object'
+        ? resolvedDiagnostics.normalizedContract
+        : generatedDomainContract
+    const capabilityProfile =
+      generatedDomainCapabilityProfile &&
+      typeof generatedDomainCapabilityProfile === 'object'
+        ? generatedDomainCapabilityProfile
+        : buildGeneratedDomainCapabilityProfile(normalizedContract, resolvedDiagnostics)
+    const diagnosticsAreSafe =
+      resolvedDiagnostics?.present === true &&
+      resolvedDiagnostics?.valid === true &&
+      resolvedDiagnostics?.safeForLocalMaterialization === true &&
+      Number(resolvedDiagnostics?.errorsCount || 0) === 0
+    const capabilityProfileIsSufficient =
+      capabilityProfile?.present === true &&
+      capabilityProfile?.built === true &&
+      capabilityProfile?.delivery?.fullstackLocal === true &&
+      capabilityProfile?.materialization?.hasAllowedTargets === true &&
+      capabilityProfile?.materialization?.hasRequiredGroups === true
+
+    if (!diagnosticsAreSafe || !capabilityProfileIsSufficient) {
+      return null
+    }
+
+    const allowedTargetPaths =
+      Array.isArray(resolvedDiagnostics?.allowedTargetPaths) &&
+      resolvedDiagnostics.allowedTargetPaths.length > 0
+        ? resolvedDiagnostics.allowedTargetPaths
+        : deriveAllowedTargetPathsFromContract(normalizedContract, '.')
+    const requiredPathGroups =
+      Array.isArray(resolvedDiagnostics?.requiredPathGroups) &&
+      resolvedDiagnostics.requiredPathGroups.length > 0
+        ? resolvedDiagnostics.requiredPathGroups
+        : deriveRequiredPathGroupsFromContract(normalizedContract)
+    const forbiddenSignals = deriveForbiddenSearchPatternsFromContract(normalizedContract)
+    const rootFolder =
+      normalizeOptionalString(normalizedContract?.root?.targetRoot) ||
+      normalizeOptionalString(normalizedContract?.root?.sourceRoot) ||
+      normalizeOptionalString(normalizedContract?.root?.slug) ||
+      ''
+    const normalizedRequiredPathGroups = requiredPathGroups
+      .map((group, index) => {
+        const candidates = Array.isArray(group)
+          ? group.filter((entry) => typeof entry === 'string' && entry.trim())
+          : Array.isArray(group?.candidates)
+            ? group.candidates.filter((entry) => typeof entry === 'string' && entry.trim())
+            : []
+        if (candidates.length === 0) {
+          return null
+        }
+
+        return {
+          label:
+            normalizeOptionalString(group?.label) ||
+            normalizeOptionalString(candidates[0]) ||
+            `required-path-group-${index + 1}`,
+          candidates,
+        }
+      })
+      .filter(Boolean)
+    const rootBasename = normalizeOptionalString(path.basename(rootFolder))
+    const primaryPersistencePaths = summarizeUniqueExecutorStrings(
+      [
+        normalizeOptionalString(normalizedContract?.database?.schemaFile),
+        normalizeOptionalString(normalizedContract?.database?.seedFile),
+      ].filter(Boolean),
+      16,
+    )
+
+    if (allowedTargetPaths.length === 0 || normalizedRequiredPathGroups.length === 0) {
+      return null
+    }
+
+    return {
+      contractKind: 'generated-domain-contract-fullstack-local',
+      rootFolder: rootFolder || 'fullstack-local',
+      allowedRootBasenames: rootBasename ? [rootBasename] : [],
+      preferredRootBasenames: rootBasename ? [rootBasename] : [],
+      forbiddenSignals: summarizeUniqueExecutorStrings(
+        ['web-scaffold-base', ...forbiddenSignals],
+        64,
+      ),
+      primaryPersistencePaths,
+      jsonPrimaryPersistencePaths: [],
+      requiredPathGroups: normalizedRequiredPathGroups,
+      requiredPaths: normalizedRequiredPathGroups.map((entry) => entry.label),
+      expectedTargetPaths: summarizeUniqueExecutorStrings(
+        normalizedRequiredPathGroups.map((entry) => entry.candidates[0]).filter(Boolean),
+        200,
+      ),
+    }
+  } catch (_error) {
+    return null
+  }
+}
+
+function resolveFullstackLocalInspectionDefinition({
+  rootFolder,
+  fullstackContractProfile,
+  materializationPlan,
+  generatedDomainContract,
+  generatedDomainContractDiagnostics,
+  generatedDomainCapabilityProfile,
+}) {
+  const legacyContractDefinition = rootFolder
+    ? buildCanonicalFullstackLocalMaterializationContract({
+        rootFolder,
+        fullstackContractProfile,
+      })
+    : null
+  const explicitContractDefinition = isUsableFullstackLocalInspectionDefinition(
+    materializationPlan?.contractDefinition,
+  )
+    ? materializationPlan.contractDefinition
+    : null
+  const generatedContractDefinition = buildGeneratedDomainContractInspectionDefinition({
+    generatedDomainContract,
+    generatedDomainContractDiagnostics,
+    generatedDomainCapabilityProfile,
+  })
+  const warnings = []
+  const errors = []
+  const appendWarning = (message) => {
+    const normalized =
+      typeof message === 'string'
+        ? message.trim()
+        : message === null || message === undefined
+          ? ''
+          : String(message).trim()
+    if (!normalized) {
+      return
+    }
+    const bounded =
+      normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`
+    if (!warnings.includes(bounded)) {
+      warnings.push(bounded)
+    }
+  }
+
+  let source = 'unavailable'
+  let contractDefinition = null
+  let reason =
+    'No hay fuente suficiente para inspeccionar el contrato fullstack local materializable.'
+
+  if (explicitContractDefinition) {
+    source = 'explicit-materialization-contract'
+    contractDefinition = explicitContractDefinition
+    reason =
+      'La inspeccion fullstack local reutiliza materializationPlan.contractDefinition explicito.'
+  } else if (generatedContractDefinition) {
+    source = 'generated-domain-contract'
+    contractDefinition = generatedContractDefinition
+    reason =
+      'La inspeccion fullstack local usa generatedDomainContract valido y suficiente antes del fallback legacy.'
+  } else if (isUsableFullstackLocalInspectionDefinition(legacyContractDefinition)) {
+    source = 'legacy-canonical-contract'
+    contractDefinition = legacyContractDefinition
+    reason =
+      'La inspeccion fullstack local sigue usando el contrato canonico legacy como fallback.'
+    if (generatedDomainContractDiagnostics?.present !== true) {
+      appendWarning(
+        'Legacy canonical inspection fallback remained active because generatedDomainContract is unavailable.',
+      )
+    } else {
+      appendWarning(
+        'Legacy canonical inspection fallback remained active because generatedDomainContract was not sufficient for inspection.',
+      )
+    }
+  }
+
+  return {
+    contractDefinition,
+    diagnostics: {
+      present: true,
+      source,
+      behaviorChanged: false,
+      generatedDomainContractUsed: source === 'generated-domain-contract',
+      explicitMaterializationContractUsed:
+        source === 'explicit-materialization-contract',
+      legacyCanonicalContractUsed: source === 'legacy-canonical-contract',
+      fallbackUsed:
+        source === 'legacy-canonical-contract' || source === 'unavailable',
+      reason,
+      warnings,
+      errors,
+      warningsCount: warnings.length,
+      errorsCount: errors.length,
+    },
+  }
+}
+
 function inspectFullstackLocalMaterializationContract({
   goal,
   context,
@@ -18022,6 +18284,9 @@ function inspectFullstackLocalMaterializationContract({
   materializationPlan,
   localProjectManifest,
   existingProjectDetection,
+  generatedDomainContract,
+  generatedDomainContractDiagnostics,
+  generatedDomainCapabilityProfile,
 }) {
   const targetPaths = collectMaterializationContractTargetPaths({
     executionScope,
@@ -18051,22 +18316,62 @@ function inspectFullstackLocalMaterializationContract({
         : [],
     fileHints,
   })
-  const usesCanonicalSpecializedContract =
-    profile.archetype === 'logistics-tracking' ||
-    profile.archetype === 'online-courses' ||
-    detectLogisticsTrackingIntent(
-      normalizeSectorDetectionText([goal, context, fileHints.join(' ')].join(' ')),
-    )
   const selectedDomain =
     profile.archetype === 'online-courses'
       ? 'online-courses'
       : profile.archetype === 'logistics-tracking'
         ? 'logistics-tracking'
         : profile.archetype || 'generic'
-  const contractDefinition = buildCanonicalFullstackLocalMaterializationContract({
-    rootFolder: rootFolder || 'logistics-tracker-local',
+  const contractResolution = resolveFullstackLocalInspectionDefinition({
+    rootFolder,
     fullstackContractProfile: profile,
+    materializationPlan,
+    generatedDomainContract,
+    generatedDomainContractDiagnostics,
+    generatedDomainCapabilityProfile,
   })
+  const contractDefinition = contractResolution.contractDefinition
+  const fullstackLocalInspectionSourceDiagnostics = contractResolution.diagnostics
+  if (!isUsableFullstackLocalInspectionDefinition(contractDefinition)) {
+    return {
+      ok: false,
+      reason: fullstackLocalInspectionSourceDiagnostics.reason,
+      missingRequiredPaths: [],
+      forbiddenSignalsFound: [],
+      usesJsonAsPrimaryPersistence: false,
+      rootPath: rootFolder,
+      contractKind: '',
+      expectedTargetPaths: [],
+      allowedRootBasenames: [],
+      preferredRootBasenames: [],
+      usesLogisticsContract: false,
+      selectedDomain,
+      hasSqlContract: false,
+      hasCanonicalDataModelDoc: false,
+      missingRequiredMarkers: [],
+      contaminationTokens: [],
+      valid: false,
+      fullstackLocalInspectionSourceDiagnostics,
+      legacyDomainResolution: {
+        fullstackLocalArchetype: profile.archetype || '',
+        usedLegacyArchetype:
+          typeof profile.archetype === 'string' &&
+          profile.archetype.trim() &&
+          profile.archetype.trim() !== 'operations',
+        canonicalMaterializationContractKind: '',
+        usedCanonicalMaterializationContract: false,
+        selectedDomain,
+        materializationPlanProfileKey: profile.archetype || '',
+        usedLegacyMaterializationProfile:
+          typeof profile.archetype === 'string' &&
+          profile.archetype.trim() &&
+          profile.archetype.trim() !== 'operations',
+      },
+    }
+  }
+  const usesCanonicalSpecializedContract =
+    contractDefinition.contractKind === 'logistics-fullstack-local' ||
+    contractDefinition.contractKind === 'online-courses-fullstack-local'
   const normalizedTargetSummary = targetPaths.join(' ')
   const resolvedExpectedTargetPaths = contractDefinition.requiredPathGroups
     .map((group) =>
@@ -18088,32 +18393,33 @@ function inspectFullstackLocalMaterializationContract({
     )
     .map((group) => group.label)
   const hasCanonicalDataModelDoc = contractDefinition.requiredPathGroups
-    .find((entry) => entry.label === 'docs/DB_SCHEMA.md|docs/DATA_MODEL.md')
+    .find((entry) => /docs\/db_schema\.md|docs\/data_model\.md/iu.test(String(entry.label || '')))
     ?.candidates.some((entry) =>
       normalizedTargetSummary.includes(
         normalizePathForComparison(entry).toLocaleLowerCase(),
       ),
     )
+  const normalizedPrimaryPersistencePaths = summarizeUniqueExecutorStrings(
+    contractDefinition.primaryPersistencePaths,
+    16,
+  )
+    .map((entry) => normalizePathForComparison(entry).toLocaleLowerCase())
+    .filter(Boolean)
   const hasSqlContract =
-    normalizedTargetSummary.includes(
-      normalizePathForComparison(
-        path.join(rootFolder || 'logistics-tracker-local', 'database', 'schema.sql'),
-      ).toLocaleLowerCase(),
-    ) &&
-    normalizedTargetSummary.includes(
-      normalizePathForComparison(
-        path.join(rootFolder || 'logistics-tracker-local', 'database', 'seed.sql'),
-      ).toLocaleLowerCase(),
-    )
+    normalizedPrimaryPersistencePaths.length > 0 &&
+    normalizedPrimaryPersistencePaths.every((entry) => normalizedTargetSummary.includes(entry))
   const usesJsonAsPrimaryPersistence =
-    contractDefinition.jsonPrimaryPersistencePaths.some((entry) =>
+    summarizeUniqueExecutorStrings(contractDefinition.jsonPrimaryPersistencePaths, 16).some((entry) =>
       targetPaths.some((targetPath) =>
         targetPath.endsWith(normalizePathForComparison(entry).toLocaleLowerCase()),
       ),
     ) && !hasSqlContract
-  const normalizedRootBasename = normalizePathForComparison(path.basename(rootFolder || '')).toLocaleLowerCase()
+  const normalizedRootBasename = normalizePathForComparison(
+    path.basename(rootFolder || contractDefinition.rootFolder || ''),
+  ).toLocaleLowerCase()
   const rootAliasMismatch =
-    usesCanonicalSpecializedContract &&
+    (usesCanonicalSpecializedContract ||
+      fullstackLocalInspectionSourceDiagnostics.source === 'generated-domain-contract') &&
     Array.isArray(contractDefinition.allowedRootBasenames) &&
     contractDefinition.allowedRootBasenames.length > 0 &&
     !contractDefinition.allowedRootBasenames.some(
@@ -18212,7 +18518,7 @@ function inspectFullstackLocalMaterializationContract({
     String(nextExpectedAction || '').trim() === 'execute-plan' &&
     missingRequiredPaths.length === 0 &&
     hasSqlContract &&
-    (!usesCanonicalSpecializedContract || hasCanonicalDataModelDoc) &&
+    (!usesCanonicalSpecializedContract || hasCanonicalDataModelDoc !== false) &&
     forbiddenSignalsFound.length === 0 &&
     !usesJsonAsPrimaryPersistence
 
@@ -18234,6 +18540,7 @@ function inspectFullstackLocalMaterializationContract({
     missingRequiredMarkers: missingRequiredPaths,
     contaminationTokens: forbiddenSignalsFound,
     valid: ok,
+    fullstackLocalInspectionSourceDiagnostics,
     legacyDomainResolution: {
       fullstackLocalArchetype: profile.archetype || '',
       usedLegacyArchetype:
@@ -36895,6 +37202,27 @@ function buildBrainDecisionContract({
     legacyDomainResolutionDiagnostics,
     legacyCapabilityAlignmentDiagnostics,
   })
+  const fullstackLocalInspectionSourceDiagnostics =
+    normalizeOptionalString(strategy).toLocaleLowerCase() ===
+      'materialize-fullstack-local-plan' &&
+    materializationPlan &&
+    typeof materializationPlan === 'object'
+      ? inspectFullstackLocalMaterializationContract({
+          goal: '',
+          context: '',
+          decisionKey: decisionKey || strategy || 'brain-decision',
+          strategy,
+          executionMode,
+          nextExpectedAction: resolvedNextExpectedAction,
+          executionScope: normalizedExecutionScope,
+          materializationPlan,
+          localProjectManifest: enrichedLocalProjectManifest,
+          existingProjectDetection,
+          generatedDomainContract: normalizedGeneratedDomainContract,
+          generatedDomainContractDiagnostics,
+          generatedDomainCapabilityProfile,
+        })?.fullstackLocalInspectionSourceDiagnostics || null
+      : null
 
   return {
     decisionKey: decisionKey || strategy || 'brain-decision',
@@ -37021,6 +37349,10 @@ function buildBrainDecisionContract({
     legacyDomainResolutionDiagnostics,
     legacyCapabilityAlignmentDiagnostics,
     legacyMigrationCandidateReport,
+    ...(fullstackLocalInspectionSourceDiagnostics &&
+    typeof fullstackLocalInspectionSourceDiagnostics === 'object'
+      ? { fullstackLocalInspectionSourceDiagnostics }
+      : {}),
     ...(materializationPlan && typeof materializationPlan === 'object'
       ? { materializationPlan }
       : {}),
@@ -47550,6 +47882,9 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
           materializationPlan: rawDecision?.materializationPlan,
           localProjectManifest: rawDecision?.localProjectManifest,
           existingProjectDetection: rawDecision?.existingProjectDetection,
+          generatedDomainContract: rawDecision?.generatedDomainContract,
+          generatedDomainContractDiagnostics: rawDecision?.generatedDomainContractDiagnostics,
+          generatedDomainCapabilityProfile: rawDecision?.generatedDomainCapabilityProfile,
         })
       : null
   const shouldUseFallbackInvalidMaterializationContract =
@@ -47855,6 +48190,11 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
           materializationPlan: workspaceAwareDecision?.materializationPlan,
           localProjectManifest: workspaceAwareDecision?.localProjectManifest,
           existingProjectDetection: workspaceAwareDecision?.existingProjectDetection,
+          generatedDomainContract: workspaceAwareDecision?.generatedDomainContract,
+          generatedDomainContractDiagnostics:
+            workspaceAwareDecision?.generatedDomainContractDiagnostics,
+          generatedDomainCapabilityProfile:
+            workspaceAwareDecision?.generatedDomainCapabilityProfile,
         })
       : null
   const fallbackCanonicalMaterializationRoot = normalizeWorkspaceProjectRoot(
@@ -50468,6 +50808,18 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
   }
 
   if (
+    brainDecision.fullstackLocalInspectionSourceDiagnostics &&
+    typeof brainDecision.fullstackLocalInspectionSourceDiagnostics === 'object'
+  ) {
+    debugMainLog(
+      'fullstack-local-inspection-source:diagnostics',
+      summarizeFullstackLocalInspectionSourceDiagnosticsForDebug(
+        brainDecision.fullstackLocalInspectionSourceDiagnostics,
+      ),
+    )
+  }
+
+  if (
     brainDecision.generatedDomainContractObservation &&
     typeof brainDecision.generatedDomainContractObservation === 'object'
   ) {
@@ -50580,6 +50932,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
         brainDecision.legacyCapabilityAlignmentDiagnostics,
       legacyMigrationCandidateReport:
         brainDecision.legacyMigrationCandidateReport,
+      fullstackLocalInspectionSourceDiagnostics:
+        brainDecision.fullstackLocalInspectionSourceDiagnostics,
       generatedDomainContractObservation:
         brainDecision.generatedDomainContractObservation,
       existingProjectDetection: brainDecision.existingProjectDetection,
@@ -50656,6 +51010,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       brainDecision.legacyCapabilityAlignmentDiagnostics,
     legacyMigrationCandidateReport:
       brainDecision.legacyMigrationCandidateReport,
+    fullstackLocalInspectionSourceDiagnostics:
+      brainDecision.fullstackLocalInspectionSourceDiagnostics,
     generatedDomainContractObservation:
       brainDecision.generatedDomainContractObservation,
     existingProjectDetection: brainDecision.existingProjectDetection,

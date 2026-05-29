@@ -9230,6 +9230,25 @@ const buildFullstackLocalMaterializationCoherenceIssue = ({
   sourcePlan: ScalableDeliveryPlanContract
   metadata: PlannerExecutionMetadata
 }) => {
+  const normalizedDecisionKey = normalizeOptionalString(metadata?.decisionKey).toLocaleLowerCase()
+  const normalizedStrategy = normalizeOptionalString(metadata?.strategy).toLocaleLowerCase()
+  const normalizedNextExpectedAction = derivePlannerNextExpectedActionForUi(metadata)
+
+  if (
+    normalizedDecisionKey === 'edit-single-existing-file' ||
+    normalizedStrategy === 'edit-single-existing-file'
+  ) {
+    return 'La preparacion fullstack local no puede degradar a edit-single-existing-file. Debe devolver un materialize-fullstack-local-plan revisable y sin aprobacion manual.'
+  }
+
+  if (
+    metadata?.approvalRequired === true ||
+    metadata?.requiresApproval === true ||
+    normalizedNextExpectedAction === 'user-approval'
+  ) {
+    return 'La preparacion fullstack local no debe reabrir user-approval. Debe devolver un materialize-fullstack-local-plan listo para execute-plan.'
+  }
+
   const contractInspection = inspectPreparedFullstackLocalMaterialization({
     metadata,
     sourcePlan,
@@ -9417,6 +9436,7 @@ const buildFullstackLocalMaterializationPrompt = ({
       'No devolver materialize-frontend-project-plan.',
       'No devolver prepare-continuation-action-plan.',
       'No devolver prepare-project-phase-plan.',
+      'No devolver edit-single-existing-file.',
       'Devolver un materialize-fullstack-local-plan ejecutable por el executor local deterministico.',
     ].join(' '),
     context: [
@@ -9434,6 +9454,9 @@ const buildFullstackLocalMaterializationPrompt = ({
       'executionModeEsperado: executor.',
       'nextExpectedActionEsperado: execute-plan.',
       'requiresApprovalEsperado: false.',
+      'No interpretar esta preparacion como una edicion puntual sobre un archivo existente.',
+      'No devolver strategy executor para editar un archivo existente.',
+      'No devolver nextExpectedAction=user-approval.',
       `allowedRootPaths: ${allowedRootPaths.join(', ') || targetRoot}.`,
       targetStructure.length > 0
         ? `targetStructure: ${targetStructure.join(' | ')}.`

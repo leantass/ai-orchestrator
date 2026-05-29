@@ -37,6 +37,9 @@ const {
   shouldIgnoreWorkspaceDirectoryEntry,
 } = require(path.join(repoRoot, 'electron', 'workspace-project-detection.cjs'))
 const {
+  deriveAllowedTargetPathsFromContract,
+  deriveForbiddenSearchPatternsFromContract,
+  deriveRequiredPathGroupsFromContract,
   buildGeneratedDomainCapabilityProfile,
   buildGeneratedDomainContractComparison,
   buildGeneratedDomainContractDiagnostics,
@@ -592,6 +595,9 @@ module.exports = {
     classifyWorkspaceProjectIntent,
     selectBestWorkspaceProjectCandidate,
     shouldIgnoreWorkspaceDirectoryEntry,
+    deriveAllowedTargetPathsFromContract,
+    deriveForbiddenSearchPatternsFromContract,
+    deriveRequiredPathGroupsFromContract,
     buildGeneratedDomainCapabilityProfile,
     buildGeneratedDomainContractComparison,
     buildGeneratedDomainContractDiagnostics,
@@ -659,6 +665,9 @@ function inspectDecisionMaterializationContract({
     materializationPlan: decision?.materializationPlan,
     localProjectManifest: decision?.localProjectManifest,
     existingProjectDetection: decision?.existingProjectDetection,
+    generatedDomainContract: decision?.generatedDomainContract,
+    generatedDomainContractDiagnostics: decision?.generatedDomainContractDiagnostics,
+    generatedDomainCapabilityProfile: decision?.generatedDomainCapabilityProfile,
   })
 }
 
@@ -784,6 +793,7 @@ function buildFullstackLocalMaterializationPrompt({ goal, context = '', scalable
       'No devolver materialize-frontend-project-plan.',
       'No devolver prepare-continuation-action-plan.',
       'No devolver prepare-project-phase-plan.',
+      'No devolver edit-single-existing-file.',
       `Devolver un materialize-fullstack-local-plan ejecutable por el executor local deterministico para "${goal}".`,
     ].join(' '),
     context: [
@@ -799,6 +809,9 @@ function buildFullstackLocalMaterializationPrompt({ goal, context = '', scalable
       'executionModeEsperado: executor.',
       'nextExpectedActionEsperado: execute-plan.',
       'requiresApprovalEsperado: false.',
+      'No interpretar esta preparacion como una edicion puntual sobre un archivo existente.',
+      'No devolver strategy executor para editar un archivo existente.',
+      'No devolver nextExpectedAction=user-approval.',
       allowedRootPaths.length > 0
         ? `allowedRootPaths: ${allowedRootPaths.join(', ')}`
         : '',
@@ -3334,7 +3347,7 @@ async function runTrackingLogisticsCanonicalPreparedContractUiCase() {
   )
   pushFailure(
     failures,
-    /const buildFullstackLocalMaterializationCoherenceIssue =[\s\S]{0,260}?inspectPreparedFullstackLocalMaterialization\(\{[\s\S]{0,120}?metadata,[\s\S]{0,120}?sourcePlan[\s\S]{0,120}?\}\)/.test(
+    /const buildFullstackLocalMaterializationCoherenceIssue =[\s\S]{0,1200}?inspectPreparedFullstackLocalMaterialization\(\{[\s\S]{0,160}?metadata,[\s\S]{0,160}?sourcePlan[\s\S]{0,160}?\}\)/.test(
       appSource,
     ),
     'La coherencia fullstack del renderer debe delegar en la inspeccion canonica del contrato materializable.',
@@ -4996,6 +5009,157 @@ async function runLegacyMigrationCandidateReportPayloadCase() {
   }
 }
 
+async function runFullstackLocalInspectionSourceDiagnosticsPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'neighborhood-clubs', label: 'Neighborhood Clubs' },
+    root: {
+      slug: 'club-nexus-local',
+      sourceRoot: 'club-nexus-local',
+      targetRoot: 'club-nexus-local',
+    },
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['agenda'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['dashboard'] },
+    ],
+    workflows: ['scheduling', 'reporting', 'inventory', 'messaging'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: ['backend/src/routes/clubs.js'],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['clubs', 'members', 'inventory'],
+    },
+    docs: ['docs/API.md', 'docs/ARCHITECTURE.md', 'docs/DB_SCHEMA.md'],
+    scripts: ['scripts/seed-local.js'],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'real-payments'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'database/seed.sql',
+        'frontend/public/index.html',
+        'frontend/admin/index.html',
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['database/seed.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+        { candidates: ['frontend/admin/index.html'] },
+      ],
+    },
+  }
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'fullstack-local-inspection-source-generated-contract',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Preferir generatedDomainContract valido para la inspeccion sin tocar el plan.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    executionScope: {
+      allowedTargetPaths: [
+        'club-nexus-local',
+        'club-nexus-local/backend/src/server.js',
+        'club-nexus-local/database/schema.sql',
+        'club-nexus-local/database/seed.sql',
+        'club-nexus-local/frontend/public/index.html',
+        'club-nexus-local/frontend/admin/index.html',
+        'club-nexus-local/docs/API.md',
+        'club-nexus-local/docs/ARCHITECTURE.md',
+        'club-nexus-local/docs/DB_SCHEMA.md',
+        'club-nexus-local/scripts/seed-local.js',
+      ],
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'club-nexus-local',
+      allowedTargetPaths: [
+        'club-nexus-local',
+        'club-nexus-local/backend/src/server.js',
+        'club-nexus-local/database/schema.sql',
+        'club-nexus-local/database/seed.sql',
+        'club-nexus-local/frontend/public/index.html',
+        'club-nexus-local/frontend/admin/index.html',
+        'club-nexus-local/docs/API.md',
+        'club-nexus-local/docs/ARCHITECTURE.md',
+        'club-nexus-local/docs/DB_SCHEMA.md',
+        'club-nexus-local/scripts/seed-local.js',
+      ],
+      operations: [
+        { type: 'create-folder', targetPath: 'club-nexus-local' },
+        { type: 'create-or-edit-file', targetPath: 'club-nexus-local/backend/src/server.js' },
+        { type: 'create-or-edit-file', targetPath: 'club-nexus-local/database/schema.sql' },
+        { type: 'create-or-edit-file', targetPath: 'club-nexus-local/database/seed.sql' },
+        { type: 'create-or-edit-file', targetPath: 'club-nexus-local/frontend/public/index.html' },
+        { type: 'create-or-edit-file', targetPath: 'club-nexus-local/frontend/admin/index.html' },
+        { type: 'create-or-edit-file', targetPath: 'club-nexus-local/docs/API.md' },
+        { type: 'create-or-edit-file', targetPath: 'club-nexus-local/docs/ARCHITECTURE.md' },
+        { type: 'create-or-edit-file', targetPath: 'club-nexus-local/docs/DB_SCHEMA.md' },
+        { type: 'create-or-edit-file', targetPath: 'club-nexus-local/scripts/seed-local.js' },
+      ],
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.fullstackLocalInspectionSourceDiagnostics?.present === true &&
+      decision.fullstackLocalInspectionSourceDiagnostics?.source ===
+        'generated-domain-contract',
+    'buildBrainDecisionContract debe adjuntar fullstackLocalInspectionSourceDiagnostics usando generated-domain-contract cuando el contrato universal es suficiente.',
+  )
+  pushFailure(
+    failures,
+    decision.fullstackLocalInspectionSourceDiagnostics?.generatedDomainContractUsed === true &&
+      decision.fullstackLocalInspectionSourceDiagnostics?.legacyCanonicalContractUsed !== true,
+    'La inspeccion no debe usar el contrato canonico legacy como fuente primaria cuando generatedDomainContract ya alcanza.',
+  )
+  pushFailure(
+    failures,
+    decision.fullstackLocalInspectionSourceDiagnostics?.behaviorChanged === false,
+    'fullstackLocalInspectionSourceDiagnostics debe declarar behaviorChanged=false.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('fullstack-local-inspection-source:diagnostics') &&
+      mainSource.includes('fullstackLocalInspectionSourceDiagnostics') &&
+      mainSource.includes('buildGeneratedDomainContractInspectionDefinition'),
+    'main.cjs debe adjuntar fullstackLocalInspectionSourceDiagnostics y loguear fullstack-local-inspection-source:diagnostics.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'materialize-fullstack-local-plan' &&
+      decision.executionMode === 'executor' &&
+      decision.nextExpectedAction === 'execute-plan',
+    'La preferencia de inspeccion no debe cambiar strategy, executionMode ni nextExpectedAction.',
+  )
+
+  return {
+    id: 'fullstack-local-inspection-source-diagnostics-payload',
+    label: 'Fullstack local inspection source diagnostics payload',
+    failures,
+  }
+}
+
 async function runGeneratedDomainContractComparisonTechnicalPanelCase() {
   const failures = []
   const appSource = fs.readFileSync(appFilePath, 'utf8')
@@ -6218,6 +6382,18 @@ async function runTrackingLogisticsPrepareFunctionalDeliveryTransitionCase() {
   )
   pushFailure(
     failures,
+    String(decision?.strategy || '').trim() !== 'edit-single-existing-file',
+    'Preparar entrega funcional local no debe degradar a edit-single-existing-file.',
+  )
+  pushFailure(
+    failures,
+    String(decision?.nextExpectedAction || '').trim() !== 'user-approval' &&
+      decision?.requiresApproval !== true &&
+      decision?.approvalRequired !== true,
+    'Preparar entrega funcional local no debe reabrir user-approval.',
+  )
+  pushFailure(
+    failures,
     !(decision?.approvalRequest || decision?.requiresApproval === true),
     'La transicion fullstack no debe reabrir approvals pendientes.',
   )
@@ -6251,6 +6427,40 @@ async function runTrackingLogisticsPrepareFunctionalDeliveryTransitionCase() {
   return {
     id: 'tracking-logistico-fullstack-prepare-functional-delivery-transition',
     label: 'Tracking logistico fullstack prepare functional delivery transition',
+    failures,
+  }
+}
+
+async function runFullstackLocalPreparationPromptGuardsWrongExecutorRouteCase() {
+  const failures = []
+  const appSource = fs.readFileSync(appFilePath, 'utf8')
+  const smokeSource = fs.readFileSync(new URL(import.meta.url), 'utf8')
+
+  pushFailure(
+    failures,
+    /No devolver edit-single-existing-file\./.test(appSource) &&
+      /No devolver nextExpectedAction=user-approval\./.test(appSource) &&
+      /No devolver strategy executor para editar un archivo existente\./.test(appSource),
+    'El prompt de preparacion fullstack local debe bloquear explicitamente edit-single-existing-file y user-approval.',
+  )
+  pushFailure(
+    failures,
+    /La preparacion fullstack local no puede degradar a edit-single-existing-file\./.test(
+      appSource,
+    ) &&
+      /La preparacion fullstack local no debe reabrir user-approval\./.test(appSource),
+    'La validacion del renderer debe rechazar rutas desviadas de edit-single-existing-file o user-approval.',
+  )
+  pushFailure(
+    failures,
+    /No devolver edit-single-existing-file\./.test(smokeSource) &&
+      /No devolver nextExpectedAction=user-approval\./.test(smokeSource),
+    'El helper espejo del smoke debe conservar las mismas restricciones que el prompt real de App.tsx.',
+  )
+
+  return {
+    id: 'fullstack-local-preparation-prompt-guards-wrong-executor-route',
+    label: 'Fullstack local preparation prompt guards wrong executor route',
     failures,
   }
 }
@@ -7531,6 +7741,7 @@ async function main() {
     results.push(await runLegacyDomainResolutionDiagnosticsPayloadCase())
     results.push(await runLegacyCapabilityAlignmentDiagnosticsPayloadCase())
     results.push(await runLegacyMigrationCandidateReportPayloadCase())
+    results.push(await runFullstackLocalInspectionSourceDiagnosticsPayloadCase())
     results.push(await runGeneratedDomainContractComparisonTechnicalPanelCase())
     results.push(await runPrepareContinuationActionPlanShowsPrimaryCtaCase())
     results.push(await runPrepareContinuationActionPlanFallbackCtaCase())
@@ -7553,6 +7764,7 @@ async function main() {
     results.push(await runTrackingLogisticsFullstackEndToEndScenarioCase())
     results.push(await runTrackingLogisticsPostApprovalDoesNotMaterializeWebBaseCase())
     results.push(await runTrackingLogisticsPrepareFunctionalDeliveryTransitionCase())
+    results.push(await runFullstackLocalPreparationPromptGuardsWrongExecutorRouteCase())
     results.push(await runTrackingLogisticsMaterializationContractCase())
     results.push(await runUtf8SurfaceCase())
 
