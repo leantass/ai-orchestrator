@@ -1311,6 +1311,261 @@ function buildGeneratedDomainCapabilityProfile(generatedDomainContract, diagnost
   }
 }
 
+function buildGeneratedDomainMaterializationShadowPlan(
+  generatedDomainContract,
+  diagnostics = null,
+  capabilityProfile = null,
+) {
+  const emptyPlan = {
+    shadowPlanVersion: '0.1',
+    present: false,
+    built: false,
+    status: 'not-available',
+    source: 'generated-domain-contract',
+    behaviorChanged: false,
+    root: null,
+    sourceRoot: null,
+    targetRoot: null,
+    allowedTargetPathsCount: 0,
+    requiredPathGroupsCount: 0,
+    frontendSurfacesCount: 0,
+    backendPresent: false,
+    databasePresent: false,
+    docsPresent: false,
+    scriptsPresent: false,
+    safety: {
+      safeForLocalMaterialization: false,
+      forbidsSecrets: false,
+      forbidsDeploy: false,
+      forbidsRealPayments: false,
+      forbidsExternalServices: false,
+      forbidsDocker: false,
+    },
+    plannedBuckets: {
+      frontend: { present: false, count: 0 },
+      backend: { present: false, count: 0 },
+      database: { present: false, count: 0 },
+      shared: { present: false, count: 0 },
+      docs: { present: false, count: 0 },
+      scripts: { present: false, count: 0 },
+      validation: { present: false, count: 0 },
+    },
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  if (!generatedDomainContract || typeof generatedDomainContract !== 'object') {
+    return emptyPlan
+  }
+
+  try {
+    const normalizedContract =
+      diagnostics?.normalizedContract && typeof diagnostics.normalizedContract === 'object'
+        ? diagnostics.normalizedContract
+        : normalizeGeneratedDomainContract(generatedDomainContract)
+    const resolvedDiagnostics =
+      diagnostics && typeof diagnostics === 'object'
+        ? diagnostics
+        : buildGeneratedDomainContractDiagnostics(
+            { generatedDomainContract: normalizedContract },
+            '.',
+          )
+    const resolvedCapabilityProfile =
+      capabilityProfile && typeof capabilityProfile === 'object'
+        ? capabilityProfile
+        : buildGeneratedDomainCapabilityProfile(normalizedContract, resolvedDiagnostics)
+    const derivedFilePaths = deriveContractFilePaths(normalizedContract)
+    const derivedRequiredPathGroups =
+      Array.isArray(resolvedDiagnostics.requiredPathGroups) &&
+      resolvedDiagnostics.requiredPathGroups.length > 0
+        ? resolvedDiagnostics.requiredPathGroups
+        : deriveRequiredPathGroupsFromContract(normalizedContract)
+    const frontendPaths = unique(
+      [
+        ...normalizedContract.frontendSurfaces.flatMap((surface) => {
+          const surfacePath = asNonEmptyString(asObject(surface).path)
+          return surfacePath ? [surfacePath, `${surfacePath}/index.html`, `${surfacePath}/app.js`] : []
+        }),
+        ...derivedFilePaths.filter((entry) => normalizeRelativePath(entry).startsWith('frontend/')),
+      ].map((entry) => normalizeRelativePath(entry)).filter(Boolean),
+    )
+    const backendPaths = unique(
+      [
+        normalizedContract.backend.packageFile,
+        normalizedContract.backend.entryFile,
+        ...asArray(normalizedContract.backend.routes).map((entry) => asNonEmptyString(asObject(entry).path)),
+        ...asArray(normalizedContract.backend.services).map((entry) => asNonEmptyString(asObject(entry).path)),
+        ...asArray(normalizedContract.backend.modules).map((entry) => asNonEmptyString(asObject(entry).path)),
+        ...derivedFilePaths.filter((entry) => normalizeRelativePath(entry).startsWith('backend/')),
+      ].map((entry) => normalizeRelativePath(entry)).filter(Boolean),
+    )
+    const databasePaths = unique(
+      [
+        normalizedContract.database.schemaFile,
+        normalizedContract.database.seedFile,
+        ...derivedFilePaths.filter((entry) => normalizeRelativePath(entry).startsWith('database/')),
+      ].map((entry) => normalizeRelativePath(entry)).filter(Boolean),
+    )
+    const sharedPaths = unique(
+      [
+        ...asArray(asObject(normalizedContract.shared).files),
+        ...derivedFilePaths.filter((entry) => normalizeRelativePath(entry).startsWith('shared/')),
+      ].map((entry) => normalizeRelativePath(entry)).filter(Boolean),
+    )
+    const docsPaths = unique(
+      [
+        ...asArray(normalizedContract.docs),
+        ...derivedFilePaths.filter((entry) => normalizeRelativePath(entry).startsWith('docs/')),
+      ].map((entry) => normalizeRelativePath(entry)).filter(Boolean),
+    )
+    const scriptsPaths = unique(
+      [
+        ...asArray(normalizedContract.scripts),
+        ...derivedFilePaths.filter((entry) => normalizeRelativePath(entry).startsWith('scripts/')),
+      ].map((entry) => normalizeRelativePath(entry)).filter(Boolean),
+    )
+    const validationPaths = unique(
+      derivedRequiredPathGroups
+        .flatMap((group) =>
+          (Array.isArray(group) ? group : asArray(asObject(group).candidates)).map((entry) =>
+            normalizeRelativePath(entry),
+          ),
+        )
+        .filter(Boolean),
+    )
+
+    const shadowPlan = {
+      ...emptyPlan,
+      present: true,
+      built: true,
+      status: 'built',
+      root: asNonEmptyString(normalizedContract.root.slug, null),
+      sourceRoot: asNonEmptyString(normalizedContract.root.sourceRoot, null),
+      targetRoot: asNonEmptyString(normalizedContract.root.targetRoot, null),
+      allowedTargetPathsCount: Number.isInteger(resolvedDiagnostics.allowedTargetPathsCount)
+        ? resolvedDiagnostics.allowedTargetPathsCount
+        : 0,
+      requiredPathGroupsCount: Number.isInteger(resolvedDiagnostics.requiredPathGroupsCount)
+        ? resolvedDiagnostics.requiredPathGroupsCount
+        : derivedRequiredPathGroups.length,
+      frontendSurfacesCount: asArray(normalizedContract.frontendSurfaces).length,
+      backendPresent: resolvedCapabilityProfile?.backend?.present === true,
+      databasePresent: resolvedCapabilityProfile?.database?.present === true,
+      docsPresent: docsPaths.length > 0,
+      scriptsPresent: scriptsPaths.length > 0,
+      safety: {
+        safeForLocalMaterialization:
+          resolvedCapabilityProfile?.safety?.safeForLocalMaterialization === true,
+        forbidsSecrets: resolvedCapabilityProfile?.safety?.forbidsSecrets === true,
+        forbidsDeploy: resolvedCapabilityProfile?.safety?.forbidsDeploy === true,
+        forbidsRealPayments: resolvedCapabilityProfile?.safety?.forbidsRealPayments === true,
+        forbidsExternalServices:
+          resolvedCapabilityProfile?.safety?.forbidsExternalServices === true,
+        forbidsDocker: resolvedCapabilityProfile?.safety?.forbidsDocker === true,
+      },
+      plannedBuckets: {
+        frontend: { present: frontendPaths.length > 0, count: frontendPaths.length },
+        backend: { present: backendPaths.length > 0, count: backendPaths.length },
+        database: { present: databasePaths.length > 0, count: databasePaths.length },
+        shared: { present: sharedPaths.length > 0, count: sharedPaths.length },
+        docs: { present: docsPaths.length > 0, count: docsPaths.length },
+        scripts: { present: scriptsPaths.length > 0, count: scriptsPaths.length },
+        validation: {
+          present: validationPaths.length > 0,
+          count: derivedRequiredPathGroups.length,
+        },
+      },
+      warnings: [],
+      errors: [],
+    }
+
+    asArray(resolvedDiagnostics.warnings).forEach((entry) => {
+      pushUniqueMessage(shadowPlan.warnings, entry)
+    })
+
+    if (resolvedDiagnostics.valid !== true) {
+      pushUniqueMessage(
+        shadowPlan.warnings,
+        'El generatedDomainContract no es valido para construir un shadow plan materializable confiable.',
+      )
+    }
+    if (resolvedDiagnostics.safeForLocalMaterialization !== true) {
+      pushUniqueMessage(
+        shadowPlan.warnings,
+        'El generatedDomainContract no esta marcado como seguro para un shadow plan local.',
+      )
+    }
+    if (resolvedCapabilityProfile?.delivery?.fullstackLocal !== true) {
+      pushUniqueMessage(
+        shadowPlan.warnings,
+        'El generatedDomainCapabilityProfile no declara fullstack-local como delivery principal.',
+      )
+    }
+    if (shadowPlan.allowedTargetPathsCount <= 0) {
+      pushUniqueMessage(
+        shadowPlan.warnings,
+        'El generatedDomainContract no expone allowedTargetPaths suficientes para el shadow plan.',
+      )
+    }
+    if (shadowPlan.requiredPathGroupsCount <= 0) {
+      pushUniqueMessage(
+        shadowPlan.warnings,
+        'El generatedDomainContract no expone requiredPathGroups suficientes para el shadow plan.',
+      )
+    }
+    if (!shadowPlan.plannedBuckets.frontend.present) {
+      pushUniqueMessage(
+        shadowPlan.warnings,
+        'El shadow plan no detecta una superficie frontend comparable.',
+      )
+    }
+    if (!shadowPlan.plannedBuckets.backend.present) {
+      pushUniqueMessage(
+        shadowPlan.warnings,
+        'El shadow plan no detecta una capa backend comparable.',
+      )
+    }
+    if (!shadowPlan.plannedBuckets.database.present) {
+      pushUniqueMessage(
+        shadowPlan.warnings,
+        'El shadow plan no detecta una capa database comparable.',
+      )
+    }
+
+    shadowPlan.warningsCount = shadowPlan.warnings.length
+    shadowPlan.errorsCount = shadowPlan.errors.length
+    shadowPlan.built =
+      resolvedDiagnostics.valid === true &&
+      resolvedDiagnostics.safeForLocalMaterialization === true &&
+      resolvedCapabilityProfile?.delivery?.fullstackLocal === true &&
+      shadowPlan.allowedTargetPathsCount > 0 &&
+      shadowPlan.requiredPathGroupsCount > 0 &&
+      shadowPlan.plannedBuckets.backend.present === true &&
+      shadowPlan.plannedBuckets.database.present === true
+    shadowPlan.status =
+      shadowPlan.errors.length > 0
+        ? 'error'
+        : shadowPlan.built
+          ? 'built'
+          : 'partial'
+
+    return shadowPlan
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : asNonEmptyString(String(error), 'error')
+
+    return {
+      ...emptyPlan,
+      present: true,
+      status: 'error',
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
 function tokenizeComparisonText(value) {
   return unique(
     asNonEmptyString(value)
@@ -1873,6 +2128,7 @@ module.exports = {
   isContractSafeForLocalMaterialization,
   buildGeneratedDomainContractDiagnostics,
   buildGeneratedDomainCapabilityProfile,
+  buildGeneratedDomainMaterializationShadowPlan,
   buildGeneratedDomainContractComparison,
   extractGeneratedDomainContractCandidate,
 }

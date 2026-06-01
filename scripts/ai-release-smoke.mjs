@@ -28,6 +28,7 @@ const {
 } = require(path.join(repoRoot, 'electron', 'workspace-project-detection.cjs'))
 const {
   buildGeneratedDomainCapabilityProfile,
+  buildGeneratedDomainMaterializationShadowPlan,
   buildGeneratedDomainContractComparison,
   buildGeneratedDomainContractDiagnostics,
   extractGeneratedDomainContractCandidate,
@@ -176,6 +177,7 @@ module.exports = {
     selectBestWorkspaceProjectCandidate,
     shouldIgnoreWorkspaceDirectoryEntry,
     buildGeneratedDomainCapabilityProfile,
+    buildGeneratedDomainMaterializationShadowPlan,
     buildGeneratedDomainContractComparison,
     buildGeneratedDomainContractDiagnostics,
     extractGeneratedDomainContractCandidate,

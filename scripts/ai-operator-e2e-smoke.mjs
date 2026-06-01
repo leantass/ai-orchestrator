@@ -41,6 +41,7 @@ const {
   deriveForbiddenSearchPatternsFromContract,
   deriveRequiredPathGroupsFromContract,
   buildGeneratedDomainCapabilityProfile,
+  buildGeneratedDomainMaterializationShadowPlan,
   buildGeneratedDomainContractComparison,
   buildGeneratedDomainContractDiagnostics,
   extractGeneratedDomainContractCandidate,
@@ -599,6 +600,7 @@ module.exports = {
     deriveForbiddenSearchPatternsFromContract,
     deriveRequiredPathGroupsFromContract,
     buildGeneratedDomainCapabilityProfile,
+    buildGeneratedDomainMaterializationShadowPlan,
     buildGeneratedDomainContractComparison,
     buildGeneratedDomainContractDiagnostics,
     extractGeneratedDomainContractCandidate,
@@ -5050,6 +5052,13 @@ async function runFullstackLocalInspectionSourceDiagnosticsPayloadCase() {
         'frontend/public/index.html',
         'frontend/admin/index.html',
       ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'database/seed.sql' },
+        { targetPath: 'frontend/public/index.html' },
+        { targetPath: 'frontend/admin/index.html' },
+      ],
     },
     validation: {
       requiredPathGroups: [
@@ -5156,6 +5165,895 @@ async function runFullstackLocalInspectionSourceDiagnosticsPayloadCase() {
   return {
     id: 'fullstack-local-inspection-source-diagnostics-payload',
     label: 'Fullstack local inspection source diagnostics payload',
+    failures,
+  }
+}
+
+async function runGeneratedDomainMaterializationShadowPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'community-libraries', label: 'Community Libraries' },
+    root: {
+      slug: 'community-libraries-local',
+      sourceRoot: 'community-libraries-local',
+      targetRoot: 'community-libraries-local',
+    },
+    roles: [],
+    entities: ['books', 'loans', 'members'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+    ],
+    workflows: ['reporting', 'inventory', 'messaging'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/books.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['books', 'loans', 'members'],
+    },
+    shared: {
+      files: [],
+    },
+    docs: ['docs/API.md', 'docs/ARCHITECTURE.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'database/seed.sql',
+        'frontend/public/index.html',
+        'frontend/admin/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'database/seed.sql' },
+        { targetPath: 'frontend/public/index.html' },
+        { targetPath: 'frontend/admin/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['database/seed.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+        { candidates: ['frontend/admin/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-shadow-aligned-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Comparar shadow plan universal contra materializationPlan legacy sin ejecutar archivos.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'community-libraries-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'community-libraries-local'
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationShadowPlan?.present === true &&
+      decision.generatedDomainMaterializationShadowPlan?.status === 'built',
+    'buildBrainDecisionContract debe adjuntar generatedDomainMaterializationShadowPlan cuando el contrato universal es suficiente.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationShadowComparison?.present === true &&
+      decision.generatedDomainMaterializationShadowComparison?.status === 'aligned',
+    'buildBrainDecisionContract debe adjuntar generatedDomainMaterializationShadowComparison alineado cuando el plan legacy es compatible.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationShadowComparison?.recommendation ===
+      'prepare-shadow-preference' &&
+      decision.generatedDomainMaterializationShadowComparison?.behaviorChanged === false,
+    'La comparacion shadow vs legacy debe permanecer observacional y recomendar prepare-shadow-preference solo como preview.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generated-domain-materialization-shadow:plan') &&
+      mainSource.includes('generated-domain-materialization-shadow:comparison') &&
+      mainSource.includes('generatedDomainMaterializationShadowPlan') &&
+      mainSource.includes('generatedDomainMaterializationShadowComparison'),
+    'main.cjs debe adjuntar y loguear generated-domain-materialization-shadow:plan y generated-domain-materialization-shadow:comparison.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'materialize-fullstack-local-plan' &&
+      decision.executionMode === 'executor' &&
+      decision.nextExpectedAction === 'execute-plan',
+    'El shadow materialization plan no debe cambiar strategy, executionMode ni nextExpectedAction.',
+  )
+
+  return {
+    id: 'generated-domain-materialization-shadow-payload',
+    label: 'Generated domain materialization shadow payload',
+    failures,
+  }
+}
+
+async function runGeneratedDomainMaterializationPreferenceGatePayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'urban-gardens', label: 'Urban Gardens' },
+    root: {
+      slug: 'urban-gardens-local',
+      sourceRoot: 'urban-gardens-local',
+      targetRoot: 'urban-gardens-local',
+    },
+    roles: [],
+    entities: ['plots', 'members', 'harvests'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['plots'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['dashboard'] },
+    ],
+    workflows: ['reporting', 'inventory', 'messaging'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/plots.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['plots', 'members', 'harvests'],
+    },
+    shared: {
+      files: [],
+    },
+    docs: ['docs/API.md', 'docs/ARCHITECTURE.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'database/seed.sql',
+        'frontend/public/index.html',
+        'frontend/admin/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'database/seed.sql' },
+        { targetPath: 'frontend/public/index.html' },
+        { targetPath: 'frontend/admin/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['database/seed.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+        { candidates: ['frontend/admin/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-preference-gate-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Evaluar la puerta observacional de preferencia futura sin tocar el plan real.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'urban-gardens-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type: targetPath === 'urban-gardens-local' ? 'create-folder' : 'create-or-edit-file',
+        targetPath,
+      })),
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationPreferenceGate?.present === true &&
+      decision.generatedDomainMaterializationPreferenceGate?.evaluated === true,
+    'buildBrainDecisionContract debe adjuntar generatedDomainMaterializationPreferenceGate al payload.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationPreferenceGate?.status === 'eligible' &&
+      decision.generatedDomainMaterializationPreferenceGate?.eligibility
+        ?.canPreferShadowInFuture === true,
+    'El preference gate debe marcar eligible cuando shadow plan y comparison estan alineados.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationPreferenceGate?.recommendation?.action ===
+      'prepare-preference-switch' &&
+      decision.generatedDomainMaterializationPreferenceGate?.behaviorChanged === false,
+    'generatedDomainMaterializationPreferenceGate debe permanecer observacional y recomendar prepare-preference-switch sin cambiar runtime.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generated-domain-materialization-preference:gate') &&
+      mainSource.includes('generatedDomainMaterializationPreferenceGate') &&
+      mainSource.includes('buildGeneratedDomainMaterializationPreferenceGate'),
+    'main.cjs debe adjuntar y loguear generated-domain-materialization-preference:gate.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'materialize-fullstack-local-plan' &&
+      decision.executionMode === 'executor' &&
+      decision.nextExpectedAction === 'execute-plan',
+    'El preference gate no debe cambiar strategy, executionMode ni nextExpectedAction.',
+  )
+
+  return {
+    id: 'generated-domain-materialization-preference-gate-payload',
+    label: 'Generated domain materialization preference gate payload',
+    failures,
+  }
+}
+
+async function runGeneratedDomainMaterializationPreferenceDecisionPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'community-libraries', label: 'Community Libraries' },
+    root: {
+      slug: 'community-libraries-local',
+      sourceRoot: 'community-libraries-local',
+      targetRoot: 'community-libraries-local',
+    },
+    roles: [],
+    entities: ['books', 'loans', 'members'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+    ],
+    workflows: ['reporting', 'inventory', 'messaging'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/books.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['books', 'loans', 'members'],
+    },
+    shared: { files: [] },
+    docs: ['docs/API.md', 'docs/ARCHITECTURE.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'database/seed.sql',
+        'frontend/public/index.html',
+        'frontend/admin/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'database/seed.sql' },
+        { targetPath: 'frontend/public/index.html' },
+        { targetPath: 'frontend/admin/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['database/seed.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+        { candidates: ['frontend/admin/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-preference-decision-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason:
+      'Simular la decision de preferencia shadow sin activar el cambio real de materialization source.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: 'community-libraries-local',
+    targetRoot: 'community-libraries-local',
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      intent: 'manage catalog, loans and local reporting',
+      deliveryLevel: 'fullstack-local',
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'community-libraries-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'community-libraries-local'
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationPreferenceDecision?.present === true &&
+      decision.generatedDomainMaterializationPreferenceDecision?.evaluated === true,
+    'buildBrainDecisionContract debe adjuntar generatedDomainMaterializationPreferenceDecision al payload.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationPreferenceDecision?.status ===
+      'would-prefer-shadow' &&
+      decision.generatedDomainMaterializationPreferenceDecision?.enabled === false &&
+      decision.generatedDomainMaterializationPreferenceDecision?.dryRun
+        ?.wouldPreferShadow === true,
+    'La decision dry-run debe marcar would-prefer-shadow sin activar la preferencia real.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationPreferenceDecision?.actual
+      ?.materializationSource === 'legacy' &&
+      decision.generatedDomainMaterializationPreferenceDecision?.behaviorChanged === false,
+    'La decision dry-run debe mantener legacy como fuente real actual y seguir siendo observacional.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generated-domain-materialization-preference:decision') &&
+      mainSource.includes('generatedDomainMaterializationPreferenceDecision') &&
+      mainSource.includes('buildGeneratedDomainMaterializationPreferenceDecision'),
+    'main.cjs debe adjuntar y loguear generated-domain-materialization-preference:decision.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'materialize-fullstack-local-plan' &&
+      decision.executionMode === 'executor' &&
+      decision.nextExpectedAction === 'execute-plan',
+    'La decision dry-run no debe cambiar strategy, executionMode ni nextExpectedAction.',
+  )
+
+  return {
+    id: 'generated-domain-materialization-preference-decision-payload',
+    label: 'Generated domain materialization preference decision payload',
+    failures,
+  }
+}
+
+async function runGeneratedDomainMaterializationShadowDiffPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'community-libraries', label: 'Community Libraries' },
+    root: {
+      slug: 'community-libraries-local',
+      sourceRoot: 'community-libraries-local',
+      targetRoot: 'community-libraries-local',
+    },
+    roles: [],
+    entities: ['books', 'loans', 'members'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+    ],
+    workflows: ['reporting', 'inventory', 'messaging'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/books.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['books', 'loans', 'members'],
+    },
+    shared: {
+      files: [],
+    },
+    docs: ['docs/API.md', 'docs/ARCHITECTURE.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'database/seed.sql',
+        'frontend/public/index.html',
+        'frontend/admin/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'database/seed.sql' },
+        { targetPath: 'frontend/public/index.html' },
+        { targetPath: 'frontend/admin/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['database/seed.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+        { candidates: ['frontend/admin/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-shadow-diff-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Comparar en detalle shadow plan y legacy materializationPlan sin ejecutar archivos.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'community-libraries-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'community-libraries-local'
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationShadowDiff?.present === true &&
+      decision.generatedDomainMaterializationShadowDiff?.compared === true,
+    'buildBrainDecisionContract debe adjuntar generatedDomainMaterializationShadowDiff al payload.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationShadowDiff?.status === 'compared' &&
+      decision.generatedDomainMaterializationShadowDiff?.allowedTargets?.overlapCount > 0 &&
+      decision.generatedDomainMaterializationShadowDiff?.requiredGroups?.overlapCount > 0,
+    'El shadow diff debe reflejar solapamiento real entre shadow plan y materializationPlan legacy compatible.',
+  )
+  pushFailure(
+    failures,
+    (decision.generatedDomainMaterializationShadowDiff?.recommendation?.action ===
+      'prepare-preference-switch' ||
+      decision.generatedDomainMaterializationShadowDiff?.recommendation?.action === 'observe') &&
+      decision.generatedDomainMaterializationShadowDiff?.behaviorChanged === false,
+    'generatedDomainMaterializationShadowDiff debe seguir siendo observacional y no cambiar runtime.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generated-domain-materialization-shadow:diff') &&
+      mainSource.includes('generatedDomainMaterializationShadowDiff') &&
+      mainSource.includes('buildGeneratedDomainMaterializationShadowDiff'),
+    'main.cjs debe adjuntar y loguear generated-domain-materialization-shadow:diff.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'materialize-fullstack-local-plan' &&
+      decision.executionMode === 'executor' &&
+      decision.nextExpectedAction === 'execute-plan',
+    'El shadow diff no debe cambiar strategy, executionMode ni nextExpectedAction.',
+  )
+
+  return {
+    id: 'generated-domain-materialization-shadow-diff-payload',
+    label: 'Generated domain materialization shadow diff payload',
+    failures,
+  }
+}
+
+async function runDomainConsistencyDiagnosticsPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'gestion-merenderos', label: 'Gestion de merenderos barriales' },
+    root: {
+      slug: 'merenderos-local',
+      sourceRoot: 'merenderos-local',
+      targetRoot: 'merenderos-local',
+    },
+    roles: [],
+    entities: ['beneficiaries', 'shifts', 'stock'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Publico', path: 'frontend/public', screens: ['dashboard'] },
+    ],
+    workflows: ['reporting', 'inventory', 'messaging'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/beneficiaries.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['beneficiaries', 'shifts', 'stock_entries'],
+    },
+    shared: { files: [] },
+    docs: ['docs/API.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: ['backend/src/server.js', 'frontend/public/index.html'],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'frontend/public/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['frontend/public/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'merenderos-arch-plan-v1',
+    strategy: 'product-architecture-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-plan',
+    reason: 'Evitar fuga de metadata residual entre dominios consecutivos.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    selectedDomain: 'community-services',
+    selectedContractKind: 'generic-fullstack-local',
+    sourceRoot: 'merenderos-local',
+    targetRoot: 'merenderos-local',
+    productArchitecture: {
+      productType: 'fullstack-local-app',
+      domain: 'gestion escolar',
+      coreModules: ['alumnos', 'familias'],
+    },
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'gestion escolar',
+      intent: 'gestionar seguimiento escolar y comunicaciones',
+      deliveryLevel: 'fullstack-local',
+    },
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      reason: 'Metadata residual de un dominio anterior.',
+      allowedRootPaths: ['fullstack-local-gestion-escolar'],
+      targetStructure: ['fullstack-local-gestion-escolar/'],
+      directories: ['fullstack-local-gestion-escolar/frontend/admin'],
+      filesToCreate: [{ path: 'fullstack-local-gestion-escolar/frontend/admin/index.html' }],
+    },
+    projectPhaseExecutionPlan: {
+      phaseId: 'frontend-mock-flow',
+      projectRoot: 'fullstack-local-gestion-escolar',
+      goal: 'Continuar una fase escolar previa.',
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'fullstack-local-gestion-escolar',
+      domain: 'gestion escolar',
+      projectType: 'fullstack-local-app',
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.domainConsistencyDiagnostics?.present === true &&
+      decision.domainConsistencyDiagnostics?.status === 'mismatch' &&
+      Array.isArray(decision.domainConsistencyDiagnostics?.mismatches) &&
+      decision.domainConsistencyDiagnostics.mismatches.length > 0,
+    'buildBrainDecisionContract debe adjuntar domainConsistencyDiagnostics cuando detecta metadata residual incompatible.',
+  )
+  pushFailure(
+    failures,
+    !decision.productArchitecture &&
+      !decision.projectBlueprint &&
+      !decision.scalableDeliveryPlan &&
+      !decision.projectPhaseExecutionPlan &&
+      !decision.localProjectManifest,
+    'La metadata residual incompatible no debe sobrevivir como metadata activa del run actual.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('domain-consistency:diagnostics') &&
+      mainSource.includes('domainConsistencyDiagnostics') &&
+      mainSource.includes('buildDomainConsistencyDiagnostics'),
+    'main.cjs debe adjuntar y loguear domain-consistency:diagnostics.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'product-architecture-plan' &&
+      decision.executionMode === 'planner-only' &&
+      decision.nextExpectedAction === 'review-plan',
+    'La proteccion de consistencia de dominio no debe cambiar strategy, executionMode ni nextExpectedAction.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationShadowPlan?.present === true &&
+      decision.generatedDomainMaterializationPreferenceGate?.present === true &&
+      decision.generatedDomainMaterializationShadowDiff?.present === true,
+    'Shadow plan, gate y diff deben seguir presentes aunque se descarte metadata residual incompatible.',
+  )
+
+  return {
+    id: 'domain-consistency-diagnostics-payload',
+    label: 'Domain consistency diagnostics payload',
+    failures,
+  }
+}
+
+async function runDomainConsistencySemanticMismatchPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: {
+      slug: 'comedores-comunitarios',
+      label: 'App de gestion de comedores comunitarios barriales',
+    },
+    root: {
+      slug: 'comedores-comunitarios-local',
+      sourceRoot: 'comedores-comunitarios-local',
+      targetRoot: 'comedores-comunitarios-local',
+    },
+    roles: ['coordinacion', 'voluntariado', 'referente territorial'],
+    entities: ['comedores', 'beneficiarios', 'raciones', 'insumos'],
+    states: {},
+    workflows: ['serving-shifts', 'inventory', 'community-reporting'],
+    frontendSurfaces: [
+      { key: 'public', label: 'Publico', path: 'frontend/public', screens: ['overview'] },
+    ],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/beneficiaries.js' }],
+      services: [{ path: 'backend/src/services/inventory.js' }],
+      modules: [],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['comedores', 'beneficiarios', 'raciones', 'insumos'],
+    },
+    shared: { files: [] },
+    docs: ['docs/API.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: ['backend/src/server.js', 'frontend/public/index.html'],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'frontend/public/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['frontend/public/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'comedores-arch-plan-v1',
+    strategy: 'product-architecture-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-plan',
+    reason: 'Evitar fuga semantica residual en metadata visible del blueprint.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    selectedDomain: 'community-services',
+    selectedContractKind: 'generic-fullstack-local',
+    sourceRoot: 'comedores-comunitarios-local',
+    targetRoot: 'comedores-comunitarios-local',
+    productArchitecture: {
+      productType: 'fullstack-local-app',
+      domain: 'app de gestion de comedores comunitarios barriales',
+      roles: ['pacientes', 'profesionales', 'operador interno'],
+      coreModules: ['agenda clinica', 'profesionales', 'turnos'],
+      dataEntities: ['pacientes', 'profesionales', 'especialidades', 'turnos'],
+      keyFlows: ['agendar turnos', 'asignar profesionales'],
+    },
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'app de gestion de comedores comunitarios barriales',
+      intent: 'gestionar operacion local del comedor comunitario',
+      deliveryLevel: 'fullstack-local',
+      roles: ['pacientes', 'profesionales', 'operador interno'],
+      modules: ['agenda clinica', 'profesionales', 'turnos'],
+      entities: ['pacientes', 'profesionales', 'especialidades', 'turnos'],
+      coreFlows: ['agendar turnos', 'asignar profesionales'],
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.domainConsistencyDiagnostics?.present === true &&
+      decision.domainConsistencyDiagnostics?.status === 'mismatch' &&
+      decision.domainConsistencyDiagnostics?.semanticStatus === 'mismatch' &&
+      Array.isArray(decision.domainConsistencyDiagnostics?.discardedBlocks) &&
+      decision.domainConsistencyDiagnostics.discardedBlocks.length >= 2,
+    'domainConsistencyDiagnostics debe detectar y marcar mismatch semantico cuando el contenido visible no coincide con el contrato actual.',
+  )
+  pushFailure(
+    failures,
+    !decision.productArchitecture && !decision.projectBlueprint,
+    'La metadata visible semanticamente incompatible no debe sobrevivir como productArchitecture o projectBlueprint actual.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('semanticStatus') &&
+      mainSource.includes('semanticOverlapScore') &&
+      mainSource.includes('discardedBlocks') &&
+      mainSource.includes('domain-consistency:diagnostics'),
+    'main.cjs debe exponer diagnostico semantico dentro de domainConsistencyDiagnostics y seguir logueandolo.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'product-architecture-plan' &&
+      decision.executionMode === 'planner-only' &&
+      decision.nextExpectedAction === 'review-plan',
+    'El saneamiento semantico no debe cambiar strategy, executionMode ni nextExpectedAction.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationShadowPlan?.present === true &&
+      decision.generatedDomainMaterializationPreferenceGate?.present === true &&
+      decision.generatedDomainMaterializationShadowDiff?.present === true &&
+      decision.generatedDomainMaterializationPreferenceDecision?.present === true,
+    'Shadow plan, gate, diff y decision dry-run deben seguir presentes aunque se descarte metadata semantica incompatible.',
+  )
+
+  return {
+    id: 'domain-consistency-semantic-mismatch-payload',
+    label: 'Domain consistency semantic mismatch payload',
     failures,
   }
 }
@@ -7742,6 +8640,12 @@ async function main() {
     results.push(await runLegacyCapabilityAlignmentDiagnosticsPayloadCase())
     results.push(await runLegacyMigrationCandidateReportPayloadCase())
     results.push(await runFullstackLocalInspectionSourceDiagnosticsPayloadCase())
+    results.push(await runGeneratedDomainMaterializationShadowPayloadCase())
+    results.push(await runGeneratedDomainMaterializationPreferenceGatePayloadCase())
+    results.push(await runGeneratedDomainMaterializationPreferenceDecisionPayloadCase())
+    results.push(await runGeneratedDomainMaterializationShadowDiffPayloadCase())
+    results.push(await runDomainConsistencyDiagnosticsPayloadCase())
+    results.push(await runDomainConsistencySemanticMismatchPayloadCase())
     results.push(await runGeneratedDomainContractComparisonTechnicalPanelCase())
     results.push(await runPrepareContinuationActionPlanShowsPrimaryCtaCase())
     results.push(await runPrepareContinuationActionPlanFallbackCtaCase())

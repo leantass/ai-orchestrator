@@ -47,6 +47,7 @@ const {
 } = require(path.join(repoRoot, 'electron', 'project-context.cjs'))
 const {
   buildGeneratedDomainCapabilityProfile,
+  buildGeneratedDomainMaterializationShadowPlan,
   buildGeneratedDomainContractComparison,
   buildGeneratedDomainContractDiagnostics,
   extractGeneratedDomainContractCandidate,
@@ -1114,6 +1115,7 @@ module.exports = {
     shouldIgnoreWorkspaceDirectoryEntry,
     buildUnavailableContextHubPack,
     buildGeneratedDomainCapabilityProfile,
+    buildGeneratedDomainMaterializationShadowPlan,
     buildGeneratedDomainContractComparison,
     buildGeneratedDomainContractDiagnostics,
     extractGeneratedDomainContractCandidate,

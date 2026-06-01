@@ -20,6 +20,7 @@ const {
   isContractSafeForLocalMaterialization,
   buildGeneratedDomainContractDiagnostics,
   buildGeneratedDomainCapabilityProfile,
+  buildGeneratedDomainMaterializationShadowPlan,
   buildGeneratedDomainContractComparison,
 } = require('../electron/generated-domain-contract.cjs')
 const {
@@ -65,6 +66,7 @@ module.exports = {
   buildLegacyCapabilityAlignmentDiagnostics,
   buildLegacyMigrationCandidateReport,
   buildGeneratedDomainCapabilityProfile,
+  buildGeneratedDomainMaterializationShadowPlan,
   inspectFullstackLocalMaterializationContract,
   buildGeneratedDomainContractObservationSystemPrompt,
   classifyGeneratedDomainContractObservationThrownError,
@@ -77,6 +79,11 @@ module.exports = {
   summarizeGeneratedDomainContractDiagnosticsForDebug,
   summarizeGeneratedDomainContractObservationForDebug,
   summarizeFullstackLocalInspectionSourceDiagnosticsForDebug,
+  summarizeGeneratedDomainMaterializationShadowPlanForDebug,
+  summarizeGeneratedDomainMaterializationShadowComparisonForDebug,
+  summarizeGeneratedDomainMaterializationShadowDiffForDebug,
+  summarizeGeneratedDomainMaterializationPreferenceDecisionForDebug,
+  summarizeDomainConsistencyDiagnosticsForDebug,
   summarizeLegacyCapabilityAlignmentDiagnosticsForDebug,
   summarizeLegacyMigrationCandidateReportForDebug,
   summarizeLegacyDomainResolutionDiagnosticsForDebug,
@@ -107,6 +114,7 @@ module.exports = {
     isContractSafeForLocalMaterialization,
     buildGeneratedDomainContractDiagnostics,
     buildGeneratedDomainCapabilityProfile,
+    buildGeneratedDomainMaterializationShadowPlan,
     buildGeneratedDomainContractComparison,
     extractGeneratedDomainContractCandidate:
       require('../electron/generated-domain-contract.cjs').extractGeneratedDomainContractCandidate,
@@ -1626,6 +1634,835 @@ function runCapabilityPreferredInspectionUnavailableCase() {
   assert.equal(debugSummary.source, 'unavailable')
 }
 
+function runGeneratedDomainMaterializationShadowComparisonWithoutLegacyCase() {
+  const generatedDomainContract = createValidInventedContract()
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-shadow-without-legacy',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    reason: 'Construir shadow plan observacional sin plan legacy comparable.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const shadowPlan = decision.generatedDomainMaterializationShadowPlan
+  const comparison = decision.generatedDomainMaterializationShadowComparison
+
+  assert.equal(shadowPlan?.present, true)
+  assert.equal(shadowPlan?.status, 'built')
+  assert.equal(comparison?.present, true)
+  assert.equal(comparison?.compared, false)
+  assert.equal(comparison?.status, 'partial')
+  assert.equal(comparison?.recommendation, 'observe')
+  assert.equal(comparison?.behaviorChanged, false)
+  assert.equal(decision.strategy, 'scalable-delivery-plan')
+  assert.equal(decision.executionMode, 'planner-only')
+  assert.equal(decision.nextExpectedAction, 'review-scalable-delivery')
+}
+
+function runGeneratedDomainMaterializationShadowComparisonAlignedCase() {
+  const generatedDomainContract = createValidInventedContract()
+  const materializationPlan = buildInspectionReadyMaterializationPlan(generatedDomainContract)
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-shadow-aligned',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Comparar shadow plan universal con materializationPlan compatible.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    executionScope: {
+      allowedTargetPaths: materializationPlan.allowedTargetPaths,
+    },
+    materializationPlan,
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const comparison = decision.generatedDomainMaterializationShadowComparison
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainMaterializationShadowComparisonForDebug(
+      comparison,
+    )
+
+  assert.equal(decision.generatedDomainMaterializationShadowPlan?.status, 'built')
+  assert.equal(comparison?.present, true)
+  assert.equal(comparison?.compared, true)
+  assert.equal(comparison?.status, 'aligned')
+  assert.equal(comparison?.migrationCandidate, true)
+  assert.equal(comparison?.recommendation, 'prepare-shadow-preference')
+  assert.equal(comparison?.behaviorChanged, false)
+  assert.equal(debugSummary.status, 'aligned')
+}
+
+function runGeneratedDomainMaterializationShadowComparisonKeepLegacyCase() {
+  const generatedDomainContract = createSparseDeliveryLevelContract('safe-first-delivery')
+  const materializationPlan = {
+    version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+    kind: 'fullstack-local-materialization',
+    strategy: 'materialize-fullstack-local-plan',
+    projectRoot: 'sparse-contract-local',
+    allowedTargetPaths: [
+      'sparse-contract-local',
+      'sparse-contract-local/backend/src/server.js',
+      'sparse-contract-local/database/schema.sql',
+    ],
+    operations: [
+      { type: 'create-folder', targetPath: 'sparse-contract-local' },
+      {
+        type: 'create-or-edit-file',
+        targetPath: 'sparse-contract-local/backend/src/server.js',
+      },
+      {
+        type: 'create-or-edit-file',
+        targetPath: 'sparse-contract-local/database/schema.sql',
+      },
+    ],
+  }
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-shadow-keep-legacy',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Mantener legacy cuando el shadow plan universal es incompleto.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    executionScope: {
+      allowedTargetPaths: materializationPlan.allowedTargetPaths,
+    },
+    materializationPlan,
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const comparison = decision.generatedDomainMaterializationShadowComparison
+
+  assert.equal(decision.generatedDomainMaterializationShadowPlan?.status, 'partial')
+  assert.equal(comparison?.present, true)
+  assert.equal(comparison?.status, 'partial')
+  assert.equal(comparison?.recommendation, 'keep-legacy')
+  assert.equal(comparison?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationShadowComparisonWithoutContractCase() {
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-shadow-no-contract',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Mantener legacy cuando no existe generatedDomainContract.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    executionScope: {
+      allowedTargetPaths: [
+        'generic-ops-local',
+        'generic-ops-local/backend/src/server.js',
+        'generic-ops-local/database/schema.sql',
+      ],
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'generic-ops-local',
+      allowedTargetPaths: [
+        'generic-ops-local',
+        'generic-ops-local/backend/src/server.js',
+        'generic-ops-local/database/schema.sql',
+      ],
+      operations: [
+        { type: 'create-folder', targetPath: 'generic-ops-local' },
+        {
+          type: 'create-or-edit-file',
+          targetPath: 'generic-ops-local/backend/src/server.js',
+        },
+      ],
+    },
+    workspacePath: repoRoot,
+  })
+  const shadowPlan = decision.generatedDomainMaterializationShadowPlan
+  const comparison = decision.generatedDomainMaterializationShadowComparison
+
+  assert.equal(shadowPlan?.present, false)
+  assert.equal(shadowPlan?.status, 'not-available')
+  assert.equal(comparison?.present, true)
+  assert.equal(comparison?.status, 'partial')
+  assert.equal(comparison?.recommendation, 'keep-legacy')
+  assert.equal(comparison?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationPreferenceGateEligibleCase() {
+  const generatedDomainContract = createValidInventedContract()
+  const materializationPlan = buildInspectionReadyMaterializationPlan(generatedDomainContract)
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-preference-gate-eligible',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Evaluar elegibilidad futura del shadow plan cuando la comparacion esta alineada.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    executionScope: {
+      allowedTargetPaths: materializationPlan.allowedTargetPaths,
+    },
+    materializationPlan,
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const gate = decision.generatedDomainMaterializationPreferenceGate
+
+  assert.equal(gate?.present, true)
+  assert.equal(gate?.evaluated, true)
+  assert.equal(gate?.status, 'eligible')
+  assert.equal(gate?.eligibility?.canPreferShadowInFuture, true)
+  assert.equal(gate?.eligibility?.blockedByDivergence, false)
+  assert.equal(gate?.recommendation?.action, 'prepare-preference-switch')
+  assert.equal(gate?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationPreferenceGateNeedsMoreEvidenceCase() {
+  const generatedDomainContract = createValidInventedContract()
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-preference-gate-needs-evidence',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    reason: 'Evaluar gate sin materializationPlan legacy comparable.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const gate = decision.generatedDomainMaterializationPreferenceGate
+
+  assert.equal(gate?.present, true)
+  assert.equal(gate?.status, 'not-ready')
+  assert.equal(gate?.eligibility?.needsMoreEvidence, true)
+  assert.equal(gate?.eligibility?.canPreferShadowInFuture, false)
+  assert.equal(gate?.recommendation?.action, 'observe')
+  assert.equal(gate?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationPreferenceGateNotReadyCase() {
+  const generatedDomainContract = createSparseDeliveryLevelContract('safe-first-delivery')
+  const materializationPlan = {
+    version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+    kind: 'fullstack-local-materialization',
+    strategy: 'materialize-fullstack-local-plan',
+    projectRoot: 'sparse-contract-local',
+    allowedTargetPaths: [
+      'sparse-contract-local',
+      'sparse-contract-local/backend/src/server.js',
+      'sparse-contract-local/database/schema.sql',
+    ],
+    operations: [
+      { type: 'create-folder', targetPath: 'sparse-contract-local' },
+      {
+        type: 'create-or-edit-file',
+        targetPath: 'sparse-contract-local/backend/src/server.js',
+      },
+    ],
+  }
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-preference-gate-not-ready',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'El shadow plan aun no tiene cobertura suficiente para preferencia futura.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    executionScope: {
+      allowedTargetPaths: materializationPlan.allowedTargetPaths,
+    },
+    materializationPlan,
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const gate = decision.generatedDomainMaterializationPreferenceGate
+
+  assert.equal(gate?.present, true)
+  assert.equal(gate?.status, 'not-ready')
+  assert.equal(
+    gate?.eligibility?.blockedByMissingRequiredGroups === true ||
+      gate?.eligibility?.blockedByMissingAllowedTargets === true ||
+      gate?.eligibility?.needsLegacyFallback === true,
+    true,
+  )
+  assert.equal(gate?.eligibility?.canPreferShadowInFuture, false)
+  assert.equal(
+    gate?.recommendation?.action === 'keep-legacy' || gate?.recommendation?.action === 'observe',
+    true,
+  )
+  assert.equal(gate?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationPreferenceGateBlockedCase() {
+  const generatedDomainContract = createValidInventedContract()
+  const materializationPlan = {
+    version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+    kind: 'fullstack-local-materialization',
+    strategy: 'materialize-fullstack-local-plan',
+    projectRoot: 'legacy-mismatch-root',
+    allowedTargetPaths: [
+      'legacy-mismatch-root',
+      'legacy-mismatch-root/backend/src/server.js',
+      'legacy-mismatch-root/database/schema.sql',
+    ],
+    operations: [
+      { type: 'create-folder', targetPath: 'legacy-mismatch-root' },
+      {
+        type: 'create-or-edit-file',
+        targetPath: 'legacy-mismatch-root/backend/src/server.js',
+      },
+      {
+        type: 'create-or-edit-file',
+        targetPath: 'legacy-mismatch-root/database/schema.sql',
+      },
+    ],
+  }
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-preference-gate-blocked',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Detectar divergencia entre shadow plan y legacy plan.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    executionScope: {
+      allowedTargetPaths: materializationPlan.allowedTargetPaths,
+    },
+    materializationPlan,
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const gate = decision.generatedDomainMaterializationPreferenceGate
+
+  assert.equal(gate?.present, true)
+  assert.equal(gate?.status, 'blocked')
+  assert.equal(gate?.eligibility?.blockedByDivergence, true)
+  assert.equal(gate?.eligibility?.canPreferShadowInFuture, false)
+  assert.equal(gate?.recommendation?.action, 'investigate')
+  assert.equal(gate?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationShadowDiffWithoutLegacyCase() {
+  const generatedDomainContract = createValidInventedContract()
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-shadow-diff-without-legacy',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    reason: 'Comparar shadow plan sin legacy materializationPlan disponible.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const diff = decision.generatedDomainMaterializationShadowDiff
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainMaterializationShadowDiffForDebug(diff)
+
+  assert.equal(diff?.present, true)
+  assert.equal(diff?.compared, false)
+  assert.equal(diff?.status, 'partial')
+  assert.equal(diff?.recommendation?.action, 'observe')
+  assert.equal(diff?.warningsCount > 0, true)
+  assert.equal(diff?.behaviorChanged, false)
+  assert.equal(debugSummary.status, 'partial')
+}
+
+function runGeneratedDomainMaterializationShadowDiffComparedCase() {
+  const generatedDomainContract = createValidInventedContract()
+  const materializationPlan = buildInspectionReadyMaterializationPlan(generatedDomainContract)
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-shadow-diff-compared',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Comparar shadow plan con un legacy materializationPlan compatible.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    executionScope: {
+      allowedTargetPaths: materializationPlan.allowedTargetPaths,
+    },
+    materializationPlan,
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const diff = decision.generatedDomainMaterializationShadowDiff
+
+  assert.equal(diff?.present, true)
+  assert.equal(diff?.compared, true)
+  assert.equal(diff?.status, 'compared')
+  assert.equal(diff?.allowedTargets?.overlapCount > 0, true)
+  assert.equal(diff?.requiredGroups?.overlapCount > 0, true)
+  assert.equal(
+    diff?.recommendation?.action === 'prepare-preference-switch' ||
+      diff?.recommendation?.action === 'observe',
+    true,
+  )
+  assert.equal(diff?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationShadowDiffDivergentCase() {
+  const generatedDomainContract = createValidInventedContract()
+  const materializationPlan = {
+    version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+    kind: 'fullstack-local-materialization',
+    strategy: 'materialize-fullstack-local-plan',
+    projectRoot: 'legacy-shadow-diff-mismatch',
+    allowedTargetPaths: [
+      'legacy-shadow-diff-mismatch',
+      'legacy-shadow-diff-mismatch/backend/src/server.js',
+      'legacy-shadow-diff-mismatch/README.md',
+    ],
+    operations: [
+      { type: 'create-folder', targetPath: 'legacy-shadow-diff-mismatch' },
+      {
+        type: 'create-or-edit-file',
+        targetPath: 'legacy-shadow-diff-mismatch/backend/src/server.js',
+      },
+      {
+        type: 'create-or-edit-file',
+        targetPath: 'legacy-shadow-diff-mismatch/README.md',
+        nextContent: 'ACCESS_TOKEN=legacy',
+      },
+    ],
+  }
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-shadow-diff-divergent',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Detectar divergencia entre shadow plan y materializationPlan legacy.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    executionScope: {
+      allowedTargetPaths: materializationPlan.allowedTargetPaths,
+    },
+    materializationPlan,
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const diff = decision.generatedDomainMaterializationShadowDiff
+
+  assert.equal(diff?.present, true)
+  assert.equal(diff?.status, 'divergent')
+  assert.equal(diff?.recommendation?.action, 'investigate')
+  assert.equal(diff?.roots?.aligned, false)
+  assert.equal(diff?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationShadowDiffWithoutContractCase() {
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-shadow-diff-no-contract',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Mantener legacy cuando no hay shadow plan universal para diff.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    executionScope: {
+      allowedTargetPaths: [
+        'generic-shadow-diff-local',
+        'generic-shadow-diff-local/backend/src/server.js',
+      ],
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'generic-shadow-diff-local',
+      allowedTargetPaths: [
+        'generic-shadow-diff-local',
+        'generic-shadow-diff-local/backend/src/server.js',
+      ],
+      operations: [
+        { type: 'create-folder', targetPath: 'generic-shadow-diff-local' },
+        {
+          type: 'create-or-edit-file',
+          targetPath: 'generic-shadow-diff-local/backend/src/server.js',
+        },
+      ],
+    },
+    workspacePath: repoRoot,
+  })
+  const diff = decision.generatedDomainMaterializationShadowDiff
+
+  assert.equal(diff?.present, true)
+  assert.equal(diff?.status, 'partial')
+  assert.equal(diff?.recommendation?.action, 'keep-legacy')
+  assert.equal(diff?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationPreferenceDecisionWouldPreferShadowCase() {
+  const generatedDomainContract = createValidInventedContract()
+  const materializationPlan = buildInspectionReadyMaterializationPlan(generatedDomainContract)
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-preference-decision-shadow',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Simular la preferencia shadow sin activarla cuando la evidencia estructural esta alineada.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: 'carnivorous-plants-local',
+    targetRoot: 'carnivorous-plants-local',
+    productArchitecture: {
+      productType: 'fullstack-local-app',
+      domain: 'carnivorous plant nursery',
+      coreModules: ['plants', 'visits', 'reports'],
+    },
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'carnivorous plant nursery',
+      intent: 'manage visits, care routines and local reports',
+      deliveryLevel: 'fullstack-local',
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'carnivorous-plants-local',
+      domain: 'carnivorous plant nursery',
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths: materializationPlan.allowedTargetPaths,
+    },
+    materializationPlan,
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const dryRun = decision.generatedDomainMaterializationPreferenceDecision
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainMaterializationPreferenceDecisionForDebug(
+      dryRun,
+    )
+
+  assert.equal(dryRun?.present, true)
+  assert.equal(dryRun?.evaluated, true)
+  assert.equal(dryRun?.mode, 'dry-run')
+  assert.equal(dryRun?.enabled, false)
+  assert.equal(dryRun?.status, 'would-prefer-shadow')
+  assert.equal(dryRun?.dryRun?.wouldPreferShadow, true)
+  assert.equal(dryRun?.actual?.materializationSource, 'legacy')
+  assert.equal(dryRun?.inputs?.domainConsistencyStatus, 'consistent')
+  assert.equal(dryRun?.recommendation?.action, 'enable-shadow-preference-later')
+  assert.equal(dryRun?.behaviorChanged, false)
+  assert.equal(debugSummary.status, 'would-prefer-shadow')
+}
+
+function runGeneratedDomainMaterializationPreferenceDecisionWouldKeepLegacyCase() {
+  const generatedDomainContract = createValidInventedContract()
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-preference-decision-legacy',
+    strategy: 'scalable-delivery-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-scalable-delivery',
+    reason: 'Mantener legacy en dry-run cuando falta evidencia comparativa.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: 'carnivorous-plants-local',
+    targetRoot: 'carnivorous-plants-local',
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'carnivorous plant nursery',
+      intent: 'manage visits, care routines and local reports',
+      deliveryLevel: 'fullstack-local',
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'carnivorous-plants-local',
+      domain: 'carnivorous plant nursery',
+      projectType: 'fullstack-local-app',
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const dryRun = decision.generatedDomainMaterializationPreferenceDecision
+
+  assert.equal(dryRun?.present, true)
+  assert.equal(dryRun?.status, 'would-keep-legacy')
+  assert.equal(dryRun?.dryRun?.wouldKeepLegacy, true)
+  assert.equal(dryRun?.recommendation?.action, 'observe')
+  assert.equal(dryRun?.actual?.materializationSource, 'none')
+  assert.equal(dryRun?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationPreferenceDecisionBlockedCase() {
+  const generatedDomainContract = createValidInventedContract()
+  const materializationPlan = {
+    version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+    kind: 'fullstack-local-materialization',
+    strategy: 'materialize-fullstack-local-plan',
+    projectRoot: 'legacy-preference-decision-mismatch',
+    allowedTargetPaths: [
+      'legacy-preference-decision-mismatch',
+      'legacy-preference-decision-mismatch/backend/src/server.js',
+      'legacy-preference-decision-mismatch/README.md',
+    ],
+    operations: [
+      { type: 'create-folder', targetPath: 'legacy-preference-decision-mismatch' },
+      {
+        type: 'create-or-edit-file',
+        targetPath: 'legacy-preference-decision-mismatch/backend/src/server.js',
+      },
+      {
+        type: 'create-or-edit-file',
+        targetPath: 'legacy-preference-decision-mismatch/README.md',
+      },
+    ],
+  }
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-preference-decision-blocked',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Detectar bloqueo observacional cuando hay divergencia estructural.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    generatedDomainContract,
+    executionScope: {
+      allowedTargetPaths: materializationPlan.allowedTargetPaths,
+    },
+    materializationPlan,
+    workspacePath: repoRoot,
+  })
+  const dryRun = decision.generatedDomainMaterializationPreferenceDecision
+
+  assert.equal(dryRun?.present, true)
+  assert.equal(dryRun?.status, 'blocked')
+  assert.equal(dryRun?.dryRun?.wouldBlock, true)
+  assert.equal(dryRun?.recommendation?.action, 'investigate')
+  assert.equal(dryRun?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationPreferenceDecisionNotAvailableCase() {
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-preference-decision-not-available',
+    strategy: 'product-architecture-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-plan',
+    reason: 'Mantener el dry-run inactivo cuando no hay insumos estructurales suficientes.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    workspacePath: repoRoot,
+  })
+  const dryRun = decision.generatedDomainMaterializationPreferenceDecision
+
+  assert.equal(dryRun?.status, 'not-available')
+  assert.equal(dryRun?.enabled, false)
+  assert.equal(dryRun?.behaviorChanged, false)
+}
+
+function runDomainConsistencyDiagnosticsDiscardResidualMetadataCase() {
+  const generatedDomainContract = {
+    ...createValidInventedContract(),
+    domain: {
+      label: 'Gestion de merenderos barriales',
+      slug: 'gestion-merenderos',
+      summary: 'Gestion local de merenderos, asistencia, stock y reportes comunitarios.',
+    },
+    root: {
+      slug: 'merenderos-local',
+      sourceRoot: 'merenderos-local',
+      targetRoot: 'merenderos-local',
+    },
+  }
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'merenderos-arch-plan-v1',
+    strategy: 'product-architecture-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-plan',
+    reason: 'Construir una arquitectura local para un servicio comunitario nuevo.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    selectedDomain: 'community-services',
+    selectedContractKind: 'generic-fullstack-local',
+    sourceRoot: 'merenderos-local',
+    targetRoot: 'merenderos-local',
+    productArchitecture: {
+      productType: 'crm local',
+      domain: 'gestion escolar',
+      coreModules: ['alumnos', 'familias', 'seguimiento'],
+    },
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'gestion escolar',
+      intent: 'gestionar seguimiento escolar y comunicaciones',
+      deliveryLevel: 'fullstack-local',
+    },
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      reason: 'Plan legado residual de un dominio anterior.',
+      allowedRootPaths: ['fullstack-local-gestion-escolar'],
+      targetStructure: ['fullstack-local-gestion-escolar/'],
+      directories: ['fullstack-local-gestion-escolar/frontend/admin'],
+      filesToCreate: [{ path: 'fullstack-local-gestion-escolar/frontend/admin/index.html' }],
+    },
+    projectPhaseExecutionPlan: {
+      phaseId: 'frontend-mock-flow',
+      projectRoot: 'fullstack-local-gestion-escolar',
+      goal: 'Continuar la maqueta escolar previa.',
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'fullstack-local-gestion-escolar',
+      domain: 'gestion escolar',
+      projectType: 'fullstack-local-app',
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const diagnostics = decision.domainConsistencyDiagnostics
+  const debugSummary =
+    observationHarness.summarizeDomainConsistencyDiagnosticsForDebug(diagnostics)
+
+  assert.equal(diagnostics?.present, true)
+  assert.equal(diagnostics?.checked, true)
+  assert.equal(diagnostics?.status, 'mismatch')
+  assert.equal(diagnostics?.currentRootSlug, 'merenderos-local')
+  assert.equal(diagnostics?.visibleRoot, 'fullstack-local-gestion-escolar')
+  assert.equal((diagnostics?.mismatches || []).length > 0, true)
+  assert.equal(debugSummary.status, 'mismatch')
+  assert.equal(Boolean(decision.productArchitecture), false)
+  assert.equal(Boolean(decision.projectBlueprint), false)
+  assert.equal(Boolean(decision.scalableDeliveryPlan), false)
+  assert.equal(Boolean(decision.projectPhaseExecutionPlan), false)
+  assert.equal(Boolean(decision.localProjectManifest), false)
+  assert.equal(decision.strategy, 'product-architecture-plan')
+  assert.equal(decision.executionMode, 'planner-only')
+  assert.equal(decision.nextExpectedAction, 'review-plan')
+  assert.equal(decision.generatedDomainMaterializationShadowPlan?.present, true)
+  assert.equal(decision.generatedDomainMaterializationPreferenceGate?.present, true)
+  assert.equal(decision.generatedDomainMaterializationShadowDiff?.present, true)
+}
+
+function runDomainConsistencyDiagnosticsSemanticMismatchCase() {
+  const generatedDomainContract = {
+    ...createValidInventedContract(),
+    domain: {
+      label: 'App de gestion de comedores comunitarios barriales',
+      slug: 'comedores-comunitarios',
+      summary: 'Gestion local de comedores, raciones, beneficiarios e insumos comunitarios.',
+    },
+    root: {
+      slug: 'comedores-comunitarios-local',
+      sourceRoot: 'comedores-comunitarios-local',
+      targetRoot: 'comedores-comunitarios-local',
+    },
+    roles: ['coordinacion', 'voluntariado', 'referente territorial'],
+    entities: ['comedores', 'beneficiarios', 'raciones', 'insumos'],
+    workflows: ['serving-shifts', 'inventory', 'community-reporting'],
+  }
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'comedores-arch-plan-v1',
+    strategy: 'product-architecture-plan',
+    executionMode: 'planner-only',
+    nextExpectedAction: 'review-plan',
+    reason: 'Construir una arquitectura local para una red de comedores comunitarios.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    selectedDomain: 'community-services',
+    selectedContractKind: 'generic-fullstack-local',
+    sourceRoot: 'comedores-comunitarios-local',
+    targetRoot: 'comedores-comunitarios-local',
+    productArchitecture: {
+      productType: 'fullstack-local-app',
+      domain: 'app de gestion de comedores comunitarios barriales',
+      roles: ['pacientes', 'profesionales', 'operador interno'],
+      coreModules: ['agenda clinica', 'profesionales', 'turnos'],
+      dataEntities: ['pacientes', 'profesionales', 'especialidades', 'turnos'],
+      keyFlows: ['agendar turnos', 'asignar profesionales', 'confirmar asistencia'],
+    },
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'app de gestion de comedores comunitarios barriales',
+      intent: 'gestionar operacion local del comedor comunitario',
+      deliveryLevel: 'fullstack-local',
+      roles: ['pacientes', 'profesionales', 'operador interno'],
+      modules: ['agenda clinica', 'profesionales', 'turnos'],
+      entities: ['pacientes', 'profesionales', 'especialidades', 'turnos'],
+      coreFlows: ['agendar turnos', 'asignar profesionales'],
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const diagnostics = decision.domainConsistencyDiagnostics
+  const debugSummary =
+    observationHarness.summarizeDomainConsistencyDiagnosticsForDebug(diagnostics)
+
+  assert.equal(diagnostics?.present, true)
+  assert.equal(diagnostics?.status, 'mismatch')
+  assert.equal(diagnostics?.semanticChecked, true)
+  assert.equal(diagnostics?.semanticStatus, 'mismatch')
+  assert.equal((diagnostics?.incompatibleBlocks || []).includes('productArchitecture'), true)
+  assert.equal((diagnostics?.incompatibleBlocks || []).includes('projectBlueprint'), true)
+  assert.equal((diagnostics?.discardedBlocks || []).includes('productArchitecture'), true)
+  assert.equal((diagnostics?.discardedBlocks || []).includes('projectBlueprint'), true)
+  assert.equal(typeof diagnostics?.semanticOverlapScore, 'number')
+  assert.equal(diagnostics?.semanticOverlapScore < 0.2, true)
+  assert.equal(debugSummary.semanticStatus, 'mismatch')
+  assert.equal(Boolean(decision.productArchitecture), false)
+  assert.equal(Boolean(decision.projectBlueprint), false)
+  assert.equal(decision.strategy, 'product-architecture-plan')
+  assert.equal(decision.executionMode, 'planner-only')
+  assert.equal(decision.nextExpectedAction, 'review-plan')
+}
+
 function createLegacyObservationDecision() {
   return observationHarness.buildBrainDecisionContract({
     decisionKey: 'legacy-observation-plan',
@@ -1983,6 +2820,62 @@ function runGeneratedDomainCapabilityProfilePartialCase() {
   assert.equal(profile.errorsCount, 0)
 }
 
+function runGeneratedDomainMaterializationShadowPlanBuiltCase() {
+  const contract = createValidInventedContract()
+  const diagnostics = buildGeneratedDomainContractDiagnostics(
+    { generatedDomainContract: contract },
+    repoRoot,
+  )
+  const capabilityProfile = buildGeneratedDomainCapabilityProfile(contract, diagnostics)
+  const shadowPlan = buildGeneratedDomainMaterializationShadowPlan(
+    contract,
+    diagnostics,
+    capabilityProfile,
+  )
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainMaterializationShadowPlanForDebug(shadowPlan)
+
+  assert.equal(shadowPlan.present, true)
+  assert.equal(shadowPlan.built, true)
+  assert.equal(shadowPlan.status, 'built')
+  assert.equal(shadowPlan.behaviorChanged, false)
+  assert.equal(shadowPlan.backendPresent, true)
+  assert.equal(shadowPlan.databasePresent, true)
+  assert.ok(shadowPlan.allowedTargetPathsCount > 0)
+  assert.ok(shadowPlan.requiredPathGroupsCount > 0)
+  assert.equal(debugSummary.present, true)
+  assert.equal(debugSummary.status, 'built')
+}
+
+function runGeneratedDomainMaterializationShadowPlanNotAvailableCase() {
+  const shadowPlan = buildGeneratedDomainMaterializationShadowPlan(null, null, null)
+
+  assert.equal(shadowPlan.present, false)
+  assert.equal(shadowPlan.built, false)
+  assert.equal(shadowPlan.status, 'not-available')
+  assert.equal(shadowPlan.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationShadowPlanPartialCase() {
+  const contract = createSparseDeliveryLevelContract('safe-first-delivery')
+  const diagnostics = buildGeneratedDomainContractDiagnostics(
+    { generatedDomainContract: contract },
+    repoRoot,
+  )
+  const capabilityProfile = buildGeneratedDomainCapabilityProfile(contract, diagnostics)
+  const shadowPlan = buildGeneratedDomainMaterializationShadowPlan(
+    contract,
+    diagnostics,
+    capabilityProfile,
+  )
+
+  assert.equal(shadowPlan.present, true)
+  assert.equal(shadowPlan.built, false)
+  assert.equal(shadowPlan.status, 'partial')
+  assert.equal(shadowPlan.behaviorChanged, false)
+  assert.ok(shadowPlan.warningsCount > 0)
+}
+
 async function runPlannerObservationNormalizeAvailabilityCase() {
   assert.equal(
     typeof observationHarness.observeGeneratedDomainContractForPlannerDecision,
@@ -2147,6 +3040,9 @@ async function main() {
   runGeneratedDomainCapabilityProfileBuiltCase()
   runGeneratedDomainCapabilityProfileNotAvailableCase()
   runGeneratedDomainCapabilityProfilePartialCase()
+  runGeneratedDomainMaterializationShadowPlanBuiltCase()
+  runGeneratedDomainMaterializationShadowPlanNotAvailableCase()
+  runGeneratedDomainMaterializationShadowPlanPartialCase()
   runBrainDecisionContractObservationCase()
   runLegacyDomainResolutionDiagnosticsUsedCase()
   runLegacyDomainResolutionDiagnosticsWithGeneratedContractCase()
@@ -2163,6 +3059,24 @@ async function main() {
   runCapabilityPreferredInspectionUsesExplicitContractCase()
   runCapabilityPreferredInspectionUsesLegacyFallbackCase()
   runCapabilityPreferredInspectionUnavailableCase()
+  runGeneratedDomainMaterializationShadowComparisonWithoutLegacyCase()
+  runGeneratedDomainMaterializationShadowComparisonAlignedCase()
+  runGeneratedDomainMaterializationShadowComparisonKeepLegacyCase()
+  runGeneratedDomainMaterializationShadowComparisonWithoutContractCase()
+  runGeneratedDomainMaterializationPreferenceGateEligibleCase()
+  runGeneratedDomainMaterializationPreferenceGateNeedsMoreEvidenceCase()
+  runGeneratedDomainMaterializationPreferenceGateNotReadyCase()
+  runGeneratedDomainMaterializationPreferenceGateBlockedCase()
+  runGeneratedDomainMaterializationShadowDiffWithoutLegacyCase()
+  runGeneratedDomainMaterializationShadowDiffComparedCase()
+  runGeneratedDomainMaterializationShadowDiffDivergentCase()
+  runGeneratedDomainMaterializationShadowDiffWithoutContractCase()
+  runGeneratedDomainMaterializationPreferenceDecisionWouldPreferShadowCase()
+  runGeneratedDomainMaterializationPreferenceDecisionWouldKeepLegacyCase()
+  runGeneratedDomainMaterializationPreferenceDecisionBlockedCase()
+  runGeneratedDomainMaterializationPreferenceDecisionNotAvailableCase()
+  runDomainConsistencyDiagnosticsDiscardResidualMetadataCase()
+  runDomainConsistencyDiagnosticsSemanticMismatchCase()
   runPlannerObservationMergeOkCase()
   runPlannerObservationMergeTimeoutCase()
   runPlannerObservationLegacyAlreadyHasContractCase()
@@ -2173,7 +3087,7 @@ async function main() {
   runPlannerObservationDebugSummaryCase()
   await runPlannerObservationNormalizeAvailabilityCase()
   runDiagnosticsDebugPreviewCase()
-  console.log('OK. GeneratedDomainContract smoke paso 60/60 checks.')
+  console.log('OK. GeneratedDomainContract smoke paso 81/81 checks.')
 }
 
 main().catch((error) => {
