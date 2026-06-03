@@ -37,9 +37,12 @@ const {
   shouldIgnoreWorkspaceDirectoryEntry,
 } = require(path.join(repoRoot, 'electron', 'workspace-project-detection.cjs'))
 const {
+  normalizeGeneratedDomainContract,
+  validateGeneratedDomainContract,
   deriveAllowedTargetPathsFromContract,
   deriveForbiddenSearchPatternsFromContract,
   deriveRequiredPathGroupsFromContract,
+  isContractSafeForLocalMaterialization,
   buildGeneratedDomainCapabilityProfile,
   buildGeneratedDomainMaterializationShadowPlan,
   buildGeneratedDomainContractComparison,
@@ -596,9 +599,12 @@ module.exports = {
     classifyWorkspaceProjectIntent,
     selectBestWorkspaceProjectCandidate,
     shouldIgnoreWorkspaceDirectoryEntry,
+    normalizeGeneratedDomainContract,
+    validateGeneratedDomainContract,
     deriveAllowedTargetPathsFromContract,
     deriveForbiddenSearchPatternsFromContract,
     deriveRequiredPathGroupsFromContract,
+    isContractSafeForLocalMaterialization,
     buildGeneratedDomainCapabilityProfile,
     buildGeneratedDomainMaterializationShadowPlan,
     buildGeneratedDomainContractComparison,
@@ -5622,6 +5628,3107 @@ async function runGeneratedDomainMaterializationPreferenceDecisionPayloadCase() 
   }
 }
 
+async function runGeneratedDomainMaterializationPreferenceSwitchPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'community-libraries', label: 'Community Libraries' },
+    root: {
+      slug: 'community-libraries-local',
+      sourceRoot: 'community-libraries-local',
+      targetRoot: 'community-libraries-local',
+    },
+    roles: [],
+    entities: ['books', 'loans', 'members'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+    ],
+    workflows: ['reporting', 'inventory', 'messaging'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/books.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['books', 'loans', 'members'],
+    },
+    shared: { files: [] },
+    docs: ['docs/API.md', 'docs/ARCHITECTURE.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'database/seed.sql',
+        'frontend/public/index.html',
+        'frontend/admin/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'database/seed.sql' },
+        { targetPath: 'frontend/public/index.html' },
+        { targetPath: 'frontend/admin/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['database/seed.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+        { candidates: ['frontend/admin/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-preference-switch-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Construir el scaffold apagado del switch de preferencia sin cambiar la fuente real.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: 'community-libraries-local',
+    targetRoot: 'community-libraries-local',
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      intent: 'manage catalog, loans and local reporting',
+      deliveryLevel: 'fullstack-local',
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'community-libraries-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'community-libraries-local'
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationPreferenceSwitch?.present === true &&
+      decision.generatedDomainMaterializationPreferenceSwitch?.evaluated === true,
+    'buildBrainDecisionContract debe adjuntar generatedDomainMaterializationPreferenceSwitch al payload.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationPreferenceSwitch?.enabled === false &&
+      decision.generatedDomainMaterializationPreferenceSwitch?.mode === 'disabled' &&
+      decision.generatedDomainMaterializationPreferenceSwitch?.candidate
+        ?.shadowAvailable === true &&
+      ['observe', 'ready-to-enable-later', 'keep-disabled', 'investigate'].includes(
+        decision.generatedDomainMaterializationPreferenceSwitch?.recommendation?.action,
+      ),
+    'El scaffold del switch debe quedar apagado en runtime, con shadow disponible como candidato observacional y una recomendacion segura sin activar el cambio real.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationPreferenceSwitch?.actual?.selectedSource ===
+      'legacy' &&
+      decision.generatedDomainMaterializationPreferenceSwitch?.actual
+        ?.materializationPlanChanged === false &&
+      decision.generatedDomainMaterializationPreferenceSwitch?.actual
+        ?.executionScopeChanged === false &&
+      decision.generatedDomainMaterializationPreferenceSwitch?.behaviorChanged === false,
+    'generatedDomainMaterializationPreferenceSwitch debe seguir observacional y no mutar materializationPlan ni executionScope.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generated-domain-materialization-preference:switch') &&
+      mainSource.includes('generatedDomainMaterializationPreferenceSwitch') &&
+      mainSource.includes('buildGeneratedDomainMaterializationPreferenceSwitch'),
+    'main.cjs debe adjuntar y loguear generated-domain-materialization-preference:switch.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'materialize-fullstack-local-plan' &&
+      decision.executionMode === 'executor' &&
+      decision.nextExpectedAction === 'execute-plan',
+    'El switch scaffold no debe cambiar strategy, executionMode ni nextExpectedAction.',
+  )
+
+  return {
+    id: 'generated-domain-materialization-preference-switch-payload',
+    label: 'Generated domain materialization preference switch payload',
+    failures,
+  }
+}
+
+async function runGeneratedDomainMaterializationSwitchReadinessReportPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'community-libraries', label: 'Community Libraries' },
+    root: {
+      slug: 'community-libraries-local',
+      sourceRoot: 'community-libraries-local',
+      targetRoot: 'community-libraries-local',
+    },
+    roles: [],
+    entities: ['books', 'loans', 'members'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+    ],
+    workflows: ['reporting', 'inventory', 'messaging'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/books.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['books', 'loans', 'members'],
+    },
+    shared: { files: [] },
+    docs: ['docs/API.md', 'docs/ARCHITECTURE.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'database/seed.sql',
+        'frontend/public/index.html',
+        'frontend/admin/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'database/seed.sql' },
+        { targetPath: 'frontend/public/index.html' },
+        { targetPath: 'frontend/admin/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['database/seed.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+        { candidates: ['frontend/admin/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-switch-readiness-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Resumir readiness del switch sin cambiar comportamiento.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: 'community-libraries-local',
+    targetRoot: 'community-libraries-local',
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      intent: 'manage catalog, loans and local reporting',
+      deliveryLevel: 'fullstack-local',
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'community-libraries-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'community-libraries-local'
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationSwitchReadinessReport?.present === true &&
+      decision.generatedDomainMaterializationSwitchReadinessReport?.evaluated === true,
+    'buildBrainDecisionContract debe adjuntar generatedDomainMaterializationSwitchReadinessReport al payload.',
+  )
+  pushFailure(
+    failures,
+    ['not-ready', 'ready-for-test-harness', 'ready-for-controlled-enable', 'blocked'].includes(
+      decision.generatedDomainMaterializationSwitchReadinessReport?.status,
+    ) &&
+      ['observe', 'test-harness-only', 'prepare-controlled-enable', 'investigate'].includes(
+        decision.generatedDomainMaterializationSwitchReadinessReport?.recommendation?.action,
+      ),
+    'El readiness report debe devolver un estado observacional válido y una recomendación segura.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationSwitchReadinessReport?.behaviorChanged === false &&
+      decision.generatedDomainMaterializationSwitchReadinessReport?.readiness
+        ?.switchEnabled === false,
+    'generatedDomainMaterializationSwitchReadinessReport debe seguir observacional y no marcar cambios de comportamiento.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generated-domain-materialization-switch:readiness') &&
+      mainSource.includes('generatedDomainMaterializationSwitchReadinessReport') &&
+      mainSource.includes('buildGeneratedDomainMaterializationSwitchReadinessReport'),
+    'main.cjs debe adjuntar y loguear generated-domain-materialization-switch:readiness.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'materialize-fullstack-local-plan' &&
+      decision.executionMode === 'executor' &&
+      decision.nextExpectedAction === 'execute-plan',
+    'El readiness report no debe cambiar strategy, executionMode ni nextExpectedAction.',
+  )
+
+  return {
+    id: 'generated-domain-materialization-switch-readiness-payload',
+    label: 'Generated domain materialization switch readiness payload',
+    failures,
+  }
+}
+
+async function runGeneratedDomainMaterializationSourceResolutionPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'community-libraries', label: 'Community Libraries' },
+    root: {
+      slug: 'community-libraries-local',
+      sourceRoot: 'community-libraries-local',
+      targetRoot: 'community-libraries-local',
+    },
+    roles: [],
+    entities: ['books', 'loans', 'members'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+    ],
+    workflows: ['reporting', 'inventory', 'messaging'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/books.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['books', 'loans', 'members'],
+    },
+    shared: { files: [] },
+    docs: ['docs/API.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'frontend/public/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'frontend/public/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-materialization-source-resolution-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Resolver la fuente observacional sin cambiar el runtime real.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: 'community-libraries-local',
+    targetRoot: 'community-libraries-local',
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      intent: 'manage catalog, loans and local reporting',
+      deliveryLevel: 'fullstack-local',
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'community-libraries-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'community-libraries-local'
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationSourceResolution?.present === true &&
+      decision.generatedDomainMaterializationSourceResolution?.resolved === true,
+    'buildBrainDecisionContract debe adjuntar generatedDomainMaterializationSourceResolution al payload.',
+  )
+  pushFailure(
+    failures,
+    ['current', 'legacy', 'none', 'generated-domain-shadow', 'blocked'].includes(
+      decision.generatedDomainMaterializationSourceResolution?.source,
+    ) &&
+      ['runtime-disabled', 'test-enabled'].includes(
+        decision.generatedDomainMaterializationSourceResolution?.mode,
+      ),
+    'La resolución de fuente debe devolver una source y un mode válidos.',
+  )
+  pushFailure(
+    failures,
+    ['current', 'legacy'].includes(
+      decision.generatedDomainMaterializationSourceResolution?.source,
+    ) &&
+      decision.generatedDomainMaterializationSourceResolution?.behaviorChanged === false &&
+      decision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.materializationPlanChanged === false &&
+      decision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.executionScopeChanged === false,
+    'generatedDomainMaterializationSourceResolution debe conservar current/legacy en runtime normal y no mutar materializationPlan ni executionScope.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generated-domain-materialization-source:resolution') &&
+      mainSource.includes('generatedDomainMaterializationSourceResolution') &&
+      mainSource.includes('resolveGeneratedDomainMaterializationSource'),
+    'main.cjs debe adjuntar y loguear generated-domain-materialization-source:resolution.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'materialize-fullstack-local-plan' &&
+      decision.executionMode === 'executor' &&
+      decision.nextExpectedAction === 'execute-plan',
+    'La resolución observacional no debe cambiar strategy, executionMode ni nextExpectedAction.',
+  )
+
+  return {
+    id: 'generated-domain-materialization-source-resolution-payload',
+    label: 'Generated domain materialization source resolution payload',
+    failures,
+  }
+}
+
+async function runGeneratedDomainMaterializationSourceResolutionTestEnabledProjectionPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'community-libraries', label: 'Community Libraries' },
+    root: {
+      slug: 'community-libraries-local',
+      sourceRoot: 'community-libraries-local',
+      targetRoot: 'community-libraries-local',
+    },
+    roles: [],
+    entities: ['books', 'loans', 'members'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+    ],
+    workflows: ['reporting', 'inventory', 'messaging'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/books.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['books', 'loans', 'members'],
+    },
+    shared: {
+      files: [],
+    },
+    docs: ['docs/API.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'frontend/public/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'frontend/public/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const baseDecisionInput = {
+    decisionKey: 'generated-domain-materialization-source-resolution-test-enabled-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Proyectar shadow en harness sin cambiar el runtime real.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: 'community-libraries-local',
+    targetRoot: 'community-libraries-local',
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      intent: 'manage catalog, loans and local reporting',
+      deliveryLevel: 'fullstack-local',
+      roles: ['member', 'librarian', 'admin'],
+      modules: ['catalog', 'loans', 'reports'],
+      entities: ['books', 'loans', 'members'],
+      coreFlows: ['manage catalog', 'register loans', 'review reports'],
+    },
+    productArchitecture: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      users: ['members', 'librarians', 'admins'],
+      roles: ['member', 'librarian', 'admin'],
+      coreModules: ['catalog', 'loans', 'reports'],
+      dataEntities: ['books', 'loans', 'members'],
+      keyFlows: ['manage catalog', 'register loans', 'review reports'],
+    },
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      title: 'Community libraries local review',
+      targetStructure: [
+        'community-libraries-local/',
+        'community-libraries-local/frontend/public/',
+        'community-libraries-local/frontend/admin/',
+        'community-libraries-local/backend/src/',
+        'community-libraries-local/database/',
+        'community-libraries-local/docs/',
+      ],
+      allowedRootPaths: ['community-libraries-local'],
+      directories: [
+        'community-libraries-local/frontend/public',
+        'community-libraries-local/frontend/admin',
+        'community-libraries-local/backend/src',
+        'community-libraries-local/database',
+        'community-libraries-local/docs',
+      ],
+      modules: ['catalog', 'loans', 'reports'],
+      successCriteria: [
+        'Keep a local fullstack structure ready for review.',
+        'Do not materialize files during the planner stage.',
+      ],
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'community-libraries-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'community-libraries-local'
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  }
+  const runtimeDecision = plannerApi.buildBrainDecisionContract(baseDecisionInput)
+  const testEnabledDecision = plannerApi.buildBrainDecisionContract({
+    ...baseDecisionInput,
+    generatedDomainMaterializationPreferenceSwitchOptions: {
+      testEnabled: true,
+    },
+    generatedDomainMaterializationSourceResolutionOptions: {
+      testEnabled: true,
+    },
+  })
+
+  pushFailure(
+    failures,
+    runtimeDecision.generatedDomainMaterializationSourceResolution?.present === true &&
+      runtimeDecision.generatedDomainMaterializationSourceResolution?.mode ===
+        'runtime-disabled' &&
+      ['current', 'legacy'].includes(
+        runtimeDecision.generatedDomainMaterializationSourceResolution?.source,
+      ) &&
+      runtimeDecision.generatedDomainMaterializationSourceResolution?.source !==
+        'generated-domain-shadow' &&
+      runtimeDecision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.materializationPlanChanged === false &&
+      runtimeDecision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.executionScopeChanged === false &&
+      runtimeDecision.generatedDomainMaterializationSourceResolution?.behaviorChanged === false,
+    'Sin opcion explicita de harness, la resolucion debe quedarse en runtime-disabled y nunca seleccionar generated-domain-shadow como fuente real.',
+  )
+  pushFailure(
+    failures,
+    testEnabledDecision.generatedDomainMaterializationSourceResolution?.present === true &&
+      testEnabledDecision.generatedDomainMaterializationSourceResolution?.mode ===
+        'test-enabled' &&
+      testEnabledDecision.generatedDomainMaterializationSourceResolution?.testProjection
+        ?.wouldSelectShadow === true &&
+      testEnabledDecision.generatedDomainMaterializationSourceResolution?.testProjection
+        ?.projectedSource === 'generated-domain-shadow' &&
+      ['current', 'legacy'].includes(
+        testEnabledDecision.generatedDomainMaterializationSourceResolution?.runtime
+          ?.selectedSource,
+      ) &&
+      testEnabledDecision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.materializationPlanChanged === false &&
+      testEnabledDecision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.executionScopeChanged === false &&
+      testEnabledDecision.generatedDomainMaterializationSourceResolution?.behaviorChanged === false,
+    'Con opcion test-enabled explicita, el harness debe poder proyectar generated-domain-shadow sin mutar materializationPlan ni executionScope reales.',
+  )
+  pushFailure(
+    failures,
+    testEnabledDecision.generatedDomainMaterializationPreferenceSwitch?.enabled === true &&
+      testEnabledDecision.generatedDomainMaterializationPreferenceSwitch?.mode ===
+        'test-enabled' &&
+      testEnabledDecision.generatedDomainMaterializationSwitchReadinessReport?.status ===
+        'ready-for-test-harness' &&
+      testEnabledDecision.generatedDomainMaterializationPreferenceDecision?.dryRun
+        ?.wouldPreferShadow === true &&
+      testEnabledDecision.generatedDomainMaterializationPreferenceGate?.status ===
+        'eligible',
+    'El test-enabled projection debe quedar respaldado por switch, readiness, dry-run y gate elegibles dentro del harness.',
+  )
+  pushFailure(
+    failures,
+    runtimeDecision.strategy === 'materialize-fullstack-local-plan' &&
+      runtimeDecision.executionMode === 'executor' &&
+      runtimeDecision.nextExpectedAction === 'execute-plan' &&
+      testEnabledDecision.strategy === 'materialize-fullstack-local-plan' &&
+      testEnabledDecision.executionMode === 'executor' &&
+      testEnabledDecision.nextExpectedAction === 'execute-plan',
+    'Ni runtime normal ni test-enabled deben cambiar strategy, executionMode o nextExpectedAction.',
+  )
+
+  return {
+    id: 'generated-domain-materialization-source-resolution-test-enabled-projection-payload',
+    label: 'Generated domain materialization source resolution test-enabled projection payload',
+    failures,
+  }
+}
+
+async function runGeneratedDomainShadowMaterializationCandidatePlanPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'community-libraries', label: 'Community Libraries' },
+    root: {
+      slug: 'community-libraries-local',
+      sourceRoot: 'community-libraries-local',
+      targetRoot: 'community-libraries-local',
+    },
+    roles: ['member', 'librarian', 'admin'],
+    entities: ['books', 'loans', 'members'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+    ],
+    workflows: ['manage catalog', 'register loans', 'review reports'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/books.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [{ path: 'backend/src/modules/loans.js' }],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['books', 'loans', 'members'],
+    },
+    shared: {
+      files: ['shared/contracts/domain.js'],
+    },
+    docs: ['docs/API.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'frontend/public/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'frontend/public/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-shadow-materialization-candidate-plan-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Adjuntar un candidate observacional sin cambiar runtime.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: 'community-libraries-local',
+    targetRoot: 'community-libraries-local',
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      intent: 'manage catalog, loans and local reporting',
+      deliveryLevel: 'fullstack-local',
+      roles: ['member', 'librarian', 'admin'],
+      modules: ['catalog', 'loans', 'reports'],
+      entities: ['books', 'loans', 'members'],
+      coreFlows: ['manage catalog', 'register loans', 'review reports'],
+    },
+    productArchitecture: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      users: ['members', 'librarians', 'admins'],
+      roles: ['member', 'librarian', 'admin'],
+      coreModules: ['catalog', 'loans', 'reports'],
+      dataEntities: ['books', 'loans', 'members'],
+      keyFlows: ['manage catalog', 'register loans', 'review reports'],
+    },
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      title: 'Community libraries local review',
+      targetStructure: [
+        'community-libraries-local/',
+        'community-libraries-local/frontend/public/',
+        'community-libraries-local/frontend/admin/',
+        'community-libraries-local/backend/src/',
+        'community-libraries-local/database/',
+        'community-libraries-local/docs/',
+      ],
+      allowedRootPaths: ['community-libraries-local'],
+      directories: [
+        'community-libraries-local/frontend/public',
+        'community-libraries-local/frontend/admin',
+        'community-libraries-local/backend/src',
+        'community-libraries-local/database',
+        'community-libraries-local/docs',
+      ],
+      modules: ['catalog', 'loans', 'reports'],
+      successCriteria: [
+        'Keep a local fullstack structure ready for review.',
+        'Do not materialize files during the planner stage.',
+      ],
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'community-libraries-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'community-libraries-local'
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainShadowMaterializationCandidatePlan?.present === true &&
+      decision.generatedDomainShadowMaterializationCandidatePlan?.status === 'built' &&
+      decision.generatedDomainShadowMaterializationCandidatePlan?.built === true,
+    'buildBrainDecisionContract debe adjuntar generatedDomainShadowMaterializationCandidatePlan cuando el shadow plan sea convertible.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainShadowMaterializationCandidatePlan?.compatibility
+      ?.resemblesMaterializationPlan === true &&
+      decision.generatedDomainShadowMaterializationCandidatePlan?.compatibility
+        ?.canBeInspected === true &&
+      Array.isArray(
+        decision.generatedDomainShadowMaterializationCandidatePlan?.candidate
+          ?.allowedTargetPaths,
+      ) &&
+      Array.isArray(
+        decision.generatedDomainShadowMaterializationCandidatePlan?.candidate
+          ?.requiredPathGroups,
+      ),
+    'El candidate plan debe parecerse a materializationPlan y exponer allowedTargetPaths + requiredPathGroups inspeccionables.',
+  )
+  pushFailure(
+    failures,
+    !Object.prototype.hasOwnProperty.call(
+      decision.generatedDomainShadowMaterializationCandidatePlan?.candidate || {},
+      'operations',
+    ) &&
+      decision.generatedDomainShadowMaterializationCandidatePlan?.behaviorChanged === false,
+    'El candidate plan no debe incluir operations ejecutables ni cambiar comportamiento runtime.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'materialize-fullstack-local-plan' &&
+      decision.executionMode === 'executor' &&
+      decision.nextExpectedAction === 'execute-plan' &&
+      decision.materializationPlan?.projectRoot === 'community-libraries-local' &&
+      Array.isArray(decision.executionScope?.allowedTargetPaths),
+    'El candidate observacional no debe cambiar strategy, executionMode, nextExpectedAction, materializationPlan real ni executionScope real.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generated-domain-shadow-materialization-candidate:plan') &&
+      mainSource.includes('generatedDomainShadowMaterializationCandidatePlan') &&
+      mainSource.includes('buildGeneratedDomainShadowMaterializationCandidatePlan'),
+    'main.cjs debe adjuntar y loguear generated-domain-shadow-materialization-candidate:plan.',
+  )
+
+  return {
+    id: 'generated-domain-shadow-materialization-candidate-plan-payload',
+    label: 'Generated domain shadow materialization candidate plan payload',
+    failures,
+  }
+}
+
+async function runGeneratedDomainShadowMaterializationEndToEndReadinessPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'community-libraries', label: 'Community Libraries' },
+    root: {
+      slug: 'community-libraries-local',
+      sourceRoot: 'community-libraries-local',
+      targetRoot: 'community-libraries-local',
+    },
+    roles: ['member', 'librarian', 'admin'],
+    entities: ['books', 'loans', 'members'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+    ],
+    workflows: ['manage catalog', 'register loans', 'review reports'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/books.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [{ path: 'backend/src/modules/loans.js' }],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['books', 'loans', 'members'],
+    },
+    shared: {
+      files: ['shared/contracts/domain.js'],
+    },
+    docs: ['docs/API.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'frontend/public/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'frontend/public/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const baseDecisionInput = {
+    decisionKey: 'generated-domain-shadow-end-to-end-readiness-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Validar el pipeline shadow completo sin cambiar runtime.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: 'community-libraries-local',
+    targetRoot: 'community-libraries-local',
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      intent: 'manage catalog, loans and local reporting',
+      deliveryLevel: 'fullstack-local',
+      roles: ['member', 'librarian', 'admin'],
+      modules: ['catalog', 'loans', 'reports'],
+      entities: ['books', 'loans', 'members'],
+      coreFlows: ['manage catalog', 'register loans', 'review reports'],
+    },
+    productArchitecture: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      users: ['members', 'librarians', 'admins'],
+      roles: ['member', 'librarian', 'admin'],
+      coreModules: ['catalog', 'loans', 'reports'],
+      dataEntities: ['books', 'loans', 'members'],
+      keyFlows: ['manage catalog', 'register loans', 'review reports'],
+    },
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      title: 'Community libraries local review',
+      targetStructure: [
+        'community-libraries-local/',
+        'community-libraries-local/frontend/public/',
+        'community-libraries-local/frontend/admin/',
+        'community-libraries-local/backend/src/',
+        'community-libraries-local/database/',
+        'community-libraries-local/docs/',
+      ],
+      allowedRootPaths: ['community-libraries-local'],
+      directories: [
+        'community-libraries-local/frontend/public',
+        'community-libraries-local/frontend/admin',
+        'community-libraries-local/backend/src',
+        'community-libraries-local/database',
+        'community-libraries-local/docs',
+      ],
+      modules: ['catalog', 'loans', 'reports'],
+      successCriteria: [
+        'Keep a local fullstack structure ready for review.',
+        'Do not materialize files during the planner stage.',
+      ],
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'community-libraries-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'community-libraries-local'
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  }
+  const runtimeDecision = plannerApi.buildBrainDecisionContract(baseDecisionInput)
+  const testEnabledDecision = plannerApi.buildBrainDecisionContract({
+    ...baseDecisionInput,
+    generatedDomainMaterializationPreferenceSwitchOptions: {
+      testEnabled: true,
+    },
+    generatedDomainMaterializationSourceResolutionOptions: {
+      testEnabled: true,
+    },
+  })
+
+  pushFailure(
+    failures,
+    runtimeDecision.generatedDomainShadowMaterializationEndToEndReadiness?.present ===
+      true &&
+      runtimeDecision.generatedDomainShadowMaterializationEndToEndReadiness?.status ===
+        'ready-for-test-harness' &&
+      runtimeDecision.generatedDomainShadowMaterializationEndToEndReadiness?.pipeline
+        ?.contractValid === true &&
+      runtimeDecision.generatedDomainShadowMaterializationEndToEndReadiness?.pipeline
+        ?.shadowPlanBuilt === true &&
+      runtimeDecision.generatedDomainShadowMaterializationEndToEndReadiness?.pipeline
+        ?.candidateBuilt === true &&
+      runtimeDecision.generatedDomainShadowMaterializationEndToEndReadiness?.pipeline
+        ?.candidateInspectable === true &&
+      runtimeDecision.generatedDomainShadowMaterializationEndToEndReadiness?.pipeline
+        ?.candidateUsableByFutureSwitch === true &&
+      runtimeDecision.generatedDomainShadowMaterializationEndToEndReadiness?.pipeline
+        ?.gateEligible === true &&
+      runtimeDecision.generatedDomainShadowMaterializationEndToEndReadiness?.pipeline
+        ?.diffAligned === true &&
+      runtimeDecision.generatedDomainShadowMaterializationEndToEndReadiness?.pipeline
+        ?.switchReadyForTestHarness === true &&
+      runtimeDecision.generatedDomainShadowMaterializationEndToEndReadiness?.pipeline
+        ?.sourceResolutionProjectsShadowInTest === true &&
+      runtimeDecision.generatedDomainShadowMaterializationEndToEndReadiness?.pipeline
+        ?.runtimeStillDisabled === true,
+    'El readiness end-to-end debe marcar el pipeline shadow como listo para harness cuando todas las piezas observacionales estan alineadas.',
+  )
+  pushFailure(
+    failures,
+    runtimeDecision.generatedDomainShadowMaterializationEndToEndReadiness?.safeguards
+      ?.noOperations === true &&
+      runtimeDecision.generatedDomainShadowMaterializationEndToEndReadiness?.safeguards
+        ?.noCommands === true &&
+      runtimeDecision.generatedDomainShadowMaterializationEndToEndReadiness?.safeguards
+        ?.noFileWrites === true &&
+      runtimeDecision.generatedDomainShadowMaterializationEndToEndReadiness?.safeguards
+        ?.noWebPrueba === true &&
+      runtimeDecision.generatedDomainShadowMaterializationEndToEndReadiness?.safeguards
+        ?.materializationPlanChanged === false &&
+      runtimeDecision.generatedDomainShadowMaterializationEndToEndReadiness?.safeguards
+        ?.executionScopeChanged === false &&
+      runtimeDecision.generatedDomainShadowMaterializationEndToEndReadiness
+        ?.behaviorChanged === false,
+    'El readiness end-to-end debe seguir observacional, sin operations, commands, writes ni mutaciones reales.',
+  )
+  pushFailure(
+    failures,
+    ['current', 'legacy'].includes(
+      runtimeDecision.generatedDomainMaterializationSourceResolution?.source,
+    ) &&
+      runtimeDecision.generatedDomainMaterializationSourceResolution?.source !==
+        'generated-domain-shadow' &&
+      runtimeDecision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.materializationPlanChanged === false &&
+      runtimeDecision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.executionScopeChanged === false,
+    'En runtime normal, el pipeline end-to-end no debe permitir que generated-domain-shadow se vuelva la fuente real.',
+  )
+  pushFailure(
+    failures,
+    testEnabledDecision.generatedDomainMaterializationSourceResolution?.mode ===
+      'test-enabled' &&
+      testEnabledDecision.generatedDomainMaterializationSourceResolution?.testProjection
+        ?.projectedSource === 'generated-domain-shadow' &&
+      ['current', 'legacy'].includes(
+        testEnabledDecision.generatedDomainMaterializationSourceResolution?.runtime
+          ?.selectedSource,
+      ) &&
+      testEnabledDecision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.materializationPlanChanged === false &&
+      testEnabledDecision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.executionScopeChanged === false,
+    'En test-enabled, el pipeline end-to-end debe poder proyectar generated-domain-shadow sin mutar el runtime real.',
+  )
+  pushFailure(
+    failures,
+    runtimeDecision.strategy === 'materialize-fullstack-local-plan' &&
+      runtimeDecision.executionMode === 'executor' &&
+      runtimeDecision.nextExpectedAction === 'execute-plan' &&
+      testEnabledDecision.strategy === 'materialize-fullstack-local-plan' &&
+      testEnabledDecision.executionMode === 'executor' &&
+      testEnabledDecision.nextExpectedAction === 'execute-plan',
+    'El readiness end-to-end no debe cambiar strategy, executionMode ni nextExpectedAction.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generated-domain-shadow-materialization:end-to-end') &&
+      mainSource.includes('generatedDomainShadowMaterializationEndToEndReadiness') &&
+      mainSource.includes('buildGeneratedDomainShadowMaterializationEndToEndReadiness'),
+    'main.cjs debe adjuntar y loguear generated-domain-shadow-materialization:end-to-end.',
+  )
+
+  return {
+    id: 'generated-domain-shadow-materialization-end-to-end-readiness-payload',
+    label: 'Generated domain shadow materialization end-to-end readiness payload',
+    failures,
+  }
+}
+
+async function runGeneratedDomainControlledEnablePolicyPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'community-libraries', label: 'Community Libraries' },
+    root: {
+      slug: 'community-libraries-local',
+      sourceRoot: 'community-libraries-local',
+      targetRoot: 'community-libraries-local',
+    },
+    roles: ['member', 'librarian', 'admin'],
+    entities: ['books', 'loans', 'members'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+    ],
+    workflows: ['manage catalog', 'register loans', 'review reports'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/books.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [{ path: 'backend/src/modules/loans.js' }],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['books', 'loans', 'members'],
+    },
+    shared: {
+      files: ['shared/contracts/domain.js'],
+    },
+    docs: ['docs/API.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'frontend/public/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'frontend/public/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-controlled-enable-policy-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Validar la policy observacional de controlled enable sin cambiar runtime.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: 'community-libraries-local',
+    targetRoot: 'community-libraries-local',
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      intent: 'manage catalog, loans and local reporting',
+      deliveryLevel: 'fullstack-local',
+      roles: ['member', 'librarian', 'admin'],
+      modules: ['catalog', 'loans', 'reports'],
+      entities: ['books', 'loans', 'members'],
+      coreFlows: ['manage catalog', 'register loans', 'review reports'],
+    },
+    productArchitecture: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      users: ['members', 'librarians', 'admins'],
+      roles: ['member', 'librarian', 'admin'],
+      coreModules: ['catalog', 'loans', 'reports'],
+      dataEntities: ['books', 'loans', 'members'],
+      keyFlows: ['manage catalog', 'register loans', 'review reports'],
+    },
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      title: 'Community libraries local review',
+      targetStructure: [
+        'community-libraries-local/',
+        'community-libraries-local/frontend/public/',
+        'community-libraries-local/frontend/admin/',
+        'community-libraries-local/backend/src/',
+        'community-libraries-local/database/',
+        'community-libraries-local/docs/',
+      ],
+      allowedRootPaths: ['community-libraries-local'],
+      directories: [
+        'community-libraries-local/frontend/public',
+        'community-libraries-local/frontend/admin',
+        'community-libraries-local/backend/src',
+        'community-libraries-local/database',
+        'community-libraries-local/docs',
+      ],
+      modules: ['catalog', 'loans', 'reports'],
+      successCriteria: [
+        'Keep a local fullstack structure ready for review.',
+        'Do not materialize files during the planner stage.',
+      ],
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'community-libraries-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'community-libraries-local'
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainControlledEnablePolicy?.present === true &&
+      [
+        'eligible-for-test-enable',
+        'eligible-for-controlled-runtime-enable',
+      ].includes(decision.generatedDomainControlledEnablePolicy?.status) &&
+      decision.generatedDomainControlledEnablePolicy?.runtimeEnabled === false,
+    'buildBrainDecisionContract debe adjuntar generatedDomainControlledEnablePolicy sin activar runtime real.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainControlledEnablePolicy?.eligibility
+      ?.hasLegacyMaterializationPlan === true &&
+      decision.generatedDomainControlledEnablePolicy?.eligibility
+        ?.hasShadowCandidate === true &&
+      decision.generatedDomainControlledEnablePolicy?.eligibility
+        ?.candidateUsableByFutureSwitch === true &&
+      decision.generatedDomainControlledEnablePolicy?.eligibility
+        ?.endToEndReadyForHarness === true &&
+      decision.generatedDomainControlledEnablePolicy?.allowedModes
+        ?.controlledRuntimeEnable === false,
+    'La policy debe reflejar la elegibilidad observacional sin habilitar controlledRuntimeEnable.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationPreferenceSwitch?.enabled === false &&
+      decision.generatedDomainMaterializationSourceResolution?.source !==
+        'generated-domain-shadow' &&
+      decision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.materializationPlanChanged === false &&
+      decision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.executionScopeChanged === false,
+    'La policy no debe activar el switch ni convertir generated-domain-shadow en la fuente real.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'materialize-fullstack-local-plan' &&
+      decision.executionMode === 'executor' &&
+      decision.nextExpectedAction === 'execute-plan' &&
+      decision.materializationPlan?.projectRoot === 'community-libraries-local' &&
+      Array.isArray(decision.executionScope?.allowedTargetPaths),
+    'La policy observacional no debe cambiar strategy, executionMode, nextExpectedAction, materializationPlan real ni executionScope real.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generated-domain-controlled-enable:policy') &&
+      mainSource.includes('generatedDomainControlledEnablePolicy') &&
+      mainSource.includes('buildGeneratedDomainControlledEnablePolicy'),
+    'main.cjs debe adjuntar y loguear generated-domain-controlled-enable:policy.',
+  )
+
+  return {
+    id: 'generated-domain-controlled-enable-policy-payload',
+    label: 'Generated domain controlled enable policy payload',
+    failures,
+  }
+}
+
+async function runGeneratedDomainFirstControlledEnableScenarioPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'community-libraries', label: 'Community Libraries' },
+    root: {
+      slug: 'community-libraries-local',
+      sourceRoot: 'community-libraries-local',
+      targetRoot: 'community-libraries-local',
+    },
+    roles: [],
+    entities: ['books', 'loans', 'members'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+    ],
+    workflows: ['reporting', 'inventory', 'messaging'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/books.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['books', 'loans', 'members'],
+    },
+    shared: {
+      files: [],
+    },
+    docs: ['docs/API.md', 'docs/ARCHITECTURE.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'database/seed.sql',
+        'frontend/public/index.html',
+        'frontend/admin/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'database/seed.sql' },
+        { targetPath: 'frontend/public/index.html' },
+        { targetPath: 'frontend/admin/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['database/seed.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+        { candidates: ['frontend/admin/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-first-controlled-enable-scenario-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason:
+      'Validar el escenario ultra acotado del primer enable real sin activar runtime.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: 'community-libraries-local',
+    targetRoot: 'community-libraries-local',
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      intent: 'manage catalog, loans and local reporting',
+      deliveryLevel: 'fullstack-local',
+      roles: ['member', 'librarian', 'admin'],
+      modules: ['catalog', 'loans', 'reports'],
+      entities: ['books', 'loans', 'members'],
+      coreFlows: ['manage catalog', 'register loans', 'review reports'],
+    },
+    productArchitecture: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      users: ['members', 'librarians', 'admins'],
+      roles: ['member', 'librarian', 'admin'],
+      coreModules: ['catalog', 'loans', 'reports'],
+      dataEntities: ['books', 'loans', 'members'],
+      keyFlows: ['manage catalog', 'register loans', 'review reports'],
+    },
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      title: 'Community libraries local review',
+      targetStructure: [
+        'community-libraries-local/',
+        'community-libraries-local/frontend/public/',
+        'community-libraries-local/frontend/admin/',
+        'community-libraries-local/backend/src/',
+        'community-libraries-local/database/',
+        'community-libraries-local/docs/',
+      ],
+      allowedRootPaths: ['community-libraries-local'],
+      directories: [
+        'community-libraries-local/frontend/public',
+        'community-libraries-local/frontend/admin',
+        'community-libraries-local/backend/src',
+        'community-libraries-local/database',
+        'community-libraries-local/docs',
+      ],
+      modules: ['catalog', 'loans', 'reports'],
+      successCriteria: [
+        'Keep a local fullstack structure ready for review.',
+        'Do not materialize files during the planner stage.',
+      ],
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'community-libraries-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'community-libraries-local'
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainFirstControlledEnableScenario?.present === true &&
+      decision.generatedDomainFirstControlledEnableScenario?.status ===
+        'ready-for-review' &&
+      decision.generatedDomainFirstControlledEnableScenario?.allowedNow === false &&
+      decision.generatedDomainFirstControlledEnableScenario?.requiresLeanApproval ===
+        true,
+    'buildBrainDecisionContract debe adjuntar el primer escenario controlado sin habilitarlo.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainFirstControlledEnableScenario?.conditions
+      ?.fullstackLocalOnly === true &&
+      decision.generatedDomainFirstControlledEnableScenario?.conditions
+        ?.hasLegacyMaterializationPlan === true &&
+      decision.generatedDomainFirstControlledEnableScenario?.conditions
+        ?.candidateUsableByFutureSwitch === true &&
+      decision.generatedDomainFirstControlledEnableScenario?.conditions
+        ?.controlledRuntimeEnable === false,
+    'El escenario controlado debe reflejar condiciones estructurales fuertes sin controlledRuntimeEnable real.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationPreferenceSwitch?.enabled === false &&
+      decision.generatedDomainMaterializationSourceResolution?.source !==
+        'generated-domain-shadow' &&
+      decision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.materializationPlanChanged === false &&
+      decision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.executionScopeChanged === false,
+    'El primer escenario controlado no debe activar switch, source shadow real ni mutaciones de runtime.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'materialize-fullstack-local-plan' &&
+      decision.executionMode === 'executor' &&
+      decision.nextExpectedAction === 'execute-plan' &&
+      decision.materializationPlan?.projectRoot === 'community-libraries-local' &&
+      Array.isArray(decision.executionScope?.allowedTargetPaths),
+    'El escenario controlado no debe cambiar strategy, executionMode, nextExpectedAction, materializationPlan real ni executionScope real.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generated-domain-controlled-enable:first-scenario') &&
+      mainSource.includes('generatedDomainFirstControlledEnableScenario') &&
+      mainSource.includes('buildGeneratedDomainFirstControlledEnableScenario'),
+    'main.cjs debe adjuntar y loguear generated-domain-controlled-enable:first-scenario.',
+  )
+
+  return {
+    id: 'generated-domain-first-controlled-enable-scenario-payload',
+    label: 'Generated domain first controlled enable scenario payload',
+    failures,
+  }
+}
+
+async function runGeneratedDomainShadowCandidateLegacyComparisonPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'community-libraries', label: 'Community Libraries' },
+    root: {
+      slug: 'community-libraries-local',
+      sourceRoot: 'community-libraries-local',
+      targetRoot: 'community-libraries-local',
+    },
+    roles: ['member', 'librarian', 'admin'],
+    entities: ['books', 'loans', 'members'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+    ],
+    workflows: ['manage catalog', 'register loans', 'review reports'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/books.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [{ path: 'backend/src/modules/loans.js' }],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['books', 'loans', 'members'],
+    },
+    shared: {
+      files: ['shared/contracts/domain.js'],
+    },
+    docs: ['docs/API.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'frontend/public/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'frontend/public/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const requiredPathGroups = deriveRequiredPathGroupsFromContract(generatedDomainContract)
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-shadow-candidate-legacy-comparison-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason:
+      'Comparar candidate shadow y materializationPlan legacy sin cambiar runtime ni escribir archivos.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: 'community-libraries-local',
+    targetRoot: 'community-libraries-local',
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'community-libraries-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'community-libraries-local'
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+      contractDefinition: {
+        requiredPathGroups,
+      },
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainShadowCandidateLegacyComparison?.present === true &&
+      decision.generatedDomainShadowCandidateLegacyComparison?.compared === true &&
+      decision.generatedDomainShadowCandidateLegacyComparison?.status === 'aligned',
+    'buildBrainDecisionContract debe adjuntar generatedDomainShadowCandidateLegacyComparison alineado cuando candidate y legacy comparten la misma forma segura.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainShadowCandidateLegacyComparison?.roots?.aligned === true &&
+      decision.generatedDomainShadowCandidateLegacyComparison?.allowedTargets?.aligned ===
+        true &&
+      decision.generatedDomainShadowCandidateLegacyComparison?.requiredGroups?.aligned ===
+        true &&
+      decision.generatedDomainShadowCandidateLegacyComparison?.safety?.aligned === true,
+    'La comparacion candidate-vs-legacy debe alinear root, allowedTargetPaths, requiredPathGroups y safety.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainShadowCandidateLegacyComparison?.operations
+      ?.candidateHasOperations === false &&
+      decision.generatedDomainShadowCandidateLegacyComparison?.operations
+        ?.candidateHasCommands === false &&
+      decision.generatedDomainShadowCandidateLegacyComparison?.operations
+        ?.candidateHasWrites === false &&
+      decision.generatedDomainShadowCandidateLegacyComparison?.behaviorChanged === false,
+    'La comparacion candidate-vs-legacy debe seguir observacional, sin operations, commands ni writes en el candidate.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'materialize-fullstack-local-plan' &&
+      decision.executionMode === 'executor' &&
+      decision.nextExpectedAction === 'execute-plan' &&
+      decision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.materializationPlanChanged === false &&
+      decision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.executionScopeChanged === false,
+    'La comparacion candidate-vs-legacy no debe cambiar strategy, executionMode, nextExpectedAction ni mutar runtime real.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generated-domain-shadow-candidate:comparison') &&
+      mainSource.includes('generatedDomainShadowCandidateLegacyComparison') &&
+      mainSource.includes('buildGeneratedDomainShadowCandidateLegacyComparison'),
+    'main.cjs debe adjuntar y loguear generated-domain-shadow-candidate:comparison.',
+  )
+
+  return {
+    id: 'generated-domain-shadow-candidate-legacy-comparison-payload',
+    label: 'Generated domain shadow candidate legacy comparison payload',
+    failures,
+  }
+}
+
+async function runGeneratedDomainFileCreationApprovalPolicyPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'community-libraries', label: 'Community Libraries' },
+    root: {
+      slug: 'community-libraries-local',
+      sourceRoot: 'community-libraries-local',
+      targetRoot: 'community-libraries-local',
+    },
+    roles: ['member', 'librarian', 'admin'],
+    entities: ['books', 'loans', 'members'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+    ],
+    workflows: ['manage catalog', 'register loans', 'review reports'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/books.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [{ path: 'backend/src/modules/loans.js' }],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['books', 'loans', 'members'],
+    },
+    shared: {
+      files: ['shared/contracts/domain.js'],
+    },
+    docs: ['docs/API.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'frontend/public/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'frontend/public/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const requiredPathGroups = deriveRequiredPathGroupsFromContract(generatedDomainContract)
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-file-creation-approval-policy-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason:
+      'Preparar una policy observacional para futura creacion real de archivos con aprobacion explicita.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: 'community-libraries-local',
+    targetRoot: 'community-libraries-local',
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      intent: 'manage catalog, loans and local reporting',
+      deliveryLevel: 'fullstack-local',
+      roles: ['member', 'librarian', 'admin'],
+      modules: ['catalog', 'loans', 'reports'],
+      entities: ['books', 'loans', 'members'],
+      coreFlows: ['manage catalog', 'register loans', 'review reports'],
+    },
+    productArchitecture: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      users: ['members', 'librarians', 'admins'],
+      roles: ['member', 'librarian', 'admin'],
+      coreModules: ['catalog', 'loans', 'reports'],
+      dataEntities: ['books', 'loans', 'members'],
+      keyFlows: ['manage catalog', 'register loans', 'review reports'],
+    },
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      title: 'Community libraries local review',
+      targetStructure: [
+        'community-libraries-local/',
+        'community-libraries-local/frontend/public/',
+        'community-libraries-local/frontend/admin/',
+        'community-libraries-local/backend/src/',
+        'community-libraries-local/database/',
+        'community-libraries-local/docs/',
+      ],
+      allowedRootPaths: ['community-libraries-local'],
+      directories: [
+        'community-libraries-local/frontend/public',
+        'community-libraries-local/frontend/admin',
+        'community-libraries-local/backend/src',
+        'community-libraries-local/database',
+        'community-libraries-local/docs',
+      ],
+      modules: ['catalog', 'loans', 'reports'],
+      successCriteria: [
+        'Keep a local fullstack structure ready for review.',
+        'Do not materialize files during the planner stage.',
+      ],
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'community-libraries-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'community-libraries-local'
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+      contractDefinition: {
+        requiredPathGroups,
+      },
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainFileCreationApprovalPolicy?.present === true &&
+      decision.generatedDomainFileCreationApprovalPolicy?.status ===
+        'ready-for-manual-approval-review' &&
+      decision.generatedDomainFileCreationApprovalPolicy?.approvalRequired === true &&
+      decision.generatedDomainFileCreationApprovalPolicy?.approved === false &&
+      decision.generatedDomainFileCreationApprovalPolicy?.allowedNow === false &&
+      decision.generatedDomainFileCreationApprovalPolicy?.requiresLeanApproval === true,
+    'buildBrainDecisionContract debe adjuntar generatedDomainFileCreationApprovalPolicy como gate observacional antes de cualquier escritura real.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainFileCreationApprovalPolicy?.evidence
+      ?.candidateComparisonStatus === 'aligned' &&
+      decision.generatedDomainFileCreationApprovalPolicy?.safeguards?.noDotEnv ===
+        true &&
+      decision.generatedDomainFileCreationApprovalPolicy?.safeguards
+        ?.noNodeModules === true &&
+      decision.generatedDomainFileCreationApprovalPolicy?.safeguards?.noCommands ===
+        true &&
+      decision.generatedDomainFileCreationApprovalPolicy?.safeguards
+        ?.noWritesExecuted === true &&
+      decision.generatedDomainFileCreationApprovalPolicy?.safeguards?.noWebPrueba ===
+        true,
+    'La policy de aprobacion debe exigir comparacion alineada y excluir .env, node_modules, commands, writes y web-prueba.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationPreferenceSwitch?.enabled === false &&
+      decision.generatedDomainMaterializationSourceResolution?.source !==
+        'generated-domain-shadow' &&
+      decision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.materializationPlanChanged === false &&
+      decision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.executionScopeChanged === false &&
+      decision.generatedDomainFileCreationApprovalPolicy?.behaviorChanged === false,
+    'La policy de aprobacion no debe activar runtime shadow ni mutar materializationPlan o executionScope reales.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'materialize-fullstack-local-plan' &&
+      decision.executionMode === 'executor' &&
+      decision.nextExpectedAction === 'execute-plan' &&
+      decision.generatedDomainFileCreationApprovalPolicy?.recommendation?.action ===
+        'request-lean-approval',
+    'La policy de aprobacion debe dejar el flujo igual y solo pedir revision explicita de Lean.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generated-domain-file-creation:approval-policy') &&
+      mainSource.includes('generatedDomainFileCreationApprovalPolicy') &&
+      mainSource.includes('buildGeneratedDomainFileCreationApprovalPolicy'),
+    'main.cjs debe adjuntar y loguear generated-domain-file-creation:approval-policy.',
+  )
+
+  return {
+    id: 'generated-domain-file-creation-approval-policy-payload',
+    label: 'Generated domain file creation approval policy payload',
+    failures,
+  }
+}
+
+async function runGeneratedDomainUniversalMaterializationPlanPreviewPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'tool-bank', label: 'Tool Bank' },
+    root: {
+      slug: 'tool-bank-local',
+      sourceRoot: 'tool-bank-local',
+      targetRoot: 'tool-bank-local',
+    },
+    roles: ['neighbor', 'coordinator', 'repair-team'],
+    entities: ['tools', 'loans', 'maintenance'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+    ],
+    workflows: ['loan-checkout', 'returns', 'maintenance'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/tools.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [{ path: 'backend/src/modules/loans.js' }],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['tools', 'loans', 'maintenance'],
+    },
+    shared: {
+      files: ['shared/contracts/domain.js'],
+    },
+    docs: ['docs/API.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'frontend/public/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'frontend/public/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const requiredPathGroups = deriveRequiredPathGroupsFromContract(generatedDomainContract)
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-universal-materialization-preview-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Construir el universal materialization preview desde el contrato sin tocar runtime real.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: 'tool-bank-local',
+    targetRoot: 'tool-bank-local',
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'tool bank',
+      intent: 'manage tools, loans and maintenance',
+      deliveryLevel: 'fullstack-local',
+      roles: ['neighbor', 'coordinator', 'repair-team'],
+      modules: ['catalog', 'loans', 'maintenance'],
+      entities: ['tools', 'loans', 'maintenance'],
+      coreFlows: ['loan-checkout', 'returns', 'maintenance'],
+    },
+    productArchitecture: {
+      productType: 'fullstack-local-app',
+      domain: 'tool bank',
+      users: ['neighbors', 'coordinators', 'repair team'],
+      roles: ['neighbor', 'coordinator', 'repair-team'],
+      coreModules: ['catalog', 'loans', 'maintenance'],
+      dataEntities: ['tools', 'loans', 'maintenance'],
+      keyFlows: ['loan-checkout', 'returns', 'maintenance'],
+    },
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'tool-bank-local',
+      domain: 'tool bank',
+      title: 'Tool bank local review',
+      targetStructure: [
+        'tool-bank-local/',
+        'tool-bank-local/frontend/public/',
+        'tool-bank-local/frontend/admin/',
+        'tool-bank-local/backend/src/',
+        'tool-bank-local/database/',
+        'tool-bank-local/docs/',
+      ],
+      allowedRootPaths: ['tool-bank-local'],
+      directories: [
+        'tool-bank-local/frontend/public',
+        'tool-bank-local/frontend/admin',
+        'tool-bank-local/backend/src',
+        'tool-bank-local/database',
+        'tool-bank-local/docs',
+      ],
+      modules: ['catalog', 'loans', 'maintenance'],
+      successCriteria: [
+        'Keep a local fullstack structure ready for review.',
+        'Do not materialize files during the planner stage.',
+      ],
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'tool-bank-local',
+      domain: 'tool bank',
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'tool-bank-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'tool-bank-local'
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+      contractDefinition: {
+        requiredPathGroups,
+      },
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainUniversalMaterializationPlanPreview?.present === true &&
+      decision.generatedDomainUniversalMaterializationPlanPreview?.built === true &&
+      decision.generatedDomainUniversalMaterializationPlanPreview?.status === 'built' &&
+      decision.generatedDomainUniversalMaterializationPlanPreview
+        ?.canBecomeMaterializationPlan === true &&
+      decision.generatedDomainUniversalMaterializationPlanPreview?.approvalRequired === true,
+    'buildBrainDecisionContract debe adjuntar generatedDomainUniversalMaterializationPlanPreview built como evidencia universal sin volverlo plan real.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainUniversalMaterializationPlanPreview?.safety
+      ?.safeForLocalMaterialization === true &&
+      decision.generatedDomainUniversalMaterializationPlanPreview?.safety?.noDotEnv ===
+        true &&
+      decision.generatedDomainUniversalMaterializationPlanPreview?.safety
+        ?.noNodeModules === true &&
+      decision.generatedDomainUniversalMaterializationPlanPreview?.safety?.noDocker ===
+        true &&
+      decision.generatedDomainUniversalMaterializationPlanPreview?.safety?.noCommands ===
+        true &&
+      decision.generatedDomainUniversalMaterializationPlanPreview?.safety?.noWrites ===
+        true,
+    'El universal preview debe seguir libre de .env, node_modules, Docker, commands y writes.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generatedDomainUniversalMaterializationPlanPreview') &&
+      mainSource.includes('generated-domain-universal-materialization:preview') &&
+      mainSource.includes('buildGeneratedDomainUniversalMaterializationPlanPreview'),
+    'main.cjs debe adjuntar y loguear generated-domain-universal-materialization:preview.',
+  )
+
+  return {
+    id: 'generated-domain-universal-materialization-preview-payload',
+    label: 'Generated domain universal materialization preview payload',
+    failures,
+  }
+}
+
+async function runGeneratedDomainUniversalMaterializationPlanPreviewComparisonPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'animal-shelters', label: 'Animal Shelters' },
+    root: {
+      slug: 'animal-shelters-local',
+      sourceRoot: 'animal-shelters-local',
+      targetRoot: 'animal-shelters-local',
+    },
+    roles: ['volunteer', 'coordinator', 'adoption-team'],
+    entities: ['animals', 'adoptions', 'volunteers'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+    ],
+    workflows: ['adoption-tracking', 'medical-checks', 'volunteer-shifts'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/animals.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [{ path: 'backend/src/modules/adoptions.js' }],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['animals', 'adoptions', 'volunteers'],
+    },
+    shared: {
+      files: ['shared/contracts/domain.js'],
+    },
+    docs: ['docs/API.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'frontend/public/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'frontend/public/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const requiredPathGroups = deriveRequiredPathGroupsFromContract(generatedDomainContract)
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-universal-materialization-preview-comparison-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Comparar preview universal, candidate shadow y materializationPlan legacy sin cambiar runtime.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: 'animal-shelters-local',
+    targetRoot: 'animal-shelters-local',
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'animal shelters',
+      intent: 'manage animals, adoptions and volunteers',
+      deliveryLevel: 'fullstack-local',
+      roles: ['volunteer', 'coordinator', 'adoption-team'],
+      modules: ['catalog', 'adoptions', 'reports'],
+      entities: ['animals', 'adoptions', 'volunteers'],
+      coreFlows: ['adoption-tracking', 'medical-checks', 'volunteer-shifts'],
+    },
+    productArchitecture: {
+      productType: 'fullstack-local-app',
+      domain: 'animal shelters',
+      users: ['volunteers', 'coordinators', 'adoption team'],
+      roles: ['volunteer', 'coordinator', 'adoption-team'],
+      coreModules: ['catalog', 'adoptions', 'reports'],
+      dataEntities: ['animals', 'adoptions', 'volunteers'],
+      keyFlows: ['adoption-tracking', 'medical-checks', 'volunteer-shifts'],
+    },
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'animal-shelters-local',
+      domain: 'animal shelters',
+      title: 'Animal shelters local review',
+      targetStructure: [
+        'animal-shelters-local/',
+        'animal-shelters-local/frontend/public/',
+        'animal-shelters-local/frontend/admin/',
+        'animal-shelters-local/backend/src/',
+        'animal-shelters-local/database/',
+        'animal-shelters-local/docs/',
+      ],
+      allowedRootPaths: ['animal-shelters-local'],
+      directories: [
+        'animal-shelters-local/frontend/public',
+        'animal-shelters-local/frontend/admin',
+        'animal-shelters-local/backend/src',
+        'animal-shelters-local/database',
+        'animal-shelters-local/docs',
+      ],
+      modules: ['catalog', 'adoptions', 'reports'],
+      successCriteria: [
+        'Keep a local fullstack structure ready for review.',
+        'Do not materialize files during the planner stage.',
+      ],
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'animal-shelters-local',
+      domain: 'animal shelters',
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'animal-shelters-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'animal-shelters-local'
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+      contractDefinition: {
+        requiredPathGroups,
+      },
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainUniversalMaterializationPlanPreviewComparison?.present ===
+      true &&
+      decision.generatedDomainUniversalMaterializationPlanPreviewComparison?.compared ===
+        true &&
+      decision.generatedDomainUniversalMaterializationPlanPreviewComparison?.status ===
+        'aligned',
+    'buildBrainDecisionContract debe adjuntar generatedDomainUniversalMaterializationPlanPreviewComparison alineado cuando preview, candidate y legacy comparten forma segura.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainUniversalMaterializationPlanPreviewComparison?.roots
+      ?.aligned === true &&
+      decision.generatedDomainUniversalMaterializationPlanPreviewComparison
+        ?.allowedTargets?.aligned === true &&
+      decision.generatedDomainUniversalMaterializationPlanPreviewComparison
+        ?.requiredGroups?.aligned === true &&
+      decision.generatedDomainUniversalMaterializationPlanPreviewComparison
+        ?.safety?.aligned === true &&
+      decision.generatedDomainUniversalMaterializationPlanPreviewComparison
+        ?.behaviorChanged === false,
+    'La comparacion del universal preview debe quedar alineada y seguir solo observacional.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes(
+      'generatedDomainUniversalMaterializationPlanPreviewComparison',
+    ) &&
+      mainSource.includes(
+        'generated-domain-universal-materialization:preview-comparison',
+      ) &&
+      mainSource.includes(
+        'buildGeneratedDomainUniversalMaterializationPlanPreviewComparison',
+      ),
+    'main.cjs debe adjuntar y loguear generated-domain-universal-materialization:preview-comparison.',
+  )
+
+  return {
+    id: 'generated-domain-universal-materialization-preview-comparison-payload',
+    label: 'Generated domain universal materialization preview comparison payload',
+    failures,
+  }
+}
+
+async function runGeneratedDomainStructuralCapabilitiesPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: {
+      slug: 'cooperativa-herramientas-raras',
+      label: 'Cooperativa de Herramientas Raras',
+    },
+    root: {
+      slug: 'cooperativa-herramientas-raras-local',
+      sourceRoot: 'cooperativa-herramientas-raras-local',
+      targetRoot: 'cooperativa-herramientas-raras-local',
+    },
+    roles: ['neighbor', 'coordinator', 'repair-team'],
+    entities: ['tools', 'loans', 'maintenance', 'reports'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+      { key: 'operator', label: 'Operator', path: 'frontend/operator', screens: ['scheduling'] },
+    ],
+    workflows: ['loan-checkout', 'maintenance', 'community-reporting'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/tools.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [{ path: 'backend/src/modules/loans.js' }],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['tools', 'loans', 'maintenance'],
+    },
+    shared: {
+      files: ['shared/contracts/domain.js'],
+    },
+    docs: ['docs/API.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'frontend/public/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'frontend/public/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const requiredPathGroups = deriveRequiredPathGroupsFromContract(generatedDomainContract)
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-structural-capabilities-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Derivar capabilities estructurales sin tocar runtime real.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: 'cooperativa-herramientas-raras-local',
+    targetRoot: 'cooperativa-herramientas-raras-local',
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'cooperativa de herramientas raras',
+      intent: 'manage tools, maintenance and community reporting',
+      deliveryLevel: 'fullstack-local',
+      roles: ['neighbor', 'coordinator', 'repair-team'],
+      modules: ['catalog', 'maintenance', 'reports', 'scheduling'],
+      entities: ['tools', 'loans', 'maintenance'],
+      coreFlows: ['loan-checkout', 'maintenance', 'community-reporting'],
+    },
+    productArchitecture: {
+      productType: 'fullstack-local-app',
+      domain: 'cooperativa de herramientas raras',
+      users: ['neighbors', 'coordinators', 'repair team'],
+      roles: ['neighbor', 'coordinator', 'repair-team'],
+      coreModules: ['catalog', 'maintenance', 'reports', 'scheduling'],
+      dataEntities: ['tools', 'loans', 'maintenance'],
+      keyFlows: ['loan-checkout', 'maintenance', 'community-reporting'],
+    },
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'cooperativa-herramientas-raras-local',
+      domain: 'cooperativa de herramientas raras',
+      title: 'Cooperativa herramientas raras local review',
+      targetStructure: [
+        'cooperativa-herramientas-raras-local/',
+        'cooperativa-herramientas-raras-local/frontend/public/',
+        'cooperativa-herramientas-raras-local/frontend/admin/',
+        'cooperativa-herramientas-raras-local/frontend/operator/',
+        'cooperativa-herramientas-raras-local/backend/src/',
+        'cooperativa-herramientas-raras-local/database/',
+      ],
+      allowedRootPaths: ['cooperativa-herramientas-raras-local'],
+      directories: [
+        'cooperativa-herramientas-raras-local/frontend/public',
+        'cooperativa-herramientas-raras-local/frontend/admin',
+        'cooperativa-herramientas-raras-local/frontend/operator',
+        'cooperativa-herramientas-raras-local/backend/src',
+        'cooperativa-herramientas-raras-local/database',
+      ],
+      modules: ['catalog', 'maintenance', 'reports', 'scheduling'],
+      successCriteria: [
+        'Keep a local fullstack structure ready for review.',
+        'Do not materialize files during the planner stage.',
+      ],
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'cooperativa-herramientas-raras-local',
+      domain: 'cooperativa de herramientas raras',
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'cooperativa-herramientas-raras-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'cooperativa-herramientas-raras-local'
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+      contractDefinition: {
+        requiredPathGroups,
+      },
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainStructuralCapabilities?.present === true &&
+      decision.generatedDomainStructuralCapabilities?.evaluated === true &&
+      decision.generatedDomainStructuralCapabilities?.hasPublicFrontend === true &&
+      decision.generatedDomainStructuralCapabilities?.hasAdminPanel === true &&
+      decision.generatedDomainStructuralCapabilities?.hasBackend === true &&
+      decision.generatedDomainStructuralCapabilities?.hasDatabase === true &&
+      decision.generatedDomainStructuralCapabilities?.hasReporting === true &&
+      decision.generatedDomainStructuralCapabilities?.hasValidation === true &&
+      decision.generatedDomainStructuralCapabilities?.hasSafeLocalMaterialization === true,
+    'buildBrainDecisionContract debe adjuntar generatedDomainStructuralCapabilities derivadas por estructura y no por rubro.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainStructuralCapabilities?.behaviorChanged === false &&
+      decision.strategy === 'materialize-fullstack-local-plan' &&
+      decision.executionMode === 'executor' &&
+      decision.nextExpectedAction === 'execute-plan',
+    'Las capabilities estructurales deben seguir solo observacionales y no cambiar el contrato de ejecucion real.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generatedDomainStructuralCapabilities') &&
+      mainSource.includes('generated-domain-structural-capabilities') &&
+      mainSource.includes('deriveGeneratedDomainStructuralCapabilities'),
+    'main.cjs debe adjuntar y loguear generated-domain-structural-capabilities.',
+  )
+
+  return {
+    id: 'generated-domain-structural-capabilities-payload',
+    label: 'Generated domain structural capabilities payload',
+    failures,
+  }
+}
+
+async function runLegacyDomainHardcodingDebtReportPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'community-libraries', label: 'Community Libraries' },
+    root: {
+      slug: 'community-libraries-local',
+      sourceRoot: 'community-libraries-local',
+      targetRoot: 'community-libraries-local',
+    },
+    roles: ['member', 'librarian', 'admin'],
+    entities: ['books', 'loans', 'members'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+    ],
+    workflows: ['manage catalog', 'register loans', 'review reports'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/books.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [{ path: 'backend/src/modules/loans.js' }],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['books', 'loans', 'members'],
+    },
+    shared: { files: ['shared/contracts/domain.js'] },
+    docs: ['docs/API.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'frontend/public/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'frontend/public/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const requiredPathGroups = deriveRequiredPathGroupsFromContract(generatedDomainContract)
+  const decision = plannerApi.buildBrainDecisionContract({
+    ...buildReusablePlanningContext(),
+    decisionKey: 'legacy-domain-hardcoding-debt-report-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Emitir un reporte observacional de deuda legacy sin cambiar runtime.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: 'community-libraries-local',
+    targetRoot: 'community-libraries-local',
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      intent: 'manage catalog, loans and local reporting',
+      deliveryLevel: 'fullstack-local',
+      roles: ['member', 'librarian', 'admin'],
+      modules: ['catalog', 'loans', 'reports'],
+      entities: ['books', 'loans', 'members'],
+      coreFlows: ['manage catalog', 'register loans', 'review reports'],
+    },
+    productArchitecture: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      users: ['members', 'librarians', 'admins'],
+      roles: ['member', 'librarian', 'admin'],
+      coreModules: ['catalog', 'loans', 'reports'],
+      dataEntities: ['books', 'loans', 'members'],
+      keyFlows: ['manage catalog', 'register loans', 'review reports'],
+    },
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      title: 'Community libraries local review',
+      targetStructure: [
+        'community-libraries-local/',
+        'community-libraries-local/frontend/public/',
+        'community-libraries-local/frontend/admin/',
+        'community-libraries-local/backend/src/',
+        'community-libraries-local/database/',
+        'community-libraries-local/docs/',
+      ],
+      allowedRootPaths: ['community-libraries-local'],
+      directories: [
+        'community-libraries-local/frontend/public',
+        'community-libraries-local/frontend/admin',
+        'community-libraries-local/backend/src',
+        'community-libraries-local/database',
+        'community-libraries-local/docs',
+      ],
+      modules: ['catalog', 'loans', 'reports'],
+      successCriteria: [
+        'Keep a local fullstack structure ready for review.',
+        'Do not materialize files during the planner stage.',
+      ],
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'community-libraries-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'community-libraries-local'
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+      contractDefinition: {
+        requiredPathGroups,
+      },
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.legacyDomainHardcodingDebtReport?.present === true &&
+      decision.legacyDomainHardcodingDebtReport?.evaluated === true &&
+      decision.legacyDomainHardcodingDebtReport?.behaviorChanged === false &&
+      decision.legacyDomainHardcodingDebtReport?.runtimeCriticalCount > 0 &&
+      decision.legacyDomainHardcodingDebtReport?.fixtureOnlyCount > 0,
+    'buildBrainDecisionContract debe adjuntar legacyDomainHardcodingDebtReport como diagnostico compacto de deuda legacy sin alterar runtime.',
+  )
+  pushFailure(
+    failures,
+    Array.isArray(decision.legacyDomainHardcodingDebtReport?.migrationCandidates) &&
+      decision.legacyDomainHardcodingDebtReport?.migrationCandidates.some(
+        (entry) => entry?.area === 'buildCanonicalFullstackLocalMaterializationContract',
+      ) &&
+      Array.isArray(decision.legacyDomainHardcodingDebtReport?.riskyAreas) &&
+      decision.legacyDomainHardcodingDebtReport?.riskyAreas.some(
+        (entry) => entry?.area === 'buildFullstackLocalMaterializationPlan',
+      ),
+    'El debt report debe distinguir candidatos de migracion segura y zonas legacy mas riesgosas.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('legacyDomainHardcodingDebtReport') &&
+      mainSource.includes('legacy-domain-hardcoding:debt-report') &&
+      mainSource.includes('buildLegacyDomainHardcodingDebtReport'),
+    'main.cjs debe adjuntar y loguear legacy-domain-hardcoding:debt-report.',
+  )
+
+  return {
+    id: 'legacy-domain-hardcoding-debt-report-payload',
+    label: 'Legacy domain hardcoding debt report payload',
+    failures,
+  }
+}
+
+async function runLocalDeterministicExecutorLegacyDebtReportPayloadCase() {
+  const failures = []
+  const decision = plannerApi.buildBrainDecisionContract({
+    ...buildReusablePlanningContext(),
+    decisionKey: 'local-deterministic-executor-legacy-debt-report-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Emitir un reporte observacional del executor legacy sin tocar runtime.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.localDeterministicExecutorLegacyDebtReport?.present === true &&
+      decision.localDeterministicExecutorLegacyDebtReport?.evaluated === true &&
+      decision.localDeterministicExecutorLegacyDebtReport?.behaviorChanged === false &&
+      decision.localDeterministicExecutorLegacyDebtReport?.executorFilePresent === true &&
+      decision.localDeterministicExecutorLegacyDebtReport?.runtimeCriticalCount > 0,
+    'buildBrainDecisionContract debe poder adjuntar localDeterministicExecutorLegacyDebtReport como diagnostico observacional del executor.',
+  )
+  pushFailure(
+    failures,
+    Array.isArray(decision.localDeterministicExecutorLegacyDebtReport?.domainSpecificSignals) &&
+      decision.localDeterministicExecutorLegacyDebtReport?.domainSpecificSignals.includes('ecommerce') &&
+      decision.localDeterministicExecutorLegacyDebtReport?.domainSpecificSignals.includes('school-crm') &&
+      decision.localDeterministicExecutorLegacyDebtReport?.domainSpecificSignals.includes('generic'),
+    'El debt report del executor debe detectar senales legacy conocidas sin crear ramas nuevas.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('localDeterministicExecutorLegacyDebtReport') &&
+      mainSource.includes('local-deterministic-executor:legacy-debt-report') &&
+      mainSource.includes('buildLocalDeterministicExecutorLegacyDebtReport'),
+    'main.cjs debe adjuntar y loguear local-deterministic-executor:legacy-debt-report.',
+  )
+
+  return {
+    id: 'local-deterministic-executor-legacy-debt-report-payload',
+    label: 'Local deterministic executor legacy debt report payload',
+    failures,
+  }
+}
+
+async function runLocalDeterministicExecutorCapabilityMigrationPlanPayloadCase() {
+  const failures = []
+  const decision = plannerApi.buildBrainDecisionContract({
+    ...buildReusablePlanningContext(),
+    decisionKey: 'local-deterministic-executor-capability-migration-plan-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Emitir un plan observacional de migracion del executor a capabilities.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.localDeterministicExecutorCapabilityMigrationPlan?.present === true &&
+      decision.localDeterministicExecutorCapabilityMigrationPlan?.evaluated === true &&
+      decision.localDeterministicExecutorCapabilityMigrationPlan?.behaviorChanged === false &&
+      Array.isArray(decision.localDeterministicExecutorCapabilityMigrationPlan?.capabilityTargets) &&
+      decision.localDeterministicExecutorCapabilityMigrationPlan?.branchMappedCount > 0,
+    'buildBrainDecisionContract debe adjuntar localDeterministicExecutorCapabilityMigrationPlan como mapa de migracion sin alterar el executor real.',
+  )
+  pushFailure(
+    failures,
+    decision.localDeterministicExecutorCapabilityMigrationPlan?.capabilityTargets?.some(
+      (entry) =>
+        entry?.capability === 'catalog' &&
+        Array.isArray(entry?.currentBranches) &&
+        entry.currentBranches.includes('ecommerce-mode-branches'),
+    ) &&
+      decision.localDeterministicExecutorCapabilityMigrationPlan?.capabilityTargets?.some(
+        (entry) =>
+          entry?.capability === 'backend-api' && entry?.migrationReadiness === 'not-ready',
+      ),
+    'El plan de migracion del executor debe distinguir capacidades ya mapeables de las que aun no conviene tocar.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('localDeterministicExecutorCapabilityMigrationPlan') &&
+      mainSource.includes('local-deterministic-executor:capability-migration-plan') &&
+      mainSource.includes('buildLocalDeterministicExecutorCapabilityMigrationPlan'),
+    'main.cjs debe adjuntar y loguear el plan observacional de migracion del executor.',
+  )
+
+  return {
+    id: 'local-deterministic-executor-capability-migration-plan-payload',
+    label: 'Local deterministic executor capability migration plan payload',
+    failures,
+  }
+}
+
+async function runGeneratedDomainMaterializationInspectionSourceResolutionPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'community-libraries', label: 'Community Libraries' },
+    root: {
+      slug: 'community-libraries-local',
+      sourceRoot: 'community-libraries-local',
+      targetRoot: 'community-libraries-local',
+    },
+    roles: ['member', 'librarian', 'admin'],
+    entities: ['books', 'loans', 'members'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+    ],
+    workflows: ['manage catalog', 'register loans', 'review reports'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/books.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [{ path: 'backend/src/modules/loans.js' }],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['books', 'loans', 'members'],
+    },
+    shared: {
+      files: ['shared/contracts/domain.js'],
+    },
+    docs: ['docs/API.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'frontend/public/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'frontend/public/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const requiredPathGroups = deriveRequiredPathGroupsFromContract(generatedDomainContract)
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-materialization-inspection-source-payload',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason:
+      'Preferir candidate o contract en la inspeccion solo de forma observacional, con fallback legacy controlado.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: 'community-libraries-local',
+    targetRoot: 'community-libraries-local',
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      intent: 'manage catalog, loans and local reporting',
+      deliveryLevel: 'fullstack-local',
+      roles: ['member', 'librarian', 'admin'],
+      modules: ['catalog', 'loans', 'reports'],
+      entities: ['books', 'loans', 'members'],
+      coreFlows: ['manage catalog', 'register loans', 'review reports'],
+    },
+    productArchitecture: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      users: ['members', 'librarians', 'admins'],
+      roles: ['member', 'librarian', 'admin'],
+      coreModules: ['catalog', 'loans', 'reports'],
+      dataEntities: ['books', 'loans', 'members'],
+      keyFlows: ['manage catalog', 'register loans', 'review reports'],
+    },
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      title: 'Community libraries local review',
+      targetStructure: [
+        'community-libraries-local/',
+        'community-libraries-local/frontend/public/',
+        'community-libraries-local/frontend/admin/',
+        'community-libraries-local/backend/src/',
+        'community-libraries-local/database/',
+        'community-libraries-local/docs/',
+      ],
+      allowedRootPaths: ['community-libraries-local'],
+      directories: [
+        'community-libraries-local/frontend/public',
+        'community-libraries-local/frontend/admin',
+        'community-libraries-local/backend/src',
+        'community-libraries-local/database',
+        'community-libraries-local/docs',
+      ],
+      modules: ['catalog', 'loans', 'reports'],
+      successCriteria: [
+        'Keep a local fullstack structure ready for review.',
+        'Do not materialize files during the planner stage.',
+      ],
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'community-libraries-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'community-libraries-local'
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+      contractDefinition: {
+        requiredPathGroups,
+      },
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationInspectionSourceResolution?.present === true &&
+      decision.generatedDomainMaterializationInspectionSourceResolution?.resolved ===
+        true &&
+      decision.generatedDomainMaterializationInspectionSourceResolution?.source ===
+        'generated-domain-candidate' &&
+      decision.generatedDomainMaterializationInspectionSourceResolution
+        ?.candidatePreferred === true,
+    'buildBrainDecisionContract debe adjuntar generatedDomainMaterializationInspectionSourceResolution prefiriendo candidate cuando la cadena observacional es segura.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationInspectionSourceResolution?.runtime
+      ?.materializationPlanChanged === false &&
+      decision.generatedDomainMaterializationInspectionSourceResolution?.runtime
+        ?.executionScopeChanged === false &&
+      decision.generatedDomainMaterializationInspectionSourceResolution
+        ?.behaviorChanged === false,
+    'La resolucion de fuente de inspeccion no debe mutar materializationPlan ni executionScope reales.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'materialize-fullstack-local-plan' &&
+      decision.executionMode === 'executor' &&
+      decision.nextExpectedAction === 'execute-plan',
+    'La resolucion de fuente de inspeccion no debe cambiar strategy, executionMode ni nextExpectedAction.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generatedDomainMaterializationInspectionSourceResolution') &&
+      mainSource.includes(
+        'generated-domain-materialization-inspection-source:resolution',
+      ) &&
+      mainSource.includes(
+        'buildGeneratedDomainMaterializationInspectionSourceResolution',
+      ),
+    'main.cjs debe adjuntar y loguear generated-domain-materialization-inspection-source:resolution.',
+  )
+
+  return {
+    id: 'generated-domain-materialization-inspection-source-resolution-payload',
+    label: 'Generated domain materialization inspection source resolution payload',
+    failures,
+  }
+}
+
 async function runGeneratedDomainMaterializationShadowDiffPayloadCase() {
   const failures = []
   const generatedDomainContract = {
@@ -8643,6 +11750,29 @@ async function main() {
     results.push(await runGeneratedDomainMaterializationShadowPayloadCase())
     results.push(await runGeneratedDomainMaterializationPreferenceGatePayloadCase())
     results.push(await runGeneratedDomainMaterializationPreferenceDecisionPayloadCase())
+    results.push(await runGeneratedDomainMaterializationPreferenceSwitchPayloadCase())
+    results.push(await runGeneratedDomainMaterializationSwitchReadinessReportPayloadCase())
+    results.push(await runGeneratedDomainMaterializationSourceResolutionPayloadCase())
+    results.push(
+      await runGeneratedDomainMaterializationSourceResolutionTestEnabledProjectionPayloadCase(),
+    )
+    results.push(await runGeneratedDomainShadowMaterializationCandidatePlanPayloadCase())
+    results.push(await runGeneratedDomainShadowCandidateLegacyComparisonPayloadCase())
+    results.push(await runGeneratedDomainShadowMaterializationEndToEndReadinessPayloadCase())
+    results.push(await runGeneratedDomainControlledEnablePolicyPayloadCase())
+    results.push(await runGeneratedDomainFirstControlledEnableScenarioPayloadCase())
+    results.push(await runGeneratedDomainFileCreationApprovalPolicyPayloadCase())
+    results.push(await runGeneratedDomainUniversalMaterializationPlanPreviewPayloadCase())
+    results.push(
+      await runGeneratedDomainUniversalMaterializationPlanPreviewComparisonPayloadCase(),
+    )
+    results.push(await runGeneratedDomainStructuralCapabilitiesPayloadCase())
+    results.push(await runLegacyDomainHardcodingDebtReportPayloadCase())
+    results.push(await runLocalDeterministicExecutorLegacyDebtReportPayloadCase())
+    results.push(await runLocalDeterministicExecutorCapabilityMigrationPlanPayloadCase())
+    results.push(
+      await runGeneratedDomainMaterializationInspectionSourceResolutionPayloadCase(),
+    )
     results.push(await runGeneratedDomainMaterializationShadowDiffPayloadCase())
     results.push(await runDomainConsistencyDiagnosticsPayloadCase())
     results.push(await runDomainConsistencySemanticMismatchPayloadCase())

@@ -2486,6 +2486,691 @@ function summarizeGeneratedDomainMaterializationPreferenceDecisionForDebug(decis
   }
 }
 
+function summarizeGeneratedDomainMaterializationPreferenceSwitchForDebug(switchDiagnostics) {
+  if (!switchDiagnostics || typeof switchDiagnostics !== 'object') {
+    return {
+      present: false,
+      evaluated: false,
+      enabled: false,
+      mode: 'disabled',
+      status: 'not-available',
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(
+    switchDiagnostics.warnings,
+  )
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(switchDiagnostics.errors)
+
+  return {
+    present: switchDiagnostics.present === true,
+    evaluated: switchDiagnostics.evaluated === true,
+    enabled: switchDiagnostics.enabled === true,
+    mode:
+      typeof switchDiagnostics.mode === 'string' && switchDiagnostics.mode.trim()
+        ? switchDiagnostics.mode.trim()
+        : 'disabled',
+    status:
+      typeof switchDiagnostics.status === 'string' && switchDiagnostics.status.trim()
+        ? switchDiagnostics.status.trim()
+        : 'not-available',
+    behaviorChanged: switchDiagnostics.behaviorChanged === true,
+    actualSelectedSource:
+      typeof switchDiagnostics.actual?.selectedSource === 'string' &&
+      switchDiagnostics.actual.selectedSource.trim()
+        ? switchDiagnostics.actual.selectedSource.trim()
+        : 'none',
+    wouldSelectShadowIfEnabled:
+      switchDiagnostics.candidate?.wouldSelectShadowIfEnabled === true,
+    materializationPlanChanged:
+      switchDiagnostics.actual?.materializationPlanChanged === true,
+    executionScopeChanged: switchDiagnostics.actual?.executionScopeChanged === true,
+    recommendedAction:
+      typeof switchDiagnostics.recommendation?.action === 'string' &&
+      switchDiagnostics.recommendation.action.trim()
+        ? switchDiagnostics.recommendation.action.trim()
+        : 'observe',
+    warningsCount: Array.isArray(switchDiagnostics.warnings)
+      ? switchDiagnostics.warnings.length
+      : 0,
+    errorsCount: Array.isArray(switchDiagnostics.errors)
+      ? switchDiagnostics.errors.length
+      : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
+function summarizeGeneratedDomainMaterializationSwitchReadinessReportForDebug(report) {
+  if (!report || typeof report !== 'object') {
+    return {
+      present: false,
+      evaluated: false,
+      status: 'not-ready',
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(report.warnings)
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(report.errors)
+
+  return {
+    present: report.present === true,
+    evaluated: report.evaluated === true,
+    status:
+      typeof report.status === 'string' && report.status.trim()
+        ? report.status.trim()
+        : 'not-ready',
+    behaviorChanged: report.behaviorChanged === true,
+    switchEnabled: report.readiness?.switchEnabled === true,
+    shadowAvailable: report.readiness?.shadowAvailable === true,
+    shadowEligible: report.readiness?.shadowEligible === true,
+    gateEligible: report.readiness?.gateEligible === true,
+    diffAligned: report.readiness?.diffAligned === true,
+    domainConsistent: report.readiness?.domainConsistent === true,
+    legacyComparisonAvailable: report.readiness?.legacyComparisonAvailable === true,
+    recommendedAction:
+      typeof report.recommendation?.action === 'string' &&
+      report.recommendation.action.trim()
+        ? report.recommendation.action.trim()
+        : 'observe',
+    warningsCount: Array.isArray(report.warnings) ? report.warnings.length : 0,
+    errorsCount: Array.isArray(report.errors) ? report.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
+function summarizeGeneratedDomainMaterializationSourceResolutionForDebug(resolution) {
+  if (!resolution || typeof resolution !== 'object') {
+    return {
+      present: false,
+      resolved: false,
+      source: 'none',
+      mode: 'runtime-disabled',
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(resolution.warnings)
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(resolution.errors)
+
+  return {
+    present: resolution.present === true,
+    resolved: resolution.resolved === true,
+    source:
+      typeof resolution.source === 'string' && resolution.source.trim()
+        ? resolution.source.trim()
+        : 'none',
+    mode:
+      typeof resolution.mode === 'string' && resolution.mode.trim()
+        ? resolution.mode.trim()
+        : 'runtime-disabled',
+    behaviorChanged: resolution.behaviorChanged === true,
+    switchEnabled: resolution.inputs?.switchEnabled === true,
+    materializationPlanPresent: resolution.inputs?.materializationPlanPresent === true,
+    shadowPlanBuilt: resolution.inputs?.shadowPlanBuilt === true,
+    wouldSelectShadow: resolution.testProjection?.wouldSelectShadow === true,
+    materializationPlanChanged:
+      resolution.runtime?.materializationPlanChanged === true,
+    executionScopeChanged: resolution.runtime?.executionScopeChanged === true,
+    recommendedAction:
+      typeof resolution.recommendation?.action === 'string' &&
+      resolution.recommendation.action.trim()
+        ? resolution.recommendation.action.trim()
+        : 'observe',
+    warningsCount: Array.isArray(resolution.warnings) ? resolution.warnings.length : 0,
+    errorsCount: Array.isArray(resolution.errors) ? resolution.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
+function summarizeGeneratedDomainShadowMaterializationCandidatePlanForDebug(candidatePlan) {
+  if (!candidatePlan || typeof candidatePlan !== 'object') {
+    return {
+      present: false,
+      built: false,
+      status: 'not-available',
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(candidatePlan.warnings)
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(candidatePlan.errors)
+
+  return {
+    present: candidatePlan.present === true,
+    built: candidatePlan.built === true,
+    status:
+      typeof candidatePlan.status === 'string' && candidatePlan.status.trim()
+        ? candidatePlan.status.trim()
+        : 'not-available',
+    behaviorChanged: candidatePlan.behaviorChanged === true,
+    root:
+      typeof candidatePlan.candidate?.targetRoot === 'string' &&
+      candidatePlan.candidate.targetRoot.trim()
+        ? candidatePlan.candidate.targetRoot.trim()
+        : typeof candidatePlan.candidate?.root === 'string' && candidatePlan.candidate.root.trim()
+          ? candidatePlan.candidate.root.trim()
+          : undefined,
+    allowedTargetPathsCount: Array.isArray(candidatePlan.candidate?.allowedTargetPaths)
+      ? candidatePlan.candidate.allowedTargetPaths.length
+      : 0,
+    requiredPathGroupsCount: Array.isArray(candidatePlan.candidate?.requiredPathGroups)
+      ? candidatePlan.candidate.requiredPathGroups.length
+      : 0,
+    resemblesMaterializationPlan:
+      candidatePlan.compatibility?.resemblesMaterializationPlan === true,
+    canBeInspected: candidatePlan.compatibility?.canBeInspected === true,
+    canBeUsedByFutureSwitch: candidatePlan.compatibility?.canBeUsedByFutureSwitch === true,
+    warningsCount: Array.isArray(candidatePlan.warnings) ? candidatePlan.warnings.length : 0,
+    errorsCount: Array.isArray(candidatePlan.errors) ? candidatePlan.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
+function summarizeGeneratedDomainShadowCandidateLegacyComparisonForDebug(comparison) {
+  if (!comparison || typeof comparison !== 'object') {
+    return {
+      present: false,
+      compared: false,
+      status: 'not-available',
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(comparison.warnings)
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(comparison.errors)
+
+  return {
+    present: comparison.present === true,
+    compared: comparison.compared === true,
+    status:
+      typeof comparison.status === 'string' && comparison.status.trim()
+        ? comparison.status.trim()
+        : 'not-available',
+    behaviorChanged: comparison.behaviorChanged === true,
+    rootAligned: comparison.roots?.aligned === true,
+    allowedTargetsOverlapCount: Number.isInteger(comparison.allowedTargets?.overlapCount)
+      ? comparison.allowedTargets.overlapCount
+      : 0,
+    requiredGroupsOverlapCount: Number.isInteger(comparison.requiredGroups?.overlapCount)
+      ? comparison.requiredGroups.overlapCount
+      : 0,
+    bucketsAligned: comparison.buckets?.allAligned === true,
+    safetyAligned: comparison.safety?.aligned === true,
+    candidateHasOperations: comparison.operations?.candidateHasOperations === true,
+    candidateHasCommands: comparison.operations?.candidateHasCommands === true,
+    candidateHasWrites: comparison.operations?.candidateHasWrites === true,
+    recommendedAction:
+      typeof comparison.recommendation?.action === 'string' &&
+      comparison.recommendation.action.trim()
+        ? comparison.recommendation.action.trim()
+        : 'observe',
+    warningsCount: Array.isArray(comparison.warnings) ? comparison.warnings.length : 0,
+    errorsCount: Array.isArray(comparison.errors) ? comparison.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
+function summarizeGeneratedDomainShadowMaterializationEndToEndReadinessForDebug(report) {
+  if (!report || typeof report !== 'object') {
+    return {
+      present: false,
+      evaluated: false,
+      status: 'not-ready',
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(report.warnings)
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(report.errors)
+
+  return {
+    present: report.present === true,
+    evaluated: report.evaluated === true,
+    status:
+      typeof report.status === 'string' && report.status.trim()
+        ? report.status.trim()
+        : 'not-ready',
+    behaviorChanged: report.behaviorChanged === true,
+    contractValid: report.pipeline?.contractValid === true,
+    shadowPlanBuilt: report.pipeline?.shadowPlanBuilt === true,
+    candidateBuilt: report.pipeline?.candidateBuilt === true,
+    candidateInspectable: report.pipeline?.candidateInspectable === true,
+    gateEligible: report.pipeline?.gateEligible === true,
+    switchReadyForTestHarness: report.pipeline?.switchReadyForTestHarness === true,
+    sourceResolutionProjectsShadowInTest:
+      report.pipeline?.sourceResolutionProjectsShadowInTest === true,
+    runtimeStillDisabled: report.pipeline?.runtimeStillDisabled === true,
+    warningsCount: Array.isArray(report.warnings) ? report.warnings.length : 0,
+    errorsCount: Array.isArray(report.errors) ? report.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
+function summarizeGeneratedDomainControlledEnablePolicyForDebug(policy) {
+  if (!policy || typeof policy !== 'object') {
+    return {
+      present: false,
+      evaluated: false,
+      status: 'not-ready',
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(policy.warnings)
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(policy.errors)
+
+  return {
+    present: policy.present === true,
+    evaluated: policy.evaluated === true,
+    status:
+      typeof policy.status === 'string' && policy.status.trim()
+        ? policy.status.trim()
+        : 'not-ready',
+    behaviorChanged: policy.behaviorChanged === true,
+    runtimeEnabled: policy.runtimeEnabled === true,
+    hasLegacyMaterializationPlan:
+      policy.eligibility?.hasLegacyMaterializationPlan === true,
+    hasShadowCandidate: policy.eligibility?.hasShadowCandidate === true,
+    candidateUsableByFutureSwitch:
+      policy.eligibility?.candidateUsableByFutureSwitch === true,
+    endToEndReadyForHarness:
+      policy.eligibility?.endToEndReadyForHarness === true,
+    controlledRuntimeEnable:
+      policy.allowedModes?.controlledRuntimeEnable === true,
+    recommendedAction:
+      typeof policy.recommendation?.action === 'string' &&
+      policy.recommendation.action.trim()
+        ? policy.recommendation.action.trim()
+        : 'observe',
+    warningsCount: Array.isArray(policy.warnings) ? policy.warnings.length : 0,
+    errorsCount: Array.isArray(policy.errors) ? policy.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
+function summarizeGeneratedDomainFirstControlledEnableScenarioForDebug(scenario) {
+  if (!scenario || typeof scenario !== 'object') {
+    return {
+      present: false,
+      evaluated: false,
+      status: 'not-ready',
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(scenario.warnings)
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(scenario.errors)
+
+  return {
+    present: scenario.present === true,
+    evaluated: scenario.evaluated === true,
+    status:
+      typeof scenario.status === 'string' && scenario.status.trim()
+        ? scenario.status.trim()
+        : 'not-ready',
+    behaviorChanged: scenario.behaviorChanged === true,
+    allowedNow: scenario.allowedNow === true,
+    requiresLeanApproval: scenario.requiresLeanApproval !== false,
+    fullstackLocalOnly: scenario.conditions?.fullstackLocalOnly === true,
+    hasLegacyMaterializationPlan:
+      scenario.conditions?.hasLegacyMaterializationPlan === true,
+    hasShadowCandidate: scenario.conditions?.hasShadowCandidate === true,
+    candidateUsableByFutureSwitch:
+      scenario.conditions?.candidateUsableByFutureSwitch === true,
+    controlledRuntimeEnable:
+      scenario.conditions?.controlledRuntimeEnable === true,
+    recommendedAction:
+      typeof scenario.recommendation?.action === 'string' &&
+      scenario.recommendation.action.trim()
+        ? scenario.recommendation.action.trim()
+        : 'observe',
+    warningsCount: Array.isArray(scenario.warnings) ? scenario.warnings.length : 0,
+    errorsCount: Array.isArray(scenario.errors) ? scenario.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
+function summarizeGeneratedDomainFileCreationApprovalPolicyForDebug(policy) {
+  if (!policy || typeof policy !== 'object') {
+    return {
+      present: false,
+      evaluated: false,
+      status: 'not-ready',
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(policy.warnings)
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(policy.errors)
+
+  return {
+    present: policy.present === true,
+    evaluated: policy.evaluated === true,
+    status:
+      typeof policy.status === 'string' && policy.status.trim()
+        ? policy.status.trim()
+        : 'not-ready',
+    behaviorChanged: policy.behaviorChanged === true,
+    approvalRequired: policy.approvalRequired === true,
+    allowedNow: policy.allowedNow === true,
+    requiresLeanApproval: policy.requiresLeanApproval !== false,
+    targetRoot:
+      typeof policy.scope?.targetRoot === 'string' && policy.scope.targetRoot.trim()
+        ? policy.scope.targetRoot.trim()
+        : undefined,
+    previewPathsCount: Array.isArray(policy.scope?.previewPaths)
+      ? policy.scope.previewPaths.length
+      : 0,
+    candidateComparisonStatus:
+      typeof policy.evidence?.candidateComparisonStatus === 'string' &&
+      policy.evidence.candidateComparisonStatus.trim()
+        ? policy.evidence.candidateComparisonStatus.trim()
+        : 'not-available',
+    candidateUsableByFutureSwitch:
+      policy.evidence?.candidateUsableByFutureSwitch === true,
+    noCommands: policy.safeguards?.noCommands === true,
+    noWritesExecuted: policy.safeguards?.noWritesExecuted === true,
+    noWebPrueba: policy.safeguards?.noWebPrueba === true,
+    recommendedAction:
+      typeof policy.recommendation?.action === 'string' &&
+      policy.recommendation.action.trim()
+        ? policy.recommendation.action.trim()
+        : 'observe',
+    warningsCount: Array.isArray(policy.warnings) ? policy.warnings.length : 0,
+    errorsCount: Array.isArray(policy.errors) ? policy.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
+function summarizeGeneratedDomainMaterializationInspectionSourceResolutionForDebug(
+  resolution,
+) {
+  if (!resolution || typeof resolution !== 'object') {
+    return {
+      present: false,
+      resolved: false,
+      source: 'none',
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(resolution.warnings)
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(resolution.errors)
+
+  return {
+    present: resolution.present === true,
+    resolved: resolution.resolved === true,
+    source:
+      typeof resolution.source === 'string' && resolution.source.trim()
+        ? resolution.source.trim()
+        : 'none',
+    behaviorChanged: resolution.behaviorChanged === true,
+    candidatePreferred: resolution.candidatePreferred === true,
+    legacyUsedAsFallback: resolution.legacyUsedAsFallback === true,
+    materializationPlanChanged:
+      resolution.runtime?.materializationPlanChanged === true,
+    executionScopeChanged: resolution.runtime?.executionScopeChanged === true,
+    candidateStatus:
+      typeof resolution.inputs?.candidateStatus === 'string' &&
+      resolution.inputs.candidateStatus.trim()
+        ? resolution.inputs.candidateStatus.trim()
+        : 'not-available',
+    comparisonStatus:
+      typeof resolution.inputs?.candidateComparisonStatus === 'string' &&
+      resolution.inputs.candidateComparisonStatus.trim()
+        ? resolution.inputs.candidateComparisonStatus.trim()
+        : 'not-available',
+    approvalStatus:
+      typeof resolution.inputs?.approvalPolicyStatus === 'string' &&
+      resolution.inputs.approvalPolicyStatus.trim()
+        ? resolution.inputs.approvalPolicyStatus.trim()
+        : 'not-available',
+    recommendedAction:
+      typeof resolution.recommendation?.action === 'string' &&
+      resolution.recommendation.action.trim()
+        ? resolution.recommendation.action.trim()
+        : 'observe',
+    warningsCount: Array.isArray(resolution.warnings) ? resolution.warnings.length : 0,
+    errorsCount: Array.isArray(resolution.errors) ? resolution.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
+function summarizeGeneratedDomainUniversalMaterializationPlanPreviewForDebug(preview) {
+  if (!preview || typeof preview !== 'object') {
+    return {
+      present: false,
+      built: false,
+      status: 'not-available',
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(preview.warnings)
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(preview.errors)
+
+  return {
+    present: preview.present === true,
+    built: preview.built === true,
+    status:
+      typeof preview.status === 'string' && preview.status.trim()
+        ? preview.status.trim()
+        : 'not-available',
+    behaviorChanged: preview.behaviorChanged === true,
+    root: typeof preview.root === 'string' && preview.root.trim() ? preview.root.trim() : undefined,
+    deliveryLevel:
+      typeof preview.deliveryLevel === 'string' && preview.deliveryLevel.trim()
+        ? preview.deliveryLevel.trim()
+        : undefined,
+    allowedTargetPathsCount: Array.isArray(preview.allowedTargetPaths)
+      ? preview.allowedTargetPaths.length
+      : 0,
+    requiredPathGroupsCount: Array.isArray(preview.requiredPathGroups)
+      ? preview.requiredPathGroups.length
+      : 0,
+    canBecomeMaterializationPlan: preview.canBecomeMaterializationPlan === true,
+    approvalRequired: preview.approvalRequired !== false,
+    safeForLocalMaterialization: preview.safety?.safeForLocalMaterialization === true,
+    noCommands: preview.safety?.noCommands === true,
+    noWrites: preview.safety?.noWrites === true,
+    warningsCount: Array.isArray(preview.warnings) ? preview.warnings.length : 0,
+    errorsCount: Array.isArray(preview.errors) ? preview.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
+function summarizeGeneratedDomainUniversalMaterializationPlanPreviewComparisonForDebug(
+  comparison,
+) {
+  if (!comparison || typeof comparison !== 'object') {
+    return {
+      present: false,
+      compared: false,
+      status: 'not-available',
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(comparison.warnings)
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(comparison.errors)
+
+  return {
+    present: comparison.present === true,
+    compared: comparison.compared === true,
+    status:
+      typeof comparison.status === 'string' && comparison.status.trim()
+        ? comparison.status.trim()
+        : 'not-available',
+    behaviorChanged: comparison.behaviorChanged === true,
+    previewBuilt: comparison.preview?.built === true,
+    legacyPresent: comparison.preview?.legacyPresent === true,
+    candidatePresent: comparison.preview?.candidatePresent === true,
+    rootsAligned: comparison.roots?.aligned === true,
+    allowedTargetsAligned: comparison.allowedTargets?.aligned === true,
+    requiredGroupsAligned: comparison.requiredGroups?.aligned === true,
+    bucketsAligned: comparison.buckets?.allAligned === true,
+    safetyAligned: comparison.safety?.aligned === true,
+    recommendedAction:
+      typeof comparison.recommendation?.action === 'string' &&
+      comparison.recommendation.action.trim()
+        ? comparison.recommendation.action.trim()
+        : 'observe',
+    warningsCount: Array.isArray(comparison.warnings) ? comparison.warnings.length : 0,
+    errorsCount: Array.isArray(comparison.errors) ? comparison.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
+function summarizeGeneratedDomainStructuralCapabilitiesForDebug(capabilities) {
+  if (!capabilities || typeof capabilities !== 'object') {
+    return {
+      present: false,
+      evaluated: false,
+      behaviorChanged: false,
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(capabilities.warnings)
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(capabilities.errors)
+
+  return {
+    present: capabilities.present === true,
+    evaluated: capabilities.evaluated === true,
+    behaviorChanged: capabilities.behaviorChanged === true,
+    hasPublicFrontend: capabilities.hasPublicFrontend === true,
+    hasAdminPanel: capabilities.hasAdminPanel === true,
+    hasOperatorPanel: capabilities.hasOperatorPanel === true,
+    hasBackend: capabilities.hasBackend === true,
+    hasDatabase: capabilities.hasDatabase === true,
+    hasReporting: capabilities.hasReporting === true,
+    hasScheduling: capabilities.hasScheduling === true,
+    hasInventory: capabilities.hasInventory === true,
+    hasDocuments: capabilities.hasDocuments === true,
+    hasMockPayments: capabilities.hasMockPayments === true,
+    hasMessaging: capabilities.hasMessaging === true,
+    hasAuthMock: capabilities.hasAuthMock === true,
+    hasValidation: capabilities.hasValidation === true,
+    hasSafeLocalMaterialization: capabilities.hasSafeLocalMaterialization === true,
+    warningsCount: Array.isArray(capabilities.warnings) ? capabilities.warnings.length : 0,
+    errorsCount: Array.isArray(capabilities.errors) ? capabilities.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
+function summarizeLegacyDomainHardcodingDebtReportForDebug(report) {
+  if (!report || typeof report !== 'object') {
+    return {
+      present: false,
+      evaluated: false,
+      behaviorChanged: false,
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(report.warnings)
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(report.errors)
+
+  return {
+    present: report.present === true,
+    evaluated: report.evaluated === true,
+    behaviorChanged: report.behaviorChanged === true,
+    legacyResolversDetected: Number.isInteger(report.legacyResolversDetected)
+      ? report.legacyResolversDetected
+      : 0,
+    runtimeCriticalCount: Number.isInteger(report.runtimeCriticalCount)
+      ? report.runtimeCriticalCount
+      : 0,
+    fixtureOnlyCount: Number.isInteger(report.fixtureOnlyCount) ? report.fixtureOnlyCount : 0,
+    migrationCandidatesCount: Array.isArray(report.migrationCandidates)
+      ? report.migrationCandidates.length
+      : 0,
+    riskyAreasCount: Array.isArray(report.riskyAreas) ? report.riskyAreas.length : 0,
+    firstRecommendedAction:
+      Array.isArray(report.recommendedNextActions) && report.recommendedNextActions.length > 0
+        ? report.recommendedNextActions[0]
+        : undefined,
+    warningsCount: Array.isArray(report.warnings) ? report.warnings.length : 0,
+    errorsCount: Array.isArray(report.errors) ? report.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
+function summarizeLocalDeterministicExecutorLegacyDebtReportForDebug(report) {
+  if (!report || typeof report !== 'object') {
+    return {
+      present: false,
+      evaluated: false,
+      behaviorChanged: false,
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(report.warnings)
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(report.errors)
+
+  return {
+    present: report.present === true,
+    evaluated: report.evaluated === true,
+    behaviorChanged: report.behaviorChanged === true,
+    executorFilePresent: report.executorFilePresent === true,
+    legacyBranchesDetected: Number.isInteger(report.legacyBranchesDetected)
+      ? report.legacyBranchesDetected
+      : 0,
+    runtimeCriticalCount: Number.isInteger(report.runtimeCriticalCount)
+      ? report.runtimeCriticalCount
+      : 0,
+    domainSpecificSignalsCount: Array.isArray(report.domainSpecificSignals)
+      ? report.domainSpecificSignals.length
+      : 0,
+    capabilityMigrationCandidatesCount: Array.isArray(report.capabilityMigrationCandidates)
+      ? report.capabilityMigrationCandidates.length
+      : 0,
+    riskyAreasCount: Array.isArray(report.riskyAreas) ? report.riskyAreas.length : 0,
+    firstRecommendedAction:
+      Array.isArray(report.recommendedNextActions) && report.recommendedNextActions.length > 0
+        ? report.recommendedNextActions[0]
+        : undefined,
+    warningsCount: Array.isArray(report.warnings) ? report.warnings.length : 0,
+    errorsCount: Array.isArray(report.errors) ? report.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
+function summarizeLocalDeterministicExecutorCapabilityMigrationPlanForDebug(plan) {
+  if (!plan || typeof plan !== 'object') {
+    return {
+      present: false,
+      evaluated: false,
+      behaviorChanged: false,
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(plan.warnings)
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(plan.errors)
+
+  return {
+    present: plan.present === true,
+    evaluated: plan.evaluated === true,
+    behaviorChanged: plan.behaviorChanged === true,
+    capabilityTargetsCount: Array.isArray(plan.capabilityTargets)
+      ? plan.capabilityTargets.length
+      : 0,
+    branchMappedCount: Number.isInteger(plan.branchMappedCount) ? plan.branchMappedCount : 0,
+    notReadyCount: Number.isInteger(plan.notReadyCount) ? plan.notReadyCount : 0,
+    firstRecommendedAction:
+      Array.isArray(plan.recommendedNextActions) && plan.recommendedNextActions.length > 0
+        ? plan.recommendedNextActions[0]
+        : undefined,
+    warningsCount: Array.isArray(plan.warnings) ? plan.warnings.length : 0,
+    errorsCount: Array.isArray(plan.errors) ? plan.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
 function summarizeDomainConsistencyDiagnosticsForDebug(diagnostics) {
   if (!diagnostics || typeof diagnostics !== 'object') {
     return {
@@ -3946,6 +4631,715 @@ function buildGeneratedDomainMaterializationPreferenceDecision({
         wouldKeepLegacy: false,
         wouldBlock: true,
         reason: 'The dry-run could not be evaluated because an internal error was raised.',
+      },
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
+function buildGeneratedDomainMaterializationPreferenceSwitch({
+  generatedDomainMaterializationShadowPlan,
+  generatedDomainMaterializationShadowComparison,
+  generatedDomainMaterializationShadowDiff,
+  generatedDomainMaterializationPreferenceGate,
+  generatedDomainMaterializationPreferenceDecision,
+  domainConsistencyDiagnostics,
+  materializationPlan,
+  preferenceSwitchOptions,
+}) {
+  const emptySwitch = {
+    present: false,
+    evaluated: false,
+    enabled: false,
+    mode: 'disabled',
+    source: 'generated-domain-materialization-preference-decision',
+    behaviorChanged: false,
+    actual: {
+      selectedSource: 'none',
+      materializationPlanChanged: false,
+      executionScopeChanged: false,
+      reason: '',
+    },
+    candidate: {
+      shadowAvailable: false,
+      shadowEligible: false,
+      wouldSelectShadowIfEnabled: false,
+      reason: '',
+    },
+    safeguards: {
+      domainConsistencyRequired: true,
+      gateEligibleRequired: true,
+      diffAlignedRequired: true,
+      noErrorsRequired: true,
+      materializationPlanMutationAllowed: false,
+    },
+    inputs: {
+      dryRunStatus: null,
+      dryRunEnabled: false,
+      dryRunWouldPreferShadow: false,
+      gateStatus: null,
+      gateCanPreferShadowInFuture: false,
+      diffStatus: null,
+      domainConsistencyStatus: null,
+      legacyPlanPresent: false,
+    },
+    recommendation: {
+      action: 'observe',
+      reason: '',
+      nextSafeStep: '',
+    },
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  const pushMessage = (target, message) => {
+    const normalized =
+      typeof message === 'string'
+        ? message.trim().replace(/\s+/gu, ' ')
+        : message === null || message === undefined
+          ? ''
+          : String(message).trim().replace(/\s+/gu, ' ')
+    if (!normalized || target.includes(normalized)) {
+      return
+    }
+    target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
+  }
+
+  const shadowPlan =
+    generatedDomainMaterializationShadowPlan &&
+    typeof generatedDomainMaterializationShadowPlan === 'object'
+      ? generatedDomainMaterializationShadowPlan
+      : null
+  const comparison =
+    generatedDomainMaterializationShadowComparison &&
+    typeof generatedDomainMaterializationShadowComparison === 'object'
+      ? generatedDomainMaterializationShadowComparison
+      : null
+  const diff =
+    generatedDomainMaterializationShadowDiff &&
+    typeof generatedDomainMaterializationShadowDiff === 'object'
+      ? generatedDomainMaterializationShadowDiff
+      : null
+  const gate =
+    generatedDomainMaterializationPreferenceGate &&
+    typeof generatedDomainMaterializationPreferenceGate === 'object'
+      ? generatedDomainMaterializationPreferenceGate
+      : null
+  const decision =
+    generatedDomainMaterializationPreferenceDecision &&
+    typeof generatedDomainMaterializationPreferenceDecision === 'object'
+      ? generatedDomainMaterializationPreferenceDecision
+      : null
+  const consistency =
+    domainConsistencyDiagnostics && typeof domainConsistencyDiagnostics === 'object'
+      ? domainConsistencyDiagnostics
+      : null
+
+  if (!shadowPlan && !comparison && !diff && !gate && !decision && !consistency) {
+    return emptySwitch
+  }
+
+  try {
+    const warnings = []
+    const errors = []
+    const runtimeEnabled = preferenceSwitchOptions?.testEnabled === true
+    const shadowAvailable = shadowPlan?.built === true
+    const gateStatus =
+      typeof gate?.status === 'string' && gate.status.trim() ? gate.status.trim() : null
+    const diffStatus =
+      typeof diff?.status === 'string' && diff.status.trim() ? diff.status.trim() : null
+    const comparisonStatus =
+      typeof comparison?.status === 'string' && comparison.status.trim()
+        ? comparison.status.trim()
+        : null
+    const decisionStatus =
+      typeof decision?.status === 'string' && decision.status.trim()
+        ? decision.status.trim()
+        : null
+    const domainConsistencyStatus =
+      typeof consistency?.status === 'string' && consistency.status.trim()
+        ? consistency.status.trim()
+        : null
+    const semanticStatus =
+      typeof consistency?.semanticStatus === 'string' && consistency.semanticStatus.trim()
+        ? consistency.semanticStatus.trim()
+        : null
+    const dryRunWouldPreferShadow = decision?.dryRun?.wouldPreferShadow === true
+    const gateCanPreferShadowInFuture = gate?.eligibility?.canPreferShadowInFuture === true
+    const legacyPlanPresent = Boolean(materializationPlan && typeof materializationPlan === 'object')
+    const domainConsistent =
+      domainConsistencyStatus === 'consistent' &&
+      (semanticStatus === null || semanticStatus === 'consistent')
+    const domainBlocked =
+      domainConsistencyStatus === 'mismatch' ||
+      domainConsistencyStatus === 'error' ||
+      semanticStatus === 'mismatch' ||
+      semanticStatus === 'error'
+    const diffAlignedEnough =
+      diffStatus === 'compared' ||
+      comparisonStatus === 'aligned' ||
+      diff?.recommendation?.action === 'prepare-preference-switch'
+    const diffBlocked =
+      diffStatus === 'divergent' ||
+      comparisonStatus === 'divergent' ||
+      diff?.recommendation?.action === 'investigate'
+    const noErrors =
+      (shadowPlan?.errorsCount || 0) === 0 &&
+      (gate?.errorsCount || 0) === 0 &&
+      (diff?.errorsCount || 0) === 0 &&
+      (decision?.errorsCount || 0) === 0 &&
+      (consistency?.errorsCount || 0) === 0
+    const shadowEligible =
+      shadowAvailable &&
+      dryRunWouldPreferShadow &&
+      gateCanPreferShadowInFuture &&
+      diffAlignedEnough &&
+      domainConsistent &&
+      noErrors
+
+    const selectedCurrentSource = legacyPlanPresent
+      ? 'legacy'
+      : shadowAvailable || gate?.present === true || decision?.present === true
+        ? 'current'
+        : 'none'
+
+    const switchDiagnostics = {
+      ...emptySwitch,
+      present: true,
+      evaluated:
+        shadowAvailable ||
+        gate?.evaluated === true ||
+        diff?.present === true ||
+        decision?.evaluated === true ||
+        consistency?.present === true ||
+        legacyPlanPresent,
+      enabled: runtimeEnabled,
+      mode: runtimeEnabled ? 'test-enabled' : 'disabled',
+      actual: {
+        selectedSource: selectedCurrentSource,
+        materializationPlanChanged: false,
+        executionScopeChanged: false,
+        reason: legacyPlanPresent
+          ? 'El runtime actual sigue usando materializationPlan legacy porque el switch scaffold permanece apagado.'
+          : shadowAvailable
+            ? 'Existe un candidato shadow observacional, pero el runtime actual no cambia la fuente real porque el switch scaffold sigue apagado.'
+            : 'No hay una fuente real de materializacion activa para este scaffold observacional.',
+      },
+      candidate: {
+        shadowAvailable,
+        shadowEligible,
+        wouldSelectShadowIfEnabled: shadowEligible,
+        reason: shadowEligible
+          ? 'Si el switch estuviera habilitado mas adelante, este caso preferiria shadow como candidato estructural.'
+          : 'La evidencia observacional actual todavia no alcanza para preferir shadow sobre legacy/current.',
+      },
+      inputs: {
+        dryRunStatus: decisionStatus,
+        dryRunEnabled: decision?.enabled === true,
+        dryRunWouldPreferShadow,
+        gateStatus,
+        gateCanPreferShadowInFuture,
+        diffStatus,
+        domainConsistencyStatus,
+        legacyPlanPresent,
+      },
+      recommendation: {
+        action: 'observe',
+        reason:
+          'El scaffold del switch existe, pero sigue apagado por defecto y no modifica la fuente real de materializacion.',
+        nextSafeStep:
+          'Seguir observando los diagnostics estructurales antes de considerar una activacion real.',
+      },
+      warnings,
+      errors,
+    }
+
+    if (domainBlocked) {
+      pushMessage(
+        warnings,
+        'El switch scaffold no deberia habilitarse mientras la consistencia de dominio siga mostrando mismatches semanticos o estructurales.',
+      )
+    }
+    if (gateStatus === 'not-ready' || gate?.eligibility?.needsMoreEvidence === true) {
+      pushMessage(
+        warnings,
+        'El switch scaffold sigue deshabilitado porque la evidencia comparativa para preferir shadow aun no es suficiente.',
+      )
+    }
+    if (diffBlocked) {
+      pushMessage(
+        warnings,
+        'El diff observacional todavia muestra divergencia, por lo que el switch scaffold debe mantenerse apagado.',
+      )
+    }
+
+    if (domainBlocked || diffBlocked || gateStatus === 'blocked') {
+      switchDiagnostics.recommendation = {
+        action: 'investigate',
+        reason:
+          'Hay señales estructurales o de consistencia de dominio que bloquearian un switch real de preferencia shadow.',
+        nextSafeStep:
+          'Investigar la divergencia o inconsistencia antes de pensar en habilitar el switch.',
+      }
+    } else if (shadowEligible) {
+      switchDiagnostics.recommendation = {
+        action: 'ready-to-enable-later',
+        reason:
+          'El scaffold apagado confirma que, con la evidencia actual, un futuro switch podria elegir shadow sin cambiar el runtime de hoy.',
+        nextSafeStep:
+          'Preparar una activacion controlada con fallback legacy explicito y pruebas adicionales.',
+      }
+    } else if (!shadowAvailable && legacyPlanPresent) {
+      switchDiagnostics.recommendation = {
+        action: 'keep-disabled',
+        reason:
+          'No hay shadow plan suficiente para pensar en un switch real, asi que el scaffold debe seguir completamente apagado.',
+        nextSafeStep:
+          'Mantener legacy/current y seguir ampliando la cobertura estructural del contrato universal.',
+      }
+    } else if (!shadowAvailable && !legacyPlanPresent) {
+      switchDiagnostics.recommendation = {
+        action: 'observe',
+        reason:
+          'No hay shadow plan ni materializationPlan legacy comparables para decidir una preferencia futura.',
+        nextSafeStep:
+          'Seguir construyendo observabilidad antes de introducir cualquier switch real.',
+      }
+    }
+
+    if (runtimeEnabled) {
+      if (shadowEligible) {
+        switchDiagnostics.actual = {
+          selectedSource: 'shadow',
+          materializationPlanChanged: false,
+          executionScopeChanged: false,
+          reason:
+            'Modo test-enabled solamente: el scaffold seleccionaria shadow como fuente hipotetica, sin mutar materializationPlan ni executionScope reales.',
+        }
+      } else {
+        switchDiagnostics.actual = {
+          selectedSource: selectedCurrentSource,
+          materializationPlanChanged: false,
+          executionScopeChanged: false,
+          reason:
+            'Modo test-enabled solamente: el scaffold sigue conservando legacy/current porque no hay elegibilidad suficiente para shadow.',
+        }
+      }
+    }
+
+    switchDiagnostics.warningsCount = switchDiagnostics.warnings.length
+    switchDiagnostics.errorsCount = switchDiagnostics.errors.length
+    return switchDiagnostics
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : normalizeOptionalString(String(error)) || 'error'
+
+    return {
+      ...emptySwitch,
+      present: true,
+      evaluated: true,
+      recommendation: {
+        action: 'investigate',
+        reason: 'El scaffold del switch de preferencia shadow devolvio un error interno.',
+        nextSafeStep: 'Revisar el scaffold y mantener el runtime actual sin cambios.',
+      },
+      status: 'error',
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
+function buildGeneratedDomainMaterializationSwitchReadinessReport({
+  generatedDomainMaterializationPreferenceSwitch,
+  generatedDomainMaterializationPreferenceDecision,
+  generatedDomainMaterializationPreferenceGate,
+  generatedDomainMaterializationShadowDiff,
+  generatedDomainMaterializationShadowComparison,
+  generatedDomainMaterializationShadowPlan,
+  domainConsistencyDiagnostics,
+  legacyMigrationCandidateReport,
+  fullstackLocalInspectionSourceDiagnostics,
+  materializationPlan,
+}) {
+  const emptyReport = {
+    present: false,
+    evaluated: false,
+    status: 'not-ready',
+    source: 'generated-domain-materialization-preference-switch',
+    behaviorChanged: false,
+    readiness: {
+      switchPresent: false,
+      switchEnabled: false,
+      shadowAvailable: false,
+      shadowEligible: false,
+      gateEligible: false,
+      diffAligned: false,
+      domainConsistent: false,
+      legacyComparisonAvailable: false,
+      dryRunWouldPreferShadow: false,
+      hasBlockingErrors: false,
+    },
+    blockers: {
+      missingShadowPlan: true,
+      missingLegacyComparison: true,
+      domainMismatch: false,
+      diffDivergent: false,
+      gateNotReady: false,
+      switchAlreadyEnabled: false,
+      errorsPresent: false,
+    },
+    recommendation: {
+      action: 'observe',
+      reason: '',
+      nextSafeStep: '',
+    },
+    evidence: {
+      switchMode: null,
+      switchRecommendedAction: null,
+      decisionStatus: null,
+      gateStatus: null,
+      diffStatus: null,
+      shadowComparisonStatus: null,
+      domainConsistencyStatus: null,
+      semanticStatus: null,
+    },
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  const pushMessage = (target, message) => {
+    const normalized =
+      typeof message === 'string'
+        ? message.trim().replace(/\s+/gu, ' ')
+        : message === null || message === undefined
+          ? ''
+          : String(message).trim().replace(/\s+/gu, ' ')
+    if (!normalized || target.includes(normalized)) {
+      return
+    }
+    target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
+  }
+
+  const preferenceSwitch =
+    generatedDomainMaterializationPreferenceSwitch &&
+    typeof generatedDomainMaterializationPreferenceSwitch === 'object'
+      ? generatedDomainMaterializationPreferenceSwitch
+      : null
+  const preferenceDecision =
+    generatedDomainMaterializationPreferenceDecision &&
+    typeof generatedDomainMaterializationPreferenceDecision === 'object'
+      ? generatedDomainMaterializationPreferenceDecision
+      : null
+  const preferenceGate =
+    generatedDomainMaterializationPreferenceGate &&
+    typeof generatedDomainMaterializationPreferenceGate === 'object'
+      ? generatedDomainMaterializationPreferenceGate
+      : null
+  const shadowDiff =
+    generatedDomainMaterializationShadowDiff &&
+    typeof generatedDomainMaterializationShadowDiff === 'object'
+      ? generatedDomainMaterializationShadowDiff
+      : null
+  const shadowComparison =
+    generatedDomainMaterializationShadowComparison &&
+    typeof generatedDomainMaterializationShadowComparison === 'object'
+      ? generatedDomainMaterializationShadowComparison
+      : null
+  const shadowPlan =
+    generatedDomainMaterializationShadowPlan &&
+    typeof generatedDomainMaterializationShadowPlan === 'object'
+      ? generatedDomainMaterializationShadowPlan
+      : null
+  const consistency =
+    domainConsistencyDiagnostics && typeof domainConsistencyDiagnostics === 'object'
+      ? domainConsistencyDiagnostics
+      : null
+  const migrationReport =
+    legacyMigrationCandidateReport && typeof legacyMigrationCandidateReport === 'object'
+      ? legacyMigrationCandidateReport
+      : null
+  const inspectionSource =
+    fullstackLocalInspectionSourceDiagnostics &&
+    typeof fullstackLocalInspectionSourceDiagnostics === 'object'
+      ? fullstackLocalInspectionSourceDiagnostics
+      : null
+
+  if (
+    !preferenceSwitch &&
+    !preferenceDecision &&
+    !preferenceGate &&
+    !shadowDiff &&
+    !shadowComparison &&
+    !shadowPlan &&
+    !consistency &&
+    !migrationReport &&
+    !inspectionSource
+  ) {
+    return emptyReport
+  }
+
+  try {
+    const warnings = []
+    const errors = []
+    const switchPresent = preferenceSwitch?.present === true
+    const switchEnabled = preferenceSwitch?.enabled === true
+    const switchMode =
+      typeof preferenceSwitch?.mode === 'string' && preferenceSwitch.mode.trim()
+        ? preferenceSwitch.mode.trim()
+        : null
+    const shadowAvailable =
+      preferenceSwitch?.candidate?.shadowAvailable === true || shadowPlan?.built === true
+    const shadowEligible = preferenceSwitch?.candidate?.shadowEligible === true
+    const gateEligible =
+      preferenceGate?.eligibility?.canPreferShadowInFuture === true ||
+      preferenceGate?.status === 'eligible'
+    const diffStatus =
+      typeof shadowDiff?.status === 'string' && shadowDiff.status.trim()
+        ? shadowDiff.status.trim()
+        : null
+    const shadowComparisonStatus =
+      typeof shadowComparison?.status === 'string' && shadowComparison.status.trim()
+        ? shadowComparison.status.trim()
+        : null
+    const diffAligned =
+      diffStatus === 'compared' ||
+      shadowComparisonStatus === 'aligned' ||
+      shadowDiff?.recommendation?.action === 'prepare-preference-switch'
+    const domainConsistencyStatus =
+      typeof consistency?.status === 'string' && consistency.status.trim()
+        ? consistency.status.trim()
+        : null
+    const semanticStatus =
+      typeof consistency?.semanticStatus === 'string' && consistency.semanticStatus.trim()
+        ? consistency.semanticStatus.trim()
+        : null
+    const domainConsistent =
+      domainConsistencyStatus === 'consistent' &&
+      (semanticStatus === null || semanticStatus === 'consistent')
+    const legacyComparisonAvailable =
+      shadowComparison?.compared === true ||
+      shadowDiff?.compared === true ||
+      shadowComparison?.legacyPlanPresent === true
+    const dryRunWouldPreferShadow =
+      preferenceDecision?.dryRun?.wouldPreferShadow === true
+    const hasBlockingErrors =
+      (preferenceSwitch?.errorsCount || 0) > 0 ||
+      (preferenceDecision?.errorsCount || 0) > 0 ||
+      (preferenceGate?.errorsCount || 0) > 0 ||
+      (shadowDiff?.errorsCount || 0) > 0 ||
+      (shadowComparison?.errorsCount || 0) > 0 ||
+      (shadowPlan?.errorsCount || 0) > 0 ||
+      (consistency?.errorsCount || 0) > 0
+    const domainMismatch =
+      domainConsistencyStatus === 'mismatch' ||
+      domainConsistencyStatus === 'error' ||
+      semanticStatus === 'mismatch' ||
+      semanticStatus === 'error'
+    const diffDivergent =
+      diffStatus === 'divergent' ||
+      shadowComparisonStatus === 'divergent' ||
+      shadowDiff?.recommendation?.action === 'investigate'
+    const gateStatus =
+      typeof preferenceGate?.status === 'string' && preferenceGate.status.trim()
+        ? preferenceGate.status.trim()
+        : null
+    const gateNotReady =
+      !gateEligible &&
+      Boolean(preferenceGate?.present === true || gateStatus === 'not-ready' || gateStatus === 'blocked')
+    const switchAlreadyEnabled = switchEnabled && switchMode !== 'test-enabled'
+    const missingShadowPlan = !shadowAvailable
+    const missingLegacyComparison = !legacyComparisonAvailable
+    const errorsPresent = hasBlockingErrors
+
+    const report = {
+      ...emptyReport,
+      present: true,
+      evaluated:
+        switchPresent ||
+        preferenceDecision?.evaluated === true ||
+        preferenceGate?.evaluated === true ||
+        shadowAvailable ||
+        Boolean(consistency?.checked === true) ||
+        Boolean(materializationPlan && typeof materializationPlan === 'object'),
+      readiness: {
+        switchPresent,
+        switchEnabled,
+        shadowAvailable,
+        shadowEligible,
+        gateEligible,
+        diffAligned,
+        domainConsistent,
+        legacyComparisonAvailable,
+        dryRunWouldPreferShadow,
+        hasBlockingErrors,
+      },
+      blockers: {
+        missingShadowPlan,
+        missingLegacyComparison,
+        domainMismatch,
+        diffDivergent,
+        gateNotReady,
+        switchAlreadyEnabled,
+        errorsPresent,
+      },
+      recommendation: {
+        action: 'observe',
+        reason:
+          'El readiness report sigue observacional y resume si el switch futuro tendria evidencia suficiente para una activacion controlada.',
+        nextSafeStep:
+          'Seguir acumulando evidencia antes de intentar una activacion real del switch.',
+      },
+      evidence: {
+        switchMode,
+        switchRecommendedAction:
+          typeof preferenceSwitch?.recommendation?.action === 'string' &&
+          preferenceSwitch.recommendation.action.trim()
+            ? preferenceSwitch.recommendation.action.trim()
+            : null,
+        decisionStatus:
+          typeof preferenceDecision?.status === 'string' &&
+          preferenceDecision.status.trim()
+            ? preferenceDecision.status.trim()
+            : null,
+        gateStatus,
+        diffStatus,
+        shadowComparisonStatus,
+        domainConsistencyStatus,
+        semanticStatus,
+      },
+      warnings,
+      errors,
+    }
+
+    if (switchAlreadyEnabled) {
+      pushMessage(
+        warnings,
+        'El readiness report detectó que el switch aparece habilitado fuera del harness de prueba, por lo que debe tratarse como una condición bloqueante.',
+      )
+    }
+    if (missingLegacyComparison) {
+      pushMessage(
+        warnings,
+        'Todavía no hay comparación legacy suficiente para considerar un cambio real del switch.',
+      )
+    }
+    if (gateNotReady) {
+      pushMessage(
+        warnings,
+        'La puerta observacional todavía no marcó al shadow plan como elegible para una preferencia futura.',
+      )
+    }
+    if (domainMismatch) {
+      pushMessage(
+        warnings,
+        'La consistencia de dominio sigue mostrando un mismatch estructural o semántico, por lo que el switch no debería acercarse a una activación real.',
+      )
+    }
+    if (diffDivergent) {
+      pushMessage(
+        warnings,
+        'El diff observacional entre shadow y legacy sigue divergente, así que el switch debe permanecer apagado.',
+      )
+    }
+    if (
+      inspectionSource?.source === 'generated-domain-contract' &&
+      shadowAvailable &&
+      !missingLegacyComparison
+    ) {
+      pushMessage(
+        warnings,
+        'La inspección ya puede apoyarse en generated-domain-contract, pero eso no alcanza por sí solo para habilitar el switch de materialización.',
+      )
+    }
+
+    if (switchAlreadyEnabled || domainMismatch || diffDivergent || errorsPresent) {
+      report.status = 'blocked'
+      report.recommendation = {
+        action: 'investigate',
+        reason:
+          'Hay bloqueos estructurales, de consistencia o de seguridad que impiden considerar una activación futura del switch.',
+        nextSafeStep:
+          'Investigar la divergencia, el mismatch o los errores antes de pensar en un enable controlado.',
+      }
+    } else if (
+      shadowAvailable &&
+      shadowEligible &&
+      gateEligible &&
+      diffAligned &&
+      domainConsistent &&
+      legacyComparisonAvailable &&
+      dryRunWouldPreferShadow
+    ) {
+      report.status = 'ready-for-test-harness'
+      report.recommendation = {
+        action: 'test-harness-only',
+        reason:
+          'La evidencia observacional es suficientemente fuerte para ensayar el switch solo en harness de prueba, sin tocar el runtime real.',
+        nextSafeStep:
+          'Probar una activación controlada en test harness con fallback explícito a legacy y sin mutar materializationPlan real.',
+      }
+    } else if (
+      shadowAvailable &&
+      shadowEligible &&
+      gateEligible &&
+      diffAligned &&
+      domainConsistent &&
+      legacyComparisonAvailable &&
+      !dryRunWouldPreferShadow
+    ) {
+      report.status = 'ready-for-controlled-enable'
+      report.recommendation = {
+        action: 'prepare-controlled-enable',
+        reason:
+          'La base estructural parece alineada, pero todavía conviene preparar un enable controlado antes de cambiar la preferencia real.',
+        nextSafeStep:
+          'Preparar una activación muy controlada con dry-run reforzado, fallback legacy y validaciones adicionales.',
+      }
+    } else {
+      report.status = 'not-ready'
+      report.recommendation = {
+        action: 'observe',
+        reason: missingLegacyComparison
+          ? 'El switch sigue no listo porque todavía falta una comparación legacy suficiente para medir alineación real.'
+          : 'El switch sigue no listo porque la evidencia observacional todavía no alcanza para una activación futura segura.',
+        nextSafeStep: missingLegacyComparison
+          ? 'Esperar un materializationPlan legacy comparable y seguir observando los diagnostics.'
+          : 'Seguir acumulando evidencia estructural antes de acercarse a una activación real del switch.',
+      }
+    }
+
+    if (
+      migrationReport?.recommendation?.action === 'observe' &&
+      report.status === 'ready-for-test-harness'
+    ) {
+      pushMessage(
+        warnings,
+        'El reporte de migración legacy sigue en observación, así que el readiness se limita a test harness y no a runtime real.',
+      )
+    }
+
+    report.warningsCount = report.warnings.length
+    report.errorsCount = report.errors.length
+    return report
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : normalizeOptionalString(String(error)) || 'error'
+
+    return {
+      ...emptyReport,
+      present: true,
+      evaluated: true,
+      status: 'error',
+      recommendation: {
+        action: 'investigate',
+        reason: 'El readiness report del switch devolvió un error interno.',
+        nextSafeStep: 'Revisar el reporte y mantener el runtime actual sin cambios.',
       },
       errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
       errorsCount: 1,
@@ -39476,6 +40870,4873 @@ function applyGeneratedDomainContractObservationToDecision({
   return mergedDecision
 }
 
+function resolveGeneratedDomainMaterializationSource({
+  materializationPlan,
+  generatedDomainMaterializationShadowPlan,
+  generatedDomainMaterializationPreferenceSwitch,
+  generatedDomainMaterializationSwitchReadinessReport,
+  generatedDomainMaterializationPreferenceDecision,
+  domainConsistencyDiagnostics,
+  sourceResolutionOptions,
+}) {
+  const emptyResolution = {
+    present: false,
+    evaluated: false,
+    resolved: false,
+    source: 'none',
+    mode: 'runtime-disabled',
+    behaviorChanged: false,
+    runtime: {
+      switchEnabled: false,
+      selectedSource: 'none',
+      materializationPlanChanged: false,
+      executionScopeChanged: false,
+    },
+    testProjection: {
+      wouldSelectShadow: false,
+      projectedSource: 'none',
+      reason: '',
+    },
+    inputs: {
+      materializationPlanPresent: false,
+      shadowPlanBuilt: false,
+      switchEnabled: false,
+      readinessStatus: null,
+      switchMode: null,
+      domainConsistencyStatus: null,
+      semanticStatus: null,
+    },
+    safeguards: {
+      requiresExplicitEnable: true,
+      requiresDomainConsistency: true,
+      requiresReadiness: true,
+      requiresNoBlockingErrors: true,
+      allowsRuntimeMutation: false,
+    },
+    recommendation: {
+      action: 'observe',
+      reason: '',
+      nextSafeStep: '',
+    },
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  const pushMessage = (target, message) => {
+    const normalized =
+      typeof message === 'string'
+        ? message.trim().replace(/\s+/gu, ' ')
+        : message === null || message === undefined
+          ? ''
+          : String(message).trim().replace(/\s+/gu, ' ')
+    if (!normalized || target.includes(normalized)) {
+      return
+    }
+    target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
+  }
+
+  const shadowPlan =
+    generatedDomainMaterializationShadowPlan &&
+    typeof generatedDomainMaterializationShadowPlan === 'object'
+      ? generatedDomainMaterializationShadowPlan
+      : null
+  const preferenceSwitch =
+    generatedDomainMaterializationPreferenceSwitch &&
+    typeof generatedDomainMaterializationPreferenceSwitch === 'object'
+      ? generatedDomainMaterializationPreferenceSwitch
+      : null
+  const readinessReport =
+    generatedDomainMaterializationSwitchReadinessReport &&
+    typeof generatedDomainMaterializationSwitchReadinessReport === 'object'
+      ? generatedDomainMaterializationSwitchReadinessReport
+      : null
+  const preferenceDecision =
+    generatedDomainMaterializationPreferenceDecision &&
+    typeof generatedDomainMaterializationPreferenceDecision === 'object'
+      ? generatedDomainMaterializationPreferenceDecision
+      : null
+  const consistency =
+    domainConsistencyDiagnostics && typeof domainConsistencyDiagnostics === 'object'
+      ? domainConsistencyDiagnostics
+      : null
+
+  if (
+    !shadowPlan &&
+    !preferenceSwitch &&
+    !readinessReport &&
+    !preferenceDecision &&
+    !consistency &&
+    !(materializationPlan && typeof materializationPlan === 'object')
+  ) {
+    return emptyResolution
+  }
+
+  try {
+    const warnings = []
+    const errors = []
+    const testEnabled = sourceResolutionOptions?.testEnabled === true
+    const materializationPlanPresent = Boolean(
+      materializationPlan && typeof materializationPlan === 'object',
+    )
+    const shadowPlanBuilt = shadowPlan?.built === true
+    const readinessStatus =
+      typeof readinessReport?.status === 'string' && readinessReport.status.trim()
+        ? readinessReport.status.trim()
+        : null
+    const switchMode =
+      typeof preferenceSwitch?.mode === 'string' && preferenceSwitch.mode.trim()
+        ? preferenceSwitch.mode.trim()
+        : testEnabled
+          ? 'test-enabled'
+          : 'runtime-disabled'
+    const domainConsistencyStatus =
+      typeof consistency?.status === 'string' && consistency.status.trim()
+        ? consistency.status.trim()
+        : null
+    const semanticStatus =
+      typeof consistency?.semanticStatus === 'string' && consistency.semanticStatus.trim()
+        ? consistency.semanticStatus.trim()
+        : null
+    const switchEnabled = testEnabled || preferenceSwitch?.enabled === true
+    const runtimeSelectedSource = materializationPlanPresent
+      ? typeof preferenceSwitch?.actual?.selectedSource === 'string' &&
+        ['current', 'legacy'].includes(
+          preferenceSwitch.actual.selectedSource.trim(),
+        )
+        ? preferenceSwitch.actual.selectedSource.trim()
+        : 'legacy'
+      : 'none'
+    const domainConsistent =
+      domainConsistencyStatus === 'consistent' &&
+      (semanticStatus === null || semanticStatus === 'consistent')
+    const domainBlocked =
+      domainConsistencyStatus === 'mismatch' ||
+      domainConsistencyStatus === 'error' ||
+      semanticStatus === 'mismatch' ||
+      semanticStatus === 'error'
+    const readinessBlocked =
+      readinessStatus === 'blocked' ||
+      readinessReport?.blockers?.domainMismatch === true ||
+      readinessReport?.blockers?.diffDivergent === true ||
+      readinessReport?.blockers?.switchAlreadyEnabled === true ||
+      readinessReport?.blockers?.errorsPresent === true
+    const readinessAllowsShadow =
+      readinessStatus === 'ready-for-test-harness' ||
+      readinessStatus === 'ready-for-controlled-enable'
+    const hasBlockingErrors =
+      (shadowPlan?.errorsCount || 0) > 0 ||
+      (preferenceSwitch?.errorsCount || 0) > 0 ||
+      (readinessReport?.errorsCount || 0) > 0 ||
+      (preferenceDecision?.errorsCount || 0) > 0 ||
+      (consistency?.errorsCount || 0) > 0
+    const dryRunWouldPreferShadow =
+      preferenceDecision?.dryRun?.wouldPreferShadow === true
+    const canProjectShadow =
+      testEnabled &&
+      shadowPlanBuilt &&
+      readinessAllowsShadow &&
+      domainConsistent &&
+      dryRunWouldPreferShadow &&
+      !readinessBlocked &&
+      !hasBlockingErrors
+
+    let source = runtimeSelectedSource
+    let projectedSource = runtimeSelectedSource
+    let recommendation = {
+      action: materializationPlanPresent ? 'keep-current' : 'observe',
+      reason: materializationPlanPresent
+        ? 'El runtime actual debe seguir usando la fuente actual mientras el switch real permanezca apagado.'
+        : 'Todavia no hay una fuente materializable activa para resolver en runtime.',
+      nextSafeStep: materializationPlanPresent
+        ? 'Mantener la fuente actual y seguir acumulando evidencia antes de un cambio real.'
+        : 'Seguir observando el shadow plan y el readiness report antes de pensar en una activacion futura.',
+    }
+
+    if (!materializationPlanPresent) {
+      pushMessage(
+        warnings,
+        'No hay materializationPlan real activo; el runtime sigue sin una fuente materializable disponible.',
+      )
+    }
+    if (!shadowPlanBuilt) {
+      pushMessage(
+        warnings,
+        'El shadow plan universal todavia no esta construido, asi que no puede proyectarse como fuente futura.',
+      )
+    }
+    if (!readinessAllowsShadow && readinessStatus && readinessStatus !== 'blocked') {
+      pushMessage(
+        warnings,
+        'El readiness report todavia no habilita una proyeccion segura hacia generated-domain-shadow.',
+      )
+    }
+    if (domainBlocked) {
+      pushMessage(
+        warnings,
+        'La consistencia de dominio no permite proyectar generated-domain-shadow como fuente candidata.',
+      )
+    }
+
+    if (domainBlocked || readinessBlocked || hasBlockingErrors) {
+      projectedSource = testEnabled ? 'blocked' : runtimeSelectedSource
+      source = testEnabled ? 'blocked' : runtimeSelectedSource
+      recommendation = {
+        action: 'investigate',
+        reason:
+          'Hay bloqueos estructurales o de consistencia que impiden resolver una fuente shadow segura, incluso en test harness.',
+        nextSafeStep:
+          'Investigar los bloqueos antes de intentar una proyeccion o una activacion controlada del switch.',
+      }
+    } else if (canProjectShadow) {
+      projectedSource = 'generated-domain-shadow'
+      source = 'generated-domain-shadow'
+      recommendation = {
+        action: 'test-harness-only',
+        reason:
+          'En modo test-enabled, la evidencia actual alcanza para proyectar generated-domain-shadow sin mutar el runtime real.',
+        nextSafeStep:
+          'Mantener esta resolucion solo en harness y sumar validaciones antes de cualquier enable controlado.',
+      }
+    } else if (testEnabled && materializationPlanPresent) {
+      projectedSource = runtimeSelectedSource
+      source = runtimeSelectedSource
+      recommendation = {
+        action: 'keep-current',
+        reason:
+          'Aun en test-enabled, la resolucion debe conservar la fuente actual porque la evidencia shadow no alcanza.',
+        nextSafeStep:
+          'Seguir observando readiness y consistencia antes de proyectar generated-domain-shadow.',
+      }
+    }
+
+    return {
+      ...emptyResolution,
+      present: true,
+      evaluated:
+        materializationPlanPresent ||
+        shadowPlanBuilt ||
+        preferenceSwitch?.evaluated === true ||
+        readinessReport?.evaluated === true ||
+        preferenceDecision?.evaluated === true ||
+        consistency?.checked === true,
+      resolved:
+        materializationPlanPresent ||
+        shadowPlanBuilt ||
+        preferenceSwitch?.present === true ||
+        readinessReport?.present === true,
+      source,
+      mode: testEnabled ? 'test-enabled' : 'runtime-disabled',
+      runtime: {
+        switchEnabled,
+        selectedSource: runtimeSelectedSource,
+        materializationPlanChanged: false,
+        executionScopeChanged: false,
+      },
+      testProjection: {
+        wouldSelectShadow: projectedSource === 'generated-domain-shadow',
+        projectedSource,
+        reason:
+          projectedSource === 'generated-domain-shadow'
+            ? 'La proyeccion de test habilita generated-domain-shadow sin mutar el runtime real.'
+            : projectedSource === 'blocked'
+              ? 'La proyeccion de test queda bloqueada por readiness, consistencia o errores observacionales.'
+              : materializationPlanPresent
+                ? 'La proyeccion sigue conservando la fuente actual porque no hay evidencia suficiente para shadow.'
+                : 'No hay fuente materializable disponible para una proyeccion distinta en esta fase.',
+      },
+      inputs: {
+        materializationPlanPresent,
+        shadowPlanBuilt,
+        switchEnabled,
+        readinessStatus,
+        switchMode,
+        domainConsistencyStatus,
+        semanticStatus,
+      },
+      recommendation,
+      warnings,
+      errors,
+      warningsCount: warnings.length,
+      errorsCount: errors.length,
+    }
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : normalizeOptionalString(String(error)) || 'error'
+
+    return {
+      ...emptyResolution,
+      present: true,
+      evaluated: true,
+      resolved: false,
+      source: 'blocked',
+      mode: sourceResolutionOptions?.testEnabled === true ? 'test-enabled' : 'runtime-disabled',
+      recommendation: {
+        action: 'investigate',
+        reason:
+          'La resolucion observacional de fuente de materializacion devolvio un error interno.',
+        nextSafeStep:
+          'Mantener runtime current/legacy sin cambios y revisar el resolver antes de usarlo como base futura.',
+      },
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
+function buildGeneratedDomainShadowMaterializationCandidatePlan({
+  generatedDomainMaterializationShadowPlan,
+  generatedDomainContract,
+  generatedDomainContractDiagnostics,
+  generatedDomainCapabilityProfile,
+  domainConsistencyDiagnostics,
+  generatedDomainMaterializationPreferenceGate,
+  generatedDomainMaterializationSourceResolution,
+}) {
+  const emptyCandidatePlan = {
+    present: false,
+    built: false,
+    status: 'not-available',
+    source: 'generated-domain-materialization-shadow',
+    behaviorChanged: false,
+    candidate: {
+      root: null,
+      sourceRoot: null,
+      targetRoot: null,
+      deliveryLevel: null,
+      allowedTargetPaths: [],
+      requiredPathGroups: [],
+      plannedBuckets: {
+        frontend: false,
+        backend: false,
+        database: false,
+        shared: false,
+        docs: false,
+        scripts: false,
+        validation: false,
+      },
+      safety: {
+        safeForLocalMaterialization: false,
+        forbidsSecrets: false,
+        forbidsDeploy: false,
+        forbidsRealPayments: false,
+        forbidsExternalServices: false,
+      },
+    },
+    compatibility: {
+      resemblesMaterializationPlan: false,
+      hasRoot: false,
+      hasAllowedTargets: false,
+      hasRequiredGroups: false,
+      hasFrontend: false,
+      hasBackend: false,
+      hasDatabase: false,
+      hasSafety: false,
+      canBeInspected: false,
+      canBeUsedByFutureSwitch: false,
+    },
+    limitations: [],
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  const pushMessage = (target, message) => {
+    const normalized =
+      typeof message === 'string'
+        ? message.trim().replace(/\s+/gu, ' ')
+        : message === null || message === undefined
+          ? ''
+          : String(message).trim().replace(/\s+/gu, ' ')
+    if (!normalized || target.includes(normalized)) {
+      return
+    }
+    target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
+  }
+
+  const normalizeCandidatePath = (value, rootHint = '') => {
+    const normalized = normalizeOptionalString(value)
+    if (!normalized) {
+      return ''
+    }
+    const candidate = normalizePathForComparison(normalized)
+    if (!path.isAbsolute(candidate)) {
+      return candidate
+    }
+
+    const normalizedRootHint = normalizePathForComparison(rootHint)
+    if (!normalizedRootHint) {
+      return candidate
+    }
+
+    const pathSegments = candidate.split('/').filter(Boolean)
+    const rootSegments = normalizedRootHint.split('/').filter(Boolean)
+    const rootBasename = rootSegments[rootSegments.length - 1] || normalizedRootHint
+    const rootIndex = pathSegments.lastIndexOf(rootBasename)
+
+    if (rootIndex === -1) {
+      return candidate
+    }
+
+    return pathSegments.slice(rootIndex).join('/')
+  }
+
+  const normalizeCandidateGroup = (group) => {
+    if (!group) {
+      return null
+    }
+    if (Array.isArray(group)) {
+      const candidates = summarizeUniqueExecutorStrings(
+        group.map((entry) => normalizeCandidatePath(entry)),
+        32,
+      ).filter(Boolean)
+      return candidates.length > 0 ? { candidates } : null
+    }
+    const normalizedGroup =
+      group && typeof group === 'object' && !Array.isArray(group) ? group : {}
+    const candidates = summarizeUniqueExecutorStrings(
+      (Array.isArray(normalizedGroup.candidates) ? normalizedGroup.candidates : [])
+        .map((entry) => normalizeCandidatePath(entry))
+        .filter(Boolean),
+      32,
+    )
+    if (candidates.length === 0) {
+      return null
+    }
+    return {
+      ...(typeof normalizedGroup.label === 'string' && normalizedGroup.label.trim()
+        ? { label: normalizedGroup.label.trim() }
+        : {}),
+      candidates,
+    }
+  }
+
+  const shadowPlan =
+    generatedDomainMaterializationShadowPlan &&
+    typeof generatedDomainMaterializationShadowPlan === 'object'
+      ? generatedDomainMaterializationShadowPlan
+      : null
+  const normalizedContract =
+    generatedDomainContractDiagnostics?.normalizedContract &&
+    typeof generatedDomainContractDiagnostics.normalizedContract === 'object'
+      ? generatedDomainContractDiagnostics.normalizedContract
+      : generatedDomainContract && typeof generatedDomainContract === 'object'
+        ? generatedDomainContract
+        : null
+  const capabilityProfile =
+    generatedDomainCapabilityProfile && typeof generatedDomainCapabilityProfile === 'object'
+      ? generatedDomainCapabilityProfile
+      : null
+  const consistency =
+    domainConsistencyDiagnostics && typeof domainConsistencyDiagnostics === 'object'
+      ? domainConsistencyDiagnostics
+      : null
+  const preferenceGate =
+    generatedDomainMaterializationPreferenceGate &&
+    typeof generatedDomainMaterializationPreferenceGate === 'object'
+      ? generatedDomainMaterializationPreferenceGate
+      : null
+  const sourceResolution =
+    generatedDomainMaterializationSourceResolution &&
+    typeof generatedDomainMaterializationSourceResolution === 'object'
+      ? generatedDomainMaterializationSourceResolution
+      : null
+
+  if (
+    !shadowPlan &&
+    !normalizedContract &&
+    !generatedDomainContractDiagnostics &&
+    !capabilityProfile &&
+    !consistency &&
+    !preferenceGate &&
+    !sourceResolution
+  ) {
+    return emptyCandidatePlan
+  }
+
+  try {
+    const warnings = []
+    const errors = []
+    const limitations = []
+    const shadowPresent = shadowPlan?.present === true
+    const shadowBuilt = shadowPlan?.built === true
+    const root =
+      normalizeOptionalString(shadowPlan?.root) ||
+      normalizeOptionalString(normalizedContract?.root?.slug) ||
+      normalizeOptionalString(generatedDomainContractDiagnostics?.rootSlug) ||
+      null
+    const sourceRoot =
+      normalizeOptionalString(shadowPlan?.sourceRoot) ||
+      normalizeOptionalString(normalizedContract?.root?.sourceRoot) ||
+      normalizeOptionalString(generatedDomainContractDiagnostics?.sourceRoot) ||
+      null
+    const targetRoot =
+      normalizeOptionalString(shadowPlan?.targetRoot) ||
+      normalizeOptionalString(normalizedContract?.root?.targetRoot) ||
+      normalizeOptionalString(generatedDomainContractDiagnostics?.targetRoot) ||
+      normalizeOptionalString(root) ||
+      null
+    const deliveryLevel =
+      normalizeOptionalString(normalizedContract?.deliveryLevel) ||
+      (capabilityProfile?.delivery?.fullstackLocal === true ? 'fullstack-local' : null)
+    const contractSignalsText = normalizeSectorDetectionText(
+      JSON.stringify({
+        entities: Array.isArray(normalizedContract?.entities) ? normalizedContract.entities : [],
+        workflows: Array.isArray(normalizedContract?.workflows) ? normalizedContract.workflows : [],
+        integrations: Array.isArray(normalizedContract?.integrations)
+          ? normalizedContract.integrations
+          : [],
+        approvals: Array.isArray(normalizedContract?.approvals) ? normalizedContract.approvals : [],
+        safety: normalizedContract?.safety || {},
+      }),
+    )
+
+    const derivedAllowedTargetPaths = summarizeUniqueExecutorStrings(
+      Array.isArray(generatedDomainContractDiagnostics?.allowedTargetPaths)
+        ? generatedDomainContractDiagnostics.allowedTargetPaths.map((entry) =>
+            normalizeCandidatePath(entry, targetRoot),
+          )
+        : normalizedContract
+          ? deriveAllowedTargetPathsFromContract(normalizedContract, '.').map((entry) =>
+              normalizeCandidatePath(entry, targetRoot),
+            )
+          : [],
+      256,
+    ).filter(Boolean)
+    const derivedRequiredPathGroups = summarizeUniqueExecutorStrings(
+      (
+        Array.isArray(generatedDomainContractDiagnostics?.requiredPathGroups)
+          ? generatedDomainContractDiagnostics.requiredPathGroups
+          : normalizedContract
+            ? deriveRequiredPathGroupsFromContract(normalizedContract)
+            : []
+      )
+        .map((entry) => normalizeCandidateGroup(entry))
+        .filter(Boolean)
+        .map((entry) => JSON.stringify(entry)),
+      128,
+    )
+      .map((entry) => {
+        try {
+          return JSON.parse(entry)
+        } catch {
+          return null
+        }
+      })
+      .filter(Boolean)
+
+    const plannedBuckets = {
+      frontend: shadowPlan?.plannedBuckets?.frontend?.present === true,
+      backend: shadowPlan?.plannedBuckets?.backend?.present === true,
+      database: shadowPlan?.plannedBuckets?.database?.present === true,
+      shared: shadowPlan?.plannedBuckets?.shared?.present === true,
+      docs: shadowPlan?.plannedBuckets?.docs?.present === true,
+      scripts: shadowPlan?.plannedBuckets?.scripts?.present === true,
+      validation: shadowPlan?.plannedBuckets?.validation?.present === true,
+    }
+    const safety = {
+      safeForLocalMaterialization:
+        shadowPlan?.safety?.safeForLocalMaterialization === true ||
+        generatedDomainContractDiagnostics?.safeForLocalMaterialization === true ||
+        capabilityProfile?.safety?.safeForLocalMaterialization === true,
+      forbidsSecrets:
+        shadowPlan?.safety?.forbidsSecrets === true ||
+        capabilityProfile?.safety?.forbidsSecrets === true ||
+        /\btoken\b|\bsecret\b|\baccess[_ -]?token\b|\bcredential\b/iu.test(contractSignalsText),
+      forbidsDeploy:
+        shadowPlan?.safety?.forbidsDeploy === true ||
+        capabilityProfile?.safety?.forbidsDeploy === true ||
+        /\bdeploy\b|\bdocker\b/iu.test(contractSignalsText),
+      forbidsRealPayments:
+        shadowPlan?.safety?.forbidsRealPayments === true ||
+        capabilityProfile?.safety?.forbidsRealPayments === true ||
+        !/\bpayment|payments|checkout|charge|billing|cobro|cobros|pago|pagos\b/iu.test(
+          contractSignalsText,
+        ),
+      forbidsExternalServices:
+        shadowPlan?.safety?.forbidsExternalServices === true ||
+        capabilityProfile?.safety?.forbidsExternalServices === true ||
+        !(
+          Array.isArray(normalizedContract?.integrations) && normalizedContract.integrations.length > 0
+        ),
+    }
+
+    const normalizedTargetRoot = normalizeCandidatePath(targetRoot)
+    const forbiddenCandidatePaths = derivedAllowedTargetPaths.filter((entry) => {
+      const normalizedEntry = normalizeCandidatePath(entry)
+      if (!normalizedEntry) {
+        return false
+      }
+      if (path.isAbsolute(normalizedEntry) || normalizedEntry.startsWith('../')) {
+        return true
+      }
+      if (
+        normalizedTargetRoot &&
+        normalizedEntry !== normalizedTargetRoot &&
+        !normalizedEntry.startsWith(`${normalizedTargetRoot}/`)
+      ) {
+        return true
+      }
+      return /(^|\/)(\.env(?:\..+)?)($|\/)|(^|\/)node_modules($|\/)|(^|\/)(?:dockerfile|docker-compose\.yml|docker-compose\.yaml)($|\/)|(^|\/)deploy($|\/)/iu.test(
+        normalizedEntry,
+      )
+    })
+
+    const domainConsistencyStatus =
+      typeof consistency?.status === 'string' && consistency.status.trim()
+        ? consistency.status.trim()
+        : null
+    const semanticStatus =
+      typeof consistency?.semanticStatus === 'string' && consistency.semanticStatus.trim()
+        ? consistency.semanticStatus.trim()
+        : null
+    const domainBlocked =
+      domainConsistencyStatus === 'mismatch' ||
+      domainConsistencyStatus === 'error' ||
+      semanticStatus === 'mismatch' ||
+      semanticStatus === 'error'
+    const gateEligible =
+      preferenceGate?.status === 'eligible' ||
+      preferenceGate?.eligibility?.canPreferShadowInFuture === true
+    const resolutionBlocked =
+      sourceResolution?.source === 'blocked' ||
+      sourceResolution?.recommendation?.action === 'investigate'
+    const sourceProjectionSupportsShadow =
+      sourceResolution?.testProjection?.wouldSelectShadow === true
+
+    const compatibility = {
+      resemblesMaterializationPlan: false,
+      hasRoot: Boolean(targetRoot),
+      hasAllowedTargets: derivedAllowedTargetPaths.length > 0,
+      hasRequiredGroups: derivedRequiredPathGroups.length > 0,
+      hasFrontend: plannedBuckets.frontend === true,
+      hasBackend: plannedBuckets.backend === true,
+      hasDatabase: plannedBuckets.database === true,
+      hasSafety:
+        safety.safeForLocalMaterialization &&
+        safety.forbidsSecrets &&
+        safety.forbidsDeploy &&
+        safety.forbidsRealPayments &&
+        safety.forbidsExternalServices,
+      canBeInspected: false,
+      canBeUsedByFutureSwitch: false,
+    }
+
+    if (!compatibility.hasRoot) {
+      pushMessage(limitations, 'Falta root/targetRoot para adaptar el shadow plan a una forma comparable.')
+    }
+    if (!compatibility.hasAllowedTargets) {
+      pushMessage(limitations, 'Faltan allowedTargetPaths para compararlo con el materializationPlan legacy.')
+    }
+    if (!compatibility.hasRequiredGroups) {
+      pushMessage(limitations, 'Faltan requiredPathGroups para inspección y comparación estructural.')
+    }
+    if (!compatibility.hasFrontend) {
+      pushMessage(limitations, 'No se detecta un bucket frontend comparable dentro del candidate plan.')
+    }
+    if (!compatibility.hasBackend) {
+      pushMessage(limitations, 'No se detecta un bucket backend comparable dentro del candidate plan.')
+    }
+    if (!compatibility.hasDatabase) {
+      pushMessage(limitations, 'No se detecta un bucket database comparable dentro del candidate plan.')
+    }
+    if (!compatibility.hasSafety) {
+      pushMessage(
+        limitations,
+        'Las señales de safety todavía no alcanzan la forma esperada para un candidate comparable a materializationPlan.',
+      )
+    }
+    if (forbiddenCandidatePaths.length > 0) {
+      pushMessage(
+        errors,
+        `El candidate shadow contiene target paths no permitidos o potencialmente ejecutables: ${forbiddenCandidatePaths.slice(0, 4).join(', ')}.`,
+      )
+    }
+    if (domainBlocked) {
+      pushMessage(
+        errors,
+        'La consistencia de dominio bloquea la adaptación del shadow plan como candidate comparable.',
+      )
+    }
+    if (shadowPresent && !shadowBuilt) {
+      pushMessage(
+        warnings,
+        'El shadow plan está presente pero todavía no está built; el candidate queda solo parcial.',
+      )
+    }
+    if (!shadowPresent) {
+      pushMessage(
+        warnings,
+        'No hay generatedDomainMaterializationShadowPlan disponible para construir un candidate comparable.',
+      )
+    }
+
+    compatibility.resemblesMaterializationPlan =
+      compatibility.hasRoot &&
+      compatibility.hasAllowedTargets &&
+      compatibility.hasRequiredGroups &&
+      compatibility.hasSafety &&
+      (compatibility.hasFrontend || compatibility.hasBackend || compatibility.hasDatabase)
+    compatibility.canBeInspected =
+      compatibility.resemblesMaterializationPlan &&
+      shadowBuilt &&
+      forbiddenCandidatePaths.length === 0 &&
+      !domainBlocked
+    compatibility.canBeUsedByFutureSwitch =
+      compatibility.canBeInspected &&
+      compatibility.hasBackend &&
+      compatibility.hasDatabase &&
+      (gateEligible || sourceProjectionSupportsShadow) &&
+      !resolutionBlocked
+
+    const candidatePlan = {
+      ...emptyCandidatePlan,
+      present: true,
+      status: 'not-available',
+      candidate: {
+        root,
+        sourceRoot,
+        targetRoot,
+        deliveryLevel: deliveryLevel || null,
+        allowedTargetPaths: derivedAllowedTargetPaths,
+        requiredPathGroups: derivedRequiredPathGroups,
+        plannedBuckets,
+        safety,
+      },
+      compatibility,
+      limitations,
+      warnings,
+      errors,
+    }
+
+    if (!shadowPresent) {
+      candidatePlan.status = 'not-available'
+    } else if (errors.length > 0 || !safety.safeForLocalMaterialization) {
+      candidatePlan.status = 'blocked'
+    } else if (compatibility.resemblesMaterializationPlan) {
+      candidatePlan.status = 'built'
+      candidatePlan.built = true
+    } else {
+      candidatePlan.status = 'partial'
+    }
+
+    if (!safety.safeForLocalMaterialization) {
+      pushMessage(
+        warnings,
+        'El shadow plan no está marcado como safeForLocalMaterialization, así que el candidate no puede proponerse para uso futuro.',
+      )
+    }
+    if (!compatibility.canBeUsedByFutureSwitch && candidatePlan.status === 'built') {
+      pushMessage(
+        warnings,
+        'El candidate ya se parece a materializationPlan, pero todavía no reúne todas las garantías para un switch futuro.',
+      )
+    }
+
+    candidatePlan.warningsCount = candidatePlan.warnings.length
+    candidatePlan.errorsCount = candidatePlan.errors.length
+    return candidatePlan
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : normalizeOptionalString(String(error)) || 'error'
+
+    return {
+      ...emptyCandidatePlan,
+      present: true,
+      status: 'error',
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
+function buildGeneratedDomainShadowCandidateLegacyComparison({
+  generatedDomainShadowMaterializationCandidatePlan,
+  generatedDomainMaterializationShadowDiff,
+  materializationPlan,
+}) {
+  const emptyComparison = {
+    present: false,
+    compared: false,
+    status: 'not-available',
+    source: 'generated-domain-shadow-candidate-vs-legacy-plan',
+    behaviorChanged: false,
+    roots: {
+      candidateRoot: null,
+      legacyRoot: null,
+      aligned: false,
+    },
+    allowedTargets: {
+      candidateCount: 0,
+      legacyCount: 0,
+      onlyInCandidate: [],
+      onlyInLegacy: [],
+      overlapCount: 0,
+      aligned: false,
+    },
+    requiredGroups: {
+      candidateCount: 0,
+      legacyCount: 0,
+      onlyInCandidate: [],
+      onlyInLegacy: [],
+      overlapCount: 0,
+      aligned: false,
+    },
+    buckets: {
+      frontend: { candidatePresent: false, legacyPresent: false, aligned: false },
+      backend: { candidatePresent: false, legacyPresent: false, aligned: false },
+      database: { candidatePresent: false, legacyPresent: false, aligned: false },
+      shared: { candidatePresent: false, legacyPresent: false, aligned: false },
+      docs: { candidatePresent: false, legacyPresent: false, aligned: false },
+      scripts: { candidatePresent: false, legacyPresent: false, aligned: false },
+      validation: { candidatePresent: false, legacyPresent: false, aligned: false },
+      allAligned: false,
+    },
+    safety: {
+      candidateSafe: false,
+      legacySafeSignalsPresent: false,
+      aligned: false,
+    },
+    operations: {
+      candidateHasOperations: false,
+      candidateHasCommands: false,
+      candidateHasWrites: false,
+      legacyHasOperations: false,
+    },
+    recommendation: {
+      action: 'observe',
+      reason: '',
+      nextSafeStep: '',
+    },
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  const pushMessage = (target, message) => {
+    const normalized =
+      typeof message === 'string'
+        ? message.trim().replace(/\s+/gu, ' ')
+        : message === null || message === undefined
+          ? ''
+          : String(message).trim().replace(/\s+/gu, ' ')
+    if (!normalized || target.includes(normalized)) {
+      return
+    }
+    target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
+  }
+
+  const normalizeLegacyPath = (value, rootHint = '') => {
+    const normalized = normalizeOptionalString(value)
+    if (!normalized) {
+      return ''
+    }
+    const candidate = normalizePathForComparison(normalized)
+    if (!path.isAbsolute(candidate)) {
+      return candidate
+    }
+
+    const normalizedRootHint = normalizePathForComparison(rootHint)
+    if (!normalizedRootHint) {
+      return candidate
+    }
+
+    const pathSegments = candidate.split('/').filter(Boolean)
+    const rootSegments = normalizedRootHint.split('/').filter(Boolean)
+    const rootBasename = rootSegments[rootSegments.length - 1] || normalizedRootHint
+    const rootIndex = pathSegments.lastIndexOf(rootBasename)
+
+    if (rootIndex === -1) {
+      return candidate
+    }
+
+    return pathSegments.slice(rootIndex).join('/')
+  }
+
+  const summarizeNormalizedStrings = (values, limit = 256, rootHint = '') =>
+    summarizeUniqueExecutorStrings(
+      values.map((entry) => normalizeLegacyPath(entry, rootHint)),
+      limit,
+    )
+      .map((entry) => entry.toLocaleLowerCase())
+      .filter(Boolean)
+
+  const candidatePlan =
+    generatedDomainShadowMaterializationCandidatePlan &&
+    typeof generatedDomainShadowMaterializationCandidatePlan === 'object'
+      ? generatedDomainShadowMaterializationCandidatePlan
+      : null
+  const shadowDiff =
+    generatedDomainMaterializationShadowDiff &&
+    typeof generatedDomainMaterializationShadowDiff === 'object'
+      ? generatedDomainMaterializationShadowDiff
+      : null
+  const legacyPlan =
+    materializationPlan && typeof materializationPlan === 'object' ? materializationPlan : null
+
+  if (!candidatePlan && !legacyPlan) {
+    return emptyComparison
+  }
+
+  try {
+    const warnings = []
+    const errors = []
+    const candidateTargetRoot =
+      normalizeOptionalString(candidatePlan?.candidate?.targetRoot) ||
+      normalizeOptionalString(candidatePlan?.candidate?.root) ||
+      null
+    const legacyRoot = normalizeOptionalString(legacyPlan?.projectRoot) || null
+    const normalizedCandidateRoot = normalizePathForComparison(candidateTargetRoot).toLocaleLowerCase()
+    const normalizedLegacyRoot = normalizePathForComparison(legacyRoot).toLocaleLowerCase()
+    const candidateAllowedTargets = summarizeNormalizedStrings(
+      Array.isArray(candidatePlan?.candidate?.allowedTargetPaths)
+        ? candidatePlan.candidate.allowedTargetPaths
+        : [],
+    )
+    const legacyAllowedTargets = summarizeNormalizedStrings([
+      ...(Array.isArray(legacyPlan?.allowedTargetPaths) ? legacyPlan.allowedTargetPaths : []),
+      ...(Array.isArray(legacyPlan?.operations)
+        ? legacyPlan.operations.map((entry) => normalizeOptionalString(entry?.targetPath))
+        : []),
+    ], 256, legacyRoot)
+    const candidateRequiredGroups = (
+      Array.isArray(candidatePlan?.candidate?.requiredPathGroups)
+        ? candidatePlan.candidate.requiredPathGroups
+        : []
+    )
+      .map((group) =>
+        summarizeNormalizedStrings(
+          Array.isArray(group?.candidates) ? group.candidates : [],
+          32,
+          candidateTargetRoot,
+        ).join(
+          ' | ',
+        ),
+      )
+      .filter(Boolean)
+    const legacyRequiredGroups = (
+      Array.isArray(legacyPlan?.contractDefinition?.requiredPathGroups)
+        ? legacyPlan.contractDefinition.requiredPathGroups
+        : []
+    )
+      .map((group) =>
+        summarizeNormalizedStrings(
+          Array.isArray(group)
+            ? group
+            : Array.isArray(group?.candidates)
+              ? group.candidates
+              : [],
+          32,
+          legacyRoot,
+        ).join(' | '),
+      )
+      .filter(Boolean)
+    const candidateOnlyTargets = candidateAllowedTargets.filter(
+      (entry) => !legacyAllowedTargets.includes(entry),
+    )
+    const legacyOnlyTargets = legacyAllowedTargets.filter(
+      (entry) => !candidateAllowedTargets.includes(entry),
+    )
+    const allowedOverlapCount = candidateAllowedTargets.filter((entry) =>
+      legacyAllowedTargets.includes(entry),
+    ).length
+    const candidateOnlyGroups = candidateRequiredGroups.filter(
+      (entry) => !legacyRequiredGroups.includes(entry),
+    )
+    const legacyOnlyGroups = legacyRequiredGroups.filter(
+      (entry) => !candidateRequiredGroups.includes(entry),
+    )
+    const requiredGroupsOverlapCount = candidateRequiredGroups.filter((entry) =>
+      legacyRequiredGroups.includes(entry),
+    ).length
+    const candidateStrings = JSON.stringify(candidatePlan?.candidate || {}).toLocaleLowerCase()
+    const candidateHasOperations =
+      Object.prototype.hasOwnProperty.call(candidatePlan?.candidate || {}, 'operations') ||
+      /\boperations\b/u.test(candidateStrings)
+    const candidateHasCommands = /\bcommand\b|\bcommands\b|\bnpm install\b|\bdocker\b|\bdeploy\b/iu.test(
+      candidateStrings,
+    )
+    const candidateHasWrites = /\bwritefile\b|\bmkdir\b|\bappend-file\b|\breplace-file\b/iu.test(
+      candidateStrings,
+    )
+    const legacyHasOperations = Array.isArray(legacyPlan?.operations) && legacyPlan.operations.length > 0
+    const legacySafeSignalsPresent =
+      legacyAllowedTargets.every(
+        (entry) =>
+          !/(^|\/)(\.env(?:\..+)?)($|\/)|(^|\/)node_modules($|\/)|(^|\/)(?:dockerfile|docker-compose\.yml|docker-compose\.yaml)($|\/)|(^|\/)deploy($|\/)/iu.test(
+            entry,
+          ),
+      ) &&
+      !Array.isArray(legacyPlan?.operations)
+        ? false
+        : !(legacyPlan?.operations || []).some((entry) =>
+            /(npm install|docker|deploy)/iu.test(
+              `${normalizeOptionalString(entry?.type)} ${normalizeOptionalString(entry?.targetPath)} ${normalizeOptionalString(entry?.command)}`,
+            ),
+          )
+    const candidateSafe =
+      candidatePlan?.candidate?.safety?.safeForLocalMaterialization === true &&
+      candidatePlan?.candidate?.safety?.forbidsSecrets === true &&
+      candidatePlan?.candidate?.safety?.forbidsDeploy === true &&
+      candidatePlan?.candidate?.safety?.forbidsRealPayments === true &&
+      candidatePlan?.candidate?.safety?.forbidsExternalServices === true &&
+      !candidateHasOperations &&
+      !candidateHasCommands &&
+      !candidateHasWrites
+
+    const bucketPrefixes = {
+      frontend: 'frontend/',
+      backend: 'backend/',
+      database: 'database/',
+      shared: 'shared/',
+      docs: 'docs/',
+      scripts: 'scripts/',
+      validation: 'validation/',
+    }
+    const buckets = {
+      frontend: { candidatePresent: false, legacyPresent: false, aligned: false },
+      backend: { candidatePresent: false, legacyPresent: false, aligned: false },
+      database: { candidatePresent: false, legacyPresent: false, aligned: false },
+      shared: { candidatePresent: false, legacyPresent: false, aligned: false },
+      docs: { candidatePresent: false, legacyPresent: false, aligned: false },
+      scripts: { candidatePresent: false, legacyPresent: false, aligned: false },
+      validation: { candidatePresent: false, legacyPresent: false, aligned: false },
+      allAligned: false,
+    }
+
+    for (const [bucketKey, prefix] of Object.entries(bucketPrefixes)) {
+      const candidatePresent =
+        candidatePlan?.candidate?.plannedBuckets?.[bucketKey] === true ||
+        (bucketKey === 'validation' && candidateRequiredGroups.length > 0)
+      const legacyPresent =
+        legacyAllowedTargets.some((entry) => entry.includes(prefix)) ||
+        (bucketKey === 'validation' && legacyRequiredGroups.length > 0)
+      buckets[bucketKey] = {
+        candidatePresent,
+        legacyPresent,
+        aligned: candidatePresent === legacyPresent || (candidatePresent && legacyPresent),
+      }
+    }
+    buckets.allAligned = ['frontend', 'backend', 'database', 'shared', 'docs', 'scripts', 'validation']
+      .every((bucketKey) => buckets[bucketKey]?.aligned === true)
+
+    const comparison = {
+      ...emptyComparison,
+      present: true,
+      compared: Boolean(candidatePlan?.present === true || legacyPlan),
+      roots: {
+        candidateRoot: candidateTargetRoot,
+        legacyRoot,
+        aligned:
+          Boolean(normalizedCandidateRoot) &&
+          Boolean(normalizedLegacyRoot) &&
+          normalizedCandidateRoot === normalizedLegacyRoot,
+      },
+      allowedTargets: {
+        candidateCount: candidateAllowedTargets.length,
+        legacyCount: legacyAllowedTargets.length,
+        onlyInCandidate: candidateOnlyTargets,
+        onlyInLegacy: legacyOnlyTargets,
+        overlapCount: allowedOverlapCount,
+        aligned:
+          candidateAllowedTargets.length > 0 &&
+          candidateOnlyTargets.length === 0 &&
+          allowedOverlapCount > 0,
+      },
+      requiredGroups: {
+        candidateCount: candidateRequiredGroups.length,
+        legacyCount: legacyRequiredGroups.length,
+        onlyInCandidate: candidateOnlyGroups,
+        onlyInLegacy: legacyOnlyGroups,
+        overlapCount: requiredGroupsOverlapCount,
+        aligned:
+          candidateRequiredGroups.length > 0 &&
+          candidateOnlyGroups.length === 0 &&
+          (requiredGroupsOverlapCount > 0 || legacyRequiredGroups.length === 0),
+      },
+      buckets,
+      safety: {
+        candidateSafe,
+        legacySafeSignalsPresent,
+        aligned: candidateSafe && legacySafeSignalsPresent,
+      },
+      operations: {
+        candidateHasOperations,
+        candidateHasCommands,
+        candidateHasWrites,
+        legacyHasOperations,
+      },
+      recommendation: {
+        action: 'observe',
+        reason:
+          'La comparacion candidate-vs-legacy sigue siendo observacional y solo mide compatibilidad estructural.',
+        nextSafeStep:
+          'Seguir contrastando candidate y legacy antes de considerar una fuente real distinta.',
+      },
+      warnings,
+      errors,
+    }
+
+    if (!candidatePlan?.present) {
+      pushMessage(
+        warnings,
+        'No hay generatedDomainShadowMaterializationCandidatePlan disponible para compararlo con materializationPlan legacy.',
+      )
+    }
+    if (!legacyPlan) {
+      pushMessage(
+        warnings,
+        'No hay materializationPlan legacy disponible para una comparacion estructural fuerte contra el candidate shadow.',
+      )
+    }
+    if (candidateHasOperations || candidateHasCommands || candidateHasWrites) {
+      pushMessage(
+        errors,
+        'El shadow candidate no debe contener operations, commands ni writes ejecutables para seguir siendo un candidate seguro.',
+      )
+    }
+    if (!comparison.roots.aligned && candidatePlan?.present && legacyPlan) {
+      pushMessage(
+        warnings,
+        'El root del candidate shadow no coincide con el projectRoot del materializationPlan legacy.',
+      )
+    }
+    if (!comparison.allowedTargets.aligned && candidatePlan?.present && legacyPlan) {
+      pushMessage(
+        warnings,
+        'Los allowedTargetPaths del candidate no se alinean completamente con la superficie legacy.',
+      )
+    }
+    if (!comparison.requiredGroups.aligned && candidatePlan?.present && legacyPlan) {
+      pushMessage(
+        warnings,
+        'Los requiredPathGroups del candidate no se alinean completamente con el contrato legacy disponible.',
+      )
+    }
+    if (!comparison.safety.aligned && candidatePlan?.present && legacyPlan) {
+      pushMessage(
+        warnings,
+        'El envelope de safety entre candidate y legacy todavia no esta completamente alineado.',
+      )
+    }
+
+    if (candidateHasOperations || candidateHasCommands || candidateHasWrites) {
+      comparison.status = 'blocked'
+      comparison.recommendation = {
+        action: 'investigate',
+        reason:
+          'El candidate introduce señales ejecutables incompatibles con una comparacion segura previa a runtime.',
+        nextSafeStep:
+          'Quitar operations, commands o writes del candidate antes de volver a compararlo.',
+      }
+    } else if (!candidatePlan?.present || !legacyPlan) {
+      comparison.status = candidatePlan?.present || legacyPlan ? 'partial' : 'not-available'
+    } else if (
+      comparison.roots.aligned &&
+      comparison.allowedTargets.aligned &&
+      comparison.requiredGroups.aligned &&
+      comparison.buckets.allAligned &&
+      comparison.safety.aligned &&
+      shadowDiff?.status === 'compared'
+    ) {
+      comparison.status = 'aligned'
+      comparison.recommendation = {
+        action: 'prepare-review',
+        reason:
+          'El candidate shadow ya se parece fuertemente al materializationPlan legacy y puede seguir usandose como evidencia estructural.',
+        nextSafeStep:
+          'Mantener esta comparacion como evidencia observacional antes de una revision manual mas fuerte.',
+      }
+    } else if (
+      !comparison.roots.aligned ||
+      comparison.allowedTargets.overlapCount === 0 ||
+      (!comparison.requiredGroups.aligned && comparison.requiredGroups.legacyCount > 0)
+    ) {
+      comparison.status = 'divergent'
+      comparison.recommendation = {
+        action: 'investigate',
+        reason:
+          'La comparacion fuerte entre candidate shadow y materializationPlan legacy muestra divergencias estructurales relevantes.',
+        nextSafeStep:
+          'Investigar roots, target paths y required groups antes de pensar en preferencia shadow.',
+      }
+    } else {
+      comparison.status = 'partial'
+    }
+
+    comparison.warningsCount = comparison.warnings.length
+    comparison.errorsCount = comparison.errors.length
+    return comparison
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : normalizeOptionalString(String(error)) || 'error'
+
+    return {
+      ...emptyComparison,
+      present: true,
+      compared: true,
+      status: 'error',
+      recommendation: {
+        action: 'investigate',
+        reason: 'La comparacion fuerte candidate-vs-legacy devolvio un error interno.',
+        nextSafeStep: 'Mantener runtime sin cambios y revisar el comparador observacional.',
+      },
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
+function buildGeneratedDomainShadowMaterializationEndToEndReadiness({
+  materializationPlan,
+  generatedDomainContractDiagnostics,
+  generatedDomainMaterializationShadowPlan,
+  generatedDomainShadowMaterializationCandidatePlan,
+  generatedDomainMaterializationShadowDiff,
+  generatedDomainMaterializationPreferenceGate,
+  generatedDomainMaterializationPreferenceDecision,
+  generatedDomainMaterializationPreferenceSwitch,
+  generatedDomainMaterializationSwitchReadinessReport,
+  generatedDomainMaterializationSourceResolution,
+  domainConsistencyDiagnostics,
+}) {
+  const emptyReport = {
+    present: false,
+    evaluated: false,
+    status: 'not-ready',
+    source: 'generated-domain-shadow-materialization-pipeline',
+    behaviorChanged: false,
+    pipeline: {
+      contractValid: false,
+      shadowPlanBuilt: false,
+      candidateBuilt: false,
+      candidateInspectable: false,
+      candidateUsableByFutureSwitch: false,
+      gateEligible: false,
+      diffAligned: false,
+      switchReadyForTestHarness: false,
+      sourceResolutionProjectsShadowInTest: false,
+      runtimeStillDisabled: false,
+    },
+    safeguards: {
+      noOperations: true,
+      noCommands: true,
+      noFileWrites: true,
+      noWebPrueba: true,
+      materializationPlanChanged: false,
+      executionScopeChanged: false,
+      behaviorChanged: false,
+    },
+    recommendation: {
+      action: 'observe',
+      reason: '',
+      nextSafeStep: '',
+    },
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  const pushMessage = (target, message) => {
+    const normalized =
+      typeof message === 'string'
+        ? message.trim().replace(/\s+/gu, ' ')
+        : message === null || message === undefined
+          ? ''
+          : String(message).trim().replace(/\s+/gu, ' ')
+    if (!normalized || target.includes(normalized)) {
+      return
+    }
+    target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
+  }
+
+  const hasForbiddenKey = (value, forbiddenKeys) => {
+    if (!value || typeof value !== 'object') {
+      return false
+    }
+    if (Array.isArray(value)) {
+      return value.some((entry) => hasForbiddenKey(entry, forbiddenKeys))
+    }
+    for (const [key, nestedValue] of Object.entries(value)) {
+      if (forbiddenKeys.has(key)) {
+        return true
+      }
+      if (hasForbiddenKey(nestedValue, forbiddenKeys)) {
+        return true
+      }
+    }
+    return false
+  }
+
+  const collectStrings = (value, target = []) => {
+    if (typeof value === 'string') {
+      target.push(value)
+      return target
+    }
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        collectStrings(entry, target)
+      }
+      return target
+    }
+    if (value && typeof value === 'object') {
+      for (const nestedValue of Object.values(value)) {
+        collectStrings(nestedValue, target)
+      }
+    }
+    return target
+  }
+
+  const shadowPlan =
+    generatedDomainMaterializationShadowPlan &&
+    typeof generatedDomainMaterializationShadowPlan === 'object'
+      ? generatedDomainMaterializationShadowPlan
+      : null
+  const candidatePlan =
+    generatedDomainShadowMaterializationCandidatePlan &&
+    typeof generatedDomainShadowMaterializationCandidatePlan === 'object'
+      ? generatedDomainShadowMaterializationCandidatePlan
+      : null
+  const shadowDiff =
+    generatedDomainMaterializationShadowDiff &&
+    typeof generatedDomainMaterializationShadowDiff === 'object'
+      ? generatedDomainMaterializationShadowDiff
+      : null
+  const preferenceGate =
+    generatedDomainMaterializationPreferenceGate &&
+    typeof generatedDomainMaterializationPreferenceGate === 'object'
+      ? generatedDomainMaterializationPreferenceGate
+      : null
+  const preferenceDecision =
+    generatedDomainMaterializationPreferenceDecision &&
+    typeof generatedDomainMaterializationPreferenceDecision === 'object'
+      ? generatedDomainMaterializationPreferenceDecision
+      : null
+  const preferenceSwitch =
+    generatedDomainMaterializationPreferenceSwitch &&
+    typeof generatedDomainMaterializationPreferenceSwitch === 'object'
+      ? generatedDomainMaterializationPreferenceSwitch
+      : null
+  const readinessReport =
+    generatedDomainMaterializationSwitchReadinessReport &&
+    typeof generatedDomainMaterializationSwitchReadinessReport === 'object'
+      ? generatedDomainMaterializationSwitchReadinessReport
+      : null
+  const sourceResolution =
+    generatedDomainMaterializationSourceResolution &&
+    typeof generatedDomainMaterializationSourceResolution === 'object'
+      ? generatedDomainMaterializationSourceResolution
+      : null
+  const consistency =
+    domainConsistencyDiagnostics && typeof domainConsistencyDiagnostics === 'object'
+      ? domainConsistencyDiagnostics
+      : null
+  const contractDiagnostics =
+    generatedDomainContractDiagnostics &&
+    typeof generatedDomainContractDiagnostics === 'object'
+      ? generatedDomainContractDiagnostics
+      : null
+
+  if (
+    !shadowPlan &&
+    !candidatePlan &&
+    !preferenceGate &&
+    !preferenceDecision &&
+    !preferenceSwitch &&
+    !readinessReport &&
+    !sourceResolution &&
+    !consistency &&
+    !contractDiagnostics
+  ) {
+    return emptyReport
+  }
+
+  try {
+    const warnings = []
+    const errors = []
+    const contractValid =
+      contractDiagnostics?.valid === true &&
+      contractDiagnostics?.safeForLocalMaterialization === true
+    const shadowPlanBuilt = shadowPlan?.built === true
+    const candidateBuilt = candidatePlan?.built === true
+    const candidateInspectable =
+      candidatePlan?.compatibility?.canBeInspected === true
+    const candidateUsableByFutureSwitch =
+      candidatePlan?.compatibility?.canBeUsedByFutureSwitch === true
+    const gateEligible =
+      preferenceGate?.eligibility?.canPreferShadowInFuture === true ||
+      preferenceGate?.status === 'eligible'
+    const diffAligned =
+      shadowDiff?.status === 'compared' ||
+      shadowDiff?.recommendation?.action === 'prepare-preference-switch'
+    const switchReadyForTestHarness =
+      readinessReport?.status === 'ready-for-test-harness' ||
+      readinessReport?.status === 'ready-for-controlled-enable'
+    const runtimeStillDisabled =
+      sourceResolution?.present === true &&
+      sourceResolution?.mode === 'runtime-disabled' &&
+      sourceResolution?.source !== 'generated-domain-shadow' &&
+      sourceResolution?.runtime?.selectedSource !== 'generated-domain-shadow' &&
+      sourceResolution?.runtime?.materializationPlanChanged !== true &&
+      sourceResolution?.runtime?.executionScopeChanged !== true
+    const candidateStrings = collectStrings(candidatePlan?.candidate)
+      .map((value) => value.toLocaleLowerCase())
+    const noOperations = !hasForbiddenKey(candidatePlan?.candidate, new Set(['operations']))
+    const noCommands =
+      !hasForbiddenKey(candidatePlan?.candidate, new Set(['command', 'commands'])) &&
+      !candidateStrings.some((value) => /\b(?:npm install|docker|deploy)\b/iu.test(value))
+    const noFileWrites =
+      !hasForbiddenKey(candidatePlan?.candidate, new Set(['writeFile', 'mkdir'])) &&
+      noOperations
+    const noWebPrueba = !candidateStrings.some((value) => value.includes('web-prueba'))
+    const hasBlockingErrors =
+      (contractDiagnostics?.errorsCount || 0) > 0 ||
+      (shadowPlan?.errorsCount || 0) > 0 ||
+      (candidatePlan?.errorsCount || 0) > 0 ||
+      (preferenceGate?.errorsCount || 0) > 0 ||
+      (preferenceDecision?.errorsCount || 0) > 0 ||
+      (preferenceSwitch?.errorsCount || 0) > 0 ||
+      (readinessReport?.errorsCount || 0) > 0 ||
+      (sourceResolution?.errorsCount || 0) > 0 ||
+      (consistency?.errorsCount || 0) > 0
+    const domainBlocked =
+      consistency?.status === 'mismatch' ||
+      consistency?.status === 'error' ||
+      consistency?.semanticStatus === 'mismatch' ||
+      consistency?.semanticStatus === 'error'
+    const candidateBlocked =
+      candidatePlan?.status === 'blocked' || candidatePlan?.status === 'error'
+    const runtimeMutated =
+      sourceResolution?.runtime?.materializationPlanChanged === true ||
+      sourceResolution?.runtime?.executionScopeChanged === true
+
+    const testEnabledProjection = resolveGeneratedDomainMaterializationSource({
+      materializationPlan,
+      generatedDomainMaterializationShadowPlan: shadowPlan,
+      generatedDomainMaterializationPreferenceSwitch: preferenceSwitch,
+      generatedDomainMaterializationSwitchReadinessReport: readinessReport,
+      generatedDomainMaterializationPreferenceDecision: preferenceDecision,
+      domainConsistencyDiagnostics: consistency,
+      sourceResolutionOptions: {
+        testEnabled: true,
+      },
+    })
+    const sourceResolutionProjectsShadowInTest =
+      testEnabledProjection?.present === true &&
+      testEnabledProjection?.mode === 'test-enabled' &&
+      testEnabledProjection?.testProjection?.wouldSelectShadow === true &&
+      testEnabledProjection?.testProjection?.projectedSource ===
+        'generated-domain-shadow'
+
+    const report = {
+      ...emptyReport,
+      present: true,
+      evaluated:
+        contractDiagnostics?.present === true ||
+        shadowPlanBuilt ||
+        candidatePlan?.present === true ||
+        preferenceGate?.evaluated === true ||
+        preferenceDecision?.evaluated === true ||
+        preferenceSwitch?.evaluated === true ||
+        readinessReport?.evaluated === true ||
+        sourceResolution?.resolved === true,
+      pipeline: {
+        contractValid,
+        shadowPlanBuilt,
+        candidateBuilt,
+        candidateInspectable,
+        candidateUsableByFutureSwitch,
+        gateEligible,
+        diffAligned,
+        switchReadyForTestHarness,
+        sourceResolutionProjectsShadowInTest,
+        runtimeStillDisabled,
+      },
+      safeguards: {
+        noOperations,
+        noCommands,
+        noFileWrites,
+        noWebPrueba,
+        materializationPlanChanged: false,
+        executionScopeChanged: false,
+        behaviorChanged: false,
+      },
+      recommendation: {
+        action: 'observe',
+        reason:
+          'El pipeline shadow sigue siendo observacional y solo resume si el recorrido completo ya es coherente para harness.',
+        nextSafeStep:
+          'Seguir acumulando evidencia estructural antes de pensar en cualquier activacion real.',
+      },
+      warnings,
+      errors,
+    }
+
+    if (!contractValid) {
+      pushMessage(
+        warnings,
+        'El GeneratedDomainContract todavia no alcanza una condicion valida y segura para respaldar un pipeline shadow end-to-end.',
+      )
+    }
+    if (!shadowPlanBuilt) {
+      pushMessage(
+        warnings,
+        'El shadow plan aun no esta built, asi que el pipeline end-to-end no puede considerarse listo.',
+      )
+    }
+    if (!candidateBuilt || !candidateInspectable) {
+      pushMessage(
+        warnings,
+        'El candidate plan todavia no es lo bastante completo o inspeccionable para cerrar el pipeline end-to-end.',
+      )
+    }
+    if (!candidateUsableByFutureSwitch) {
+      pushMessage(
+        warnings,
+        'El candidate plan aun no puede proponerse como base de un future switch observacional.',
+      )
+    }
+    if (!gateEligible) {
+      pushMessage(
+        warnings,
+        'La preference gate todavia no reconoce al shadow pipeline como elegible para una preferencia futura.',
+      )
+    }
+    if (!diffAligned) {
+      pushMessage(
+        warnings,
+        'El shadow diff todavia no muestra una alineacion suficiente para respaldar el pipeline completo.',
+      )
+    }
+    if (!switchReadyForTestHarness) {
+      pushMessage(
+        warnings,
+        'El switch readiness report aun no considera listo el pipeline para una proyeccion de harness.',
+      )
+    }
+    if (!runtimeStillDisabled) {
+      pushMessage(
+        warnings,
+        'El pipeline end-to-end exige que el runtime normal siga apagado y sin mutaciones de materializacion.',
+      )
+    }
+    if (!noOperations || !noCommands || !noFileWrites || !noWebPrueba) {
+      pushMessage(
+        errors,
+        'El pipeline end-to-end detecto señales incompatibles con el modo observacional: operations, commands, writes o referencias a web-prueba.',
+      )
+    }
+    if (runtimeMutated) {
+      pushMessage(
+        errors,
+        'La resolucion runtime no debe marcar mutaciones de materializationPlan ni executionScope dentro del pipeline observacional.',
+      )
+    }
+
+    if (
+      hasBlockingErrors ||
+      candidateBlocked ||
+      domainBlocked ||
+      testEnabledProjection?.source === 'blocked' ||
+      !noOperations ||
+      !noCommands ||
+      !noFileWrites ||
+      !noWebPrueba ||
+      runtimeMutated
+    ) {
+      report.status = 'blocked'
+      report.recommendation = {
+        action: 'investigate',
+        reason:
+          'El pipeline shadow completo todavia tiene bloqueos estructurales, de consistencia o de seguridad que impiden una proyeccion confiable.',
+        nextSafeStep:
+          'Investigar el candidate, la consistencia o el readiness antes de seguir acercando el switch.',
+      }
+    } else if (
+      contractValid &&
+      shadowPlanBuilt &&
+      candidateBuilt &&
+      candidateInspectable &&
+      candidateUsableByFutureSwitch &&
+      gateEligible &&
+      diffAligned &&
+      switchReadyForTestHarness &&
+      sourceResolutionProjectsShadowInTest &&
+      runtimeStillDisabled
+    ) {
+      report.status = 'ready-for-test-harness'
+      report.recommendation = {
+        action: 'ready-for-test-harness',
+        reason:
+          'El pipeline shadow completo ya es internamente consistente y puede proyectarse en harness sin tocar el runtime real.',
+        nextSafeStep:
+          'Seguir limitando el uso a harness y ampliar las pruebas antes de cualquier activacion controlada.',
+      }
+    } else {
+      report.status = 'not-ready'
+      report.recommendation = {
+        action: 'observe',
+        reason:
+          'El pipeline shadow ya tiene piezas conectadas, pero todavia falta evidencia para considerarlo listo de punta a punta.',
+        nextSafeStep:
+          'Seguir observando candidate, gate, diff y readiness hasta completar la cadena sin bloqueos.',
+      }
+    }
+
+    report.warningsCount = report.warnings.length
+    report.errorsCount = report.errors.length
+    return report
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : normalizeOptionalString(String(error)) || 'error'
+
+    return {
+      ...emptyReport,
+      present: true,
+      evaluated: true,
+      status: 'error',
+      recommendation: {
+        action: 'investigate',
+        reason: 'El pipeline shadow end-to-end devolvio un error interno.',
+        nextSafeStep: 'Revisar el reporte y mantener el runtime actual sin cambios.',
+      },
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
+function buildGeneratedDomainControlledEnablePolicy({
+  generatedDomainMaterializationPreferenceSwitch,
+  generatedDomainMaterializationSwitchReadinessReport,
+  generatedDomainMaterializationSourceResolution,
+  generatedDomainShadowMaterializationCandidatePlan,
+  generatedDomainShadowMaterializationEndToEndReadiness,
+  generatedDomainMaterializationShadowDiff,
+  domainConsistencyDiagnostics,
+  materializationPlan,
+}) {
+  const emptyPolicy = {
+    present: false,
+    evaluated: false,
+    status: 'not-ready',
+    source: 'generated-domain-shadow-enable-policy',
+    behaviorChanged: false,
+    runtimeEnabled: false,
+    eligibility: {
+      hasLegacyMaterializationPlan: false,
+      hasShadowCandidate: false,
+      candidateUsableByFutureSwitch: false,
+      endToEndReadyForHarness: false,
+      sourceResolutionCanProjectShadow: false,
+      domainConsistencyOk: false,
+      diffAligned: false,
+      noBlockingErrors: false,
+    },
+    blockers: {
+      missingLegacyMaterializationPlan: true,
+      missingShadowCandidate: true,
+      candidateNotUsable: true,
+      endToEndNotReady: true,
+      domainMismatch: false,
+      diffNotAligned: true,
+      blockingErrors: false,
+      runtimeEnableNotAllowed: true,
+    },
+    allowedModes: {
+      observeOnly: true,
+      testHarnessEnable: false,
+      controlledRuntimeEnable: false,
+    },
+    recommendation: {
+      action: 'observe',
+      reason: '',
+      nextSafeStep: '',
+    },
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  const pushMessage = (target, message) => {
+    const normalized =
+      typeof message === 'string'
+        ? message.trim().replace(/\s+/gu, ' ')
+        : message === null || message === undefined
+          ? ''
+          : String(message).trim().replace(/\s+/gu, ' ')
+    if (!normalized || target.includes(normalized)) {
+      return
+    }
+    target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
+  }
+
+  const preferenceSwitch =
+    generatedDomainMaterializationPreferenceSwitch &&
+    typeof generatedDomainMaterializationPreferenceSwitch === 'object'
+      ? generatedDomainMaterializationPreferenceSwitch
+      : null
+  const readinessReport =
+    generatedDomainMaterializationSwitchReadinessReport &&
+    typeof generatedDomainMaterializationSwitchReadinessReport === 'object'
+      ? generatedDomainMaterializationSwitchReadinessReport
+      : null
+  const sourceResolution =
+    generatedDomainMaterializationSourceResolution &&
+    typeof generatedDomainMaterializationSourceResolution === 'object'
+      ? generatedDomainMaterializationSourceResolution
+      : null
+  const candidatePlan =
+    generatedDomainShadowMaterializationCandidatePlan &&
+    typeof generatedDomainShadowMaterializationCandidatePlan === 'object'
+      ? generatedDomainShadowMaterializationCandidatePlan
+      : null
+  const endToEndReadiness =
+    generatedDomainShadowMaterializationEndToEndReadiness &&
+    typeof generatedDomainShadowMaterializationEndToEndReadiness === 'object'
+      ? generatedDomainShadowMaterializationEndToEndReadiness
+      : null
+  const shadowDiff =
+    generatedDomainMaterializationShadowDiff &&
+    typeof generatedDomainMaterializationShadowDiff === 'object'
+      ? generatedDomainMaterializationShadowDiff
+      : null
+  const consistency =
+    domainConsistencyDiagnostics && typeof domainConsistencyDiagnostics === 'object'
+      ? domainConsistencyDiagnostics
+      : null
+
+  if (
+    !preferenceSwitch &&
+    !readinessReport &&
+    !sourceResolution &&
+    !candidatePlan &&
+    !endToEndReadiness &&
+    !shadowDiff &&
+    !consistency &&
+    !(materializationPlan && typeof materializationPlan === 'object')
+  ) {
+    return emptyPolicy
+  }
+
+  try {
+    const warnings = []
+    const errors = []
+    const hasLegacyMaterializationPlan = Boolean(
+      materializationPlan && typeof materializationPlan === 'object',
+    )
+    const hasShadowCandidate = candidatePlan?.present === true
+    const candidateUsableByFutureSwitch =
+      candidatePlan?.compatibility?.canBeUsedByFutureSwitch === true
+    const endToEndReadyForHarness =
+      endToEndReadiness?.status === 'ready-for-test-harness'
+    const sourceResolutionCanProjectShadow =
+      (sourceResolution?.testProjection?.wouldSelectShadow === true &&
+        sourceResolution?.testProjection?.projectedSource ===
+          'generated-domain-shadow') ||
+      endToEndReadiness?.pipeline?.sourceResolutionProjectsShadowInTest === true
+    const domainConsistencyOk =
+      consistency?.status === 'consistent' &&
+      (consistency?.semanticStatus === null ||
+        consistency?.semanticStatus === undefined ||
+        consistency?.semanticStatus === 'consistent')
+    const diffAligned =
+      shadowDiff?.status === 'compared' ||
+      shadowDiff?.recommendation?.action === 'prepare-preference-switch'
+    const noBlockingErrors =
+      (preferenceSwitch?.errorsCount || 0) === 0 &&
+      (readinessReport?.errorsCount || 0) === 0 &&
+      (sourceResolution?.errorsCount || 0) === 0 &&
+      (candidatePlan?.errorsCount || 0) === 0 &&
+      (endToEndReadiness?.errorsCount || 0) === 0 &&
+      (shadowDiff?.errorsCount || 0) === 0 &&
+      (consistency?.errorsCount || 0) === 0
+    const domainMismatch =
+      consistency?.status === 'mismatch' ||
+      consistency?.status === 'error' ||
+      consistency?.semanticStatus === 'mismatch' ||
+      consistency?.semanticStatus === 'error'
+    const candidateBlocked =
+      candidatePlan?.status === 'blocked' ||
+      candidatePlan?.status === 'error' ||
+      candidateUsableByFutureSwitch !== true
+    const endToEndNotReady = !endToEndReadyForHarness
+    const diffNotAligned = !diffAligned
+    const blockingErrors = !noBlockingErrors
+
+    const policy = {
+      ...emptyPolicy,
+      present: true,
+      evaluated:
+        hasLegacyMaterializationPlan ||
+        hasShadowCandidate ||
+        Boolean(readinessReport?.evaluated === true) ||
+        Boolean(sourceResolution?.resolved === true) ||
+        Boolean(endToEndReadiness?.evaluated === true),
+      eligibility: {
+        hasLegacyMaterializationPlan,
+        hasShadowCandidate,
+        candidateUsableByFutureSwitch,
+        endToEndReadyForHarness,
+        sourceResolutionCanProjectShadow,
+        domainConsistencyOk,
+        diffAligned,
+        noBlockingErrors,
+      },
+      blockers: {
+        missingLegacyMaterializationPlan: !hasLegacyMaterializationPlan,
+        missingShadowCandidate: !hasShadowCandidate,
+        candidateNotUsable: !candidateUsableByFutureSwitch,
+        endToEndNotReady,
+        domainMismatch,
+        diffNotAligned,
+        blockingErrors,
+        runtimeEnableNotAllowed: true,
+      },
+      allowedModes: {
+        observeOnly: true,
+        testHarnessEnable:
+          hasShadowCandidate &&
+          candidateUsableByFutureSwitch &&
+          endToEndReadyForHarness &&
+          sourceResolutionCanProjectShadow &&
+          domainConsistencyOk &&
+          diffAligned &&
+          noBlockingErrors,
+        controlledRuntimeEnable: false,
+      },
+      recommendation: {
+        action: 'observe',
+        reason:
+          'La policy sigue siendo observacional y define una frontera conservadora antes de cualquier enable real.',
+        nextSafeStep:
+          'Mantener el runtime actual y seguir validando la cadena shadow por harness.',
+      },
+      warnings,
+      errors,
+    }
+
+    if (!hasLegacyMaterializationPlan) {
+      pushMessage(
+        warnings,
+        'Todavia no hay materializationPlan legacy comparable, por lo que un enable controlado real no puede considerarse listo.',
+      )
+    }
+    if (!hasShadowCandidate) {
+      pushMessage(
+        warnings,
+        'Todavia no existe un shadow candidate suficiente para respaldar una politica de enable.',
+      )
+    }
+    if (!candidateUsableByFutureSwitch) {
+      pushMessage(
+        warnings,
+        'El shadow candidate aun no es usable por un future switch, asi que la politica debe mantenerse conservadora.',
+      )
+    }
+    if (!endToEndReadyForHarness) {
+      pushMessage(
+        warnings,
+        'El pipeline shadow end-to-end todavia no esta listo para harness, por lo que la politica no puede escalar.',
+      )
+    }
+    if (domainMismatch) {
+      pushMessage(
+        warnings,
+        'La consistencia de dominio sigue mostrando un mismatch, por lo que cualquier enable futuro debe bloquearse.',
+      )
+    }
+    if (diffNotAligned) {
+      pushMessage(
+        warnings,
+        'El diff observacional todavia no esta lo bastante alineado para una politica de enable mas fuerte.',
+      )
+    }
+    if (blockingErrors) {
+      pushMessage(
+        warnings,
+        'La politica detecta errores bloqueantes en los diagnostics previos, por lo que debe mantenerse en modo observacional.',
+      )
+    }
+
+    if (domainMismatch || candidatePlan?.status === 'blocked' || blockingErrors) {
+      policy.status = 'blocked'
+      policy.recommendation = {
+        action: 'investigate',
+        reason:
+          'Hay bloqueos estructurales o de consistencia que impiden definir una politica segura de enable futuro.',
+        nextSafeStep:
+          'Investigar candidate, consistencia o errores antes de acercar cualquier enable controlado.',
+      }
+    } else if (!hasLegacyMaterializationPlan || !hasShadowCandidate || !candidateUsableByFutureSwitch) {
+      policy.status = 'not-ready'
+      policy.recommendation = {
+        action: 'observe',
+        reason:
+          'Falta evidencia estructural minima para pensar en una politica de enable mas fuerte.',
+        nextSafeStep:
+          'Seguir acumulando materializationPlan legacy comparable y un candidate plenamente usable.',
+      }
+    } else if (
+      hasLegacyMaterializationPlan &&
+      hasShadowCandidate &&
+      candidateUsableByFutureSwitch &&
+      endToEndReadyForHarness &&
+      sourceResolutionCanProjectShadow &&
+      domainConsistencyOk &&
+      diffAligned &&
+      noBlockingErrors
+    ) {
+      policy.status = 'eligible-for-controlled-runtime-enable'
+      policy.recommendation = {
+        action: 'prepare-runtime-enable-review',
+        reason:
+          'La evidencia observacional ya es suficientemente fuerte para preparar una revision formal de runtime enable, sin activarlo todavia.',
+        nextSafeStep:
+          'Hacer una revision controlada de riesgos y fallback antes de cualquier cambio real de runtime.',
+      }
+    } else if (policy.allowedModes.testHarnessEnable) {
+      policy.status = 'eligible-for-test-enable'
+      policy.recommendation = {
+        action: 'allow-test-harness-enable',
+        reason:
+          'La policy permite seguir usando solo harness para ensayar la proyeccion shadow, sin tocar el runtime real.',
+        nextSafeStep:
+          'Mantener el uso en harness y ampliar las validaciones antes de una revision mas fuerte.',
+      }
+    } else {
+      policy.status = 'not-ready'
+    }
+
+    policy.warningsCount = policy.warnings.length
+    policy.errorsCount = policy.errors.length
+    return policy
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : normalizeOptionalString(String(error)) || 'error'
+
+    return {
+      ...emptyPolicy,
+      present: true,
+      evaluated: true,
+      status: 'error',
+      recommendation: {
+        action: 'investigate',
+        reason: 'La policy observacional de controlled enable devolvio un error interno.',
+        nextSafeStep: 'Revisar la policy y mantener el runtime actual sin cambios.',
+      },
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
+function buildGeneratedDomainFirstControlledEnableScenario({
+  generatedDomainControlledEnablePolicy,
+  generatedDomainMaterializationPreferenceSwitch,
+  generatedDomainMaterializationSourceResolution,
+  generatedDomainShadowMaterializationCandidatePlan,
+  generatedDomainShadowMaterializationEndToEndReadiness,
+  domainConsistencyDiagnostics,
+  materializationPlan,
+}) {
+  const emptyScenario = {
+    present: false,
+    evaluated: false,
+    status: 'not-ready',
+    source: 'generated-domain-first-controlled-enable-scenario',
+    behaviorChanged: false,
+    allowedNow: false,
+    requiresLeanApproval: true,
+    conditions: {
+      fullstackLocalOnly: false,
+      hasLegacyMaterializationPlan: false,
+      hasShadowCandidate: false,
+      candidateUsableByFutureSwitch: false,
+      domainConsistencyOk: false,
+      semanticConsistencyOk: false,
+      diffAligned: false,
+      noErrors: false,
+      noDotEnv: false,
+      noNodeModules: false,
+      noDocker: false,
+      noDeploy: false,
+      noExternalServices: false,
+      noRealPayments: false,
+      noCommands: false,
+      noFileWrites: false,
+      noWebPrueba: false,
+      runtimeEnabled: false,
+      controlledRuntimeEnable: false,
+    },
+    blockers: {
+      notFullstackLocal: true,
+      missingLegacyMaterializationPlan: true,
+      missingShadowCandidate: true,
+      candidateNotUsable: true,
+      domainMismatch: false,
+      semanticMismatch: false,
+      diffNotAligned: true,
+      blockingErrors: false,
+      runtimeEnableStillForbidden: true,
+      leanApprovalRequired: true,
+    },
+    recommendation: {
+      action: 'observe',
+      reason: '',
+      nextSafeStep: '',
+    },
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  const pushMessage = (target, message) => {
+    const normalized =
+      typeof message === 'string'
+        ? message.trim().replace(/\s+/gu, ' ')
+        : message === null || message === undefined
+          ? ''
+          : String(message).trim().replace(/\s+/gu, ' ')
+    if (!normalized || target.includes(normalized)) {
+      return
+    }
+    target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
+  }
+
+  const collectStrings = (value, target = []) => {
+    if (typeof value === 'string') {
+      target.push(value)
+      return target
+    }
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        collectStrings(entry, target)
+      }
+      return target
+    }
+    if (value && typeof value === 'object') {
+      for (const nestedValue of Object.values(value)) {
+        collectStrings(nestedValue, target)
+      }
+    }
+    return target
+  }
+
+  const controlledEnablePolicy =
+    generatedDomainControlledEnablePolicy &&
+    typeof generatedDomainControlledEnablePolicy === 'object'
+      ? generatedDomainControlledEnablePolicy
+      : null
+  const preferenceSwitch =
+    generatedDomainMaterializationPreferenceSwitch &&
+    typeof generatedDomainMaterializationPreferenceSwitch === 'object'
+      ? generatedDomainMaterializationPreferenceSwitch
+      : null
+  const sourceResolution =
+    generatedDomainMaterializationSourceResolution &&
+    typeof generatedDomainMaterializationSourceResolution === 'object'
+      ? generatedDomainMaterializationSourceResolution
+      : null
+  const candidatePlan =
+    generatedDomainShadowMaterializationCandidatePlan &&
+    typeof generatedDomainShadowMaterializationCandidatePlan === 'object'
+      ? generatedDomainShadowMaterializationCandidatePlan
+      : null
+  const endToEndReadiness =
+    generatedDomainShadowMaterializationEndToEndReadiness &&
+    typeof generatedDomainShadowMaterializationEndToEndReadiness === 'object'
+      ? generatedDomainShadowMaterializationEndToEndReadiness
+      : null
+  const consistency =
+    domainConsistencyDiagnostics && typeof domainConsistencyDiagnostics === 'object'
+      ? domainConsistencyDiagnostics
+      : null
+
+  if (
+    !controlledEnablePolicy &&
+    !preferenceSwitch &&
+    !sourceResolution &&
+    !candidatePlan &&
+    !endToEndReadiness &&
+    !(materializationPlan && typeof materializationPlan === 'object')
+  ) {
+    return emptyScenario
+  }
+
+  try {
+    const warnings = []
+    const errors = []
+    const candidateStrings = collectStrings(candidatePlan?.candidate).map((value) =>
+      value.toLocaleLowerCase(),
+    )
+    const deliveryLevel =
+      typeof candidatePlan?.candidate?.deliveryLevel === 'string' &&
+      candidatePlan.candidate.deliveryLevel.trim()
+        ? candidatePlan.candidate.deliveryLevel.trim()
+        : null
+    const hasLegacyMaterializationPlan = Boolean(
+      materializationPlan && typeof materializationPlan === 'object',
+    )
+    const hasShadowCandidate = candidatePlan?.present === true
+    const candidateUsableByFutureSwitch =
+      candidatePlan?.compatibility?.canBeUsedByFutureSwitch === true
+    const fullstackLocalOnly = deliveryLevel === 'fullstack-local'
+    const domainConsistencyOk = consistency?.status === 'consistent'
+    const semanticConsistencyOk =
+      consistency?.semanticStatus === 'consistent' ||
+      consistency?.semanticStatus === null ||
+      consistency?.semanticStatus === undefined
+    const diffAligned =
+      controlledEnablePolicy?.eligibility?.diffAligned === true &&
+      endToEndReadiness?.pipeline?.candidateInspectable === true
+    const noErrors =
+      (controlledEnablePolicy?.errorsCount || 0) === 0 &&
+      (candidatePlan?.errorsCount || 0) === 0 &&
+      (endToEndReadiness?.errorsCount || 0) === 0 &&
+      (consistency?.errorsCount || 0) === 0
+    const noCommands =
+      endToEndReadiness?.safeguards?.noCommands === true &&
+      !candidateStrings.some((value) => /\b(?:npm install|docker|deploy)\b/iu.test(value))
+    const noFileWrites = endToEndReadiness?.safeguards?.noFileWrites === true
+    const noWebPrueba = endToEndReadiness?.safeguards?.noWebPrueba === true
+    const noDotEnv = !candidateStrings.some((value) => value.includes('.env'))
+    const noNodeModules = !candidateStrings.some((value) => value.includes('node_modules'))
+    const noDocker = !candidateStrings.some((value) => value.includes('docker'))
+    const noDeploy = !candidateStrings.some((value) => /\bdeploy\b/iu.test(value))
+    const noExternalServices =
+      candidatePlan?.candidate?.safety?.forbidsExternalServices === true
+    const noRealPayments =
+      candidatePlan?.candidate?.safety?.forbidsRealPayments === true
+    const runtimeEnabled = controlledEnablePolicy?.runtimeEnabled === true
+    const controlledRuntimeEnable =
+      controlledEnablePolicy?.allowedModes?.controlledRuntimeEnable === true
+    const canProjectShadowInHarness =
+      sourceResolution?.testProjection?.projectedSource === 'generated-domain-shadow' ||
+      endToEndReadiness?.pipeline?.sourceResolutionProjectsShadowInTest === true ||
+      controlledEnablePolicy?.eligibility?.sourceResolutionCanProjectShadow === true
+    const blockingErrors = !noErrors
+    const domainMismatch =
+      consistency?.status === 'mismatch' || consistency?.status === 'error'
+    const semanticMismatch =
+      consistency?.semanticStatus === 'mismatch' ||
+      consistency?.semanticStatus === 'error'
+
+    const scenario = {
+      ...emptyScenario,
+      present: true,
+      evaluated:
+        controlledEnablePolicy?.evaluated === true ||
+        candidatePlan?.present === true ||
+        endToEndReadiness?.evaluated === true ||
+        sourceResolution?.resolved === true ||
+        hasLegacyMaterializationPlan,
+      conditions: {
+        fullstackLocalOnly,
+        hasLegacyMaterializationPlan,
+        hasShadowCandidate,
+        candidateUsableByFutureSwitch,
+        domainConsistencyOk,
+        semanticConsistencyOk,
+        diffAligned,
+        noErrors,
+        noDotEnv,
+        noNodeModules,
+        noDocker,
+        noDeploy,
+        noExternalServices,
+        noRealPayments,
+        noCommands,
+        noFileWrites,
+        noWebPrueba,
+        runtimeEnabled,
+        controlledRuntimeEnable,
+      },
+      blockers: {
+        notFullstackLocal: !fullstackLocalOnly,
+        missingLegacyMaterializationPlan: !hasLegacyMaterializationPlan,
+        missingShadowCandidate: !hasShadowCandidate,
+        candidateNotUsable: !candidateUsableByFutureSwitch,
+        domainMismatch,
+        semanticMismatch,
+        diffNotAligned: !diffAligned,
+        blockingErrors,
+        runtimeEnableStillForbidden: true,
+        leanApprovalRequired: true,
+      },
+      recommendation: {
+        action: 'observe',
+        reason:
+          'El primer escenario real de enable sigue siendo solo una frontera observacional y requiere aprobacion manual antes de existir como runtime.',
+        nextSafeStep:
+          'Mantener el escenario como diagnostico y seguir ensayandolo en harness sin tocar el runtime normal.',
+      },
+      warnings,
+      errors,
+    }
+
+    if (!fullstackLocalOnly) {
+      pushMessage(
+        warnings,
+        'El primer escenario controlado futuro deberia limitarse a fullstack-local seguro y todavia no cumple esa condicion.',
+      )
+    }
+    if (!hasLegacyMaterializationPlan) {
+      pushMessage(
+        warnings,
+        'Sin materializationPlan legacy comparable no corresponde evaluar un primer enable real futuro.',
+      )
+    }
+    if (!candidateUsableByFutureSwitch) {
+      pushMessage(
+        warnings,
+        'El shadow candidate todavia no es usable por un future switch, por lo que el escenario debe seguir cerrado.',
+      )
+    }
+    if (domainMismatch || semanticMismatch) {
+      pushMessage(
+        warnings,
+        'La consistencia de dominio o la consistencia semantica siguen bloqueando cualquier escenario de enable real futuro.',
+      )
+    }
+    if (!noCommands || !noFileWrites || !noWebPrueba || !noDotEnv || !noNodeModules) {
+      pushMessage(
+        errors,
+        'El escenario controlado detecto senales incompatibles con un primer enable ultra acotado: commands, writes, web-prueba, .env o node_modules.',
+      )
+    }
+    if (runtimeEnabled || controlledRuntimeEnable) {
+      pushMessage(
+        errors,
+        'El primer escenario controlado no debe activar runtimeEnabled ni controlledRuntimeEnable en esta fase observacional.',
+      )
+    }
+
+    if (
+      domainMismatch ||
+      semanticMismatch ||
+      !noCommands ||
+      !noFileWrites ||
+      !noWebPrueba ||
+      !noDotEnv ||
+      !noNodeModules ||
+      !noDocker ||
+      !noDeploy ||
+      !noExternalServices ||
+      !noRealPayments ||
+      blockingErrors ||
+      runtimeEnabled ||
+      controlledRuntimeEnable
+    ) {
+      scenario.status = 'blocked'
+      scenario.recommendation = {
+        action: 'investigate',
+        reason:
+          'El primer escenario real futuro todavia tiene bloqueos de seguridad, consistencia o alcance que impiden siquiera pedir habilitacion.',
+        nextSafeStep:
+          'Investigar candidate, policy o consistency antes de elevar este escenario a revision manual.',
+      }
+    } else if (
+      fullstackLocalOnly &&
+      hasLegacyMaterializationPlan &&
+      hasShadowCandidate &&
+      candidateUsableByFutureSwitch &&
+      domainConsistencyOk &&
+      semanticConsistencyOk &&
+      diffAligned &&
+      noErrors &&
+      noCommands &&
+      noFileWrites &&
+      noWebPrueba &&
+      noDotEnv &&
+      noNodeModules &&
+      noDocker &&
+      noDeploy &&
+      noExternalServices &&
+      noRealPayments &&
+      endToEndReadiness?.status === 'ready-for-test-harness' &&
+      controlledEnablePolicy?.status === 'eligible-for-controlled-runtime-enable' &&
+      canProjectShadowInHarness
+    ) {
+      scenario.status = 'ready-for-review'
+      scenario.recommendation = {
+        action: 'request-lean-approval',
+        reason:
+          'La evidencia observacional ya describe un primer escenario ultra acotado que podria revisarse manualmente antes de cualquier enable real.',
+        nextSafeStep:
+          'Presentar este escenario a Lean con riesgos, fallback y alcance estrictamente acotado antes de pensar en un enable real interno.',
+      }
+    } else {
+      scenario.status = 'not-ready'
+    }
+
+    scenario.warningsCount = scenario.warnings.length
+    scenario.errorsCount = scenario.errors.length
+    return scenario
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : normalizeOptionalString(String(error)) || 'error'
+
+    return {
+      ...emptyScenario,
+      present: true,
+      evaluated: true,
+      status: 'error',
+      recommendation: {
+        action: 'investigate',
+        reason: 'El escenario controlado del primer enable real devolvio un error interno.',
+        nextSafeStep: 'Mantener el runtime actual sin cambios y revisar el diagnostico.',
+      },
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
+function buildGeneratedDomainFileCreationApprovalPolicy({
+  materializationPlan,
+  generatedDomainMaterializationSourceResolution,
+  generatedDomainShadowMaterializationCandidatePlan,
+  generatedDomainShadowCandidateLegacyComparison,
+  generatedDomainShadowMaterializationEndToEndReadiness,
+  generatedDomainControlledEnablePolicy,
+  generatedDomainFirstControlledEnableScenario,
+}) {
+  const emptyPolicy = {
+    present: false,
+    evaluated: false,
+    status: 'not-ready',
+    source: 'generated-domain-file-creation-approval-policy',
+    behaviorChanged: false,
+    approvalRequired: true,
+    approved: false,
+    allowedNow: false,
+    requiresLeanApproval: true,
+    scope: {
+      targetRoot: null,
+      previewPaths: [],
+      legacyAllowedTargetPathsCount: 0,
+      candidateAllowedTargetPathsCount: 0,
+    },
+    evidence: {
+      hasLegacyMaterializationPlan: false,
+      hasShadowCandidate: false,
+      candidateComparisonStatus: null,
+      candidateComparable: false,
+      candidateUsableByFutureSwitch: false,
+      endToEndStatus: null,
+      controlledEnablePolicyStatus: null,
+      firstControlledScenarioStatus: null,
+      sourceReal: 'none',
+      sourceProjectedInTest: null,
+    },
+    safeguards: {
+      withinAllowedRootOnly: false,
+      noDotEnv: false,
+      noNodeModules: false,
+      noDocker: false,
+      noDeploy: false,
+      noExternalServices: false,
+      noRealPayments: false,
+      noCommands: false,
+      noWritesExecuted: true,
+      noWebPrueba: false,
+      materializationPlanChanged: false,
+      executionScopeChanged: false,
+    },
+    blockers: {
+      missingLegacyMaterializationPlan: true,
+      missingShadowCandidate: true,
+      comparisonNotAligned: true,
+      candidateNotUsable: true,
+      endToEndNotReady: true,
+      controlledPolicyNotReady: true,
+      firstScenarioNotReady: true,
+      unsafePaths: true,
+      forbiddenSignals: true,
+      runtimeStillMutable: false,
+      leanApprovalRequired: true,
+    },
+    recommendation: {
+      action: 'observe',
+      reason: '',
+      nextSafeStep: '',
+    },
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  const pushMessage = (target, message) => {
+    const normalized =
+      typeof message === 'string'
+        ? message.trim().replace(/\s+/gu, ' ')
+        : message === null || message === undefined
+          ? ''
+          : String(message).trim().replace(/\s+/gu, ' ')
+    if (!normalized || target.includes(normalized)) {
+      return
+    }
+    target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
+  }
+
+  const sourceResolution =
+    generatedDomainMaterializationSourceResolution &&
+    typeof generatedDomainMaterializationSourceResolution === 'object'
+      ? generatedDomainMaterializationSourceResolution
+      : null
+  const candidatePlan =
+    generatedDomainShadowMaterializationCandidatePlan &&
+    typeof generatedDomainShadowMaterializationCandidatePlan === 'object'
+      ? generatedDomainShadowMaterializationCandidatePlan
+      : null
+  const candidateComparison =
+    generatedDomainShadowCandidateLegacyComparison &&
+    typeof generatedDomainShadowCandidateLegacyComparison === 'object'
+      ? generatedDomainShadowCandidateLegacyComparison
+      : null
+  const endToEndReadiness =
+    generatedDomainShadowMaterializationEndToEndReadiness &&
+    typeof generatedDomainShadowMaterializationEndToEndReadiness === 'object'
+      ? generatedDomainShadowMaterializationEndToEndReadiness
+      : null
+  const controlledEnablePolicy =
+    generatedDomainControlledEnablePolicy &&
+    typeof generatedDomainControlledEnablePolicy === 'object'
+      ? generatedDomainControlledEnablePolicy
+      : null
+  const firstScenario =
+    generatedDomainFirstControlledEnableScenario &&
+    typeof generatedDomainFirstControlledEnableScenario === 'object'
+      ? generatedDomainFirstControlledEnableScenario
+      : null
+  const legacyPlan =
+    materializationPlan && typeof materializationPlan === 'object' ? materializationPlan : null
+
+  if (
+    !sourceResolution &&
+    !candidatePlan &&
+    !candidateComparison &&
+    !endToEndReadiness &&
+    !controlledEnablePolicy &&
+    !firstScenario &&
+    !legacyPlan
+  ) {
+    return emptyPolicy
+  }
+
+  try {
+    const warnings = []
+    const errors = []
+    const hasLegacyMaterializationPlan = Boolean(legacyPlan)
+    const hasShadowCandidate = candidatePlan?.present === true
+    const candidateUsableByFutureSwitch =
+      candidatePlan?.compatibility?.canBeUsedByFutureSwitch === true
+    const candidateComparisonStatus =
+      normalizeOptionalString(candidateComparison?.status) || null
+    const comparisonAligned = candidateComparisonStatus === 'aligned'
+    const endToEndStatus =
+      normalizeOptionalString(endToEndReadiness?.status) || null
+    const endToEndReady = endToEndStatus === 'ready-for-test-harness'
+    const controlledEnablePolicyStatus =
+      normalizeOptionalString(controlledEnablePolicy?.status) || null
+    const controlledPolicyReady =
+      controlledEnablePolicyStatus === 'eligible-for-test-enable' ||
+      controlledEnablePolicyStatus === 'eligible-for-controlled-runtime-enable'
+    const firstControlledScenarioStatus =
+      normalizeOptionalString(firstScenario?.status) || null
+    const firstScenarioReady = firstControlledScenarioStatus === 'ready-for-review'
+    const sourceReal =
+      normalizeOptionalString(sourceResolution?.source) || 'none'
+    const sourceProjectedInTest =
+      normalizeOptionalString(sourceResolution?.testProjection?.projectedSource) || null
+    const normalizeScopedPath = (value, rootHint = '') => {
+      const normalized = normalizeOptionalString(value)
+      if (!normalized) {
+        return ''
+      }
+      const candidate = normalizePathForComparison(normalized)
+      if (!path.isAbsolute(candidate)) {
+        return candidate
+      }
+
+      const normalizedRootHint = normalizePathForComparison(rootHint)
+      if (!normalizedRootHint) {
+        return candidate
+      }
+
+      const pathSegments = candidate.split('/').filter(Boolean)
+      const rootSegments = normalizedRootHint.split('/').filter(Boolean)
+      const rootBasename = rootSegments[rootSegments.length - 1] || normalizedRootHint
+      const rootIndex = pathSegments.lastIndexOf(rootBasename)
+
+      if (rootIndex === -1) {
+        return candidate
+      }
+
+      return pathSegments.slice(rootIndex).join('/')
+    }
+
+    const candidatePaths = summarizeUniqueExecutorStrings(
+      Array.isArray(candidatePlan?.candidate?.allowedTargetPaths)
+        ? candidatePlan.candidate.allowedTargetPaths.map((entry) =>
+            normalizePathForComparison(entry),
+          )
+        : [],
+      256,
+    ).filter(Boolean)
+    const legacyPaths = summarizeUniqueExecutorStrings(
+      [
+        ...(Array.isArray(legacyPlan?.allowedTargetPaths)
+          ? legacyPlan.allowedTargetPaths
+          : []),
+        ...(Array.isArray(legacyPlan?.operations)
+          ? legacyPlan.operations.map((entry) => normalizeOptionalString(entry?.targetPath))
+          : []),
+      ].map((entry) =>
+        normalizeScopedPath(entry, normalizeOptionalString(legacyPlan?.projectRoot) || ''),
+      ),
+      256,
+    ).filter(Boolean)
+    const previewPaths = summarizeUniqueExecutorStrings(
+      [...candidatePaths, ...legacyPaths],
+      24,
+    ).filter(Boolean)
+    const targetRoot =
+      normalizeOptionalString(candidatePlan?.candidate?.targetRoot) ||
+      normalizeOptionalString(candidatePlan?.candidate?.root) ||
+      normalizeOptionalString(legacyPlan?.projectRoot) ||
+      null
+    const normalizedTargetRoot = normalizePathForComparison(targetRoot)
+    const combinedSignals = JSON.stringify({
+      candidate: candidatePlan?.candidate || {},
+      comparison: candidateComparison?.operations || {},
+      legacyPaths,
+      previewPaths,
+    }).toLocaleLowerCase()
+
+    const withinAllowedRootOnly =
+      previewPaths.length > 0 &&
+      previewPaths.every((entry) => {
+        if (!entry) {
+          return true
+        }
+        if (path.isAbsolute(entry) || entry.startsWith('../')) {
+          return false
+        }
+        if (!normalizedTargetRoot) {
+          return true
+        }
+        return (
+          entry === normalizedTargetRoot || entry.startsWith(`${normalizedTargetRoot}/`)
+        )
+      })
+    const noDotEnv =
+      !previewPaths.some((entry) => /(^|\/)\.env(?:\..+)?($|\/)/iu.test(entry)) &&
+      !/\.env(?:\.[a-z0-9_-]+)?/iu.test(combinedSignals)
+    const noNodeModules =
+      !previewPaths.some((entry) => /(^|\/)node_modules($|\/)/iu.test(entry)) &&
+      !/node_modules/iu.test(combinedSignals)
+    const noDocker =
+      !previewPaths.some((entry) =>
+        /(^|\/)(?:dockerfile|docker-compose\.yml|docker-compose\.yaml)($|\/)/iu.test(entry),
+      ) && !/\bdocker\b/iu.test(combinedSignals)
+    const noDeploy =
+      !previewPaths.some((entry) => /(^|\/)deploy($|\/)/iu.test(entry)) &&
+      !/\bdeploy\b/iu.test(combinedSignals)
+    const noExternalServices =
+      candidatePlan?.candidate?.safety?.forbidsExternalServices === true
+    const noRealPayments =
+      candidatePlan?.candidate?.safety?.forbidsRealPayments === true
+    const noCommands =
+      candidateComparison?.operations?.candidateHasCommands !== true &&
+      !/\bcommand\b|\bcommands\b|\bnpm install\b|\bdocker\b|\bdeploy\b/iu.test(
+        combinedSignals,
+      )
+    const noWritesExecuted =
+      candidateComparison?.operations?.candidateHasWrites !== true &&
+      sourceResolution?.runtime?.materializationPlanChanged !== true &&
+      sourceResolution?.runtime?.executionScopeChanged !== true
+    const noWebPrueba =
+      !previewPaths.some((entry) => /(^|\/)web-prueba($|\/)/iu.test(entry)) &&
+      !/web-prueba/iu.test(combinedSignals)
+    const materializationPlanChanged =
+      sourceResolution?.runtime?.materializationPlanChanged === true
+    const executionScopeChanged =
+      sourceResolution?.runtime?.executionScopeChanged === true
+    const unsafePaths = !withinAllowedRootOnly || !noDotEnv || !noNodeModules || !noWebPrueba
+    const forbiddenSignals =
+      !noDocker ||
+      !noDeploy ||
+      !noExternalServices ||
+      !noRealPayments ||
+      !noCommands ||
+      !noWritesExecuted
+    const runtimeStillMutable =
+      sourceReal === 'generated-domain-shadow' ||
+      materializationPlanChanged ||
+      executionScopeChanged
+
+    const policy = {
+      ...emptyPolicy,
+      present: true,
+      evaluated:
+        hasLegacyMaterializationPlan ||
+        hasShadowCandidate ||
+        candidateComparison?.present === true ||
+        endToEndReadiness?.evaluated === true ||
+        controlledEnablePolicy?.evaluated === true ||
+        firstScenario?.evaluated === true,
+      scope: {
+        targetRoot,
+        previewPaths,
+        legacyAllowedTargetPathsCount: legacyPaths.length,
+        candidateAllowedTargetPathsCount: candidatePaths.length,
+      },
+      evidence: {
+        hasLegacyMaterializationPlan,
+        hasShadowCandidate,
+        candidateComparisonStatus,
+        candidateComparable: candidateComparison?.compared === true,
+        candidateUsableByFutureSwitch,
+        endToEndStatus,
+        controlledEnablePolicyStatus,
+        firstControlledScenarioStatus,
+        sourceReal,
+        sourceProjectedInTest,
+      },
+      safeguards: {
+        withinAllowedRootOnly,
+        noDotEnv,
+        noNodeModules,
+        noDocker,
+        noDeploy,
+        noExternalServices,
+        noRealPayments,
+        noCommands,
+        noWritesExecuted,
+        noWebPrueba,
+        materializationPlanChanged,
+        executionScopeChanged,
+      },
+      blockers: {
+        missingLegacyMaterializationPlan: !hasLegacyMaterializationPlan,
+        missingShadowCandidate: !hasShadowCandidate,
+        comparisonNotAligned: !comparisonAligned,
+        candidateNotUsable: !candidateUsableByFutureSwitch,
+        endToEndNotReady: !endToEndReady,
+        controlledPolicyNotReady: !controlledPolicyReady,
+        firstScenarioNotReady: !firstScenarioReady,
+        unsafePaths,
+        forbiddenSignals,
+        runtimeStillMutable,
+        leanApprovalRequired: true,
+      },
+      recommendation: {
+        action: 'observe',
+        reason:
+          'La policy de creacion real de archivos sigue siendo observacional y todavia no habilita escrituras reales.',
+        nextSafeStep:
+          'Mantener la materializacion real apagada hasta que Lean revise explicitamente el candidate y los paths.',
+      },
+      warnings,
+      errors,
+    }
+
+    if (!hasLegacyMaterializationPlan) {
+      pushMessage(
+        warnings,
+        'Todavia falta un materializationPlan legacy presente para revisar una aprobacion real de archivos.',
+      )
+    }
+    if (!hasShadowCandidate) {
+      pushMessage(
+        warnings,
+        'Todavia falta un shadow candidate disponible para pedir una aprobacion real de archivos.',
+      )
+    }
+    if (!comparisonAligned && candidateComparison?.present === true) {
+      pushMessage(
+        warnings,
+        'La comparacion candidate-vs-legacy todavia no quedo alineada para una revision manual de escritura real.',
+      )
+    }
+    if (unsafePaths) {
+      pushMessage(
+        errors,
+        'La policy detecto paths fuera del root permitido o referencias sensibles (.env, node_modules o web-prueba).',
+      )
+    }
+    if (forbiddenSignals) {
+      pushMessage(
+        errors,
+        'La policy detecto señales incompatibles con una aprobacion segura (docker, deploy, servicios externos, pagos reales, commands o writes).',
+      )
+    }
+    if (runtimeStillMutable) {
+      pushMessage(
+        errors,
+        'La policy detecto una mutacion de runtime o una fuente real shadow, lo que bloquea cualquier aprobacion de archivos.',
+      )
+    }
+
+    if (unsafePaths || forbiddenSignals || runtimeStillMutable) {
+      policy.status = 'blocked'
+      policy.recommendation = {
+        action: 'investigate',
+        reason:
+          'La policy encontro paths o señales incompatibles con una aprobacion segura de escritura real.',
+        nextSafeStep:
+          'Corregir los paths y las señales bloqueantes antes de volver a pedir una revision manual.',
+      }
+    } else if (
+      hasLegacyMaterializationPlan &&
+      hasShadowCandidate &&
+      comparisonAligned &&
+      candidateUsableByFutureSwitch &&
+      endToEndReady &&
+      controlledPolicyReady &&
+      firstScenarioReady &&
+      noDotEnv &&
+      noNodeModules &&
+      noDocker &&
+      noDeploy &&
+      noExternalServices &&
+      noRealPayments &&
+      noCommands &&
+      noWritesExecuted &&
+      noWebPrueba &&
+      withinAllowedRootOnly
+    ) {
+      policy.status = 'ready-for-manual-approval-review'
+      policy.recommendation = {
+        action: 'request-lean-approval',
+        reason:
+          'La cadena observacional ya esta alineada para que Lean revise manualmente una futura escritura real acotada.',
+        nextSafeStep:
+          'Mostrar root, previewPaths, exclusiones y riesgos antes de cualquier materializacion real.',
+      }
+    } else {
+      policy.status = 'not-ready'
+      policy.recommendation = {
+        action: 'observe',
+        reason:
+          'Todavia faltan comparacion, candidate o readiness suficientes antes de pedir una aprobacion manual de archivos.',
+        nextSafeStep:
+          'Seguir reforzando candidate, comparacion y readiness sin habilitar escrituras reales.',
+      }
+    }
+
+    policy.warningsCount = policy.warnings.length
+    policy.errorsCount = policy.errors.length
+    return policy
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : normalizeOptionalString(String(error)) || 'error'
+
+    return {
+      ...emptyPolicy,
+      present: true,
+      evaluated: true,
+      status: 'error',
+      recommendation: {
+        action: 'investigate',
+        reason: 'La policy observacional de creacion real de archivos devolvio un error interno.',
+        nextSafeStep:
+          'Mantener la materializacion real apagada y revisar la policy antes de usarla como gate.',
+      },
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
+function buildGeneratedDomainUniversalMaterializationPlanPreview({
+  generatedDomainContract,
+  generatedDomainContractDiagnostics,
+  generatedDomainCapabilityProfile,
+  generatedDomainShadowMaterializationCandidatePlan,
+  generatedDomainFileCreationApprovalPolicy,
+  domainConsistencyDiagnostics,
+}) {
+  const emptyPreview = {
+    present: false,
+    built: false,
+    status: 'not-available',
+    source: 'generated-domain-contract',
+    behaviorChanged: false,
+    root: null,
+    sourceRoot: null,
+    targetRoot: null,
+    deliveryLevel: null,
+    surfaces: [],
+    frontend: {
+      present: false,
+      surfaceCount: 0,
+      paths: [],
+    },
+    backend: {
+      present: false,
+      packageFile: null,
+      entryFile: null,
+      routeCount: 0,
+      serviceCount: 0,
+      moduleCount: 0,
+      paths: [],
+    },
+    database: {
+      present: false,
+      schemaFile: null,
+      seedFile: null,
+      tableCount: 0,
+    },
+    shared: {
+      present: false,
+      files: [],
+    },
+    docs: {
+      present: false,
+      files: [],
+    },
+    scripts: {
+      present: false,
+      files: [],
+    },
+    validation: {
+      present: false,
+      syntaxChecks: [],
+      requiredPathGroupsCount: 0,
+    },
+    safety: {
+      safeForLocalMaterialization: false,
+      forbidsSecrets: false,
+      forbidsDeploy: false,
+      forbidsRealPayments: false,
+      forbidsExternalServices: false,
+      noDotEnv: false,
+      noNodeModules: false,
+      noDocker: false,
+      noCommands: false,
+      noWrites: false,
+    },
+    allowedTargetPaths: [],
+    requiredPathGroups: [],
+    forbiddenSignals: [],
+    approvalRequired: true,
+    canBecomeMaterializationPlan: false,
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  const pushMessage = (target, message) => {
+    const normalized =
+      typeof message === 'string'
+        ? message.trim().replace(/\s+/gu, ' ')
+        : message === null || message === undefined
+          ? ''
+          : String(message).trim().replace(/\s+/gu, ' ')
+    if (!normalized || target.includes(normalized)) {
+      return
+    }
+    target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
+  }
+
+  const normalizePreviewPath = (value, rootHint = '') => {
+    const normalized = normalizeOptionalString(value)
+    if (!normalized) {
+      return ''
+    }
+    const candidate = normalizePathForComparison(normalized)
+    if (!path.isAbsolute(candidate)) {
+      return candidate
+    }
+
+    const normalizedRootHint = normalizePathForComparison(rootHint)
+    if (!normalizedRootHint) {
+      return candidate
+    }
+
+    const pathSegments = candidate.split('/').filter(Boolean)
+    const rootSegments = normalizedRootHint.split('/').filter(Boolean)
+    const rootBasename = rootSegments[rootSegments.length - 1] || normalizedRootHint
+    const rootIndex = pathSegments.lastIndexOf(rootBasename)
+
+    if (rootIndex === -1) {
+      return candidate
+    }
+
+    return pathSegments.slice(rootIndex).join('/')
+  }
+
+  const normalizePreviewGroup = (group, rootHint = '') => {
+    if (!group) {
+      return null
+    }
+    const rawCandidates = Array.isArray(group)
+      ? group
+      : Array.isArray(group?.candidates)
+        ? group.candidates
+        : []
+    const candidates = summarizeUniqueExecutorStrings(
+      rawCandidates.map((entry) => normalizePreviewPath(entry, rootHint)),
+      32,
+    ).filter(Boolean)
+    if (candidates.length === 0) {
+      return null
+    }
+    return {
+      ...(typeof group?.label === 'string' && group.label.trim()
+        ? { label: group.label.trim() }
+        : {}),
+      candidates,
+    }
+  }
+
+  const normalizedContract =
+    generatedDomainContractDiagnostics?.normalizedContract &&
+    typeof generatedDomainContractDiagnostics.normalizedContract === 'object'
+      ? generatedDomainContractDiagnostics.normalizedContract
+      : generatedDomainContract &&
+          typeof generatedDomainContract === 'object' &&
+          typeof generatedDomainContract.contractVersion === 'string' &&
+          generatedDomainContract.contractVersion.trim()
+        ? generatedDomainContract
+        : null
+  const capabilityProfile =
+    generatedDomainCapabilityProfile && typeof generatedDomainCapabilityProfile === 'object'
+      ? generatedDomainCapabilityProfile
+      : null
+  const candidatePlan =
+    generatedDomainShadowMaterializationCandidatePlan &&
+    typeof generatedDomainShadowMaterializationCandidatePlan === 'object'
+      ? generatedDomainShadowMaterializationCandidatePlan
+      : null
+  const approvalPolicy =
+    generatedDomainFileCreationApprovalPolicy &&
+    typeof generatedDomainFileCreationApprovalPolicy === 'object'
+      ? generatedDomainFileCreationApprovalPolicy
+      : null
+  const consistency =
+    domainConsistencyDiagnostics && typeof domainConsistencyDiagnostics === 'object'
+      ? domainConsistencyDiagnostics
+      : null
+
+  if (
+    !normalizedContract &&
+    !generatedDomainContractDiagnostics &&
+    !capabilityProfile &&
+    !candidatePlan &&
+    !approvalPolicy &&
+    !consistency
+  ) {
+    return emptyPreview
+  }
+
+  try {
+    const warnings = []
+    const errors = []
+    const root =
+      normalizeOptionalString(normalizedContract?.root?.slug) ||
+      normalizeOptionalString(generatedDomainContractDiagnostics?.rootSlug) ||
+      normalizeOptionalString(candidatePlan?.candidate?.root) ||
+      null
+    const sourceRoot =
+      normalizeOptionalString(normalizedContract?.root?.sourceRoot) ||
+      normalizeOptionalString(generatedDomainContractDiagnostics?.sourceRoot) ||
+      normalizeOptionalString(candidatePlan?.candidate?.sourceRoot) ||
+      null
+    const targetRoot =
+      normalizeOptionalString(normalizedContract?.root?.targetRoot) ||
+      normalizeOptionalString(generatedDomainContractDiagnostics?.targetRoot) ||
+      normalizeOptionalString(candidatePlan?.candidate?.targetRoot) ||
+      normalizeOptionalString(root) ||
+      null
+    const normalizedTargetRoot = normalizePreviewPath(targetRoot)
+    const validationResult = normalizedContract
+      ? validateGeneratedDomainContract(normalizedContract)
+      : { ok: false, errors: [], warnings: [] }
+    const safetyResult = normalizedContract
+      ? isContractSafeForLocalMaterialization(normalizedContract)
+      : { ok: false, errors: [], forbiddenSearchPatterns: [], allowedTargetPaths: [] }
+    const derivedAllowedTargetPaths = summarizeUniqueExecutorStrings(
+      (
+        Array.isArray(generatedDomainContractDiagnostics?.allowedTargetPaths)
+          ? generatedDomainContractDiagnostics.allowedTargetPaths
+          : Array.isArray(safetyResult.allowedTargetPaths)
+            ? safetyResult.allowedTargetPaths
+            : normalizedContract
+              ? deriveAllowedTargetPathsFromContract(normalizedContract, '.')
+              : []
+      ).map((entry) => normalizePreviewPath(entry, targetRoot)),
+      256,
+    ).filter(Boolean)
+    const requiredPathGroups = summarizeUniqueExecutorStrings(
+      (
+        Array.isArray(generatedDomainContractDiagnostics?.requiredPathGroups)
+          ? generatedDomainContractDiagnostics.requiredPathGroups
+          : normalizedContract
+            ? deriveRequiredPathGroupsFromContract(normalizedContract)
+            : []
+      )
+        .map((entry) => normalizePreviewGroup(entry, targetRoot))
+        .filter(Boolean)
+        .map((entry) => JSON.stringify(entry)),
+      128,
+    )
+      .map((entry) => {
+        try {
+          return JSON.parse(entry)
+        } catch {
+          return null
+        }
+      })
+      .filter(Boolean)
+    const forbiddenSignals = summarizeUniqueExecutorStrings(
+      [
+        ...(Array.isArray(generatedDomainContractDiagnostics?.forbiddenSearchPatterns)
+          ? generatedDomainContractDiagnostics.forbiddenSearchPatterns
+          : normalizedContract
+            ? deriveForbiddenSearchPatternsFromContract(normalizedContract)
+            : []),
+        ...(Array.isArray(normalizedContract?.safety?.forbiddenFiles)
+          ? normalizedContract.safety.forbiddenFiles
+          : []),
+        ...(Array.isArray(normalizedContract?.safety?.explicitExclusions)
+          ? normalizedContract.safety.explicitExclusions
+          : []),
+      ],
+      64,
+    ).filter(Boolean)
+    const surfaces = Array.isArray(normalizedContract?.frontendSurfaces)
+      ? normalizedContract.frontendSurfaces
+          .map((surface) => ({
+            key: normalizeOptionalString(surface?.key) || '',
+            label: normalizeOptionalString(surface?.label) || '',
+            path: normalizePreviewPath(surface?.path, targetRoot),
+            screens: summarizeUniqueExecutorStrings(
+              Array.isArray(surface?.screens) ? surface.screens : [],
+              24,
+            ).filter(Boolean),
+          }))
+          .filter((surface) => surface.key || surface.path)
+      : []
+    const frontendPaths = summarizeUniqueExecutorStrings(
+      surfaces.map((surface) => surface.path).filter(Boolean),
+      32,
+    ).filter(Boolean)
+    const backendPaths = summarizeUniqueExecutorStrings(
+      [
+        normalizePreviewPath(normalizedContract?.backend?.packageFile, targetRoot),
+        normalizePreviewPath(normalizedContract?.backend?.entryFile, targetRoot),
+        ...(Array.isArray(normalizedContract?.backend?.routes)
+          ? normalizedContract.backend.routes.map((entry) =>
+              normalizePreviewPath(entry?.path || entry, targetRoot),
+            )
+          : []),
+        ...(Array.isArray(normalizedContract?.backend?.services)
+          ? normalizedContract.backend.services.map((entry) =>
+              normalizePreviewPath(entry?.path || entry, targetRoot),
+            )
+          : []),
+        ...(Array.isArray(normalizedContract?.backend?.modules)
+          ? normalizedContract.backend.modules.map((entry) =>
+              normalizePreviewPath(entry?.path || entry, targetRoot),
+            )
+          : []),
+      ],
+      64,
+    ).filter(Boolean)
+    const sharedFiles = summarizeUniqueExecutorStrings(
+      Array.isArray(normalizedContract?.shared?.files)
+        ? normalizedContract.shared.files.map((entry) => normalizePreviewPath(entry, targetRoot))
+        : [],
+      64,
+    ).filter(Boolean)
+    const docsFiles = summarizeUniqueExecutorStrings(
+      Array.isArray(normalizedContract?.docs)
+        ? normalizedContract.docs.map((entry) => normalizePreviewPath(entry, targetRoot))
+        : [],
+      64,
+    ).filter(Boolean)
+    const scriptsFiles = summarizeUniqueExecutorStrings(
+      Array.isArray(normalizedContract?.scripts)
+        ? normalizedContract.scripts.map((entry) => normalizePreviewPath(entry, targetRoot))
+        : [],
+      64,
+    ).filter(Boolean)
+    const previewExecutionSurfaceText = JSON.stringify({
+      allowedTargetPaths: derivedAllowedTargetPaths,
+      requiredPathGroups,
+      syntaxChecks: Array.isArray(normalizedContract?.validation?.syntaxChecks)
+        ? normalizedContract.validation.syntaxChecks
+        : [],
+      materializationRequiredFiles: Array.isArray(normalizedContract?.materialization?.requiredFiles)
+        ? normalizedContract.materialization.requiredFiles
+        : [],
+      candidateAllowedTargetPaths: candidatePlan?.candidate?.allowedTargetPaths || [],
+    }).toLocaleLowerCase()
+    const noDotEnv =
+      !previewExecutionSurfaceText.includes('.env') &&
+      !derivedAllowedTargetPaths.some((entry) => /(^|\/)\.env(?:\..+)?($|\/)/iu.test(entry))
+    const noNodeModules =
+      !previewExecutionSurfaceText.includes('node_modules') &&
+      !derivedAllowedTargetPaths.some((entry) => /(^|\/)node_modules($|\/)/iu.test(entry))
+    const noDocker =
+      !/\bdocker\b|dockerfile|docker-compose/iu.test(previewExecutionSurfaceText) &&
+      !derivedAllowedTargetPaths.some((entry) =>
+        /(^|\/)(?:dockerfile|docker-compose\.yml|docker-compose\.yaml)($|\/)/iu.test(
+          entry,
+        ),
+      )
+    const noCommands =
+      !/\bcommand\b|\bcommands\b|\bnpm install\b/iu.test(previewExecutionSurfaceText) &&
+      !(
+        Array.isArray(normalizedContract?.validation?.syntaxChecks) &&
+        normalizedContract.validation.syntaxChecks.some((entry) =>
+          /\bnpm install\b|\bdocker\b|\bdeploy\b/iu.test(String(entry || '')),
+        )
+      )
+    const noWrites = true
+    const safeForLocalMaterialization =
+      safetyResult.ok === true ||
+      candidatePlan?.candidate?.safety?.safeForLocalMaterialization === true ||
+      capabilityProfile?.safety?.safeForLocalMaterialization === true
+    const domainMismatch =
+      consistency?.status === 'mismatch' ||
+      consistency?.status === 'error' ||
+      consistency?.semanticStatus === 'mismatch' ||
+      consistency?.semanticStatus === 'error'
+    const approvalRequired = approvalPolicy?.approvalRequired !== false
+
+    const preview = {
+      ...emptyPreview,
+      present: true,
+      root,
+      sourceRoot,
+      targetRoot,
+      deliveryLevel:
+        normalizeOptionalString(normalizedContract?.deliveryLevel) ||
+        (capabilityProfile?.delivery?.fullstackLocal === true ? 'fullstack-local' : null),
+      surfaces,
+      frontend: {
+        present: frontendPaths.length > 0,
+        surfaceCount: surfaces.length,
+        paths: frontendPaths,
+      },
+      backend: {
+        present: backendPaths.length > 0,
+        packageFile: normalizePreviewPath(normalizedContract?.backend?.packageFile, targetRoot) || null,
+        entryFile: normalizePreviewPath(normalizedContract?.backend?.entryFile, targetRoot) || null,
+        routeCount: Array.isArray(normalizedContract?.backend?.routes)
+          ? normalizedContract.backend.routes.length
+          : 0,
+        serviceCount: Array.isArray(normalizedContract?.backend?.services)
+          ? normalizedContract.backend.services.length
+          : 0,
+        moduleCount: Array.isArray(normalizedContract?.backend?.modules)
+          ? normalizedContract.backend.modules.length
+          : 0,
+        paths: backendPaths,
+      },
+      database: {
+        present:
+          Boolean(normalizedContract?.database?.schemaFile) ||
+          Boolean(normalizedContract?.database?.seedFile) ||
+          (Array.isArray(normalizedContract?.database?.tables) &&
+            normalizedContract.database.tables.length > 0),
+        schemaFile: normalizePreviewPath(normalizedContract?.database?.schemaFile, targetRoot) || null,
+        seedFile: normalizePreviewPath(normalizedContract?.database?.seedFile, targetRoot) || null,
+        tableCount: Array.isArray(normalizedContract?.database?.tables)
+          ? normalizedContract.database.tables.length
+          : 0,
+      },
+      shared: {
+        present: sharedFiles.length > 0,
+        files: sharedFiles,
+      },
+      docs: {
+        present: docsFiles.length > 0,
+        files: docsFiles,
+      },
+      scripts: {
+        present: scriptsFiles.length > 0,
+        files: scriptsFiles,
+      },
+      validation: {
+        present:
+          requiredPathGroups.length > 0 ||
+          (Array.isArray(normalizedContract?.validation?.syntaxChecks) &&
+            normalizedContract.validation.syntaxChecks.length > 0),
+        syntaxChecks: summarizeUniqueExecutorStrings(
+          Array.isArray(normalizedContract?.validation?.syntaxChecks)
+            ? normalizedContract.validation.syntaxChecks
+            : [],
+          32,
+        ).filter(Boolean),
+        requiredPathGroupsCount: requiredPathGroups.length,
+      },
+      safety: {
+        safeForLocalMaterialization,
+        forbidsSecrets:
+          candidatePlan?.candidate?.safety?.forbidsSecrets === true ||
+          capabilityProfile?.safety?.forbidsSecrets === true ||
+          forbiddenSignals.some((entry) => /token|secret|credential|api key/iu.test(entry)),
+        forbidsDeploy:
+          candidatePlan?.candidate?.safety?.forbidsDeploy === true ||
+          capabilityProfile?.safety?.forbidsDeploy === true ||
+          forbiddenSignals.some((entry) => /\bdeploy\b/iu.test(entry)),
+        forbidsRealPayments:
+          candidatePlan?.candidate?.safety?.forbidsRealPayments === true ||
+          capabilityProfile?.safety?.forbidsRealPayments === true ||
+          forbiddenSignals.some((entry) => /payment|pago|mercadopago|checkout/iu.test(entry)),
+        forbidsExternalServices:
+          candidatePlan?.candidate?.safety?.forbidsExternalServices === true ||
+          capabilityProfile?.safety?.forbidsExternalServices === true ||
+          !(
+            Array.isArray(normalizedContract?.integrations) &&
+            normalizedContract.integrations.some(
+              (entry) =>
+                normalizeOptionalString(entry?.mode) !== 'mock-only' ||
+                entry?.realIntegrationAllowedNow === true,
+            )
+          ),
+        noDotEnv,
+        noNodeModules,
+        noDocker,
+        noCommands,
+        noWrites,
+      },
+      allowedTargetPaths: derivedAllowedTargetPaths,
+      requiredPathGroups,
+      forbiddenSignals,
+      approvalRequired,
+      canBecomeMaterializationPlan: false,
+      warnings,
+      errors,
+    }
+
+    if (!normalizedContract) {
+      pushMessage(
+        warnings,
+        'Todavia no hay GeneratedDomainContract normalizado para derivar un universal materialization preview completo.',
+      )
+    }
+    if (!validationResult.ok) {
+      ;(validationResult.errors || []).forEach((entry) => pushMessage(errors, entry))
+    }
+    ;(validationResult.warnings || []).forEach((entry) => pushMessage(warnings, entry))
+    ;(safetyResult.errors || []).forEach((entry) => pushMessage(errors, entry))
+    if (!preview.root || !preview.targetRoot) {
+      pushMessage(errors, 'El preview universal necesita root y targetRoot coherentes para seguir siendo seguro.')
+    }
+    if (derivedAllowedTargetPaths.length === 0) {
+      pushMessage(warnings, 'El preview universal todavia no pudo derivar allowedTargetPaths suficientes.')
+    }
+    if (requiredPathGroups.length === 0) {
+      pushMessage(warnings, 'El preview universal todavia no pudo derivar requiredPathGroups suficientes.')
+    }
+    if (domainMismatch) {
+      pushMessage(
+        errors,
+        'La consistencia de dominio bloquea la promocion del preview universal como base futura de materializationPlan.',
+      )
+    }
+    if (!noDotEnv || !noNodeModules || !noDocker) {
+      pushMessage(
+        errors,
+        'El preview universal detecto referencias incompatibles con seguridad local (.env, node_modules o Docker).',
+      )
+    }
+    if (!noCommands || !noWrites) {
+      pushMessage(
+        errors,
+        'El preview universal detecto señales ejecutables (commands o writes) y debe seguir siendo solo observacional.',
+      )
+    }
+
+    const structurallyReady =
+      preview.frontend.present &&
+      preview.backend.present &&
+      preview.database.present &&
+      derivedAllowedTargetPaths.length > 0 &&
+      requiredPathGroups.length > 0
+    preview.canBecomeMaterializationPlan =
+      validationResult.ok === true &&
+      safeForLocalMaterialization === true &&
+      structurallyReady &&
+      !domainMismatch &&
+      preview.safety.noDotEnv === true &&
+      preview.safety.noNodeModules === true &&
+      preview.safety.noDocker === true &&
+      preview.safety.noCommands === true &&
+      preview.safety.noWrites === true
+
+    if (errors.length > 0) {
+      preview.status = 'blocked'
+    } else if (preview.canBecomeMaterializationPlan) {
+      preview.status = 'built'
+      preview.built = true
+    } else if (normalizedContract) {
+      preview.status = 'partial'
+    }
+
+    preview.warningsCount = preview.warnings.length
+    preview.errorsCount = preview.errors.length
+    return preview
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : normalizeOptionalString(String(error)) || 'error'
+
+    return {
+      ...emptyPreview,
+      present: true,
+      status: 'error',
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
+function buildGeneratedDomainUniversalMaterializationPlanPreviewComparison({
+  generatedDomainUniversalMaterializationPlanPreview,
+  materializationPlan,
+  generatedDomainShadowMaterializationCandidatePlan,
+}) {
+  const emptyComparison = {
+    present: false,
+    compared: false,
+    status: 'not-available',
+    source: 'generated-domain-universal-materialization-preview-comparison',
+    behaviorChanged: false,
+    preview: {
+      built: false,
+      legacyPresent: false,
+      candidatePresent: false,
+    },
+    roots: {
+      previewRoot: null,
+      legacyRoot: null,
+      candidateRoot: null,
+      aligned: false,
+    },
+    allowedTargets: {
+      previewCount: 0,
+      legacyCount: 0,
+      candidateCount: 0,
+      overlapWithLegacyCount: 0,
+      overlapWithCandidateCount: 0,
+      aligned: false,
+    },
+    requiredGroups: {
+      previewCount: 0,
+      legacyCount: 0,
+      candidateCount: 0,
+      overlapWithLegacyCount: 0,
+      overlapWithCandidateCount: 0,
+      aligned: false,
+    },
+    fileChecks: {
+      previewHasBackendEntry: false,
+      previewHasDatabaseSchema: false,
+      previewHasFrontendSurface: false,
+      aligned: false,
+    },
+    buckets: {
+      frontend: { previewPresent: false, legacyPresent: false, candidatePresent: false, aligned: false },
+      backend: { previewPresent: false, legacyPresent: false, candidatePresent: false, aligned: false },
+      database: { previewPresent: false, legacyPresent: false, candidatePresent: false, aligned: false },
+      shared: { previewPresent: false, legacyPresent: false, candidatePresent: false, aligned: false },
+      docs: { previewPresent: false, legacyPresent: false, candidatePresent: false, aligned: false },
+      scripts: { previewPresent: false, legacyPresent: false, candidatePresent: false, aligned: false },
+      validation: { previewPresent: false, legacyPresent: false, candidatePresent: false, aligned: false },
+      allAligned: false,
+    },
+    safety: {
+      previewSafe: false,
+      legacySafeSignalsPresent: false,
+      candidateSafe: false,
+      aligned: false,
+    },
+    recommendation: {
+      action: 'observe',
+      reason: '',
+      nextSafeStep: '',
+    },
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  const pushMessage = (target, message) => {
+    const normalized =
+      typeof message === 'string'
+        ? message.trim().replace(/\s+/gu, ' ')
+        : message === null || message === undefined
+          ? ''
+          : String(message).trim().replace(/\s+/gu, ' ')
+    if (!normalized || target.includes(normalized)) {
+      return
+    }
+    target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
+  }
+
+  const normalizeComparisonPath = (value, rootHint = '') => {
+    const normalized = normalizeOptionalString(value)
+    if (!normalized) {
+      return ''
+    }
+    const candidate = normalizePathForComparison(normalized)
+    if (!path.isAbsolute(candidate)) {
+      return candidate
+    }
+    const normalizedRootHint = normalizePathForComparison(rootHint)
+    if (!normalizedRootHint) {
+      return candidate
+    }
+    const pathSegments = candidate.split('/').filter(Boolean)
+    const rootSegments = normalizedRootHint.split('/').filter(Boolean)
+    const rootBasename = rootSegments[rootSegments.length - 1] || normalizedRootHint
+    const rootIndex = pathSegments.lastIndexOf(rootBasename)
+    if (rootIndex === -1) {
+      return candidate
+    }
+    return pathSegments.slice(rootIndex).join('/')
+  }
+
+  const normalizeComparisonGroup = (group, rootHint = '') =>
+    summarizeUniqueExecutorStrings(
+      (Array.isArray(group?.candidates) ? group.candidates : Array.isArray(group) ? group : [])
+        .map((entry) => normalizeComparisonPath(entry, rootHint)),
+      32,
+    )
+      .filter(Boolean)
+      .join(' | ')
+
+  const preview =
+    generatedDomainUniversalMaterializationPlanPreview &&
+    typeof generatedDomainUniversalMaterializationPlanPreview === 'object'
+      ? generatedDomainUniversalMaterializationPlanPreview
+      : null
+  const legacyPlan =
+    materializationPlan && typeof materializationPlan === 'object' ? materializationPlan : null
+  const candidatePlan =
+    generatedDomainShadowMaterializationCandidatePlan &&
+    typeof generatedDomainShadowMaterializationCandidatePlan === 'object'
+      ? generatedDomainShadowMaterializationCandidatePlan
+      : null
+
+  if (!preview && !legacyPlan && !candidatePlan) {
+    return emptyComparison
+  }
+
+  try {
+    const warnings = []
+    const errors = []
+    const previewRoot = normalizeOptionalString(preview?.targetRoot || preview?.root) || null
+    const legacyRoot = normalizeOptionalString(legacyPlan?.projectRoot) || null
+    const candidateRoot =
+      normalizeOptionalString(candidatePlan?.candidate?.targetRoot || candidatePlan?.candidate?.root) ||
+      null
+    const previewAllowedTargets = summarizeUniqueExecutorStrings(
+      Array.isArray(preview?.allowedTargetPaths)
+        ? preview.allowedTargetPaths.map((entry) => normalizeComparisonPath(entry, previewRoot))
+        : [],
+      256,
+    ).filter(Boolean)
+    const legacyAllowedTargets = summarizeUniqueExecutorStrings(
+      [
+        ...(Array.isArray(legacyPlan?.allowedTargetPaths) ? legacyPlan.allowedTargetPaths : []),
+        ...(Array.isArray(legacyPlan?.operations)
+          ? legacyPlan.operations.map((entry) => normalizeOptionalString(entry?.targetPath))
+          : []),
+      ].map((entry) => normalizeComparisonPath(entry, legacyRoot)),
+      256,
+    ).filter(Boolean)
+    const candidateAllowedTargets = summarizeUniqueExecutorStrings(
+      Array.isArray(candidatePlan?.candidate?.allowedTargetPaths)
+        ? candidatePlan.candidate.allowedTargetPaths.map((entry) =>
+            normalizeComparisonPath(entry, candidateRoot),
+          )
+        : [],
+      256,
+    ).filter(Boolean)
+    const previewRequiredGroups = (
+      Array.isArray(preview?.requiredPathGroups) ? preview.requiredPathGroups : []
+    )
+      .map((group) => normalizeComparisonGroup(group, previewRoot))
+      .filter(Boolean)
+    const legacyRequiredGroups = (
+      Array.isArray(legacyPlan?.contractDefinition?.requiredPathGroups)
+        ? legacyPlan.contractDefinition.requiredPathGroups
+        : []
+    )
+      .map((group) => normalizeComparisonGroup(group, legacyRoot))
+      .filter(Boolean)
+    const candidateRequiredGroups = (
+      Array.isArray(candidatePlan?.candidate?.requiredPathGroups)
+        ? candidatePlan.candidate.requiredPathGroups
+        : []
+    )
+      .map((group) => normalizeComparisonGroup(group, candidateRoot))
+      .filter(Boolean)
+
+    const comparison = {
+      ...emptyComparison,
+      present: true,
+      compared: Boolean(preview?.present === true || legacyPlan || candidatePlan?.present === true),
+      preview: {
+        built: preview?.built === true,
+        legacyPresent: Boolean(legacyPlan),
+        candidatePresent: candidatePlan?.present === true,
+      },
+      roots: {
+        previewRoot,
+        legacyRoot,
+        candidateRoot,
+        aligned:
+          Boolean(previewRoot) &&
+          (!legacyRoot || normalizeComparisonPath(previewRoot) === normalizeComparisonPath(legacyRoot)) &&
+          (!candidateRoot || normalizeComparisonPath(previewRoot) === normalizeComparisonPath(candidateRoot)),
+      },
+      allowedTargets: {
+        previewCount: previewAllowedTargets.length,
+        legacyCount: legacyAllowedTargets.length,
+        candidateCount: candidateAllowedTargets.length,
+        overlapWithLegacyCount: previewAllowedTargets.filter((entry) =>
+          legacyAllowedTargets.includes(entry),
+        ).length,
+        overlapWithCandidateCount: previewAllowedTargets.filter((entry) =>
+          candidateAllowedTargets.includes(entry),
+        ).length,
+        aligned: false,
+      },
+      requiredGroups: {
+        previewCount: previewRequiredGroups.length,
+        legacyCount: legacyRequiredGroups.length,
+        candidateCount: candidateRequiredGroups.length,
+        overlapWithLegacyCount: previewRequiredGroups.filter((entry) =>
+          legacyRequiredGroups.includes(entry),
+        ).length,
+        overlapWithCandidateCount: previewRequiredGroups.filter((entry) =>
+          candidateRequiredGroups.includes(entry),
+        ).length,
+        aligned: false,
+      },
+      fileChecks: {
+        previewHasBackendEntry:
+          typeof preview?.backend?.entryFile === 'string' && preview.backend.entryFile.trim(),
+        previewHasDatabaseSchema:
+          typeof preview?.database?.schemaFile === 'string' && preview.database.schemaFile.trim(),
+        previewHasFrontendSurface: preview?.frontend?.present === true,
+        aligned: false,
+      },
+      buckets: {
+        frontend: {
+          previewPresent: preview?.frontend?.present === true,
+          legacyPresent: legacyAllowedTargets.some((entry) => entry.includes('frontend/')),
+          candidatePresent: candidatePlan?.candidate?.plannedBuckets?.frontend === true,
+          aligned: false,
+        },
+        backend: {
+          previewPresent: preview?.backend?.present === true,
+          legacyPresent: legacyAllowedTargets.some((entry) => entry.includes('backend/')),
+          candidatePresent: candidatePlan?.candidate?.plannedBuckets?.backend === true,
+          aligned: false,
+        },
+        database: {
+          previewPresent: preview?.database?.present === true,
+          legacyPresent: legacyAllowedTargets.some((entry) => entry.includes('database/')),
+          candidatePresent: candidatePlan?.candidate?.plannedBuckets?.database === true,
+          aligned: false,
+        },
+        shared: {
+          previewPresent: preview?.shared?.present === true,
+          legacyPresent: legacyAllowedTargets.some((entry) => entry.includes('shared/')),
+          candidatePresent: candidatePlan?.candidate?.plannedBuckets?.shared === true,
+          aligned: false,
+        },
+        docs: {
+          previewPresent: preview?.docs?.present === true,
+          legacyPresent: legacyAllowedTargets.some((entry) => entry.includes('docs/')),
+          candidatePresent: candidatePlan?.candidate?.plannedBuckets?.docs === true,
+          aligned: false,
+        },
+        scripts: {
+          previewPresent: preview?.scripts?.present === true,
+          legacyPresent: legacyAllowedTargets.some((entry) => entry.includes('scripts/')),
+          candidatePresent: candidatePlan?.candidate?.plannedBuckets?.scripts === true,
+          aligned: false,
+        },
+        validation: {
+          previewPresent: Array.isArray(preview?.requiredPathGroups) && preview.requiredPathGroups.length > 0,
+          legacyPresent: legacyRequiredGroups.length > 0,
+          candidatePresent: candidatePlan?.candidate?.plannedBuckets?.validation === true,
+          aligned: false,
+        },
+        allAligned: false,
+      },
+      safety: {
+        previewSafe:
+          preview?.safety?.safeForLocalMaterialization === true &&
+          preview?.safety?.noDotEnv === true &&
+          preview?.safety?.noNodeModules === true &&
+          preview?.safety?.noDocker === true &&
+          preview?.safety?.noCommands === true &&
+          preview?.safety?.noWrites === true,
+        legacySafeSignalsPresent:
+          !legacyAllowedTargets.some((entry) =>
+            /(^|\/)(\.env(?:\..+)?)($|\/)|(^|\/)node_modules($|\/)|(^|\/)(?:dockerfile|docker-compose\.yml|docker-compose\.yaml)($|\/)|(^|\/)deploy($|\/)/iu.test(
+              entry,
+            ),
+          ),
+        candidateSafe:
+          candidatePlan?.candidate?.safety?.safeForLocalMaterialization === true &&
+          candidatePlan?.candidate?.safety?.forbidsSecrets === true &&
+          candidatePlan?.candidate?.safety?.forbidsDeploy === true &&
+          candidatePlan?.candidate?.safety?.forbidsRealPayments === true &&
+          candidatePlan?.candidate?.safety?.forbidsExternalServices === true,
+        aligned: false,
+      },
+      recommendation: {
+        action: 'observe',
+        reason:
+          'La comparacion universal preview vs legacy sigue siendo observacional y no cambia la fuente real de materializacion.',
+        nextSafeStep:
+          'Seguir contrastando preview, candidate y legacy antes de proponer una migracion de runtime.',
+      },
+      warnings,
+      errors,
+    }
+
+    comparison.allowedTargets.aligned =
+      previewAllowedTargets.length > 0 &&
+      (legacyAllowedTargets.length === 0 ||
+        comparison.allowedTargets.overlapWithLegacyCount > 0) &&
+      (candidateAllowedTargets.length === 0 ||
+        comparison.allowedTargets.overlapWithCandidateCount > 0)
+    comparison.requiredGroups.aligned =
+      previewRequiredGroups.length > 0 &&
+      (legacyRequiredGroups.length === 0 ||
+        comparison.requiredGroups.overlapWithLegacyCount > 0) &&
+      (candidateRequiredGroups.length === 0 ||
+        comparison.requiredGroups.overlapWithCandidateCount > 0)
+    comparison.fileChecks.aligned =
+      Boolean(comparison.fileChecks.previewHasBackendEntry) &&
+      Boolean(comparison.fileChecks.previewHasDatabaseSchema) &&
+      comparison.fileChecks.previewHasFrontendSurface === true
+    for (const bucketKey of ['frontend', 'backend', 'database', 'shared', 'docs', 'scripts', 'validation']) {
+      const bucket = comparison.buckets[bucketKey]
+      bucket.aligned =
+        bucket.previewPresent === true &&
+        (bucket.legacyPresent === false || bucket.previewPresent === bucket.legacyPresent) &&
+        (bucket.candidatePresent === false || bucket.previewPresent === bucket.candidatePresent)
+    }
+    comparison.buckets.allAligned = ['frontend', 'backend', 'database', 'shared', 'docs', 'scripts', 'validation']
+      .every((bucketKey) => comparison.buckets[bucketKey]?.aligned === true)
+    comparison.safety.aligned =
+      comparison.safety.previewSafe === true &&
+      comparison.safety.legacySafeSignalsPresent === true &&
+      (candidatePlan?.present !== true || comparison.safety.candidateSafe === true)
+
+    const previewBlocked =
+      preview?.status === 'blocked' ||
+      preview?.status === 'error' ||
+      preview?.safety?.noCommands !== true ||
+      preview?.safety?.noWrites !== true
+    if (!preview?.present) {
+      pushMessage(
+        warnings,
+        'Todavia no hay generatedDomainUniversalMaterializationPlanPreview disponible para comparar contra legacy.',
+      )
+    }
+    if (!legacyPlan) {
+      pushMessage(
+        warnings,
+        'No hay materializationPlan legacy disponible para una comparacion fuerte del preview universal.',
+      )
+    }
+    if (previewBlocked) {
+      pushMessage(
+        errors,
+        'El universal preview detecto señales bloqueantes o ejecutables y no puede compararse como candidato seguro.',
+      )
+    }
+    if (!comparison.roots.aligned && preview?.present && (legacyPlan || candidatePlan?.present)) {
+      pushMessage(
+        warnings,
+        'El root del universal preview no coincide completamente con legacy y/o candidate.',
+      )
+    }
+
+    if (previewBlocked) {
+      comparison.status = 'blocked'
+      comparison.recommendation = {
+        action: 'investigate',
+        reason:
+          'El universal preview sigue bloqueado por señales incompatibles con una comparacion segura previa a runtime.',
+        nextSafeStep:
+          'Revisar safety, allowedTargetPaths y requiredPathGroups antes de volver a compararlo.',
+      }
+    } else if (!preview?.present) {
+      comparison.status = 'not-available'
+    } else if (
+      comparison.roots.aligned &&
+      comparison.allowedTargets.aligned &&
+      comparison.requiredGroups.aligned &&
+      comparison.fileChecks.aligned &&
+      comparison.buckets.allAligned &&
+      comparison.safety.aligned &&
+      preview?.canBecomeMaterializationPlan === true
+    ) {
+      comparison.status = 'aligned'
+      comparison.recommendation = {
+        action: 'ready-for-harness',
+        reason:
+          'El universal preview ya se alinea suficientemente con legacy y candidate como evidencia fuerte para harness.',
+        nextSafeStep:
+          'Mantenerlo en modo preview/harness y seguir sin reemplazar el materializationPlan real.',
+      }
+    } else if (
+      !comparison.roots.aligned ||
+      (legacyPlan && comparison.allowedTargets.overlapWithLegacyCount === 0) ||
+      (legacyPlan && comparison.requiredGroups.overlapWithLegacyCount === 0)
+    ) {
+      comparison.status = 'divergent'
+      comparison.recommendation = {
+        action: 'keep-legacy',
+        reason:
+          'El universal preview todavia diverge de la forma legacy en puntos estructurales importantes.',
+        nextSafeStep:
+          'Mantener legacy como referencia real y seguir afinando el preview universal observacional.',
+      }
+    } else {
+      comparison.status = 'partial'
+      comparison.recommendation = {
+        action: 'observe',
+        reason:
+          'El universal preview ya aporta evidencia estructural, pero todavia no alcanza una alineacion fuerte completa.',
+        nextSafeStep:
+          'Seguir comparando preview, candidate y legacy antes de promover otra etapa.',
+      }
+    }
+
+    comparison.warningsCount = comparison.warnings.length
+    comparison.errorsCount = comparison.errors.length
+    return comparison
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : normalizeOptionalString(String(error)) || 'error'
+
+    return {
+      ...emptyComparison,
+      present: true,
+      compared: true,
+      status: 'error',
+      recommendation: {
+        action: 'investigate',
+        reason: 'La comparacion del universal preview devolvio un error interno.',
+        nextSafeStep:
+          'Mantener legacy como referencia real mientras se revisa el diagnostico del preview.',
+      },
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
+function deriveGeneratedDomainStructuralCapabilities({
+  generatedDomainContract,
+  generatedDomainCapabilityProfile,
+  generatedDomainUniversalMaterializationPlanPreview,
+  generatedDomainShadowMaterializationCandidatePlan,
+}) {
+  const emptyCapabilities = {
+    present: false,
+    evaluated: false,
+    behaviorChanged: false,
+    hasPublicFrontend: false,
+    hasAdminPanel: false,
+    hasOperatorPanel: false,
+    hasBackend: false,
+    hasDatabase: false,
+    hasReporting: false,
+    hasScheduling: false,
+    hasInventory: false,
+    hasDocuments: false,
+    hasMockPayments: false,
+    hasMessaging: false,
+    hasAuthMock: false,
+    hasValidation: false,
+    hasSafeLocalMaterialization: false,
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  const pushMessage = (target, message) => {
+    const normalized =
+      typeof message === 'string'
+        ? message.trim().replace(/\s+/gu, ' ')
+        : message === null || message === undefined
+          ? ''
+          : String(message).trim().replace(/\s+/gu, ' ')
+    if (!normalized || target.includes(normalized)) {
+      return
+    }
+    target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
+  }
+
+  const normalizedContract =
+    generatedDomainContract &&
+    typeof generatedDomainContract === 'object' &&
+    generatedDomainContract.contractVersion
+      ? generatedDomainContract
+      : null
+  const capabilityProfile =
+    generatedDomainCapabilityProfile &&
+    typeof generatedDomainCapabilityProfile === 'object'
+      ? generatedDomainCapabilityProfile
+      : null
+  const preview =
+    generatedDomainUniversalMaterializationPlanPreview &&
+    typeof generatedDomainUniversalMaterializationPlanPreview === 'object'
+      ? generatedDomainUniversalMaterializationPlanPreview
+      : null
+  const candidatePlan =
+    generatedDomainShadowMaterializationCandidatePlan &&
+    typeof generatedDomainShadowMaterializationCandidatePlan === 'object'
+      ? generatedDomainShadowMaterializationCandidatePlan
+      : null
+
+  if (!normalizedContract && !capabilityProfile && !preview && !candidatePlan) {
+    return emptyCapabilities
+  }
+
+  try {
+    const warnings = []
+    const errors = []
+    const surfaces = Array.isArray(normalizedContract?.frontendSurfaces)
+      ? normalizedContract.frontendSurfaces
+      : []
+    const allSurfaceSignals = [
+      ...surfaces.map((entry) => entry?.key),
+      ...surfaces.map((entry) => entry?.label),
+      ...(Array.isArray(preview?.surfaces) ? preview.surfaces.map((entry) => entry?.key) : []),
+      ...(Array.isArray(preview?.surfaces) ? preview.surfaces.map((entry) => entry?.label) : []),
+    ]
+      .filter((entry) => typeof entry === 'string' && entry.trim())
+      .map((entry) => entry.trim().toLocaleLowerCase())
+    const modulesText = JSON.stringify(
+      {
+        workflows: normalizedContract?.workflows,
+        entities: normalizedContract?.entities,
+        roles: normalizedContract?.roles,
+        backend: normalizedContract?.backend,
+        database: normalizedContract?.database,
+        shared: normalizedContract?.shared,
+        docs: normalizedContract?.docs,
+        scripts: normalizedContract?.scripts,
+        validation: normalizedContract?.validation,
+        profile: capabilityProfile,
+      },
+      null,
+      0,
+    )
+    const includesAnySignal = (signals) =>
+      signals.some((entry) => allSurfaceSignals.includes(entry) || modulesText.includes(entry))
+
+    const capabilities = {
+      ...emptyCapabilities,
+      present: true,
+      evaluated: true,
+      hasPublicFrontend:
+        preview?.frontend?.present === true ||
+        capabilityProfile?.frontendPresent === true ||
+        includesAnySignal(['public', 'catalog', 'landing']),
+      hasAdminPanel:
+        includesAnySignal(['admin', 'dashboard', 'backoffice']) ||
+        surfaces.some((entry) => /admin|dashboard|backoffice/iu.test(String(entry?.key || entry?.label || ''))),
+      hasOperatorPanel:
+        includesAnySignal(['operator', 'operations', 'operativo']) ||
+        surfaces.some((entry) => /operativ|operator|operations/iu.test(String(entry?.key || entry?.label || ''))),
+      hasBackend:
+        preview?.backend?.present === true ||
+        capabilityProfile?.backendPresent === true ||
+        Boolean(normalizedContract?.backend?.entryFile),
+      hasDatabase:
+        preview?.database?.present === true ||
+        capabilityProfile?.databasePresent === true ||
+        Boolean(normalizedContract?.database?.schemaFile),
+      hasReporting: includesAnySignal(['report', 'reports', 'reporting', 'analytics']),
+      hasScheduling: includesAnySignal([
+        'schedule',
+        'scheduling',
+        'turnos',
+        'agenda',
+        'calendar',
+        'reservas',
+      ]),
+      hasInventory: includesAnySignal(['inventory', 'stock', 'inventario', 'catalog']),
+      hasDocuments: includesAnySignal(['document', 'documents', 'docs', 'expediente']),
+      hasMockPayments:
+        includesAnySignal(['mock-payments', 'payment', 'payments', 'checkout']) &&
+        !(
+          Array.isArray(normalizedContract?.integrations) &&
+          normalizedContract.integrations.some(
+            (entry) =>
+              normalizeOptionalString(entry?.mode) !== 'mock-only' ||
+              entry?.realIntegrationAllowedNow === true,
+          )
+        ),
+      hasMessaging: includesAnySignal([
+        'messaging',
+        'messages',
+        'notifications',
+        'communications',
+        'comunicaciones',
+      ]),
+      hasAuthMock: includesAnySignal(['auth', 'login', 'roles', 'permissions', 'mock-auth']),
+      hasValidation:
+        preview?.validation?.present === true ||
+        (Array.isArray(normalizedContract?.validation?.requiredPathGroups) &&
+          normalizedContract.validation.requiredPathGroups.length > 0),
+      hasSafeLocalMaterialization:
+        preview?.safety?.safeForLocalMaterialization === true &&
+        preview?.safety?.noDotEnv === true &&
+        preview?.safety?.noNodeModules === true &&
+        preview?.safety?.noDocker === true &&
+        preview?.safety?.noCommands === true &&
+        preview?.safety?.noWrites === true &&
+        (candidatePlan?.present !== true ||
+          candidatePlan?.candidate?.safety?.safeForLocalMaterialization === true),
+      warnings,
+      errors,
+    }
+
+    if (!capabilities.hasPublicFrontend && !capabilities.hasAdminPanel && !capabilities.hasOperatorPanel) {
+      pushMessage(
+        warnings,
+        'Todavia no se detectan superficies frontend suficientes para derivar capacidades estructurales completas.',
+      )
+    }
+    if (!capabilities.hasBackend) {
+      pushMessage(warnings, 'No se detecta backend estructural dentro del contrato universal actual.')
+    }
+    if (!capabilities.hasDatabase) {
+      pushMessage(warnings, 'No se detecta database estructural dentro del contrato universal actual.')
+    }
+    if (!capabilities.hasValidation) {
+      pushMessage(warnings, 'Faltan señales de validation para promover capacidades estructurales completas.')
+    }
+    if (!capabilities.hasSafeLocalMaterialization) {
+      pushMessage(
+        warnings,
+        'Las capacidades estructurales todavia no pueden afirmar safe local materialization completa.',
+      )
+    }
+
+    capabilities.warningsCount = capabilities.warnings.length
+    capabilities.errorsCount = capabilities.errors.length
+    return capabilities
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : normalizeOptionalString(String(error)) || 'error'
+
+    return {
+      ...emptyCapabilities,
+      present: true,
+      evaluated: true,
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
+function buildLegacyDomainHardcodingDebtReport({
+  generatedDomainStructuralCapabilities,
+}) {
+  const pushMessage = (target, message) => {
+    const normalized =
+      typeof message === 'string'
+        ? message.trim().replace(/\s+/gu, ' ')
+        : message === null || message === undefined
+          ? ''
+          : String(message).trim().replace(/\s+/gu, ' ')
+    if (!normalized || target.includes(normalized)) {
+      return
+    }
+    target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
+  }
+
+  const areas = [
+    {
+      name: 'detectSafeFirstDeliveryModuleFamily',
+      detected: typeof detectSafeFirstDeliveryModuleFamily === 'function',
+      classification: 'runtime-critical',
+      migrationStatus: 'safe-to-wrap',
+      reason: 'Resuelve familias legacy conocidas a partir de modulos y sigue condicionando ramas de runtime.',
+    },
+    {
+      name: 'detectFullstackLocalDemoArchetype',
+      detected: typeof detectFullstackLocalDemoArchetype === 'function',
+      classification: 'runtime-critical',
+      migrationStatus: 'safe-to-wrap',
+      reason: 'Sostiene inferencia archetype-first para demo/materialization y necesita quedar como fallback explicito.',
+    },
+    {
+      name: 'buildCanonicalFullstackLocalMaterializationContract',
+      detected: typeof buildCanonicalFullstackLocalMaterializationContract === 'function',
+      classification: 'runtime-critical',
+      migrationStatus: 'safe-to-migrate-to-capabilities',
+      reason: 'Codifica required paths y contract kinds por vertical como fuente legacy de verdad.',
+    },
+    {
+      name: 'inspectFullstackLocalMaterializationContract',
+      detected: typeof inspectFullstackLocalMaterializationContract === 'function',
+      classification: 'runtime-critical',
+      migrationStatus: 'safe-to-migrate-to-capabilities',
+      reason: 'Sigue mezclando inspeccion estructural con conocimiento legacy de archetypes y selectedDomain.',
+    },
+    {
+      name: 'buildFullstackLocalMaterializationPlan',
+      detected: typeof buildFullstackLocalMaterializationPlan === 'function',
+      classification: 'runtime-critical',
+      migrationStatus: 'do-not-touch-yet',
+      reason: 'Sigue siendo el punto mas sensible de compatibilidad y no conviene reescribirlo en este pase.',
+    },
+    {
+      name: 'fullstackLocalDemoDataByVertical',
+      detected: true,
+      classification: 'fixture-only',
+      migrationStatus: 'safe-to-isolate',
+      reason: 'Los demos por vertical son utiles como regresion, pero no deberian gobernar el camino universal.',
+    },
+    {
+      name: 'domainNormalizersByVertical',
+      detected: true,
+      classification: 'runtime-critical',
+      migrationStatus: 'safe-to-wrap',
+      reason: 'Persisten normalizadores por rubro que todavia sesgan selectedDomain y selectedContractKind.',
+    },
+    {
+      name: 'selectedDomain-selectedContractKind',
+      detected: true,
+      classification: 'runtime-critical',
+      migrationStatus: 'do-not-touch-yet',
+      reason: 'Siguen siendo compatibilidad observable de payload y deben migrarse con cobertura mas amplia.',
+    },
+  ]
+
+  const warnings = []
+  const errors = []
+  const runtimeCriticalCount = areas.filter(
+    (entry) => entry.detected && entry.classification === 'runtime-critical',
+  ).length
+  const fixtureOnlyCount = areas.filter(
+    (entry) => entry.detected && entry.classification === 'fixture-only',
+  ).length
+  const migrationCandidates = areas
+    .filter(
+      (entry) =>
+        entry.detected &&
+        (entry.migrationStatus === 'safe-to-wrap' ||
+          entry.migrationStatus === 'safe-to-isolate' ||
+          entry.migrationStatus === 'safe-to-migrate-to-capabilities'),
+    )
+    .map((entry) => ({
+      area: entry.name,
+      migrationStatus: entry.migrationStatus,
+      reason: entry.reason,
+    }))
+  const riskyAreas = areas
+    .filter(
+      (entry) =>
+        entry.detected &&
+        (entry.classification === 'runtime-critical' || entry.migrationStatus === 'do-not-touch-yet'),
+    )
+    .map((entry) => ({
+      area: entry.name,
+      migrationStatus: entry.migrationStatus,
+      reason: entry.reason,
+    }))
+  const structuralCapabilities =
+    generatedDomainStructuralCapabilities &&
+    typeof generatedDomainStructuralCapabilities === 'object'
+      ? generatedDomainStructuralCapabilities
+      : null
+
+  if (runtimeCriticalCount > 0) {
+    pushMessage(
+      warnings,
+      'main.cjs todavia concentra resolvers runtime-critical por familia/archetype que deben migrarse de forma gradual.',
+    )
+  }
+  if (fixtureOnlyCount === 0) {
+    pushMessage(
+      warnings,
+      'No se detectaron suficientes zonas marcadas como fixture-only; conviene seguir separando demos de runtime real.',
+    )
+  }
+  if (structuralCapabilities?.hasSafeLocalMaterialization !== true) {
+    pushMessage(
+      warnings,
+      'Las capacidades estructurales todavia no alcanzan para reemplazar el hardcoding legacy como motor de runtime.',
+    )
+  }
+
+  return {
+    present: true,
+    evaluated: true,
+    behaviorChanged: false,
+    legacyResolversDetected: areas.filter((entry) => entry.detected).length,
+    runtimeCriticalCount,
+    fixtureOnlyCount,
+    migrationCandidates,
+    riskyAreas,
+    recommendedNextActions: [
+      'Mantener buildFullstackLocalMaterializationPlan como fallback legacy mientras preview/candidate ganan cobertura.',
+      'Seguir migrando inspeccion y comparacion hacia capabilities estructurales antes de tocar selectedDomain o selectedContractKind.',
+      'Aislar demos y archetypes conocidos como fixtures/regresiones, no como fuente conceptual del runtime nuevo.',
+    ],
+    areas,
+    warnings,
+    errors,
+    warningsCount: warnings.length,
+    errorsCount: errors.length,
+  }
+}
+
+function readLocalDeterministicExecutorAuditSurface() {
+  const executorBasePath =
+    typeof __dirname !== 'undefined' && typeof __dirname === 'string' && __dirname.trim()
+      ? __dirname
+      : path.join(process.cwd(), 'electron')
+  const executorFilePath = path.join(executorBasePath, 'local-deterministic-executor.cjs')
+
+  if (!fs.existsSync(executorFilePath)) {
+    return {
+      executorFilePath,
+      executorFilePresent: false,
+      sourceText: '',
+      normalizedText: '',
+      readError: '',
+    }
+  }
+
+  try {
+    const sourceText = fs.readFileSync(executorFilePath, 'utf8')
+    return {
+      executorFilePath,
+      executorFilePresent: true,
+      sourceText,
+      normalizedText: sourceText.toLocaleLowerCase(),
+      readError: '',
+    }
+  } catch (error) {
+    return {
+      executorFilePath,
+      executorFilePresent: true,
+      sourceText: '',
+      normalizedText: '',
+      readError:
+        error instanceof Error ? error.message : normalizeOptionalString(String(error)) || 'error',
+    }
+  }
+}
+
+function buildLocalDeterministicExecutorLegacyDebtReport() {
+  const auditSurface = readLocalDeterministicExecutorAuditSurface()
+  const warnings = []
+  const errors = []
+
+  const pushMessage = (target, message) => {
+    const normalized =
+      typeof message === 'string'
+        ? message.trim().replace(/\s+/gu, ' ')
+        : message === null || message === undefined
+          ? ''
+          : String(message).trim().replace(/\s+/gu, ' ')
+    if (!normalized || target.includes(normalized)) {
+      return
+    }
+    target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
+  }
+
+  const detectSignal = (patterns) =>
+    patterns.some((pattern) => pattern.test(auditSurface.sourceText || ''))
+
+  const areas = [
+    {
+      name: 'detectSafeFirstDeliveryInteractionMode',
+      detected: detectSignal([/function\s+detectSafeFirstDeliveryInteractionMode\s*\(/u]),
+      classification: 'runtime-critical',
+      migrationStatus: 'capability-candidate',
+      reason: 'Todavia resume ramas por ecommerce, school-crm y generic antes de llegar al runtime mode.',
+    },
+    {
+      name: 'buildSafeFirstDeliveryRuntimeModeConfig',
+      detected: detectSignal([/function\s+buildSafeFirstDeliveryRuntimeModeConfig\s*\(/u]),
+      classification: 'runtime-critical',
+      migrationStatus: 'safe-to-migrate-later',
+      reason: 'Sigue resolviendo runtimeMode a partir de interactionMode y necesita migracion gradual a capacidades.',
+    },
+    {
+      name: 'productType-domainLabel-resolution',
+      detected: detectSignal([/resolvedProductType/u, /resolvedDomain/u, /domainLabel/u]),
+      classification: 'runtime-critical',
+      migrationStatus: 'safe-to-wrap',
+      reason: 'La resolucion de productType y domainLabel todavia condiciona copy, logs y plantillas por rubro.',
+    },
+    {
+      name: 'school-crm-entry-templates',
+      detected: detectSignal([/school-crm/u, /entryTemplates/u]),
+      classification: 'safe-to-observe',
+      migrationStatus: 'capability-candidate',
+      reason: 'Las variaciones school-crm ya pueden reinterpretarse como admin-panel, forms y reporting.',
+    },
+    {
+      name: 'ecommerce-mode-branches',
+      detected: detectSignal([/ecommerce/u, /mercado pago/u, /catalogo/u]),
+      classification: 'runtime-critical',
+      migrationStatus: 'capability-candidate',
+      reason: 'Las ramas ecommerce concentran catalog, checkout mock e inventario como capacidades transferibles.',
+    },
+    {
+      name: 'generic-fallback-mode',
+      detected: detectSignal([/return 'generic'/u, /kind:\s*'generic'/u]),
+      classification: 'runtime-critical',
+      migrationStatus: 'do-not-touch-yet',
+      reason: 'El fallback generic sigue sosteniendo compatibilidad amplia y no conviene moverlo sin cobertura extra.',
+    },
+    {
+      name: 'string-domain-logs-and-builders',
+      detected: detectSignal([/domainLabel/u, /productLabel/u, /fallbackLabel/u]),
+      classification: 'fixture-like',
+      migrationStatus: 'safe-to-observe',
+      reason: 'Hay copy y builders de UX local atados a labels de dominio que pueden desacoplarse despues del runtime.',
+    },
+  ]
+
+  const domainSpecificSignals = [
+    'ecommerce',
+    'school-crm',
+    'generic',
+    'interactionMode',
+    'runtimeMode',
+    'productType',
+    'domainLabel',
+  ].filter((entry) => auditSurface.normalizedText.includes(entry.toLocaleLowerCase()))
+  const normalizedDetectedSignals = domainSpecificSignals.map((entry) =>
+    entry.toLocaleLowerCase(),
+  )
+
+  const capabilityMigrationCandidates = [
+    {
+      capability: 'catalog',
+      currentBranches: ['ecommerce-mode-branches'],
+      migrationReadiness: 'partial',
+      note: 'Catalogo, productos y stock mock ya aparecen como senales estructurales reutilizables.',
+    },
+    {
+      capability: 'admin-panel',
+      currentBranches: ['school-crm-entry-templates', 'generic-fallback-mode'],
+      migrationReadiness: 'partial',
+      note: 'Los paneles administrativos ya pueden derivarse como vistas seguras sin atarse al rubro escolar.',
+    },
+    {
+      capability: 'forms',
+      currentBranches: ['school-crm-entry-templates', 'generic-fallback-mode'],
+      migrationReadiness: 'partial',
+      note: 'Los formularios mock del executor pueden unificarse como capacidades CRUD locales.',
+    },
+    {
+      capability: 'reporting',
+      currentBranches: ['school-crm-entry-templates', 'string-domain-logs-and-builders'],
+      migrationReadiness: 'partial',
+      note: 'Los reportes mock existen pero siguen mezclados con labels de dominio.',
+    },
+    {
+      capability: 'mock-payments',
+      currentBranches: ['ecommerce-mode-branches'],
+      migrationReadiness: 'partial',
+      note: 'Los pagos siguen siendo mock y pueden abstraerse sin tocar integraciones reales.',
+    },
+    {
+      capability: 'tracking',
+      currentBranches: [],
+      migrationReadiness: 'not-ready',
+      note: 'Todavia no hay una capa de tracking estructural clara en el executor actual.',
+    },
+    {
+      capability: 'database-local',
+      currentBranches: [],
+      migrationReadiness: 'not-ready',
+      note: 'El executor safe-first no gobierna database local real; debe quedar fuera hasta otra fase.',
+    },
+    {
+      capability: 'backend-api',
+      currentBranches: [],
+      migrationReadiness: 'not-ready',
+      note: 'El executor no debe promover backend real sin una politica separada y aprobada.',
+    },
+  ]
+
+  const runtimeCriticalCount = areas.filter(
+    (entry) => entry.detected && entry.classification === 'runtime-critical',
+  ).length
+  const riskyAreas = areas
+    .filter(
+      (entry) =>
+        entry.detected &&
+        (entry.classification === 'runtime-critical' || entry.migrationStatus === 'do-not-touch-yet'),
+    )
+    .map((entry) => ({
+      area: entry.name,
+      classification: entry.classification,
+      migrationStatus: entry.migrationStatus,
+      reason: entry.reason,
+    }))
+
+  if (auditSurface.executorFilePresent !== true) {
+    pushMessage(errors, 'No se encontro electron/local-deterministic-executor.cjs para auditar deuda legacy.')
+  }
+  if (auditSurface.readError) {
+    pushMessage(errors, `No se pudo leer el executor local para auditarlo: ${auditSurface.readError}.`)
+  }
+  if (runtimeCriticalCount > 0) {
+    pushMessage(
+      warnings,
+      'local-deterministic-executor.cjs todavia concentra ramas runtime-critical por rubro y necesita una migracion gradual a capacidades.',
+    )
+  }
+  if (
+    !normalizedDetectedSignals.includes('interactionmode') ||
+    !normalizedDetectedSignals.includes('runtimemode')
+  ) {
+    pushMessage(
+      warnings,
+      'La auditoria no encontro todas las senales esperadas de interactionMode/runtimeMode; conviene revisar el executor manualmente antes de migrarlo.',
+    )
+  }
+
+  return {
+    present: true,
+    evaluated: true,
+    behaviorChanged: false,
+    executorFilePresent: auditSurface.executorFilePresent === true,
+    executorFilePath: auditSurface.executorFilePath,
+    legacyBranchesDetected: areas.filter((entry) => entry.detected).length,
+    runtimeCriticalCount,
+    domainSpecificSignals,
+    capabilityMigrationCandidates,
+    riskyAreas,
+    recommendedNextActions: [
+      'Mantener interactionMode y runtimeMode actuales como fallback observable mientras se introducen capacidades estructurales paralelas.',
+      'Separar primero catalog/admin-panel/forms/reporting/mock-payments como capacidades observacionales antes de tocar los branches de ejecucion.',
+      'Dejar generic como fallback final hasta que los casos inventados y los smokes domain-agnostic cubran la migracion.',
+    ],
+    areas,
+    warnings,
+    errors,
+    warningsCount: warnings.length,
+    errorsCount: errors.length,
+  }
+}
+
+function buildLocalDeterministicExecutorCapabilityMigrationPlan({
+  localDeterministicExecutorLegacyDebtReport,
+}) {
+  const warnings = []
+  const errors = []
+
+  const pushMessage = (target, message) => {
+    const normalized =
+      typeof message === 'string'
+        ? message.trim().replace(/\s+/gu, ' ')
+        : message === null || message === undefined
+          ? ''
+          : String(message).trim().replace(/\s+/gu, ' ')
+    if (!normalized || target.includes(normalized)) {
+      return
+    }
+    target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
+  }
+
+  const debtReport =
+    localDeterministicExecutorLegacyDebtReport &&
+    typeof localDeterministicExecutorLegacyDebtReport === 'object'
+      ? localDeterministicExecutorLegacyDebtReport
+      : null
+
+  const capabilityTargets = [
+    {
+      capability: 'catalog',
+      currentBranches: ['ecommerce-mode-branches'],
+      migrationReadiness: 'branch-mapped',
+      blockers: ['checkout mock y copy comercial siguen mezclados con labels ecommerce.'],
+    },
+    {
+      capability: 'admin-panel',
+      currentBranches: ['school-crm-entry-templates', 'generic-fallback-mode'],
+      migrationReadiness: 'branch-mapped',
+      blockers: ['todavia depende de templates y labels legacy.'],
+    },
+    {
+      capability: 'public-surface',
+      currentBranches: ['generic-fallback-mode', 'string-domain-logs-and-builders'],
+      migrationReadiness: 'branch-mapped',
+      blockers: ['faltan invariantes estructurales para diferenciar presentacion publica vs admin.'],
+    },
+    {
+      capability: 'forms',
+      currentBranches: ['school-crm-entry-templates', 'generic-fallback-mode'],
+      migrationReadiness: 'branch-mapped',
+      blockers: ['las variaciones siguen embebidas en templates por modo.'],
+    },
+    {
+      capability: 'scheduling',
+      currentBranches: [],
+      migrationReadiness: 'not-ready',
+      blockers: ['no hay una abstraccion clara de scheduling dentro del executor actual.'],
+    },
+    {
+      capability: 'inventory',
+      currentBranches: ['ecommerce-mode-branches'],
+      migrationReadiness: 'partial',
+      blockers: ['stock e inventario aparecen, pero no como capability transversal.'],
+    },
+    {
+      capability: 'reporting',
+      currentBranches: ['school-crm-entry-templates', 'string-domain-logs-and-builders'],
+      migrationReadiness: 'partial',
+      blockers: ['faltan contratos estructurales de reporting compartidos.'],
+    },
+    {
+      capability: 'documents',
+      currentBranches: [],
+      migrationReadiness: 'not-ready',
+      blockers: ['no hay superficie de documentos suficientemente clara en el executor actual.'],
+    },
+    {
+      capability: 'tracking',
+      currentBranches: [],
+      migrationReadiness: 'not-ready',
+      blockers: ['tracking todavia vive mas en planner/main que en el executor.'],
+    },
+    {
+      capability: 'mock-payments',
+      currentBranches: ['ecommerce-mode-branches'],
+      migrationReadiness: 'partial',
+      blockers: ['hay mock payments, pero siguen mezclados con la rama ecommerce.'],
+    },
+    {
+      capability: 'messaging',
+      currentBranches: ['school-crm-entry-templates'],
+      migrationReadiness: 'partial',
+      blockers: ['mensajeria y comunicaciones no estan aisladas como capability generica.'],
+    },
+    {
+      capability: 'auth-mock',
+      currentBranches: [],
+      migrationReadiness: 'not-ready',
+      blockers: ['auth mock no debe habilitarse desde este executor sin una fase separada.'],
+    },
+    {
+      capability: 'database-local',
+      currentBranches: [],
+      migrationReadiness: 'not-ready',
+      blockers: ['database local real queda fuera del alcance seguro del executor actual.'],
+    },
+    {
+      capability: 'backend-api',
+      currentBranches: [],
+      migrationReadiness: 'not-ready',
+      blockers: ['backend API real no debe moverse desde este pase observacional.'],
+    },
+  ]
+
+  const branchMappedCount = capabilityTargets.filter(
+    (entry) => entry.migrationReadiness === 'branch-mapped' || entry.migrationReadiness === 'partial',
+  ).length
+  const notReadyCount = capabilityTargets.filter(
+    (entry) => entry.migrationReadiness === 'not-ready',
+  ).length
+
+  if (debtReport?.executorFilePresent !== true) {
+    pushMessage(errors, 'No hay un executor legible para construir un plan de migracion creible.')
+  }
+  if ((debtReport?.runtimeCriticalCount || 0) > 0) {
+    pushMessage(
+      warnings,
+      'El plan de migracion del executor sigue siendo solo observacional porque interactionMode/runtimeMode aun son runtime-critical.',
+    )
+  }
+
+  return {
+    present: true,
+    evaluated: true,
+    behaviorChanged: false,
+    branchMappedCount,
+    notReadyCount,
+    capabilityTargets,
+    recommendedNextActions: [
+      'Empezar por catalog/admin-panel/public-surface/forms/reporting como capas observacionales paralelas al executor legacy.',
+      'No tocar interactionMode ni runtimeMode hasta que los smokes domain-agnostic cubran generic, ecommerce y school-crm sin ramas nuevas.',
+      'Mantener backend-api y database-local fuera del executor hasta una fase aprobada de runtime real.',
+    ],
+    warnings,
+    errors,
+    warningsCount: warnings.length,
+    errorsCount: errors.length,
+  }
+}
+
+function resolveLegacySafeFirstDeliveryModuleFamily(modules) {
+  return detectSafeFirstDeliveryModuleFamily(modules)
+}
+
+function detectLegacyFullstackLocalDemoArchetype(options) {
+  return detectFullstackLocalDemoArchetype(options)
+}
+
+function buildLegacyCanonicalFullstackLocalMaterializationContract(options) {
+  return buildCanonicalFullstackLocalMaterializationContract(options)
+}
+
+function buildGeneratedDomainMaterializationInspectionSourceResolution({
+  generatedDomainShadowMaterializationCandidatePlan,
+  generatedDomainShadowCandidateLegacyComparison,
+  generatedDomainFileCreationApprovalPolicy,
+  domainConsistencyDiagnostics,
+  materializationPlan,
+  fullstackLocalInspectionSourceDiagnostics,
+}) {
+  const emptyResolution = {
+    present: false,
+    evaluated: false,
+    resolved: false,
+    source: 'none',
+    behaviorChanged: false,
+    candidatePreferred: false,
+    legacyUsedAsFallback: false,
+    runtime: {
+      materializationPlanChanged: false,
+      executionScopeChanged: false,
+    },
+    inputs: {
+      hasLegacyMaterializationPlan: false,
+      hasShadowCandidate: false,
+      candidateStatus: null,
+      candidateInspectable: false,
+      candidateUsableByFutureSwitch: false,
+      candidateComparisonStatus: null,
+      approvalPolicyStatus: null,
+      domainConsistencyStatus: null,
+      semanticStatus: null,
+      legacyInspectionSource: null,
+    },
+    blockers: {
+      candidateBlocked: false,
+      candidateUnsafe: false,
+      candidateNotInspectable: false,
+      domainMismatch: false,
+      approvalBlocked: false,
+      legacyUnavailable: false,
+    },
+    recommendation: {
+      action: 'observe',
+      reason: '',
+      nextSafeStep: '',
+    },
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  const pushMessage = (target, message) => {
+    const normalized =
+      typeof message === 'string'
+        ? message.trim().replace(/\s+/gu, ' ')
+        : message === null || message === undefined
+          ? ''
+          : String(message).trim().replace(/\s+/gu, ' ')
+    if (!normalized || target.includes(normalized)) {
+      return
+    }
+    target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
+  }
+
+  const candidatePlan =
+    generatedDomainShadowMaterializationCandidatePlan &&
+    typeof generatedDomainShadowMaterializationCandidatePlan === 'object'
+      ? generatedDomainShadowMaterializationCandidatePlan
+      : null
+  const candidateComparison =
+    generatedDomainShadowCandidateLegacyComparison &&
+    typeof generatedDomainShadowCandidateLegacyComparison === 'object'
+      ? generatedDomainShadowCandidateLegacyComparison
+      : null
+  const approvalPolicy =
+    generatedDomainFileCreationApprovalPolicy &&
+    typeof generatedDomainFileCreationApprovalPolicy === 'object'
+      ? generatedDomainFileCreationApprovalPolicy
+      : null
+  const consistency =
+    domainConsistencyDiagnostics && typeof domainConsistencyDiagnostics === 'object'
+      ? domainConsistencyDiagnostics
+      : null
+  const inspectionDiagnostics =
+    fullstackLocalInspectionSourceDiagnostics &&
+    typeof fullstackLocalInspectionSourceDiagnostics === 'object'
+      ? fullstackLocalInspectionSourceDiagnostics
+      : null
+  const legacyPlan =
+    materializationPlan && typeof materializationPlan === 'object' ? materializationPlan : null
+
+  if (
+    !candidatePlan &&
+    !candidateComparison &&
+    !approvalPolicy &&
+    !consistency &&
+    !inspectionDiagnostics &&
+    !legacyPlan
+  ) {
+    return emptyResolution
+  }
+
+  try {
+    const warnings = []
+    const errors = []
+    const hasLegacyMaterializationPlan = Boolean(legacyPlan)
+    const hasShadowCandidate = candidatePlan?.present === true
+    const candidateStatus = normalizeOptionalString(candidatePlan?.status) || null
+    const candidateInspectable = candidatePlan?.compatibility?.canBeInspected === true
+    const candidateUsableByFutureSwitch =
+      candidatePlan?.compatibility?.canBeUsedByFutureSwitch === true
+    const candidateComparisonStatus =
+      normalizeOptionalString(candidateComparison?.status) || null
+    const approvalPolicyStatus =
+      normalizeOptionalString(approvalPolicy?.status) || null
+    const domainConsistencyStatus =
+      normalizeOptionalString(consistency?.status) || null
+    const semanticStatus =
+      normalizeOptionalString(consistency?.semanticStatus) || null
+    const legacyInspectionSource =
+      normalizeOptionalString(inspectionDiagnostics?.source) || null
+    const domainMismatch =
+      domainConsistencyStatus === 'mismatch' ||
+      domainConsistencyStatus === 'error' ||
+      semanticStatus === 'mismatch' ||
+      semanticStatus === 'error'
+    const approvalBlocked = approvalPolicyStatus === 'blocked'
+    const candidateBlocked =
+      candidateStatus === 'blocked' ||
+      candidateStatus === 'error' ||
+      candidateComparisonStatus === 'blocked' ||
+      candidateComparisonStatus === 'divergent'
+    const candidateUnsafe =
+      candidatePlan?.candidate?.safety?.safeForLocalMaterialization !== true ||
+      approvalPolicy?.safeguards?.noCommands !== true ||
+      approvalPolicy?.safeguards?.noWritesExecuted !== true ||
+      approvalPolicy?.safeguards?.noWebPrueba !== true
+    const legacyAvailable =
+      hasLegacyMaterializationPlan ||
+      legacyInspectionSource === 'legacy-canonical-contract' ||
+      legacyInspectionSource === 'explicit-materialization-contract'
+    const contractAvailable = legacyInspectionSource === 'generated-domain-contract'
+    const candidateComparable =
+      candidateComparisonStatus === 'aligned' || candidateComparisonStatus === 'partial'
+    const candidateReadyForInspection =
+      hasShadowCandidate &&
+      candidateInspectable &&
+      candidateUsableByFutureSwitch &&
+      candidateComparable &&
+      !candidateBlocked &&
+      !candidateUnsafe &&
+      !approvalBlocked &&
+      !domainMismatch
+
+    const resolution = {
+      ...emptyResolution,
+      present: true,
+      evaluated:
+        hasLegacyMaterializationPlan ||
+        hasShadowCandidate ||
+        Boolean(inspectionDiagnostics?.present === true) ||
+        Boolean(consistency?.checked === true) ||
+        Boolean(approvalPolicy?.evaluated === true),
+      resolved:
+        hasLegacyMaterializationPlan ||
+        hasShadowCandidate ||
+        Boolean(inspectionDiagnostics?.present === true),
+      source: 'none',
+      candidatePreferred: false,
+      legacyUsedAsFallback: false,
+      inputs: {
+        hasLegacyMaterializationPlan,
+        hasShadowCandidate,
+        candidateStatus,
+        candidateInspectable,
+        candidateUsableByFutureSwitch,
+        candidateComparisonStatus,
+        approvalPolicyStatus,
+        domainConsistencyStatus,
+        semanticStatus,
+        legacyInspectionSource,
+      },
+      blockers: {
+        candidateBlocked,
+        candidateUnsafe,
+        candidateNotInspectable: hasShadowCandidate && !candidateInspectable,
+        domainMismatch,
+        approvalBlocked,
+        legacyUnavailable: !legacyAvailable && !contractAvailable,
+      },
+      recommendation: {
+        action: 'observe',
+        reason:
+          'La resolucion de fuente de inspeccion sigue siendo observacional y no reemplaza el runtime real.',
+        nextSafeStep:
+          'Seguir comparando candidate, contract y legacy antes de cambiar la inspeccion efectiva.',
+      },
+      warnings,
+      errors,
+    }
+
+    if (candidateReadyForInspection) {
+      resolution.source = 'generated-domain-candidate'
+      resolution.candidatePreferred = true
+      resolution.recommendation = {
+        action: 'prefer-candidate-observationally',
+        reason:
+          'El shadow candidate ya es inspeccionable, seguro y comparable, por lo que puede preferirse observacionalmente sobre legacy.',
+        nextSafeStep:
+          'Usar esta preferencia solo como evidencia diagnostica mientras legacy siga como fallback real.',
+      }
+    } else if (contractAvailable && !domainMismatch && !approvalBlocked) {
+      resolution.source = 'generated-domain-contract'
+      resolution.candidatePreferred = true
+      resolution.recommendation = {
+        action: 'prefer-contract-observationally',
+        reason:
+          'Todavia no conviene preferir el candidate, pero el contrato universal ya puede sostener una fuente de inspeccion observacional segura.',
+        nextSafeStep:
+          'Mantener candidate y legacy como contraste mientras el contrato universal gana cobertura.',
+      }
+    } else if (legacyAvailable) {
+      resolution.source = 'legacy'
+      resolution.legacyUsedAsFallback = true
+      resolution.recommendation = {
+        action: 'keep-legacy-fallback',
+        reason:
+          'La inspeccion todavia necesita apoyarse en legacy porque candidate/contract no alcanzan una preferencia segura.',
+        nextSafeStep:
+          'Seguir reforzando candidate, comparacion y policy hasta que legacy quede solo como respaldo temporal.',
+      }
+    } else if (
+      hasShadowCandidate ||
+      candidateComparisonStatus === 'blocked' ||
+      approvalBlocked ||
+      domainMismatch
+    ) {
+      resolution.source = 'blocked'
+      resolution.recommendation = {
+        action: 'investigate',
+        reason:
+          'Hay evidencia candidata, pero no es segura ni suficiente para resolver una fuente de inspeccion confiable.',
+        nextSafeStep:
+          'Investigar candidate, comparacion, approval policy y consistencia de dominio antes de insistir con una preferencia nueva.',
+      }
+    }
+
+    if (!hasShadowCandidate) {
+      pushMessage(
+        warnings,
+        'Todavia no hay generatedDomainShadowMaterializationCandidatePlan utilizable para una preferencia candidate-first.',
+      )
+    }
+    if (hasShadowCandidate && !candidateInspectable) {
+      pushMessage(
+        warnings,
+        'El shadow candidate existe pero todavia no puede inspeccionarse con seguridad como fuente preferida.',
+      )
+    }
+    if (candidateComparisonStatus === 'divergent') {
+      pushMessage(
+        warnings,
+        'La comparacion fuerte entre candidate y legacy sigue mostrando divergencias estructurales relevantes.',
+      )
+    }
+    if (candidateComparisonStatus === 'blocked') {
+      pushMessage(
+        errors,
+        'La comparacion candidate-vs-legacy quedo bloqueada por señales ejecutables o incompatibilidades fuertes.',
+      )
+    }
+    if (approvalBlocked) {
+      pushMessage(
+        warnings,
+        'La policy de aprobacion de archivos sigue bloqueando cualquier preferencia de inspeccion basada en candidate.',
+      )
+    }
+    if (domainMismatch) {
+      pushMessage(
+        warnings,
+        'La consistencia de dominio no permite preferir candidate ni contract por encima de legacy.',
+      )
+    }
+    if (!legacyAvailable && resolution.source === 'legacy') {
+      pushMessage(
+        errors,
+        'La resolucion intento usar legacy como fallback pero no encontro un materializationPlan legacy disponible.',
+      )
+      resolution.source = 'blocked'
+      resolution.legacyUsedAsFallback = false
+    }
+    if (resolution.source === 'none') {
+      pushMessage(
+        warnings,
+        'No hay candidate, contract ni legacy suficientes para resolver una fuente de inspeccion.',
+      )
+    }
+
+    resolution.warningsCount = resolution.warnings.length
+    resolution.errorsCount = resolution.errors.length
+    return resolution
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : normalizeOptionalString(String(error)) || 'error'
+
+    return {
+      ...emptyResolution,
+      present: true,
+      evaluated: true,
+      resolved: false,
+      source: 'blocked',
+      recommendation: {
+        action: 'investigate',
+        reason: 'La resolucion de fuente de inspeccion devolvio un error interno.',
+        nextSafeStep:
+          'Mantener la inspeccion actual sin cambios y revisar el diagnostico antes de otra migracion.',
+      },
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
 function buildBrainDecisionContract({
   decisionKey,
   strategy,
@@ -39530,6 +45791,8 @@ function buildBrainDecisionContract({
   generatedDomainContract,
   workspacePath,
   finalResult,
+  generatedDomainMaterializationPreferenceSwitchOptions = null,
+  generatedDomainMaterializationSourceResolutionOptions = null,
   stripStaleApprovalArtifacts = false,
 }) {
   const resolvedRequiresApproval = requiresApproval === true
@@ -39803,6 +46066,141 @@ function buildBrainDecisionContract({
       legacyMigrationCandidateReport,
       materializationPlan,
     })
+  const generatedDomainMaterializationPreferenceSwitch =
+    buildGeneratedDomainMaterializationPreferenceSwitch({
+      generatedDomainMaterializationShadowPlan,
+      generatedDomainMaterializationShadowComparison,
+      generatedDomainMaterializationShadowDiff,
+      generatedDomainMaterializationPreferenceGate,
+      generatedDomainMaterializationPreferenceDecision,
+      domainConsistencyDiagnostics,
+      materializationPlan,
+      preferenceSwitchOptions: generatedDomainMaterializationPreferenceSwitchOptions,
+    })
+  const generatedDomainMaterializationSwitchReadinessReport =
+    buildGeneratedDomainMaterializationSwitchReadinessReport({
+      generatedDomainMaterializationPreferenceSwitch,
+      generatedDomainMaterializationPreferenceDecision,
+      generatedDomainMaterializationPreferenceGate,
+      generatedDomainMaterializationShadowDiff,
+      generatedDomainMaterializationShadowComparison,
+      generatedDomainMaterializationShadowPlan,
+      domainConsistencyDiagnostics,
+      legacyMigrationCandidateReport,
+      fullstackLocalInspectionSourceDiagnostics,
+      materializationPlan,
+    })
+  const generatedDomainMaterializationSourceResolution =
+    resolveGeneratedDomainMaterializationSource({
+      materializationPlan,
+      generatedDomainMaterializationShadowPlan,
+      generatedDomainMaterializationPreferenceSwitch,
+      generatedDomainMaterializationSwitchReadinessReport,
+      generatedDomainMaterializationPreferenceDecision,
+      domainConsistencyDiagnostics,
+      sourceResolutionOptions: generatedDomainMaterializationSourceResolutionOptions,
+    })
+  const generatedDomainShadowMaterializationCandidatePlan =
+    buildGeneratedDomainShadowMaterializationCandidatePlan({
+      generatedDomainMaterializationShadowPlan,
+      generatedDomainContract: normalizedGeneratedDomainContract,
+      generatedDomainContractDiagnostics,
+      generatedDomainCapabilityProfile,
+      domainConsistencyDiagnostics,
+      generatedDomainMaterializationPreferenceGate,
+      generatedDomainMaterializationSourceResolution,
+    })
+  const generatedDomainShadowCandidateLegacyComparison =
+    buildGeneratedDomainShadowCandidateLegacyComparison({
+      generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainMaterializationShadowDiff,
+      materializationPlan,
+    })
+  const generatedDomainShadowMaterializationEndToEndReadiness =
+    buildGeneratedDomainShadowMaterializationEndToEndReadiness({
+      materializationPlan,
+      generatedDomainContractDiagnostics,
+      generatedDomainMaterializationShadowPlan,
+      generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainMaterializationShadowDiff,
+      generatedDomainMaterializationPreferenceGate,
+      generatedDomainMaterializationPreferenceDecision,
+      generatedDomainMaterializationPreferenceSwitch,
+      generatedDomainMaterializationSwitchReadinessReport,
+      generatedDomainMaterializationSourceResolution,
+      domainConsistencyDiagnostics,
+    })
+  const generatedDomainControlledEnablePolicy =
+    buildGeneratedDomainControlledEnablePolicy({
+      generatedDomainMaterializationPreferenceSwitch,
+      generatedDomainMaterializationSwitchReadinessReport,
+      generatedDomainMaterializationSourceResolution,
+      generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainShadowMaterializationEndToEndReadiness,
+      generatedDomainMaterializationShadowDiff,
+      domainConsistencyDiagnostics,
+      materializationPlan,
+    })
+  const generatedDomainFirstControlledEnableScenario =
+    buildGeneratedDomainFirstControlledEnableScenario({
+      generatedDomainControlledEnablePolicy,
+      generatedDomainMaterializationPreferenceSwitch,
+      generatedDomainMaterializationSourceResolution,
+      generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainShadowMaterializationEndToEndReadiness,
+      domainConsistencyDiagnostics,
+      materializationPlan,
+    })
+  const generatedDomainFileCreationApprovalPolicy =
+    buildGeneratedDomainFileCreationApprovalPolicy({
+      materializationPlan,
+      generatedDomainMaterializationSourceResolution,
+      generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainShadowCandidateLegacyComparison,
+      generatedDomainShadowMaterializationEndToEndReadiness,
+      generatedDomainControlledEnablePolicy,
+      generatedDomainFirstControlledEnableScenario,
+    })
+  const generatedDomainUniversalMaterializationPlanPreview =
+    buildGeneratedDomainUniversalMaterializationPlanPreview({
+      generatedDomainContract: normalizedGeneratedDomainContract,
+      generatedDomainContractDiagnostics,
+      generatedDomainCapabilityProfile,
+      generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainFileCreationApprovalPolicy,
+      domainConsistencyDiagnostics,
+    })
+  const generatedDomainUniversalMaterializationPlanPreviewComparison =
+    buildGeneratedDomainUniversalMaterializationPlanPreviewComparison({
+      generatedDomainUniversalMaterializationPlanPreview,
+      materializationPlan,
+      generatedDomainShadowMaterializationCandidatePlan,
+    })
+  const generatedDomainStructuralCapabilities =
+    deriveGeneratedDomainStructuralCapabilities({
+      generatedDomainContract: normalizedGeneratedDomainContract,
+      generatedDomainCapabilityProfile,
+      generatedDomainUniversalMaterializationPlanPreview,
+      generatedDomainShadowMaterializationCandidatePlan,
+    })
+  const legacyDomainHardcodingDebtReport = buildLegacyDomainHardcodingDebtReport({
+    generatedDomainStructuralCapabilities,
+  })
+  const localDeterministicExecutorLegacyDebtReport =
+    buildLocalDeterministicExecutorLegacyDebtReport()
+  const localDeterministicExecutorCapabilityMigrationPlan =
+    buildLocalDeterministicExecutorCapabilityMigrationPlan({
+      localDeterministicExecutorLegacyDebtReport,
+    })
+  const generatedDomainMaterializationInspectionSourceResolution =
+    buildGeneratedDomainMaterializationInspectionSourceResolution({
+      generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainShadowCandidateLegacyComparison,
+      generatedDomainFileCreationApprovalPolicy,
+      domainConsistencyDiagnostics,
+      materializationPlan,
+      fullstackLocalInspectionSourceDiagnostics,
+    })
 
   return {
     decisionKey: decisionKey || strategy || 'brain-decision',
@@ -39939,6 +46337,22 @@ function buildBrainDecisionContract({
     legacyMigrationCandidateReport,
     generatedDomainMaterializationPreferenceGate,
     generatedDomainMaterializationPreferenceDecision,
+    generatedDomainMaterializationPreferenceSwitch,
+    generatedDomainMaterializationSwitchReadinessReport,
+    generatedDomainMaterializationSourceResolution,
+    generatedDomainShadowMaterializationCandidatePlan,
+    generatedDomainShadowCandidateLegacyComparison,
+    generatedDomainShadowMaterializationEndToEndReadiness,
+    generatedDomainControlledEnablePolicy,
+    generatedDomainFirstControlledEnableScenario,
+    generatedDomainFileCreationApprovalPolicy,
+    generatedDomainUniversalMaterializationPlanPreview,
+    generatedDomainUniversalMaterializationPlanPreviewComparison,
+    generatedDomainStructuralCapabilities,
+    legacyDomainHardcodingDebtReport,
+    localDeterministicExecutorLegacyDebtReport,
+    localDeterministicExecutorCapabilityMigrationPlan,
+    generatedDomainMaterializationInspectionSourceResolution,
     domainConsistencyDiagnostics,
     ...(fullstackLocalInspectionSourceDiagnostics &&
     typeof fullstackLocalInspectionSourceDiagnostics === 'object'
@@ -53423,6 +59837,199 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
   }
 
   if (
+    brainDecision.generatedDomainMaterializationPreferenceSwitch &&
+    typeof brainDecision.generatedDomainMaterializationPreferenceSwitch === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-materialization-preference:switch',
+      summarizeGeneratedDomainMaterializationPreferenceSwitchForDebug(
+        brainDecision.generatedDomainMaterializationPreferenceSwitch,
+      ),
+    )
+  }
+
+  if (
+    brainDecision.generatedDomainMaterializationSwitchReadinessReport &&
+    typeof brainDecision.generatedDomainMaterializationSwitchReadinessReport === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-materialization-switch:readiness',
+      summarizeGeneratedDomainMaterializationSwitchReadinessReportForDebug(
+        brainDecision.generatedDomainMaterializationSwitchReadinessReport,
+      ),
+    )
+  }
+
+  if (
+    brainDecision.generatedDomainMaterializationSourceResolution &&
+    typeof brainDecision.generatedDomainMaterializationSourceResolution === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-materialization-source:resolution',
+      summarizeGeneratedDomainMaterializationSourceResolutionForDebug(
+        brainDecision.generatedDomainMaterializationSourceResolution,
+      ),
+    )
+  }
+
+  if (
+    brainDecision.generatedDomainShadowMaterializationCandidatePlan &&
+    typeof brainDecision.generatedDomainShadowMaterializationCandidatePlan === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-shadow-materialization-candidate:plan',
+      summarizeGeneratedDomainShadowMaterializationCandidatePlanForDebug(
+        brainDecision.generatedDomainShadowMaterializationCandidatePlan,
+      ),
+    )
+  }
+
+  if (
+    brainDecision.generatedDomainShadowCandidateLegacyComparison &&
+    typeof brainDecision.generatedDomainShadowCandidateLegacyComparison === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-shadow-candidate:comparison',
+      summarizeGeneratedDomainShadowCandidateLegacyComparisonForDebug(
+        brainDecision.generatedDomainShadowCandidateLegacyComparison,
+      ),
+    )
+  }
+
+  if (
+    brainDecision.generatedDomainShadowMaterializationEndToEndReadiness &&
+    typeof brainDecision.generatedDomainShadowMaterializationEndToEndReadiness === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-shadow-materialization:end-to-end',
+      summarizeGeneratedDomainShadowMaterializationEndToEndReadinessForDebug(
+        brainDecision.generatedDomainShadowMaterializationEndToEndReadiness,
+      ),
+    )
+  }
+
+  if (
+    brainDecision.generatedDomainControlledEnablePolicy &&
+    typeof brainDecision.generatedDomainControlledEnablePolicy === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-controlled-enable:policy',
+      summarizeGeneratedDomainControlledEnablePolicyForDebug(
+        brainDecision.generatedDomainControlledEnablePolicy,
+      ),
+    )
+  }
+
+  if (
+    brainDecision.generatedDomainFirstControlledEnableScenario &&
+    typeof brainDecision.generatedDomainFirstControlledEnableScenario === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-controlled-enable:first-scenario',
+      summarizeGeneratedDomainFirstControlledEnableScenarioForDebug(
+        brainDecision.generatedDomainFirstControlledEnableScenario,
+      ),
+    )
+  }
+
+  if (
+    brainDecision.generatedDomainFileCreationApprovalPolicy &&
+    typeof brainDecision.generatedDomainFileCreationApprovalPolicy === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-file-creation:approval-policy',
+      summarizeGeneratedDomainFileCreationApprovalPolicyForDebug(
+        brainDecision.generatedDomainFileCreationApprovalPolicy,
+      ),
+    )
+  }
+
+  if (
+    brainDecision.generatedDomainMaterializationInspectionSourceResolution &&
+    typeof brainDecision.generatedDomainMaterializationInspectionSourceResolution === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-materialization-inspection-source:resolution',
+      summarizeGeneratedDomainMaterializationInspectionSourceResolutionForDebug(
+        brainDecision.generatedDomainMaterializationInspectionSourceResolution,
+      ),
+    )
+  }
+
+  if (
+    brainDecision.generatedDomainUniversalMaterializationPlanPreview &&
+    typeof brainDecision.generatedDomainUniversalMaterializationPlanPreview === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-universal-materialization:preview',
+      summarizeGeneratedDomainUniversalMaterializationPlanPreviewForDebug(
+        brainDecision.generatedDomainUniversalMaterializationPlanPreview,
+      ),
+    )
+  }
+
+  if (
+    brainDecision.generatedDomainUniversalMaterializationPlanPreviewComparison &&
+    typeof brainDecision.generatedDomainUniversalMaterializationPlanPreviewComparison ===
+      'object'
+  ) {
+    debugMainLog(
+      'generated-domain-universal-materialization:preview-comparison',
+      summarizeGeneratedDomainUniversalMaterializationPlanPreviewComparisonForDebug(
+        brainDecision.generatedDomainUniversalMaterializationPlanPreviewComparison,
+      ),
+    )
+  }
+
+  if (
+    brainDecision.generatedDomainStructuralCapabilities &&
+    typeof brainDecision.generatedDomainStructuralCapabilities === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-structural-capabilities',
+      summarizeGeneratedDomainStructuralCapabilitiesForDebug(
+        brainDecision.generatedDomainStructuralCapabilities,
+      ),
+    )
+  }
+
+  if (
+    brainDecision.legacyDomainHardcodingDebtReport &&
+    typeof brainDecision.legacyDomainHardcodingDebtReport === 'object'
+  ) {
+    debugMainLog(
+      'legacy-domain-hardcoding:debt-report',
+      summarizeLegacyDomainHardcodingDebtReportForDebug(
+        brainDecision.legacyDomainHardcodingDebtReport,
+      ),
+    )
+  }
+
+  if (
+    brainDecision.localDeterministicExecutorLegacyDebtReport &&
+    typeof brainDecision.localDeterministicExecutorLegacyDebtReport === 'object'
+  ) {
+    debugMainLog(
+      'local-deterministic-executor:legacy-debt-report',
+      summarizeLocalDeterministicExecutorLegacyDebtReportForDebug(
+        brainDecision.localDeterministicExecutorLegacyDebtReport,
+      ),
+    )
+  }
+
+  if (
+    brainDecision.localDeterministicExecutorCapabilityMigrationPlan &&
+    typeof brainDecision.localDeterministicExecutorCapabilityMigrationPlan === 'object'
+  ) {
+    debugMainLog(
+      'local-deterministic-executor:capability-migration-plan',
+      summarizeLocalDeterministicExecutorCapabilityMigrationPlanForDebug(
+        brainDecision.localDeterministicExecutorCapabilityMigrationPlan,
+      ),
+    )
+  }
+
+  if (
     brainDecision.domainConsistencyDiagnostics &&
     typeof brainDecision.domainConsistencyDiagnostics === 'object'
   ) {
@@ -53606,6 +60213,38 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
         brainDecision.generatedDomainMaterializationPreferenceGate,
       generatedDomainMaterializationPreferenceDecision:
         brainDecision.generatedDomainMaterializationPreferenceDecision,
+      generatedDomainMaterializationPreferenceSwitch:
+        brainDecision.generatedDomainMaterializationPreferenceSwitch,
+      generatedDomainMaterializationSwitchReadinessReport:
+        brainDecision.generatedDomainMaterializationSwitchReadinessReport,
+      generatedDomainMaterializationSourceResolution:
+        brainDecision.generatedDomainMaterializationSourceResolution,
+      generatedDomainShadowMaterializationCandidatePlan:
+        brainDecision.generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainShadowCandidateLegacyComparison:
+        brainDecision.generatedDomainShadowCandidateLegacyComparison,
+      generatedDomainShadowMaterializationEndToEndReadiness:
+        brainDecision.generatedDomainShadowMaterializationEndToEndReadiness,
+      generatedDomainControlledEnablePolicy:
+        brainDecision.generatedDomainControlledEnablePolicy,
+      generatedDomainFirstControlledEnableScenario:
+        brainDecision.generatedDomainFirstControlledEnableScenario,
+      generatedDomainFileCreationApprovalPolicy:
+        brainDecision.generatedDomainFileCreationApprovalPolicy,
+      generatedDomainUniversalMaterializationPlanPreview:
+        brainDecision.generatedDomainUniversalMaterializationPlanPreview,
+      generatedDomainUniversalMaterializationPlanPreviewComparison:
+        brainDecision.generatedDomainUniversalMaterializationPlanPreviewComparison,
+      generatedDomainStructuralCapabilities:
+        brainDecision.generatedDomainStructuralCapabilities,
+      legacyDomainHardcodingDebtReport:
+        brainDecision.legacyDomainHardcodingDebtReport,
+      localDeterministicExecutorLegacyDebtReport:
+        brainDecision.localDeterministicExecutorLegacyDebtReport,
+      localDeterministicExecutorCapabilityMigrationPlan:
+        brainDecision.localDeterministicExecutorCapabilityMigrationPlan,
+      generatedDomainMaterializationInspectionSourceResolution:
+        brainDecision.generatedDomainMaterializationInspectionSourceResolution,
       fullstackLocalInspectionSourceDiagnostics:
         brainDecision.fullstackLocalInspectionSourceDiagnostics,
       generatedDomainContractObservation:
@@ -53695,6 +60334,38 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       brainDecision.generatedDomainMaterializationPreferenceGate,
     generatedDomainMaterializationPreferenceDecision:
       brainDecision.generatedDomainMaterializationPreferenceDecision,
+    generatedDomainMaterializationPreferenceSwitch:
+      brainDecision.generatedDomainMaterializationPreferenceSwitch,
+    generatedDomainMaterializationSwitchReadinessReport:
+      brainDecision.generatedDomainMaterializationSwitchReadinessReport,
+    generatedDomainMaterializationSourceResolution:
+      brainDecision.generatedDomainMaterializationSourceResolution,
+    generatedDomainShadowMaterializationCandidatePlan:
+      brainDecision.generatedDomainShadowMaterializationCandidatePlan,
+    generatedDomainShadowCandidateLegacyComparison:
+      brainDecision.generatedDomainShadowCandidateLegacyComparison,
+    generatedDomainShadowMaterializationEndToEndReadiness:
+      brainDecision.generatedDomainShadowMaterializationEndToEndReadiness,
+    generatedDomainControlledEnablePolicy:
+      brainDecision.generatedDomainControlledEnablePolicy,
+    generatedDomainFirstControlledEnableScenario:
+      brainDecision.generatedDomainFirstControlledEnableScenario,
+    generatedDomainFileCreationApprovalPolicy:
+      brainDecision.generatedDomainFileCreationApprovalPolicy,
+    generatedDomainUniversalMaterializationPlanPreview:
+      brainDecision.generatedDomainUniversalMaterializationPlanPreview,
+    generatedDomainUniversalMaterializationPlanPreviewComparison:
+      brainDecision.generatedDomainUniversalMaterializationPlanPreviewComparison,
+    generatedDomainStructuralCapabilities:
+      brainDecision.generatedDomainStructuralCapabilities,
+    legacyDomainHardcodingDebtReport:
+      brainDecision.legacyDomainHardcodingDebtReport,
+    localDeterministicExecutorLegacyDebtReport:
+      brainDecision.localDeterministicExecutorLegacyDebtReport,
+    localDeterministicExecutorCapabilityMigrationPlan:
+      brainDecision.localDeterministicExecutorCapabilityMigrationPlan,
+    generatedDomainMaterializationInspectionSourceResolution:
+      brainDecision.generatedDomainMaterializationInspectionSourceResolution,
     fullstackLocalInspectionSourceDiagnostics:
       brainDecision.fullstackLocalInspectionSourceDiagnostics,
     generatedDomainContractObservation:

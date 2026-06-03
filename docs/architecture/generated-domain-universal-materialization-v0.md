@@ -1,0 +1,427 @@
+# Generated Domain Universal Materialization v0
+
+## 1. Proposito
+
+Este documento define la siguiente fase segura para JEFE: pasar de un `materializationPlan` legacy y archetype-first hacia una materializacion universal derivada del `GeneratedDomainContract`, sin activar runtime riesgoso antes de tiempo.
+
+En este estado del proyecto, la direccion correcta es:
+
+- contrato universal como fuente estructural
+- preview/candidate/shadow como puente
+- approvals explicitas antes de cualquier write real
+- fallback legacy controlado mientras exista deuda
+
+## 2. Estado actual
+
+Hoy ya existen estas piezas observacionales:
+
+- `GeneratedDomainContract`
+- `generatedDomainCapabilityProfile`
+- `generatedDomainMaterializationShadowPlan`
+- `generatedDomainShadowMaterializationCandidatePlan`
+- `generatedDomainShadowCandidateLegacyComparison`
+- `generatedDomainMaterializationSourceResolution`
+- `generatedDomainMaterializationInspectionSourceResolution`
+- `generatedDomainShadowMaterializationEndToEndReadiness`
+- `generatedDomainControlledEnablePolicy`
+- `generatedDomainFirstControlledEnableScenario`
+- `generatedDomainFileCreationApprovalPolicy`
+- `generatedDomainUniversalMaterializationPlanPreview`
+- `generatedDomainUniversalMaterializationPlanPreviewComparison`
+
+Estas piezas ya permiten razonar sobre una materializacion universal futura sin reemplazar el `materializationPlan` real ni tocar `executionScope`.
+
+## 3. Principios
+
+- runtime normal sigue apagado para shadow
+- `behaviorChanged=false` salvo autorizacion explicita
+- no writes reales sin aprobacion de Lean
+- no `.env`
+- no `node_modules`
+- no Docker
+- no deploy
+- no servicios externos reales
+- no pagos reales
+- no `web-prueba` sin aprobacion explicita
+- no dominio como branch productivo nuevo
+
+## 4. Entradas del flujo universal
+
+La materializacion universal futura deberia leer:
+
+- `GeneratedDomainContract`
+- `generatedDomainCapabilityProfile`
+- `domainConsistencyDiagnostics`
+- `generatedDomainShadowMaterializationCandidatePlan`
+- `generatedDomainShadowCandidateLegacyComparison`
+- `generatedDomainFileCreationApprovalPolicy`
+- `generatedDomainControlledEnablePolicy`
+
+Entradas opcionales:
+
+- `Context Hub` como memoria auxiliar no obligatoria
+- `materializationPlan` legacy solo como fallback y comparacion
+
+## 5. Etapas propuestas
+
+### 5.1 Normalizacion del contrato
+
+- validar schema
+- validar safety
+- completar defaults seguros
+- normalizar `root.slug`, `sourceRoot`, `targetRoot`
+- derivar `allowedTargetPaths`
+- derivar `requiredPathGroups`
+- derivar `forbiddenSignals`
+
+### 5.2 Preview universal
+
+`generatedDomainUniversalMaterializationPlanPreview` ya cumple la funcion de vista estructural no ejecutable.
+
+Debe seguir pudiendo responder:
+
+- que superficies existen
+- que buckets existen
+- que paths serian validos
+- que required groups serian exigibles
+- si el contrato podria convertirse en plan materializable
+
+### 5.3 Candidate comparable
+
+`generatedDomainShadowMaterializationCandidatePlan` es el adaptador entre shadow y forma legacy.
+
+Debe seguir siendo:
+
+- serializable
+- inspeccionable
+- no ejecutable
+- sin `operations`
+- sin `commands`
+- sin writes
+
+### 5.4 Comparacion fuerte
+
+La comparacion fuerte entre preview, candidate y legacy debe seguir cubriendo:
+
+- `root`
+- `sourceRoot`
+- `targetRoot`
+- `allowedTargetPaths`
+- `requiredPathGroups`
+- `fileChecks`
+- `buckets`
+- `safety`
+
+Estados aceptables:
+
+- `aligned`
+- `partial`
+- `divergent`
+- `blocked`
+- `not-available`
+
+### 5.5 Aprobacion explicita
+
+Antes de cualquier materializacion real, `generatedDomainFileCreationApprovalPolicy` debe exigir:
+
+- root visible
+- archivos visibles
+- exclusiones visibles
+- riesgos visibles
+- aprobacion explicita de Lean
+
+Sin esa aprobacion:
+
+- `approvalRequired=true`
+- `approved=false`
+- `allowedNow=false`
+
+## 6. Como deberia verse el plan universal real
+
+El `materializationPlan` universal futuro deberia construirse desde el contrato y no desde un archetype cerrado.
+
+Campos minimos:
+
+- `version`
+- `kind`
+- `strategy`
+- `projectRoot`
+- `allowedTargetPaths`
+- `contractDefinition.requiredPathGroups`
+- `surfaces`
+- `frontend`
+- `backend`
+- `database`
+- `shared`
+- `docs`
+- `scripts`
+- `validation`
+- `safety`
+
+Campos que no deben aparecer automaticamente sin aprobacion:
+
+- `operations` ejecutables reales
+- commands
+- writes efectivos
+- `.env`
+- `node_modules`
+- Docker
+- deploy
+- paths fuera del root permitido
+
+## 7. Safety gates
+
+Ninguna ruta futura de enable deberia cruzar a runtime real si falla cualquiera de estos checks:
+
+- contrato invalido
+- `domainConsistencyDiagnostics` en mismatch/error
+- candidate no inspeccionable
+- comparison `divergent` o `blocked`
+- approval policy no lista
+- presencia de `.env`
+- presencia de `node_modules`
+- señales de Docker o deploy
+- servicios externos reales
+- pagos reales
+- root fuera de alcance permitido
+- intento de tocar `web-prueba`
+
+## 8. Rollback y fallback
+
+Mientras exista deuda legacy:
+
+- la fuente real de runtime sigue siendo legacy/current/none
+- el preview universal no gobierna runtime
+- el candidate no reemplaza el `materializationPlan`
+- el fallback legacy sigue vivo para inspeccion y ejecucion segura
+
+Si una etapa universal falla:
+
+- se conserva la observabilidad
+- se bloquea la promocion
+- se recomienda `observe` o `investigate`
+- no se miente sobre readiness
+
+## 9. Context Hub
+
+`Context Hub` debe seguir siendo una ayuda, no una dependencia dura.
+
+Reglas:
+
+- `unavailable` no bloquea el flujo
+- `available` no pisa el contrato actual
+- no debe arrastrar dominio viejo
+- no debe contaminar roots
+- los fallos de eventos no deben romper la decision principal
+
+## 10. Mapa de deuda legacy actual
+
+### `electron/main.cjs`
+
+Zonas con deuda fuerte:
+
+- `detectSafeFirstDeliveryModuleFamily`
+- `detectFullstackLocalDemoArchetype`
+- `buildCanonicalFullstackLocalMaterializationContract`
+- `inspectFullstackLocalMaterializationContract`
+- `buildFullstackLocalMaterializationPlan`
+
+Estado recomendado:
+
+- migrar primero inspeccion
+- luego comparacion
+- despues preview/candidate
+- por ultimo resolver enable y plan real
+
+### `electron/local-deterministic-executor.cjs`
+
+Todavia tiene ramas fuertes por:
+
+- `ecommerce`
+- `school-crm`
+- `generic`
+- `interactionMode`
+- `runtimeMode`
+
+La migracion futura deberia orientarse a capacidades:
+
+- `catalog`
+- `admin-panel`
+- `forms`
+- `scheduling`
+- `inventory`
+- `reporting`
+- `documents`
+- `tracking`
+- `mock-payments`
+
+## 11. Roadmap seguro
+
+1. mantener preview/candidate/comparison como superficie estable
+2. preferir candidate-first para inspeccion cuando sea seguro
+3. seguir reforzando comparacion con fallback legacy
+4. exigir approval policy antes de cualquier write
+5. crear plan universal real solo en harness
+6. validar con dominios inventados y prompts sensibles
+7. pedir aprobacion de Lean antes de cualquier runtime enable o materializacion real
+
+## 12. Legacy hardcoding reduction plan
+
+El hardcoding legacy mas sensible sigue concentrado en `electron/main.cjs`.
+
+### Zonas runtime-critical
+
+- `detectSafeFirstDeliveryModuleFamily`
+- `detectFullstackLocalDemoArchetype`
+- `buildCanonicalFullstackLocalMaterializationContract`
+- `inspectFullstackLocalMaterializationContract`
+- `buildFullstackLocalMaterializationPlan`
+- `selectedDomain`
+- `selectedContractKind`
+
+Estas zonas no deben borrarse de golpe. La migracion segura es:
+
+1. aislarlas como fallback explicito
+2. reforzar diagnosticos observacionales
+3. derivar capacidades estructurales universales
+4. preferir candidate/preview en inspeccion
+5. dejar el runtime real intacto hasta una fase aprobada
+
+### Zonas fixture-only o safe-to-isolate
+
+- demo data por vertical
+- fixtures de regresion por dominio
+- contratos canonicos historicos usados por smokes
+
+Estas piezas pueden seguir existiendo si quedan claramente tratadas como regresiones, no como motor conceptual del runtime nuevo.
+
+### Relacion con capabilities
+
+La reduccion de hardcoding no deberia preguntar primero por el rubro. Deberia preguntar por capacidades como:
+
+- `hasPublicFrontend`
+- `hasAdminPanel`
+- `hasOperatorPanel`
+- `hasBackend`
+- `hasDatabase`
+- `hasReporting`
+- `hasScheduling`
+- `hasInventory`
+- `hasDocuments`
+- `hasMockPayments`
+- `hasMessaging`
+- `hasAuthMock`
+- `hasValidation`
+- `hasSafeLocalMaterialization`
+
+Mientras esas capacidades no tengan cobertura suficiente, el legacy sigue siendo fallback temporal.
+
+### Relacion con candidate-first inspection
+
+`generatedDomainMaterializationInspectionSourceResolution` ya permite preferir candidate/contract cuando:
+
+- el candidate es inspeccionable
+- la comparacion con legacy no es riesgosa
+- la approval policy sigue bloqueando writes reales
+- la consistencia de dominio no muestra mismatch fuerte
+
+Eso permite migrar inspeccion antes de migrar materializacion real.
+
+### Riesgos actuales
+
+- `buildFullstackLocalMaterializationPlan` sigue siendo demasiado central para tocarlo de golpe
+- `selectedDomain` y `selectedContractKind` siguen siendo compatibilidad observable
+- `local-deterministic-executor.cjs` conserva branching por `ecommerce`, `school-crm` y `generic`
+- todavia no hay approval de Lean para runtime enable ni writes reales
+
+## 13. Local deterministic executor migration plan
+
+### Estado actual
+
+`electron/local-deterministic-executor.cjs` sigue siendo una capa de compatibilidad valiosa, pero todavia decide bastante comportamiento a partir de:
+
+- `ecommerce`
+- `school-crm`
+- `generic`
+- `interactionMode`
+- `runtimeMode`
+- `productType`
+- `domainLabel`
+
+Hoy no conviene reescribirlo de golpe porque sigue siendo runtime-critical para las entregas locales seguras ya validadas.
+
+### Branches legacy mas sensibles
+
+- `detectSafeFirstDeliveryInteractionMode`
+- `buildSafeFirstDeliveryRuntimeModeConfig`
+- resolucion de `productType` y `domainLabel`
+- templates y variaciones `school-crm`
+- ramas `ecommerce` con catalogo, checkout mock y pagos mock
+- fallback `generic`
+
+### Capacidades objetivo
+
+La migracion correcta no es "sumar otro rubro". Es proyectar el executor hacia capacidades como:
+
+- `catalog`
+- `admin-panel`
+- `public-surface`
+- `forms`
+- `scheduling`
+- `inventory`
+- `reporting`
+- `documents`
+- `tracking`
+- `mock-payments`
+- `messaging`
+- `auth-mock`
+- `database-local`
+- `backend-api`
+
+### Plan gradual
+
+1. observar y clasificar ramas legacy sin tocar outputs
+2. mapear `catalog`, `admin-panel`, `public-surface`, `forms`, `reporting` y `mock-payments` como capacidades observacionales
+3. mantener `interactionMode` y `runtimeMode` como fallback mientras la suite domain-agnostic gane cobertura
+4. dejar `database-local` y `backend-api` fuera del executor hasta una fase separada y aprobada
+5. tocar el fallback `generic` solo cuando existan invariantes estructurales suficientes
+
+### Que queda bloqueado
+
+- reescribir `runtimeMode`
+- reescribir `interactionMode`
+- cambiar outputs observables del executor
+- cambiar paths o builders reales
+- usar el executor para backend real, database real o writes fuera de politica
+
+### Como validar
+
+- smokes que verifiquen el debt report y el capability migration plan
+- auditoria de texto del executor para confirmar que no aparecieron ramas nuevas por dominio
+- `npm run quality:ci`
+- `node scripts/generated-domain-contract-smoke.mjs`
+- `node scripts/ai-operator-e2e-smoke.mjs`
+
+## 14. No objetivos de esta fase
+
+Esta fase no habilita:
+
+- runtime shadow real
+- reemplazo del `materializationPlan` real
+- materializacion efectiva de archivos
+- ejecucion local automatica
+- cambios de renderer
+- cambios sobre `web-prueba`
+- integraciones reales
+
+## 15. Criterio de salida
+
+La materializacion universal podra considerarse lista para revision controlada cuando:
+
+- el preview este `built`
+- el candidate sea usable
+- la comparacion con legacy quede `aligned`
+- la inspeccion prefiera candidate/contract de manera segura
+- la approval policy quede lista para revision manual
+- el runtime normal siga sin mutacion
+- la suite domain-agnostic siga verde

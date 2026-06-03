@@ -62,6 +62,22 @@ module.exports = {
   applyGeneratedDomainContractObservationToDecision,
   buildGeneratedDomainContractObservationFailureResult,
   buildBrainDecisionContract,
+  buildGeneratedDomainMaterializationPreferenceSwitch,
+  buildGeneratedDomainMaterializationSwitchReadinessReport,
+  resolveGeneratedDomainMaterializationSource,
+  buildGeneratedDomainShadowMaterializationCandidatePlan,
+  buildGeneratedDomainShadowCandidateLegacyComparison,
+  buildGeneratedDomainShadowMaterializationEndToEndReadiness,
+  buildGeneratedDomainControlledEnablePolicy,
+  buildGeneratedDomainFirstControlledEnableScenario,
+  buildGeneratedDomainFileCreationApprovalPolicy,
+  buildGeneratedDomainUniversalMaterializationPlanPreview,
+  buildGeneratedDomainUniversalMaterializationPlanPreviewComparison,
+  deriveGeneratedDomainStructuralCapabilities,
+  buildLegacyDomainHardcodingDebtReport,
+  buildLocalDeterministicExecutorLegacyDebtReport,
+  buildLocalDeterministicExecutorCapabilityMigrationPlan,
+  buildGeneratedDomainMaterializationInspectionSourceResolution,
   buildLegacyDomainResolutionDiagnostics,
   buildLegacyCapabilityAlignmentDiagnostics,
   buildLegacyMigrationCandidateReport,
@@ -83,6 +99,22 @@ module.exports = {
   summarizeGeneratedDomainMaterializationShadowComparisonForDebug,
   summarizeGeneratedDomainMaterializationShadowDiffForDebug,
   summarizeGeneratedDomainMaterializationPreferenceDecisionForDebug,
+  summarizeGeneratedDomainMaterializationPreferenceSwitchForDebug,
+  summarizeGeneratedDomainMaterializationSwitchReadinessReportForDebug,
+  summarizeGeneratedDomainMaterializationSourceResolutionForDebug,
+  summarizeGeneratedDomainShadowMaterializationCandidatePlanForDebug,
+  summarizeGeneratedDomainShadowCandidateLegacyComparisonForDebug,
+  summarizeGeneratedDomainShadowMaterializationEndToEndReadinessForDebug,
+  summarizeGeneratedDomainControlledEnablePolicyForDebug,
+  summarizeGeneratedDomainFirstControlledEnableScenarioForDebug,
+  summarizeGeneratedDomainFileCreationApprovalPolicyForDebug,
+  summarizeGeneratedDomainUniversalMaterializationPlanPreviewForDebug,
+  summarizeGeneratedDomainUniversalMaterializationPlanPreviewComparisonForDebug,
+  summarizeGeneratedDomainStructuralCapabilitiesForDebug,
+  summarizeLegacyDomainHardcodingDebtReportForDebug,
+  summarizeLocalDeterministicExecutorLegacyDebtReportForDebug,
+  summarizeLocalDeterministicExecutorCapabilityMigrationPlanForDebug,
+  summarizeGeneratedDomainMaterializationInspectionSourceResolutionForDebug,
   summarizeDomainConsistencyDiagnosticsForDebug,
   summarizeLegacyCapabilityAlignmentDiagnosticsForDebug,
   summarizeLegacyMigrationCandidateReportForDebug,
@@ -2302,6 +2334,2526 @@ function runGeneratedDomainMaterializationPreferenceDecisionNotAvailableCase() {
   assert.equal(dryRun?.behaviorChanged, false)
 }
 
+function runGeneratedDomainMaterializationPreferenceSwitchDisabledWouldPreferShadowCase() {
+  const preferenceSwitch =
+    observationHarness.buildGeneratedDomainMaterializationPreferenceSwitch({
+      generatedDomainMaterializationShadowPlan: {
+        present: true,
+        built: true,
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationShadowComparison: {
+        present: true,
+        status: 'aligned',
+      },
+      generatedDomainMaterializationShadowDiff: {
+        present: true,
+        status: 'compared',
+        recommendation: { action: 'prepare-preference-switch' },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceGate: {
+        present: true,
+        evaluated: true,
+        status: 'eligible',
+        errorsCount: 0,
+        eligibility: {
+          canPreferShadowInFuture: true,
+          needsMoreEvidence: false,
+          blockedByDivergence: false,
+          blockedByErrors: false,
+        },
+      },
+      generatedDomainMaterializationPreferenceDecision: {
+        present: true,
+        evaluated: true,
+        enabled: false,
+        status: 'would-prefer-shadow',
+        errorsCount: 0,
+        dryRun: {
+          wouldPreferShadow: true,
+        },
+      },
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'consistent',
+        semanticStatus: 'consistent',
+        errorsCount: 0,
+      },
+      materializationPlan: {
+        kind: 'fullstack-local-materialization',
+      },
+    })
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainMaterializationPreferenceSwitchForDebug(
+      preferenceSwitch,
+    )
+
+  assert.equal(preferenceSwitch?.present, true)
+  assert.equal(preferenceSwitch?.evaluated, true)
+  assert.equal(preferenceSwitch?.enabled, false)
+  assert.equal(preferenceSwitch?.mode, 'disabled')
+  assert.equal(preferenceSwitch?.candidate?.wouldSelectShadowIfEnabled, true)
+  assert.equal(preferenceSwitch?.candidate?.shadowEligible, true)
+  assert.equal(preferenceSwitch?.actual?.selectedSource, 'legacy')
+  assert.equal(preferenceSwitch?.actual?.materializationPlanChanged, false)
+  assert.equal(preferenceSwitch?.actual?.executionScopeChanged, false)
+  assert.equal(preferenceSwitch?.recommendation?.action, 'ready-to-enable-later')
+  assert.equal(preferenceSwitch?.behaviorChanged, false)
+  assert.equal(debugSummary.enabled, false)
+  assert.equal(debugSummary.wouldSelectShadowIfEnabled, true)
+}
+
+function runGeneratedDomainMaterializationPreferenceSwitchDisabledKeepLegacyCase() {
+  const preferenceSwitch =
+    observationHarness.buildGeneratedDomainMaterializationPreferenceSwitch({
+      generatedDomainMaterializationShadowPlan: {
+        present: true,
+        built: true,
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationShadowDiff: {
+        present: true,
+        status: 'partial',
+        recommendation: { action: 'observe' },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceGate: {
+        present: true,
+        evaluated: true,
+        status: 'not-ready',
+        errorsCount: 0,
+        eligibility: {
+          canPreferShadowInFuture: false,
+          needsMoreEvidence: true,
+          blockedByDivergence: false,
+          blockedByErrors: false,
+        },
+      },
+      generatedDomainMaterializationPreferenceDecision: {
+        present: true,
+        evaluated: true,
+        enabled: false,
+        status: 'would-keep-legacy',
+        errorsCount: 0,
+        dryRun: {
+          wouldPreferShadow: false,
+        },
+      },
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'consistent',
+        semanticStatus: 'consistent',
+        errorsCount: 0,
+      },
+    })
+
+  assert.equal(preferenceSwitch?.present, true)
+  assert.equal(preferenceSwitch?.enabled, false)
+  assert.equal(preferenceSwitch?.candidate?.wouldSelectShadowIfEnabled, false)
+  assert.equal(preferenceSwitch?.recommendation?.action, 'observe')
+  assert.equal(preferenceSwitch?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationPreferenceSwitchInvestigateCase() {
+  const preferenceSwitch =
+    observationHarness.buildGeneratedDomainMaterializationPreferenceSwitch({
+      generatedDomainMaterializationShadowPlan: {
+        present: true,
+        built: true,
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationShadowDiff: {
+        present: true,
+        status: 'divergent',
+        recommendation: { action: 'investigate' },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceGate: {
+        present: true,
+        evaluated: true,
+        status: 'blocked',
+        errorsCount: 0,
+        eligibility: {
+          canPreferShadowInFuture: false,
+          needsMoreEvidence: false,
+          blockedByDivergence: true,
+          blockedByErrors: false,
+        },
+      },
+      generatedDomainMaterializationPreferenceDecision: {
+        present: true,
+        evaluated: true,
+        enabled: false,
+        status: 'blocked',
+        errorsCount: 0,
+        dryRun: {
+          wouldPreferShadow: false,
+        },
+      },
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'mismatch',
+        semanticStatus: 'mismatch',
+        errorsCount: 0,
+      },
+      materializationPlan: {
+        kind: 'fullstack-local-materialization',
+      },
+    })
+
+  assert.equal(preferenceSwitch?.present, true)
+  assert.equal(preferenceSwitch?.enabled, false)
+  assert.equal(preferenceSwitch?.recommendation?.action, 'investigate')
+  assert.equal(preferenceSwitch?.candidate?.wouldSelectShadowIfEnabled, false)
+  assert.equal(preferenceSwitch?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationPreferenceSwitchTestEnabledCase() {
+  const preferenceSwitch =
+    observationHarness.buildGeneratedDomainMaterializationPreferenceSwitch({
+      generatedDomainMaterializationShadowPlan: {
+        present: true,
+        built: true,
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationShadowComparison: {
+        present: true,
+        status: 'aligned',
+      },
+      generatedDomainMaterializationShadowDiff: {
+        present: true,
+        status: 'compared',
+        recommendation: { action: 'prepare-preference-switch' },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceGate: {
+        present: true,
+        evaluated: true,
+        status: 'eligible',
+        errorsCount: 0,
+        eligibility: {
+          canPreferShadowInFuture: true,
+          needsMoreEvidence: false,
+          blockedByDivergence: false,
+          blockedByErrors: false,
+        },
+      },
+      generatedDomainMaterializationPreferenceDecision: {
+        present: true,
+        evaluated: true,
+        enabled: false,
+        status: 'would-prefer-shadow',
+        errorsCount: 0,
+        dryRun: {
+          wouldPreferShadow: true,
+        },
+      },
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'consistent',
+        semanticStatus: 'consistent',
+        errorsCount: 0,
+      },
+      materializationPlan: {
+        kind: 'fullstack-local-materialization',
+      },
+      preferenceSwitchOptions: {
+        testEnabled: true,
+      },
+    })
+
+  assert.equal(preferenceSwitch?.present, true)
+  assert.equal(preferenceSwitch?.enabled, true)
+  assert.equal(preferenceSwitch?.mode, 'test-enabled')
+  assert.equal(preferenceSwitch?.actual?.selectedSource, 'shadow')
+  assert.equal(preferenceSwitch?.actual?.materializationPlanChanged, false)
+  assert.equal(preferenceSwitch?.actual?.executionScopeChanged, false)
+  assert.equal(preferenceSwitch?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationSwitchReadinessReportNotReadyCase() {
+  const readinessReport =
+    observationHarness.buildGeneratedDomainMaterializationSwitchReadinessReport({
+      generatedDomainMaterializationPreferenceSwitch: {
+        present: true,
+        evaluated: true,
+        enabled: false,
+        mode: 'disabled',
+        behaviorChanged: false,
+        candidate: {
+          shadowAvailable: true,
+          shadowEligible: false,
+          wouldSelectShadowIfEnabled: false,
+        },
+        recommendation: { action: 'observe' },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceDecision: {
+        present: true,
+        evaluated: true,
+        status: 'would-keep-legacy',
+        dryRun: { wouldPreferShadow: false },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceGate: {
+        present: true,
+        evaluated: true,
+        status: 'not-ready',
+        eligibility: {
+          canPreferShadowInFuture: false,
+          needsMoreEvidence: true,
+        },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationShadowDiff: {
+        present: true,
+        compared: false,
+        status: 'partial',
+        recommendation: { action: 'observe' },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationShadowComparison: {
+        present: true,
+        compared: false,
+        status: 'partial',
+        legacyPlanPresent: false,
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationShadowPlan: {
+        present: true,
+        built: true,
+        errorsCount: 0,
+      },
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'consistent',
+        semanticStatus: 'consistent',
+        errorsCount: 0,
+      },
+    })
+
+  assert.equal(readinessReport?.present, true)
+  assert.equal(readinessReport?.status, 'not-ready')
+  assert.equal(readinessReport?.blockers?.missingLegacyComparison, true)
+  assert.equal(readinessReport?.recommendation?.action, 'observe')
+  assert.equal(readinessReport?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationSwitchReadinessReportReadyCase() {
+  const readinessReport =
+    observationHarness.buildGeneratedDomainMaterializationSwitchReadinessReport({
+      generatedDomainMaterializationPreferenceSwitch: {
+        present: true,
+        evaluated: true,
+        enabled: false,
+        mode: 'disabled',
+        behaviorChanged: false,
+        candidate: {
+          shadowAvailable: true,
+          shadowEligible: true,
+          wouldSelectShadowIfEnabled: true,
+        },
+        recommendation: { action: 'ready-to-enable-later' },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceDecision: {
+        present: true,
+        evaluated: true,
+        status: 'would-prefer-shadow',
+        dryRun: { wouldPreferShadow: true },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceGate: {
+        present: true,
+        evaluated: true,
+        status: 'eligible',
+        eligibility: {
+          canPreferShadowInFuture: true,
+          needsMoreEvidence: false,
+        },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationShadowDiff: {
+        present: true,
+        compared: true,
+        status: 'compared',
+        recommendation: { action: 'prepare-preference-switch' },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationShadowComparison: {
+        present: true,
+        compared: true,
+        status: 'aligned',
+        legacyPlanPresent: true,
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationShadowPlan: {
+        present: true,
+        built: true,
+        errorsCount: 0,
+      },
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'consistent',
+        semanticStatus: 'consistent',
+        errorsCount: 0,
+      },
+      legacyMigrationCandidateReport: {
+        present: true,
+        evaluated: true,
+        status: 'no-action',
+      },
+      materializationPlan: {
+        kind: 'fullstack-local-materialization',
+      },
+    })
+
+  assert.equal(readinessReport?.present, true)
+  assert.equal(readinessReport?.status, 'ready-for-test-harness')
+  assert.equal(readinessReport?.readiness?.shadowEligible, true)
+  assert.equal(readinessReport?.readiness?.legacyComparisonAvailable, true)
+  assert.equal(readinessReport?.recommendation?.action, 'test-harness-only')
+  assert.equal(readinessReport?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationSwitchReadinessReportDomainBlockedCase() {
+  const readinessReport =
+    observationHarness.buildGeneratedDomainMaterializationSwitchReadinessReport({
+      generatedDomainMaterializationPreferenceSwitch: {
+        present: true,
+        evaluated: true,
+        enabled: false,
+        mode: 'disabled',
+        behaviorChanged: false,
+        candidate: {
+          shadowAvailable: true,
+          shadowEligible: false,
+          wouldSelectShadowIfEnabled: false,
+        },
+        recommendation: { action: 'investigate' },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceDecision: {
+        present: true,
+        evaluated: true,
+        status: 'blocked',
+        dryRun: { wouldPreferShadow: false },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceGate: {
+        present: true,
+        evaluated: true,
+        status: 'blocked',
+        eligibility: {
+          canPreferShadowInFuture: false,
+          blockedByDivergence: false,
+        },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationShadowDiff: {
+        present: true,
+        compared: true,
+        status: 'compared',
+        recommendation: { action: 'observe' },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationShadowComparison: {
+        present: true,
+        compared: true,
+        status: 'aligned',
+        legacyPlanPresent: true,
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationShadowPlan: {
+        present: true,
+        built: true,
+        errorsCount: 0,
+      },
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'mismatch',
+        semanticStatus: 'mismatch',
+        errorsCount: 0,
+      },
+      materializationPlan: {
+        kind: 'fullstack-local-materialization',
+      },
+    })
+
+  assert.equal(readinessReport?.status, 'blocked')
+  assert.equal(readinessReport?.blockers?.domainMismatch, true)
+  assert.equal(readinessReport?.recommendation?.action, 'investigate')
+}
+
+function runGeneratedDomainMaterializationSwitchReadinessReportDiffBlockedCase() {
+  const readinessReport =
+    observationHarness.buildGeneratedDomainMaterializationSwitchReadinessReport({
+      generatedDomainMaterializationPreferenceSwitch: {
+        present: true,
+        evaluated: true,
+        enabled: false,
+        mode: 'disabled',
+        behaviorChanged: false,
+        candidate: {
+          shadowAvailable: true,
+          shadowEligible: false,
+          wouldSelectShadowIfEnabled: false,
+        },
+        recommendation: { action: 'investigate' },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceDecision: {
+        present: true,
+        evaluated: true,
+        status: 'blocked',
+        dryRun: { wouldPreferShadow: false },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceGate: {
+        present: true,
+        evaluated: true,
+        status: 'blocked',
+        eligibility: {
+          canPreferShadowInFuture: false,
+          blockedByDivergence: true,
+        },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationShadowDiff: {
+        present: true,
+        compared: true,
+        status: 'divergent',
+        recommendation: { action: 'investigate' },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationShadowComparison: {
+        present: true,
+        compared: true,
+        status: 'divergent',
+        legacyPlanPresent: true,
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationShadowPlan: {
+        present: true,
+        built: true,
+        errorsCount: 0,
+      },
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'consistent',
+        semanticStatus: 'consistent',
+        errorsCount: 0,
+      },
+      materializationPlan: {
+        kind: 'fullstack-local-materialization',
+      },
+    })
+
+  assert.equal(readinessReport?.status, 'blocked')
+  assert.equal(readinessReport?.blockers?.diffDivergent, true)
+  assert.equal(readinessReport?.recommendation?.action, 'investigate')
+}
+
+function runGeneratedDomainMaterializationSourceResolutionRuntimeLegacyCase() {
+  const sourceResolution =
+    observationHarness.resolveGeneratedDomainMaterializationSource({
+      materializationPlan: {
+        kind: 'fullstack-local-materialization',
+      },
+      generatedDomainMaterializationShadowPlan: {
+        present: true,
+        built: true,
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceSwitch: {
+        present: true,
+        evaluated: true,
+        enabled: false,
+        mode: 'disabled',
+        actual: {
+          selectedSource: 'legacy',
+          materializationPlanChanged: false,
+          executionScopeChanged: false,
+        },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationSwitchReadinessReport: {
+        present: true,
+        evaluated: true,
+        status: 'not-ready',
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceDecision: {
+        present: true,
+        evaluated: true,
+        dryRun: { wouldPreferShadow: false },
+        errorsCount: 0,
+      },
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'consistent',
+        semanticStatus: 'consistent',
+        errorsCount: 0,
+      },
+    })
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainMaterializationSourceResolutionForDebug(
+      sourceResolution,
+    )
+
+  assert.equal(sourceResolution?.present, true)
+  assert.equal(sourceResolution?.source, 'legacy')
+  assert.equal(sourceResolution?.mode, 'runtime-disabled')
+  assert.equal(sourceResolution?.runtime?.selectedSource, 'legacy')
+  assert.equal(sourceResolution?.testProjection?.projectedSource, 'legacy')
+  assert.equal(sourceResolution?.behaviorChanged, false)
+  assert.equal(sourceResolution?.runtime?.materializationPlanChanged, false)
+  assert.equal(sourceResolution?.runtime?.executionScopeChanged, false)
+  assert.equal(debugSummary.source, 'legacy')
+}
+
+function runGeneratedDomainMaterializationSourceResolutionRuntimeNoneCase() {
+  const sourceResolution =
+    observationHarness.resolveGeneratedDomainMaterializationSource({
+      generatedDomainMaterializationPreferenceSwitch: {
+        present: true,
+        evaluated: true,
+        enabled: false,
+        mode: 'disabled',
+        actual: {
+          selectedSource: 'none',
+          materializationPlanChanged: false,
+          executionScopeChanged: false,
+        },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationSwitchReadinessReport: {
+        present: true,
+        evaluated: true,
+        status: 'not-ready',
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceDecision: {
+        present: true,
+        evaluated: true,
+        dryRun: { wouldPreferShadow: false },
+        errorsCount: 0,
+      },
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: false,
+        status: 'not-available',
+        semanticStatus: 'not-available',
+        errorsCount: 0,
+      },
+    })
+
+  assert.equal(sourceResolution?.present, true)
+  assert.equal(sourceResolution?.source, 'none')
+  assert.equal(sourceResolution?.runtime?.selectedSource, 'none')
+  assert.equal(sourceResolution?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationSourceResolutionRuntimeDisabledShadowCandidateCase() {
+  const sourceResolution =
+    observationHarness.resolveGeneratedDomainMaterializationSource({
+      materializationPlan: {
+        kind: 'fullstack-local-materialization',
+      },
+      generatedDomainMaterializationShadowPlan: {
+        present: true,
+        built: true,
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceSwitch: {
+        present: true,
+        evaluated: true,
+        enabled: false,
+        mode: 'disabled',
+        actual: {
+          selectedSource: 'legacy',
+          materializationPlanChanged: false,
+          executionScopeChanged: false,
+        },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationSwitchReadinessReport: {
+        present: true,
+        evaluated: true,
+        status: 'ready-for-test-harness',
+        blockers: {
+          missingLegacyComparison: false,
+          gateNotReady: false,
+          domainMismatch: false,
+          diffDivergent: false,
+          errorsPresent: false,
+          switchAlreadyEnabled: false,
+          missingShadowPlan: false,
+        },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceDecision: {
+        present: true,
+        evaluated: true,
+        dryRun: { wouldPreferShadow: true },
+        errorsCount: 0,
+      },
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'consistent',
+        semanticStatus: 'consistent',
+        errorsCount: 0,
+      },
+    })
+
+  assert.equal(sourceResolution?.present, true)
+  assert.equal(sourceResolution?.mode, 'runtime-disabled')
+  assert.equal(sourceResolution?.source, 'legacy')
+  assert.equal(sourceResolution?.runtime?.selectedSource, 'legacy')
+  assert.equal(sourceResolution?.testProjection?.wouldSelectShadow, false)
+  assert.equal(sourceResolution?.testProjection?.projectedSource, 'legacy')
+  assert.equal(sourceResolution?.runtime?.materializationPlanChanged, false)
+  assert.equal(sourceResolution?.runtime?.executionScopeChanged, false)
+  assert.equal(sourceResolution?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationSourceResolutionTestEnabledShadowCase() {
+  const sourceResolution =
+    observationHarness.resolveGeneratedDomainMaterializationSource({
+      materializationPlan: {
+        kind: 'fullstack-local-materialization',
+      },
+      generatedDomainMaterializationShadowPlan: {
+        present: true,
+        built: true,
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceSwitch: {
+        present: true,
+        evaluated: true,
+        enabled: false,
+        mode: 'disabled',
+        actual: {
+          selectedSource: 'legacy',
+          materializationPlanChanged: false,
+          executionScopeChanged: false,
+        },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationSwitchReadinessReport: {
+        present: true,
+        evaluated: true,
+        status: 'ready-for-test-harness',
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceDecision: {
+        present: true,
+        evaluated: true,
+        dryRun: { wouldPreferShadow: true },
+        errorsCount: 0,
+      },
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'consistent',
+        semanticStatus: 'consistent',
+        errorsCount: 0,
+      },
+      sourceResolutionOptions: {
+        testEnabled: true,
+      },
+    })
+
+  assert.equal(sourceResolution?.present, true)
+  assert.equal(sourceResolution?.mode, 'test-enabled')
+  assert.equal(sourceResolution?.source, 'generated-domain-shadow')
+  assert.equal(sourceResolution?.testProjection?.projectedSource, 'generated-domain-shadow')
+  assert.equal(sourceResolution?.testProjection?.wouldSelectShadow, true)
+  assert.equal(sourceResolution?.runtime?.selectedSource, 'legacy')
+  assert.equal(sourceResolution?.runtime?.materializationPlanChanged, false)
+  assert.equal(sourceResolution?.runtime?.executionScopeChanged, false)
+  assert.equal(sourceResolution?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationSourceResolutionTestBlockedCase() {
+  const sourceResolution =
+    observationHarness.resolveGeneratedDomainMaterializationSource({
+      materializationPlan: {
+        kind: 'fullstack-local-materialization',
+      },
+      generatedDomainMaterializationShadowPlan: {
+        present: true,
+        built: true,
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceSwitch: {
+        present: true,
+        evaluated: true,
+        enabled: false,
+        mode: 'disabled',
+        actual: {
+          selectedSource: 'legacy',
+          materializationPlanChanged: false,
+          executionScopeChanged: false,
+        },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationSwitchReadinessReport: {
+        present: true,
+        evaluated: true,
+        status: 'blocked',
+        blockers: {
+          domainMismatch: true,
+        },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceDecision: {
+        present: true,
+        evaluated: true,
+        dryRun: { wouldPreferShadow: true },
+        errorsCount: 0,
+      },
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'mismatch',
+        semanticStatus: 'mismatch',
+        errorsCount: 0,
+      },
+      sourceResolutionOptions: {
+        testEnabled: true,
+      },
+    })
+
+  assert.equal(sourceResolution?.present, true)
+  assert.equal(sourceResolution?.source, 'blocked')
+  assert.equal(sourceResolution?.testProjection?.projectedSource, 'blocked')
+  assert.equal(sourceResolution?.recommendation?.action, 'investigate')
+  assert.equal(sourceResolution?.behaviorChanged, false)
+}
+
+function runGeneratedDomainShadowMaterializationCandidatePlanBuiltCase() {
+  const contract = createValidInventedContract()
+  const diagnostics = buildGeneratedDomainContractDiagnostics(
+    { generatedDomainContract: contract },
+    repoRoot,
+  )
+  const capabilityProfile = buildGeneratedDomainCapabilityProfile(contract, diagnostics)
+  const shadowPlan = buildGeneratedDomainMaterializationShadowPlan(
+    contract,
+    diagnostics,
+    capabilityProfile,
+  )
+  const candidatePlan =
+    observationHarness.buildGeneratedDomainShadowMaterializationCandidatePlan({
+      generatedDomainMaterializationShadowPlan: shadowPlan,
+      generatedDomainContract: contract,
+      generatedDomainContractDiagnostics: diagnostics,
+      generatedDomainCapabilityProfile: capabilityProfile,
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'consistent',
+        semanticStatus: 'consistent',
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceGate: {
+        present: true,
+        evaluated: true,
+        status: 'eligible',
+        eligibility: {
+          canPreferShadowInFuture: true,
+        },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationSourceResolution: {
+        present: true,
+        resolved: true,
+        source: 'legacy',
+        testProjection: {
+          wouldSelectShadow: true,
+        },
+        recommendation: {
+          action: 'test-harness-only',
+        },
+      },
+    })
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainShadowMaterializationCandidatePlanForDebug(
+      candidatePlan,
+    )
+
+  assert.equal(candidatePlan?.present, true)
+  assert.equal(candidatePlan?.built, true)
+  assert.equal(candidatePlan?.status, 'built')
+  assert.equal(candidatePlan?.compatibility?.resemblesMaterializationPlan, true)
+  assert.equal(candidatePlan?.compatibility?.canBeInspected, true)
+  assert.equal(candidatePlan?.compatibility?.canBeUsedByFutureSwitch, true)
+  assert.equal(candidatePlan?.behaviorChanged, false)
+  assert.equal(Array.isArray(candidatePlan?.candidate?.allowedTargetPaths), true)
+  assert.equal(Array.isArray(candidatePlan?.candidate?.requiredPathGroups), true)
+  assert.equal('operations' in (candidatePlan?.candidate || {}), false)
+  assert.equal(debugSummary?.status, 'built')
+}
+
+function runGeneratedDomainShadowMaterializationCandidatePlanPartialCase() {
+  const candidatePlan =
+    observationHarness.buildGeneratedDomainShadowMaterializationCandidatePlan({
+      generatedDomainMaterializationShadowPlan: {
+        present: true,
+        built: true,
+        status: 'built',
+        root: 'partial-local',
+        sourceRoot: 'partial-local',
+        targetRoot: 'partial-local',
+        plannedBuckets: {
+          frontend: { present: true },
+          backend: { present: false },
+          database: { present: false },
+          shared: { present: false },
+          docs: { present: false },
+          scripts: { present: false },
+          validation: { present: false },
+        },
+        safety: {
+          safeForLocalMaterialization: true,
+          forbidsSecrets: true,
+          forbidsDeploy: true,
+          forbidsRealPayments: true,
+          forbidsExternalServices: true,
+        },
+        errorsCount: 0,
+      },
+      generatedDomainContractDiagnostics: {
+        targetRoot: 'partial-local',
+        safeForLocalMaterialization: true,
+        allowedTargetPaths: ['partial-local', 'partial-local/frontend/public/index.html'],
+        requiredPathGroups: [],
+      },
+      generatedDomainCapabilityProfile: {
+        safety: {
+          safeForLocalMaterialization: true,
+          forbidsSecrets: true,
+          forbidsDeploy: true,
+          forbidsRealPayments: true,
+          forbidsExternalServices: true,
+        },
+      },
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'consistent',
+        semanticStatus: 'consistent',
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceGate: {
+        present: true,
+        evaluated: true,
+        status: 'not-ready',
+        eligibility: {
+          canPreferShadowInFuture: false,
+        },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationSourceResolution: {
+        present: true,
+        resolved: true,
+        source: 'none',
+        testProjection: {
+          wouldSelectShadow: false,
+        },
+        recommendation: {
+          action: 'observe',
+        },
+      },
+    })
+
+  assert.equal(candidatePlan?.present, true)
+  assert.equal(candidatePlan?.status, 'partial')
+  assert.equal(candidatePlan?.built, false)
+  assert.equal(candidatePlan?.compatibility?.canBeUsedByFutureSwitch, false)
+  assert.equal(candidatePlan?.behaviorChanged, false)
+  assert.ok((candidatePlan?.limitations || []).length > 0)
+}
+
+function runGeneratedDomainShadowMaterializationCandidatePlanNotAvailableCase() {
+  const candidatePlan =
+    observationHarness.buildGeneratedDomainShadowMaterializationCandidatePlan({
+      generatedDomainMaterializationSourceResolution: {
+        present: true,
+        resolved: true,
+        source: 'none',
+      },
+    })
+
+  assert.equal(candidatePlan?.present, true)
+  assert.equal(candidatePlan?.built, false)
+  assert.equal(candidatePlan?.status, 'not-available')
+  assert.equal(candidatePlan?.behaviorChanged, false)
+}
+
+function runGeneratedDomainShadowMaterializationCandidatePlanBlockedCase() {
+  const candidatePlan =
+    observationHarness.buildGeneratedDomainShadowMaterializationCandidatePlan({
+      generatedDomainMaterializationShadowPlan: {
+        present: true,
+        built: true,
+        status: 'built',
+        root: 'unsafe-local',
+        sourceRoot: 'unsafe-local',
+        targetRoot: 'unsafe-local',
+        plannedBuckets: {
+          frontend: { present: true },
+          backend: { present: true },
+          database: { present: true },
+          shared: { present: true },
+          docs: { present: true },
+          scripts: { present: false },
+          validation: { present: true },
+        },
+        safety: {
+          safeForLocalMaterialization: true,
+          forbidsSecrets: true,
+          forbidsDeploy: true,
+          forbidsRealPayments: true,
+          forbidsExternalServices: true,
+        },
+        errorsCount: 0,
+      },
+      generatedDomainContractDiagnostics: {
+        targetRoot: 'unsafe-local',
+        safeForLocalMaterialization: true,
+        allowedTargetPaths: [
+          'unsafe-local',
+          'unsafe-local/backend/src/server.js',
+          '.env',
+          '../escape/path.txt',
+        ],
+        requiredPathGroups: [{ candidates: ['unsafe-local/backend/src/server.js'] }],
+      },
+      generatedDomainCapabilityProfile: {
+        safety: {
+          safeForLocalMaterialization: true,
+          forbidsSecrets: true,
+          forbidsDeploy: true,
+          forbidsRealPayments: true,
+          forbidsExternalServices: true,
+        },
+      },
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'consistent',
+        semanticStatus: 'consistent',
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationPreferenceGate: {
+        present: true,
+        evaluated: true,
+        status: 'eligible',
+        eligibility: {
+          canPreferShadowInFuture: true,
+        },
+        errorsCount: 0,
+      },
+      generatedDomainMaterializationSourceResolution: {
+        present: true,
+        resolved: true,
+        source: 'legacy',
+        testProjection: {
+          wouldSelectShadow: true,
+        },
+        recommendation: {
+          action: 'test-harness-only',
+        },
+      },
+    })
+
+  assert.equal(candidatePlan?.present, true)
+  assert.equal(candidatePlan?.built, false)
+  assert.equal(candidatePlan?.status, 'blocked')
+  assert.equal(candidatePlan?.compatibility?.canBeUsedByFutureSwitch, false)
+  assert.equal(candidatePlan?.behaviorChanged, false)
+  assert.ok((candidatePlan?.errors || []).length > 0)
+  assert.equal('operations' in (candidatePlan?.candidate || {}), false)
+}
+
+function runGeneratedDomainShadowCandidateLegacyComparisonAlignedCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const comparison = decision.generatedDomainShadowCandidateLegacyComparison
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainShadowCandidateLegacyComparisonForDebug(
+      comparison,
+    )
+
+  assert.equal(comparison?.present, true)
+  assert.equal(comparison?.compared, true)
+  assert.equal(comparison?.status, 'aligned')
+  assert.equal(comparison?.roots?.aligned, true)
+  assert.equal(comparison?.allowedTargets?.aligned, true)
+  assert.equal(comparison?.requiredGroups?.aligned, true)
+  assert.equal(comparison?.buckets?.allAligned, true)
+  assert.equal(comparison?.safety?.aligned, true)
+  assert.equal(comparison?.operations?.candidateHasOperations, false)
+  assert.equal(comparison?.operations?.candidateHasCommands, false)
+  assert.equal(comparison?.operations?.candidateHasWrites, false)
+  assert.equal(comparison?.behaviorChanged, false)
+  assert.equal(debugSummary?.status, 'aligned')
+}
+
+function runGeneratedDomainShadowCandidateLegacyComparisonBlockedCase() {
+  const comparison =
+    observationHarness.buildGeneratedDomainShadowCandidateLegacyComparison({
+      generatedDomainShadowMaterializationCandidatePlan: {
+        present: true,
+        built: true,
+        status: 'built',
+        behaviorChanged: false,
+        candidate: {
+          root: 'unsafe-local',
+          targetRoot: 'unsafe-local',
+          allowedTargetPaths: ['unsafe-local', 'unsafe-local/backend/src/server.js'],
+          requiredPathGroups: [{ candidates: ['unsafe-local/backend/src/server.js'] }],
+          plannedBuckets: {
+            frontend: false,
+            backend: true,
+            database: false,
+            shared: false,
+            docs: false,
+            scripts: false,
+            validation: false,
+          },
+          safety: {
+            safeForLocalMaterialization: true,
+            forbidsSecrets: true,
+            forbidsDeploy: true,
+            forbidsRealPayments: true,
+            forbidsExternalServices: true,
+          },
+          operations: [{ type: 'create-or-edit-file', targetPath: 'unsafe-local/backend/src/server.js' }],
+        },
+      },
+      generatedDomainMaterializationShadowDiff: {
+        present: true,
+        compared: true,
+        status: 'compared',
+      },
+      materializationPlan: {
+        projectRoot: 'unsafe-local',
+        allowedTargetPaths: ['unsafe-local', 'unsafe-local/backend/src/server.js'],
+        operations: [{ type: 'create-or-edit-file', targetPath: 'unsafe-local/backend/src/server.js' }],
+        contractDefinition: {
+          requiredPathGroups: [{ candidates: ['unsafe-local/backend/src/server.js'] }],
+        },
+      },
+    })
+
+  assert.equal(comparison?.present, true)
+  assert.equal(comparison?.status, 'blocked')
+  assert.equal(comparison?.operations?.candidateHasOperations, true)
+  assert.equal(comparison?.recommendation?.action, 'investigate')
+  assert.equal(comparison?.behaviorChanged, false)
+}
+
+function createGeneratedDomainShadowReadyPipelineFixture() {
+  const generatedDomainContract = createValidInventedContract()
+  const generatedDomainContractDiagnostics = buildGeneratedDomainContractDiagnostics(
+    { generatedDomainContract },
+    repoRoot,
+  )
+  const generatedDomainCapabilityProfile = buildGeneratedDomainCapabilityProfile(
+    generatedDomainContract,
+    generatedDomainContractDiagnostics,
+  )
+  const generatedDomainMaterializationShadowPlan = buildGeneratedDomainMaterializationShadowPlan(
+    generatedDomainContract,
+    generatedDomainContractDiagnostics,
+    generatedDomainCapabilityProfile,
+  )
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const materializationPlan = {
+    version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+    kind: 'fullstack-local-materialization',
+    strategy: 'materialize-fullstack-local-plan',
+    projectRoot:
+      generatedDomainContract.root?.targetRoot ||
+      generatedDomainContractDiagnostics.targetRoot ||
+      'invented-local',
+    allowedTargetPaths,
+    operations: allowedTargetPaths.map((targetPath) => ({
+      type:
+        targetPath ===
+        (generatedDomainContract.root?.targetRoot ||
+          generatedDomainContractDiagnostics.targetRoot ||
+          'invented-local')
+          ? 'create-folder'
+          : 'create-or-edit-file',
+      targetPath,
+    })),
+    contractDefinition: {
+      requiredPathGroups: deriveRequiredPathGroupsFromContract(generatedDomainContract),
+    },
+  }
+  const domainConsistencyDiagnostics = {
+    present: true,
+    checked: true,
+    status: 'consistent',
+    semanticStatus: 'consistent',
+    errorsCount: 0,
+  }
+  const generatedDomainMaterializationShadowComparison = {
+    present: true,
+    compared: true,
+    status: 'aligned',
+    legacyPlanPresent: true,
+    errorsCount: 0,
+  }
+  const generatedDomainMaterializationShadowDiff = {
+    present: true,
+    compared: true,
+    status: 'compared',
+    recommendation: {
+      action: 'prepare-preference-switch',
+    },
+    errorsCount: 0,
+  }
+  const generatedDomainMaterializationPreferenceGate = {
+    present: true,
+    evaluated: true,
+    status: 'eligible',
+    eligibility: {
+      canPreferShadowInFuture: true,
+      blockedByDivergence: false,
+      needsMoreEvidence: false,
+    },
+    errorsCount: 0,
+  }
+  const generatedDomainMaterializationPreferenceDecision = {
+    present: true,
+    evaluated: true,
+    enabled: false,
+    status: 'would-prefer-shadow',
+    dryRun: {
+      wouldPreferShadow: true,
+      wouldKeepLegacy: false,
+      wouldBlock: false,
+    },
+    actual: {
+      materializationSource: 'legacy',
+      reason: 'Keep legacy until the real switch exists.',
+    },
+    errorsCount: 0,
+  }
+  const generatedDomainMaterializationPreferenceSwitch =
+    observationHarness.buildGeneratedDomainMaterializationPreferenceSwitch({
+      generatedDomainMaterializationShadowPlan,
+      generatedDomainMaterializationShadowComparison,
+      generatedDomainMaterializationShadowDiff,
+      generatedDomainMaterializationPreferenceGate,
+      generatedDomainMaterializationPreferenceDecision,
+      domainConsistencyDiagnostics,
+      materializationPlan,
+    })
+  const generatedDomainMaterializationSwitchReadinessReport =
+    observationHarness.buildGeneratedDomainMaterializationSwitchReadinessReport({
+      generatedDomainMaterializationPreferenceSwitch,
+      generatedDomainMaterializationPreferenceDecision,
+      generatedDomainMaterializationPreferenceGate,
+      generatedDomainMaterializationShadowDiff,
+      generatedDomainMaterializationShadowComparison,
+      generatedDomainMaterializationShadowPlan,
+      domainConsistencyDiagnostics,
+      materializationPlan,
+    })
+  const generatedDomainMaterializationSourceResolution =
+    observationHarness.resolveGeneratedDomainMaterializationSource({
+      materializationPlan,
+      generatedDomainMaterializationShadowPlan,
+      generatedDomainMaterializationPreferenceSwitch,
+      generatedDomainMaterializationSwitchReadinessReport,
+      generatedDomainMaterializationPreferenceDecision,
+      domainConsistencyDiagnostics,
+    })
+  const generatedDomainShadowMaterializationCandidatePlan =
+    observationHarness.buildGeneratedDomainShadowMaterializationCandidatePlan({
+      generatedDomainMaterializationShadowPlan,
+      generatedDomainContract,
+      generatedDomainContractDiagnostics,
+      generatedDomainCapabilityProfile,
+      domainConsistencyDiagnostics,
+      generatedDomainMaterializationPreferenceGate,
+      generatedDomainMaterializationSourceResolution,
+    })
+  const generatedDomainShadowCandidateLegacyComparison =
+    observationHarness.buildGeneratedDomainShadowCandidateLegacyComparison({
+      generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainMaterializationShadowDiff,
+      materializationPlan,
+    })
+
+  return {
+    generatedDomainContract,
+    generatedDomainContractDiagnostics,
+    generatedDomainCapabilityProfile,
+    generatedDomainMaterializationShadowPlan,
+    generatedDomainMaterializationShadowComparison,
+    generatedDomainMaterializationShadowDiff,
+    generatedDomainMaterializationPreferenceGate,
+    generatedDomainMaterializationPreferenceDecision,
+    generatedDomainMaterializationPreferenceSwitch,
+    generatedDomainMaterializationSwitchReadinessReport,
+    generatedDomainMaterializationSourceResolution,
+    generatedDomainShadowMaterializationCandidatePlan,
+    generatedDomainShadowCandidateLegacyComparison,
+    materializationPlan,
+  }
+}
+
+function createGeneratedDomainAlignedApprovalObservationDecision({
+  generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'community-libraries', label: 'Community Libraries' },
+    root: {
+      slug: 'community-libraries-local',
+      sourceRoot: 'community-libraries-local',
+      targetRoot: 'community-libraries-local',
+    },
+    roles: ['member', 'librarian', 'admin'],
+    entities: ['books', 'loans', 'members'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+    ],
+    workflows: ['manage catalog', 'register loans', 'review reports'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/books.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [{ path: 'backend/src/modules/loans.js' }],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['books', 'loans', 'members'],
+    },
+    shared: {
+      files: ['shared/contracts/domain.js'],
+    },
+    docs: ['docs/API.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'frontend/public/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'frontend/public/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+      ],
+    },
+    approvals: [],
+  },
+  decisionKey = 'generated-domain-aligned-approval-observation',
+} = {}) {
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const requiredPathGroups = deriveRequiredPathGroupsFromContract(generatedDomainContract)
+  const domainLabel =
+    String(generatedDomainContract?.domain?.label || 'community libraries').trim() ||
+    'community libraries'
+  const rootPath =
+    String(generatedDomainContract?.root?.targetRoot || 'community-libraries-local').trim() ||
+    'community-libraries-local'
+  const inferredModules = [
+    ...(Array.isArray(generatedDomainContract?.frontendSurfaces)
+      ? generatedDomainContract.frontendSurfaces.map((entry) => entry?.key)
+      : []),
+    ...(Array.isArray(generatedDomainContract?.entities)
+      ? generatedDomainContract.entities
+      : []),
+  ]
+    .filter((entry) => typeof entry === 'string' && entry.trim())
+    .slice(0, 6)
+
+  return observationHarness.buildBrainDecisionContract({
+    decisionKey,
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Construir una cadena observacional alineada para comparar candidate, policy y approvals.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: rootPath,
+    targetRoot: rootPath,
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: domainLabel,
+      intent: 'manage catalog, loans and local reporting',
+      deliveryLevel: 'fullstack-local',
+      roles: Array.isArray(generatedDomainContract?.roles) ? generatedDomainContract.roles : [],
+      modules: inferredModules,
+      entities: Array.isArray(generatedDomainContract?.entities)
+        ? generatedDomainContract.entities
+        : [],
+      coreFlows: Array.isArray(generatedDomainContract?.workflows)
+        ? generatedDomainContract.workflows
+        : [],
+    },
+    productArchitecture: {
+      productType: 'fullstack-local-app',
+      domain: domainLabel,
+      users: Array.isArray(generatedDomainContract?.roles) ? generatedDomainContract.roles : [],
+      roles: Array.isArray(generatedDomainContract?.roles) ? generatedDomainContract.roles : [],
+      coreModules: inferredModules,
+      dataEntities: Array.isArray(generatedDomainContract?.entities)
+        ? generatedDomainContract.entities
+        : [],
+      keyFlows: Array.isArray(generatedDomainContract?.workflows)
+        ? generatedDomainContract.workflows
+        : [],
+    },
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: rootPath,
+      domain: domainLabel,
+      title: `${domainLabel} local review`,
+      targetStructure: [
+        `${rootPath}/`,
+        `${rootPath}/frontend/public/`,
+        `${rootPath}/frontend/admin/`,
+        `${rootPath}/backend/src/`,
+        `${rootPath}/database/`,
+        `${rootPath}/docs/`,
+      ],
+      allowedRootPaths: [rootPath],
+      directories: [
+        `${rootPath}/frontend/public`,
+        `${rootPath}/frontend/admin`,
+        `${rootPath}/backend/src`,
+        `${rootPath}/database`,
+        `${rootPath}/docs`,
+      ],
+      modules: inferredModules,
+      successCriteria: [
+        'Keep a local fullstack structure ready for review.',
+        'Do not materialize files during the planner stage.',
+      ],
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: rootPath,
+      domain: domainLabel,
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: rootPath,
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === rootPath
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+      contractDefinition: {
+        requiredPathGroups,
+      },
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+}
+
+function runGeneratedDomainShadowMaterializationEndToEndReadinessReadyCase() {
+  const fixture = createGeneratedDomainShadowReadyPipelineFixture()
+  const readiness =
+    observationHarness.buildGeneratedDomainShadowMaterializationEndToEndReadiness({
+      materializationPlan: fixture.materializationPlan,
+      generatedDomainContractDiagnostics: fixture.generatedDomainContractDiagnostics,
+      generatedDomainMaterializationShadowPlan:
+        fixture.generatedDomainMaterializationShadowPlan,
+      generatedDomainShadowMaterializationCandidatePlan:
+        fixture.generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainMaterializationShadowDiff:
+        fixture.generatedDomainMaterializationShadowDiff,
+      generatedDomainMaterializationPreferenceGate:
+        fixture.generatedDomainMaterializationPreferenceGate,
+      generatedDomainMaterializationPreferenceDecision:
+        fixture.generatedDomainMaterializationPreferenceDecision,
+      generatedDomainMaterializationPreferenceSwitch:
+        fixture.generatedDomainMaterializationPreferenceSwitch,
+      generatedDomainMaterializationSwitchReadinessReport:
+        fixture.generatedDomainMaterializationSwitchReadinessReport,
+      generatedDomainMaterializationSourceResolution:
+        fixture.generatedDomainMaterializationSourceResolution,
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'consistent',
+        semanticStatus: 'consistent',
+        errorsCount: 0,
+      },
+    })
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainShadowMaterializationEndToEndReadinessForDebug(
+      readiness,
+    )
+
+  assert.equal(readiness?.present, true)
+  assert.equal(readiness?.status, 'ready-for-test-harness')
+  assert.equal(readiness?.pipeline?.contractValid, true)
+  assert.equal(readiness?.pipeline?.shadowPlanBuilt, true)
+  assert.equal(readiness?.pipeline?.candidateBuilt, true)
+  assert.equal(readiness?.pipeline?.candidateInspectable, true)
+  assert.equal(readiness?.pipeline?.candidateUsableByFutureSwitch, true)
+  assert.equal(readiness?.pipeline?.gateEligible, true)
+  assert.equal(readiness?.pipeline?.diffAligned, true)
+  assert.equal(readiness?.pipeline?.switchReadyForTestHarness, true)
+  assert.equal(readiness?.pipeline?.sourceResolutionProjectsShadowInTest, true)
+  assert.equal(readiness?.pipeline?.runtimeStillDisabled, true)
+  assert.equal(readiness?.safeguards?.noOperations, true)
+  assert.equal(readiness?.safeguards?.noCommands, true)
+  assert.equal(readiness?.safeguards?.noFileWrites, true)
+  assert.equal(readiness?.safeguards?.noWebPrueba, true)
+  assert.equal(readiness?.safeguards?.materializationPlanChanged, false)
+  assert.equal(readiness?.safeguards?.executionScopeChanged, false)
+  assert.equal(readiness?.behaviorChanged, false)
+  assert.equal(debugSummary?.status, 'ready-for-test-harness')
+}
+
+function runGeneratedDomainShadowMaterializationEndToEndReadinessBlockedCase() {
+  const fixture = createGeneratedDomainShadowReadyPipelineFixture()
+  const blockedReadiness =
+    observationHarness.buildGeneratedDomainShadowMaterializationEndToEndReadiness({
+      materializationPlan: fixture.materializationPlan,
+      generatedDomainContractDiagnostics: fixture.generatedDomainContractDiagnostics,
+      generatedDomainMaterializationShadowPlan:
+        fixture.generatedDomainMaterializationShadowPlan,
+      generatedDomainShadowMaterializationCandidatePlan: {
+        ...fixture.generatedDomainShadowMaterializationCandidatePlan,
+        built: false,
+        status: 'blocked',
+        compatibility: {
+          ...fixture.generatedDomainShadowMaterializationCandidatePlan?.compatibility,
+          canBeInspected: false,
+          canBeUsedByFutureSwitch: false,
+        },
+        errors: ['Blocked candidate fixture.'],
+        errorsCount: 1,
+      },
+      generatedDomainMaterializationShadowDiff:
+        fixture.generatedDomainMaterializationShadowDiff,
+      generatedDomainMaterializationPreferenceGate:
+        fixture.generatedDomainMaterializationPreferenceGate,
+      generatedDomainMaterializationPreferenceDecision:
+        fixture.generatedDomainMaterializationPreferenceDecision,
+      generatedDomainMaterializationPreferenceSwitch:
+        fixture.generatedDomainMaterializationPreferenceSwitch,
+      generatedDomainMaterializationSwitchReadinessReport: {
+        ...fixture.generatedDomainMaterializationSwitchReadinessReport,
+        status: 'blocked',
+        blockers: {
+          ...fixture.generatedDomainMaterializationSwitchReadinessReport?.blockers,
+          errorsPresent: true,
+        },
+        errorsCount: 1,
+      },
+      generatedDomainMaterializationSourceResolution:
+        fixture.generatedDomainMaterializationSourceResolution,
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'consistent',
+        semanticStatus: 'consistent',
+        errorsCount: 0,
+      },
+    })
+
+  assert.equal(blockedReadiness?.present, true)
+  assert.equal(blockedReadiness?.status, 'blocked')
+  assert.equal(blockedReadiness?.pipeline?.candidateUsableByFutureSwitch, false)
+  assert.equal(blockedReadiness?.pipeline?.sourceResolutionProjectsShadowInTest, false)
+  assert.equal(blockedReadiness?.recommendation?.action, 'investigate')
+  assert.equal(blockedReadiness?.behaviorChanged, false)
+}
+
+function runGeneratedDomainControlledEnablePolicyNotReadyWithoutLegacyCase() {
+  const fixture = createGeneratedDomainShadowReadyPipelineFixture()
+  const policy = observationHarness.buildGeneratedDomainControlledEnablePolicy({
+    generatedDomainMaterializationPreferenceSwitch:
+      fixture.generatedDomainMaterializationPreferenceSwitch,
+    generatedDomainMaterializationSwitchReadinessReport:
+      fixture.generatedDomainMaterializationSwitchReadinessReport,
+    generatedDomainMaterializationSourceResolution:
+      fixture.generatedDomainMaterializationSourceResolution,
+    generatedDomainShadowMaterializationCandidatePlan:
+      fixture.generatedDomainShadowMaterializationCandidatePlan,
+    generatedDomainShadowMaterializationEndToEndReadiness: {
+      present: true,
+      evaluated: true,
+      status: 'ready-for-test-harness',
+      pipeline: {
+        contractValid: true,
+        shadowPlanBuilt: true,
+        candidateBuilt: true,
+        candidateInspectable: true,
+        candidateUsableByFutureSwitch: true,
+        gateEligible: true,
+        diffAligned: true,
+        switchReadyForTestHarness: true,
+        sourceResolutionProjectsShadowInTest: true,
+        runtimeStillDisabled: true,
+      },
+      errorsCount: 0,
+    },
+    generatedDomainMaterializationShadowDiff:
+      fixture.generatedDomainMaterializationShadowDiff,
+    domainConsistencyDiagnostics: {
+      present: true,
+      checked: true,
+      status: 'consistent',
+      semanticStatus: 'consistent',
+      errorsCount: 0,
+    },
+    materializationPlan: null,
+  })
+
+  assert.equal(policy?.present, true)
+  assert.equal(policy?.status, 'not-ready')
+  assert.equal(policy?.runtimeEnabled, false)
+  assert.equal(policy?.eligibility?.hasLegacyMaterializationPlan, false)
+  assert.equal(policy?.blockers?.missingLegacyMaterializationPlan, true)
+  assert.equal(policy?.allowedModes?.controlledRuntimeEnable, false)
+  assert.equal(policy?.behaviorChanged, false)
+}
+
+function runGeneratedDomainControlledEnablePolicyEligibleCase() {
+  const fixture = createGeneratedDomainShadowReadyPipelineFixture()
+  const endToEndReadiness =
+    observationHarness.buildGeneratedDomainShadowMaterializationEndToEndReadiness({
+      materializationPlan: fixture.materializationPlan,
+      generatedDomainContractDiagnostics: fixture.generatedDomainContractDiagnostics,
+      generatedDomainMaterializationShadowPlan:
+        fixture.generatedDomainMaterializationShadowPlan,
+      generatedDomainShadowMaterializationCandidatePlan:
+        fixture.generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainMaterializationShadowDiff:
+        fixture.generatedDomainMaterializationShadowDiff,
+      generatedDomainMaterializationPreferenceGate:
+        fixture.generatedDomainMaterializationPreferenceGate,
+      generatedDomainMaterializationPreferenceDecision:
+        fixture.generatedDomainMaterializationPreferenceDecision,
+      generatedDomainMaterializationPreferenceSwitch:
+        fixture.generatedDomainMaterializationPreferenceSwitch,
+      generatedDomainMaterializationSwitchReadinessReport:
+        fixture.generatedDomainMaterializationSwitchReadinessReport,
+      generatedDomainMaterializationSourceResolution:
+        fixture.generatedDomainMaterializationSourceResolution,
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'consistent',
+        semanticStatus: 'consistent',
+        errorsCount: 0,
+      },
+    })
+  const policy = observationHarness.buildGeneratedDomainControlledEnablePolicy({
+    generatedDomainMaterializationPreferenceSwitch:
+      fixture.generatedDomainMaterializationPreferenceSwitch,
+    generatedDomainMaterializationSwitchReadinessReport:
+      fixture.generatedDomainMaterializationSwitchReadinessReport,
+    generatedDomainMaterializationSourceResolution:
+      fixture.generatedDomainMaterializationSourceResolution,
+    generatedDomainShadowMaterializationCandidatePlan:
+      fixture.generatedDomainShadowMaterializationCandidatePlan,
+    generatedDomainShadowMaterializationEndToEndReadiness: endToEndReadiness,
+    generatedDomainMaterializationShadowDiff:
+      fixture.generatedDomainMaterializationShadowDiff,
+    domainConsistencyDiagnostics: {
+      present: true,
+      checked: true,
+      status: 'consistent',
+      semanticStatus: 'consistent',
+      errorsCount: 0,
+    },
+    materializationPlan: fixture.materializationPlan,
+  })
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainControlledEnablePolicyForDebug(policy)
+
+  assert.equal(policy?.present, true)
+  assert.equal(policy?.status, 'eligible-for-controlled-runtime-enable')
+  assert.equal(policy?.runtimeEnabled, false)
+  assert.equal(policy?.eligibility?.hasLegacyMaterializationPlan, true)
+  assert.equal(policy?.eligibility?.candidateUsableByFutureSwitch, true)
+  assert.equal(policy?.eligibility?.endToEndReadyForHarness, true)
+  assert.equal(policy?.allowedModes?.testHarnessEnable, true)
+  assert.equal(policy?.allowedModes?.controlledRuntimeEnable, false)
+  assert.equal(policy?.recommendation?.action, 'prepare-runtime-enable-review')
+  assert.equal(policy?.behaviorChanged, false)
+  assert.equal(debugSummary?.status, 'eligible-for-controlled-runtime-enable')
+}
+
+function runGeneratedDomainControlledEnablePolicyDomainMismatchCase() {
+  const fixture = createGeneratedDomainShadowReadyPipelineFixture()
+  const policy = observationHarness.buildGeneratedDomainControlledEnablePolicy({
+    generatedDomainMaterializationPreferenceSwitch:
+      fixture.generatedDomainMaterializationPreferenceSwitch,
+    generatedDomainMaterializationSwitchReadinessReport:
+      fixture.generatedDomainMaterializationSwitchReadinessReport,
+    generatedDomainMaterializationSourceResolution:
+      fixture.generatedDomainMaterializationSourceResolution,
+    generatedDomainShadowMaterializationCandidatePlan:
+      fixture.generatedDomainShadowMaterializationCandidatePlan,
+    generatedDomainShadowMaterializationEndToEndReadiness: {
+      present: true,
+      evaluated: true,
+      status: 'blocked',
+      errorsCount: 0,
+    },
+    generatedDomainMaterializationShadowDiff:
+      fixture.generatedDomainMaterializationShadowDiff,
+    domainConsistencyDiagnostics: {
+      present: true,
+      checked: true,
+      status: 'mismatch',
+      semanticStatus: 'mismatch',
+      errorsCount: 0,
+    },
+    materializationPlan: fixture.materializationPlan,
+  })
+
+  assert.equal(policy?.present, true)
+  assert.equal(policy?.status, 'blocked')
+  assert.equal(policy?.blockers?.domainMismatch, true)
+  assert.equal(policy?.allowedModes?.controlledRuntimeEnable, false)
+  assert.equal(policy?.recommendation?.action, 'investigate')
+  assert.equal(policy?.behaviorChanged, false)
+}
+
+function runGeneratedDomainControlledEnablePolicyCandidateBlockedCase() {
+  const fixture = createGeneratedDomainShadowReadyPipelineFixture()
+  const policy = observationHarness.buildGeneratedDomainControlledEnablePolicy({
+    generatedDomainMaterializationPreferenceSwitch:
+      fixture.generatedDomainMaterializationPreferenceSwitch,
+    generatedDomainMaterializationSwitchReadinessReport:
+      fixture.generatedDomainMaterializationSwitchReadinessReport,
+    generatedDomainMaterializationSourceResolution:
+      fixture.generatedDomainMaterializationSourceResolution,
+    generatedDomainShadowMaterializationCandidatePlan: {
+      ...fixture.generatedDomainShadowMaterializationCandidatePlan,
+      built: false,
+      status: 'blocked',
+      compatibility: {
+        ...fixture.generatedDomainShadowMaterializationCandidatePlan?.compatibility,
+        canBeUsedByFutureSwitch: false,
+      },
+      errors: ['Blocked candidate fixture.'],
+      errorsCount: 1,
+    },
+    generatedDomainShadowMaterializationEndToEndReadiness: {
+      present: true,
+      evaluated: true,
+      status: 'blocked',
+      errorsCount: 1,
+    },
+    generatedDomainMaterializationShadowDiff:
+      fixture.generatedDomainMaterializationShadowDiff,
+    domainConsistencyDiagnostics: {
+      present: true,
+      checked: true,
+      status: 'consistent',
+      semanticStatus: 'consistent',
+      errorsCount: 0,
+    },
+    materializationPlan: fixture.materializationPlan,
+  })
+
+  assert.equal(policy?.present, true)
+  assert.equal(policy?.status, 'blocked')
+  assert.equal(policy?.blockers?.candidateNotUsable, true)
+  assert.equal(policy?.allowedModes?.controlledRuntimeEnable, false)
+  assert.equal(policy?.behaviorChanged, false)
+}
+
+function runGeneratedDomainFirstControlledEnableScenarioReadyForReviewCase() {
+  const fixture = createGeneratedDomainShadowReadyPipelineFixture()
+  const endToEndReadiness =
+    observationHarness.buildGeneratedDomainShadowMaterializationEndToEndReadiness({
+      materializationPlan: fixture.materializationPlan,
+      generatedDomainContractDiagnostics: fixture.generatedDomainContractDiagnostics,
+      generatedDomainMaterializationShadowPlan:
+        fixture.generatedDomainMaterializationShadowPlan,
+      generatedDomainShadowMaterializationCandidatePlan:
+        fixture.generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainMaterializationShadowDiff:
+        fixture.generatedDomainMaterializationShadowDiff,
+      generatedDomainMaterializationPreferenceGate:
+        fixture.generatedDomainMaterializationPreferenceGate,
+      generatedDomainMaterializationPreferenceDecision:
+        fixture.generatedDomainMaterializationPreferenceDecision,
+      generatedDomainMaterializationPreferenceSwitch:
+        fixture.generatedDomainMaterializationPreferenceSwitch,
+      generatedDomainMaterializationSwitchReadinessReport:
+        fixture.generatedDomainMaterializationSwitchReadinessReport,
+      generatedDomainMaterializationSourceResolution:
+        fixture.generatedDomainMaterializationSourceResolution,
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'consistent',
+        semanticStatus: 'consistent',
+        errorsCount: 0,
+      },
+    })
+  const policy = observationHarness.buildGeneratedDomainControlledEnablePolicy({
+    generatedDomainMaterializationPreferenceSwitch:
+      fixture.generatedDomainMaterializationPreferenceSwitch,
+    generatedDomainMaterializationSwitchReadinessReport:
+      fixture.generatedDomainMaterializationSwitchReadinessReport,
+    generatedDomainMaterializationSourceResolution:
+      fixture.generatedDomainMaterializationSourceResolution,
+    generatedDomainShadowMaterializationCandidatePlan:
+      fixture.generatedDomainShadowMaterializationCandidatePlan,
+    generatedDomainShadowMaterializationEndToEndReadiness: endToEndReadiness,
+    generatedDomainMaterializationShadowDiff:
+      fixture.generatedDomainMaterializationShadowDiff,
+    domainConsistencyDiagnostics: {
+      present: true,
+      checked: true,
+      status: 'consistent',
+      semanticStatus: 'consistent',
+      errorsCount: 0,
+    },
+    materializationPlan: fixture.materializationPlan,
+  })
+  const scenario = observationHarness.buildGeneratedDomainFirstControlledEnableScenario({
+    generatedDomainControlledEnablePolicy: policy,
+    generatedDomainMaterializationPreferenceSwitch:
+      fixture.generatedDomainMaterializationPreferenceSwitch,
+    generatedDomainMaterializationSourceResolution:
+      fixture.generatedDomainMaterializationSourceResolution,
+    generatedDomainShadowMaterializationCandidatePlan:
+      fixture.generatedDomainShadowMaterializationCandidatePlan,
+    generatedDomainShadowMaterializationEndToEndReadiness: endToEndReadiness,
+    domainConsistencyDiagnostics: {
+      present: true,
+      checked: true,
+      status: 'consistent',
+      semanticStatus: 'consistent',
+      errorsCount: 0,
+    },
+    materializationPlan: fixture.materializationPlan,
+  })
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainFirstControlledEnableScenarioForDebug(
+      scenario,
+    )
+
+  assert.equal(scenario?.present, true)
+  assert.equal(scenario?.status, 'ready-for-review')
+  assert.equal(scenario?.allowedNow, false)
+  assert.equal(scenario?.requiresLeanApproval, true)
+  assert.equal(scenario?.conditions?.fullstackLocalOnly, true)
+  assert.equal(scenario?.conditions?.controlledRuntimeEnable, false)
+  assert.equal(scenario?.conditions?.runtimeEnabled, false)
+  assert.equal(scenario?.conditions?.noCommands, true)
+  assert.equal(scenario?.conditions?.noFileWrites, true)
+  assert.equal(scenario?.conditions?.noWebPrueba, true)
+  assert.equal(scenario?.recommendation?.action, 'request-lean-approval')
+  assert.equal(scenario?.behaviorChanged, false)
+  assert.equal(debugSummary?.status, 'ready-for-review')
+}
+
+function runGeneratedDomainFirstControlledEnableScenarioBlockedCase() {
+  const fixture = createGeneratedDomainShadowReadyPipelineFixture()
+  const scenario = observationHarness.buildGeneratedDomainFirstControlledEnableScenario({
+    generatedDomainControlledEnablePolicy: {
+      present: true,
+      evaluated: true,
+      status: 'blocked',
+      behaviorChanged: false,
+      runtimeEnabled: false,
+      allowedModes: {
+        observeOnly: true,
+        testHarnessEnable: false,
+        controlledRuntimeEnable: false,
+      },
+      errorsCount: 1,
+    },
+    generatedDomainMaterializationPreferenceSwitch:
+      fixture.generatedDomainMaterializationPreferenceSwitch,
+    generatedDomainMaterializationSourceResolution:
+      fixture.generatedDomainMaterializationSourceResolution,
+    generatedDomainShadowMaterializationCandidatePlan:
+      fixture.generatedDomainShadowMaterializationCandidatePlan,
+    generatedDomainShadowMaterializationEndToEndReadiness: {
+      present: true,
+      evaluated: true,
+      status: 'blocked',
+      safeguards: {
+        noCommands: true,
+        noFileWrites: true,
+        noWebPrueba: true,
+      },
+      errorsCount: 1,
+    },
+    domainConsistencyDiagnostics: {
+      present: true,
+      checked: true,
+      status: 'mismatch',
+      semanticStatus: 'mismatch',
+      errorsCount: 0,
+    },
+    materializationPlan: fixture.materializationPlan,
+  })
+
+  assert.equal(scenario?.present, true)
+  assert.equal(scenario?.status, 'blocked')
+  assert.equal(scenario?.allowedNow, false)
+  assert.equal(scenario?.blockers?.domainMismatch, true)
+  assert.equal(scenario?.blockers?.semanticMismatch, true)
+  assert.equal(scenario?.conditions?.controlledRuntimeEnable, false)
+  assert.equal(scenario?.behaviorChanged, false)
+}
+
+function runGeneratedDomainFileCreationApprovalPolicyReadyCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const approvalPolicy = decision.generatedDomainFileCreationApprovalPolicy
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainFileCreationApprovalPolicyForDebug(
+      approvalPolicy,
+    )
+
+  assert.equal(approvalPolicy?.present, true)
+  assert.equal(approvalPolicy?.status, 'ready-for-manual-approval-review')
+  assert.equal(approvalPolicy?.approvalRequired, true)
+  assert.equal(approvalPolicy?.allowedNow, false)
+  assert.equal(approvalPolicy?.requiresLeanApproval, true)
+  assert.equal(approvalPolicy?.evidence?.candidateComparisonStatus, 'aligned')
+  assert.equal(approvalPolicy?.safeguards?.noDotEnv, true)
+  assert.equal(approvalPolicy?.safeguards?.noNodeModules, true)
+  assert.equal(approvalPolicy?.safeguards?.noCommands, true)
+  assert.equal(approvalPolicy?.safeguards?.noWritesExecuted, true)
+  assert.equal(approvalPolicy?.safeguards?.noWebPrueba, true)
+  assert.equal(approvalPolicy?.safeguards?.materializationPlanChanged, false)
+  assert.equal(approvalPolicy?.safeguards?.executionScopeChanged, false)
+  assert.equal(approvalPolicy?.recommendation?.action, 'request-lean-approval')
+  assert.equal(approvalPolicy?.behaviorChanged, false)
+  assert.equal(debugSummary?.status, 'ready-for-manual-approval-review')
+}
+
+function runGeneratedDomainFileCreationApprovalPolicyBlockedCase() {
+  const approvalPolicy = observationHarness.buildGeneratedDomainFileCreationApprovalPolicy({
+    materializationPlan: {
+      projectRoot: 'unsafe-local',
+      allowedTargetPaths: ['unsafe-local', '.env', 'web-prueba/index.html'],
+      operations: [{ targetPath: 'unsafe-local/backend/src/server.js' }],
+    },
+    generatedDomainMaterializationSourceResolution: {
+      present: true,
+      resolved: true,
+      source: 'generated-domain-shadow',
+      runtime: {
+        materializationPlanChanged: true,
+        executionScopeChanged: true,
+      },
+      testProjection: {
+        projectedSource: 'generated-domain-shadow',
+      },
+    },
+    generatedDomainShadowMaterializationCandidatePlan: {
+      present: true,
+      built: false,
+      status: 'blocked',
+      compatibility: {
+        canBeUsedByFutureSwitch: false,
+      },
+      candidate: {
+        root: 'unsafe-local',
+        targetRoot: 'unsafe-local',
+        allowedTargetPaths: ['unsafe-local', '.env', 'web-prueba/index.html'],
+        safety: {
+          forbidsExternalServices: false,
+          forbidsRealPayments: false,
+        },
+      },
+      errorsCount: 1,
+    },
+    generatedDomainShadowCandidateLegacyComparison: {
+      present: true,
+      compared: true,
+      status: 'blocked',
+      operations: {
+        candidateHasCommands: true,
+        candidateHasWrites: true,
+      },
+      errorsCount: 1,
+    },
+    generatedDomainShadowMaterializationEndToEndReadiness: {
+      present: true,
+      evaluated: true,
+      status: 'blocked',
+      errorsCount: 1,
+    },
+    generatedDomainControlledEnablePolicy: {
+      present: true,
+      evaluated: true,
+      status: 'blocked',
+      errorsCount: 1,
+    },
+    generatedDomainFirstControlledEnableScenario: {
+      present: true,
+      evaluated: true,
+      status: 'blocked',
+      errorsCount: 1,
+    },
+  })
+
+  assert.equal(approvalPolicy?.present, true)
+  assert.equal(approvalPolicy?.status, 'blocked')
+  assert.equal(approvalPolicy?.allowedNow, false)
+  assert.equal(approvalPolicy?.blockers?.unsafePaths, true)
+  assert.equal(approvalPolicy?.blockers?.runtimeStillMutable, true)
+  assert.equal(approvalPolicy?.recommendation?.action, 'investigate')
+  assert.equal(approvalPolicy?.behaviorChanged, false)
+}
+
+function runGeneratedDomainUniversalMaterializationPlanPreviewBuiltCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const preview = decision.generatedDomainUniversalMaterializationPlanPreview
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainUniversalMaterializationPlanPreviewForDebug(
+      preview,
+    )
+
+  assert.equal(preview?.present, true)
+  assert.equal(preview?.built, true)
+  assert.equal(preview?.status, 'built')
+  assert.equal(preview?.approvalRequired, true)
+  assert.equal(preview?.canBecomeMaterializationPlan, true)
+  assert.equal(preview?.frontend?.present, true)
+  assert.equal(preview?.backend?.present, true)
+  assert.equal(preview?.database?.present, true)
+  assert.equal(preview?.safety?.safeForLocalMaterialization, true)
+  assert.equal(preview?.safety?.noDotEnv, true)
+  assert.equal(preview?.safety?.noNodeModules, true)
+  assert.equal(preview?.safety?.noDocker, true)
+  assert.equal(preview?.safety?.noCommands, true)
+  assert.equal(preview?.safety?.noWrites, true)
+  assert.equal('operations' in preview, false)
+  assert.equal(preview?.behaviorChanged, false)
+  assert.equal(debugSummary?.status, 'built')
+}
+
+function runGeneratedDomainUniversalMaterializationPlanPreviewBlockedCase() {
+  const preview = observationHarness.buildGeneratedDomainUniversalMaterializationPlanPreview({
+    generatedDomainContract: {
+      ...createValidInventedContract(),
+      root: {
+        slug: 'unsafe-local',
+        sourceRoot: 'unsafe-local',
+        targetRoot: 'unsafe-local',
+      },
+      safety: {
+        forbiddenFiles: ['.env'],
+        forbiddenSignals: ['ACCESS_TOKEN'],
+        explicitExclusions: ['deploy', 'docker'],
+      },
+      materialization: {
+        requiredFiles: ['backend/src/server.js', '.env', 'web-prueba/index.html'],
+        operations: [{ targetPath: 'backend/src/server.js' }],
+      },
+    },
+    generatedDomainContractDiagnostics: null,
+    generatedDomainCapabilityProfile: null,
+    generatedDomainShadowMaterializationCandidatePlan: {
+      present: true,
+      built: false,
+      candidate: {
+        safety: {
+          safeForLocalMaterialization: false,
+        },
+      },
+    },
+    generatedDomainFileCreationApprovalPolicy: {
+      present: true,
+      evaluated: true,
+      approvalRequired: true,
+      approved: false,
+      allowedNow: false,
+    },
+    domainConsistencyDiagnostics: {
+      present: true,
+      checked: true,
+      status: 'mismatch',
+      semanticStatus: 'mismatch',
+    },
+  })
+
+  assert.equal(preview?.present, true)
+  assert.equal(preview?.status, 'blocked')
+  assert.equal(preview?.built, false)
+  assert.equal(preview?.canBecomeMaterializationPlan, false)
+  assert.equal(preview?.approvalRequired, true)
+  assert.equal(preview?.behaviorChanged, false)
+}
+
+function runGeneratedDomainUniversalMaterializationPlanPreviewComparisonAlignedCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const comparison =
+    decision.generatedDomainUniversalMaterializationPlanPreviewComparison
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainUniversalMaterializationPlanPreviewComparisonForDebug(
+      comparison,
+    )
+
+  assert.equal(comparison?.present, true)
+  assert.equal(comparison?.compared, true)
+  assert.equal(comparison?.status, 'aligned')
+  assert.equal(comparison?.roots?.aligned, true)
+  assert.equal(comparison?.allowedTargets?.aligned, true)
+  assert.equal(comparison?.requiredGroups?.aligned, true)
+  assert.equal(comparison?.buckets?.allAligned, true)
+  assert.equal(comparison?.safety?.aligned, true)
+  assert.equal(comparison?.recommendation?.action, 'ready-for-harness')
+  assert.equal(comparison?.behaviorChanged, false)
+  assert.equal(debugSummary?.status, 'aligned')
+}
+
+function runGeneratedDomainUniversalMaterializationPlanPreviewComparisonBlockedCase() {
+  const comparison =
+    observationHarness.buildGeneratedDomainUniversalMaterializationPlanPreviewComparison({
+      generatedDomainUniversalMaterializationPlanPreview: {
+        present: true,
+        built: false,
+        status: 'blocked',
+        root: 'unsafe-local',
+        targetRoot: 'unsafe-local',
+        allowedTargetPaths: ['unsafe-local', '.env'],
+        requiredPathGroups: [{ candidates: ['backend/src/server.js'] }],
+        frontend: { present: true },
+        backend: { present: true, entryFile: 'backend/src/server.js' },
+        database: { present: true, schemaFile: 'database/schema.sql' },
+        safety: {
+          safeForLocalMaterialization: false,
+          noDotEnv: false,
+          noNodeModules: true,
+          noDocker: true,
+          noCommands: false,
+          noWrites: false,
+        },
+      },
+      materializationPlan: {
+        projectRoot: 'unsafe-local',
+        allowedTargetPaths: ['unsafe-local/backend/src/server.js'],
+      },
+      generatedDomainShadowMaterializationCandidatePlan: {
+        present: true,
+        candidate: {
+          targetRoot: 'unsafe-local',
+          allowedTargetPaths: ['unsafe-local/.env'],
+          plannedBuckets: { frontend: true, backend: true, database: true },
+          safety: {
+            safeForLocalMaterialization: false,
+          },
+        },
+      },
+    })
+
+  assert.equal(comparison?.present, true)
+  assert.equal(comparison?.status, 'blocked')
+  assert.equal(comparison?.recommendation?.action, 'investigate')
+  assert.equal(comparison?.behaviorChanged, false)
+}
+
+function runGeneratedDomainUniversalMaterializationPlanPreviewInventedDomainsCase() {
+  const inventedContracts = [
+    {
+      label: 'Banco comunitario de herramientas',
+      slug: 'banco-comunitario-herramientas',
+      root: 'banco-herramientas-local',
+      entities: ['herramientas', 'prestamos', 'socios'],
+      workflows: ['loan-checkout', 'returns', 'maintenance'],
+    },
+    {
+      label: 'Refugios de animales barriales',
+      slug: 'refugios-animales-barriales',
+      root: 'refugios-animales-local',
+      entities: ['animales', 'adopciones', 'voluntarios'],
+      workflows: ['adoption-tracking', 'medical-checks', 'volunteer-shifts'],
+    },
+    {
+      label: 'Centros de apoyo escolar',
+      slug: 'centros-apoyo-escolar',
+      root: 'apoyo-escolar-local',
+      entities: ['centros', 'estudiantes', 'tutores'],
+      workflows: ['attendance', 'class-scheduling', 'community-reporting'],
+    },
+    {
+      label: 'Talleres textiles cooperativos',
+      slug: 'talleres-textiles-cooperativos',
+      root: 'talleres-textiles-local',
+      entities: ['talleres', 'prendas', 'pedidos'],
+      workflows: ['production-planning', 'inventory-tracking', 'community-reporting'],
+    },
+    {
+      label: 'Comedores comunitarios barriales',
+      slug: 'comedores-comunitarios-barriales',
+      root: 'comedores-comunitarios-local',
+      entities: ['comedores', 'beneficiarios', 'raciones'],
+      workflows: ['meal-planning', 'stock-control', 'attendance-reporting'],
+    },
+    {
+      label: 'Huertas urbanas compartidas',
+      slug: 'huertas-urbanas-compartidas',
+      root: 'huertas-urbanas-local',
+      entities: ['huertas', 'parcelas', 'cultivos'],
+      workflows: ['harvest-tracking', 'task-scheduling', 'community-reporting'],
+    },
+    {
+      label: 'Criadero local de plantas carnivoras',
+      slug: 'criadero-plantas-carnivoras',
+      root: 'plantas-carnivoras-local',
+      entities: ['plantas', 'especies', 'reservas'],
+      workflows: ['visit-reservations', 'care-routine', 'mock-sales'],
+    },
+  ]
+
+  inventedContracts.forEach((fixture) => {
+    const contract = createValidInventedContract()
+    contract.domain = {
+      label: fixture.label,
+      slug: fixture.slug,
+      summary: `Gestion local para ${fixture.label.toLowerCase()}.`,
+    }
+    contract.root = {
+      slug: fixture.root,
+      sourceRoot: fixture.root,
+      targetRoot: fixture.root,
+    }
+    contract.entities = fixture.entities
+    contract.workflows = fixture.workflows
+    const decision = createGeneratedDomainAlignedApprovalObservationDecision({
+      generatedDomainContract: contract,
+      decisionKey: `generated-domain-preview-${fixture.slug}`,
+    })
+
+    assert.equal(decision.generatedDomainUniversalMaterializationPlanPreview?.present, true)
+    assert.equal(decision.generatedDomainUniversalMaterializationPlanPreview?.status, 'built')
+    assert.equal(
+      decision.generatedDomainUniversalMaterializationPlanPreview?.canBecomeMaterializationPlan,
+      true,
+    )
+    assert.equal(
+      decision.generatedDomainUniversalMaterializationPlanPreviewComparison?.status,
+      'aligned',
+    )
+  })
+}
+
+function runGeneratedDomainStructuralCapabilitiesInventedCase() {
+  const contract = createValidInventedContract()
+  contract.domain = {
+    label: 'Cooperativa barrial de herramientas raras',
+    slug: 'cooperativa-herramientas-raras',
+    summary: 'Gestion local de prestamos, mantenimiento, reportes y coordinacion comunitaria.',
+  }
+  contract.root = {
+    slug: 'cooperativa-herramientas-raras-local',
+    sourceRoot: 'cooperativa-herramientas-raras-local',
+    targetRoot: 'cooperativa-herramientas-raras-local',
+  }
+  contract.entities = ['herramientas', 'prestamos', 'coordinaciones', 'mantenimientos']
+  contract.workflows = ['loan-checkout', 'maintenance', 'community-reporting']
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision({
+    generatedDomainContract: contract,
+    decisionKey: 'generated-domain-structural-capabilities-invented',
+  })
+  const capabilities = decision.generatedDomainStructuralCapabilities
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainStructuralCapabilitiesForDebug(
+      capabilities,
+    )
+
+  assert.equal(capabilities?.present, true)
+  assert.equal(capabilities?.evaluated, true)
+  assert.equal(capabilities?.hasPublicFrontend, true)
+  assert.equal(capabilities?.hasAdminPanel, true)
+  assert.equal(capabilities?.hasBackend, true)
+  assert.equal(capabilities?.hasDatabase, true)
+  assert.equal(capabilities?.hasReporting, true)
+  assert.equal(capabilities?.hasValidation, true)
+  assert.equal(capabilities?.hasSafeLocalMaterialization, true)
+  assert.equal(capabilities?.behaviorChanged, false)
+  assert.equal(debugSummary?.hasSafeLocalMaterialization, true)
+}
+
+function runLegacyDomainHardcodingDebtReportCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const report = decision.legacyDomainHardcodingDebtReport
+  const debugSummary =
+    observationHarness.summarizeLegacyDomainHardcodingDebtReportForDebug(report)
+
+  assert.equal(report?.present, true)
+  assert.equal(report?.evaluated, true)
+  assert.equal(report?.behaviorChanged, false)
+  assert.equal(report?.legacyResolversDetected > 0, true)
+  assert.equal(report?.runtimeCriticalCount > 0, true)
+  assert.equal(report?.fixtureOnlyCount > 0, true)
+  assert.equal(Array.isArray(report?.migrationCandidates), true)
+  assert.equal(Array.isArray(report?.riskyAreas), true)
+  assert.equal(
+    report?.migrationCandidates?.some(
+      (entry) => entry?.area === 'buildCanonicalFullstackLocalMaterializationContract',
+    ),
+    true,
+  )
+  assert.equal(
+    report?.riskyAreas?.some(
+      (entry) => entry?.area === 'buildFullstackLocalMaterializationPlan',
+    ),
+    true,
+  )
+  assert.equal(debugSummary?.runtimeCriticalCount > 0, true)
+}
+
+function runLocalDeterministicExecutorLegacyDebtReportCase() {
+  const report = observationHarness.buildLocalDeterministicExecutorLegacyDebtReport()
+  const debugSummary =
+    observationHarness.summarizeLocalDeterministicExecutorLegacyDebtReportForDebug(report)
+
+  assert.equal(report?.present, true)
+  assert.equal(report?.evaluated, true)
+  assert.equal(report?.behaviorChanged, false)
+  assert.equal(report?.executorFilePresent, true)
+  assert.equal(report?.legacyBranchesDetected > 0, true)
+  assert.equal(report?.runtimeCriticalCount > 0, true)
+  assert.equal(Array.isArray(report?.domainSpecificSignals), true)
+  assert.equal(Array.isArray(report?.capabilityMigrationCandidates), true)
+  assert.equal(Array.isArray(report?.riskyAreas), true)
+  assert.equal(
+    report?.domainSpecificSignals?.includes('ecommerce') &&
+      report?.domainSpecificSignals?.includes('school-crm') &&
+      report?.domainSpecificSignals?.includes('generic'),
+    true,
+  )
+  assert.equal(
+    report?.capabilityMigrationCandidates?.some((entry) => entry?.capability === 'catalog'),
+    true,
+  )
+  assert.equal(
+    report?.riskyAreas?.some((entry) => entry?.area === 'buildSafeFirstDeliveryRuntimeModeConfig'),
+    true,
+  )
+  assert.equal(debugSummary?.runtimeCriticalCount > 0, true)
+}
+
+function runLocalDeterministicExecutorCapabilityMigrationPlanCase() {
+  const debtReport = observationHarness.buildLocalDeterministicExecutorLegacyDebtReport()
+  const plan = observationHarness.buildLocalDeterministicExecutorCapabilityMigrationPlan({
+    localDeterministicExecutorLegacyDebtReport: debtReport,
+  })
+  const debugSummary =
+    observationHarness.summarizeLocalDeterministicExecutorCapabilityMigrationPlanForDebug(plan)
+
+  assert.equal(plan?.present, true)
+  assert.equal(plan?.evaluated, true)
+  assert.equal(plan?.behaviorChanged, false)
+  assert.equal(Array.isArray(plan?.capabilityTargets), true)
+  assert.equal(plan?.branchMappedCount > 0, true)
+  assert.equal(plan?.notReadyCount > 0, true)
+  assert.equal(
+    plan?.capabilityTargets?.some(
+      (entry) =>
+        entry?.capability === 'catalog' && Array.isArray(entry?.currentBranches) && entry.currentBranches.length > 0,
+    ),
+    true,
+  )
+  assert.equal(
+    plan?.capabilityTargets?.some(
+      (entry) => entry?.capability === 'backend-api' && entry?.migrationReadiness === 'not-ready',
+    ),
+    true,
+  )
+  assert.equal(debugSummary?.capabilityTargetsCount > 0, true)
+}
+
+function runGeneratedDomainMaterializationInspectionSourceResolutionCandidateCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const resolution =
+    decision.generatedDomainMaterializationInspectionSourceResolution
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainMaterializationInspectionSourceResolutionForDebug(
+      resolution,
+    )
+
+  assert.equal(resolution?.present, true)
+  assert.equal(resolution?.resolved, true)
+  assert.equal(resolution?.source, 'generated-domain-candidate')
+  assert.equal(resolution?.candidatePreferred, true)
+  assert.equal(resolution?.legacyUsedAsFallback, false)
+  assert.equal(resolution?.runtime?.materializationPlanChanged, false)
+  assert.equal(resolution?.runtime?.executionScopeChanged, false)
+  assert.equal(resolution?.behaviorChanged, false)
+  assert.equal(debugSummary?.source, 'generated-domain-candidate')
+}
+
+function runGeneratedDomainMaterializationInspectionSourceResolutionLegacyFallbackCase() {
+  const alignedDecision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const resolution =
+    observationHarness.buildGeneratedDomainMaterializationInspectionSourceResolution({
+      generatedDomainShadowMaterializationCandidatePlan: {
+        ...alignedDecision.generatedDomainShadowMaterializationCandidatePlan,
+        status: 'partial',
+        compatibility: {
+          ...alignedDecision.generatedDomainShadowMaterializationCandidatePlan
+            ?.compatibility,
+          canBeInspected: false,
+          canBeUsedByFutureSwitch: false,
+        },
+      },
+      generatedDomainShadowCandidateLegacyComparison: {
+        ...alignedDecision.generatedDomainShadowCandidateLegacyComparison,
+        status: 'partial',
+      },
+      generatedDomainFileCreationApprovalPolicy: {
+        ...alignedDecision.generatedDomainFileCreationApprovalPolicy,
+        status: 'not-ready',
+      },
+      domainConsistencyDiagnostics: alignedDecision.domainConsistencyDiagnostics,
+      materializationPlan: alignedDecision.materializationPlan,
+      fullstackLocalInspectionSourceDiagnostics:
+        {
+          ...alignedDecision.fullstackLocalInspectionSourceDiagnostics,
+          source: 'legacy-canonical-contract',
+          generatedDomainContractUsed: false,
+          legacyCanonicalContractUsed: true,
+          fallbackUsed: true,
+        },
+    })
+
+  assert.equal(resolution?.present, true)
+  assert.equal(resolution?.source, 'legacy')
+  assert.equal(resolution?.candidatePreferred, false)
+  assert.equal(resolution?.legacyUsedAsFallback, true)
+  assert.equal(resolution?.runtime?.materializationPlanChanged, false)
+  assert.equal(resolution?.runtime?.executionScopeChanged, false)
+  assert.equal(resolution?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationInspectionSourceResolutionBlockedCase() {
+  const resolution =
+    observationHarness.buildGeneratedDomainMaterializationInspectionSourceResolution({
+      generatedDomainShadowMaterializationCandidatePlan: {
+        present: true,
+        built: false,
+        status: 'blocked',
+        compatibility: {
+          canBeInspected: false,
+          canBeUsedByFutureSwitch: false,
+        },
+        candidate: {
+          safety: {
+            safeForLocalMaterialization: false,
+          },
+        },
+      },
+      generatedDomainShadowCandidateLegacyComparison: {
+        present: true,
+        compared: true,
+        status: 'blocked',
+      },
+      generatedDomainFileCreationApprovalPolicy: {
+        present: true,
+        evaluated: true,
+        status: 'blocked',
+        safeguards: {
+          noCommands: false,
+          noWritesExecuted: true,
+          noWebPrueba: false,
+        },
+      },
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'mismatch',
+        semanticStatus: 'mismatch',
+      },
+      materializationPlan: null,
+      fullstackLocalInspectionSourceDiagnostics: {
+        present: true,
+        source: 'unavailable',
+      },
+    })
+
+  assert.equal(resolution?.present, true)
+  assert.equal(resolution?.source, 'blocked')
+  assert.equal(resolution?.legacyUsedAsFallback, false)
+  assert.equal(resolution?.blockers?.domainMismatch, true)
+  assert.equal(resolution?.blockers?.approvalBlocked, true)
+  assert.equal(resolution?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationInspectionSourceResolutionNoneCase() {
+  const resolution =
+    observationHarness.buildGeneratedDomainMaterializationInspectionSourceResolution({
+      generatedDomainShadowMaterializationCandidatePlan: null,
+      generatedDomainShadowCandidateLegacyComparison: null,
+      generatedDomainFileCreationApprovalPolicy: null,
+      domainConsistencyDiagnostics: null,
+      materializationPlan: null,
+      fullstackLocalInspectionSourceDiagnostics: null,
+    })
+
+  assert.equal(resolution?.present, false)
+  assert.equal(resolution?.source, 'none')
+  assert.equal(resolution?.behaviorChanged, false)
+}
+
 function runDomainConsistencyDiagnosticsDiscardResidualMetadataCase() {
   const generatedDomainContract = {
     ...createValidInventedContract(),
@@ -3075,7 +5627,49 @@ async function main() {
   runGeneratedDomainMaterializationPreferenceDecisionWouldKeepLegacyCase()
   runGeneratedDomainMaterializationPreferenceDecisionBlockedCase()
   runGeneratedDomainMaterializationPreferenceDecisionNotAvailableCase()
-  runDomainConsistencyDiagnosticsDiscardResidualMetadataCase()
+  runGeneratedDomainMaterializationPreferenceSwitchDisabledWouldPreferShadowCase()
+  runGeneratedDomainMaterializationPreferenceSwitchDisabledKeepLegacyCase()
+  runGeneratedDomainMaterializationPreferenceSwitchInvestigateCase()
+  runGeneratedDomainMaterializationPreferenceSwitchTestEnabledCase()
+  runGeneratedDomainMaterializationSwitchReadinessReportNotReadyCase()
+  runGeneratedDomainMaterializationSwitchReadinessReportReadyCase()
+  runGeneratedDomainMaterializationSwitchReadinessReportDomainBlockedCase()
+  runGeneratedDomainMaterializationSwitchReadinessReportDiffBlockedCase()
+  runGeneratedDomainMaterializationSourceResolutionRuntimeLegacyCase()
+  runGeneratedDomainMaterializationSourceResolutionRuntimeNoneCase()
+  runGeneratedDomainMaterializationSourceResolutionRuntimeDisabledShadowCandidateCase()
+  runGeneratedDomainMaterializationSourceResolutionTestEnabledShadowCase()
+  runGeneratedDomainMaterializationSourceResolutionTestBlockedCase()
+  runGeneratedDomainShadowMaterializationCandidatePlanBuiltCase()
+  runGeneratedDomainShadowMaterializationCandidatePlanPartialCase()
+  runGeneratedDomainShadowMaterializationCandidatePlanNotAvailableCase()
+  runGeneratedDomainShadowMaterializationCandidatePlanBlockedCase()
+  runGeneratedDomainShadowCandidateLegacyComparisonAlignedCase()
+  runGeneratedDomainShadowCandidateLegacyComparisonBlockedCase()
+  runGeneratedDomainShadowMaterializationEndToEndReadinessReadyCase()
+  runGeneratedDomainShadowMaterializationEndToEndReadinessBlockedCase()
+  runGeneratedDomainControlledEnablePolicyNotReadyWithoutLegacyCase()
+  runGeneratedDomainControlledEnablePolicyEligibleCase()
+  runGeneratedDomainControlledEnablePolicyDomainMismatchCase()
+  runGeneratedDomainControlledEnablePolicyCandidateBlockedCase()
+runGeneratedDomainFirstControlledEnableScenarioReadyForReviewCase()
+runGeneratedDomainFirstControlledEnableScenarioBlockedCase()
+runGeneratedDomainFileCreationApprovalPolicyReadyCase()
+runGeneratedDomainFileCreationApprovalPolicyBlockedCase()
+runGeneratedDomainUniversalMaterializationPlanPreviewBuiltCase()
+runGeneratedDomainUniversalMaterializationPlanPreviewBlockedCase()
+runGeneratedDomainUniversalMaterializationPlanPreviewComparisonAlignedCase()
+runGeneratedDomainUniversalMaterializationPlanPreviewComparisonBlockedCase()
+  runGeneratedDomainUniversalMaterializationPlanPreviewInventedDomainsCase()
+  runGeneratedDomainStructuralCapabilitiesInventedCase()
+  runLegacyDomainHardcodingDebtReportCase()
+  runLocalDeterministicExecutorLegacyDebtReportCase()
+  runLocalDeterministicExecutorCapabilityMigrationPlanCase()
+  runGeneratedDomainMaterializationInspectionSourceResolutionCandidateCase()
+runGeneratedDomainMaterializationInspectionSourceResolutionLegacyFallbackCase()
+runGeneratedDomainMaterializationInspectionSourceResolutionBlockedCase()
+runGeneratedDomainMaterializationInspectionSourceResolutionNoneCase()
+runDomainConsistencyDiagnosticsDiscardResidualMetadataCase()
   runDomainConsistencyDiagnosticsSemanticMismatchCase()
   runPlannerObservationMergeOkCase()
   runPlannerObservationMergeTimeoutCase()
@@ -3087,7 +5681,7 @@ async function main() {
   runPlannerObservationDebugSummaryCase()
   await runPlannerObservationNormalizeAvailabilityCase()
   runDiagnosticsDebugPreviewCase()
-  console.log('OK. GeneratedDomainContract smoke paso 81/81 checks.')
+  console.log('OK. GeneratedDomainContract smoke completado.')
 }
 
 main().catch((error) => {
