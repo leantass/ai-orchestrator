@@ -1,0 +1,488 @@
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
+import vm from 'node:vm'
+import { spawnSync } from 'node:child_process'
+import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
+
+const require = createRequire(import.meta.url)
+const currentFilePath = fileURLToPath(import.meta.url)
+const repoRoot = path.resolve(path.dirname(currentFilePath), '..')
+const mainFilePath = path.join(repoRoot, 'electron', 'main.cjs')
+const mainSource = fs.readFileSync(mainFilePath, 'utf8')
+const {
+  normalizeGeneratedDomainContract,
+  validateGeneratedDomainContract,
+  deriveAllowedTargetPathsFromContract,
+  deriveRequiredPathGroupsFromContract,
+  deriveForbiddenSearchPatternsFromContract,
+  isContractSafeForLocalMaterialization,
+  buildGeneratedDomainContractDiagnostics,
+  buildGeneratedDomainCapabilityProfile,
+  buildGeneratedDomainMaterializationShadowPlan,
+  buildGeneratedDomainContractComparison,
+  extractGeneratedDomainContractCandidate,
+} = require(path.join(repoRoot, 'electron', 'generated-domain-contract.cjs'))
+const {
+  LOCAL_MATERIALIZATION_PLAN_VERSION,
+} = require(path.join(repoRoot, 'electron', 'local-deterministic-executor.cjs'))
+const {
+  FULLSTACK_LOCAL_BASE_PHASES,
+  getFullstackLocalBasePhaseDefinition,
+  buildFullstackLocalManifestPhaseBlueprints,
+} = require(path.join(repoRoot, 'electron', 'fullstack-phase-contracts.cjs'))
+const {
+  classifyWorkspaceProjectIntent,
+  selectBestWorkspaceProjectCandidate,
+  shouldIgnoreWorkspaceDirectoryEntry,
+} = require(path.join(repoRoot, 'electron', 'workspace-project-detection.cjs'))
+
+function extractSegment({ startMarker, endMarker }) {
+  const start = mainSource.indexOf(startMarker)
+  if (start === -1) {
+    throw new Error(`No se encontro el anchor inicial ${JSON.stringify(startMarker)}.`)
+  }
+
+  const end = mainSource.indexOf(endMarker, start)
+  if (end === -1) {
+    throw new Error(`No se encontro el anchor final ${JSON.stringify(endMarker)}.`)
+  }
+
+  return mainSource.slice(start, end)
+}
+
+function loadObservationHarness() {
+  const plannerSurface = extractSegment({
+    startMarker: 'function summarizeGeneratedDomainContractDiagnosticsForDebug(diagnostics) {',
+    endMarker: 'function createLocalRulesStrategicBrainProvider() {',
+  })
+  const harness = `
+${plannerSurface}
+module.exports = {
+  buildBrainDecisionContract,
+  buildGeneratedDomainUniversalMaterializationPlan,
+  evaluateGeneratedDomainFileCreationApproval,
+  materializeGeneratedDomainSandboxPlan,
+};
+`
+
+  const sandbox = {
+    module: { exports: {} },
+    exports: {},
+    require,
+    console,
+    process,
+    Buffer,
+    fs,
+    path,
+    LOCAL_MATERIALIZATION_PLAN_VERSION,
+    FULLSTACK_LOCAL_BASE_PHASES,
+    getFullstackLocalBasePhaseDefinition,
+    buildFullstackLocalManifestPhaseBlueprints,
+    classifyWorkspaceProjectIntent,
+    selectBestWorkspaceProjectCandidate,
+    shouldIgnoreWorkspaceDirectoryEntry,
+    normalizeGeneratedDomainContract,
+    validateGeneratedDomainContract,
+    deriveAllowedTargetPathsFromContract,
+    deriveRequiredPathGroupsFromContract,
+    deriveForbiddenSearchPatternsFromContract,
+    isContractSafeForLocalMaterialization,
+    buildGeneratedDomainContractDiagnostics,
+    buildGeneratedDomainCapabilityProfile,
+    buildGeneratedDomainMaterializationShadowPlan,
+    buildGeneratedDomainContractComparison,
+    extractGeneratedDomainContractCandidate,
+    AbortController,
+    fetch: globalThis.fetch,
+    setTimeout,
+    clearTimeout,
+    setInterval,
+    clearInterval,
+  }
+
+  vm.createContext(sandbox)
+  vm.runInContext(harness, sandbox, {
+    filename: 'generated-domain-materialization-sandbox-smoke-harness.cjs',
+  })
+
+  return sandbox.module.exports || {}
+}
+
+const observationHarness = loadObservationHarness()
+const sandboxRootRelative = '.codex-temp/generated-domain-materialization-sandbox'
+const smokeSandboxPath = path.join(repoRoot, '.codex-temp', 'generated-domain-materialization-sandbox')
+
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value))
+}
+
+function createValidInventedContract() {
+  return {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: {
+      label: 'Community Libraries',
+      slug: 'community-libraries',
+      summary: 'Gestion local de catalogo, prestamos y reportes comunitarios.',
+    },
+    root: {
+      slug: 'community-libraries-local',
+      sourceRoot: 'community-libraries-local',
+      targetRoot: 'community-libraries-local',
+    },
+    roles: ['member', 'librarian', 'admin'],
+    entities: ['books', 'loans', 'members'],
+    states: {
+      loan: ['pending', 'active', 'returned'],
+    },
+    workflows: ['manage catalog', 'register loans', 'review reports'],
+    frontendSurfaces: [
+      { key: 'public', label: 'Publico', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+    ],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [
+        { path: 'backend/src/routes/books.js' },
+        { path: 'backend/src/routes/loans.js' },
+        { path: 'backend/src/routes/reports.js' },
+      ],
+      services: [{ path: 'backend/src/services/reporting.js' }],
+      modules: [{ path: 'backend/src/modules/loans.js' }],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['books', 'loans', 'members'],
+      relationships: ['loans.book_id -> books.id'],
+      seedData: ['books base', 'loans base'],
+    },
+    shared: {
+      files: ['shared/contracts/domain.js'],
+    },
+    docs: ['docs/API.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env', 'Dockerfile', 'docker-compose.yml'],
+      forbiddenSignals: ['real token', 'external api call'],
+      explicitExclusions: ['deploy', 'node_modules', 'real-webhooks'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'frontend/public/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'frontend/public/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+}
+
+function buildInspectionReadyMaterializationPlan(contract) {
+  const normalizedContract = normalizeGeneratedDomainContract(contract)
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(normalizedContract, '.')
+  const requiredPathGroups = deriveRequiredPathGroupsFromContract(normalizedContract)
+
+  return {
+    version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+    kind: 'fullstack-local-materialization',
+    strategy: 'materialize-fullstack-local-plan',
+    projectRoot: normalizedContract.root.targetRoot,
+    allowedTargetPaths,
+    operations: allowedTargetPaths.map((targetPath) => ({
+      type: targetPath === normalizedContract.root.targetRoot ? 'create-folder' : 'create-or-edit-file',
+      targetPath,
+    })),
+    contractDefinition: {
+      requiredPathGroups,
+    },
+  }
+}
+
+function createUniversalDecision() {
+  const generatedDomainContract = createValidInventedContract()
+  const materializationPlan = buildInspectionReadyMaterializationPlan(generatedDomainContract)
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(generatedDomainContract, '.')
+
+  return observationHarness.buildBrainDecisionContract({
+    decisionKey: 'generated-domain-sandbox-materialization-smoke',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Validar materializacion universal segura en sandbox interno.',
+    instruction: 'No tocar runtime real ni web-prueba.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: generatedDomainContract.root.sourceRoot,
+    targetRoot: generatedDomainContract.root.targetRoot,
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: generatedDomainContract.domain.label,
+      intent: 'manage local tool loans and reports',
+      deliveryLevel: 'fullstack-local',
+      roles: generatedDomainContract.roles,
+      modules: ['catalog', 'loans', 'reports'],
+      entities: generatedDomainContract.entities,
+      coreFlows: generatedDomainContract.workflows,
+    },
+    productArchitecture: {
+      productType: 'fullstack-local-app',
+      domain: generatedDomainContract.domain.label,
+      users: generatedDomainContract.roles,
+      roles: generatedDomainContract.roles,
+      coreModules: ['catalog', 'loans', 'reports'],
+      dataEntities: generatedDomainContract.entities,
+      keyFlows: generatedDomainContract.workflows,
+    },
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: generatedDomainContract.root.targetRoot,
+      domain: generatedDomainContract.domain.label,
+      title: `${generatedDomainContract.domain.label} local review`,
+      targetStructure: [
+        `${generatedDomainContract.root.targetRoot}/`,
+        `${generatedDomainContract.root.targetRoot}/frontend/public/`,
+        `${generatedDomainContract.root.targetRoot}/backend/src/`,
+        `${generatedDomainContract.root.targetRoot}/database/`,
+        `${generatedDomainContract.root.targetRoot}/docs/`,
+      ],
+      allowedRootPaths: [generatedDomainContract.root.targetRoot],
+      directories: [
+        `${generatedDomainContract.root.targetRoot}/frontend/public`,
+        `${generatedDomainContract.root.targetRoot}/backend/src`,
+        `${generatedDomainContract.root.targetRoot}/database`,
+        `${generatedDomainContract.root.targetRoot}/docs`,
+      ],
+      modules: ['catalog', 'loans', 'reports'],
+      successCriteria: [
+        'Keep a local fullstack structure ready for review.',
+        'Do not materialize files during the planner stage.',
+      ],
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: generatedDomainContract.root.targetRoot,
+      domain: generatedDomainContract.domain.label,
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan,
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+}
+
+function ensureRemoved(targetPath) {
+  fs.rmSync(targetPath, { recursive: true, force: true })
+}
+
+function listRelativeFiles(rootPath) {
+  const files = []
+
+  function visit(currentPath) {
+    for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
+      const resolved = path.join(currentPath, entry.name)
+      if (entry.isDirectory()) {
+        visit(resolved)
+        continue
+      }
+      files.push(path.relative(rootPath, resolved).replace(/\\/g, '/'))
+    }
+  }
+
+  if (fs.existsSync(rootPath)) {
+    visit(rootPath)
+  }
+
+  return files.sort()
+}
+
+function assertNodeCheck(filePath) {
+  const result = spawnSync(process.execPath, ['--check', filePath], {
+    encoding: 'utf8',
+  })
+
+  assert.equal(
+    result.status,
+    0,
+    `node --check fallo para ${filePath}: ${result.stderr || result.stdout || 'sin detalle'}`,
+  )
+}
+
+function runBlockedCases(universalPlan) {
+  const blockedByApproval = observationHarness.evaluateGeneratedDomainFileCreationApproval({
+    generatedDomainUniversalMaterializationPlan: universalPlan,
+    approvalDecision: {
+      approved: false,
+      scope: 'sandbox-only',
+    },
+    workspacePath: repoRoot,
+    sandboxRoot: `${sandboxRootRelative}/blocked-by-approval`,
+  })
+  assert.equal(blockedByApproval.status, 'blocked')
+  assert.equal(blockedByApproval.approved, false)
+
+  const blockedByWebPrueba = observationHarness.evaluateGeneratedDomainFileCreationApproval({
+    generatedDomainUniversalMaterializationPlan: universalPlan,
+    approvalDecision: {
+      approved: true,
+      scope: 'sandbox-only',
+    },
+    workspacePath: repoRoot,
+    sandboxRoot: 'web-prueba/generated-domain-materialization-sandbox',
+  })
+  assert.equal(blockedByWebPrueba.status, 'blocked')
+
+  const blockedByEnvPlan = cloneJson(universalPlan)
+  blockedByEnvPlan.filesToCreate.push({
+    path: `${blockedByEnvPlan.projectRoot}/.env`,
+    area: 'forbidden',
+    content: 'SECRET=blocked',
+  })
+  const blockedEnvEvaluation = observationHarness.evaluateGeneratedDomainFileCreationApproval({
+    generatedDomainUniversalMaterializationPlan: blockedByEnvPlan,
+    approvalDecision: {
+      approved: true,
+      scope: 'sandbox-only',
+    },
+    workspacePath: repoRoot,
+    sandboxRoot: `${sandboxRootRelative}/blocked-by-env`,
+  })
+  assert.equal(blockedEnvEvaluation.status, 'blocked')
+
+  const blockedByOutsideRootPlan = cloneJson(universalPlan)
+  blockedByOutsideRootPlan.filesToCreate.push({
+    path: '../outside-root.js',
+    area: 'forbidden',
+    content: 'module.exports = {}',
+  })
+  const blockedOutsideEvaluation = observationHarness.evaluateGeneratedDomainFileCreationApproval({
+    generatedDomainUniversalMaterializationPlan: blockedByOutsideRootPlan,
+    approvalDecision: {
+      approved: true,
+      scope: 'sandbox-only',
+    },
+    workspacePath: repoRoot,
+    sandboxRoot: `${sandboxRootRelative}/blocked-by-outside-root`,
+  })
+  assert.equal(blockedOutsideEvaluation.status, 'blocked')
+
+  const blockedMaterializationReport = observationHarness.materializeGeneratedDomainSandboxPlan({
+    generatedDomainUniversalMaterializationPlan: universalPlan,
+    generatedDomainFileCreationApprovalEvaluation: blockedByApproval,
+  })
+  assert.equal(blockedMaterializationReport.status, 'blocked')
+  assert.equal(blockedMaterializationReport.materialized, false)
+}
+
+async function main() {
+  ensureRemoved(smokeSandboxPath)
+
+  try {
+    const decision = createUniversalDecision()
+    const universalPlan = decision.generatedDomainUniversalMaterializationPlan
+
+    assert.equal(universalPlan?.present, true)
+    assert.equal(universalPlan?.built, true)
+    assert.equal(universalPlan?.canMaterializeInSandbox, true)
+
+    const approvalEvaluation = observationHarness.evaluateGeneratedDomainFileCreationApproval({
+      generatedDomainUniversalMaterializationPlan: universalPlan,
+      approvalDecision: {
+        approved: true,
+        scope: 'sandbox-only',
+        approvalReason: 'Sandbox validation smoke.',
+      },
+      workspacePath: repoRoot,
+      sandboxRoot: `${sandboxRootRelative}/happy-path`,
+    })
+
+    assert.equal(approvalEvaluation?.status, 'approved-for-sandbox')
+    assert.equal(approvalEvaluation?.approved, true)
+    assert.equal(approvalEvaluation?.blocked, false)
+
+    const materializationReport = observationHarness.materializeGeneratedDomainSandboxPlan({
+      generatedDomainUniversalMaterializationPlan: universalPlan,
+      generatedDomainFileCreationApprovalEvaluation: approvalEvaluation,
+    })
+
+    assert.equal(materializationReport?.status, 'materialized')
+    assert.equal(materializationReport?.materialized, true)
+
+    const projectRootPath = path.join(
+      repoRoot,
+      '.codex-temp',
+      'generated-domain-materialization-sandbox',
+      'happy-path',
+      universalPlan.projectRoot,
+    )
+    const expectedFiles = [
+      'README.md',
+      'docs/domain.md',
+      'frontend/index.html',
+      'frontend/src/main.js',
+      'frontend/src/mock-data.js',
+      'backend/src/index.js',
+      'shared/contracts/domain.js',
+      'database/schema.sql',
+      'database/seed.json',
+      'validation/report.json',
+    ]
+
+    for (const relativePath of expectedFiles) {
+      assert.equal(
+        fs.existsSync(path.join(projectRootPath, relativePath)),
+        true,
+        `Falta el archivo esperado ${relativePath}.`,
+      )
+    }
+
+    const allFiles = listRelativeFiles(projectRootPath)
+    assert.equal(allFiles.some((entry) => /(^|\/)\.env($|\/)/iu.test(entry)), false)
+    assert.equal(allFiles.some((entry) => /(^|\/)node_modules($|\/)/iu.test(entry)), false)
+    assert.equal(allFiles.some((entry) => /(^|\/)web-prueba($|\/)/iu.test(entry)), false)
+    assert.equal(allFiles.some((entry) => /(^|\/)deploy($|\/)/iu.test(entry)), false)
+    assert.equal(allFiles.some((entry) => /(^|\/)dockerfile($|\/)/iu.test(entry)), false)
+
+    assertNodeCheck(path.join(projectRootPath, 'frontend', 'src', 'main.js'))
+    assertNodeCheck(path.join(projectRootPath, 'frontend', 'src', 'mock-data.js'))
+    assertNodeCheck(path.join(projectRootPath, 'backend', 'src', 'index.js'))
+    assertNodeCheck(path.join(projectRootPath, 'shared', 'contracts', 'domain.js'))
+
+    JSON.parse(fs.readFileSync(path.join(projectRootPath, 'database', 'seed.json'), 'utf8'))
+    JSON.parse(fs.readFileSync(path.join(projectRootPath, 'validation', 'report.json'), 'utf8'))
+
+    runBlockedCases(universalPlan)
+
+    console.log(
+      `OK. Generated domain sandbox materialization smoke completado. Archivos creados: ${materializationReport.created.length}.`,
+    )
+  } finally {
+    ensureRemoved(smokeSandboxPath)
+  }
+}
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.stack || error.message : String(error))
+  process.exitCode = 1
+})

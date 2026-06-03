@@ -485,3 +485,129 @@ La materializacion universal podra considerarse lista para revision controlada c
 - la approval policy quede lista para revision manual
 - el runtime normal siga sin mutacion
 - la suite domain-agnostic siga verde
+
+## 16. MVP functional flow
+
+El MVP funcional seguro que ya queda preparado en esta fase es:
+
+`pedido`
+→ `GeneratedDomainContract`
+→ `generatedDomainCapabilityProfile`
+→ `generatedDomainUniversalMaterializationPlanPreview`
+→ `generatedDomainMaterializationApprovalPayload`
+→ `generatedDomainUniversalMaterializationPlan`
+→ `evaluateGeneratedDomainFileCreationApproval`
+→ `materializeGeneratedDomainSandboxPlan`
+→ `validation/report.json`
+
+Notas:
+
+- `buildBrainDecisionContract(...)` solo adjunta diagnostics y candidates
+- el runtime normal no ejecuta writes
+- la materializacion real queda acotada a harness/sandbox interno
+
+## 17. Sandbox materialization flow
+
+### Inputs
+
+- `GeneratedDomainContract`
+- `generatedDomainUniversalMaterializationPlanPreview`
+- `generatedDomainShadowMaterializationCandidatePlan`
+- `generatedDomainFileCreationApprovalPolicy`
+- `domainConsistencyDiagnostics`
+- `generatedDomainStructuralCapabilities`
+
+### Candidate ejecutable seguro
+
+`buildGeneratedDomainUniversalMaterializationPlan(...)` deriva:
+
+- `projectRoot`
+- `sourceRoot`
+- `targetRoot`
+- `allowedTargetPaths`
+- `requiredPathGroups`
+- `filesToCreate`
+- `fileChecks`
+- `validationPlan`
+- `forbiddenSignals`
+- `approvalRequired`
+- `approved=false`
+- `safety`
+- `rollback`
+- `report`
+
+### Approval gate
+
+`evaluateGeneratedDomainFileCreationApproval(...)` solo permite continuar cuando:
+
+- `approved=true`
+- `scope=sandbox-only`
+- el sandbox queda dentro del repo
+- no hay `.env`
+- no hay `node_modules`
+- no hay `Docker`
+- no hay `deploy`
+- no hay `web-prueba`
+- no hay rutas fuera de root
+
+### Materializacion
+
+`materializeGeneratedDomainSandboxPlan(...)`:
+
+- escribe solo dentro del sandbox aprobado
+- no ejecuta comandos externos
+- no instala dependencias
+- no inicia servicios
+- no toca `web-prueba`
+- genera `validation/report.json`
+
+## 18. Security rules
+
+La politica dura de esta fase queda explicitamente bloqueando:
+
+- `.env`
+- secretos y credenciales
+- `node_modules`
+- `Dockerfile` y `docker-compose`
+- `deploy`
+- pagos reales
+- servicios externos reales
+- bases productivas
+- paths absolutos peligrosos
+- `..`
+- otros proyectos
+- `web-prueba`
+
+## 19. Rollback and report
+
+El rollback de esta fase no usa deletes destructivos generales.
+
+La estrategia permitida es:
+
+- remover solo el root del sandbox controlado
+- no tocar otros roots del workspace
+- usar `validation/report.json` como evidencia del alcance escrito
+
+El reporte debe listar:
+
+- archivos creados
+- archivos bloqueados
+- validaciones corridas
+- warnings
+- errors
+- pista de rollback
+
+## 20. Remaining roadmap
+
+Todavia quedan deliberadamente fuera de este MVP base:
+
+- runtime shadow real
+- cambio de fuente real a `generated-domain-shadow`
+- mutacion del `materializationPlan` real
+- mutacion del `executionScope` real
+- UI visual de approval
+- materializacion fuera de sandbox
+- deploy
+- Docker
+- integraciones reales
+- pagos reales

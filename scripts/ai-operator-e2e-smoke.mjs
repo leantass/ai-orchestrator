@@ -8989,6 +8989,96 @@ async function runGeneratedDomainRuntimeShadowReadinessDecisionPayloadCase() {
   }
 }
 
+async function runGeneratedDomainUniversalMaterializationPlanPayloadCase() {
+  const failures = []
+  const decision = createAlignedGeneratedDomainObservationDecision({
+    decisionKey: 'generated-domain-universal-materialization-plan',
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainUniversalMaterializationPlan?.present === true &&
+      decision.generatedDomainUniversalMaterializationPlan?.built === true &&
+      decision.generatedDomainUniversalMaterializationPlan?.status === 'built' &&
+      decision.generatedDomainUniversalMaterializationPlan?.approvalRequired === true &&
+      decision.generatedDomainUniversalMaterializationPlan?.approved === false &&
+      decision.generatedDomainUniversalMaterializationPlan?.canMaterializeInSandbox === true,
+    'buildBrainDecisionContract debe adjuntar generatedDomainUniversalMaterializationPlan como candidate ejecutable seguro solo para sandbox.',
+  )
+  pushFailure(
+    failures,
+    Array.isArray(decision.generatedDomainUniversalMaterializationPlan?.filesToCreate) &&
+      decision.generatedDomainUniversalMaterializationPlan.filesToCreate.length > 0 &&
+      Array.isArray(decision.generatedDomainUniversalMaterializationPlan?.fileChecks) &&
+      Array.isArray(decision.generatedDomainUniversalMaterializationPlan?.validationPlan?.syntaxChecks),
+    'El universal materialization plan debe exponer filesToCreate, fileChecks y validationPlan serializables.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainUniversalMaterializationPlan?.safety?.noDotEnv === true &&
+      decision.generatedDomainUniversalMaterializationPlan?.safety?.noNodeModules === true &&
+      decision.generatedDomainUniversalMaterializationPlan?.safety?.noDocker === true &&
+      decision.generatedDomainUniversalMaterializationPlan?.safety?.noCommands === true,
+    'El universal materialization plan debe mantener reglas duras de seguridad.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generatedDomainUniversalMaterializationPlan') &&
+      mainSource.includes('generated-domain-universal-materialization:plan') &&
+      mainSource.includes('buildGeneratedDomainUniversalMaterializationPlan'),
+    'main.cjs debe adjuntar y loguear generated-domain-universal-materialization:plan.',
+  )
+
+  return {
+    id: 'generated-domain-universal-materialization-plan',
+    label: 'Generated domain universal materialization plan',
+    failures,
+  }
+}
+
+async function runGeneratedDomainFileCreationApprovalEvaluationPayloadCase() {
+  const failures = []
+  const decision = createAlignedGeneratedDomainObservationDecision({
+    decisionKey: 'generated-domain-file-creation-approval-evaluation',
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainFileCreationApprovalEvaluation?.present === true &&
+      decision.generatedDomainFileCreationApprovalEvaluation?.evaluated === true &&
+      decision.generatedDomainFileCreationApprovalEvaluation?.status === 'blocked' &&
+      decision.generatedDomainFileCreationApprovalEvaluation?.approved === false &&
+      decision.generatedDomainFileCreationApprovalEvaluation?.blocked === true,
+    'buildBrainDecisionContract debe adjuntar generatedDomainFileCreationApprovalEvaluation bloqueado por default cuando no existe approval explicita.',
+  )
+  pushFailure(
+    failures,
+    Array.isArray(decision.generatedDomainFileCreationApprovalEvaluation?.reasons) &&
+      decision.generatedDomainFileCreationApprovalEvaluation.reasons.length > 0 &&
+      Array.isArray(decision.generatedDomainFileCreationApprovalEvaluation?.allowedFiles),
+    'La evaluacion de approval debe exponer reasons y allowedFiles serializables aunque siga bloqueada por default.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generatedDomainFileCreationApprovalEvaluation') &&
+      mainSource.includes('generated-domain-file-creation:approval-evaluation') &&
+      mainSource.includes('evaluateGeneratedDomainFileCreationApproval'),
+    'main.cjs debe adjuntar y loguear generated-domain-file-creation:approval-evaluation.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainRuntimeShadowReadinessDecision?.runtimeEnabled === false &&
+      decision.generatedDomainMaterializationSourceResolution?.source !== 'generated-domain-shadow',
+    'La evaluacion de approval no debe activar runtime ni cambiar la fuente real.',
+  )
+
+  return {
+    id: 'generated-domain-file-creation-approval-evaluation',
+    label: 'Generated domain file creation approval evaluation',
+    failures,
+  }
+}
+
 async function runGeneratedDomainMaterializationShadowDiffPayloadCase() {
   const failures = []
   const generatedDomainContract = {
@@ -12024,6 +12114,8 @@ async function main() {
     results.push(await runGeneratedDomainFileCreationApprovalPolicyPayloadCase())
     results.push(await runGeneratedDomainMaterializationApprovalPayloadCase())
     results.push(await runGeneratedDomainRuntimeShadowReadinessDecisionPayloadCase())
+    results.push(await runGeneratedDomainUniversalMaterializationPlanPayloadCase())
+    results.push(await runGeneratedDomainFileCreationApprovalEvaluationPayloadCase())
     results.push(await runGeneratedDomainUniversalMaterializationPlanPreviewPayloadCase())
     results.push(
       await runGeneratedDomainUniversalMaterializationPlanPreviewComparisonPayloadCase(),

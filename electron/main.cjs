@@ -2996,6 +2996,129 @@ function summarizeGeneratedDomainRuntimeShadowReadinessDecisionForDebug(decision
   }
 }
 
+function summarizeGeneratedDomainUniversalMaterializationPlanForDebug(plan) {
+  if (!plan || typeof plan !== 'object') {
+    return {
+      present: false,
+      built: false,
+      status: 'not-available',
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(plan.warnings)
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(plan.errors)
+
+  return {
+    present: plan.present === true,
+    built: plan.built === true,
+    status:
+      typeof plan.status === 'string' && plan.status.trim()
+        ? plan.status.trim()
+        : 'not-available',
+    behaviorChanged: plan.behaviorChanged === true,
+    projectRoot:
+      typeof plan.projectRoot === 'string' && plan.projectRoot.trim()
+        ? plan.projectRoot.trim()
+        : undefined,
+    filesToCreateCount: Array.isArray(plan.filesToCreate) ? plan.filesToCreate.length : 0,
+    fileChecksCount: Array.isArray(plan.fileChecks) ? plan.fileChecks.length : 0,
+    allowedTargetPathsCount: Array.isArray(plan.allowedTargetPaths)
+      ? plan.allowedTargetPaths.length
+      : 0,
+    requiredPathGroupsCount: Array.isArray(plan.requiredPathGroups)
+      ? plan.requiredPathGroups.length
+      : 0,
+    approvalRequired: plan.approvalRequired !== false,
+    approved: plan.approved === true,
+    canMaterializeInSandbox: plan.canMaterializeInSandbox === true,
+    safeForLocalMaterialization: plan.safety?.safeForLocalMaterialization === true,
+    noDotEnv: plan.safety?.noDotEnv === true,
+    noNodeModules: plan.safety?.noNodeModules === true,
+    noDocker: plan.safety?.noDocker === true,
+    noCommands: plan.safety?.noCommands === true,
+    warningsCount: Array.isArray(plan.warnings) ? plan.warnings.length : 0,
+    errorsCount: Array.isArray(plan.errors) ? plan.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
+function summarizeGeneratedDomainFileCreationApprovalEvaluationForDebug(evaluation) {
+  if (!evaluation || typeof evaluation !== 'object') {
+    return {
+      present: false,
+      evaluated: false,
+      status: 'not-available',
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(evaluation.warnings)
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(evaluation.errors)
+
+  return {
+    present: evaluation.present === true,
+    evaluated: evaluation.evaluated === true,
+    status:
+      typeof evaluation.status === 'string' && evaluation.status.trim()
+        ? evaluation.status.trim()
+        : 'not-available',
+    behaviorChanged: evaluation.behaviorChanged === true,
+    approved: evaluation.approved === true,
+    blocked: evaluation.blocked === true,
+    sandboxRoot:
+      typeof evaluation.sandboxRoot?.requested === 'string' &&
+      evaluation.sandboxRoot.requested.trim()
+        ? evaluation.sandboxRoot.requested.trim()
+        : undefined,
+    allowedFilesCount: Array.isArray(evaluation.allowedFiles)
+      ? evaluation.allowedFiles.length
+      : 0,
+    blockedFilesCount: Array.isArray(evaluation.blockedFiles)
+      ? evaluation.blockedFiles.length
+      : 0,
+    reasonsCount: Array.isArray(evaluation.reasons) ? evaluation.reasons.length : 0,
+    warningsCount: Array.isArray(evaluation.warnings) ? evaluation.warnings.length : 0,
+    errorsCount: Array.isArray(evaluation.errors) ? evaluation.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
+function summarizeGeneratedDomainSandboxMaterializationReportForDebug(report) {
+  if (!report || typeof report !== 'object') {
+    return {
+      present: false,
+      materialized: false,
+      status: 'not-available',
+    }
+  }
+
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(report.warnings)
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(report.errors)
+
+  return {
+    present: report.present === true,
+    materialized: report.materialized === true,
+    status:
+      typeof report.status === 'string' && report.status.trim()
+        ? report.status.trim()
+        : 'not-available',
+    behaviorChanged: report.behaviorChanged === true,
+    sandboxRoot:
+      typeof report.sandboxRoot?.relative === 'string' && report.sandboxRoot.relative.trim()
+        ? report.sandboxRoot.relative.trim()
+        : undefined,
+    createdCount: Array.isArray(report.created) ? report.created.length : 0,
+    skippedCount: Array.isArray(report.skipped) ? report.skipped.length : 0,
+    blockedCount: Array.isArray(report.blocked) ? report.blocked.length : 0,
+    validationsCount: Array.isArray(report.validations) ? report.validations.length : 0,
+    warningsCount: Array.isArray(report.warnings) ? report.warnings.length : 0,
+    errorsCount: Array.isArray(report.errors) ? report.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
 function summarizeGeneratedDomainMaterializationInspectionSourceResolutionForDebug(
   resolution,
 ) {
@@ -46646,6 +46769,1135 @@ function buildGeneratedDomainRuntimeShadowReadinessDecision({
   }
 }
 
+function buildGeneratedDomainUniversalMaterializationPlan({
+  generatedDomainContract,
+  generatedDomainUniversalMaterializationPlanPreview,
+  generatedDomainShadowMaterializationCandidatePlan,
+  generatedDomainFileCreationApprovalPolicy,
+  domainConsistencyDiagnostics,
+  generatedDomainStructuralCapabilities,
+}) {
+  const emptyPlan = {
+    present: false,
+    built: false,
+    status: 'not-available',
+    source: 'generated-domain-universal-materialization-plan',
+    behaviorChanged: false,
+    projectRoot: null,
+    sourceRoot: null,
+    targetRoot: null,
+    deliveryLevel: null,
+    allowedTargetPaths: [],
+    requiredPathGroups: [],
+    filesToCreate: [],
+    fileChecks: [],
+    validationPlan: {
+      syntaxChecks: [],
+      jsonChecks: [],
+      pathChecks: [],
+      forbiddenPathChecks: [],
+    },
+    forbiddenSignals: [],
+    approvalRequired: true,
+    approved: false,
+    canBecomeMaterializationPlan: false,
+    canMaterializeInSandbox: false,
+    safety: {
+      safeForLocalMaterialization: false,
+      noDotEnv: false,
+      noNodeModules: false,
+      noDocker: false,
+      noDeploy: false,
+      noExternalServices: false,
+      noRealPayments: false,
+      noCredentials: false,
+      noCommands: false,
+      sandboxOnly: true,
+    },
+    rollback: {
+      strategy: 'remove-sandbox-root-only',
+      destructiveCommandsAllowed: false,
+      hint: '',
+    },
+    report: {
+      reportFile: null,
+      generatedAtStage: 'preview-only',
+    },
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  const pushMessage = (target, message) => {
+    const normalized =
+      typeof message === 'string'
+        ? message.trim().replace(/\s+/gu, ' ')
+        : message === null || message === undefined
+          ? ''
+          : String(message).trim().replace(/\s+/gu, ' ')
+    if (!normalized || target.includes(normalized)) {
+      return
+    }
+    target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
+  }
+
+  const normalizePlanPath = (value, rootHint = '') => {
+    const normalized = normalizeOptionalString(value)
+    if (!normalized) {
+      return ''
+    }
+
+    const candidate = normalizePathForComparison(normalized)
+    if (!path.isAbsolute(candidate)) {
+      return candidate
+    }
+
+    const normalizedRootHint = normalizePathForComparison(rootHint)
+    if (!normalizedRootHint) {
+      return candidate
+    }
+
+    const pathSegments = candidate.split('/').filter(Boolean)
+    const rootSegments = normalizedRootHint.split('/').filter(Boolean)
+    const rootBasename = rootSegments[rootSegments.length - 1] || normalizedRootHint
+    const rootIndex = pathSegments.lastIndexOf(rootBasename)
+
+    if (rootIndex === -1) {
+      return candidate
+    }
+
+    return pathSegments.slice(rootIndex).join('/')
+  }
+
+  const normalizeRequiredGroups = (groups, rootHint) =>
+    summarizeUniqueExecutorObjects(
+      (Array.isArray(groups) ? groups : [])
+        .map((entry, index) => {
+          if (Array.isArray(entry)) {
+            const candidates = summarizeUniqueExecutorStrings(
+              entry.map((value) => normalizePlanPath(value, rootHint)),
+              16,
+            ).filter(Boolean)
+            return candidates.length > 0
+              ? { label: `group-${index + 1}`, candidates }
+              : null
+          }
+
+          if (entry && typeof entry === 'object') {
+            const candidates = summarizeUniqueExecutorStrings(
+              (Array.isArray(entry.candidates) ? entry.candidates : []).map((value) =>
+                normalizePlanPath(value, rootHint),
+              ),
+              16,
+            ).filter(Boolean)
+            const label = normalizeOptionalString(entry.label) || `group-${index + 1}`
+            return candidates.length > 0 ? { label, candidates } : null
+          }
+
+          const candidate = normalizePlanPath(entry, rootHint)
+          return candidate ? { label: `group-${index + 1}`, candidates: [candidate] } : null
+        })
+        .filter(Boolean),
+      48,
+    )
+
+  const contract =
+    generatedDomainContract && typeof generatedDomainContract === 'object'
+      ? normalizeGeneratedDomainContract(generatedDomainContract)
+      : null
+  const preview =
+    generatedDomainUniversalMaterializationPlanPreview &&
+    typeof generatedDomainUniversalMaterializationPlanPreview === 'object'
+      ? generatedDomainUniversalMaterializationPlanPreview
+      : null
+  const candidatePlan =
+    generatedDomainShadowMaterializationCandidatePlan &&
+    typeof generatedDomainShadowMaterializationCandidatePlan === 'object'
+      ? generatedDomainShadowMaterializationCandidatePlan
+      : null
+  const approvalPolicy =
+    generatedDomainFileCreationApprovalPolicy &&
+    typeof generatedDomainFileCreationApprovalPolicy === 'object'
+      ? generatedDomainFileCreationApprovalPolicy
+      : null
+  const consistency =
+    domainConsistencyDiagnostics && typeof domainConsistencyDiagnostics === 'object'
+      ? domainConsistencyDiagnostics
+      : null
+  const structuralCapabilities =
+    generatedDomainStructuralCapabilities &&
+    typeof generatedDomainStructuralCapabilities === 'object'
+      ? generatedDomainStructuralCapabilities
+      : null
+
+  if (!contract && !preview && !candidatePlan && !approvalPolicy && !consistency) {
+    return emptyPlan
+  }
+
+  try {
+    const warnings = []
+    const errors = []
+    const domainLabel =
+      normalizeOptionalString(contract?.domain?.label) ||
+      normalizeOptionalString(contract?.domain?.slug) ||
+      'Generated Domain Project'
+    const deliveryLevel =
+      normalizeOptionalString(contract?.deliveryLevel) ||
+      normalizeOptionalString(preview?.deliveryLevel) ||
+      'fullstack-local'
+    const projectRoot =
+      normalizeOptionalString(contract?.root?.targetRoot) ||
+      normalizeOptionalString(preview?.targetRoot) ||
+      normalizeOptionalString(candidatePlan?.candidate?.targetRoot) ||
+      null
+    const normalizedProjectRoot = normalizePlanPath(projectRoot)
+    const sourceRoot =
+      normalizeOptionalString(contract?.root?.sourceRoot) ||
+      normalizeOptionalString(preview?.sourceRoot) ||
+      normalizedProjectRoot
+    const targetRoot =
+      normalizeOptionalString(contract?.root?.targetRoot) ||
+      normalizeOptionalString(preview?.targetRoot) ||
+      normalizedProjectRoot
+    const domainMismatch =
+      normalizeOptionalString(consistency?.status) === 'mismatch' ||
+      normalizeOptionalString(consistency?.status) === 'error' ||
+      normalizeOptionalString(consistency?.semanticStatus) === 'mismatch' ||
+      normalizeOptionalString(consistency?.semanticStatus) === 'error'
+    const previewBuilt = preview?.built === true
+    const previewSafe = preview?.safety?.safeForLocalMaterialization === true
+    const approvalBlocked = approvalPolicy?.status === 'blocked'
+    const rootLooksUnsafe =
+      !normalizedProjectRoot ||
+      path.isAbsolute(normalizedProjectRoot) ||
+      normalizedProjectRoot.startsWith('../') ||
+      /(^|\/)\.env(?:\..+)?($|\/)/iu.test(normalizedProjectRoot) ||
+      /(^|\/)node_modules($|\/)/iu.test(normalizedProjectRoot) ||
+      /(^|\/)web-prueba($|\/)/iu.test(normalizedProjectRoot)
+    const hasFrontend =
+      preview?.frontend?.present === true ||
+      structuralCapabilities?.hasPublicFrontend === true ||
+      structuralCapabilities?.hasAdminPanel === true
+    const hasBackend =
+      preview?.backend?.present === true || structuralCapabilities?.hasBackend === true
+    const hasDatabase =
+      preview?.database?.present === true || structuralCapabilities?.hasDatabase === true
+    const frontendPaths = summarizeUniqueExecutorStrings(
+      [
+        hasFrontend ? `${normalizedProjectRoot}/frontend/index.html` : '',
+        hasFrontend ? `${normalizedProjectRoot}/frontend/src/main.js` : '',
+        hasFrontend ? `${normalizedProjectRoot}/frontend/src/mock-data.js` : '',
+      ],
+      12,
+    ).filter(Boolean)
+    const backendPaths = summarizeUniqueExecutorStrings(
+      [hasBackend ? `${normalizedProjectRoot}/backend/src/index.js` : ''],
+      12,
+    ).filter(Boolean)
+    const databasePaths = summarizeUniqueExecutorStrings(
+      [
+        hasDatabase ? `${normalizedProjectRoot}/database/schema.sql` : '',
+        hasDatabase ? `${normalizedProjectRoot}/database/seed.json` : '',
+      ],
+      12,
+    ).filter(Boolean)
+    const sharedPaths = summarizeUniqueExecutorStrings(
+      [`${normalizedProjectRoot}/shared/contracts/domain.js`],
+      12,
+    )
+    const docsPaths = summarizeUniqueExecutorStrings(
+      [
+        `${normalizedProjectRoot}/README.md`,
+        `${normalizedProjectRoot}/docs/domain.md`,
+      ],
+      12,
+    )
+    const validationPaths = summarizeUniqueExecutorStrings(
+      [`${normalizedProjectRoot}/validation/report.json`],
+      12,
+    )
+    const allPlannedPaths = summarizeUniqueExecutorStrings(
+      [
+        normalizedProjectRoot,
+        ...docsPaths,
+        ...frontendPaths,
+        ...backendPaths,
+        ...sharedPaths,
+        ...databasePaths,
+        ...validationPaths,
+      ],
+      96,
+    ).filter(Boolean)
+
+    const requiredPathGroups = normalizeRequiredGroups(
+      Array.isArray(preview?.requiredPathGroups) && preview.requiredPathGroups.length > 0
+        ? preview.requiredPathGroups
+        : contract
+          ? deriveRequiredPathGroupsFromContract(contract)
+          : [],
+      normalizedProjectRoot,
+    )
+    const fallbackRequiredPathGroups =
+      requiredPathGroups.length > 0
+        ? requiredPathGroups
+        : allPlannedPaths
+            .filter((entry) => entry !== normalizedProjectRoot)
+            .map((entry, index) => ({
+              label: `required-${index + 1}`,
+              candidates: [entry],
+            }))
+
+    const workflows = summarizeUniqueExecutorStrings(contract?.workflows || [], 12)
+    const roles = summarizeUniqueExecutorStrings(contract?.roles || [], 12)
+    const entities = summarizeUniqueExecutorStrings(contract?.entities || [], 16)
+    const tables = summarizeUniqueExecutorStrings(contract?.database?.tables || [], 16)
+    const surfaces = summarizeUniqueExecutorStrings(
+      (Array.isArray(contract?.frontendSurfaces) ? contract.frontendSurfaces : []).map(
+        (entry) => normalizeOptionalString(entry?.key) || normalizeOptionalString(entry?.label),
+      ),
+      12,
+    ).filter(Boolean)
+    const forbiddenSignals = summarizeUniqueExecutorStrings(
+      [
+        '.env',
+        'node_modules',
+        'Dockerfile',
+        'docker-compose.yml',
+        'deploy',
+        'web-prueba',
+        ...(contract ? deriveForbiddenSearchPatternsFromContract(contract) : []),
+        ...(Array.isArray(preview?.forbiddenSignals) ? preview.forbiddenSignals : []),
+      ],
+      48,
+    ).filter(Boolean)
+
+    const frontendState = {
+      domainLabel,
+      deliveryLevel,
+      entities,
+      workflows,
+      roles,
+    }
+
+    const buildReadmeContent = () => `# ${domainLabel}
+
+Materializacion universal segura derivada del GeneratedDomainContract.
+
+## Estado
+
+- Delivery level: ${deliveryLevel}
+- Project root: ${normalizedProjectRoot}
+- Approval required: yes
+- Sandbox only: yes
+
+## Capabilities observadas
+
+- Frontend publico: ${hasFrontend ? 'si' : 'no'}
+- Backend local: ${hasBackend ? 'si' : 'no'}
+- Database local: ${hasDatabase ? 'si' : 'no'}
+- Reporting: ${structuralCapabilities?.hasReporting === true ? 'si' : 'no'}
+- Scheduling: ${structuralCapabilities?.hasScheduling === true ? 'si' : 'no'}
+
+## Roles
+
+${roles.length > 0 ? roles.map((entry) => `- ${entry}`).join('\n') : '- Sin roles declarados'}
+
+## Entidades
+
+${entities.length > 0 ? entities.map((entry) => `- ${entry}`).join('\n') : '- Sin entidades declaradas'}
+
+## Workflows
+
+${workflows.length > 0 ? workflows.map((entry) => `- ${entry}`).join('\n') : '- Sin workflows declarados'}
+
+## Restricciones
+
+- No .env
+- No node_modules
+- No Docker
+- No deploy
+- No servicios externos reales
+- No pagos reales
+- No web-prueba
+`
+
+    const buildDomainDocContent = () => `# Domain Summary
+
+## Domain
+
+- Label: ${domainLabel}
+- Delivery level: ${deliveryLevel}
+- Root: ${normalizedProjectRoot}
+
+## Frontend surfaces
+
+${surfaces.length > 0 ? surfaces.map((entry) => `- ${entry}`).join('\n') : '- Sin superficies declaradas'}
+
+## Roles
+
+${roles.length > 0 ? roles.map((entry) => `- ${entry}`).join('\n') : '- Sin roles declarados'}
+
+## Entities
+
+${entities.length > 0 ? entities.map((entry) => `- ${entry}`).join('\n') : '- Sin entidades declaradas'}
+
+## Workflows
+
+${workflows.length > 0 ? workflows.map((entry) => `- ${entry}`).join('\n') : '- Sin workflows declarados'}
+`
+
+    const buildFrontendIndexHtmlContent = () => `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${domainLabel}</title>
+  </head>
+  <body>
+    <main id="app">Loading ${domainLabel}...</main>
+    <script src="./src/mock-data.js"></script>
+    <script src="./src/main.js"></script>
+  </body>
+</html>
+`
+
+    const buildFrontendMockDataContent = () => `const generatedDomainMockData = ${JSON.stringify(
+      frontendState,
+      null,
+      2,
+    )};
+globalThis.generatedDomainMockData = generatedDomainMockData;
+`
+
+    const buildFrontendMainJsContent = () => `const appRoot = globalThis.document && globalThis.document.getElementById
+  ? globalThis.document.getElementById('app')
+  : null;
+const state = globalThis.generatedDomainMockData || {};
+
+if (appRoot) {
+  const entityItems = Array.isArray(state.entities)
+    ? state.entities.map((entry) => '<li>' + entry + '</li>').join('')
+    : '';
+  const workflowItems = Array.isArray(state.workflows)
+    ? state.workflows.map((entry) => '<li>' + entry + '</li>').join('')
+    : '';
+
+  appRoot.innerHTML = [
+    '<section>',
+    '<h1>' + (state.domainLabel || 'Generated Domain Project') + '</h1>',
+    '<p>Sandbox scaffold derivado de capacidades universales.</p>',
+    '<h2>Entities</h2>',
+    '<ul>' + entityItems + '</ul>',
+    '<h2>Workflows</h2>',
+    '<ul>' + workflowItems + '</ul>',
+    '</section>',
+  ].join('');
+}
+`
+
+    const buildBackendIndexContent = () => `const domainContractSummary = require('../../shared/contracts/domain.js');
+
+function buildSandboxBackendPreview() {
+  return {
+    status: 'sandbox-only',
+    domain: domainContractSummary.domain,
+    entities: domainContractSummary.entities,
+    workflows: domainContractSummary.workflows,
+  };
+}
+
+module.exports = {
+  buildSandboxBackendPreview,
+};
+`
+
+    const buildSharedContractContent = () => `module.exports = ${JSON.stringify(
+      {
+        domain: {
+          label: domainLabel,
+          slug: normalizeOptionalString(contract?.domain?.slug) || null,
+          deliveryLevel,
+        },
+        roles,
+        entities,
+        workflows,
+        tables,
+        safety: {
+          sandboxOnly: true,
+          noDotEnv: true,
+          noNodeModules: true,
+          noDocker: true,
+          noDeploy: true,
+          noExternalServices: true,
+          noRealPayments: true,
+        },
+      },
+      null,
+      2,
+    )};
+`
+
+    const buildDatabaseSchemaContent = () => {
+      if (tables.length === 0) {
+        return '-- Sandbox schema intentionally minimal.\n'
+      }
+
+      return `${tables
+        .map(
+          (tableName, index) => `CREATE TABLE ${String(tableName).replace(/[^a-z0-9_]/giu, '_')} (
+  id INTEGER PRIMARY KEY,
+  label TEXT NOT NULL,
+  sort_order INTEGER DEFAULT ${index + 1}
+);`,
+        )
+        .join('\n\n')}\n`
+    }
+
+    const buildDatabaseSeedContent = () =>
+      JSON.stringify(
+        {
+          domain: normalizeOptionalString(contract?.domain?.slug) || domainLabel,
+          entities,
+          workflows,
+          seedMode: 'sandbox-preview',
+          records: entities.map((entityName, index) => ({
+            id: index + 1,
+            entity: entityName,
+            label: `${entityName} demo`,
+          })),
+        },
+        null,
+        2,
+      )
+
+    const buildValidationReportPlaceholder = () =>
+      JSON.stringify(
+        {
+          status: 'pending-materialization',
+          domain: domainLabel,
+          projectRoot: normalizedProjectRoot,
+          filesPlanned: allPlannedPaths.filter((entry) => entry !== normalizedProjectRoot),
+          sandboxOnly: true,
+        },
+        null,
+        2,
+      )
+
+    const filesToCreate = [
+      {
+        path: `${normalizedProjectRoot}/README.md`,
+        area: 'docs',
+        content: buildReadmeContent(),
+      },
+      {
+        path: `${normalizedProjectRoot}/docs/domain.md`,
+        area: 'docs',
+        content: buildDomainDocContent(),
+      },
+      ...(hasFrontend
+        ? [
+            {
+              path: `${normalizedProjectRoot}/frontend/index.html`,
+              area: 'frontend',
+              content: buildFrontendIndexHtmlContent(),
+            },
+            {
+              path: `${normalizedProjectRoot}/frontend/src/main.js`,
+              area: 'frontend',
+              content: buildFrontendMainJsContent(),
+            },
+            {
+              path: `${normalizedProjectRoot}/frontend/src/mock-data.js`,
+              area: 'frontend',
+              content: buildFrontendMockDataContent(),
+            },
+          ]
+        : []),
+      ...(hasBackend
+        ? [
+            {
+              path: `${normalizedProjectRoot}/backend/src/index.js`,
+              area: 'backend',
+              content: buildBackendIndexContent(),
+            },
+          ]
+        : []),
+      {
+        path: `${normalizedProjectRoot}/shared/contracts/domain.js`,
+        area: 'shared',
+        content: buildSharedContractContent(),
+      },
+      ...(hasDatabase
+        ? [
+            {
+              path: `${normalizedProjectRoot}/database/schema.sql`,
+              area: 'database',
+              content: buildDatabaseSchemaContent(),
+            },
+            {
+              path: `${normalizedProjectRoot}/database/seed.json`,
+              area: 'database',
+              content: buildDatabaseSeedContent(),
+            },
+          ]
+        : []),
+      {
+        path: `${normalizedProjectRoot}/validation/report.json`,
+        area: 'validation',
+        content: buildValidationReportPlaceholder(),
+      },
+    ]
+
+    const fileChecks = summarizeUniqueExecutorObjects(
+      filesToCreate.flatMap((entry) => [
+        { type: 'exists', targetPath: entry.path },
+        ...(entry.path.endsWith('README.md')
+          ? [{ type: 'file-contains', targetPath: entry.path, text: domainLabel }]
+          : []),
+      ]),
+      96,
+    )
+
+    const validationPlan = {
+      syntaxChecks: summarizeUniqueExecutorStrings(
+        filesToCreate
+          .filter((entry) => /\.js$/iu.test(entry.path))
+          .map((entry) => entry.path),
+        24,
+      ),
+      jsonChecks: summarizeUniqueExecutorStrings(
+        filesToCreate
+          .filter((entry) => /\.json$/iu.test(entry.path))
+          .map((entry) => entry.path),
+        24,
+      ),
+      pathChecks: [normalizedProjectRoot],
+      forbiddenPathChecks: summarizeUniqueExecutorStrings(
+        forbiddenSignals.filter((entry) =>
+          ['.env', 'node_modules', 'Dockerfile', 'docker-compose.yml', 'deploy', 'web-prueba'].includes(
+            entry,
+          ),
+        ),
+        24,
+      ),
+    }
+
+    const plan = {
+      ...emptyPlan,
+      present: true,
+      projectRoot: normalizedProjectRoot,
+      sourceRoot: normalizePlanPath(sourceRoot, normalizedProjectRoot),
+      targetRoot: normalizePlanPath(targetRoot, normalizedProjectRoot),
+      deliveryLevel,
+      allowedTargetPaths: allPlannedPaths,
+      requiredPathGroups: fallbackRequiredPathGroups,
+      filesToCreate,
+      fileChecks,
+      validationPlan,
+      forbiddenSignals,
+      approvalRequired: true,
+      approved: false,
+      canBecomeMaterializationPlan: preview?.canBecomeMaterializationPlan === true,
+      canMaterializeInSandbox: false,
+      safety: {
+        safeForLocalMaterialization:
+          previewSafe &&
+          approvalPolicy?.safeguards?.noDotEnv === true &&
+          approvalPolicy?.safeguards?.noNodeModules === true &&
+          approvalPolicy?.safeguards?.noDocker === true &&
+          approvalPolicy?.safeguards?.noDeploy === true &&
+          approvalPolicy?.safeguards?.noExternalServices === true &&
+          approvalPolicy?.safeguards?.noRealPayments === true &&
+          approvalPolicy?.safeguards?.noCommands === true &&
+          approvalPolicy?.safeguards?.noWebPrueba === true &&
+          !rootLooksUnsafe,
+        noDotEnv:
+          approvalPolicy?.safeguards?.noDotEnv === true &&
+          !allPlannedPaths.some((entry) => /(^|\/)\.env(?:\..+)?($|\/)/iu.test(entry)),
+        noNodeModules:
+          approvalPolicy?.safeguards?.noNodeModules === true &&
+          !allPlannedPaths.some((entry) => /(^|\/)node_modules($|\/)/iu.test(entry)),
+        noDocker:
+          approvalPolicy?.safeguards?.noDocker === true &&
+          !allPlannedPaths.some((entry) =>
+            /(^|\/)(?:dockerfile|docker-compose\.yml|docker-compose\.yaml)($|\/)/iu.test(entry),
+          ),
+        noDeploy:
+          approvalPolicy?.safeguards?.noDeploy === true &&
+          !allPlannedPaths.some((entry) => /(^|\/)deploy($|\/)/iu.test(entry)),
+        noExternalServices: approvalPolicy?.safeguards?.noExternalServices === true,
+        noRealPayments: approvalPolicy?.safeguards?.noRealPayments === true,
+        noCredentials: true,
+        noCommands: approvalPolicy?.safeguards?.noCommands === true,
+        sandboxOnly: true,
+      },
+      rollback: {
+        strategy: 'remove-sandbox-root-only',
+        destructiveCommandsAllowed: false,
+        hint:
+          'Si hace falta revertir, eliminar solo el root del sandbox controlado y no tocar otros proyectos.',
+      },
+      report: {
+        reportFile: `${normalizedProjectRoot}/validation/report.json`,
+        generatedAtStage: 'universal-plan',
+      },
+      warnings,
+      errors,
+    }
+
+    if (!previewBuilt) {
+      pushMessage(
+        warnings,
+        'El universal materialization preview todavia no esta completamente built, por lo que este plan sigue en modo candidato.',
+      )
+    }
+    if (domainMismatch) {
+      pushMessage(
+        errors,
+        'La consistencia de dominio o la consistencia semantica siguen en mismatch, por lo que el plan universal queda bloqueado.',
+      )
+    }
+    if (approvalBlocked) {
+      pushMessage(
+        errors,
+        'La policy de aprobacion de archivos sigue bloqueada, por lo que el plan universal no puede promoverse a escritura segura.',
+      )
+    }
+    if (rootLooksUnsafe) {
+      pushMessage(
+        errors,
+        'El root del plan universal es inseguro o incluye rutas bloqueadas para materializacion.',
+      )
+    }
+
+    if (!normalizedProjectRoot || domainMismatch || approvalBlocked || rootLooksUnsafe) {
+      plan.status = 'blocked'
+      plan.built = false
+      plan.canMaterializeInSandbox = false
+    } else if (
+      plan.safety.safeForLocalMaterialization === true &&
+      filesToCreate.length > 0 &&
+      previewBuilt
+    ) {
+      plan.status = 'built'
+      plan.built = true
+      plan.canMaterializeInSandbox = true
+    } else {
+      plan.status = 'partial'
+      plan.built = false
+      plan.canMaterializeInSandbox = false
+    }
+
+    plan.warningsCount = plan.warnings.length
+    plan.errorsCount = plan.errors.length
+    return plan
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : normalizeOptionalString(String(error)) || 'error'
+
+    return {
+      ...emptyPlan,
+      present: true,
+      status: 'error',
+      evaluated: true,
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
+function evaluateGeneratedDomainFileCreationApproval({
+  generatedDomainUniversalMaterializationPlan,
+  approvalDecision,
+  workspacePath,
+  sandboxRoot = '.codex-temp/generated-domain-materialization-sandbox',
+}) {
+  const emptyEvaluation = {
+    present: false,
+    evaluated: false,
+    status: 'not-available',
+    source: 'generated-domain-file-creation-approval-evaluation',
+    behaviorChanged: false,
+    approved: false,
+    blocked: true,
+    sandboxRoot: {
+      requested: normalizeOptionalString(sandboxRoot) || null,
+      resolved: null,
+      relative: null,
+      withinWorkspace: false,
+    },
+    reasons: [],
+    allowedFiles: [],
+    blockedFiles: [],
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  const pushMessage = (target, message) => {
+    const normalized =
+      typeof message === 'string'
+        ? message.trim().replace(/\s+/gu, ' ')
+        : message === null || message === undefined
+          ? ''
+          : String(message).trim().replace(/\s+/gu, ' ')
+    if (!normalized || target.includes(normalized)) {
+      return
+    }
+    target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
+  }
+
+  const plan =
+    generatedDomainUniversalMaterializationPlan &&
+    typeof generatedDomainUniversalMaterializationPlan === 'object'
+      ? generatedDomainUniversalMaterializationPlan
+      : null
+
+  if (!plan) {
+    return emptyEvaluation
+  }
+
+  const workspaceRoot = path.resolve(
+    normalizeOptionalString(workspacePath) || process.cwd(),
+  )
+  const requestedSandboxRoot =
+    normalizeOptionalString(sandboxRoot) ||
+    '.codex-temp/generated-domain-materialization-sandbox'
+  const resolvedSandboxRoot = path.resolve(workspaceRoot, requestedSandboxRoot)
+  const sandboxRelative = normalizePathForComparison(
+    path.relative(workspaceRoot, resolvedSandboxRoot),
+  )
+  const sandboxWithinWorkspace =
+    sandboxRelative === '' ||
+    (!sandboxRelative.startsWith('..') && !path.isAbsolute(sandboxRelative))
+
+  try {
+    const reasons = []
+    const warnings = []
+    const errors = []
+    const allowedFiles = []
+    const blockedFiles = []
+    const approvalGranted = approvalDecision?.approved === true
+    const approvalScope = normalizeOptionalString(approvalDecision?.scope) || 'none'
+    const sandboxLooksUnsafe =
+      !sandboxWithinWorkspace ||
+      !sandboxRelative ||
+      /(^|\/)\.env(?:\..+)?($|\/)/iu.test(sandboxRelative) ||
+      /(^|\/)node_modules($|\/)/iu.test(sandboxRelative) ||
+      /(^|\/)web-prueba($|\/)/iu.test(sandboxRelative) ||
+      /(^|\/)(?:dockerfile|docker-compose\.yml|docker-compose\.yaml)($|\/)/iu.test(
+        sandboxRelative,
+      ) ||
+      /(^|\/)deploy($|\/)/iu.test(sandboxRelative)
+
+    if (!approvalGranted) {
+      pushMessage(reasons, 'Falta una aprobacion explicita para materializar archivos.')
+    }
+    if (approvalScope !== 'sandbox-only') {
+      pushMessage(
+        reasons,
+        'La aprobacion solo puede habilitar un sandbox interno seguro y debe declarar scope sandbox-only.',
+      )
+    }
+    if (sandboxLooksUnsafe) {
+      pushMessage(
+        reasons,
+        'El sandbox solicitado queda fuera del workspace permitido o toca rutas bloqueadas.',
+      )
+    }
+    if (plan.built !== true || plan.canMaterializeInSandbox !== true) {
+      pushMessage(
+        reasons,
+        'El plan universal todavia no esta listo para materializacion segura en sandbox.',
+      )
+    }
+
+    const filesToCreate = Array.isArray(plan.filesToCreate) ? plan.filesToCreate : []
+    for (const entry of filesToCreate) {
+      const relativePath = normalizePathForComparison(entry?.path)
+      const blockedReason =
+        !relativePath
+          ? 'missing-path'
+          : path.isAbsolute(relativePath) || relativePath.startsWith('../')
+            ? 'outside-root'
+            : /(^|\/)\.env(?:\..+)?($|\/)/iu.test(relativePath)
+              ? 'dot-env'
+              : /(^|\/)node_modules($|\/)/iu.test(relativePath)
+                ? 'node-modules'
+                : /(^|\/)web-prueba($|\/)/iu.test(relativePath)
+                  ? 'web-prueba'
+                  : /(^|\/)(?:dockerfile|docker-compose\.yml|docker-compose\.yaml)($|\/)/iu.test(
+                        relativePath,
+                      )
+                    ? 'docker'
+                    : /(^|\/)deploy($|\/)/iu.test(relativePath)
+                      ? 'deploy'
+                      : ''
+      const resolvedPath = path.resolve(resolvedSandboxRoot, relativePath)
+      const relativeToSandbox = normalizePathForComparison(
+        path.relative(resolvedSandboxRoot, resolvedPath),
+      )
+      const insideSandbox =
+        relativeToSandbox === '' ||
+        (!relativeToSandbox.startsWith('..') && !path.isAbsolute(relativeToSandbox))
+
+      if (blockedReason || !insideSandbox) {
+        blockedFiles.push({
+          path: relativePath || normalizeOptionalString(entry?.path) || '',
+          reason: blockedReason || 'outside-sandbox',
+        })
+        continue
+      }
+
+      allowedFiles.push({
+        path: relativePath,
+        resolvedPath,
+        area: normalizeOptionalString(entry?.area) || 'project',
+      })
+    }
+
+    if (blockedFiles.length > 0) {
+      pushMessage(
+        reasons,
+        'Hay archivos propuestos que siguen cayendo en rutas bloqueadas o fuera del sandbox.',
+      )
+    }
+
+    const evaluation = {
+      ...emptyEvaluation,
+      present: true,
+      evaluated: true,
+      sandboxRoot: {
+        requested: requestedSandboxRoot,
+        resolved: resolvedSandboxRoot,
+        relative: sandboxRelative || requestedSandboxRoot,
+        withinWorkspace: sandboxWithinWorkspace,
+      },
+      reasons,
+      allowedFiles,
+      blockedFiles,
+      warnings,
+      errors,
+    }
+
+    if (approvalGranted && approvalScope === 'sandbox-only' && !sandboxLooksUnsafe && blockedFiles.length === 0 && plan.built === true && plan.canMaterializeInSandbox === true) {
+      evaluation.status = 'approved-for-sandbox'
+      evaluation.approved = true
+      evaluation.blocked = false
+    } else {
+      evaluation.status = 'blocked'
+      evaluation.approved = false
+      evaluation.blocked = true
+    }
+
+    evaluation.warningsCount = evaluation.warnings.length
+    evaluation.errorsCount = evaluation.errors.length
+    return evaluation
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : normalizeOptionalString(String(error)) || 'error'
+
+    return {
+      ...emptyEvaluation,
+      present: true,
+      evaluated: true,
+      status: 'error',
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
+function materializeGeneratedDomainSandboxPlan({
+  generatedDomainUniversalMaterializationPlan,
+  generatedDomainFileCreationApprovalEvaluation,
+}) {
+  const emptyReport = {
+    present: false,
+    materialized: false,
+    status: 'not-available',
+    source: 'generated-domain-sandbox-materialization-report',
+    behaviorChanged: false,
+    sandboxRoot: {
+      relative: null,
+      resolved: null,
+    },
+    created: [],
+    skipped: [],
+    blocked: [],
+    validations: [],
+    warnings: [],
+    errors: [],
+    reportFile: null,
+    rollback: {
+      strategy: 'remove-sandbox-root-only',
+      hint: '',
+    },
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  const pushMessage = (target, message) => {
+    const normalized =
+      typeof message === 'string'
+        ? message.trim().replace(/\s+/gu, ' ')
+        : message === null || message === undefined
+          ? ''
+          : String(message).trim().replace(/\s+/gu, ' ')
+    if (!normalized || target.includes(normalized)) {
+      return
+    }
+    target.push(normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`)
+  }
+
+  const plan =
+    generatedDomainUniversalMaterializationPlan &&
+    typeof generatedDomainUniversalMaterializationPlan === 'object'
+      ? generatedDomainUniversalMaterializationPlan
+      : null
+  const approvalEvaluation =
+    generatedDomainFileCreationApprovalEvaluation &&
+    typeof generatedDomainFileCreationApprovalEvaluation === 'object'
+      ? generatedDomainFileCreationApprovalEvaluation
+      : null
+
+  if (!plan && !approvalEvaluation) {
+    return emptyReport
+  }
+
+  try {
+    const created = []
+    const skipped = []
+    const blocked = []
+    const validations = []
+    const warnings = []
+    const errors = []
+    const sandboxRootRelative =
+      normalizeOptionalString(approvalEvaluation?.sandboxRoot?.relative) || null
+    const sandboxRootResolved =
+      normalizeOptionalString(approvalEvaluation?.sandboxRoot?.resolved) || null
+
+    const report = {
+      ...emptyReport,
+      present: true,
+      sandboxRoot: {
+        relative: sandboxRootRelative,
+        resolved: sandboxRootResolved,
+      },
+      rollback: {
+        strategy: 'remove-sandbox-root-only',
+        hint:
+          'Si hace falta revertir, eliminar solo la carpeta del sandbox controlado y no tocar ningun otro proyecto.',
+      },
+      created,
+      skipped,
+      blocked,
+      validations,
+      warnings,
+      errors,
+    }
+
+    if (!plan || plan.built !== true || plan.canMaterializeInSandbox !== true) {
+      pushMessage(
+        blocked,
+        'El plan universal no esta construido o todavia no permite materializacion segura en sandbox.',
+      )
+    }
+    if (!approvalEvaluation || approvalEvaluation.approved !== true || approvalEvaluation.blocked === true) {
+      pushMessage(
+        blocked,
+        'La evaluacion de approval no habilita escribir archivos en sandbox.',
+      )
+    }
+    if (!sandboxRootResolved) {
+      pushMessage(blocked, 'No hay sandboxRoot resuelto para materializar el scaffold.')
+    }
+
+    if (blocked.length > 0) {
+      report.status = 'blocked'
+      report.materialized = false
+      report.warningsCount = report.warnings.length
+      report.errorsCount = report.errors.length
+      return report
+    }
+
+    const filesByPath = new Map(
+      (Array.isArray(plan.filesToCreate) ? plan.filesToCreate : [])
+        .filter((entry) => entry && typeof entry === 'object')
+        .map((entry) => [normalizePathForComparison(entry.path), entry]),
+    )
+
+    for (const allowedFile of approvalEvaluation.allowedFiles || []) {
+      const planEntry = filesByPath.get(normalizePathForComparison(allowedFile.path))
+      if (!planEntry) {
+        skipped.push(`Sin contenido planificado para ${allowedFile.path}.`)
+        continue
+      }
+
+      fs.mkdirSync(path.dirname(allowedFile.resolvedPath), { recursive: true })
+      fs.writeFileSync(
+        allowedFile.resolvedPath,
+        typeof planEntry.content === 'string' ? planEntry.content : '',
+        'utf8',
+      )
+      created.push(allowedFile.path)
+    }
+
+    const reportFileRelative =
+      normalizeOptionalString(plan.report?.reportFile) || `${plan.projectRoot}/validation/report.json`
+    const reportFileResolved = path.resolve(sandboxRootResolved, reportFileRelative)
+    fs.mkdirSync(path.dirname(reportFileResolved), { recursive: true })
+    fs.writeFileSync(
+      reportFileResolved,
+      JSON.stringify(
+        {
+          status: 'materialized',
+          projectRoot: plan.projectRoot,
+          sandboxRoot: sandboxRootRelative,
+          created,
+          skipped,
+          blocked,
+          validations: [
+            'sandbox-only',
+            'no-dot-env',
+            'no-node-modules',
+            'no-docker',
+            'no-deploy',
+            'no-web-prueba',
+          ],
+          rollback: report.rollback,
+        },
+        null,
+        2,
+      ),
+      'utf8',
+    )
+
+    report.reportFile = reportFileRelative
+    pushMessage(validations, 'Scaffold materializado solo dentro del sandbox aprobado.')
+    pushMessage(validations, 'No se ejecutaron comandos externos ni instalaciones.')
+    pushMessage(validations, 'El reporte de validacion del sandbox fue persistido dentro del scaffold.')
+    report.status = 'materialized'
+    report.materialized = true
+    report.warningsCount = report.warnings.length
+    report.errorsCount = report.errors.length
+    return report
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : normalizeOptionalString(String(error)) || 'error'
+
+    return {
+      ...emptyReport,
+      present: true,
+      status: 'error',
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
 function buildBrainDecisionContract({
   decisionKey,
   strategy,
@@ -47092,6 +48344,24 @@ function buildBrainDecisionContract({
       generatedDomainUniversalMaterializationPlanPreview,
       generatedDomainShadowMaterializationCandidatePlan,
     })
+  const generatedDomainUniversalMaterializationPlan =
+    buildGeneratedDomainUniversalMaterializationPlan({
+      generatedDomainContract: normalizedGeneratedDomainContract,
+      generatedDomainUniversalMaterializationPlanPreview,
+      generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainFileCreationApprovalPolicy,
+      domainConsistencyDiagnostics,
+      generatedDomainStructuralCapabilities,
+    })
+  const generatedDomainFileCreationApprovalEvaluation =
+    evaluateGeneratedDomainFileCreationApproval({
+      generatedDomainUniversalMaterializationPlan,
+      approvalDecision: {
+        approved: false,
+        scope: 'observation-only',
+      },
+      workspacePath,
+    })
   const legacyDomainHardcodingDebtReport = buildLegacyDomainHardcodingDebtReport({
     generatedDomainStructuralCapabilities,
   })
@@ -47280,12 +48550,14 @@ function buildBrainDecisionContract({
     generatedDomainFileCreationApprovalPolicy,
     generatedDomainUniversalMaterializationPlanPreview,
     generatedDomainUniversalMaterializationPlanPreviewComparison,
+    generatedDomainUniversalMaterializationPlan,
     generatedDomainStructuralCapabilities,
     legacyDomainHardcodingDebtReport,
     localDeterministicExecutorLegacyDebtReport,
     localDeterministicExecutorCapabilityMigrationPlan,
     generatedDomainMaterializationInspectionSourceResolution,
     generatedDomainMaterializationApprovalPayload,
+    generatedDomainFileCreationApprovalEvaluation,
     generatedDomainRuntimeShadowReadinessDecision,
     domainConsistencyDiagnostics,
     ...(fullstackLocalInspectionSourceDiagnostics &&
@@ -60903,6 +62175,18 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
   }
 
   if (
+    brainDecision.generatedDomainFileCreationApprovalEvaluation &&
+    typeof brainDecision.generatedDomainFileCreationApprovalEvaluation === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-file-creation:approval-evaluation',
+      summarizeGeneratedDomainFileCreationApprovalEvaluationForDebug(
+        brainDecision.generatedDomainFileCreationApprovalEvaluation,
+      ),
+    )
+  }
+
+  if (
     brainDecision.generatedDomainRuntimeShadowReadinessDecision &&
     typeof brainDecision.generatedDomainRuntimeShadowReadinessDecision === 'object'
   ) {
@@ -60935,6 +62219,18 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       'generated-domain-universal-materialization:preview-comparison',
       summarizeGeneratedDomainUniversalMaterializationPlanPreviewComparisonForDebug(
         brainDecision.generatedDomainUniversalMaterializationPlanPreviewComparison,
+      ),
+    )
+  }
+
+  if (
+    brainDecision.generatedDomainUniversalMaterializationPlan &&
+    typeof brainDecision.generatedDomainUniversalMaterializationPlan === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-universal-materialization:plan',
+      summarizeGeneratedDomainUniversalMaterializationPlanForDebug(
+        brainDecision.generatedDomainUniversalMaterializationPlan,
       ),
     )
   }
@@ -61193,6 +62489,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
         brainDecision.generatedDomainUniversalMaterializationPlanPreview,
       generatedDomainUniversalMaterializationPlanPreviewComparison:
         brainDecision.generatedDomainUniversalMaterializationPlanPreviewComparison,
+      generatedDomainUniversalMaterializationPlan:
+        brainDecision.generatedDomainUniversalMaterializationPlan,
       generatedDomainStructuralCapabilities:
         brainDecision.generatedDomainStructuralCapabilities,
       legacyDomainHardcodingDebtReport:
@@ -61205,6 +62503,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
         brainDecision.generatedDomainMaterializationInspectionSourceResolution,
       generatedDomainMaterializationApprovalPayload:
         brainDecision.generatedDomainMaterializationApprovalPayload,
+      generatedDomainFileCreationApprovalEvaluation:
+        brainDecision.generatedDomainFileCreationApprovalEvaluation,
       generatedDomainRuntimeShadowReadinessDecision:
         brainDecision.generatedDomainRuntimeShadowReadinessDecision,
       fullstackLocalInspectionSourceDiagnostics:
@@ -61318,6 +62618,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       brainDecision.generatedDomainUniversalMaterializationPlanPreview,
     generatedDomainUniversalMaterializationPlanPreviewComparison:
       brainDecision.generatedDomainUniversalMaterializationPlanPreviewComparison,
+    generatedDomainUniversalMaterializationPlan:
+      brainDecision.generatedDomainUniversalMaterializationPlan,
     generatedDomainStructuralCapabilities:
       brainDecision.generatedDomainStructuralCapabilities,
     legacyDomainHardcodingDebtReport:
@@ -61330,6 +62632,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       brainDecision.generatedDomainMaterializationInspectionSourceResolution,
     generatedDomainMaterializationApprovalPayload:
       brainDecision.generatedDomainMaterializationApprovalPayload,
+    generatedDomainFileCreationApprovalEvaluation:
+      brainDecision.generatedDomainFileCreationApprovalEvaluation,
     generatedDomainRuntimeShadowReadinessDecision:
       brainDecision.generatedDomainRuntimeShadowReadinessDecision,
     fullstackLocalInspectionSourceDiagnostics:
