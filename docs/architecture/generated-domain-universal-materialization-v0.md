@@ -26,8 +26,10 @@ Hoy ya existen estas piezas observacionales:
 - `generatedDomainControlledEnablePolicy`
 - `generatedDomainFirstControlledEnableScenario`
 - `generatedDomainFileCreationApprovalPolicy`
+- `generatedDomainMaterializationApprovalPayload`
 - `generatedDomainUniversalMaterializationPlanPreview`
 - `generatedDomainUniversalMaterializationPlanPreviewComparison`
+- `generatedDomainRuntimeShadowReadinessDecision`
 
 Estas piezas ya permiten razonar sobre una materializacion universal futura sin reemplazar el `materializationPlan` real ni tocar `executionScope`.
 
@@ -135,6 +137,64 @@ Sin esa aprobacion:
 - `approvalRequired=true`
 - `approved=false`
 - `allowedNow=false`
+
+### 5.6 Payload de aprobacion
+
+`generatedDomainMaterializationApprovalPayload` debe consolidar la revision manual futura sin ejecutar nada real.
+
+Debe dejar visible:
+
+- `root`
+- `sourceRoot`
+- `targetRoot`
+- `pathsPreview`
+- `filesPreview`
+- `directoriesPreview`
+- `forbiddenPaths`
+- `affectedAreas`
+- `blockedReasons`
+- `validations`
+- `risks`
+
+Y debe seguir dejando claro:
+
+- `approvalRequired=true`
+- `approved=false` por defecto
+- `allowedNow=false`
+- `notExecutedDisclaimer` explicito
+
+### 5.7 Decision final de readiness shadow
+
+`generatedDomainRuntimeShadowReadinessDecision` debe ser la capa integradora antes de cualquier runtime enable futuro.
+
+Debe unificar:
+
+- `generatedDomainControlledEnablePolicy`
+- `generatedDomainFileCreationApprovalPolicy`
+- `generatedDomainFirstControlledEnableScenario`
+- `generatedDomainShadowMaterializationCandidatePlan`
+- `generatedDomainUniversalMaterializationPlanPreview`
+- `generatedDomainUniversalMaterializationPlanPreviewComparison`
+- `generatedDomainShadowCandidateLegacyComparison`
+- `generatedDomainMaterializationSourceResolution`
+- `generatedDomainShadowMaterializationEndToEndReadiness`
+- `domainConsistencyDiagnostics`
+
+Estados esperables:
+
+- `ready-for-harness`
+- `requires-Lean-approval`
+- `ready-for-controlled-runtime-review`
+- `not-ready`
+- `blocked`
+
+Mientras no exista aprobacion explicita:
+
+- `runtimeEnabled=false`
+- `controlledRuntimeEnable=false`
+- `source real != generated-domain-shadow`
+- no muta `materializationPlan`
+- no muta `executionScope`
 
 ## 6. Como deberia verse el plan universal real
 

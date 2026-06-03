@@ -8729,6 +8729,266 @@ async function runGeneratedDomainMaterializationInspectionSourceResolutionPayloa
   }
 }
 
+function createAlignedGeneratedDomainObservationDecision({
+  decisionKey = 'generated-domain-aligned-observation-decision',
+} = {}) {
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'community-libraries', label: 'Community Libraries' },
+    root: {
+      slug: 'community-libraries-local',
+      sourceRoot: 'community-libraries-local',
+      targetRoot: 'community-libraries-local',
+    },
+    roles: ['member', 'librarian', 'admin'],
+    entities: ['books', 'loans', 'members'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['reports'] },
+    ],
+    workflows: ['manage catalog', 'register loans', 'review reports'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/books.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [{ path: 'backend/src/modules/loans.js' }],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['books', 'loans', 'members'],
+    },
+    shared: {
+      files: ['shared/contracts/domain.js'],
+    },
+    docs: ['docs/API.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'frontend/public/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'frontend/public/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const requiredPathGroups = deriveRequiredPathGroupsFromContract(generatedDomainContract)
+
+  return plannerApi.buildBrainDecisionContract({
+    ...buildReusablePlanningContext(),
+    decisionKey,
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason:
+      'Construir una cadena observacional alineada para candidate, approvals y readiness sin materializar nada.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: 'community-libraries-local',
+    targetRoot: 'community-libraries-local',
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      intent: 'manage catalog, loans and local reporting',
+      deliveryLevel: 'fullstack-local',
+      roles: ['member', 'librarian', 'admin'],
+      modules: ['catalog', 'loans', 'reports'],
+      entities: ['books', 'loans', 'members'],
+      coreFlows: ['manage catalog', 'register loans', 'review reports'],
+    },
+    productArchitecture: {
+      productType: 'fullstack-local-app',
+      domain: 'community libraries',
+      users: ['members', 'librarians', 'admins'],
+      roles: ['member', 'librarian', 'admin'],
+      coreModules: ['catalog', 'loans', 'reports'],
+      dataEntities: ['books', 'loans', 'members'],
+      keyFlows: ['manage catalog', 'register loans', 'review reports'],
+    },
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      title: 'Community libraries local review',
+      targetStructure: [
+        'community-libraries-local/',
+        'community-libraries-local/frontend/public/',
+        'community-libraries-local/frontend/admin/',
+        'community-libraries-local/backend/src/',
+        'community-libraries-local/database/',
+        'community-libraries-local/docs/',
+      ],
+      allowedRootPaths: ['community-libraries-local'],
+      directories: [
+        'community-libraries-local/frontend/public',
+        'community-libraries-local/frontend/admin',
+        'community-libraries-local/backend/src',
+        'community-libraries-local/database',
+        'community-libraries-local/docs',
+      ],
+      modules: ['catalog', 'loans', 'reports'],
+      successCriteria: [
+        'Keep a local fullstack structure ready for review.',
+        'Do not materialize files during the planner stage.',
+      ],
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-libraries-local',
+      domain: 'community libraries',
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'community-libraries-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'community-libraries-local'
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+      contractDefinition: {
+        requiredPathGroups,
+      },
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+}
+
+async function runGeneratedDomainMaterializationApprovalPayloadCase() {
+  const failures = []
+  const decision = createAlignedGeneratedDomainObservationDecision({
+    decisionKey: 'generated-domain-materialization-approval-payload',
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationApprovalPayload?.present === true &&
+      decision.generatedDomainMaterializationApprovalPayload?.status ===
+        'ready-for-review' &&
+      decision.generatedDomainMaterializationApprovalPayload?.approvalRequired ===
+        true &&
+      decision.generatedDomainMaterializationApprovalPayload?.approved === false,
+    'buildBrainDecisionContract debe adjuntar generatedDomainMaterializationApprovalPayload como revision observacional de aprobacion de archivos.',
+  )
+  pushFailure(
+    failures,
+    Array.isArray(decision.generatedDomainMaterializationApprovalPayload?.review?.pathsPreview) &&
+      decision.generatedDomainMaterializationApprovalPayload.review.pathsPreview
+        .length > 0 &&
+      Array.isArray(
+        decision.generatedDomainMaterializationApprovalPayload?.blockedReasons,
+      ) &&
+      decision.generatedDomainMaterializationApprovalPayload.behaviorChanged === false,
+    'El approval payload debe exponer pathsPreview, blockedReasons serializables y seguir sin cambiar comportamiento.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'materialize-fullstack-local-plan' &&
+      decision.executionMode === 'executor' &&
+      decision.nextExpectedAction === 'execute-plan',
+    'El approval payload no debe cambiar strategy, executionMode ni nextExpectedAction.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generatedDomainMaterializationApprovalPayload') &&
+      mainSource.includes('generated-domain-materialization:approval-payload') &&
+      mainSource.includes('buildGeneratedDomainMaterializationApprovalPayload'),
+    'main.cjs debe adjuntar y loguear generated-domain-materialization:approval-payload.',
+  )
+
+  return {
+    id: 'generated-domain-materialization-approval-payload',
+    label: 'Generated domain materialization approval payload',
+    failures,
+  }
+}
+
+async function runGeneratedDomainRuntimeShadowReadinessDecisionPayloadCase() {
+  const failures = []
+  const decision = createAlignedGeneratedDomainObservationDecision({
+    decisionKey: 'generated-domain-runtime-shadow-readiness-decision',
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainRuntimeShadowReadinessDecision?.present === true &&
+      ['requires-Lean-approval', 'ready-for-harness'].includes(
+        decision.generatedDomainRuntimeShadowReadinessDecision?.status,
+      ) &&
+      decision.generatedDomainRuntimeShadowReadinessDecision?.runtimeEnabled ===
+        false &&
+      decision.generatedDomainRuntimeShadowReadinessDecision
+        ?.controlledRuntimeEnable === false,
+    'buildBrainDecisionContract debe adjuntar generatedDomainRuntimeShadowReadinessDecision sin activar runtime real.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainRuntimeShadowReadinessDecision?.safeguards
+      ?.materializationPlanChanged === false &&
+      decision.generatedDomainRuntimeShadowReadinessDecision?.safeguards
+        ?.executionScopeChanged === false &&
+      decision.generatedDomainRuntimeShadowReadinessDecision?.behaviorChanged ===
+        false,
+    'La decision final de readiness shadow no debe mutar materializationPlan ni executionScope reales.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generatedDomainRuntimeShadowReadinessDecision') &&
+      mainSource.includes('generated-domain-runtime-shadow:readiness-decision') &&
+      mainSource.includes('buildGeneratedDomainRuntimeShadowReadinessDecision'),
+    'main.cjs debe adjuntar y loguear generated-domain-runtime-shadow:readiness-decision.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationSourceResolution?.source !==
+      'generated-domain-shadow',
+    'La decision final de readiness shadow no debe convertir generated-domain-shadow en fuente real del runtime normal.',
+  )
+
+  return {
+    id: 'generated-domain-runtime-shadow-readiness-decision',
+    label: 'Generated domain runtime shadow readiness decision',
+    failures,
+  }
+}
+
 async function runGeneratedDomainMaterializationShadowDiffPayloadCase() {
   const failures = []
   const generatedDomainContract = {
@@ -11762,6 +12022,8 @@ async function main() {
     results.push(await runGeneratedDomainControlledEnablePolicyPayloadCase())
     results.push(await runGeneratedDomainFirstControlledEnableScenarioPayloadCase())
     results.push(await runGeneratedDomainFileCreationApprovalPolicyPayloadCase())
+    results.push(await runGeneratedDomainMaterializationApprovalPayloadCase())
+    results.push(await runGeneratedDomainRuntimeShadowReadinessDecisionPayloadCase())
     results.push(await runGeneratedDomainUniversalMaterializationPlanPreviewPayloadCase())
     results.push(
       await runGeneratedDomainUniversalMaterializationPlanPreviewComparisonPayloadCase(),

@@ -78,6 +78,8 @@ module.exports = {
   buildLocalDeterministicExecutorLegacyDebtReport,
   buildLocalDeterministicExecutorCapabilityMigrationPlan,
   buildGeneratedDomainMaterializationInspectionSourceResolution,
+  buildGeneratedDomainMaterializationApprovalPayload,
+  buildGeneratedDomainRuntimeShadowReadinessDecision,
   buildLegacyDomainResolutionDiagnostics,
   buildLegacyCapabilityAlignmentDiagnostics,
   buildLegacyMigrationCandidateReport,
@@ -115,6 +117,8 @@ module.exports = {
   summarizeLocalDeterministicExecutorLegacyDebtReportForDebug,
   summarizeLocalDeterministicExecutorCapabilityMigrationPlanForDebug,
   summarizeGeneratedDomainMaterializationInspectionSourceResolutionForDebug,
+  summarizeGeneratedDomainMaterializationApprovalPayloadForDebug,
+  summarizeGeneratedDomainRuntimeShadowReadinessDecisionForDebug,
   summarizeDomainConsistencyDiagnosticsForDebug,
   summarizeLegacyCapabilityAlignmentDiagnosticsForDebug,
   summarizeLegacyMigrationCandidateReportForDebug,
@@ -4362,6 +4366,290 @@ function runGeneratedDomainFileCreationApprovalPolicyBlockedCase() {
   assert.equal(approvalPolicy?.behaviorChanged, false)
 }
 
+function runGeneratedDomainMaterializationApprovalPayloadReadyCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const payload = decision.generatedDomainMaterializationApprovalPayload
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainMaterializationApprovalPayloadForDebug(
+      payload,
+    )
+
+  assert.equal(payload?.present, true)
+  assert.equal(payload?.status, 'ready-for-review')
+  assert.equal(payload?.approvalRequired, true)
+  assert.equal(payload?.approved, false)
+  assert.equal(payload?.allowedNow, false)
+  assert.equal(payload?.requiresLeanApproval, true)
+  assert.equal(Array.isArray(payload?.review?.pathsPreview), true)
+  assert.equal((payload?.review?.pathsPreview || []).length > 0, true)
+  assert.equal((payload?.review?.filesPreview || []).length > 0, true)
+  assert.equal((payload?.review?.forbiddenPaths || []).length, 0)
+  assert.equal(payload?.evidence?.approvalPolicyStatus, 'ready-for-manual-approval-review')
+  assert.equal(payload?.behaviorChanged, false)
+  assert.equal(debugSummary?.status, 'ready-for-review')
+}
+
+function runGeneratedDomainMaterializationApprovalPayloadBlockedCase() {
+  const payload = observationHarness.buildGeneratedDomainMaterializationApprovalPayload({
+    generatedDomainFileCreationApprovalPolicy: {
+      present: true,
+      evaluated: true,
+      status: 'blocked',
+      approvalRequired: true,
+      approved: false,
+      allowedNow: false,
+      scope: {
+        targetRoot: 'unsafe-local',
+        previewPaths: ['unsafe-local', '.env', 'web-prueba/index.html'],
+      },
+      blockers: {
+        unsafePaths: true,
+        forbiddenSignals: true,
+      },
+      safeguards: {
+        withinAllowedRootOnly: false,
+        noDotEnv: false,
+        noNodeModules: true,
+        noDocker: false,
+        noDeploy: false,
+        noExternalServices: false,
+        noRealPayments: false,
+        noCommands: false,
+        noWritesExecuted: true,
+        noWebPrueba: false,
+      },
+    },
+    generatedDomainUniversalMaterializationPlanPreview: {
+      present: true,
+      built: false,
+      status: 'blocked',
+      root: 'unsafe-local',
+      sourceRoot: 'unsafe-local',
+      targetRoot: 'unsafe-local',
+      allowedTargetPaths: ['unsafe-local', '.env', 'web-prueba/index.html'],
+      forbiddenSignals: ['docker', 'deploy'],
+      frontend: { present: true },
+      backend: { present: true },
+      validation: { present: true },
+      safety: { safeForLocalMaterialization: false },
+    },
+    generatedDomainUniversalMaterializationPlanPreviewComparison: {
+      present: true,
+      compared: true,
+      status: 'blocked',
+    },
+    generatedDomainShadowMaterializationCandidatePlan: {
+      present: true,
+      status: 'blocked',
+      candidate: {
+        targetRoot: 'unsafe-local',
+      },
+    },
+    generatedDomainMaterializationInspectionSourceResolution: {
+      present: true,
+      resolved: true,
+      source: 'blocked',
+    },
+    generatedDomainStructuralCapabilities: {
+      present: true,
+      evaluated: true,
+      capabilities: {
+        hasBackend: true,
+      },
+    },
+  })
+
+  assert.equal(payload?.present, true)
+  assert.equal(payload?.status, 'blocked')
+  assert.equal((payload?.review?.forbiddenPaths || []).length > 0, true)
+  assert.equal((payload?.blockedReasons || []).length > 0, true)
+  assert.equal(payload?.behaviorChanged, false)
+}
+
+function runGeneratedDomainRuntimeShadowReadinessDecisionRequiresApprovalCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const readinessDecision = decision.generatedDomainRuntimeShadowReadinessDecision
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainRuntimeShadowReadinessDecisionForDebug(
+      readinessDecision,
+    )
+
+  assert.equal(readinessDecision?.present, true)
+  assert.equal(readinessDecision?.status, 'requires-Lean-approval')
+  assert.equal(readinessDecision?.runtimeEnabled, false)
+  assert.equal(readinessDecision?.controlledRuntimeEnable, false)
+  assert.equal(readinessDecision?.requiresLeanApproval, true)
+  assert.equal(readinessDecision?.readiness?.readyForHarness, true)
+  assert.equal(readinessDecision?.readiness?.approvalPayloadReady, true)
+  assert.equal(readinessDecision?.safeguards?.materializationPlanChanged, false)
+  assert.equal(readinessDecision?.safeguards?.executionScopeChanged, false)
+  assert.equal(readinessDecision?.recommendation?.action, 'request-lean-approval')
+  assert.equal(readinessDecision?.behaviorChanged, false)
+  assert.equal(debugSummary?.status, 'requires-Lean-approval')
+}
+
+function runGeneratedDomainRuntimeShadowReadinessDecisionHarnessOnlyCase() {
+  const readinessDecision =
+    observationHarness.buildGeneratedDomainRuntimeShadowReadinessDecision({
+      generatedDomainControlledEnablePolicy: {
+        present: true,
+        evaluated: true,
+        status: 'eligible-for-test-enable',
+        allowedModes: {
+          testHarnessEnable: true,
+          controlledRuntimeEnable: false,
+        },
+      },
+      generatedDomainFileCreationApprovalPolicy: {
+        present: true,
+        evaluated: true,
+        status: 'not-ready',
+        approvalRequired: true,
+        approved: false,
+        safeguards: {
+          noCommands: true,
+          noWritesExecuted: true,
+          noWebPrueba: true,
+        },
+      },
+      generatedDomainFirstControlledEnableScenario: {
+        present: true,
+        evaluated: true,
+        status: 'not-ready',
+      },
+      generatedDomainShadowMaterializationCandidatePlan: {
+        present: true,
+        status: 'built',
+      },
+      generatedDomainUniversalMaterializationPlanPreview: {
+        present: true,
+        built: true,
+        status: 'built',
+      },
+      generatedDomainUniversalMaterializationPlanPreviewComparison: {
+        present: true,
+        compared: true,
+        status: 'aligned',
+      },
+      generatedDomainShadowCandidateLegacyComparison: {
+        present: true,
+        compared: true,
+        status: 'aligned',
+      },
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'consistent',
+        semanticStatus: 'consistent',
+      },
+      generatedDomainMaterializationSourceResolution: {
+        present: true,
+        resolved: true,
+        source: 'current',
+        runtime: {
+          materializationPlanChanged: false,
+          executionScopeChanged: false,
+        },
+        testProjection: {
+          projectedSource: 'generated-domain-shadow',
+        },
+      },
+      generatedDomainShadowMaterializationEndToEndReadiness: {
+        present: true,
+        evaluated: true,
+        status: 'ready-for-test-harness',
+      },
+      generatedDomainMaterializationApprovalPayload: {
+        present: true,
+        evaluated: true,
+        status: 'not-ready',
+      },
+    })
+
+  assert.equal(readinessDecision?.present, true)
+  assert.equal(readinessDecision?.status, 'ready-for-harness')
+  assert.equal(readinessDecision?.readiness?.readyForHarness, true)
+  assert.equal(readinessDecision?.readiness?.approvalPayloadReady, false)
+  assert.equal(readinessDecision?.runtimeEnabled, false)
+  assert.equal(readinessDecision?.behaviorChanged, false)
+}
+
+function runGeneratedDomainRuntimeShadowReadinessDecisionBlockedCase() {
+  const readinessDecision =
+    observationHarness.buildGeneratedDomainRuntimeShadowReadinessDecision({
+      generatedDomainControlledEnablePolicy: {
+        present: true,
+        evaluated: true,
+        status: 'blocked',
+      },
+      generatedDomainFileCreationApprovalPolicy: {
+        present: true,
+        evaluated: true,
+        status: 'blocked',
+        safeguards: {
+          noCommands: false,
+          noWritesExecuted: false,
+          noWebPrueba: false,
+        },
+      },
+      generatedDomainFirstControlledEnableScenario: {
+        present: true,
+        evaluated: true,
+        status: 'blocked',
+      },
+      generatedDomainShadowMaterializationCandidatePlan: {
+        present: true,
+        status: 'blocked',
+      },
+      generatedDomainUniversalMaterializationPlanPreview: {
+        present: true,
+        built: false,
+        status: 'blocked',
+      },
+      generatedDomainUniversalMaterializationPlanPreviewComparison: {
+        present: true,
+        compared: true,
+        status: 'blocked',
+      },
+      generatedDomainShadowCandidateLegacyComparison: {
+        present: true,
+        compared: true,
+        status: 'blocked',
+      },
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'mismatch',
+        semanticStatus: 'mismatch',
+      },
+      generatedDomainMaterializationSourceResolution: {
+        present: true,
+        resolved: true,
+        source: 'generated-domain-shadow',
+        runtime: {
+          materializationPlanChanged: true,
+          executionScopeChanged: true,
+        },
+      },
+      generatedDomainShadowMaterializationEndToEndReadiness: {
+        present: true,
+        evaluated: true,
+        status: 'blocked',
+      },
+      generatedDomainMaterializationApprovalPayload: {
+        present: true,
+        evaluated: true,
+        status: 'blocked',
+      },
+    })
+
+  assert.equal(readinessDecision?.present, true)
+  assert.equal(readinessDecision?.status, 'blocked')
+  assert.equal(readinessDecision?.blockers?.domainMismatch, true)
+  assert.equal(readinessDecision?.blockers?.runtimeNormalNotOff, true)
+  assert.equal(readinessDecision?.behaviorChanged, false)
+}
+
 function runGeneratedDomainUniversalMaterializationPlanPreviewBuiltCase() {
   const decision = createGeneratedDomainAlignedApprovalObservationDecision()
   const preview = decision.generatedDomainUniversalMaterializationPlanPreview
@@ -5656,6 +5944,11 @@ runGeneratedDomainFirstControlledEnableScenarioReadyForReviewCase()
 runGeneratedDomainFirstControlledEnableScenarioBlockedCase()
 runGeneratedDomainFileCreationApprovalPolicyReadyCase()
 runGeneratedDomainFileCreationApprovalPolicyBlockedCase()
+runGeneratedDomainMaterializationApprovalPayloadReadyCase()
+runGeneratedDomainMaterializationApprovalPayloadBlockedCase()
+runGeneratedDomainRuntimeShadowReadinessDecisionRequiresApprovalCase()
+runGeneratedDomainRuntimeShadowReadinessDecisionHarnessOnlyCase()
+runGeneratedDomainRuntimeShadowReadinessDecisionBlockedCase()
 runGeneratedDomainUniversalMaterializationPlanPreviewBuiltCase()
 runGeneratedDomainUniversalMaterializationPlanPreviewBlockedCase()
 runGeneratedDomainUniversalMaterializationPlanPreviewComparisonAlignedCase()
