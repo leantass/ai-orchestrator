@@ -49,6 +49,9 @@ const {
   buildGeneratedDomainContractDiagnostics,
   extractGeneratedDomainContractCandidate,
 } = require(path.join(repoRoot, 'electron', 'generated-domain-contract.cjs'))
+const generatedDomainOrchestrationDiagnostics = require(
+  path.join(repoRoot, 'electron', 'generated-domain-orchestration-diagnostics.cjs'),
+)
 
 const smokeWorkspaceRoot = path.join(repoRoot, '.tmp', 'ai-operator-e2e-smoke')
 const continuationBasePhaseIds = [
@@ -587,6 +590,7 @@ module.exports = {
     module: { exports: {} },
     exports: {},
     require,
+    __dirname: path.join(repoRoot, 'electron'),
     console,
     process,
     Buffer,
@@ -610,6 +614,7 @@ module.exports = {
     buildGeneratedDomainContractComparison,
     buildGeneratedDomainContractDiagnostics,
     extractGeneratedDomainContractCandidate,
+    generatedDomainOrchestrationDiagnostics,
     setTimeout,
     clearTimeout,
     setInterval,

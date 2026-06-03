@@ -52,6 +52,9 @@ const {
   buildGeneratedDomainContractDiagnostics,
   extractGeneratedDomainContractCandidate,
 } = require(path.join(repoRoot, 'electron', 'generated-domain-contract.cjs'))
+const generatedDomainOrchestrationDiagnostics = require(
+  path.join(repoRoot, 'electron', 'generated-domain-orchestration-diagnostics.cjs'),
+)
 const requiredPlannerFunctions = [
   'buildDomainUnderstanding',
   'buildProductArchitecturePlan',
@@ -1101,6 +1104,7 @@ module.exports = {
     module: { exports: {} },
     exports: {},
     require,
+    __dirname: path.join(repoRoot, 'electron'),
     console,
     process,
     Buffer,
@@ -1119,6 +1123,7 @@ module.exports = {
     buildGeneratedDomainContractComparison,
     buildGeneratedDomainContractDiagnostics,
     extractGeneratedDomainContractCandidate,
+    generatedDomainOrchestrationDiagnostics,
     setTimeout,
     clearTimeout,
     setInterval,

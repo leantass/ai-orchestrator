@@ -36,6 +36,9 @@ const {
   selectBestWorkspaceProjectCandidate,
   shouldIgnoreWorkspaceDirectoryEntry,
 } = require(path.join(repoRoot, 'electron', 'workspace-project-detection.cjs'))
+const generatedDomainOrchestrationDiagnostics = require(
+  path.join(repoRoot, 'electron', 'generated-domain-orchestration-diagnostics.cjs'),
+)
 
 function extractSegment({ startMarker, endMarker }) {
   const start = mainSource.indexOf(startMarker)
@@ -136,6 +139,7 @@ module.exports = {
     module: { exports: {} },
     exports: {},
     require,
+    __dirname: path.join(repoRoot, 'electron'),
     console,
     process,
     Buffer,
@@ -158,6 +162,7 @@ module.exports = {
     buildGeneratedDomainCapabilityProfile,
     buildGeneratedDomainMaterializationShadowPlan,
     buildGeneratedDomainContractComparison,
+    generatedDomainOrchestrationDiagnostics,
     extractGeneratedDomainContractCandidate:
       require('../electron/generated-domain-contract.cjs').extractGeneratedDomainContractCandidate,
     AbortController,
