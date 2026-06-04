@@ -76,6 +76,7 @@ function loadObservationHarness() {
 ${plannerSurface}
 module.exports = {
   buildBrainDecisionContract,
+  buildGeneratedDomainMaterializationApprovalSurface,
   buildGeneratedDomainUniversalMaterializationPlan,
   resolveGeneratedDomainControlledRuntimeMaterializationSource,
   evaluateGeneratedDomainFileCreationApproval,
@@ -485,6 +486,44 @@ function runBlockedCases(universalPlan) {
     })
   assert.equal(blockedControlledSource?.mode, 'blocked')
   assert.equal(blockedControlledSource?.selectedSource, 'blocked')
+  const blockedApprovalSurface =
+    observationHarness.buildGeneratedDomainMaterializationApprovalSurface({
+      generatedDomainFileCreationApprovalPolicy: {
+        present: true,
+        evaluated: true,
+        approvalRequired: true,
+        requiresLeanApproval: true,
+        safeguards: {
+          noDotEnv: true,
+          noNodeModules: true,
+          noDocker: true,
+          noDeploy: true,
+          noExternalServices: true,
+          noRealPayments: true,
+          noProductionDb: true,
+          noCredentials: true,
+          noWebPrueba: true,
+        },
+      },
+      generatedDomainFileCreationApprovalEvaluation: blockedByApproval,
+      generatedDomainMaterializationApprovalPayload: {
+        present: true,
+        review: {
+          root: universalPlan.projectRoot,
+          sourceRoot: universalPlan.sourceRoot,
+          targetRoot: universalPlan.targetRoot,
+          filesPreview: universalPlan.filesToCreate.map((entry) => entry.path),
+        },
+      },
+      generatedDomainUniversalMaterializationPlan: universalPlan,
+      generatedDomainControlledRuntimeMaterializationSource: blockedControlledSource,
+      generatedDomainRuntimeShadowReadinessDecision: {
+        present: true,
+        runtimeEnabled: false,
+        controlledRuntimeEnable: false,
+      },
+    })
+  assert.equal(blockedApprovalSurface?.status, 'blocked')
 
   const blockedByWebPrueba = observationHarness.evaluateGeneratedDomainFileCreationApproval({
     generatedDomainUniversalMaterializationPlan: universalPlan,
@@ -544,6 +583,7 @@ function runHappyPathScenario({ id, contract, expectedDomainLabel }) {
   const universalPlan = decision.generatedDomainUniversalMaterializationPlan
   const readinessReport = decision.generatedDomainMvpReadinessExecutiveReport
   const runtimeSource = decision.generatedDomainControlledRuntimeMaterializationSource
+  const approvalSurface = decision.generatedDomainMaterializationApprovalSurface
 
   assert.equal(universalPlan?.present, true)
   assert.equal(universalPlan?.built, true)
@@ -554,6 +594,9 @@ function runHappyPathScenario({ id, contract, expectedDomainLabel }) {
   assert.equal(runtimeSource?.present, true)
   assert.equal(runtimeSource?.enabled, false)
   assert.equal(runtimeSource?.mode, 'runtime-disabled')
+  assert.equal(approvalSurface?.present, true)
+  assert.equal(approvalSurface?.status, 'ready-for-review')
+  assert.equal(Array.isArray(approvalSurface?.files?.preview), true)
 
   const approvalEvaluation = observationHarness.evaluateGeneratedDomainFileCreationApproval({
     generatedDomainUniversalMaterializationPlan: universalPlan,
@@ -598,6 +641,19 @@ function runHappyPathScenario({ id, contract, expectedDomainLabel }) {
     'generated-domain-universal',
   )
   assert.equal(controlledRuntimeSource?.fallbackLegacyAvailable, true)
+  const approvedSurface = observationHarness.buildGeneratedDomainMaterializationApprovalSurface({
+    generatedDomainFileCreationApprovalPolicy:
+      decision.generatedDomainFileCreationApprovalPolicy,
+    generatedDomainFileCreationApprovalEvaluation: approvalEvaluation,
+    generatedDomainMaterializationApprovalPayload:
+      decision.generatedDomainMaterializationApprovalPayload,
+    generatedDomainUniversalMaterializationPlan: universalPlan,
+    generatedDomainControlledRuntimeMaterializationSource: controlledRuntimeSource,
+    generatedDomainRuntimeShadowReadinessDecision:
+      decision.generatedDomainRuntimeShadowReadinessDecision,
+  })
+  assert.equal(approvedSurface?.status, 'approved-for-sandbox')
+  assert.equal(approvedSurface?.target?.isSandbox, true)
 
   const materializationReport = observationHarness.materializeGeneratedDomainSandboxPlan({
     generatedDomainUniversalMaterializationPlan: universalPlan,

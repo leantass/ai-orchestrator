@@ -907,3 +907,60 @@ Que requiere Lean:
 - cualquier write fuera de sandbox interno aprobado
 - cualquier revision sobre `web-prueba`
 - cualquier runtime review visual o manual de produccion real
+
+## 28. Approval surface v0.1
+
+Que muestra la surface:
+
+- `generatedDomainMaterializationApprovalSurface`
+- estado serializable para revision humana previa a cualquier materializacion
+- `root`, `sourceRoot`, `targetRoot`
+- preview de archivos
+- conteos de archivos a crear y bloqueados
+- safety flags
+- validations planeadas
+- blockers, warnings y errors
+
+Como se conecta con approval policy:
+
+- consume `generatedDomainFileCreationApprovalPolicy`
+- consume `generatedDomainFileCreationApprovalEvaluation`
+- consume `generatedDomainMaterializationApprovalPayload`
+- refleja si la aprobacion esta:
+- `ready-for-review`
+- `approved-for-sandbox`
+- `blocked`
+
+Como se conecta con el universal plan:
+
+- usa `generatedDomainUniversalMaterializationPlan` como fuente estructural
+- reutiliza previews del approval payload para mostrar archivos y paths
+- no ejecuta commands
+- no ejecuta writes
+- no promueve el runtime general
+
+Bloqueos explicitos:
+
+- `web-prueba`
+- `.env`
+- `node_modules`
+- `Dockerfile` y `docker-compose`
+- `deploy`
+- roots inseguros o fuera del workspace permitido
+
+Uso futuro en UI:
+
+- la UI visual futura solo deberia consumir esta surface ya serializada
+- no necesita recalcular policy ni approval en renderer
+- puede mostrar:
+- resumen de aprobacion
+- root y sandbox target
+- files preview
+- blockers y riesgos
+- next action sugerido
+
+Validacion manual futura requerida:
+
+- confirmacion visual del layout final en renderer
+- decision humana real de Lean antes de cualquier approval fuera de harness
+- cualquier aprobacion sobre proyectos externos o fuera del sandbox interno

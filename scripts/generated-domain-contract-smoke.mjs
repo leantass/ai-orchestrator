@@ -95,6 +95,7 @@ module.exports = {
   buildLegacyCanonicalFullstackLocalMaterializationContract,
   buildGeneratedDomainMaterializationInspectionSourceResolution,
   buildGeneratedDomainMaterializationApprovalPayload,
+  buildGeneratedDomainMaterializationApprovalSurface,
   buildGeneratedDomainUniversalMaterializationPlan,
   buildGeneratedDomainUniversalMaterializationPlanCandidate,
   buildGeneratedDomainMaterializationPlanCandidateLegacyComparison,
@@ -144,6 +145,7 @@ module.exports = {
   summarizeLocalDeterministicExecutorCapabilityMigrationPlanForDebug,
   summarizeGeneratedDomainMaterializationInspectionSourceResolutionForDebug,
   summarizeGeneratedDomainMaterializationApprovalPayloadForDebug,
+  summarizeGeneratedDomainMaterializationApprovalSurfaceForDebug,
   summarizeGeneratedDomainUniversalMaterializationPlanForDebug,
   summarizeGeneratedDomainUniversalMaterializationPlanCandidateForDebug,
   summarizeGeneratedDomainMaterializationPlanCandidateLegacyComparisonForDebug,
@@ -5697,6 +5699,153 @@ function runGeneratedDomainFileCreationApprovalEvaluationApprovedSandboxCase() {
   assert.equal(evaluation?.blockedFiles.length, 0)
 }
 
+function runGeneratedDomainMaterializationApprovalSurfaceReadyForReviewCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const surface = decision.generatedDomainMaterializationApprovalSurface
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainMaterializationApprovalSurfaceForDebug(
+      surface,
+    )
+
+  assert.equal(surface?.present, true)
+  assert.equal(surface?.built, true)
+  assert.equal(surface?.status, 'ready-for-review')
+  assert.equal(surface?.review?.requiresLeanApproval, true)
+  assert.equal(surface?.review?.approvalState, 'pending-review')
+  assert.equal(surface?.behaviorChanged, false)
+  assert.equal(surface?.target?.isWebPrueba, false)
+  assert.equal(surface?.files?.total > 0, true)
+  assert.equal(Array.isArray(surface?.files?.preview), true)
+  assert.equal(surface?.errorsCount, 0)
+  assert.equal(debugSummary?.status, 'ready-for-review')
+}
+
+function runGeneratedDomainMaterializationApprovalSurfaceApprovedSandboxCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const approvalEvaluation = observationHarness.evaluateGeneratedDomainFileCreationApproval({
+    generatedDomainUniversalMaterializationPlan:
+      decision.generatedDomainUniversalMaterializationPlan,
+    approvalDecision: {
+      approved: true,
+      scope: 'sandbox-only',
+      approvalReason: 'Approval surface sandbox harness.',
+    },
+    workspacePath: repoRoot,
+    sandboxRoot: '.codex-temp/generated-domain-materialization-sandbox/approval-surface-approved',
+  })
+  const controlledRuntimeSource =
+    observationHarness.resolveGeneratedDomainControlledRuntimeMaterializationSource({
+      generatedDomainRuntimeShadowReadinessDecision:
+        decision.generatedDomainRuntimeShadowReadinessDecision,
+      generatedDomainControlledEnablePolicy:
+        decision.generatedDomainControlledEnablePolicy,
+      generatedDomainFirstControlledEnableScenario:
+        decision.generatedDomainFirstControlledEnableScenario,
+      generatedDomainUniversalMaterializationPlan:
+        decision.generatedDomainUniversalMaterializationPlan,
+      generatedDomainMaterializationPlanDecouplingReport:
+        decision.generatedDomainMaterializationPlanDecouplingReport,
+      generatedDomainMaterializationPlanCandidateLegacyComparison:
+        decision.generatedDomainMaterializationPlanCandidateLegacyComparison,
+      generatedDomainFileCreationApprovalEvaluation: approvalEvaluation,
+      domainConsistencyDiagnostics: decision.domainConsistencyDiagnostics,
+      controlledRuntimeSourceOptions: {
+        harnessControlledEnable: true,
+        simulateLeanApproval: true,
+      },
+    })
+  const surface = observationHarness.buildGeneratedDomainMaterializationApprovalSurface({
+    generatedDomainFileCreationApprovalPolicy:
+      decision.generatedDomainFileCreationApprovalPolicy,
+    generatedDomainFileCreationApprovalEvaluation: approvalEvaluation,
+    generatedDomainMaterializationApprovalPayload:
+      decision.generatedDomainMaterializationApprovalPayload,
+    generatedDomainUniversalMaterializationPlan:
+      decision.generatedDomainUniversalMaterializationPlan,
+    generatedDomainControlledRuntimeMaterializationSource: controlledRuntimeSource,
+    generatedDomainRuntimeShadowReadinessDecision:
+      decision.generatedDomainRuntimeShadowReadinessDecision,
+  })
+
+  assert.equal(surface?.present, true)
+  assert.equal(surface?.status, 'approved-for-sandbox')
+  assert.equal(surface?.review?.approvalMode, 'sandbox-only')
+  assert.equal(surface?.target?.isSandbox, true)
+  assert.equal(surface?.safety?.noWebPrueba, true)
+  assert.equal(Array.isArray(surface?.files?.preview), true)
+  assert.equal(surface?.files?.preview.length > 0, true)
+}
+
+function runGeneratedDomainMaterializationApprovalSurfaceWebPruebaBlockedCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision({
+    generatedDomainContract: {
+      ...createValidInventedContract(),
+      root: {
+        slug: 'web-prueba',
+        sourceRoot: 'web-prueba',
+        targetRoot: 'web-prueba',
+      },
+    },
+    decisionKey: 'generated-domain-approval-surface-web-prueba',
+  })
+  const surface = decision.generatedDomainMaterializationApprovalSurface
+
+  assert.equal(surface?.present, true)
+  assert.equal(surface?.status, 'blocked')
+  assert.equal(surface?.target?.isWebPrueba, true)
+  assert.equal(
+    surface?.blockers?.some((entry) => String(entry).includes('web-prueba')),
+    true,
+  )
+}
+
+function runGeneratedDomainMaterializationApprovalSurfaceForbiddenFilesBlockedCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const unsafePlan = JSON.parse(
+    JSON.stringify(decision.generatedDomainUniversalMaterializationPlan),
+  )
+  unsafePlan.filesToCreate.push(
+    { path: `${unsafePlan.projectRoot}/.env`, area: 'forbidden', content: 'SECRET=blocked' },
+    { path: `${unsafePlan.projectRoot}/node_modules/index.js`, area: 'forbidden', content: '' },
+    { path: `${unsafePlan.projectRoot}/Dockerfile`, area: 'forbidden', content: 'FROM node:22' },
+    { path: `${unsafePlan.projectRoot}/deploy/release.txt`, area: 'forbidden', content: 'blocked' },
+  )
+  const approvalEvaluation = observationHarness.evaluateGeneratedDomainFileCreationApproval({
+    generatedDomainUniversalMaterializationPlan: unsafePlan,
+    approvalDecision: {
+      approved: true,
+      scope: 'sandbox-only',
+      approvalReason: 'Forbidden files must stay blocked.',
+    },
+    workspacePath: repoRoot,
+    sandboxRoot: '.codex-temp/generated-domain-materialization-sandbox/approval-surface-blocked',
+  })
+  const surface = observationHarness.buildGeneratedDomainMaterializationApprovalSurface({
+    generatedDomainFileCreationApprovalPolicy:
+      decision.generatedDomainFileCreationApprovalPolicy,
+    generatedDomainFileCreationApprovalEvaluation: approvalEvaluation,
+    generatedDomainMaterializationApprovalPayload:
+      decision.generatedDomainMaterializationApprovalPayload,
+    generatedDomainUniversalMaterializationPlan: unsafePlan,
+    generatedDomainControlledRuntimeMaterializationSource:
+      decision.generatedDomainControlledRuntimeMaterializationSource,
+    generatedDomainRuntimeShadowReadinessDecision:
+      decision.generatedDomainRuntimeShadowReadinessDecision,
+  })
+
+  assert.equal(surface?.present, true)
+  assert.equal(surface?.status, 'blocked')
+  assert.equal(surface?.files?.blocked >= 4, true)
+  assert.equal(
+    surface?.blockers?.some((entry) =>
+      ['.env', 'node_modules', 'Dockerfile', 'deploy'].some((needle) =>
+        String(entry).includes(needle),
+      ),
+    ),
+    true,
+  )
+}
+
 function runGeneratedDomainUniversalMaterializationPlanPreviewInventedDomainsCase() {
   const inventedContracts = [
     {
@@ -6872,6 +7021,10 @@ runGeneratedDomainControlledRuntimeMaterializationSourceUnsafePathBlockedCase()
 runGeneratedDomainUniversalMaterializationPlanBlockedCase()
 runGeneratedDomainFileCreationApprovalEvaluationBlockedCase()
 runGeneratedDomainFileCreationApprovalEvaluationApprovedSandboxCase()
+runGeneratedDomainMaterializationApprovalSurfaceReadyForReviewCase()
+runGeneratedDomainMaterializationApprovalSurfaceApprovedSandboxCase()
+runGeneratedDomainMaterializationApprovalSurfaceWebPruebaBlockedCase()
+runGeneratedDomainMaterializationApprovalSurfaceForbiddenFilesBlockedCase()
   runGeneratedDomainUniversalMaterializationPlanPreviewInventedDomainsCase()
   runGeneratedDomainStructuralCapabilitiesInventedCase()
   runLegacyDomainHardcodingDebtReportCase()

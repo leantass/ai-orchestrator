@@ -9370,6 +9370,64 @@ async function runGeneratedDomainControlledRuntimeMaterializationSourcePayloadCa
   }
 }
 
+async function runGeneratedDomainMaterializationApprovalSurfacePayloadCase() {
+  const failures = []
+  const decision = createAlignedGeneratedDomainObservationDecision({
+    decisionKey: 'generated-domain-materialization-approval-surface',
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationApprovalSurface?.present === true &&
+      decision.generatedDomainMaterializationApprovalSurface?.built === true &&
+      decision.generatedDomainMaterializationApprovalSurface?.status ===
+        'ready-for-review' &&
+      decision.generatedDomainMaterializationApprovalSurface?.review
+        ?.requiresLeanApproval === true &&
+      decision.generatedDomainMaterializationApprovalSurface?.review
+        ?.approvalState === 'pending-review',
+    'buildBrainDecisionContract debe adjuntar generatedDomainMaterializationApprovalSurface lista para revision cuando el plan universal esta listo pero todavia no existe approval explicita.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationApprovalSurface?.behaviorChanged ===
+      false &&
+      decision.generatedDomainMaterializationApprovalSurface?.target
+        ?.isWebPrueba === false &&
+      decision.generatedDomainMaterializationApprovalSurface?.target
+        ?.isSafeRoot === true &&
+      Array.isArray(
+        decision.generatedDomainMaterializationApprovalSurface?.files?.preview,
+      ) &&
+      decision.generatedDomainMaterializationApprovalSurface?.files?.preview.length > 0,
+    'La approval surface debe exponer root seguro y preview de archivos sin tocar web-prueba ni ejecutar writes.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'materialize-fullstack-local-plan' &&
+      decision.executionMode === 'executor' &&
+      decision.nextExpectedAction === 'execute-plan' &&
+      decision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.materializationPlanChanged === false &&
+      decision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.executionScopeChanged === false,
+    'La approval surface no debe cambiar strategy, executionMode, nextExpectedAction, materializationPlan real ni executionScope real.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generatedDomainMaterializationApprovalSurface') &&
+      mainSource.includes('generated-domain-materialization:approval-surface') &&
+      mainSource.includes('buildGeneratedDomainMaterializationApprovalSurface'),
+    'main.cjs debe adjuntar y loguear generated-domain-materialization:approval-surface.',
+  )
+
+  return {
+    id: 'generated-domain-materialization-approval-surface',
+    label: 'Generated domain materialization approval surface',
+    failures,
+  }
+}
+
 async function runGeneratedDomainFileCreationApprovalEvaluationPayloadCase() {
   const failures = []
   const decision = createAlignedGeneratedDomainObservationDecision({
@@ -12453,6 +12511,7 @@ async function main() {
     results.push(await runGeneratedDomainUniversalMaterializationPlanPayloadCase())
     results.push(await runGeneratedDomainMaterializationPlanDecouplingPayloadCase())
     results.push(await runGeneratedDomainControlledRuntimeMaterializationSourcePayloadCase())
+    results.push(await runGeneratedDomainMaterializationApprovalSurfacePayloadCase())
     results.push(await runGeneratedDomainFileCreationApprovalEvaluationPayloadCase())
     results.push(await runGeneratedDomainUniversalMaterializationPlanPreviewPayloadCase())
     results.push(

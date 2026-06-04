@@ -345,6 +345,43 @@ function summarizeGeneratedDomainMaterializationApprovalPayloadForDebug(payload)
   }
 }
 
+function summarizeGeneratedDomainMaterializationApprovalSurfaceForDebug(surface) {
+  if (!surface || typeof surface !== 'object') {
+    return {
+      present: false,
+      built: false,
+      status: 'not-available',
+    }
+  }
+
+  const blockerSummary = summarizeDebugEntries(surface.blockers)
+  const warningSummary = summarizeDebugEntries(surface.warnings)
+  const errorSummary = summarizeDebugEntries(surface.errors)
+
+  return {
+    present: surface.present === true,
+    built: surface.built === true,
+    status:
+      typeof surface.status === 'string' && surface.status.trim()
+        ? surface.status.trim()
+        : 'not-available',
+    behaviorChanged: surface.behaviorChanged === true,
+    requiresLeanApproval: surface.review?.requiresLeanApproval !== false,
+    approvalState:
+      normalizeOptionalString(surface.review?.approvalState) || 'not-requested',
+    approvalMode:
+      normalizeOptionalString(surface.review?.approvalMode) || 'manual-review',
+    root: normalizeOptionalString(surface.target?.root) || undefined,
+    filesCount: Number.isInteger(surface.files?.total) ? surface.files.total : 0,
+    blockedCount: Number.isInteger(surface.files?.blocked) ? surface.files.blocked : 0,
+    warningsCount: Array.isArray(surface.warnings) ? surface.warnings.length : 0,
+    errorsCount: Array.isArray(surface.errors) ? surface.errors.length : 0,
+    ...(blockerSummary.firstEntry ? { firstBlocker: blockerSummary.firstEntry } : {}),
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
 function summarizeGeneratedDomainRuntimeShadowReadinessDecisionForDebug(decision) {
   if (!decision || typeof decision !== 'object') {
     return {
@@ -2579,6 +2616,398 @@ function resolveGeneratedDomainControlledRuntimeMaterializationSource({
   }
 }
 
+function buildGeneratedDomainMaterializationApprovalSurface({
+  generatedDomainFileCreationApprovalPolicy,
+  generatedDomainFileCreationApprovalEvaluation,
+  generatedDomainMaterializationApprovalPayload,
+  generatedDomainUniversalMaterializationPlan,
+  generatedDomainControlledRuntimeMaterializationSource,
+  generatedDomainRuntimeShadowReadinessDecision,
+}) {
+  const emptySurface = {
+    present: false,
+    built: false,
+    status: 'not-available',
+    source: 'generated-domain-materialization-approval',
+    behaviorChanged: false,
+    review: {
+      title: '',
+      summary: '',
+      nextAction: '',
+      requiresLeanApproval: true,
+      approvalState: 'not-requested',
+      approvalMode: 'manual-review',
+    },
+    target: {
+      root: null,
+      sourceRoot: null,
+      targetRoot: null,
+      isSandbox: false,
+      isWebPrueba: false,
+      isSafeRoot: false,
+    },
+    files: {
+      total: 0,
+      toCreate: 0,
+      toModify: 0,
+      blocked: 0,
+      preview: [],
+    },
+    safety: {
+      noDotEnv: false,
+      noNodeModules: false,
+      noDocker: false,
+      noDeploy: false,
+      noExternalServices: false,
+      noRealPayments: false,
+      noProductionDb: false,
+      noCredentials: false,
+      noWebPrueba: false,
+    },
+    validations: {
+      planned: [],
+      required: [],
+      commands: [],
+      fileChecks: [],
+      manualChecks: [],
+    },
+    blockers: [],
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  const approvalPolicy =
+    generatedDomainFileCreationApprovalPolicy &&
+    typeof generatedDomainFileCreationApprovalPolicy === 'object'
+      ? generatedDomainFileCreationApprovalPolicy
+      : null
+  const approvalEvaluation =
+    generatedDomainFileCreationApprovalEvaluation &&
+    typeof generatedDomainFileCreationApprovalEvaluation === 'object'
+      ? generatedDomainFileCreationApprovalEvaluation
+      : null
+  const approvalPayload =
+    generatedDomainMaterializationApprovalPayload &&
+    typeof generatedDomainMaterializationApprovalPayload === 'object'
+      ? generatedDomainMaterializationApprovalPayload
+      : null
+  const universalPlan =
+    generatedDomainUniversalMaterializationPlan &&
+    typeof generatedDomainUniversalMaterializationPlan === 'object'
+      ? generatedDomainUniversalMaterializationPlan
+      : null
+  const controlledRuntimeSource =
+    generatedDomainControlledRuntimeMaterializationSource &&
+    typeof generatedDomainControlledRuntimeMaterializationSource === 'object'
+      ? generatedDomainControlledRuntimeMaterializationSource
+      : null
+  const runtimeReadiness =
+    generatedDomainRuntimeShadowReadinessDecision &&
+    typeof generatedDomainRuntimeShadowReadinessDecision === 'object'
+      ? generatedDomainRuntimeShadowReadinessDecision
+      : null
+
+  if (
+    !approvalPolicy &&
+    !approvalEvaluation &&
+    !approvalPayload &&
+    !universalPlan &&
+    !controlledRuntimeSource &&
+    !runtimeReadiness
+  ) {
+    return emptySurface
+  }
+
+  try {
+    const blockers = []
+    const warnings = []
+    const errors = []
+    const pushMessage = (target, message) => pushUniqueMessage(target, message)
+    const root =
+      normalizeOptionalString(approvalPayload?.review?.root) ||
+      normalizeOptionalString(universalPlan?.projectRoot) ||
+      null
+    const sourceRoot =
+      normalizeOptionalString(approvalPayload?.review?.sourceRoot) ||
+      normalizeOptionalString(universalPlan?.sourceRoot) ||
+      null
+    const targetRoot =
+      normalizeOptionalString(approvalPayload?.review?.targetRoot) ||
+      normalizeOptionalString(universalPlan?.targetRoot) ||
+      null
+    const sandboxRelative =
+      normalizeOptionalString(approvalEvaluation?.sandboxRoot?.relative) || ''
+    const isSandbox = Boolean(
+      sandboxRelative &&
+        !/(^|\/)web-prueba($|\/)/iu.test(sandboxRelative) &&
+        /(^|\/)\.codex-temp($|\/)|(^|\/)generated-domain-materialization-sandbox($|\/)/iu.test(
+          sandboxRelative,
+        ),
+    )
+    const isWebPrueba =
+      /(^|\/)web-prueba($|\/)/iu.test(root || '') ||
+      /(^|\/)web-prueba($|\/)/iu.test(targetRoot || '') ||
+      /(^|\/)web-prueba($|\/)/iu.test(sandboxRelative)
+    const isSafeRoot =
+      approvalEvaluation?.sandboxRoot?.withinWorkspace === true &&
+      isWebPrueba !== true &&
+      !/(^|\/)\.env(?:\..+)?($|\/)|(^|\/)node_modules($|\/)|(^|\/)(?:dockerfile|docker-compose\.ya?ml)($|\/)|(^|\/)deploy($|\/)/iu.test(
+        sandboxRelative || targetRoot || root || '',
+      )
+
+    const previewPaths = summarizeUniqueExecutorStrings(
+      [
+        ...(Array.isArray(approvalPayload?.review?.filesPreview)
+          ? approvalPayload.review.filesPreview
+          : []),
+        ...(Array.isArray(approvalPayload?.review?.pathsPreview)
+          ? approvalPayload.review.pathsPreview
+          : []),
+        ...(Array.isArray(universalPlan?.filesToCreate)
+          ? universalPlan.filesToCreate.map((entry) => normalizeOptionalString(entry?.path))
+          : []),
+      ],
+      24,
+    ).filter(Boolean)
+    const toCreate = Array.isArray(universalPlan?.filesToCreate)
+      ? universalPlan.filesToCreate.length
+      : Array.isArray(approvalPayload?.review?.filesPreview)
+        ? approvalPayload.review.filesPreview.length
+        : 0
+    const blockedCount = Array.isArray(approvalEvaluation?.blockedFiles)
+      ? approvalEvaluation.blockedFiles.length
+      : 0
+
+    const safety = {
+      noDotEnv: approvalPolicy?.safeguards?.noDotEnv === true,
+      noNodeModules: approvalPolicy?.safeguards?.noNodeModules === true,
+      noDocker: approvalPolicy?.safeguards?.noDocker === true,
+      noDeploy: approvalPolicy?.safeguards?.noDeploy === true,
+      noExternalServices: approvalPolicy?.safeguards?.noExternalServices === true,
+      noRealPayments: approvalPolicy?.safeguards?.noRealPayments === true,
+      noProductionDb: approvalPolicy?.safeguards?.noProductionDb === true,
+      noCredentials: approvalPolicy?.safeguards?.noCredentials === true,
+      noWebPrueba: approvalPolicy?.safeguards?.noWebPrueba === true,
+    }
+
+    const validationFileChecks = summarizeUniqueExecutorStrings(
+      Array.isArray(universalPlan?.fileChecks)
+        ? universalPlan.fileChecks.map((entry) => normalizeOptionalString(entry?.path))
+        : [],
+      24,
+    ).filter(Boolean)
+    const validationCommands = summarizeUniqueExecutorStrings(
+      Array.isArray(universalPlan?.validationPlan?.commands)
+        ? universalPlan.validationPlan.commands
+        : [],
+      16,
+    )
+    const manualChecks = summarizeUniqueExecutorStrings(
+      [
+        ...(Array.isArray(approvalPayload?.validations) ? approvalPayload.validations : []),
+        ...(Array.isArray(universalPlan?.validationPlan?.manualChecks)
+          ? universalPlan.validationPlan.manualChecks
+          : []),
+      ],
+      24,
+    )
+    const plannedChecks = summarizeUniqueExecutorStrings(
+      [
+        ...(Array.isArray(universalPlan?.validationPlan?.checks)
+          ? universalPlan.validationPlan.checks
+          : []),
+        ...(Array.isArray(universalPlan?.validationPlan?.steps)
+          ? universalPlan.validationPlan.steps
+          : []),
+      ],
+      24,
+    )
+    const requiredChecks = summarizeUniqueExecutorStrings(
+      Array.isArray(universalPlan?.requiredPathGroups)
+        ? universalPlan.requiredPathGroups.flatMap((group) =>
+            Array.isArray(group?.candidates) ? group.candidates : [],
+          )
+        : [],
+      24,
+    )
+
+    if (isWebPrueba) {
+      pushMessage(blockers, 'web-prueba sigue bloqueado para cualquier aprobacion de materializacion.')
+    }
+    if (blockedCount > 0) {
+      pushMessage(
+        blockers,
+        'La aprobacion todavia detecta archivos bloqueados por rutas prohibidas o fuera del sandbox.',
+      )
+      for (const blockedFile of approvalEvaluation?.blockedFiles || []) {
+        const blockedPath = normalizeOptionalString(blockedFile?.path)
+        const blockedReason = normalizeOptionalString(blockedFile?.reason)
+        if (blockedPath || blockedReason) {
+          pushMessage(
+            blockers,
+            `Archivo bloqueado: ${blockedPath || 'path-desconocido'} (${blockedReason || 'blocked'}).`,
+          )
+        }
+      }
+    }
+    if (approvalEvaluation?.status === 'blocked') {
+      for (const reason of approvalEvaluation.reasons || []) {
+        pushMessage(blockers, reason)
+      }
+    }
+    for (const blockedReason of approvalPayload?.blockedReasons || []) {
+      pushMessage(blockers, blockedReason)
+    }
+    for (const warning of approvalPayload?.warnings || []) {
+      pushMessage(warnings, warning)
+    }
+    for (const warning of approvalEvaluation?.warnings || []) {
+      pushMessage(warnings, warning)
+    }
+    for (const warning of controlledRuntimeSource?.warnings || []) {
+      pushMessage(warnings, warning)
+    }
+    for (const blocker of controlledRuntimeSource?.blockers || []) {
+      pushMessage(blockers, blocker)
+    }
+    for (const error of approvalPayload?.errors || []) {
+      pushMessage(errors, error)
+    }
+    for (const error of approvalEvaluation?.errors || []) {
+      pushMessage(errors, error)
+    }
+    for (const error of controlledRuntimeSource?.errors || []) {
+      pushMessage(errors, error)
+    }
+    if (approvalPayload?.present !== true) {
+      pushMessage(warnings, 'La surface todavia depende de approval payload parcial o no disponible.')
+    }
+    if (runtimeReadiness?.runtimeEnabled === true) {
+      pushMessage(errors, 'El runtime controlado no deberia activarse para esta surface observacional.')
+    }
+
+    let status = 'not-available'
+    let approvalState = 'not-requested'
+    let approvalMode = 'manual-review'
+    let nextAction =
+      'Revisar root, archivos, exclusions y riesgos antes de cualquier aprobacion manual.'
+    let summary =
+      'La surface expone el alcance de una materializacion segura sin ejecutar writes reales.'
+
+    if (errors.length > 0) {
+      status = 'error'
+      approvalState = 'error'
+      nextAction = 'Investigar los errores antes de volver a revisar la aprobacion.'
+      summary =
+        'La surface encontro errores internos y mantiene cualquier materializacion real apagada.'
+    } else if (
+      normalizeOptionalString(controlledRuntimeSource?.mode) === 'blocked' ||
+      isWebPrueba ||
+      blockedCount > 0 ||
+      (blockers.length > 0 && approvalEvaluation?.approved === true)
+    ) {
+      status = 'blocked'
+      approvalState = 'blocked'
+      nextAction =
+        'Corregir blockers de root, archivos o policy antes de solicitar una aprobacion nueva.'
+      summary =
+        'La surface bloquea la materializacion porque detecto rutas o señales incompatibles con seguridad local.'
+    } else if (approvalEvaluation?.status === 'approved-for-sandbox') {
+      status = 'approved-for-sandbox'
+      approvalState = 'approved'
+      approvalMode = 'sandbox-only'
+      nextAction =
+        'El harness puede materializar en sandbox seguro; el runtime normal sigue apagado.'
+      summary =
+        'La aprobacion actual solo habilita sandbox interno seguro, con fallback legacy intacto.'
+    } else if (universalPlan?.built === true && approvalPolicy?.approvalRequired === true) {
+      status = 'ready-for-review'
+      approvalState = 'pending-review'
+      nextAction =
+        'Lean puede revisar root, files preview, validations y blockers antes de aprobar sandbox.'
+      summary =
+        'La surface esta lista para revision manual: muestra el alcance del plan universal sin ejecutar materializacion.'
+    } else if (approvalPayload?.present === true || approvalPolicy?.present === true) {
+      status = 'blocked'
+      approvalState = 'blocked'
+      nextAction =
+        'Completar plan, policy o root seguro antes de presentar una aprobacion utilizable.'
+      summary =
+        'La surface todavia no tiene evidencia suficiente para una revision segura de materializacion.'
+    }
+
+    return {
+      ...emptySurface,
+      present: true,
+      built:
+        universalPlan?.built === true &&
+        approvalPayload?.present === true &&
+        approvalPolicy?.present === true,
+      status,
+      review: {
+        title:
+          universalPlan?.built === true
+            ? 'Approval review for generated domain materialization'
+            : 'Approval review unavailable',
+        summary,
+        nextAction,
+        requiresLeanApproval: approvalPolicy?.requiresLeanApproval !== false,
+        approvalState,
+        approvalMode,
+      },
+      target: {
+        root,
+        sourceRoot,
+        targetRoot,
+        isSandbox,
+        isWebPrueba,
+        isSafeRoot,
+      },
+      files: {
+        total: previewPaths.length,
+        toCreate,
+        toModify: 0,
+        blocked: blockedCount,
+        preview: previewPaths,
+      },
+      safety,
+      validations: {
+        planned: plannedChecks,
+        required: requiredChecks,
+        commands: validationCommands,
+        fileChecks: validationFileChecks,
+        manualChecks,
+      },
+      blockers,
+      warnings,
+      errors,
+      warningsCount: warnings.length,
+      errorsCount: errors.length,
+    }
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : normalizeOptionalString(String(error)) || 'error'
+
+    return {
+      ...emptySurface,
+      present: true,
+      built: false,
+      status: 'error',
+      review: {
+        ...emptySurface.review,
+        title: 'Approval review unavailable',
+        summary: 'La surface devolvio un error interno y mantiene la materializacion apagada.',
+        nextAction: 'Investigar el error antes de presentar una aprobacion manual.',
+        approvalState: 'error',
+      },
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
 function buildGeneratedDomainMvpReadinessExecutiveReport({
   generatedDomainContractDiagnostics,
   generatedDomainUniversalMaterializationPlanPreview,
@@ -2915,6 +3344,7 @@ module.exports = {
   summarizeGeneratedDomainFirstControlledEnableScenarioForDebug,
   summarizeGeneratedDomainFileCreationApprovalPolicyForDebug,
   summarizeGeneratedDomainMaterializationApprovalPayloadForDebug,
+  summarizeGeneratedDomainMaterializationApprovalSurfaceForDebug,
   summarizeGeneratedDomainRuntimeShadowReadinessDecisionForDebug,
   summarizeGeneratedDomainControlledRuntimeMaterializationSourceForDebug,
   summarizeGeneratedDomainMvpReadinessExecutiveReportForDebug,
@@ -2923,6 +3353,7 @@ module.exports = {
   buildGeneratedDomainControlledEnablePolicy,
   buildGeneratedDomainFirstControlledEnableScenario,
   buildGeneratedDomainMaterializationApprovalPayload,
+  buildGeneratedDomainMaterializationApprovalSurface,
   buildGeneratedDomainRuntimeShadowReadinessDecision,
   resolveGeneratedDomainControlledRuntimeMaterializationSource,
   buildGeneratedDomainMvpReadinessExecutiveReport,
