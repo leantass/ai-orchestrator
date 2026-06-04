@@ -39,6 +39,7 @@ import {
   getValidationStatusLabel,
 } from './project-state-labels'
 import {
+  buildPlannerApprovalSurfaceViewModel,
   canGenerateContinuationReviewFallbackForUi,
   canPrepareProjectContinuityNextActionForUi,
   derivePlannerNextExpectedActionForUi,
@@ -832,6 +833,65 @@ type ProjectWorkMode = 'auto' | 'new-project' | 'continue-existing'
 
 type MaterializationPlanContract = Record<string, unknown>
 
+type GeneratedDomainMaterializationApprovalSurfaceContract = {
+  present: boolean
+  built?: boolean
+  status?: string
+  source?: string
+  behaviorChanged?: boolean
+  review?: {
+    title?: string
+    summary?: string
+    nextAction?: string
+    requiresLeanApproval?: boolean
+    approvalState?: string
+    approvalMode?: string
+  } | null
+  target?: {
+    root?: string
+    sourceRoot?: string
+    targetRoot?: string
+    isSandbox?: boolean
+    isWebPrueba?: boolean
+    isSafeRoot?: boolean
+  } | null
+  files?: {
+    total?: number
+    toCreate?: number
+    toModify?: number
+    blocked?: number
+    preview?: string[]
+  } | null
+  safety?: {
+    noDotEnv?: boolean
+    noNodeModules?: boolean
+    noDocker?: boolean
+    noDeploy?: boolean
+    noExternalServices?: boolean
+    noRealPayments?: boolean
+    noProductionDb?: boolean
+    noCredentials?: boolean
+    noWebPrueba?: boolean
+  } | null
+  validations?: {
+    planned?: string[]
+    required?: string[]
+    commands?: string[]
+    manualChecks?: string[]
+    fileChecks?: Array<{
+      path?: string
+      expectation?: string
+      expectedKind?: string
+      type?: string
+    }>
+  } | null
+  blockers?: string[]
+  warnings?: string[]
+  errors?: string[]
+  warningsCount?: number
+  errorsCount?: number
+} | null
+
 type PlannerExecutionMetadata = {
   approvalRequired: boolean
   requiresApproval: boolean
@@ -935,6 +995,7 @@ type PlannerExecutionMetadata = {
     errorPreview?: string
     elapsedMs?: number
   } | null
+  generatedDomainMaterializationApprovalSurface: GeneratedDomainMaterializationApprovalSurfaceContract
 }
 
 type PlannerRequestSnapshot = {
@@ -1206,6 +1267,7 @@ type PlannerDecisionResponse = {
   generatedDomainContractDiagnostics?: PlannerExecutionMetadata['generatedDomainContractDiagnostics']
   generatedDomainContractComparison?: PlannerExecutionMetadata['generatedDomainContractComparison']
   generatedDomainContractObservation?: PlannerExecutionMetadata['generatedDomainContractObservation']
+  generatedDomainMaterializationApprovalSurface?: PlannerExecutionMetadata['generatedDomainMaterializationApprovalSurface']
   brainAdapter?: {
     id?: string
   }
@@ -1455,6 +1517,7 @@ const EMPTY_PLANNER_EXECUTION_METADATA: PlannerExecutionMetadata = {
   generatedDomainContractDiagnostics: null,
   generatedDomainContractComparison: null,
   generatedDomainContractObservation: null,
+  generatedDomainMaterializationApprovalSurface: null,
 }
 
 const buildSafeFirstDeliveryReviewMetadata = ({
@@ -1495,6 +1558,8 @@ const buildSafeFirstDeliveryReviewMetadata = ({
   generatedDomainContractDiagnostics: baseMetadata.generatedDomainContractDiagnostics,
   generatedDomainContractComparison: baseMetadata.generatedDomainContractComparison,
   generatedDomainContractObservation: baseMetadata.generatedDomainContractObservation,
+  generatedDomainMaterializationApprovalSurface:
+    baseMetadata.generatedDomainMaterializationApprovalSurface,
   decisionKey: 'safe-first-delivery-plan',
   strategy: 'safe-first-delivery-plan',
   executionMode: 'planner-only',
@@ -3788,6 +3853,198 @@ const normalizeDomainUnderstandingContract = (
   return Object.keys(normalizedValue).length > 0 ? normalizedValue : null
 }
 
+const normalizeGeneratedDomainMaterializationApprovalSurfaceContract = (
+  value: unknown,
+): GeneratedDomainMaterializationApprovalSurfaceContract => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const contract = value as NonNullable<GeneratedDomainMaterializationApprovalSurfaceContract>
+  const normalizedFileChecks = Array.isArray(contract.validations?.fileChecks)
+    ? contract.validations.fileChecks
+        .map((entry) =>
+          entry && typeof entry === 'object'
+            ? {
+                ...(normalizeOptionalString(entry.path)
+                  ? { path: normalizeOptionalString(entry.path) }
+                  : {}),
+                ...(normalizeOptionalString(entry.expectation)
+                  ? { expectation: normalizeOptionalString(entry.expectation) }
+                  : {}),
+                ...(normalizeOptionalString(entry.expectedKind)
+                  ? { expectedKind: normalizeOptionalString(entry.expectedKind) }
+                  : {}),
+                ...(normalizeOptionalString(entry.type)
+                  ? { type: normalizeOptionalString(entry.type) }
+                  : {}),
+              }
+            : null,
+        )
+        .filter(
+          (
+            entry,
+          ): entry is NonNullable<
+            NonNullable<
+              NonNullable<GeneratedDomainMaterializationApprovalSurfaceContract>['validations']
+            >['fileChecks']
+          >[number] => Boolean(entry) && Object.keys(entry).length > 0,
+        )
+    : []
+
+  const normalizedValue: NonNullable<GeneratedDomainMaterializationApprovalSurfaceContract> = {
+    present: contract.present === true,
+    ...(typeof contract.built === 'boolean' ? { built: contract.built } : {}),
+    ...(normalizeOptionalString(contract.status)
+      ? { status: normalizeOptionalString(contract.status) }
+      : {}),
+    ...(normalizeOptionalString(contract.source)
+      ? { source: normalizeOptionalString(contract.source) }
+      : {}),
+    ...(typeof contract.behaviorChanged === 'boolean'
+      ? { behaviorChanged: contract.behaviorChanged }
+      : {}),
+    ...(contract.review && typeof contract.review === 'object'
+      ? {
+          review: {
+            ...(normalizeOptionalString(contract.review.title)
+              ? { title: normalizeOptionalString(contract.review.title) }
+              : {}),
+            ...(normalizeOptionalString(contract.review.summary)
+              ? { summary: normalizeOptionalString(contract.review.summary) }
+              : {}),
+            ...(normalizeOptionalString(contract.review.nextAction)
+              ? { nextAction: normalizeOptionalString(contract.review.nextAction) }
+              : {}),
+            ...(typeof contract.review.requiresLeanApproval === 'boolean'
+              ? { requiresLeanApproval: contract.review.requiresLeanApproval }
+              : {}),
+            ...(normalizeOptionalString(contract.review.approvalState)
+              ? {
+                  approvalState: normalizeOptionalString(contract.review.approvalState),
+                }
+              : {}),
+            ...(normalizeOptionalString(contract.review.approvalMode)
+              ? { approvalMode: normalizeOptionalString(contract.review.approvalMode) }
+              : {}),
+          },
+        }
+      : {}),
+    ...(contract.target && typeof contract.target === 'object'
+      ? {
+          target: {
+            ...(normalizeOptionalString(contract.target.root)
+              ? { root: normalizeOptionalString(contract.target.root) }
+              : {}),
+            ...(normalizeOptionalString(contract.target.sourceRoot)
+              ? { sourceRoot: normalizeOptionalString(contract.target.sourceRoot) }
+              : {}),
+            ...(normalizeOptionalString(contract.target.targetRoot)
+              ? { targetRoot: normalizeOptionalString(contract.target.targetRoot) }
+              : {}),
+            ...(typeof contract.target.isSandbox === 'boolean'
+              ? { isSandbox: contract.target.isSandbox }
+              : {}),
+            ...(typeof contract.target.isWebPrueba === 'boolean'
+              ? { isWebPrueba: contract.target.isWebPrueba }
+              : {}),
+            ...(typeof contract.target.isSafeRoot === 'boolean'
+              ? { isSafeRoot: contract.target.isSafeRoot }
+              : {}),
+          },
+        }
+      : {}),
+    ...(contract.files && typeof contract.files === 'object'
+      ? {
+          files: {
+            ...(Number.isInteger(contract.files.total) ? { total: contract.files.total } : {}),
+            ...(Number.isInteger(contract.files.toCreate)
+              ? { toCreate: contract.files.toCreate }
+              : {}),
+            ...(Number.isInteger(contract.files.toModify)
+              ? { toModify: contract.files.toModify }
+              : {}),
+            ...(Number.isInteger(contract.files.blocked)
+              ? { blocked: contract.files.blocked }
+              : {}),
+            ...(normalizeOptionalStringArray(contract.files.preview).length > 0
+              ? { preview: normalizeOptionalStringArray(contract.files.preview) }
+              : {}),
+          },
+        }
+      : {}),
+    ...(contract.safety && typeof contract.safety === 'object'
+      ? {
+          safety: {
+            ...(typeof contract.safety.noDotEnv === 'boolean'
+              ? { noDotEnv: contract.safety.noDotEnv }
+              : {}),
+            ...(typeof contract.safety.noNodeModules === 'boolean'
+              ? { noNodeModules: contract.safety.noNodeModules }
+              : {}),
+            ...(typeof contract.safety.noDocker === 'boolean'
+              ? { noDocker: contract.safety.noDocker }
+              : {}),
+            ...(typeof contract.safety.noDeploy === 'boolean'
+              ? { noDeploy: contract.safety.noDeploy }
+              : {}),
+            ...(typeof contract.safety.noExternalServices === 'boolean'
+              ? { noExternalServices: contract.safety.noExternalServices }
+              : {}),
+            ...(typeof contract.safety.noRealPayments === 'boolean'
+              ? { noRealPayments: contract.safety.noRealPayments }
+              : {}),
+            ...(typeof contract.safety.noProductionDb === 'boolean'
+              ? { noProductionDb: contract.safety.noProductionDb }
+              : {}),
+            ...(typeof contract.safety.noCredentials === 'boolean'
+              ? { noCredentials: contract.safety.noCredentials }
+              : {}),
+            ...(typeof contract.safety.noWebPrueba === 'boolean'
+              ? { noWebPrueba: contract.safety.noWebPrueba }
+              : {}),
+          },
+        }
+      : {}),
+    ...(contract.validations && typeof contract.validations === 'object'
+      ? {
+          validations: {
+            ...(normalizeOptionalStringArray(contract.validations.planned).length > 0
+              ? { planned: normalizeOptionalStringArray(contract.validations.planned) }
+              : {}),
+            ...(normalizeOptionalStringArray(contract.validations.required).length > 0
+              ? { required: normalizeOptionalStringArray(contract.validations.required) }
+              : {}),
+            ...(normalizeOptionalStringArray(contract.validations.commands).length > 0
+              ? { commands: normalizeOptionalStringArray(contract.validations.commands) }
+              : {}),
+            ...(normalizeOptionalStringArray(contract.validations.manualChecks).length > 0
+              ? { manualChecks: normalizeOptionalStringArray(contract.validations.manualChecks) }
+              : {}),
+            ...(normalizedFileChecks.length > 0 ? { fileChecks: normalizedFileChecks } : {}),
+          },
+        }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.blockers).length > 0
+      ? { blockers: normalizeOptionalStringArray(contract.blockers) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.warnings).length > 0
+      ? { warnings: normalizeOptionalStringArray(contract.warnings) }
+      : {}),
+    ...(normalizeOptionalStringArray(contract.errors).length > 0
+      ? { errors: normalizeOptionalStringArray(contract.errors) }
+      : {}),
+    ...(Number.isInteger(contract.warningsCount)
+      ? { warningsCount: contract.warningsCount }
+      : {}),
+    ...(Number.isInteger(contract.errorsCount)
+      ? { errorsCount: contract.errorsCount }
+      : {}),
+  }
+
+  return normalizedValue
+}
+
 const extractPlannerExecutionMetadata = (payload?: {
   approvalRequired?: boolean
   requiresApproval?: boolean
@@ -3832,7 +4089,9 @@ const extractPlannerExecutionMetadata = (payload?: {
   activeProjectContext?: ActiveProjectContextContract | null
   generatedDomainContract?: Record<string, unknown> | null
   generatedDomainContractDiagnostics?: PlannerExecutionMetadata['generatedDomainContractDiagnostics']
+  generatedDomainContractComparison?: PlannerExecutionMetadata['generatedDomainContractComparison']
   generatedDomainContractObservation?: PlannerExecutionMetadata['generatedDomainContractObservation']
+  generatedDomainMaterializationApprovalSurface?: PlannerExecutionMetadata['generatedDomainMaterializationApprovalSurface']
   tasks?: unknown[]
   assumptions?: string[]
 } | null): PlannerExecutionMetadata => {
@@ -4320,6 +4579,10 @@ const extractPlannerExecutionMetadata = (payload?: {
             : {}),
         }
       : null,
+  generatedDomainMaterializationApprovalSurface:
+    normalizeGeneratedDomainMaterializationApprovalSurfaceContract(
+      payload?.generatedDomainMaterializationApprovalSurface,
+    ),
   tasks: Array.isArray(payload?.tasks)
     ? payload.tasks
         .map((task) =>
@@ -13016,6 +13279,14 @@ function App() {
     effectivePlannerExecutionMetadata.generatedDomainContractComparison
   const activeGeneratedDomainContractDiagnostics =
     effectivePlannerExecutionMetadata.generatedDomainContractDiagnostics
+  const activeGeneratedDomainMaterializationApprovalSurface =
+    effectivePlannerExecutionMetadata.generatedDomainMaterializationApprovalSurface
+  const plannerApprovalSurfaceViewModel = buildPlannerApprovalSurfaceViewModel({
+    generatedDomainMaterializationApprovalSurface:
+      activeGeneratedDomainMaterializationApprovalSurface,
+    plannerExecutionMetadata,
+    effectivePlannerExecutionMetadata,
+  })
   const generatedDomainContractComparisonStatus = normalizeOptionalString(
     activeGeneratedDomainContractComparison?.status,
   )
@@ -13185,6 +13456,155 @@ function App() {
           <div className="mt-3 rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm leading-6 text-rose-50">
             <span className="font-semibold">Primer error:</span>{' '}
             {generatedDomainContractComparisonFirstError}
+          </div>
+        ) : null}
+      </article>
+    ) : null
+  const shouldShowGeneratedDomainMaterializationApprovalSurfaceCard =
+    plannerApprovalSurfaceViewModel.present === true
+  const generatedDomainMaterializationApprovalSurfaceStatus = normalizeOptionalString(
+    plannerApprovalSurfaceViewModel.status,
+  )
+  const generatedDomainMaterializationApprovalSurfaceFirstBlocker =
+    plannerApprovalSurfaceViewModel.blockers[0] || ''
+  const generatedDomainMaterializationApprovalSurfaceFirstWarning =
+    activeGeneratedDomainMaterializationApprovalSurface?.warnings?.[0] || ''
+  const generatedDomainMaterializationApprovalSurfaceFirstError =
+    activeGeneratedDomainMaterializationApprovalSurface?.errors?.[0] || ''
+  const generatedDomainMaterializationApprovalSurfaceStatusToneClass =
+    generatedDomainMaterializationApprovalSurfaceStatus === 'approved-for-sandbox'
+      ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100'
+      : generatedDomainMaterializationApprovalSurfaceStatus === 'ready-for-review'
+        ? 'border-sky-300/20 bg-sky-300/10 text-sky-100'
+        : generatedDomainMaterializationApprovalSurfaceStatus === 'blocked'
+          ? 'border-rose-300/20 bg-rose-300/10 text-rose-100'
+          : 'border-white/10 bg-white/5 text-slate-300'
+  const generatedDomainMaterializationApprovalSurfaceStatusLabel =
+    generatedDomainMaterializationApprovalSurfaceStatus === 'approved-for-sandbox'
+      ? 'Aprobado para sandbox'
+      : generatedDomainMaterializationApprovalSurfaceStatus === 'ready-for-review'
+        ? 'Listo para revision'
+        : generatedDomainMaterializationApprovalSurfaceStatus === 'blocked'
+          ? 'Bloqueado'
+          : 'No disponible'
+  const generatedDomainMaterializationApprovalSurfaceTechnicalCard =
+    shouldShowGeneratedDomainMaterializationApprovalSurfaceCard ? (
+      <article className="rounded-[28px] border border-white/8 bg-white/[0.03] p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Aprobacion de materializacion
+            </div>
+            <div className="mt-2 text-base font-semibold text-white">
+              Surface de revision previa
+            </div>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+              {plannerApprovalSurfaceViewModel.summary ||
+                'No ejecuta todavia. Solo resume archivos, riesgos y validaciones previas a una aprobacion explicita.'}
+            </p>
+          </div>
+          <div
+            className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${generatedDomainMaterializationApprovalSurfaceStatusToneClass}`}
+          >
+            {generatedDomainMaterializationApprovalSurfaceStatusLabel}
+          </div>
+        </div>
+        <div className="mt-4">
+          <ResultKeyValueGrid
+            items={[
+              {
+                label: 'Approval state',
+                value: plannerApprovalSurfaceViewModel.approvalState || 'not-available',
+              },
+              {
+                label: 'Root',
+                value: plannerApprovalSurfaceViewModel.root || 'No disponible',
+              },
+              {
+                label: 'Files',
+                value: `${plannerApprovalSurfaceViewModel.filesCount} archivo(s)`,
+              },
+              {
+                label: 'Blockers',
+                value: `${plannerApprovalSurfaceViewModel.blockedCount} bloqueo(s)`,
+              },
+              {
+                label: 'Warnings',
+                value: `${plannerApprovalSurfaceViewModel.warningsCount} warning(s)`,
+              },
+              {
+                label: 'Errors',
+                value: `${plannerApprovalSurfaceViewModel.errorsCount} error(s)`,
+              },
+              {
+                label: 'Lean approval',
+                value:
+                  plannerApprovalSurfaceViewModel.requiresLeanApproval === true
+                    ? 'Requerida'
+                    : 'No requerida',
+              },
+              {
+                label: 'Next action',
+                value:
+                  plannerApprovalSurfaceViewModel.nextActionLabel || 'Preparar revision',
+              },
+            ]}
+          />
+        </div>
+        {plannerApprovalSurfaceViewModel.safetyLabels.length > 0 ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {plannerApprovalSurfaceViewModel.safetyLabels.map((label) => (
+              <span
+                key={`approval-safety-${label}`}
+                className="rounded-full border border-white/10 bg-slate-950/50 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-slate-300"
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        ) : null}
+        {plannerApprovalSurfaceViewModel.validations.length > 0 ? (
+          <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/50 p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Validaciones principales
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {plannerApprovalSurfaceViewModel.validations.map((entry) => (
+                <span
+                  key={`approval-validation-${entry}`}
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-200"
+                >
+                  {entry}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        <div className="mt-4 rounded-2xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm leading-6 text-sky-50">
+          <span className="font-semibold">No ejecuta todavia.</span>{' '}
+          {generatedDomainMaterializationApprovalSurfaceStatus === 'approved-for-sandbox'
+            ? 'Solo sandbox/harness aprobado.'
+            : 'Requiere aprobacion explicita antes de cualquier materializacion controlada.'}
+        </div>
+        {generatedDomainMaterializationApprovalSurfaceFirstBlocker ? (
+          <div className="mt-3 rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm leading-6 text-rose-50">
+            <span className="font-semibold">Primer bloqueo:</span>{' '}
+            {generatedDomainMaterializationApprovalSurfaceFirstBlocker}
+          </div>
+        ) : null}
+        {!generatedDomainMaterializationApprovalSurfaceFirstBlocker &&
+        generatedDomainMaterializationApprovalSurfaceFirstWarning ? (
+          <div className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm leading-6 text-amber-50">
+            <span className="font-semibold">Primer warning:</span>{' '}
+            {generatedDomainMaterializationApprovalSurfaceFirstWarning}
+          </div>
+        ) : null}
+        {!generatedDomainMaterializationApprovalSurfaceFirstBlocker &&
+        !generatedDomainMaterializationApprovalSurfaceFirstWarning &&
+        generatedDomainMaterializationApprovalSurfaceFirstError ? (
+          <div className="mt-3 rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm leading-6 text-rose-50">
+            <span className="font-semibold">Primer error:</span>{' '}
+            {generatedDomainMaterializationApprovalSurfaceFirstError}
           </div>
         ) : null}
       </article>
@@ -21460,6 +21880,7 @@ function App() {
               />
             </div>
             {generatedDomainContractComparisonTechnicalCard}
+            {generatedDomainMaterializationApprovalSurfaceTechnicalCard}
             {activeProductArchitecture ? (
               <ProductArchitectureCard
                 architecture={activeProductArchitecture}
@@ -24490,6 +24911,7 @@ function App() {
                 </div>
 
                 {generatedDomainContractComparisonTechnicalCard}
+                {generatedDomainMaterializationApprovalSurfaceTechnicalCard}
 
                 {activeProductArchitecture ? (
                   <ProductArchitectureCard

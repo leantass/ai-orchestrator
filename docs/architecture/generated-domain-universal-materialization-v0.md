@@ -964,3 +964,48 @@ Validacion manual futura requerida:
 - confirmacion visual del layout final en renderer
 - decision humana real de Lean antes de cualquier approval fuera de harness
 - cualquier aprobacion sobre proyectos externos o fuera del sandbox interno
+
+## 29. UI approval surface consumption v0.1
+
+Que muestra ahora el renderer:
+
+- una tarjeta tecnica compacta de `Aprobacion de materializacion`
+- `status`, `approvalState` y `nextAction`
+- `root` objetivo
+- cantidad de archivos propuestos
+- cantidad de bloqueos, warnings y errors
+- safety labels:
+- sin `.env`
+- sin `node_modules`
+- sin Docker
+- sin deploy
+- sin servicios externos
+- sin `web-prueba`
+- validaciones principales derivadas del payload backend
+
+Que NO ejecuta:
+
+- no agrega botones de write real
+- no dispara materializacion desde la UI
+- no cambia el CTA principal actual
+- no promueve `generated-domain-universal` como runtime general
+
+Como se conecta con backend:
+
+- consume `generatedDomainMaterializationApprovalSurface`
+- usa `buildPlannerApprovalSurfaceViewModel(...)` para normalizar lectura en renderer
+- reutiliza la signal de approval ya calculada por backend/policy
+- no recalcula safety ni approval desde Electron visual
+
+Como se mantiene seguro:
+
+- la UI sigue mostrando un estado de solo lectura
+- conserva el texto `No ejecuta todavia`
+- cuando hay aprobacion de harness solo expone `approved-for-sandbox`
+- cualquier `web-prueba`, `.env`, `node_modules`, Docker o deploy sigue entrando como `blocked`
+
+Validacion manual futura pendiente:
+
+- revisar el layout visual final en Electron renderer real
+- decidir si la tarjeta vive solo en advanced mode o tambien en vistas resumidas
+- definir un flujo humano real de approval antes de habilitar cualquier accion de escritura

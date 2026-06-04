@@ -4,6 +4,7 @@ import vm from 'node:vm'
 import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
+  buildPlannerApprovalSurfaceViewModel,
   canGenerateContinuationReviewFallbackForUi,
   canPrepareProjectContinuityNextActionForUi,
   derivePlannerMaterializationUiState,
@@ -9375,6 +9376,14 @@ async function runGeneratedDomainMaterializationApprovalSurfacePayloadCase() {
   const decision = createAlignedGeneratedDomainObservationDecision({
     decisionKey: 'generated-domain-materialization-approval-surface',
   })
+  const appSource = fs.readFileSync(appFilePath, 'utf8')
+  const plannerUiStateSource = fs.readFileSync(plannerUiStateFilePath, 'utf8')
+  const approvalSurfaceViewModel = buildPlannerApprovalSurfaceViewModel({
+    generatedDomainMaterializationApprovalSurface:
+      decision.generatedDomainMaterializationApprovalSurface,
+    plannerExecutionMetadata: decision,
+    effectivePlannerExecutionMetadata: decision,
+  })
 
   pushFailure(
     failures,
@@ -9404,6 +9413,15 @@ async function runGeneratedDomainMaterializationApprovalSurfacePayloadCase() {
   )
   pushFailure(
     failures,
+    approvalSurfaceViewModel.present === true &&
+      approvalSurfaceViewModel.status === 'ready-for-review' &&
+      approvalSurfaceViewModel.filesCount > 0 &&
+      approvalSurfaceViewModel.safetyLabels.includes('Sin .env') &&
+      approvalSurfaceViewModel.nextActionLabel === 'Revisar aprobacion',
+    'buildPlannerApprovalSurfaceViewModel debe resumir la approval surface en un view model de solo lectura con labels seguros para el renderer.',
+  )
+  pushFailure(
+    failures,
     decision.strategy === 'materialize-fullstack-local-plan' &&
       decision.executionMode === 'executor' &&
       decision.nextExpectedAction === 'execute-plan' &&
@@ -9412,6 +9430,16 @@ async function runGeneratedDomainMaterializationApprovalSurfacePayloadCase() {
       decision.generatedDomainMaterializationSourceResolution?.runtime
         ?.executionScopeChanged === false,
     'La approval surface no debe cambiar strategy, executionMode, nextExpectedAction, materializationPlan real ni executionScope real.',
+  )
+  pushFailure(
+    failures,
+    plannerUiStateSource.includes('buildPlannerApprovalSurfaceViewModel') &&
+      appSource.includes('generatedDomainMaterializationApprovalSurface') &&
+      appSource.includes('Aprobacion de materializacion') &&
+      appSource.includes('No ejecuta todavia.') &&
+      !appSource.includes('Ejecutar aprobacion') &&
+      !appSource.includes('Materializar aprobacion'),
+    'App.tsx y planner-ui-state.js deben consumir generatedDomainMaterializationApprovalSurface como lectura tecnica sin agregar ejecucion directa.',
   )
   pushFailure(
     failures,

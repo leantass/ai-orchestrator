@@ -8,6 +8,9 @@ const normalizeOptionalStringArray = (value) =>
 
 const uniqueStringsForUi = (values) => [...new Set(normalizeOptionalStringArray(values))]
 
+const normalizeOptionalInteger = (value, fallback = 0) =>
+  Number.isInteger(value) && value >= 0 ? value : fallback
+
 const normalizeContinuationActionCandidateForUi = (value) => {
   if (!value || typeof value !== 'object') {
     return null
@@ -837,6 +840,154 @@ export const inspectPreparedFullstackLocalMaterialization = ({
     reason: 'Contrato fullstack local válido.',
     missingRequiredPaths,
     forbiddenSignalsFound,
+  }
+}
+
+export const buildPlannerApprovalSurfaceViewModel = ({
+  generatedDomainMaterializationApprovalSurface,
+  plannerExecutionMetadata,
+  effectivePlannerExecutionMetadata,
+} = {}) => {
+  const surface =
+    generatedDomainMaterializationApprovalSurface &&
+    typeof generatedDomainMaterializationApprovalSurface === 'object'
+      ? generatedDomainMaterializationApprovalSurface
+      : null
+
+  if (!surface) {
+    return {
+      present: false,
+      status: 'not-available',
+      title: 'Aprobacion de materializacion',
+      summary: 'Todavia no hay una surface de aprobacion lista para revisar.',
+      approvalState: 'not-available',
+      requiresLeanApproval: false,
+      root: '',
+      filesCount: 0,
+      blockedCount: 0,
+      warningsCount: 0,
+      errorsCount: 0,
+      safetyLabels: [],
+      validations: [],
+      blockers: [],
+      nextActionLabel: 'Preparar revision',
+    }
+  }
+
+  const review =
+    surface.review && typeof surface.review === 'object' ? surface.review : {}
+  const target =
+    surface.target && typeof surface.target === 'object' ? surface.target : {}
+  const files = surface.files && typeof surface.files === 'object' ? surface.files : {}
+  const safety =
+    surface.safety && typeof surface.safety === 'object' ? surface.safety : {}
+  const validations =
+    surface.validations && typeof surface.validations === 'object'
+      ? surface.validations
+      : {}
+  const currentMetadata =
+    plannerExecutionMetadata && typeof plannerExecutionMetadata === 'object'
+      ? plannerExecutionMetadata
+      : {}
+  const effectiveMetadata =
+    effectivePlannerExecutionMetadata &&
+    typeof effectivePlannerExecutionMetadata === 'object'
+      ? effectivePlannerExecutionMetadata
+      : currentMetadata
+  const status = normalizeOptionalString(surface.status) || 'not-available'
+  const blockers = uniqueStringsForUi(surface.blockers)
+  const warnings = uniqueStringsForUi(surface.warnings)
+  const errors = uniqueStringsForUi(surface.errors)
+  const filesPreview = uniqueStringsForUi(files.preview)
+  const validationEntries = uniqueStringsForUi([
+    ...normalizeOptionalStringArray(validations.planned),
+    ...normalizeOptionalStringArray(validations.required),
+    ...normalizeOptionalStringArray(validations.manualChecks),
+    ...normalizeOptionalStringArray(validations.commands),
+    ...((Array.isArray(validations.fileChecks) ? validations.fileChecks : []).flatMap((entry) =>
+      entry && typeof entry === 'object'
+        ? [entry.path, entry.expectation, entry.expectedKind, entry.type]
+        : [],
+    )),
+  ])
+  const filesCount = normalizeOptionalInteger(
+    files.total,
+    Math.max(
+      filesPreview.length,
+      normalizeOptionalInteger(files.toCreate) + normalizeOptionalInteger(files.toModify),
+    ),
+  )
+  const blockedCount = normalizeOptionalInteger(files.blocked, blockers.length)
+  const warningsCount = normalizeOptionalInteger(surface.warningsCount, warnings.length)
+  const errorsCount = normalizeOptionalInteger(surface.errorsCount, errors.length)
+  const requiresLeanApproval = review.requiresLeanApproval === true
+  const approvalState =
+    normalizeOptionalString(review.approvalState) ||
+    (status === 'approved-for-sandbox'
+      ? 'approved'
+      : status === 'blocked'
+        ? 'blocked'
+        : status === 'ready-for-review'
+          ? 'pending-review'
+          : 'not-available')
+  const root =
+    normalizeOptionalString(target.targetRoot) ||
+    normalizeOptionalString(target.root) ||
+    normalizeOptionalString(target.sourceRoot) ||
+    normalizeOptionalString(effectiveMetadata?.materializationPlan?.projectRoot) ||
+    normalizeOptionalString(currentMetadata?.materializationPlan?.projectRoot)
+
+  const safetyLabels = [
+    safety.noDotEnv === false ? 'Bloquea .env' : 'Sin .env',
+    safety.noNodeModules === false ? 'Bloquea node_modules' : 'Sin node_modules',
+    safety.noDocker === false ? 'Bloquea Docker' : 'Sin Docker',
+    safety.noDeploy === false ? 'Bloquea deploy' : 'Sin deploy',
+    safety.noExternalServices === false
+      ? 'Bloquea servicios externos'
+      : 'Sin servicios externos',
+    safety.noRealPayments === false ? 'Bloquea pagos reales' : 'Sin pagos reales',
+    safety.noProductionDb === false ? 'Bloquea DB productiva' : 'Sin DB productiva',
+    safety.noCredentials === false ? 'Bloquea credenciales' : 'Sin credenciales',
+    safety.noWebPrueba === false ? 'Bloquea web-prueba' : 'Sin web-prueba',
+  ]
+
+  let summary = normalizeOptionalString(review.summary)
+  if (!summary) {
+    summary =
+      status === 'approved-for-sandbox'
+        ? 'La revision quedo aprobada solo para sandbox/harness controlado. La UI no ejecuta archivos por si sola.'
+        : status === 'blocked'
+          ? 'La revision quedo bloqueada por seguridad y no debe materializarse desde esta pantalla.'
+          : status === 'ready-for-review'
+            ? 'La materializacion sigue en modo lectura. Revisa archivos, bloqueos y validaciones antes de aprobar el sandbox.'
+            : 'Todavia no hay una revision lista para mostrar.'
+  }
+
+  const nextActionLabel =
+    status === 'approved-for-sandbox'
+      ? 'Ver detalle de sandbox aprobado'
+      : status === 'blocked'
+        ? 'Revisar bloqueos'
+        : status === 'ready-for-review'
+          ? 'Revisar aprobacion'
+          : normalizeOptionalString(review.nextAction) || 'Preparar revision'
+
+  return {
+    present: surface.present === true,
+    status,
+    title: normalizeOptionalString(review.title) || 'Aprobacion de materializacion',
+    summary,
+    approvalState,
+    requiresLeanApproval,
+    root,
+    filesCount,
+    blockedCount,
+    warningsCount,
+    errorsCount,
+    safetyLabels,
+    validations: validationEntries.slice(0, 8),
+    blockers: blockers.slice(0, 4),
+    nextActionLabel,
   }
 }
 
