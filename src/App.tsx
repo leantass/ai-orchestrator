@@ -995,6 +995,9 @@ type PlannerExecutionMetadata = {
     errorPreview?: string
     elapsedMs?: number
   } | null
+  generatedDomainUniversalMaterializationPlan: Record<string, unknown> | null
+  generatedDomainFileCreationApprovalEvaluation: Record<string, unknown> | null
+  generatedDomainControlledRuntimeMaterializationSource: Record<string, unknown> | null
   generatedDomainMaterializationApprovalSurface: GeneratedDomainMaterializationApprovalSurfaceContract
 }
 
@@ -1517,6 +1520,9 @@ const EMPTY_PLANNER_EXECUTION_METADATA: PlannerExecutionMetadata = {
   generatedDomainContractDiagnostics: null,
   generatedDomainContractComparison: null,
   generatedDomainContractObservation: null,
+  generatedDomainUniversalMaterializationPlan: null,
+  generatedDomainFileCreationApprovalEvaluation: null,
+  generatedDomainControlledRuntimeMaterializationSource: null,
   generatedDomainMaterializationApprovalSurface: null,
 }
 
@@ -1558,6 +1564,12 @@ const buildSafeFirstDeliveryReviewMetadata = ({
   generatedDomainContractDiagnostics: baseMetadata.generatedDomainContractDiagnostics,
   generatedDomainContractComparison: baseMetadata.generatedDomainContractComparison,
   generatedDomainContractObservation: baseMetadata.generatedDomainContractObservation,
+  generatedDomainUniversalMaterializationPlan:
+    baseMetadata.generatedDomainUniversalMaterializationPlan,
+  generatedDomainFileCreationApprovalEvaluation:
+    baseMetadata.generatedDomainFileCreationApprovalEvaluation,
+  generatedDomainControlledRuntimeMaterializationSource:
+    baseMetadata.generatedDomainControlledRuntimeMaterializationSource,
   generatedDomainMaterializationApprovalSurface:
     baseMetadata.generatedDomainMaterializationApprovalSurface,
   decisionKey: 'safe-first-delivery-plan',
@@ -4578,6 +4590,21 @@ const extractPlannerExecutionMetadata = (payload?: {
             ? { elapsedMs: payload.generatedDomainContractObservation.elapsedMs }
             : {}),
         }
+      : null,
+  generatedDomainUniversalMaterializationPlan:
+    payload?.generatedDomainUniversalMaterializationPlan &&
+    typeof payload.generatedDomainUniversalMaterializationPlan === 'object'
+      ? (payload.generatedDomainUniversalMaterializationPlan as Record<string, unknown>)
+      : null,
+  generatedDomainFileCreationApprovalEvaluation:
+    payload?.generatedDomainFileCreationApprovalEvaluation &&
+    typeof payload.generatedDomainFileCreationApprovalEvaluation === 'object'
+      ? (payload.generatedDomainFileCreationApprovalEvaluation as Record<string, unknown>)
+      : null,
+  generatedDomainControlledRuntimeMaterializationSource:
+    payload?.generatedDomainControlledRuntimeMaterializationSource &&
+    typeof payload.generatedDomainControlledRuntimeMaterializationSource === 'object'
+      ? (payload.generatedDomainControlledRuntimeMaterializationSource as Record<string, unknown>)
       : null,
   generatedDomainMaterializationApprovalSurface:
     normalizeGeneratedDomainMaterializationApprovalSurfaceContract(
@@ -18873,6 +18900,24 @@ function App() {
                   currentPlannerExecutionMetadata.materializationPlan,
               }
             : {}),
+          ...(currentPlannerExecutionMetadata.generatedDomainUniversalMaterializationPlan
+            ? {
+                generatedDomainUniversalMaterializationPlan:
+                  currentPlannerExecutionMetadata.generatedDomainUniversalMaterializationPlan,
+              }
+            : {}),
+          ...(currentPlannerExecutionMetadata.generatedDomainFileCreationApprovalEvaluation
+            ? {
+                generatedDomainFileCreationApprovalEvaluation:
+                  currentPlannerExecutionMetadata.generatedDomainFileCreationApprovalEvaluation,
+              }
+            : {}),
+          ...(currentPlannerExecutionMetadata.generatedDomainControlledRuntimeMaterializationSource
+            ? {
+                generatedDomainControlledRuntimeMaterializationSource:
+                  currentPlannerExecutionMetadata.generatedDomainControlledRuntimeMaterializationSource,
+              }
+            : {}),
         }
         startOrContinueExecutionRun({
           requestId: executionRequestId,
@@ -20571,6 +20616,24 @@ function App() {
         : {}),
       ...(executionMetadata.materializationPlan
         ? { materializationPlan: executionMetadata.materializationPlan }
+        : {}),
+      ...(executionMetadata.generatedDomainUniversalMaterializationPlan
+        ? {
+            generatedDomainUniversalMaterializationPlan:
+              executionMetadata.generatedDomainUniversalMaterializationPlan,
+          }
+        : {}),
+      ...(executionMetadata.generatedDomainFileCreationApprovalEvaluation
+        ? {
+            generatedDomainFileCreationApprovalEvaluation:
+              executionMetadata.generatedDomainFileCreationApprovalEvaluation,
+          }
+        : {}),
+      ...(executionMetadata.generatedDomainControlledRuntimeMaterializationSource
+        ? {
+            generatedDomainControlledRuntimeMaterializationSource:
+              executionMetadata.generatedDomainControlledRuntimeMaterializationSource,
+          }
         : {}),
     }
     startOrContinueExecutionRun({

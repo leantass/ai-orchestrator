@@ -292,6 +292,48 @@ function createSchedulingAdminContract() {
   return contract
 }
 
+function createToolBankContract() {
+  const contract = cloneJson(createValidInventedContract())
+  contract.domain = {
+    label: 'Banco comunitario de herramientas barriales',
+    slug: 'community-tool-bank',
+    summary:
+      'Gestion local de prestamos, devoluciones, mantenimiento y disponibilidad de herramientas barriales.',
+  }
+  contract.root = {
+    slug: 'community-tool-bank-local',
+    sourceRoot: 'community-tool-bank-local',
+    targetRoot: 'community-tool-bank-local',
+  }
+  contract.roles = ['vecino', 'coordinacion', 'voluntariado']
+  contract.entities = ['tools', 'loans', 'members', 'maintenance']
+  contract.workflows = [
+    'register tool loans',
+    'track returns',
+    'schedule maintenance',
+  ]
+  contract.frontendSurfaces = [
+    { key: 'public', label: 'Catalogo', path: 'frontend/public', screens: ['catalog'] },
+    { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['loans', 'maintenance'] },
+  ]
+  contract.backend.routes = [
+    { path: 'backend/src/routes/tools.js' },
+    { path: 'backend/src/routes/loans.js' },
+    { path: 'backend/src/routes/maintenance.js' },
+  ]
+  contract.backend.modules = [{ path: 'backend/src/modules/toolbank.js' }]
+  contract.database.tables = ['tools', 'loans', 'members', 'maintenance']
+  contract.database.relationships = ['loans.tool_id -> tools.id']
+  contract.database.seedData = ['tools base', 'members base', 'maintenance base']
+  contract.validation.requiredPathGroups = [
+    { candidates: ['backend/src/routes/tools.js'] },
+    { candidates: ['database/schema.sql'] },
+    { candidates: ['frontend/public/index.html'] },
+  ]
+  contract.scenarioModules = ['catalog', 'loans', 'maintenance']
+  return contract
+}
+
 function buildInspectionReadyMaterializationPlan(contract) {
   const normalizedContract = normalizeGeneratedDomainContract(contract)
   const allowedTargetPaths = deriveAllowedTargetPathsFromContract(normalizedContract, '.')
@@ -313,7 +355,10 @@ function buildInspectionReadyMaterializationPlan(contract) {
   }
 }
 
-function createUniversalDecision(generatedDomainContract = createValidInventedContract()) {
+function createUniversalDecision(
+  generatedDomainContract = createValidInventedContract(),
+  overrides = {},
+) {
   const materializationPlan = buildInspectionReadyMaterializationPlan(generatedDomainContract)
   const allowedTargetPaths = deriveAllowedTargetPathsFromContract(generatedDomainContract, '.')
   const scenarioModules =
@@ -391,6 +436,7 @@ function createUniversalDecision(generatedDomainContract = createValidInventedCo
     materializationPlan,
     generatedDomainContract,
     workspacePath: repoRoot,
+    ...overrides,
   })
 }
 
@@ -719,6 +765,109 @@ function runHappyPathScenario({ id, contract, expectedDomainLabel }) {
   }
 }
 
+function runApprovedToolBankScenario() {
+  const approvedExternalSandboxPath =
+    'C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\sandbox-toolbank-local'
+  const contract = createToolBankContract()
+  const decision = createUniversalDecision(contract, {
+    resolvedDecisionMap: new Map([
+      [
+        'approve-sandbox-path',
+        {
+          status: 'approved',
+          selectedOption: 'approved',
+          freeAnswer: approvedExternalSandboxPath,
+          summary:
+            'Lean aprobó materializar solo la SFD local segura en sandbox controlado.',
+        },
+      ],
+    ]),
+    plannerFeedback: {
+      type: 'approval-granted',
+      approvalRequestDecisionKey: 'approve-sandbox-path',
+      selectedOption: 'approved',
+      freeAnswer: approvedExternalSandboxPath,
+      approvalReason:
+        'Materializar solo la SFD local segura y validarla con el flujo de sandbox.',
+    },
+  })
+  const approvalEvaluation = decision.generatedDomainFileCreationApprovalEvaluation
+  const approvalSurface = decision.generatedDomainMaterializationApprovalSurface
+  const runtimeSource = decision.generatedDomainControlledRuntimeMaterializationSource
+  const universalPlan = decision.generatedDomainUniversalMaterializationPlan
+
+  assert.equal(approvalEvaluation?.approved, true)
+  assert.equal(approvalEvaluation?.blocked, false)
+  assert.equal(approvalEvaluation?.status, 'approved-for-sandbox')
+  assert.equal(
+    approvalEvaluation?.sandboxRoot?.relative,
+    '.codex-temp/generated-domain-materialization-approved/sandbox-toolbank-local',
+  )
+  assert.equal(approvalSurface?.status, 'approved-for-sandbox')
+  assert.equal(runtimeSource?.enabled, true)
+  assert.equal(runtimeSource?.mode, 'harness-controlled')
+  assert.equal(runtimeSource?.selectedSource, 'generated-domain-universal')
+
+  const materializationReport = observationHarness.materializeGeneratedDomainSandboxPlan({
+    generatedDomainUniversalMaterializationPlan: universalPlan,
+    generatedDomainFileCreationApprovalEvaluation: approvalEvaluation,
+  })
+
+  assert.equal(materializationReport?.status, 'materialized')
+  assert.equal(materializationReport?.materialized, true)
+  assert.equal(
+    materializationReport?.sandboxRoot?.relative,
+    '.codex-temp/generated-domain-materialization-approved/sandbox-toolbank-local',
+  )
+
+  const projectRootPath = path.join(
+    repoRoot,
+    '.codex-temp',
+    'generated-domain-materialization-approved',
+    'sandbox-toolbank-local',
+    universalPlan.projectRoot,
+  )
+  const expectedFiles = [
+    'README.md',
+    'docs/domain.md',
+    'frontend/index.html',
+    'frontend/src/main.js',
+    'frontend/src/mock-data.js',
+    'backend/src/index.js',
+    'shared/contracts/domain.js',
+    'database/schema.sql',
+    'database/seed.json',
+    'validation/report.json',
+  ]
+  for (const relativePath of expectedFiles) {
+    assert.equal(
+      fs.existsSync(path.join(projectRootPath, relativePath)),
+      true,
+      `Falta el archivo esperado ${relativePath} en el smoke toolbank.`,
+    )
+  }
+
+  const contentPool = expectedFiles
+    .filter((entry) => entry !== 'validation/report.json')
+    .map((entry) => fs.readFileSync(path.join(projectRootPath, entry), 'utf8'))
+    .join('\n')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase()
+  assert.equal(contentPool.includes('banco comunitario de herramientas'), true)
+  ;['refugios', 'comercio online', 'salud', 'cursos', 'ecommerce'].forEach((token) => {
+    assert.equal(
+      contentPool.includes(token),
+      false,
+      `El scaffold toolbank no debe contaminarse con ${token}.`,
+    )
+  })
+
+  return {
+    createdCount: materializationReport.created.length,
+  }
+}
+
 async function main() {
   ensureRemoved(smokeSandboxPath)
 
@@ -741,18 +890,27 @@ async function main() {
       },
     ]
     const results = scenarios.map((scenario) => runHappyPathScenario(scenario))
+    const toolBankResult = runApprovedToolBankScenario()
     runBlockedCases(results[0].universalPlan)
 
     const totalCreated = results.reduce(
       (sum, entry) => sum + (Number.isInteger(entry.createdCount) ? entry.createdCount : 0),
       0,
-    )
+    ) + (Number.isInteger(toolBankResult.createdCount) ? toolBankResult.createdCount : 0)
 
     console.log(
-      `OK. Generated domain sandbox materialization smoke completado. Dominios validados: ${scenarios.length}. Archivos creados: ${totalCreated}.`,
+      `OK. Generated domain sandbox materialization smoke completado. Dominios validados: ${scenarios.length + 1}. Archivos creados: ${totalCreated}.`,
     )
   } finally {
     ensureRemoved(smokeSandboxPath)
+    ensureRemoved(
+      path.join(
+        repoRoot,
+        '.codex-temp',
+        'generated-domain-materialization-approved',
+        'sandbox-toolbank-local',
+      ),
+    )
   }
 }
 

@@ -6260,7 +6260,7 @@ function runDomainConsistencyDiagnosticsDiscardResidualMetadataCase() {
   assert.equal(diagnostics?.checked, true)
   assert.equal(diagnostics?.status, 'mismatch')
   assert.equal(diagnostics?.currentRootSlug, 'merenderos-local')
-  assert.equal(diagnostics?.visibleRoot, 'fullstack-local-gestion-escolar')
+  assert.equal(diagnostics?.visibleRoot, 'merenderos-local')
   assert.equal((diagnostics?.mismatches || []).length > 0, true)
   assert.equal(debugSummary.status, 'mismatch')
   assert.equal(Boolean(decision.productArchitecture), false)

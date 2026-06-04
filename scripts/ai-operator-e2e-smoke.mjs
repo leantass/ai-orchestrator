@@ -9057,6 +9057,191 @@ function createAlignedGeneratedDomainObservationDecision({
   })
 }
 
+function createApprovedToolBankObservationDecision() {
+  const approvedSandboxPath =
+    'C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\sandbox-toolbank-local'
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: {
+      slug: 'community-tool-bank',
+      label: 'Banco comunitario de herramientas barriales',
+    },
+    root: {
+      slug: 'community-tool-bank-local',
+      sourceRoot: 'community-tool-bank-local',
+      targetRoot: 'community-tool-bank-local',
+    },
+    roles: ['vecino', 'coordinacion', 'voluntariado'],
+    entities: ['tools', 'loans', 'members', 'maintenance'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Catalogo', path: 'frontend/public', screens: ['catalog'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['loans'] },
+    ],
+    workflows: ['register tool loans', 'track returns', 'schedule maintenance'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/tools.js' }],
+      services: [{ path: 'backend/src/services/maintenance.js' }],
+      modules: [{ path: 'backend/src/modules/toolbank.js' }],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['tools', 'loans', 'members', 'maintenance'],
+    },
+    shared: {
+      files: ['shared/contracts/domain.js'],
+    },
+    docs: ['docs/API.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'frontend/public/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'frontend/public/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const requiredPathGroups = deriveRequiredPathGroupsFromContract(generatedDomainContract)
+
+  return plannerApi.buildBrainDecisionContract({
+    ...buildReusablePlanningContext(),
+    decisionKey: 'toolbank-approved-sandbox-observation',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason:
+      'Reproducir la aprobacion humana de sandbox para un banco comunitario de herramientas barriales.',
+    instruction:
+      'Materializar solo la SFD local segura dentro del sandbox aprobado y no tocar web-prueba.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    sourceRoot: 'community-tool-bank-local',
+    targetRoot: 'community-tool-bank-local',
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'banco comunitario de herramientas barriales',
+      intent: 'gestionar prestamos y devoluciones de herramientas',
+      deliveryLevel: 'fullstack-local',
+      roles: ['vecino', 'coordinacion', 'voluntariado'],
+      modules: ['catalog', 'loans', 'maintenance'],
+      entities: ['tools', 'loans', 'members', 'maintenance'],
+      coreFlows: ['register tool loans', 'track returns', 'schedule maintenance'],
+    },
+    productArchitecture: {
+      productType: 'fullstack-local-app',
+      domain: 'banco comunitario de herramientas barriales',
+      users: ['vecino', 'coordinacion', 'voluntariado'],
+      roles: ['vecino', 'coordinacion', 'voluntariado'],
+      coreModules: ['catalog', 'loans', 'maintenance'],
+      dataEntities: ['tools', 'loans', 'members', 'maintenance'],
+      keyFlows: ['register tool loans', 'track returns', 'schedule maintenance'],
+    },
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-tool-bank-local',
+      domain: 'banco comunitario de herramientas barriales',
+      title: 'Community tool bank local review',
+      targetStructure: [
+        'community-tool-bank-local/',
+        'community-tool-bank-local/frontend/public/',
+        'community-tool-bank-local/frontend/admin/',
+        'community-tool-bank-local/backend/src/',
+        'community-tool-bank-local/database/',
+        'community-tool-bank-local/docs/',
+      ],
+      allowedRootPaths: ['community-tool-bank-local'],
+      directories: [
+        'community-tool-bank-local/frontend/public',
+        'community-tool-bank-local/frontend/admin',
+        'community-tool-bank-local/backend/src',
+        'community-tool-bank-local/database',
+        'community-tool-bank-local/docs',
+      ],
+      modules: ['catalog', 'loans', 'maintenance'],
+      successCriteria: [
+        'Keep a local fullstack structure ready for review.',
+        'Do not materialize files during the planner stage.',
+      ],
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'community-tool-bank-local',
+      domain: 'banco comunitario de herramientas barriales',
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'community-tool-bank-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'community-tool-bank-local'
+            ? 'create-folder'
+            : 'create-or-edit-file',
+        targetPath,
+      })),
+      contractDefinition: {
+        requiredPathGroups,
+      },
+    },
+    generatedDomainContract,
+    resolvedDecisionMap: new Map([
+      [
+        'approve-sandbox-path',
+        {
+          status: 'approved',
+          selectedOption: 'approved',
+          freeAnswer: approvedSandboxPath,
+          summary: 'Aprobacion humana explicita para materializacion sandbox controlada.',
+        },
+      ],
+    ]),
+    plannerFeedback: {
+      type: 'approval-granted',
+      approvalRequestDecisionKey: 'approve-sandbox-path',
+      selectedOption: 'approved',
+      freeAnswer: approvedSandboxPath,
+      approvalReason:
+        'No tocar web-prueba, no crear .env, no instalar dependencias ni usar servicios externos.',
+    },
+    workspacePath: repoRoot,
+  })
+}
+
 async function runGeneratedDomainMaterializationApprovalPayloadCase() {
   const failures = []
   const decision = createAlignedGeneratedDomainObservationDecision({
@@ -9495,6 +9680,65 @@ async function runGeneratedDomainFileCreationApprovalEvaluationPayloadCase() {
   return {
     id: 'generated-domain-file-creation-approval-evaluation',
     label: 'Generated domain file creation approval evaluation',
+    failures,
+  }
+}
+
+async function runGeneratedDomainSandboxApprovalBridgeCase() {
+  const failures = []
+  const decision = createApprovedToolBankObservationDecision()
+  const appSource = fs.readFileSync(appFilePath, 'utf8')
+
+  pushFailure(
+    failures,
+    decision.generatedDomainFileCreationApprovalEvaluation?.present === true &&
+      decision.generatedDomainFileCreationApprovalEvaluation?.approved === true &&
+      decision.generatedDomainFileCreationApprovalEvaluation?.blocked === false &&
+      decision.generatedDomainFileCreationApprovalEvaluation?.status ===
+        'approved-for-sandbox',
+    'La aprobacion humana approve-sandbox-path debe convertirse en approval evaluation efectiva para sandbox.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationApprovalSurface?.status ===
+      'approved-for-sandbox' &&
+      decision.generatedDomainMaterializationApprovalSurface?.review?.approvalState ===
+        'approved' &&
+      decision.generatedDomainMaterializationApprovalSurface?.target?.isWebPrueba === false,
+    'La approval surface debe reflejar approved-for-sandbox y seguir bloqueando web-prueba.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainControlledRuntimeMaterializationSource?.enabled === true &&
+      decision.generatedDomainControlledRuntimeMaterializationSource?.mode ===
+        'harness-controlled' &&
+      decision.generatedDomainControlledRuntimeMaterializationSource?.selectedSource ===
+        'generated-domain-universal' &&
+      decision.generatedDomainControlledRuntimeMaterializationSource
+        ?.fallbackLegacyAvailable === true,
+    'La seleccion controlada debe poder elegir generated-domain-universal solo en harness/sandbox aprobado.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainFileCreationApprovalEvaluation?.sandboxRoot?.relative ===
+      '.codex-temp/generated-domain-materialization-approved/sandbox-toolbank-local' &&
+      decision.generatedDomainFileCreationApprovalEvaluation?.sandboxRoot
+        ?.withinWorkspace === true,
+    'Una ruta externa aprobada debe mapearse a un sandbox interno seguro dentro del workspace.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('resolveGeneratedDomainSandboxApprovalDecision') &&
+      mainSource.includes('generated-domain-sandbox-materialization:attempt') &&
+      mainSource.includes('generatedDomainUniversalMaterializationPlan') &&
+      appSource.includes('generatedDomainFileCreationApprovalEvaluation') &&
+      appSource.includes('generatedDomainControlledRuntimeMaterializationSource'),
+    'El bridge approval-granted -> execute payload -> materializacion sandbox debe quedar cableado entre main.cjs y App.tsx.',
+  )
+
+  return {
+    id: 'generated-domain-sandbox-approval-bridge',
+    label: 'Generated domain sandbox approval bridge',
     failures,
   }
 }
@@ -12541,6 +12785,7 @@ async function main() {
     results.push(await runGeneratedDomainControlledRuntimeMaterializationSourcePayloadCase())
     results.push(await runGeneratedDomainMaterializationApprovalSurfacePayloadCase())
     results.push(await runGeneratedDomainFileCreationApprovalEvaluationPayloadCase())
+    results.push(await runGeneratedDomainSandboxApprovalBridgeCase())
     results.push(await runGeneratedDomainUniversalMaterializationPlanPreviewPayloadCase())
     results.push(
       await runGeneratedDomainUniversalMaterializationPlanPreviewComparisonPayloadCase(),

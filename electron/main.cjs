@@ -3260,6 +3260,10 @@ function buildDomainConsistencyDiagnostics({
           : semanticOverlapScore < 0.35
             ? 'partial'
             : 'consistent'
+    const shouldPreferCurrentVisibleSignals =
+      mismatches.length > 0 ||
+      incompatibleBlocks.length > 0 ||
+      semanticStatus === 'mismatch'
 
     const diagnostics = {
       present: true,
@@ -3281,8 +3285,19 @@ function buildDomainConsistencyDiagnostics({
           1,
         )[0] || null,
       currentRootSlug: currentRoots[0] || null,
-      visibleDomainLabel,
-      visibleRoot,
+      visibleDomainLabel: shouldPreferCurrentVisibleSignals
+        ? limitStrings(
+            [
+              generatedDomainContract?.domain?.label,
+              generatedDomainContractDiagnostics?.domainSlug,
+              visibleDomainLabel,
+            ],
+            1,
+          )[0] || null
+        : visibleDomainLabel,
+      visibleRoot: shouldPreferCurrentVisibleSignals
+        ? currentRoots[0] || visibleRoot
+        : visibleRoot,
       semanticChecked,
       semanticStatus,
       semanticOverlapScore: Number(semanticOverlapScore.toFixed(3)),
@@ -11860,6 +11875,8 @@ function finalizeWorkspaceProjectDecision({
   goal,
   context,
   workspacePath,
+  resolvedDecisionMap = null,
+  plannerFeedback = null,
   userParticipationMode,
   costMode,
   inferredProjectState,
@@ -11939,6 +11956,8 @@ function finalizeWorkspaceProjectDecision({
 
     return buildBrainDecisionContract({
       ...baseDecision,
+      resolvedDecisionMap,
+      plannerFeedback,
       existingProjectDetection: existingProjectDetected
         ? {
             detected: true,
@@ -44754,6 +44773,8 @@ function buildBrainDecisionContract({
   generatedDomainContract,
   workspacePath,
   finalResult,
+  resolvedDecisionMap = null,
+  plannerFeedback = null,
   generatedDomainMaterializationPreferenceSwitchOptions = null,
   generatedDomainMaterializationSourceResolutionOptions = null,
   generatedDomainControlledRuntimeMaterializationSourceOptions = null,
@@ -45217,14 +45238,24 @@ function buildBrainDecisionContract({
       generatedDomainUniversalMaterializationPlanCandidate,
       materializationPlan,
     })
+  const generatedDomainSandboxApprovalDecision =
+    resolveGeneratedDomainSandboxApprovalDecision({
+      resolvedDecisionMap,
+      plannerFeedback,
+      workspacePath,
+    })
   const generatedDomainFileCreationApprovalEvaluation =
     evaluateGeneratedDomainFileCreationApproval({
       generatedDomainUniversalMaterializationPlan,
       approvalDecision: {
-        approved: false,
-        scope: 'observation-only',
+        approved: generatedDomainSandboxApprovalDecision.approved === true,
+        scope: generatedDomainSandboxApprovalDecision.scope,
+        approvalReason: generatedDomainSandboxApprovalDecision.approvalReason,
+        requestedSandboxRoot:
+          generatedDomainSandboxApprovalDecision.requestedSandboxRoot,
       },
       workspacePath,
+      sandboxRoot: generatedDomainSandboxApprovalDecision.effectiveSandboxRoot,
     })
   const generatedDomainMaterializationPlanDecouplingReport =
     buildGeneratedDomainMaterializationPlanDecouplingReport({
@@ -45299,6 +45330,18 @@ function buildBrainDecisionContract({
       generatedDomainShadowMaterializationEndToEndReadiness,
       generatedDomainMaterializationApprovalPayload,
     })
+  const effectiveControlledRuntimeMaterializationSourceOptions = {
+    ...(generatedDomainControlledRuntimeMaterializationSourceOptions &&
+    typeof generatedDomainControlledRuntimeMaterializationSourceOptions === 'object'
+      ? generatedDomainControlledRuntimeMaterializationSourceOptions
+      : {}),
+    ...(generatedDomainSandboxApprovalDecision.approved
+      ? {
+          harnessControlledEnable: true,
+          simulateLeanApproval: true,
+        }
+      : {}),
+  }
   const generatedDomainControlledRuntimeMaterializationSource =
     resolveGeneratedDomainControlledRuntimeMaterializationSource({
       generatedDomainRuntimeShadowReadinessDecision,
@@ -45310,7 +45353,7 @@ function buildBrainDecisionContract({
       generatedDomainFileCreationApprovalEvaluation,
       domainConsistencyDiagnostics,
       controlledRuntimeSourceOptions:
-        generatedDomainControlledRuntimeMaterializationSourceOptions,
+        effectiveControlledRuntimeMaterializationSourceOptions,
     })
   const generatedDomainMaterializationApprovalSurface =
     buildGeneratedDomainMaterializationApprovalSurface({
@@ -46713,6 +46756,147 @@ function getResolvedDecisionRecord(resolvedDecisionMap, ...decisionKeys) {
   }
 
   return null
+}
+
+function isApprovedResolvedDecisionRecord(record) {
+  if (!record || typeof record !== 'object') {
+    return false
+  }
+
+  return (
+    record.status === 'approved' ||
+    record.decision === 'approved' ||
+    normalizeOptionalString(record.selectedOption).toLocaleLowerCase() === 'approved'
+  )
+}
+
+function extractApprovedSandboxRootCandidate(...values) {
+  for (const value of values) {
+    const normalizedValue = normalizeOptionalString(value)
+
+    if (!normalizedValue) {
+      continue
+    }
+
+    if (
+      /^[a-z]:[\\/]/iu.test(normalizedValue) ||
+      normalizedValue.startsWith('.') ||
+      normalizedValue.startsWith('/') ||
+      normalizedValue.startsWith('\\')
+    ) {
+      return normalizedValue
+    }
+
+    const embeddedWindowsPathMatch = normalizedValue.match(/[a-z]:\\[^\r\n"']+/iu)
+    if (embeddedWindowsPathMatch && embeddedWindowsPathMatch[0]) {
+      return embeddedWindowsPathMatch[0].trim()
+    }
+  }
+
+  return ''
+}
+
+function slugifySandboxFolderName(value) {
+  const normalizedValue = normalizeOptionalString(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/gu, '')
+    .toLocaleLowerCase()
+    .replace(/[^a-z0-9]+/gu, '-')
+    .replace(/^-+|-+$/gu, '')
+
+  return normalizedValue || 'approved-sandbox'
+}
+
+function resolveGeneratedDomainSandboxApprovalDecision({
+  resolvedDecisionMap,
+  plannerFeedback,
+  workspacePath,
+}) {
+  const normalizedResolvedDecisionMap =
+    resolvedDecisionMap instanceof Map ? resolvedDecisionMap : new Map()
+  const decisionRecord = getResolvedDecisionRecord(
+    normalizedResolvedDecisionMap,
+    'approve-sandbox-path',
+  )
+  const feedbackDecisionKey = normalizeResolvedDecisionKey(
+    plannerFeedback?.approvalRequestDecisionKey,
+  )
+  const feedbackApproved =
+    plannerFeedback?.type === 'approval-granted' &&
+    feedbackDecisionKey === 'approve-sandbox-path'
+  const recordApproved = isApprovedResolvedDecisionRecord(decisionRecord)
+  const approved = feedbackApproved || recordApproved
+  const requestedSandboxRoot = extractApprovedSandboxRootCandidate(
+    decisionRecord?.freeAnswer,
+    decisionRecord?.selectedOption,
+    decisionRecord?.summary,
+    plannerFeedback?.freeAnswer,
+    plannerFeedback?.selectedOption,
+    plannerFeedback?.approvalReason,
+    plannerFeedback?.instruction,
+  )
+  const defaultRelativeSandboxRoot = '.codex-temp/generated-domain-materialization-sandbox'
+  const workspaceRoot = path.resolve(
+    normalizeOptionalString(workspacePath) || process.cwd(),
+  )
+  const requestedResolvedPath = requestedSandboxRoot
+    ? path.resolve(requestedSandboxRoot)
+    : ''
+  const trustedExternalSandboxBase = path.resolve(workspaceRoot, '..', '..')
+  const requestedComparablePath = normalizePathForComparison(requestedResolvedPath)
+  const relativeToWorkspace = requestedResolvedPath
+    ? path.relative(workspaceRoot, requestedResolvedPath)
+    : ''
+  const requestedInsideWorkspace =
+    requestedResolvedPath &&
+    (relativeToWorkspace === '' ||
+      (!relativeToWorkspace.startsWith('..') && !path.isAbsolute(relativeToWorkspace)))
+  const relativeToTrustedBase = requestedResolvedPath
+    ? path.relative(trustedExternalSandboxBase, requestedResolvedPath)
+    : ''
+  const requestedInsideTrustedBase =
+    requestedResolvedPath &&
+    (relativeToTrustedBase === '' ||
+      (!relativeToTrustedBase.startsWith('..') && !path.isAbsolute(relativeToTrustedBase)))
+  const requestedLooksBlocked =
+    !requestedComparablePath ||
+    /(^|\/)\.env(?:\..+)?($|\/)/iu.test(requestedComparablePath) ||
+    /(^|\/)node_modules($|\/)/iu.test(requestedComparablePath) ||
+    /(^|\/)web-prueba($|\/)/iu.test(requestedComparablePath) ||
+    /(^|\/)(?:dockerfile|docker-compose\.yml|docker-compose\.yaml)($|\/)/iu.test(
+      requestedComparablePath,
+    ) ||
+    /(^|\/)deploy($|\/)/iu.test(requestedComparablePath) ||
+    /(^|\/)c:\/windows($|\/)/iu.test(requestedComparablePath)
+  const requestedLooksLikeSandbox =
+    /(^|\/)sandbox[-/]/iu.test(requestedComparablePath) ||
+    /sandbox/iu.test(path.basename(requestedResolvedPath || requestedSandboxRoot))
+  let effectiveSandboxRoot = defaultRelativeSandboxRoot
+
+  if (approved && requestedSandboxRoot && !requestedLooksBlocked) {
+    if (requestedInsideWorkspace) {
+      effectiveSandboxRoot = requestedSandboxRoot
+    } else if (requestedInsideTrustedBase && requestedLooksLikeSandbox) {
+      effectiveSandboxRoot = path.posix.join(
+        '.codex-temp',
+        'generated-domain-materialization-approved',
+        slugifySandboxFolderName(path.basename(requestedResolvedPath)),
+      )
+    }
+  }
+
+  return {
+    approved,
+    scope: approved ? 'sandbox-only' : 'observation-only',
+    requestedSandboxRoot: requestedSandboxRoot || defaultRelativeSandboxRoot,
+    effectiveSandboxRoot,
+    approvalReason:
+      normalizeOptionalString(plannerFeedback?.approvalReason) ||
+      normalizeOptionalString(decisionRecord?.summary) ||
+      (approved
+        ? 'Aprobacion humana explicita para materializacion sandbox.'
+        : 'Sin aprobacion humana explicita para materializacion sandbox.'),
+  }
 }
 
 function isDeferredResolvedDecision(record) {
@@ -51774,6 +51958,8 @@ async function buildLocalStrategicBrainDecision({
       goal,
       context: normalizedContext,
       workspacePath,
+      resolvedDecisionMap,
+      plannerFeedback,
       userParticipationMode: normalizedUserParticipationMode,
       costMode,
       inferredProjectState,
@@ -51787,6 +51973,8 @@ async function buildLocalStrategicBrainDecision({
         ...payload,
         domainUnderstanding,
         stripStaleApprovalArtifacts: approvalFeedbackResolved,
+        resolvedDecisionMap,
+        plannerFeedback,
       }),
     )
   const buildDecisionWithPlanningContracts = (
@@ -51832,6 +52020,8 @@ async function buildLocalStrategicBrainDecision({
         ...payload,
         ...additionalMetadata,
         domainUnderstanding,
+        resolvedDecisionMap,
+        plannerFeedback,
         projectBlueprint: planningContracts.projectBlueprint,
         questionPolicy: planningContracts.questionPolicy,
         implementationRoadmap: planningContracts.implementationRoadmap,
@@ -56050,6 +56240,8 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
   const normalizedDecision = buildBrainDecisionContract({
     ...fallbackDecision,
     stripStaleApprovalArtifacts: shouldDropStaleApprovalArtifacts,
+    resolvedDecisionMap,
+    plannerFeedback,
     decisionKey:
       shouldUseFallbackStructuredFullstackDecision
         ? fallbackDecision.decisionKey
@@ -56312,6 +56504,8 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
     goal: input.goal,
     context: input.context,
     workspacePath: input.workspacePath,
+    resolvedDecisionMap,
+    plannerFeedback,
     userParticipationMode: input.userParticipationMode,
     costMode: input.costMode,
     inferredProjectState: normalizedInferredProjectState,
@@ -56381,6 +56575,8 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
   const stabilizedWorkspaceAwareDecision = shouldRepairWorkspaceAwareMaterialization
     ? buildBrainDecisionContract({
         ...workspaceAwareDecision,
+        resolvedDecisionMap,
+        plannerFeedback,
         instruction:
           typeof fallbackDecision?.instruction === 'string' &&
           fallbackDecision.instruction.trim()
@@ -56515,6 +56711,8 @@ async function normalizeOpenAIBrainDecision(rawDecision, input) {
     requiresApproval: false,
     approvalRequest: null,
     question: '',
+    resolvedDecisionMap,
+    plannerFeedback,
     reason:
       'El usuario ya delegó los faltantes menores o la decisión ya estaba resuelta, así que el Cerebro sigue sin reabrir ese approval.',
     nextExpectedAction: 'execute-plan',
@@ -59753,6 +59951,21 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
     payload?.materializationPlan && typeof payload.materializationPlan === 'object'
       ? payload.materializationPlan
       : null
+  const generatedDomainUniversalMaterializationPlan =
+    payload?.generatedDomainUniversalMaterializationPlan &&
+    typeof payload.generatedDomainUniversalMaterializationPlan === 'object'
+      ? payload.generatedDomainUniversalMaterializationPlan
+      : null
+  const generatedDomainFileCreationApprovalEvaluation =
+    payload?.generatedDomainFileCreationApprovalEvaluation &&
+    typeof payload.generatedDomainFileCreationApprovalEvaluation === 'object'
+      ? payload.generatedDomainFileCreationApprovalEvaluation
+      : null
+  const generatedDomainControlledRuntimeMaterializationSource =
+    payload?.generatedDomainControlledRuntimeMaterializationSource &&
+    typeof payload.generatedDomainControlledRuntimeMaterializationSource === 'object'
+      ? payload.generatedDomainControlledRuntimeMaterializationSource
+      : null
   const contextHubStatus =
     payload?.contextHubStatus && typeof payload.contextHubStatus === 'object'
       ? {
@@ -59939,6 +60152,100 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
           allowedTargetPathsCount: executionScope?.allowedTargetPaths?.length || 0,
           hasRendererPlan: materializationPlan !== null,
         })
+
+        const shouldUseGeneratedDomainSandboxMaterialization =
+          generatedDomainUniversalMaterializationPlan &&
+          generatedDomainFileCreationApprovalEvaluation &&
+          generatedDomainControlledRuntimeMaterializationSource?.enabled === true &&
+          normalizeOptionalString(
+            generatedDomainControlledRuntimeMaterializationSource?.selectedSource,
+          ) === 'generated-domain-universal'
+
+        if (shouldUseGeneratedDomainSandboxMaterialization) {
+          debugMainLog('generated-domain-sandbox-materialization:attempt', {
+            requestId: requestId || undefined,
+            decisionKey,
+            sandboxRoot:
+              generatedDomainFileCreationApprovalEvaluation?.sandboxRoot?.relative ||
+              undefined,
+          })
+          emitExecutionEvent(webContents, {
+            requestId: requestId || undefined,
+            source: 'orquestador',
+            title: 'Materializacion sandbox aprobada',
+            content:
+              'Electron va a materializar el scaffold universal solo dentro del sandbox aprobado.',
+            status: 'info',
+            raw: JSON.stringify(
+              {
+                selectedSource:
+                  generatedDomainControlledRuntimeMaterializationSource?.selectedSource ||
+                  'none',
+                sandboxRoot:
+                  generatedDomainFileCreationApprovalEvaluation?.sandboxRoot || null,
+              },
+              null,
+              2,
+            ),
+          })
+          const sandboxMaterializationReport = materializeGeneratedDomainSandboxPlan({
+            generatedDomainUniversalMaterializationPlan,
+            generatedDomainFileCreationApprovalEvaluation,
+          })
+          const sandboxMaterializationResponse = buildExecuteTaskCompletionPayload(
+            {
+              ok: sandboxMaterializationReport?.materialized === true,
+              requestId,
+              instruction,
+              status:
+                sandboxMaterializationReport?.materialized === true
+                  ? 'completed'
+                  : sandboxMaterializationReport?.status || 'blocked',
+              reason:
+                sandboxMaterializationReport?.materialized === true
+                  ? 'generated domain sandbox materialization completed'
+                  : 'generated domain sandbox materialization blocked',
+              result:
+                sandboxMaterializationReport?.materialized === true
+                  ? `Scaffold sandbox materializado en ${sandboxMaterializationReport?.sandboxRoot?.relative || 'sandbox aprobado'} con ${Array.isArray(sandboxMaterializationReport?.created) ? sandboxMaterializationReport.created.length : 0} archivos creados.`
+                  : 'La materializacion sandbox no pudo ejecutarse porque la aprobacion efectiva sigue bloqueada.',
+              approvalRequired: false,
+              bridgeMode: 'generated-domain-sandbox-approved',
+              bridgeModeSource: 'electron-execute-task',
+              materializationLayer: 'generated-domain-sandbox',
+              details: {
+                generatedDomainSandboxMaterializationReport:
+                  sandboxMaterializationReport || null,
+                generatedDomainFileCreationApprovalEvaluation:
+                  generatedDomainFileCreationApprovalEvaluation || null,
+                generatedDomainControlledRuntimeMaterializationSource:
+                  generatedDomainControlledRuntimeMaterializationSource || null,
+              },
+            },
+            requestId,
+          )
+          if (sandboxMaterializationReport?.materialized === true) {
+            emitExecutionFinishedEventBestEffort({
+              finalResponse: sandboxMaterializationResponse,
+              requestId,
+              instruction,
+              workspacePath,
+              decisionKey,
+              contextHubStatus,
+            })
+          } else {
+            emitExecutionFailedEventBestEffort({
+              finalResponse: sandboxMaterializationResponse,
+              requestId,
+              instruction,
+              workspacePath,
+              decisionKey,
+              contextHubStatus,
+            })
+          }
+          emitExecutionCompleteEvent(webContents, sandboxMaterializationResponse)
+          return
+        }
 
         if (!resolvedMaterializationPlan) {
           const reason = localPlanSkipReason({
