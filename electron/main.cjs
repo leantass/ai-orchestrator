@@ -46772,6 +46772,18 @@ function isApprovedResolvedDecisionRecord(record) {
   )
 }
 
+function isGeneratedDomainSandboxApprovalDecisionKey(value) {
+  const normalizedValue = normalizeResolvedDecisionKey(value)
+  return (
+    normalizedValue === 'approve-sandbox-path' ||
+    normalizedValue === 'approval-materialize-sandbox:v1'
+  )
+}
+
+function normalizeGeneratedDomainSandboxApprovalOption(value) {
+  return normalizeResolvedDecisionKey(value)
+}
+
 function extractApprovedSandboxRootCandidate(...values) {
   for (const value of values) {
     const normalizedValue = normalizeOptionalString(value)
@@ -46854,14 +46866,41 @@ function resolveGeneratedDomainSandboxApprovalDecision({
   const decisionRecord = getResolvedDecisionRecord(
     normalizedResolvedDecisionMap,
     'approve-sandbox-path',
+    'approval-materialize-sandbox:v1',
   )
   const feedbackDecisionKey = normalizeResolvedDecisionKey(
     plannerFeedback?.approvalRequestDecisionKey,
   )
+  const decisionRecordKey = normalizeResolvedDecisionKey(decisionRecord?.key)
+  const activeDecisionKey = isGeneratedDomainSandboxApprovalDecisionKey(
+    feedbackDecisionKey,
+  )
+    ? feedbackDecisionKey
+    : decisionRecordKey
+  const selectedApprovalOption = normalizeGeneratedDomainSandboxApprovalOption(
+    plannerFeedback?.selectedOptionKey ||
+      plannerFeedback?.selectedOption ||
+      decisionRecord?.selectedOptionKey ||
+      decisionRecord?.selectedOption,
+  )
+  const usesApprovalRequestV1 =
+    activeDecisionKey === 'approval-materialize-sandbox:v1'
+  const selectedProvideNewEmptyWorkspace =
+    selectedApprovalOption === 'provide-new-empty-workspace'
+  const selectedApproveSubfolderInsideCurrentWorkspace =
+    selectedApprovalOption === 'approve-subfolder-inside-current-workspace'
+  const selectedDeclineMaterializationNow =
+    selectedApprovalOption === 'decline-materialization-now'
+  const optionAllowsSandboxApproval =
+    !usesApprovalRequestV1 || selectedProvideNewEmptyWorkspace
   const feedbackApproved =
     plannerFeedback?.type === 'approval-granted' &&
-    feedbackDecisionKey === 'approve-sandbox-path'
-  const recordApproved = isApprovedResolvedDecisionRecord(decisionRecord)
+    isGeneratedDomainSandboxApprovalDecisionKey(feedbackDecisionKey) &&
+    optionAllowsSandboxApproval
+  const recordApproved =
+    isApprovedResolvedDecisionRecord(decisionRecord) &&
+    isGeneratedDomainSandboxApprovalDecisionKey(decisionRecordKey) &&
+    optionAllowsSandboxApproval
   const approved = feedbackApproved || recordApproved
   const requestedSandboxRoot = extractApprovedSandboxRootCandidate(
     decisionRecord?.freeAnswer,
@@ -46922,18 +46961,32 @@ function resolveGeneratedDomainSandboxApprovalDecision({
     /sandbox/iu.test(requestedBasename)
   const requestedIsExternalAbsoluteSandboxPath =
     isAbsoluteExternalSandboxPath(requestedSandboxRoot) && !requestedInsideWorkspace
+  const optionBlockedReason = selectedApproveSubfolderInsideCurrentWorkspace
+    ? 'La opcion approve-subfolder-inside-current-workspace requiere una aprobacion separada y no puede tocar el workspace actual en este flujo seguro.'
+    : usesApprovalRequestV1 &&
+        !selectedProvideNewEmptyWorkspace &&
+        !selectedDeclineMaterializationNow
+        ? 'La aprobacion sandbox v1 requiere elegir provide-new-empty-workspace para usar un workspace externo seguro.'
+        : ''
+  const missingApprovedSandboxPath =
+    usesApprovalRequestV1 && selectedProvideNewEmptyWorkspace && !requestedSandboxRoot
   const canUseRequestedSandboxRoot =
-    !requestedSandboxRoot ||
-    (!requestedLooksBlocked &&
-      (requestedInsideWorkspace ||
-        (requestedLooksLikeSandbox &&
-          !requestedBasenameBlocked &&
-          (requestedInsideTrustedBase || requestedIsExternalAbsoluteSandboxPath))))
+    !(optionBlockedReason || missingApprovedSandboxPath) &&
+    (!requestedSandboxRoot ||
+      (!requestedLooksBlocked &&
+        (requestedInsideWorkspace ||
+          (requestedLooksLikeSandbox &&
+            !requestedBasenameBlocked &&
+            (requestedInsideTrustedBase || requestedIsExternalAbsoluteSandboxPath)))))
   const effectiveApproved = approved && canUseRequestedSandboxRoot
   const approvalBlockedReason =
-    approved && !canUseRequestedSandboxRoot
+    optionBlockedReason ||
+    (approved && missingApprovedSandboxPath
+      ? 'La aprobacion sandbox v1 requiere una ruta externa segura en freeAnswer.'
+      : '') ||
+    (approved && !canUseRequestedSandboxRoot
       ? 'La ruta aprobada no es un sandbox interno seguro ni puede mapearse de forma controlada.'
-      : ''
+      : '')
   let effectiveSandboxRoot = defaultRelativeSandboxRoot
 
   if (effectiveApproved && requestedSandboxRoot && !requestedLooksBlocked) {

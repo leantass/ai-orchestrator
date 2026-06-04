@@ -9057,9 +9057,12 @@ function createAlignedGeneratedDomainObservationDecision({
   })
 }
 
-function createApprovedToolBankObservationDecision(
+function createApprovedToolBankObservationDecision({
   approvedSandboxPath = 'C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\sandbox-toolbank-local',
-) {
+  approvalRequestDecisionKey = 'approval-materialize-sandbox:v1',
+  selectedOption = 'provide-new-empty-workspace',
+  feedbackType = 'approval-granted',
+} = {}) {
   const generatedDomainContract = {
     contractVersion: '1.0',
     deliveryLevel: 'fullstack-local',
@@ -9221,19 +9224,25 @@ function createApprovedToolBankObservationDecision(
     generatedDomainContract,
     resolvedDecisionMap: new Map([
       [
-        'approve-sandbox-path',
+        approvalRequestDecisionKey,
         {
-          status: 'approved',
-          selectedOption: 'approved',
+          status: feedbackType === 'approval-granted' ? 'approved' : 'resolved',
+          decision:
+            feedbackType === 'approval-rejected'
+              ? 'rejected'
+              : feedbackType === 'approval-deferred'
+                ? 'deferred'
+                : 'approved',
+          selectedOption,
           freeAnswer: approvedSandboxPath,
           summary: 'Aprobacion humana explicita para materializacion sandbox controlada.',
         },
       ],
     ]),
     plannerFeedback: {
-      type: 'approval-granted',
-      approvalRequestDecisionKey: 'approve-sandbox-path',
-      selectedOption: 'approved',
+      type: feedbackType,
+      approvalRequestDecisionKey,
+      selectedOption,
       freeAnswer: approvedSandboxPath,
       approvalReason:
         'No tocar web-prueba, no crear .env, no instalar dependencias ni usar servicios externos.',
@@ -9687,17 +9696,31 @@ async function runGeneratedDomainFileCreationApprovalEvaluationPayloadCase() {
 async function runGeneratedDomainSandboxApprovalBridgeCase() {
   const failures = []
   const decision = createApprovedToolBankObservationDecision()
-  const posixDecision = createApprovedToolBankObservationDecision(
-    '/home/runner/work/sandbox-toolbank-local',
-  )
-  const unsafeWebPruebaDecision = createApprovedToolBankObservationDecision(
-    'C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\web-prueba',
-  )
-  const unsafeEnvDecision = createApprovedToolBankObservationDecision('.env')
-  const unsafeNodeModulesDecision =
-    createApprovedToolBankObservationDecision('node_modules')
-  const unsafeDockerDecision = createApprovedToolBankObservationDecision('Dockerfile')
-  const unsafeDeployDecision = createApprovedToolBankObservationDecision('deploy')
+  const posixDecision = createApprovedToolBankObservationDecision({
+    approvedSandboxPath: '/home/runner/work/sandbox-toolbank-local',
+  })
+  const currentWorkspaceDecision = createApprovedToolBankObservationDecision({
+    selectedOption: 'approve-subfolder-inside-current-workspace',
+  })
+  const declinedDecision = createApprovedToolBankObservationDecision({
+    selectedOption: 'decline-materialization-now',
+    feedbackType: 'approval-deferred',
+  })
+  const unsafeWebPruebaDecision = createApprovedToolBankObservationDecision({
+    approvedSandboxPath: 'C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\web-prueba',
+  })
+  const unsafeEnvDecision = createApprovedToolBankObservationDecision({
+    approvedSandboxPath: '.env',
+  })
+  const unsafeNodeModulesDecision = createApprovedToolBankObservationDecision({
+    approvedSandboxPath: 'node_modules',
+  })
+  const unsafeDockerDecision = createApprovedToolBankObservationDecision({
+    approvedSandboxPath: 'Dockerfile',
+  })
+  const unsafeDeployDecision = createApprovedToolBankObservationDecision({
+    approvedSandboxPath: 'deploy',
+  })
   const appSource = fs.readFileSync(appFilePath, 'utf8')
 
   pushFailure(
@@ -9707,7 +9730,7 @@ async function runGeneratedDomainSandboxApprovalBridgeCase() {
       decision.generatedDomainFileCreationApprovalEvaluation?.blocked === false &&
       decision.generatedDomainFileCreationApprovalEvaluation?.status ===
         'approved-for-sandbox',
-    'La aprobacion humana approve-sandbox-path debe convertirse en approval evaluation efectiva para sandbox.',
+    'La aprobacion humana approval-materialize-sandbox:v1 con provide-new-empty-workspace debe convertirse en approval evaluation efectiva para sandbox.',
   )
   pushFailure(
     failures,
@@ -9744,6 +9767,23 @@ async function runGeneratedDomainSandboxApprovalBridgeCase() {
       posixDecision.generatedDomainFileCreationApprovalEvaluation?.sandboxRoot
         ?.withinWorkspace === true,
     'Una ruta POSIX externa aprobada debe mapearse al mismo sandbox interno seguro.',
+  )
+  pushFailure(
+    failures,
+    currentWorkspaceDecision.generatedDomainFileCreationApprovalEvaluation?.approved ===
+      false &&
+      currentWorkspaceDecision.generatedDomainFileCreationApprovalEvaluation?.blocked ===
+        true &&
+      currentWorkspaceDecision.generatedDomainControlledRuntimeMaterializationSource
+        ?.enabled === false,
+    'approve-subfolder-inside-current-workspace debe quedar bloqueado o requerir una aprobacion separada.',
+  )
+  pushFailure(
+    failures,
+    declinedDecision.generatedDomainFileCreationApprovalEvaluation?.approved === false &&
+      declinedDecision.generatedDomainControlledRuntimeMaterializationSource?.enabled ===
+        false,
+    'decline-materialization-now no debe disparar materializacion sandbox ni habilitar la fuente universal.',
   )
   ;[
     unsafeWebPruebaDecision,
