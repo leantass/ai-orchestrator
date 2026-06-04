@@ -650,3 +650,54 @@ La intencion es reforzar que:
 - el contrato universal gobierna por capacidades
 - la materializacion segura no depende de rubros fijos
 - los dominios siguen siendo fixtures/harnesses, no motor runtime
+
+## 23. GeneratedDomainContract extraction plan
+
+La extraccion completa de `electron/generated-domain-contract.cjs` hacia un runtime mas chico todavia no se mueve en esta fase porque sigue muy acoplada a:
+
+- `buildBrainDecisionContract(...)`
+- el harness VM de `generated-domain-contract-smoke`
+- builders de preview, candidate y sandbox
+
+Plan exacto de extraccion segura:
+
+1. mover helpers de validacion/safety a un modulo puro compartido
+2. mover normalizacion y derives de paths a un modulo puro compartido
+3. mantener `buildGeneratedDomainCapabilityProfile(...)` como frontera estable entre contrato y runtime
+4. recablear smokes para depender del modulo nuevo antes de reducir `main.cjs`
+5. dejar `electron/generated-domain-contract.cjs` como facade fina cuando la cobertura siga verde
+
+Hasta que ese plan no pase con smokes verdes:
+
+- no se toca el runtime real
+- no se toca renderer
+- no se promueve shadow a fuente real
+
+## 24. Post-MVP backlog and risk log
+
+Backlog post-MVP que queda explicitamente separado de esta fase:
+
+- UI visual de approval y resultado de materializacion
+- runtime shadow real con fallback legacy controlado
+- ejecucion local opcional aprobada
+- integraciones reales
+- Docker
+- deploy
+- pagos reales
+- servicios externos reales
+- DB productiva
+
+Riesgos tecnicos que siguen abiertos:
+
+- `electron/main.cjs` todavia concentra demasiada logica
+- `inspectFullstackLocalMaterializationContract` sigue siendo legacy-first
+- `buildFullstackLocalMaterializationPlan` sigue mezclando contrato universal y fallback legacy
+- `electron/local-deterministic-executor.cjs` conserva branching fuerte por `ecommerce`, `school-crm` y `generic`
+
+Mitigaciones ya implementadas:
+
+- diagnostics observacionales
+- approval policy estricta
+- sandbox materialization
+- suite domain-agnostic incremental
+- readiness executive report

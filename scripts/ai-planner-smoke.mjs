@@ -55,6 +55,9 @@ const {
 const generatedDomainOrchestrationDiagnostics = require(
   path.join(repoRoot, 'electron', 'generated-domain-orchestration-diagnostics.cjs'),
 )
+const generatedDomainLegacyDiagnostics = require(
+  path.join(repoRoot, 'electron', 'generated-domain-legacy-diagnostics.cjs'),
+)
 const generatedDomainMaterializationPolicies = require(
   path.join(repoRoot, 'electron', 'generated-domain-materialization-policies.cjs'),
 )
@@ -1127,6 +1130,7 @@ module.exports = {
     buildGeneratedDomainContractDiagnostics,
     extractGeneratedDomainContractCandidate,
     generatedDomainOrchestrationDiagnostics,
+    generatedDomainLegacyDiagnostics,
     generatedDomainMaterializationPolicies,
     setTimeout,
     clearTimeout,
