@@ -1009,3 +1009,81 @@ Validacion manual futura pendiente:
 - revisar el layout visual final en Electron renderer real
 - decidir si la tarjeta vive solo en advanced mode o tambien en vistas resumidas
 - definir un flujo humano real de approval antes de habilitar cualquier accion de escritura
+
+## 30. MVP technical closure status
+
+Estado general:
+
+- MVP tecnico cerrado para sandbox/harness
+- runtime real normal sigue apagado por seguridad
+- no hay materializacion fuera de sandbox interno aprobado
+- `web-prueba` no fue tocado
+
+Que ya esta terminado:
+
+- pedido -> contrato universal por harness
+- contrato -> plan universal
+- plan -> approval payload
+- approval payload -> approval surface backend
+- approval surface -> renderer minimo de solo lectura
+- approval -> materializacion sandbox controlada
+- validacion sandbox
+- reporte ejecutivo de readiness del MVP
+- fallback legacy intacto
+
+Que valida el sandbox:
+
+- 3 dominios distintos materializados en sandbox controlado
+- archivos creados solo dentro de `.codex-temp/generated-domain-materialization-sandbox`
+- `validation/report.json` generado
+- cleanup del sandbox smoke
+- bloqueos de `web-prueba`, `.env`, `node_modules`, Docker, deploy, servicios externos, pagos reales y DB productiva
+
+Que muestra la UI hoy:
+
+- tarjeta tecnica de `Aprobacion de materializacion`
+- status de revision
+- root objetivo
+- cantidad de archivos y bloqueos
+- safety labels
+- validaciones principales
+- primer blocker, warning o error
+- mensaje explicito de que no ejecuta todavia
+
+Que sigue apagado por seguridad:
+
+- runtime universal general
+- runtime real controlado fuera de harness
+- materializacion fuera de sandbox
+- cualquier write sobre proyectos externos
+- cualquier write sobre `web-prueba`
+- cualquier flujo con `.env`, Docker, deploy, servicios externos, pagos reales o DB productiva
+
+Post-MVP pendiente:
+
+- validacion manual visual del renderer en Electron real
+- approval humana real fuera de harness
+- desacople fuerte de `electron/main.cjs`
+- desacople fuerte de `electron/local-deterministic-executor.cjs`
+- reduccion adicional de rutas legacy-first
+
+Como se valida hoy:
+
+- `generated-domain-contract-smoke`
+- `generated-domain-materialization-sandbox-smoke`
+- `ai-operator-e2e-smoke`
+- `ai-planner-smoke`
+- `ai-release-smoke`
+- `tsc`
+- `build`
+- `quality:ci`
+
+Que no se debe tocar en este baseline:
+
+- `web-prueba`
+- `.env`
+- `node_modules`
+- Docker o deploy reales
+- servicios externos reales
+- pagos reales
+- DB productiva
