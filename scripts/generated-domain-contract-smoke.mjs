@@ -99,6 +99,7 @@ module.exports = {
   buildGeneratedDomainUniversalMaterializationPlanCandidate,
   buildGeneratedDomainMaterializationPlanCandidateLegacyComparison,
   buildGeneratedDomainMaterializationPlanDecouplingReport,
+  resolveGeneratedDomainControlledRuntimeMaterializationSource,
   evaluateGeneratedDomainFileCreationApproval,
   materializeGeneratedDomainSandboxPlan,
   resolveGeneratedDomainContractFirstInspectionDefinition,
@@ -147,6 +148,7 @@ module.exports = {
   summarizeGeneratedDomainUniversalMaterializationPlanCandidateForDebug,
   summarizeGeneratedDomainMaterializationPlanCandidateLegacyComparisonForDebug,
   summarizeGeneratedDomainMaterializationPlanDecouplingReportForDebug,
+  summarizeGeneratedDomainControlledRuntimeMaterializationSourceForDebug,
   summarizeGeneratedDomainFileCreationApprovalEvaluationForDebug,
   summarizeGeneratedDomainSandboxMaterializationReportForDebug,
   summarizeGeneratedDomainInspectionContractDecouplingReportForDebug,
@@ -5384,6 +5386,203 @@ function runGeneratedDomainMaterializationPlanDecouplingReportReadyCase() {
   assert.ok(['partial', 'ready-for-harness'].includes(debugSummary?.migrationStatus))
 }
 
+function runGeneratedDomainControlledRuntimeMaterializationSourceRuntimeDisabledCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const runtimeSource = decision.generatedDomainControlledRuntimeMaterializationSource
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainControlledRuntimeMaterializationSourceForDebug(
+      runtimeSource,
+    )
+
+  assert.equal(runtimeSource?.present, true)
+  assert.equal(runtimeSource?.evaluated, true)
+  assert.equal(runtimeSource?.enabled, false)
+  assert.equal(runtimeSource?.mode, 'runtime-disabled')
+  assert.ok(['legacy', 'current', 'none'].includes(runtimeSource?.selectedSource))
+  assert.equal(runtimeSource?.behaviorChanged, false)
+  assert.equal(runtimeSource?.materializationPlanChanged, false)
+  assert.equal(runtimeSource?.executionScopeChanged, false)
+  assert.equal(runtimeSource?.fallbackLegacyAvailable, true)
+  assert.equal(debugSummary?.mode, 'runtime-disabled')
+}
+
+function runGeneratedDomainControlledRuntimeMaterializationSourceHarnessApprovedCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const approvalEvaluation = observationHarness.evaluateGeneratedDomainFileCreationApproval({
+    generatedDomainUniversalMaterializationPlan:
+      decision.generatedDomainUniversalMaterializationPlan,
+    approvalDecision: {
+      approved: true,
+      scope: 'sandbox-only',
+      approvalReason: 'Harness controlled enable smoke.',
+    },
+    workspacePath: repoRoot,
+    sandboxRoot: '.codex-temp/generated-domain-materialization-sandbox/runtime-enable-approved',
+  })
+  const runtimeSource =
+    observationHarness.resolveGeneratedDomainControlledRuntimeMaterializationSource({
+      generatedDomainRuntimeShadowReadinessDecision:
+        decision.generatedDomainRuntimeShadowReadinessDecision,
+      generatedDomainControlledEnablePolicy:
+        decision.generatedDomainControlledEnablePolicy,
+      generatedDomainFirstControlledEnableScenario:
+        decision.generatedDomainFirstControlledEnableScenario,
+      generatedDomainUniversalMaterializationPlan:
+        decision.generatedDomainUniversalMaterializationPlan,
+      generatedDomainMaterializationPlanDecouplingReport:
+        decision.generatedDomainMaterializationPlanDecouplingReport,
+      generatedDomainMaterializationPlanCandidateLegacyComparison:
+        decision.generatedDomainMaterializationPlanCandidateLegacyComparison,
+      generatedDomainFileCreationApprovalEvaluation: approvalEvaluation,
+      domainConsistencyDiagnostics: decision.domainConsistencyDiagnostics,
+      controlledRuntimeSourceOptions: {
+        harnessControlledEnable: true,
+        simulateLeanApproval: true,
+      },
+    })
+
+  assert.equal(runtimeSource?.present, true)
+  assert.equal(runtimeSource?.enabled, true)
+  assert.equal(runtimeSource?.mode, 'harness-controlled')
+  assert.equal(runtimeSource?.selectedSource, 'generated-domain-universal')
+  assert.equal(runtimeSource?.fallbackLegacyAvailable, true)
+  assert.equal(runtimeSource?.approved, true)
+  assert.equal(runtimeSource?.behaviorChanged, false)
+  assert.equal(runtimeSource?.materializationPlanChanged, false)
+  assert.equal(runtimeSource?.executionScopeChanged, false)
+}
+
+function runGeneratedDomainControlledRuntimeMaterializationSourceHarnessBlockedByApprovalCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const approvalEvaluation = observationHarness.evaluateGeneratedDomainFileCreationApproval({
+    generatedDomainUniversalMaterializationPlan:
+      decision.generatedDomainUniversalMaterializationPlan,
+    approvalDecision: {
+      approved: false,
+      scope: 'sandbox-only',
+    },
+    workspacePath: repoRoot,
+    sandboxRoot: '.codex-temp/generated-domain-materialization-sandbox/runtime-enable-blocked',
+  })
+  const runtimeSource =
+    observationHarness.resolveGeneratedDomainControlledRuntimeMaterializationSource({
+      generatedDomainRuntimeShadowReadinessDecision:
+        decision.generatedDomainRuntimeShadowReadinessDecision,
+      generatedDomainControlledEnablePolicy:
+        decision.generatedDomainControlledEnablePolicy,
+      generatedDomainFirstControlledEnableScenario:
+        decision.generatedDomainFirstControlledEnableScenario,
+      generatedDomainUniversalMaterializationPlan:
+        decision.generatedDomainUniversalMaterializationPlan,
+      generatedDomainMaterializationPlanDecouplingReport:
+        decision.generatedDomainMaterializationPlanDecouplingReport,
+      generatedDomainMaterializationPlanCandidateLegacyComparison:
+        decision.generatedDomainMaterializationPlanCandidateLegacyComparison,
+      generatedDomainFileCreationApprovalEvaluation: approvalEvaluation,
+      domainConsistencyDiagnostics: decision.domainConsistencyDiagnostics,
+      controlledRuntimeSourceOptions: {
+        harnessControlledEnable: true,
+      },
+    })
+
+  assert.equal(runtimeSource?.present, true)
+  assert.equal(runtimeSource?.enabled, false)
+  assert.equal(runtimeSource?.mode, 'blocked')
+  assert.equal(runtimeSource?.selectedSource, 'blocked')
+  assert.equal(runtimeSource?.approved, false)
+  assert.equal(Array.isArray(runtimeSource?.blockers), true)
+  assert.equal(runtimeSource?.blockers.length > 0, true)
+}
+
+function runGeneratedDomainControlledRuntimeMaterializationSourceWebPruebaBlockedCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const approvalEvaluation = observationHarness.evaluateGeneratedDomainFileCreationApproval({
+    generatedDomainUniversalMaterializationPlan:
+      decision.generatedDomainUniversalMaterializationPlan,
+    approvalDecision: {
+      approved: true,
+      scope: 'sandbox-only',
+      approvalReason: 'Unsafe root should stay blocked.',
+    },
+    workspacePath: repoRoot,
+    sandboxRoot: 'web-prueba/generated-domain-materialization-sandbox/runtime-enable',
+  })
+  const runtimeSource =
+    observationHarness.resolveGeneratedDomainControlledRuntimeMaterializationSource({
+      generatedDomainRuntimeShadowReadinessDecision:
+        decision.generatedDomainRuntimeShadowReadinessDecision,
+      generatedDomainControlledEnablePolicy:
+        decision.generatedDomainControlledEnablePolicy,
+      generatedDomainFirstControlledEnableScenario:
+        decision.generatedDomainFirstControlledEnableScenario,
+      generatedDomainUniversalMaterializationPlan:
+        decision.generatedDomainUniversalMaterializationPlan,
+      generatedDomainMaterializationPlanDecouplingReport:
+        decision.generatedDomainMaterializationPlanDecouplingReport,
+      generatedDomainMaterializationPlanCandidateLegacyComparison:
+        decision.generatedDomainMaterializationPlanCandidateLegacyComparison,
+      generatedDomainFileCreationApprovalEvaluation: approvalEvaluation,
+      domainConsistencyDiagnostics: decision.domainConsistencyDiagnostics,
+      controlledRuntimeSourceOptions: {
+        harnessControlledEnable: true,
+        simulateLeanApproval: true,
+      },
+    })
+
+  assert.equal(approvalEvaluation?.status, 'blocked')
+  assert.equal(runtimeSource?.enabled, false)
+  assert.equal(runtimeSource?.mode, 'blocked')
+  assert.equal(runtimeSource?.selectedSource, 'blocked')
+}
+
+function runGeneratedDomainControlledRuntimeMaterializationSourceUnsafePathBlockedCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const unsafePlan = JSON.parse(
+    JSON.stringify(decision.generatedDomainUniversalMaterializationPlan),
+  )
+  unsafePlan.filesToCreate.push({
+    path: `${unsafePlan.projectRoot}/.env`,
+    area: 'forbidden',
+    content: 'SECRET=blocked',
+  })
+  const approvalEvaluation = observationHarness.evaluateGeneratedDomainFileCreationApproval({
+    generatedDomainUniversalMaterializationPlan: unsafePlan,
+    approvalDecision: {
+      approved: true,
+      scope: 'sandbox-only',
+      approvalReason: 'Unsafe path must stay blocked.',
+    },
+    workspacePath: repoRoot,
+    sandboxRoot: '.codex-temp/generated-domain-materialization-sandbox/runtime-enable-unsafe',
+  })
+  const runtimeSource =
+    observationHarness.resolveGeneratedDomainControlledRuntimeMaterializationSource({
+      generatedDomainRuntimeShadowReadinessDecision:
+        decision.generatedDomainRuntimeShadowReadinessDecision,
+      generatedDomainControlledEnablePolicy:
+        decision.generatedDomainControlledEnablePolicy,
+      generatedDomainFirstControlledEnableScenario:
+        decision.generatedDomainFirstControlledEnableScenario,
+      generatedDomainUniversalMaterializationPlan: unsafePlan,
+      generatedDomainMaterializationPlanDecouplingReport:
+        decision.generatedDomainMaterializationPlanDecouplingReport,
+      generatedDomainMaterializationPlanCandidateLegacyComparison:
+        decision.generatedDomainMaterializationPlanCandidateLegacyComparison,
+      generatedDomainFileCreationApprovalEvaluation: approvalEvaluation,
+      domainConsistencyDiagnostics: decision.domainConsistencyDiagnostics,
+      controlledRuntimeSourceOptions: {
+        harnessControlledEnable: true,
+        simulateLeanApproval: true,
+      },
+    })
+
+  assert.equal(approvalEvaluation?.status, 'blocked')
+  assert.equal(runtimeSource?.enabled, false)
+  assert.equal(runtimeSource?.mode, 'blocked')
+  assert.equal(runtimeSource?.selectedSource, 'blocked')
+  assert.equal(runtimeSource?.behaviorChanged, false)
+}
+
 function runGeneratedDomainUniversalMaterializationPlanBlockedCase() {
   const plan = observationHarness.buildGeneratedDomainUniversalMaterializationPlan({
     generatedDomainContract: {
@@ -6665,6 +6864,11 @@ runGeneratedDomainUniversalMaterializationPlanCandidateBlockedCase()
 runGeneratedDomainMaterializationPlanCandidateLegacyComparisonAlignedCase()
 runGeneratedDomainMaterializationPlanCandidateLegacyComparisonNotAvailableCase()
 runGeneratedDomainMaterializationPlanDecouplingReportReadyCase()
+runGeneratedDomainControlledRuntimeMaterializationSourceRuntimeDisabledCase()
+runGeneratedDomainControlledRuntimeMaterializationSourceHarnessApprovedCase()
+runGeneratedDomainControlledRuntimeMaterializationSourceHarnessBlockedByApprovalCase()
+runGeneratedDomainControlledRuntimeMaterializationSourceWebPruebaBlockedCase()
+runGeneratedDomainControlledRuntimeMaterializationSourceUnsafePathBlockedCase()
 runGeneratedDomainUniversalMaterializationPlanBlockedCase()
 runGeneratedDomainFileCreationApprovalEvaluationBlockedCase()
 runGeneratedDomainFileCreationApprovalEvaluationApprovedSandboxCase()

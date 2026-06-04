@@ -396,6 +396,47 @@ function summarizeGeneratedDomainRuntimeShadowReadinessDecisionForDebug(decision
   }
 }
 
+function summarizeGeneratedDomainControlledRuntimeMaterializationSourceForDebug(
+  runtimeSource,
+) {
+  if (!runtimeSource || typeof runtimeSource !== 'object') {
+    return {
+      present: false,
+      evaluated: false,
+      enabled: false,
+      mode: 'runtime-disabled',
+      selectedSource: 'none',
+    }
+  }
+
+  const warningSummary = summarizeDebugEntries(runtimeSource.warnings)
+  const errorSummary = summarizeDebugEntries(runtimeSource.errors)
+
+  return {
+    present: runtimeSource.present === true,
+    evaluated: runtimeSource.evaluated === true,
+    enabled: runtimeSource.enabled === true,
+    mode: normalizeOptionalString(runtimeSource.mode) || 'runtime-disabled',
+    selectedSource:
+      normalizeOptionalString(runtimeSource.selectedSource) || 'none',
+    behaviorChanged: runtimeSource.behaviorChanged === true,
+    materializationPlanChanged:
+      runtimeSource.materializationPlanChanged === true,
+    executionScopeChanged: runtimeSource.executionScopeChanged === true,
+    fallbackLegacyAvailable: runtimeSource.fallbackLegacyAvailable === true,
+    approvalRequired: runtimeSource.approvalRequired !== false,
+    approved: runtimeSource.approved === true,
+    warningsCount: Array.isArray(runtimeSource.warnings)
+      ? runtimeSource.warnings.length
+      : 0,
+    errorsCount: Array.isArray(runtimeSource.errors)
+      ? runtimeSource.errors.length
+      : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
 function summarizeGeneratedDomainMvpReadinessExecutiveReportForDebug(report) {
   if (!report || typeof report !== 'object') {
     return {
@@ -2234,6 +2275,310 @@ function buildGeneratedDomainRuntimeShadowReadinessDecision({
   }
 }
 
+function resolveGeneratedDomainControlledRuntimeMaterializationSource({
+  generatedDomainRuntimeShadowReadinessDecision,
+  generatedDomainControlledEnablePolicy,
+  generatedDomainFirstControlledEnableScenario,
+  generatedDomainUniversalMaterializationPlan,
+  generatedDomainMaterializationPlanDecouplingReport,
+  generatedDomainMaterializationPlanCandidateLegacyComparison,
+  generatedDomainFileCreationApprovalEvaluation,
+  domainConsistencyDiagnostics,
+  controlledRuntimeSourceOptions = null,
+}) {
+  const emptyResolution = {
+    present: false,
+    evaluated: false,
+    enabled: false,
+    mode: 'runtime-disabled',
+    selectedSource: 'none',
+    behaviorChanged: false,
+    materializationPlanChanged: false,
+    executionScopeChanged: false,
+    fallbackLegacyAvailable: false,
+    approvalRequired: true,
+    approved: false,
+    blockers: [],
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  const runtimeReadiness =
+    generatedDomainRuntimeShadowReadinessDecision &&
+    typeof generatedDomainRuntimeShadowReadinessDecision === 'object'
+      ? generatedDomainRuntimeShadowReadinessDecision
+      : null
+  const controlledEnablePolicy =
+    generatedDomainControlledEnablePolicy &&
+    typeof generatedDomainControlledEnablePolicy === 'object'
+      ? generatedDomainControlledEnablePolicy
+      : null
+  const firstScenario =
+    generatedDomainFirstControlledEnableScenario &&
+    typeof generatedDomainFirstControlledEnableScenario === 'object'
+      ? generatedDomainFirstControlledEnableScenario
+      : null
+  const universalPlan =
+    generatedDomainUniversalMaterializationPlan &&
+    typeof generatedDomainUniversalMaterializationPlan === 'object'
+      ? generatedDomainUniversalMaterializationPlan
+      : null
+  const decouplingReport =
+    generatedDomainMaterializationPlanDecouplingReport &&
+    typeof generatedDomainMaterializationPlanDecouplingReport === 'object'
+      ? generatedDomainMaterializationPlanDecouplingReport
+      : null
+  const candidateComparison =
+    generatedDomainMaterializationPlanCandidateLegacyComparison &&
+    typeof generatedDomainMaterializationPlanCandidateLegacyComparison === 'object'
+      ? generatedDomainMaterializationPlanCandidateLegacyComparison
+      : null
+  const approvalEvaluation =
+    generatedDomainFileCreationApprovalEvaluation &&
+    typeof generatedDomainFileCreationApprovalEvaluation === 'object'
+      ? generatedDomainFileCreationApprovalEvaluation
+      : null
+  const consistency =
+    domainConsistencyDiagnostics && typeof domainConsistencyDiagnostics === 'object'
+      ? domainConsistencyDiagnostics
+      : null
+
+  if (
+    !runtimeReadiness &&
+    !controlledEnablePolicy &&
+    !firstScenario &&
+    !universalPlan &&
+    !decouplingReport &&
+    !candidateComparison &&
+    !approvalEvaluation &&
+    !consistency
+  ) {
+    return emptyResolution
+  }
+
+  const pushBlockedMessage = (target, message) => {
+    pushUniqueMessage(target, message)
+  }
+
+  const normalizeRuntimeSource = (value) => {
+    const normalized = normalizeOptionalString(value).toLocaleLowerCase()
+    if (!normalized) {
+      return 'none'
+    }
+    if (normalized === 'current' || normalized === 'legacy' || normalized === 'none') {
+      return normalized
+    }
+    if (normalized.includes('legacy')) {
+      return 'legacy'
+    }
+    if (normalized.includes('current')) {
+      return 'current'
+    }
+    return 'legacy'
+  }
+
+  try {
+    const blockers = []
+    const warnings = []
+    const errors = []
+    const harnessControlledEnable =
+      controlledRuntimeSourceOptions?.harnessControlledEnable === true
+    const simulateLeanApproval =
+      controlledRuntimeSourceOptions?.simulateLeanApproval === true
+    const selectedSourceNormal = normalizeRuntimeSource(
+      decouplingReport?.currentPlanSource ||
+        runtimeReadiness?.evidence?.sourceReal ||
+        controlledEnablePolicy?.source,
+    )
+    const fallbackLegacyAvailable = decouplingReport?.legacyPlanPresent === true
+    const approvalRequired = universalPlan?.approvalRequired !== false
+    const approvalGranted =
+      approvalEvaluation?.present === true &&
+      approvalEvaluation?.status === 'approved-for-sandbox' &&
+      approvalEvaluation?.approved === true &&
+      approvalEvaluation?.blocked !== true
+    const sandboxRootSafe =
+      approvalEvaluation?.sandboxRoot?.withinWorkspace === true &&
+      !/(^|\/)\.env(?:\..+)?($|\/)|(^|\/)node_modules($|\/)|(^|\/)web-prueba($|\/)|(^|\/)(?:dockerfile|docker-compose\.yml|docker-compose\.yaml)($|\/)|(^|\/)deploy($|\/)/iu.test(
+        normalizeOptionalString(approvalEvaluation?.sandboxRoot?.relative),
+      ) &&
+      Array.isArray(approvalEvaluation?.blockedFiles) &&
+      approvalEvaluation.blockedFiles.length === 0 &&
+      Array.isArray(approvalEvaluation?.allowedFiles) &&
+      approvalEvaluation.allowedFiles.length > 0
+    const universalPlanReady =
+      universalPlan?.present === true &&
+      universalPlan?.built === true &&
+      universalPlan?.canMaterializeInSandbox === true &&
+      universalPlan?.safety?.safeForLocalMaterialization === true
+    const candidateComparisonStatus = normalizeOptionalString(
+      candidateComparison?.status,
+    ).toLocaleLowerCase()
+    const decouplingStatus = normalizeOptionalString(
+      decouplingReport?.migrationStatus,
+    ).toLocaleLowerCase()
+    const readinessStatus = normalizeOptionalString(
+      runtimeReadiness?.status,
+    ).toLocaleLowerCase()
+    const controlledEnablePolicyStatus = normalizeOptionalString(
+      controlledEnablePolicy?.status,
+    ).toLocaleLowerCase()
+    const firstScenarioStatus = normalizeOptionalString(
+      firstScenario?.status,
+    ).toLocaleLowerCase()
+    const candidateComparable =
+      ['aligned', 'partial'].includes(candidateComparisonStatus) &&
+      candidateComparison?.present === true
+    const decouplingReady =
+      decouplingReport?.present === true &&
+      ['partial', 'ready-for-harness'].includes(decouplingStatus) &&
+      decouplingReport?.universalCanRepresentPlan === true
+    const domainConsistent =
+      consistency?.status === 'consistent' &&
+      (consistency?.semanticStatus === 'consistent' ||
+        consistency?.semanticStatus === null ||
+        consistency?.semanticStatus === undefined)
+    const readinessAllowsHarness =
+      readinessStatus === 'ready-for-harness' ||
+      readinessStatus === 'ready-for-controlled-runtime-review' ||
+      (readinessStatus === 'requires-lean-approval' && simulateLeanApproval)
+    const controlledPolicyReady =
+      ['eligible-for-test-enable', 'eligible-for-controlled-runtime-enable'].includes(
+        controlledEnablePolicyStatus,
+      )
+    const firstScenarioReady =
+      firstScenarioStatus === 'ready-for-review' ||
+      (firstScenarioStatus === 'requires-lean-approval' &&
+        simulateLeanApproval)
+    const runtimeNormalStillOff =
+      runtimeReadiness?.readiness?.runtimeNormalStillOff !== false &&
+      runtimeReadiness?.runtimeEnabled !== true &&
+      runtimeReadiness?.controlledRuntimeEnable !== true &&
+      runtimeReadiness?.safeguards?.materializationPlanChanged !== true &&
+      runtimeReadiness?.safeguards?.executionScopeChanged !== true
+
+    if (!harnessControlledEnable) {
+      if (universalPlanReady) {
+        pushUniqueMessage(
+          warnings,
+          'El candidate universal esta listo, pero el runtime normal sigue apagado por defecto.',
+        )
+      }
+      return {
+        ...emptyResolution,
+        present: true,
+        evaluated:
+          runtimeReadiness?.evaluated === true ||
+          universalPlan?.present === true ||
+          decouplingReport?.present === true ||
+          approvalEvaluation?.present === true,
+        selectedSource: selectedSourceNormal,
+        fallbackLegacyAvailable,
+        blockers,
+        warnings,
+        errors,
+        warningsCount: warnings.length,
+        errorsCount: errors.length,
+      }
+    }
+
+    if (!approvalGranted) {
+      pushBlockedMessage(
+        blockers,
+        'La seleccion controlada requiere una aprobacion approved-for-sandbox explicita.',
+      )
+    }
+    if (!sandboxRootSafe) {
+      pushBlockedMessage(
+        blockers,
+        'El sandbox controlado debe quedar dentro del workspace y fuera de web-prueba, .env, node_modules, Docker y deploy.',
+      )
+    }
+    if (!universalPlanReady) {
+      pushBlockedMessage(
+        blockers,
+        'El universal materialization plan todavia no esta listo para materializar en sandbox.',
+      )
+    }
+    if (!candidateComparable) {
+      pushBlockedMessage(
+        blockers,
+        'La comparacion entre el candidate universal y el plan legacy todavia no es suficientemente comparable.',
+      )
+    }
+    if (!decouplingReady) {
+      pushBlockedMessage(
+        blockers,
+        'El desacople del materialization plan todavia no alcanza una condicion ready-for-harness.',
+      )
+    }
+    if (!domainConsistent) {
+      pushBlockedMessage(
+        blockers,
+        'La consistencia de dominio no permite seleccionar la fuente universal en modo controlado.',
+      )
+    }
+    if (!readinessAllowsHarness) {
+      pushBlockedMessage(
+        blockers,
+        'El readiness shadow todavia no permite un harness controlled enable seguro.',
+      )
+    }
+    if (!controlledPolicyReady) {
+      pushBlockedMessage(
+        blockers,
+        'La controlled enable policy todavia no habilita el uso de harness-control.',
+      )
+    }
+    if (!firstScenarioReady) {
+      pushBlockedMessage(
+        blockers,
+        'El primer escenario controlado todavia no quedo listo para review/harness.',
+      )
+    }
+    if (!runtimeNormalStillOff) {
+      pushBlockedMessage(
+        blockers,
+        'El runtime normal debe seguir apagado antes de permitir una seleccion controlada en harness.',
+      )
+    }
+
+    const enabled = blockers.length === 0
+
+    return {
+      ...emptyResolution,
+      present: true,
+      evaluated: true,
+      enabled,
+      mode: enabled ? 'harness-controlled' : 'blocked',
+      selectedSource: enabled ? 'generated-domain-universal' : 'blocked',
+      fallbackLegacyAvailable,
+      approvalRequired,
+      approved: approvalGranted,
+      blockers,
+      warnings,
+      errors,
+      warningsCount: warnings.length,
+      errorsCount: errors.length,
+    }
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : normalizeOptionalString(String(error)) || 'error'
+
+    return {
+      ...emptyResolution,
+      present: true,
+      evaluated: true,
+      mode: 'blocked',
+      selectedSource: 'blocked',
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
 function buildGeneratedDomainMvpReadinessExecutiveReport({
   generatedDomainContractDiagnostics,
   generatedDomainUniversalMaterializationPlanPreview,
@@ -2571,6 +2916,7 @@ module.exports = {
   summarizeGeneratedDomainFileCreationApprovalPolicyForDebug,
   summarizeGeneratedDomainMaterializationApprovalPayloadForDebug,
   summarizeGeneratedDomainRuntimeShadowReadinessDecisionForDebug,
+  summarizeGeneratedDomainControlledRuntimeMaterializationSourceForDebug,
   summarizeGeneratedDomainMvpReadinessExecutiveReportForDebug,
   summarizeGeneratedDomainMaterializationInspectionSourceResolutionForDebug,
   resolveGeneratedDomainMaterializationSource,
@@ -2578,5 +2924,6 @@ module.exports = {
   buildGeneratedDomainFirstControlledEnableScenario,
   buildGeneratedDomainMaterializationApprovalPayload,
   buildGeneratedDomainRuntimeShadowReadinessDecision,
+  resolveGeneratedDomainControlledRuntimeMaterializationSource,
   buildGeneratedDomainMvpReadinessExecutiveReport,
 }

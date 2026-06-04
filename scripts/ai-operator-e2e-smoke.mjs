@@ -9313,6 +9313,63 @@ async function runGeneratedDomainMaterializationPlanDecouplingPayloadCase() {
   }
 }
 
+async function runGeneratedDomainControlledRuntimeMaterializationSourcePayloadCase() {
+  const failures = []
+  const decision = createAlignedGeneratedDomainObservationDecision({
+    decisionKey: 'generated-domain-controlled-runtime-materialization-source',
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainControlledRuntimeMaterializationSource?.present === true &&
+      decision.generatedDomainControlledRuntimeMaterializationSource?.evaluated === true &&
+      decision.generatedDomainControlledRuntimeMaterializationSource?.enabled === false &&
+      decision.generatedDomainControlledRuntimeMaterializationSource?.mode ===
+        'runtime-disabled' &&
+      ['legacy', 'current', 'none'].includes(
+        decision.generatedDomainControlledRuntimeMaterializationSource?.selectedSource,
+      ),
+    'buildBrainDecisionContract debe adjuntar generatedDomainControlledRuntimeMaterializationSource con runtime normal apagado por defecto.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainControlledRuntimeMaterializationSource?.behaviorChanged ===
+      false &&
+      decision.generatedDomainControlledRuntimeMaterializationSource
+        ?.materializationPlanChanged === false &&
+      decision.generatedDomainControlledRuntimeMaterializationSource
+        ?.executionScopeChanged === false,
+    'generatedDomainControlledRuntimeMaterializationSource no debe cambiar behavior, materializationPlan ni executionScope en runtime normal.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'materialize-fullstack-local-plan' &&
+      decision.executionMode === 'executor' &&
+      decision.nextExpectedAction === 'execute-plan' &&
+      decision.generatedDomainRuntimeShadowReadinessDecision?.runtimeEnabled === false &&
+      decision.generatedDomainRuntimeShadowReadinessDecision
+        ?.controlledRuntimeEnable === false,
+    'El controlled runtime source debe preservar strategy, executionMode, nextExpectedAction y mantener runtime real apagado.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generatedDomainControlledRuntimeMaterializationSource') &&
+      mainSource.includes(
+        'generated-domain-controlled-runtime:materialization-source',
+      ) &&
+      mainSource.includes(
+        'resolveGeneratedDomainControlledRuntimeMaterializationSource',
+      ),
+    'main.cjs debe adjuntar y loguear generated-domain-controlled-runtime:materialization-source.',
+  )
+
+  return {
+    id: 'generated-domain-controlled-runtime-materialization-source',
+    label: 'Generated domain controlled runtime materialization source',
+    failures,
+  }
+}
+
 async function runGeneratedDomainFileCreationApprovalEvaluationPayloadCase() {
   const failures = []
   const decision = createAlignedGeneratedDomainObservationDecision({
@@ -12395,6 +12452,7 @@ async function main() {
     results.push(await runGeneratedDomainMvpReadinessExecutiveReportPayloadCase())
     results.push(await runGeneratedDomainUniversalMaterializationPlanPayloadCase())
     results.push(await runGeneratedDomainMaterializationPlanDecouplingPayloadCase())
+    results.push(await runGeneratedDomainControlledRuntimeMaterializationSourcePayloadCase())
     results.push(await runGeneratedDomainFileCreationApprovalEvaluationPayloadCase())
     results.push(await runGeneratedDomainUniversalMaterializationPlanPreviewPayloadCase())
     results.push(

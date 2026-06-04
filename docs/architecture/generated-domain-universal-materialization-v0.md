@@ -841,3 +841,69 @@ Relacion con el sandbox MVP:
 - no toca `web-prueba`
 - no toca `.env`
 - no usa Docker, deploy ni servicios externos
+
+## 27. Runtime controlled enable v0.1
+
+Runtime normal:
+
+- sigue apagado por defecto
+- `generatedDomainControlledRuntimeMaterializationSource` devuelve:
+- `enabled=false`
+- `mode=runtime-disabled`
+- `selectedSource=current|legacy|none`
+- `behaviorChanged=false`
+- `materializationPlanChanged=false`
+- `executionScopeChanged=false`
+- el runtime real no promueve `generated-domain-universal` ni `generated-domain-shadow`
+
+Harness controlled enable:
+
+- existe solo como helper interno y seguro
+- requiere opciones explicitas de harness
+- no depende de `.env`
+- no depende de flags globales
+- no depende de UI ni de Electron visual
+- solo puede seleccionar `generated-domain-universal` si:
+- el universal plan ya esta built
+- la approval evaluation quedo `approved-for-sandbox`
+- el sandbox root queda dentro del workspace permitido
+- no toca `web-prueba`
+- no toca `.env`
+- no toca `node_modules`
+- no toca Docker ni deploy
+- la consistencia de dominio sigue OK
+- la comparacion candidate-vs-legacy sigue usable
+- el readiness shadow ya permite harness
+- el fallback legacy sigue disponible
+
+Materializacion:
+
+- cualquier write real sigue acotado a sandbox/harness controlado
+- el helper solo selecciona fuente bajo esas condiciones
+- no cambia el `materializationPlan` real del runtime normal
+- no cambia el `executionScope` real
+- no cambia `strategy`, `executionMode` ni `nextExpectedAction`
+
+Blockers:
+
+- approval faltante
+- sandbox inseguro
+- mismatch de dominio
+- candidate/comparison insuficientes
+- readiness shadow insuficiente
+- cualquier intento de tocar `web-prueba`, `.env`, `node_modules`, Docker o deploy
+
+Que falta para produccion real:
+
+- una aprobacion Lean explicita para cualquier runtime review controlado
+- mas coverage de fallback legacy ante fallos raros
+- una UI/backend de aprobacion mas visible
+- desacoplar mas `main.cjs`
+- seguir reduciendo el peso legacy de `buildFullstackLocalMaterializationPlan(...)`
+
+Que requiere Lean:
+
+- cualquier enable fuera de harness
+- cualquier write fuera de sandbox interno aprobado
+- cualquier revision sobre `web-prueba`
+- cualquier runtime review visual o manual de produccion real

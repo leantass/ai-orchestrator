@@ -2134,6 +2134,14 @@ function summarizeGeneratedDomainRuntimeShadowReadinessDecisionForDebug(decision
   )
 }
 
+function summarizeGeneratedDomainControlledRuntimeMaterializationSourceForDebug(
+  runtimeSource,
+) {
+  return generatedDomainMaterializationPolicies.summarizeGeneratedDomainControlledRuntimeMaterializationSourceForDebug(
+    runtimeSource,
+  )
+}
+
 function summarizeGeneratedDomainMvpReadinessExecutiveReportForDebug(report) {
   return generatedDomainMaterializationPolicies.summarizeGeneratedDomainMvpReadinessExecutiveReportForDebug(
     report,
@@ -43483,6 +43491,32 @@ function buildGeneratedDomainRuntimeShadowReadinessDecision({
   )
 }
 
+function resolveGeneratedDomainControlledRuntimeMaterializationSource({
+  generatedDomainRuntimeShadowReadinessDecision,
+  generatedDomainControlledEnablePolicy,
+  generatedDomainFirstControlledEnableScenario,
+  generatedDomainUniversalMaterializationPlan,
+  generatedDomainMaterializationPlanDecouplingReport,
+  generatedDomainMaterializationPlanCandidateLegacyComparison,
+  generatedDomainFileCreationApprovalEvaluation,
+  domainConsistencyDiagnostics,
+  controlledRuntimeSourceOptions = null,
+}) {
+  return generatedDomainMaterializationPolicies.resolveGeneratedDomainControlledRuntimeMaterializationSource(
+    {
+      generatedDomainRuntimeShadowReadinessDecision,
+      generatedDomainControlledEnablePolicy,
+      generatedDomainFirstControlledEnableScenario,
+      generatedDomainUniversalMaterializationPlan,
+      generatedDomainMaterializationPlanDecouplingReport,
+      generatedDomainMaterializationPlanCandidateLegacyComparison,
+      generatedDomainFileCreationApprovalEvaluation,
+      domainConsistencyDiagnostics,
+      controlledRuntimeSourceOptions,
+    },
+  )
+}
+
 function buildGeneratedDomainMvpReadinessExecutiveReport({
   generatedDomainContractDiagnostics,
   generatedDomainUniversalMaterializationPlanPreview,
@@ -44696,6 +44730,7 @@ function buildBrainDecisionContract({
   finalResult,
   generatedDomainMaterializationPreferenceSwitchOptions = null,
   generatedDomainMaterializationSourceResolutionOptions = null,
+  generatedDomainControlledRuntimeMaterializationSourceOptions = null,
   stripStaleApprovalArtifacts = false,
 }) {
   const resolvedRequiresApproval = requiresApproval === true
@@ -45238,6 +45273,19 @@ function buildBrainDecisionContract({
       generatedDomainShadowMaterializationEndToEndReadiness,
       generatedDomainMaterializationApprovalPayload,
     })
+  const generatedDomainControlledRuntimeMaterializationSource =
+    resolveGeneratedDomainControlledRuntimeMaterializationSource({
+      generatedDomainRuntimeShadowReadinessDecision,
+      generatedDomainControlledEnablePolicy,
+      generatedDomainFirstControlledEnableScenario,
+      generatedDomainUniversalMaterializationPlan,
+      generatedDomainMaterializationPlanDecouplingReport,
+      generatedDomainMaterializationPlanCandidateLegacyComparison,
+      generatedDomainFileCreationApprovalEvaluation,
+      domainConsistencyDiagnostics,
+      controlledRuntimeSourceOptions:
+        generatedDomainControlledRuntimeMaterializationSourceOptions,
+    })
   const generatedDomainMvpReadinessExecutiveReport =
     buildGeneratedDomainMvpReadinessExecutiveReport({
       generatedDomainContractDiagnostics,
@@ -45411,6 +45459,7 @@ function buildBrainDecisionContract({
     generatedDomainFileCreationApprovalEvaluation,
     generatedDomainInspectionContractDecouplingReport,
     generatedDomainRuntimeShadowReadinessDecision,
+    generatedDomainControlledRuntimeMaterializationSource,
     generatedDomainMvpReadinessExecutiveReport,
     domainConsistencyDiagnostics,
     ...(fullstackLocalInspectionSourceDiagnostics &&
@@ -59100,6 +59149,18 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
   }
 
   if (
+    brainDecision.generatedDomainControlledRuntimeMaterializationSource &&
+    typeof brainDecision.generatedDomainControlledRuntimeMaterializationSource === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-controlled-runtime:materialization-source',
+      summarizeGeneratedDomainControlledRuntimeMaterializationSourceForDebug(
+        brainDecision.generatedDomainControlledRuntimeMaterializationSource,
+      ),
+    )
+  }
+
+  if (
     brainDecision.generatedDomainMvpReadinessExecutiveReport &&
     typeof brainDecision.generatedDomainMvpReadinessExecutiveReport === 'object'
   ) {
@@ -59428,6 +59489,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
         brainDecision.generatedDomainInspectionContractDecouplingReport,
       generatedDomainRuntimeShadowReadinessDecision:
         brainDecision.generatedDomainRuntimeShadowReadinessDecision,
+      generatedDomainControlledRuntimeMaterializationSource:
+        brainDecision.generatedDomainControlledRuntimeMaterializationSource,
       generatedDomainMvpReadinessExecutiveReport:
         brainDecision.generatedDomainMvpReadinessExecutiveReport,
       fullstackLocalInspectionSourceDiagnostics:
@@ -59567,6 +59630,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       brainDecision.generatedDomainInspectionContractDecouplingReport,
     generatedDomainRuntimeShadowReadinessDecision:
       brainDecision.generatedDomainRuntimeShadowReadinessDecision,
+    generatedDomainControlledRuntimeMaterializationSource:
+      brainDecision.generatedDomainControlledRuntimeMaterializationSource,
     generatedDomainMvpReadinessExecutiveReport:
       brainDecision.generatedDomainMvpReadinessExecutiveReport,
     fullstackLocalInspectionSourceDiagnostics:

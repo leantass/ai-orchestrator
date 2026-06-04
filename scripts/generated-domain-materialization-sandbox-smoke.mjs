@@ -77,6 +77,7 @@ ${plannerSurface}
 module.exports = {
   buildBrainDecisionContract,
   buildGeneratedDomainUniversalMaterializationPlan,
+  resolveGeneratedDomainControlledRuntimeMaterializationSource,
   evaluateGeneratedDomainFileCreationApproval,
   materializeGeneratedDomainSandboxPlan,
 };
@@ -441,6 +442,49 @@ function runBlockedCases(universalPlan) {
   })
   assert.equal(blockedByApproval.status, 'blocked')
   assert.equal(blockedByApproval.approved, false)
+  const blockedControlledSource =
+    observationHarness.resolveGeneratedDomainControlledRuntimeMaterializationSource({
+      generatedDomainRuntimeShadowReadinessDecision: {
+        present: true,
+        status: 'requires-Lean-approval',
+        readiness: { runtimeNormalStillOff: true },
+        safeguards: {
+          materializationPlanChanged: false,
+          executionScopeChanged: false,
+        },
+      },
+      generatedDomainControlledEnablePolicy: {
+        present: true,
+        status: 'eligible-for-controlled-runtime-enable',
+      },
+      generatedDomainFirstControlledEnableScenario: {
+        present: true,
+        status: 'ready-for-review',
+      },
+      generatedDomainUniversalMaterializationPlan: universalPlan,
+      generatedDomainMaterializationPlanDecouplingReport: {
+        present: true,
+        currentPlanSource: 'legacy-materialization-plan',
+        legacyPlanPresent: true,
+        universalCanRepresentPlan: true,
+        migrationStatus: 'ready-for-harness',
+      },
+      generatedDomainMaterializationPlanCandidateLegacyComparison: {
+        present: true,
+        status: 'aligned',
+      },
+      generatedDomainFileCreationApprovalEvaluation: blockedByApproval,
+      domainConsistencyDiagnostics: {
+        present: true,
+        status: 'consistent',
+        semanticStatus: 'consistent',
+      },
+      controlledRuntimeSourceOptions: {
+        harnessControlledEnable: true,
+      },
+    })
+  assert.equal(blockedControlledSource?.mode, 'blocked')
+  assert.equal(blockedControlledSource?.selectedSource, 'blocked')
 
   const blockedByWebPrueba = observationHarness.evaluateGeneratedDomainFileCreationApproval({
     generatedDomainUniversalMaterializationPlan: universalPlan,
@@ -499,6 +543,7 @@ function runHappyPathScenario({ id, contract, expectedDomainLabel }) {
   const decision = createUniversalDecision(contract)
   const universalPlan = decision.generatedDomainUniversalMaterializationPlan
   const readinessReport = decision.generatedDomainMvpReadinessExecutiveReport
+  const runtimeSource = decision.generatedDomainControlledRuntimeMaterializationSource
 
   assert.equal(universalPlan?.present, true)
   assert.equal(universalPlan?.built, true)
@@ -506,6 +551,9 @@ function runHappyPathScenario({ id, contract, expectedDomainLabel }) {
   assert.equal(readinessReport?.present, true)
   assert.equal(readinessReport?.runtime?.runtimeEnabled, false)
   assert.equal(readinessReport?.runtime?.controlledRuntimeEnable, false)
+  assert.equal(runtimeSource?.present, true)
+  assert.equal(runtimeSource?.enabled, false)
+  assert.equal(runtimeSource?.mode, 'runtime-disabled')
 
   const approvalEvaluation = observationHarness.evaluateGeneratedDomainFileCreationApproval({
     generatedDomainUniversalMaterializationPlan: universalPlan,
@@ -521,6 +569,35 @@ function runHappyPathScenario({ id, contract, expectedDomainLabel }) {
   assert.equal(approvalEvaluation?.status, 'approved-for-sandbox')
   assert.equal(approvalEvaluation?.approved, true)
   assert.equal(approvalEvaluation?.blocked, false)
+  const controlledRuntimeSource =
+    observationHarness.resolveGeneratedDomainControlledRuntimeMaterializationSource({
+      generatedDomainRuntimeShadowReadinessDecision:
+        decision.generatedDomainRuntimeShadowReadinessDecision,
+      generatedDomainControlledEnablePolicy:
+        decision.generatedDomainControlledEnablePolicy,
+      generatedDomainFirstControlledEnableScenario:
+        decision.generatedDomainFirstControlledEnableScenario,
+      generatedDomainUniversalMaterializationPlan: universalPlan,
+      generatedDomainMaterializationPlanDecouplingReport:
+        decision.generatedDomainMaterializationPlanDecouplingReport,
+      generatedDomainMaterializationPlanCandidateLegacyComparison:
+        decision.generatedDomainMaterializationPlanCandidateLegacyComparison,
+      generatedDomainFileCreationApprovalEvaluation: approvalEvaluation,
+      domainConsistencyDiagnostics: decision.domainConsistencyDiagnostics,
+      controlledRuntimeSourceOptions: {
+        harnessControlledEnable: true,
+        simulateLeanApproval: true,
+      },
+    })
+
+  assert.equal(controlledRuntimeSource?.present, true)
+  assert.equal(controlledRuntimeSource?.enabled, true)
+  assert.equal(controlledRuntimeSource?.mode, 'harness-controlled')
+  assert.equal(
+    controlledRuntimeSource?.selectedSource,
+    'generated-domain-universal',
+  )
+  assert.equal(controlledRuntimeSource?.fallbackLegacyAvailable, true)
 
   const materializationReport = observationHarness.materializeGeneratedDomainSandboxPlan({
     generatedDomainUniversalMaterializationPlan: universalPlan,
