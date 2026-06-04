@@ -701,3 +701,63 @@ Mitigaciones ya implementadas:
 - sandbox materialization
 - suite domain-agnostic incremental
 - readiness executive report
+
+## 25. Inspection contract decoupling plan
+
+Estado actual:
+
+- `inspectFullstackLocalMaterializationContract(...)` sigue siendo legacy-first en el sentido de que conserva un fallback canonico legacy obligatorio
+- hoy la ruta real de inspeccion puede reutilizar `materializationPlan.contractDefinition`, luego `generatedDomainContract` cuando alcanza, y finalmente caer al contrato canonico legacy
+- el runtime normal no cambia ni promote `generated-domain-shadow` como fuente real
+
+Paso v0.1:
+
+- `resolveGeneratedDomainContractFirstInspectionDefinition(...)` calcula en paralelo una fuente observacional `contract-first`
+- el helper puede preferir:
+- `universal-plan`
+- `shadow-candidate`
+- `generated-domain-contract`
+- `legacy`
+- `blocked`
+- `none`
+- esta resolucion es diagnostica y de harness
+- `behaviorChanged=false`
+- `materializationPlanChanged=false`
+- `executionScopeChanged=false`
+
+Reporte observacional:
+
+- `generatedDomainInspectionContractDecouplingReport` resume:
+- fuente real actual de inspeccion
+- disponibilidad de `universal-plan`, `shadow-candidate` y `generated-domain-contract`
+- si candidate/contract ya pueden inspeccionar
+- si el fallback legacy sigue siendo requerido
+- `migrationStatus`
+- blockers, warnings y errors
+
+Fallback legacy que sigue intacto:
+
+- contrato canonico legacy
+- resolucion real actual de `inspectFullstackLocalMaterializationContract(...)`
+- ninguna mutacion del runtime normal
+
+Que falta antes de cambiar runtime real:
+
+- mas cobertura sobre `inspectFullstackLocalMaterializationContract(...)`
+- mas evidencia alineada entre `generatedDomainUniversalMaterializationPlan`, candidate y contrato inspeccionable
+- validar mismatchs de dominio y degradaciones raras con mas fixtures
+- desacoplar mas logicamente `buildFullstackLocalMaterializationPlan(...)`
+- mantener fallback legacy hasta que la ruta contract-first quede verde de punta a punta
+
+Riesgos:
+
+- `inspectFullstackLocalMaterializationContract(...)` todavia mezcla compatibilidad historica y evidencia nueva
+- un cambio agresivo podria alterar la semantica de inspeccion sin tocar materializacion
+- el executor legacy sigue condicionando parte de la lectura de planes fullstack locales
+
+Validaciones necesarias:
+
+- smoke directo de casos `universal-plan`, `legacy`, `mismatch` y `none`
+- payload E2E con `generatedDomainInspectionContractDecouplingReport`
+- build + quality + planner/release/sandbox smokes
+- confirmacion de que `strategy`, `executionMode`, `nextExpectedAction`, `materializationPlan` real y `executionScope` real no cambian

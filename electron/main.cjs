@@ -155,6 +155,7 @@ const {
 const generatedDomainOrchestrationDiagnostics = require('./generated-domain-orchestration-diagnostics.cjs')
 const generatedDomainLegacyDiagnostics = require('./generated-domain-legacy-diagnostics.cjs')
 const generatedDomainMaterializationPolicies = require('./generated-domain-materialization-policies.cjs')
+const generatedDomainInspectionDiagnostics = require('./generated-domain-inspection-diagnostics.cjs')
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL)
 const defaultExecutorBridgePath = path.join(
@@ -711,6 +712,58 @@ function summarizeFullstackLocalInspectionSourceDiagnosticsForDebug(diagnostics)
     ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
     ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
   }
+}
+
+function resolveGeneratedDomainContractFirstInspectionDefinition({
+  generatedDomainUniversalMaterializationPlan,
+  generatedDomainShadowMaterializationCandidatePlan,
+  generatedDomainUniversalMaterializationPlanPreview,
+  generatedDomainContract,
+  generatedDomainContractDiagnostics,
+  domainConsistencyDiagnostics,
+  legacyInspectionDefinition,
+}) {
+  return generatedDomainInspectionDiagnostics.resolveGeneratedDomainContractFirstInspectionDefinition(
+    {
+      generatedDomainUniversalMaterializationPlan,
+      generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainUniversalMaterializationPlanPreview,
+      generatedDomainContract,
+      generatedDomainContractDiagnostics,
+      domainConsistencyDiagnostics,
+      legacyInspectionDefinition,
+    },
+  )
+}
+
+function buildGeneratedDomainInspectionContractDecouplingReport({
+  fullstackLocalInspectionSourceDiagnostics,
+  generatedDomainContractFirstInspectionDefinition,
+  generatedDomainUniversalMaterializationPlan,
+  generatedDomainShadowMaterializationCandidatePlan,
+  generatedDomainUniversalMaterializationPlanPreview,
+  generatedDomainContract,
+  generatedDomainContractDiagnostics,
+  legacyInspectionDefinition,
+}) {
+  return generatedDomainInspectionDiagnostics.buildGeneratedDomainInspectionContractDecouplingReport(
+    {
+      fullstackLocalInspectionSourceDiagnostics,
+      generatedDomainContractFirstInspectionDefinition,
+      generatedDomainUniversalMaterializationPlan,
+      generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainUniversalMaterializationPlanPreview,
+      generatedDomainContract,
+      generatedDomainContractDiagnostics,
+      legacyInspectionDefinition,
+    },
+  )
+}
+
+function summarizeGeneratedDomainInspectionContractDecouplingReportForDebug(report) {
+  return generatedDomainInspectionDiagnostics.summarizeGeneratedDomainInspectionContractDecouplingReportForDebug(
+    report,
+  )
 }
 
 function summarizeGeneratedDomainMaterializationShadowPlanForDebug(plan) {
@@ -44794,6 +44847,52 @@ function buildBrainDecisionContract({
           generatedDomainCapabilityProfile,
         })?.fullstackLocalInspectionSourceDiagnostics || null
       : null
+  const fullstackLocalInspectionTargetPaths = collectMaterializationContractTargetPaths({
+    executionScope: normalizedExecutionScope,
+    materializationPlan,
+  })
+  const fullstackLocalInspectionRootFolder =
+    normalizeOptionalString(materializationPlan?.projectRoot) ||
+    normalizeOptionalString(enrichedLocalProjectManifest?.projectRoot) ||
+    (fullstackLocalInspectionTargetPaths[0]
+      ? fullstackLocalInspectionTargetPaths[0].split('/').filter(Boolean)[0] || ''
+      : '') ||
+    ''
+  const fullstackLocalInspectionFileHints = [
+    ...fullstackLocalInspectionTargetPaths,
+    ...(Array.isArray(materializationPlan?.operations)
+      ? materializationPlan.operations.map((entry) =>
+          typeof entry?.nextContent === 'string' ? entry.nextContent.slice(0, 400) : '',
+        )
+      : []),
+  ]
+  const fullstackLocalInspectionProfile =
+    normalizeOptionalString(strategy).toLocaleLowerCase() ===
+      'materialize-fullstack-local-plan' &&
+    materializationPlan &&
+    typeof materializationPlan === 'object'
+      ? inferFullstackLocalContractProfileFromPlanningArtifacts({
+          goal: '',
+          context: '',
+          rootFolder: fullstackLocalInspectionRootFolder,
+          domainLabel: normalizeOptionalString(enrichedLocalProjectManifest?.domain),
+          modules:
+            Array.isArray(enrichedLocalProjectManifest?.modules) &&
+            enrichedLocalProjectManifest.modules.length > 0
+              ? enrichedLocalProjectManifest.modules
+              : [],
+          fileHints: fullstackLocalInspectionFileHints,
+        })
+      : null
+  const generatedDomainInspectionLegacyFallbackDefinition =
+    fullstackLocalInspectionRootFolder &&
+    fullstackLocalInspectionProfile &&
+    typeof fullstackLocalInspectionProfile === 'object'
+      ? buildLegacyCanonicalFullstackLocalMaterializationContract({
+          rootFolder: fullstackLocalInspectionRootFolder,
+          fullstackContractProfile: fullstackLocalInspectionProfile,
+        })
+      : null
   const generatedDomainMaterializationPreferenceGate =
     buildGeneratedDomainMaterializationPreferenceGate({
       generatedDomainMaterializationShadowPlan,
@@ -44971,6 +45070,27 @@ function buildBrainDecisionContract({
         scope: 'observation-only',
       },
       workspacePath,
+    })
+  const generatedDomainContractFirstInspectionDefinition =
+    resolveGeneratedDomainContractFirstInspectionDefinition({
+      generatedDomainUniversalMaterializationPlan,
+      generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainUniversalMaterializationPlanPreview,
+      generatedDomainContract: normalizedGeneratedDomainContract,
+      generatedDomainContractDiagnostics,
+      domainConsistencyDiagnostics,
+      legacyInspectionDefinition: generatedDomainInspectionLegacyFallbackDefinition,
+    })
+  const generatedDomainInspectionContractDecouplingReport =
+    buildGeneratedDomainInspectionContractDecouplingReport({
+      fullstackLocalInspectionSourceDiagnostics,
+      generatedDomainContractFirstInspectionDefinition,
+      generatedDomainUniversalMaterializationPlan,
+      generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainUniversalMaterializationPlanPreview,
+      generatedDomainContract: normalizedGeneratedDomainContract,
+      generatedDomainContractDiagnostics,
+      legacyInspectionDefinition: generatedDomainInspectionLegacyFallbackDefinition,
     })
   const legacyDomainHardcodingDebtReport = buildLegacyDomainHardcodingDebtReport({
     generatedDomainStructuralCapabilities,
@@ -45181,6 +45301,7 @@ function buildBrainDecisionContract({
     generatedDomainMaterializationInspectionSourceResolution,
     generatedDomainMaterializationApprovalPayload,
     generatedDomainFileCreationApprovalEvaluation,
+    generatedDomainInspectionContractDecouplingReport,
     generatedDomainRuntimeShadowReadinessDecision,
     generatedDomainMvpReadinessExecutiveReport,
     domainConsistencyDiagnostics,
@@ -58811,6 +58932,18 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
   }
 
   if (
+    brainDecision.generatedDomainInspectionContractDecouplingReport &&
+    typeof brainDecision.generatedDomainInspectionContractDecouplingReport === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-inspection-contract:decoupling-report',
+      summarizeGeneratedDomainInspectionContractDecouplingReportForDebug(
+        brainDecision.generatedDomainInspectionContractDecouplingReport,
+      ),
+    )
+  }
+
+  if (
     brainDecision.generatedDomainRuntimeShadowReadinessDecision &&
     typeof brainDecision.generatedDomainRuntimeShadowReadinessDecision === 'object'
   ) {
@@ -59141,6 +59274,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
         brainDecision.generatedDomainMaterializationApprovalPayload,
       generatedDomainFileCreationApprovalEvaluation:
         brainDecision.generatedDomainFileCreationApprovalEvaluation,
+      generatedDomainInspectionContractDecouplingReport:
+        brainDecision.generatedDomainInspectionContractDecouplingReport,
       generatedDomainRuntimeShadowReadinessDecision:
         brainDecision.generatedDomainRuntimeShadowReadinessDecision,
       generatedDomainMvpReadinessExecutiveReport:
@@ -59272,6 +59407,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       brainDecision.generatedDomainMaterializationApprovalPayload,
     generatedDomainFileCreationApprovalEvaluation:
       brainDecision.generatedDomainFileCreationApprovalEvaluation,
+    generatedDomainInspectionContractDecouplingReport:
+      brainDecision.generatedDomainInspectionContractDecouplingReport,
     generatedDomainRuntimeShadowReadinessDecision:
       brainDecision.generatedDomainRuntimeShadowReadinessDecision,
     generatedDomainMvpReadinessExecutiveReport:

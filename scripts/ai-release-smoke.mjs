@@ -42,6 +42,9 @@ const generatedDomainLegacyDiagnostics = require(
 const generatedDomainMaterializationPolicies = require(
   path.join(repoRoot, 'electron', 'generated-domain-materialization-policies.cjs'),
 )
+const generatedDomainInspectionDiagnostics = require(
+  path.join(repoRoot, 'electron', 'generated-domain-inspection-diagnostics.cjs'),
+)
 
 const smokeWorkspaceRoot = path.join(repoRoot, '.tmp', 'ai-release-smoke')
 const continuationBasePhaseIds = [
@@ -194,6 +197,7 @@ module.exports = {
     generatedDomainOrchestrationDiagnostics,
     generatedDomainLegacyDiagnostics,
     generatedDomainMaterializationPolicies,
+    generatedDomainInspectionDiagnostics,
     setTimeout,
     clearTimeout,
     setInterval,

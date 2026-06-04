@@ -58,6 +58,9 @@ const generatedDomainLegacyDiagnostics = require(
 const generatedDomainMaterializationPolicies = require(
   path.join(repoRoot, 'electron', 'generated-domain-materialization-policies.cjs'),
 )
+const generatedDomainInspectionDiagnostics = require(
+  path.join(repoRoot, 'electron', 'generated-domain-inspection-diagnostics.cjs'),
+)
 
 const smokeWorkspaceRoot = path.join(repoRoot, '.tmp', 'ai-operator-e2e-smoke')
 const continuationBasePhaseIds = [
@@ -623,6 +626,7 @@ module.exports = {
     generatedDomainOrchestrationDiagnostics,
     generatedDomainLegacyDiagnostics,
     generatedDomainMaterializationPolicies,
+    generatedDomainInspectionDiagnostics,
     setTimeout,
     clearTimeout,
     setInterval,
@@ -5184,6 +5188,150 @@ async function runFullstackLocalInspectionSourceDiagnosticsPayloadCase() {
   return {
     id: 'fullstack-local-inspection-source-diagnostics-payload',
     label: 'Fullstack local inspection source diagnostics payload',
+    failures,
+  }
+}
+
+async function runGeneratedDomainInspectionContractDecouplingReportPayloadCase() {
+  const failures = []
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: { slug: 'club-nexus', label: 'Club Nexus' },
+    root: {
+      slug: 'club-nexus-local',
+      sourceRoot: 'club-nexus-local',
+      targetRoot: 'club-nexus-local',
+    },
+    roles: [],
+    entities: ['members', 'events', 'bookings'],
+    states: {},
+    frontendSurfaces: [
+      { key: 'public', label: 'Public', path: 'frontend/public', screens: ['home'] },
+      { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['dashboard'] },
+    ],
+    workflows: ['scheduling', 'reporting', 'messaging'],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [{ path: 'backend/src/routes/members.js' }],
+      services: [{ path: 'backend/src/services/reports.js' }],
+      modules: [],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['members', 'events', 'bookings'],
+    },
+    shared: { files: [] },
+    docs: ['docs/API.md', 'docs/ARCHITECTURE.md', 'docs/DB_SCHEMA.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env'],
+      forbiddenSignals: ['ACCESS_TOKEN'],
+      explicitExclusions: ['deploy', 'docker'],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'database/seed.sql',
+        'frontend/public/index.html',
+        'frontend/admin/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'database/seed.sql' },
+        { targetPath: 'frontend/public/index.html' },
+        { targetPath: 'frontend/admin/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['database/seed.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+        { candidates: ['frontend/admin/index.html'] },
+      ],
+    },
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(
+    generatedDomainContract,
+    '.',
+  )
+  const decision = plannerApi.buildBrainDecisionContract({
+    decisionKey: 'inspection-contract-decoupling-report',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Evaluar el desacople observacional contract-first de la inspeccion sin tocar runtime.',
+    instruction: 'No materializar nada.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'club-nexus-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type: targetPath === 'club-nexus-local' ? 'create-folder' : 'create-or-edit-file',
+        targetPath,
+      })),
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainInspectionContractDecouplingReport?.present === true &&
+      ['ready-for-harness', 'partial'].includes(
+        decision.generatedDomainInspectionContractDecouplingReport?.migrationStatus,
+      ),
+    'buildBrainDecisionContract debe adjuntar generatedDomainInspectionContractDecouplingReport como diagnostico observacional del desacople de inspeccion.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainInspectionContractDecouplingReport?.behaviorChanged === false &&
+      decision.generatedDomainInspectionContractDecouplingReport?.currentInspectionSource ===
+        'generated-domain-contract',
+    'generatedDomainInspectionContractDecouplingReport debe declarar behaviorChanged=false y preservar la fuente actual de inspeccion.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainInspectionContractDecouplingReport?.legacyFallbackAvailable ===
+      true &&
+      decision.generatedDomainInspectionContractDecouplingReport?.contractCanInspect ===
+        true,
+    'El reporte de desacople debe reconocer fallback legacy disponible y capacidad de inspeccion contract-first.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generated-domain-inspection-contract:decoupling-report') &&
+      mainSource.includes('generatedDomainInspectionContractDecouplingReport') &&
+      mainSource.includes('resolveGeneratedDomainContractFirstInspectionDefinition'),
+    'main.cjs debe adjuntar y loguear generated-domain-inspection-contract:decoupling-report.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'materialize-fullstack-local-plan' &&
+      decision.executionMode === 'executor' &&
+      decision.nextExpectedAction === 'execute-plan',
+    'El desacople observacional de inspeccion no debe cambiar strategy, executionMode ni nextExpectedAction.',
+  )
+
+  return {
+    id: 'generated-domain-inspection-contract-decoupling-report-payload',
+    label: 'Generated domain inspection contract decoupling report payload',
     failures,
   }
 }
@@ -12159,6 +12307,7 @@ async function main() {
     results.push(await runLegacyCapabilityAlignmentDiagnosticsPayloadCase())
     results.push(await runLegacyMigrationCandidateReportPayloadCase())
     results.push(await runFullstackLocalInspectionSourceDiagnosticsPayloadCase())
+    results.push(await runGeneratedDomainInspectionContractDecouplingReportPayloadCase())
     results.push(await runGeneratedDomainMaterializationShadowPayloadCase())
     results.push(await runGeneratedDomainMaterializationPreferenceGatePayloadCase())
     results.push(await runGeneratedDomainMaterializationPreferenceDecisionPayloadCase())

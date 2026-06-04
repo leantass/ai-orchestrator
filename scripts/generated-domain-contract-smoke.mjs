@@ -45,6 +45,9 @@ const generatedDomainLegacyDiagnostics = require(
 const generatedDomainMaterializationPolicies = require(
   path.join(repoRoot, 'electron', 'generated-domain-materialization-policies.cjs'),
 )
+const generatedDomainInspectionDiagnostics = require(
+  path.join(repoRoot, 'electron', 'generated-domain-inspection-diagnostics.cjs'),
+)
 
 function extractSegment({ startMarker, endMarker }) {
   const start = mainSource.indexOf(startMarker)
@@ -86,11 +89,14 @@ module.exports = {
   buildLegacyDomainHardcodingDebtReport,
   buildLocalDeterministicExecutorLegacyDebtReport,
   buildLocalDeterministicExecutorCapabilityMigrationPlan,
+  buildLegacyCanonicalFullstackLocalMaterializationContract,
   buildGeneratedDomainMaterializationInspectionSourceResolution,
   buildGeneratedDomainMaterializationApprovalPayload,
   buildGeneratedDomainUniversalMaterializationPlan,
   evaluateGeneratedDomainFileCreationApproval,
   materializeGeneratedDomainSandboxPlan,
+  resolveGeneratedDomainContractFirstInspectionDefinition,
+  buildGeneratedDomainInspectionContractDecouplingReport,
   buildGeneratedDomainRuntimeShadowReadinessDecision,
   buildGeneratedDomainMvpReadinessExecutiveReport,
   buildLegacyDomainResolutionDiagnostics,
@@ -134,6 +140,7 @@ module.exports = {
   summarizeGeneratedDomainUniversalMaterializationPlanForDebug,
   summarizeGeneratedDomainFileCreationApprovalEvaluationForDebug,
   summarizeGeneratedDomainSandboxMaterializationReportForDebug,
+  summarizeGeneratedDomainInspectionContractDecouplingReportForDebug,
   summarizeGeneratedDomainRuntimeShadowReadinessDecisionForDebug,
   summarizeGeneratedDomainMvpReadinessExecutiveReportForDebug,
   summarizeDomainConsistencyDiagnosticsForDebug,
@@ -173,6 +180,7 @@ module.exports = {
     generatedDomainOrchestrationDiagnostics,
     generatedDomainLegacyDiagnostics,
     generatedDomainMaterializationPolicies,
+    generatedDomainInspectionDiagnostics,
     extractGeneratedDomainContractCandidate:
       require('../electron/generated-domain-contract.cjs').extractGeneratedDomainContractCandidate,
     AbortController,
@@ -1689,6 +1697,148 @@ function runCapabilityPreferredInspectionUnavailableCase() {
   assert.equal(inspection?.fullstackLocalInspectionSourceDiagnostics?.source, 'unavailable')
   assert.equal(inspection?.ok, false)
   assert.equal(debugSummary.source, 'unavailable')
+}
+
+function buildLegacyInspectionDefinitionFixture(rootFolder = 'generic-ops-local') {
+  return observationHarness.buildLegacyCanonicalFullstackLocalMaterializationContract({
+    rootFolder,
+    fullstackContractProfile: {
+      archetype: 'operations',
+      frontendFeatureBasename: 'appointments',
+      backendRouteBasename: 'appointments',
+      backendModuleBasename: 'appointments',
+    },
+  })
+}
+
+function runGeneratedDomainInspectionContractDecouplingReadyCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const resolution =
+    observationHarness.resolveGeneratedDomainContractFirstInspectionDefinition({
+      generatedDomainUniversalMaterializationPlan:
+        decision.generatedDomainUniversalMaterializationPlan,
+      generatedDomainShadowMaterializationCandidatePlan:
+        decision.generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainUniversalMaterializationPlanPreview:
+        decision.generatedDomainUniversalMaterializationPlanPreview,
+      generatedDomainContract: decision.generatedDomainContract,
+      generatedDomainContractDiagnostics: decision.generatedDomainContractDiagnostics,
+      domainConsistencyDiagnostics: decision.domainConsistencyDiagnostics,
+      legacyInspectionDefinition: buildLegacyInspectionDefinitionFixture(
+        decision.generatedDomainUniversalMaterializationPlan?.projectRoot,
+      ),
+    })
+  const report = observationHarness.buildGeneratedDomainInspectionContractDecouplingReport({
+    fullstackLocalInspectionSourceDiagnostics:
+      decision.fullstackLocalInspectionSourceDiagnostics,
+    generatedDomainContractFirstInspectionDefinition: resolution,
+    generatedDomainUniversalMaterializationPlan:
+      decision.generatedDomainUniversalMaterializationPlan,
+    generatedDomainShadowMaterializationCandidatePlan:
+      decision.generatedDomainShadowMaterializationCandidatePlan,
+    generatedDomainUniversalMaterializationPlanPreview:
+      decision.generatedDomainUniversalMaterializationPlanPreview,
+    generatedDomainContract: decision.generatedDomainContract,
+    generatedDomainContractDiagnostics: decision.generatedDomainContractDiagnostics,
+    legacyInspectionDefinition: buildLegacyInspectionDefinitionFixture(
+      decision.generatedDomainUniversalMaterializationPlan?.projectRoot,
+    ),
+  })
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainInspectionContractDecouplingReportForDebug(
+      report,
+    )
+
+  assert.ok(['universal-plan', 'shadow-candidate'].includes(resolution?.source))
+  assert.equal(resolution?.behaviorChanged, false)
+  assert.equal(resolution?.candidateCanInspect, true)
+  assert.equal(report?.present, true)
+  assert.equal(report?.migrationStatus, 'ready-for-harness')
+  assert.equal(report?.currentInspectionSource, 'generated-domain-contract')
+  assert.equal(report?.legacyFallbackAvailable, true)
+  assert.equal(debugSummary?.migrationStatus, 'ready-for-harness')
+}
+
+function runGeneratedDomainInspectionContractDecouplingLegacyFallbackCase() {
+  const resolution =
+    observationHarness.resolveGeneratedDomainContractFirstInspectionDefinition({
+      generatedDomainUniversalMaterializationPlan: null,
+      generatedDomainShadowMaterializationCandidatePlan: {
+        present: true,
+        built: false,
+        status: 'partial',
+        candidate: {
+          allowedTargetPaths: ['generic-ops-local/backend/src/server.js'],
+          requiredPathGroups: [],
+          safety: {
+            safeForLocalMaterialization: true,
+          },
+        },
+        compatibility: {
+          canBeInspected: false,
+          canBeUsedByFutureSwitch: false,
+        },
+      },
+      generatedDomainUniversalMaterializationPlanPreview: null,
+      generatedDomainContract: null,
+      generatedDomainContractDiagnostics: null,
+      domainConsistencyDiagnostics: {
+        present: true,
+        checked: true,
+        status: 'aligned',
+        semanticStatus: 'aligned',
+      },
+      legacyInspectionDefinition: buildLegacyInspectionDefinitionFixture(),
+    })
+
+  assert.equal(resolution?.source, 'legacy')
+  assert.equal(typeof resolution?.fallbackReason, 'string')
+  assert.ok(resolution?.fallbackReason.length > 0)
+  assert.equal(resolution?.behaviorChanged, false)
+}
+
+function runGeneratedDomainInspectionContractDecouplingMismatchCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const resolution =
+    observationHarness.resolveGeneratedDomainContractFirstInspectionDefinition({
+      generatedDomainUniversalMaterializationPlan:
+        decision.generatedDomainUniversalMaterializationPlan,
+      generatedDomainShadowMaterializationCandidatePlan:
+        decision.generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainUniversalMaterializationPlanPreview:
+        decision.generatedDomainUniversalMaterializationPlanPreview,
+      generatedDomainContract: decision.generatedDomainContract,
+      generatedDomainContractDiagnostics: decision.generatedDomainContractDiagnostics,
+      domainConsistencyDiagnostics: {
+        ...decision.domainConsistencyDiagnostics,
+        status: 'mismatch',
+        semanticStatus: 'mismatch',
+      },
+      legacyInspectionDefinition: buildLegacyInspectionDefinitionFixture(
+        decision.generatedDomainUniversalMaterializationPlan?.projectRoot,
+      ),
+    })
+
+  assert.ok(['legacy', 'blocked'].includes(resolution?.source))
+  assert.equal(resolution?.behaviorChanged, false)
+  assert.ok(Array.isArray(resolution?.warnings))
+  assert.ok(resolution?.warnings.length > 0)
+}
+
+function runGeneratedDomainInspectionContractDecouplingWithoutCandidateCase() {
+  const resolution =
+    observationHarness.resolveGeneratedDomainContractFirstInspectionDefinition({
+      generatedDomainUniversalMaterializationPlan: null,
+      generatedDomainShadowMaterializationCandidatePlan: null,
+      generatedDomainUniversalMaterializationPlanPreview: null,
+      generatedDomainContract: null,
+      generatedDomainContractDiagnostics: null,
+      domainConsistencyDiagnostics: null,
+      legacyInspectionDefinition: buildLegacyInspectionDefinitionFixture(),
+    })
+
+  assert.equal(resolution?.source, 'legacy')
+  assert.equal(resolution?.behaviorChanged, false)
 }
 
 function runGeneratedDomainMaterializationShadowComparisonWithoutLegacyCase() {
@@ -6186,6 +6336,10 @@ async function main() {
   runCapabilityPreferredInspectionUsesExplicitContractCase()
   runCapabilityPreferredInspectionUsesLegacyFallbackCase()
   runCapabilityPreferredInspectionUnavailableCase()
+  runGeneratedDomainInspectionContractDecouplingReadyCase()
+  runGeneratedDomainInspectionContractDecouplingLegacyFallbackCase()
+  runGeneratedDomainInspectionContractDecouplingMismatchCase()
+  runGeneratedDomainInspectionContractDecouplingWithoutCandidateCase()
   runGeneratedDomainMaterializationShadowComparisonWithoutLegacyCase()
   runGeneratedDomainMaterializationShadowComparisonAlignedCase()
   runGeneratedDomainMaterializationShadowComparisonKeepLegacyCase()
