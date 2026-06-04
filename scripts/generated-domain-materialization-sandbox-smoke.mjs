@@ -49,6 +49,9 @@ const generatedDomainMaterializationPolicies = require(
 const generatedDomainInspectionDiagnostics = require(
   path.join(repoRoot, 'electron', 'generated-domain-inspection-diagnostics.cjs'),
 )
+const generatedDomainMaterializationPlanDiagnostics = require(
+  path.join(repoRoot, 'electron', 'generated-domain-materialization-plan-diagnostics.cjs'),
+)
 
 function extractSegment({ startMarker, endMarker }) {
   const start = mainSource.indexOf(startMarker)
@@ -111,6 +114,7 @@ module.exports = {
     generatedDomainLegacyDiagnostics,
     generatedDomainMaterializationPolicies,
     generatedDomainInspectionDiagnostics,
+    generatedDomainMaterializationPlanDiagnostics,
     AbortController,
     fetch: globalThis.fetch,
     setTimeout,

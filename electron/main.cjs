@@ -156,6 +156,7 @@ const generatedDomainOrchestrationDiagnostics = require('./generated-domain-orch
 const generatedDomainLegacyDiagnostics = require('./generated-domain-legacy-diagnostics.cjs')
 const generatedDomainMaterializationPolicies = require('./generated-domain-materialization-policies.cjs')
 const generatedDomainInspectionDiagnostics = require('./generated-domain-inspection-diagnostics.cjs')
+const generatedDomainMaterializationPlanDiagnostics = require('./generated-domain-materialization-plan-diagnostics.cjs')
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL)
 const defaultExecutorBridgePath = path.join(
@@ -762,6 +763,84 @@ function buildGeneratedDomainInspectionContractDecouplingReport({
 
 function summarizeGeneratedDomainInspectionContractDecouplingReportForDebug(report) {
   return generatedDomainInspectionDiagnostics.summarizeGeneratedDomainInspectionContractDecouplingReportForDebug(
+    report,
+  )
+}
+
+function buildGeneratedDomainUniversalMaterializationPlanCandidate({
+  generatedDomainContract,
+  generatedDomainContractDiagnostics,
+  generatedDomainCapabilityProfile,
+  generatedDomainUniversalMaterializationPlanPreview,
+  generatedDomainShadowMaterializationCandidatePlan,
+  generatedDomainFileCreationApprovalPolicy,
+  domainConsistencyDiagnostics,
+}) {
+  return generatedDomainMaterializationPlanDiagnostics.buildGeneratedDomainUniversalMaterializationPlanCandidate(
+    {
+      generatedDomainContract,
+      generatedDomainContractDiagnostics,
+      generatedDomainCapabilityProfile,
+      generatedDomainUniversalMaterializationPlanPreview,
+      generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainFileCreationApprovalPolicy,
+      domainConsistencyDiagnostics,
+    },
+  )
+}
+
+function buildGeneratedDomainMaterializationPlanCandidateLegacyComparison({
+  generatedDomainUniversalMaterializationPlanCandidate,
+  materializationPlan,
+}) {
+  return generatedDomainMaterializationPlanDiagnostics.buildGeneratedDomainMaterializationPlanCandidateLegacyComparison(
+    {
+      generatedDomainUniversalMaterializationPlanCandidate,
+      materializationPlan,
+    },
+  )
+}
+
+function buildGeneratedDomainMaterializationPlanDecouplingReport({
+  materializationPlan,
+  generatedDomainUniversalMaterializationPlan,
+  generatedDomainUniversalMaterializationPlanPreview,
+  generatedDomainShadowMaterializationCandidatePlan,
+  generatedDomainFileCreationApprovalPolicy,
+  generatedDomainFileCreationApprovalEvaluation,
+  generatedDomainUniversalMaterializationPlanCandidate,
+  generatedDomainMaterializationPlanCandidateLegacyComparison,
+}) {
+  return generatedDomainMaterializationPlanDiagnostics.buildGeneratedDomainMaterializationPlanDecouplingReport(
+    {
+      materializationPlan,
+      generatedDomainUniversalMaterializationPlan,
+      generatedDomainUniversalMaterializationPlanPreview,
+      generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainFileCreationApprovalPolicy,
+      generatedDomainFileCreationApprovalEvaluation,
+      generatedDomainUniversalMaterializationPlanCandidate,
+      generatedDomainMaterializationPlanCandidateLegacyComparison,
+    },
+  )
+}
+
+function summarizeGeneratedDomainUniversalMaterializationPlanCandidateForDebug(candidate) {
+  return generatedDomainMaterializationPlanDiagnostics.summarizeGeneratedDomainUniversalMaterializationPlanCandidateForDebug(
+    candidate,
+  )
+}
+
+function summarizeGeneratedDomainMaterializationPlanCandidateLegacyComparisonForDebug(
+  comparison,
+) {
+  return generatedDomainMaterializationPlanDiagnostics.summarizeGeneratedDomainMaterializationPlanCandidateLegacyComparisonForDebug(
+    comparison,
+  )
+}
+
+function summarizeGeneratedDomainMaterializationPlanDecouplingReportForDebug(report) {
+  return generatedDomainMaterializationPlanDiagnostics.summarizeGeneratedDomainMaterializationPlanDecouplingReportForDebug(
     report,
   )
 }
@@ -45062,6 +45141,21 @@ function buildBrainDecisionContract({
       domainConsistencyDiagnostics,
       generatedDomainStructuralCapabilities,
     })
+  const generatedDomainUniversalMaterializationPlanCandidate =
+    buildGeneratedDomainUniversalMaterializationPlanCandidate({
+      generatedDomainContract: normalizedGeneratedDomainContract,
+      generatedDomainContractDiagnostics,
+      generatedDomainCapabilityProfile,
+      generatedDomainUniversalMaterializationPlanPreview,
+      generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainFileCreationApprovalPolicy,
+      domainConsistencyDiagnostics,
+    })
+  const generatedDomainMaterializationPlanCandidateLegacyComparison =
+    buildGeneratedDomainMaterializationPlanCandidateLegacyComparison({
+      generatedDomainUniversalMaterializationPlanCandidate,
+      materializationPlan,
+    })
   const generatedDomainFileCreationApprovalEvaluation =
     evaluateGeneratedDomainFileCreationApproval({
       generatedDomainUniversalMaterializationPlan,
@@ -45070,6 +45164,17 @@ function buildBrainDecisionContract({
         scope: 'observation-only',
       },
       workspacePath,
+    })
+  const generatedDomainMaterializationPlanDecouplingReport =
+    buildGeneratedDomainMaterializationPlanDecouplingReport({
+      materializationPlan,
+      generatedDomainUniversalMaterializationPlan,
+      generatedDomainUniversalMaterializationPlanPreview,
+      generatedDomainShadowMaterializationCandidatePlan,
+      generatedDomainFileCreationApprovalPolicy,
+      generatedDomainFileCreationApprovalEvaluation,
+      generatedDomainUniversalMaterializationPlanCandidate,
+      generatedDomainMaterializationPlanCandidateLegacyComparison,
     })
   const generatedDomainContractFirstInspectionDefinition =
     resolveGeneratedDomainContractFirstInspectionDefinition({
@@ -45294,6 +45399,9 @@ function buildBrainDecisionContract({
     generatedDomainUniversalMaterializationPlanPreview,
     generatedDomainUniversalMaterializationPlanPreviewComparison,
     generatedDomainUniversalMaterializationPlan,
+    generatedDomainUniversalMaterializationPlanCandidate,
+    generatedDomainMaterializationPlanCandidateLegacyComparison,
+    generatedDomainMaterializationPlanDecouplingReport,
     generatedDomainStructuralCapabilities,
     legacyDomainHardcodingDebtReport,
     localDeterministicExecutorLegacyDebtReport,
@@ -58944,6 +59052,42 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
   }
 
   if (
+    brainDecision.generatedDomainUniversalMaterializationPlanCandidate &&
+    typeof brainDecision.generatedDomainUniversalMaterializationPlanCandidate === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-materialization-plan:candidate',
+      summarizeGeneratedDomainUniversalMaterializationPlanCandidateForDebug(
+        brainDecision.generatedDomainUniversalMaterializationPlanCandidate,
+      ),
+    )
+  }
+
+  if (
+    brainDecision.generatedDomainMaterializationPlanCandidateLegacyComparison &&
+    typeof brainDecision.generatedDomainMaterializationPlanCandidateLegacyComparison === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-materialization-plan:candidate-legacy-comparison',
+      summarizeGeneratedDomainMaterializationPlanCandidateLegacyComparisonForDebug(
+        brainDecision.generatedDomainMaterializationPlanCandidateLegacyComparison,
+      ),
+    )
+  }
+
+  if (
+    brainDecision.generatedDomainMaterializationPlanDecouplingReport &&
+    typeof brainDecision.generatedDomainMaterializationPlanDecouplingReport === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-materialization-plan:decoupling-report',
+      summarizeGeneratedDomainMaterializationPlanDecouplingReportForDebug(
+        brainDecision.generatedDomainMaterializationPlanDecouplingReport,
+      ),
+    )
+  }
+
+  if (
     brainDecision.generatedDomainRuntimeShadowReadinessDecision &&
     typeof brainDecision.generatedDomainRuntimeShadowReadinessDecision === 'object'
   ) {
@@ -59260,6 +59404,12 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
         brainDecision.generatedDomainUniversalMaterializationPlanPreviewComparison,
       generatedDomainUniversalMaterializationPlan:
         brainDecision.generatedDomainUniversalMaterializationPlan,
+      generatedDomainUniversalMaterializationPlanCandidate:
+        brainDecision.generatedDomainUniversalMaterializationPlanCandidate,
+      generatedDomainMaterializationPlanCandidateLegacyComparison:
+        brainDecision.generatedDomainMaterializationPlanCandidateLegacyComparison,
+      generatedDomainMaterializationPlanDecouplingReport:
+        brainDecision.generatedDomainMaterializationPlanDecouplingReport,
       generatedDomainStructuralCapabilities:
         brainDecision.generatedDomainStructuralCapabilities,
       legacyDomainHardcodingDebtReport:
@@ -59393,6 +59543,12 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       brainDecision.generatedDomainUniversalMaterializationPlanPreviewComparison,
     generatedDomainUniversalMaterializationPlan:
       brainDecision.generatedDomainUniversalMaterializationPlan,
+    generatedDomainUniversalMaterializationPlanCandidate:
+      brainDecision.generatedDomainUniversalMaterializationPlanCandidate,
+    generatedDomainMaterializationPlanCandidateLegacyComparison:
+      brainDecision.generatedDomainMaterializationPlanCandidateLegacyComparison,
+    generatedDomainMaterializationPlanDecouplingReport:
+      brainDecision.generatedDomainMaterializationPlanDecouplingReport,
     generatedDomainStructuralCapabilities:
       brainDecision.generatedDomainStructuralCapabilities,
     legacyDomainHardcodingDebtReport:

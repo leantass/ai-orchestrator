@@ -64,6 +64,9 @@ const generatedDomainMaterializationPolicies = require(
 const generatedDomainInspectionDiagnostics = require(
   path.join(repoRoot, 'electron', 'generated-domain-inspection-diagnostics.cjs'),
 )
+const generatedDomainMaterializationPlanDiagnostics = require(
+  path.join(repoRoot, 'electron', 'generated-domain-materialization-plan-diagnostics.cjs'),
+)
 const requiredPlannerFunctions = [
   'buildDomainUnderstanding',
   'buildProductArchitecturePlan',
@@ -1136,6 +1139,7 @@ module.exports = {
     generatedDomainLegacyDiagnostics,
     generatedDomainMaterializationPolicies,
     generatedDomainInspectionDiagnostics,
+    generatedDomainMaterializationPlanDiagnostics,
     setTimeout,
     clearTimeout,
     setInterval,

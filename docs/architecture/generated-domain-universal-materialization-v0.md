@@ -761,3 +761,83 @@ Validaciones necesarias:
 - payload E2E con `generatedDomainInspectionContractDecouplingReport`
 - build + quality + planner/release/sandbox smokes
 - confirmacion de que `strategy`, `executionMode`, `nextExpectedAction`, `materializationPlan` real y `executionScope` real no cambian
+
+## 26. BuildFullstackLocalMaterializationPlan decoupling plan
+
+Estado actual:
+
+- `buildFullstackLocalMaterializationPlan(...)` sigue naciendo desde una mezcla de:
+- `detectFullstackLocalDemoArchetype(...)`
+- `resolveFullstackLocalContractProfile(...)`
+- contratos canonicos y rutas legacy
+- esa salida real sigue siendo la fuente efectiva del `materializationPlan` normal del runtime
+- el MVP sandbox ya demuestra que el contrato universal puede materializar seguro, pero todavia no reemplaza ese plan runtime
+
+Paso v0.1:
+
+- `buildGeneratedDomainUniversalMaterializationPlanCandidate(...)` construye un candidato paralelo y puramente observacional
+- el candidate se deriva desde:
+- `GeneratedDomainContract`
+- diagnostics del contrato
+- capability profile
+- `generatedDomainUniversalMaterializationPlanPreview`
+- shadow candidate
+- approval policy
+- consistency diagnostics
+- el candidate expone:
+- `projectRoot`
+- `allowedTargetPaths`
+- `requiredPathGroups`
+- `filesToCreate`
+- `fileChecks`
+- `validationPlan`
+- `forbiddenSignals`
+- `approvalRequired`
+- `approved:false`
+- `safety`
+- nunca ejecuta commands ni escribe archivos reales
+
+Comparacion nueva:
+
+- `generatedDomainMaterializationPlanCandidateLegacyComparison` compara candidate vs `materializationPlan` legacy
+- compara roots, paths, required groups, files, file checks, validation plan, forbidden signals, safety y readiness de sandbox
+- su salida es observacional y usa estados:
+- `not-available`
+- `aligned`
+- `partial`
+- `divergent`
+- `blocked`
+
+Reporte de desacople:
+
+- `generatedDomainMaterializationPlanDecouplingReport` resume:
+- fuente actual del plan real
+- si el plan legacy sigue presente
+- si preview / universal plan / candidate existen
+- si el candidate ya puede representar el plan
+- si approval policy y sandbox readiness estan listos
+- `migrationStatus`
+- blockers, warnings y errors
+
+Que sigue quedando en fallback legacy:
+
+- el `materializationPlan` real del runtime normal
+- la mezcla actual archetype/profile-first
+- cualquier dependencia de contratos canonicos legacy
+
+Que falta antes de mover runtime real:
+
+- reducir mas divergencias candidate-vs-legacy
+- acercar `buildFullstackLocalMaterializationPlan(...)` a `GeneratedDomainContract` sin romper cobertura
+- seguir desacoplando `inspectFullstackLocalMaterializationContract(...)`
+- probar mas fixtures domain-agnostic y continuidad entre corridas
+- mantener `materializationPlanChanged=false` y `executionScopeChanged=false` hasta una aprobacion explicita
+
+Relacion con el sandbox MVP:
+
+- el candidate universal usa la misma direccion de seguridad del MVP sandbox
+- sirve para demostrar compatibilidad estructural antes de cualquier promote real
+- no habilita runtime normal
+- no toca `web-prueba`
+- no toca `.env`
+- no usa Docker, deploy ni servicios externos

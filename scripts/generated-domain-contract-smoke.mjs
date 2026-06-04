@@ -48,6 +48,9 @@ const generatedDomainMaterializationPolicies = require(
 const generatedDomainInspectionDiagnostics = require(
   path.join(repoRoot, 'electron', 'generated-domain-inspection-diagnostics.cjs'),
 )
+const generatedDomainMaterializationPlanDiagnostics = require(
+  path.join(repoRoot, 'electron', 'generated-domain-materialization-plan-diagnostics.cjs'),
+)
 
 function extractSegment({ startMarker, endMarker }) {
   const start = mainSource.indexOf(startMarker)
@@ -93,6 +96,9 @@ module.exports = {
   buildGeneratedDomainMaterializationInspectionSourceResolution,
   buildGeneratedDomainMaterializationApprovalPayload,
   buildGeneratedDomainUniversalMaterializationPlan,
+  buildGeneratedDomainUniversalMaterializationPlanCandidate,
+  buildGeneratedDomainMaterializationPlanCandidateLegacyComparison,
+  buildGeneratedDomainMaterializationPlanDecouplingReport,
   evaluateGeneratedDomainFileCreationApproval,
   materializeGeneratedDomainSandboxPlan,
   resolveGeneratedDomainContractFirstInspectionDefinition,
@@ -138,6 +144,9 @@ module.exports = {
   summarizeGeneratedDomainMaterializationInspectionSourceResolutionForDebug,
   summarizeGeneratedDomainMaterializationApprovalPayloadForDebug,
   summarizeGeneratedDomainUniversalMaterializationPlanForDebug,
+  summarizeGeneratedDomainUniversalMaterializationPlanCandidateForDebug,
+  summarizeGeneratedDomainMaterializationPlanCandidateLegacyComparisonForDebug,
+  summarizeGeneratedDomainMaterializationPlanDecouplingReportForDebug,
   summarizeGeneratedDomainFileCreationApprovalEvaluationForDebug,
   summarizeGeneratedDomainSandboxMaterializationReportForDebug,
   summarizeGeneratedDomainInspectionContractDecouplingReportForDebug,
@@ -181,6 +190,7 @@ module.exports = {
     generatedDomainLegacyDiagnostics,
     generatedDomainMaterializationPolicies,
     generatedDomainInspectionDiagnostics,
+    generatedDomainMaterializationPlanDiagnostics,
     extractGeneratedDomainContractCandidate:
       require('../electron/generated-domain-contract.cjs').extractGeneratedDomainContractCandidate,
     AbortController,
@@ -5121,6 +5131,259 @@ function runGeneratedDomainUniversalMaterializationPlanBuiltCase() {
   assert.equal(debugSummary?.status, 'built')
 }
 
+function runGeneratedDomainUniversalMaterializationPlanCandidateBuiltCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const candidate = observationHarness.buildGeneratedDomainUniversalMaterializationPlanCandidate({
+    generatedDomainContract: decision.generatedDomainContract,
+    generatedDomainContractDiagnostics: decision.generatedDomainContractDiagnostics,
+    generatedDomainCapabilityProfile: decision.generatedDomainCapabilityProfile,
+    generatedDomainUniversalMaterializationPlanPreview:
+      decision.generatedDomainUniversalMaterializationPlanPreview,
+    generatedDomainShadowMaterializationCandidatePlan:
+      decision.generatedDomainShadowMaterializationCandidatePlan,
+    generatedDomainFileCreationApprovalPolicy:
+      decision.generatedDomainFileCreationApprovalPolicy,
+    domainConsistencyDiagnostics: decision.domainConsistencyDiagnostics,
+  })
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainUniversalMaterializationPlanCandidateForDebug(
+      candidate,
+    )
+
+  assert.equal(candidate?.present, true)
+  assert.equal(candidate?.built, true)
+  assert.equal(candidate?.status, 'built')
+  assert.equal(candidate?.approvalRequired, true)
+  assert.equal(candidate?.approved, false)
+  assert.equal(Array.isArray(candidate?.filesToCreate), true)
+  assert.equal(candidate?.filesToCreate.length > 0, true)
+  assert.equal(candidate?.safety?.noDotEnv, true)
+  assert.equal(candidate?.safety?.noNodeModules, true)
+  assert.equal(candidate?.safety?.noDocker, true)
+  assert.equal(candidate?.safety?.noDeploy, true)
+  assert.equal(candidate?.safety?.noCommands, true)
+  assert.equal(debugSummary?.status, 'built')
+}
+
+function runGeneratedDomainUniversalMaterializationPlanCandidateBlockedCase() {
+  const candidate = observationHarness.buildGeneratedDomainUniversalMaterializationPlanCandidate({
+    generatedDomainContract: {
+      ...createValidInventedContract(),
+      root: {
+        slug: 'web-prueba',
+        sourceRoot: 'web-prueba',
+        targetRoot: 'web-prueba',
+      },
+    },
+    generatedDomainContractDiagnostics: {
+      present: true,
+      valid: true,
+      safeForLocalMaterialization: false,
+    },
+    generatedDomainCapabilityProfile: {
+      present: true,
+      backendApi: true,
+      data: { databaseLocal: true },
+      surfaces: { public: true, admin: true },
+    },
+    generatedDomainUniversalMaterializationPlanPreview: {
+      present: true,
+      built: false,
+      status: 'blocked',
+      targetRoot: 'web-prueba',
+      allowedTargetPaths: ['web-prueba', 'web-prueba/.env'],
+      requiredPathGroups: [{ candidates: ['web-prueba/backend/src/index.js'] }],
+      frontend: { present: true },
+      backend: { present: true },
+      database: { present: true },
+      safety: {
+        safeForLocalMaterialization: false,
+      },
+    },
+    generatedDomainShadowMaterializationCandidatePlan: {
+      present: true,
+      candidate: {
+        targetRoot: 'web-prueba',
+      },
+    },
+    generatedDomainFileCreationApprovalPolicy: {
+      present: true,
+      evaluated: true,
+      status: 'blocked',
+      safeguards: {
+        noDotEnv: false,
+        noNodeModules: true,
+        noDocker: false,
+        noDeploy: false,
+        noExternalServices: false,
+        noRealPayments: false,
+        noCommands: false,
+        noWebPrueba: false,
+      },
+    },
+    domainConsistencyDiagnostics: {
+      present: true,
+      checked: true,
+      status: 'mismatch',
+      semanticStatus: 'mismatch',
+    },
+  })
+
+  assert.equal(candidate?.present, true)
+  assert.equal(candidate?.status, 'blocked')
+  assert.equal(candidate?.built, false)
+  assert.equal(candidate?.behaviorChanged, false)
+  assert.ok(Array.isArray(candidate?.errors))
+  assert.ok(candidate?.errors.length > 0)
+}
+
+function runGeneratedDomainMaterializationPlanCandidateLegacyComparisonAlignedCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const candidate = observationHarness.buildGeneratedDomainUniversalMaterializationPlanCandidate({
+    generatedDomainContract: decision.generatedDomainContract,
+    generatedDomainContractDiagnostics: decision.generatedDomainContractDiagnostics,
+    generatedDomainCapabilityProfile: decision.generatedDomainCapabilityProfile,
+    generatedDomainUniversalMaterializationPlanPreview:
+      decision.generatedDomainUniversalMaterializationPlanPreview,
+    generatedDomainShadowMaterializationCandidatePlan:
+      decision.generatedDomainShadowMaterializationCandidatePlan,
+    generatedDomainFileCreationApprovalPolicy:
+      decision.generatedDomainFileCreationApprovalPolicy,
+    domainConsistencyDiagnostics: decision.domainConsistencyDiagnostics,
+  })
+  const comparison =
+    observationHarness.buildGeneratedDomainMaterializationPlanCandidateLegacyComparison({
+      generatedDomainUniversalMaterializationPlanCandidate: candidate,
+      materializationPlan: decision.materializationPlan,
+    })
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainMaterializationPlanCandidateLegacyComparisonForDebug(
+      comparison,
+    )
+
+  assert.equal(comparison?.present, true)
+  assert.equal(comparison?.compared, true)
+  assert.ok(['aligned', 'partial'].includes(comparison?.status))
+  assert.equal(comparison?.behaviorChanged, false)
+  assert.equal(comparison?.legacyPlanPresent, true)
+  assert.equal(comparison?.candidatePresent, true)
+  assert.ok(['ready-for-harness', 'observe'].includes(comparison?.recommendation))
+  assert.ok(['aligned', 'partial'].includes(debugSummary?.status))
+}
+
+function runGeneratedDomainMaterializationPlanCandidateLegacyComparisonNotAvailableCase() {
+  const candidate = observationHarness.buildGeneratedDomainUniversalMaterializationPlanCandidate({
+    generatedDomainContract: createValidInventedContract(),
+    generatedDomainContractDiagnostics: {
+      present: true,
+      valid: true,
+      safeForLocalMaterialization: true,
+    },
+    generatedDomainCapabilityProfile: {
+      present: true,
+      backendApi: true,
+      data: { databaseLocal: true },
+      surfaces: { public: true, admin: true },
+    },
+    generatedDomainUniversalMaterializationPlanPreview: {
+      present: true,
+      built: true,
+      status: 'built',
+      targetRoot: 'candidate-only-local',
+      allowedTargetPaths: ['candidate-only-local/backend/src/index.js'],
+      requiredPathGroups: [{ candidates: ['candidate-only-local/backend/src/index.js'] }],
+      frontend: { present: true },
+      backend: { present: true },
+      database: { present: true },
+      safety: {
+        safeForLocalMaterialization: true,
+      },
+    },
+    generatedDomainShadowMaterializationCandidatePlan: {
+      present: true,
+    },
+    generatedDomainFileCreationApprovalPolicy: {
+      present: true,
+      evaluated: true,
+      status: 'ready-for-review',
+      safeguards: {
+        noDotEnv: true,
+        noNodeModules: true,
+        noDocker: true,
+        noDeploy: true,
+        noExternalServices: true,
+        noRealPayments: true,
+        noCommands: true,
+        noWebPrueba: true,
+      },
+    },
+    domainConsistencyDiagnostics: {
+      present: true,
+      checked: true,
+      status: 'consistent',
+      semanticStatus: 'consistent',
+    },
+  })
+  const comparison =
+    observationHarness.buildGeneratedDomainMaterializationPlanCandidateLegacyComparison({
+      generatedDomainUniversalMaterializationPlanCandidate: candidate,
+      materializationPlan: null,
+    })
+
+  assert.equal(comparison?.present, true)
+  assert.equal(comparison?.status, 'not-available')
+  assert.equal(comparison?.behaviorChanged, false)
+}
+
+function runGeneratedDomainMaterializationPlanDecouplingReportReadyCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const candidate = observationHarness.buildGeneratedDomainUniversalMaterializationPlanCandidate({
+    generatedDomainContract: decision.generatedDomainContract,
+    generatedDomainContractDiagnostics: decision.generatedDomainContractDiagnostics,
+    generatedDomainCapabilityProfile: decision.generatedDomainCapabilityProfile,
+    generatedDomainUniversalMaterializationPlanPreview:
+      decision.generatedDomainUniversalMaterializationPlanPreview,
+    generatedDomainShadowMaterializationCandidatePlan:
+      decision.generatedDomainShadowMaterializationCandidatePlan,
+    generatedDomainFileCreationApprovalPolicy:
+      decision.generatedDomainFileCreationApprovalPolicy,
+    domainConsistencyDiagnostics: decision.domainConsistencyDiagnostics,
+  })
+  const comparison =
+    observationHarness.buildGeneratedDomainMaterializationPlanCandidateLegacyComparison({
+      generatedDomainUniversalMaterializationPlanCandidate: candidate,
+      materializationPlan: decision.materializationPlan,
+    })
+  const report = observationHarness.buildGeneratedDomainMaterializationPlanDecouplingReport({
+    materializationPlan: decision.materializationPlan,
+    generatedDomainUniversalMaterializationPlan:
+      decision.generatedDomainUniversalMaterializationPlan,
+    generatedDomainUniversalMaterializationPlanPreview:
+      decision.generatedDomainUniversalMaterializationPlanPreview,
+    generatedDomainShadowMaterializationCandidatePlan:
+      decision.generatedDomainShadowMaterializationCandidatePlan,
+    generatedDomainFileCreationApprovalPolicy:
+      decision.generatedDomainFileCreationApprovalPolicy,
+    generatedDomainFileCreationApprovalEvaluation:
+      decision.generatedDomainFileCreationApprovalEvaluation,
+    generatedDomainUniversalMaterializationPlanCandidate: candidate,
+    generatedDomainMaterializationPlanCandidateLegacyComparison: comparison,
+  })
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainMaterializationPlanDecouplingReportForDebug(
+      report,
+    )
+
+  assert.equal(report?.present, true)
+  assert.equal(report?.behaviorChanged, false)
+  assert.equal(report?.legacyPlanPresent, true)
+  assert.equal(report?.previewPresent, true)
+  assert.equal(report?.candidatePresent, true)
+  assert.equal(report?.approvalPolicyReady, true)
+  assert.ok(['partial', 'ready-for-harness'].includes(report?.migrationStatus))
+  assert.ok(['partial', 'ready-for-harness'].includes(debugSummary?.migrationStatus))
+}
+
 function runGeneratedDomainUniversalMaterializationPlanBlockedCase() {
   const plan = observationHarness.buildGeneratedDomainUniversalMaterializationPlan({
     generatedDomainContract: {
@@ -6397,6 +6660,11 @@ runGeneratedDomainUniversalMaterializationPlanPreviewBlockedCase()
 runGeneratedDomainUniversalMaterializationPlanPreviewComparisonAlignedCase()
 runGeneratedDomainUniversalMaterializationPlanPreviewComparisonBlockedCase()
 runGeneratedDomainUniversalMaterializationPlanBuiltCase()
+runGeneratedDomainUniversalMaterializationPlanCandidateBuiltCase()
+runGeneratedDomainUniversalMaterializationPlanCandidateBlockedCase()
+runGeneratedDomainMaterializationPlanCandidateLegacyComparisonAlignedCase()
+runGeneratedDomainMaterializationPlanCandidateLegacyComparisonNotAvailableCase()
+runGeneratedDomainMaterializationPlanDecouplingReportReadyCase()
 runGeneratedDomainUniversalMaterializationPlanBlockedCase()
 runGeneratedDomainFileCreationApprovalEvaluationBlockedCase()
 runGeneratedDomainFileCreationApprovalEvaluationApprovedSandboxCase()

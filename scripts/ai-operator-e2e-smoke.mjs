@@ -61,6 +61,9 @@ const generatedDomainMaterializationPolicies = require(
 const generatedDomainInspectionDiagnostics = require(
   path.join(repoRoot, 'electron', 'generated-domain-inspection-diagnostics.cjs'),
 )
+const generatedDomainMaterializationPlanDiagnostics = require(
+  path.join(repoRoot, 'electron', 'generated-domain-materialization-plan-diagnostics.cjs'),
+)
 
 const smokeWorkspaceRoot = path.join(repoRoot, '.tmp', 'ai-operator-e2e-smoke')
 const continuationBasePhaseIds = [
@@ -627,6 +630,7 @@ module.exports = {
     generatedDomainLegacyDiagnostics,
     generatedDomainMaterializationPolicies,
     generatedDomainInspectionDiagnostics,
+    generatedDomainMaterializationPlanDiagnostics,
     setTimeout,
     clearTimeout,
     setInterval,
@@ -9246,6 +9250,69 @@ async function runGeneratedDomainUniversalMaterializationPlanPayloadCase() {
   }
 }
 
+async function runGeneratedDomainMaterializationPlanDecouplingPayloadCase() {
+  const failures = []
+  const decision = createAlignedGeneratedDomainObservationDecision({
+    decisionKey: 'generated-domain-materialization-plan-decoupling-report',
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainUniversalMaterializationPlanCandidate?.present === true &&
+      ['built', 'partial'].includes(
+        decision.generatedDomainUniversalMaterializationPlanCandidate?.status,
+      ) &&
+      decision.generatedDomainUniversalMaterializationPlanCandidate?.approvalRequired === true &&
+      decision.generatedDomainUniversalMaterializationPlanCandidate?.approved === false,
+    'buildBrainDecisionContract debe adjuntar generatedDomainUniversalMaterializationPlanCandidate como evidencia paralela sin promoverlo a plan real.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationPlanCandidateLegacyComparison?.present === true &&
+      ['aligned', 'partial'].includes(
+        decision.generatedDomainMaterializationPlanCandidateLegacyComparison?.status,
+      ) &&
+      decision.generatedDomainMaterializationPlanCandidateLegacyComparison?.behaviorChanged === false,
+    'buildBrainDecisionContract debe adjuntar generatedDomainMaterializationPlanCandidateLegacyComparison sin cambiar el comportamiento real del plan legacy.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMaterializationPlanDecouplingReport?.present === true &&
+      ['partial', 'ready-for-harness'].includes(
+        decision.generatedDomainMaterializationPlanDecouplingReport?.migrationStatus,
+      ) &&
+      decision.generatedDomainMaterializationPlanDecouplingReport?.behaviorChanged === false,
+    'buildBrainDecisionContract debe adjuntar generatedDomainMaterializationPlanDecouplingReport como diagnostico observacional del desacople del plan.',
+  )
+  pushFailure(
+    failures,
+    decision.strategy === 'materialize-fullstack-local-plan' &&
+      decision.executionMode === 'executor' &&
+      decision.nextExpectedAction === 'execute-plan' &&
+      decision.generatedDomainMaterializationSourceResolution?.runtime
+        ?.materializationPlanChanged === false,
+    'El desacople del materialization plan no debe cambiar strategy, executionMode, nextExpectedAction ni materializationPlan real.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generatedDomainUniversalMaterializationPlanCandidate') &&
+      mainSource.includes('generatedDomainMaterializationPlanCandidateLegacyComparison') &&
+      mainSource.includes('generatedDomainMaterializationPlanDecouplingReport') &&
+      mainSource.includes('generated-domain-materialization-plan:candidate') &&
+      mainSource.includes(
+        'generated-domain-materialization-plan:candidate-legacy-comparison',
+      ) &&
+      mainSource.includes('generated-domain-materialization-plan:decoupling-report'),
+    'main.cjs debe adjuntar y loguear candidate, comparison y decoupling report del materialization plan.',
+  )
+
+  return {
+    id: 'generated-domain-materialization-plan-decoupling',
+    label: 'Generated domain materialization plan decoupling',
+    failures,
+  }
+}
+
 async function runGeneratedDomainFileCreationApprovalEvaluationPayloadCase() {
   const failures = []
   const decision = createAlignedGeneratedDomainObservationDecision({
@@ -12327,6 +12394,7 @@ async function main() {
     results.push(await runGeneratedDomainRuntimeShadowReadinessDecisionPayloadCase())
     results.push(await runGeneratedDomainMvpReadinessExecutiveReportPayloadCase())
     results.push(await runGeneratedDomainUniversalMaterializationPlanPayloadCase())
+    results.push(await runGeneratedDomainMaterializationPlanDecouplingPayloadCase())
     results.push(await runGeneratedDomainFileCreationApprovalEvaluationPayloadCase())
     results.push(await runGeneratedDomainUniversalMaterializationPlanPreviewPayloadCase())
     results.push(
