@@ -9057,9 +9057,9 @@ function createAlignedGeneratedDomainObservationDecision({
   })
 }
 
-function createApprovedToolBankObservationDecision() {
-  const approvedSandboxPath =
-    'C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\sandbox-toolbank-local'
+function createApprovedToolBankObservationDecision(
+  approvedSandboxPath = 'C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\sandbox-toolbank-local',
+) {
   const generatedDomainContract = {
     contractVersion: '1.0',
     deliveryLevel: 'fullstack-local',
@@ -9687,6 +9687,17 @@ async function runGeneratedDomainFileCreationApprovalEvaluationPayloadCase() {
 async function runGeneratedDomainSandboxApprovalBridgeCase() {
   const failures = []
   const decision = createApprovedToolBankObservationDecision()
+  const posixDecision = createApprovedToolBankObservationDecision(
+    '/home/runner/work/sandbox-toolbank-local',
+  )
+  const unsafeWebPruebaDecision = createApprovedToolBankObservationDecision(
+    'C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\web-prueba',
+  )
+  const unsafeEnvDecision = createApprovedToolBankObservationDecision('.env')
+  const unsafeNodeModulesDecision =
+    createApprovedToolBankObservationDecision('node_modules')
+  const unsafeDockerDecision = createApprovedToolBankObservationDecision('Dockerfile')
+  const unsafeDeployDecision = createApprovedToolBankObservationDecision('deploy')
   const appSource = fs.readFileSync(appFilePath, 'utf8')
 
   pushFailure(
@@ -9726,6 +9737,30 @@ async function runGeneratedDomainSandboxApprovalBridgeCase() {
         ?.withinWorkspace === true,
     'Una ruta externa aprobada debe mapearse a un sandbox interno seguro dentro del workspace.',
   )
+  pushFailure(
+    failures,
+    posixDecision.generatedDomainFileCreationApprovalEvaluation?.sandboxRoot?.relative ===
+      '.codex-temp/generated-domain-materialization-approved/sandbox-toolbank-local' &&
+      posixDecision.generatedDomainFileCreationApprovalEvaluation?.sandboxRoot
+        ?.withinWorkspace === true,
+    'Una ruta POSIX externa aprobada debe mapearse al mismo sandbox interno seguro.',
+  )
+  ;[
+    unsafeWebPruebaDecision,
+    unsafeEnvDecision,
+    unsafeNodeModulesDecision,
+    unsafeDockerDecision,
+    unsafeDeployDecision,
+  ].forEach((unsafeDecision) => {
+    pushFailure(
+      failures,
+      unsafeDecision.generatedDomainFileCreationApprovalEvaluation?.approved === false &&
+        unsafeDecision.generatedDomainFileCreationApprovalEvaluation?.blocked === true &&
+        unsafeDecision.generatedDomainControlledRuntimeMaterializationSource?.enabled ===
+          false,
+      'Las rutas inseguras aprobadas manualmente deben seguir bloqueadas y no pueden habilitar la fuente universal.',
+    )
+  })
   pushFailure(
     failures,
     mainSource.includes('resolveGeneratedDomainSandboxApprovalDecision') &&

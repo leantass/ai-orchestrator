@@ -45335,7 +45335,9 @@ function buildBrainDecisionContract({
     typeof generatedDomainControlledRuntimeMaterializationSourceOptions === 'object'
       ? generatedDomainControlledRuntimeMaterializationSourceOptions
       : {}),
-    ...(generatedDomainSandboxApprovalDecision.approved
+    ...(generatedDomainSandboxApprovalDecision.approved &&
+    generatedDomainFileCreationApprovalEvaluation?.approved === true &&
+    generatedDomainFileCreationApprovalEvaluation?.blocked !== true
       ? {
           harnessControlledEnable: true,
           simulateLeanApproval: true,
@@ -46779,6 +46781,14 @@ function extractApprovedSandboxRootCandidate(...values) {
     }
 
     if (
+      /^(?:\.env(?:\..+)?|node_modules|web-prueba|dockerfile|docker-compose\.(?:yaml|yml)|deploy)$/iu.test(
+        normalizedValue,
+      )
+    ) {
+      return normalizedValue
+    }
+
+    if (
       /^[a-z]:[\\/]/iu.test(normalizedValue) ||
       normalizedValue.startsWith('.') ||
       normalizedValue.startsWith('/') ||
@@ -46805,6 +46815,33 @@ function slugifySandboxFolderName(value) {
     .replace(/^-+|-+$/gu, '')
 
   return normalizedValue || 'approved-sandbox'
+}
+
+function normalizeExternalSandboxPathForComparison(value) {
+  const normalizedValue = normalizePathForComparison(normalizeOptionalString(value))
+  return normalizedValue
+    ? normalizedValue.replace(/^([a-z]):\//iu, (_, driveLetter) => `${driveLetter.toLocaleLowerCase()}:/`)
+    : ''
+}
+
+function isAbsoluteExternalSandboxPath(value) {
+  const normalizedValue = normalizeExternalSandboxPathForComparison(value)
+  return (
+    /^[a-z]:\//iu.test(normalizedValue) ||
+    normalizedValue.startsWith('/') ||
+    normalizedValue.startsWith('//')
+  )
+}
+
+function getCrossPlatformSandboxBasename(value) {
+  const normalizedValue = normalizeExternalSandboxPathForComparison(value).replace(/\/+$/u, '')
+
+  if (!normalizedValue) {
+    return ''
+  }
+
+  const segments = normalizedValue.split('/').filter(Boolean)
+  return segments.length > 0 ? segments[segments.length - 1] : ''
 }
 
 function resolveGeneratedDomainSandboxApprovalDecision({
@@ -46839,11 +46876,15 @@ function resolveGeneratedDomainSandboxApprovalDecision({
   const workspaceRoot = path.resolve(
     normalizeOptionalString(workspacePath) || process.cwd(),
   )
+  const requestedComparableCandidatePath =
+    normalizeExternalSandboxPathForComparison(requestedSandboxRoot)
   const requestedResolvedPath = requestedSandboxRoot
     ? path.resolve(requestedSandboxRoot)
     : ''
   const trustedExternalSandboxBase = path.resolve(workspaceRoot, '..', '..')
-  const requestedComparablePath = normalizePathForComparison(requestedResolvedPath)
+  const requestedComparablePath =
+    requestedComparableCandidatePath ||
+    normalizeExternalSandboxPathForComparison(requestedResolvedPath)
   const relativeToWorkspace = requestedResolvedPath
     ? path.relative(workspaceRoot, requestedResolvedPath)
     : ''
@@ -46868,32 +46909,56 @@ function resolveGeneratedDomainSandboxApprovalDecision({
     ) ||
     /(^|\/)deploy($|\/)/iu.test(requestedComparablePath) ||
     /(^|\/)c:\/windows($|\/)/iu.test(requestedComparablePath)
+  const requestedBasename = getCrossPlatformSandboxBasename(
+    requestedSandboxRoot || requestedResolvedPath,
+  )
+  const requestedBasenameBlocked =
+    !requestedBasename ||
+    /^(?:\.env(?:\..+)?|node_modules|dockerfile|docker-compose\.(?:yaml|yml)|deploy|web-prueba)$/iu.test(
+      requestedBasename,
+    )
   const requestedLooksLikeSandbox =
     /(^|\/)sandbox[-/]/iu.test(requestedComparablePath) ||
-    /sandbox/iu.test(path.basename(requestedResolvedPath || requestedSandboxRoot))
+    /sandbox/iu.test(requestedBasename)
+  const requestedIsExternalAbsoluteSandboxPath =
+    isAbsoluteExternalSandboxPath(requestedSandboxRoot) && !requestedInsideWorkspace
+  const canUseRequestedSandboxRoot =
+    !requestedSandboxRoot ||
+    (!requestedLooksBlocked &&
+      (requestedInsideWorkspace ||
+        (requestedLooksLikeSandbox &&
+          !requestedBasenameBlocked &&
+          (requestedInsideTrustedBase || requestedIsExternalAbsoluteSandboxPath))))
+  const effectiveApproved = approved && canUseRequestedSandboxRoot
+  const approvalBlockedReason =
+    approved && !canUseRequestedSandboxRoot
+      ? 'La ruta aprobada no es un sandbox interno seguro ni puede mapearse de forma controlada.'
+      : ''
   let effectiveSandboxRoot = defaultRelativeSandboxRoot
 
-  if (approved && requestedSandboxRoot && !requestedLooksBlocked) {
+  if (effectiveApproved && requestedSandboxRoot && !requestedLooksBlocked) {
     if (requestedInsideWorkspace) {
       effectiveSandboxRoot = requestedSandboxRoot
-    } else if (requestedInsideTrustedBase && requestedLooksLikeSandbox) {
+    } else if (!requestedBasenameBlocked && requestedLooksLikeSandbox) {
       effectiveSandboxRoot = path.posix.join(
         '.codex-temp',
         'generated-domain-materialization-approved',
-        slugifySandboxFolderName(path.basename(requestedResolvedPath)),
+        slugifySandboxFolderName(requestedBasename),
       )
     }
   }
 
   return {
-    approved,
-    scope: approved ? 'sandbox-only' : 'observation-only',
+    approved: effectiveApproved,
+    blocked: Boolean(approvalBlockedReason),
+    scope: effectiveApproved ? 'sandbox-only' : 'observation-only',
     requestedSandboxRoot: requestedSandboxRoot || defaultRelativeSandboxRoot,
     effectiveSandboxRoot,
     approvalReason:
+      approvalBlockedReason ||
       normalizeOptionalString(plannerFeedback?.approvalReason) ||
       normalizeOptionalString(decisionRecord?.summary) ||
-      (approved
+      (effectiveApproved
         ? 'Aprobacion humana explicita para materializacion sandbox.'
         : 'Sin aprobacion humana explicita para materializacion sandbox.'),
   }
