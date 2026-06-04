@@ -8998,6 +8998,55 @@ async function runGeneratedDomainRuntimeShadowReadinessDecisionPayloadCase() {
   }
 }
 
+async function runGeneratedDomainMvpReadinessExecutiveReportPayloadCase() {
+  const failures = []
+  const decision = createAlignedGeneratedDomainObservationDecision({
+    decisionKey: 'generated-domain-mvp-readiness-executive-report',
+  })
+
+  pushFailure(
+    failures,
+    decision.generatedDomainMvpReadinessExecutiveReport?.present === true &&
+      ['requires-Lean-approval', 'ready'].includes(
+        decision.generatedDomainMvpReadinessExecutiveReport?.status,
+      ) &&
+      decision.generatedDomainMvpReadinessExecutiveReport?.mvpFlow?.contractReady === true &&
+      decision.generatedDomainMvpReadinessExecutiveReport?.mvpFlow?.planReady === true,
+    'buildBrainDecisionContract debe adjuntar generatedDomainMvpReadinessExecutiveReport como resumen ejecutivo del MVP sin activar runtime real.',
+  )
+  pushFailure(
+    failures,
+    decision.generatedDomainMvpReadinessExecutiveReport?.runtime?.runtimeEnabled === false &&
+      decision.generatedDomainMvpReadinessExecutiveReport?.runtime
+        ?.controlledRuntimeEnable === false &&
+      decision.generatedDomainMvpReadinessExecutiveReport?.runtime
+        ?.materializationPlanChanged === false &&
+      decision.generatedDomainMvpReadinessExecutiveReport?.runtime
+        ?.executionScopeChanged === false,
+    'El readiness ejecutivo del MVP no debe cambiar runtimeEnabled, controlledRuntimeEnable, materializationPlan ni executionScope.',
+  )
+  pushFailure(
+    failures,
+    Array.isArray(decision.generatedDomainMvpReadinessExecutiveReport?.approvals?.pendingItems) &&
+      Array.isArray(decision.generatedDomainMvpReadinessExecutiveReport?.recommendedNextActions) &&
+      decision.generatedDomainMvpReadinessExecutiveReport?.behaviorChanged === false,
+    'El readiness ejecutivo del MVP debe exponer pendingItems y recommendedNextActions serializables sin cambiar comportamiento.',
+  )
+  pushFailure(
+    failures,
+    mainSource.includes('generatedDomainMvpReadinessExecutiveReport') &&
+      mainSource.includes('generated-domain-mvp:readiness-report') &&
+      mainSource.includes('buildGeneratedDomainMvpReadinessExecutiveReport'),
+    'main.cjs debe adjuntar y loguear generated-domain-mvp:readiness-report.',
+  )
+
+  return {
+    id: 'generated-domain-mvp-readiness-executive-report',
+    label: 'Generated domain MVP readiness executive report',
+    failures,
+  }
+}
+
 async function runGeneratedDomainUniversalMaterializationPlanPayloadCase() {
   const failures = []
   const decision = createAlignedGeneratedDomainObservationDecision({
@@ -12123,6 +12172,7 @@ async function main() {
     results.push(await runGeneratedDomainFileCreationApprovalPolicyPayloadCase())
     results.push(await runGeneratedDomainMaterializationApprovalPayloadCase())
     results.push(await runGeneratedDomainRuntimeShadowReadinessDecisionPayloadCase())
+    results.push(await runGeneratedDomainMvpReadinessExecutiveReportPayloadCase())
     results.push(await runGeneratedDomainUniversalMaterializationPlanPayloadCase())
     results.push(await runGeneratedDomainFileCreationApprovalEvaluationPayloadCase())
     results.push(await runGeneratedDomainUniversalMaterializationPlanPreviewPayloadCase())

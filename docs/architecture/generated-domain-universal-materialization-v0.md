@@ -611,3 +611,42 @@ Todavia quedan deliberadamente fuera de este MVP base:
 - Docker
 - integraciones reales
 - pagos reales
+
+## 21. Executive MVP readiness report
+
+`generatedDomainMvpReadinessExecutiveReport` consolida el estado del MVP sin tocar runtime real.
+
+Debe responder de forma compacta:
+
+- si `GeneratedDomainContract` ya es valido y seguro
+- si el `preview` universal ya es utilizable
+- si el `generatedDomainUniversalMaterializationPlan` ya esta listo para sandbox
+- si la policy de approval ya actua como gate
+- si el payload de approval ya esta listo para revision
+- si el sandbox sigue siendo el unico lugar permitido para writes reales
+- si el runtime normal sigue apagado y sin mutaciones
+- que aprobaciones, riesgos y siguientes pasos quedan pendientes
+
+Este reporte es ejecutivo, no ejecutable:
+
+- no cambia `strategy`
+- no cambia `executionMode`
+- no cambia `nextExpectedAction`
+- no activa `generated-domain-shadow` como fuente real
+- no escribe archivos
+
+## 22. MVP validation breadth
+
+El smoke de sandbox ya no depende de un solo dominio inventado.
+
+Hoy valida el mismo pipeline seguro sobre al menos tres variantes:
+
+- sistema comunitario local
+- ecommerce mock local
+- sistema de turnos/admin local
+
+La intencion es reforzar que:
+
+- el contrato universal gobierna por capacidades
+- la materializacion segura no depende de rubros fijos
+- los dominios siguen siendo fixtures/harnesses, no motor runtime

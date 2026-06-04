@@ -200,7 +200,82 @@ function createValidInventedContract() {
       ],
     },
     approvals: [],
+    scenarioModules: ['catalog', 'loans', 'reports'],
   }
+}
+
+function createEcommerceMockContract() {
+  const contract = cloneJson(createValidInventedContract())
+  contract.domain = {
+    label: 'Mock Neighborhood Store',
+    slug: 'mock-neighborhood-store',
+    summary: 'Catalogo local, carrito mock y reportes sin pagos reales ni servicios externos.',
+  }
+  contract.root = {
+    slug: 'mock-neighborhood-store-local',
+    sourceRoot: 'mock-neighborhood-store-local',
+    targetRoot: 'mock-neighborhood-store-local',
+  }
+  contract.roles = ['shopper', 'operator', 'admin']
+  contract.entities = ['products', 'orders', 'customers']
+  contract.workflows = ['browse catalog', 'simulate cart', 'review mock orders']
+  contract.frontendSurfaces = [
+    { key: 'public', label: 'Catalogo', path: 'frontend/public', screens: ['catalog', 'cart'] },
+    { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['orders', 'reports'] },
+  ]
+  contract.backend.routes = [
+    { path: 'backend/src/routes/products.js' },
+    { path: 'backend/src/routes/orders.js' },
+    { path: 'backend/src/routes/reports.js' },
+  ]
+  contract.backend.modules = [{ path: 'backend/src/modules/catalog.js' }]
+  contract.database.tables = ['products', 'orders', 'customers']
+  contract.database.relationships = ['orders.customer_id -> customers.id']
+  contract.database.seedData = ['products base', 'orders mock']
+  contract.validation.requiredPathGroups = [
+    { candidates: ['backend/src/routes/products.js'] },
+    { candidates: ['database/schema.sql'] },
+    { candidates: ['frontend/public/index.html'] },
+  ]
+  contract.scenarioModules = ['catalog', 'cart', 'orders']
+  return contract
+}
+
+function createSchedulingAdminContract() {
+  const contract = cloneJson(createValidInventedContract())
+  contract.domain = {
+    label: 'Local Scheduling Desk',
+    slug: 'local-scheduling-desk',
+    summary: 'Agenda local, turnos y panel administrativo sin backend real activo ni externos.',
+  }
+  contract.root = {
+    slug: 'local-scheduling-desk',
+    sourceRoot: 'local-scheduling-desk',
+    targetRoot: 'local-scheduling-desk',
+  }
+  contract.roles = ['patient', 'operator', 'admin']
+  contract.entities = ['appointments', 'customers', 'staff']
+  contract.workflows = ['book appointment', 'review agenda', 'generate local reports']
+  contract.frontendSurfaces = [
+    { key: 'public', label: 'Turnos', path: 'frontend/public', screens: ['agenda'] },
+    { key: 'admin', label: 'Admin', path: 'frontend/admin', screens: ['calendar', 'reports'] },
+  ]
+  contract.backend.routes = [
+    { path: 'backend/src/routes/appointments.js' },
+    { path: 'backend/src/routes/calendar.js' },
+    { path: 'backend/src/routes/reports.js' },
+  ]
+  contract.backend.modules = [{ path: 'backend/src/modules/scheduling.js' }]
+  contract.database.tables = ['appointments', 'customers', 'staff']
+  contract.database.relationships = ['appointments.staff_id -> staff.id']
+  contract.database.seedData = ['appointments base', 'calendar base']
+  contract.validation.requiredPathGroups = [
+    { candidates: ['backend/src/routes/appointments.js'] },
+    { candidates: ['database/schema.sql'] },
+    { candidates: ['frontend/public/index.html'] },
+  ]
+  contract.scenarioModules = ['appointments', 'calendar', 'reports']
+  return contract
 }
 
 function buildInspectionReadyMaterializationPlan(contract) {
@@ -224,10 +299,14 @@ function buildInspectionReadyMaterializationPlan(contract) {
   }
 }
 
-function createUniversalDecision() {
-  const generatedDomainContract = createValidInventedContract()
+function createUniversalDecision(generatedDomainContract = createValidInventedContract()) {
   const materializationPlan = buildInspectionReadyMaterializationPlan(generatedDomainContract)
   const allowedTargetPaths = deriveAllowedTargetPathsFromContract(generatedDomainContract, '.')
+  const scenarioModules =
+    Array.isArray(generatedDomainContract.scenarioModules) &&
+    generatedDomainContract.scenarioModules.length > 0
+      ? generatedDomainContract.scenarioModules
+      : ['catalog', 'loans', 'reports']
 
   return observationHarness.buildBrainDecisionContract({
     decisionKey: 'generated-domain-sandbox-materialization-smoke',
@@ -248,7 +327,7 @@ function createUniversalDecision() {
       intent: 'manage local tool loans and reports',
       deliveryLevel: 'fullstack-local',
       roles: generatedDomainContract.roles,
-      modules: ['catalog', 'loans', 'reports'],
+      modules: scenarioModules,
       entities: generatedDomainContract.entities,
       coreFlows: generatedDomainContract.workflows,
     },
@@ -280,7 +359,7 @@ function createUniversalDecision() {
         `${generatedDomainContract.root.targetRoot}/database`,
         `${generatedDomainContract.root.targetRoot}/docs`,
       ],
-      modules: ['catalog', 'loans', 'reports'],
+      modules: scenarioModules,
       successCriteria: [
         'Keep a local fullstack structure ready for review.',
         'Do not materialize files during the planner stage.',
@@ -404,87 +483,128 @@ function runBlockedCases(universalPlan) {
   assert.equal(blockedMaterializationReport.materialized, false)
 }
 
+function runHappyPathScenario({ id, contract, expectedDomainLabel }) {
+  const decision = createUniversalDecision(contract)
+  const universalPlan = decision.generatedDomainUniversalMaterializationPlan
+  const readinessReport = decision.generatedDomainMvpReadinessExecutiveReport
+
+  assert.equal(universalPlan?.present, true)
+  assert.equal(universalPlan?.built, true)
+  assert.equal(universalPlan?.canMaterializeInSandbox, true)
+  assert.equal(readinessReport?.present, true)
+  assert.equal(readinessReport?.runtime?.runtimeEnabled, false)
+  assert.equal(readinessReport?.runtime?.controlledRuntimeEnable, false)
+
+  const approvalEvaluation = observationHarness.evaluateGeneratedDomainFileCreationApproval({
+    generatedDomainUniversalMaterializationPlan: universalPlan,
+    approvalDecision: {
+      approved: true,
+      scope: 'sandbox-only',
+      approvalReason: `Sandbox validation smoke for ${id}.`,
+    },
+    workspacePath: repoRoot,
+    sandboxRoot: `${sandboxRootRelative}/${id}`,
+  })
+
+  assert.equal(approvalEvaluation?.status, 'approved-for-sandbox')
+  assert.equal(approvalEvaluation?.approved, true)
+  assert.equal(approvalEvaluation?.blocked, false)
+
+  const materializationReport = observationHarness.materializeGeneratedDomainSandboxPlan({
+    generatedDomainUniversalMaterializationPlan: universalPlan,
+    generatedDomainFileCreationApprovalEvaluation: approvalEvaluation,
+  })
+
+  assert.equal(materializationReport?.status, 'materialized')
+  assert.equal(materializationReport?.materialized, true)
+
+  const projectRootPath = path.join(
+    repoRoot,
+    '.codex-temp',
+    'generated-domain-materialization-sandbox',
+    id,
+    universalPlan.projectRoot,
+  )
+  const expectedFiles = [
+    'README.md',
+    'docs/domain.md',
+    'frontend/index.html',
+    'frontend/src/main.js',
+    'frontend/src/mock-data.js',
+    'backend/src/index.js',
+    'shared/contracts/domain.js',
+    'database/schema.sql',
+    'database/seed.json',
+    'validation/report.json',
+  ]
+
+  for (const relativePath of expectedFiles) {
+    assert.equal(
+      fs.existsSync(path.join(projectRootPath, relativePath)),
+      true,
+      `Falta el archivo esperado ${relativePath} para ${id}.`,
+    )
+  }
+
+  const allFiles = listRelativeFiles(projectRootPath)
+  assert.equal(allFiles.some((entry) => /(^|\/)\.env($|\/)/iu.test(entry)), false)
+  assert.equal(allFiles.some((entry) => /(^|\/)node_modules($|\/)/iu.test(entry)), false)
+  assert.equal(allFiles.some((entry) => /(^|\/)web-prueba($|\/)/iu.test(entry)), false)
+  assert.equal(allFiles.some((entry) => /(^|\/)deploy($|\/)/iu.test(entry)), false)
+  assert.equal(allFiles.some((entry) => /(^|\/)dockerfile($|\/)/iu.test(entry)), false)
+
+  assertNodeCheck(path.join(projectRootPath, 'frontend', 'src', 'main.js'))
+  assertNodeCheck(path.join(projectRootPath, 'frontend', 'src', 'mock-data.js'))
+  assertNodeCheck(path.join(projectRootPath, 'backend', 'src', 'index.js'))
+  assertNodeCheck(path.join(projectRootPath, 'shared', 'contracts', 'domain.js'))
+
+  JSON.parse(fs.readFileSync(path.join(projectRootPath, 'database', 'seed.json'), 'utf8'))
+  const validationReport = JSON.parse(
+    fs.readFileSync(path.join(projectRootPath, 'validation', 'report.json'), 'utf8'),
+  )
+  assert.equal(
+    String(validationReport?.projectRoot || '').trim(),
+    String(universalPlan?.projectRoot || '').trim(),
+    `validation/report.json deberia conservar el projectRoot materializado para ${expectedDomainLabel}.`,
+  )
+
+  return {
+    createdCount: materializationReport.created.length,
+    universalPlan,
+  }
+}
+
 async function main() {
   ensureRemoved(smokeSandboxPath)
 
   try {
-    const decision = createUniversalDecision()
-    const universalPlan = decision.generatedDomainUniversalMaterializationPlan
-
-    assert.equal(universalPlan?.present, true)
-    assert.equal(universalPlan?.built, true)
-    assert.equal(universalPlan?.canMaterializeInSandbox, true)
-
-    const approvalEvaluation = observationHarness.evaluateGeneratedDomainFileCreationApproval({
-      generatedDomainUniversalMaterializationPlan: universalPlan,
-      approvalDecision: {
-        approved: true,
-        scope: 'sandbox-only',
-        approvalReason: 'Sandbox validation smoke.',
+    const scenarios = [
+      {
+        id: 'community-system',
+        contract: createValidInventedContract(),
+        expectedDomainLabel: 'Community Libraries',
       },
-      workspacePath: repoRoot,
-      sandboxRoot: `${sandboxRootRelative}/happy-path`,
-    })
-
-    assert.equal(approvalEvaluation?.status, 'approved-for-sandbox')
-    assert.equal(approvalEvaluation?.approved, true)
-    assert.equal(approvalEvaluation?.blocked, false)
-
-    const materializationReport = observationHarness.materializeGeneratedDomainSandboxPlan({
-      generatedDomainUniversalMaterializationPlan: universalPlan,
-      generatedDomainFileCreationApprovalEvaluation: approvalEvaluation,
-    })
-
-    assert.equal(materializationReport?.status, 'materialized')
-    assert.equal(materializationReport?.materialized, true)
-
-    const projectRootPath = path.join(
-      repoRoot,
-      '.codex-temp',
-      'generated-domain-materialization-sandbox',
-      'happy-path',
-      universalPlan.projectRoot,
-    )
-    const expectedFiles = [
-      'README.md',
-      'docs/domain.md',
-      'frontend/index.html',
-      'frontend/src/main.js',
-      'frontend/src/mock-data.js',
-      'backend/src/index.js',
-      'shared/contracts/domain.js',
-      'database/schema.sql',
-      'database/seed.json',
-      'validation/report.json',
+      {
+        id: 'mock-ecommerce',
+        contract: createEcommerceMockContract(),
+        expectedDomainLabel: 'Mock Neighborhood Store',
+      },
+      {
+        id: 'scheduling-admin',
+        contract: createSchedulingAdminContract(),
+        expectedDomainLabel: 'Local Scheduling Desk',
+      },
     ]
+    const results = scenarios.map((scenario) => runHappyPathScenario(scenario))
+    runBlockedCases(results[0].universalPlan)
 
-    for (const relativePath of expectedFiles) {
-      assert.equal(
-        fs.existsSync(path.join(projectRootPath, relativePath)),
-        true,
-        `Falta el archivo esperado ${relativePath}.`,
-      )
-    }
-
-    const allFiles = listRelativeFiles(projectRootPath)
-    assert.equal(allFiles.some((entry) => /(^|\/)\.env($|\/)/iu.test(entry)), false)
-    assert.equal(allFiles.some((entry) => /(^|\/)node_modules($|\/)/iu.test(entry)), false)
-    assert.equal(allFiles.some((entry) => /(^|\/)web-prueba($|\/)/iu.test(entry)), false)
-    assert.equal(allFiles.some((entry) => /(^|\/)deploy($|\/)/iu.test(entry)), false)
-    assert.equal(allFiles.some((entry) => /(^|\/)dockerfile($|\/)/iu.test(entry)), false)
-
-    assertNodeCheck(path.join(projectRootPath, 'frontend', 'src', 'main.js'))
-    assertNodeCheck(path.join(projectRootPath, 'frontend', 'src', 'mock-data.js'))
-    assertNodeCheck(path.join(projectRootPath, 'backend', 'src', 'index.js'))
-    assertNodeCheck(path.join(projectRootPath, 'shared', 'contracts', 'domain.js'))
-
-    JSON.parse(fs.readFileSync(path.join(projectRootPath, 'database', 'seed.json'), 'utf8'))
-    JSON.parse(fs.readFileSync(path.join(projectRootPath, 'validation', 'report.json'), 'utf8'))
-
-    runBlockedCases(universalPlan)
+    const totalCreated = results.reduce(
+      (sum, entry) => sum + (Number.isInteger(entry.createdCount) ? entry.createdCount : 0),
+      0,
+    )
 
     console.log(
-      `OK. Generated domain sandbox materialization smoke completado. Archivos creados: ${materializationReport.created.length}.`,
+      `OK. Generated domain sandbox materialization smoke completado. Dominios validados: ${scenarios.length}. Archivos creados: ${totalCreated}.`,
     )
   } finally {
     ensureRemoved(smokeSandboxPath)

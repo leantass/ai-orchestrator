@@ -2742,6 +2742,12 @@ function summarizeGeneratedDomainRuntimeShadowReadinessDecisionForDebug(decision
   )
 }
 
+function summarizeGeneratedDomainMvpReadinessExecutiveReportForDebug(report) {
+  return generatedDomainMaterializationPolicies.summarizeGeneratedDomainMvpReadinessExecutiveReportForDebug(
+    report,
+  )
+}
+
 function summarizeGeneratedDomainUniversalMaterializationPlanForDebug(plan) {
   if (!plan || typeof plan !== 'object') {
     return {
@@ -44085,6 +44091,34 @@ function buildGeneratedDomainRuntimeShadowReadinessDecision({
   )
 }
 
+function buildGeneratedDomainMvpReadinessExecutiveReport({
+  generatedDomainContractDiagnostics,
+  generatedDomainUniversalMaterializationPlanPreview,
+  generatedDomainUniversalMaterializationPlan,
+  generatedDomainFileCreationApprovalPolicy,
+  generatedDomainMaterializationApprovalPayload,
+  generatedDomainFileCreationApprovalEvaluation,
+  generatedDomainRuntimeShadowReadinessDecision,
+  generatedDomainStructuralCapabilities,
+  legacyDomainHardcodingDebtReport,
+  localDeterministicExecutorLegacyDebtReport,
+}) {
+  return generatedDomainMaterializationPolicies.buildGeneratedDomainMvpReadinessExecutiveReport(
+    {
+      generatedDomainContractDiagnostics,
+      generatedDomainUniversalMaterializationPlanPreview,
+      generatedDomainUniversalMaterializationPlan,
+      generatedDomainFileCreationApprovalPolicy,
+      generatedDomainMaterializationApprovalPayload,
+      generatedDomainFileCreationApprovalEvaluation,
+      generatedDomainRuntimeShadowReadinessDecision,
+      generatedDomainStructuralCapabilities,
+      legacyDomainHardcodingDebtReport,
+      localDeterministicExecutorLegacyDebtReport,
+    },
+  )
+}
+
 function buildGeneratedDomainUniversalMaterializationPlan({
   generatedDomainContract,
   generatedDomainUniversalMaterializationPlanPreview,
@@ -45719,6 +45753,19 @@ function buildBrainDecisionContract({
       generatedDomainShadowMaterializationEndToEndReadiness,
       generatedDomainMaterializationApprovalPayload,
     })
+  const generatedDomainMvpReadinessExecutiveReport =
+    buildGeneratedDomainMvpReadinessExecutiveReport({
+      generatedDomainContractDiagnostics,
+      generatedDomainUniversalMaterializationPlanPreview,
+      generatedDomainUniversalMaterializationPlan,
+      generatedDomainFileCreationApprovalPolicy,
+      generatedDomainMaterializationApprovalPayload,
+      generatedDomainFileCreationApprovalEvaluation,
+      generatedDomainRuntimeShadowReadinessDecision,
+      generatedDomainStructuralCapabilities,
+      legacyDomainHardcodingDebtReport,
+      localDeterministicExecutorLegacyDebtReport,
+    })
 
   return {
     decisionKey: decisionKey || strategy || 'brain-decision',
@@ -45875,6 +45922,7 @@ function buildBrainDecisionContract({
     generatedDomainMaterializationApprovalPayload,
     generatedDomainFileCreationApprovalEvaluation,
     generatedDomainRuntimeShadowReadinessDecision,
+    generatedDomainMvpReadinessExecutiveReport,
     domainConsistencyDiagnostics,
     ...(fullstackLocalInspectionSourceDiagnostics &&
     typeof fullstackLocalInspectionSourceDiagnostics === 'object'
@@ -59515,6 +59563,18 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
   }
 
   if (
+    brainDecision.generatedDomainMvpReadinessExecutiveReport &&
+    typeof brainDecision.generatedDomainMvpReadinessExecutiveReport === 'object'
+  ) {
+    debugMainLog(
+      'generated-domain-mvp:readiness-report',
+      summarizeGeneratedDomainMvpReadinessExecutiveReportForDebug(
+        brainDecision.generatedDomainMvpReadinessExecutiveReport,
+      ),
+    )
+  }
+
+  if (
     brainDecision.generatedDomainUniversalMaterializationPlanPreview &&
     typeof brainDecision.generatedDomainUniversalMaterializationPlanPreview === 'object'
   ) {
@@ -59823,6 +59883,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
         brainDecision.generatedDomainFileCreationApprovalEvaluation,
       generatedDomainRuntimeShadowReadinessDecision:
         brainDecision.generatedDomainRuntimeShadowReadinessDecision,
+      generatedDomainMvpReadinessExecutiveReport:
+        brainDecision.generatedDomainMvpReadinessExecutiveReport,
       fullstackLocalInspectionSourceDiagnostics:
         brainDecision.fullstackLocalInspectionSourceDiagnostics,
       generatedDomainContractObservation:
@@ -59952,6 +60014,8 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
       brainDecision.generatedDomainFileCreationApprovalEvaluation,
     generatedDomainRuntimeShadowReadinessDecision:
       brainDecision.generatedDomainRuntimeShadowReadinessDecision,
+    generatedDomainMvpReadinessExecutiveReport:
+      brainDecision.generatedDomainMvpReadinessExecutiveReport,
     fullstackLocalInspectionSourceDiagnostics:
       brainDecision.fullstackLocalInspectionSourceDiagnostics,
     generatedDomainContractObservation:

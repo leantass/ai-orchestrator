@@ -89,6 +89,7 @@ module.exports = {
   evaluateGeneratedDomainFileCreationApproval,
   materializeGeneratedDomainSandboxPlan,
   buildGeneratedDomainRuntimeShadowReadinessDecision,
+  buildGeneratedDomainMvpReadinessExecutiveReport,
   buildLegacyDomainResolutionDiagnostics,
   buildLegacyCapabilityAlignmentDiagnostics,
   buildLegacyMigrationCandidateReport,
@@ -131,6 +132,7 @@ module.exports = {
   summarizeGeneratedDomainFileCreationApprovalEvaluationForDebug,
   summarizeGeneratedDomainSandboxMaterializationReportForDebug,
   summarizeGeneratedDomainRuntimeShadowReadinessDecisionForDebug,
+  summarizeGeneratedDomainMvpReadinessExecutiveReportForDebug,
   summarizeDomainConsistencyDiagnosticsForDebug,
   summarizeLegacyCapabilityAlignmentDiagnosticsForDebug,
   summarizeLegacyMigrationCandidateReportForDebug,
@@ -4665,6 +4667,125 @@ function runGeneratedDomainRuntimeShadowReadinessDecisionBlockedCase() {
   assert.equal(readinessDecision?.behaviorChanged, false)
 }
 
+function runGeneratedDomainMvpReadinessExecutiveReportRequiresApprovalCase() {
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision()
+  const report = decision.generatedDomainMvpReadinessExecutiveReport
+  const debugSummary =
+    observationHarness.summarizeGeneratedDomainMvpReadinessExecutiveReportForDebug(report)
+
+  assert.equal(report?.present, true)
+  assert.equal(report?.status, 'requires-Lean-approval')
+  assert.equal(report?.mvpFlow?.contractReady, true)
+  assert.equal(report?.mvpFlow?.previewReady, true)
+  assert.equal(report?.mvpFlow?.planReady, true)
+  assert.equal(report?.mvpFlow?.approvalPayloadReady, true)
+  assert.equal(report?.mvpFlow?.approvalGateReady, true)
+  assert.equal(report?.mvpFlow?.sandboxReady, true)
+  assert.equal(report?.mvpFlow?.validationReady, true)
+  assert.equal(report?.mvpFlow?.reportReady, true)
+  assert.equal(report?.runtime?.runtimeEnabled, false)
+  assert.equal(report?.runtime?.controlledRuntimeEnable, false)
+  assert.equal(report?.runtime?.materializationPlanChanged, false)
+  assert.equal(report?.runtime?.executionScopeChanged, false)
+  assert.equal(Array.isArray(report?.approvals?.pendingItems), true)
+  assert.equal(report?.approvals?.pendingItems.length > 0, true)
+  assert.equal(report?.behaviorChanged, false)
+  assert.equal(debugSummary?.status, 'requires-Lean-approval')
+}
+
+function runGeneratedDomainMvpReadinessExecutiveReportBlockedCase() {
+  const report = observationHarness.buildGeneratedDomainMvpReadinessExecutiveReport({
+    generatedDomainContractDiagnostics: {
+      present: true,
+      valid: false,
+      safeForLocalMaterialization: false,
+    },
+    generatedDomainUniversalMaterializationPlanPreview: {
+      present: true,
+      built: false,
+      safety: {
+        safeForLocalMaterialization: false,
+      },
+    },
+    generatedDomainUniversalMaterializationPlan: {
+      present: true,
+      built: false,
+      canMaterializeInSandbox: false,
+      safety: {
+        safeForLocalMaterialization: false,
+      },
+      validationPlan: {
+        syntaxChecks: [],
+      },
+      fileChecks: [],
+      report: {
+        reportFile: null,
+      },
+    },
+    generatedDomainFileCreationApprovalPolicy: {
+      present: true,
+      evaluated: true,
+      approvalRequired: true,
+      approved: false,
+      requiresLeanApproval: true,
+      safeguards: {
+        noCommands: false,
+        noWritesExecuted: false,
+      },
+    },
+    generatedDomainMaterializationApprovalPayload: {
+      present: true,
+      evaluated: true,
+      status: 'blocked',
+    },
+    generatedDomainFileCreationApprovalEvaluation: {
+      present: true,
+      evaluated: true,
+      status: 'blocked',
+    },
+    generatedDomainRuntimeShadowReadinessDecision: {
+      present: true,
+      evaluated: true,
+      status: 'blocked',
+      runtimeEnabled: false,
+      controlledRuntimeEnable: false,
+      evidence: {
+        sourceReal: 'generated-domain-shadow',
+      },
+      safeguards: {
+        materializationPlanChanged: true,
+        executionScopeChanged: true,
+      },
+      readiness: {
+        runtimeNormalStillOff: false,
+      },
+    },
+    generatedDomainStructuralCapabilities: {
+      present: true,
+      evaluated: true,
+      hasSafeLocalMaterialization: false,
+    },
+    legacyDomainHardcodingDebtReport: {
+      present: true,
+      evaluated: true,
+      runtimeCriticalCount: 2,
+    },
+    localDeterministicExecutorLegacyDebtReport: {
+      present: true,
+      evaluated: true,
+      runtimeCriticalCount: 1,
+    },
+  })
+
+  assert.equal(report?.present, true)
+  assert.equal(report?.status, 'blocked')
+  assert.equal(report?.runtime?.runtimeNormalStillOff, false)
+  assert.equal(report?.errorsCount > 0, true)
+  assert.equal(Array.isArray(report?.blockers), true)
+  assert.equal(report?.blockers.length > 0, true)
+  assert.equal(report?.behaviorChanged, false)
+}
+
 function runGeneratedDomainUniversalMaterializationPlanPreviewBuiltCase() {
   const decision = createGeneratedDomainAlignedApprovalObservationDecision()
   const preview = decision.generatedDomainUniversalMaterializationPlanPreview
@@ -6111,6 +6232,8 @@ runGeneratedDomainMaterializationApprovalPayloadBlockedCase()
 runGeneratedDomainRuntimeShadowReadinessDecisionRequiresApprovalCase()
 runGeneratedDomainRuntimeShadowReadinessDecisionHarnessOnlyCase()
 runGeneratedDomainRuntimeShadowReadinessDecisionBlockedCase()
+runGeneratedDomainMvpReadinessExecutiveReportRequiresApprovalCase()
+runGeneratedDomainMvpReadinessExecutiveReportBlockedCase()
 runGeneratedDomainUniversalMaterializationPlanPreviewBuiltCase()
 runGeneratedDomainUniversalMaterializationPlanPreviewBlockedCase()
 runGeneratedDomainUniversalMaterializationPlanPreviewComparisonAlignedCase()

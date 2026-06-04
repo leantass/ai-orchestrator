@@ -396,6 +396,54 @@ function summarizeGeneratedDomainRuntimeShadowReadinessDecisionForDebug(decision
   }
 }
 
+function summarizeGeneratedDomainMvpReadinessExecutiveReportForDebug(report) {
+  if (!report || typeof report !== 'object') {
+    return {
+      present: false,
+      evaluated: false,
+      status: 'not-ready',
+    }
+  }
+
+  const warningSummary = summarizeDebugEntries(report.warnings)
+  const errorSummary = summarizeDebugEntries(report.errors)
+
+  return {
+    present: report.present === true,
+    evaluated: report.evaluated === true,
+    status:
+      typeof report.status === 'string' && report.status.trim()
+        ? report.status.trim()
+        : 'not-ready',
+    behaviorChanged: report.behaviorChanged === true,
+    contractReady: report.mvpFlow?.contractReady === true,
+    previewReady: report.mvpFlow?.previewReady === true,
+    planReady: report.mvpFlow?.planReady === true,
+    approvalPayloadReady: report.mvpFlow?.approvalPayloadReady === true,
+    approvalGateReady: report.mvpFlow?.approvalGateReady === true,
+    sandboxReady: report.mvpFlow?.sandboxReady === true,
+    validationReady: report.mvpFlow?.validationReady === true,
+    reportReady: report.mvpFlow?.reportReady === true,
+    runtimeEnabled: report.runtime?.runtimeEnabled === true,
+    controlledRuntimeEnable: report.runtime?.controlledRuntimeEnable === true,
+    sourceReal:
+      typeof report.runtime?.sourceReal === 'string' && report.runtime.sourceReal.trim()
+        ? report.runtime.sourceReal.trim()
+        : 'none',
+    approvalRequired: report.approvals?.approvalRequired !== false,
+    approved: report.approvals?.approved === true,
+    pendingApprovalsCount: Array.isArray(report.approvals?.pendingItems)
+      ? report.approvals.pendingItems.length
+      : 0,
+    blockersCount: Array.isArray(report.blockers) ? report.blockers.length : 0,
+    risksCount: Array.isArray(report.risks) ? report.risks.length : 0,
+    warningsCount: Array.isArray(report.warnings) ? report.warnings.length : 0,
+    errorsCount: Array.isArray(report.errors) ? report.errors.length : 0,
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+  }
+}
+
 function summarizeGeneratedDomainMaterializationInspectionSourceResolutionForDebug(
   resolution,
 ) {
@@ -2186,6 +2234,336 @@ function buildGeneratedDomainRuntimeShadowReadinessDecision({
   }
 }
 
+function buildGeneratedDomainMvpReadinessExecutiveReport({
+  generatedDomainContractDiagnostics,
+  generatedDomainUniversalMaterializationPlanPreview,
+  generatedDomainUniversalMaterializationPlan,
+  generatedDomainFileCreationApprovalPolicy,
+  generatedDomainMaterializationApprovalPayload,
+  generatedDomainFileCreationApprovalEvaluation,
+  generatedDomainRuntimeShadowReadinessDecision,
+  generatedDomainStructuralCapabilities,
+  legacyDomainHardcodingDebtReport,
+  localDeterministicExecutorLegacyDebtReport,
+}) {
+  const emptyReport = {
+    present: false,
+    evaluated: false,
+    status: 'not-ready',
+    source: 'generated-domain-mvp-readiness-executive-report',
+    behaviorChanged: false,
+    mvpFlow: {
+      contractReady: false,
+      previewReady: false,
+      planReady: false,
+      approvalPayloadReady: false,
+      approvalGateReady: false,
+      sandboxReady: false,
+      validationReady: false,
+      reportReady: false,
+    },
+    runtime: {
+      runtimeEnabled: false,
+      controlledRuntimeEnable: false,
+      sourceReal: 'none',
+      materializationPlanChanged: false,
+      executionScopeChanged: false,
+      runtimeNormalStillOff: true,
+    },
+    approvals: {
+      approvalRequired: true,
+      approved: false,
+      requiresLeanApproval: true,
+      approvalPolicyStatus: null,
+      approvalPayloadStatus: null,
+      approvalEvaluationStatus: null,
+      pendingItems: [],
+    },
+    risks: [],
+    blockers: [],
+    recommendedNextActions: [],
+    warnings: [],
+    errors: [],
+    warningsCount: 0,
+    errorsCount: 0,
+  }
+
+  const contractDiagnostics =
+    generatedDomainContractDiagnostics &&
+    typeof generatedDomainContractDiagnostics === 'object'
+      ? generatedDomainContractDiagnostics
+      : null
+  const preview =
+    generatedDomainUniversalMaterializationPlanPreview &&
+    typeof generatedDomainUniversalMaterializationPlanPreview === 'object'
+      ? generatedDomainUniversalMaterializationPlanPreview
+      : null
+  const universalPlan =
+    generatedDomainUniversalMaterializationPlan &&
+    typeof generatedDomainUniversalMaterializationPlan === 'object'
+      ? generatedDomainUniversalMaterializationPlan
+      : null
+  const approvalPolicy =
+    generatedDomainFileCreationApprovalPolicy &&
+    typeof generatedDomainFileCreationApprovalPolicy === 'object'
+      ? generatedDomainFileCreationApprovalPolicy
+      : null
+  const approvalPayload =
+    generatedDomainMaterializationApprovalPayload &&
+    typeof generatedDomainMaterializationApprovalPayload === 'object'
+      ? generatedDomainMaterializationApprovalPayload
+      : null
+  const approvalEvaluation =
+    generatedDomainFileCreationApprovalEvaluation &&
+    typeof generatedDomainFileCreationApprovalEvaluation === 'object'
+      ? generatedDomainFileCreationApprovalEvaluation
+      : null
+  const runtimeReadiness =
+    generatedDomainRuntimeShadowReadinessDecision &&
+    typeof generatedDomainRuntimeShadowReadinessDecision === 'object'
+      ? generatedDomainRuntimeShadowReadinessDecision
+      : null
+  const structuralCapabilities =
+    generatedDomainStructuralCapabilities &&
+    typeof generatedDomainStructuralCapabilities === 'object'
+      ? generatedDomainStructuralCapabilities
+      : null
+  const legacyDebtReport =
+    legacyDomainHardcodingDebtReport && typeof legacyDomainHardcodingDebtReport === 'object'
+      ? legacyDomainHardcodingDebtReport
+      : null
+  const executorDebtReport =
+    localDeterministicExecutorLegacyDebtReport &&
+    typeof localDeterministicExecutorLegacyDebtReport === 'object'
+      ? localDeterministicExecutorLegacyDebtReport
+      : null
+
+  if (
+    !contractDiagnostics &&
+    !preview &&
+    !universalPlan &&
+    !approvalPolicy &&
+    !approvalPayload &&
+    !approvalEvaluation &&
+    !runtimeReadiness &&
+    !structuralCapabilities &&
+    !legacyDebtReport &&
+    !executorDebtReport
+  ) {
+    return emptyReport
+  }
+
+  try {
+    const warnings = []
+    const errors = []
+    const risks = []
+    const blockers = []
+    const pendingItems = []
+    const recommendedNextActions = []
+
+    const contractReady =
+      contractDiagnostics?.valid === true &&
+      contractDiagnostics?.safeForLocalMaterialization === true
+    const previewReady =
+      preview?.built === true &&
+      preview?.safety?.safeForLocalMaterialization === true &&
+      preview?.approvalRequired === true
+    const planReady =
+      universalPlan?.built === true &&
+      universalPlan?.canMaterializeInSandbox === true &&
+      universalPlan?.safety?.safeForLocalMaterialization === true
+    const approvalPayloadReady =
+      approvalPayload?.status === 'ready-for-review' || approvalPayload?.status === 'blocked'
+    const approvalGateReady =
+      approvalPolicy?.present === true &&
+      approvalPolicy?.evaluated === true &&
+      approvalPolicy?.approvalRequired === true &&
+      approvalPolicy?.safeguards?.noCommands === true &&
+      approvalPolicy?.safeguards?.noWritesExecuted === true
+    const sandboxReady =
+      universalPlan?.canMaterializeInSandbox === true &&
+      universalPlan?.safety?.sandboxOnly === true &&
+      approvalEvaluation?.status !== 'error'
+    const validationReady =
+      Array.isArray(universalPlan?.fileChecks) &&
+      universalPlan.fileChecks.length > 0 &&
+      Array.isArray(universalPlan?.validationPlan?.syntaxChecks)
+    const reportReady =
+      normalizeOptionalString(universalPlan?.report?.reportFile).length > 0
+
+    const runtimeEnabled = runtimeReadiness?.runtimeEnabled === true
+    const controlledRuntimeEnable = runtimeReadiness?.controlledRuntimeEnable === true
+    const sourceReal =
+      normalizeOptionalString(runtimeReadiness?.evidence?.sourceReal) ||
+      normalizeOptionalString(runtimeReadiness?.runtime?.sourceReal) ||
+      'none'
+    const materializationPlanChanged =
+      runtimeReadiness?.safeguards?.materializationPlanChanged === true
+    const executionScopeChanged =
+      runtimeReadiness?.safeguards?.executionScopeChanged === true
+    const runtimeNormalStillOff =
+      runtimeReadiness?.readiness?.runtimeNormalStillOff !== false &&
+      runtimeEnabled !== true &&
+      controlledRuntimeEnable !== true &&
+      sourceReal !== 'generated-domain-shadow' &&
+      materializationPlanChanged !== true &&
+      executionScopeChanged !== true
+
+    if (!contractReady) {
+      pushUniqueMessage(blockers, 'El GeneratedDomainContract todavia no esta validado como base segura del MVP.')
+      pushUniqueMessage(warnings, 'El contrato generado aun no alcanza una condicion segura para cerrar el MVP completo.')
+    }
+    if (!previewReady) {
+      pushUniqueMessage(blockers, 'El universal preview todavia no esta listo como evidencia estructural completa.')
+    }
+    if (!planReady) {
+      pushUniqueMessage(blockers, 'El universal materialization plan todavia no quedo listo como candidate seguro de sandbox.')
+    }
+    if (!approvalGateReady) {
+      pushUniqueMessage(blockers, 'La policy de aprobacion de archivos todavia no esta lista como gate formal del MVP.')
+    }
+    if (!approvalPayloadReady) {
+      pushUniqueMessage(blockers, 'El payload de aprobacion todavia no es lo bastante concreto para review manual futura.')
+    }
+    if (!validationReady) {
+      pushUniqueMessage(blockers, 'El plan universal todavia no expone una superficie de validacion suficientemente completa.')
+    }
+    if (!reportReady) {
+      pushUniqueMessage(blockers, 'El plan universal todavia no deja listo un report file consistente para el MVP.')
+    }
+    if (!runtimeNormalStillOff) {
+      pushUniqueMessage(errors, 'El readiness ejecutivo detecto un runtime normal alterado o una fuente shadow real, lo cual esta prohibido.')
+    }
+
+    if (approvalPolicy?.approvalRequired !== false && approvalPolicy?.approved !== true) {
+      pushUniqueMessage(
+        pendingItems,
+        'Aprobacion explicita de Lean para cualquier write real fuera de sandbox/harness.',
+      )
+    }
+    if (runtimeReadiness?.status === 'requires-Lean-approval') {
+      pushUniqueMessage(
+        pendingItems,
+        'Approval explicita de Lean antes de cualquier runtime review controlado.',
+      )
+    }
+
+    if ((legacyDebtReport?.runtimeCriticalCount || 0) > 0) {
+      pushUniqueMessage(
+        risks,
+        'main.cjs todavia conserva ramas runtime-critical legacy que obligan a mantener fallback y observabilidad fuerte.',
+      )
+    }
+    if ((executorDebtReport?.runtimeCriticalCount || 0) > 0) {
+      pushUniqueMessage(
+        risks,
+        'local-deterministic-executor.cjs sigue acoplado a ramas legacy por dominio/familia.',
+      )
+    }
+    if (structuralCapabilities?.hasSafeLocalMaterialization !== true) {
+      pushUniqueMessage(
+        risks,
+        'Las capacidades estructurales todavia no demuestran completamente una materializacion local segura en todos los casos.',
+      )
+    }
+
+    if (runtimeReadiness?.status === 'ready-for-harness') {
+      pushUniqueMessage(
+        recommendedNextActions,
+        'Seguir validando el MVP solo en harness/sandbox y ampliar fixtures domain-agnostic antes de cualquier paso real.',
+      )
+    }
+    if (approvalPolicy?.approved !== true) {
+      pushUniqueMessage(
+        recommendedNextActions,
+        'Mantener approvalRequired=true y approved=false fuera del sandbox controlado.',
+      )
+    }
+    pushUniqueMessage(
+      recommendedNextActions,
+      'Seguir desacoplando main.cjs y mantener local-deterministic-executor.cjs como deuda observada hasta tener mas cobertura.',
+    )
+
+    const report = {
+      ...emptyReport,
+      present: true,
+      evaluated:
+        contractDiagnostics?.present === true ||
+        preview?.present === true ||
+        universalPlan?.present === true ||
+        approvalPolicy?.evaluated === true ||
+        approvalPayload?.evaluated === true ||
+        approvalEvaluation?.evaluated === true ||
+        runtimeReadiness?.evaluated === true,
+      mvpFlow: {
+        contractReady,
+        previewReady,
+        planReady,
+        approvalPayloadReady,
+        approvalGateReady,
+        sandboxReady,
+        validationReady,
+        reportReady,
+      },
+      runtime: {
+        runtimeEnabled,
+        controlledRuntimeEnable,
+        sourceReal,
+        materializationPlanChanged,
+        executionScopeChanged,
+        runtimeNormalStillOff,
+      },
+      approvals: {
+        approvalRequired: approvalPolicy?.approvalRequired !== false,
+        approved: approvalPolicy?.approved === true,
+        requiresLeanApproval: approvalPolicy?.requiresLeanApproval !== false,
+        approvalPolicyStatus: normalizeOptionalString(approvalPolicy?.status) || null,
+        approvalPayloadStatus: normalizeOptionalString(approvalPayload?.status) || null,
+        approvalEvaluationStatus: normalizeOptionalString(approvalEvaluation?.status) || null,
+        pendingItems,
+      },
+      risks,
+      blockers,
+      recommendedNextActions,
+      warnings,
+      errors,
+    }
+
+    if (!runtimeNormalStillOff) {
+      report.status = 'blocked'
+    } else if (
+      contractReady &&
+      previewReady &&
+      planReady &&
+      approvalPayloadReady &&
+      approvalGateReady &&
+      sandboxReady &&
+      validationReady &&
+      reportReady
+    ) {
+      report.status = pendingItems.length > 0 ? 'requires-Lean-approval' : 'ready'
+    } else {
+      report.status = 'not-ready'
+    }
+
+    report.warningsCount = report.warnings.length
+    report.errorsCount = report.errors.length
+    return report
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : normalizeOptionalString(String(error)) || 'error'
+
+    return {
+      ...emptyReport,
+      present: true,
+      evaluated: true,
+      status: 'error',
+      errors: [errorMessage.length <= 180 ? errorMessage : `${errorMessage.slice(0, 177)}...`],
+      errorsCount: 1,
+    }
+  }
+}
+
 module.exports = {
   summarizeGeneratedDomainMaterializationSourceResolutionForDebug,
   summarizeGeneratedDomainControlledEnablePolicyForDebug,
@@ -2193,10 +2571,12 @@ module.exports = {
   summarizeGeneratedDomainFileCreationApprovalPolicyForDebug,
   summarizeGeneratedDomainMaterializationApprovalPayloadForDebug,
   summarizeGeneratedDomainRuntimeShadowReadinessDecisionForDebug,
+  summarizeGeneratedDomainMvpReadinessExecutiveReportForDebug,
   summarizeGeneratedDomainMaterializationInspectionSourceResolutionForDebug,
   resolveGeneratedDomainMaterializationSource,
   buildGeneratedDomainControlledEnablePolicy,
   buildGeneratedDomainFirstControlledEnableScenario,
   buildGeneratedDomainMaterializationApprovalPayload,
   buildGeneratedDomainRuntimeShadowReadinessDecision,
+  buildGeneratedDomainMvpReadinessExecutiveReport,
 }
