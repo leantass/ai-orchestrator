@@ -63,6 +63,7 @@ const sections = [
       ['node', ['--check', 'scripts/ai-planner-smoke.mjs']],
       ['node', ['--check', 'scripts/ai-operator-e2e-smoke.mjs']],
       ['node', ['--check', 'scripts/ai-release-smoke.mjs']],
+      ['node', ['--check', 'scripts/generated-domain-electron-ui-e2e-smoke.mjs']],
       ['node', ['--check', 'scripts/wait-for-vite-dev.mjs']],
       ['node', ['--check', 'scripts/ai-quality.mjs']],
     ],
@@ -91,6 +92,11 @@ const sections = [
     id: 'operator-e2e-smoke',
     label: 'Operator E2E smoke',
     commands: [['node', ['scripts/ai-operator-e2e-smoke.mjs']]],
+  },
+  {
+    id: 'generated-domain-electron-ui-e2e-smoke',
+    label: 'Generated domain Electron UI E2E smoke',
+    commands: [['node', ['scripts/generated-domain-electron-ui-e2e-smoke.mjs']]],
   },
   {
     id: 'build',

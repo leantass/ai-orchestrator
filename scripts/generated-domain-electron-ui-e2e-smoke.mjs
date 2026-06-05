@@ -1,0 +1,273 @@
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
+import vm from 'node:vm'
+import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
+
+import {
+  buildPlannerApprovalSurfaceViewModel,
+  derivePlannerMaterializationUiState,
+  inspectPreparedFullstackLocalMaterialization,
+  isPreparedFullstackLocalMaterializationResponse,
+} from '../src/planner-ui-state.js'
+
+const require = createRequire(import.meta.url)
+const currentFilePath = fileURLToPath(import.meta.url)
+const repoRoot = path.resolve(path.dirname(currentFilePath), '..')
+const mainFilePath = path.join(repoRoot, 'electron', 'main.cjs')
+const mainSource = fs.readFileSync(mainFilePath, 'utf8')
+const {
+  normalizeGeneratedDomainContract,
+  validateGeneratedDomainContract,
+  deriveAllowedTargetPathsFromContract,
+  deriveRequiredPathGroupsFromContract,
+  deriveForbiddenSearchPatternsFromContract,
+  isContractSafeForLocalMaterialization,
+  buildGeneratedDomainContractDiagnostics,
+  buildGeneratedDomainCapabilityProfile,
+  buildGeneratedDomainMaterializationShadowPlan,
+  buildGeneratedDomainContractComparison,
+  extractGeneratedDomainContractCandidate,
+} = require(path.join(repoRoot, 'electron', 'generated-domain-contract.cjs'))
+const {
+  LOCAL_MATERIALIZATION_PLAN_VERSION,
+} = require(path.join(repoRoot, 'electron', 'local-deterministic-executor.cjs'))
+const {
+  FULLSTACK_LOCAL_BASE_PHASES,
+  getFullstackLocalBasePhaseDefinition,
+  buildFullstackLocalManifestPhaseBlueprints,
+} = require(path.join(repoRoot, 'electron', 'fullstack-phase-contracts.cjs'))
+const {
+  classifyWorkspaceProjectIntent,
+  selectBestWorkspaceProjectCandidate,
+  shouldIgnoreWorkspaceDirectoryEntry,
+} = require(path.join(repoRoot, 'electron', 'workspace-project-detection.cjs'))
+const generatedDomainOrchestrationDiagnostics = require(
+  path.join(repoRoot, 'electron', 'generated-domain-orchestration-diagnostics.cjs'),
+)
+const generatedDomainLegacyDiagnostics = require(
+  path.join(repoRoot, 'electron', 'generated-domain-legacy-diagnostics.cjs'),
+)
+const generatedDomainMaterializationPolicies = require(
+  path.join(repoRoot, 'electron', 'generated-domain-materialization-policies.cjs'),
+)
+const generatedDomainInspectionDiagnostics = require(
+  path.join(repoRoot, 'electron', 'generated-domain-inspection-diagnostics.cjs'),
+)
+const generatedDomainMaterializationPlanDiagnostics = require(
+  path.join(repoRoot, 'electron', 'generated-domain-materialization-plan-diagnostics.cjs'),
+)
+
+function extractSegment({ startMarker, endMarker }) {
+  const start = mainSource.indexOf(startMarker)
+  if (start === -1) {
+    throw new Error(`No se encontro el anchor inicial ${JSON.stringify(startMarker)}.`)
+  }
+
+  const end = mainSource.indexOf(endMarker, start)
+  if (end === -1) {
+    throw new Error(`No se encontro el anchor final ${JSON.stringify(endMarker)}.`)
+  }
+
+  return mainSource.slice(start, end)
+}
+
+function loadUiHarness() {
+  const plannerSurface = extractSegment({
+    startMarker: 'function summarizeGeneratedDomainContractDiagnosticsForDebug(diagnostics) {',
+    endMarker: 'function createLocalRulesStrategicBrainProvider() {',
+  })
+  const harness = `
+${plannerSurface}
+module.exports = {
+  buildLocalStrategicBrainDecision,
+  materializeGeneratedDomainSandboxPlan,
+};
+`
+
+  const sandbox = {
+    module: { exports: {} },
+    exports: {},
+    require,
+    __dirname: path.join(repoRoot, 'electron'),
+    console,
+    process,
+    Buffer,
+    fs,
+    path,
+    LOCAL_MATERIALIZATION_PLAN_VERSION,
+    FULLSTACK_LOCAL_BASE_PHASES,
+    getFullstackLocalBasePhaseDefinition,
+    buildFullstackLocalManifestPhaseBlueprints,
+    classifyWorkspaceProjectIntent,
+    selectBestWorkspaceProjectCandidate,
+    shouldIgnoreWorkspaceDirectoryEntry,
+    normalizeGeneratedDomainContract,
+    validateGeneratedDomainContract,
+    deriveAllowedTargetPathsFromContract,
+    deriveRequiredPathGroupsFromContract,
+    deriveForbiddenSearchPatternsFromContract,
+    isContractSafeForLocalMaterialization,
+    buildGeneratedDomainContractDiagnostics,
+    buildGeneratedDomainCapabilityProfile,
+    buildGeneratedDomainMaterializationShadowPlan,
+    buildGeneratedDomainContractComparison,
+    extractGeneratedDomainContractCandidate,
+    generatedDomainOrchestrationDiagnostics,
+    generatedDomainLegacyDiagnostics,
+    generatedDomainMaterializationPolicies,
+    generatedDomainInspectionDiagnostics,
+    generatedDomainMaterializationPlanDiagnostics,
+    AbortController,
+    fetch: globalThis.fetch,
+    setTimeout,
+    clearTimeout,
+    setInterval,
+    clearInterval,
+  }
+
+  vm.createContext(sandbox)
+  vm.runInContext(harness, sandbox, {
+    filename: 'generated-domain-electron-ui-e2e-smoke-harness.cjs',
+  })
+
+  return sandbox.module.exports || {}
+}
+
+function ensureRemoved(targetPath) {
+  fs.rmSync(targetPath, { recursive: true, force: true })
+}
+
+const uiHarness = loadUiHarness()
+const goal = `Quiero crear una app local para gestionar un banco comunitario de herramientas barriales.
+
+La idea es que vecinos puedan consultar herramientas disponibles, solicitar prestamos, reservar herramientas, registrar devoluciones, ver el estado de cada herramienta y que un operador pueda aprobar prestamos, marcar herramientas como devueltas o danadas, cargar nuevas herramientas y ver reportes simples.
+
+Tiene que tener frontend publico, panel operativo, panel administrativo, backend local mock y diseno de base de datos local.
+
+No quiero pagos reales, no quiero credenciales reales, no quiero deploy, no quiero Docker, no quiero servicios externos y no quiero tocar web-prueba.
+
+Primero quiero una planificacion segura, approval surface y una materializacion solo en sandbox si todo esta aprobado por el flujo seguro.`
+const context = `Es una prueba real controlada para validar que JEFE puede resolver un dominio nuevo sin depender de templates hardcodeados ni arrastrar metadata vieja de otros proyectos.
+
+El sistema debe funcionar como fullstack local seguro, orientado a un MVP inicial. Los usuarios principales son vecinos, operadores del banco de herramientas y administradores.
+
+La app debe contemplar herramientas, categorias, disponibilidad, estado de conservacion, solicitudes de prestamo, reservas, devoluciones, danos, vecinos, operadores, panel administrativo, panel operativo y reportes simples.
+
+La prueba debe validar el flujo completo:
+pedido -> contrato universal -> plan -> approval surface -> aprobacion humana -> materializacion sandbox -> validacion -> reporte.
+
+No debe crear archivos reales fuera del sandbox seguro. No debe tocar web-prueba. No debe crear .env, node_modules, Docker, deploy ni usar servicios externos.`
+const previousExecutionResult =
+  '__orchestrator_feedback__:' +
+  JSON.stringify({
+    type: 'approval-granted',
+    source: 'planner',
+    approvalMode: 'once',
+    approvalDecision: 'approved',
+    approvalRequestDecisionKey: 'approve-sandbox-materialization-v1',
+    responseMode: 'options',
+    selectedOption: 'approve',
+  })
+
+const decision = await uiHarness.buildLocalStrategicBrainDecision({
+  goal,
+  context,
+  workspacePath: repoRoot,
+  iteration: 1,
+  previousExecutionResult,
+  requiresApproval: false,
+  userParticipationMode: 'operator-approves-sensitive',
+  projectState: {
+    resolvedDecisions: [
+      {
+        key: 'approve-sandbox-materialization-v1',
+        status: 'approved',
+        source: 'planner',
+        decision: 'approved',
+        label: 'approve',
+        responseMode: 'options',
+        selectedOption: 'approve',
+      },
+    ],
+  },
+})
+
+assert.equal(decision?.strategy, 'materialize-fullstack-local-plan')
+assert.equal(decision?.executionMode, 'executor')
+assert.equal(decision?.nextExpectedAction, 'execute-plan')
+assert.equal(isPreparedFullstackLocalMaterializationResponse(decision), true)
+
+const approvalEvaluation = decision.generatedDomainFileCreationApprovalEvaluation
+const runtimeSource = decision.generatedDomainControlledRuntimeMaterializationSource
+const universalPlan = decision.generatedDomainUniversalMaterializationPlan
+const approvalSurface = decision.generatedDomainMaterializationApprovalSurface
+
+assert.equal(approvalEvaluation?.approved, true)
+assert.equal(approvalEvaluation?.blocked, false)
+assert.equal(approvalEvaluation?.status, 'approved-for-sandbox')
+assert.equal(runtimeSource?.enabled, true)
+assert.equal(runtimeSource?.selectedSource, 'generated-domain-universal')
+assert.equal(universalPlan?.status, 'built')
+assert.equal(universalPlan?.canMaterializeInSandbox, true)
+assert.equal(universalPlan?.safety?.safeForLocalMaterialization, true)
+assert.equal(approvalSurface?.status, 'approved-for-sandbox')
+
+const materializationUiState = derivePlannerMaterializationUiState({
+  plannerExecutionMetadata: decision,
+  effectivePlannerExecutionMetadata: decision,
+})
+const approvalSurfaceViewModel = buildPlannerApprovalSurfaceViewModel({
+  generatedDomainMaterializationApprovalSurface: approvalSurface,
+  plannerExecutionMetadata: decision,
+  effectivePlannerExecutionMetadata: decision,
+})
+const contractInspection = inspectPreparedFullstackLocalMaterialization({
+  metadata: decision,
+  sourcePlan: decision.scalableDeliveryPlan,
+})
+
+assert.equal(materializationUiState.fullstackMaterializationResponseReady, true)
+assert.equal(materializationUiState.fullstackMaterializationContractReady, true)
+assert.equal(materializationUiState.materializeCtaVisible, true)
+assert.equal(materializationUiState.materializeCtaEnabled, true)
+assert.equal(materializationUiState.uiState, 'materialization-ready')
+assert.equal(contractInspection.ok, true)
+assert.equal(approvalSurfaceViewModel.present, true)
+assert.equal(approvalSurfaceViewModel.status, 'approved-for-sandbox')
+assert.equal(approvalSurfaceViewModel.approvalState, 'approved')
+assert.notEqual(approvalSurfaceViewModel.summary.includes('Todavia no se ejecuto ninguna instruccion'), true)
+
+const sandboxControlRoot = path.join(
+  repoRoot,
+  '.codex-temp',
+  'generated-domain-materialization-approved',
+  'community-tool-bank-local',
+)
+ensureRemoved(sandboxControlRoot)
+
+const materializationReport = uiHarness.materializeGeneratedDomainSandboxPlan({
+  generatedDomainUniversalMaterializationPlan: universalPlan,
+  generatedDomainFileCreationApprovalEvaluation: approvalEvaluation,
+})
+
+assert.equal(materializationReport?.materialized, true)
+assert.equal(materializationReport?.status, 'materialized')
+
+const sandboxProjectRoot = path.join(sandboxControlRoot, universalPlan.projectRoot)
+const reportPath = path.join(sandboxProjectRoot, 'validation', 'report.json')
+
+assert.equal(fs.existsSync(reportPath), true)
+assert.equal(fs.existsSync(path.join(sandboxProjectRoot, '.env')), false)
+assert.equal(fs.existsSync(path.join(sandboxProjectRoot, 'node_modules')), false)
+assert.equal(sandboxProjectRoot.replace(/\\/g, '/').includes('/web-prueba/'), false)
+
+const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'))
+assert.equal(report?.status, 'materialized')
+
+console.log(
+  'OK. El flujo UI/E2E alternativo ya no queda en revision: approve-sandbox-materialization-v1 promueve execute-plan, habilita generated-domain-universal y materializa validation/report.json en sandbox controlado.',
+)
+
+ensureRemoved(sandboxControlRoot)

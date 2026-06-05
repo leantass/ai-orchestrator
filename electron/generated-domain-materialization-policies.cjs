@@ -2495,6 +2495,13 @@ function resolveGeneratedDomainControlledRuntimeMaterializationSource({
       runtimeReadiness?.controlledRuntimeEnable !== true &&
       runtimeReadiness?.safeguards?.materializationPlanChanged !== true &&
       runtimeReadiness?.safeguards?.executionScopeChanged !== true
+    const explicitSandboxPromotionReady =
+      approvalGranted &&
+      sandboxRootSafe &&
+      universalPlanReady &&
+      domainConsistent &&
+      runtimeNormalStillOff &&
+      simulateLeanApproval
 
     if (!harnessControlledEnable) {
       if (universalPlanReady) {
@@ -2513,6 +2520,32 @@ function resolveGeneratedDomainControlledRuntimeMaterializationSource({
           approvalEvaluation?.present === true,
         selectedSource: selectedSourceNormal,
         fallbackLegacyAvailable,
+        blockers,
+        warnings,
+        errors,
+        warningsCount: warnings.length,
+        errorsCount: errors.length,
+      }
+    }
+
+    if (explicitSandboxPromotionReady) {
+      if (!candidateComparable || !decouplingReady || !readinessAllowsHarness) {
+        pushUniqueMessage(
+          warnings,
+          'Se habilita la fuente universal solo para harness-control porque ya existe aprobacion sandbox explicita, plan universal seguro y runtime normal apagado.',
+        )
+      }
+
+      return {
+        ...emptyResolution,
+        present: true,
+        evaluated: true,
+        enabled: true,
+        mode: 'harness-controlled',
+        selectedSource: 'generated-domain-universal',
+        fallbackLegacyAvailable,
+        approvalRequired,
+        approved: true,
         blockers,
         warnings,
         errors,

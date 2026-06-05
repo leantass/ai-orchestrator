@@ -12193,6 +12193,10 @@ function extractProductArchitectureDomainLabel(goal, context, productType) {
       .join(' '),
   )
 
+  if (detectCommunityToolBankIntent(normalizedSourceText)) {
+    return 'banco comunitario de herramientas'
+  }
+
   const extractionPatterns = [
     /\b(?:ecommerce|crm|erp|marketplace|saas|sistema|plataforma|app|aplicacion|herramienta|solucion)\s+para\s+(.+?)(?=\s+(?:con|que|preparad[oa]|orientad[oa]|pensad[oa]|sin|no|y\b)|[.,;:]|$)/iu,
     /\bpara\s+(una?|el|la)\s+(.+?)(?=\s+(?:con|que|preparad[oa]|orientad[oa]|pensad[oa]|sin|no|y\b)|[.,;:]|$)/iu,
@@ -17018,6 +17022,13 @@ function buildScalableProjectRootFolderName({
 
   if (
     normalizedDeliveryLevel === 'fullstack-local' &&
+    detectCommunityToolBankIntent(combinedText)
+  ) {
+    return 'community-tool-bank-local'
+  }
+
+  if (
+    normalizedDeliveryLevel === 'fullstack-local' &&
     (/\bturnos?\b/u.test(combinedText) &&
       /\b(?:medic(?:o|a|os|as)?|salud|clinic(?:a|as)?|pacientes?|profesionales?)\b/u.test(
         combinedText,
@@ -20756,6 +20767,12 @@ function detectFullstackLocalDemoArchetype({
   }
 
   if (
+    detectCommunityToolBankIntent(combinedText)
+  ) {
+    return 'operations'
+  }
+
+  if (
     /\bcanchas?\b|\breservas?\b|\bhorarios?\b|\bdisponibilidad\b|\btorneos?\b/u.test(
       combinedText,
     )
@@ -20828,6 +20845,31 @@ function detectFullstackLocalDemoArchetype({
   }
 
   return 'operations'
+}
+
+function detectCommunityToolBankIntent(normalizedText) {
+  if (typeof normalizedText !== 'string' || !normalizedText.trim()) {
+    return false
+  }
+
+  const hasStrongToolSignals =
+    /\bherramientas?\b|\btool(?:s|bank)?\b|\binstrumental\b/u.test(normalizedText)
+  const hasWeakToolSignals = /\butileria\b/u.test(normalizedText)
+  const hasCommunitySignals =
+    /\bcomunitari[oa]s?\b|\bbarriales?\b|\bvecin(?:o|os|a|as)\b/u.test(normalizedText)
+  const hasLoanSignals =
+    /\bprestamos?\b|\bsolicitar\b|\bsolicitudes?\b|\breservas?\b|\bdevoluciones?\b|\bdanad[ao]s?\b|\bestado\s+de\s+cada\s+herramienta\b/u.test(
+      normalizedText,
+    )
+  const hasOperatorSignals =
+    /\boperadores?\b|\badministrativ[oa]s?\b|\bpanel\s+operativ[oa]\b|\bpanel\s+administrativ[oa]\b/u.test(
+      normalizedText,
+    )
+
+  return (
+    (hasStrongToolSignals && (hasLoanSignals || hasCommunitySignals || hasOperatorSignals)) ||
+    (hasWeakToolSignals && hasCommunitySignals && (hasLoanSignals || hasOperatorSignals))
+  )
 }
 
 function inferFullstackLocalContractProfileFromPlanningArtifacts({
@@ -21305,6 +21347,14 @@ function buildCanonicalFullstackLocalMaterializationContract({
     {
       label: 'frontend/public/index.html',
       candidates: [contractPaths.frontendPublicIndexPath],
+    },
+    {
+      label: 'docs/DB_SCHEMA.md|docs/DATA_MODEL.md',
+      candidates: [
+        contractPaths.docsDbSchemaPath,
+        contractPaths.docsDataModelPath,
+        path.join(normalizedRootFolder, 'docs', 'data-model.md'),
+      ],
     },
   ]
 
@@ -28549,6 +28599,8 @@ function buildFullstackLocalMaterializationPlan({
     ? []
     : [
         frontendIndexHtmlPath,
+        fullstackContractPaths.frontendAdminIndexPath,
+        fullstackContractPaths.frontendPublicIndexPath,
         frontendMainJsPath,
         frontendRoutesPath,
         frontendFeaturePath,
@@ -28925,6 +28977,38 @@ function buildFullstackLocalMaterializationPlan({
     <script src="./src/mock-data.js"></script>
     <script src="./src/components/App.js"></script>
     <script src="./src/main.js"></script>
+  </body>
+</html>
+`
+  const genericAdminIndexHtmlContent = `<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${appTitle} | Panel operativo local</title>
+    <link rel="stylesheet" href="../src/styles.css" />
+  </head>
+  <body data-surface="admin">
+    <div id="app"></div>
+    <script src="../src/mock-data.js"></script>
+    <script src="../src/components/App.js"></script>
+    <script src="../src/main.js"></script>
+  </body>
+</html>
+`
+  const genericPublicIndexHtmlContent = `<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${appTitle} | Catalogo publico local</title>
+    <link rel="stylesheet" href="../src/styles.css" />
+  </head>
+  <body data-surface="public">
+    <div id="app"></div>
+    <script src="../src/mock-data.js"></script>
+    <script src="../src/components/App.js"></script>
+    <script src="../src/main.js"></script>
   </body>
 </html>
 `
@@ -29543,6 +29627,250 @@ Modelar una integración futura con Mercado Pago sin credenciales, sin checkout 
     `allowedTargetPaths: ${allowedTargetPaths.join(', ')}`,
     `successCriteria: ${successCriteria.join(' | ')}`,
   ].filter(Boolean)
+  const normalizedContractRoot = normalizePathForComparison(rootFolder)
+  const toGeneratedDomainContractPath = (targetPath) => {
+    const normalizedTargetPath = normalizePathForComparison(targetPath)
+    if (!normalizedTargetPath) {
+      return ''
+    }
+    if (normalizedTargetPath === normalizedContractRoot) {
+      return ''
+    }
+    return normalizedTargetPath.startsWith(`${normalizedContractRoot}/`)
+      ? normalizedTargetPath.slice(normalizedContractRoot.length + 1)
+      : normalizedTargetPath
+  }
+  const generatedDomainContractRoles = summarizeUniqueExecutorStrings(
+    [
+      ...(Array.isArray(normalizedDomainUnderstanding?.roles)
+        ? normalizedDomainUnderstanding.roles
+        : []),
+      ...(detectCommunityToolBankIntent(normalizedDomainText)
+        ? ['vecino', 'operador', 'administrador']
+        : []),
+    ],
+    12,
+  )
+  const generatedDomainContractEntities = summarizeUniqueExecutorStrings(
+    [
+      ...(Array.isArray(normalizedDomainUnderstanding?.primaryEntities)
+        ? normalizedDomainUnderstanding.primaryEntities
+        : []),
+      ...(Array.isArray(fullstackLocalDemoData?.domainEntities)
+        ? fullstackLocalDemoData.domainEntities
+        : []),
+      ...(detectCommunityToolBankIntent(normalizedDomainText)
+        ? ['herramientas', 'prestamos', 'reservas', 'devoluciones', 'vecinos']
+        : []),
+    ],
+    12,
+  )
+  const generatedDomainContractWorkflows = summarizeUniqueExecutorStrings(
+    [
+      ...(Array.isArray(normalizedDomainUnderstanding?.coreFlows)
+        ? normalizedDomainUnderstanding.coreFlows
+        : []),
+      ...(detectCommunityToolBankIntent(normalizedDomainText)
+        ? [
+            'consultar herramientas disponibles',
+            'solicitar prestamos y reservas',
+            'registrar devoluciones y danos',
+            'aprobar prestamos y reportes simples',
+          ]
+        : []),
+    ],
+    12,
+  )
+  const generatedDomainContractTables = summarizeUniqueExecutorStrings(
+    generatedDomainContractEntities.map((entry) =>
+      slugifyBusinessSector(entry).replace(/-/g, '_'),
+    ),
+    12,
+  ).filter(Boolean)
+  const generatedDomainContractAllowedTargetPaths = summarizeUniqueExecutorStrings(
+    allowedTargetPaths.map((entry) => toGeneratedDomainContractPath(entry)),
+    128,
+  ).filter(Boolean)
+  const generatedDomainContractRequiredFiles = summarizeUniqueExecutorStrings(
+    [
+      rootReadmePath,
+      frontendIndexHtmlPath,
+      frontendMainJsPath,
+      frontendMockDataPath,
+      backendPackageJsonPath,
+      backendServerPath,
+      backendPrimaryRoutePath,
+      backendPrimaryModulePath,
+      sharedDomainPath,
+      sharedContractsPath,
+      databaseSchemaPath,
+      databaseSeedPath,
+      docsArchitecturePath,
+      docsApiPath,
+      docsDataModelPath,
+      docsRunbookPath,
+      scriptsSeedPath,
+      projectManifestPath,
+    ].map((entry) => toGeneratedDomainContractPath(entry)),
+    64,
+  ).filter(Boolean)
+  const generatedDomainContract = {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: {
+      slug:
+        slugifyBusinessSector(domainLabel) ||
+        slugifyBusinessSector(appTitle) ||
+        'generated-domain',
+      label: domainLabel || appTitle || 'Generated domain project',
+      summary: detectCommunityToolBankIntent(normalizedDomainText)
+        ? 'Scaffold fullstack local seguro para gestionar herramientas, prestamos, reservas y devoluciones sin runtime real.'
+        : 'Scaffold fullstack local seguro, mock-only y revisable.',
+    },
+    root: {
+      slug: path.basename(rootFolder),
+      sourceRoot: rootFolder,
+      targetRoot: rootFolder,
+    },
+    roles: generatedDomainContractRoles,
+    entities: generatedDomainContractEntities,
+    states: {
+      primary: summarizeUniqueExecutorStrings(
+        Array.isArray(normalizedDomainUnderstanding?.stateModel)
+          ? normalizedDomainUnderstanding.stateModel
+          : [],
+        12,
+      ),
+    },
+    workflows: generatedDomainContractWorkflows,
+    frontendSurfaces: usesCanonicalSpecializedFullstackContract
+      ? summarizeUniqueExecutorStrings(
+          [
+            fullstackContractPaths.frontendAdminIndexPath ? 'frontend/admin' : '',
+            fullstackContractPaths.frontendPublicIndexPath ? 'frontend/public' : '',
+            usesOnlineCoursesFullstackContract ? 'frontend/student' : '',
+          ],
+          4,
+        )
+          .filter(Boolean)
+          .map((surfacePath, index) => ({
+            key: index === 0 ? 'admin' : index === 1 ? 'public' : 'student',
+            label:
+              index === 0
+                ? 'Panel local'
+                : index === 1
+                  ? 'Frontend publico'
+                  : 'Panel alumno',
+            path: surfacePath,
+            screens:
+              index === 0
+                ? ['dashboard', 'operacion']
+                : index === 1
+                  ? ['publico', 'consulta']
+                  : ['alumno', 'progreso'],
+          }))
+      : [
+          {
+            key: 'local-shell',
+            label: 'Frontend local',
+            path: 'frontend',
+            screens: detectCommunityToolBankIntent(normalizedDomainText)
+              ? ['catalogo', 'prestamos', 'operacion', 'reportes']
+              : ['dashboard', 'flujo-principal'],
+          },
+        ],
+    backend: {
+      packageFile: toGeneratedDomainContractPath(backendPackageJsonPath),
+      entryFile: toGeneratedDomainContractPath(backendServerPath),
+      routes: [
+        { path: toGeneratedDomainContractPath(backendHealthRoutePath) },
+        { path: toGeneratedDomainContractPath(backendPrimaryRoutePath) },
+      ],
+      services: [],
+      modules: [{ path: toGeneratedDomainContractPath(backendPrimaryModulePath) }],
+    },
+    database: {
+      schemaFile: toGeneratedDomainContractPath(databaseSchemaPath),
+      seedFile: toGeneratedDomainContractPath(databaseSeedPath),
+      tables: generatedDomainContractTables,
+    },
+    shared: {
+      files: [
+        toGeneratedDomainContractPath(sharedDomainPath),
+        toGeneratedDomainContractPath(sharedContractsPath),
+      ].filter(Boolean),
+    },
+    docs: [
+      toGeneratedDomainContractPath(docsArchitecturePath),
+      toGeneratedDomainContractPath(docsApiPath),
+      toGeneratedDomainContractPath(docsDataModelPath),
+      toGeneratedDomainContractPath(docsRunbookPath),
+    ].filter(Boolean),
+    scripts: [
+      toGeneratedDomainContractPath(scriptsReadmePath),
+      toGeneratedDomainContractPath(scriptsSeedPath),
+    ].filter(Boolean),
+    integrations: [
+      {
+        name: 'local-mock-only',
+        mode: 'mock-only',
+        realIntegrationAllowedNow: false,
+        notes: 'Sin servicios externos reales ni webhooks activos.',
+      },
+    ],
+    safety: {
+      forbiddenFiles: ['.env', 'node_modules', 'Dockerfile', 'docker-compose.yml'],
+      forbiddenSignals: ['ACCESS_TOKEN', 'mercadopago-client-secret', 'web-prueba'],
+      explicitExclusions: [
+        'deploy',
+        'production',
+        'real-payments',
+        'external-services',
+        'real-webhooks',
+        'credentials',
+      ],
+    },
+    materialization: {
+      requiredFiles: generatedDomainContractRequiredFiles,
+      operations: generatedDomainContractRequiredFiles.map((targetPath) => ({
+        type: 'replace-file',
+        targetPath,
+      })),
+      allowedTargetPaths: generatedDomainContractAllowedTargetPaths,
+    },
+    validation: {
+      syntaxChecks: [
+        toGeneratedDomainContractPath(frontendMainJsPath),
+        toGeneratedDomainContractPath(frontendMockDataPath),
+        toGeneratedDomainContractPath(sharedDomainPath),
+        toGeneratedDomainContractPath(sharedContractsPath),
+      ].filter(Boolean),
+      requiredPathGroups: generatedDomainContractRequiredFiles.map((entry) => [entry]),
+      forbiddenSearchPatterns: [
+        'ACCESS_TOKEN',
+        'mercadopago-client-secret',
+        'mercadopago-access-token',
+        'mercadopago-api-domain',
+      ],
+    },
+    approvals: [
+      {
+        key: 'sandbox-only-human-approval',
+        scope: 'sandbox-only',
+        status: 'pending',
+        allowsNow: ['sandbox-materialization'],
+        forbidsNow: [
+          '.env',
+          'node_modules',
+          'deploy',
+          'production',
+          'real-payments',
+          'external-services',
+          'web-prueba',
+        ],
+      },
+    ],
+  }
 
   return {
     tasks: [
@@ -29629,6 +29957,16 @@ Modelar una integración futura con Mercado Pago sin credenciales, sin checkout 
           ? []
           : [
               { type: 'replace-file', targetPath: frontendIndexHtmlPath, nextContent: frontendIndexHtmlContent },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.frontendAdminIndexPath,
+                nextContent: genericAdminIndexHtmlContent,
+              },
+              {
+                type: 'replace-file',
+                targetPath: fullstackContractPaths.frontendPublicIndexPath,
+                nextContent: genericPublicIndexHtmlContent,
+              },
               { type: 'replace-file', targetPath: frontendMainJsPath, nextContent: frontendMainJsContent },
               { type: 'replace-file', targetPath: frontendRoutesPath, nextContent: frontendRoutesContent },
               { type: 'replace-file', targetPath: frontendFeaturePath, nextContent: frontendFeatureContent },
@@ -30297,6 +30635,7 @@ module.exports = {
       ],
     },
     localProjectManifest,
+    generatedDomainContract,
     selectedDomain: fullstackContractProfile.archetype,
     detectedVertical: fullstackContractProfile.archetype,
     selectedContractKind: usesOnlineCoursesFullstackContract
@@ -47350,6 +47689,94 @@ function resolveGeneratedDomainSandboxApprovalDecision({
   }
 }
 
+function shouldPromoteGeneratedDomainSandboxApprovalToMaterialization({
+  plannerFeedback,
+}) {
+  if (!plannerFeedback || typeof plannerFeedback !== 'object') {
+    return false
+  }
+
+  if (plannerFeedback.type !== 'approval-granted') {
+    return false
+  }
+
+  const decisionKey = normalizeResolvedDecisionKey(
+    plannerFeedback.approvalRequestDecisionKey,
+  )
+
+  if (!isGeneratedDomainSandboxApprovalDecisionKey(decisionKey)) {
+    return false
+  }
+
+  const selectedApprovalOption = normalizeGeneratedDomainSandboxApprovalOption(
+    plannerFeedback.selectedOptionKey || plannerFeedback.selectedOption,
+  )
+  const requestedSandboxRoot = extractApprovedSandboxRootCandidate(
+    plannerFeedback.freeAnswer,
+    plannerFeedback.selectedOption,
+    plannerFeedback.approvalReason,
+    plannerFeedback.instruction,
+  )
+  const requestedSandboxSubfolder = extractApprovedSandboxSubfolderCandidate(
+    plannerFeedback.freeAnswer,
+    plannerFeedback.selectedOption,
+    plannerFeedback.approvalReason,
+    plannerFeedback.instruction,
+  )
+  const approvalNarrative = buildGeneratedDomainSandboxApprovalNarrative(
+    plannerFeedback.freeAnswer,
+    plannerFeedback.selectedOption,
+    plannerFeedback.approvalReason,
+    plannerFeedback.instruction,
+  )
+  const approvalNarrativeHasExplicitSandboxIntent =
+    hasGeneratedDomainExplicitSandboxIntent(approvalNarrative)
+  const approvalNarrativeHasUnsafeAuthorization =
+    hasGeneratedDomainUnsafeApprovalAuthorization(approvalNarrative)
+
+  if (approvalNarrativeHasUnsafeAuthorization) {
+    return false
+  }
+
+  if (decisionKey === 'approve-sandbox-materialization-v1') {
+    return (
+      !selectedApprovalOption ||
+      selectedApprovalOption === 'approve' ||
+      selectedApprovalOption === 'approved'
+    )
+  }
+
+  if (decisionKey === 'approval-materialize-sandbox:v1') {
+    return selectedApprovalOption === 'provide-new-empty-workspace'
+  }
+
+  if (decisionKey === 'approve-sandbox-path') {
+    return (
+      !selectedApprovalOption ||
+      selectedApprovalOption === 'sandbox-external-new-workspace' ||
+      selectedApprovalOption === 'approved'
+    )
+  }
+
+  if (decisionKey === 'approval-sandbox-location-v1') {
+    return (
+      selectedApprovalOption === 'custom-path-inside-workspace' &&
+      approvalNarrativeHasExplicitSandboxIntent &&
+      Boolean(requestedSandboxRoot) &&
+      Boolean(requestedSandboxSubfolder)
+    )
+  }
+
+  if (decisionKey === 'approval-materialize-sfd-sandbox-v1') {
+    return (
+      approvalNarrativeHasExplicitSandboxIntent &&
+      Boolean(requestedSandboxRoot)
+    )
+  }
+
+  return false
+}
+
 function isDeferredResolvedDecision(record) {
   if (!record || typeof record !== 'object') {
     return false
@@ -52352,6 +52779,14 @@ async function buildLocalStrategicBrainDecision({
   const hasStrongFullstackRequestGuard =
     strongFullstackRequestProfile.matches &&
     strongFullstackRequestProfile.deliveryLevel === 'fullstack-local'
+  const sandboxApprovalPromotesMaterialization =
+    approvalAlreadyGranted &&
+    shouldPromoteGeneratedDomainSandboxApprovalToMaterialization({
+      plannerFeedback,
+    })
+  const shouldPromoteApprovedSandboxFullstackLocalMaterialization =
+    sandboxApprovalPromotesMaterialization &&
+    hasStrongFullstackRequestGuard
   const productArchitectureIntent = detectProductArchitecturePlanningIntent(
     goal,
     normalizedContext,
@@ -53354,7 +53789,8 @@ async function buildLocalStrategicBrainDecision({
   }
 
   if (
-    fullstackLocalMaterializationIntent.matches &&
+    (fullstackLocalMaterializationIntent.matches ||
+      shouldPromoteApprovedSandboxFullstackLocalMaterialization) &&
     !safeFirstDeliveryIntent.matches &&
     !scopedFileEditIntent &&
     !localGoalDescriptor &&
@@ -53372,7 +53808,9 @@ async function buildLocalStrategicBrainDecision({
       deliveryLevel: 'fullstack-local',
       domainUnderstanding,
       reason:
-        'El objetivo ya pide materializar un fullstack-local revisado, asi que conviene devolver una segunda fase ejecutable con scope local estricto y sin instalar dependencias ni levantar servicios.',
+        shouldPromoteApprovedSandboxFullstackLocalMaterialization
+          ? 'La aprobacion sandbox ya fue concedida y el pedido mantiene una ruta fullstack-local segura, asi que conviene promoverlo a materializacion local controlada sin volver a revision.'
+          : 'El objetivo ya pide materializar un fullstack-local revisado, asi que conviene devolver una segunda fase ejecutable con scope local estricto y sin instalar dependencias ni levantar servicios.',
     })
     const fullstackLocalMaterializationPlan = buildFullstackLocalMaterializationPlan({
       goal,
@@ -53388,7 +53826,9 @@ async function buildLocalStrategicBrainDecision({
       strategy: 'materialize-fullstack-local-plan',
       executionMode: 'executor',
       reason:
-        'El objetivo ya pide materializar el fullstack-local revisado y el Cerebro puede devolver un materializationPlan local, estructurado y revisable para el executor deterministico.',
+        shouldPromoteApprovedSandboxFullstackLocalMaterialization
+          ? 'La aprobacion sandbox resolvio la ultima revision pendiente y el Cerebro puede devolver un materializationPlan local, estructurado y acotado al sandbox seguro.'
+          : 'El objetivo ya pide materializar el fullstack-local revisado y el Cerebro puede devolver un materializationPlan local, estructurado y revisable para el executor deterministico.',
       tasks: fullstackLocalMaterializationPlan.tasks,
       requiresApproval: false,
       assumptions: fullstackLocalMaterializationPlan.assumptions,
@@ -53398,6 +53838,7 @@ async function buildLocalStrategicBrainDecision({
       executionScope: fullstackLocalMaterializationPlan.executionScope,
       scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
       materializationPlan: fullstackLocalMaterializationPlan.materializationPlan,
+      generatedDomainContract: fullstackLocalMaterializationPlan.generatedDomainContract,
       },
       {
         deliveryLevel: 'fullstack-local',
