@@ -9062,7 +9062,7 @@ function createApprovedToolBankObservationDecision({
   approvalRequestDecisionKey = 'approve-sandbox-path',
   selectedOption = 'sandbox-external-new-workspace',
   feedbackType = 'approval-granted',
-  freeAnswer = '',
+  freeAnswer,
   approvalReason = '',
 } = {}) {
   const generatedDomainContract = {
@@ -9134,6 +9134,9 @@ function createApprovedToolBankObservationDecision({
     '.',
   )
   const requiredPathGroups = deriveRequiredPathGroupsFromContract(generatedDomainContract)
+
+  const effectiveFreeAnswer =
+    typeof freeAnswer === 'string' ? freeAnswer : approvedSandboxPath
 
   return plannerApi.buildBrainDecisionContract({
     ...buildReusablePlanningContext(),
@@ -9236,7 +9239,7 @@ function createApprovedToolBankObservationDecision({
                 ? 'deferred'
                 : 'approved',
           selectedOption,
-          freeAnswer: freeAnswer || approvedSandboxPath,
+          freeAnswer: effectiveFreeAnswer,
           summary: 'Aprobacion humana explicita para materializacion sandbox controlada.',
         },
       ],
@@ -9245,7 +9248,7 @@ function createApprovedToolBankObservationDecision({
       type: feedbackType,
       approvalRequestDecisionKey,
       selectedOption,
-      freeAnswer: freeAnswer || approvedSandboxPath,
+      freeAnswer: effectiveFreeAnswer,
       approvalReason:
         approvalReason ||
         'No tocar web-prueba, no crear .env, no instalar dependencias ni usar servicios externos.',
@@ -9729,6 +9732,13 @@ La materializacion debe ser mock-only, local, segura y validada con el flujo san
   const posixDecision = createApprovedToolBankObservationDecision({
     approvedSandboxPath: '/home/runner/work/sandbox-toolbank-local',
   })
+  const finalSandboxMaterializationDecision = createApprovedToolBankObservationDecision({
+    approvalRequestDecisionKey: 'approve-sandbox-materialization-v1',
+    selectedOption: 'approve',
+    freeAnswer: '',
+    approvalReason:
+      'Aprobacion final para crear la subcarpeta segura y materializar la primera entrega mock en sandbox sin tocar web-prueba.',
+  })
   const v1Decision = createApprovedToolBankObservationDecision({
     approvalRequestDecisionKey: 'approval-materialize-sandbox:v1',
     selectedOption: 'provide-new-empty-workspace',
@@ -9760,6 +9770,25 @@ La materializacion debe ser mock-only, local, segura y validada con el flujo san
   })
   const appSource = fs.readFileSync(appFilePath, 'utf8')
 
+  pushFailure(
+    failures,
+    finalSandboxMaterializationDecision.generatedDomainFileCreationApprovalEvaluation
+      ?.approved === true &&
+      finalSandboxMaterializationDecision.generatedDomainFileCreationApprovalEvaluation
+        ?.blocked === false &&
+      finalSandboxMaterializationDecision.generatedDomainControlledRuntimeMaterializationSource
+        ?.enabled === true &&
+      finalSandboxMaterializationDecision.generatedDomainControlledRuntimeMaterializationSource
+        ?.selectedSource === 'generated-domain-universal' &&
+      finalSandboxMaterializationDecision.generatedDomainUniversalMaterializationPlan
+        ?.status === 'built' &&
+      finalSandboxMaterializationDecision.generatedDomainUniversalMaterializationPlan
+        ?.canMaterializeInSandbox === true &&
+      finalSandboxMaterializationDecision.generatedDomainFileCreationApprovalEvaluation
+        ?.sandboxRoot?.relative ===
+        '.codex-temp/generated-domain-materialization-approved/community-tool-bank-local',
+    'La aprobacion final approve-sandbox-materialization-v1 con selectedOption approve debe promover la materializacion sandbox segura sin requerir otra aprobacion muda.',
+  )
   pushFailure(
     failures,
     locationApprovalDecision.generatedDomainFileCreationApprovalEvaluation?.approved ===

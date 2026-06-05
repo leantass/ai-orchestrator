@@ -45254,6 +45254,9 @@ function buildBrainDecisionContract({
       resolvedDecisionMap,
       plannerFeedback,
       workspacePath,
+      generatedDomainUniversalMaterializationPlan,
+      generatedDomainContract: normalizedGeneratedDomainContract,
+      materializationPlan,
     })
   const generatedDomainFileCreationApprovalEvaluation =
     evaluateGeneratedDomainFileCreationApproval({
@@ -46787,6 +46790,7 @@ function isGeneratedDomainSandboxApprovalDecisionKey(value) {
   const normalizedValue = normalizeResolvedDecisionKey(value)
   return (
     normalizedValue === 'approve-sandbox-path' ||
+    normalizedValue === 'approve-sandbox-materialization-v1' ||
     normalizedValue === 'approval-materialize-sandbox:v1' ||
     normalizedValue === 'approval-sandbox-location-v1' ||
     normalizedValue === 'approval-materialize-sfd-sandbox-v1'
@@ -47030,16 +47034,43 @@ function getCrossPlatformSandboxBasename(value) {
   return segments.length > 0 ? segments[segments.length - 1] : ''
 }
 
+function buildGeneratedDomainApprovedSandboxRoot({
+  generatedDomainUniversalMaterializationPlan,
+  generatedDomainContract,
+  materializationPlan,
+}) {
+  const preferredProjectRoot = normalizeWorkspaceProjectRoot(
+    normalizeOptionalString(generatedDomainUniversalMaterializationPlan?.projectRoot) ||
+      normalizeOptionalString(generatedDomainContract?.root?.targetRoot) ||
+      normalizeOptionalString(generatedDomainContract?.root?.sourceRoot) ||
+      normalizeOptionalString(materializationPlan?.projectRoot),
+  )
+  const normalizedBasename = getCrossPlatformSandboxBasename(preferredProjectRoot)
+  const sandboxFolderName = slugifySandboxFolderName(
+    normalizedBasename || preferredProjectRoot || 'approved-sandbox',
+  )
+
+  return path.posix.join(
+    '.codex-temp',
+    'generated-domain-materialization-approved',
+    sandboxFolderName,
+  )
+}
+
 function resolveGeneratedDomainSandboxApprovalDecision({
   resolvedDecisionMap,
   plannerFeedback,
   workspacePath,
+  generatedDomainUniversalMaterializationPlan,
+  generatedDomainContract,
+  materializationPlan,
 }) {
   const normalizedResolvedDecisionMap =
     resolvedDecisionMap instanceof Map ? resolvedDecisionMap : new Map()
   const decisionRecord = getResolvedDecisionRecord(
     normalizedResolvedDecisionMap,
     'approve-sandbox-path',
+    'approve-sandbox-materialization-v1',
     'approval-sandbox-location-v1',
     'approval-materialize-sandbox:v1',
     'approval-materialize-sfd-sandbox-v1',
@@ -47060,6 +47091,8 @@ function resolveGeneratedDomainSandboxApprovalDecision({
       decisionRecord?.selectedOption,
   )
   const usesApprovalRequestLegacy = activeDecisionKey === 'approve-sandbox-path'
+  const usesApprovalSandboxMaterializationV1 =
+    activeDecisionKey === 'approve-sandbox-materialization-v1'
   const usesApprovalLocationV1 =
     activeDecisionKey === 'approval-sandbox-location-v1'
   const usesApprovalRequestV1 =
@@ -47073,6 +47106,7 @@ function resolveGeneratedDomainSandboxApprovalDecision({
   const selectedNoMaterializationYet =
     selectedApprovalOption === 'no-materialization-yet'
   const selectedLegacyApproved = selectedApprovalOption === 'approved'
+  const selectedApprove = selectedApprovalOption === 'approve'
   const selectedCustomPathInsideWorkspace =
     selectedApprovalOption === 'custom-path-inside-workspace'
   const selectedProvideNewEmptyWorkspace =
@@ -47112,7 +47146,13 @@ function resolveGeneratedDomainSandboxApprovalDecision({
     hasGeneratedDomainExplicitSandboxIntent(approvalNarrative)
   const approvalNarrativeHasUnsafeAuthorization =
     hasGeneratedDomainUnsafeApprovalAuthorization(approvalNarrative)
-  const defaultRelativeSandboxRoot = '.codex-temp/generated-domain-materialization-sandbox'
+  const defaultRelativeSandboxRoot = usesApprovalSandboxMaterializationV1
+    ? buildGeneratedDomainApprovedSandboxRoot({
+        generatedDomainUniversalMaterializationPlan,
+        generatedDomainContract,
+        materializationPlan,
+      })
+    : '.codex-temp/generated-domain-materialization-sandbox'
   const workspaceRoot = path.resolve(
     normalizeOptionalString(workspacePath) || process.cwd(),
   )
@@ -47176,7 +47216,9 @@ function resolveGeneratedDomainSandboxApprovalDecision({
     !approvalNarrativeHasUnsafeAuthorization &&
     Boolean(requestedSandboxRoot)
   const optionAllowsSandboxApproval =
-    usesApprovalRequestV1
+    usesApprovalSandboxMaterializationV1
+      ? !selectedApprovalOption || selectedApprove || selectedLegacyApproved
+      : usesApprovalRequestV1
       ? selectedProvideNewEmptyWorkspace
       : usesApprovalLocationV1
         ? selectedLegacyApproved || locationApprovalCanPromoteSandboxMaterialization
@@ -47202,7 +47244,12 @@ function resolveGeneratedDomainSandboxApprovalDecision({
     ? 'La opcion approve-subfolder-inside-current-workspace requiere una aprobacion separada y no puede tocar el workspace actual en este flujo seguro.'
     : selectedSandboxInsideWorkspaceNewFolder
       ? 'La opcion sandbox-inside-workspace-new-folder requiere una aprobacion separada y no puede tocar el workspace actual en este flujo seguro.'
-      : usesApprovalLocationV1 &&
+      : usesApprovalSandboxMaterializationV1 &&
+          selectedApprovalOption &&
+          !selectedApprove &&
+          !selectedLegacyApproved
+        ? 'La aprobacion approve-sandbox-materialization-v1 solo puede promoverse con la opcion approve sobre un scaffold sandbox ya seguro.'
+        : usesApprovalLocationV1 &&
           selectedCustomPathInsideWorkspace &&
           !locationApprovalCanPromoteSandboxMaterialization
         ? 'La aprobacion approval-sandbox-location-v1 con custom-path-inside-workspace solo puede promoverse si freeAnswer declara un workspace externo seguro, una carpeta sandbox explicita y la intencion sandbox/mock-only.'
@@ -47283,6 +47330,8 @@ function resolveGeneratedDomainSandboxApprovalDecision({
             )
           : mappedSandboxRoot
     }
+  } else if (effectiveApproved && usesApprovalSandboxMaterializationV1) {
+    effectiveSandboxRoot = defaultRelativeSandboxRoot
   }
 
   return {

@@ -966,6 +966,77 @@ La materializacion debe ser mock-only, local, segura y validada con el flujo san
   }
 }
 
+function runFinalSandboxMaterializationApprovalScenario() {
+  const contract = createToolBankContract()
+  const decision = createUniversalDecision(contract, {
+    resolvedDecisionMap: new Map([
+      [
+        'approve-sandbox-materialization-v1',
+        {
+          status: 'approved',
+          decision: 'approved',
+          selectedOption: 'approve',
+          summary:
+            'Lean aprobo materializar la primera entrega segura mock dentro del sandbox controlado.',
+        },
+      ],
+    ]),
+    plannerFeedback: {
+      type: 'approval-granted',
+      approvalDecision: 'approved',
+      approvalRequestDecisionKey: 'approve-sandbox-materialization-v1',
+      selectedOption: 'approve',
+      approvalReason:
+        'Aprobacion final para materializar solo la entrega segura mock dentro del sandbox controlado sin tocar web-prueba.',
+    },
+  })
+  const approvalEvaluation = decision.generatedDomainFileCreationApprovalEvaluation
+  const runtimeSource = decision.generatedDomainControlledRuntimeMaterializationSource
+  const universalPlan = decision.generatedDomainUniversalMaterializationPlan
+
+  assert.equal(approvalEvaluation?.approved, true)
+  assert.equal(approvalEvaluation?.blocked, false)
+  assert.equal(approvalEvaluation?.status, 'approved-for-sandbox')
+  assert.equal(
+    approvalEvaluation?.sandboxRoot?.relative,
+    '.codex-temp/generated-domain-materialization-approved/community-tool-bank-local',
+  )
+  assert.equal(runtimeSource?.enabled, true)
+  assert.equal(runtimeSource?.selectedSource, 'generated-domain-universal')
+  assert.equal(universalPlan?.status, 'built')
+  assert.equal(universalPlan?.canMaterializeInSandbox, true)
+  assert.equal(universalPlan?.safety?.safeForLocalMaterialization, true)
+
+  const materializationReport = observationHarness.materializeGeneratedDomainSandboxPlan({
+    generatedDomainUniversalMaterializationPlan: universalPlan,
+    generatedDomainFileCreationApprovalEvaluation: approvalEvaluation,
+  })
+
+  assert.equal(materializationReport?.status, 'materialized')
+  assert.equal(materializationReport?.materialized, true)
+  assert.equal(
+    materializationReport?.sandboxRoot?.relative,
+    '.codex-temp/generated-domain-materialization-approved/community-tool-bank-local',
+  )
+
+  const projectRootPath = path.join(
+    repoRoot,
+    '.codex-temp',
+    'generated-domain-materialization-approved',
+    'community-tool-bank-local',
+    universalPlan.projectRoot,
+  )
+  assert.equal(
+    fs.existsSync(path.join(projectRootPath, 'validation', 'report.json')),
+    true,
+    'La aprobacion final approve-sandbox-materialization-v1 debe persistir validation/report.json en el sandbox controlado.',
+  )
+
+  return {
+    createdCount: materializationReport.created.length,
+  }
+}
+
 async function main() {
   ensureRemoved(smokeSandboxPath)
 
@@ -990,6 +1061,8 @@ async function main() {
     const results = scenarios.map((scenario) => runHappyPathScenario(scenario))
     const toolBankResult = runApprovedToolBankScenario()
     const sandboxLocationResult = runSandboxLocationApprovalScenario()
+    const finalSandboxMaterializationResult =
+      runFinalSandboxMaterializationApprovalScenario()
     runBlockedCases(results[0].universalPlan)
 
     const totalCreated = results.reduce(
@@ -999,13 +1072,24 @@ async function main() {
       (Number.isInteger(toolBankResult.createdCount) ? toolBankResult.createdCount : 0) +
       (Number.isInteger(sandboxLocationResult.createdCount)
         ? sandboxLocationResult.createdCount
+        : 0) +
+      (Number.isInteger(finalSandboxMaterializationResult.createdCount)
+        ? finalSandboxMaterializationResult.createdCount
         : 0)
 
     console.log(
-      `OK. Generated domain sandbox materialization smoke completado. Dominios validados: ${scenarios.length + 2}. Archivos creados: ${totalCreated}.`,
+      `OK. Generated domain sandbox materialization smoke completado. Dominios validados: ${scenarios.length + 3}. Archivos creados: ${totalCreated}.`,
     )
   } finally {
     ensureRemoved(smokeSandboxPath)
+    ensureRemoved(
+      path.join(
+        repoRoot,
+        '.codex-temp',
+        'generated-domain-materialization-approved',
+        'community-tool-bank-local',
+      ),
+    )
     ensureRemoved(
       path.join(
         repoRoot,
