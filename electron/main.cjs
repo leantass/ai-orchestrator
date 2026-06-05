@@ -46787,7 +46787,9 @@ function isGeneratedDomainSandboxApprovalDecisionKey(value) {
   const normalizedValue = normalizeResolvedDecisionKey(value)
   return (
     normalizedValue === 'approve-sandbox-path' ||
-    normalizedValue === 'approval-materialize-sandbox:v1'
+    normalizedValue === 'approval-materialize-sandbox:v1' ||
+    normalizedValue === 'approval-sandbox-location-v1' ||
+    normalizedValue === 'approval-materialize-sfd-sandbox-v1'
   )
 }
 
@@ -46879,6 +46881,117 @@ function extractApprovedSandboxRootCandidate(...values) {
   return ''
 }
 
+function extractApprovedSandboxSubfolderCandidate(...values) {
+  const blockedCandidatePattern =
+    /^(?:\.env(?:\..+)?|node_modules|dockerfile|docker-compose\.(?:yaml|yml)|deploy|web-prueba|sandbox-external-new-workspace|sandbox-inside-workspace-new-folder|provide-new-empty-workspace|approve-subfolder-inside-current-workspace|custom-path-inside-workspace|no-materialization-yet|decline-materialization-now)$/iu
+
+  for (const value of values) {
+    const normalizedValue = normalizeOptionalString(value)
+
+    if (!normalizedValue) {
+      continue
+    }
+
+    const labelledCandidateMatch = normalizedValue.match(
+      /(?:carpeta|folder|subcarpeta|subfolder|subruta|directorio)[^:\r\n]*:\s*([A-Za-z0-9._-]+)/iu,
+    )
+    const inlineSandboxCandidateMatch = normalizedValue
+      .split(/\r?\n/iu)
+      .map((entry) => entry.trim())
+      .find(
+        (entry) =>
+          entry &&
+          !/[\\/]/u.test(entry) &&
+          !/^[a-z]:/iu.test(entry) &&
+          /^sandbox-[a-z0-9][a-z0-9._-]*$/iu.test(entry),
+      )
+    const directCandidate = normalizeOptionalString(
+      labelledCandidateMatch?.[1] || inlineSandboxCandidateMatch || '',
+    )
+
+    if (
+      directCandidate &&
+      !blockedCandidatePattern.test(directCandidate) &&
+      !directCandidate.includes('..') &&
+      /sandbox/iu.test(directCandidate)
+    ) {
+      return directCandidate
+    }
+  }
+
+  return ''
+}
+
+function buildGeneratedDomainSandboxApprovalNarrative(...values) {
+  return values
+    .map((value) => normalizeOptionalString(value))
+    .filter(Boolean)
+    .join('\n')
+}
+
+function hasGeneratedDomainExplicitSandboxIntent(value) {
+  const normalizedValue = normalizeOptionalString(value)
+
+  if (!normalizedValue) {
+    return false
+  }
+
+  return (
+    /mock[-\s]?only/iu.test(normalizedValue) ||
+    /sandbox[-\s]?only/iu.test(normalizedValue) ||
+    /solo\s+(?:en\s+)?sandbox/iu.test(normalizedValue) ||
+    /materializa(?:r|cion)[\s\S]{0,80}sandbox/iu.test(normalizedValue) ||
+    /sandbox[\s\S]{0,80}materializa(?:r|cion)/iu.test(normalizedValue)
+  )
+}
+
+function hasGeneratedDomainUnsafeApprovalAuthorization(value) {
+  const normalizedValue = normalizeOptionalString(value)
+
+  if (!normalizedValue) {
+    return false
+  }
+
+  const hasPositiveUnsafeAuthorization = (tokenPattern, negativePattern) =>
+    tokenPattern.test(normalizedValue) && !negativePattern.test(normalizedValue)
+
+  return (
+    hasPositiveUnsafeAuthorization(
+      /\bweb-prueba\b/iu,
+      /\b(?:no|sin)\s+tocar\s+web-prueba\b/iu,
+    ) ||
+    hasPositiveUnsafeAuthorization(/\b\.env\b/iu, /\b(?:no|sin)\s+crear\s+\.env\b/iu) ||
+    hasPositiveUnsafeAuthorization(
+      /\bnode_modules\b/iu,
+      /\b(?:no|sin)\s+crear\s+node_modules\b/iu,
+    ) ||
+    hasPositiveUnsafeAuthorization(
+      /\b(?:docker|dockerfile|docker-compose)\b/iu,
+      /\b(?:no|sin|ni)\s+usar\s+docker\b/iu,
+    ) ||
+    hasPositiveUnsafeAuthorization(
+      /\bdeploy\b/iu,
+      /\b(?:no|sin|ni)\s+hacer\s+deploy\b/iu,
+    ) ||
+    hasPositiveUnsafeAuthorization(
+      /\bservicios?\s+externos?\b/iu,
+      /\b(?:no|sin|ni)\s+(?:llamar|usar)\s+servicios?\s+externos?\b/iu,
+    ) ||
+    hasPositiveUnsafeAuthorization(
+      /\bpagos?\s+reales?\b/iu,
+      /\b(?:no|sin|ni)\s+usar\s+pagos?\s+reales?\b/iu,
+    ) ||
+    hasPositiveUnsafeAuthorization(
+      /\b(?:db\s+productiva|base\s+de\s+datos\s+productiva)\b/iu,
+      /\b(?:no|sin|ni)\s+usar\s+(?:db\s+productiva|base\s+de\s+datos\s+productiva)\b/iu,
+    ) ||
+    hasPositiveUnsafeAuthorization(
+      /\bcredenciales\b/iu,
+      /\b(?:no|sin|ni)\s+usar\s+credenciales\b/iu,
+    )
+  )
+}
+
 function slugifySandboxFolderName(value) {
   const normalizedValue = normalizeOptionalString(value)
     .normalize('NFD')
@@ -46927,7 +47040,9 @@ function resolveGeneratedDomainSandboxApprovalDecision({
   const decisionRecord = getResolvedDecisionRecord(
     normalizedResolvedDecisionMap,
     'approve-sandbox-path',
+    'approval-sandbox-location-v1',
     'approval-materialize-sandbox:v1',
+    'approval-materialize-sfd-sandbox-v1',
   )
   const feedbackDecisionKey = normalizeResolvedDecisionKey(
     plannerFeedback?.approvalRequestDecisionKey,
@@ -46945,8 +47060,12 @@ function resolveGeneratedDomainSandboxApprovalDecision({
       decisionRecord?.selectedOption,
   )
   const usesApprovalRequestLegacy = activeDecisionKey === 'approve-sandbox-path'
+  const usesApprovalLocationV1 =
+    activeDecisionKey === 'approval-sandbox-location-v1'
   const usesApprovalRequestV1 =
     activeDecisionKey === 'approval-materialize-sandbox:v1'
+  const usesApprovalMaterializeSfdV1 =
+    activeDecisionKey === 'approval-materialize-sfd-sandbox-v1'
   const selectedSandboxExternalNewWorkspace =
     selectedApprovalOption === 'sandbox-external-new-workspace'
   const selectedSandboxInsideWorkspaceNewFolder =
@@ -46954,29 +47073,14 @@ function resolveGeneratedDomainSandboxApprovalDecision({
   const selectedNoMaterializationYet =
     selectedApprovalOption === 'no-materialization-yet'
   const selectedLegacyApproved = selectedApprovalOption === 'approved'
+  const selectedCustomPathInsideWorkspace =
+    selectedApprovalOption === 'custom-path-inside-workspace'
   const selectedProvideNewEmptyWorkspace =
     selectedApprovalOption === 'provide-new-empty-workspace'
   const selectedApproveSubfolderInsideCurrentWorkspace =
     selectedApprovalOption === 'approve-subfolder-inside-current-workspace'
   const selectedDeclineMaterializationNow =
     selectedApprovalOption === 'decline-materialization-now'
-  const optionAllowsSandboxApproval =
-    usesApprovalRequestV1
-      ? selectedProvideNewEmptyWorkspace
-      : usesApprovalRequestLegacy
-        ? !selectedApprovalOption ||
-          selectedSandboxExternalNewWorkspace ||
-          selectedLegacyApproved
-        : true
-  const feedbackApproved =
-    plannerFeedback?.type === 'approval-granted' &&
-    isGeneratedDomainSandboxApprovalDecisionKey(feedbackDecisionKey) &&
-    optionAllowsSandboxApproval
-  const recordApproved =
-    isApprovedResolvedDecisionRecord(decisionRecord) &&
-    isGeneratedDomainSandboxApprovalDecisionKey(decisionRecordKey) &&
-    optionAllowsSandboxApproval
-  const approved = feedbackApproved || recordApproved
   const requestedSandboxRoot = extractApprovedSandboxRootCandidate(
     decisionRecord?.freeAnswer,
     decisionRecord?.selectedOption,
@@ -46986,6 +47090,28 @@ function resolveGeneratedDomainSandboxApprovalDecision({
     plannerFeedback?.approvalReason,
     plannerFeedback?.instruction,
   )
+  const requestedSandboxSubfolder = extractApprovedSandboxSubfolderCandidate(
+    decisionRecord?.freeAnswer,
+    decisionRecord?.selectedOption,
+    decisionRecord?.summary,
+    plannerFeedback?.freeAnswer,
+    plannerFeedback?.selectedOption,
+    plannerFeedback?.approvalReason,
+    plannerFeedback?.instruction,
+  )
+  const approvalNarrative = buildGeneratedDomainSandboxApprovalNarrative(
+    decisionRecord?.freeAnswer,
+    decisionRecord?.selectedOption,
+    decisionRecord?.summary,
+    plannerFeedback?.freeAnswer,
+    plannerFeedback?.selectedOption,
+    plannerFeedback?.approvalReason,
+    plannerFeedback?.instruction,
+  )
+  const approvalNarrativeHasExplicitSandboxIntent =
+    hasGeneratedDomainExplicitSandboxIntent(approvalNarrative)
+  const approvalNarrativeHasUnsafeAuthorization =
+    hasGeneratedDomainUnsafeApprovalAuthorization(approvalNarrative)
   const defaultRelativeSandboxRoot = '.codex-temp/generated-domain-materialization-sandbox'
   const workspaceRoot = path.resolve(
     normalizeOptionalString(workspacePath) || process.cwd(),
@@ -47036,10 +47162,62 @@ function resolveGeneratedDomainSandboxApprovalDecision({
     /sandbox/iu.test(requestedBasename)
   const requestedIsExternalAbsoluteSandboxPath =
     isAbsoluteExternalSandboxPath(requestedSandboxRoot) && !requestedInsideWorkspace
+  const locationApprovalCanPromoteSandboxMaterialization =
+    usesApprovalLocationV1 &&
+    selectedCustomPathInsideWorkspace &&
+    approvalNarrativeHasExplicitSandboxIntent &&
+    !approvalNarrativeHasUnsafeAuthorization &&
+    Boolean(requestedSandboxRoot) &&
+    Boolean(requestedSandboxSubfolder) &&
+    requestedIsExternalAbsoluteSandboxPath
+  const materializeSfdApprovalCanPromoteSandboxMaterialization =
+    usesApprovalMaterializeSfdV1 &&
+    approvalNarrativeHasExplicitSandboxIntent &&
+    !approvalNarrativeHasUnsafeAuthorization &&
+    Boolean(requestedSandboxRoot)
+  const optionAllowsSandboxApproval =
+    usesApprovalRequestV1
+      ? selectedProvideNewEmptyWorkspace
+      : usesApprovalLocationV1
+        ? selectedLegacyApproved || locationApprovalCanPromoteSandboxMaterialization
+        : usesApprovalMaterializeSfdV1
+          ? !selectedApprovalOption ||
+            selectedLegacyApproved ||
+            materializeSfdApprovalCanPromoteSandboxMaterialization
+          : usesApprovalRequestLegacy
+            ? !selectedApprovalOption ||
+              selectedSandboxExternalNewWorkspace ||
+              selectedLegacyApproved
+            : true
+  const feedbackApproved =
+    plannerFeedback?.type === 'approval-granted' &&
+    isGeneratedDomainSandboxApprovalDecisionKey(feedbackDecisionKey) &&
+    optionAllowsSandboxApproval
+  const recordApproved =
+    isApprovedResolvedDecisionRecord(decisionRecord) &&
+    isGeneratedDomainSandboxApprovalDecisionKey(decisionRecordKey) &&
+    optionAllowsSandboxApproval
+  const approved = feedbackApproved || recordApproved
   const optionBlockedReason = selectedApproveSubfolderInsideCurrentWorkspace
     ? 'La opcion approve-subfolder-inside-current-workspace requiere una aprobacion separada y no puede tocar el workspace actual en este flujo seguro.'
     : selectedSandboxInsideWorkspaceNewFolder
       ? 'La opcion sandbox-inside-workspace-new-folder requiere una aprobacion separada y no puede tocar el workspace actual en este flujo seguro.'
+      : usesApprovalLocationV1 &&
+          selectedCustomPathInsideWorkspace &&
+          !locationApprovalCanPromoteSandboxMaterialization
+        ? 'La aprobacion approval-sandbox-location-v1 con custom-path-inside-workspace solo puede promoverse si freeAnswer declara un workspace externo seguro, una carpeta sandbox explicita y la intencion sandbox/mock-only.'
+        : approvalNarrativeHasUnsafeAuthorization
+          ? 'La aprobacion declarada habilita rutas o capacidades inseguras y no puede promover la materializacion sandbox.'
+          : usesApprovalMaterializeSfdV1 &&
+              !materializeSfdApprovalCanPromoteSandboxMaterialization &&
+              selectedApprovalOption &&
+              !selectedLegacyApproved &&
+              !selectedDeclineMaterializationNow
+            ? 'La aprobacion approval-materialize-sfd-sandbox-v1 solo puede promoverse si mantiene la intencion sandbox/mock-only y una ruta segura ya declarada.'
+            : usesApprovalMaterializeSfdV1 &&
+                !selectedApprovalOption &&
+                !materializeSfdApprovalCanPromoteSandboxMaterialization
+              ? 'La aprobacion approval-materialize-sfd-sandbox-v1 necesita una ruta segura previa y una intencion sandbox/mock-only para materializar.'
       : usesApprovalRequestV1 &&
           !selectedProvideNewEmptyWorkspace &&
           !selectedDeclineMaterializationNow
@@ -47052,12 +47230,18 @@ function resolveGeneratedDomainSandboxApprovalDecision({
           ? 'La aprobacion approve-sandbox-path requiere elegir sandbox-external-new-workspace para usar un workspace externo seguro.'
           : ''
   const missingApprovedSandboxPath =
+    ((usesApprovalLocationV1 && selectedCustomPathInsideWorkspace) ||
+      (usesApprovalMaterializeSfdV1 && !selectedDeclineMaterializationNow) ||
     ((usesApprovalRequestV1 && selectedProvideNewEmptyWorkspace) ||
       (usesApprovalRequestLegacy &&
-        (selectedSandboxExternalNewWorkspace || selectedLegacyApproved))) &&
+        (selectedSandboxExternalNewWorkspace || selectedLegacyApproved)))) &&
     !requestedSandboxRoot
+  const missingApprovedSandboxSubfolder =
+    usesApprovalLocationV1 &&
+    selectedCustomPathInsideWorkspace &&
+    !requestedSandboxSubfolder
   const canUseRequestedSandboxRoot =
-    !(optionBlockedReason || missingApprovedSandboxPath) &&
+    !(optionBlockedReason || missingApprovedSandboxPath || missingApprovedSandboxSubfolder) &&
     (!requestedSandboxRoot ||
       (!requestedLooksBlocked &&
         (requestedInsideWorkspace ||
@@ -47070,7 +47254,12 @@ function resolveGeneratedDomainSandboxApprovalDecision({
     (approved && missingApprovedSandboxPath
       ? usesApprovalRequestLegacy
         ? 'La aprobacion approve-sandbox-path requiere una ruta externa segura en freeAnswer.'
+        : usesApprovalLocationV1
+          ? 'La aprobacion approval-sandbox-location-v1 requiere un workspace externo seguro en freeAnswer.'
         : 'La aprobacion sandbox v1 requiere una ruta externa segura en freeAnswer.'
+      : '') ||
+    (approved && missingApprovedSandboxSubfolder
+      ? 'La aprobacion approval-sandbox-location-v1 requiere una carpeta sandbox explicita dentro del workspace alternativo.'
       : '') ||
     (approved && !canUseRequestedSandboxRoot
       ? 'La ruta aprobada no es un sandbox interno seguro ni puede mapearse de forma controlada.'
@@ -47081,11 +47270,18 @@ function resolveGeneratedDomainSandboxApprovalDecision({
     if (requestedInsideWorkspace) {
       effectiveSandboxRoot = requestedSandboxRoot
     } else if (!requestedBasenameBlocked && requestedLooksLikeSandbox) {
-      effectiveSandboxRoot = path.posix.join(
+      const mappedSandboxRoot = path.posix.join(
         '.codex-temp',
         'generated-domain-materialization-approved',
         slugifySandboxFolderName(requestedBasename),
       )
+      effectiveSandboxRoot =
+        requestedSandboxSubfolder && !requestedSandboxSubfolder.includes('..')
+          ? path.posix.join(
+              mappedSandboxRoot,
+              slugifySandboxFolderName(requestedSandboxSubfolder),
+            )
+          : mappedSandboxRoot
     }
   }
 

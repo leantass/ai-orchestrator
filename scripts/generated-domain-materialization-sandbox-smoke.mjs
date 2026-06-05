@@ -869,6 +869,103 @@ function runApprovedToolBankScenario() {
   }
 }
 
+function runSandboxLocationApprovalScenario() {
+  const approvedExternalSandboxPath =
+    'C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\sandbox-toolbank-local'
+  const approvedSandboxFolder = 'sandbox-community-toolbank'
+  const approvalFreeAnswer = `Apruebo crear/materializar unicamente en un sandbox seguro y aislado para esta prueba.
+
+Usar como workspace alternativo seguro la ruta:
+
+${approvedExternalSandboxPath}
+
+Dentro de ese workspace, materializar exclusivamente la carpeta:
+
+${approvedSandboxFolder}
+
+No tocar web-prueba.
+No crear .env.
+No crear node_modules.
+No usar Docker.
+No hacer deploy.
+No llamar servicios externos.
+No usar pagos reales.
+No usar base de datos productiva.
+No usar credenciales.
+
+La materializacion debe ser mock-only, local, segura y validada con el flujo sandbox.`
+  const contract = createToolBankContract()
+  const decision = createUniversalDecision(contract, {
+    resolvedDecisionMap: new Map([
+      [
+        'approval-sandbox-location-v1',
+        {
+          status: 'approved',
+          decision: 'approved',
+          selectedOption: 'custom-path-inside-workspace',
+          freeAnswer: approvalFreeAnswer,
+          summary:
+            'Lean aprobo materializar solo la SFD local segura dentro de un workspace externo controlado.',
+        },
+      ],
+    ]),
+    plannerFeedback: {
+      type: 'approval-granted',
+      approvalRequestDecisionKey: 'approval-sandbox-location-v1',
+      selectedOption: 'custom-path-inside-workspace',
+      freeAnswer: approvalFreeAnswer,
+      approvalReason:
+        'Materializar solo la SFD local segura dentro del sandbox externo aprobado y validarla con el flujo sandbox.',
+    },
+  })
+  const approvalEvaluation = decision.generatedDomainFileCreationApprovalEvaluation
+  const runtimeSource = decision.generatedDomainControlledRuntimeMaterializationSource
+  const universalPlan = decision.generatedDomainUniversalMaterializationPlan
+
+  assert.equal(approvalEvaluation?.approved, true)
+  assert.equal(approvalEvaluation?.blocked, false)
+  assert.equal(approvalEvaluation?.status, 'approved-for-sandbox')
+  assert.equal(
+    approvalEvaluation?.sandboxRoot?.relative,
+    '.codex-temp/generated-domain-materialization-approved/sandbox-toolbank-local/sandbox-community-toolbank',
+  )
+  assert.equal(runtimeSource?.enabled, true)
+  assert.equal(runtimeSource?.selectedSource, 'generated-domain-universal')
+  assert.equal(universalPlan?.status, 'built')
+  assert.equal(universalPlan?.canMaterializeInSandbox, true)
+  assert.equal(universalPlan?.safety?.safeForLocalMaterialization, true)
+
+  const materializationReport = observationHarness.materializeGeneratedDomainSandboxPlan({
+    generatedDomainUniversalMaterializationPlan: universalPlan,
+    generatedDomainFileCreationApprovalEvaluation: approvalEvaluation,
+  })
+
+  assert.equal(materializationReport?.status, 'materialized')
+  assert.equal(materializationReport?.materialized, true)
+  assert.equal(
+    materializationReport?.sandboxRoot?.relative,
+    '.codex-temp/generated-domain-materialization-approved/sandbox-toolbank-local/sandbox-community-toolbank',
+  )
+
+  const projectRootPath = path.join(
+    repoRoot,
+    '.codex-temp',
+    'generated-domain-materialization-approved',
+    'sandbox-toolbank-local',
+    'sandbox-community-toolbank',
+    universalPlan.projectRoot,
+  )
+  assert.equal(
+    fs.existsSync(path.join(projectRootPath, 'validation', 'report.json')),
+    true,
+    'La variante approval-sandbox-location-v1 debe persistir validation/report.json en el sandbox controlado.',
+  )
+
+  return {
+    createdCount: materializationReport.created.length,
+  }
+}
+
 async function main() {
   ensureRemoved(smokeSandboxPath)
 
@@ -892,15 +989,20 @@ async function main() {
     ]
     const results = scenarios.map((scenario) => runHappyPathScenario(scenario))
     const toolBankResult = runApprovedToolBankScenario()
+    const sandboxLocationResult = runSandboxLocationApprovalScenario()
     runBlockedCases(results[0].universalPlan)
 
     const totalCreated = results.reduce(
       (sum, entry) => sum + (Number.isInteger(entry.createdCount) ? entry.createdCount : 0),
       0,
-    ) + (Number.isInteger(toolBankResult.createdCount) ? toolBankResult.createdCount : 0)
+    ) +
+      (Number.isInteger(toolBankResult.createdCount) ? toolBankResult.createdCount : 0) +
+      (Number.isInteger(sandboxLocationResult.createdCount)
+        ? sandboxLocationResult.createdCount
+        : 0)
 
     console.log(
-      `OK. Generated domain sandbox materialization smoke completado. Dominios validados: ${scenarios.length + 1}. Archivos creados: ${totalCreated}.`,
+      `OK. Generated domain sandbox materialization smoke completado. Dominios validados: ${scenarios.length + 2}. Archivos creados: ${totalCreated}.`,
     )
   } finally {
     ensureRemoved(smokeSandboxPath)
@@ -910,6 +1012,15 @@ async function main() {
         '.codex-temp',
         'generated-domain-materialization-approved',
         'sandbox-toolbank-local',
+      ),
+    )
+    ensureRemoved(
+      path.join(
+        repoRoot,
+        '.codex-temp',
+        'generated-domain-materialization-approved',
+        'sandbox-toolbank-local',
+        'sandbox-community-toolbank',
       ),
     )
   }

@@ -9062,6 +9062,8 @@ function createApprovedToolBankObservationDecision({
   approvalRequestDecisionKey = 'approve-sandbox-path',
   selectedOption = 'sandbox-external-new-workspace',
   feedbackType = 'approval-granted',
+  freeAnswer = '',
+  approvalReason = '',
 } = {}) {
   const generatedDomainContract = {
     contractVersion: '1.0',
@@ -9234,7 +9236,7 @@ function createApprovedToolBankObservationDecision({
                 ? 'deferred'
                 : 'approved',
           selectedOption,
-          freeAnswer: approvedSandboxPath,
+          freeAnswer: freeAnswer || approvedSandboxPath,
           summary: 'Aprobacion humana explicita para materializacion sandbox controlada.',
         },
       ],
@@ -9243,8 +9245,9 @@ function createApprovedToolBankObservationDecision({
       type: feedbackType,
       approvalRequestDecisionKey,
       selectedOption,
-      freeAnswer: approvedSandboxPath,
+      freeAnswer: freeAnswer || approvedSandboxPath,
       approvalReason:
+        approvalReason ||
         'No tocar web-prueba, no crear .env, no instalar dependencias ni usar servicios externos.',
     },
     workspacePath: repoRoot,
@@ -9696,6 +9699,33 @@ async function runGeneratedDomainFileCreationApprovalEvaluationPayloadCase() {
 async function runGeneratedDomainSandboxApprovalBridgeCase() {
   const failures = []
   const decision = createApprovedToolBankObservationDecision()
+  const locationApprovalDecision = createApprovedToolBankObservationDecision({
+    approvalRequestDecisionKey: 'approval-sandbox-location-v1',
+    selectedOption: 'custom-path-inside-workspace',
+    freeAnswer: `Apruebo crear/materializar unicamente en un sandbox seguro y aislado para esta prueba.
+
+Usar como workspace alternativo seguro la ruta:
+
+C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\sandbox-toolbank-local
+
+Dentro de ese workspace, materializar exclusivamente la carpeta:
+
+sandbox-community-toolbank
+
+No tocar web-prueba.
+No crear .env.
+No crear node_modules.
+No usar Docker.
+No hacer deploy.
+No llamar servicios externos.
+No usar pagos reales.
+No usar base de datos productiva.
+No usar credenciales.
+
+La materializacion debe ser mock-only, local, segura y validada con el flujo sandbox.`,
+    approvalReason:
+      'Aprobacion explicita para materializacion mock-only dentro de un sandbox externo seguro y aislado.',
+  })
   const posixDecision = createApprovedToolBankObservationDecision({
     approvedSandboxPath: '/home/runner/work/sandbox-toolbank-local',
   })
@@ -9730,6 +9760,23 @@ async function runGeneratedDomainSandboxApprovalBridgeCase() {
   })
   const appSource = fs.readFileSync(appFilePath, 'utf8')
 
+  pushFailure(
+    failures,
+    locationApprovalDecision.generatedDomainFileCreationApprovalEvaluation?.approved ===
+      true &&
+      locationApprovalDecision.generatedDomainFileCreationApprovalEvaluation?.blocked ===
+        false &&
+      locationApprovalDecision.generatedDomainFileCreationApprovalEvaluation?.sandboxRoot
+        ?.relative ===
+        '.codex-temp/generated-domain-materialization-approved/sandbox-toolbank-local/sandbox-community-toolbank' &&
+      locationApprovalDecision.generatedDomainUniversalMaterializationPlan?.status ===
+        'built' &&
+      locationApprovalDecision.generatedDomainUniversalMaterializationPlan
+        ?.canMaterializeInSandbox === true &&
+      locationApprovalDecision.generatedDomainControlledRuntimeMaterializationSource
+        ?.selectedSource === 'generated-domain-universal',
+    'La variante approval-sandbox-location-v1 con custom-path-inside-workspace y un workspace externo seguro debe promoverse a materializacion sandbox controlada.',
+  )
   pushFailure(
     failures,
     decision.generatedDomainFileCreationApprovalEvaluation?.present === true &&
