@@ -81,6 +81,7 @@ function loadUiHarness() {
   const harness = `
 ${plannerSurface}
 module.exports = {
+  buildBrainRoutingDecision,
   buildLocalStrategicBrainDecision,
   materializeGeneratedDomainSandboxPlan,
 };
@@ -170,11 +171,27 @@ const previousExecutionResult =
     responseMode: 'options',
     selectedOption: 'approve',
   })
+const safeWorkspacePath = '.codex-temp\\generated-domain-materialization-approved'
+
+const maxQualityRoutingDecision = uiHarness.buildBrainRoutingDecision({
+  goal,
+  context,
+  workspacePath: safeWorkspacePath,
+  iteration: 1,
+  previousExecutionResult: '',
+  requiresApproval: false,
+  costMode: 'max-quality',
+  routingHints: null,
+})
+
+assert.equal(maxQualityRoutingDecision?.selectedProvider, 'local-rules')
+assert.equal(maxQualityRoutingDecision?.fallbackProvider, 'openai')
+assert.equal(maxQualityRoutingDecision?.routingMode, 'max-quality-policy')
 
 const decision = await uiHarness.buildLocalStrategicBrainDecision({
   goal,
   context,
-  workspacePath: repoRoot,
+  workspacePath: safeWorkspacePath,
   iteration: 1,
   previousExecutionResult,
   requiresApproval: false,

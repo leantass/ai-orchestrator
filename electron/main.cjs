@@ -16660,6 +16660,21 @@ function detectScopedExistingFileEditIntent({
   context,
   workspacePath,
 }) {
+  const materializeSafeFirstDeliveryIntent =
+    detectMaterializeSafeFirstDeliveryPlanningIntent(goal, context)
+  const frontendProjectMaterializationIntent =
+    detectFrontendProjectMaterializationPlanningIntent(goal, context)
+  const fullstackLocalMaterializationIntent =
+    detectFullstackLocalMaterializationPlanningIntent(goal, context)
+
+  if (
+    materializeSafeFirstDeliveryIntent?.matches === true ||
+    frontendProjectMaterializationIntent?.matches === true ||
+    fullstackLocalMaterializationIntent?.matches === true
+  ) {
+    return null
+  }
+
   const extractRelaxedFolderHint = (text) => {
     if (typeof text !== 'string' || !text.trim()) {
       return ''
@@ -20754,6 +20769,12 @@ function detectFullstackLocalDemoArchetype({
     return 'online-courses'
   }
 
+  if (
+    detectCommunityToolBankIntent(combinedText)
+  ) {
+    return 'community-tool-bank'
+  }
+
   if (detectLogisticsTrackingIntent(combinedText)) {
     return 'logistics-tracking'
   }
@@ -20764,12 +20785,6 @@ function detectFullstackLocalDemoArchetype({
     )
   ) {
     return 'veterinary'
-  }
-
-  if (
-    detectCommunityToolBankIntent(combinedText)
-  ) {
-    return 'operations'
   }
 
   if (
@@ -21959,6 +21974,23 @@ function resolveFullstackLocalContractProfile({
       publicRoutePath: '/catalog',
       publicRoutePurpose: 'Explorar el catálogo público local de cursos sin servicios externos.',
       validationSchemaMarker: 'create table courses',
+    }
+  }
+
+  if (resolvedArchetype === 'community-tool-bank') {
+    return {
+      archetype: resolvedArchetype,
+      frontendFeatureBasename: 'tools',
+      backendModuleBasename: 'tools',
+      backendRouteBasename: 'tools',
+      primaryFeatureLabel: 'herramientas, prestamos y reservas',
+      primaryRoutePath: '/tools',
+      primaryRoutePurpose:
+        'Listar herramientas, disponibilidad, prestamos y reservas mock en modo local.',
+      publicRoutePath: '/catalog',
+      publicRoutePurpose:
+        'Consultar el catalogo local de herramientas disponibles sin servicios reales.',
+      validationSchemaMarker: 'create table tools',
     }
   }
 
@@ -23592,6 +23624,117 @@ function buildOperationsFullstackLocalDemoData({
   })
 }
 
+function buildCommunityToolBankFullstackLocalDemoData({
+  appTitle,
+  nextRecommendedPhase,
+}) {
+  return buildTemplateFullstackLocalDemoData({
+    appTitle,
+    archetype: 'community-tool-bank',
+    heroKicker: 'Banco comunitario de herramientas',
+    subtitle:
+      'Entrega funcional local para herramientas disponibles, prestamos, reservas, devoluciones, incidencias y reportes simples.',
+    domainSummary:
+      'Permite revisar un banco comunitario de herramientas en modo local, seguro y mock-only, sin runtime real.',
+    nextRecommendedPhase,
+    navItems: [
+      { id: 'dashboard', label: 'Dashboard', hint: 'Estado general' },
+      { id: 'clients', label: 'Vecinos', hint: 'Personas registradas' },
+      { id: 'resources', label: 'Herramientas', hint: 'Catalogo y disponibilidad' },
+      { id: 'appointments', label: 'Prestamos', hint: 'Solicitudes y reservas' },
+      { id: 'reminders', label: 'Alertas', hint: 'Devoluciones e incidencias' },
+      { id: 'reports', label: 'Reportes', hint: 'Indicadores mock' },
+    ],
+    metrics: [
+      { id: 'tools', label: 'Herramientas activas', value: '42', tone: 'sky', detail: '36 disponibles y 6 en mantenimiento local' },
+      { id: 'loans', label: 'Prestamos vigentes', value: '11', tone: 'emerald', detail: '4 con devolución esta semana y 2 en revisión' },
+      { id: 'alerts', label: 'Alertas operativas', value: '3', tone: 'amber', detail: 'Devoluciones tardías o herramientas dañadas' },
+    ],
+    alerts: [
+      { id: 'tb-1', tone: 'amber', title: 'Tres alertas pendientes', detail: 'Revisar devoluciones atrasadas y una herramienta dañada.' },
+      { id: 'tb-2', tone: 'sky', title: 'Catalogo local listo', detail: 'Las herramientas pueden consultarse en modo local sin servicios externos.' },
+    ],
+    constraints: ['Sin npm install', 'Sin backend real', 'Sin base real', 'Sin deploy'],
+    team: [
+      { id: 'OPS-TB-001', name: 'Operación barrial', role: 'Seguimiento de prestamos', shift: '9 a 18 hs', status: 'Activa', focus: 'Aprobaciones, devoluciones y daños' },
+      { id: 'OPS-TB-002', name: 'Administración local', role: 'Catalogo y reportes', shift: '10 a 17 hs', status: 'Activa', focus: 'Altas, mantenimiento y métricas simples' },
+    ],
+    datasets: {
+      clients: [
+        { id: 'VEC-001', name: 'Lucía Torres', contact: 'interno 101', segment: 'Vecina', status: 'Activa', nextVisit: 'Retira 08/05', notes: 'Solicita herramientas para mejoras del centro comunitario.' },
+        { id: 'VEC-002', name: 'Mario Ruiz', contact: 'interno 114', segment: 'Vecino', status: 'Pendiente de aprobación', nextVisit: 'Reserva 09/05', notes: 'Esperando confirmación de disponibilidad de amoladora.' },
+      ],
+      resources: [
+        { id: 'TOOL-001', name: 'Taladro percutor', surface: 'Electricas', schedule: 'Disponible hoy', status: 'Disponible', note: 'Kit completo con mechas y maletín.' },
+        { id: 'TOOL-002', name: 'Amoladora angular', surface: 'Electricas', schedule: 'Reserva 09/05', status: 'Reservada', note: 'Requiere confirmar devolución previa.' },
+        { id: 'TOOL-003', name: 'Escalera extensible', surface: 'Altura', schedule: 'Mantenimiento 07/05', status: 'En revisión', note: 'Pendiente de control por daño menor.' },
+      ],
+      appointments: [
+        { id: 'PRE-001', clientName: 'Lucía Torres', professional: 'Operación barrial', reason: 'Prestamo de taladro percutor', slot: '08/05 10:00', status: 'confirmado', room: 'Mostrador local', notes: 'Entrega con devolución prevista al día siguiente.' },
+        { id: 'PRE-002', clientName: 'Mario Ruiz', professional: 'Administración local', reason: 'Reserva de amoladora angular', slot: '09/05 17:00', status: 'pendiente', room: 'Panel operativo', notes: 'Falta validar disponibilidad final.' },
+      ],
+      reminders: [
+        { id: 'ALT-001', clientName: 'Lucía Torres', type: 'Devolución programada', dueDate: '09/05', channel: 'Panel local', status: 'pendiente', detail: 'Confirmar recepción del taladro y estado general.' },
+        { id: 'ALT-002', clientName: 'Escalera extensible', type: 'Herramienta dañada', dueDate: '07/05', channel: 'Administración', status: 'en revisión', detail: 'Registrar observación local y bloquear nuevos préstamos.' },
+      ],
+      reports: [
+        { id: 'REP-TB-001', name: 'Prestamos por estado', value: '11', detail: 'La mayoría sigue en circuito local seguro y revisable.', status: 'Controlado' },
+        { id: 'REP-TB-002', name: 'Herramientas en revisión', value: '3', detail: 'Daños o mantenimientos relevados sin runtime real.', status: 'Atención' },
+      ],
+      activity: [
+        { id: 'ACT-TB-001', time: '09:20', title: 'Prestamo aprobado', detail: 'Lucía Torres recibió confirmación local para retirar el taladro.', tone: 'sky' },
+        { id: 'ACT-TB-002', time: '11:10', title: 'Incidencia registrada', detail: 'Se marcó una observación sobre la escalera extensible.', tone: 'amber' },
+      ],
+    },
+    views: [
+      buildFullstackLocalDemoView({ id: 'dashboard', label: 'Dashboard', title: 'Estado del banco de herramientas', description: 'Resumen local de herramientas, préstamos y alertas.', kind: 'dashboard', supportsSearch: false }),
+      buildFullstackLocalDemoView({
+        id: 'clients', label: 'Vecinos', title: 'Vecinos', description: 'Personas registradas para solicitar o devolver herramientas.',
+        datasetKey: 'clients',
+        columns: [{ key: 'name', label: 'Vecino' }, { key: 'segment', label: 'Tipo' }, { key: 'contact', label: 'Contacto' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'notes', label: 'Notas' }],
+        searchableKeys: ['name', 'segment', 'contact', 'status'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'resources', label: 'Herramientas', title: 'Herramientas', description: 'Catalogo local con disponibilidad y estado de conservación.',
+        datasetKey: 'resources',
+        columns: [{ key: 'name', label: 'Herramienta' }, { key: 'surface', label: 'Categoría' }, { key: 'schedule', label: 'Disponibilidad' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'note', label: 'Detalle' }],
+        searchableKeys: ['name', 'surface', 'schedule', 'status'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'appointments', label: 'Prestamos', title: 'Prestamos y reservas', description: 'Solicitudes, aprobaciones y reservas locales.',
+        datasetKey: 'appointments',
+        columns: [{ key: 'slot', label: 'Fecha' }, { key: 'clientName', label: 'Vecino' }, { key: 'reason', label: 'Solicitud' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'professional', label: 'Operación' }, { key: 'notes', label: 'Notas' }],
+        searchableKeys: ['clientName', 'reason', 'status'],
+        supportsStatusFilter: true,
+      }),
+      buildFullstackLocalDemoView({
+        id: 'reminders', label: 'Alertas', title: 'Alertas', description: 'Devoluciones, daños e incidencias locales.',
+        datasetKey: 'reminders',
+        columns: [{ key: 'type', label: 'Alerta' }, { key: 'clientName', label: 'Origen' }, { key: 'dueDate', label: 'Fecha' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'detail', label: 'Detalle' }],
+        searchableKeys: ['type', 'clientName', 'status'],
+      }),
+      buildFullstackLocalDemoView({ id: 'reports', label: 'Reportes', title: 'Reportes', description: 'Indicadores mock del banco comunitario.', datasetKey: 'reports', kind: 'reports', supportsSearch: false }),
+    ],
+    quickActions: [
+      { id: 'qa-tb-1', label: 'Ver herramientas', targetView: 'resources', feedback: 'Se abrió el catálogo local de herramientas.' },
+      { id: 'qa-tb-2', label: 'Revisar préstamos', targetView: 'appointments', feedback: 'Se abrió el tablero local de préstamos y reservas.' },
+      { id: 'qa-tb-3', label: 'Abrir alertas', targetView: 'reminders', feedback: 'Quedaron visibles las devoluciones e incidencias pendientes.' },
+    ],
+    interactionHighlights: [
+      'Buscar herramientas disponibles, categorías y estado desde el tablero local.',
+      'Revisar préstamos, reservas y devoluciones en modo mock sin backend real.',
+      'Registrar alertas por daños o demoras sin salir del navegador.',
+    ],
+    statusOptions: { appointments: ['todos', 'pendiente', 'confirmado', 'en revisión', 'devuelto'] },
+    domainEntities: ['herramientas', 'prestamos', 'reservas', 'devoluciones', 'vecinos', 'reportes'],
+    modules: ['herramientas', 'prestamos', 'reservas', 'devoluciones', 'panel operativo', 'reportes'],
+  })
+}
+
 function buildLogisticsTrackingFullstackLocalDemoData({
   appTitle,
   nextRecommendedPhase,
@@ -24127,6 +24270,11 @@ function buildFullstackLocalDemoData({
       })
     case 'online-courses':
       return buildOnlineCoursesFullstackLocalDemoData({
+        appTitle,
+        nextRecommendedPhase,
+      })
+    case 'community-tool-bank':
+      return buildCommunityToolBankFullstackLocalDemoData({
         appTitle,
         nextRecommendedPhase,
       })
@@ -26158,6 +26306,8 @@ function buildFullstackLocalBackendServerContent(fullstackLocalDemoData) {
     fullstackContractProfile.archetype === 'online-courses'
   const isLogisticsTracking =
     fullstackContractProfile.archetype === 'logistics-tracking'
+  const isCommunityToolBank =
+    fullstackContractProfile.archetype === 'community-tool-bank'
   const datasetMap = buildFullstackLocalDatasetCollectionMap(fullstackLocalDemoData)
   const collectionCounts = Object.fromEntries(
     Object.entries(datasetMap).map(([datasetKey, entries]) => [
@@ -26311,6 +26461,83 @@ function createServerContract() {
       ),
       mockIncidentReview: markIncidentReviewed(
         listMockIncidents()[0] && listMockIncidents()[0].id,
+      ),
+    },
+    health: healthRoute(),
+  }
+}
+
+module.exports = {
+  createRouteContracts,
+  createServerContract,
+  createServerManifest: createServerContract,
+}
+`
+  }
+
+  if (isCommunityToolBank) {
+    return `const { healthRoute } = require('./routes/health')
+const {
+  listMockAppointments,
+  listMockClients,
+  listResources,
+  listMockReminders,
+  listMockReports,
+  listMockTeam,
+  listDatasetKeys,
+  buildAppointmentDetail,
+  transitionAppointmentStatus,
+  markReminderReviewed,
+} = require('./modules/${fullstackContractProfile.backendModuleBasename}')
+
+function createRouteContracts() {
+  return [
+    { method: 'GET', path: '/health', purpose: 'Chequeo conceptual de salud local.' },
+    { method: 'GET', path: ${JSON.stringify(fullstackContractProfile.primaryRoutePath)}, purpose: ${JSON.stringify(fullstackContractProfile.primaryRoutePurpose)} },
+    { method: 'GET', path: '/neighbors', purpose: 'Listar vecinos y su estado mock dentro del circuito local.' },
+    { method: 'GET', path: ${JSON.stringify(fullstackContractProfile.publicRoutePath)}, purpose: ${JSON.stringify(fullstackContractProfile.publicRoutePurpose)} },
+    { method: 'GET', path: '/alerts', purpose: 'Listar alertas, devoluciones e incidencias locales.' },
+    { method: 'GET', path: '/reports', purpose: 'Listar reportes mock sin exportacion real.' },
+  ]
+}
+
+function createServerContract() {
+  return {
+    kind: 'fullstack-local',
+    archetype: ${JSON.stringify(fullstackLocalDemoData?.overview?.archetype || 'community-tool-bank')},
+    activeServer: false,
+    canListen: false,
+    routes: createRouteContracts(),
+    counts: {
+      loans: listMockAppointments().length,
+      neighbors: listMockClients().length,
+      tools: listResources().length,
+      alerts: listMockReminders().length,
+      reports: listMockReports().length,
+      team: listMockTeam().length,
+    },
+    collections: ${JSON.stringify(collectionCounts, null, 2)},
+    availableDatasets: listDatasetKeys(),
+    reviewFlows: [
+      'listar herramientas y disponibilidad mock',
+      'revisar prestamos y reservas locales',
+      'simular cambio de estado de un prestamo',
+      'marcar alertas o devoluciones como revisadas',
+      'leer reportes locales sin exportacion real',
+    ],
+    sampleOperations: {
+      nextLoanDetail: buildAppointmentDetail(listMockAppointments()[0] && listMockAppointments()[0].id),
+      mockStatusTransition: transitionAppointmentStatus(
+        listMockAppointments()[0] && listMockAppointments()[0].id,
+        ${JSON.stringify(
+          summarizeUniqueExecutorStrings(
+            (fullstackLocalDemoData?.statusOptions?.appointments || []).filter(Boolean),
+            2,
+          )[0] || 'confirmado',
+        )},
+      ),
+      mockAlertReview: markReminderReviewed(
+        listMockReminders()[0] && listMockReminders()[0].id,
       ),
     },
     health: healthRoute(),
@@ -26485,6 +26712,13 @@ function buildFullstackLocalSharedDomainObject(fullstackLocalDemoData) {
           trackingEvents: 'trackingEvents',
           incidents: 'reminders',
         }
+      : fullstackContractProfile.archetype === 'community-tool-bank'
+        ? {
+            neighbors: 'clients',
+            tools: 'resources',
+            loans: 'appointments',
+            alerts: 'reminders',
+          }
       : fullstackContractProfile.archetype === 'online-courses'
         ? {
             catalog: 'courses',
@@ -26672,6 +26906,29 @@ function buildFullstackLocalEntityRelationships(fullstackLocalDemoData) {
         to: 'progress',
         relation: 'one-to-many',
         detail: 'Cada inscripción acumula avance por clase y curso.',
+      },
+    ]
+  }
+
+  if (fullstackContractProfile.archetype === 'community-tool-bank') {
+    return [
+      {
+        from: 'neighbors',
+        to: 'loans',
+        relation: 'one-to-many',
+        detail: 'Un vecino puede solicitar varios préstamos o reservas dentro del circuito local.',
+      },
+      {
+        from: 'tools',
+        to: 'loans',
+        relation: 'one-to-many',
+        detail: 'Cada herramienta puede aparecer en múltiples préstamos o reservas según disponibilidad.',
+      },
+      {
+        from: 'tools',
+        to: 'alerts',
+        relation: 'one-to-many',
+        detail: 'Las alertas cubren devoluciones, daños y mantenimiento sobre herramientas concretas.',
       },
     ]
   }
@@ -27694,6 +27951,99 @@ insert into incidents (id, shipment_id, incident_type, due_at, status, channel, 
     }
   }
 
+  if (archetype === 'community-tool-bank') {
+    return {
+      readmeContent: `# Database local
+
+Esta carpeta queda como diseño revisable para el banco comunitario de herramientas.
+
+- No se creó una base de datos real.
+- No se ejecutaron migraciones.
+- \`schema.sql\` y \`seeds/seed-local.sql\` describen herramientas, vecinos, préstamos, reservas y alertas mock.
+`,
+      schemaContent: `-- Esquema local revisable para ${appTitle}
+-- No ejecutar automáticamente sin una aprobación posterior.
+
+create table neighbors (
+  id text primary key,
+  full_name text not null,
+  contact text,
+  role_label text,
+  status text not null,
+  notes text
+);
+
+create table tools (
+  id text primary key,
+  name text not null,
+  category text not null,
+  availability_label text,
+  status text not null,
+  notes text
+);
+
+create table loans (
+  id text primary key,
+  neighbor_id text not null,
+  tool_id text not null,
+  scheduled_at text not null,
+  reason text not null,
+  status text not null,
+  operation_area text,
+  notes text,
+  foreign key (neighbor_id) references neighbors(id),
+  foreign key (tool_id) references tools(id)
+);
+
+create table alerts (
+  id text primary key,
+  loan_id text,
+  tool_id text,
+  alert_type text not null,
+  due_date text not null,
+  status text not null,
+  channel text,
+  notes text,
+  foreign key (loan_id) references loans(id),
+  foreign key (tool_id) references tools(id)
+);
+
+create table report_snapshots (
+  id text primary key,
+  snapshot_date text not null,
+  report_name text not null,
+  metric_label text not null,
+  metric_value text not null,
+  status text not null,
+  notes text
+);
+`,
+      seedContent: `-- Seed local y revisable. No ejecutar automáticamente.
+
+insert into neighbors (id, full_name, contact, role_label, status, notes) values
+  ('VEC-001', 'Lucía Torres', 'interno 101', 'Vecina', 'Activa', 'Solicita herramientas para mejoras del centro comunitario'),
+  ('VEC-002', 'Mario Ruiz', 'interno 114', 'Vecino', 'Pendiente de aprobación', 'Esperando confirmación de disponibilidad de amoladora');
+
+insert into tools (id, name, category, availability_label, status, notes) values
+  ('TOOL-001', 'Taladro percutor', 'Electricas', 'Disponible hoy', 'Disponible', 'Kit completo con mechas y maletín'),
+  ('TOOL-002', 'Amoladora angular', 'Electricas', 'Reserva 09/05', 'Reservada', 'Requiere confirmar devolución previa'),
+  ('TOOL-003', 'Escalera extensible', 'Altura', 'Mantenimiento 07/05', 'En revisión', 'Pendiente de control por daño menor');
+
+insert into loans (id, neighbor_id, tool_id, scheduled_at, reason, status, operation_area, notes) values
+  ('PRE-001', 'VEC-001', 'TOOL-001', '2026-05-08 10:00', 'Préstamo de taladro percutor', 'confirmado', 'Mostrador local', 'Entrega con devolución prevista al día siguiente'),
+  ('PRE-002', 'VEC-002', 'TOOL-002', '2026-05-09 17:00', 'Reserva de amoladora angular', 'pendiente', 'Panel operativo', 'Falta validar disponibilidad final');
+
+insert into alerts (id, loan_id, tool_id, alert_type, due_date, status, channel, notes) values
+  ('ALT-001', 'PRE-001', 'TOOL-001', 'Devolución programada', '2026-05-09', 'pendiente', 'Panel local', 'Confirmar recepción del taladro y estado general'),
+  ('ALT-002', null, 'TOOL-003', 'Herramienta dañada', '2026-05-07', 'en revisión', 'Administración', 'Registrar observación local y bloquear nuevos préstamos');
+
+insert into report_snapshots (id, snapshot_date, report_name, metric_label, metric_value, status, notes) values
+  ('REP-TB-001', '2026-05-05', 'Prestamos por estado', 'Prestamos vigentes', '11', 'controlado', 'Circuito local seguro y revisable'),
+  ('REP-TB-002', '2026-05-05', 'Herramientas en revisión', 'Alertas operativas', '3', 'atención', 'Daños o mantenimientos relevados sin runtime real');
+`,
+    }
+  }
+
   return {
     readmeContent: `# Database local
 
@@ -28510,6 +28860,7 @@ function buildFullstackLocalMaterializationPlan({
   const databaseSeedsFolder = path.join(databaseFolder, 'seeds')
   const scriptsFolder = path.join(rootFolder, 'scripts')
   const docsFolder = path.join(rootFolder, 'docs')
+  const validationFolder = path.join(rootFolder, 'validation')
   const rootReadmePath = path.join(rootFolder, 'README.md')
   const rootPackageJsonPath = path.join(rootFolder, 'package.json')
   const frontendPackageJsonPath = path.join(frontendFolder, 'package.json')
@@ -28536,6 +28887,7 @@ function buildFullstackLocalMaterializationPlan({
   const docsApiPath = path.join(docsFolder, 'api.md')
   const docsDataModelPath = path.join(docsFolder, 'data-model.md')
   const docsRunbookPath = path.join(docsFolder, 'local-runbook.md')
+  const validationReportJsonPath = path.join(validationFolder, 'report.json')
   const projectManifestPath = path.join(rootFolder, 'jefe-project.json')
   const modules = summarizeUniqueExecutorStrings(
     normalizedScalablePlan?.modules ||
@@ -29595,6 +29947,32 @@ Modelar una integración futura con Mercado Pago sin credenciales, sin checkout 
 `
     : ''
   const docsRunbookContent = documentationBundle.runbookContent
+  const validationReportJsonContent = `${JSON.stringify(
+    {
+      status: 'materialized',
+      projectRoot: rootFolder,
+      domain: domainLabel || appTitle || 'proyecto local',
+      deliveryLevel: 'fullstack-local',
+      archetype: fullstackContractProfile.archetype || 'operations',
+      sandboxControlled: true,
+      safeForLocalMaterialization: true,
+      validations: [
+        'frontend-file-protocol-ready',
+        'no-dot-env',
+        'no-node-modules',
+        'no-docker',
+        'no-deploy',
+        'no-external-services',
+        'no-real-payments',
+        'no-production-db',
+        'no-web-prueba',
+      ],
+      nextRecommendedPhase:
+        localProjectManifest?.nextRecommendedPhase || 'frontend-mock-flow',
+    },
+    null,
+    2,
+  )}\n`
   const databaseSchemaValidationMarker =
     fullstackContractProfile.validationSchemaMarker ||
     (fullstackLocalArchetype === 'veterinary'
@@ -29709,6 +30087,7 @@ Modelar una integración futura con Mercado Pago sin credenciales, sin checkout 
       docsApiPath,
       docsDataModelPath,
       docsRunbookPath,
+      validationReportJsonPath,
       scriptsSeedPath,
       projectManifestPath,
     ].map((entry) => toGeneratedDomainContractPath(entry)),
@@ -29948,6 +30327,7 @@ Modelar una integración futura con Mercado Pago sin credenciales, sin checkout 
         { type: 'create-folder', targetPath: databaseSeedsFolder },
         { type: 'create-folder', targetPath: scriptsFolder },
         { type: 'create-folder', targetPath: docsFolder },
+        { type: 'create-folder', targetPath: validationFolder },
         { type: 'replace-file', targetPath: rootReadmePath, nextContent: rootReadmeContent },
         { type: 'replace-file', targetPath: rootPackageJsonPath, nextContent: rootPackageJsonContent },
         { type: 'replace-file', targetPath: frontendPackageJsonPath, nextContent: frontendPackageJsonContent },
@@ -30326,6 +30706,11 @@ module.exports = {
             ]
           : []),
         { type: 'replace-file', targetPath: docsRunbookPath, nextContent: docsRunbookContent },
+        {
+          type: 'replace-file',
+          targetPath: validationReportJsonPath,
+          nextContent: validationReportJsonContent,
+        },
         { type: 'replace-file', targetPath: projectManifestPath, nextContent: localProjectManifestContent },
       ],
       validations: [
@@ -30519,6 +30904,7 @@ module.exports = {
         { type: 'exists', targetPath: docsApiPath, expectedKind: 'file' },
         { type: 'exists', targetPath: docsDataModelPath, expectedKind: 'file' },
         { type: 'exists', targetPath: docsRunbookPath, expectedKind: 'file' },
+        { type: 'exists', targetPath: validationReportJsonPath, expectedKind: 'file' },
         { type: 'exists', targetPath: projectManifestPath, expectedKind: 'file' },
         ...(usesCanonicalSpecializedFullstackContract
           ? []
@@ -30544,6 +30930,8 @@ module.exports = {
         { type: 'file-contains', targetPath: docsApiPath, expectedText: fullstackContractProfile.primaryRoutePath },
         { type: 'file-contains', targetPath: docsDataModelPath, expectedText: 'Entidades principales' },
         { type: 'file-contains', targetPath: docsRunbookPath, expectedText: 'Como abrir la entrega local' },
+        { type: 'file-contains', targetPath: validationReportJsonPath, expectedText: '"status": "materialized"' },
+        { type: 'file-contains', targetPath: validationReportJsonPath, expectedText: '"safeForLocalMaterialization": true' },
         ...(usesLogisticsFullstackContract
           ? [
               {
@@ -36834,6 +37222,9 @@ function buildFullstackLocalArchetypeAppTitle(archetype) {
   if (archetype === 'online-courses') {
     return 'Cursos online local'
   }
+  if (archetype === 'community-tool-bank') {
+    return 'Banco comunitario de herramientas local'
+  }
   if (archetype === 'veterinary') {
     return 'Veterinaria local'
   }
@@ -36869,6 +37260,9 @@ function buildFullstackLocalArchetypeDisplayLabel(archetype) {
   if (archetype === 'online-courses') {
     return 'Cursos online'
   }
+  if (archetype === 'community-tool-bank') {
+    return 'Banco comunitario de herramientas'
+  }
   if (archetype === 'veterinary') {
     return 'Veterinaria'
   }
@@ -36903,11 +37297,17 @@ function buildFullstackLocalArchetypeDisplayLabel(archetype) {
 function fullstackLocalDomainLabelMatchesArchetype(label, archetype) {
   const normalizedLabel = normalizeSectorDetectionText(label)
 
-  if (!normalizedLabel || !archetype || archetype === 'operations') {
+  if (
+    !normalizedLabel ||
+    !archetype ||
+    archetype === 'operations'
+  ) {
     return true
   }
 
   const compatibilityPatterns = {
+    'community-tool-bank':
+      /\bherramientas?\b|\bprestamos?\b|\breservas?\b|\bdevoluciones?\b|\bvecin(?:o|os|a|as)\b|\bcomunitari[oa]s?\b/u,
     'online-courses':
       /\bcursos?\b|\bclases?\b|\blecciones?\b|\bmodulos?\b|\bmódulos?\b|\balumnos?\b|\bestudiantes?\b|\binscripciones?\b|\bplanes?\b|\bmercado pago\b|\bprogreso\b/u,
     veterinary: /\bveterinaria\b|\bveterinari[oa]s?\b|\bmascotas?\b|\bvacunas?\b|\bpet\b/u,
@@ -47295,10 +47695,25 @@ function hasGeneratedDomainUnsafeApprovalAuthorization(value) {
     return false
   }
 
+  const hasExplicitUnsafeGrant = (tokenPattern) =>
+    new RegExp(
+      String.raw`\b(?:autoriz[oa]|permit[oa]|habilit[oa]|aprobad[oa]|acept[oa]|se puede)\b[\s\S]{0,80}${tokenPattern.source}`,
+      'iu',
+    ).test(normalizedValue)
+
   const hasPositiveUnsafeAuthorization = (tokenPattern, negativePattern) =>
     tokenPattern.test(normalizedValue) && !negativePattern.test(normalizedValue)
 
   return (
+    hasExplicitUnsafeGrant(/\bweb-prueba\b/iu) ||
+    hasExplicitUnsafeGrant(/\b\.env\b/iu) ||
+    hasExplicitUnsafeGrant(/\bnode_modules\b/iu) ||
+    hasExplicitUnsafeGrant(/\b(?:docker|dockerfile|docker-compose)\b/iu) ||
+    hasExplicitUnsafeGrant(/\bdeploy\b/iu) ||
+    hasExplicitUnsafeGrant(/\bservicios?\s+externos?\b/iu) ||
+    hasExplicitUnsafeGrant(/\bpagos?\s+reales?\b/iu) ||
+    hasExplicitUnsafeGrant(/\b(?:db\s+productiva|base\s+de\s+datos\s+productiva)\b/iu) ||
+    hasExplicitUnsafeGrant(/\bcredenciales\b/iu) ||
     hasPositiveUnsafeAuthorization(
       /\bweb-prueba\b/iu,
       /\b(?:no|sin)\s+tocar\s+web-prueba\b/iu,
@@ -54658,6 +55073,23 @@ function buildBrainRoutingAssessment(input) {
     instruction: input.goal,
     context: input.context,
   })
+  const materializeSafeFirstDeliveryIntent =
+    detectMaterializeSafeFirstDeliveryPlanningIntent(input.goal, input.context)
+  const frontendProjectMaterializationIntent =
+    detectFrontendProjectMaterializationPlanningIntent(input.goal, input.context)
+  const fullstackLocalMaterializationIntent =
+    detectFullstackLocalMaterializationPlanningIntent(input.goal, input.context)
+  const structuredLocalMaterializationGoal =
+    materializeSafeFirstDeliveryIntent.matches === true ||
+    frontendProjectMaterializationIntent.matches === true ||
+    fullstackLocalMaterializationIntent.matches === true
+  const strongFullstackRequestProfile = detectStrongFullstackLocalRequestProfile({
+    goal: input.goal,
+    context: input.context,
+    previousExecutionResult: input.previousExecutionResult,
+  })
+  const explicitLocalFunctionalDeliveryIntent =
+    detectExplicitLocalFunctionalDeliveryIntent(input.goal, input.context)
   const looksLikeWebBaseGoal =
     !scopedFileEditIntent &&
     Boolean(webScaffoldSector) &&
@@ -54666,15 +55098,16 @@ function buildBrainRoutingAssessment(input) {
       normalizedGoal.includes('landing') ||
       normalizedGoal.includes('pagina'))
   const looksLikeCreativeOrOpenEndedGoal =
-    (!scopedFileEditIntent && looksLikeWebBaseGoal) ||
-    normalizedGoal.includes('base') ||
-    (!scopedFileEditIntent && normalizedGoal.includes('experiencia')) ||
-    normalizedGoal.includes('diseño') ||
-    normalizedGoal.includes('diseno') ||
-    (!scopedFileEditIntent && normalizedGoal.includes('original')) ||
-    (!scopedFileEditIntent && normalizedGoal.includes('estructura')) ||
-    normalizedGoal.includes('marca') ||
-    (!scopedFileEditIntent && normalizedContext.length > 140)
+    !structuredLocalMaterializationGoal &&
+    ((!scopedFileEditIntent && looksLikeWebBaseGoal) ||
+      normalizedGoal.includes('base') ||
+      (!scopedFileEditIntent && normalizedGoal.includes('experiencia')) ||
+      normalizedGoal.includes('diseño') ||
+      normalizedGoal.includes('diseno') ||
+      (!scopedFileEditIntent && normalizedGoal.includes('original')) ||
+      (!scopedFileEditIntent && normalizedGoal.includes('estructura')) ||
+      normalizedGoal.includes('marca') ||
+      (!scopedFileEditIntent && normalizedContext.length > 140))
   const hasRecoverableExecutionError = plannerFeedback?.type === 'execution-error'
   const isDeterministicLocal =
     Boolean(localGoalDescriptor) || Boolean(scopedFileEditIntent) || isDeterministicComposite
@@ -54754,6 +55187,12 @@ function buildBrainRoutingAssessment(input) {
     hasRecoverableExecutionError,
     isDeterministicLocal,
     localRulesFit,
+    materializeSafeFirstDeliveryIntent,
+    frontendProjectMaterializationIntent,
+    fullstackLocalMaterializationIntent,
+    structuredLocalMaterializationGoal,
+    strongFullstackRequestProfile,
+    explicitLocalFunctionalDeliveryIntent,
   }
 }
 
@@ -55277,19 +55716,52 @@ function buildBrainRoutingDecision(input) {
   }
 
   if (normalizedCostMode === 'max-quality') {
-    if (
+    const maxQualitySandboxPlanningFit =
+      (assessment.structuredLocalMaterializationGoal === true ||
+        (assessment.strongFullstackRequestProfile?.matches === true &&
+          ['fullstack-local', 'safe-first-delivery'].includes(
+            normalizeOptionalString(
+              assessment.strongFullstackRequestProfile?.deliveryLevel,
+            ).toLocaleLowerCase(),
+          ) &&
+          (assessment.explicitLocalFunctionalDeliveryIntent === true ||
+            assessment.strongFullstackRequestProfile?.requiresSensitiveReview !==
+              true))) &&
+      assessment.risk !== 'high' &&
+      !assessment.hasRecoverableExecutionError
+    const maxQualityDeterministicLocalFit =
       assessment.localRulesFit &&
-      assessment.impact === 'low' &&
+      assessment.isDeterministicLocal &&
+      assessment.risk !== 'high' &&
+      !assessment.looksLikeCreativeOrOpenEndedGoal &&
+      !assessment.hasRecoverableExecutionError &&
       !assessment.explicitApprovalPreference
+
+    if (
+      (assessment.localRulesFit && assessment.impact === 'low' && !assessment.explicitApprovalPreference) ||
+      maxQualitySandboxPlanningFit ||
+      maxQualityDeterministicLocalFit
     ) {
       return buildBrainRoutingDecisionDetails({
         selectedProvider: 'local-rules',
         fallbackProvider: 'openai',
         reason:
-          'Incluso en max-quality, el pedido es tan trivial y acotado que local-rules alcanza sin sacrificar calidad material.',
-        confidence: 0.8,
+          maxQualitySandboxPlanningFit
+            ? 'Incluso en max-quality, un pedido fullstack local con restricciones fuertes de sandbox conviene resolverlo primero con local-rules para evitar que la UI quede congelada esperando un provider remoto.'
+            : maxQualityDeterministicLocalFit
+            ? 'Incluso en max-quality, el pedido es local, determinista y seguro; conviene priorizar local-rules para no congelar la UI esperando un provider remoto.'
+            : 'Incluso en max-quality, el pedido es tan trivial y acotado que local-rules alcanza sin sacrificar calidad material.',
+        confidence: maxQualitySandboxPlanningFit
+          ? 0.9
+          : maxQualityDeterministicLocalFit
+            ? 0.88
+            : 0.8,
         routingMode: 'max-quality-policy',
-        problemNature: 'max-quality-trivial-local',
+        problemNature: maxQualitySandboxPlanningFit
+          ? 'max-quality-sandbox-local'
+          : maxQualityDeterministicLocalFit
+            ? 'max-quality-deterministic-local'
+            : 'max-quality-trivial-local',
         costMode: normalizedCostMode,
         assessment,
       })
@@ -57749,6 +58221,28 @@ function createStrategicBrainProviderRegistry() {
   }
 }
 
+async function buildResponsiveLocalStrategicBrainFallbackResult(input, reason) {
+  const providerRegistry = createStrategicBrainProviderRegistry()
+  const localRulesProvider = providerRegistry['local-rules']
+  const routingDecision = buildBrainRoutingDecision(buildStrategicBrainInput(input))
+  const decision = await buildLocalStrategicBrainDecision(input)
+
+  return {
+    routingDecision: {
+      ...routingDecision,
+      resolvedProvider: localRulesProvider.providerId,
+      fallbackUsed: true,
+      fallbackReason: reason,
+    },
+    adapter: buildStrategicBrainProviderDescriptor(localRulesProvider),
+    primaryAdapter: buildStrategicBrainProviderDescriptor(
+      providerRegistry[routingDecision.selectedProvider] || localRulesProvider,
+    ),
+    fallbackAdapter: buildStrategicBrainProviderDescriptor(localRulesProvider),
+    decision,
+  }
+}
+
 function shouldStartGeneratedDomainContractObservation({
   strategicBrainInput,
   primaryProvider,
@@ -57917,6 +58411,29 @@ async function requestStrategicBrainDecision(input) {
     providerRegistry[routingDecision.fallbackProvider]
       ? providerRegistry[routingDecision.fallbackProvider]
       : null
+  const strongFullstackLocalFallbackProfile = detectStrongFullstackLocalRequestProfile({
+    goal: strategicBrainInput.goal,
+    context: strategicBrainInput.context,
+    previousExecutionResult: strategicBrainInput.previousExecutionResult,
+  })
+  const responsiveOpenAIFallbackTimeoutMs = Math.max(
+    5000,
+    Number.parseInt(
+      process.env.AI_ORCHESTRATOR_BRAIN_RESPONSIVE_FALLBACK_TIMEOUT_MS || '12000',
+      10,
+    ) || 12000,
+  )
+  const shouldUseResponsiveOpenAIFallback =
+    primaryProvider?.providerId === 'openai' &&
+    fallbackProvider?.providerId === 'local-rules' &&
+    normalizeOptionalString(routingDecision?.costMode).toLocaleLowerCase() ===
+      'max-quality' &&
+    strongFullstackLocalFallbackProfile?.matches === true &&
+    ['fullstack-local', 'safe-first-delivery'].includes(
+      normalizeOptionalString(
+        strongFullstackLocalFallbackProfile?.deliveryLevel,
+      ).toLocaleLowerCase(),
+    )
   const generatedDomainContractObservationHandle =
     startGeneratedDomainContractObservationTask({
       strategicBrainInput,
@@ -57931,8 +58448,46 @@ async function requestStrategicBrainDecision(input) {
       )
     }
 
+    let resolvedDecision = null
+    let responsiveFallbackUsed = false
+    let responsiveFallbackReason = ''
+
+    if (shouldUseResponsiveOpenAIFallback) {
+      const primaryDecisionPromise = Promise.resolve().then(() =>
+        primaryProvider.decide(strategicBrainInput),
+      )
+      const responsiveFallbackPromise = new Promise((resolve) => {
+        setTimeout(async () => {
+          const fallbackDecision = await fallbackProvider.decide(strategicBrainInput)
+          resolve({
+            timedOut: true,
+            fallbackDecision,
+          })
+        }, responsiveOpenAIFallbackTimeoutMs)
+      })
+      const responsiveResult = await Promise.race([
+        primaryDecisionPromise.then((decision) => ({
+          timedOut: false,
+          decision,
+        })),
+        responsiveFallbackPromise,
+      ])
+
+      if (responsiveResult?.timedOut === true) {
+        resolvedDecision = responsiveResult.fallbackDecision
+        responsiveFallbackUsed = true
+        responsiveFallbackReason =
+          `OpenAI no respondio a tiempo para un pedido fullstack local seguro; ` +
+          `JEFE continuo con local-rules tras ${responsiveOpenAIFallbackTimeoutMs} ms.`
+      } else {
+        resolvedDecision = responsiveResult?.decision || null
+      }
+    } else {
+      resolvedDecision = await primaryProvider.decide(strategicBrainInput)
+    }
+
     const decision = finalizeGeneratedDomainContractObservation({
-      legacyDecision: await primaryProvider.decide(strategicBrainInput),
+      legacyDecision: resolvedDecision,
       observationHandle: generatedDomainContractObservationHandle,
     })
 
@@ -57940,10 +58495,17 @@ async function requestStrategicBrainDecision(input) {
       routingDecision: {
         ...routingDecision,
         selectedProvider: primaryProvider.providerId,
-        resolvedProvider: primaryProvider.providerId,
-        fallbackUsed: false,
+        resolvedProvider: responsiveFallbackUsed
+          ? fallbackProvider.providerId
+          : primaryProvider.providerId,
+        fallbackUsed: responsiveFallbackUsed,
+        fallbackReason: responsiveFallbackUsed
+          ? responsiveFallbackReason
+          : undefined,
       },
-      adapter: buildStrategicBrainProviderDescriptor(primaryProvider),
+      adapter: buildStrategicBrainProviderDescriptor(
+        responsiveFallbackUsed ? fallbackProvider : primaryProvider,
+      ),
       primaryAdapter: buildStrategicBrainProviderDescriptor(primaryProvider),
       fallbackAdapter: buildStrategicBrainProviderDescriptor(fallbackProvider),
       decision,
@@ -57989,12 +58551,72 @@ function createWindow() {
     },
   })
 
+  maybeRunElectronVisualE2EDriver(mainWindow)
+
   if (isDev) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL)
     return
   }
 
   mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
+}
+
+function maybeRunElectronVisualE2EDriver(mainWindow) {
+  const configuredDriverPath =
+    typeof process.env.AI_ORCHESTRATOR_ELECTRON_E2E_DRIVER === 'string'
+      ? process.env.AI_ORCHESTRATOR_ELECTRON_E2E_DRIVER.trim()
+      : ''
+
+  if (!configuredDriverPath) {
+    return
+  }
+
+  const repoRoot = path.resolve(__dirname, '..')
+  const resolvedDriverPath = path.isAbsolute(configuredDriverPath)
+    ? configuredDriverPath
+    : path.resolve(repoRoot, configuredDriverPath)
+
+  mainWindow.webContents.once('did-finish-load', () => {
+    setTimeout(async () => {
+      try {
+        const driverModule = await import(
+          `${pathToFileURL(resolvedDriverPath).href}?ts=${Date.now()}`
+        )
+        const runDriver =
+          driverModule.runElectronVisualE2E || driverModule.default
+
+        if (typeof runDriver !== 'function') {
+          throw new Error(
+            `El driver ${resolvedDriverPath} no exporta runElectronVisualE2E().`,
+          )
+        }
+
+        await runDriver({
+          app,
+          electron: electronModule,
+          mainWindow,
+          repoRoot,
+        })
+      } catch (error) {
+        const driverErrorMessage =
+          error instanceof Error ? error.stack || error.message : String(error)
+        console.error(`[electron-e2e] ${driverErrorMessage}`)
+        process.exitCode = 1
+      } finally {
+        if (process.env.AI_ORCHESTRATOR_ELECTRON_E2E_AUTO_QUIT === '1') {
+          setTimeout(() => {
+            if (!mainWindow.isDestroyed()) {
+              mainWindow.close()
+            }
+
+            if (!app.isQuiting) {
+              app.quit()
+            }
+          }, 300)
+        }
+      }
+    }, 250)
+  })
 }
 
 function runMockExecutorTask({ instruction, context, workspacePath }) {
@@ -59899,7 +60521,7 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
 
   debugMainLog('plan-task:context-hub-pack', contextHubStatus)
 
-  const strategicBrainResult = await requestStrategicBrainDecision({
+  const strategicBrainInput = {
     goal,
     context,
     workspacePath,
@@ -59916,7 +60538,24 @@ ipcMain.handle('ai-orchestrator:plan-task', async (_event, payload) => {
     existingProjectContext,
     projectWorkMode,
     contextHubPack,
-  })
+  }
+  const planTaskHandlerTimeoutMs = Math.max(
+    8000,
+    Number.parseInt(
+      process.env.AI_ORCHESTRATOR_PLAN_TASK_HANDLER_TIMEOUT_MS || '18000',
+      10,
+    ) || 18000,
+  )
+  const strategicBrainResult = await Promise.race([
+    requestStrategicBrainDecision(strategicBrainInput),
+    (async () => {
+      await new Promise((resolve) => setTimeout(resolve, planTaskHandlerTimeoutMs))
+      return buildResponsiveLocalStrategicBrainFallbackResult(
+        strategicBrainInput,
+        `El plan-task no respondio a tiempo y JEFE continuo con local-rules tras ${planTaskHandlerTimeoutMs} ms.`,
+      )
+    })(),
+  ])
   const {
     adapter: brainAdapter,
     primaryAdapter: brainPrimaryAdapter,

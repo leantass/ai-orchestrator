@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { flushSync } from 'react-dom'
 import {
   ActionTile,
   DisclosurePanel,
@@ -1450,7 +1451,7 @@ const DEFAULT_GOAL_INPUT =
 const LEGACY_DEFAULT_WORKSPACE_PATH =
   'C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\orquestadoria\\ai-orchestrator'
 const DEFAULT_WORKSPACE_PATH =
-  'C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\web-prueba'
+  '.codex-temp\\generated-domain-materialization-approved'
 const DEFAULT_EXECUTION_CONTEXT_INPUT = ''
 const DEFAULT_USER_PARTICIPATION_MODE: UserParticipationMode = ''
 const DEFAULT_RESOLVED_DECISIONS: ResolvedDecisionRecord[] = []
@@ -9700,6 +9701,30 @@ const buildFullstackLocalMaterializationPrompt = ({
     originalGoal,
     originalContext,
   })
+  const normalizedDomainPromptText = [
+    originalGoal,
+    originalContext,
+    normalizeOptionalString(plan.domainLabel),
+    normalizeOptionalString(plan.domainSlug),
+    normalizeOptionalString(plan.targetRoot),
+    allowedRootPaths.join(' '),
+    targetStructure.join(' '),
+    directories.join(' '),
+    filesToCreate.join(' '),
+  ]
+    .filter((value) => typeof value === 'string' && value.trim())
+    .join(' ')
+    .toLocaleLowerCase()
+  const isCommunityToolBankPlan =
+    /\bherramientas?\b|\btool(?:s|bank)?\b|\binstrumental\b/u.test(
+      normalizedDomainPromptText,
+    ) &&
+    (/\bprestamos?\b|\bsolicitudes?\b|\breservas?\b|\bdevoluciones?\b|\bdanad[ao]s?\b/u.test(
+      normalizedDomainPromptText,
+    ) ||
+      /\bcomunitari[oa]s?\b|\bbarriales?\b|\bvecin(?:o|os|a|as)\b/u.test(
+        normalizedDomainPromptText,
+      ))
   const contractSpecificGuidance = isOnlineCoursesPlan
     ? [
         'Mantener un contrato canonico coherente de cursos online y no reciclar logistica, tracking, veterinaria ni ecommerce generico de productos.',
@@ -9710,11 +9735,19 @@ const buildFullstackLocalMaterializationPrompt = ({
         'Incluir shared/plans.js, shared/payment-statuses.js, shared/course-statuses.js, database/schema.sql, database/seed.sql, docs/API.md, docs/ARCHITECTURE.md, docs/DB_SCHEMA.md, docs/PAYMENTS_MOCK.md y docs/LOCAL_VALIDATION.md.',
         'Mercado Pago debe quedar solo como simulacion local documentada con estados pending, approved, rejected y cancelled.',
       ]
+    : isCommunityToolBankPlan
+      ? [
+          'Mantener un contrato canonico coherente de banco comunitario de herramientas y no reciclar logistica, tracking, cursos, salud ni ecommerce generico.',
+          'Incluir frontend administrativo y frontend publico revisable para vecinos, operadores y administradores dentro de frontend/admin y frontend/public.',
+          'Incluir backend/src/routes/tools.js, loans.js, reservations.js, returns.js, incidents.js y reports.js como contratos locales mock-only.',
+          'Incluir shared/contracts/domain.js, shared/types/contracts.js, database/schema.sql, database/seed.sql, docs/API.md, docs/ARCHITECTURE.md, docs/DB_SCHEMA.md y docs/LOCAL_VALIDATION.md.',
+          'El dominio visible debe centrarse en herramientas, disponibilidad, prestamos, reservas, devoluciones, danos y reportes simples, sin lenguaje de tracking logistico.',
+        ]
     : [
         'Materializar solo un scaffold local con README.md, package.json raiz, frontend/, frontend/admin/, frontend/public/, backend/, shared/, database/, scripts/ y docs/.',
         'Incluir frontend administrativo, frontend publico revisable, docs/API.md y docs/DB_SCHEMA.md o docs/DATA_MODEL.md.',
         'Exigir database/schema.sql y database/seed.sql como contrato SQL local obligatorio. database/shipments.json o cualquier JSON similar solo puede ser auxiliar y nunca la persistencia principal.',
-        'Para tracking logistico incluir backend/src/routes/shipments.js, backend/src/routes/tracking.js, frontend/admin/index.html, frontend/admin/app.js, frontend/public/index.html y frontend/public/app.js.',
+        'Elegir archivos de rutas, entidades y modulos segun el dominio actual sin reciclar tracking logistico, veterinaria, salud, cursos ni ecommerce generico.',
       ]
 
   return {
@@ -19438,6 +19471,96 @@ function App() {
     setSessionEvents(DEFAULT_SESSION_EVENTS)
     setRuntimeStatus(DEFAULT_RUNTIME_STATUS)
   }
+
+  const buildJefeDevTestBridgeState = useEffectEvent(() => ({
+    activeWizardStep,
+    sessionStatus,
+    currentStep,
+    isPlanning,
+    isExecutingTask,
+    goalInput,
+    executionContextInput,
+    workspacePath,
+    brainCostMode,
+    manualReuseMode,
+    decisionPending,
+    approvalMessage,
+    pendingInstruction: visiblePendingInstruction,
+    approvalOptions: visibleApprovalOptions.map((option) => ({
+      key: option.key,
+      label: option.label,
+      description: option.description || '',
+    })),
+    selectedApprovalOption: approvalSelectedOption,
+    approvalFreeAnswer,
+    activeApprovalDecisionKey:
+      normalizeOptionalString(activeApprovalRequest?.decisionKey) || '',
+    executorRequestState,
+    plannerInstruction,
+    nextExpectedAction:
+      normalizeOptionalString(plannerExecutionMetadata.nextExpectedAction) || '',
+    resultHumanText,
+    wizardCanShowResult,
+  }))
+
+  useEffect(() => {
+    if (!import.meta.env.DEV || typeof window === 'undefined') {
+      return undefined
+    }
+
+    const bridgeTarget = window as Window & {
+      __JEFE_TEST__?: {
+        resetSession: () => void
+        setGoal: (value: string) => void
+        setContext: (value: string) => void
+        setWorkspacePath: (value: string) => void
+        setBrainMode: (value: string) => void
+        setReuseMode: (value: string) => void
+        next: () => void
+        generatePlan: () => Promise<void>
+        execute: () => Promise<void>
+        selectApprovalOption: (value: string) => void
+        setApprovalFreeAnswer: (value: string) => void
+        approveOnce: () => Promise<void>
+        rejectApproval: () => Promise<void>
+        getState: () => Record<string, unknown>
+      }
+    }
+
+    bridgeTarget.__JEFE_TEST__ = {
+      resetSession: handleResetSessionMemory,
+      setGoal: (value) => flushSync(() => setGoalInput(value)),
+      setContext: (value) => flushSync(() => setExecutionContextInput(value)),
+      setWorkspacePath: (value) => flushSync(() => setWorkspacePath(value)),
+      setBrainMode: (value) =>
+        flushSync(() => setBrainCostMode(value as typeof brainCostMode)),
+      setReuseMode: (value) =>
+        flushSync(() => setManualReuseMode(value as ManualReuseMode)),
+      next: handleWizardNext,
+      generatePlan: handleWizardGeneratePlan,
+      execute: handleWizardExecute,
+      selectApprovalOption: (value) =>
+        flushSync(() => setApprovalSelectedOption(value)),
+      setApprovalFreeAnswer: (value) =>
+        flushSync(() => setApprovalFreeAnswer(value)),
+      approveOnce: handleApproveOnce,
+      rejectApproval: handleRejectApproval,
+      getState: () => buildJefeDevTestBridgeState(),
+    }
+
+    return () => {
+      delete bridgeTarget.__JEFE_TEST__
+    }
+  }, [
+    brainCostMode,
+    buildJefeDevTestBridgeState,
+    handleApproveOnce,
+    handleRejectApproval,
+    handleResetSessionMemory,
+    handleWizardExecute,
+    handleWizardGeneratePlan,
+    handleWizardNext,
+  ])
 
   const handleTestLocalConnection = async () => {
     const minWait = new Promise((resolve) => {
