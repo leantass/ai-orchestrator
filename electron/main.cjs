@@ -3249,10 +3249,11 @@ function buildDomainConsistencyDiagnostics({
     })
 
     const semanticChecked =
-      currentSemanticTokens.size >= 3 && (visibleSemanticTokenSet.size >= 3 || semanticComparableBlocks > 0)
+      currentSemanticTokens.size >= 3 &&
+      (visibleSemanticTokenSet.size >= 3 || semanticComparableBlocks > 0)
     const semanticOverlapScore =
       semanticVisibleTotal > 0 ? semanticOverlapTotal / semanticVisibleTotal : 0
-    const semanticStatus =
+    const rawSemanticStatus =
       incompatibleBlocks.length > 0
         ? 'mismatch'
         : !semanticChecked
@@ -3260,20 +3261,46 @@ function buildDomainConsistencyDiagnostics({
           : semanticOverlapScore < 0.35
             ? 'partial'
             : 'consistent'
+    const currentContractValid =
+      generatedDomainContractDiagnostics?.present === true &&
+      (generatedDomainContractDiagnostics?.valid === true ||
+        (generatedDomainContractDiagnostics?.errorsCount || 0) === 0)
+    const currentContractSafeForLocalMaterialization =
+      generatedDomainContractDiagnostics?.safeForLocalMaterialization === true ||
+      generatedDomainCapabilityProfile?.safety?.safeForLocalMaterialization === true
+    const canSanitizeResidualMismatchForMaterialization =
+      normalizedStrategy === 'materialize-fullstack-local-plan' ||
+      normalizedStrategy === 'materialize-safe-first-delivery-plan' ||
+      normalizedStrategy === 'safe-first-delivery-plan' ||
+      normalizedStrategy === 'scalable-delivery-plan'
+    const residualMismatchSanitizable =
+      canSanitizeResidualMismatchForMaterialization &&
+      mismatches.length > 0 &&
+      currentRoots.length > 0 &&
+      currentContractValid &&
+      currentContractSafeForLocalMaterialization &&
+      incompatibleBlocks.length > 0 &&
+      discardedBlocks.length === incompatibleBlocks.length
+    const displayStatus = residualMismatchSanitizable
+      ? 'consistent-after-discard'
+      : mismatches.length > 0
+        ? 'mismatch'
+        : checkedEntries > 0
+          ? 'consistent'
+          : 'partial'
+    const semanticStatus =
+      residualMismatchSanitizable && rawSemanticStatus === 'mismatch'
+        ? 'consistent-after-discard'
+        : rawSemanticStatus
     const shouldPreferCurrentVisibleSignals =
       mismatches.length > 0 ||
       incompatibleBlocks.length > 0 ||
-      semanticStatus === 'mismatch'
+      rawSemanticStatus === 'mismatch'
 
     const diagnostics = {
       present: true,
       checked: true,
-      status:
-        mismatches.length > 0
-          ? 'mismatch'
-          : checkedEntries > 0
-            ? 'consistent'
-            : 'partial',
+      status: displayStatus,
       behaviorChanged: false,
       currentDomainSlug:
         limitStrings(
@@ -3300,6 +3327,15 @@ function buildDomainConsistencyDiagnostics({
         : visibleRoot,
       semanticChecked,
       semanticStatus,
+      blockingStatus:
+        mismatches.length > 0
+          ? 'mismatch'
+          : checkedEntries > 0
+            ? 'consistent'
+            : 'partial',
+      semanticBlockingStatus: rawSemanticStatus,
+      blocksUniversalMaterialization: !residualMismatchSanitizable && (mismatches.length > 0 || rawSemanticStatus === 'mismatch'),
+      sanitized: residualMismatchSanitizable,
       semanticOverlapScore: Number(semanticOverlapScore.toFixed(3)),
       contractSignalsCount: currentSemanticTokens.size,
       visibleSignalsCount: visibleSemanticTokenSet.size,
@@ -3321,6 +3357,14 @@ function buildDomainConsistencyDiagnostics({
       pushMessage(
         diagnostics.warnings,
         'Current generatedDomainCapabilityProfile is structurally valid, so incompatible residual planner metadata was ignored in favor of the current run signals.',
+      )
+      diagnostics.warningsCount = diagnostics.warnings.length
+    }
+
+    if (residualMismatchSanitizable) {
+      pushMessage(
+        diagnostics.warnings,
+        'Residual planner metadata was discarded in favor of the current generated-domain contract, so the mismatch stays observable but no longer blocks universal materialization.',
       )
       diagnostics.warningsCount = diagnostics.warnings.length
     }
@@ -3872,9 +3916,8 @@ function buildGeneratedDomainMaterializationPreferenceDecision({
     const gateBlockedByDivergence = gate?.eligibility?.blockedByDivergence === true
     const gateBlockedByErrors = gate?.eligibility?.blockedByErrors === true
     const gateNeedsLegacyFallback = gate?.eligibility?.needsLegacyFallback === true
-    const domainConsistent = domainConsistencyStatus === 'consistent'
-    const domainBlocked =
-      domainConsistencyStatus === 'mismatch' || domainConsistencyStatus === 'error'
+    const domainConsistent = isGeneratedDomainDomainConsistencyAligned(consistency)
+    const domainBlocked = isGeneratedDomainDomainConsistencyBlocked(consistency)
     const diffAlignedEnough = diffStatus === 'compared' || comparisonStatus === 'aligned'
     const diffBlocked = diffStatus === 'divergent' || comparisonStatus === 'divergent'
 
@@ -4132,14 +4175,8 @@ function buildGeneratedDomainMaterializationPreferenceSwitch({
     const dryRunWouldPreferShadow = decision?.dryRun?.wouldPreferShadow === true
     const gateCanPreferShadowInFuture = gate?.eligibility?.canPreferShadowInFuture === true
     const legacyPlanPresent = Boolean(materializationPlan && typeof materializationPlan === 'object')
-    const domainConsistent =
-      domainConsistencyStatus === 'consistent' &&
-      (semanticStatus === null || semanticStatus === 'consistent')
-    const domainBlocked =
-      domainConsistencyStatus === 'mismatch' ||
-      domainConsistencyStatus === 'error' ||
-      semanticStatus === 'mismatch' ||
-      semanticStatus === 'error'
+    const domainConsistent = isGeneratedDomainDomainConsistencyAligned(consistency)
+    const domainBlocked = isGeneratedDomainDomainConsistencyBlocked(consistency)
     const diffAlignedEnough =
       diffStatus === 'compared' ||
       comparisonStatus === 'aligned' ||
@@ -4481,9 +4518,7 @@ function buildGeneratedDomainMaterializationSwitchReadinessReport({
       typeof consistency?.semanticStatus === 'string' && consistency.semanticStatus.trim()
         ? consistency.semanticStatus.trim()
         : null
-    const domainConsistent =
-      domainConsistencyStatus === 'consistent' &&
-      (semanticStatus === null || semanticStatus === 'consistent')
+    const domainConsistent = isGeneratedDomainDomainConsistencyAligned(consistency)
     const legacyComparisonAvailable =
       shadowComparison?.compared === true ||
       shadowDiff?.compared === true ||
@@ -4498,11 +4533,7 @@ function buildGeneratedDomainMaterializationSwitchReadinessReport({
       (shadowComparison?.errorsCount || 0) > 0 ||
       (shadowPlan?.errorsCount || 0) > 0 ||
       (consistency?.errorsCount || 0) > 0
-    const domainMismatch =
-      domainConsistencyStatus === 'mismatch' ||
-      domainConsistencyStatus === 'error' ||
-      semanticStatus === 'mismatch' ||
-      semanticStatus === 'error'
+    const domainMismatch = isGeneratedDomainDomainConsistencyBlocked(consistency)
     const diffDivergent =
       diffStatus === 'divergent' ||
       shadowComparisonStatus === 'divergent' ||
@@ -40563,11 +40594,7 @@ function buildGeneratedDomainShadowMaterializationCandidatePlan({
       typeof consistency?.semanticStatus === 'string' && consistency.semanticStatus.trim()
         ? consistency.semanticStatus.trim()
         : null
-    const domainBlocked =
-      domainConsistencyStatus === 'mismatch' ||
-      domainConsistencyStatus === 'error' ||
-      semanticStatus === 'mismatch' ||
-      semanticStatus === 'error'
+    const domainBlocked = isGeneratedDomainDomainConsistencyBlocked(consistency)
     const gateEligible =
       preferenceGate?.status === 'eligible' ||
       preferenceGate?.eligibility?.canPreferShadowInFuture === true
@@ -41374,11 +41401,7 @@ function buildGeneratedDomainShadowMaterializationEndToEndReadiness({
       (readinessReport?.errorsCount || 0) > 0 ||
       (sourceResolution?.errorsCount || 0) > 0 ||
       (consistency?.errorsCount || 0) > 0
-    const domainBlocked =
-      consistency?.status === 'mismatch' ||
-      consistency?.status === 'error' ||
-      consistency?.semanticStatus === 'mismatch' ||
-      consistency?.semanticStatus === 'error'
+    const domainBlocked = isGeneratedDomainDomainConsistencyBlocked(consistency)
     const candidateBlocked =
       candidatePlan?.status === 'blocked' || candidatePlan?.status === 'error'
     const runtimeMutated =
@@ -42436,11 +42459,7 @@ function buildGeneratedDomainUniversalMaterializationPlanPreview({
       safetyResult.ok === true ||
       candidatePlan?.candidate?.safety?.safeForLocalMaterialization === true ||
       capabilityProfile?.safety?.safeForLocalMaterialization === true
-    const domainMismatch =
-      consistency?.status === 'mismatch' ||
-      consistency?.status === 'error' ||
-      consistency?.semanticStatus === 'mismatch' ||
-      consistency?.semanticStatus === 'error'
+    const domainMismatch = isGeneratedDomainDomainConsistencyBlocked(consistency)
     const approvalRequired = approvalPolicy?.approvalRequired !== false
 
     const preview = {
@@ -43264,11 +43283,7 @@ function buildGeneratedDomainMaterializationInspectionSourceResolution({
       normalizeOptionalString(consistency?.semanticStatus) || null
     const legacyInspectionSource =
       normalizeOptionalString(inspectionDiagnostics?.source) || null
-    const domainMismatch =
-      domainConsistencyStatus === 'mismatch' ||
-      domainConsistencyStatus === 'error' ||
-      semanticStatus === 'mismatch' ||
-      semanticStatus === 'error'
+    const domainMismatch = isGeneratedDomainDomainConsistencyBlocked(consistency)
     const approvalBlocked = approvalPolicyStatus === 'blocked'
     const candidateBlocked =
       candidateStatus === 'blocked' ||
@@ -43781,11 +43796,7 @@ function buildGeneratedDomainUniversalMaterializationPlan({
       normalizeOptionalString(contract?.root?.targetRoot) ||
       normalizeOptionalString(preview?.targetRoot) ||
       normalizedProjectRoot
-    const domainMismatch =
-      normalizeOptionalString(consistency?.status) === 'mismatch' ||
-      normalizeOptionalString(consistency?.status) === 'error' ||
-      normalizeOptionalString(consistency?.semanticStatus) === 'mismatch' ||
-      normalizeOptionalString(consistency?.semanticStatus) === 'error'
+    const domainMismatch = isGeneratedDomainDomainConsistencyBlocked(consistency)
     const previewBuilt = preview?.built === true
     const previewSafe = preview?.safety?.safeForLocalMaterialization === true
     const approvalBlocked = approvalPolicy?.status === 'blocked'
@@ -46784,6 +46795,56 @@ function normalizeGeneratedDomainSandboxApprovalOption(value) {
   return normalizeResolvedDecisionKey(value)
 }
 
+function isGeneratedDomainDomainConsistencyBlocked(consistency) {
+  if (!consistency || typeof consistency !== 'object') {
+    return false
+  }
+
+  if (typeof consistency?.blocksUniversalMaterialization === 'boolean') {
+    return consistency.blocksUniversalMaterialization
+  }
+
+  const blockingStatus = normalizeOptionalString(
+    consistency?.blockingStatus || consistency?.status,
+  )
+  const semanticBlockingStatus = normalizeOptionalString(
+    consistency?.semanticBlockingStatus || consistency?.semanticStatus,
+  )
+
+  return (
+    blockingStatus === 'mismatch' ||
+    blockingStatus === 'error' ||
+    semanticBlockingStatus === 'mismatch' ||
+    semanticBlockingStatus === 'error'
+  )
+}
+
+function isGeneratedDomainDomainConsistencyAligned(consistency) {
+  if (!consistency || typeof consistency !== 'object') {
+    return false
+  }
+
+  if (isGeneratedDomainDomainConsistencyBlocked(consistency)) {
+    return false
+  }
+
+  const status = normalizeOptionalString(consistency?.status)
+  const semanticStatus = normalizeOptionalString(consistency?.semanticStatus)
+  const consistentStatuses = new Set([
+    'consistent',
+    'consistent-after-discard',
+    'sanitized',
+  ])
+
+  return (
+    consistentStatuses.has(status) &&
+    (!semanticStatus ||
+      semanticStatus === 'partial' ||
+      semanticStatus === 'not-available' ||
+      consistentStatuses.has(semanticStatus))
+  )
+}
+
 function extractApprovedSandboxRootCandidate(...values) {
   for (const value of values) {
     const normalizedValue = normalizeOptionalString(value)
@@ -46883,8 +46944,16 @@ function resolveGeneratedDomainSandboxApprovalDecision({
       decisionRecord?.selectedOptionKey ||
       decisionRecord?.selectedOption,
   )
+  const usesApprovalRequestLegacy = activeDecisionKey === 'approve-sandbox-path'
   const usesApprovalRequestV1 =
     activeDecisionKey === 'approval-materialize-sandbox:v1'
+  const selectedSandboxExternalNewWorkspace =
+    selectedApprovalOption === 'sandbox-external-new-workspace'
+  const selectedSandboxInsideWorkspaceNewFolder =
+    selectedApprovalOption === 'sandbox-inside-workspace-new-folder'
+  const selectedNoMaterializationYet =
+    selectedApprovalOption === 'no-materialization-yet'
+  const selectedLegacyApproved = selectedApprovalOption === 'approved'
   const selectedProvideNewEmptyWorkspace =
     selectedApprovalOption === 'provide-new-empty-workspace'
   const selectedApproveSubfolderInsideCurrentWorkspace =
@@ -46892,7 +46961,13 @@ function resolveGeneratedDomainSandboxApprovalDecision({
   const selectedDeclineMaterializationNow =
     selectedApprovalOption === 'decline-materialization-now'
   const optionAllowsSandboxApproval =
-    !usesApprovalRequestV1 || selectedProvideNewEmptyWorkspace
+    usesApprovalRequestV1
+      ? selectedProvideNewEmptyWorkspace
+      : usesApprovalRequestLegacy
+        ? !selectedApprovalOption ||
+          selectedSandboxExternalNewWorkspace ||
+          selectedLegacyApproved
+        : true
   const feedbackApproved =
     plannerFeedback?.type === 'approval-granted' &&
     isGeneratedDomainSandboxApprovalDecisionKey(feedbackDecisionKey) &&
@@ -46963,13 +47038,24 @@ function resolveGeneratedDomainSandboxApprovalDecision({
     isAbsoluteExternalSandboxPath(requestedSandboxRoot) && !requestedInsideWorkspace
   const optionBlockedReason = selectedApproveSubfolderInsideCurrentWorkspace
     ? 'La opcion approve-subfolder-inside-current-workspace requiere una aprobacion separada y no puede tocar el workspace actual en este flujo seguro.'
-    : usesApprovalRequestV1 &&
-        !selectedProvideNewEmptyWorkspace &&
-        !selectedDeclineMaterializationNow
+    : selectedSandboxInsideWorkspaceNewFolder
+      ? 'La opcion sandbox-inside-workspace-new-folder requiere una aprobacion separada y no puede tocar el workspace actual en este flujo seguro.'
+      : usesApprovalRequestV1 &&
+          !selectedProvideNewEmptyWorkspace &&
+          !selectedDeclineMaterializationNow
         ? 'La aprobacion sandbox v1 requiere elegir provide-new-empty-workspace para usar un workspace externo seguro.'
-        : ''
+        : usesApprovalRequestLegacy &&
+            selectedApprovalOption &&
+            !selectedSandboxExternalNewWorkspace &&
+            !selectedLegacyApproved &&
+            !selectedNoMaterializationYet
+          ? 'La aprobacion approve-sandbox-path requiere elegir sandbox-external-new-workspace para usar un workspace externo seguro.'
+          : ''
   const missingApprovedSandboxPath =
-    usesApprovalRequestV1 && selectedProvideNewEmptyWorkspace && !requestedSandboxRoot
+    ((usesApprovalRequestV1 && selectedProvideNewEmptyWorkspace) ||
+      (usesApprovalRequestLegacy &&
+        (selectedSandboxExternalNewWorkspace || selectedLegacyApproved))) &&
+    !requestedSandboxRoot
   const canUseRequestedSandboxRoot =
     !(optionBlockedReason || missingApprovedSandboxPath) &&
     (!requestedSandboxRoot ||
@@ -46982,7 +47068,9 @@ function resolveGeneratedDomainSandboxApprovalDecision({
   const approvalBlockedReason =
     optionBlockedReason ||
     (approved && missingApprovedSandboxPath
-      ? 'La aprobacion sandbox v1 requiere una ruta externa segura en freeAnswer.'
+      ? usesApprovalRequestLegacy
+        ? 'La aprobacion approve-sandbox-path requiere una ruta externa segura en freeAnswer.'
+        : 'La aprobacion sandbox v1 requiere una ruta externa segura en freeAnswer.'
       : '') ||
     (approved && !canUseRequestedSandboxRoot
       ? 'La ruta aprobada no es un sandbox interno seguro ni puede mapearse de forma controlada.'

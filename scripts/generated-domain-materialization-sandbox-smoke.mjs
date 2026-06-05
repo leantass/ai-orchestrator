@@ -772,11 +772,11 @@ function runApprovedToolBankScenario() {
   const decision = createUniversalDecision(contract, {
     resolvedDecisionMap: new Map([
       [
-        'approval-materialize-sandbox:v1',
+        'approve-sandbox-path',
         {
           status: 'approved',
           decision: 'approved',
-          selectedOption: 'provide-new-empty-workspace',
+          selectedOption: 'sandbox-external-new-workspace',
           freeAnswer: approvedExternalSandboxPath,
           summary:
             'Lean aprobó materializar solo la SFD local segura en sandbox controlado.',
@@ -785,8 +785,8 @@ function runApprovedToolBankScenario() {
     ]),
     plannerFeedback: {
       type: 'approval-granted',
-      approvalRequestDecisionKey: 'approval-materialize-sandbox:v1',
-      selectedOption: 'provide-new-empty-workspace',
+      approvalRequestDecisionKey: 'approve-sandbox-path',
+      selectedOption: 'sandbox-external-new-workspace',
       freeAnswer: approvedExternalSandboxPath,
       approvalReason:
         'Materializar solo la SFD local segura y validarla con el flujo de sandbox.',

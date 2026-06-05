@@ -6351,6 +6351,123 @@ function runDomainConsistencyDiagnosticsSemanticMismatchCase() {
   assert.equal(decision.nextExpectedAction, 'review-plan')
 }
 
+function runDomainConsistencyDiagnosticsSanitizedMaterializationCase() {
+  const generatedDomainContract = {
+    ...createValidInventedContract(),
+    domain: {
+      label: 'Banco comunitario de herramientas barriales',
+      slug: 'community-tool-bank',
+      summary: 'Gestion local de prestamos, devoluciones y mantenimiento de herramientas.',
+    },
+    root: {
+      slug: 'community-tool-bank-local',
+      sourceRoot: 'community-tool-bank-local',
+      targetRoot: 'community-tool-bank-local',
+    },
+    roles: ['vecino', 'coordinacion', 'voluntariado'],
+    entities: ['tools', 'loans', 'members', 'maintenance'],
+    workflows: ['register tool loans', 'track returns', 'schedule maintenance'],
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['tools', 'loans', 'members', 'maintenance'],
+    },
+  }
+  const allowedTargetPaths = deriveAllowedTargetPathsFromContract(generatedDomainContract, '.')
+  const requiredPathGroups = deriveRequiredPathGroupsFromContract(generatedDomainContract)
+  const decision = observationHarness.buildBrainDecisionContract({
+    decisionKey: 'toolbank-materialization-sanitized-domain-consistency',
+    strategy: 'materialize-fullstack-local-plan',
+    executionMode: 'executor',
+    nextExpectedAction: 'execute-plan',
+    reason: 'Descartar metadata residual incompatible y conservar el contrato actual del banco de herramientas.',
+    instruction: 'No tocar web-prueba y no materializar fuera del sandbox aprobado.',
+    completed: false,
+    requiresApproval: false,
+    tasks: [],
+    assumptions: [],
+    selectedDomain: 'community-tool-bank',
+    selectedContractKind: 'generic-fullstack-local',
+    sourceRoot: 'community-tool-bank-local',
+    targetRoot: 'community-tool-bank-local',
+    productArchitecture: {
+      productType: 'storytelling landing',
+      domain: 'gastronomic storytelling',
+      roles: ['chef', 'comensal'],
+      coreModules: ['menu', 'reservas'],
+      dataEntities: ['platos', 'mesas'],
+      keyFlows: ['publicar menu', 'tomar reservas'],
+    },
+    projectBlueprint: {
+      productType: 'fullstack-local-app',
+      domain: 'gestion de refugios de animales',
+      intent: 'organizar adopciones y rescates',
+      deliveryLevel: 'fullstack-local',
+      roles: ['rescatista', 'cuidador'],
+      modules: ['adopciones', 'rescates'],
+      entities: ['animales', 'hogares'],
+      coreFlows: ['registrar rescate', 'coordinar adopcion'],
+    },
+    scalableDeliveryPlan: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'fullstack-local-comercio-online',
+      domain: 'comercio online',
+      title: 'Plan residual de ecommerce',
+      targetStructure: ['fullstack-local-comercio-online/', 'fullstack-local-comercio-online/frontend/'],
+      allowedRootPaths: ['fullstack-local-comercio-online'],
+      directories: ['fullstack-local-comercio-online/frontend'],
+      modules: ['catalogo', 'checkout'],
+    },
+    localProjectManifest: {
+      deliveryLevel: 'fullstack-local',
+      projectRoot: 'fullstack-local-comercio-online',
+      domain: 'comercio online',
+      projectType: 'fullstack-local-app',
+    },
+    executionScope: {
+      allowedTargetPaths,
+    },
+    materializationPlan: {
+      version: LOCAL_MATERIALIZATION_PLAN_VERSION,
+      kind: 'fullstack-local-materialization',
+      strategy: 'materialize-fullstack-local-plan',
+      projectRoot: 'community-tool-bank-local',
+      allowedTargetPaths,
+      operations: allowedTargetPaths.map((targetPath) => ({
+        type:
+          targetPath === 'community-tool-bank-local' ? 'create-folder' : 'create-or-edit-file',
+        targetPath,
+      })),
+      contractDefinition: {
+        requiredPathGroups,
+      },
+    },
+    generatedDomainContract,
+    workspacePath: repoRoot,
+  })
+  const diagnostics = decision.domainConsistencyDiagnostics
+
+  assert.equal(diagnostics?.present, true)
+  assert.equal(diagnostics?.status, 'consistent-after-discard')
+  assert.equal(diagnostics?.semanticStatus, 'consistent-after-discard')
+  assert.equal(diagnostics?.sanitized, true)
+  assert.equal(diagnostics?.visibleRoot, 'community-tool-bank-local')
+  assert.equal(
+    diagnostics?.visibleDomainLabel,
+    'Banco comunitario de herramientas barriales',
+  )
+  assert.equal((diagnostics?.discardedBlocks || []).includes('productArchitecture'), true)
+  assert.equal((diagnostics?.discardedBlocks || []).includes('projectBlueprint'), true)
+  assert.equal(Boolean(decision.productArchitecture), false)
+  assert.equal(Boolean(decision.projectBlueprint), false)
+  assert.equal(Boolean(decision.scalableDeliveryPlan), false)
+  assert.equal(Boolean(decision.localProjectManifest), false)
+  assert.notEqual(decision.generatedDomainUniversalMaterializationPlanPreview?.status, 'blocked')
+  assert.equal(decision.generatedDomainUniversalMaterializationPlan?.built, true)
+  assert.equal(decision.generatedDomainUniversalMaterializationPlan?.status, 'built')
+  assert.notEqual(decision.generatedDomainMaterializationApprovalSurface?.status, 'blocked')
+}
+
 function createLegacyObservationDecision() {
   return observationHarness.buildBrainDecisionContract({
     decisionKey: 'legacy-observation-plan',
@@ -7035,8 +7152,9 @@ runGeneratedDomainMaterializationInspectionSourceResolutionLegacyFallbackCase()
 runGeneratedDomainMaterializationInspectionSourceResolutionBlockedCase()
 runGeneratedDomainMaterializationInspectionSourceResolutionNoneCase()
 runDomainConsistencyDiagnosticsDiscardResidualMetadataCase()
-  runDomainConsistencyDiagnosticsSemanticMismatchCase()
-  runPlannerObservationMergeOkCase()
+runDomainConsistencyDiagnosticsSemanticMismatchCase()
+runDomainConsistencyDiagnosticsSanitizedMaterializationCase()
+runPlannerObservationMergeOkCase()
   runPlannerObservationMergeTimeoutCase()
   runPlannerObservationLegacyAlreadyHasContractCase()
   runPlannerObservationInvalidCase()

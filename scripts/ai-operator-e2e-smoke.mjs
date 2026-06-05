@@ -9059,8 +9059,8 @@ function createAlignedGeneratedDomainObservationDecision({
 
 function createApprovedToolBankObservationDecision({
   approvedSandboxPath = 'C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\sandbox-toolbank-local',
-  approvalRequestDecisionKey = 'approval-materialize-sandbox:v1',
-  selectedOption = 'provide-new-empty-workspace',
+  approvalRequestDecisionKey = 'approve-sandbox-path',
+  selectedOption = 'sandbox-external-new-workspace',
   feedbackType = 'approval-granted',
 } = {}) {
   const generatedDomainContract = {
@@ -9699,11 +9699,18 @@ async function runGeneratedDomainSandboxApprovalBridgeCase() {
   const posixDecision = createApprovedToolBankObservationDecision({
     approvedSandboxPath: '/home/runner/work/sandbox-toolbank-local',
   })
+  const v1Decision = createApprovedToolBankObservationDecision({
+    approvalRequestDecisionKey: 'approval-materialize-sandbox:v1',
+    selectedOption: 'provide-new-empty-workspace',
+  })
+  const legacyApprovedDecision = createApprovedToolBankObservationDecision({
+    selectedOption: 'approved',
+  })
   const currentWorkspaceDecision = createApprovedToolBankObservationDecision({
-    selectedOption: 'approve-subfolder-inside-current-workspace',
+    selectedOption: 'sandbox-inside-workspace-new-folder',
   })
   const declinedDecision = createApprovedToolBankObservationDecision({
-    selectedOption: 'decline-materialization-now',
+    selectedOption: 'no-materialization-yet',
     feedbackType: 'approval-deferred',
   })
   const unsafeWebPruebaDecision = createApprovedToolBankObservationDecision({
@@ -9730,7 +9737,7 @@ async function runGeneratedDomainSandboxApprovalBridgeCase() {
       decision.generatedDomainFileCreationApprovalEvaluation?.blocked === false &&
       decision.generatedDomainFileCreationApprovalEvaluation?.status ===
         'approved-for-sandbox',
-    'La aprobacion humana approval-materialize-sandbox:v1 con provide-new-empty-workspace debe convertirse en approval evaluation efectiva para sandbox.',
+    'La aprobacion humana approve-sandbox-path con sandbox-external-new-workspace debe convertirse en approval evaluation efectiva para sandbox.',
   )
   pushFailure(
     failures,
@@ -9762,6 +9769,23 @@ async function runGeneratedDomainSandboxApprovalBridgeCase() {
   )
   pushFailure(
     failures,
+    v1Decision.generatedDomainFileCreationApprovalEvaluation?.approved === true &&
+      v1Decision.generatedDomainFileCreationApprovalEvaluation?.blocked === false &&
+      v1Decision.generatedDomainControlledRuntimeMaterializationSource?.selectedSource ===
+        'generated-domain-universal',
+    'La variante approval-materialize-sandbox:v1 con provide-new-empty-workspace debe seguir aprobando la materializacion sandbox segura.',
+  )
+  pushFailure(
+    failures,
+    legacyApprovedDecision.generatedDomainFileCreationApprovalEvaluation?.approved === true &&
+      legacyApprovedDecision.generatedDomainFileCreationApprovalEvaluation?.blocked === false &&
+      legacyApprovedDecision.generatedDomainFileCreationApprovalEvaluation?.sandboxRoot
+        ?.relative ===
+        '.codex-temp/generated-domain-materialization-approved/sandbox-toolbank-local',
+    'La variante legacy approved debe seguir permitiendo la materializacion sandbox si la ruta externa es segura.',
+  )
+  pushFailure(
+    failures,
     posixDecision.generatedDomainFileCreationApprovalEvaluation?.sandboxRoot?.relative ===
       '.codex-temp/generated-domain-materialization-approved/sandbox-toolbank-local' &&
       posixDecision.generatedDomainFileCreationApprovalEvaluation?.sandboxRoot
@@ -9776,14 +9800,14 @@ async function runGeneratedDomainSandboxApprovalBridgeCase() {
         true &&
       currentWorkspaceDecision.generatedDomainControlledRuntimeMaterializationSource
         ?.enabled === false,
-    'approve-subfolder-inside-current-workspace debe quedar bloqueado o requerir una aprobacion separada.',
+    'sandbox-inside-workspace-new-folder debe quedar bloqueado o requerir una aprobacion separada.',
   )
   pushFailure(
     failures,
     declinedDecision.generatedDomainFileCreationApprovalEvaluation?.approved === false &&
       declinedDecision.generatedDomainControlledRuntimeMaterializationSource?.enabled ===
         false,
-    'decline-materialization-now no debe disparar materializacion sandbox ni habilitar la fuente universal.',
+    'no-materialization-yet no debe disparar materializacion sandbox ni habilitar la fuente universal.',
   )
   ;[
     unsafeWebPruebaDecision,
