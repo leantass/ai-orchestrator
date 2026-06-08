@@ -2,7 +2,13 @@
 const fs = require('fs')
 const path = require('path')
 const { pathToFileURL } = require('url')
-const util = require('util')
+const {
+  formatMainDebugDetails: formatMainDebugDetailsHelper,
+} = require('./main-debug-summaries.cjs')
+const {
+  normalizeEventStringList: normalizeEventStringListHelper,
+  normalizeEventStringValue: normalizeEventStringValueHelper,
+} = require('./main-normalizers.cjs')
 
 function isElectronExecutablePath(executablePath) {
   if (typeof executablePath !== 'string' || !executablePath.trim()) {
@@ -262,23 +268,7 @@ function writeToGuardedStream(stream, guard, text) {
 }
 
 function formatMainDebugDetails(details) {
-  if (details === undefined) {
-    return ''
-  }
-
-  if (typeof details === 'string') {
-    return details
-  }
-
-  try {
-    const serializedDetails = JSON.stringify(details)
-
-    return serializedDetails === undefined
-      ? util.inspect(details, { depth: 4, breakLength: Infinity })
-      : serializedDetails
-  } catch {
-    return util.inspect(details, { depth: 4, breakLength: Infinity })
-  }
+  return formatMainDebugDetailsHelper(details)
 }
 
 function debugMainLog(label, details) {
@@ -292,51 +282,6 @@ function debugMainLog(label, details) {
   }
 
   writeToGuardedStream(process.stderr, mainStderrGuard, message)
-}
-
-function summarizeGeneratedDomainContractDiagnosticsForDebug(diagnostics) {
-  if (!diagnostics || typeof diagnostics !== 'object') {
-    return {
-      present: false,
-    }
-  }
-
-  const errorSummary = summarizeGeneratedDomainContractDebugEntries(diagnostics.errors)
-  const warningSummary = summarizeGeneratedDomainContractDebugEntries(diagnostics.warnings)
-
-  return {
-    present: diagnostics.present === true,
-    valid: diagnostics.valid === true,
-    safeForLocalMaterialization: diagnostics.safeForLocalMaterialization === true,
-    domainSlug:
-      typeof diagnostics.domainSlug === 'string' && diagnostics.domainSlug.trim()
-        ? diagnostics.domainSlug.trim()
-        : undefined,
-    rootSlug:
-      typeof diagnostics.rootSlug === 'string' && diagnostics.rootSlug.trim()
-        ? diagnostics.rootSlug.trim()
-        : undefined,
-    sourceRoot:
-      typeof diagnostics.sourceRoot === 'string' && diagnostics.sourceRoot.trim()
-        ? diagnostics.sourceRoot.trim()
-        : undefined,
-    targetRoot:
-      typeof diagnostics.targetRoot === 'string' && diagnostics.targetRoot.trim()
-        ? diagnostics.targetRoot.trim()
-        : undefined,
-    errorsCount: Array.isArray(diagnostics.errors) ? diagnostics.errors.length : 0,
-    warningsCount: Array.isArray(diagnostics.warnings) ? diagnostics.warnings.length : 0,
-    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
-    ...(errorSummary.preview.length > 0 ? { errorsPreview: errorSummary.preview } : {}),
-    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
-    ...(warningSummary.preview.length > 0 ? { warningsPreview: warningSummary.preview } : {}),
-    allowedTargetPathsCount: Number.isInteger(diagnostics.allowedTargetPathsCount)
-      ? diagnostics.allowedTargetPathsCount
-      : 0,
-    requiredPathGroupsCount: Number.isInteger(diagnostics.requiredPathGroupsCount)
-      ? diagnostics.requiredPathGroupsCount
-      : 0,
-  }
 }
 
 function compactGeneratedDomainContractDebugAbsolutePath(value) {
@@ -444,6 +389,51 @@ function summarizeGeneratedDomainContractDebugEntries(entries, maxEntries = 3) {
   return {
     firstEntry: preview[0],
     preview,
+  }
+}
+
+function summarizeGeneratedDomainContractDiagnosticsForDebug(diagnostics) {
+  if (!diagnostics || typeof diagnostics !== 'object') {
+    return {
+      present: false,
+    }
+  }
+
+  const errorSummary = summarizeGeneratedDomainContractDebugEntries(diagnostics.errors)
+  const warningSummary = summarizeGeneratedDomainContractDebugEntries(diagnostics.warnings)
+
+  return {
+    present: diagnostics.present === true,
+    valid: diagnostics.valid === true,
+    safeForLocalMaterialization: diagnostics.safeForLocalMaterialization === true,
+    domainSlug:
+      typeof diagnostics.domainSlug === 'string' && diagnostics.domainSlug.trim()
+        ? diagnostics.domainSlug.trim()
+        : undefined,
+    rootSlug:
+      typeof diagnostics.rootSlug === 'string' && diagnostics.rootSlug.trim()
+        ? diagnostics.rootSlug.trim()
+        : undefined,
+    sourceRoot:
+      typeof diagnostics.sourceRoot === 'string' && diagnostics.sourceRoot.trim()
+        ? diagnostics.sourceRoot.trim()
+        : undefined,
+    targetRoot:
+      typeof diagnostics.targetRoot === 'string' && diagnostics.targetRoot.trim()
+        ? diagnostics.targetRoot.trim()
+        : undefined,
+    errorsCount: Array.isArray(diagnostics.errors) ? diagnostics.errors.length : 0,
+    warningsCount: Array.isArray(diagnostics.warnings) ? diagnostics.warnings.length : 0,
+    ...(errorSummary.firstEntry ? { firstError: errorSummary.firstEntry } : {}),
+    ...(errorSummary.preview.length > 0 ? { errorsPreview: errorSummary.preview } : {}),
+    ...(warningSummary.firstEntry ? { firstWarning: warningSummary.firstEntry } : {}),
+    ...(warningSummary.preview.length > 0 ? { warningsPreview: warningSummary.preview } : {}),
+    allowedTargetPathsCount: Number.isInteger(diagnostics.allowedTargetPathsCount)
+      ? diagnostics.allowedTargetPathsCount
+      : 0,
+    requiredPathGroupsCount: Number.isInteger(diagnostics.requiredPathGroupsCount)
+      ? diagnostics.requiredPathGroupsCount
+      : 0,
   }
 }
 
@@ -4745,15 +4735,11 @@ function buildSafeGeneratedDomainContractObservationErrorPreview(value) {
 }
 
 function normalizeEventStringValue(value) {
-  return typeof value === 'string' && value.trim() ? value.trim() : ''
+  return normalizeEventStringValueHelper(value)
 }
 
 function normalizeEventStringList(entries) {
-  if (!Array.isArray(entries)) {
-    return []
-  }
-
-  return [...new Set(entries.map(normalizeEventStringValue).filter(Boolean))]
+  return normalizeEventStringListHelper(entries)
 }
 
 function hasMarkedExecutionEventRequestId(eventSet, requestId) {
@@ -5725,6 +5711,114 @@ function buildOutputPreview(text, maxLength = 240) {
   }
 
   return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text
+}
+
+function compactGeneratedDomainContractDebugAbsolutePath(value) {
+  const normalized =
+    typeof value === 'string' ? value.trim().replace(/\\/gu, '/') : ''
+  if (!normalized || normalized.length <= 48) {
+    return normalized
+  }
+
+  const segments = normalized.split('/').filter(Boolean)
+  if (segments.length <= 3) {
+    return normalized
+  }
+
+  if (/^[A-Za-z]:\//u.test(normalized)) {
+    return `${normalized.slice(0, 2)}/.../${segments.slice(-3).join('/')}`
+  }
+
+  if (normalized.startsWith('/')) {
+    return `/.../${segments.slice(-3).join('/')}`
+  }
+
+  return `.../${segments.slice(-3).join('/')}`
+}
+
+function compactGeneratedDomainContractDebugAbsolutePaths(value) {
+  const normalized = typeof value === 'string' ? value : ''
+  if (!normalized) {
+    return ''
+  }
+
+  const withWindowsPathsCompacted = normalized.replace(
+    /[A-Za-z]:[\\/](?:[^\\/\s"'`]+[\\/])*[^\\/\s"'`]+/gu,
+    (entry) => compactGeneratedDomainContractDebugAbsolutePath(entry),
+  )
+
+  return withWindowsPathsCompacted.replace(
+    /(^|[\s("'`])\/(?:[^\/\s"'`]+\/){2,}[^\/\s"'`]+/gu,
+    (entry, prefix) =>
+      `${prefix}${compactGeneratedDomainContractDebugAbsolutePath(entry.slice(prefix.length))}`,
+  )
+}
+
+function sanitizeGeneratedDomainContractDebugPreview(value, maxLength = 240) {
+  const normalized =
+    typeof value === 'string'
+      ? value
+      : value === null || value === undefined
+        ? ''
+        : String(value)
+  if (!normalized.trim()) {
+    return ''
+  }
+
+  let sanitized = normalized.replace(/\s+/gu, ' ').trim()
+
+  sanitized = sanitized.replace(
+    /\bheaders?\b\s*[:=]\s*(?:\{[^{}]*\}|\[[^[\]]*\]|"[^"]*"|'[^']*'|[^\s,;]+)/giu,
+    'headers:[redacted]',
+  )
+  sanitized = sanitized.replace(
+    /\bbod(?:y|ies)\b\s*[:=]\s*(?:\{[^{}]*\}|\[[^[\]]*\]|"[^"]*"|'[^']*'|[^\s,;]+)/giu,
+    'body:[redacted]',
+  )
+  sanitized = sanitized.replace(
+    /\bpayload\b\s*[:=]\s*(?:\{[^{}]*\}|\[[^[\]]*\]|"[^"]*"|'[^']*'|[^\s,;]+)/giu,
+    'payload:[redacted]',
+  )
+  sanitized = sanitized.replace(
+    /\b((?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|token|secret|password|authorization))\b(\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu,
+    (_match, key, separator) => `${key}${separator}[redacted]`,
+  )
+  sanitized = sanitized.replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+\b/giu, 'Bearer [redacted]')
+  sanitized = sanitized.replace(/\bsk-[A-Za-z0-9_-]{8,}\b/gu, '[redacted-api-key]')
+  sanitized = compactGeneratedDomainContractDebugAbsolutePaths(sanitized)
+
+  return buildOutputPreview(sanitized, maxLength)
+}
+
+function summarizeGeneratedDomainContractDebugEntries(entries, maxEntries = 3) {
+  if (!Array.isArray(entries) || maxEntries <= 0) {
+    return {
+      firstEntry: undefined,
+      preview: [],
+    }
+  }
+
+  const preview = []
+  const seen = new Set()
+
+  for (const entry of entries) {
+    const sanitized = sanitizeGeneratedDomainContractDebugPreview(entry, 240)
+    if (!sanitized || seen.has(sanitized)) {
+      continue
+    }
+
+    seen.add(sanitized)
+    preview.push(sanitized)
+
+    if (preview.length >= maxEntries) {
+      break
+    }
+  }
+
+  return {
+    firstEntry: preview[0],
+    preview,
+  }
 }
 
 function normalizeExecutorAttemptScope(value) {
