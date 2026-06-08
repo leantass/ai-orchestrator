@@ -11848,6 +11848,88 @@ const deriveApprovalEquivalenceFamily = (...texts: unknown[]) => {
   return isProvisionalWebScaffoldApproval ? 'provisional-web-scaffold' : ''
 }
 
+const SANDBOX_MATERIALIZATION_APPROVAL_DECISION_KEYS = new Set([
+  'approve-sandbox-path',
+  'approve-sandbox-materialization-v1',
+  'approval-sandbox-location-v1',
+  'approval-materialize-sandbox:v1',
+  'approval-materialize-sfd-sandbox-v1',
+])
+
+const SANDBOX_MATERIALIZATION_DEFERRED_OPTION_KEYS = new Set([
+  'decline-materialization-now',
+  'no-materialization-yet',
+])
+
+const normalizeApprovalDecisionKey = (value: unknown) =>
+  typeof value === 'string' ? value.trim().toLocaleLowerCase() : ''
+
+const isSandboxMaterializationApprovalDecisionKey = (value: unknown) =>
+  SANDBOX_MATERIALIZATION_APPROVAL_DECISION_KEYS.has(
+    normalizeApprovalDecisionKey(value),
+  )
+
+const isSandboxMaterializationDeferredOption = (value: unknown) =>
+  SANDBOX_MATERIALIZATION_DEFERRED_OPTION_KEYS.has(
+    normalizeOptionalString(value).toLocaleLowerCase(),
+  )
+
+const resolveUnsafeSandboxApprovalReason = (
+  selectedOption: string,
+  freeAnswer: string,
+) => {
+  const selectedText = normalizeOptionalString(selectedOption).toLocaleLowerCase()
+  const freeAnswerText = normalizeOptionalString(freeAnswer)
+  const combinedText = `${selectedText} ${freeAnswerText}`.trim()
+  const normalizedCombinedText = combinedText.toLocaleLowerCase()
+
+  if (!normalizedCombinedText) {
+    return ''
+  }
+
+  const mentionsWebPrueba =
+    normalizedCombinedText.includes('web-prueba') &&
+    !/\b(?:no|sin)\s+tocar\s+web-prueba\b/iu.test(normalizedCombinedText)
+  if (mentionsWebPrueba) {
+    return 'La aprobacion intenta habilitar escritura directa en web-prueba.'
+  }
+
+  const mentionsDotEnv =
+    /\.env(?:\.[a-z0-9_-]+)?/iu.test(normalizedCombinedText) &&
+    !/\b(?:no|sin)\s+crear\s+\.env\b/iu.test(normalizedCombinedText)
+  if (mentionsDotEnv) {
+    return 'La aprobacion intenta habilitar un archivo .env real.'
+  }
+
+  const mentionsNodeModules =
+    /\bnode_modules\b/iu.test(normalizedCombinedText) &&
+    !/\b(?:no|sin)\s+crear\s+node_modules\b/iu.test(normalizedCombinedText)
+  if (mentionsNodeModules) {
+    return 'La aprobacion intenta habilitar node_modules dentro del flujo seguro.'
+  }
+
+  const mentionsDocker =
+    /\b(?:docker|dockerfile|docker-compose)\b/iu.test(normalizedCombinedText) &&
+    !/\b(?:no|sin|ni)\s+usar\s+docker\b/iu.test(normalizedCombinedText) &&
+    !/\b(?:no|sin)\s+crear\s+dockerfile\b/iu.test(normalizedCombinedText)
+  if (mentionsDocker) {
+    return 'La aprobacion intenta habilitar Docker o infraestructura real.'
+  }
+
+  const mentionsDeploy =
+    /\bdeploy\b/iu.test(normalizedCombinedText) &&
+    !/\b(?:no|sin|ni)\s+hacer\s+deploy\b/iu.test(normalizedCombinedText)
+  if (mentionsDeploy) {
+    return 'La aprobacion intenta habilitar deploy dentro del flujo seguro.'
+  }
+
+  if (normalizedCombinedText.includes('..')) {
+    return 'La aprobacion intenta usar path traversal fuera del sandbox controlado.'
+  }
+
+  return ''
+}
+
 const resolveLatestDecisionTimestamp = (record?: ResolvedDecisionRecord | null) =>
   normalizeOptionalString(record?.updatedAt) || new Date().toISOString()
 
@@ -17265,19 +17347,24 @@ function App() {
     decisionType: 'approval-granted' | 'approval-rejected',
   ) => {
     const approvalFamily = resolveCurrentApprovalFamily()
+    const activeDecisionKey = normalizeApprovalDecisionKey(activeApprovalRequest?.decisionKey)
     const selectedOption = normalizeOptionalString(approvalSelectedOption)
     const freeAnswer = normalizeOptionalString(approvalFreeAnswer)
     const combinedDecisionText = [selectedOption, freeAnswer].filter(Boolean).join(' ')
     const isRealPaymentsFamily = approvalFamily === 'real-payments'
+    const isSandboxMaterializationFamily =
+      isSandboxMaterializationApprovalDecisionKey(activeDecisionKey)
     const isDraftDecision =
       decisionType === 'approval-granted' &&
       isRealPaymentsFamily &&
       detectDraftApprovalIntent(selectedOption, freeAnswer)
     const isDeferredDecision =
       decisionType === 'approval-granted' &&
-      isRealPaymentsFamily &&
-      !isDraftDecision &&
-      detectDeferredApprovalIntent(selectedOption, freeAnswer)
+      ((isRealPaymentsFamily &&
+        !isDraftDecision &&
+        detectDeferredApprovalIntent(selectedOption, freeAnswer)) ||
+        (isSandboxMaterializationFamily &&
+          isSandboxMaterializationDeferredOption(selectedOption)))
     const feedbackType =
       decisionType === 'approval-rejected'
         ? 'approval-rejected'
@@ -17310,12 +17397,18 @@ function App() {
       summary:
         decisionType === 'approval-rejected'
           ? activeApprovalRequest?.reason || approvalMessage || DEFAULT_APPROVAL_MESSAGE
-          : isDraftDecision
+        : isDraftDecision
             ? 'La integracion real de Mercado Pago queda documentada como borrador futuro; la entrega actual sigue con mock local y sin credenciales.'
-            : isDeferredDecision
+            : isDeferredDecision && isSandboxMaterializationFamily
+              ? 'La materializacion sandbox queda diferida por decision humana; se conserva la planificacion revisable y no se crea ningun archivo.'
+              : isDeferredDecision
               ? 'La integracion real de Mercado Pago queda diferida; la entrega actual sigue con mock local y sin credenciales.'
               : activeApprovalRequest?.reason || approvalMessage || DEFAULT_APPROVAL_MESSAGE,
-      scope: isRealPaymentsFamily ? 'real-payments' : '',
+      scope: isRealPaymentsFamily
+        ? 'real-payments'
+        : isSandboxMaterializationFamily
+          ? 'sandbox-materialization'
+          : '',
       allowsNow:
         isRealPaymentsFamily && (isDeferredDecision || isDraftDecision)
           ? REAL_PAYMENTS_DEFERRED_ALLOWS_NOW
@@ -17621,6 +17714,102 @@ function App() {
       status: 'success',
       failureType: '',
       failureContext: null,
+    })
+  }
+  const closeSandboxApprovalWithoutMaterialization = ({
+    decisionValue,
+    decisionLabel,
+  }: {
+    decisionValue: 'rejected' | 'deferred'
+    decisionLabel: string
+  }) => {
+    const isDeferred = decisionValue === 'deferred'
+    const instruction =
+      normalizeOptionalString(activeApprovalRequest?.question) ||
+      normalizeOptionalString(activeApprovalRequest?.reason) ||
+      approvalMessage ||
+      DEFAULT_APPROVAL_MESSAGE
+    const result = isDeferred
+      ? 'El operador decidio no materializar todavia. Se conserva solo la planificacion revisable y no se creo ningun archivo.'
+      : 'El operador rechazo la materializacion sandbox. Se conserva solo la planificacion revisable y no se creo ningun archivo.'
+    const finalStatus = isDeferred
+      ? 'Materializacion sandbox diferida'
+      : 'Materializacion sandbox rechazada'
+    const sessionStatusLabel = isDeferred
+      ? 'Planificacion conservada sin materializar todavia'
+      : 'Planificacion conservada tras rechazo de materializacion'
+    const currentStepLabel = isDeferred
+      ? 'La corrida cerro sin materializar y puede retomarse mas adelante desde la planificacion'
+      : 'La corrida cerro el rechazo de materializacion sin ejecutar escrituras'
+    const approvalLabel = decisionLabel || (isDeferred ? 'Diferida manualmente' : 'Rechazada manualmente')
+
+    clearVisibleExecutionRuntimeState({
+      requestState: 'success',
+      result,
+    })
+    settlePlannerReviewRun()
+    setIsPlanning(false)
+    setIsExecutingTask(false)
+    setIsAutoFlowRunning(false)
+    setSessionStatus(sessionStatusLabel)
+    setCurrentStep(currentStepLabel)
+    updateLastRunSummary({
+      objective: normalizedGoalInput,
+      instruction,
+      result,
+      approval: approvalLabel,
+      finalStatus,
+    })
+    setSessionEvents((currentEvents) => [
+      ...currentEvents,
+      isDeferred
+        ? 'Se decidio conservar solo la planificacion sin materializar todavia'
+        : 'Se rechazo la materializacion sandbox y no se crearon archivos',
+      'El flujo cerro la decision humana sin pedir una nueva definicion del usuario',
+    ])
+    addFlowMessage({
+      source: 'orquestador',
+      title: 'Decision del orquestador',
+      content: result,
+      status: 'warning',
+    })
+  }
+  const closeSandboxApprovalBlockedBySafety = (reason: string) => {
+    const instruction =
+      normalizeOptionalString(activeApprovalRequest?.question) ||
+      normalizeOptionalString(activeApprovalRequest?.reason) ||
+      approvalMessage ||
+      DEFAULT_APPROVAL_MESSAGE
+    const result =
+      `${reason} Se bloqueo la materializacion sandbox y no se creo ningun archivo.`.trim()
+
+    clearVisibleExecutionRuntimeState({
+      requestState: 'success',
+      result,
+    })
+    settlePlannerReviewRun()
+    setIsPlanning(false)
+    setIsExecutingTask(false)
+    setIsAutoFlowRunning(false)
+    setSessionStatus('Bloqueada por seguridad')
+    setCurrentStep('La corrida cerro una aprobacion insegura sin ejecutar escrituras')
+    updateLastRunSummary({
+      objective: normalizedGoalInput,
+      instruction,
+      result,
+      approval: 'Bloqueada por seguridad',
+      finalStatus: 'Materializacion sandbox bloqueada por seguridad',
+    })
+    setSessionEvents((currentEvents) => [
+      ...currentEvents,
+      'Se bloqueo una aprobacion sandbox por permisos o destinos inseguros',
+      'El flujo cerro la decision insegura sin replanificacion muda',
+    ])
+    addFlowMessage({
+      source: 'orquestador',
+      title: 'Decision del orquestador',
+      content: result,
+      status: 'error',
     })
   }
   const closeManualExecutionState = ({
@@ -19379,16 +19568,16 @@ function App() {
   const handleApproveOnce = async () => {
     const shouldResumeAutoFlow = autoFlowAwaitingApproval === approvalSource
     const approvalDecisionProfile = resolveCurrentApprovalDecisionProfile('approval-granted')
-    const approvalFeedback = buildApprovalResponseFeedback({
-      type: approvalDecisionProfile.feedbackType,
-      approvalMode: 'once',
-    })
-    const persistedDecisionRecords = rememberCurrentApprovalDecision(approvalDecisionProfile)
-    const nextResolvedDecisions = mergeResolvedDecisionRecords(
-      resolvedDecisions,
-      persistedDecisionRecords,
-    )
-    const projectStateOverride = buildPlannerProjectState(nextResolvedDecisions)
+    const isSandboxDeferredDecision =
+      approvalDecisionProfile.decisionValue === 'deferred' &&
+      isSandboxMaterializationApprovalDecisionKey(activeApprovalRequest?.decisionKey)
+    const unsafeSandboxApprovalReason =
+      isSandboxMaterializationApprovalDecisionKey(activeApprovalRequest?.decisionKey)
+        ? resolveUnsafeSandboxApprovalReason(
+            approvalDecisionProfile.selectedOption,
+            approvalDecisionProfile.freeAnswer,
+          )
+        : ''
     setDecisionPending(false)
     setProjectApprovalPolicy(null)
     resetApprovalInteractionState()
@@ -19403,6 +19592,32 @@ function App() {
       'Se envio una respuesta humana al Cerebro',
       'El Mensajero devolvió la respuesta al Cerebro',
     ])
+
+    if (unsafeSandboxApprovalReason) {
+      setIsAutoFlowRunning(false)
+      closeSandboxApprovalBlockedBySafety(unsafeSandboxApprovalReason)
+      return
+    }
+
+    const approvalFeedback = buildApprovalResponseFeedback({
+      type: approvalDecisionProfile.feedbackType,
+      approvalMode: 'once',
+    })
+    const persistedDecisionRecords = rememberCurrentApprovalDecision(approvalDecisionProfile)
+    const nextResolvedDecisions = mergeResolvedDecisionRecords(
+      resolvedDecisions,
+      persistedDecisionRecords,
+    )
+    const projectStateOverride = buildPlannerProjectState(nextResolvedDecisions)
+
+    if (isSandboxDeferredDecision) {
+      setIsAutoFlowRunning(false)
+      closeSandboxApprovalWithoutMaterialization({
+        decisionValue: 'deferred',
+        decisionLabel: approvalDecisionProfile.decisionLabel,
+      })
+      return
+    }
 
     if (shouldResumeAutoFlow) {
       setIsAutoFlowRunning(true)
@@ -19501,6 +19716,8 @@ function App() {
   const handleRejectApproval = async () => {
     const shouldResumeAutoFlow = autoFlowAwaitingApproval === approvalSource
     const rejectionDecisionProfile = resolveCurrentApprovalDecisionProfile('approval-rejected')
+    const isSandboxRejection =
+      isSandboxMaterializationApprovalDecisionKey(activeApprovalRequest?.decisionKey)
     const rejectionFeedback = buildApprovalResponseFeedback({
       type: 'approval-rejected',
       approvalMode: 'once',
@@ -19525,6 +19742,15 @@ function App() {
       'Se rechazo la propuesta actual',
       'El Mensajero devolvió el rechazo al Cerebro',
     ])
+
+    if (isSandboxRejection) {
+      setIsAutoFlowRunning(false)
+      closeSandboxApprovalWithoutMaterialization({
+        decisionValue: 'rejected',
+        decisionLabel: rejectionDecisionProfile.decisionLabel,
+      })
+      return
+    }
 
     if (shouldResumeAutoFlow) {
       setIsAutoFlowRunning(true)

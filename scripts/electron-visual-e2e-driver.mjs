@@ -614,7 +614,7 @@ async function driveScenario(mainWindow, repoRoot, scenario, scenarioArtifactsPa
     sawExecution,
     sawResult,
     reportExists,
-    finalBodyTextSample: finalSnapshot.bodyText.slice(0, 1200),
+    finalBodyTextSample: finalSnapshot.bodyText.slice(0, 8000),
     finalButtons: finalSnapshot.buttons,
     stepLog,
     ...(capturedValidationReport || {
