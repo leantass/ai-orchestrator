@@ -9676,11 +9676,24 @@ const buildFullstackLocalMaterializationPrompt = ({
   plan,
   originalGoal,
   originalContext,
+  workspacePath,
 }: {
   plan: ScalableDeliveryPlanContract
   originalGoal: string
   originalContext: string
+  workspacePath: string
 }) => {
+  const normalizedWorkspacePath = normalizeOptionalString(workspacePath)
+    .replace(/\\/g, '/')
+    .toLocaleLowerCase()
+  const workspaceAlreadySandboxApproved =
+    normalizedWorkspacePath.endsWith(
+      '.codex-temp/generated-domain-materialization-approved',
+    ) ||
+    normalizedWorkspacePath.includes(
+      '/.codex-temp/generated-domain-materialization-approved/',
+    )
+  const workspaceRequiresSandboxApproval = !workspaceAlreadySandboxApproved
   const allowedRootPaths = normalizeOptionalStringArray(plan.allowedRootPaths)
   const targetStructure = normalizeOptionalStringArray(plan.targetStructure)
   const directories = normalizeOptionalStringArray(plan.directories)
@@ -9760,7 +9773,9 @@ const buildFullstackLocalMaterializationPrompt = ({
       'No devolver prepare-continuation-action-plan.',
       'No devolver prepare-project-phase-plan.',
       'No devolver edit-single-existing-file.',
-      'Devolver un materialize-fullstack-local-plan ejecutable por el executor local deterministico.',
+      workspaceRequiresSandboxApproval
+        ? 'Si el workspace activo no es un sandbox interno aprobado, no devolver un materialize-fullstack-local-plan ejecutable todavia: primero devolver una approvalRequest para ubicar el sandbox seguro.'
+        : 'Devolver un materialize-fullstack-local-plan ejecutable por el executor local deterministico.',
     ].join(' '),
     context: [
       `Objetivo original: ${normalizeOptionalString(originalGoal) || 'No definido'}.`,
@@ -9773,13 +9788,23 @@ const buildFullstackLocalMaterializationPrompt = ({
       'projectIntent: new-project-intent.',
       'acción requerida: materializar fullstack-local.',
       'modo esperado: scaffold fullstack local, estatico y revisable.',
-      'strategyEsperada: materialize-fullstack-local-plan.',
-      'executionModeEsperado: executor.',
-      'nextExpectedActionEsperado: execute-plan.',
-      'requiresApprovalEsperado: false.',
+      workspaceRequiresSandboxApproval
+        ? 'strategyEsperada: scalable-delivery-plan con approval sandbox pendiente.'
+        : 'strategyEsperada: materialize-fullstack-local-plan.',
+      workspaceRequiresSandboxApproval
+        ? 'executionModeEsperado: planner-only hasta resolver approval sandbox.'
+        : 'executionModeEsperado: executor.',
+      workspaceRequiresSandboxApproval
+        ? 'nextExpectedActionEsperado: user-approval.'
+        : 'nextExpectedActionEsperado: execute-plan.',
+      workspaceRequiresSandboxApproval
+        ? 'requiresApprovalEsperado: true.'
+        : 'requiresApprovalEsperado: false.',
       'No interpretar esta preparacion como una edicion puntual sobre un archivo existente.',
       'No devolver strategy executor para editar un archivo existente.',
-      'No devolver nextExpectedAction=user-approval.',
+      workspaceRequiresSandboxApproval
+        ? 'Devolver approvalRequest decisionKey approval-sandbox-location-v1 con opcion custom-path-inside-workspace, allowFreeAnswer true y una alternativa no-materialization-yet.'
+        : 'No devolver nextExpectedAction=user-approval.',
       `allowedRootPaths: ${allowedRootPaths.join(', ') || targetRoot}.`,
       targetStructure.length > 0
         ? `targetStructure: ${targetStructure.join(' | ')}.`
@@ -9793,6 +9818,9 @@ const buildFullstackLocalMaterializationPrompt = ({
       successCriteria.length > 0
         ? `successCriteria: ${successCriteria.join(' | ')}.`
         : '',
+      workspaceRequiresSandboxApproval
+        ? `El workspace activo (${workspacePath}) no puede recibir writes directos; primero hace falta una ubicacion sandbox aprobada que luego se mapee a .codex-temp/generated-domain-materialization-approved/.`
+        : 'El workspace actual ya es un sandbox interno aprobado y puede materializar solo dentro de ese scope controlado.',
       'Si el workspace detecta un proyecto existente pero applicable=false o projectIntent=new-project-intent, ignorarlo por completo dentro del contrato materializable.',
       'No reutilizar manifest, roadmap, phaseExpansionPlan, modulos ni dominio de proyectos detectados fuera de alcance como fullstack-local-veterinaria.',
       ...contractSpecificGuidance,
@@ -9802,6 +9830,105 @@ const buildFullstackLocalMaterializationPrompt = ({
       .filter(Boolean)
       .join('\n'),
   }
+}
+
+const isGeneratedDomainApprovedSandboxWorkspacePathForUi = (workspacePath: string) => {
+  const normalizedWorkspacePath = normalizeOptionalString(workspacePath)
+    .replace(/\\/g, '/')
+    .toLocaleLowerCase()
+
+  return (
+    normalizedWorkspacePath.endsWith(
+      '.codex-temp/generated-domain-materialization-approved',
+    ) ||
+    normalizedWorkspacePath.includes(
+      '/.codex-temp/generated-domain-materialization-approved/',
+    )
+  )
+}
+
+const buildUnsafeWorkspaceSandboxApprovalResponse = ({
+  response,
+  workspacePath,
+}: {
+  response: PlannerDecisionResponse
+  workspacePath: string
+}): PlannerDecisionResponse => {
+  const approvalReason =
+    `El workspace configurado (${workspacePath}) no es un sandbox interno aprobado. ` +
+    'Antes de cualquier materializacion fullstack local, JEFE necesita una ubicacion sandbox segura y aislada.'
+
+  return {
+    ...response,
+    approvalRequired: true,
+    requiresApproval: true,
+    approvalReason,
+    question:
+      'Antes de materializar el scaffold fullstack local, necesito una ubicacion sandbox segura. Puedes indicar un workspace alternativo aislado y una carpeta sandbox especifica, o decidir no materializar todavia.',
+    nextExpectedAction: 'user-approval',
+    instruction:
+      'Antes de materializar la entrega fullstack local, necesito una aprobacion humana que declare una ubicacion sandbox segura y aislada.',
+    approvalRequest: {
+      decisionKey: 'approval-sandbox-location-v1',
+      reason: approvalReason,
+      question:
+        'Antes de materializar el scaffold fullstack local, necesito una ubicacion sandbox segura. Puedes indicar un workspace alternativo aislado y una carpeta sandbox especifica, o decidir no materializar todavia.',
+      options: [
+        {
+          key: 'custom-path-inside-workspace',
+          label: 'Indicar subruta especifica dentro del workspace',
+          description:
+            'Permite declarar un workspace alternativo seguro y una carpeta sandbox explicita para mapearla al sandbox interno controlado.',
+        },
+        {
+          key: 'no-materialization-yet',
+          label: 'No materializar todavia',
+          description:
+            'Mantiene la planificacion sin crear archivos hasta recibir una ubicacion sandbox aprobada.',
+        },
+      ],
+      allowFreeAnswer: true,
+      allowBrainDefault: false,
+      impact: 'high',
+      nextExpectedAction: 'user-approval',
+    },
+  }
+}
+
+const shouldCoerceUnsafeWorkspaceMaterializationToApproval = ({
+  response,
+  metadata,
+  workspacePath,
+}: {
+  response: PlannerDecisionResponse
+  metadata: PlannerExecutionMetadata
+  workspacePath: string
+}) => {
+  if (!response?.ok) {
+    return false
+  }
+
+  if (isGeneratedDomainApprovedSandboxWorkspacePathForUi(workspacePath)) {
+    return false
+  }
+
+  if (shouldTreatPlannerResponseAsApprovalRequired(response)) {
+    return false
+  }
+
+  if (normalizeOptionalString(metadata?.strategy) !== 'materialize-fullstack-local-plan') {
+    return false
+  }
+
+  const approvalEvaluationApproved =
+    metadata?.generatedDomainFileCreationApprovalEvaluation?.approved === true &&
+    metadata?.generatedDomainFileCreationApprovalEvaluation?.blocked !== true
+  const runtimeSourceApproved =
+    metadata?.generatedDomainControlledRuntimeMaterializationSource?.selectedSource ===
+      'generated-domain-universal' &&
+    metadata?.generatedDomainControlledRuntimeMaterializationSource?.enabled === true
+
+  return !(approvalEvaluationApproved && runtimeSourceApproved)
 }
 
 function DetailDialog({
@@ -18342,8 +18469,6 @@ function App() {
         }),
       )
       const response = sanitizePlannerDecisionResponse(rawResponse)
-      const plannerApprovalRequired =
-        shouldTreatPlannerResponseAsApprovalRequired(response)
 
       if (!response?.ok || !response.instruction) {
         addFlowMessage({
@@ -18372,8 +18497,21 @@ function App() {
         return
       }
 
-      const nextExecutionMetadata = resolvePlannerExecutionMetadata(response)
-      syncBrainRoutingDecision(response.brainRoutingDecision)
+      const rawExecutionMetadata = resolvePlannerExecutionMetadata(response)
+      const effectiveResponse = shouldCoerceUnsafeWorkspaceMaterializationToApproval({
+        response,
+        metadata: rawExecutionMetadata,
+        workspacePath,
+      })
+        ? buildUnsafeWorkspaceSandboxApprovalResponse({
+            response,
+            workspacePath,
+          })
+        : response
+      const plannerApprovalRequired =
+        shouldTreatPlannerResponseAsApprovalRequired(effectiveResponse)
+      const nextExecutionMetadata = resolvePlannerExecutionMetadata(effectiveResponse)
+      syncBrainRoutingDecision(effectiveResponse.brainRoutingDecision)
       setPlannerExecutionMetadata(nextExecutionMetadata)
       setPlannerRequestSnapshot({
         goal: replanGoal,
@@ -18388,8 +18526,8 @@ function App() {
       addFlowMessage({
         source: 'planificador',
         title: 'Respuesta del planificador',
-        content: response.instruction,
-        raw: formatStructuredContent(response),
+        content: effectiveResponse.instruction,
+        raw: formatStructuredContent(effectiveResponse),
         status: plannerApprovalRequired ? 'warning' : 'success',
       })
 
@@ -18400,8 +18538,8 @@ function App() {
               type: 'approval-granted',
               source: 'planner',
               approvalMode: 'project-rule',
-              instruction: response.instruction,
-              approvalReason: resolveApprovalReason(response),
+              instruction: effectiveResponse.instruction,
+              approvalReason: resolveApprovalReason(effectiveResponse),
             }),
             true,
           )
@@ -18410,16 +18548,16 @@ function App() {
 
         openApprovalCheckpoint({
           source: 'planner',
-          instruction: response.instruction,
-          payload: response,
-          planCompletion: response.completed === true,
+          instruction: effectiveResponse.instruction,
+          payload: effectiveResponse,
+          planCompletion: effectiveResponse.completed === true,
         })
         clearVisibleExecutionRuntimeState()
         setSessionStatus('Esperando aprobación para continuar')
         setCurrentStep('El Cerebro necesita una decision humana antes de seguir')
         updateLastRunSummary({
           objective: normalizedGoalInput,
-          instruction: response.instruction,
+          instruction: effectiveResponse.instruction,
           result: 'Pendiente de aprobación',
           approval: 'Manual requerida',
           finalStatus: 'Esperando aprobación para continuar',
@@ -18427,17 +18565,17 @@ function App() {
         return
       }
 
-      setPlannerInstruction(response.instruction)
-      setCurrentStep(response.instruction)
-      if (isUserClarificationPlannerResponse(response)) {
+      setPlannerInstruction(effectiveResponse.instruction)
+      setCurrentStep(effectiveResponse.instruction)
+      if (isUserClarificationPlannerResponse(effectiveResponse)) {
         clearVisibleExecutionRuntimeState()
         settlePlannerReviewRun()
         setSessionStatus('Esperando una nueva definición del usuario')
         setCurrentStep('El Cerebro necesita una nueva definición antes de ejecutar')
         updateLastRunSummary({
           objective: normalizedGoalInput,
-          instruction: response.instruction,
-          result: response.instruction,
+          instruction: effectiveResponse.instruction,
+          result: effectiveResponse.instruction,
           approval: approvedByProjectRule
             ? 'Autoaprobada por regla del proyecto'
             : 'No requerida',
@@ -18453,15 +18591,15 @@ function App() {
         return
       }
 
-      if (isReviewOnlyPlannerResponse(response)) {
+      if (isReviewOnlyPlannerResponse(effectiveResponse)) {
         clearVisibleExecutionRuntimeState()
         settlePlannerReviewRun()
         setSessionStatus('Plan listo para revision')
         setCurrentStep('El Cerebro devolvio una arquitectura para revisar antes de ejecutar')
         updateLastRunSummary({
           objective: normalizedGoalInput,
-          instruction: response.instruction,
-          result: response.instruction,
+          instruction: effectiveResponse.instruction,
+          result: effectiveResponse.instruction,
           approval: approvedByProjectRule
             ? 'Autoaprobada por regla del proyecto'
             : 'No requerida',
@@ -18481,7 +18619,7 @@ function App() {
       setSessionStatus('El Cerebro definió una nueva acción')
       updateLastRunSummary({
         objective: normalizedGoalInput,
-        instruction: response.instruction,
+        instruction: effectiveResponse.instruction,
         result: 'Pendiente de ejecución',
         approval: approvedByProjectRule
           ? 'Autoaprobada por regla del proyecto'
@@ -18489,18 +18627,18 @@ function App() {
         finalStatus: 'Plan reconfigurado',
       })
 
-      if (response.completed) {
+      if (effectiveResponse.completed) {
         clearVisibleExecutionRuntimeState({
           requestState: 'success',
-          result: response.instruction,
+          result: effectiveResponse.instruction,
         })
         settlePlannerReviewRun()
         setSessionStatus('Ejecución completada')
         setCurrentStep('El Cerebro cerró la corrida sin necesitar otra ejecución')
         updateLastRunSummary({
           objective: normalizedGoalInput,
-          instruction: response.instruction,
-          result: response.instruction,
+          instruction: effectiveResponse.instruction,
+          result: effectiveResponse.instruction,
           approval: approvedByProjectRule
             ? 'Autoaprobada por regla del proyecto'
             : 'No requerida',
@@ -18510,8 +18648,8 @@ function App() {
       }
 
       await handleExecuteCurrentInstruction(
-        response.instruction,
-        resolvePlannerExecutionMetadata(response),
+        effectiveResponse.instruction,
+        resolvePlannerExecutionMetadata(effectiveResponse),
       )
     } catch {
       setExecutorRequestState('error')
@@ -19698,8 +19836,6 @@ function App() {
         }),
       })
       const response = sanitizePlannerDecisionResponse(rawResponse)
-      const plannerApprovalRequired =
-        shouldTreatPlannerResponseAsApprovalRequired(response)
 
       if (!response?.ok || !response.instruction) {
         options?.onPlanningFailure?.()
@@ -19718,18 +19854,30 @@ function App() {
         return
       }
 
+      const rawExecutionMetadata = resolvePlannerExecutionMetadata(response)
+      const effectiveResponse = shouldCoerceUnsafeWorkspaceMaterializationToApproval({
+        response,
+        metadata: rawExecutionMetadata,
+        workspacePath,
+      })
+        ? buildUnsafeWorkspaceSandboxApprovalResponse({
+            response,
+            workspacePath,
+          })
+        : response
+      const plannerApprovalRequired =
+        shouldTreatPlannerResponseAsApprovalRequired(effectiveResponse)
+      const nextExecutionMetadata = resolvePlannerExecutionMetadata(effectiveResponse)
       addFlowMessage({
         source: 'planificador',
         title: 'Respuesta del planificador',
-        content: response.instruction,
-        raw: formatStructuredContent(response),
+        content: effectiveResponse.instruction,
+        raw: formatStructuredContent(effectiveResponse),
         status: plannerApprovalRequired ? 'warning' : 'success',
       })
-      const nextExecutionMetadata = resolvePlannerExecutionMetadata(response)
-      const validationIssue = options?.validateResponse?.(
-        response,
-        nextExecutionMetadata,
-      )
+      const validationIssue = plannerApprovalRequired
+        ? ''
+        : options?.validateResponse?.(effectiveResponse, nextExecutionMetadata)
 
       if (validationIssue) {
         options?.onPlanningFailure?.()
@@ -19760,7 +19908,7 @@ function App() {
         return
       }
 
-      syncBrainRoutingDecision(response.brainRoutingDecision)
+      syncBrainRoutingDecision(effectiveResponse.brainRoutingDecision)
       setPlannerExecutionMetadata(nextExecutionMetadata)
       setPlannerRequestSnapshot({
         goal: plannerGoal,
@@ -19778,7 +19926,7 @@ function App() {
           matchesProjectApprovalPolicy({
             policy: projectApprovalPolicy,
             source: 'planner',
-            payload: response,
+            payload: effectiveResponse,
           })
         ) {
           await replanManualFlow(
@@ -19786,8 +19934,8 @@ function App() {
               type: 'approval-granted',
               source: 'planner',
               approvalMode: 'project-rule',
-              instruction: response.instruction,
-              approvalReason: resolveApprovalReason(response),
+              instruction: effectiveResponse.instruction,
+              approvalReason: resolveApprovalReason(effectiveResponse),
             }),
             true,
           )
@@ -19796,12 +19944,12 @@ function App() {
           setApprovalMessage('')
           setPendingInstruction('')
           setApprovalSource('')
-          setPlannerInstruction(response.instruction)
-          setCurrentStep(response.instruction)
+          setPlannerInstruction(effectiveResponse.instruction)
+          setCurrentStep(effectiveResponse.instruction)
           setSessionStatus('Plan autoaprobado por regla del proyecto')
           updateLastRunSummary({
             objective: normalizedPlannerGoal,
-            instruction: response.instruction,
+            instruction: effectiveResponse.instruction,
             result: 'Pendiente de ejecución',
             approval: 'Autoaprobada por regla del proyecto',
             finalStatus: 'Plan autoaprobado por regla del proyecto',
@@ -19823,15 +19971,15 @@ function App() {
 
         openApprovalCheckpoint({
           source: 'planner',
-          instruction: response.instruction,
-          payload: response,
+          instruction: effectiveResponse.instruction,
+          payload: effectiveResponse,
         })
         clearVisibleExecutionRuntimeState()
         setSessionStatus('Esperando aprobación para continuar')
         setCurrentStep('El Cerebro necesita una decision humana antes de seguir')
         updateLastRunSummary({
           objective: normalizedPlannerGoal,
-          instruction: response.instruction,
+          instruction: effectiveResponse.instruction,
           result: 'Pendiente de aprobación',
           approval: 'Manual requerida',
           finalStatus: 'Esperando aprobación para continuar',
@@ -19855,8 +20003,8 @@ function App() {
       setPendingInstruction('')
       setPendingExecutionInstruction('')
       setApprovalSource('')
-      setPlannerInstruction(response.instruction)
-      setCurrentStep(response.instruction)
+      setPlannerInstruction(effectiveResponse.instruction)
+      setCurrentStep(effectiveResponse.instruction)
       const preparedMaterializationStrategy = normalizeOptionalString(
         nextExecutionMetadata.strategy || nextExecutionMetadata.decisionKey,
       ).toLocaleLowerCase()
@@ -19902,9 +20050,9 @@ function App() {
         ),
         requiresApproval: nextExecutionMetadata.requiresApproval === true,
         adapterId:
-          normalizeOptionalString(response.brainAdapter?.id) ||
-          normalizeOptionalString(response.brainRoutingDecision?.resolvedProvider),
-        fallbackUsed: response.brainRoutingDecision?.fallbackUsed === true,
+          normalizeOptionalString(effectiveResponse.brainAdapter?.id) ||
+          normalizeOptionalString(effectiveResponse.brainRoutingDecision?.resolvedProvider),
+        fallbackUsed: effectiveResponse.brainRoutingDecision?.fallbackUsed === true,
         materializationResponseReady:
           preparedFullstackLocalMaterializationUiState?.fullstackMaterializationResponseReady ===
           true,
@@ -19976,13 +20124,13 @@ function App() {
         setSessionStatus('Plan generado')
         setCurrentStep(
           buildPlannedCurrentStepLabel({
-            plannerInstruction: response.instruction,
+            plannerInstruction: effectiveResponse.instruction,
             executionMode: nextExecutionMetadata.executionMode,
           }),
         )
         updateLastRunSummary({
           objective: normalizedPlannerGoal,
-          instruction: response.instruction,
+          instruction: effectiveResponse.instruction,
           result: 'Pendiente de ejecución',
           approval: 'No requerida',
           finalStatus:
@@ -20017,14 +20165,14 @@ function App() {
         return
       }
 
-      if (isUserClarificationPlannerResponse(response)) {
+      if (isUserClarificationPlannerResponse(effectiveResponse)) {
         clearVisibleExecutionRuntimeState()
         setSessionStatus('Esperando una nueva definición del usuario')
         setCurrentStep('El Cerebro necesita una nueva definición antes de ejecutar')
         updateLastRunSummary({
           objective: normalizedPlannerGoal,
-          instruction: response.instruction,
-          result: response.instruction,
+          instruction: effectiveResponse.instruction,
+          result: effectiveResponse.instruction,
           approval: 'No requerida',
           finalStatus: 'Esperando una nueva definición del usuario',
         })
@@ -20042,15 +20190,15 @@ function App() {
         return
       }
 
-      if (isReviewOnlyPlannerResponse(response)) {
+      if (isReviewOnlyPlannerResponse(effectiveResponse)) {
         clearVisibleExecutionRuntimeState()
         settlePlannerReviewRun()
         setSessionStatus('Plan listo para revision')
         setCurrentStep('El Cerebro devolvio una arquitectura para revisar antes de ejecutar')
         updateLastRunSummary({
           objective: normalizedPlannerGoal,
-          instruction: response.instruction,
-          result: response.instruction,
+          instruction: effectiveResponse.instruction,
+          result: effectiveResponse.instruction,
           approval: 'No requerida',
           finalStatus: 'Plan listo para revision',
         })
@@ -20072,7 +20220,7 @@ function App() {
       setSessionStatus('Plan generado')
       updateLastRunSummary({
         objective: normalizedPlannerGoal,
-        instruction: response.instruction,
+        instruction: effectiveResponse.instruction,
         result: 'Pendiente de ejecución',
         approval: 'No requerida',
         finalStatus: 'Plan generado',
@@ -20560,6 +20708,7 @@ function App() {
       plan: activeScalableDeliveryPlan,
       originalGoal: goalInput,
       originalContext: getCurrentExecutionContextValue(),
+      workspacePath,
     })
 
     clearVisibleExecutionRuntimeState()

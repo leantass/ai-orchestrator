@@ -67,6 +67,11 @@ const generatedDomainMaterializationPlanDiagnostics = require(
 )
 
 const smokeWorkspaceRoot = path.join(repoRoot, '.tmp', 'ai-operator-e2e-smoke')
+const approvedSandboxWorkspaceRoot = path.join(
+  smokeWorkspaceRoot,
+  '.codex-temp',
+  'generated-domain-materialization-approved',
+)
 const continuationBasePhaseIds = [
   'fullstack-local-scaffold',
   'frontend-mock-flow',
@@ -216,6 +221,10 @@ function cloneJson(value) {
 function ensureCleanDirectory(targetPath) {
   fs.rmSync(targetPath, { recursive: true, force: true })
   fs.mkdirSync(targetPath, { recursive: true })
+}
+
+function resolveApprovedSandboxWorkspacePath(workspaceName) {
+  return path.join(approvedSandboxWorkspaceRoot, workspaceName)
 }
 
 function cleanupSmokeWorkspaceRoot() {
@@ -919,7 +928,7 @@ async function buildFullstackFixture({
   context,
   projectLabel,
 }) {
-  const workspacePath = path.join(smokeWorkspaceRoot, workspaceName)
+  const workspacePath = resolveApprovedSandboxWorkspacePath(workspaceName)
   ensureCleanDirectory(workspacePath)
 
   const phaseOneDecision = await requestPlannerDecision({
@@ -3084,7 +3093,7 @@ async function runUiHelperSanityCase() {
   )
   pushFailure(
     failures,
-    /if \(response\.completed\)\s*\{[\s\S]{0,400}?settlePlannerReviewRun\(\)[\s\S]{0,200}?setSessionStatus\('Ejecuci.n completada'\)/.test(
+    /if \(effectiveResponse\.completed\)\s*\{[\s\S]{0,400}?settlePlannerReviewRun\(\)[\s\S]{0,200}?setSessionStatus\('Ejecuci.n completada'\)/.test(
       appSource,
     ),
     'La rama completed despues de una replanificacion debe cerrar la corrida activa y no dejar approval-pending colgado.',
@@ -3100,6 +3109,33 @@ async function runUiHelperSanityCase() {
 async function runTrackingLogisticsPostApprovalUiStateRealCase() {
   const failures = []
   const appSource = fs.readFileSync(appFilePath, 'utf8')
+  const rawResponseSanitizeMarker =
+    'const response = sanitizePlannerDecisionResponse(rawResponse)'
+  const effectiveResponseMarker =
+    'const effectiveResponse = shouldCoerceUnsafeWorkspaceMaterializationToApproval({'
+  const approvalFromEffectiveMarker =
+    'shouldTreatPlannerResponseAsApprovalRequired(effectiveResponse)'
+  const firstSanitizeIndex = appSource.indexOf(rawResponseSanitizeMarker)
+  const firstEffectiveResponseIndex = appSource.indexOf(
+    effectiveResponseMarker,
+    firstSanitizeIndex,
+  )
+  const firstApprovalFromEffectiveIndex = appSource.indexOf(
+    approvalFromEffectiveMarker,
+    firstEffectiveResponseIndex,
+  )
+  const secondSanitizeIndex = appSource.indexOf(
+    rawResponseSanitizeMarker,
+    firstSanitizeIndex + rawResponseSanitizeMarker.length,
+  )
+  const secondEffectiveResponseIndex = appSource.indexOf(
+    effectiveResponseMarker,
+    secondSanitizeIndex,
+  )
+  const secondApprovalFromEffectiveIndex = appSource.indexOf(
+    approvalFromEffectiveMarker,
+    secondEffectiveResponseIndex,
+  )
 
   pushFailure(
     failures,
@@ -3128,9 +3164,9 @@ async function runTrackingLogisticsPostApprovalUiStateRealCase() {
   )
   pushFailure(
     failures,
-    /const rawResponse = await window\.aiOrchestrator\?\.planTask\?\.\([\s\S]{0,220}?const response = sanitizePlannerDecisionResponse\(rawResponse\)[\s\S]{0,160}?const plannerApprovalRequired =[\s\S]{0,120}?shouldTreatPlannerResponseAsApprovalRequired\(response\)/.test(
-      appSource,
-    ),
+    firstSanitizeIndex >= 0 &&
+      firstEffectiveResponseIndex > firstSanitizeIndex &&
+      firstApprovalFromEffectiveIndex > firstEffectiveResponseIndex,
     'replanManualFlow debe sanear la respuesta antes de decidir aprobacion o error.',
   )
   pushFailure(
@@ -3142,9 +3178,9 @@ async function runTrackingLogisticsPostApprovalUiStateRealCase() {
   )
   pushFailure(
     failures,
-    /const rawResponse = await window\.aiOrchestrator\?\.planTask\?\.\(\{[\s\S]{0,260}?const response = sanitizePlannerDecisionResponse\(rawResponse\)[\s\S]{0,160}?const plannerApprovalRequired =[\s\S]{0,120}?shouldTreatPlannerResponseAsApprovalRequired\(response\)/.test(
-      appSource,
-    ),
+    secondSanitizeIndex >= 0 &&
+      secondEffectiveResponseIndex > secondSanitizeIndex &&
+      secondApprovalFromEffectiveIndex > secondEffectiveResponseIndex,
     'handleGenerateNextStep debe sanear el payload antes de ramificar por approval.',
   )
   pushFailure(
@@ -3228,7 +3264,7 @@ async function runTrackingLogisticsPostApprovalReviewStateCase() {
   )
   pushFailure(
     failures,
-    /if \(isReviewOnlyPlannerResponse\(response\)\) \{[\s\S]{0,220}?clearVisibleExecutionRuntimeState\(\)[\s\S]{0,120}?settlePlannerReviewRun\(\)[\s\S]{0,220}?setSessionStatus\('Plan listo para revision'\)/.test(
+    /if \(isReviewOnlyPlannerResponse\(effectiveResponse\)\) \{[\s\S]{0,220}?clearVisibleExecutionRuntimeState\(\)[\s\S]{0,120}?settlePlannerReviewRun\(\)[\s\S]{0,220}?setSessionStatus\('Plan listo para revision'\)/.test(
       appSource,
     ),
     'replanManualFlow debe cerrar la corrida review-only antes de dejar la UI en Plan listo para revision.',
@@ -3242,7 +3278,7 @@ async function runTrackingLogisticsPostApprovalReviewStateCase() {
   )
   pushFailure(
     failures,
-    /if \(isReviewOnlyPlannerResponse\(response\)\) \{[\s\S]{0,220}?clearVisibleExecutionRuntimeState\(\)[\s\S]{0,120}?settlePlannerReviewRun\(\)[\s\S]{0,220}?setSessionStatus\('Plan listo para revision'\)/.test(
+    /if \(isReviewOnlyPlannerResponse\(effectiveResponse\)\) \{[\s\S]{0,220}?clearVisibleExecutionRuntimeState\(\)[\s\S]{0,120}?settlePlannerReviewRun\(\)[\s\S]{0,220}?setSessionStatus\('Plan listo para revision'\)/.test(
       appSource,
     ),
     'handleGenerateNextStep debe cerrar la corrida review-only antes de dejar la UI en Plan listo para revision.',
@@ -11457,7 +11493,7 @@ async function runOnlineCoursesApprovalLaterReturnsScalableReviewCase() {
 }
 
 async function requestTrackingLogisticsPreparedMaterializationDecision({
-  workspacePath = smokeWorkspaceRoot,
+  workspacePath = approvedSandboxWorkspaceRoot,
 } = {}) {
   const goal =
     'Sistema fullstack local de tracking logistico para una empresa de logistica con backend local, API local, SQLite o base local, frontend administrativo, consulta publica por codigo, entidades y relaciones, envios, historial de eventos, incidencias y reportes basicos.'
@@ -11633,23 +11669,24 @@ async function runFullstackLocalPreparationPromptGuardsWrongExecutorRouteCase() 
   pushFailure(
     failures,
     /No devolver edit-single-existing-file\./.test(appSource) &&
-      /No devolver nextExpectedAction=user-approval\./.test(appSource) &&
-      /No devolver strategy executor para editar un archivo existente\./.test(appSource),
-    'El prompt de preparacion fullstack local debe bloquear explicitamente edit-single-existing-file y user-approval.',
+      /No devolver strategy executor para editar un archivo existente\./.test(appSource) &&
+      /Devolver approvalRequest decisionKey approval-sandbox-location-v1/.test(appSource),
+    'El prompt de preparacion fullstack local debe bloquear edit-single-existing-file y declarar approval sandbox cuando el workspace no es seguro.',
   )
   pushFailure(
     failures,
     /La preparacion fullstack local no puede degradar a edit-single-existing-file\./.test(
       appSource,
     ) &&
-      /La preparacion fullstack local no debe reabrir user-approval\./.test(appSource),
-    'La validacion del renderer debe rechazar rutas desviadas de edit-single-existing-file o user-approval.',
+      /La preparacion fullstack local no debe reabrir user-approval\./.test(appSource) &&
+      /workspace configurado .* no es un sandbox interno aprobado/i.test(appSource),
+    'La validacion del renderer debe distinguir entre un desvio incorrecto y una approval sandbox obligatoria por workspace inseguro.',
   )
   pushFailure(
     failures,
     /No devolver edit-single-existing-file\./.test(smokeSource) &&
-      /No devolver nextExpectedAction=user-approval\./.test(smokeSource),
-    'El helper espejo del smoke debe conservar las mismas restricciones que el prompt real de App.tsx.',
+      /approval-sandbox-location-v1/.test(smokeSource),
+    'El helper espejo del smoke debe conservar la restriccion de edit-single-existing-file y el flujo de approval sandbox.',
   )
 
   return {
@@ -12613,7 +12650,10 @@ async function runTrackingLogisticsMaterializationRejectsJsonOnlyCase() {
   }
 }
 async function runTrackingLogisticsNewProjectDoesNotUseVeterinaryManifestCase() {
-  const detectedProjectPath = path.join(smokeWorkspaceRoot, 'fullstack-local-veterinaria')
+  const detectedProjectPath = path.join(
+    approvedSandboxWorkspaceRoot,
+    'fullstack-local-veterinaria',
+  )
   ensureCleanDirectory(detectedProjectPath)
   fs.writeFileSync(
     path.join(detectedProjectPath, 'jefe-project.json'),
@@ -12638,7 +12678,9 @@ async function runTrackingLogisticsNewProjectDoesNotUseVeterinaryManifestCase() 
     '# Fullstack local veterinaria\n',
     'utf8',
   )
-  const result = await requestTrackingLogisticsPreparedMaterializationDecision()
+  const result = await requestTrackingLogisticsPreparedMaterializationDecision({
+    workspacePath: approvedSandboxWorkspaceRoot,
+  })
   const failures = [...(Array.isArray(result.failures) ? result.failures : [])]
   const decision = result.decision
   const contaminationPool = normalizeText(

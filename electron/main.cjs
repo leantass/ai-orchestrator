@@ -47811,6 +47811,23 @@ function buildGeneratedDomainApprovedSandboxRoot({
   )
 }
 
+function isGeneratedDomainApprovedSandboxWorkspacePath(workspacePath) {
+  const normalizedWorkspacePath = normalizeExternalSandboxPathForComparison(
+    path.resolve(normalizeOptionalString(workspacePath) || process.cwd()),
+  ).replace(/\/+$/u, '')
+
+  if (!normalizedWorkspacePath) {
+    return false
+  }
+
+  return (
+    normalizedWorkspacePath.endsWith('/.codex-temp/generated-domain-materialization-approved') ||
+    normalizedWorkspacePath.includes(
+      '/.codex-temp/generated-domain-materialization-approved/',
+    )
+  )
+}
+
 function resolveGeneratedDomainSandboxApprovalDecision({
   resolvedDecisionMap,
   plannerFeedback,
@@ -53202,6 +53219,12 @@ async function buildLocalStrategicBrainDecision({
   const shouldPromoteApprovedSandboxFullstackLocalMaterialization =
     sandboxApprovalPromotesMaterialization &&
     hasStrongFullstackRequestGuard
+  const generatedDomainWorkspaceAlreadySandboxApproved =
+    isGeneratedDomainApprovedSandboxWorkspacePath(workspacePath)
+  const shouldRequestSandboxLocationApprovalBeforeFullstackMaterialization =
+    hasStrongFullstackRequestGuard &&
+    !generatedDomainWorkspaceAlreadySandboxApproved &&
+    !shouldPromoteApprovedSandboxFullstackLocalMaterialization
   const productArchitectureIntent = detectProductArchitecturePlanningIntent(
     goal,
     normalizedContext,
@@ -54216,6 +54239,70 @@ async function buildLocalStrategicBrainDecision({
       approvalFeedbackResolved ||
       hasRecoverableExecutionError)
   ) {
+    if (shouldRequestSandboxLocationApprovalBeforeFullstackMaterialization) {
+      const scalableDeliveryPlan = buildScalableDeliveryPlan({
+        goal,
+        context,
+        workspacePath,
+        deliveryLevel: 'fullstack-local',
+        domainUnderstanding,
+        reason:
+          'El objetivo sigue siendo fullstack-local, pero el workspace actual no es un sandbox interno aprobado. Antes de materializar, JEFE debe pedir una ubicacion de sandbox segura y aislada.',
+      })
+
+      return buildDecisionWithPlanningContracts(
+        {
+          decisionKey: 'scalable-delivery-plan',
+          strategy: 'scalable-delivery-plan',
+          executionMode: 'planner-only',
+          reason:
+            'Antes de materializar un scaffold fullstack local, JEFE necesita una aprobacion explicita de ubicacion sandbox porque el workspace activo no puede recibir writes directos.',
+          tasks: scalableDeliveryPlan.tasks,
+          requiresApproval: true,
+          approvalRequest: buildBrainApprovalRequest({
+            decisionKey: 'approval-sandbox-location-v1',
+            reason:
+              'El scaffold fullstack local solo puede materializarse dentro de un sandbox controlado y el workspace activo no es un sandbox interno aprobado.',
+            question:
+              'Antes de materializar el scaffold fullstack local, necesito una ubicacion sandbox segura. Puedes indicar un workspace alternativo aislado y una carpeta sandbox especifica, o decidir no materializar todavia.',
+            options: [
+              {
+                key: 'custom-path-inside-workspace',
+                label: 'Indicar subruta especifica dentro del workspace',
+                description:
+                  'Permite declarar un workspace alternativo seguro y una carpeta sandbox explicita para mapearla al sandbox interno controlado.',
+              },
+              {
+                key: 'no-materialization-yet',
+                label: 'No materializar todavia',
+                description:
+                  'Mantiene la planificacion sin crear archivos hasta recibir una ubicacion sandbox aprobada.',
+              },
+            ],
+            allowFreeAnswer: true,
+            allowBrainDefault: false,
+            impact: 'high',
+            nextExpectedAction: 'user-approval',
+          }),
+          assumptions: [
+            ...scalableDeliveryPlan.assumptions,
+            workspacePath
+              ? `El workspace configurado (${workspacePath}) no puede recibir la materializacion directa; primero hace falta una ubicacion sandbox aprobada.`
+              : 'Sin una ubicacion sandbox aprobada, la materializacion no puede correr sobre el workspace activo.',
+          ],
+          instruction:
+            'Antes de materializar la entrega fullstack local, necesito una aprobacion humana que declare una ubicacion sandbox segura y aislada.',
+          completed: false,
+          nextExpectedAction: 'user-approval',
+          scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
+        },
+        {
+          deliveryLevel: 'fullstack-local',
+          scalableDeliveryPlan: scalableDeliveryPlan.scalableDeliveryPlan,
+        },
+      )
+    }
+
     const scalableDeliveryPlan = buildScalableDeliveryPlan({
       goal,
       context,

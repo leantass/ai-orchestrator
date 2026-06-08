@@ -92,6 +92,18 @@ module.exports = {
     exports: {},
     require,
     __dirname: path.join(repoRoot, 'electron'),
+    app: {
+      getPath: (name) =>
+        name === 'userData'
+          ? path.join(repoRoot, '.codex-temp', 'generated-domain-electron-ui-e2e-user-data')
+          : repoRoot,
+    },
+    lookupReusableArtifactsForPlanning: async () => ({
+      matches: [],
+      total: 0,
+      query: '',
+      source: 'generated-domain-electron-ui-e2e-stub',
+    }),
     console,
     process,
     Buffer,
@@ -160,6 +172,53 @@ La prueba debe validar el flujo completo:
 pedido -> contrato universal -> plan -> approval surface -> aprobacion humana -> materializacion sandbox -> validacion -> reporte.
 
 No debe crear archivos reales fuera del sandbox seguro. No debe tocar web-prueba. No debe crear .env, node_modules, Docker, deploy ni usar servicios externos.`
+const preparedUnsafeWorkspaceGoal =
+  'Preparar la materializacion controlada de un fullstack-local local y revisable dentro de una carpeta nueva del workspace. Si el workspace activo no es un sandbox interno aprobado, no devolver un materialize-fullstack-local-plan ejecutable todavia: primero devolver una approvalRequest para ubicar el sandbox seguro.'
+const preparedUnsafeWorkspaceContext = [
+  `Objetivo original: ${goal}.`,
+  `Contexto previo del operador: ${context}.`,
+  'sourceStrategy: scalable-delivery-plan.',
+  'sourceNextExpectedAction: review-scalable-delivery.',
+  'deliveryLevel: fullstack-local.',
+  'projectIntent: new-project-intent.',
+  'accion requerida: materializar fullstack-local.',
+  'modo esperado: scaffold fullstack local, estatico y revisable.',
+  'strategyEsperada: scalable-delivery-plan con approval sandbox pendiente.',
+  'executionModeEsperado: planner-only hasta resolver approval sandbox.',
+  'nextExpectedActionEsperado: user-approval.',
+  'requiresApprovalEsperado: true.',
+  'Devolver approvalRequest decisionKey approval-sandbox-location-v1 con opcion custom-path-inside-workspace, allowFreeAnswer true y una alternativa no-materialization-yet.',
+  `El workspace activo (${repoRoot}) no puede recibir writes directos; primero hace falta una ubicacion sandbox aprobada que luego se mapee a .codex-temp/generated-domain-materialization-approved/.`,
+].join('\n')
+const unsafeWorkspaceDecision = await uiHarness.buildLocalStrategicBrainDecision({
+  goal: preparedUnsafeWorkspaceGoal,
+  context: preparedUnsafeWorkspaceContext,
+  workspacePath: repoRoot,
+  iteration: 1,
+  previousExecutionResult: '',
+  requiresApproval: false,
+  userParticipationMode: 'operator-approves-sensitive',
+  projectState: {
+    resolvedDecisions: [],
+  },
+})
+
+assert.equal(unsafeWorkspaceDecision?.requiresApproval, true)
+assert.equal(unsafeWorkspaceDecision?.executionMode, 'planner-only')
+assert.equal(unsafeWorkspaceDecision?.strategy, 'scalable-delivery-plan')
+assert.equal(
+  unsafeWorkspaceDecision?.approvalRequest?.decisionKey,
+  'approval-sandbox-location-v1',
+)
+assert.equal(
+  unsafeWorkspaceDecision?.nextExpectedAction,
+  'user-approval',
+)
+assert.equal(
+  unsafeWorkspaceDecision?.instruction.includes('ubicacion sandbox segura'),
+  true,
+)
+
 const previousExecutionResult =
   '__orchestrator_feedback__:' +
   JSON.stringify({

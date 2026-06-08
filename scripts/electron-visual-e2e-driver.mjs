@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { createHash } from 'node:crypto'
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -10,6 +11,12 @@ function normalizeText(value) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLocaleLowerCase()
+}
+
+function toNormalizedList(values) {
+  return Array.isArray(values)
+    ? values.map((entry) => normalizeText(entry)).filter(Boolean)
+    : []
 }
 
 function buildScenarioConfig() {
@@ -36,6 +43,85 @@ function buildArtifactsRoot(repoRoot) {
   return configuredRoot
     ? path.resolve(configuredRoot)
     : path.join(repoRoot, '.codex-temp', 'electron-visual-e2e')
+}
+
+function resolveScenarioReportPath(repoRoot, expectedReportRelativePath) {
+  return path.resolve(repoRoot, expectedReportRelativePath)
+}
+
+function summarizeValidationReport(report) {
+  const validations = Array.isArray(report?.validations)
+    ? report.validations.length
+    : Array.isArray(report?.checks)
+      ? report.checks.length
+      : null
+  const operationsApplied = Number.isFinite(report?.operationsApplied)
+    ? report.operationsApplied
+    : Array.isArray(report?.appliedOperations)
+      ? report.appliedOperations.length
+      : null
+
+  return {
+    status: report?.status || '',
+    domain: report?.domain || report?.domainLabel || '',
+    projectRoot: report?.projectRoot || '',
+    sandboxControlled: report?.sandboxControlled ?? null,
+    safeForLocalMaterialization: report?.safeForLocalMaterialization ?? null,
+    operationsApplied,
+    validations,
+  }
+}
+
+function captureValidationReportSnapshot({
+  repoRoot,
+  scenarioArtifactsPath,
+  expectedReportRelativePath,
+}) {
+  const absoluteReportPath = resolveScenarioReportPath(repoRoot, expectedReportRelativePath)
+  const existsAtCapture = fs.existsSync(absoluteReportPath)
+  const snapshot = {
+    validationReportPath: expectedReportRelativePath,
+    validationReportAbsolutePath: absoluteReportPath,
+    validationReportExistsAtCapture: existsAtCapture,
+    validationReportHash: '',
+    validationReportSnapshotPath: '',
+    validationReportSummary: null,
+    validationReportSnapshot: null,
+  }
+
+  if (!existsAtCapture) {
+    return snapshot
+  }
+
+  const rawReport = fs.readFileSync(absoluteReportPath, 'utf8')
+  snapshot.validationReportHash = createHash('sha256')
+    .update(rawReport)
+    .digest('hex')
+
+  const persistedSnapshotPath = path.join(
+    scenarioArtifactsPath,
+    'validation-report.snapshot.json',
+  )
+  fs.writeFileSync(persistedSnapshotPath, rawReport, 'utf8')
+  snapshot.validationReportSnapshotPath = persistedSnapshotPath
+
+  try {
+    const parsedReport = JSON.parse(rawReport)
+    snapshot.validationReportSummary = summarizeValidationReport(parsedReport)
+    snapshot.validationReportSnapshot = parsedReport
+  } catch {
+    snapshot.validationReportSummary = {
+      status: 'unparsed',
+      domain: '',
+      projectRoot: '',
+      sandboxControlled: null,
+      safeForLocalMaterialization: null,
+      operationsApplied: null,
+      validations: null,
+    }
+  }
+
+  return snapshot
 }
 
 async function writeScreenshot(mainWindow, targetPath) {
@@ -298,6 +384,25 @@ async function resolveApproval(mainWindow, scenario, approvalStepIndex, stepLog)
     return 'unsafe-web-prueba'
   }
 
+  if (activeMode === 'defer' || activeMode === 'not-yet') {
+    const option =
+      snapshotBefore.bridgeState?.approvalOptions?.find?.((entry) => {
+        const label = normalizeText(entry.label)
+        return (
+          label.includes('no materializar todavia') ||
+          label.includes('no materializacion yet') ||
+          label.includes('mantener solo planificacion') ||
+          label.includes('decline materialization now') ||
+          label.includes('no-materialization-yet')
+        )
+      }) || null
+    if (option?.key) {
+      await callBridge(mainWindow, 'selectApprovalOption', option.key)
+    }
+    await callBridge(mainWindow, 'approveOnce')
+    return 'defer'
+  }
+
   throw new Error(`Modo de approval no soportado por el driver visual: ${activeMode}`)
 }
 
@@ -375,6 +480,7 @@ async function driveScenario(mainWindow, repoRoot, scenario, scenarioArtifactsPa
   let preparationTriggered = false
   let materializationTriggered = false
   let finalSnapshot = await getSnapshot(mainWindow)
+  let capturedValidationReport = null
 
   for (let iteration = 0; iteration < 24; iteration += 1) {
     await delay(1000)
@@ -403,6 +509,11 @@ async function driveScenario(mainWindow, repoRoot, scenario, scenarioArtifactsPa
     })
 
     if (reportExists) {
+      capturedValidationReport = captureValidationReportSnapshot({
+        repoRoot,
+        scenarioArtifactsPath,
+        expectedReportRelativePath: scenario.expectedReportRelativePath,
+      })
       sawResult = true
       break
     }
@@ -493,7 +604,9 @@ async function driveScenario(mainWindow, repoRoot, scenario, scenarioArtifactsPa
   await writeScreenshot(mainWindow, path.join(scenarioArtifactsPath, '09-resultado.png'))
   finalSnapshot = await getSnapshot(mainWindow)
 
-  const reportExists = fs.existsSync(path.join(repoRoot, scenario.expectedReportRelativePath))
+  const reportExists =
+    Boolean(capturedValidationReport?.validationReportExistsAtCapture) ||
+    fs.existsSync(resolveScenarioReportPath(repoRoot, scenario.expectedReportRelativePath))
   const result = {
     id: scenario.id,
     label: scenario.label,
@@ -504,6 +617,51 @@ async function driveScenario(mainWindow, repoRoot, scenario, scenarioArtifactsPa
     finalBodyTextSample: finalSnapshot.bodyText.slice(0, 1200),
     finalButtons: finalSnapshot.buttons,
     stepLog,
+    ...(capturedValidationReport || {
+      validationReportPath: scenario.expectedReportRelativePath,
+      validationReportAbsolutePath: resolveScenarioReportPath(
+        repoRoot,
+        scenario.expectedReportRelativePath,
+      ),
+      validationReportExistsAtCapture: false,
+      validationReportHash: '',
+      validationReportSnapshotPath: '',
+      validationReportSummary: null,
+      validationReportSnapshot: null,
+    }),
+  }
+
+  const normalizedFinalBodyText = normalizeText(result.finalBodyTextSample)
+  const requiredFinalBodySubstrings = toNormalizedList(
+    scenario.requiredFinalBodySubstrings,
+  )
+  const forbiddenFinalBodySubstrings = toNormalizedList(
+    scenario.forbiddenFinalBodySubstrings,
+  )
+
+  for (const requiredSubstring of requiredFinalBodySubstrings) {
+    if (!normalizedFinalBodyText.includes(requiredSubstring)) {
+      throw new Error(
+        `La corrida visual ${scenario.id} no mostro la senal final requerida ${JSON.stringify(requiredSubstring)}.`,
+      )
+    }
+  }
+
+  for (const forbiddenSubstring of forbiddenFinalBodySubstrings) {
+    if (normalizedFinalBodyText.includes(forbiddenSubstring)) {
+      throw new Error(
+        `La corrida visual ${scenario.id} termino con una senal prohibida ${JSON.stringify(forbiddenSubstring)}.`,
+      )
+    }
+  }
+
+  if (
+    Number.isFinite(scenario.minApprovalStepsSeen) &&
+    result.approvalStepsSeen < Number(scenario.minApprovalStepsSeen)
+  ) {
+    throw new Error(
+      `La corrida visual ${scenario.id} debia mostrar al menos ${scenario.minApprovalStepsSeen} approval(s) y solo mostro ${result.approvalStepsSeen}.`,
+    )
   }
 
   if (scenario.expectMaterialization) {

@@ -958,6 +958,11 @@ const smokeExecutionWorkspaceRoot = path.join(
   process.env.TEMP || 'C:/tmp',
   'ai-planner-phase-smoke',
 )
+const approvedSandboxWorkspaceRoot = path.join(
+  smokeExecutionWorkspaceRoot,
+  '.codex-temp',
+  'generated-domain-materialization-approved',
+)
 let cachedFullstackPhaseFixturePromise = null
 
 function printUsage() {
@@ -3624,7 +3629,7 @@ async function requestTrackingLogisticsPreparedMaterializationDecision() {
   const baseDecision = await plannerApi.buildLocalStrategicBrainDecision({
     goal: testCase.goal,
     context: testCase.context,
-    workspacePath: smokeExecutionWorkspaceRoot,
+    workspacePath: approvedSandboxWorkspaceRoot,
     iteration: 2,
     previousExecutionResult: approvalFeedback,
     requiresApproval: true,
@@ -3687,7 +3692,7 @@ async function requestTrackingLogisticsPreparedMaterializationDecision() {
     ]
       .filter(Boolean)
       .join('\n'),
-    workspacePath: smokeExecutionWorkspaceRoot,
+    workspacePath: approvedSandboxWorkspaceRoot,
     iteration: 3,
     previousExecutionResult: approvalFeedback,
     requiresApproval: false,
@@ -5635,6 +5640,10 @@ function ensureCleanDirectory(targetPath) {
   fs.mkdirSync(targetPath, { recursive: true })
 }
 
+function resolveApprovedSandboxWorkspacePath(workspaceName) {
+  return path.join(approvedSandboxWorkspaceRoot, workspaceName)
+}
+
 function findManifestPathInsideWorkspace(workspacePath) {
   if (!workspacePath || !fs.existsSync(workspacePath)) {
     return ''
@@ -5665,7 +5674,7 @@ async function buildFullstackFixtureForCase({
   goal,
   context,
 }) {
-  const workspacePath = path.join(smokeExecutionWorkspaceRoot, workspaceName)
+  const workspacePath = resolveApprovedSandboxWorkspacePath(workspaceName)
   ensureCleanDirectory(workspacePath)
 
   const reusablePlanningContext = buildReusablePlanningContext()
@@ -6859,10 +6868,13 @@ async function runFrontendProjectMaterializationValidation() {
 
 async function runFullstackLocalMaterializationValidation() {
   const reusablePlanningContext = buildReusablePlanningContext()
+  const approvedWorkspacePath = resolveApprovedSandboxWorkspacePath(
+    'fullstack-local-materialization',
+  )
   const phaseOneDecision = await plannerApi.buildLocalStrategicBrainDecision({
     goal: fullstackLocalMaterializationCase.goal,
     context: fullstackLocalMaterializationCase.context,
-    workspacePath: 'C:/tmp/ai-planner-smoke-workspace',
+    workspacePath: approvedWorkspacePath,
     iteration: 1,
     previousExecutionResult: '',
     requiresApproval: false,
@@ -6888,7 +6900,7 @@ async function runFullstackLocalMaterializationValidation() {
   const phaseTwoDecision = await plannerApi.buildLocalStrategicBrainDecision({
     goal: prompt.goal,
     context: prompt.context,
-    workspacePath: 'C:/tmp/ai-planner-smoke-workspace',
+    workspacePath: approvedWorkspacePath,
     iteration: 1,
     previousExecutionResult: '',
     requiresApproval: false,

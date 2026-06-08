@@ -56,6 +56,11 @@ const generatedDomainMaterializationPlanDiagnostics = require(
 )
 
 const smokeWorkspaceRoot = path.join(repoRoot, '.tmp', 'ai-release-smoke')
+const approvedSandboxWorkspaceRoot = path.join(
+  smokeWorkspaceRoot,
+  '.codex-temp',
+  'generated-domain-materialization-approved',
+)
 const continuationBasePhaseIds = [
   'fullstack-local-scaffold',
   'frontend-mock-flow',
@@ -128,6 +133,10 @@ function cloneJson(value) {
 function ensureCleanDirectory(targetPath) {
   fs.rmSync(targetPath, { recursive: true, force: true })
   fs.mkdirSync(targetPath, { recursive: true })
+}
+
+function resolveApprovedSandboxWorkspacePath(workspaceName) {
+  return path.join(approvedSandboxWorkspaceRoot, workspaceName)
 }
 
 function cleanupSmokeWorkspaceRoot() {
@@ -361,7 +370,7 @@ async function buildFullstackFixture({
   context,
   projectLabel,
 }) {
-  const workspacePath = path.join(smokeWorkspaceRoot, workspaceName)
+  const workspacePath = resolveApprovedSandboxWorkspacePath(workspaceName)
   ensureCleanDirectory(workspacePath)
 
   const phaseOneDecision = await requestPlannerDecision({
