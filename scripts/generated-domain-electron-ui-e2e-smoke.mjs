@@ -230,7 +230,12 @@ const previousExecutionResult =
     responseMode: 'options',
     selectedOption: 'approve',
   })
-const safeWorkspacePath = '.codex-temp\\generated-domain-materialization-approved'
+const smokeRunId = `generated-domain-electron-ui-e2e-${process.pid}-${Date.now()}`
+const safeWorkspacePath = [
+  '.codex-temp',
+  'generated-domain-materialization-approved',
+  smokeRunId,
+].join('\\')
 
 const maxQualityRoutingDecision = uiHarness.buildBrainRoutingDecision({
   goal,
@@ -319,9 +324,11 @@ const sandboxControlRoot = path.join(
   repoRoot,
   '.codex-temp',
   'generated-domain-materialization-approved',
-  'community-tool-bank-local',
+  smokeRunId,
 )
+const sandboxProjectRoot = path.join(sandboxControlRoot, universalPlan.projectRoot)
 ensureRemoved(sandboxControlRoot)
+ensureRemoved(sandboxProjectRoot)
 
 const materializationReport = uiHarness.materializeGeneratedDomainSandboxPlan({
   generatedDomainUniversalMaterializationPlan: universalPlan,
@@ -331,13 +338,24 @@ const materializationReport = uiHarness.materializeGeneratedDomainSandboxPlan({
 assert.equal(materializationReport?.materialized, true)
 assert.equal(materializationReport?.status, 'materialized')
 
-const sandboxProjectRoot = path.join(sandboxControlRoot, universalPlan.projectRoot)
-const reportPath = path.join(sandboxProjectRoot, 'validation', 'report.json')
+const sandboxRootResolved =
+  typeof materializationReport?.sandboxRoot?.resolved === 'string' &&
+  materializationReport.sandboxRoot.resolved.trim()
+    ? materializationReport.sandboxRoot.resolved.trim()
+    : sandboxControlRoot
+const materializedProjectRoot = path.resolve(
+  sandboxRootResolved,
+  universalPlan.projectRoot,
+)
+const reportPath =
+  typeof materializationReport?.reportFile === 'string' && materializationReport.reportFile.trim()
+    ? path.resolve(sandboxRootResolved, materializationReport.reportFile.trim())
+    : path.join(materializedProjectRoot, 'validation', 'report.json')
 
 assert.equal(fs.existsSync(reportPath), true)
-assert.equal(fs.existsSync(path.join(sandboxProjectRoot, '.env')), false)
-assert.equal(fs.existsSync(path.join(sandboxProjectRoot, 'node_modules')), false)
-assert.equal(sandboxProjectRoot.replace(/\\/g, '/').includes('/web-prueba/'), false)
+assert.equal(fs.existsSync(path.join(materializedProjectRoot, '.env')), false)
+assert.equal(fs.existsSync(path.join(materializedProjectRoot, 'node_modules')), false)
+assert.equal(materializedProjectRoot.replace(/\\/g, '/').includes('/web-prueba/'), false)
 
 const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'))
 assert.equal(report?.status, 'materialized')
@@ -346,4 +364,14 @@ console.log(
   'OK. El flujo UI/E2E alternativo ya no queda en revision: approve-sandbox-materialization-v1 promueve execute-plan, habilita generated-domain-universal y materializa validation/report.json en sandbox controlado.',
 )
 
-ensureRemoved(sandboxControlRoot)
+if (
+  sandboxRootResolved.replace(/\\/g, '/').startsWith(
+    path
+      .join(repoRoot, '.codex-temp', 'generated-domain-materialization-approved')
+      .replace(/\\/g, '/'),
+  )
+) {
+  ensureRemoved(sandboxRootResolved)
+} else {
+  ensureRemoved(sandboxControlRoot)
+}

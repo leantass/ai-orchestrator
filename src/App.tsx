@@ -30,6 +30,7 @@ import { HomeDashboardPanel } from './components/HomeDashboardPanel'
 import { PlanOverviewPanel } from './components/PlanOverviewPanel'
 import { ProjectInputsPanel } from './components/ProjectInputsPanel'
 import { ResultSummaryPanel } from './components/ResultSummaryPanel'
+import { SimpleExperienceDashboard } from './components/SimpleExperienceDashboard'
 import {
   getPrepareActionButtonLabel,
   getProjectContinuationStatusLabel,
@@ -1435,6 +1436,8 @@ const RESOLVED_DECISIONS_KEY = 'ai-orchestrator.resolvedDecisions'
 const BRAIN_COST_MODE_KEY = 'ai-orchestrator.brainCostMode'
 const FLOW_CONSOLE_STATE_KEY = 'ai-orchestrator.flowConsoleState'
 const FLOW_MESSAGES_KEY = 'ai-orchestrator.flowMessages'
+const EXPERIENCE_MODE_KEY = 'ai-orchestrator.experienceMode'
+const UI_THEME_MODE_KEY = 'ai-orchestrator.uiThemeMode'
 const DEFAULT_SESSION_STATUS = 'Listo para recibir un objetivo'
 const DEFAULT_CURRENT_STEP = 'Esperando una nueva instrucción del planificador'
 const READY_WITH_PROJECT_RULE_STATUS =
@@ -1473,6 +1476,8 @@ const DEFAULT_LAST_RUN_SUMMARY = {
   finalStatus: DEFAULT_LAST_RUN_TEXT,
 }
 const DEFAULT_FLOW_MESSAGES: FlowMessage[] = []
+const DEFAULT_EXPERIENCE_MODE: ExperienceMode = 'simple'
+const DEFAULT_UI_THEME_MODE: UiThemeMode = 'light'
 const EMPTY_PLANNER_EXECUTION_METADATA: PlannerExecutionMetadata = {
   approvalRequired: false,
   requiresApproval: false,
@@ -5042,7 +5047,8 @@ type AppSectionKey =
   | 'corridas'
   | 'consola'
 
-type ExperienceMode = 'guided' | 'advanced'
+type ExperienceMode = 'simple' | 'advanced' | 'technical'
+type UiThemeMode = 'light' | 'dark'
 
 type WizardStepKey =
   | 'goal'
@@ -10468,8 +10474,39 @@ const buildGoalContextPlanHints = ({
     }
   }
 
+  if (
+    combinedText.includes('banco comunitario de herramientas') ||
+    (combinedText.includes('herramienta') &&
+      (combinedText.includes('prestamo') ||
+        combinedText.includes('reserva') ||
+        combinedText.includes('vecino')))
+  ) {
+    domainLabel = 'Banco comunitario de herramientas'
+    pushUniqueLabel(moduleItems, 'herramientas')
+    pushUniqueLabel(moduleItems, 'prestamos')
+    pushUniqueLabel(moduleItems, 'reservas')
+    pushUniqueLabel(moduleItems, 'vecinos')
+    pushUniqueLabel(moduleItems, 'reportes')
+    pushUniqueLabel(flowItems, 'consultar herramientas disponibles')
+    pushUniqueLabel(flowItems, 'registrar prestamos y reservas')
+    pushUniqueLabel(flowItems, 'seguir devoluciones y danos')
+    pushUniqueLabel(flowItems, 'revisar reportes simples')
+  }
+
   if (includesAny(['pedido', 'pedidos', 'orden ', 'ordenes', 'solicitud', 'solicitudes'])) {
     pushUniqueLabel(moduleItems, 'pedidos')
+  }
+  if (includesAny(['herramienta', 'herramientas'])) {
+    pushUniqueLabel(moduleItems, 'herramientas')
+  }
+  if (includesAny(['prestamo', 'prestamos'])) {
+    pushUniqueLabel(moduleItems, 'prestamos')
+  }
+  if (includesAny(['reserva', 'reservas'])) {
+    pushUniqueLabel(moduleItems, 'reservas')
+  }
+  if (includesAny(['vecino', 'vecinos'])) {
+    pushUniqueLabel(moduleItems, 'vecinos')
   }
   if (includesAny(['cliente', 'clientes'])) {
     pushUniqueLabel(moduleItems, 'clientes')
@@ -13058,6 +13095,59 @@ const getStoredFlowMessages = () => {
   }
 }
 
+const normalizeExperienceMode = (value: unknown): ExperienceMode =>
+  value === 'advanced' || value === 'technical' || value === 'simple'
+    ? value
+    : DEFAULT_EXPERIENCE_MODE
+
+const getStoredExperienceMode = (): ExperienceMode => {
+  try {
+    return normalizeExperienceMode(localStorage.getItem(EXPERIENCE_MODE_KEY))
+  } catch {
+    return DEFAULT_EXPERIENCE_MODE
+  }
+}
+
+const normalizeUiThemeMode = (value: unknown): UiThemeMode =>
+  value === 'dark' || value === 'light' ? value : DEFAULT_UI_THEME_MODE
+
+const getStoredUiThemeMode = (): UiThemeMode => {
+  try {
+    return normalizeUiThemeMode(localStorage.getItem(UI_THEME_MODE_KEY))
+  } catch {
+    return DEFAULT_UI_THEME_MODE
+  }
+}
+
+const simplifyUserFacingText = (value: string) => {
+  const normalizedValue = repairMojibakeText(normalizeOptionalString(value))
+
+  if (!normalizedValue) {
+    return ''
+  }
+
+  return normalizedValue
+    .replace(/Aprobaci[oó]n requerida/gi, 'Necesito tu permiso')
+    .replace(/Bloqueo por aprobaci[oó]n/gi, 'Falta tu confirmación')
+    .replace(/Approval/gi, 'Confirmación')
+    .replace(/Sandbox/gi, 'Zona de prueba segura')
+    .replace(/Materializaci[oó]n/gi, 'Creación de primera versión')
+    .replace(/Materializar/gi, 'Crear primera versión')
+    .replace(/Runtime/gi, 'Ejecución')
+    .replace(/Execution/gi, 'Trabajo en curso')
+    .replace(/Generated domain/gi, 'Plan del proyecto')
+    .replace(/Contract/gi, 'Estructura del proyecto')
+    .replace(/Validation report/gi, 'Revisión del resultado')
+    .replace(/Planner/gi, 'Planificador')
+    .replace(/Payload/gi, 'Datos internos')
+    .replace(
+      /Todav[ií]a no se ejecut[oó] ninguna instrucci[oó]n/gi,
+      'Aún no empezó el trabajo. Falta una confirmación o una acción.',
+    )
+    .replace(/Materializaci[oó]n completada/gi, 'Primera versión creada')
+    .replace(/web-prueba/gi, 'proyecto protegido')
+}
+
 function App() {
   const persistedFlowMessages = getStoredFlowMessages()
   const skipProjectPolicyPersistenceRef = useRef(false)
@@ -13217,8 +13307,12 @@ function App() {
   const [detailReusableArtifact, setDetailReusableArtifact] =
     useState<ReusableArtifactRecord | null>(null)
   const [isFinalResponseOpen, setIsFinalResponseOpen] = useState(false)
-  const [experienceMode, setExperienceMode] =
-    useState<ExperienceMode>('guided')
+  const [experienceMode, setExperienceMode] = useState<ExperienceMode>(() =>
+    getStoredExperienceMode(),
+  )
+  const [uiThemeMode, setUiThemeMode] = useState<UiThemeMode>(() =>
+    getStoredUiThemeMode(),
+  )
   const [activeWizardStep, setActiveWizardStep] =
     useState<WizardStepKey>('goal')
 
@@ -15942,7 +16036,7 @@ function App() {
     onClick: () => setActiveWizardStep(step.key),
   }))
   const activeShellNavKey = (() => {
-    if (experienceMode === 'guided') {
+    if (experienceMode === 'simple') {
       return activeWizardStep === 'context' ? 'projects' : 'guided'
     }
 
@@ -15975,20 +16069,20 @@ function App() {
     },
     {
       key: 'guided',
-      label: 'Flujo guiado',
+      label: 'Nuevo pedido',
       group: 'Operacion',
       icon: 'guided' as const,
       description: 'Paso a paso.',
       active: activeShellNavKey === 'guided',
       badge: `0${activeWizardStepIndex + 1}`,
-      onClick: () => setExperienceMode('guided'),
+      onClick: () => setExperienceMode('simple'),
     },
     {
       key: 'advanced',
-      label: 'Panel avanzado',
+      label: 'Mis proyectos',
       group: 'Operacion',
       icon: 'advanced' as const,
-      description: 'Vista tecnica.',
+      description: 'Vista avanzada.',
       active: activeShellNavKey === 'advanced',
       onClick: () => {
         setExperienceMode('advanced')
@@ -16058,7 +16152,7 @@ function App() {
       description: 'Contexto y workspace.',
       active: activeShellNavKey === 'projects',
       onClick: () => {
-        setExperienceMode('guided')
+        setExperienceMode('simple')
         setActiveWizardStep('context')
       },
     },
@@ -16081,8 +16175,74 @@ function App() {
       disabled: true,
     },
   ]
+  const simpleShellNavItems = [
+    {
+      key: 'home-simple',
+      label: 'Inicio',
+      description: 'Resumen actual.',
+      group: 'Operacion',
+      active: true,
+      icon: 'home' as const,
+      onClick: () => setExperienceMode('simple'),
+    },
+    {
+      key: 'request-simple',
+      label: 'Nuevo pedido',
+      description: 'Contar la idea y revisar el plan.',
+      group: 'Operacion',
+      icon: 'guided' as const,
+      onClick: () => {
+        setExperienceMode('simple')
+        setActiveWizardStep('goal')
+      },
+    },
+    {
+      key: 'projects-simple',
+      label: 'Mis proyectos',
+      description: 'Proyecto actual y continuidad.',
+      group: 'Operacion',
+      icon: 'projects' as const,
+      onClick: () => {
+        setExperienceMode('advanced')
+        setActiveSection('objetivo')
+      },
+    },
+    {
+      key: 'history-simple',
+      label: 'Historial',
+      description: 'Últimas corridas.',
+      group: 'Operacion',
+      icon: 'history' as const,
+      onClick: () => {
+        setExperienceMode('advanced')
+        setActiveSection('corridas')
+      },
+    },
+    {
+      key: 'settings-simple',
+      label: 'Configuración',
+      description: 'Memoria, modos y detalle.',
+      group: 'Soporte',
+      icon: 'settings' as const,
+      onClick: () => {
+        setExperienceMode('advanced')
+        setActiveSection('memoria')
+      },
+    },
+    {
+      key: 'help-simple',
+      label: 'Ayuda',
+      description: 'Ver detalle técnico y apoyo.',
+      group: 'Soporte',
+      icon: 'context' as const,
+      onClick: () => {
+        setExperienceMode('technical')
+        setIsFlowConsoleOpen(true)
+      },
+    },
+  ]
   const contextPanelSections =
-    experienceMode === 'guided'
+    experienceMode === 'simple'
       ? [
           {
             title: 'Paso actual',
@@ -16519,7 +16679,7 @@ function App() {
                     ? wizardResultAvailabilityLabel
                     : undefined,
     onClick: () => {
-      setExperienceMode('guided')
+      setExperienceMode('simple')
       setActiveWizardStep(step.key)
     },
   }))
@@ -16692,6 +16852,284 @@ function App() {
         title: action.title,
         detail: action.detail,
       }))
+  const simpleSummaryProjectValue =
+    simplifyUserFacingText(
+      planOverviewGoalContextHints.domainLabel ||
+        normalizeOptionalString(
+          effectivePlannerExecutionMetadata.domainUnderstanding?.domainLabel,
+        ) ||
+        normalizeOptionalString(activeProductArchitecture?.domain) ||
+        normalizeOptionalString(activeProductArchitecture?.productName),
+    ) || 'Todavía estoy armando el resumen.'
+  const simpleSummaryUsersValue =
+    simplifyUserFacingText(
+      collectUniqueSummaryValues(
+        effectivePlannerExecutionMetadata.domainUnderstanding?.roles,
+        activeProductArchitecture?.users,
+        activeProductArchitecture?.roles,
+      )
+        .slice(0, 4)
+        .join(', '),
+    ) || 'Todavía estoy armando el resumen.'
+  const simpleSummaryFunctionsValue =
+    simplifyUserFacingText(
+      collectUniqueSummaryValues(
+        effectivePlannerExecutionMetadata.domainUnderstanding?.primaryModules,
+        planOverviewGoalContextHints.moduleItems,
+        activeProductArchitecture?.coreModules,
+      )
+        .slice(0, 5)
+        .join(', '),
+    ) || 'Todavía estoy armando el resumen.'
+  const simpleSummaryLimitsValue =
+    simplifyUserFacingText(
+      collectUniqueSummaryValues(
+        effectivePlannerExecutionMetadata.domainUnderstanding?.explicitExclusions,
+        planOverviewGoalContextHints.exclusionItems,
+        activeProductArchitecture?.outOfScopeForFirstIteration,
+      )
+        .slice(0, 5)
+        .join(', '),
+    ) || 'Todavía estoy armando el resumen.'
+  const simpleSummaryCards = [
+    { label: 'Proyecto', value: simpleSummaryProjectValue },
+    { label: 'Usuarios', value: simpleSummaryUsersValue },
+    { label: 'Funciones principales', value: simpleSummaryFunctionsValue },
+    { label: 'Límites y seguridad', value: simpleSummaryLimitsValue },
+  ]
+  const simpleGoalScopedProjectValue =
+    simplifyUserFacingText(planOverviewGoalContextHints.domainLabel) ||
+    summarizeInlineText(normalizedGoalInput, 88)
+  const simpleGoalScopedFunctionsValue =
+    simplifyUserFacingText(
+      planOverviewGoalContextHints.moduleItems.slice(0, 5).join(', '),
+    ) || 'Plan conservado'
+  const simpleGoalScopedLimitsValue =
+    simplifyUserFacingText(
+      planOverviewGoalContextHints.exclusionItems.slice(0, 5).join(', '),
+    ) || 'Sin cambios aplicados'
+  const simplePlanSteps = [
+    {
+      title: 'Analizar y entender',
+      description: 'Entiendo en profundidad tu necesidad.',
+    },
+    {
+      title: 'Diseñar el plan',
+      description: 'Defino módulos, datos y funciones.',
+    },
+    {
+      title: 'Crear primera versión',
+      description: 'Preparo una versión de prueba segura.',
+    },
+    {
+      title: 'Validar resultado',
+      description: 'Reviso que todo funcione bien.',
+    },
+  ]
+  const simpleActiveApprovalKey = normalizeOptionalString(activeApprovalRequest?.decisionKey)
+  const simpleApprovalOptions = visibleApprovalOptions
+  const simpleDeferredApprovalOption =
+    simpleApprovalOptions.find(
+      (option) =>
+        option.key.toLocaleLowerCase().includes('defer') ||
+        option.key.toLocaleLowerCase().includes('not') ||
+        normalizeOptionalString(option.label).toLocaleLowerCase().includes('todavia') ||
+        normalizeOptionalString(option.label).toLocaleLowerCase().includes('por ahora'),
+    ) || null
+  const simpleLocationApprovalOption =
+    simpleApprovalOptions.find(
+      (option) =>
+        option.key === 'custom-path-inside-workspace' ||
+        normalizeOptionalString(option.label)
+          .toLocaleLowerCase()
+          .includes('carpeta recomendada') ||
+        normalizeOptionalString(option.label)
+          .toLocaleLowerCase()
+          .includes('subruta'),
+    ) || null
+  const simpleSuggestedLocationAnswer = `Apruebo crear/materializar únicamente en una zona de prueba segura y aislada para esta prueba.
+
+Usar como workspace alternativo seguro la ruta:
+
+C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\sandbox-toolbank-local
+
+Dentro de ese workspace, materializar exclusivamente la carpeta:
+
+sandbox-community-toolbank
+
+No tocar proyecto protegido.
+No tocar el workspace actual del proyecto ai-orchestrator.
+No crear .env.
+No crear node_modules.
+No usar Docker.
+No hacer deploy.
+No llamar servicios externos.
+No usar pagos reales.
+No usar base de datos productiva.
+No usar credenciales.`
+  const latestHumanDecisionStatus = normalizeOptionalString(latestHumanDecision?.status)
+    .toLocaleLowerCase()
+  const latestHumanDecisionOption = normalizeOptionalString(
+    latestHumanDecision?.selectedOption,
+  ).toLocaleLowerCase()
+  const simpleHasExplicitPauseDecision =
+    latestHumanDecisionStatus === 'deferred' ||
+    latestHumanDecisionOption.includes('no-materialization-yet') ||
+    latestHumanDecisionOption.includes('defer')
+  const simpleHasExplicitRejectDecision =
+    latestHumanDecisionStatus === 'rejected' ||
+    latestHumanDecisionOption.includes('reject')
+  const normalizedSimpleResultText = normalizeOptionalString(
+    shouldShowLocalMaterializationSummary
+      ? resultHumanText || resultMaterializationSummaryDescription
+      : resultHumanText || executorResult || visibleFinalTextResponse,
+  ).toLocaleLowerCase()
+  const normalizedSimpleOutcomeSignals = [
+    normalizedSimpleResultText,
+    normalizeOptionalString(sessionStatus).toLocaleLowerCase(),
+    normalizeOptionalString(currentStep).toLocaleLowerCase(),
+  ]
+    .filter(Boolean)
+    .join(' ')
+  const simpleHasExplicitBlockedOutcome =
+    normalizedSimpleOutcomeSignals.includes('bloque') ||
+    normalizedSimpleOutcomeSignals.includes('protegid') ||
+    normalizedSimpleOutcomeSignals.includes('web-prueba')
+  const simpleHasExplicitNoChangeOutcome =
+    normalizedSimpleOutcomeSignals.includes('no se creo nada') ||
+    normalizedSimpleOutcomeSignals.includes('no se crearon archivos')
+  const simpleShouldShowMaterializedResult =
+    shouldShowLocalMaterializationSummary &&
+    !simpleHasExplicitBlockedOutcome &&
+    !simpleHasExplicitPauseDecision &&
+    !simpleHasExplicitRejectDecision &&
+    !simpleHasExplicitNoChangeOutcome
+  const simpleResultKind = simpleShouldShowMaterializedResult
+    ? 'success'
+    : simpleHasExplicitBlockedOutcome
+      ? 'blocked'
+    : simpleHasExplicitPauseDecision
+        ? 'deferred'
+        : simpleHasExplicitRejectDecision ||
+            normalizedSimpleResultText.includes('rechaz') ||
+            normalizedSimpleResultText.includes('solo el plan')
+          ? 'rejected'
+          : simpleHasExplicitNoChangeOutcome
+            ? 'no-change'
+            : normalizedSimpleResultText
+              ? 'summary'
+              : 'idle'
+  const simpleHeroState = simpleShouldShowMaterializedResult
+    ? 'done'
+    : simpleResultKind === 'blocked'
+      ? 'blocked'
+      : simpleHasExplicitRejectDecision || simpleResultKind === 'rejected'
+        ? 'no-change'
+        : simpleHasExplicitPauseDecision
+          ? 'paused'
+          : decisionPending || Boolean(activeApprovalRequest)
+            ? 'approval'
+            : isExecutingTask || executorRequestState === 'running'
+              ? 'working'
+              : hasWizardPlan
+                ? 'understood'
+                : 'start'
+  const simpleHeroTitle =
+    simpleHeroState === 'done'
+      ? 'Trabajo terminado'
+      : simpleHeroState === 'blocked'
+        ? 'Bloqueado por seguridad'
+        : simpleHeroState === 'no-change'
+          ? 'No se creó nada'
+          : simpleHeroState === 'paused'
+            ? 'Trabajo pausado'
+            : simpleHeroState === 'approval'
+              ? 'Necesito tu permiso'
+              : simpleHeroState === 'working'
+                ? 'Estoy trabajando'
+                : simpleHeroState === 'understood'
+                  ? 'Esto entendí'
+                  : 'Contame qué querés hacer'
+  const simpleHeroDescription =
+    simpleHeroState === 'blocked'
+      ? 'JEFE frenó la acción para cuidar el proyecto. No se creó nada y el detalle técnico sigue disponible.'
+      : simpleHeroState === 'no-change'
+        ? 'Decidiste dejar solo el plan. No se creó ningún archivo y podés retomarlo cuando quieras.'
+        : simpleHeroState === 'paused'
+          ? 'El pedido queda pausado por ahora. El plan sigue visible para retomarlo más adelante.'
+          : simpleHeroState === 'approval'
+            ? 'JEFE ya entendió el pedido y espera una confirmación para seguir sin tocar tus proyectos reales.'
+            : simpleHeroState === 'working'
+              ? 'Estoy creando o revisando la primera versión dentro de una zona de prueba segura.'
+              : simpleHeroState === 'done'
+                ? 'La corrida llegó a un cierre claro y ya podés revisar qué se creó y qué sigue.'
+                : simpleHeroState === 'understood'
+                  ? 'Ya preparé un resumen simple del pedido y un plan inicial para revisar.'
+                  : 'Escribí tu idea en simple. JEFE entiende, planifica y te guía paso a paso.'
+  const simpleStatusBadgeLabel =
+    simpleHeroState === 'blocked'
+      ? 'Bloqueado'
+      : simpleHeroState === 'no-change'
+        ? 'Sin cambios'
+        : simpleHeroState === 'paused'
+          ? 'Pausado'
+          : decisionPending
+            ? 'Esperando confirmación'
+            : isExecutingTask || executorRequestState === 'running'
+            ? 'Trabajo en curso'
+              : simpleShouldShowMaterializedResult
+                ? 'Listo'
+                : hasWizardPlan
+                  ? 'Plan listo'
+                  : 'Listo para empezar'
+  const simpleHasTerminalNonSuccessOutcome =
+    simpleResultKind === 'blocked' ||
+    simpleResultKind === 'rejected' ||
+    simpleResultKind === 'no-change' ||
+    simpleResultKind === 'deferred'
+  const simpleResolvedSummaryCards = simpleHasTerminalNonSuccessOutcome
+    ? [
+        {
+          label: 'Proyecto',
+          value:
+            simpleGoalScopedProjectValue ||
+            (simpleResultKind === 'blocked'
+              ? 'Acción bloqueada por seguridad'
+              : 'Plan conservado'),
+        },
+        {
+          label: 'Estado',
+          value:
+            simpleResultKind === 'blocked'
+              ? 'Acción bloqueada por seguridad'
+              : simpleResultKind === 'deferred'
+                ? 'Plan conservado'
+                : 'No se creó nada',
+        },
+        {
+          label: 'Funciones principales',
+          value:
+            simpleGoalScopedFunctionsValue ||
+            (simpleResultKind === 'blocked'
+              ? 'Acción bloqueada por seguridad'
+              : 'Plan conservado'),
+        },
+        {
+          label: 'Límites y seguridad',
+          value: simpleGoalScopedLimitsValue,
+        },
+      ]
+    : simpleSummaryCards
+  const simpleNextStepCards =
+    simpleShouldShowMaterializedResult && resultNextStepItems.length > 0
+      ? resultNextStepItems.slice(0, 4).map((item) => ({
+          title: simplifyUserFacingText(item.title),
+          detail: simplifyUserFacingText(item.detail),
+        }))
+      : simplePlanSteps.map((item) => ({
+          title: item.title,
+          detail: item.description,
+        }))
 
   const handleWizardBack = () => {
     if (activeWizardStepIndex <= 0) {
@@ -16734,6 +17172,17 @@ function App() {
 
   const handleWizardStartOver = () => {
     setActiveWizardStep('goal')
+  }
+
+  const runSimpleApprovalOption = async (
+    optionKey: string,
+    freeAnswer = '',
+  ) => {
+    flushSync(() => {
+      setApprovalSelectedOption(optionKey)
+      setApprovalFreeAnswer(freeAnswer)
+    })
+    await handleApproveOnce()
   }
 
   useEffect(() => {
@@ -17642,6 +18091,12 @@ function App() {
     persistFlowConsoleStateNow({ open, pinned })
   }
 
+  const openFlowConsoleForSystemEvent = () => {
+    if (experienceMode === 'technical') {
+      setFlowConsoleVisibility({ open: true, pinned: true })
+    }
+  }
+
   const applyExecutionClosureState = ({
     instruction,
     result,
@@ -18235,6 +18690,26 @@ function App() {
   }, [flowMessages])
 
   useEffect(() => {
+    try {
+      localStorage.setItem(EXPERIENCE_MODE_KEY, experienceMode)
+    } catch {
+      // Ignora errores de persistencia local para no romper la sesion.
+    }
+  }, [experienceMode])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(UI_THEME_MODE_KEY, uiThemeMode)
+    } catch {
+      // Ignora errores de persistencia local para no romper la sesion.
+    }
+  }, [uiThemeMode])
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = uiThemeMode
+  }, [uiThemeMode])
+
+  useEffect(() => {
     persistFlowConsoleStateNow({
       open: isFlowConsoleOpen,
       pinned: isFlowConsolePinnedOpen,
@@ -18611,7 +19086,7 @@ function App() {
     const replanGoal =
       normalizeOptionalString(continuationOverride?.goal) || normalizeOptionalString(goalInput)
 
-    setFlowConsoleVisibility({ open: true, pinned: true })
+    openFlowConsoleForSystemEvent()
     setIsPlanning(true)
     setIsExecutingTask(false)
     setDecisionPending(false)
@@ -19558,7 +20033,7 @@ function App() {
         'Falló el flujo automático en la etapa de ejecución',
       ])
     } finally {
-      setFlowConsoleVisibility({ open: true, pinned: true })
+      openFlowConsoleForSystemEvent()
       setIsPlanning(false)
       setIsExecutingTask(false)
       setIsAutoFlowRunning(false)
@@ -21140,7 +21615,7 @@ function App() {
       executionMetadata,
     })
 
-    setFlowConsoleVisibility({ open: true, pinned: true })
+    openFlowConsoleForSystemEvent()
     clearVisibleExecutionRuntimeState({ requestState: 'running' })
     setIsExecutingTask(true)
     setSessionEvents((currentEvents) => [
@@ -21655,7 +22130,7 @@ function App() {
         'Falló la ejecución de la instrucción',
       ])
     } finally {
-      setFlowConsoleVisibility({ open: true, pinned: true })
+      openFlowConsoleForSystemEvent()
       if (finalExecutionClosure) {
         addDiagnosticFlowMessage(
           'Diagnóstico de cierre manual',
@@ -21694,7 +22169,7 @@ function App() {
   }
 
   const handleAutoFlow = async () => {
-    setFlowConsoleVisibility({ open: true, pinned: true })
+    openFlowConsoleForSystemEvent()
     setIsAutoFlowRunning(true)
     setAutoFlowIteration(0)
     setSessionEvents((currentEvents) => [
@@ -22955,6 +23430,610 @@ function App() {
       footer={guidedFooterNote ? <span>{guidedFooterNote}</span> : undefined}
     />
   )
+
+  const experienceModeSwitcher = (
+    <div className="jefe-toggle-shell inline-flex w-full rounded-[18px] p-1">
+      {([
+        { key: 'simple', label: 'Simple' },
+        { key: 'advanced', label: 'Avanzado' },
+        { key: 'technical', label: 'Técnico' },
+      ] as Array<{ key: ExperienceMode; label: string }>).map((option) => (
+        <button
+          key={option.key}
+          type="button"
+          data-active={experienceMode === option.key}
+          onClick={() => {
+            setExperienceMode(option.key)
+            if (option.key === 'technical') {
+              setIsFlowConsoleOpen(true)
+            }
+          }}
+          className="jefe-toggle-option min-w-0 flex-1 rounded-[14px] px-3 py-2 text-sm font-semibold transition"
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
+
+  const themeModeSwitcher = (
+    <div className="flex items-center justify-end gap-2">
+      {([
+        { key: 'light', label: 'Claro' },
+        { key: 'dark', label: 'Oscuro' },
+      ] as Array<{ key: UiThemeMode; label: string }>).map((option) => (
+        <button
+          key={option.key}
+          type="button"
+          data-active={uiThemeMode === option.key}
+          onClick={() => setUiThemeMode(option.key)}
+          className="jefe-theme-chip rounded-full px-3.5 py-2 text-xs font-semibold transition"
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
+
+  const simplePrimaryActionLabel = plannerIsReviewOnly
+    ? plannerReviewPrimaryActionLabel
+    : simpleHasTerminalNonSuccessOutcome
+      ? wizardCanShowResult
+        ? wizardExecutionResultButtonLabel
+        : ''
+      : canExecuteInstruction
+      ? simplifyUserFacingText(executeCurrentInstructionLabel)
+      : wizardCanShowResult
+        ? wizardExecutionResultButtonLabel
+        : ''
+  const simplePrimaryActionHandler =
+    plannerIsReviewOnly && handlePlannerReviewPrimaryAction
+      ? handlePlannerReviewPrimaryAction
+      : simpleHasTerminalNonSuccessOutcome
+        ? wizardCanShowResult
+          ? () => handleWizardNext()
+          : null
+        : canExecuteInstruction
+        ? () => handleWizardExecute()
+        : wizardCanShowResult
+          ? () => handleWizardNext()
+          : null
+  const simplePrimaryActionBusy =
+    plannerIsReviewOnly && handlePlannerReviewPrimaryAction
+      ? isPlannerReviewActionBusy
+      : isExecutingTask
+  const simplePrimaryActionButtonLabel =
+    plannerIsReviewOnly && handlePlannerReviewPrimaryAction
+      ? simplePrimaryActionBusy
+        ? plannerReviewPrimaryActionBusyLabel
+        : simplePrimaryActionLabel
+      : simplePrimaryActionBusy
+        ? 'Procesando...'
+        : simplePrimaryActionLabel
+  const simplePrimaryActionHelperText =
+    plannerIsReviewOnly && handlePlannerReviewPrimaryAction
+      ? 'JEFE prepara el siguiente paso seguro antes de crear archivos.'
+      : canExecuteInstruction
+        ? 'La acción usa la instrucción actual y mantiene el alcance local y seguro.'
+        : wizardCanShowResult
+          ? 'La corrida cerró y ya podés revisar el resultado visible.'
+          : ''
+
+  const simpleResolvedPrimaryActionHelperText =
+    simpleHasTerminalNonSuccessOutcome
+      ? simpleResultKind === 'blocked'
+        ? 'La accion quedo frenada por seguridad. Podés revisar el plan o ajustar el pedido.'
+        : simpleResultKind === 'deferred'
+          ? 'No se crearon archivos. El plan queda disponible para retomarlo después.'
+          : 'No se crearon archivos. Podés ajustar el pedido o volver a preparar el plan.'
+      : simplePrimaryActionHelperText
+  const simpleResultVisibleValue =
+    simpleShouldShowMaterializedResult
+      ? simplifyUserFacingText(resultMaterializationSummaryDescription)
+      : simpleResultKind === 'blocked'
+        ? 'Acción bloqueada por seguridad'
+        : simpleResultKind === 'rejected' || simpleResultKind === 'no-change'
+          ? 'No se creó ningún archivo.'
+          : simpleResultKind === 'deferred'
+            ? 'Plan guardado para continuar después.'
+            : simplifyUserFacingText(effectiveResultStatusPresentation.label) ||
+              'Aún no hay resultado.'
+  const simpleResultVisibleDetail =
+    simpleShouldShowMaterializedResult
+      ? simplifyUserFacingText(resultHumanText)
+      : simpleResultKind === 'blocked'
+        ? 'JEFE frenó el pedido antes de crear archivos porque la ubicación o el alcance no eran seguros.'
+        : simpleResultKind === 'rejected' || simpleResultKind === 'no-change'
+          ? 'Se conserva solo la planificación revisable. No se tocó ninguna carpeta.'
+          : simpleResultKind === 'deferred'
+            ? 'La planificación sigue disponible y no se crearon archivos por ahora.'
+            : simplifyUserFacingText(
+                effectiveResultStatusPresentation.detail || executorResult,
+              )
+  const simpleResultLocationValue =
+    simpleShouldShowMaterializedResult
+      ? simplifyUserFacingText(
+          resultMaterializationFolderLabel || 'Todavía no se creó una carpeta.',
+        )
+      : 'No se creó una carpeta.'
+  const simpleResultLocationDetail =
+    simpleShouldShowMaterializedResult
+      ? simplifyUserFacingText(resultMaterializationValidationsLabel)
+      : simpleResultKind === 'blocked'
+        ? 'Bloqueado antes de crear archivos.'
+        : simpleResultKind === 'deferred'
+          ? 'Plan guardado sin cambios en el workspace.'
+          : 'Sin archivos creados.'
+
+  const simpleShell = (
+    <SimpleExperienceDashboard
+      title={simpleHeroTitle}
+      description={simpleHeroDescription}
+      modeSwitcher={experienceModeSwitcher}
+      themeSwitcher={themeModeSwitcher}
+      navItems={simpleShellNavItems}
+      statusLabel={`Cerebro: ${activeContextHubStatus?.available ? 'Conectado' : 'Local'}`}
+      statusDetail={`Modo: ${runtimePlatformLabel} + ${runtimeOnlineLabel}`}
+      statusBadge={plannerBadge}
+      requestPanel={
+        <article className="jefe-surface rounded-[28px] p-5 sm:p-6">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div>
+              <label
+                htmlFor="simple-goal-input"
+                className="text-sm font-semibold text-[color:var(--jefe-text-strong)]"
+              >
+                Contame tu idea
+              </label>
+              <textarea
+                id="simple-goal-input"
+                value={goalInput}
+                onChange={(event) => setGoalInput(event.target.value)}
+                rows={5}
+                className="jefe-input mt-3 w-full rounded-[24px] px-4 py-4 text-sm leading-7"
+                placeholder="Ejemplo: Quiero una app local para un banco comunitario de herramientas donde los vecinos puedan pedir prestado y devolver herramientas."
+              />
+              <label
+                htmlFor="simple-context-input"
+                className="mt-4 block text-sm font-semibold text-[color:var(--jefe-text-strong)]"
+              >
+                Contexto y límites
+              </label>
+              <textarea
+                id="simple-context-input"
+                ref={executionContextInputRef}
+                value={executionContextInput}
+                onChange={(event) => setExecutionContextInput(event.target.value)}
+                rows={4}
+                className="jefe-input mt-3 w-full rounded-[24px] px-4 py-4 text-sm leading-7"
+                placeholder="Acá podés aclarar alcance, restricciones, contexto del proyecto o información del operador."
+              />
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <PrimaryActionButton
+                  onClick={handleWizardGeneratePlan}
+                  disabled={isPlanning || !goalInput.trim()}
+                  tone="sky"
+                  className="sm:w-auto sm:min-w-[220px]"
+                >
+                  {isPlanning ? 'Entendiendo pedido...' : 'Enviar pedido'}
+                </PrimaryActionButton>
+                <SecondaryActionButton
+                  onClick={handleAttachInputFiles}
+                  disabled={isProjectContextBusy}
+                  className="sm:w-auto"
+                >
+                  Adjuntar archivos
+                </SecondaryActionButton>
+                <SecondaryActionButton
+                  onClick={handleAttachInputFolder}
+                  disabled={isProjectContextBusy}
+                  className="sm:w-auto"
+                >
+                  Adjuntar carpeta
+                </SecondaryActionButton>
+              </div>
+            </div>
+
+            <ResultSectionCard
+              title="Estado actual"
+              description={simplifyUserFacingText(guidedStepActionSummaryDetail)}
+              icon="status"
+              badge={simpleStatusBadgeLabel}
+              tone={decisionPending ? 'amber' : isExecutingTask ? 'sky' : 'default'}
+            >
+              <div className="space-y-3">
+                <MetricCard
+                  label="Etapa"
+                  value={simplifyUserFacingText(simpleHeroTitle)}
+                  detail={simplifyUserFacingText(visibleCurrentStepLabel)}
+                  icon="guided"
+                  tone={decisionPending ? 'amber' : isExecutingTask ? 'sky' : 'default'}
+                  emphasis="hero"
+                />
+                <div className="rounded-[22px] border border-[color:var(--jefe-line)] bg-[color:var(--jefe-elevated)] px-4 py-4 text-sm leading-6 text-[color:var(--jefe-muted)]">
+                  {simplifyUserFacingText(
+                    decisionPending
+                      ? 'Estoy listo para crear la primera versión de prueba cuando me des permiso.'
+                      : sessionStatus,
+                  )}
+                </div>
+              </div>
+            </ResultSectionCard>
+          </div>
+        </article>
+      }
+      understoodPanel={
+        <ResultSectionCard
+          title="Esto entendí de tu pedido"
+          description="Si hay algo que no entendí bien, decímelo así lo ajusto."
+          icon="goal"
+          badge={
+            simpleSummaryProjectValue === 'Todavía estoy armando el resumen.'
+              ? 'En progreso'
+              : 'Listo'
+          }
+          tone="violet"
+          actions={
+            <SecondaryActionButton
+              onClick={() => {
+                setExperienceMode('advanced')
+                setActiveSection('objetivo')
+              }}
+              className="w-auto"
+            >
+              Editar información
+            </SecondaryActionButton>
+          }
+        >
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {simpleResolvedSummaryCards.map((item, index) => (
+              <MetricCard
+                key={item.label}
+                label={item.label}
+                value={item.value}
+                tone={index === 0 ? 'sky' : index === 3 ? 'amber' : 'default'}
+                icon={
+                  index === 0
+                    ? 'projects'
+                    : index === 1
+                      ? 'context'
+                      : index === 2
+                        ? 'plan'
+                        : 'shield'
+                }
+              />
+            ))}
+          </div>
+        </ResultSectionCard>
+      }
+      planPanel={
+        <ResultSectionCard
+          title="Plan propuesto"
+          description="El plan puede ajustarse después de tu confirmación."
+          icon="plan"
+          badge={hasWizardPlan ? 'Listo para revisar' : 'Paso a paso'}
+          tone="sky"
+          actions={
+            <SecondaryActionButton
+              onClick={() => setExperienceMode('advanced')}
+              className="w-auto"
+            >
+              Ver detalle
+            </SecondaryActionButton>
+          }
+        >
+          <div className="grid gap-3 xl:grid-cols-4">
+            {simplePlanSteps.map((step, index) => (
+              <MetricCard
+                key={`${step.title}-${index + 1}`}
+                label={`${index + 1}. ${step.title}`}
+                value={step.description}
+                tone={index === 2 ? 'violet' : 'default'}
+                icon={
+                  index === 0
+                    ? 'goal'
+                    : index === 1
+                      ? 'brain'
+                      : index === 2
+                        ? 'build'
+                        : 'result'
+                }
+              />
+            ))}
+          </div>
+        </ResultSectionCard>
+      }
+      approvalPanel={
+        decisionPending || activeApprovalRequest ? (
+          <ResultSectionCard
+            title="Necesito tu permiso para avanzar"
+            description={
+              simpleActiveApprovalKey.includes('location')
+                ? 'JEFE puede usar una carpeta de prueba segura y aislada. Esto no toca tus proyectos reales.'
+                : 'JEFE puede crear una primera versión en una zona de prueba segura. Esto no toca tus proyectos reales.'
+            }
+            icon="approval"
+            badge="Pendiente"
+            tone="amber"
+          >
+            <div className="space-y-4">
+              <div className="text-sm leading-6 text-[color:var(--jefe-muted)]">
+                {simplifyUserFacingText(activeApprovalRequest?.question || approvalMessage)}
+              </div>
+              {simpleApprovalOptions.length > 0 ? (
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {simpleLocationApprovalOption ? (
+                    <PrimaryActionButton
+                      onClick={() =>
+                        runSimpleApprovalOption(
+                          simpleLocationApprovalOption.key,
+                          simpleSuggestedLocationAnswer,
+                        )
+                      }
+                      tone="sky"
+                    >
+                      Usar carpeta recomendada
+                    </PrimaryActionButton>
+                  ) : (
+                    <PrimaryActionButton
+                      onClick={handleApproveOnce}
+                      disabled={!canSendRichApprovalResponse}
+                      tone="sky"
+                    >
+                      Crear primera versión de prueba
+                    </PrimaryActionButton>
+                  )}
+                  <SecondaryActionButton onClick={handleRejectApproval}>
+                    Dejar solo el plan
+                  </SecondaryActionButton>
+                  {simpleDeferredApprovalOption ? (
+                    <SecondaryActionButton
+                      onClick={() =>
+                        runSimpleApprovalOption(simpleDeferredApprovalOption.key)
+                      }
+                    >
+                      No avanzar por ahora
+                    </SecondaryActionButton>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <PrimaryActionButton
+                    onClick={handleApproveOnce}
+                    disabled={!canSendRichApprovalResponse}
+                    tone="sky"
+                  >
+                    Crear primera versión de prueba
+                  </PrimaryActionButton>
+                  <SecondaryActionButton onClick={handleRejectApproval}>
+                    Dejar solo el plan
+                  </SecondaryActionButton>
+                </div>
+              )}
+              {simpleActiveApprovalKey.includes('location') ? (
+                <textarea
+                  value={approvalFreeAnswer}
+                  onChange={(event) => setApprovalFreeAnswer(event.target.value)}
+                  rows={5}
+                  className="jefe-input w-full rounded-[20px] px-4 py-4 text-sm leading-6"
+                  placeholder="Elegí una carpeta de prueba segura o usá la recomendada."
+                />
+              ) : null}
+              <div className="text-xs leading-5 text-[color:var(--jefe-subtle)]">
+                Siempre podés ver, ajustar o cancelar antes de crear cualquier archivo.
+              </div>
+            </div>
+          </ResultSectionCard>
+        ) : undefined
+      }
+      rightStatusPanel={
+        <ResultSectionCard
+          title="Estado actual"
+          description={simplifyUserFacingText(simpleHeroDescription)}
+          icon="status"
+          badge={simpleStatusBadgeLabel}
+          actions={
+            simplePrimaryActionHandler && simplePrimaryActionButtonLabel ? (
+              <div className="w-full sm:w-auto">
+                <PrimaryActionButton
+                  onClick={simplePrimaryActionHandler}
+                  disabled={simplePrimaryActionBusy}
+                  tone={canExecuteInstruction ? 'amber' : 'sky'}
+                  className="sm:min-w-[220px]"
+                >
+                  {simplePrimaryActionButtonLabel}
+                </PrimaryActionButton>
+              </div>
+            ) : undefined
+          }
+          tone={
+            decisionPending
+              ? 'amber'
+              : isExecutingTask
+                ? 'sky'
+                : simpleShouldShowMaterializedResult
+                  ? 'emerald'
+                  : 'default'
+          }
+        >
+          <div className="grid gap-3">
+            <MetricCard
+              label="Estado"
+              value={simplifyUserFacingText(sessionStatus)}
+              detail={simplifyUserFacingText(currentStep)}
+              icon="status"
+              tone={decisionPending ? 'amber' : isExecutingTask ? 'sky' : 'default'}
+              emphasis="hero"
+            />
+            <MetricCard
+              label="Siguiente acción"
+              value={simplifyUserFacingText(guidedStepActionSummaryLabel)}
+              detail={
+                simplifyUserFacingText(simpleResolvedPrimaryActionHelperText) ||
+                simplifyUserFacingText(guidedStepActionSummaryDetail)
+              }
+              icon="next"
+            />
+          </div>
+        </ResultSectionCard>
+      }
+      rightNextStepsPanel={
+        <ResultSectionCard
+          title="Próximos pasos"
+          description="Lo más importante del recorrido queda visible de entrada."
+          icon="next"
+          badge={`${simpleNextStepCards.length}`}
+        >
+          <div className="space-y-3">
+            {simpleNextStepCards.map((item, index) => (
+              <div
+                key={`${item.title}-${index + 1}`}
+                className="jefe-surface-inset rounded-[20px] px-4 py-4"
+              >
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--jefe-subtle)]">
+                  {String(index + 1).padStart(2, '0')}
+                </div>
+                <div className="mt-2 text-sm font-semibold text-[color:var(--jefe-text-strong)]">
+                  {item.title}
+                </div>
+                <div className="mt-1 text-xs leading-5 text-[color:var(--jefe-muted)]">
+                  {item.detail}
+                </div>
+              </div>
+            ))}
+            <SecondaryActionButton onClick={() => setExperienceMode('advanced')}>
+              Ver todos los detalles
+            </SecondaryActionButton>
+          </div>
+        </ResultSectionCard>
+      }
+      rightResultPanel={
+        <ResultSectionCard
+          title={
+            simpleShouldShowMaterializedResult
+              ? 'Primera versión creada correctamente'
+              : simpleResultKind === 'rejected' || simpleResultKind === 'no-change'
+                ? 'No se creó nada'
+                : simpleResultKind === 'deferred'
+                  ? 'Trabajo pausado'
+                  : simpleResultKind === 'blocked'
+                    ? 'Bloqueado por seguridad'
+                    : 'Resultado'
+          }
+          description={
+            simpleShouldShowMaterializedResult
+              ? 'Ya podés revisar qué se creó, dónde quedó y cuál es el próximo paso recomendado.'
+              : simpleResultKind === 'rejected'
+                ? 'Decidiste mantener solo el plan. No se crearon archivos.'
+                : simpleResultKind === 'deferred'
+                  ? 'Decidiste no crear archivos por ahora. El plan queda disponible para continuar después.'
+                  : simpleResultKind === 'blocked'
+                    ? 'JEFE frenó la acción para proteger el proyecto. No se creó nada.'
+                    : 'Todavía no hay un resultado final para mostrar.'
+          }
+          icon="result"
+          badge={
+            simpleShouldShowMaterializedResult
+              ? 'Listo'
+              : simpleResultKind === 'rejected' || simpleResultKind === 'no-change'
+                ? 'Sin cambios'
+              : simpleResultKind === 'idle'
+                ? 'Sin resultado'
+                : 'Revisado'
+          }
+          tone={
+            simpleShouldShowMaterializedResult
+              ? 'emerald'
+              : simpleResultKind === 'blocked'
+                ? 'rose'
+                : simpleResultKind === 'deferred'
+                  ? 'amber'
+                  : 'default'
+          }
+        >
+          <div className="space-y-3">
+            <MetricCard
+              label="Resultado visible"
+              value={simpleResultVisibleValue}
+              detail={simpleResultVisibleDetail}
+              icon="result"
+              emphasis="hero"
+              tone={
+                simpleShouldShowMaterializedResult
+                  ? 'emerald'
+                  : simpleResultKind === 'blocked'
+                    ? 'rose'
+                    : simpleResultKind === 'deferred'
+                      ? 'amber'
+                      : 'default'
+              }
+            />
+            <MetricCard
+              label="Dónde quedó"
+              value={simpleResultLocationValue}
+              detail={simpleResultLocationDetail}
+              icon="folder"
+            />
+          </div>
+        </ResultSectionCard>
+      }
+      technicalPanel={
+        <DisclosurePanel
+          title="Ver detalle técnico"
+          description="Logs, datos internos, rutas, diagnósticos y más información técnica."
+          icon="services"
+          badge={experienceMode === 'technical' ? 'Técnico' : 'Opcional'}
+          defaultOpen={experienceMode === 'technical'}
+        >
+          <div className="grid gap-3">
+            <ResultKeyValueGrid
+              items={[
+                {
+                  label: 'decisionKey',
+                  value: activeDecisionKeyLabel || 'No disponible',
+                },
+                {
+                  label: 'selectedSource',
+                  value:
+                    simplifyUserFacingText(
+                      normalizeOptionalString(
+                        effectivePlannerExecutionMetadata
+                          .generatedDomainControlledRuntimeMaterializationSource
+                          ?.selectedSource,
+                      ),
+                    ) || 'No disponible',
+                },
+                {
+                  label: 'Ruta principal',
+                  value: resultPrimaryAffectedPathLabel || workspacePath || 'No disponible',
+                },
+                {
+                  label: 'Datos internos',
+                  value: simplifyUserFacingText(executorRequestStateLabel),
+                  detail: simplifyUserFacingText(activePlannerStrategyLabel),
+                },
+              ]}
+            />
+            <details className="jefe-surface-inset rounded-[20px] px-4 py-4">
+              <summary className="cursor-pointer list-none text-sm font-semibold text-[color:var(--jefe-text-strong)]">
+                Mostrar logs y respuestas
+              </summary>
+              <div className="mt-4 grid gap-3">
+                <div className="jefe-surface-muted rounded-[18px] px-4 py-4 text-xs leading-6 text-[color:var(--jefe-muted)]">
+                  {plannerInstruction}
+                </div>
+                <div className="jefe-surface-muted rounded-[18px] px-4 py-4 text-xs leading-6 text-[color:var(--jefe-muted)]">
+                  {executorResult}
+                </div>
+              </div>
+            </details>
+          </div>
+        </DisclosurePanel>
+      }
+      footer={<span>JEFE protege tu proyecto. No se modifica nada sin tu permiso.</span>}
+    />
+  )
+  void guidedShell
 
   const useLegacySingleScreenLayout = false
 
@@ -24815,7 +25894,7 @@ function App() {
       <div
         className="mx-auto flex min-h-screen w-full max-w-[1600px] flex-col px-4 py-6 sm:px-6 lg:px-8"
       >
-        {experienceMode === 'advanced' ? (
+        {experienceMode !== 'simple' ? (
           <div className="mb-3 rounded-3xl border border-white/10 bg-slate-950/50 px-4 py-2.5 shadow-[0_18px_50px_rgba(0,0,0,0.28)] sm:px-5">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
               <div>
@@ -24827,29 +25906,17 @@ function App() {
                   La vista avanzada conserva el tablero reorganizado para inspección y diagnóstico.
                 </p>
               </div>
-              <div className="inline-flex rounded-2xl border border-white/10 bg-white/[0.04] p-1">
-                <button
-                  type="button"
-                  onClick={() => setExperienceMode('guided')}
-                  className="rounded-xl px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/5"
-                >
-                  Flujo guiado
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setExperienceMode('advanced')}
-                  className="rounded-xl bg-sky-300/15 px-4 py-2 text-sm font-medium text-sky-100 transition"
-                >
-                  Panel avanzado
-                </button>
+              <div className="flex w-full max-w-[520px] flex-col gap-2">
+                {experienceModeSwitcher}
+                <div className="flex justify-end">{themeModeSwitcher}</div>
               </div>
             </div>
           </div>
         ) : null}
 
-        {experienceMode === 'guided' ? guidedShell : null}
+        {experienceMode === 'simple' ? simpleShell : null}
 
-        {experienceMode === 'advanced' ? (
+        {experienceMode !== 'simple' ? (
           <>
         <header className="rounded-3xl border border-white/10 bg-slate-950/50 px-5 py-6 shadow-[0_18px_50px_rgba(0,0,0,0.28)] sm:px-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">

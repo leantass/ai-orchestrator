@@ -106,36 +106,30 @@ const iconMap: Record<AppIconName, LucideIcon> = {
 }
 
 const tonePanelClassName: Record<MetricTone, string> = {
-  default:
-    'border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.028),rgba(255,255,255,0.015))]',
-  sky:
-    'border-sky-300/18 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.12),transparent_40%),linear-gradient(180deg,rgba(56,189,248,0.08),rgba(8,15,28,0.68))]',
-  emerald:
-    'border-emerald-300/18 bg-[radial-gradient(circle_at_top_right,rgba(52,211,153,0.12),transparent_40%),linear-gradient(180deg,rgba(52,211,153,0.08),rgba(8,15,28,0.68))]',
-  amber:
-    'border-amber-300/18 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.12),transparent_40%),linear-gradient(180deg,rgba(251,191,36,0.08),rgba(8,15,28,0.68))]',
-  rose:
-    'border-rose-300/18 bg-[radial-gradient(circle_at_top_right,rgba(251,113,133,0.14),transparent_40%),linear-gradient(180deg,rgba(251,113,133,0.08),rgba(8,15,28,0.68))]',
-  violet:
-    'border-violet-300/18 bg-[radial-gradient(circle_at_top_right,rgba(167,139,250,0.14),transparent_40%),linear-gradient(180deg,rgba(167,139,250,0.09),rgba(8,15,28,0.68))]',
+  default: 'jefe-surface',
+  sky: 'jefe-surface jefe-tone-panel-sky',
+  emerald: 'jefe-surface jefe-tone-panel-emerald',
+  amber: 'jefe-surface jefe-tone-panel-amber',
+  rose: 'jefe-surface jefe-tone-panel-rose',
+  violet: 'jefe-surface jefe-tone-panel-violet',
 }
 
 const toneBadgeClassName: Record<MetricTone, string> = {
-  default: 'border-white/10 bg-white/[0.05] text-slate-100',
-  sky: 'border-sky-300/20 bg-sky-300/10 text-sky-100',
-  emerald: 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100',
-  amber: 'border-amber-300/20 bg-amber-300/10 text-amber-100',
-  rose: 'border-rose-300/20 bg-rose-300/10 text-rose-100',
-  violet: 'border-violet-300/20 bg-violet-300/10 text-violet-100',
+  default: 'jefe-status-pill jefe-tone-badge-default',
+  sky: 'jefe-status-pill jefe-tone-badge-sky',
+  emerald: 'jefe-status-pill jefe-tone-badge-emerald',
+  amber: 'jefe-status-pill jefe-tone-badge-amber',
+  rose: 'jefe-status-pill jefe-tone-badge-rose',
+  violet: 'jefe-status-pill jefe-tone-badge-violet',
 }
 
 const toneIconClassName: Record<MetricTone, string> = {
-  default: 'border-white/10 bg-slate-950/70 text-slate-200',
-  sky: 'border-sky-300/20 bg-sky-300/12 text-sky-100',
-  emerald: 'border-emerald-300/20 bg-emerald-300/12 text-emerald-100',
-  amber: 'border-amber-300/20 bg-amber-300/12 text-amber-100',
-  rose: 'border-rose-300/20 bg-rose-300/12 text-rose-100',
-  violet: 'border-violet-300/20 bg-violet-300/12 text-violet-100',
+  default: 'jefe-tone-icon-default',
+  sky: 'jefe-tone-icon-sky',
+  emerald: 'jefe-tone-icon-emerald',
+  amber: 'jefe-tone-icon-amber',
+  rose: 'jefe-tone-icon-rose',
+  violet: 'jefe-tone-icon-violet',
 }
 
 const toneProgressClassName: Record<MetricTone, string> = {
@@ -176,6 +170,7 @@ function inferSidebarIcon(label: string): AppIconName {
 
 export function SidebarSectionButton({
   active,
+  disabled = false,
   label,
   description,
   badge,
@@ -183,6 +178,7 @@ export function SidebarSectionButton({
   onClick,
 }: {
   active: boolean
+  disabled?: boolean
   label: string
   description: string
   badge?: string
@@ -195,12 +191,16 @@ export function SidebarSectionButton({
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
+      aria-disabled={disabled}
       data-active={active}
       className={joinClasses(
         'group relative w-full overflow-hidden rounded-[22px] border px-4 py-3 text-left transition duration-200',
         active
-          ? 'border-cyan-300/28 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.16),transparent_32%),linear-gradient(180deg,rgba(56,189,248,0.1),rgba(8,15,28,0.9))] text-white shadow-[0_14px_40px_rgba(56,189,248,0.12)]'
-          : 'border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.028),rgba(255,255,255,0.015))] text-slate-200 hover:border-white/18 hover:bg-white/[0.05]',
+          ? 'border-[color:var(--jefe-primary-line)] bg-[color:var(--jefe-primary-soft)] text-[color:var(--jefe-text-strong)] shadow-[var(--jefe-shadow-soft)]'
+          : disabled
+            ? 'cursor-not-allowed border-[color:var(--jefe-line)] bg-[color:var(--jefe-panel-soft)] text-[color:var(--jefe-subtle)] opacity-70'
+            : 'border-[color:var(--jefe-line)] bg-[color:var(--jefe-elevated)] text-[color:var(--jefe-text)] hover:border-[color:var(--jefe-line-strong)] hover:bg-[color:var(--jefe-panel-soft)]',
       )}
     >
       <div className="flex items-center justify-between gap-3">
@@ -209,8 +209,10 @@ export function SidebarSectionButton({
             className={joinClasses(
               'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border',
               active
-                ? 'border-cyan-300/22 bg-cyan-300/12 text-cyan-100'
-                : 'border-white/10 bg-slate-950/60 text-slate-300',
+                ? 'border-[color:var(--jefe-primary-line)] bg-[color:var(--jefe-primary-soft)] text-[color:var(--jefe-primary)]'
+                : disabled
+                  ? 'border-[color:var(--jefe-line)] bg-[color:var(--jefe-panel-soft)] text-[color:var(--jefe-subtle)]'
+                  : 'border-[color:var(--jefe-line)] bg-[color:var(--jefe-panel-muted)] text-[color:var(--jefe-muted)]',
             )}
           >
             <DashboardIcon name={resolvedIcon} className="h-4 w-4" />
@@ -218,7 +220,7 @@ export function SidebarSectionButton({
           <div className="min-w-0">
             <div className="text-sm font-semibold">{label}</div>
             {active && description ? (
-              <div className="mt-1 text-xs leading-5 text-slate-500">{description}</div>
+              <div className="mt-1 text-xs leading-5 text-[color:var(--jefe-muted)]">{description}</div>
             ) : null}
           </div>
         </div>
@@ -227,7 +229,11 @@ export function SidebarSectionButton({
           <ChevronRight
             className={joinClasses(
               'h-4 w-4 transition',
-              active ? 'text-cyan-100' : 'text-slate-500 group-hover:text-slate-300',
+              active
+                ? 'text-[color:var(--jefe-primary)]'
+                : disabled
+                  ? 'text-[color:var(--jefe-subtle)]'
+                  : 'text-[color:var(--jefe-subtle)] group-hover:text-[color:var(--jefe-text)]',
             )}
             strokeWidth={1.8}
           />
@@ -251,21 +257,21 @@ export function SectionHeader({
   icon?: AppIconName
 }) {
   return (
-    <div className="flex flex-col gap-4 border-b border-white/8 pb-5 lg:flex-row lg:items-end lg:justify-between">
+    <div className="flex flex-col gap-4 border-b border-[color:var(--jefe-line)] pb-5 lg:flex-row lg:items-end lg:justify-between">
       <div className="flex items-start gap-4">
         {icon ? (
-          <div className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-sky-300/20 bg-sky-300/10 text-sky-100 sm:inline-flex">
+          <div className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl border jefe-tone-icon-sky sm:inline-flex">
             <DashboardIcon name={icon} className="h-5 w-5" />
           </div>
         ) : null}
         <div className="space-y-2">
           {eyebrow ? (
-            <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-sky-200/80">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--jefe-primary)]">
               {eyebrow}
             </div>
           ) : null}
-          <div className="text-2xl font-semibold tracking-tight text-white">{title}</div>
-          <p className="max-w-3xl text-sm leading-6 text-slate-400">{description}</p>
+          <div className="text-2xl font-semibold tracking-tight text-[color:var(--jefe-text-strong)]">{title}</div>
+          <p className="max-w-3xl text-sm leading-6 text-[color:var(--jefe-muted)]">{description}</p>
         </div>
       </div>
       {actions ? <div className="flex flex-wrap gap-3">{actions}</div> : null}
@@ -308,19 +314,19 @@ export function MetricCard({
         className,
       )}
     >
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/16 to-transparent" />
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[color:var(--jefe-line-strong)] to-transparent" />
       <div className="relative flex h-full flex-col justify-between gap-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--jefe-subtle)]">
                 {label}
               </div>
               {badge ? <SurfaceHeaderTag>{badge}</SurfaceHeaderTag> : null}
             </div>
             <div
               className={joinClasses(
-                'mt-3 font-semibold leading-tight text-slate-50',
+                'mt-3 font-semibold leading-tight text-[color:var(--jefe-text-strong)]',
                 emphasis === 'hero' ? 'text-[1.05rem] leading-7' : 'text-sm leading-6',
               )}
             >
@@ -339,7 +345,7 @@ export function MetricCard({
         </div>
 
         <div className="space-y-3">
-          {detail ? <div className="text-xs leading-5 text-slate-400">{detail}</div> : null}
+          {detail ? <div className="text-xs leading-5 text-[color:var(--jefe-muted)]">{detail}</div> : null}
           {clampedProgress !== null ? (
             <ProgressMeter value={clampedProgress} tone={tone} compact />
           ) : null}
@@ -372,7 +378,9 @@ export function ActionTile({
       className={joinClasses(
         'group relative overflow-hidden rounded-[20px] border px-3.5 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition',
         tonePanelClassName[tone],
-        disabled ? 'cursor-not-allowed opacity-60' : 'hover:border-white/16 hover:bg-white/[0.06]',
+        disabled
+          ? 'cursor-not-allowed opacity-60'
+          : 'hover:border-[color:var(--jefe-line-strong)] hover:bg-[color:var(--jefe-panel-soft)]',
       )}
     >
       <div className="flex items-start gap-3">
@@ -386,10 +394,10 @@ export function ActionTile({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-3">
-            <div className="text-sm font-semibold text-white">{label}</div>
+            <div className="text-sm font-semibold text-[color:var(--jefe-text-strong)]">{label}</div>
             {badge ? <SurfaceHeaderTag>{badge}</SurfaceHeaderTag> : null}
           </div>
-          <div className="mt-1 text-xs leading-5 text-slate-400">{detail}</div>
+          <div className="mt-1 text-xs leading-5 text-[color:var(--jefe-muted)]">{detail}</div>
         </div>
       </div>
     </div>
@@ -421,15 +429,15 @@ export function PrimaryActionButton({
 }) {
   const toneClassName: Record<MetricTone, string> = {
     default:
-      'border-white/12 bg-white/[0.08] text-white hover:bg-white/[0.12] shadow-[0_18px_40px_rgba(15,23,42,0.38)]',
-    sky: 'border-sky-300/20 bg-sky-300/12 text-sky-50 hover:bg-sky-300/18 shadow-[0_20px_44px_rgba(56,189,248,0.18)]',
+      'border-[color:var(--jefe-primary-line)] bg-[color:var(--jefe-primary)] text-[color:var(--jefe-primary-text)] hover:brightness-105 shadow-[0_20px_44px_rgba(37,99,235,0.18)]',
+    sky: 'border-[color:var(--jefe-primary-line)] bg-[color:var(--jefe-primary)] text-[color:var(--jefe-primary-text)] hover:brightness-105 shadow-[0_20px_44px_rgba(37,99,235,0.18)]',
     emerald:
-      'border-emerald-300/20 bg-emerald-300/12 text-emerald-50 hover:bg-emerald-300/18 shadow-[0_20px_44px_rgba(52,211,153,0.16)]',
+      'border-transparent bg-[color:var(--jefe-success)] text-white hover:brightness-105 shadow-[0_20px_44px_rgba(22,163,74,0.18)]',
     amber:
-      'border-amber-300/20 bg-amber-300/12 text-amber-50 hover:bg-amber-300/18 shadow-[0_20px_44px_rgba(251,191,36,0.16)]',
-    rose: 'border-rose-300/20 bg-rose-300/12 text-rose-50 hover:bg-rose-300/18 shadow-[0_20px_44px_rgba(251,113,133,0.16)]',
+      'border-transparent bg-[color:var(--jefe-warning)] text-white hover:brightness-105 shadow-[0_20px_44px_rgba(217,119,6,0.18)]',
+    rose: 'border-transparent bg-[color:var(--jefe-danger)] text-white hover:brightness-105 shadow-[0_20px_44px_rgba(220,38,38,0.18)]',
     violet:
-      'border-violet-300/20 bg-violet-300/12 text-violet-50 hover:bg-violet-300/18 shadow-[0_20px_44px_rgba(167,139,250,0.18)]',
+      'border-transparent bg-[color:var(--jefe-accent-violet)] text-white hover:brightness-105 shadow-[0_20px_44px_rgba(139,92,246,0.18)]',
   }
 
   return (
@@ -438,7 +446,7 @@ export function PrimaryActionButton({
       onClick={onClick}
       disabled={disabled}
       className={joinClasses(
-        'w-full rounded-[20px] border px-4 py-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-slate-500',
+        'w-full rounded-[20px] border px-4 py-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:border-[color:var(--jefe-line)] disabled:bg-[color:var(--jefe-panel-soft)] disabled:text-[color:var(--jefe-subtle)]',
         toneClassName[tone],
         className,
       )}
@@ -465,7 +473,7 @@ export function SecondaryActionButton({
       onClick={onClick}
       disabled={disabled}
       className={joinClasses(
-        'w-full rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:text-slate-500',
+        'jefe-secondary-button w-full rounded-[18px] px-4 py-3 text-sm font-medium disabled:cursor-not-allowed disabled:text-[color:var(--jefe-subtle)]',
         className,
       )}
     >
@@ -490,14 +498,14 @@ export function ProgressMeter({
   return (
     <div className="space-y-2">
       {label ? (
-        <div className="flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+        <div className="flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--jefe-subtle)]">
           <span>{label}</span>
           <span>{`${clampedValue}%`}</span>
         </div>
       ) : null}
       <div
         className={joinClasses(
-          'rounded-full border border-white/8 bg-slate-950/70 p-1',
+          'rounded-full border border-[color:var(--jefe-line)] bg-[color:var(--jefe-panel-muted)] p-1',
           compact ? 'p-[3px]' : 'p-1',
         )}
       >
@@ -550,13 +558,13 @@ export function ResultSectionCard({
           </div>
           <div className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--jefe-subtle)]">
                 {title}
               </div>
               {badge ? <SurfaceHeaderTag>{badge}</SurfaceHeaderTag> : null}
             </div>
             {description ? (
-              <div className="text-sm leading-6 text-slate-400">{description}</div>
+              <div className="text-sm leading-6 text-[color:var(--jefe-muted)]">{description}</div>
             ) : null}
           </div>
         </div>
@@ -600,26 +608,26 @@ export function DisclosurePanel({
             <div className="flex min-w-0 items-start gap-3">
               <div
                 className={joinClasses(
-                  'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border',
-                  toneIconClassName[tone],
-                )}
+                    'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border',
+                    toneIconClassName[tone],
+                  )}
               >
                 <DashboardIcon name={icon} className="h-4 w-4" />
               </div>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--jefe-subtle)]">
                     {title}
                   </div>
                   {badge ? <SurfaceHeaderTag>{badge}</SurfaceHeaderTag> : null}
                 </div>
                 {description ? (
-                  <div className="mt-1 text-sm leading-6 text-slate-400">{description}</div>
+                  <div className="mt-1 text-sm leading-6 text-[color:var(--jefe-muted)]">{description}</div>
                 ) : null}
               </div>
             </div>
             <ChevronRight
-              className="mt-1 h-4 w-4 shrink-0 text-slate-500 transition group-open:rotate-90"
+              className="mt-1 h-4 w-4 shrink-0 text-[color:var(--jefe-subtle)] transition group-open:rotate-90"
               strokeWidth={1.8}
             />
           </div>
@@ -675,10 +683,10 @@ export function ResultKeyValueGrid({
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--jefe-subtle)]">
                   {item.label}
                 </div>
-                <div className="mt-2 text-sm font-semibold leading-6 text-slate-100">
+                <div className="mt-2 text-sm font-semibold leading-6 text-[color:var(--jefe-text-strong)]">
                   {item.value}
                 </div>
               </div>
@@ -694,7 +702,7 @@ export function ResultKeyValueGrid({
               ) : null}
             </div>
             {item.detail ? (
-              <div className="mt-2 text-xs leading-5 text-slate-400">{item.detail}</div>
+              <div className="mt-2 text-xs leading-5 text-[color:var(--jefe-muted)]">{item.detail}</div>
             ) : null}
           </div>
         )
@@ -713,12 +721,12 @@ export function EmptyStateBlock({
   icon?: AppIconName
 }) {
   return (
-    <div className="rounded-[24px] border border-dashed border-white/12 bg-slate-950/40 px-4 py-8 text-center">
-      <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-slate-300">
+    <div className="jefe-surface-soft rounded-[24px] border-dashed px-4 py-8 text-center">
+      <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl border jefe-tone-icon-default">
         <DashboardIcon name={icon} className="h-5 w-5" />
       </div>
-      <div className="mt-4 text-sm font-semibold text-slate-100">{title}</div>
-      <div className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+      <div className="mt-4 text-sm font-semibold text-[color:var(--jefe-text-strong)]">{title}</div>
+      <div className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-[color:var(--jefe-muted)]">
         {description}
       </div>
     </div>
@@ -753,8 +761,8 @@ export function InlineHint({
           <DashboardIcon name={icon} className="h-4 w-4" />
         </div>
         <div>
-          <div className="text-sm font-semibold text-slate-100">{label}</div>
-          <div className="mt-1 text-xs leading-5 text-slate-400">{detail}</div>
+          <div className="text-sm font-semibold text-[color:var(--jefe-text-strong)]">{label}</div>
+          <div className="mt-1 text-xs leading-5 text-[color:var(--jefe-muted)]">{detail}</div>
         </div>
       </div>
     </div>
@@ -763,7 +771,7 @@ export function InlineHint({
 
 export function SurfaceHeaderTag({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+    <span className="inline-flex rounded-full border border-[color:var(--jefe-line)] bg-[color:var(--jefe-panel-soft)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--jefe-muted)]">
       {children}
     </span>
   )

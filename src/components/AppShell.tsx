@@ -93,28 +93,28 @@ export function AppShell({
   }, {})
 
   return (
-    <div className="min-h-screen bg-transparent text-slate-100">
+    <div className="min-h-screen bg-transparent text-[color:var(--jefe-text)]">
       <div className="mx-auto flex w-full max-w-[1720px] gap-4 px-4 py-4 sm:px-6 xl:px-8">
         <aside className={joinClasses('hidden w-[248px] shrink-0 xl:block', showSidebar ? '' : 'xl:hidden')}>
           <div className="sticky top-4 space-y-4">
-            <section className="overflow-hidden rounded-[22px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_34%),linear-gradient(180deg,rgba(5,10,21,0.98),rgba(8,15,28,0.9))] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.3)] backdrop-blur">
+            <section className="jefe-surface-sidebar overflow-hidden rounded-[22px] p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.34em] text-cyan-200/80">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.34em] text-[color:var(--jefe-primary)]">
                     JEFE
                   </div>
-                  <div className="mt-2 text-base font-semibold tracking-tight text-white">Flujo simple</div>
-                  <p className="mt-1 text-xs leading-5 text-slate-400">Una accion clara por paso.</p>
+                  <div className="mt-2 text-base font-semibold tracking-tight text-[color:var(--jefe-text-strong)]">Orquestador de IA</div>
+                  <p className="mt-1 text-xs leading-5 text-[color:var(--jefe-muted)]">Una forma clara de planificar y avanzar paso a paso.</p>
                 </div>
-                <div className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">
+                <div className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border jefe-tone-icon-sky">
                   <DashboardIcon name="flow" className="h-4 w-4" />
                 </div>
               </div>
             </section>
 
-            <section className="rounded-[24px] border border-white/10 bg-slate-950/72 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.34)] backdrop-blur">
+            <section className="jefe-surface rounded-[24px] p-4">
               <div className="mb-4 flex items-center justify-between gap-3">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--jefe-subtle)]">
                   Navegacion
                 </div>
                 <SurfaceHeaderTag>Shell</SurfaceHeaderTag>
@@ -126,16 +126,17 @@ export function AppShell({
                     {groupLabel === 'Operacion' ? (
                       <>
                         <div className="flex items-center justify-between gap-3 px-1">
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[color:var(--jefe-subtle)]">
                             {groupLabel}
                           </div>
-                          <div className="h-px flex-1 bg-gradient-to-r from-white/8 to-transparent" />
+                          <div className="h-px flex-1 bg-gradient-to-r from-[color:var(--jefe-line)] to-transparent" />
                         </div>
                         <div className="space-y-2">
                           {items.map((item) => (
                             <SidebarSectionButton
                               key={item.key}
                               active={Boolean(item.active)}
+                              disabled={Boolean(item.disabled)}
                               label={item.label}
                               description={item.description}
                               badge={item.badge}
@@ -146,12 +147,12 @@ export function AppShell({
                         </div>
                       </>
                     ) : (
-                      <details className="group rounded-[22px] border border-white/8 bg-white/[0.02] px-3 py-3">
+                      <details className="group jefe-surface-soft rounded-[22px] px-3 py-3">
                         <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[color:var(--jefe-subtle)]">
                             {groupLabel}
                           </div>
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 transition group-open:text-slate-300">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--jefe-subtle)] transition group-open:text-[color:var(--jefe-text)]">
                             {items.length} items
                           </div>
                         </summary>
@@ -160,6 +161,7 @@ export function AppShell({
                             <SidebarSectionButton
                               key={item.key}
                               active={Boolean(item.active)}
+                              disabled={Boolean(item.disabled)}
                               label={item.label}
                               description={item.description}
                               badge={item.badge}
@@ -175,35 +177,40 @@ export function AppShell({
               </div>
             </section>
 
-            <section className="rounded-[20px] border border-white/10 bg-slate-950/72 p-4 shadow-[0_18px_44px_rgba(0,0,0,0.24)] backdrop-blur">
+            <section className="jefe-surface-soft rounded-[20px] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                    Sistema
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--jefe-subtle)]">
+                    ¿Qué es JEFE?
                   </div>
-                  <div className="mt-2 text-sm font-semibold text-white">{statusLabel}</div>
-                  <div className="mt-1 text-xs leading-5 text-slate-400">{statusDetail}</div>
+                  <div className="mt-2 text-sm font-semibold text-[color:var(--jefe-text-strong)]">JEFE te ayuda a crear software con IA de forma segura y guiada.</div>
+                  <div className="mt-2 text-xs leading-5 text-[color:var(--jefe-muted)]">No modifica proyectos reales sin una confirmación clara.</div>
                 </div>
-                {statusBadge ? <ResultStatusBadge label={statusBadge} tone="emerald" /> : null}
+                <DashboardIcon name="brain" className="mt-1 h-4 w-4 text-[color:var(--jefe-primary)]" />
+              </div>
+              <div className="mt-4 rounded-[18px] border border-[color:var(--jefe-line)] bg-[color:var(--jefe-elevated)] px-4 py-3">
+                <div className="text-xs font-semibold text-[color:var(--jefe-text-strong)]">{statusLabel}</div>
+                <div className="mt-1 text-xs leading-5 text-[color:var(--jefe-muted)]">{statusDetail}</div>
+                {statusBadge ? <div className="mt-3"><ResultStatusBadge label={statusBadge} tone="emerald" /></div> : null}
               </div>
             </section>
           </div>
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="overflow-hidden rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(6,11,22,0.98),rgba(8,15,28,0.9))] px-4 py-3 shadow-[0_18px_50px_rgba(0,0,0,0.28)] backdrop-blur sm:px-5">
+          <header className="jefe-surface-hero overflow-hidden rounded-[20px] px-4 py-4 sm:px-5">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0 max-w-2xl">
                 {eyebrow ? (
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-cyan-200/72">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[color:var(--jefe-primary)]">
                     {eyebrow}
                   </div>
                 ) : null}
-                <div className="mt-1 text-base font-semibold tracking-tight text-white sm:text-lg">
+                <div className="mt-1 text-base font-semibold tracking-tight text-[color:var(--jefe-text-strong)] sm:text-lg">
                   {title}
                 </div>
                 {description ? (
-                  <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-400">{description}</p>
+                  <p className="mt-1 max-w-2xl text-xs leading-5 text-[color:var(--jefe-muted)]">{description}</p>
                 ) : null}
               </div>
 
@@ -225,10 +232,10 @@ export function AppShell({
                   className={joinClasses(
                     'min-w-fit rounded-full border px-3 py-2 text-sm transition',
                     item.active
-                      ? 'border-sky-300/30 bg-sky-300/12 text-sky-50'
+                      ? 'border-[color:var(--jefe-primary-line)] bg-[color:var(--jefe-primary-soft)] text-[color:var(--jefe-primary)]'
                       : item.disabled
-                        ? 'cursor-not-allowed border-white/8 bg-white/[0.02] text-slate-500'
-                        : 'border-white/10 bg-white/[0.03] text-slate-200 hover:bg-white/[0.06]',
+                        ? 'cursor-not-allowed border-[color:var(--jefe-line)] bg-[color:var(--jefe-panel-soft)] text-[color:var(--jefe-subtle)]'
+                        : 'border-[color:var(--jefe-line)] bg-[color:var(--jefe-panel)] text-[color:var(--jefe-text)] hover:bg-[color:var(--jefe-panel-soft)]',
                   )}
                 >
                   {item.label}
@@ -236,9 +243,9 @@ export function AppShell({
               ))}
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <div className="rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-200">
-                <div className="font-semibold text-white">{statusLabel}</div>
-                <div className="mt-1 text-xs leading-5 text-slate-400">{statusDetail}</div>
+              <div className="jefe-surface rounded-[20px] px-4 py-3 text-sm text-[color:var(--jefe-text)]">
+                <div className="font-semibold text-[color:var(--jefe-text-strong)]">{statusLabel}</div>
+                <div className="mt-1 text-xs leading-5 text-[color:var(--jefe-muted)]">{statusDetail}</div>
               </div>
             </div>
           </div>
@@ -249,7 +256,7 @@ export function AppShell({
           </div>
 
           {footer ? (
-            <footer className="mt-4 rounded-[20px] border border-white/8 bg-slate-950/60 px-4 py-3 text-sm text-slate-400 shadow-[0_12px_34px_rgba(0,0,0,0.22)] backdrop-blur sm:px-5">
+            <footer className="jefe-surface mt-4 rounded-[20px] px-4 py-3 text-sm text-[color:var(--jefe-muted)] sm:px-5">
               {footer}
             </footer>
           ) : null}
