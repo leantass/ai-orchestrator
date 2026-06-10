@@ -161,8 +161,14 @@ async function getSnapshot(mainWindow) {
         bodyText,
         buttons,
         radioLabels,
-        hasGoalInput: Boolean(document.querySelector('#guided-goal-input')),
-        hasContextInput: Boolean(document.querySelector('#guided-context-input')),
+        hasGoalInput: Boolean(
+          document.querySelector('#guided-goal-input, #simple-goal-input'),
+        ),
+        hasContextInput: Boolean(
+          document.querySelector('#guided-context-input, #simple-context-input'),
+        ),
+        hasSimpleGoalInput: Boolean(document.querySelector('#simple-goal-input')),
+        hasSimpleContextInput: Boolean(document.querySelector('#simple-context-input')),
         hasReuseSelect: Boolean(document.querySelector('#guided-reuse-mode')),
         headings,
       }
@@ -272,6 +278,38 @@ async function clickButtonByText(mainWindow, candidates) {
       return (button.innerText || '').trim()
     })()`,
   )
+}
+
+async function applyThemeSequence(mainWindow, scenario, scenarioArtifactsPath, stepLog) {
+  const themeSequence = Array.isArray(scenario.themeSequence)
+    ? scenario.themeSequence.filter(Boolean)
+    : []
+
+  for (let index = 0; index < themeSequence.length; index += 1) {
+    const themeLabel = String(themeSequence[index] || '').trim()
+    if (!themeLabel) {
+      continue
+    }
+
+    const clickedTheme = await clickButtonByText(mainWindow, [themeLabel])
+    if (!clickedTheme) {
+      throw new Error(`No se pudo activar visualmente el tema ${themeLabel}.`)
+    }
+
+    await delay(250)
+    await writeScreenshot(
+      mainWindow,
+      path.join(
+        scenarioArtifactsPath,
+        `01-theme-${String(index + 1).padStart(2, '0')}-${normalizeText(themeLabel)}.png`,
+      ),
+    )
+    stepLog.push({
+      kind: 'theme-toggle',
+      requestedTheme: themeLabel,
+      clickedTheme,
+    })
+  }
 }
 
 async function selectRadioLabel(mainWindow, candidates) {
@@ -423,10 +461,11 @@ async function driveScenario(mainWindow, repoRoot, scenario, scenarioArtifactsPa
   await waitFor(
     mainWindow,
     'goal input',
-    `Boolean(document.querySelector('#guided-goal-input'))`,
+    `Boolean(document.querySelector('#guided-goal-input, #simple-goal-input'))`,
     45000,
   )
   await writeScreenshot(mainWindow, path.join(scenarioArtifactsPath, '01-inicio.png'))
+  await applyThemeSequence(mainWindow, scenario, scenarioArtifactsPath, stepLog)
   if (typeof scenario.workspacePath === 'string' && scenario.workspacePath.trim()) {
     await callBridge(
       mainWindow,
@@ -437,39 +476,48 @@ async function driveScenario(mainWindow, repoRoot, scenario, scenarioArtifactsPa
   await callBridge(mainWindow, 'setGoal', scenario.goal)
   await writeScreenshot(mainWindow, path.join(scenarioArtifactsPath, '02-objetivo.png'))
   writeHeartbeat({ stage: 'goal-loaded', snapshot: await getSnapshot(mainWindow) })
-  await callBridge(mainWindow, 'next')
+  const initialSnapshot = await getSnapshot(mainWindow)
+  const useSimpleFlow = Boolean(initialSnapshot.hasSimpleGoalInput)
 
-  await waitFor(
-    mainWindow,
-    'context step',
-    `window.__JEFE_TEST__?.getState?.().activeWizardStep === 'context'`,
-  )
   await callBridge(mainWindow, 'setContext', scenario.context)
   await writeScreenshot(mainWindow, path.join(scenarioArtifactsPath, '03-contexto.png'))
   writeHeartbeat({ stage: 'context-loaded', snapshot: await getSnapshot(mainWindow) })
-  await callBridge(mainWindow, 'next')
 
-  await waitFor(
-    mainWindow,
-    'brain step',
-    `window.__JEFE_TEST__?.getState?.().activeWizardStep === 'brain'`,
-  )
   await callBridge(mainWindow, 'setBrainMode', 'max-quality')
   await writeScreenshot(mainWindow, path.join(scenarioArtifactsPath, '04-criterio.png'))
   writeHeartbeat({ stage: 'brain-loaded', snapshot: await getSnapshot(mainWindow) })
-  await callBridge(mainWindow, 'next')
 
-  await waitFor(
-    mainWindow,
-    'memory step',
-    `window.__JEFE_TEST__?.getState?.().activeWizardStep === 'memory'`,
-  )
   await callBridge(mainWindow, 'setReuseMode', 'none')
   await writeScreenshot(mainWindow, path.join(scenarioArtifactsPath, '05-memoria.png'))
   writeHeartbeat({ stage: 'memory-loaded', snapshot: await getSnapshot(mainWindow) })
-  const planButtonClicked = await clickButtonByText(mainWindow, ['Generar plan'])
-  if (!planButtonClicked) {
-    throw new Error('No se pudo disparar visualmente el boton Generar plan.')
+
+  if (!useSimpleFlow) {
+    await callBridge(mainWindow, 'next')
+
+    await waitFor(
+      mainWindow,
+      'context step',
+      `window.__JEFE_TEST__?.getState?.().activeWizardStep === 'context'`,
+    )
+    await callBridge(mainWindow, 'next')
+
+    await waitFor(
+      mainWindow,
+      'brain step',
+      `window.__JEFE_TEST__?.getState?.().activeWizardStep === 'brain'`,
+    )
+    await callBridge(mainWindow, 'next')
+
+    await waitFor(
+      mainWindow,
+      'memory step',
+      `window.__JEFE_TEST__?.getState?.().activeWizardStep === 'memory'`,
+    )
+  }
+
+  const planTriggered = await callBridge(mainWindow, 'generatePlan')
+  if (!planTriggered) {
+    throw new Error('No se pudo disparar el generatePlan desde el bridge visual.')
   }
   await writeScreenshot(mainWindow, path.join(scenarioArtifactsPath, '06-plan-disparado.png'))
   writeHeartbeat({ stage: 'plan-triggered', snapshot: await getSnapshot(mainWindow) })
@@ -518,7 +566,12 @@ async function driveScenario(mainWindow, repoRoot, scenario, scenarioArtifactsPa
       break
     }
 
-    if (normalizedBodyText.includes('aprobacion requerida') || normalizedBodyText.includes('aprobación requerida')) {
+    if (
+      finalSnapshot.bridgeState?.decisionPending ||
+      normalizedBodyText.includes('aprobacion requerida') ||
+      normalizedBodyText.includes('aprobación requerida') ||
+      normalizedBodyText.includes('necesito tu permiso para avanzar')
+    ) {
       await writeScreenshot(
         mainWindow,
         path.join(
@@ -542,6 +595,7 @@ async function driveScenario(mainWindow, repoRoot, scenario, scenarioArtifactsPa
       visibleButtonTexts.some((text) => {
         const normalizedText = normalizeText(text)
         return (
+          normalizedText.includes('preparar primera entrega segura') ||
           normalizedText.includes('preparar entrega funcional local') ||
           normalizedText.includes('preparar materializacion sandbox') ||
           normalizedText.includes('preparar la ejecucion') ||
@@ -550,6 +604,7 @@ async function driveScenario(mainWindow, repoRoot, scenario, scenarioArtifactsPa
       })
     ) {
       const preparationClicked = await clickButtonByText(mainWindow, [
+        'Preparar primera entrega segura',
         'Preparar entrega funcional local',
         'Preparar materializacion sandbox',
         'Preparar la ejecucion',

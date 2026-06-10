@@ -9746,7 +9746,7 @@ const buildFullstackLocalMaterializationPrompt = ({
       ))
   const contractSpecificGuidance = isOnlineCoursesPlan
     ? [
-        'Mantener un contrato canonico coherente de cursos online y no reciclar logistica, tracking, veterinaria ni ecommerce generico de productos.',
+        'Mantener un contrato canonico coherente de cursos online y no reciclar terminologia heredada de otros dominios como veterinaria o ecommerce generico de productos.',
         'Usar la misma raiz objetivo para todo el contrato materializable y no arrastrar roots previos fuera de alcance.',
         'Materializar frontend publico, frontend admin y panel alumno dentro de frontend/public, frontend/admin y frontend/student.',
         'Incluir backend/src/routes/courses.js, categories.js, modules.js, lessons.js, students.js, enrollments.js, plans.js, payments.js y progress.js.',
@@ -9756,17 +9756,17 @@ const buildFullstackLocalMaterializationPrompt = ({
       ]
     : isCommunityToolBankPlan
       ? [
-          'Mantener un contrato canonico coherente de banco comunitario de herramientas y no reciclar logistica, tracking, cursos, salud ni ecommerce generico.',
+          'Mantener un contrato canonico coherente de banco comunitario de herramientas y no reciclar terminologia heredada de cursos, salud u otros ecommerce genericos.',
           'Incluir frontend administrativo y frontend publico revisable para vecinos, operadores y administradores dentro de frontend/admin y frontend/public.',
           'Incluir backend/src/routes/tools.js, loans.js, reservations.js, returns.js, incidents.js y reports.js como contratos locales mock-only.',
           'Incluir shared/contracts/domain.js, shared/types/contracts.js, database/schema.sql, database/seed.sql, docs/API.md, docs/ARCHITECTURE.md, docs/DB_SCHEMA.md y docs/LOCAL_VALIDATION.md.',
-          'El dominio visible debe centrarse en herramientas, disponibilidad, prestamos, reservas, devoluciones, danos y reportes simples, sin lenguaje de tracking logistico.',
+          'El dominio visible debe centrarse en herramientas, disponibilidad, prestamos, reservas, devoluciones, danos y reportes simples, sin lenguaje heredado de otros dominios.',
         ]
     : [
         'Materializar solo un scaffold local con README.md, package.json raiz, frontend/, frontend/admin/, frontend/public/, backend/, shared/, database/, scripts/ y docs/.',
         'Incluir frontend administrativo, frontend publico revisable, docs/API.md y docs/DB_SCHEMA.md o docs/DATA_MODEL.md.',
         'Exigir database/schema.sql y database/seed.sql como contrato SQL local obligatorio. database/shipments.json o cualquier JSON similar solo puede ser auxiliar y nunca la persistencia principal.',
-        'Elegir archivos de rutas, entidades y modulos segun el dominio actual sin reciclar tracking logistico, veterinaria, salud, cursos ni ecommerce generico.',
+        'Elegir archivos de rutas, entidades y modulos segun el dominio actual sin reciclar terminologia heredada de otros dominios, salud, cursos ni ecommerce generico.',
       ]
 
   return {
@@ -13146,6 +13146,49 @@ const simplifyUserFacingText = (value: string) => {
     )
     .replace(/Materializaci[oó]n completada/gi, 'Primera versión creada')
     .replace(/web-prueba/gi, 'proyecto protegido')
+}
+
+const normalizeSimpleExperienceSearchText = (value: unknown) =>
+  repairMojibakeText(normalizeOptionalString(value))
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase()
+
+const hasStaleSimpleExperienceDomainSignal = (value: unknown) => {
+  const normalizedValue = normalizeSimpleExperienceSearchText(value)
+
+  if (!normalizedValue) {
+    return false
+  }
+
+  return (
+    normalizedValue.includes('tracking logistico') ||
+    normalizedValue.includes('tracking logistico local') ||
+    normalizedValue.includes('logistics tracker') ||
+    (normalizedValue.includes('tracking') && normalizedValue.includes('logistica'))
+  )
+}
+
+const sanitizeSimpleExperienceText = ({
+  value,
+  fallback = '',
+  replacement,
+}: {
+  value: unknown
+  fallback?: string
+  replacement?: string
+}) => {
+  const simplifiedValue = simplifyUserFacingText(normalizeOptionalString(value))
+
+  if (!simplifiedValue) {
+    return fallback
+  }
+
+  if (!hasStaleSimpleExperienceDomainSignal(simplifiedValue)) {
+    return simplifiedValue
+  }
+
+  return replacement || fallback
 }
 
 function App() {
@@ -16852,45 +16895,83 @@ function App() {
         title: action.title,
         detail: action.detail,
       }))
+  const normalizedSimpleExperienceContextText = normalizeSimpleExperienceSearchText(
+    [
+      normalizedGoalInput,
+      executionContextInput,
+      planOverviewGoalContextHints.domainLabel,
+      planOverviewGoalContextHints.moduleItems.join(', '),
+      normalizeOptionalString(
+        effectivePlannerExecutionMetadata.domainUnderstanding?.domainLabel,
+      ),
+      normalizeOptionalString(activeProductArchitecture?.domain),
+      normalizeOptionalString(activeProductArchitecture?.productName),
+    ].join(' '),
+  )
+  const simpleIsCommunityToolBankContext =
+    (/\bherramientas?\b|\btool(?:s|bank)?\b|\binstrumental\b/u.test(
+      normalizedSimpleExperienceContextText,
+    ) &&
+      (/\bprestamos?\b|\bsolicitudes?\b|\breservas?\b|\bdevoluciones?\b|\bdanad[ao]s?\b/u.test(
+        normalizedSimpleExperienceContextText,
+      ) ||
+        /\bcomunitari[oa]s?\b|\bbarriales?\b|\bvecin(?:o|os|a|as)\b/u.test(
+          normalizedSimpleExperienceContextText,
+        ))) ||
+    normalizedSimpleExperienceContextText.includes('banco comunitario de herramientas')
+  const simplePreferredProjectLabel = simpleIsCommunityToolBankContext
+    ? 'Banco comunitario de herramientas'
+    : normalizedGoalInput
+      ? 'Proyecto actual'
+      : 'Proyecto de prueba'
   const simpleSummaryProjectValue =
-    simplifyUserFacingText(
-      planOverviewGoalContextHints.domainLabel ||
+    sanitizeSimpleExperienceText({
+      value:
+        planOverviewGoalContextHints.domainLabel ||
         normalizeOptionalString(
           effectivePlannerExecutionMetadata.domainUnderstanding?.domainLabel,
         ) ||
         normalizeOptionalString(activeProductArchitecture?.domain) ||
         normalizeOptionalString(activeProductArchitecture?.productName),
-    ) || 'Todavía estoy armando el resumen.'
+      fallback: simplePreferredProjectLabel,
+      replacement: simplePreferredProjectLabel,
+    }) || 'Todavía estoy armando el resumen.'
   const simpleSummaryUsersValue =
-    simplifyUserFacingText(
-      collectUniqueSummaryValues(
+    sanitizeSimpleExperienceText({
+      value: collectUniqueSummaryValues(
         effectivePlannerExecutionMetadata.domainUnderstanding?.roles,
         activeProductArchitecture?.users,
         activeProductArchitecture?.roles,
       )
         .slice(0, 4)
         .join(', '),
-    ) || 'Todavía estoy armando el resumen.'
+      fallback: 'Todavía estoy armando el resumen.',
+      replacement: 'Plan conservado',
+    }) || 'Todavía estoy armando el resumen.'
   const simpleSummaryFunctionsValue =
-    simplifyUserFacingText(
-      collectUniqueSummaryValues(
+    sanitizeSimpleExperienceText({
+      value: collectUniqueSummaryValues(
         effectivePlannerExecutionMetadata.domainUnderstanding?.primaryModules,
         planOverviewGoalContextHints.moduleItems,
         activeProductArchitecture?.coreModules,
       )
         .slice(0, 5)
         .join(', '),
-    ) || 'Todavía estoy armando el resumen.'
+      fallback: 'Todavía estoy armando el resumen.',
+      replacement: 'Plan conservado',
+    }) || 'Todavía estoy armando el resumen.'
   const simpleSummaryLimitsValue =
-    simplifyUserFacingText(
-      collectUniqueSummaryValues(
+    sanitizeSimpleExperienceText({
+      value: collectUniqueSummaryValues(
         effectivePlannerExecutionMetadata.domainUnderstanding?.explicitExclusions,
         planOverviewGoalContextHints.exclusionItems,
         activeProductArchitecture?.outOfScopeForFirstIteration,
       )
         .slice(0, 5)
         .join(', '),
-    ) || 'Todavía estoy armando el resumen.'
+      fallback: 'Todavía estoy armando el resumen.',
+      replacement: 'Sin cambios aplicados',
+    }) || 'Todavía estoy armando el resumen.'
   const simpleSummaryCards = [
     { label: 'Proyecto', value: simpleSummaryProjectValue },
     { label: 'Usuarios', value: simpleSummaryUsersValue },
@@ -16898,16 +16979,25 @@ function App() {
     { label: 'Límites y seguridad', value: simpleSummaryLimitsValue },
   ]
   const simpleGoalScopedProjectValue =
-    simplifyUserFacingText(planOverviewGoalContextHints.domainLabel) ||
-    summarizeInlineText(normalizedGoalInput, 88)
+    sanitizeSimpleExperienceText({
+      value:
+        planOverviewGoalContextHints.domainLabel ||
+        summarizeInlineText(normalizedGoalInput, 88),
+      fallback: simplePreferredProjectLabel,
+      replacement: simplePreferredProjectLabel,
+    }) || simplePreferredProjectLabel
   const simpleGoalScopedFunctionsValue =
-    simplifyUserFacingText(
-      planOverviewGoalContextHints.moduleItems.slice(0, 5).join(', '),
-    ) || 'Plan conservado'
+    sanitizeSimpleExperienceText({
+      value: planOverviewGoalContextHints.moduleItems.slice(0, 5).join(', '),
+      fallback: 'Plan conservado',
+      replacement: 'Plan conservado',
+    }) || 'Plan conservado'
   const simpleGoalScopedLimitsValue =
-    simplifyUserFacingText(
-      planOverviewGoalContextHints.exclusionItems.slice(0, 5).join(', '),
-    ) || 'Sin cambios aplicados'
+    sanitizeSimpleExperienceText({
+      value: planOverviewGoalContextHints.exclusionItems.slice(0, 5).join(', '),
+      fallback: 'Sin cambios aplicados',
+      replacement: 'Sin cambios aplicados',
+    }) || 'Sin cambios aplicados'
   const simplePlanSteps = [
     {
       title: 'Analizar y entender',
@@ -17123,8 +17213,16 @@ No usar credenciales.`
   const simpleNextStepCards =
     simpleShouldShowMaterializedResult && resultNextStepItems.length > 0
       ? resultNextStepItems.slice(0, 4).map((item) => ({
-          title: simplifyUserFacingText(item.title),
-          detail: simplifyUserFacingText(item.detail),
+          title: sanitizeSimpleExperienceText({
+            value: item.title,
+            fallback: 'Paso siguiente',
+            replacement: 'Paso siguiente',
+          }),
+          detail: sanitizeSimpleExperienceText({
+            value: item.detail,
+            fallback: 'Plan conservado',
+            replacement: 'Plan conservado',
+          }),
         }))
       : simplePlanSteps.map((item) => ({
           title: item.title,
@@ -23529,27 +23627,41 @@ No usar credenciales.`
       : simplePrimaryActionHelperText
   const simpleResultVisibleValue =
     simpleShouldShowMaterializedResult
-      ? simplifyUserFacingText(resultMaterializationSummaryDescription)
+      ? sanitizeSimpleExperienceText({
+          value: resultMaterializationSummaryDescription,
+          fallback: 'Proyecto actual',
+          replacement: simplePreferredProjectLabel,
+        })
       : simpleResultKind === 'blocked'
         ? 'Acción bloqueada por seguridad'
         : simpleResultKind === 'rejected' || simpleResultKind === 'no-change'
           ? 'No se creó ningún archivo.'
           : simpleResultKind === 'deferred'
             ? 'Plan guardado para continuar después.'
-            : simplifyUserFacingText(effectiveResultStatusPresentation.label) ||
+            : sanitizeSimpleExperienceText({
+                value: effectiveResultStatusPresentation.label,
+                fallback: 'Aun no hay resultado.',
+                replacement: 'Proyecto actual',
+              }) ||
               'Aún no hay resultado.'
   const simpleResultVisibleDetail =
     simpleShouldShowMaterializedResult
-      ? simplifyUserFacingText(resultHumanText)
+      ? sanitizeSimpleExperienceText({
+          value: resultHumanText,
+          fallback: 'La salida quedo lista para revisar.',
+          replacement: 'La salida quedo lista para revisar.',
+        })
       : simpleResultKind === 'blocked'
         ? 'JEFE frenó el pedido antes de crear archivos porque la ubicación o el alcance no eran seguros.'
         : simpleResultKind === 'rejected' || simpleResultKind === 'no-change'
           ? 'Se conserva solo la planificación revisable. No se tocó ninguna carpeta.'
           : simpleResultKind === 'deferred'
             ? 'La planificación sigue disponible y no se crearon archivos por ahora.'
-            : simplifyUserFacingText(
-                effectiveResultStatusPresentation.detail || executorResult,
-              )
+            : sanitizeSimpleExperienceText({
+                value: effectiveResultStatusPresentation.detail || executorResult,
+                fallback: 'La planificacion sigue disponible para revisar.',
+                replacement: 'La planificacion sigue disponible para revisar.',
+              })
   const simpleResultLocationValue =
     simpleShouldShowMaterializedResult
       ? simplifyUserFacingText(

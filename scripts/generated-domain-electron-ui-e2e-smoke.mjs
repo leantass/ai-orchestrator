@@ -17,6 +17,8 @@ const currentFilePath = fileURLToPath(import.meta.url)
 const repoRoot = path.resolve(path.dirname(currentFilePath), '..')
 const mainFilePath = path.join(repoRoot, 'electron', 'main.cjs')
 const mainSource = fs.readFileSync(mainFilePath, 'utf8')
+const appFilePath = path.join(repoRoot, 'src', 'App.tsx')
+const appSource = fs.readFileSync(appFilePath, 'utf8')
 const {
   normalizeGeneratedDomainContract,
   validateGeneratedDomainContract,
@@ -57,6 +59,22 @@ const generatedDomainInspectionDiagnostics = require(
 )
 const generatedDomainMaterializationPlanDiagnostics = require(
   path.join(repoRoot, 'electron', 'generated-domain-materialization-plan-diagnostics.cjs'),
+)
+
+assert.equal(
+  appSource.includes('sin lenguaje de tracking logistico'),
+  false,
+  'App.tsx no debe volver a mostrar el copy heredado "sin lenguaje de tracking logistico".',
+)
+assert.equal(
+  appSource.includes('sin reciclar tracking logistico'),
+  false,
+  'App.tsx no debe volver a mostrar el copy heredado "sin reciclar tracking logistico".',
+)
+assert.equal(
+  appSource.includes('no reciclar logistica, tracking'),
+  false,
+  'App.tsx no debe volver a incluir guidance heredada con "logistica, tracking".',
 )
 
 function extractSegment({ startMarker, endMarker }) {
