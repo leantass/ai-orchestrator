@@ -17199,27 +17199,66 @@ function detectBlueprintDataSensitivity(goal, context, domainUnderstanding) {
       .join(' '),
   )
 
+  if (!normalizedText) {
+    return 'none'
+  }
+
+  const hasBlueprintMockOrFutureContext = (topicPattern) => {
+    const topicSource = `(?:${topicPattern.source})`
+    return [
+      /\b(?:solo mock|mock local|backend mock|datos?\s+mock|datos?\s+fictici(?:o|a)s?|datos?\s+de\s+prueba|usuarios?\s+fictici(?:o|a)s?|clientes?\s+fictici(?:o|a)s?|base local de prueba|mvp local|solo base local|solo datos de prueba)\b/u,
+      /\b(?:sin|no)\s+(?:datos?\s+reales?|pagos?\s+reales?|credenciales?(?:\s+reales?)?|usuarios?\s+reales?|clientes?\s+reales?|db\s+productiva|base(?:\s+de\s+datos)?\s+productiva|produccion)\b/u,
+      /\b(?:mas adelante|en el futuro|fase futura|por ahora|ahora mock|fuera de alcance|no en esta etapa)\b/u,
+      new RegExp(
+        `\\b(?:mock|fictici(?:o|a)s?|de prueba|demo|simulad(?:o|a)s?|sandbox)\\b[^\\n\\.;,:]{0,160}${topicSource}`,
+        'u',
+      ),
+      new RegExp(
+        `${topicSource}[^\\n\\.;,:]{0,160}\\b(?:mock|fictici(?:o|a)s?|de prueba|demo|simulad(?:o|a)s?|sandbox)\\b`,
+        'u',
+      ),
+    ].some((pattern) => pattern.test(normalizedText))
+  }
+
+  const hasImmediateBlueprintSensitivityIntent = (topicPattern) =>
+    hasImmediateSensitiveTopicIntent(normalizedText, topicPattern) &&
+    !hasBlueprintMockOrFutureContext(topicPattern)
+
   if (
-    /\b(?:salud|medic|pacientes?|dni|documentos?|historias? clinicas?|tarjetas?)\b/u.test(
-      normalizedText,
+    hasImmediateBlueprintSensitivityIntent(
+      /\b(?:salud|medic|pacientes?|dni|documentos?|historias?\s+clinicas?|tarjetas?)\b/u,
+    ) ||
+    hasImmediateBlueprintSensitivityIntent(
+      /\b(?:datos?\s+reales?|datos?\s+personales?|informacion(?:es)?\s+sensible(?:s)?|informacion(?:es)?\s+sensibles?\s+real(?:es)?|emails?\s+reales?)\b/u,
+    ) ||
+    hasImmediateBlueprintSensitivityIntent(
+      /\b(?:usuarios?|clientes?)\s+reales?\b/u,
+    ) ||
+    hasImmediateBlueprintSensitivityIntent(
+      /\b(?:pagos?\s+reales?|cobros?\s+reales?|credenciales?\s+reales?|secrets?\s+reales?|secretos?\s+reales?)\b/u,
+    ) ||
+    hasImmediateBlueprintSensitivityIntent(
+      /\b(?:db\s+productiva|base(?:\s+de\s+datos)?\s+productiva|produccion)\b/u,
     )
   ) {
     return 'high'
   }
 
   if (
-    /\b(?:alumnos?|familias?|pagos?|facturacion|facturación|clientes?|usuarios?)\b/u.test(
-      normalizedText,
+    hasImmediateBlueprintSensitivityIntent(
+      /\b(?:alumnos?|familias?|menores)\b/u,
+    ) ||
+    hasImmediateBlueprintSensitivityIntent(
+      /\b(?:datos?\s+(?:de\s+)?clientes?|datos?\s+(?:de\s+)?usuarios?|guardar\s+clientes?|guardar\s+usuarios?|registrar\s+clientes?|registrar\s+usuarios?|base\s+de\s+datos[^\\n\\.;,:]{0,80}\b(?:clientes?|usuarios?)\b)\b/u,
+    ) ||
+    hasImmediateBlueprintSensitivityIntent(
+      /\b(?:facturacion|facturacion\s+real|pagos?|checkout)\b/u,
     )
   ) {
     return 'medium'
   }
 
-  if (normalizedText) {
-    return 'low'
-  }
-
-  return 'none'
+  return 'low'
 }
 
 function detectStackPreference(text, candidates) {

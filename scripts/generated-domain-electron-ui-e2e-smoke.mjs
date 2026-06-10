@@ -102,6 +102,7 @@ module.exports = {
   buildBrainRoutingDecision,
   buildLocalStrategicBrainDecision,
   buildBlueprintIntegrations,
+  detectBlueprintDataSensitivity,
   deriveApprovalEquivalenceFamily,
   detectSensitiveApprovalRequirement,
   detectRemoteOrCriticalAction,
@@ -435,6 +436,68 @@ for (const testCase of positiveBlueprintIntegrationCases) {
     integrations.some((entry) => entry?.type === testCase.expectedType),
     true,
     `El blueprint debe conservar ${testCase.expectedType} para "${testCase.label}".`,
+  )
+}
+
+const blueprintDataSensitivityCases = [
+  {
+    label: 'sensibilidad negada',
+    goal: 'Quiero una app local con usuarios ficticios, sin datos reales, sin pagos reales y sin credenciales.',
+    context: 'Solo mock local y datos de prueba en una base local.',
+    expectedSensitivity: 'low',
+  },
+  {
+    label: 'sensibilidad real positiva',
+    goal: 'Quiero usar usuarios reales, pagos reales y credenciales reales.',
+    context: 'La app operara con datos reales inmediatos.',
+    expectedSensitivity: 'high',
+  },
+  {
+    label: 'futuro de pagos',
+    goal: 'Mas adelante agregamos pagos reales, pero ahora solo mock local.',
+    context: 'Por ahora fuera de alcance.',
+    expectedSensitivity: 'low',
+  },
+  {
+    label: 'futuro de usuarios reales',
+    goal: 'Mas adelante usara usuarios reales, ahora mock.',
+    context: 'No en esta etapa.',
+    expectedSensitivity: 'low',
+  },
+  {
+    label: 'datos ficticios',
+    goal: 'Necesito clientes ficticios y datos de prueba en una base local.',
+    context: 'Solo mock local.',
+    expectedSensitivity: 'low',
+  },
+  {
+    label: 'datos reales de clientes',
+    goal: 'La app manejara datos reales de clientes y datos personales.',
+    context: 'Se operara con informacion sensible real.',
+    expectedSensitivity: 'high',
+  },
+  {
+    label: 'db productiva negada',
+    goal: 'Solo base local de prueba, sin DB productiva y sin produccion.',
+    context: 'Nada real en esta etapa.',
+    expectedSensitivity: 'low',
+  },
+  {
+    label: 'db productiva positiva',
+    goal: 'Debe conectarse a una base productiva con usuarios reales.',
+    context: 'Usar produccion en esta fase.',
+    expectedSensitivity: 'high',
+  },
+]
+
+for (const testCase of blueprintDataSensitivityCases) {
+  assert.equal(
+    uiHarness.detectBlueprintDataSensitivity(testCase.goal, testCase.context, {
+      domainLabel: 'Proyecto local de prueba',
+      primaryEntities: ['usuarios', 'clientes'],
+    }),
+    testCase.expectedSensitivity,
+    `La sensibilidad de datos para "${testCase.label}" debe ser ${testCase.expectedSensitivity}.`,
   )
 }
 
