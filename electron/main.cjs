@@ -51698,8 +51698,7 @@ function deriveApprovalEquivalenceFamily(...texts) {
     combinedText.includes('github repo') ||
     combinedText.includes('crear repo') ||
     combinedText.includes('subir repo') ||
-    combinedText.includes('publicar repo') ||
-    explicitlyNoDeploy
+    combinedText.includes('publicar repo')
   const mentionsRealPayments =
     combinedText.includes('mercado pago') ||
     combinedText.includes('stripe') ||

@@ -101,6 +101,7 @@ ${plannerSurface}
 module.exports = {
   buildBrainRoutingDecision,
   buildLocalStrategicBrainDecision,
+  deriveApprovalEquivalenceFamily,
   materializeGeneratedDomainSandboxPlan,
 };
 `
@@ -237,6 +238,51 @@ assert.equal(
   true,
 )
 
+const smokeRunId = `generated-domain-electron-ui-e2e-${process.pid}-${Date.now()}`
+const safeWorkspacePath = [
+  '.codex-temp',
+  'generated-domain-materialization-approved',
+  smokeRunId,
+].join('\\')
+
+const shortSafeGoal = 'Quiero una app para banco de herramientas barriales.'
+const shortSafeContext =
+  'Solo local. No deploy. No Docker. No servicios externos. No tocar web-prueba. Primera version en zona de prueba segura.'
+const visualReviewGoal =
+  'Quiero revisar el banco comunitario de herramientas y dejar solo el plan.'
+const visualReviewContext =
+  'Proyecto actual: banco comunitario de herramientas. No tocar web-prueba. No deploy. No Docker. No servicios externos.'
+
+assert.equal(
+  uiHarness.deriveApprovalEquivalenceFamily(shortSafeGoal, shortSafeContext),
+  '',
+  'Un pedido corto de banco de herramientas en zona segura no debe derivar public-repo-creation.',
+)
+assert.equal(
+  uiHarness.deriveApprovalEquivalenceFamily(visualReviewGoal, visualReviewContext),
+  '',
+  'La variante resumida de revision local no debe derivar public-repo-creation.',
+)
+
+const visualReviewDecision = await uiHarness.buildLocalStrategicBrainDecision({
+  goal: visualReviewGoal,
+  context: visualReviewContext,
+  workspacePath: safeWorkspacePath,
+  iteration: 1,
+  previousExecutionResult: '',
+  requiresApproval: false,
+  userParticipationMode: 'operator-approves-sensitive',
+  projectState: {
+    resolvedDecisions: [],
+  },
+})
+
+assert.notEqual(
+  visualReviewDecision?.approvalRequest?.decisionKey,
+  'approve-public-repo-creation',
+  'La revision local de banco de herramientas no debe pedir approve-public-repo-creation.',
+)
+
 const previousExecutionResult =
   '__orchestrator_feedback__:' +
   JSON.stringify({
@@ -248,12 +294,6 @@ const previousExecutionResult =
     responseMode: 'options',
     selectedOption: 'approve',
   })
-const smokeRunId = `generated-domain-electron-ui-e2e-${process.pid}-${Date.now()}`
-const safeWorkspacePath = [
-  '.codex-temp',
-  'generated-domain-materialization-approved',
-  smokeRunId,
-].join('\\')
 
 const maxQualityRoutingDecision = uiHarness.buildBrainRoutingDecision({
   goal,

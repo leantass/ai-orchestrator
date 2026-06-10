@@ -11824,9 +11824,24 @@ const deriveApprovalEquivalenceFamily = (...texts: unknown[]) => {
     combinedText.includes('repo sin deploy') ||
     combinedText.includes('sin deploy') ||
     combinedText.includes('no deploy') ||
+    combinedText.includes('no desplegar') ||
+    combinedText.includes('no publicar') ||
     combinedText.includes('sin publicar') ||
     combinedText.includes('sin publicacion') ||
     combinedText.includes('sin publicación')
+  const explicitlyNoPublicRepo =
+    combinedText.includes('sin repo publico') ||
+    combinedText.includes('no crear repo publico') ||
+    combinedText.includes('no subir repo') ||
+    combinedText.includes('sin github repo') ||
+    combinedText.includes('sin public repo')
+  const explicitlyLocalOnly =
+    combinedText.includes('solo para pruebas locales') ||
+    combinedText.includes('solo local') ||
+    combinedText.includes('solo en local') ||
+    combinedText.includes('solo dentro del workspace local') ||
+    combinedText.includes('dentro del workspace local') ||
+    combinedText.includes('entorno local')
   const mentionsDeploy =
     combinedText.includes('deploy') ||
     combinedText.includes('github pages') ||
@@ -11843,8 +11858,7 @@ const deriveApprovalEquivalenceFamily = (...texts: unknown[]) => {
     combinedText.includes('github repo') ||
     combinedText.includes('crear repo') ||
     combinedText.includes('publicar repo') ||
-    combinedText.includes('subir repo') ||
-    explicitlyNoDeploy
+    combinedText.includes('subir repo')
   const explicitlyNoRealPayments =
     combinedText.includes('sin pagos reales') ||
     combinedText.includes('sin pago real') ||
@@ -11858,6 +11872,10 @@ const deriveApprovalEquivalenceFamily = (...texts: unknown[]) => {
     combinedText.includes('pago real') ||
     combinedText.includes('cobros reales') ||
     combinedText.includes('payment gateway')
+  const hasPositiveDeployIntent = mentionsDeploy && !explicitlyNoDeploy
+  const hasPositivePublicRepoIntent = mentionsPublicRepo && !explicitlyNoPublicRepo
+  const hasPositiveRealPaymentsIntent =
+    mentionsRealPayments && !explicitlyNoRealPayments
   const isProvisionalWebScaffoldApproval =
     (combinedText.includes('scaffold') || combinedText.includes('generacion')) &&
     (combinedText.includes('provisional') ||
@@ -11870,15 +11888,24 @@ const deriveApprovalEquivalenceFamily = (...texts: unknown[]) => {
       combinedText.includes('ruta local') ||
       combinedText.includes('path local'))
 
-  if (mentionsDeploy && !explicitlyNoDeploy) {
+  if (
+    isProvisionalWebScaffoldApproval &&
+    (explicitlyLocalOnly || explicitlyNoDeploy || explicitlyNoPublicRepo) &&
+    !hasPositiveDeployIntent &&
+    !hasPositivePublicRepoIntent
+  ) {
+    return 'provisional-web-scaffold'
+  }
+
+  if (hasPositiveDeployIntent) {
     return 'public-deploy'
   }
 
-  if (mentionsRealPayments && !explicitlyNoRealPayments) {
+  if (hasPositiveRealPaymentsIntent) {
     return 'real-payments'
   }
 
-  if (mentionsPublicRepo) {
+  if (hasPositivePublicRepoIntent) {
     return 'public-repo-creation'
   }
 
