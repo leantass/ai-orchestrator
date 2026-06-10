@@ -148,6 +148,7 @@ module.exports = {
   buildLocalStrategicBrainDecision,
   buildBlueprintIntegrations,
   detectBlueprintDataSensitivity,
+  detectNoDeployLocalContinuationIntent,
   deriveApprovalEquivalenceFamily,
   detectSensitiveApprovalRequirement,
   detectRemoteOrCriticalAction,
@@ -271,6 +272,62 @@ for (const testCase of deferredApprovalIntentCases) {
     appApprovalIntentHarness.detectDeferredApprovalIntent(testCase.text),
     testCase.expectedDeferred,
     `detectDeferredApprovalIntent debe devolver ${testCase.expectedDeferred} para "${testCase.label}".`,
+  )
+}
+
+const noDeployLocalContinuationCases = [
+  {
+    label: 'local seguro',
+    text: 'Solo local, sin deploy, sin Docker, sin servicios externos, no tocar web-prueba.',
+    expectedLocalContinuation: true,
+  },
+  {
+    label: 'sandbox seguro',
+    text: 'Primera versión en zona de prueba segura, sin publicar y sin credenciales reales.',
+    expectedLocalContinuation: true,
+  },
+  {
+    label: 'mvp local',
+    text: 'Quiero un MVP local con backend mock, sin deploy y sin DB productiva.',
+    expectedLocalContinuation: true,
+  },
+  {
+    label: 'sandbox local',
+    text: 'Ahora seguir con sandbox local, luego vemos deploy.',
+    expectedLocalContinuation: true,
+  },
+  {
+    label: 'produccion positiva',
+    text: 'Quiero hacer deploy ahora a producción.',
+    expectedLocalContinuation: false,
+  },
+  {
+    label: 'publicacion positiva',
+    text: 'Quiero publicar ahora un repo público.',
+    expectedLocalContinuation: false,
+  },
+  {
+    label: 'docker positivo',
+    text: 'Quiero usar Docker para producción.',
+    expectedLocalContinuation: false,
+  },
+  {
+    label: 'web-prueba positivo',
+    text: 'Quiero escribir en web-prueba.',
+    expectedLocalContinuation: false,
+  },
+  {
+    label: 'deploy futuro ahora local',
+    text: 'Preparar para deploy futuro, pero ahora solo local y sandbox.',
+    expectedLocalContinuation: true,
+  },
+]
+
+for (const testCase of noDeployLocalContinuationCases) {
+  assert.equal(
+    uiHarness.detectNoDeployLocalContinuationIntent(testCase.text),
+    testCase.expectedLocalContinuation,
+    `detectNoDeployLocalContinuationIntent debe devolver ${testCase.expectedLocalContinuation} para "${testCase.label}".`,
   )
 }
 

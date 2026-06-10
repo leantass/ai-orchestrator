@@ -11916,23 +11916,102 @@ function detectNoDeployLocalContinuationIntent(...texts) {
     return false
   }
 
+  const hasFutureRemoteScope =
+    /\b(?:luego|despues|después|mas adelante|más adelante|en el futuro|para futuro|fase futura)\b[^\\n\\.;,:]{0,180}\b(?:deploy|deployar|desplegar|publicar|publicacion|publicación|produccion|producción|servicios? externos?|integraciones? externas?)\b/u.test(
+      normalizedText,
+    ) ||
+    /\b(?:deploy|deployar|desplegar|publicar|publicacion|publicación|produccion|producción|servicios? externos?|integraciones? externas?)\b[^\\n\\.;,:]{0,180}\b(?:luego|despues|después|mas adelante|más adelante|en el futuro|para futuro|futuro|fase futura)\b/u.test(
+      normalizedText,
+    )
+
+  const hasImmediateRemoteOrUnsafeIntent =
+    hasImmediateSensitiveTopicIntent(
+      normalizedText,
+      /\b(?:deploy|deployar|desplegar|publicar|publicacion|publicación|subir\s+a\s+produccion|subir\s+a\s+producción|produccion|producción|repo\s+publico|repo\s+público|public\s+repo)\b/u,
+    ) ||
+    hasImmediateSensitiveTopicIntent(
+      normalizedText,
+      /\b(?:docker|dockerfile|docker-compose|docker\s+compose|servicios?\s+externos?|integraciones?\s+externas?|webhooks?|credenciales?\s+reales?|secrets?\s+reales?|secretos?\s+reales?|pagos?\s+reales?|db\s+productiva|base\s+productiva|base\s+de\s+datos\s+productiva|web-prueba)\b/u,
+    )
+
+  if (hasImmediateRemoteOrUnsafeIntent && !hasFutureRemoteScope) {
+    return false
+  }
+
   const noDeploySignals = [
     /\bno deploy\b/u,
+    /\bsin deploy\b/u,
+    /\bno hacer deploy\b/u,
+    /\bsin hacer deploy\b/u,
+    /\bno deployar\b/u,
+    /\bsin deployar\b/u,
     /\bno publicar\b/u,
+    /\bsin publicar\b/u,
     /\bno publicacion real\b/u,
     /\bno publicación real\b/u,
     /\bno desplegar\b/u,
+    /\bsin desplegar\b/u,
+    /\bno subir a produccion\b/u,
+    /\bno subir a producción\b/u,
+    /\bsin subir a produccion\b/u,
+    /\bsin subir a producción\b/u,
     /\bno externos\b/u,
   ]
   const localContinuationSignals = [
     /\bseguir local\b/u,
+    /\bseguir con sandbox local\b/u,
+    /\bcontinuar local\b/u,
+    /\bcontinuar con sandbox local\b/u,
+    /\bahora seguir\b[^\\n\\.;,:]{0,120}\b(?:local|sandbox|mock|mvp local)\b/u,
+    /\bahora continuar\b[^\\n\\.;,:]{0,120}\b(?:local|sandbox|mock|mvp local)\b/u,
     /\bbackend local\b/u,
+    /\bbackend mock\b/u,
     /\bapi local\b/u,
     /\bsqlite\b/u,
     /\bbase local\b/u,
     /\bbase de datos local\b/u,
+  ]
+  const localModeSignals = [
+    /\bsolo local\b/u,
+    /\bmodo local\b/u,
+    /\bapp local\b/u,
+    /\bmvp local\b/u,
+    /\bprimera version local\b/u,
+    /\bprimera versión local\b/u,
+    /\bsolo sandbox\b/u,
+    /\bsandbox local\b/u,
+    /\bzona de prueba\b/u,
+    /\bzona de prueba segura\b/u,
+    /\bsolo zona segura\b/u,
+    /\bsolo entorno de prueba\b/u,
+    /\bversion local segura\b/u,
+    /\bversión local segura\b/u,
+  ]
+  const safetyRestrictionSignals = [
+    /\bsin docker\b/u,
+    /\bno docker\b/u,
+    /\bsin credenciales(?:\s+reales?)?\b/u,
+    /\bno credenciales(?:\s+reales?)?\b/u,
     /\bsin servicios externos\b/u,
+    /\bno servicios externos\b/u,
     /\bsin integraciones externas\b/u,
+    /\bno integraciones externas\b/u,
+    /\bsin webhooks?\b/u,
+    /\bno webhooks?\b/u,
+    /\bsin pagos reales\b/u,
+    /\bno pagos reales\b/u,
+    /\bsin db productiva\b/u,
+    /\bno db productiva\b/u,
+    /\bsin base productiva\b/u,
+    /\bno base productiva\b/u,
+    /\bsin base de datos productiva\b/u,
+    /\bno base de datos productiva\b/u,
+    /\bno tocar web-prueba\b/u,
+    /\bsin tocar web-prueba\b/u,
+  ]
+  const futureRemoteSignals = [
+    /\b(?:luego|despues|después|mas adelante|más adelante|en el futuro|para futuro|deploy futuro|fase futura)\b[^\\n\\.;,:]{0,180}\b(?:deploy|deployar|desplegar|publicar|publicacion|publicación|produccion|producción|servicios? externos?|integraciones? externas?)\b/u,
+    /\b(?:deploy|deployar|desplegar|publicar|publicacion|publicación|produccion|producción|servicios? externos?|integraciones? externas?)\b[^\\n\\.;,:]{0,180}\b(?:luego|despues|después|mas adelante|más adelante|en el futuro|para futuro|futuro|fase futura)\b/u,
   ]
 
   const noDeployCount = noDeploySignals.reduce(
@@ -11943,8 +12022,25 @@ function detectNoDeployLocalContinuationIntent(...texts) {
     (count, pattern) => (pattern.test(normalizedText) ? count + 1 : count),
     0,
   )
+  const localModeCount = localModeSignals.reduce(
+    (count, pattern) => (pattern.test(normalizedText) ? count + 1 : count),
+    0,
+  )
+  const safetyRestrictionCount = safetyRestrictionSignals.reduce(
+    (count, pattern) => (pattern.test(normalizedText) ? count + 1 : count),
+    0,
+  )
+  const futureRemoteCount = futureRemoteSignals.reduce(
+    (count, pattern) => (pattern.test(normalizedText) ? count + 1 : count),
+    hasFutureRemoteScope ? 1 : 0,
+  )
 
-  return noDeployCount >= 1 && localContinuationCount >= 2
+  return (
+    (noDeployCount >= 1 && localContinuationCount >= 2) ||
+    (localModeCount >= 1 && noDeployCount + safetyRestrictionCount + futureRemoteCount >= 1) ||
+    (futureRemoteCount >= 1 && localModeCount + localContinuationCount >= 1) ||
+    (noDeployCount >= 1 && safetyRestrictionCount >= 1)
+  )
 }
 
 function normalizePathForComparison(value) {
