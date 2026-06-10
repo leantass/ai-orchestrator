@@ -102,6 +102,8 @@ module.exports = {
   buildBrainRoutingDecision,
   buildLocalStrategicBrainDecision,
   deriveApprovalEquivalenceFamily,
+  detectSensitiveApprovalRequirement,
+  detectRemoteOrCriticalAction,
   materializeGeneratedDomainSandboxPlan,
 };
 `
@@ -282,6 +284,96 @@ assert.notEqual(
   'approve-public-repo-creation',
   'La revision local de banco de herramientas no debe pedir approve-public-repo-creation.',
 )
+
+const negatedIntentCases = [
+  {
+    label: 'no deploy',
+    goal: 'Quiero una app local para banco de herramientas barriales.',
+    context: 'Solo plan local. No deploy. No publicar. Zona de prueba segura.',
+  },
+  {
+    label: 'no pagos reales',
+    goal: 'Quiero una app local para banco de herramientas barriales.',
+    context: 'No pagos reales ni checkout real. Solo mock local.',
+  },
+  {
+    label: 'no servicios externos',
+    goal: 'Quiero una app local para banco de herramientas barriales.',
+    context: 'No servicios externos. Sin integraciones externas. Primera version local.',
+  },
+  {
+    label: 'no credenciales',
+    goal: 'Quiero una app local para banco de herramientas barriales.',
+    context: 'No credenciales, no secrets y no usar .env. Solo zona segura.',
+  },
+  {
+    label: 'no DB productiva',
+    goal: 'Quiero una app local para banco de herramientas barriales.',
+    context: 'No DB productiva ni base real. Solo base local mock.',
+  },
+  {
+    label: 'no Docker',
+    goal: 'Quiero una app local para banco de herramientas barriales.',
+    context: 'No Docker ni Dockerfile. Solo archivos locales revisables.',
+  },
+  {
+    label: 'no tocar web-prueba',
+    goal: 'Quiero una app local para banco de herramientas barriales.',
+    context: 'No tocar web-prueba. Solo sandbox seguro dentro del workspace.',
+  },
+  {
+    label: 'futuro fuera de alcance',
+    goal: 'Quiero una app local para banco de herramientas barriales.',
+    context:
+      'Mas adelante podriamos publicar, pero ahora no. Dejar deploy y repo publico fuera de alcance por ahora.',
+  },
+]
+
+for (const testCase of negatedIntentCases) {
+  assert.equal(
+    uiHarness.detectSensitiveApprovalRequirement(testCase.goal, testCase.context),
+    false,
+    `El caso negado "${testCase.label}" no debe activar sensitive approval inmediato.`,
+  )
+  assert.equal(
+    uiHarness.detectRemoteOrCriticalAction(testCase.goal, testCase.context),
+    false,
+    `El caso negado "${testCase.label}" no debe activar remote/critical inmediato.`,
+  )
+}
+
+const positiveSensitiveCases = [
+  {
+    label: 'repo publico',
+    goal: 'Quiero crear un repo publico para este proyecto.',
+    context: 'Subir repo ahora y dejarlo visible en GitHub.',
+    expectedFamily: 'public-repo-creation',
+  },
+  {
+    label: 'pagos reales',
+    goal: 'Quiero usar pagos reales con Mercado Pago.',
+    context: 'Conectar Mercado Pago ahora con checkout real.',
+    expectedFamily: 'real-payments',
+  },
+]
+
+for (const testCase of positiveSensitiveCases) {
+  assert.equal(
+    uiHarness.deriveApprovalEquivalenceFamily(testCase.goal, testCase.context),
+    testCase.expectedFamily,
+    `El caso positivo "${testCase.label}" debe conservar su approval family.`,
+  )
+  assert.equal(
+    uiHarness.detectSensitiveApprovalRequirement(testCase.goal, testCase.context),
+    true,
+    `El caso positivo "${testCase.label}" debe activar sensitive approval.`,
+  )
+  assert.equal(
+    uiHarness.detectRemoteOrCriticalAction(testCase.goal, testCase.context),
+    true,
+    `El caso positivo "${testCase.label}" debe activar remote/critical.`,
+  )
+}
 
 const previousExecutionResult =
   '__orchestrator_feedback__:' +

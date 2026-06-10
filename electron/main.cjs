@@ -51679,6 +51679,8 @@ function deriveApprovalEquivalenceFamily(...texts) {
   const explicitlyNoRealPayments =
     combinedText.includes('sin pagos reales') ||
     combinedText.includes('sin pago real') ||
+    combinedText.includes('no pagos reales') ||
+    combinedText.includes('no pago real') ||
     combinedText.includes('checkout simulado') ||
     combinedText.includes('sin checkout real') ||
     combinedText.includes('sin venta directa')
@@ -51706,10 +51708,24 @@ function deriveApprovalEquivalenceFamily(...texts) {
     combinedText.includes('pago real') ||
     combinedText.includes('cobros reales') ||
     combinedText.includes('payment gateway')
-  const hasPositiveDeployIntent = mentionsDeploy && !explicitlyNoDeploy
-  const hasPositivePublicRepoIntent = mentionsPublicRepo && !explicitlyNoPublicRepo
+  const futureOrDeferredSignals =
+    combinedText.includes('mas adelante') ||
+    combinedText.includes('por ahora') ||
+    combinedText.includes('ahora no') ||
+    combinedText.includes('no en esta etapa') ||
+    combinedText.includes('fuera de alcance') ||
+    combinedText.includes('para futuro') ||
+    combinedText.includes('luego vemos') ||
+    combinedText.includes('despues vemos')
+  const defersDeploy = mentionsDeploy && futureOrDeferredSignals
+  const defersPublicRepo = mentionsPublicRepo && futureOrDeferredSignals
+  const defersRealPayments = mentionsRealPayments && futureOrDeferredSignals
+  const hasPositiveDeployIntent =
+    mentionsDeploy && !explicitlyNoDeploy && !defersDeploy
+  const hasPositivePublicRepoIntent =
+    mentionsPublicRepo && !explicitlyNoPublicRepo && !defersPublicRepo
   const hasPositiveRealPaymentsIntent =
-    mentionsRealPayments && !explicitlyNoRealPayments
+    mentionsRealPayments && !explicitlyNoRealPayments && !defersRealPayments
   const isProvisionalWebScaffoldApproval =
     (combinedText.includes('scaffold') || combinedText.includes('generacion')) &&
     (combinedText.includes('provisional') ||
@@ -51750,6 +51766,39 @@ function deriveApprovalEquivalenceFamily(...texts) {
   return ''
 }
 
+function hasImmediateSensitiveTopicIntent(normalizedText, topicPattern) {
+  if (!(topicPattern instanceof RegExp) || !topicPattern.test(normalizedText)) {
+    return false
+  }
+
+  const topicSource = `(?:${topicPattern.source})`
+  const scopedOutPatterns = [
+    new RegExp(`\\b(?:no|sin|ni)\\b[^\\n\\.;,:]{0,160}${topicSource}`, 'u'),
+    new RegExp(
+      `\\b(?:no|sin)\\s+(?:usar|crear|tocar|habilitar|configurar|levantar|conectar|publicar|desplegar|subir|integrar|exponer|materializar)\\b[^\\n\\.;,:]{0,220}${topicSource}`,
+      'u',
+    ),
+    new RegExp(
+      `\\b(?:fuera de alcance|por ahora|no ahora|no en esta etapa|mas adelante|en una etapa futura|para futuro|luego|despues)\\b[^\\n\\.;,:]{0,220}${topicSource}`,
+      'u',
+    ),
+    new RegExp(
+      `${topicSource}[^\\n\\.;,:]{0,160}\\b(?:fuera de alcance|por ahora|no ahora|no en esta etapa|mas adelante|en una etapa futura|para futuro|luego|despues)\\b`,
+      'u',
+    ),
+    new RegExp(
+      `\\b(?:dejar|mantener)\\b[^\\n\\.;,:]{0,220}${topicSource}[^\\n\\.;,:]{0,120}\\bfuera de alcance\\b`,
+      'u',
+    ),
+    new RegExp(
+      `\\b(?:sin|no)\\b[^\\n\\.;,:]{0,120}(?:servicios? externos?|integraciones? externas?|credenciales?|deploy|docker|pagos? reales?|base productiva|db productiva|\\.env|web-prueba)[^\\n\\.;,:]{0,160}${topicSource}`,
+      'u',
+    ),
+  ]
+
+  return !scopedOutPatterns.some((pattern) => pattern.test(normalizedText))
+}
+
 function detectSensitiveApprovalRequirement(...texts) {
   const approvalFamily = deriveApprovalEquivalenceFamily(...texts)
 
@@ -51757,39 +51806,52 @@ function detectSensitiveApprovalRequirement(...texts) {
     return true
   }
 
-  const combinedText = texts
-    .filter((value) => typeof value === 'string' && value.trim())
-    .join(' ')
-    .toLocaleLowerCase()
+  const normalizedText = normalizeSectorDetectionText(
+    texts.filter((value) => typeof value === 'string' && value.trim()).join(' '),
+  )
 
-  if (!combinedText) {
+  if (!normalizedText) {
     return false
   }
 
   const sensitivePatterns = [
-    'borrar',
-    'eliminar',
-    'migrar',
-    'auth',
-    'credencial',
-    'api key',
-    'token',
-    'password',
-    'produccion',
-    'producción',
-    'deploy',
-    'publicar',
-    'publicacion',
-    'publicación',
-    'github pages',
-    'vercel',
-    'repo publico',
-    'repo público',
-    'public repo',
-    'github repo',
+    /\bborrar\b/u,
+    /\beliminar\b/u,
+    /\bmigrar\b/u,
+    /\bauth\b/u,
+    /\bcredenciales?\b/u,
+    /\bapi keys?\b/u,
+    /\btokens?\b/u,
+    /\bpassword\b/u,
+    /\bsecretos?\b/u,
+    /\bproduccion\b/u,
+    /\bproductiv[ao]\b/u,
+    /\bdeploy\b/u,
+    /\bdesplegar\b/u,
+    /\bpublicar\b/u,
+    /\bpublicacion\b/u,
+    /\bgithub pages\b/u,
+    /\bvercel\b/u,
+    /\brepo publico\b/u,
+    /\bpublic repo\b/u,
+    /\bgithub repo\b/u,
+    /\bservicios? externos?\b/u,
+    /\bintegraciones? externas?\b/u,
+    /\bwebhooks?\b/u,
+    /\.env(?!\.example)\b/u,
+    /\bbase de datos real\b/u,
+    /\bbase productiva\b/u,
+    /\bdb productiva\b/u,
+    /\bproduction database\b/u,
+    /\bdocker\b/u,
+    /\bdockerfile\b/u,
+    /\bdocker-compose\b/u,
+    /\bdocker compose\b/u,
   ]
 
-  return sensitivePatterns.some((pattern) => combinedText.includes(pattern))
+  return sensitivePatterns.some((pattern) =>
+    hasImmediateSensitiveTopicIntent(normalizedText, pattern),
+  )
 }
 
 function buildSensitiveApprovalRequest({ goal, context }) {
@@ -51898,48 +51960,65 @@ function shouldSuppressPlaceholderAssetApproval({
 }
 
 function detectRemoteOrCriticalAction(...texts) {
-  const combinedText = texts
-    .filter((value) => typeof value === 'string' && value.trim())
-    .join(' ')
-    .toLocaleLowerCase()
+  const normalizedText = normalizeSectorDetectionText(
+    texts.filter((value) => typeof value === 'string' && value.trim()).join(' '),
+  )
 
-  if (!combinedText) {
+  if (!normalizedText) {
     return false
   }
 
   const criticalPatterns = [
-    'push',
-    'pull request',
-    'pr ',
-    'pr.',
-    'deploy',
-    'publicar',
-    'publicacion',
-    'publicación',
-    'produccion',
-    'producción',
-    'github pages',
-    'vercel',
-    'repo publico',
-    'repo público',
-    'public repo',
-    'github repo',
-    'subir repo',
-    'dominio real',
-    'dns',
-    'credencial',
-    'api key',
-    'token',
-    'password',
-    'costo real',
-    'costos reales',
-    'legal',
-    'seguridad',
-    'borrar',
-    'eliminar',
+    /\bpush\b/u,
+    /\bpull request\b/u,
+    /\bpr\b/u,
+    /\bdeploy\b/u,
+    /\bpublicar\b/u,
+    /\bpublicacion\b/u,
+    /\bproduccion\b/u,
+    /\bproductiv[ao]\b/u,
+    /\bgithub pages\b/u,
+    /\bvercel\b/u,
+    /\brepo publico\b/u,
+    /\bpublic repo\b/u,
+    /\bgithub repo\b/u,
+    /\bsubir repo\b/u,
+    /\bdominio real\b/u,
+    /\bdns\b/u,
+    /\bcredenciales?\b/u,
+    /\bapi keys?\b/u,
+    /\btokens?\b/u,
+    /\bpassword\b/u,
+    /\bsecretos?\b/u,
+    /\bcosto real\b/u,
+    /\bcostos reales\b/u,
+    /\bpagos? reales?\b/u,
+    /\bpago real\b/u,
+    /\bcobros? reales?\b/u,
+    /\bmercado pago\b/u,
+    /\bstripe\b/u,
+    /\blegal\b/u,
+    /\bseguridad\b/u,
+    /\bborrar\b/u,
+    /\beliminar\b/u,
+    /\bservicios? externos?\b/u,
+    /\bintegraciones? externas?\b/u,
+    /\bwebhooks?\b/u,
+    /\.env(?!\.example)\b/u,
+    /\bbase de datos real\b/u,
+    /\bbase productiva\b/u,
+    /\bdb productiva\b/u,
+    /\bproduction database\b/u,
+    /\bdocker\b/u,
+    /\bdockerfile\b/u,
+    /\bdocker-compose\b/u,
+    /\bdocker compose\b/u,
+    /\bweb-prueba\b/u,
   ]
 
-  return criticalPatterns.some((pattern) => combinedText.includes(pattern))
+  return criticalPatterns.some((pattern) =>
+    hasImmediateSensitiveTopicIntent(normalizedText, pattern),
+  )
 }
 
 function detectRecoverableExecutorFailure(...texts) {
