@@ -11938,53 +11938,170 @@ const isSandboxMaterializationDeferredOption = (value: unknown) =>
     normalizeOptionalString(value).toLocaleLowerCase(),
   )
 
+const normalizeUnsafeSandboxIntentText = (value: unknown) =>
+  normalizeOptionalString(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+
+const hasImmediateUnsafeSandboxTopicIntent = (
+  normalizedText: string,
+  topicPattern: RegExp,
+) => {
+  if (!normalizedText || !topicPattern.test(normalizedText)) {
+    return false
+  }
+
+  const topicSource = `(?:${topicPattern.source})`
+  const scopedOutPatterns = [
+    new RegExp(`\\b(?:no|sin|ni)\\b[^\\n\\.;,:]{0,160}${topicSource}`, 'u'),
+    new RegExp(
+      `\\b(?:no|sin)\\s+(?:usar|crear|tocar|habilitar|configurar|levantar|conectar|publicar|desplegar|subir|integrar|exponer|materializar|instalar|llamar|escribir)\\b[^\\n\\.;,:]{0,220}${topicSource}`,
+      'u',
+    ),
+    new RegExp(
+      `\\b(?:fuera de alcance|por ahora|no ahora|no en esta etapa|mas adelante|en una etapa futura|para futuro|luego|despues)\\b[^\\n\\.;,:]{0,220}${topicSource}`,
+      'u',
+    ),
+    new RegExp(
+      `${topicSource}[^\\n\\.;,:]{0,160}\\b(?:fuera de alcance|por ahora|no ahora|no en esta etapa|mas adelante|en una etapa futura|para futuro|luego|despues)\\b`,
+      'u',
+    ),
+    new RegExp(
+      `\\b(?:dejar|mantener)\\b[^\\n\\.;,:]{0,220}${topicSource}[^\\n\\.;,:]{0,120}\\bfuera de alcance\\b`,
+      'u',
+    ),
+  ]
+
+  return !scopedOutPatterns.some((pattern) => pattern.test(normalizedText))
+}
+
+const hasExplicitUnsafeSandboxGrant = (
+  normalizedText: string,
+  topicPattern: RegExp,
+) => {
+  if (!normalizedText) {
+    return false
+  }
+
+  const topicSource = `(?:${topicPattern.source})`
+  return new RegExp(
+    `\\b(?:autorizo|permito|habilito|apruebo|acepto|se puede|quiero|necesito)\\b(?![^\\n\\.;,:]{0,40}\\b(?:no|sin|ni)\\b)[^\\n\\.;,:]{0,120}${topicSource}`,
+    'u',
+  ).test(normalizedText)
+}
+
 const resolveUnsafeSandboxApprovalReason = (
   selectedOption: string,
   freeAnswer: string,
 ) => {
-  const selectedText = normalizeOptionalString(selectedOption).toLocaleLowerCase()
+  const selectedText = normalizeOptionalString(selectedOption)
   const freeAnswerText = normalizeOptionalString(freeAnswer)
   const combinedText = `${selectedText} ${freeAnswerText}`.trim()
-  const normalizedCombinedText = combinedText.toLocaleLowerCase()
+  const normalizedCombinedText = normalizeUnsafeSandboxIntentText(combinedText)
 
   if (!normalizedCombinedText) {
     return ''
   }
 
-  const mentionsWebPrueba =
-    normalizedCombinedText.includes('web-prueba') &&
-    !/\b(?:no|sin)\s+tocar\s+web-prueba\b/iu.test(normalizedCombinedText)
-  if (mentionsWebPrueba) {
+  if (
+    hasExplicitUnsafeSandboxGrant(normalizedCombinedText, /\bweb-prueba\b/u) ||
+    hasImmediateUnsafeSandboxTopicIntent(normalizedCombinedText, /\bweb-prueba\b/u)
+  ) {
     return 'La aprobacion intenta habilitar escritura directa en web-prueba.'
   }
 
-  const mentionsDotEnv =
-    /\.env(?:\.[a-z0-9_-]+)?/iu.test(normalizedCombinedText) &&
-    !/\b(?:no|sin)\s+crear\s+\.env\b/iu.test(normalizedCombinedText)
-  if (mentionsDotEnv) {
+  if (
+    hasExplicitUnsafeSandboxGrant(
+      normalizedCombinedText,
+      /\.env(?:\.[a-z0-9_-]+)?\b/u,
+    ) ||
+    hasImmediateUnsafeSandboxTopicIntent(
+      normalizedCombinedText,
+      /\.env(?:\.[a-z0-9_-]+)?\b/u,
+    )
+  ) {
     return 'La aprobacion intenta habilitar un archivo .env real.'
   }
 
-  const mentionsNodeModules =
-    /\bnode_modules\b/iu.test(normalizedCombinedText) &&
-    !/\b(?:no|sin)\s+crear\s+node_modules\b/iu.test(normalizedCombinedText)
-  if (mentionsNodeModules) {
+  if (
+    hasExplicitUnsafeSandboxGrant(
+      normalizedCombinedText,
+      /\bnode_modules\b|\binstalar dependencias\b|\bnpm install\b|\bpnpm install\b|\byarn install\b|\bbun install\b/u,
+    ) ||
+    hasImmediateUnsafeSandboxTopicIntent(
+      normalizedCombinedText,
+      /\bnode_modules\b|\binstalar dependencias\b|\bnpm install\b|\bpnpm install\b|\byarn install\b|\bbun install\b/u,
+    )
+  ) {
     return 'La aprobacion intenta habilitar node_modules dentro del flujo seguro.'
   }
 
-  const mentionsDocker =
-    /\b(?:docker|dockerfile|docker-compose)\b/iu.test(normalizedCombinedText) &&
-    !/\b(?:no|sin|ni)\s+usar\s+docker\b/iu.test(normalizedCombinedText) &&
-    !/\b(?:no|sin)\s+crear\s+dockerfile\b/iu.test(normalizedCombinedText)
-  if (mentionsDocker) {
+  if (
+    hasExplicitUnsafeSandboxGrant(
+      normalizedCombinedText,
+      /\b(?:docker|dockerfile|docker-compose|docker compose)\b/u,
+    ) ||
+    hasImmediateUnsafeSandboxTopicIntent(
+      normalizedCombinedText,
+      /\b(?:docker|dockerfile|docker-compose|docker compose)\b/u,
+    )
+  ) {
     return 'La aprobacion intenta habilitar Docker o infraestructura real.'
   }
 
-  const mentionsDeploy =
-    /\bdeploy\b/iu.test(normalizedCombinedText) &&
-    !/\b(?:no|sin|ni)\s+hacer\s+deploy\b/iu.test(normalizedCombinedText)
-  if (mentionsDeploy) {
+  if (
+    hasExplicitUnsafeSandboxGrant(
+      normalizedCombinedText,
+      /\bdeploy\b|\bdesplegar\b|\bpublicar\b|\bvercel\b|\bgithub pages\b/u,
+    ) ||
+    hasImmediateUnsafeSandboxTopicIntent(
+      normalizedCombinedText,
+      /\bdeploy\b|\bdesplegar\b|\bpublicar\b|\bvercel\b|\bgithub pages\b/u,
+    )
+  ) {
     return 'La aprobacion intenta habilitar deploy dentro del flujo seguro.'
+  }
+
+  if (
+    hasExplicitUnsafeSandboxGrant(
+      normalizedCombinedText,
+      /\bservicios?\s+externos?\b|\bintegraciones?\s+externas?\b|\bwebhooks?\b|\bapi(?:s)?\s+externas?\b/u,
+    ) ||
+    hasImmediateUnsafeSandboxTopicIntent(
+      normalizedCombinedText,
+      /\bservicios?\s+externos?\b|\bintegraciones?\s+externas?\b|\bwebhooks?\b|\bapi(?:s)?\s+externas?\b/u,
+    )
+  ) {
+    return 'La aprobacion intenta habilitar servicios externos reales dentro del flujo seguro.'
+  }
+
+  if (
+    hasExplicitUnsafeSandboxGrant(
+      normalizedCombinedText,
+      /\bpagos?\s+reales?\b|\bcobros?\s+reales?\b|\bmercado pago\b|\bstripe\b|\bcheckout real\b/u,
+    ) ||
+    hasImmediateUnsafeSandboxTopicIntent(
+      normalizedCombinedText,
+      /\bpagos?\s+reales?\b|\bcobros?\s+reales?\b|\bmercado pago\b|\bstripe\b|\bcheckout real\b/u,
+    )
+  ) {
+    return 'La aprobacion intenta habilitar pagos reales dentro del flujo seguro.'
+  }
+
+  if (
+    hasExplicitUnsafeSandboxGrant(
+      normalizedCombinedText,
+      /\bcredenciales?\b|\bsecrets?\b|\bsecretos?\b|\bapi keys?\b|\btokens?\b|\bpasswords?\b/u,
+    ) ||
+    hasImmediateUnsafeSandboxTopicIntent(
+      normalizedCombinedText,
+      /\bcredenciales?\b|\bsecrets?\b|\bsecretos?\b|\bapi keys?\b|\btokens?\b|\bpasswords?\b/u,
+    )
+  ) {
+    return 'La aprobacion intenta habilitar credenciales reales dentro del flujo seguro.'
   }
 
   if (normalizedCombinedText.includes('..')) {

@@ -17592,7 +17592,12 @@ function buildBlueprintIntegrations({ goal, context, deliveryLevel }) {
     })
   }
 
-  if (/\bmercado pago\b|\bstripe\b|\bpagos?\b/u.test(normalizedText)) {
+  if (
+    hasImmediateSensitiveTopicIntent(
+      normalizedText,
+      /\bmercado pago\b|\bstripe\b|\bpagos?\b|\bcobros?\b/u,
+    )
+  ) {
     pushIntegration({
       name: 'pasarela de pagos',
       type: 'payments',
@@ -17602,7 +17607,12 @@ function buildBlueprintIntegrations({ goal, context, deliveryLevel }) {
     })
   }
 
-  if (/\bemail\b|\bcorreo\b|\bnotificaciones?\b/u.test(normalizedText)) {
+  if (
+    hasImmediateSensitiveTopicIntent(
+      normalizedText,
+      /\bemail\b|\bcorreo\b|\bnotificaciones?\b|\bemails?\s+reales?\b/u,
+    )
+  ) {
     pushIntegration({
       name: 'notificaciones',
       type: 'communication',
@@ -17612,7 +17622,9 @@ function buildBlueprintIntegrations({ goal, context, deliveryLevel }) {
     })
   }
 
-  if (/\bredis\b|\bbullmq\b|\bcron\b/u.test(normalizedText)) {
+  if (
+    hasImmediateSensitiveTopicIntent(normalizedText, /\bredis\b|\bbullmq\b|\bcron\b/u)
+  ) {
     pushIntegration({
       name: 'procesamiento asincrono local',
       type: 'runtime',
@@ -17625,7 +17637,12 @@ function buildBlueprintIntegrations({ goal, context, deliveryLevel }) {
     })
   }
 
-  if (/\bauth\b|\blogin\b|\bpermisos?\b/u.test(normalizedText)) {
+  if (
+    hasImmediateSensitiveTopicIntent(
+      normalizedText,
+      /\bauth\b|\blogin\b|\bpermisos?\b/u,
+    )
+  ) {
     pushIntegration({
       name: 'auth y permisos',
       type: 'security',
@@ -17635,7 +17652,12 @@ function buildBlueprintIntegrations({ goal, context, deliveryLevel }) {
     })
   }
 
-  if (/\bwebhooks?\b|\bintegraciones?\b|\bapi externa\b/u.test(normalizedText)) {
+  if (
+    hasImmediateSensitiveTopicIntent(
+      normalizedText,
+      /\bwebhooks?\b|\bintegraciones?\b|\bapi externa\b|\bservicios? externos?\b|\bwhatsapp real\b/u,
+    )
+  ) {
     pushIntegration({
       name: 'integraciones externas',
       type: 'external-service',
@@ -47783,63 +47805,76 @@ function hasGeneratedDomainExplicitSandboxIntent(value) {
 }
 
 function hasGeneratedDomainUnsafeApprovalAuthorization(value) {
-  const normalizedValue = normalizeOptionalString(value)
+  const normalizedValue = normalizeSectorDetectionText(normalizeOptionalString(value))
 
   if (!normalizedValue) {
     return false
   }
 
-  const hasExplicitUnsafeGrant = (tokenPattern) =>
-    new RegExp(
-      String.raw`\b(?:autoriz[oa]|permit[oa]|habilit[oa]|aprobad[oa]|acept[oa]|se puede)\b[\s\S]{0,80}${tokenPattern.source}`,
-      'iu',
+  const hasExplicitUnsafeGrant = (topicPattern) => {
+    const topicSource = `(?:${topicPattern.source})`
+    return new RegExp(
+      `\\b(?:autorizo|permito|habilito|apruebo|acepto|se puede|quiero|necesito)\\b(?![^\\n\\.;,:]{0,40}\\b(?:no|sin|ni)\\b)[^\\n\\.;,:]{0,120}${topicSource}`,
+      'u',
     ).test(normalizedValue)
-
-  const hasPositiveUnsafeAuthorization = (tokenPattern, negativePattern) =>
-    tokenPattern.test(normalizedValue) && !negativePattern.test(normalizedValue)
+  }
 
   return (
-    hasExplicitUnsafeGrant(/\bweb-prueba\b/iu) ||
-    hasExplicitUnsafeGrant(/\b\.env\b/iu) ||
-    hasExplicitUnsafeGrant(/\bnode_modules\b/iu) ||
-    hasExplicitUnsafeGrant(/\b(?:docker|dockerfile|docker-compose)\b/iu) ||
-    hasExplicitUnsafeGrant(/\bdeploy\b/iu) ||
-    hasExplicitUnsafeGrant(/\bservicios?\s+externos?\b/iu) ||
-    hasExplicitUnsafeGrant(/\bpagos?\s+reales?\b/iu) ||
-    hasExplicitUnsafeGrant(/\b(?:db\s+productiva|base\s+de\s+datos\s+productiva)\b/iu) ||
-    hasExplicitUnsafeGrant(/\bcredenciales\b/iu) ||
-    hasPositiveUnsafeAuthorization(
-      /\bweb-prueba\b/iu,
-      /\b(?:no|sin)\s+tocar\s+web-prueba\b/iu,
+    hasExplicitUnsafeGrant(/\bweb-prueba\b/u) ||
+    hasImmediateSensitiveTopicIntent(normalizedValue, /\bweb-prueba\b/u) ||
+    hasExplicitUnsafeGrant(/\.env(?:\.[a-z0-9_-]+)?\b/u) ||
+    hasImmediateSensitiveTopicIntent(
+      normalizedValue,
+      /\.env(?:\.[a-z0-9_-]+)?\b/u,
     ) ||
-    hasPositiveUnsafeAuthorization(/\b\.env\b/iu, /\b(?:no|sin)\s+crear\s+\.env\b/iu) ||
-    hasPositiveUnsafeAuthorization(
-      /\bnode_modules\b/iu,
-      /\b(?:no|sin)\s+crear\s+node_modules\b/iu,
+    hasExplicitUnsafeGrant(
+      /\bnode_modules\b|\binstalar dependencias\b|\bnpm install\b|\bpnpm install\b|\byarn install\b|\bbun install\b/u,
     ) ||
-    hasPositiveUnsafeAuthorization(
-      /\b(?:docker|dockerfile|docker-compose)\b/iu,
-      /\b(?:no|sin|ni)\s+usar\s+docker\b/iu,
+    hasImmediateSensitiveTopicIntent(
+      normalizedValue,
+      /\bnode_modules\b|\binstalar dependencias\b|\bnpm install\b|\bpnpm install\b|\byarn install\b|\bbun install\b/u,
     ) ||
-    hasPositiveUnsafeAuthorization(
-      /\bdeploy\b/iu,
-      /\b(?:no|sin|ni)\s+hacer\s+deploy\b/iu,
+    hasExplicitUnsafeGrant(
+      /\b(?:docker|dockerfile|docker-compose|docker compose)\b/u,
     ) ||
-    hasPositiveUnsafeAuthorization(
-      /\bservicios?\s+externos?\b/iu,
-      /\b(?:no|sin|ni)\s+(?:llamar|usar)\s+servicios?\s+externos?\b/iu,
+    hasImmediateSensitiveTopicIntent(
+      normalizedValue,
+      /\b(?:docker|dockerfile|docker-compose|docker compose)\b/u,
     ) ||
-    hasPositiveUnsafeAuthorization(
-      /\bpagos?\s+reales?\b/iu,
-      /\b(?:no|sin|ni)\s+usar\s+pagos?\s+reales?\b/iu,
+    hasExplicitUnsafeGrant(
+      /\bdeploy\b|\bdesplegar\b|\bpublicar\b|\bvercel\b|\bgithub pages\b/u,
     ) ||
-    hasPositiveUnsafeAuthorization(
-      /\b(?:db\s+productiva|base\s+de\s+datos\s+productiva)\b/iu,
-      /\b(?:no|sin|ni)\s+usar\s+(?:db\s+productiva|base\s+de\s+datos\s+productiva)\b/iu,
+    hasImmediateSensitiveTopicIntent(
+      normalizedValue,
+      /\bdeploy\b|\bdesplegar\b|\bpublicar\b|\bvercel\b|\bgithub pages\b/u,
     ) ||
-    hasPositiveUnsafeAuthorization(
-      /\bcredenciales\b/iu,
-      /\b(?:no|sin|ni)\s+usar\s+credenciales\b/iu,
+    hasExplicitUnsafeGrant(
+      /\bservicios?\s+externos?\b|\bintegraciones?\s+externas?\b|\bwebhooks?\b|\bapi(?:s)?\s+externas?\b/u,
+    ) ||
+    hasImmediateSensitiveTopicIntent(
+      normalizedValue,
+      /\bservicios?\s+externos?\b|\bintegraciones?\s+externas?\b|\bwebhooks?\b|\bapi(?:s)?\s+externas?\b/u,
+    ) ||
+    hasExplicitUnsafeGrant(
+      /\bpagos?\s+reales?\b|\bcobros?\s+reales?\b|\bmercado pago\b|\bstripe\b|\bcheckout real\b/u,
+    ) ||
+    hasImmediateSensitiveTopicIntent(
+      normalizedValue,
+      /\bpagos?\s+reales?\b|\bcobros?\s+reales?\b|\bmercado pago\b|\bstripe\b|\bcheckout real\b/u,
+    ) ||
+    hasExplicitUnsafeGrant(
+      /\b(?:db\s+productiva|base\s+de\s+datos\s+productiva|base\s+productiva)\b/u,
+    ) ||
+    hasImmediateSensitiveTopicIntent(
+      normalizedValue,
+      /\b(?:db\s+productiva|base\s+de\s+datos\s+productiva|base\s+productiva)\b/u,
+    ) ||
+    hasExplicitUnsafeGrant(
+      /\bcredenciales?\b|\bsecrets?\b|\bsecretos?\b|\bapi keys?\b|\btokens?\b|\bpasswords?\b/u,
+    ) ||
+    hasImmediateSensitiveTopicIntent(
+      normalizedValue,
+      /\bcredenciales?\b|\bsecrets?\b|\bsecretos?\b|\bapi keys?\b|\btokens?\b|\bpasswords?\b/u,
     )
   )
 }

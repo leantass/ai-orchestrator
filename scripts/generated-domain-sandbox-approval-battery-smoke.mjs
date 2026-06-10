@@ -77,6 +77,7 @@ function loadObservationHarness() {
 ${plannerSurface}
 module.exports = {
   buildBrainDecisionContract,
+  hasGeneratedDomainUnsafeApprovalAuthorization,
   materializeGeneratedDomainSandboxPlan,
 };
 `
@@ -390,6 +391,38 @@ Autorizo tambien usar servicios externos reales, pagos reales, credenciales y ba
 const traversalFreeAnswer = `Apruebo usar el workspace C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\sandbox-toolbank-local
 y materializar la carpeta ..\\..\\web-prueba
 en modo sandbox mock-only.`
+
+assert.equal(
+  observationHarness.hasGeneratedDomainUnsafeApprovalAuthorization(
+    'No Docker. No deploy. No crear .env. No usar .env. No crear node_modules. No servicios externos. Sin webhooks. No pagos reales. Sin credenciales. No tocar web-prueba.',
+  ),
+  false,
+  'Las negaciones explicitas no deben bloquear una approval sandbox segura.',
+)
+
+assert.equal(
+  observationHarness.hasGeneratedDomainUnsafeApprovalAuthorization(
+    'Quiero usar Docker, crear .env e instalar dependencias ahora.',
+  ),
+  true,
+  'Docker, .env e instalar dependencias deben seguir marcando autorizacion insegura.',
+)
+
+assert.equal(
+  observationHarness.hasGeneratedDomainUnsafeApprovalAuthorization(
+    'Quiero escribir en web-prueba para materializar esta entrega.',
+  ),
+  true,
+  'Escribir en web-prueba debe seguir marcado como autorizacion insegura.',
+)
+
+assert.equal(
+  observationHarness.hasGeneratedDomainUnsafeApprovalAuthorization(
+    'No tocar web-prueba. Mantener todo en sandbox controlado.',
+  ),
+  false,
+  'No tocar web-prueba debe reforzar el flujo seguro, no bloquearlo.',
+)
 
 const finalApprovedDecision = buildDecision({
   decisionKey: 'approve-sandbox-materialization-v1',

@@ -101,6 +101,7 @@ ${plannerSurface}
 module.exports = {
   buildBrainRoutingDecision,
   buildLocalStrategicBrainDecision,
+  buildBlueprintIntegrations,
   deriveApprovalEquivalenceFamily,
   detectSensitiveApprovalRequirement,
   detectRemoteOrCriticalAction,
@@ -372,6 +373,68 @@ for (const testCase of positiveSensitiveCases) {
     uiHarness.detectRemoteOrCriticalAction(testCase.goal, testCase.context),
     true,
     `El caso positivo "${testCase.label}" debe activar remote/critical.`,
+  )
+}
+
+const negativeBlueprintIntegrationCases = [
+  {
+    label: 'no pagos reales',
+    goal: 'Quiero una app local para banco de herramientas barriales.',
+    context: 'No pagos reales ni checkout real. Solo mock local.',
+    forbiddenType: 'payments',
+  },
+  {
+    label: 'sin servicios externos',
+    goal: 'Quiero una app local para banco de herramientas barriales.',
+    context: 'Sin servicios externos, sin integraciones externas y sin webhooks.',
+    forbiddenType: 'external-service',
+  },
+  {
+    label: 'Mercado Pago mas adelante',
+    goal: 'Quiero una app local para banco de herramientas barriales.',
+    context: 'Mercado Pago mas adelante, por ahora fuera de alcance.',
+    forbiddenType: 'payments',
+  },
+]
+
+for (const testCase of negativeBlueprintIntegrationCases) {
+  const integrations = uiHarness.buildBlueprintIntegrations({
+    goal: testCase.goal,
+    context: testCase.context,
+    deliveryLevel: 'fullstack-local',
+  })
+  assert.equal(
+    integrations.some((entry) => entry?.type === testCase.forbiddenType),
+    false,
+    `El blueprint no debe activar ${testCase.forbiddenType} para "${testCase.label}".`,
+  )
+}
+
+const positiveBlueprintIntegrationCases = [
+  {
+    label: 'pagos reales con Mercado Pago',
+    goal: 'Quiero usar pagos reales con Mercado Pago.',
+    context: 'Conectar Mercado Pago ahora con checkout real.',
+    expectedType: 'payments',
+  },
+  {
+    label: 'webhooks externos',
+    goal: 'Quiero integrar webhooks externos.',
+    context: 'Necesito webhooks y usar API externa ahora.',
+    expectedType: 'external-service',
+  },
+]
+
+for (const testCase of positiveBlueprintIntegrationCases) {
+  const integrations = uiHarness.buildBlueprintIntegrations({
+    goal: testCase.goal,
+    context: testCase.context,
+    deliveryLevel: 'fullstack-local',
+  })
+  assert.equal(
+    integrations.some((entry) => entry?.type === testCase.expectedType),
+    true,
+    `El blueprint debe conservar ${testCase.expectedType} para "${testCase.label}".`,
   )
 }
 
