@@ -11791,18 +11791,52 @@ const detectDeferredApprovalIntent = (...texts: unknown[]) => {
     return false
   }
 
+  const hasSafeLocalContinuationIntent =
+    /\b(?:ahora|por ahora|mientras tanto)\b[^.\n;,:]{0,120}\b(?:seguir|continuar|continuemos|continua|continuá|mantener|solo)\b[^.\n;,:]{0,160}\b(?:local|mock|sandbox|mvp local|zona de prueba segura|primera version local|primera versión local)\b/u.test(
+      combinedText,
+    ) ||
+    /\b(?:seguir|continuar|continuemos|continua|continuá|mantener)\b[^.\n;,:]{0,160}\b(?:local|mock|sandbox|mvp local|zona de prueba segura|primera version local|primera versión local)\b/u.test(
+      combinedText,
+    ) ||
+    /\b(?:mock ahora|ahora mock|ahora solo local|solo sandbox|primera version local|primera versión local|mvp local|zona de prueba segura)\b/u.test(
+      combinedText,
+    )
+  const hasFutureScopedFeatureIntent =
+    /\b(?:mas adelante|más adelante|luego|fase 2|en el futuro|fase futura)\b[^.\n;,:]{0,180}\b(?:pagos? reales?|deploy|publica(?:r|mos|cion|ción)|servicios? externos?|integraciones? externas?|usuarios? reales?|clientes? reales?|credenciales?|docker|base productiva|produccion|producción)\b/u.test(
+      combinedText,
+    ) ||
+    /\b(?:pagos? reales?|deploy|publica(?:r|mos|cion|ción)|servicios? externos?|integraciones? externas?|usuarios? reales?|clientes? reales?|credenciales?|docker|base productiva|produccion|producción)\b[^.\n;,:]{0,180}\b(?:mas adelante|más adelante|luego|fase 2|en el futuro|fase futura|despues|después)\b/u.test(
+      combinedText,
+    )
+
+  if (hasSafeLocalContinuationIntent && hasFutureScopedFeatureIntent) {
+    return false
+  }
+
+  if (
+    /\b(?:por ahora|ahora)\b[^.\n;,:]{0,120}\b(?:sin|no)\b[^.\n;,:]{0,160}\b(?:pagos?|servicios? externos?|integraciones? externas?|deploy|docker|credenciales?|web-prueba)\b/u.test(
+      combinedText,
+    ) &&
+    hasSafeLocalContinuationIntent
+  ) {
+    return false
+  }
+
   return (
-    combinedText.includes('prepararlo mas adelante') ||
-    combinedText.includes('prepararlo más adelante') ||
-    combinedText.includes('mas adelante') ||
-    combinedText.includes('más adelante') ||
-    combinedText.includes('pagos reales despues') ||
-    combinedText.includes('pagos reales después') ||
-    combinedText.includes('real payments later') ||
-    combinedText.includes('continuar mock') ||
-    combinedText.includes('seguir mock') ||
-    combinedText.includes('mock ahora') ||
-    combinedText.includes('luego vemos pagos reales')
+    /\bprepararlo\s+(?:mas|más)\s+adelante\b/u.test(combinedText) ||
+    /\b(?:no|ni)\s+(?:materializar|avanzar|ejecutar|crear(?:\s+nada|\s+archivos?)?|generar(?:\s+archivos?)?)\s+(?:todavia|todavía|aun|aún|por ahora)\b/u.test(
+      combinedText,
+    ) ||
+    /\btodav(?:ia|ía)\s+no\s+quiero\s+(?:crear\s+archivos?|materializar|avanzar|ejecutar)\b/u.test(
+      combinedText,
+    ) ||
+    /\b(?:deja(?:lo)?|dejalo|dejarlo)\s+para\s+desp(?:ues|ués)\b/u.test(combinedText) ||
+    /\bpaus(?:ar|a|á|alo|alo)\b/u.test(combinedText) ||
+    /\besper(?:ar|a|á|ame|emos)?\s+(?:mi\s+)?aprobaci(?:on|ón)\b/u.test(combinedText) ||
+    /\b(?:primero\s+quiero\s+)?solo\s+plan(?:ificacion|ificación)?\b(?:\s+por ahora)?[^.\n;]{0,160}\bno\s+crear\s+archivos?\b/u.test(
+      combinedText,
+    ) ||
+    /\bmantener\s+solo\s+plan(?:ificacion|ificación)\b/u.test(combinedText)
   )
 }
 

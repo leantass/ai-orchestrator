@@ -91,6 +91,51 @@ function extractSegment({ startMarker, endMarker }) {
   return mainSource.slice(start, end)
 }
 
+function extractAppSegment({ startMarker, endMarker }) {
+  const start = appSource.indexOf(startMarker)
+  if (start === -1) {
+    throw new Error(`No se encontro el anchor inicial de App ${JSON.stringify(startMarker)}.`)
+  }
+
+  const end = appSource.indexOf(endMarker, start)
+  if (end === -1) {
+    throw new Error(`No se encontro el anchor final de App ${JSON.stringify(endMarker)}.`)
+  }
+
+  return appSource.slice(start, end)
+}
+
+function loadAppApprovalIntentHarness() {
+  const deferredApprovalIntentSource = extractAppSegment({
+    startMarker: 'const detectDeferredApprovalIntent = (...texts: unknown[]) => {',
+    endMarker: 'const deriveApprovalEquivalenceFamily = (...texts: unknown[]) => {',
+  })
+    .replace(
+      'const detectDeferredApprovalIntent = (...texts: unknown[]) => {',
+      'const detectDeferredApprovalIntent = (...texts) => {',
+    )
+    .replaceAll('.filter((value): value is string =>', '.filter((value) =>')
+
+  const harness = `
+${deferredApprovalIntentSource}
+module.exports = {
+  detectDeferredApprovalIntent,
+};
+`
+
+  const sandbox = {
+    module: { exports: {} },
+    exports: {},
+  }
+
+  vm.createContext(sandbox)
+  vm.runInContext(harness, sandbox, {
+    filename: 'generated-domain-app-approval-intent-harness.cjs',
+  })
+
+  return sandbox.module.exports || {}
+}
+
 function loadUiHarness() {
   const plannerSurface = extractSegment({
     startMarker: 'function summarizeGeneratedDomainContractDiagnosticsForDebug(diagnostics) {',
@@ -176,6 +221,59 @@ function ensureRemoved(targetPath) {
 }
 
 const uiHarness = loadUiHarness()
+const appApprovalIntentHarness = loadAppApprovalIntentHarness()
+
+const deferredApprovalIntentCases = [
+  {
+    label: 'no materializar todavia',
+    text: 'No materializar todavía, dejalo para después.',
+    expectedDeferred: true,
+  },
+  {
+    label: 'esperar aprobacion',
+    text: 'No avanzar todavía, esperá mi aprobación.',
+    expectedDeferred: true,
+  },
+  {
+    label: 'solo planificacion',
+    text: 'Primero quiero solo planificación, no crear archivos.',
+    expectedDeferred: true,
+  },
+  {
+    label: 'pagos futuros mock local',
+    text: 'Más adelante agregamos pagos reales, pero ahora quiero seguir con mock local.',
+    expectedDeferred: false,
+  },
+  {
+    label: 'deploy futuro sandbox local',
+    text: 'Luego vemos deploy, ahora seguir con sandbox local.',
+    expectedDeferred: false,
+  },
+  {
+    label: 'fase futura servicios externos',
+    text: 'Fase 2 con servicios externos, ahora solo MVP local.',
+    expectedDeferred: false,
+  },
+  {
+    label: 'restriccion actual segura',
+    text: 'Por ahora sin pagos y sin servicios externos, seguir con zona de prueba segura.',
+    expectedDeferred: false,
+  },
+  {
+    label: 'mock ahora',
+    text: 'Continuar mock ahora con primera versión local.',
+    expectedDeferred: false,
+  },
+]
+
+for (const testCase of deferredApprovalIntentCases) {
+  assert.equal(
+    appApprovalIntentHarness.detectDeferredApprovalIntent(testCase.text),
+    testCase.expectedDeferred,
+    `detectDeferredApprovalIntent debe devolver ${testCase.expectedDeferred} para "${testCase.label}".`,
+  )
+}
+
 const goal = `Quiero crear una app local para gestionar un banco comunitario de herramientas barriales.
 
 La idea es que vecinos puedan consultar herramientas disponibles, solicitar prestamos, reservar herramientas, registrar devoluciones, ver el estado de cada herramienta y que un operador pueda aprobar prestamos, marcar herramientas como devueltas o danadas, cargar nuevas herramientas y ver reportes simples.
