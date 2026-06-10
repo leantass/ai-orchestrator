@@ -23701,7 +23701,7 @@ No usar credenciales.`
                 id="simple-goal-input"
                 value={goalInput}
                 onChange={(event) => setGoalInput(event.target.value)}
-                rows={5}
+                rows={4}
                 className="jefe-input mt-3 w-full rounded-[24px] px-4 py-4 text-sm leading-7"
                 placeholder="Ejemplo: Quiero una app local para un banco comunitario de herramientas donde los vecinos puedan pedir prestado y devolver herramientas."
               />
@@ -23716,7 +23716,7 @@ No usar credenciales.`
                 ref={executionContextInputRef}
                 value={executionContextInput}
                 onChange={(event) => setExecutionContextInput(event.target.value)}
-                rows={4}
+                rows={3}
                 className="jefe-input mt-3 w-full rounded-[24px] px-4 py-4 text-sm leading-7"
                 placeholder="Acá podés aclarar alcance, restricciones, contexto del proyecto o información del operador."
               />
@@ -23830,7 +23830,7 @@ No usar credenciales.`
               onClick={() => setExperienceMode('advanced')}
               className="w-auto"
             >
-              Ver detalle
+              Ver plan completo
             </SecondaryActionButton>
           }
         >
@@ -24014,7 +24014,7 @@ No usar credenciales.`
               </div>
             ))}
             <SecondaryActionButton onClick={() => setExperienceMode('advanced')}>
-              Ver todos los detalles
+              Abrir vista avanzada
             </SecondaryActionButton>
           </div>
         </ResultSectionCard>

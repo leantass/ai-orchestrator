@@ -356,6 +356,8 @@ async function captureTechnicalDetailAvailability(
     'Ver detalle técnico',
     'Ver detalle tecnico',
     'Ver detalle',
+    'Ver plan completo',
+    'Abrir vista avanzada',
   ])
 
   if (!clickedDetail) {
