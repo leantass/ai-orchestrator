@@ -656,6 +656,243 @@ for (const testCase of blueprintDataSensitivityCases) {
   )
 }
 
+const bikeWorkshopGoal = `Quiero crear una app local para gestionar un taller barrial de reparacion de bicicletas.
+
+La app tiene que permitir que vecinos registren bicicletas, pidan turnos de reparacion, consulten el estado del trabajo, vean presupuestos estimados y reciban avisos simulados.
+
+Tambien tiene que tener un panel operativo para mecanicos, donde puedan ver ordenes de trabajo, cambiar estados, registrar repuestos usados, marcar una bici como lista y cargar observaciones.
+
+Ademas tiene que tener un panel administrativo para cargar tipos de reparacion, repuestos, precios de referencia, usuarios operadores y reportes simples.
+
+Tiene que incluir frontend publico, panel operativo, panel administrativo, backend local mock y diseno de base de datos local.
+
+No quiero pagos reales, no quiero credenciales reales, no quiero deploy, no quiero Docker, no quiero servicios externos, no quiero webhooks, no quiero DB productiva y no quiero tocar web-prueba.
+
+Primero quiero planificacion segura, confirmacion humana y una primera version solo en zona de prueba segura.`
+
+const bikeWorkshopContext = `Es una prueba real controlada para validar que JEFE puede resolver un dominio nuevo sin depender de plantillas rigidas ni arrastrar datos viejos de otros proyectos.
+
+La app debe funcionar como MVP local seguro. Los usuarios principales son vecinos, mecanicos/operadores y administradores.
+
+Todo debe ser mock/local, en zona de prueba segura, sin deploy, sin servicios externos y sin credenciales reales.`
+
+const bikeWorkshopApprovedExternalSandboxPath =
+  'C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\sandbox-bike-repair-local'
+const bikeWorkshopApprovedSandboxFolder = 'sandbox-bike-repair-workshop'
+const bikeWorkshopApprovalFreeAnswer = `Apruebo crear/materializar unicamente en un sandbox seguro y aislado para esta prueba.
+
+Usar como workspace alternativo seguro la ruta:
+
+${bikeWorkshopApprovedExternalSandboxPath}
+
+Dentro de ese workspace, materializar exclusivamente la carpeta:
+
+${bikeWorkshopApprovedSandboxFolder}
+
+No tocar web-prueba.
+No crear .env.
+No crear node_modules.
+No usar Docker.
+No hacer deploy.
+No llamar servicios externos.
+No usar pagos reales.
+No usar base de datos productiva.
+No usar credenciales.
+
+La materializacion debe ser mock-only, local, segura y validada con el flujo sandbox.`
+
+const bikeWorkshopPreviousExecutionResult =
+  '__orchestrator_feedback__:' +
+  JSON.stringify({
+    type: 'approval-granted',
+    source: 'planner',
+    approvalMode: 'once',
+    approvalDecision: 'approved',
+    approvalRequestDecisionKey: 'approve-sandbox-materialization-v1',
+    responseMode: 'options',
+    selectedOption: 'approve',
+    approvalReason:
+      'Materializar solo la primera version local segura dentro del sandbox aprobado.',
+  })
+
+const bikeWorkshopPlanningDecision = await uiHarness.buildLocalStrategicBrainDecision({
+  goal: bikeWorkshopGoal,
+  context: bikeWorkshopContext,
+  workspacePath: safeWorkspacePath,
+  iteration: 1,
+  previousExecutionResult: '',
+  requiresApproval: false,
+  userParticipationMode: 'operator-approves-sensitive',
+  projectState: {
+    resolvedDecisions: [],
+  },
+})
+
+const bikeWorkshopExecutionGoal = bikeWorkshopGoal.replace(
+  'Primero quiero planificacion segura, confirmacion humana y una primera version solo en zona de prueba segura.',
+  'La planificacion segura ya fue revisada y la confirmacion humana ya fue concedida; materializar ahora una primera version solo en zona de prueba segura.',
+)
+
+const bikeWorkshopDecision = await uiHarness.buildLocalStrategicBrainDecision({
+  goal: bikeWorkshopExecutionGoal,
+  context: bikeWorkshopContext,
+  workspacePath: safeWorkspacePath,
+  iteration: 2,
+  previousExecutionResult: bikeWorkshopPreviousExecutionResult,
+  requiresApproval: false,
+  userParticipationMode: 'operator-approves-sensitive',
+  projectState: {
+    resolvedDecisions: [
+      {
+        key: 'approve-sandbox-materialization-v1',
+        status: 'approved',
+        source: 'planner',
+        decision: 'approved',
+        label: 'approve',
+        responseMode: 'options',
+        selectedOption: 'approve',
+        summary:
+          'Aprobacion humana para materializar solo el taller de bicicletas en sandbox seguro.',
+      },
+    ],
+  },
+})
+
+const bikeWorkshopDomainText = JSON.stringify(
+  {
+    planning: {
+      domainUnderstanding: bikeWorkshopPlanningDecision?.domainUnderstanding,
+      projectBlueprint: bikeWorkshopPlanningDecision?.projectBlueprint,
+      productArchitecture: bikeWorkshopPlanningDecision?.productArchitecture,
+      safeFirstDeliveryPlan: bikeWorkshopPlanningDecision?.safeFirstDeliveryPlan,
+      scalableDeliveryPlan: bikeWorkshopPlanningDecision?.scalableDeliveryPlan,
+    },
+    execution: {
+      domainUnderstanding: bikeWorkshopDecision?.domainUnderstanding,
+      projectBlueprint: bikeWorkshopDecision?.projectBlueprint,
+      productArchitecture: bikeWorkshopDecision?.productArchitecture,
+      safeFirstDeliveryPlan: bikeWorkshopDecision?.safeFirstDeliveryPlan,
+      scalableDeliveryPlan: bikeWorkshopDecision?.scalableDeliveryPlan,
+      materializationPlan: bikeWorkshopDecision?.materializationPlan,
+      localProjectManifest: bikeWorkshopDecision?.localProjectManifest,
+      generatedDomainContract: bikeWorkshopDecision?.generatedDomainContract,
+      universalPlan: bikeWorkshopDecision?.generatedDomainUniversalMaterializationPlan,
+    },
+  },
+  null,
+  2,
+)
+const normalizedBikeWorkshopDomainText = bikeWorkshopDomainText
+  .normalize('NFD')
+  .replace(/\p{Diacritic}/gu, '')
+  .toLocaleLowerCase()
+
+for (const requiredTerm of [
+  'taller barrial de reparacion de bicicletas',
+  'bicicletas',
+  'vecinos',
+  'turnos',
+  'ordenes de trabajo',
+  'mecanicos',
+  'repuestos',
+  'presupuestos estimados',
+  'panel publico',
+  'panel operativo',
+  'panel administrativo',
+  'backend mock',
+  'base local',
+]) {
+  assert.equal(
+    normalizedBikeWorkshopDomainText.includes(requiredTerm),
+    true,
+    `El contrato del taller de bicicletas debe conservar ${requiredTerm}.`,
+  )
+}
+
+for (const forbiddenDomain of [
+  'operaciones portuarias',
+  'operacion portuaria',
+  'ecommerce local',
+  'banco comunitario de herramientas',
+  'tracking logistico',
+]) {
+  assert.equal(
+    normalizedBikeWorkshopDomainText.includes(forbiddenDomain),
+    false,
+    `El contrato del taller de bicicletas no debe contaminarse con ${forbiddenDomain}.`,
+  )
+}
+
+const bikeWorkshopApprovalEvaluation =
+  bikeWorkshopDecision.generatedDomainFileCreationApprovalEvaluation
+const bikeWorkshopUniversalPlan =
+  bikeWorkshopDecision.generatedDomainUniversalMaterializationPlan
+
+assert.equal(bikeWorkshopDecision?.strategy, 'materialize-fullstack-local-plan')
+assert.equal(bikeWorkshopDecision?.executionMode, 'executor')
+assert.equal(bikeWorkshopDecision?.nextExpectedAction, 'execute-plan')
+assert.equal(bikeWorkshopApprovalEvaluation?.approved, true)
+assert.equal(bikeWorkshopApprovalEvaluation?.blocked, false)
+assert.equal(bikeWorkshopApprovalEvaluation?.status, 'approved-for-sandbox')
+assert.equal(bikeWorkshopUniversalPlan?.status, 'built')
+assert.equal(bikeWorkshopUniversalPlan?.canMaterializeInSandbox, true)
+assert.equal(bikeWorkshopUniversalPlan?.safety?.safeForLocalMaterialization, true)
+
+const bikeWorkshopSandboxRoot = path.join(
+  repoRoot,
+  '.codex-temp',
+  'generated-domain-materialization-approved',
+  bikeWorkshopUniversalPlan.projectRoot,
+)
+ensureRemoved(bikeWorkshopSandboxRoot)
+
+const bikeWorkshopMaterializationReport = uiHarness.materializeGeneratedDomainSandboxPlan({
+  generatedDomainUniversalMaterializationPlan: bikeWorkshopUniversalPlan,
+  generatedDomainFileCreationApprovalEvaluation: bikeWorkshopApprovalEvaluation,
+})
+
+assert.equal(bikeWorkshopMaterializationReport?.materialized, true)
+assert.equal(bikeWorkshopMaterializationReport?.status, 'materialized')
+
+const bikeWorkshopSandboxRootResolved =
+  typeof bikeWorkshopMaterializationReport?.sandboxRoot?.resolved === 'string' &&
+  bikeWorkshopMaterializationReport.sandboxRoot.resolved.trim()
+    ? bikeWorkshopMaterializationReport.sandboxRoot.resolved.trim()
+    : bikeWorkshopSandboxRoot
+const bikeWorkshopMaterializedProjectRoot = path.resolve(
+  bikeWorkshopSandboxRootResolved,
+  bikeWorkshopUniversalPlan.projectRoot,
+)
+const bikeWorkshopReportPath = path.join(
+  bikeWorkshopMaterializedProjectRoot,
+  'validation',
+  'report.json',
+)
+assert.equal(fs.existsSync(bikeWorkshopReportPath), true)
+assert.equal(fs.existsSync(path.join(bikeWorkshopMaterializedProjectRoot, '.env')), false)
+assert.equal(fs.existsSync(path.join(bikeWorkshopMaterializedProjectRoot, 'node_modules')), false)
+assert.equal(fs.existsSync(path.join(bikeWorkshopMaterializedProjectRoot, 'Dockerfile')), false)
+assert.equal(
+  bikeWorkshopMaterializedProjectRoot.replace(/\\/g, '/').includes('/web-prueba/'),
+  false,
+)
+
+const bikeWorkshopReport = JSON.parse(fs.readFileSync(bikeWorkshopReportPath, 'utf8'))
+assert.equal(bikeWorkshopReport?.status, 'materialized')
+const bikeWorkshopSchemaPath = path.join(
+  bikeWorkshopMaterializedProjectRoot,
+  'database',
+  'schema.sql',
+)
+assert.equal(
+  /\bcreate\s+table\s+(?:bicycles|bicicletas)\b/u.test(
+    fs.readFileSync(bikeWorkshopSchemaPath, 'utf8').toLocaleLowerCase(),
+  ),
+  true,
+)
+
+ensureRemoved(bikeWorkshopSandboxRootResolved)
+
 const previousExecutionResult =
   '__orchestrator_feedback__:' +
   JSON.stringify({

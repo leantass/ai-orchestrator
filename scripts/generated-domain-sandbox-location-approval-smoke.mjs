@@ -197,13 +197,114 @@ function createToolBankContract() {
   }
 }
 
-function createDecision() {
-  const contract = createToolBankContract()
+function createBikeWorkshopContract() {
+  return {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: {
+      slug: 'bike-repair-workshop',
+      label: 'Taller barrial de reparacion de bicicletas',
+    },
+    root: {
+      slug: 'bike-repair-workshop-local',
+      sourceRoot: 'bike-repair-workshop-local',
+      targetRoot: 'bike-repair-workshop-local',
+    },
+    roles: ['vecino', 'mecanico', 'operador', 'administrador'],
+    entities: [
+      'bicicletas',
+      'vecinos',
+      'turnos',
+      'ordenes de trabajo',
+      'repuestos',
+      'presupuestos estimados',
+      'avisos simulados',
+    ],
+    states: {
+      workOrder: ['pendiente', 'diagnostico', 'en reparacion', 'presupuestado', 'listo'],
+    },
+    frontendSurfaces: [
+      { key: 'public', label: 'Panel publico', path: 'frontend/public', screens: ['status'] },
+      { key: 'operator', label: 'Panel operativo', path: 'frontend/operator', screens: ['work-orders'] },
+      { key: 'admin', label: 'Panel administrativo', path: 'frontend/admin', screens: ['settings'] },
+    ],
+    workflows: [
+      'registrar bicicletas y vecinos',
+      'pedir turnos de reparacion',
+      'gestionar ordenes de trabajo',
+      'registrar repuestos usados',
+      'emitir avisos simulados',
+      'revisar reportes simples',
+    ],
+    backend: {
+      packageFile: 'backend/package.json',
+      entryFile: 'backend/src/server.js',
+      routes: [
+        { path: 'backend/src/routes/bicycles.js' },
+        { path: 'backend/src/routes/work-orders.js' },
+        { path: 'backend/src/routes/reports.js' },
+      ],
+      services: [{ path: 'backend/src/services/notices.js' }],
+      modules: [{ path: 'backend/src/modules/workshop.js' }],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'database/seed.sql',
+      tables: ['bicicletas', 'vecinos', 'turnos', 'ordenes de trabajo', 'repuestos'],
+    },
+    shared: {
+      files: ['shared/contracts/domain.js'],
+    },
+    docs: ['docs/API.md'],
+    scripts: ['scripts/seed-local.js'],
+    integrations: [],
+    safety: {
+      forbiddenFiles: ['.env', 'Dockerfile', 'docker-compose.yml'],
+      forbiddenSignals: ['ACCESS_TOKEN', 'web-prueba', 'pagos reales'],
+      explicitExclusions: [
+        'deploy',
+        'docker',
+        'node_modules',
+        'servicios externos',
+        'credenciales reales',
+        'DB productiva',
+      ],
+    },
+    materialization: {
+      requiredFiles: [
+        'backend/src/server.js',
+        'database/schema.sql',
+        'frontend/public/index.html',
+      ],
+      operations: [
+        { targetPath: 'backend/src/server.js' },
+        { targetPath: 'database/schema.sql' },
+        { targetPath: 'frontend/public/index.html' },
+      ],
+    },
+    validation: {
+      requiredPathGroups: [
+        { candidates: ['backend/src/server.js'] },
+        { candidates: ['database/schema.sql'] },
+        { candidates: ['frontend/public/index.html'] },
+      ],
+    },
+    approvals: [],
+  }
+}
+
+function createDecision({
+  contract = createToolBankContract(),
+  approvedExternalSandboxPath =
+    'C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\sandbox-toolbank-local',
+  approvedSandboxFolder = 'sandbox-community-toolbank',
+  intent = 'gestionar prestamos y devoluciones de herramientas',
+  modules = ['catalog', 'loans', 'maintenance'],
+  reason = 'Reproducir la aprobacion real approval-sandbox-location-v1 en harness.',
+  instruction = 'Materializar solo la SFD local segura dentro del sandbox aprobado.',
+} = {}) {
   const allowedTargetPaths = deriveAllowedTargetPathsFromContract(contract, '.')
   const requiredPathGroups = deriveRequiredPathGroupsFromContract(contract)
-  const approvedExternalSandboxPath =
-    'C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\sandbox-toolbank-local'
-  const approvedSandboxFolder = 'sandbox-community-toolbank'
   const approvalFreeAnswer = `Apruebo crear/materializar unicamente en un sandbox seguro y aislado para esta prueba.
 
 Usar como workspace alternativo seguro la ruta:
@@ -231,8 +332,8 @@ La materializacion debe ser mock-only, local, segura y validada con el flujo san
     strategy: 'materialize-fullstack-local-plan',
     executionMode: 'executor',
     nextExpectedAction: 'execute-plan',
-    reason: 'Reproducir la aprobacion real approval-sandbox-location-v1 en harness.',
-    instruction: 'Materializar solo la SFD local segura dentro del sandbox aprobado.',
+    reason,
+    instruction,
     completed: false,
     requiresApproval: false,
     tasks: [],
@@ -242,10 +343,10 @@ La materializacion debe ser mock-only, local, segura y validada con el flujo san
     projectBlueprint: {
       productType: 'fullstack-local-app',
       domain: contract.domain.label,
-      intent: 'gestionar prestamos y devoluciones de herramientas',
+      intent,
       deliveryLevel: 'fullstack-local',
       roles: contract.roles,
-      modules: ['catalog', 'loans', 'maintenance'],
+      modules,
       entities: contract.entities,
       coreFlows: contract.workflows,
     },
@@ -254,7 +355,7 @@ La materializacion debe ser mock-only, local, segura y validada con el flujo san
       domain: contract.domain.label,
       users: contract.roles,
       roles: contract.roles,
-      coreModules: ['catalog', 'loans', 'maintenance'],
+      coreModules: modules,
       dataEntities: contract.entities,
       keyFlows: contract.workflows,
     },
@@ -277,7 +378,7 @@ La materializacion debe ser mock-only, local, segura y validada con el flujo san
         `${contract.root.targetRoot}/database`,
         `${contract.root.targetRoot}/docs`,
       ],
-      modules: ['catalog', 'loans', 'maintenance'],
+      modules,
       successCriteria: [
         'Keep a local fullstack structure ready for review.',
         'Do not materialize files during the planner stage.',
@@ -385,8 +486,76 @@ assert.equal(
 const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'))
 assert.equal(report?.status, 'materialized')
 
+const bikeDecision = createDecision({
+  contract: createBikeWorkshopContract(),
+  approvedExternalSandboxPath:
+    'C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\sandbox-bike-repair-local',
+  approvedSandboxFolder: 'sandbox-bike-repair-workshop',
+  intent:
+    'gestionar bicicletas, vecinos, turnos, ordenes de trabajo, repuestos y presupuestos estimados',
+  modules: [
+    'bicicletas',
+    'vecinos',
+    'turnos',
+    'ordenes de trabajo',
+    'mecanicos',
+    'repuestos',
+    'presupuestos estimados',
+    'panel publico',
+    'panel operativo',
+    'panel administrativo',
+    'backend mock',
+    'base local',
+  ],
+  reason:
+    'Reproducir approval-sandbox-location-v1 con dominio nuevo de taller barrial de bicicletas.',
+  instruction:
+    'Materializar solo el taller de bicicletas mock/local dentro del sandbox aprobado.',
+})
+const bikeApprovalEvaluation = bikeDecision.generatedDomainFileCreationApprovalEvaluation
+const bikeUniversalPlan = bikeDecision.generatedDomainUniversalMaterializationPlan
+
+assert.equal(bikeApprovalEvaluation?.approved, true)
+assert.equal(bikeApprovalEvaluation?.blocked, false)
+assert.equal(bikeApprovalEvaluation?.status, 'approved-for-sandbox')
+assert.equal(
+  bikeApprovalEvaluation?.sandboxRoot?.relative,
+  '.codex-temp/generated-domain-materialization-approved/sandbox-bike-repair-local/sandbox-bike-repair-workshop',
+)
+assert.equal(bikeUniversalPlan?.status, 'built')
+assert.equal(bikeUniversalPlan?.canMaterializeInSandbox, true)
+assert.equal(bikeUniversalPlan?.safety?.safeForLocalMaterialization, true)
+
+const bikeMaterializationReport = observationHarness.materializeGeneratedDomainSandboxPlan({
+  generatedDomainUniversalMaterializationPlan: bikeUniversalPlan,
+  generatedDomainFileCreationApprovalEvaluation: bikeApprovalEvaluation,
+})
+
+assert.equal(bikeMaterializationReport?.materialized, true)
+assert.equal(bikeMaterializationReport?.status, 'materialized')
+
+const bikeSandboxProjectRoot = path.join(
+  repoRoot,
+  '.codex-temp',
+  'generated-domain-materialization-approved',
+  'sandbox-bike-repair-local',
+  'sandbox-bike-repair-workshop',
+  bikeUniversalPlan.projectRoot,
+)
+const bikeReportPath = path.join(bikeSandboxProjectRoot, 'validation', 'report.json')
+
+assert.equal(fs.existsSync(bikeReportPath), true)
+assert.equal(fs.existsSync(path.join(bikeSandboxProjectRoot, '.env')), false)
+assert.equal(fs.existsSync(path.join(bikeSandboxProjectRoot, 'node_modules')), false)
+assert.equal(fs.existsSync(path.join(bikeSandboxProjectRoot, 'Dockerfile')), false)
+assert.equal(
+  bikeSandboxProjectRoot.replace(/\\/g, '/').includes('/web-prueba/'),
+  false,
+)
+assert.equal(JSON.parse(fs.readFileSync(bikeReportPath, 'utf8'))?.status, 'materialized')
+
 console.log(
-  'OK. approval-sandbox-location-v1 con custom-path-inside-workspace se promovio a sandbox seguro y validation/report.json quedo materializado.',
+  'OK. approval-sandbox-location-v1 con custom-path-inside-workspace se promovio a sandbox seguro y validation/report.json quedo materializado, incluido el taller de bicicletas.',
 )
 
 ensureRemoved(
@@ -396,5 +565,14 @@ ensureRemoved(
     'generated-domain-materialization-approved',
     'sandbox-toolbank-local',
     'sandbox-community-toolbank',
+  ),
+)
+ensureRemoved(
+  path.join(
+    repoRoot,
+    '.codex-temp',
+    'generated-domain-materialization-approved',
+    'sandbox-bike-repair-local',
+    'sandbox-bike-repair-workshop',
   ),
 )

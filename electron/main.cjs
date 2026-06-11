@@ -12908,6 +12908,12 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
     detectSafeFirstDeliveryRechargeOrdersIntent(normalizedText)
   const hasCommercialLandingEcommerceIntent =
     detectCommercialLandingEcommerceIntent(normalizedText)
+  const hasBikeRepairWorkshopIntent =
+    detectBikeRepairWorkshopIntent(normalizedText)
+  const hasPortOperationsIntent =
+    /\b(?:puertos?|portuari[ao]s?|buques?|barcos?|embarcaciones?|muelles?|eta|etd|arribos?|salidas?|zona\s+asignada|operaciones?\s+portuarias?)\b/u.test(
+      normalizedText,
+    )
   const commercialEcommerceProfile = hasCommercialLandingEcommerceIntent
     ? buildCommercialEcommerceDomainProfile(normalizedText)
     : null
@@ -12961,10 +12967,54 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
     },
     {
       label: 'operaciones portuarias',
-      patterns: [/\b(?:carga|descarga|reparacion|espera|abastecimiento|operaciones?\s+portuarias?)\b/u],
+      patterns: hasPortOperationsIntent
+        ? [/\b(?:carga|descarga|reparacion|espera|abastecimiento|operaciones?\s+portuarias?)\b/u]
+        : [/\boperaciones?\s+portuarias?\b/u],
       mockData: 'Operaciones portuarias mock con tipo de operacion, prioridad y estado.',
       screen: 'operaciones portuarias',
       behavior: 'Consultar operaciones portuarias mock y su avance local.',
+    },
+    {
+      label: 'bicicletas',
+      patterns: hasBikeRepairWorkshopIntent ? [/\bbicicletas?\b|\bbicis?\b/u] : [],
+      mockData: 'Bicicletas mock con vecino, marca, estado y observaciones del taller.',
+      screen: 'bicicletas',
+      behavior: 'Registrar bicicleta mock y revisar su estado de reparacion local.',
+    },
+    {
+      label: 'vecinos',
+      patterns: hasBikeRepairWorkshopIntent ? [/\bvecin(?:o|os|a|as)\b/u] : [],
+      mockData: 'Vecinos mock con contacto local, bicicleta asociada y turnos pendientes.',
+      screen: 'vecinos',
+      behavior: 'Consultar vecinos mock y sus bicicletas registradas.',
+    },
+    {
+      label: 'turnos',
+      patterns: hasBikeRepairWorkshopIntent ? [/\bturnos?\b/u] : [],
+      mockData: 'Turnos de reparacion mock con fecha, prioridad y estado.',
+      screen: 'turnos',
+      behavior: 'Solicitar turno de reparacion y cambiar su estado mock.',
+    },
+    {
+      label: 'ordenes de trabajo',
+      patterns: hasBikeRepairWorkshopIntent ? [/\borderes?\s+de\s+trabajo\b|\bordenes?\s+de\s+trabajo\b/u] : [],
+      mockData: 'Ordenes de trabajo mock con mecanico, repuestos y observaciones.',
+      screen: 'ordenes de trabajo',
+      behavior: 'Actualizar orden de trabajo, repuestos usados y observaciones locales.',
+    },
+    {
+      label: 'repuestos',
+      patterns: hasBikeRepairWorkshopIntent ? [/\brepuestos?\b/u] : [],
+      mockData: 'Repuestos mock con stock local, precio de referencia y uso previsto.',
+      screen: 'repuestos',
+      behavior: 'Registrar repuestos usados y revisar precios de referencia mock.',
+    },
+    {
+      label: 'presupuestos estimados',
+      patterns: hasBikeRepairWorkshopIntent ? [/\bpresupuestos?\s+estimados?\b|\bpresupuestos?\b/u] : [],
+      mockData: 'Presupuestos estimados mock sin pagos reales ni checkout.',
+      screen: 'presupuestos estimados',
+      behavior: 'Ver presupuesto estimado y mantener pagos reales fuera de alcance.',
     },
     {
       label: 'documentacion',
@@ -13539,6 +13589,81 @@ function detectSchoolCrmIntent(normalizedText) {
   )
 }
 
+function detectBikeRepairWorkshopIntent(normalizedText) {
+  if (typeof normalizedText !== 'string' || !normalizedText.trim()) {
+    return false
+  }
+
+  const hasBikeSignals =
+    /\bbicicletas?\b|\bbicis?\b|\bbike(?:s)?\b/u.test(normalizedText)
+  const hasRepairSignals =
+    /\breparacion(?:es)?\b|\breparar\b|\btaller(?:es)?\b|\bmecanicos?\b|\brepuestos?\b|\borderes?\s+de\s+trabajo\b|\bpresupuestos?\s+estimados?\b/u.test(
+      normalizedText,
+    )
+  const hasWorkshopSignals =
+    /\btaller(?:es)?\b|\bbarrial(?:es)?\b|\bvecin(?:o|os|a|as)\b|\bturnos?\b|\bordenes?\s+de\s+trabajo\b|\bpanel\s+(?:publico|operativo|administrativo)\b/u.test(
+      normalizedText,
+    )
+
+  return hasBikeSignals && hasRepairSignals && hasWorkshopSignals
+}
+
+function buildBikeRepairWorkshopDomainProfile() {
+  return {
+    domainLabel: 'taller barrial de reparacion de bicicletas',
+    modules: [
+      'bicicletas',
+      'vecinos',
+      'turnos',
+      'ordenes de trabajo',
+      'mecanicos/operadores',
+      'repuestos',
+      'presupuestos estimados',
+      'estados del trabajo',
+      'avisos simulados',
+      'panel publico',
+      'panel operativo',
+      'panel administrativo',
+      'backend mock',
+      'base local',
+      'reportes simples',
+    ],
+    entities: [
+      'bicicletas',
+      'vecinos',
+      'turnos',
+      'ordenes de trabajo',
+      'mecanicos',
+      'repuestos',
+      'presupuestos estimados',
+      'estados',
+      'observaciones',
+      'avisos simulados',
+      'reportes',
+    ],
+    roles: ['vecino', 'mecanico/operador', 'administrador'],
+    localActions: [
+      'Registrar bicicletas y vecinos con datos mock/locales.',
+      'Solicitar turnos de reparacion y consultar estados del trabajo.',
+      'Gestionar ordenes de trabajo, repuestos usados y observaciones operativas.',
+      'Cargar tipos de reparacion, precios de referencia y reportes simples.',
+      'Emitir avisos simulados sin webhooks ni servicios externos.',
+    ],
+    stateHints: ['pendiente', 'diagnostico', 'en reparacion', 'presupuestado', 'listo'],
+    approvalThemes: ['materializacion solo en sandbox seguro'],
+    explicitExclusions: [
+      'pagos reales',
+      'credenciales reales',
+      'deploy',
+      'Docker',
+      'servicios externos',
+      'webhooks reales',
+      'DB productiva',
+      'web-prueba',
+    ],
+  }
+}
+
 function buildDomainUnderstanding({
   goal,
   context,
@@ -13560,6 +13685,9 @@ function buildDomainUnderstanding({
     : null
   const onlineCoursesProfile = detectOnlineCoursesIntent(normalizedText)
     ? buildOnlineCoursesDomainProfile()
+    : null
+  const bikeRepairWorkshopProfile = detectBikeRepairWorkshopIntent(normalizedText)
+    ? buildBikeRepairWorkshopDomainProfile()
     : null
   const isRechargeOrdersSystem =
     explicitModuleFamily?.key === 'recharge-orders' ||
@@ -13585,6 +13713,8 @@ function buildDomainUnderstanding({
     ? 'school-crm'
     : isRechargeOrdersSystem
       ? 'recharge-orders'
+    : bikeRepairWorkshopProfile
+      ? 'bike-repair-workshop'
     : logisticsTrackingProfile
       ? 'logistics-tracking'
     : commercialEcommerceProfile
@@ -13595,6 +13725,9 @@ function buildDomainUnderstanding({
       ? onlineCoursesProfile?.domainLabel || 'plataforma de cursos online'
       : '') ||
     (resolvedFamilyKey === 'school-crm' ? 'gestion escolar' : '') ||
+    (resolvedFamilyKey === 'bike-repair-workshop'
+      ? bikeRepairWorkshopProfile?.domainLabel || ''
+      : '') ||
     (resolvedFamilyKey === 'logistics-tracking'
       ? logisticsTrackingProfile?.domainLabel || ''
       : '') ||
@@ -13615,6 +13748,8 @@ function buildDomainUnderstanding({
         ? logisticsTrackingProfile?.modules || []
       : resolvedFamilyKey === 'commercial-ecommerce'
         ? commercialEcommerceProfile?.modules || []
+      : resolvedFamilyKey === 'bike-repair-workshop'
+        ? bikeRepairWorkshopProfile?.modules || []
       : resolvedFamilyKey === 'ecommerce'
         ? ['catalogo', 'productos', 'carrito local', 'checkout simulado', 'ordenes', 'reportes']
         : resolvedFamilyKey === 'online-courses'
@@ -13639,12 +13774,17 @@ function buildDomainUnderstanding({
           : explicitModuleFamily?.matches || []
   const rawPrimaryModules = summarizeUniqueExecutorStrings(
     [
-      ...(resolvedFamilyKey === 'online-courses' ? [] : dynamicPlanParts.modules),
+      ...(resolvedFamilyKey === 'bike-repair-workshop'
+        ? bikeRepairWorkshopProfile?.modules || []
+        : []),
+      ...(resolvedFamilyKey === 'online-courses' || resolvedFamilyKey === 'bike-repair-workshop'
+        ? []
+        : dynamicPlanParts.modules),
       ...fallbackModules,
       resolvedFamilyKey === 'security' ? 'reportes' : '',
       /\breportes?\b/u.test(normalizedText) ? 'reportes' : '',
     ].filter(Boolean),
-    12,
+    resolvedFamilyKey === 'bike-repair-workshop' ? 16 : 12,
   )
   const primaryModules =
     resolvedFamilyKey === 'commercial-ecommerce'
@@ -13684,6 +13824,9 @@ function buildDomainUnderstanding({
       ...(resolvedFamilyKey === 'logistics-tracking'
         ? logisticsTrackingProfile?.entities || []
         : []),
+      ...(resolvedFamilyKey === 'bike-repair-workshop'
+        ? bikeRepairWorkshopProfile?.entities || []
+        : []),
       ...primaryModules
         .map((entry) => inferSafeFirstDeliveryMaterializationEntityName(entry))
         .filter(Boolean),
@@ -13717,6 +13860,8 @@ function buildDomainUnderstanding({
     'commercial-ecommerce':
       'mostrar un ecommerce local mock con hero, catalogo, carrito simulado y conversion comercial',
     ecommerce: 'gestionar catalogo, carrito y ordenes mock',
+    'bike-repair-workshop':
+      'gestionar bicicletas, vecinos, turnos, ordenes de trabajo, repuestos y presupuestos estimados en modo local',
     'online-courses':
       'gestionar cursos online, alumnos, planes, pagos mock y progreso del alumno',
     'school-crm': 'gestionar seguimiento escolar y comunicaciones',
@@ -13753,6 +13898,10 @@ function buildDomainUnderstanding({
     resolvedFamilyKey === 'commercial-ecommerce' && commercialEcommerceProfile
       ? commercialEcommerceProfile.localActions
       : []
+  const bikeRepairLocalFlows =
+    resolvedFamilyKey === 'bike-repair-workshop' && bikeRepairWorkshopProfile
+      ? bikeRepairWorkshopProfile.localActions
+      : []
   const coreFlows = summarizeUniqueExecutorStrings(
     onlineCoursesLocalFlows.length > 0
       ? onlineCoursesLocalFlows
@@ -13760,6 +13909,8 @@ function buildDomainUnderstanding({
       ? logisticsLocalFlows
       : ecommerceLocalFlows.length > 0
       ? ecommerceLocalFlows
+      : bikeRepairLocalFlows.length > 0
+      ? bikeRepairLocalFlows
       : dynamicPlanParts.localBehavior.length > 0
       ? dynamicPlanParts.localBehavior
       : [
@@ -13778,6 +13929,8 @@ function buildDomainUnderstanding({
       ? logisticsLocalFlows
       : ecommerceLocalFlows.length > 0
       ? ecommerceLocalFlows
+      : bikeRepairLocalFlows.length > 0
+      ? bikeRepairLocalFlows
       : dynamicPlanParts.localBehavior.length > 0
       ? dynamicPlanParts.localBehavior
       : coreFlows,
@@ -13800,6 +13953,8 @@ function buildDomainUnderstanding({
     pushUniquePlannerValues(roles, ['administrador', 'moderador', 'miembro'])
   } else if (resolvedFamilyKey === 'security') {
     pushUniquePlannerValues(roles, ['administrador', 'operador', 'supervisor'])
+  } else if (resolvedFamilyKey === 'bike-repair-workshop' && bikeRepairWorkshopProfile) {
+    pushUniquePlannerValues(roles, bikeRepairWorkshopProfile.roles)
   } else if (resolvedFamilyKey === 'recharge-orders') {
     pushUniquePlannerValues(roles, ['administrador', 'operador local', 'cliente'])
   } else if (resolvedFamilyKey === 'port-operations') {
@@ -13839,6 +13994,10 @@ function buildDomainUnderstanding({
     pushUniquePlannerValues(explicitExclusions, commercialEcommerceProfile.explicitExclusions)
   }
 
+  if (resolvedFamilyKey === 'bike-repair-workshop' && bikeRepairWorkshopProfile) {
+    pushUniquePlannerValues(explicitExclusions, bikeRepairWorkshopProfile.explicitExclusions)
+  }
+
   if (
     /\bdatos sensibles\b|\bmenores\b|\bsalud\b|\bpacientes?\b|\balumnos?\b|\bfamilias?\b/u.test(
       normalizedText,
@@ -13876,6 +14035,8 @@ function buildDomainUnderstanding({
     stateModel: summarizeUniqueExecutorStrings(
       isRechargeOrdersSystem
         ? buildRechargeOrdersDomainProfile().stateHints
+        : resolvedFamilyKey === 'bike-repair-workshop' && bikeRepairWorkshopProfile
+          ? bikeRepairWorkshopProfile.stateHints
         : buildSafeFirstDeliveryMaterializationStateHints({
             productType: productKind,
             isSchoolCrm,
@@ -13888,6 +14049,8 @@ function buildDomainUnderstanding({
     approvalThemes: summarizeUniqueExecutorStrings(
       isRechargeOrdersSystem
         ? buildRechargeOrdersDomainProfile().approvalThemes
+        : resolvedFamilyKey === 'bike-repair-workshop' && bikeRepairWorkshopProfile
+          ? bikeRepairWorkshopProfile.approvalThemes
         : buildSafeFirstDeliveryMaterializationApprovalThemes({
             productType: productKind,
             isSchoolCrm,
@@ -17969,7 +18132,7 @@ function buildQuestionPolicy({
   const optionalQuestions = []
   const delegatedDecisions = []
   const normalizedResolvedDecisionMap =
-    resolvedDecisionMap instanceof Map ? resolvedDecisionMap : new Map()
+    normalizeResolvedDecisionMapLike(resolvedDecisionMap)
   const externalIntegrationsDetected = integrations.some(
     (integration) => integration.approvalRequired === true,
   )
@@ -21026,6 +21189,10 @@ function detectFullstackLocalDemoArchetype({
     return 'community-tool-bank'
   }
 
+  if (detectBikeRepairWorkshopIntent(combinedText)) {
+    return 'bike-repair-workshop'
+  }
+
   if (detectLogisticsTrackingIntent(combinedText)) {
     return 'logistics-tracking'
   }
@@ -22242,6 +22409,23 @@ function resolveFullstackLocalContractProfile({
       publicRoutePurpose:
         'Consultar el catalogo local de herramientas disponibles sin servicios reales.',
       validationSchemaMarker: 'create table tools',
+    }
+  }
+
+  if (resolvedArchetype === 'bike-repair-workshop') {
+    return {
+      archetype: resolvedArchetype,
+      frontendFeatureBasename: 'work-orders',
+      backendModuleBasename: 'work-orders',
+      backendRouteBasename: 'work-orders',
+      primaryFeatureLabel: 'bicicletas, turnos y ordenes de trabajo',
+      primaryRoutePath: '/work-orders',
+      primaryRoutePurpose:
+        'Listar bicicletas, turnos, ordenes de trabajo, repuestos y presupuestos mock en modo local.',
+      publicRoutePath: '/status',
+      publicRoutePurpose:
+        'Consultar el estado publico simulado de una bicicleta sin servicios reales.',
+      validationSchemaMarker: 'create table bicycles',
     }
   }
 
@@ -23875,6 +24059,115 @@ function buildOperationsFullstackLocalDemoData({
   })
 }
 
+function buildBikeRepairWorkshopFullstackLocalDemoData({
+  appTitle,
+  nextRecommendedPhase,
+}) {
+  return buildTemplateFullstackLocalDemoData({
+    appTitle,
+    archetype: 'bike-repair-workshop',
+    heroKicker: 'Taller barrial de bicicletas',
+    subtitle:
+      'Entrega funcional local para vecinos, bicicletas, turnos, ordenes de trabajo, repuestos y presupuestos estimados.',
+    domainSummary:
+      'MVP local seguro para gestionar reparaciones de bicicletas con panel publico, operativo y administrativo, backend mock y base local revisable.',
+    nextRecommendedPhase,
+    navItems: [
+      { id: 'dashboard', label: 'Dashboard', hint: 'Estado general' },
+      { id: 'clients', label: 'Vecinos', hint: 'Personas registradas' },
+      { id: 'resources', label: 'Bicicletas', hint: 'Bicis y estado' },
+      { id: 'appointments', label: 'Ordenes', hint: 'Turnos y trabajos' },
+      { id: 'inventory', label: 'Repuestos', hint: 'Stock y precios' },
+      { id: 'reports', label: 'Reportes', hint: 'Indicadores mock' },
+    ],
+    metrics: [
+      { id: 'bikes', label: 'Bicicletas activas', value: '24', tone: 'sky', detail: '8 en diagnostico y 6 listas para retirar' },
+      { id: 'orders', label: 'Ordenes abiertas', value: '13', tone: 'emerald', detail: '5 con presupuesto estimado pendiente' },
+      { id: 'parts', label: 'Repuestos bajos', value: '4', tone: 'amber', detail: 'Cubiertas, cables y camaras requieren revision local' },
+    ],
+    alerts: [
+      { id: 'bike-a1', tone: 'amber', title: 'Presupuestos pendientes', detail: 'Cinco ordenes necesitan validar repuestos usados y costo estimado.' },
+      { id: 'bike-a2', tone: 'sky', title: 'Avisos simulados listos', detail: 'Los vecinos pueden revisar estados mock sin webhooks reales.' },
+    ],
+    constraints: ['Sin pagos reales', 'Sin credenciales reales', 'Sin deploy', 'Sin Docker', 'Sin servicios externos', 'Sin DB productiva'],
+    team: [
+      { id: 'MEC-001', name: 'Sofia Perez', role: 'Mecanica operadora', shift: '9 a 14 hs', status: 'Activa', focus: 'Diagnostico y ajustes' },
+      { id: 'ADM-001', name: 'Mesa barrial', role: 'Administracion local', shift: '10 a 17 hs', status: 'Activa', focus: 'Turnos, precios y reportes' },
+    ],
+    datasets: {
+      clients: [
+        { id: 'VEC-001', name: 'Ana Martinez', contact: 'interno 101', segment: 'Vecina', status: 'Activa', nextVisit: 'Turno 08/05', notes: 'Trae bicicleta urbana con freno delantero flojo.' },
+        { id: 'VEC-002', name: 'Carlos Nuñez', contact: 'interno 118', segment: 'Vecino', status: 'Pendiente', nextVisit: 'Retiro 09/05', notes: 'Debe confirmar presupuesto estimado antes de retirar.' },
+      ],
+      resources: [
+        { id: 'BIC-001', name: 'Bicicleta urbana rodado 28', surface: 'Frenos', schedule: 'Diagnostico hoy', status: 'En diagnostico', note: 'Freno delantero flojo y cadena con ruido.' },
+        { id: 'BIC-002', name: 'Mountain bike rodado 29', surface: 'Transmision', schedule: 'Lista 09/05', status: 'Lista', note: 'Cambio de cable y ajuste general completado.' },
+      ],
+      appointments: [
+        { id: 'OT-001', clientName: 'Ana Martinez', professional: 'Sofia Perez', reason: 'Ajuste de frenos y revision general', slot: '08/05 10:00', status: 'en diagnostico', room: 'Banco 1', notes: 'Presupuesto estimado: $8.500. Aviso simulado pendiente.' },
+        { id: 'OT-002', clientName: 'Carlos Nuñez', professional: 'Mesa barrial', reason: 'Cambio de cable de cambios', slot: '09/05 12:00', status: 'listo', room: 'Retiro', notes: 'Marcar bici como lista y cargar observacion final.' },
+      ],
+      inventory: [
+        { id: 'REP-001', name: 'Cable de freno', category: 'Frenos', stock: 7, minStock: 5, stockSummary: '7 / minimo 5', status: 'normal', note: 'Precio de referencia mock: $2.400.' },
+        { id: 'REP-002', name: 'Camara rodado 29', category: 'Ruedas', stock: 2, minStock: 4, stockSummary: '2 / minimo 4', status: 'stock bajo', note: 'Usar solo como dato local de prueba.' },
+      ],
+      reports: [
+        { id: 'REP-BIKE-001', name: 'Ordenes por estado', value: '13', detail: 'Pendiente, diagnostico, en reparacion, presupuestado y listo.', status: 'Controlado' },
+        { id: 'REP-BIKE-002', name: 'Presupuestos estimados', value: '5', detail: 'Valores mock sin pagos reales ni checkout.', status: 'Revision' },
+      ],
+      activity: [
+        { id: 'ACT-BIKE-001', time: '09:40', title: 'Turno registrado', detail: 'Ana Martinez agrego una bicicleta urbana para diagnostico mock.', tone: 'sky' },
+        { id: 'ACT-BIKE-002', time: '11:20', title: 'Bici lista', detail: 'La orden OT-002 paso a lista con observacion final local.', tone: 'emerald' },
+      ],
+    },
+    views: [
+      buildFullstackLocalDemoView({ id: 'dashboard', label: 'Dashboard', title: 'Estado del taller', description: 'Resumen local de bicicletas, turnos, ordenes y repuestos.', kind: 'dashboard', supportsSearch: false }),
+      buildFullstackLocalDemoView({
+        id: 'clients', label: 'Vecinos', title: 'Vecinos', description: 'Personas que registran bicicletas y consultan estados.',
+        datasetKey: 'clients',
+        columns: [{ key: 'name', label: 'Vecino' }, { key: 'segment', label: 'Tipo' }, { key: 'contact', label: 'Contacto' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'nextVisit', label: 'Proximo turno' }, { key: 'notes', label: 'Notas' }],
+        searchableKeys: ['name', 'segment', 'contact', 'status'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'resources', label: 'Bicicletas', title: 'Bicicletas', description: 'Bicicletas registradas y estado de reparacion.',
+        datasetKey: 'resources',
+        columns: [{ key: 'name', label: 'Bicicleta' }, { key: 'surface', label: 'Area' }, { key: 'schedule', label: 'Agenda' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'note', label: 'Observacion' }],
+        searchableKeys: ['name', 'surface', 'status', 'schedule'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'appointments', label: 'Ordenes', title: 'Ordenes de trabajo', description: 'Turnos, mecanicos, repuestos usados y observaciones.',
+        datasetKey: 'appointments',
+        columns: [{ key: 'slot', label: 'Turno' }, { key: 'clientName', label: 'Vecino' }, { key: 'professional', label: 'Mecanico' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'reason', label: 'Trabajo' }, { key: 'room', label: 'Ubicacion' }, { key: 'notes', label: 'Observaciones' }],
+        searchableKeys: ['slot', 'clientName', 'professional', 'reason', 'status'],
+        supportsStatusFilter: true,
+      }),
+      buildFullstackLocalDemoView({
+        id: 'inventory', label: 'Repuestos', title: 'Repuestos', description: 'Stock local y precios de referencia mock.',
+        datasetKey: 'inventory',
+        columns: [{ key: 'name', label: 'Repuesto' }, { key: 'category', label: 'Categoria' }, { key: 'stockSummary', label: 'Stock' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'note', label: 'Nota' }],
+        searchableKeys: ['name', 'category', 'status'],
+        supportsLowStockToggle: true,
+      }),
+      buildFullstackLocalDemoView({ id: 'reports', label: 'Reportes', title: 'Reportes', description: 'Indicadores mock del taller.', datasetKey: 'reports', kind: 'reports', supportsSearch: false }),
+    ],
+    quickActions: [
+      { id: 'qa-bike-1', label: 'Ver ordenes', targetView: 'appointments', feedback: 'Se abrio el panel operativo de ordenes de trabajo.' },
+    ],
+    interactionHighlights: [
+      'Buscar vecinos, bicicletas, estados y repuestos desde el tablero local.',
+      'Cambiar estados mock de ordenes de trabajo sin backend real activo.',
+      'Registrar presupuestos estimados y avisos simulados sin pagos ni webhooks reales.',
+    ],
+    statusOptions: { appointments: ['todos', 'pendiente', 'en diagnostico', 'en reparacion', 'presupuestado', 'listo'] },
+    domainEntities: ['bicicletas', 'vecinos', 'turnos', 'ordenes de trabajo', 'mecanicos', 'repuestos', 'presupuestos estimados', 'avisos simulados', 'reportes'],
+    modules: ['panel publico', 'panel operativo', 'panel administrativo', 'backend mock', 'base local', 'bicicletas', 'turnos', 'ordenes de trabajo', 'repuestos', 'reportes'],
+  })
+}
+
 function buildCommunityToolBankFullstackLocalDemoData({
   appTitle,
   nextRecommendedPhase,
@@ -24526,6 +24819,11 @@ function buildFullstackLocalDemoData({
       })
     case 'community-tool-bank':
       return buildCommunityToolBankFullstackLocalDemoData({
+        appTitle,
+        nextRecommendedPhase,
+      })
+    case 'bike-repair-workshop':
+      return buildBikeRepairWorkshopFullstackLocalDemoData({
         appTitle,
         nextRecommendedPhase,
       })
@@ -28295,6 +28593,119 @@ insert into report_snapshots (id, snapshot_date, report_name, metric_label, metr
     }
   }
 
+  if (archetype === 'bike-repair-workshop') {
+    return {
+      readmeContent: `# Database local
+
+Esta carpeta queda como diseño revisable para el taller barrial de reparacion de bicicletas.
+
+- No se creo una base de datos real.
+- No se ejecutaron migraciones.
+- \`schema.sql\` y \`seeds/seed-local.sql\` describen vecinos, bicicletas, turnos, ordenes de trabajo, repuestos, presupuestos estimados y avisos simulados.
+`,
+      schemaContent: `-- Esquema local revisable para ${appTitle}
+-- No ejecutar automaticamente sin una aprobacion posterior.
+
+create table neighbors (
+  id text primary key,
+  full_name text not null,
+  contact text,
+  status text not null,
+  notes text
+);
+
+create table bicycles (
+  id text primary key,
+  neighbor_id text not null,
+  bike_label text not null,
+  bike_type text,
+  current_status text not null,
+  notes text,
+  foreign key (neighbor_id) references neighbors(id)
+);
+
+create table mechanics (
+  id text primary key,
+  full_name text not null,
+  role_label text not null,
+  shift_label text,
+  status text not null
+);
+
+create table work_orders (
+  id text primary key,
+  bicycle_id text not null,
+  mechanic_id text,
+  scheduled_at text not null,
+  repair_type text not null,
+  work_status text not null,
+  estimated_budget_label text,
+  observations text,
+  foreign key (bicycle_id) references bicycles(id),
+  foreign key (mechanic_id) references mechanics(id)
+);
+
+create table spare_parts (
+  id text primary key,
+  name text not null,
+  category text not null,
+  reference_price_label text,
+  stock integer not null,
+  status text not null,
+  notes text
+);
+
+create table work_order_parts (
+  id text primary key,
+  work_order_id text not null,
+  spare_part_id text not null,
+  quantity integer not null,
+  notes text,
+  foreign key (work_order_id) references work_orders(id),
+  foreign key (spare_part_id) references spare_parts(id)
+);
+
+create table simulated_notices (
+  id text primary key,
+  work_order_id text not null,
+  notice_type text not null,
+  status text not null,
+  message text not null,
+  foreign key (work_order_id) references work_orders(id)
+);
+`,
+      seedContent: `-- Seed local y revisable. No ejecutar automaticamente.
+
+insert into neighbors (id, full_name, contact, status, notes) values
+  ('VEC-001', 'Ana Martinez', 'interno 101', 'Activa', 'Bicicleta urbana con freno delantero flojo'),
+  ('VEC-002', 'Carlos Nunez', 'interno 118', 'Pendiente', 'Debe confirmar presupuesto estimado');
+
+insert into bicycles (id, neighbor_id, bike_label, bike_type, current_status, notes) values
+  ('BIC-001', 'VEC-001', 'Bicicleta urbana rodado 28', 'Urbana', 'en diagnostico', 'Freno delantero flojo y cadena con ruido'),
+  ('BIC-002', 'VEC-002', 'Mountain bike rodado 29', 'MTB', 'lista', 'Cambio de cable y ajuste general completado');
+
+insert into mechanics (id, full_name, role_label, shift_label, status) values
+  ('MEC-001', 'Sofia Perez', 'Mecanica operadora', '9 a 14 hs', 'Activa'),
+  ('ADM-001', 'Mesa barrial', 'Administracion local', '10 a 17 hs', 'Activa');
+
+insert into work_orders (id, bicycle_id, mechanic_id, scheduled_at, repair_type, work_status, estimated_budget_label, observations) values
+  ('OT-001', 'BIC-001', 'MEC-001', '2026-05-08 10:00', 'Ajuste de frenos y revision general', 'en diagnostico', '$8.500 mock', 'Aviso simulado pendiente'),
+  ('OT-002', 'BIC-002', 'ADM-001', '2026-05-09 12:00', 'Cambio de cable de cambios', 'listo', '$6.200 mock', 'Lista para retirar');
+
+insert into spare_parts (id, name, category, reference_price_label, stock, status, notes) values
+  ('REP-001', 'Cable de freno', 'Frenos', '$2.400 mock', 7, 'normal', 'Stock local de prueba'),
+  ('REP-002', 'Camara rodado 29', 'Ruedas', '$4.800 mock', 2, 'stock bajo', 'No representa inventario real');
+
+insert into work_order_parts (id, work_order_id, spare_part_id, quantity, notes) values
+  ('OTP-001', 'OT-002', 'REP-001', 1, 'Repuesto usado en orden lista');
+
+insert into simulated_notices (id, work_order_id, notice_type, status, message) values
+  ('AVS-001', 'OT-001', 'presupuesto-estimado', 'pendiente', 'Presupuesto estimado listo para revision local'),
+  ('AVS-002', 'OT-002', 'bicicleta-lista', 'simulado', 'La bicicleta figura lista para retirar en el panel local');
+`,
+    }
+  }
+
   return {
     readmeContent: `# Database local
 
@@ -30234,9 +30645,11 @@ Modelar una integración futura con Mercado Pago sin credenciales, sin checkout 
           ? 'create table courts'
           : fullstackLocalArchetype === 'online-courses'
             ? 'create table courses'
-          : fullstackLocalArchetype === 'ecommerce'
-            ? 'create table products'
-            : fullstackLocalArchetype === 'school-crm'
+            : fullstackLocalArchetype === 'bike-repair-workshop'
+              ? 'create table bicycles'
+              : fullstackLocalArchetype === 'ecommerce'
+                ? 'create table products'
+                : fullstackLocalArchetype === 'school-crm'
               ? 'create table students'
               : fullstackLocalArchetype === 'document-management'
                 ? 'create table documents'
@@ -37476,6 +37889,9 @@ function buildFullstackLocalArchetypeAppTitle(archetype) {
   if (archetype === 'community-tool-bank') {
     return 'Banco comunitario de herramientas local'
   }
+  if (archetype === 'bike-repair-workshop') {
+    return 'Taller barrial de bicicletas local'
+  }
   if (archetype === 'veterinary') {
     return 'Veterinaria local'
   }
@@ -37513,6 +37929,9 @@ function buildFullstackLocalArchetypeDisplayLabel(archetype) {
   }
   if (archetype === 'community-tool-bank') {
     return 'Banco comunitario de herramientas'
+  }
+  if (archetype === 'bike-repair-workshop') {
+    return 'Taller barrial de bicicletas'
   }
   if (archetype === 'veterinary') {
     return 'Veterinaria'
@@ -37559,6 +37978,8 @@ function fullstackLocalDomainLabelMatchesArchetype(label, archetype) {
   const compatibilityPatterns = {
     'community-tool-bank':
       /\bherramientas?\b|\bprestamos?\b|\breservas?\b|\bdevoluciones?\b|\bvecin(?:o|os|a|as)\b|\bcomunitari[oa]s?\b/u,
+    'bike-repair-workshop':
+      /\bbicicletas?\b|\bbicis?\b|\btaller(?:es)?\b|\breparacion(?:es)?\b|\bmecanicos?\b|\brepuestos?\b|\bordenes?\s+de\s+trabajo\b|\bpresupuestos?\s+estimados?\b|\bvecin(?:o|os|a|as)\b/u,
     'online-courses':
       /\bcursos?\b|\bclases?\b|\blecciones?\b|\bmodulos?\b|\bmódulos?\b|\balumnos?\b|\bestudiantes?\b|\binscripciones?\b|\bplanes?\b|\bmercado pago\b|\bprogreso\b/u,
     veterinary: /\bveterinaria\b|\bveterinari[oa]s?\b|\bmascotas?\b|\bvacunas?\b|\bpet\b/u,
@@ -47752,6 +48173,22 @@ function hasResolvedDecision(resolvedDecisionMap, ...decisionKeys) {
   )
 }
 
+function normalizeResolvedDecisionMapLike(resolvedDecisionMap) {
+  if (
+    resolvedDecisionMap &&
+    typeof resolvedDecisionMap.get === 'function' &&
+    typeof resolvedDecisionMap.has === 'function'
+  ) {
+    return resolvedDecisionMap
+  }
+
+  if (Array.isArray(resolvedDecisionMap)) {
+    return new Map(resolvedDecisionMap)
+  }
+
+  return new Map()
+}
+
 function getResolvedDecisionRecord(resolvedDecisionMap, ...decisionKeys) {
   for (const decisionKey of decisionKeys) {
     const record = resolvedDecisionMap.get(normalizeResolvedDecisionKey(decisionKey))
@@ -48101,7 +48538,7 @@ function resolveGeneratedDomainSandboxApprovalDecision({
   materializationPlan,
 }) {
   const normalizedResolvedDecisionMap =
-    resolvedDecisionMap instanceof Map ? resolvedDecisionMap : new Map()
+    normalizeResolvedDecisionMapLike(resolvedDecisionMap)
   const decisionRecord = getResolvedDecisionRecord(
     normalizedResolvedDecisionMap,
     'approve-sandbox-path',
