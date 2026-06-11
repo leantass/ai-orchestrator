@@ -7184,6 +7184,84 @@ function sanitizeBusinessSectorLabel(value) {
     .trim()
 }
 
+function isSandboxConstraintDomainLabel(value) {
+  const normalizedValue = normalizeSectorDetectionText(value)
+
+  if (!normalizedValue) {
+    return false
+  }
+
+  const exactConstraintLabels = new Set([
+    'zona de prueba segura',
+    'zona de prueba',
+    'sandbox',
+    'sandbox local',
+    'backend mock',
+    'base local',
+    'base de datos local',
+    'mvp local',
+    'app local',
+    'primera version local',
+    'primera version segura',
+    'confirmacion humana',
+    'planificacion segura',
+    'fullstack local',
+    'mock local',
+    'mock/local',
+  ])
+
+  if (exactConstraintLabels.has(normalizedValue)) {
+    return true
+  }
+
+  return (
+    /^(?:sin|no)\s+(?:deploy|docker|servicios?\s+externos?|credenciales?|webhooks?|pagos?\s+reales?|db\s+productiva|base\s+productiva|tocar\s+web-prueba)\b/u.test(
+      normalizedValue,
+    ) ||
+    /^(?:solo\s+)?(?:zona\s+de\s+prueba|sandbox|entorno\s+de\s+prueba|modo\s+local)\b/u.test(
+      normalizedValue,
+    )
+  )
+}
+
+function sanitizeBusinessDomainLabel(value) {
+  const label = stripLeadingSpanishArticle(sanitizeBusinessSectorLabel(value))
+
+  return isSandboxConstraintDomainLabel(label) ? '' : label
+}
+
+function extractExplicitManagedDomainLabelFromText(...texts) {
+  const stopLookahead =
+    '(?=\\s+(?:la\\s+app\\s+tiene|tambien\\s+tiene|también\\s+tiene|ademas\\s+tiene|además\\s+tiene|tiene\\s+que\\s+incluir|no\\s+quiero|primero\\s+quiero|todo\\s+debe|configuracion\\s+esperada|configuración\\s+esperada|con\\s+mencion|con\\s+mención|con\\s+socios|con\\s+talleres|con\\s+frontend|con\\s+backend|en\\s+zona\\s+de\\s+prueba|sin\\s+deploy|sin\\s+servicios|sin\\s+credenciales)|[.,;:\\n]|$)'
+  const patterns = [
+    new RegExp(
+      `\\b(?:quiero\\s+crear\\s+una?\\s+)?(?:app|aplicacion|aplicación|sistema|plataforma|herramienta)\\s+(?:local\\s+)?para\\s+(?:gestionar|administrar|coordinar|organizar)\\s+(.+?)${stopLookahead}`,
+      'iu',
+    ),
+    new RegExp(
+      `\\b(?:sistema|plataforma|proyecto)\\s+(?:local\\s+)?(?:para|sobre)\\s+(.+?)${stopLookahead}`,
+      'iu',
+    ),
+  ]
+
+  for (const text of texts) {
+    if (typeof text !== 'string' || !text.trim()) {
+      continue
+    }
+
+    for (const pattern of patterns) {
+      const match = text.match(pattern)
+      const label = sanitizeBusinessDomainLabel(match?.[1] || '')
+
+      if (label) {
+        return label
+      }
+    }
+  }
+
+  return ''
+}
+
 function stripLeadingSpanishArticle(value) {
   if (typeof value !== 'string' || !value.trim()) {
     return ''
@@ -12395,6 +12473,12 @@ function extractProductArchitectureDomainLabel(goal, context, productType) {
     return 'banco comunitario de herramientas'
   }
 
+  const managedDomainLabel = extractExplicitManagedDomainLabelFromText(goal, context)
+
+  if (managedDomainLabel) {
+    return managedDomainLabel
+  }
+
   const extractionPatterns = [
     /\b(?:ecommerce|crm|erp|marketplace|saas|sistema|plataforma|app|aplicacion|herramienta|solucion)\s+para\s+(.+?)(?=\s+(?:con|que|preparad[oa]|orientad[oa]|pensad[oa]|sin|no|y\b)|[.,;:]|$)/iu,
     /\bpara\s+(una?|el|la)\s+(.+?)(?=\s+(?:con|que|preparad[oa]|orientad[oa]|pensad[oa]|sin|no|y\b)|[.,;:]|$)/iu,
@@ -12407,10 +12491,10 @@ function extractProductArchitectureDomainLabel(goal, context, productType) {
 
     for (const pattern of extractionPatterns) {
       const match = text.match(pattern)
-      const extractedLabel = sanitizeBusinessSectorLabel(match?.[2] || match?.[1] || '')
+      const extractedLabel = sanitizeBusinessDomainLabel(match?.[2] || match?.[1] || '')
 
       if (extractedLabel) {
-        return stripLeadingSpanishArticle(extractedLabel)
+        return extractedLabel
       }
     }
   }
@@ -12920,6 +13004,11 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
     detectBikeRepairWorkshopIntent(normalizedText)
   const hasCommunityPlantNurseryIntent =
     detectCommunityPlantNurseryIntent(normalizedText)
+  const hasExplicitManagedDomainRequest =
+    /\b(?:app|aplicacion|sistema|plataforma|herramienta)\s+(?:local\s+)?para\s+(?:gestionar|administrar|coordinar|organizar)\b/u.test(
+      normalizedText,
+    ) || /\bpara\s+(?:gestionar|administrar|coordinar|organizar)\b/u.test(normalizedText)
+  const dynamicCollectionLimit = hasExplicitManagedDomainRequest ? 32 : 12
   const hasPortOperationsIntent =
     /\b(?:puertos?|portuari[ao]s?|buques?|barcos?|embarcaciones?|muelles?|eta|etd|arribos?|salidas?|zona\s+asignada|operaciones?\s+portuarias?)\b/u.test(
       normalizedText,
@@ -13218,6 +13307,125 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
       behavior: 'Revisar responsables mock y su asignacion inicial.',
     },
     {
+      label: 'vecinos',
+      patterns: hasBikeRepairWorkshopIntent || hasCommunityPlantNurseryIntent ? [] : [/\bvecin(?:o|os|a|as)\b/u],
+      mockData: 'Vecinos mock con datos ficticios y actividad local del dominio.',
+      screen: 'vecinos',
+      behavior: 'Consultar vecinos mock y su participacion en el flujo local.',
+    },
+    {
+      label: 'coordinadores',
+      patterns: [/\bcoordinadores?\b/u],
+      mockData: 'Coordinadores mock con permisos locales, tareas y observaciones.',
+      screen: 'coordinadores',
+      behavior: 'Revisar coordinadores mock y acciones operativas locales.',
+    },
+    {
+      label: 'usuarios operadores',
+      patterns: [/\busuarios?\s+operadores?\b|\boperadores?\b/u],
+      mockData: 'Usuarios operadores mock sin credenciales reales.',
+      screen: 'usuarios operadores',
+      behavior: 'Administrar usuarios operadores mock sin auth real ni credenciales.',
+    },
+    {
+      label: 'talleres',
+      patterns: [/\btalleres?\b/u],
+      mockData: 'Talleres mock con categoria, docente, horario, cupo y estado de inscripcion.',
+      screen: 'talleres',
+      behavior: 'Consultar talleres mock, cupos y horarios disponibles.',
+    },
+    {
+      label: 'categorias',
+      patterns: [/\bcategorias?\b/u],
+      mockData: 'Categorias mock para ordenar talleres, recursos o contenidos locales.',
+      screen: 'categorias',
+      behavior: 'Administrar categorias mock y su visibilidad local.',
+    },
+    {
+      label: 'docentes',
+      patterns: [/\bdocentes?\b|\binstructores?\b/u],
+      mockData: 'Docentes mock con taller asignado, disponibilidad y observaciones.',
+      screen: 'docentes',
+      behavior: 'Revisar docentes mock, talleres asignados y disponibilidad local.',
+    },
+    {
+      label: 'inscripciones',
+      patterns: [/\binscripciones?\b|\binscriban\b|\binscribirse\b/u],
+      mockData: 'Inscripciones mock con vecino, taller, estado y observaciones.',
+      screen: 'inscripciones',
+      behavior: 'Aprobar inscripciones mock y consultar su estado local.',
+    },
+    {
+      label: 'cupos',
+      patterns: [/\bcupos?\b/u],
+      mockData: 'Cupos mock por taller, horario y espacio asignado.',
+      screen: 'cupos',
+      behavior: 'Administrar cupos mock y revisar disponibilidad local.',
+    },
+    {
+      label: 'espacios/aulas',
+      patterns: [/\bespacios?\b|\baulas?\b/u],
+      mockData: 'Espacios y aulas mock con capacidad, disponibilidad y observaciones.',
+      screen: 'espacios y aulas',
+      behavior: 'Asignar espacios o aulas mock a talleres y horarios.',
+    },
+    {
+      label: 'asistencia',
+      patterns: [/\basistencia\b|\basistencias\b/u],
+      mockData: 'Asistencia mock por taller, vecino y fecha de clase.',
+      screen: 'asistencia',
+      behavior: 'Marcar asistencia mock y revisar estado de participacion local.',
+    },
+    {
+      label: 'materiales',
+      patterns: [/\bmateriales?\b/u],
+      mockData: 'Materiales mock requeridos o entregados por taller.',
+      screen: 'materiales',
+      behavior: 'Registrar materiales entregados y revisar necesidades mock.',
+    },
+    {
+      label: 'estados de inscripcion',
+      patterns: [/\bestados?\s+de\s+inscripcion\b|\bestado\s+de\s+inscripcion\b/u],
+      mockData: 'Estados de inscripcion mock para pendiente, aprobada, lista de espera o cancelada.',
+      screen: 'estados de inscripcion',
+      behavior: 'Cambiar estados de inscripcion mock sin servicios externos.',
+    },
+    {
+      label: 'panel publico',
+      patterns: [/\bpanel\s+publico\b|\bfrontend\s+publico\b/u],
+      mockData: 'Panel publico mock para consulta local de informacion del dominio.',
+      screen: 'panel publico',
+      behavior: 'Consultar el panel publico mock sin publicar ni desplegar.',
+    },
+    {
+      label: 'panel operativo',
+      patterns: [/\bpanel\s+operativo\b/u],
+      mockData: 'Panel operativo mock para coordinacion diaria y cambios de estado.',
+      screen: 'panel operativo',
+      behavior: 'Usar el panel operativo mock para aprobar y registrar observaciones.',
+    },
+    {
+      label: 'panel administrativo',
+      patterns: [/\bpanel\s+administrativo\b|\bpanel\s+admin\b/u],
+      mockData: 'Panel administrativo mock para cargar catalogos, usuarios operadores y reportes.',
+      screen: 'panel administrativo',
+      behavior: 'Administrar datos maestros mock y reportes locales.',
+    },
+    {
+      label: 'backend mock',
+      patterns: [/\bbackend\s+mock\b/u],
+      mockData: 'Backend mock local sin servicios externos ni credenciales reales.',
+      screen: 'backend mock',
+      behavior: 'Revisar contratos de backend mock sin levantar servicios reales.',
+    },
+    {
+      label: 'base local',
+      patterns: [/\bbase\s+local\b|\bbase\s+de\s+datos\s+local\b/u],
+      mockData: 'Base local como diseno revisable sin DB productiva.',
+      screen: 'base local',
+      behavior: 'Revisar diseno de base local sin ejecutar una DB productiva.',
+    },
+    {
       label: 'rutas',
       patterns: [/\brutas?\b/u],
       mockData: 'Rutas mock con puntos de control y estado de recorrido.',
@@ -13339,10 +13547,10 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
       return
     }
 
-    pushUniquePlannerValues(modules, [definition.label])
-    pushUniquePlannerValues(mockData, [definition.mockData])
-    pushUniquePlannerValues(screens, [definition.screen])
-    pushUniquePlannerValues(localBehavior, [definition.behavior])
+    pushUniquePlannerValues(modules, [definition.label], dynamicCollectionLimit)
+    pushUniquePlannerValues(mockData, [definition.mockData], dynamicCollectionLimit)
+    pushUniquePlannerValues(screens, [definition.screen], dynamicCollectionLimit)
+    pushUniquePlannerValues(localBehavior, [definition.behavior], dynamicCollectionLimit)
   })
 
   if (hasRechargeOrdersIntent) {
@@ -13878,6 +14086,46 @@ function buildDomainUnderstanding({
     (!explicitModuleFamily &&
       productKind !== 'ecommerce' &&
       detectSafeFirstDeliveryRequestTrackingIntent(normalizedText))
+  const hasManagedDomainVerb =
+    /\bpara\s+(?:gestionar|administrar|coordinar|organizar)\b/u.test(normalizedText)
+  const explicitManagedDomainLabel =
+    extractExplicitManagedDomainLabelFromText(goal, context) ||
+    (hasManagedDomainVerb ? extractProductArchitectureDomainLabel(goal, context, productKind) : '')
+  const explicitManagedDomainModules = explicitManagedDomainLabel
+    ? [
+        { label: 'vecinos', pattern: /\bvecin(?:o|os|a|as)\b/u },
+        { label: 'socios', pattern: /\bsocios?\b/u },
+        { label: 'libros', pattern: /\blibros?\b/u },
+        { label: 'prestamos', pattern: /\bprestamos?\b/u },
+        { label: 'devoluciones', pattern: /\bdevoluciones?\b/u },
+        { label: 'reservas', pattern: /\breservas?\b/u },
+        { label: 'coordinadores', pattern: /\bcoordinadores?\b/u },
+        { label: 'operadores', pattern: /\boperadores?\b/u },
+        { label: 'docentes', pattern: /\bdocentes?\b|\binstructores?\b/u },
+        { label: 'talleres', pattern: /\btalleres?\b/u },
+        { label: 'categorias', pattern: /\bcategor\w*\b/u },
+        { label: 'inscripciones', pattern: /\binscripciones?\b|\binscriban\b|\binscribirse\b/u },
+        { label: 'cupos', pattern: /\bcupos?\b/u },
+        { label: 'horarios', pattern: /\bhorarios?\b/u },
+        { label: 'espacios/aulas', pattern: /\bespacios?\b|\baulas?\b/u },
+        { label: 'asistencia', pattern: /\basistencia\b|\basistencias\b/u },
+        { label: 'materiales', pattern: /\bmateriales?\b/u },
+        { label: 'observaciones', pattern: /\bobservaciones?\b/u },
+        {
+          label: 'estados de inscripcion',
+          pattern:
+            /\bestados?\s+de\s+inscripci\w*\b|\bestado\s+de\s+inscripci\w*\b|\binscripci\w*\b/u,
+        },
+        { label: 'reportes simples', pattern: /\breportes?\s+simples?\b/u },
+        { label: 'panel publico', pattern: /\bfrontend\b|\bpanel\s+p\w*\b|\bpublic\w*\b/u },
+        { label: 'panel operativo', pattern: /\bpanel\s+operativo\b/u },
+        { label: 'panel administrativo', pattern: /\bpanel\s+administrativo\b|\bpanel\s+admin\b/u },
+        { label: 'backend mock', pattern: /\bbackend\s+mock\b/u },
+        { label: 'base local', pattern: /\bbase\s+local\b|\bbase\s+de\s+datos\s+local\b/u },
+      ]
+        .filter((definition) => definition.pattern.test(normalizedText))
+        .map((definition) => definition.label)
+    : []
   const resolvedFamilyKey = isOnlineCourses
     ? 'online-courses'
     : isSchoolCrm
@@ -13911,6 +14159,7 @@ function buildDomainUnderstanding({
       ? commercialEcommerceProfile?.domainLabel || ''
       : '') ||
     explicitModuleFamily?.domainLabel ||
+    explicitManagedDomainLabel ||
     extractProductArchitectureDomainLabel(goal, context, productKind)
   const distinctiveDynamicModules = dynamicPlanParts.modules.filter((entry) => {
     const normalizedEntry = normalizeSectorDetectionText(entry)
@@ -13958,6 +14207,7 @@ function buildDomainUnderstanding({
       ...(resolvedFamilyKey === 'community-plant-nursery'
         ? communityPlantNurseryProfile?.modules || []
         : []),
+      ...explicitManagedDomainModules,
       ...(resolvedFamilyKey === 'online-courses' ||
       resolvedFamilyKey === 'bike-repair-workshop' ||
       resolvedFamilyKey === 'community-plant-nursery'
@@ -13967,9 +14217,12 @@ function buildDomainUnderstanding({
       resolvedFamilyKey === 'security' ? 'reportes' : '',
       /\breportes?\b/u.test(normalizedText) ? 'reportes' : '',
     ].filter(Boolean),
-    resolvedFamilyKey === 'bike-repair-workshop' || resolvedFamilyKey === 'community-plant-nursery'
-      ? 20
-      : 12,
+    explicitManagedDomainLabel || explicitManagedDomainModules.length > 0
+      ? 32
+      : resolvedFamilyKey === 'bike-repair-workshop' ||
+          resolvedFamilyKey === 'community-plant-nursery'
+        ? 20
+        : 12,
   )
   const primaryModules =
     resolvedFamilyKey === 'commercial-ecommerce'
@@ -14019,7 +14272,7 @@ function buildDomainUnderstanding({
         .map((entry) => inferSafeFirstDeliveryMaterializationEntityName(entry))
         .filter(Boolean),
     ],
-    12,
+    explicitManagedDomainLabel || explicitManagedDomainModules.length > 0 ? 32 : 12,
   )
   const secondaryEntities = summarizeUniqueExecutorStrings(
     primaryModules
@@ -17980,7 +18233,14 @@ function buildBlueprintModules({
 
   if (deliveryLevel === 'fullstack-local') {
     return summarizeUniqueExecutorStrings(
-      ['frontend local', 'backend local', 'database design', 'documentacion', ...modules],
+      [
+        'frontend local',
+        'backend local',
+        'database design',
+        'documentacion',
+        'scripts locales',
+        ...modules,
+      ],
       16,
     )
   }
@@ -32154,10 +32414,16 @@ function normalizeDomainUnderstandingContract(value) {
 
   const normalizedDomainLabel =
     typeof value.domainLabel === 'string' ? normalizeSectorDetectionText(value.domainLabel) : ''
+  const hasExtendedBusinessDomainModules =
+    !isSandboxConstraintDomainLabel(normalizedDomainLabel) &&
+    Array.isArray(value.primaryModules) &&
+    value.primaryModules.length > 12
   const primaryModuleLimit =
-    normalizedDomainLabel === 'vivero comunitario de intercambio de plantas' ||
-    normalizedDomainLabel === 'taller barrial de reparacion de bicicletas'
-      ? 20
+    hasExtendedBusinessDomainModules
+      ? 32
+      : normalizedDomainLabel === 'vivero comunitario de intercambio de plantas' ||
+          normalizedDomainLabel === 'taller barrial de reparacion de bicicletas'
+        ? 20
       : 12
   const normalizedValue = {
     ...(typeof value.domainLabel === 'string' && value.domainLabel.trim()
@@ -32172,8 +32438,8 @@ function normalizeDomainUnderstandingContract(value) {
     ...(summarizeUniqueExecutorStrings(value.primaryModules, primaryModuleLimit).length > 0
       ? { primaryModules: summarizeUniqueExecutorStrings(value.primaryModules, primaryModuleLimit) }
       : {}),
-    ...(summarizeUniqueExecutorStrings(value.primaryEntities, 12).length > 0
-      ? { primaryEntities: summarizeUniqueExecutorStrings(value.primaryEntities, 12) }
+    ...(summarizeUniqueExecutorStrings(value.primaryEntities, primaryModuleLimit).length > 0
+      ? { primaryEntities: summarizeUniqueExecutorStrings(value.primaryEntities, primaryModuleLimit) }
       : {}),
     ...(summarizeUniqueExecutorStrings(value.secondaryEntities, 12).length > 0
       ? { secondaryEntities: summarizeUniqueExecutorStrings(value.secondaryEntities, 12) }

@@ -749,6 +749,142 @@ for (const forbiddenDomain of [
   )
 }
 
+async function assertGenericManagedDomainUnderstanding({
+  label,
+  goal,
+  context,
+  expectedDomain,
+  requiredTerms,
+}) {
+  const decision = await uiHarness.buildLocalStrategicBrainDecision({
+    goal,
+    context,
+    workspacePath: safeWorkspacePath,
+    qualityPreference: 'max',
+    reusePolicy: 'none',
+    previousExecutionResult: '',
+  })
+  const actualDomain = String(decision?.domainUnderstanding?.domainLabel || '')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLocaleLowerCase()
+  const expectedDomainNormalized = expectedDomain
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLocaleLowerCase()
+  const domainText = JSON.stringify(
+    {
+      domainUnderstanding: decision?.domainUnderstanding,
+      projectBlueprint: decision?.projectBlueprint,
+      scalableDeliveryPlan: decision?.scalableDeliveryPlan,
+    },
+    null,
+    2,
+  )
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLocaleLowerCase()
+
+  assert.equal(actualDomain, expectedDomainNormalized, `${label} debe conservar domainLabel.`)
+
+  for (const forbiddenDomainLabel of [
+    'zona de prueba segura',
+    'sandbox',
+    'backend mock',
+    'base local',
+    'fullstack local',
+  ]) {
+    assert.notEqual(
+      actualDomain,
+      forbiddenDomainLabel,
+      `${label} no debe usar ${forbiddenDomainLabel} como dominio principal.`,
+    )
+  }
+
+  for (const requiredTerm of requiredTerms) {
+    assert.equal(
+      domainText.includes(requiredTerm),
+      true,
+      `${label} debe conservar ${requiredTerm}.`,
+    )
+  }
+
+  for (const forbiddenApproval of [
+    'repo publico',
+    'pagos reales',
+    'servicios externos',
+    'deploy',
+    'docker',
+    'credenciales',
+  ]) {
+    assert.equal(
+      JSON.stringify(decision?.approvalRequest || {})
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .toLocaleLowerCase()
+        .includes(forbiddenApproval),
+      false,
+      `${label} no debe pedir approval de ${forbiddenApproval}.`,
+    )
+  }
+}
+
+await assertGenericManagedDomainUnderstanding({
+  label: 'centro cultural no perfilado',
+  goal: `Quiero crear una app local para gestionar un centro barrial de talleres culturales y oficios.
+
+La app permite consultar talleres, horarios, cupos, docentes, materiales, inscripciones y estados de inscripcion.
+
+Tambien incluye panel publico, panel operativo, panel administrativo, backend mock y base local.
+
+Todo en zona de prueba segura, sin deploy, sin servicios externos, sin Docker y sin credenciales reales.`,
+  context:
+    'El sistema contempla vecinos, coordinadores, docentes, categorias, talleres, inscripciones, cupos, horarios, espacios/aulas, asistencia, materiales, observaciones, estados de inscripcion, reportes simples, panel publico, panel operativo, panel administrativo, backend mock y base local.',
+  expectedDomain: 'centro barrial de talleres culturales y oficios',
+  requiredTerms: [
+    'talleres',
+    'categorias',
+    'docentes',
+    'vecinos',
+    'coordinadores',
+    'inscripciones',
+    'cupos',
+    'horarios',
+    'espacios/aulas',
+    'asistencia',
+    'materiales',
+    'observaciones',
+    'estados de inscripcion',
+    'reportes simples',
+    'panel publico',
+    'panel operativo',
+    'panel administrativo',
+    'backend mock',
+    'base local',
+  ],
+})
+
+await assertGenericManagedDomainUnderstanding({
+  label: 'biblioteca vecinal no perfilada',
+  goal:
+    'Quiero crear una app local para gestionar una biblioteca vecinal de intercambio de libros, con socios, libros, prestamos, devoluciones, reservas, categorias, operadores, reportes simples, backend mock y base local. Todo en zona de prueba segura, sin deploy, sin servicios externos y sin credenciales reales.',
+  context:
+    'Validar dominio generico no perfilado. La zona de prueba segura es restriccion, no dominio.',
+  expectedDomain: 'biblioteca vecinal de intercambio de libros',
+  requiredTerms: [
+    'socios',
+    'libros',
+    'prestamos',
+    'devoluciones',
+    'reservas',
+    'categorias',
+    'operadores',
+    'reportes simples',
+    'backend mock',
+    'base local',
+  ],
+})
+
 const communityNurseryExecutionGoal = communityNurseryGoal.replace(
   'Primero quiero planificacion segura, confirmacion humana y una primera version solo en zona de prueba segura.',
   'La planificacion segura ya fue revisada y la confirmacion humana ya fue concedida; materializar ahora una primera version solo en zona de prueba segura.',
