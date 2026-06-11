@@ -1037,6 +1037,124 @@ function runFinalSandboxMaterializationApprovalScenario() {
   }
 }
 
+function runSandboxRootStylePathNormalizationScenario() {
+  const sandboxRootRelative =
+    '.codex-temp/generated-domain-materialization-approved/root-style-path-normalization'
+  const sandboxRootResolved = path.join(
+    repoRoot,
+    '.codex-temp',
+    'generated-domain-materialization-approved',
+    'root-style-path-normalization',
+  )
+  ensureRemoved(sandboxRootResolved)
+
+  const universalPlan = {
+    built: true,
+    canMaterializeInSandbox: true,
+    projectRoot: 'root-style-path-normalization',
+    filesToCreate: [
+      { path: '/README.md', area: 'docs', content: '# Root style path\n' },
+      { path: '/docs/domain.md', area: 'docs', content: '# Domain\n' },
+      { path: '/frontend/index.html', area: 'frontend', content: '<!doctype html>\n' },
+    ],
+    report: {
+      reportFile: '/validation/report.json',
+    },
+  }
+
+  const approvalEvaluation = observationHarness.evaluateGeneratedDomainFileCreationApproval({
+    generatedDomainUniversalMaterializationPlan: universalPlan,
+    approvalDecision: {
+      approved: true,
+      scope: 'sandbox-only',
+    },
+    workspacePath: repoRoot,
+    sandboxRoot: sandboxRootRelative,
+  })
+
+  assert.equal(approvalEvaluation?.approved, true)
+  assert.equal(approvalEvaluation?.blocked, false)
+  assert.equal(approvalEvaluation?.status, 'approved-for-sandbox')
+  assert.deepStrictEqual(
+    Array.from(approvalEvaluation.allowedFiles.map((entry) => entry.path)),
+    ['README.md', 'docs/domain.md', 'frontend/index.html'],
+  )
+
+  const materializationReport = observationHarness.materializeGeneratedDomainSandboxPlan({
+    generatedDomainUniversalMaterializationPlan: universalPlan,
+    generatedDomainFileCreationApprovalEvaluation: approvalEvaluation,
+  })
+
+  assert.equal(materializationReport?.materialized, true)
+  assert.equal(fs.existsSync(path.join(sandboxRootResolved, 'README.md')), true)
+  assert.equal(fs.existsSync(path.join(sandboxRootResolved, 'docs', 'domain.md')), true)
+  assert.equal(fs.existsSync(path.join(sandboxRootResolved, 'frontend', 'index.html')), true)
+  assert.equal(fs.existsSync(path.join(sandboxRootResolved, 'validation', 'report.json')), true)
+  assert.equal(fs.existsSync(path.join(repoRoot, 'README.md')), true)
+
+  ensureRemoved(sandboxRootResolved)
+  return {
+    createdCount: materializationReport.created.length,
+  }
+}
+
+function runDangerousSandboxPathBlockedScenario() {
+  const sandboxRootRelative =
+    '.codex-temp/generated-domain-materialization-approved/dangerous-path-blocked'
+  const universalPlan = {
+    built: true,
+    canMaterializeInSandbox: true,
+    projectRoot: 'dangerous-path-blocked',
+    filesToCreate: [
+      { path: '../escape.txt', area: 'docs', content: 'escape' },
+      { path: '/web-prueba/evil.txt', area: 'docs', content: 'evil' },
+      { path: '.env', area: 'config', content: 'TOKEN=real' },
+      { path: 'node_modules/package.json', area: 'deps', content: '{}' },
+    ],
+  }
+
+  const approvalEvaluation = observationHarness.evaluateGeneratedDomainFileCreationApproval({
+    generatedDomainUniversalMaterializationPlan: universalPlan,
+    approvalDecision: {
+      approved: true,
+      scope: 'sandbox-only',
+    },
+    workspacePath: repoRoot,
+    sandboxRoot: sandboxRootRelative,
+  })
+
+  assert.equal(approvalEvaluation?.approved, false)
+  assert.equal(approvalEvaluation?.blocked, true)
+  assert.equal(approvalEvaluation?.status, 'blocked')
+  assert.equal(approvalEvaluation.blockedFiles.length, 4)
+  assert.equal(
+    approvalEvaluation.blockedFiles.some((entry) => entry.path === '../escape.txt'),
+    true,
+  )
+  assert.equal(
+    approvalEvaluation.blockedFiles.some((entry) =>
+      String(entry.path || '').endsWith('web-prueba/evil.txt'),
+    ),
+    true,
+  )
+  assert.equal(
+    approvalEvaluation.blockedFiles.some((entry) => entry.path === '.env'),
+    true,
+  )
+  assert.equal(
+    approvalEvaluation.blockedFiles.some((entry) => entry.path === 'node_modules/package.json'),
+    true,
+  )
+
+  const materializationReport = observationHarness.materializeGeneratedDomainSandboxPlan({
+    generatedDomainUniversalMaterializationPlan: universalPlan,
+    generatedDomainFileCreationApprovalEvaluation: approvalEvaluation,
+  })
+
+  assert.equal(materializationReport?.materialized, false)
+  assert.equal(materializationReport?.status, 'blocked')
+}
+
 async function main() {
   ensureRemoved(smokeSandboxPath)
 
@@ -1063,6 +1181,8 @@ async function main() {
     const sandboxLocationResult = runSandboxLocationApprovalScenario()
     const finalSandboxMaterializationResult =
       runFinalSandboxMaterializationApprovalScenario()
+    const rootStylePathNormalizationResult = runSandboxRootStylePathNormalizationScenario()
+    runDangerousSandboxPathBlockedScenario()
     runBlockedCases(results[0].universalPlan)
 
     const totalCreated = results.reduce(
@@ -1075,10 +1195,13 @@ async function main() {
         : 0) +
       (Number.isInteger(finalSandboxMaterializationResult.createdCount)
         ? finalSandboxMaterializationResult.createdCount
+        : 0) +
+      (Number.isInteger(rootStylePathNormalizationResult.createdCount)
+        ? rootStylePathNormalizationResult.createdCount
         : 0)
 
     console.log(
-      `OK. Generated domain sandbox materialization smoke completado. Dominios validados: ${scenarios.length + 3}. Archivos creados: ${totalCreated}.`,
+      `OK. Generated domain sandbox materialization smoke completado. Dominios validados: ${scenarios.length + 5}. Archivos creados: ${totalCreated}.`,
     )
   } finally {
     ensureRemoved(smokeSandboxPath)
@@ -1105,6 +1228,22 @@ async function main() {
         'generated-domain-materialization-approved',
         'sandbox-toolbank-local',
         'sandbox-community-toolbank',
+      ),
+    )
+    ensureRemoved(
+      path.join(
+        repoRoot,
+        '.codex-temp',
+        'generated-domain-materialization-approved',
+        'root-style-path-normalization',
+      ),
+    )
+    ensureRemoved(
+      path.join(
+        repoRoot,
+        '.codex-temp',
+        'generated-domain-materialization-approved',
+        'dangerous-path-blocked',
       ),
     )
   }

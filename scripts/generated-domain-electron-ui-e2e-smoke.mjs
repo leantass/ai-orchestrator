@@ -656,6 +656,190 @@ for (const testCase of blueprintDataSensitivityCases) {
   )
 }
 
+const communityNurseryGoal = `Quiero crear una app local para gestionar un vivero comunitario de intercambio de plantas.
+
+La app tiene que permitir que vecinos registren plantas, esquejes o semillas disponibles, consulten especies, pidan intercambios, reserven plantas, registren entregas y vean consejos basicos de cuidado.
+
+Tambien tiene que tener un panel operativo para coordinadores del vivero, donde puedan aprobar solicitudes, cambiar estados, marcar entregas realizadas, registrar observaciones y actualizar disponibilidad.
+
+Ademas tiene que tener un panel administrativo para cargar especies, categorias, zonas de cultivo, usuarios operadores, reglas de intercambio y reportes simples.
+
+Tiene que incluir frontend publico, panel operativo, panel administrativo, backend local mock y diseno de base de datos local.
+
+No quiero pagos reales, no quiero credenciales reales, no quiero deploy, no quiero Docker, no quiero servicios externos, no quiero webhooks, no quiero DB productiva y no quiero tocar web-prueba.
+
+Primero quiero planificacion segura, confirmacion humana y una primera version solo en zona de prueba segura.`
+
+const communityNurseryContext = `Es una segunda prueba real controlada para validar que JEFE puede resolver un dominio nuevo sin depender de plantillas rigidas, sin sobreajustarse al caso taller de bicicletas y sin arrastrar dominios anteriores.
+
+La app debe funcionar como MVP local seguro. Los usuarios principales son vecinos, coordinadores del vivero y administradores.
+
+El sistema debe contemplar plantas, especies, esquejes, semillas, vecinos, solicitudes de intercambio, reservas, entregas, disponibilidad, cuidados basicos, observaciones, panel publico, panel operativo, panel administrativo, backend mock y base local.
+
+Todo debe ser mock/local. No debe crear archivos reales fuera de una zona de prueba segura. No debe tocar web-prueba. No debe crear .env, node_modules, Docker, deploy ni usar servicios externos.`
+
+const communityNurseryDecision = await uiHarness.buildLocalStrategicBrainDecision({
+  goal: communityNurseryGoal,
+  context: communityNurseryContext,
+  workspacePath: safeWorkspacePath,
+  iteration: 1,
+  previousExecutionResult: '',
+  requiresApproval: false,
+  userParticipationMode: 'operator-approves-sensitive',
+  projectState: {
+    resolvedDecisions: [],
+  },
+})
+
+const communityNurseryDomainText = JSON.stringify(
+  {
+    domainUnderstanding: communityNurseryDecision?.domainUnderstanding,
+    projectBlueprint: communityNurseryDecision?.projectBlueprint,
+    productArchitecture: communityNurseryDecision?.productArchitecture,
+    safeFirstDeliveryPlan: communityNurseryDecision?.safeFirstDeliveryPlan,
+    scalableDeliveryPlan: communityNurseryDecision?.scalableDeliveryPlan,
+  },
+  null,
+  2,
+)
+  .normalize('NFD')
+  .replace(/\p{Diacritic}/gu, '')
+  .toLocaleLowerCase()
+
+for (const requiredTerm of [
+  'vivero comunitario',
+  'plantas',
+  'especies',
+  'esquejes',
+  'semillas',
+  'vecinos',
+  'solicitudes de intercambio',
+  'reservas',
+  'entregas',
+  'disponibilidad',
+  'cuidados basicos',
+  'coordinadores',
+  'panel publico',
+  'panel operativo',
+  'panel administrativo',
+  'backend mock',
+  'base local',
+]) {
+  assert.equal(
+    communityNurseryDomainText.includes(requiredTerm),
+    true,
+    `El contrato del vivero comunitario debe conservar ${requiredTerm}.`,
+  )
+}
+
+for (const forbiddenDomain of [
+  'taller barrial de reparacion de bicicletas',
+  'bicicletas',
+  'mecanicos',
+  'repuestos',
+  'operaciones portuarias',
+  'ecommerce local',
+  'banco comunitario de herramientas',
+  'tracking logistico',
+]) {
+  assert.equal(
+    communityNurseryDomainText.includes(forbiddenDomain),
+    false,
+    `El contrato del vivero comunitario no debe contaminarse con ${forbiddenDomain}.`,
+  )
+}
+
+const communityNurseryExecutionGoal = communityNurseryGoal.replace(
+  'Primero quiero planificacion segura, confirmacion humana y una primera version solo en zona de prueba segura.',
+  'La planificacion segura ya fue revisada y la confirmacion humana ya fue concedida; materializar ahora una primera version solo en zona de prueba segura.',
+)
+
+const communityNurseryDecisionForMaterialization =
+  await uiHarness.buildLocalStrategicBrainDecision({
+    goal: communityNurseryExecutionGoal,
+    context: communityNurseryContext,
+    workspacePath: safeWorkspacePath,
+    iteration: 2,
+    previousExecutionResult: JSON.stringify({
+      source: 'planner',
+      approvalMode: 'once',
+      approvalDecision: 'approved',
+      approvalRequestDecisionKey: 'approve-sandbox-materialization-v1',
+      responseMode: 'options',
+      selectedOption: 'approve',
+      approvalReason:
+        'Materializar solo la primera version local segura dentro del sandbox aprobado.',
+    }),
+    requiresApproval: false,
+    userParticipationMode: 'operator-approves-sensitive',
+    projectState: {
+      resolvedDecisions: [
+        {
+          key: 'approve-sandbox-materialization-v1',
+          status: 'approved',
+          source: 'planner',
+          decision: 'approved',
+          label: 'approve',
+          responseMode: 'options',
+          selectedOption: 'approve',
+          summary:
+            'Aprobacion humana para materializar solo el vivero comunitario en sandbox seguro.',
+        },
+      ],
+    },
+  })
+
+const communityNurseryApprovalEvaluation =
+  communityNurseryDecisionForMaterialization.generatedDomainFileCreationApprovalEvaluation
+const communityNurseryUniversalPlan =
+  communityNurseryDecisionForMaterialization.generatedDomainUniversalMaterializationPlan
+
+assert.equal(
+  communityNurseryDecisionForMaterialization?.strategy,
+  'materialize-fullstack-local-plan',
+)
+assert.equal(communityNurseryDecisionForMaterialization?.nextExpectedAction, 'execute-plan')
+assert.equal(communityNurseryApprovalEvaluation?.approved, true)
+assert.equal(communityNurseryApprovalEvaluation?.blocked, false)
+assert.equal(communityNurseryApprovalEvaluation?.status, 'approved-for-sandbox')
+assert.equal(communityNurseryUniversalPlan?.status, 'built')
+assert.equal(communityNurseryUniversalPlan?.canMaterializeInSandbox, true)
+
+const communityNurserySandboxRoot = path.join(
+  repoRoot,
+  '.codex-temp',
+  'generated-domain-materialization-approved',
+  communityNurseryUniversalPlan.projectRoot,
+)
+ensureRemoved(communityNurserySandboxRoot)
+
+const communityNurseryMaterializationReport =
+  uiHarness.materializeGeneratedDomainSandboxPlan({
+    generatedDomainUniversalMaterializationPlan: communityNurseryUniversalPlan,
+    generatedDomainFileCreationApprovalEvaluation: communityNurseryApprovalEvaluation,
+  })
+
+assert.equal(communityNurseryMaterializationReport?.materialized, true)
+assert.equal(communityNurseryMaterializationReport?.status, 'materialized')
+
+const communityNurseryMaterializedProjectRoot = path.resolve(
+  communityNurseryMaterializationReport.sandboxRoot.resolved,
+  communityNurseryUniversalPlan.projectRoot,
+)
+assert.equal(
+  fs.existsSync(path.join(communityNurseryMaterializedProjectRoot, 'validation', 'report.json')),
+  true,
+)
+assert.equal(fs.existsSync(path.join(communityNurseryMaterializedProjectRoot, '.env')), false)
+assert.equal(
+  fs.existsSync(path.join(communityNurseryMaterializedProjectRoot, 'node_modules')),
+  false,
+)
+assert.equal(
+  communityNurseryMaterializedProjectRoot.replace(/\\/g, '/').includes('/web-prueba/'),
+  false,
+)
+
 const bikeWorkshopGoal = `Quiero crear una app local para gestionar un taller barrial de reparacion de bicicletas.
 
 La app tiene que permitir que vecinos registren bicicletas, pidan turnos de reparacion, consulten el estado del trabajo, vean presupuestos estimados y reciban avisos simulados.

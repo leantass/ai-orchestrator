@@ -11794,6 +11794,14 @@ function detectFullstackLocalMaterializationPlanningIntent(goal, context) {
       normalizedText.includes('preparar materializacion')) ||
     (normalizedText.includes('preparar entrega funcional local') &&
       normalizedText.includes('review-scalable-delivery')) ||
+    (/\b(?:materializar|crear|generar)\b[^.\n]{0,180}\bprimera\s+version\s+(?:solo\s+)?(?:local|en\s+zona\s+de\s+prueba\s+segura)\b/u.test(
+      normalizedText,
+    ) &&
+      /\bfrontend\s+publico\b/u.test(normalizedText) &&
+      /\bbackend\s+(?:local\s+)?mock\b/u.test(normalizedText) &&
+      /\b(?:base\s+local|base\s+de\s+datos\s+local|diseno\s+de\s+base\s+de\s+datos\s+local)\b/u.test(
+        normalizedText,
+      )) ||
     (normalizedText.includes('sourcestrategy: scalable-delivery-plan') &&
       normalizedText.includes('execute-plan') &&
       normalizedText.includes('executor'))
@@ -12910,6 +12918,8 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
     detectCommercialLandingEcommerceIntent(normalizedText)
   const hasBikeRepairWorkshopIntent =
     detectBikeRepairWorkshopIntent(normalizedText)
+  const hasCommunityPlantNurseryIntent =
+    detectCommunityPlantNurseryIntent(normalizedText)
   const hasPortOperationsIntent =
     /\b(?:puertos?|portuari[ao]s?|buques?|barcos?|embarcaciones?|muelles?|eta|etd|arribos?|salidas?|zona\s+asignada|operaciones?\s+portuarias?)\b/u.test(
       normalizedText,
@@ -13015,6 +13025,62 @@ function buildDynamicSafeDeliveryPlanParts(sourceText) {
       mockData: 'Presupuestos estimados mock sin pagos reales ni checkout.',
       screen: 'presupuestos estimados',
       behavior: 'Ver presupuesto estimado y mantener pagos reales fuera de alcance.',
+    },
+    {
+      label: 'vivero comunitario',
+      patterns: hasCommunityPlantNurseryIntent ? [/\bvivero(?:s)?\s+comunitari[oa]s?\b|\bvivero(?:s)?\b/u] : [],
+      mockData: 'Vivero comunitario mock con disponibilidad, reglas y estado local.',
+      screen: 'vivero comunitario',
+      behavior: 'Revisar el vivero comunitario mock y su tablero local.',
+    },
+    {
+      label: 'plantas',
+      patterns: hasCommunityPlantNurseryIntent ? [/\bplantas?\b/u] : [],
+      mockData: 'Plantas mock con especie, origen, disponibilidad y cuidados basicos.',
+      screen: 'plantas',
+      behavior: 'Registrar plantas mock y consultar su disponibilidad local.',
+    },
+    {
+      label: 'especies',
+      patterns: hasCommunityPlantNurseryIntent ? [/\bespecies?\b/u] : [],
+      mockData: 'Especies mock con categorias, zonas de cultivo y consejos de cuidado.',
+      screen: 'especies',
+      behavior: 'Consultar especies mock y sus cuidados basicos.',
+    },
+    {
+      label: 'esquejes',
+      patterns: hasCommunityPlantNurseryIntent ? [/\besquejes?\b/u] : [],
+      mockData: 'Esquejes mock disponibles para intercambio local.',
+      screen: 'esquejes',
+      behavior: 'Registrar esquejes disponibles y asociarlos a solicitudes mock.',
+    },
+    {
+      label: 'semillas',
+      patterns: hasCommunityPlantNurseryIntent ? [/\bsemillas?\b/u] : [],
+      mockData: 'Semillas mock con categoria, temporada y disponibilidad.',
+      screen: 'semillas',
+      behavior: 'Registrar semillas y revisar disponibilidad local.',
+    },
+    {
+      label: 'solicitudes de intercambio',
+      patterns: hasCommunityPlantNurseryIntent ? [/\bsolicitudes?\s+de\s+intercambio\b|\bintercambios?\b/u] : [],
+      mockData: 'Solicitudes de intercambio mock con vecino, planta y estado.',
+      screen: 'solicitudes de intercambio',
+      behavior: 'Aprobar solicitudes de intercambio y cambiar estados mock.',
+    },
+    {
+      label: 'entregas',
+      patterns: hasCommunityPlantNurseryIntent ? [/\bentregas?\b/u] : [],
+      mockData: 'Entregas mock con fecha, responsable y observaciones.',
+      screen: 'entregas',
+      behavior: 'Marcar entregas realizadas y registrar observaciones locales.',
+    },
+    {
+      label: 'cuidados basicos',
+      patterns: hasCommunityPlantNurseryIntent ? [/\bcuidados?\s+basicos?\b|\bconsejos?\s+basicos?\s+de\s+cuidado\b/u] : [],
+      mockData: 'Consejos de cuidado mock por especie, temporada y zona de cultivo.',
+      screen: 'cuidados basicos',
+      behavior: 'Consultar cuidados basicos mock sin servicios externos.',
     },
     {
       label: 'documentacion',
@@ -13594,6 +13660,25 @@ function detectBikeRepairWorkshopIntent(normalizedText) {
     return false
   }
 
+  const antiExampleBikeSignals =
+    /\b(?:sin\s+sobreajustarse|no\s+sobreajustarse|evitar\s+sobreajust|sin\s+arrastrar|no\s+arrastrar|evitar\s+contaminacion|evitar\s+contaminación|sin\s+contaminacion|sin\s+contaminación|no\s+depender|sin\s+depender|dominio\s+anterior|caso\s+(?:anterior|previo))\b[^.\n;]{0,180}\b(?:taller(?:es)?\s+(?:de\s+)?bicicletas?|taller(?:es)?\s+(?:barrial(?:es)?\s+)?(?:de\s+)?reparacion\s+de\s+bicicletas?|bicicletas?|bicis?|bike\s+workshop|bike\s+repair)\b/u.test(
+      normalizedText,
+    ) ||
+    /\b(?:taller(?:es)?\s+(?:de\s+)?bicicletas?|taller(?:es)?\s+(?:barrial(?:es)?\s+)?(?:de\s+)?reparacion\s+de\s+bicicletas?|bicicletas?|bicis?|bike\s+workshop|bike\s+repair)\b[^.\n;]{0,180}\b(?:como\s+anti\s*ejemplo|como\s+anti-ejemplo|a\s+evitar|que\s+no\s+debe\s+activar|contaminacion\s+a\s+evitar|contaminación\s+a\s+evitar)\b/u.test(
+      normalizedText,
+    )
+  const hasDirectBikeRequest =
+    /\b(?:quiero|crear|hacer|necesito|gestionar|materializar|mvp|app|sistema)\b[^.\n;]{0,260}\b(?:taller(?:es)?\s+(?:de\s+)?bicicletas?|taller(?:es)?\s+(?:barrial(?:es)?\s+)?(?:de\s+)?reparacion\s+de\s+bicicletas?|bicicleteria|bicicletas?)\b/u.test(
+      normalizedText,
+    ) ||
+    /\bbicicletas?\b[^.\n;]{0,220}\b(?:turnos?|mecanicos?|repuestos?|ordenes?\s+de\s+trabajo|presupuestos?)\b/u.test(
+      normalizedText,
+    )
+
+  if (antiExampleBikeSignals && !hasDirectBikeRequest) {
+    return false
+  }
+
   const hasBikeSignals =
     /\bbicicletas?\b|\bbicis?\b|\bbike(?:s)?\b/u.test(normalizedText)
   const hasRepairSignals =
@@ -13606,6 +13691,89 @@ function detectBikeRepairWorkshopIntent(normalizedText) {
     )
 
   return hasBikeSignals && hasRepairSignals && hasWorkshopSignals
+}
+
+function detectCommunityPlantNurseryIntent(normalizedText) {
+  if (typeof normalizedText !== 'string' || !normalizedText.trim()) {
+    return false
+  }
+
+  const hasNurserySignals =
+    /\bvivero(?:s)?\b|\bintercambio\s+de\s+plantas?\b|\bplantas?\b|\besquejes?\b|\bsemillas?\b|\bespecies?\b/u.test(
+      normalizedText,
+    )
+  const hasCommunitySignals =
+    /\bcomunitari[oa]s?\b|\bvecin(?:o|os|a|as)\b|\bcoordinadores?\b|\badministradores?\b/u.test(
+      normalizedText,
+    )
+  const hasExchangeSignals =
+    /\bintercambios?\b|\bsolicitudes?\s+de\s+intercambio\b|\breservas?\b|\bentregas?\b|\bdisponibilidad\b|\bcuidados?\s+basicos?\b|\bzonas?\s+de\s+cultivo\b/u.test(
+      normalizedText,
+    )
+
+  return hasNurserySignals && hasCommunitySignals && hasExchangeSignals
+}
+
+function buildCommunityPlantNurseryDomainProfile() {
+  return {
+    domainLabel: 'vivero comunitario de intercambio de plantas',
+    modules: [
+      'vivero comunitario',
+      'plantas',
+      'especies',
+      'esquejes',
+      'semillas',
+      'vecinos',
+      'solicitudes de intercambio',
+      'reservas',
+      'entregas',
+      'disponibilidad',
+      'cuidados basicos',
+      'coordinadores',
+      'panel publico',
+      'panel operativo',
+      'panel administrativo',
+      'backend mock',
+      'base local',
+      'reportes simples',
+    ],
+    entities: [
+      'plantas',
+      'especies',
+      'esquejes',
+      'semillas',
+      'vecinos',
+      'solicitudes de intercambio',
+      'reservas',
+      'entregas',
+      'disponibilidad',
+      'cuidados basicos',
+      'observaciones',
+      'zonas de cultivo',
+      'reglas de intercambio',
+      'reportes',
+    ],
+    roles: ['vecino', 'coordinador del vivero', 'administrador'],
+    localActions: [
+      'Registrar plantas, esquejes y semillas disponibles con datos mock/locales.',
+      'Consultar especies, disponibilidad y consejos basicos de cuidado.',
+      'Solicitar intercambios, reservar plantas y registrar entregas mock.',
+      'Aprobar solicitudes, cambiar estados y registrar observaciones operativas.',
+      'Administrar especies, categorias, zonas de cultivo, reglas de intercambio y reportes simples.',
+    ],
+    stateHints: ['disponible', 'reservada', 'solicitada', 'aprobada', 'entregada'],
+    approvalThemes: ['materializacion solo en sandbox seguro'],
+    explicitExclusions: [
+      'pagos reales',
+      'credenciales reales',
+      'deploy',
+      'Docker',
+      'servicios externos',
+      'webhooks reales',
+      'DB productiva',
+      'web-prueba',
+    ],
+  }
 }
 
 function buildBikeRepairWorkshopDomainProfile() {
@@ -13689,6 +13857,9 @@ function buildDomainUnderstanding({
   const bikeRepairWorkshopProfile = detectBikeRepairWorkshopIntent(normalizedText)
     ? buildBikeRepairWorkshopDomainProfile()
     : null
+  const communityPlantNurseryProfile = detectCommunityPlantNurseryIntent(normalizedText)
+    ? buildCommunityPlantNurseryDomainProfile()
+    : null
   const isRechargeOrdersSystem =
     explicitModuleFamily?.key === 'recharge-orders' ||
     detectSafeFirstDeliveryRechargeOrdersIntent(normalizedText)
@@ -13713,6 +13884,8 @@ function buildDomainUnderstanding({
     ? 'school-crm'
     : isRechargeOrdersSystem
       ? 'recharge-orders'
+    : communityPlantNurseryProfile
+      ? 'community-plant-nursery'
     : bikeRepairWorkshopProfile
       ? 'bike-repair-workshop'
     : logisticsTrackingProfile
@@ -13725,6 +13898,9 @@ function buildDomainUnderstanding({
       ? onlineCoursesProfile?.domainLabel || 'plataforma de cursos online'
       : '') ||
     (resolvedFamilyKey === 'school-crm' ? 'gestion escolar' : '') ||
+    (resolvedFamilyKey === 'community-plant-nursery'
+      ? communityPlantNurseryProfile?.domainLabel || ''
+      : '') ||
     (resolvedFamilyKey === 'bike-repair-workshop'
       ? bikeRepairWorkshopProfile?.domainLabel || ''
       : '') ||
@@ -13748,6 +13924,8 @@ function buildDomainUnderstanding({
         ? logisticsTrackingProfile?.modules || []
       : resolvedFamilyKey === 'commercial-ecommerce'
         ? commercialEcommerceProfile?.modules || []
+      : resolvedFamilyKey === 'community-plant-nursery'
+        ? communityPlantNurseryProfile?.modules || []
       : resolvedFamilyKey === 'bike-repair-workshop'
         ? bikeRepairWorkshopProfile?.modules || []
       : resolvedFamilyKey === 'ecommerce'
@@ -13777,14 +13955,21 @@ function buildDomainUnderstanding({
       ...(resolvedFamilyKey === 'bike-repair-workshop'
         ? bikeRepairWorkshopProfile?.modules || []
         : []),
-      ...(resolvedFamilyKey === 'online-courses' || resolvedFamilyKey === 'bike-repair-workshop'
+      ...(resolvedFamilyKey === 'community-plant-nursery'
+        ? communityPlantNurseryProfile?.modules || []
+        : []),
+      ...(resolvedFamilyKey === 'online-courses' ||
+      resolvedFamilyKey === 'bike-repair-workshop' ||
+      resolvedFamilyKey === 'community-plant-nursery'
         ? []
         : dynamicPlanParts.modules),
       ...fallbackModules,
       resolvedFamilyKey === 'security' ? 'reportes' : '',
       /\breportes?\b/u.test(normalizedText) ? 'reportes' : '',
     ].filter(Boolean),
-    resolvedFamilyKey === 'bike-repair-workshop' ? 16 : 12,
+    resolvedFamilyKey === 'bike-repair-workshop' || resolvedFamilyKey === 'community-plant-nursery'
+      ? 20
+      : 12,
   )
   const primaryModules =
     resolvedFamilyKey === 'commercial-ecommerce'
@@ -13827,6 +14012,9 @@ function buildDomainUnderstanding({
       ...(resolvedFamilyKey === 'bike-repair-workshop'
         ? bikeRepairWorkshopProfile?.entities || []
         : []),
+      ...(resolvedFamilyKey === 'community-plant-nursery'
+        ? communityPlantNurseryProfile?.entities || []
+        : []),
       ...primaryModules
         .map((entry) => inferSafeFirstDeliveryMaterializationEntityName(entry))
         .filter(Boolean),
@@ -13862,6 +14050,8 @@ function buildDomainUnderstanding({
     ecommerce: 'gestionar catalogo, carrito y ordenes mock',
     'bike-repair-workshop':
       'gestionar bicicletas, vecinos, turnos, ordenes de trabajo, repuestos y presupuestos estimados en modo local',
+    'community-plant-nursery':
+      'gestionar plantas, especies, esquejes, semillas, intercambios, reservas, entregas y cuidados basicos en modo local',
     'online-courses':
       'gestionar cursos online, alumnos, planes, pagos mock y progreso del alumno',
     'school-crm': 'gestionar seguimiento escolar y comunicaciones',
@@ -13902,6 +14092,10 @@ function buildDomainUnderstanding({
     resolvedFamilyKey === 'bike-repair-workshop' && bikeRepairWorkshopProfile
       ? bikeRepairWorkshopProfile.localActions
       : []
+  const plantNurseryLocalFlows =
+    resolvedFamilyKey === 'community-plant-nursery' && communityPlantNurseryProfile
+      ? communityPlantNurseryProfile.localActions
+      : []
   const coreFlows = summarizeUniqueExecutorStrings(
     onlineCoursesLocalFlows.length > 0
       ? onlineCoursesLocalFlows
@@ -13911,6 +14105,8 @@ function buildDomainUnderstanding({
       ? ecommerceLocalFlows
       : bikeRepairLocalFlows.length > 0
       ? bikeRepairLocalFlows
+      : plantNurseryLocalFlows.length > 0
+      ? plantNurseryLocalFlows
       : dynamicPlanParts.localBehavior.length > 0
       ? dynamicPlanParts.localBehavior
       : [
@@ -13931,6 +14127,8 @@ function buildDomainUnderstanding({
       ? ecommerceLocalFlows
       : bikeRepairLocalFlows.length > 0
       ? bikeRepairLocalFlows
+      : plantNurseryLocalFlows.length > 0
+      ? plantNurseryLocalFlows
       : dynamicPlanParts.localBehavior.length > 0
       ? dynamicPlanParts.localBehavior
       : coreFlows,
@@ -13953,6 +14151,8 @@ function buildDomainUnderstanding({
     pushUniquePlannerValues(roles, ['administrador', 'moderador', 'miembro'])
   } else if (resolvedFamilyKey === 'security') {
     pushUniquePlannerValues(roles, ['administrador', 'operador', 'supervisor'])
+  } else if (resolvedFamilyKey === 'community-plant-nursery' && communityPlantNurseryProfile) {
+    pushUniquePlannerValues(roles, communityPlantNurseryProfile.roles)
   } else if (resolvedFamilyKey === 'bike-repair-workshop' && bikeRepairWorkshopProfile) {
     pushUniquePlannerValues(roles, bikeRepairWorkshopProfile.roles)
   } else if (resolvedFamilyKey === 'recharge-orders') {
@@ -13998,6 +14198,10 @@ function buildDomainUnderstanding({
     pushUniquePlannerValues(explicitExclusions, bikeRepairWorkshopProfile.explicitExclusions)
   }
 
+  if (resolvedFamilyKey === 'community-plant-nursery' && communityPlantNurseryProfile) {
+    pushUniquePlannerValues(explicitExclusions, communityPlantNurseryProfile.explicitExclusions)
+  }
+
   if (
     /\bdatos sensibles\b|\bmenores\b|\bsalud\b|\bpacientes?\b|\balumnos?\b|\bfamilias?\b/u.test(
       normalizedText,
@@ -14037,6 +14241,8 @@ function buildDomainUnderstanding({
         ? buildRechargeOrdersDomainProfile().stateHints
         : resolvedFamilyKey === 'bike-repair-workshop' && bikeRepairWorkshopProfile
           ? bikeRepairWorkshopProfile.stateHints
+          : resolvedFamilyKey === 'community-plant-nursery' && communityPlantNurseryProfile
+            ? communityPlantNurseryProfile.stateHints
         : buildSafeFirstDeliveryMaterializationStateHints({
             productType: productKind,
             isSchoolCrm,
@@ -14051,6 +14257,8 @@ function buildDomainUnderstanding({
         ? buildRechargeOrdersDomainProfile().approvalThemes
         : resolvedFamilyKey === 'bike-repair-workshop' && bikeRepairWorkshopProfile
           ? bikeRepairWorkshopProfile.approvalThemes
+          : resolvedFamilyKey === 'community-plant-nursery' && communityPlantNurseryProfile
+            ? communityPlantNurseryProfile.approvalThemes
         : buildSafeFirstDeliveryMaterializationApprovalThemes({
             productType: productKind,
             isSchoolCrm,
@@ -21189,6 +21397,10 @@ function detectFullstackLocalDemoArchetype({
     return 'community-tool-bank'
   }
 
+  if (detectCommunityPlantNurseryIntent(combinedText)) {
+    return 'community-plant-nursery'
+  }
+
   if (detectBikeRepairWorkshopIntent(combinedText)) {
     return 'bike-repair-workshop'
   }
@@ -22409,6 +22621,23 @@ function resolveFullstackLocalContractProfile({
       publicRoutePurpose:
         'Consultar el catalogo local de herramientas disponibles sin servicios reales.',
       validationSchemaMarker: 'create table tools',
+    }
+  }
+
+  if (resolvedArchetype === 'community-plant-nursery') {
+    return {
+      archetype: resolvedArchetype,
+      frontendFeatureBasename: 'plants',
+      backendModuleBasename: 'plants',
+      backendRouteBasename: 'plants',
+      primaryFeatureLabel: 'plantas, especies e intercambios',
+      primaryRoutePath: '/plants',
+      primaryRoutePurpose:
+        'Listar plantas, esquejes, semillas, reservas e intercambios mock en modo local.',
+      publicRoutePath: '/catalog',
+      publicRoutePurpose:
+        'Consultar el catalogo publico simulado del vivero sin servicios reales.',
+      validationSchemaMarker: 'create table plants',
     }
   }
 
@@ -24394,6 +24623,115 @@ function buildLogisticsTrackingFullstackLocalDemoData({
   })
 }
 
+function buildCommunityPlantNurseryFullstackLocalDemoData({
+  appTitle,
+  nextRecommendedPhase,
+}) {
+  return buildTemplateFullstackLocalDemoData({
+    appTitle,
+    archetype: 'community-plant-nursery',
+    heroKicker: 'Vivero comunitario',
+    subtitle:
+      'Entrega funcional local para vecinos, plantas, especies, esquejes, semillas, intercambios y reservas.',
+    domainSummary:
+      'MVP local seguro para gestionar un vivero comunitario con panel publico, operativo y administrativo, backend mock y base local revisable.',
+    nextRecommendedPhase,
+    navItems: [
+      { id: 'dashboard', label: 'Dashboard', hint: 'Estado general' },
+      { id: 'clients', label: 'Vecinos', hint: 'Solicitantes' },
+      { id: 'resources', label: 'Plantas', hint: 'Especies y disponibilidad' },
+      { id: 'appointments', label: 'Intercambios', hint: 'Solicitudes y reservas' },
+      { id: 'inventory', label: 'Semillas', hint: 'Esquejes y stock' },
+      { id: 'reports', label: 'Reportes', hint: 'Indicadores mock' },
+    ],
+    metrics: [
+      { id: 'plants', label: 'Plantas disponibles', value: '42', tone: 'emerald', detail: '18 esquejes y 12 semillas listas para reservar' },
+      { id: 'exchanges', label: 'Solicitudes abiertas', value: '16', tone: 'sky', detail: '7 reservas pendientes de aprobacion' },
+      { id: 'deliveries', label: 'Entregas de la semana', value: '9', tone: 'amber', detail: 'Coordinadores revisan disponibilidad y observaciones' },
+    ],
+    alerts: [
+      { id: 'plant-a1', tone: 'sky', title: 'Reservas por aprobar', detail: 'Hay solicitudes de intercambio esperando coordinador del vivero.' },
+      { id: 'plant-a2', tone: 'emerald', title: 'Cuidados basicos publicados', detail: 'Los vecinos pueden consultar consejos simulados sin servicios externos.' },
+    ],
+    constraints: ['Sin pagos reales', 'Sin credenciales reales', 'Sin deploy', 'Sin Docker', 'Sin servicios externos', 'Sin DB productiva'],
+    team: [
+      { id: 'COO-001', name: 'Lina Verdes', role: 'Coordinadora del vivero', shift: '9 a 13 hs', status: 'Activa', focus: 'Aprobar solicitudes y entregas' },
+      { id: 'ADM-001', name: 'Mesa del vivero', role: 'Administracion local', shift: '10 a 16 hs', status: 'Activa', focus: 'Especies, reglas y reportes' },
+    ],
+    datasets: {
+      clients: [
+        { id: 'VEC-001', name: 'Rosa Medina', contact: 'interno 121', segment: 'Vecina', status: 'Activa', nextVisit: 'Entrega 10/05', notes: 'Reserva esqueje de romero y aporta semillas de albahaca.' },
+        { id: 'VEC-002', name: 'Nico Ferreyra', contact: 'interno 135', segment: 'Vecino', status: 'Pendiente', nextVisit: 'Retiro 11/05', notes: 'Solicita suculenta y consulta cuidados basicos.' },
+      ],
+      resources: [
+        { id: 'PLA-001', name: 'Romero aromatico', surface: 'Aromatica', schedule: 'Disponible hoy', status: 'Disponible', note: 'Esquejes en buen estado. Cuidado: sol y riego moderado.' },
+        { id: 'PLA-002', name: 'Suculenta echeveria', surface: 'Suculenta', schedule: 'Reserva 11/05', status: 'Reservada', note: 'Reservada para entrega simulada.' },
+      ],
+      appointments: [
+        { id: 'INT-001', clientName: 'Rosa Medina', professional: 'Lina Verdes', reason: 'Intercambio de esqueje por semillas', slot: '10/05 10:30', status: 'aprobada', room: 'Mesa vivero', notes: 'Marcar entrega realizada y actualizar disponibilidad.' },
+        { id: 'INT-002', clientName: 'Nico Ferreyra', professional: 'Mesa del vivero', reason: 'Reserva de suculenta', slot: '11/05 12:00', status: 'reservada', room: 'Retiro local', notes: 'Agregar consejo basico de cuidado al aviso simulado.' },
+      ],
+      inventory: [
+        { id: 'SEM-001', name: 'Semillas de albahaca', category: 'Semillas', stock: 18, minStock: 6, stockSummary: '18 / minimo 6', status: 'normal', note: 'Disponibles para intercambio local.' },
+        { id: 'ESQ-001', name: 'Esquejes de lavanda', category: 'Esquejes', stock: 3, minStock: 5, stockSummary: '3 / minimo 5', status: 'stock bajo', note: 'Actualizar disponibilidad antes de aprobar reservas.' },
+      ],
+      reports: [
+        { id: 'REP-PLANT-001', name: 'Solicitudes por estado', value: '16', detail: 'Solicitada, aprobada, reservada, entregada y cancelada.', status: 'Controlado' },
+        { id: 'REP-PLANT-002', name: 'Disponibilidad por especie', value: '24', detail: 'Plantas, esquejes y semillas con disponibilidad mock.', status: 'Revision' },
+      ],
+      activity: [
+        { id: 'ACT-PLANT-001', time: '09:20', title: 'Planta registrada', detail: 'Rosa agrego semillas de albahaca como disponibilidad local.', tone: 'emerald' },
+        { id: 'ACT-PLANT-002', time: '11:10', title: 'Reserva aprobada', detail: 'La solicitud INT-002 paso a reservada con aviso simulado.', tone: 'sky' },
+      ],
+    },
+    views: [
+      buildFullstackLocalDemoView({ id: 'dashboard', label: 'Dashboard', title: 'Estado del vivero', description: 'Resumen local de plantas, intercambios, reservas, entregas y disponibilidad.', kind: 'dashboard', supportsSearch: false }),
+      buildFullstackLocalDemoView({
+        id: 'clients', label: 'Vecinos', title: 'Vecinos', description: 'Personas que registran plantas y piden intercambios.',
+        datasetKey: 'clients',
+        columns: [{ key: 'name', label: 'Vecino' }, { key: 'segment', label: 'Tipo' }, { key: 'contact', label: 'Contacto' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'nextVisit', label: 'Proxima entrega' }, { key: 'notes', label: 'Notas' }],
+        searchableKeys: ['name', 'segment', 'contact', 'status'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'resources', label: 'Plantas', title: 'Plantas y especies', description: 'Catalogo publico local de especies, esquejes, semillas y disponibilidad.',
+        datasetKey: 'resources',
+        columns: [{ key: 'name', label: 'Planta' }, { key: 'surface', label: 'Categoria' }, { key: 'schedule', label: 'Disponibilidad' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'note', label: 'Cuidados basicos' }],
+        searchableKeys: ['name', 'surface', 'status', 'schedule'],
+      }),
+      buildFullstackLocalDemoView({
+        id: 'appointments', label: 'Intercambios', title: 'Solicitudes de intercambio', description: 'Solicitudes, reservas, entregas y observaciones operativas.',
+        datasetKey: 'appointments',
+        columns: [{ key: 'slot', label: 'Fecha' }, { key: 'clientName', label: 'Vecino' }, { key: 'professional', label: 'Coordinador' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'reason', label: 'Solicitud' }, { key: 'room', label: 'Zona' }, { key: 'notes', label: 'Observaciones' }],
+        searchableKeys: ['slot', 'clientName', 'professional', 'reason', 'status'],
+        supportsStatusFilter: true,
+      }),
+      buildFullstackLocalDemoView({
+        id: 'inventory', label: 'Semillas', title: 'Esquejes y semillas', description: 'Stock local y disponibilidad mock para coordinadores.',
+        datasetKey: 'inventory',
+        columns: [{ key: 'name', label: 'Item' }, { key: 'category', label: 'Tipo' }, { key: 'stockSummary', label: 'Stock' }, { key: 'status', label: 'Estado', kind: 'badge' }],
+        detailFields: [{ key: 'note', label: 'Nota' }],
+        searchableKeys: ['name', 'category', 'status'],
+        supportsLowStockToggle: true,
+      }),
+      buildFullstackLocalDemoView({ id: 'reports', label: 'Reportes', title: 'Reportes', description: 'Indicadores mock del vivero.', datasetKey: 'reports', kind: 'reports', supportsSearch: false }),
+    ],
+    quickActions: [
+      { id: 'qa-plant-1', label: 'Ver intercambios', targetView: 'appointments', feedback: 'Se abrio el panel operativo de solicitudes de intercambio.' },
+    ],
+    interactionHighlights: [
+      'Buscar plantas, especies, vecinos y estados desde el tablero principal.',
+      'Cambiar estados mock de solicitudes sin salir del navegador.',
+      'Actualizar disponibilidad y observaciones solo en memoria local.',
+    ],
+    statusOptions: { appointments: ['todos', 'solicitada', 'aprobada', 'reservada', 'entregada'] },
+    domainEntities: ['plantas', 'especies', 'esquejes', 'semillas', 'vecinos', 'solicitudes de intercambio', 'reservas', 'entregas', 'disponibilidad', 'cuidados basicos', 'coordinadores', 'reportes'],
+    modules: ['vivero comunitario', 'plantas', 'especies', 'esquejes', 'semillas', 'solicitudes de intercambio', 'reservas', 'entregas', 'panel publico', 'panel operativo', 'panel administrativo', 'backend mock', 'base local'],
+  })
+}
+
 function buildRealEstateFullstackLocalDemoData({
   appTitle,
   nextRecommendedPhase,
@@ -24819,6 +25157,11 @@ function buildFullstackLocalDemoData({
       })
     case 'community-tool-bank':
       return buildCommunityToolBankFullstackLocalDemoData({
+        appTitle,
+        nextRecommendedPhase,
+      })
+    case 'community-plant-nursery':
+      return buildCommunityPlantNurseryFullstackLocalDemoData({
         appTitle,
         nextRecommendedPhase,
       })
@@ -28706,6 +29049,110 @@ insert into simulated_notices (id, work_order_id, notice_type, status, message) 
     }
   }
 
+  if (archetype === 'community-plant-nursery') {
+    return {
+      readmeContent: `# Database local
+
+Esta carpeta queda como diseno revisable para el vivero comunitario de intercambio de plantas.
+
+- No se creo una base de datos real.
+- No se ejecutaron migraciones.
+- \`schema.sql\` y \`seeds/seed-local.sql\` describen plantas, especies, esquejes, semillas, vecinos, solicitudes de intercambio, reservas, entregas, disponibilidad y cuidados basicos.
+`,
+      schemaContent: `-- Esquema local revisable para ${appTitle}
+-- No ejecutar automaticamente sin una aprobacion posterior.
+
+create table neighbors (
+  id text primary key,
+  full_name text not null,
+  contact text,
+  status text not null,
+  notes text
+);
+
+create table species (
+  id text primary key,
+  common_name text not null,
+  category text not null,
+  care_notes text,
+  status text not null
+);
+
+create table plants (
+  id text primary key,
+  species_id text not null,
+  owner_neighbor_id text,
+  plant_type text not null,
+  availability_status text not null,
+  care_notes text,
+  observations text,
+  foreign key (species_id) references species(id),
+  foreign key (owner_neighbor_id) references neighbors(id)
+);
+
+create table coordinators (
+  id text primary key,
+  full_name text not null,
+  role_label text not null,
+  shift_label text,
+  status text not null
+);
+
+create table exchange_requests (
+  id text primary key,
+  neighbor_id text not null,
+  plant_id text not null,
+  coordinator_id text,
+  requested_at text not null,
+  request_type text not null,
+  status text not null,
+  reservation_note text,
+  delivery_note text,
+  observations text,
+  foreign key (neighbor_id) references neighbors(id),
+  foreign key (plant_id) references plants(id),
+  foreign key (coordinator_id) references coordinators(id)
+);
+
+create table report_snapshots (
+  id text primary key,
+  snapshot_date text not null,
+  report_name text not null,
+  metric_label text not null,
+  metric_value text not null,
+  status text not null,
+  notes text
+);
+`,
+      seedContent: `-- Seed local y revisable. No ejecutar automaticamente.
+
+insert into neighbors (id, full_name, contact, status, notes) values
+  ('VEC-001', 'Rosa Medina', 'interno 121', 'Activa', 'Reserva esqueje de romero y aporta semillas de albahaca'),
+  ('VEC-002', 'Nico Ferreyra', 'interno 135', 'Pendiente', 'Solicita suculenta y consulta cuidados basicos');
+
+insert into species (id, common_name, category, care_notes, status) values
+  ('ESP-001', 'Romero aromatico', 'Aromatica', 'Sol directo y riego moderado', 'Activa'),
+  ('ESP-002', 'Suculenta echeveria', 'Suculenta', 'Mucha luz y poca agua', 'Activa');
+
+insert into plants (id, species_id, owner_neighbor_id, plant_type, availability_status, care_notes, observations) values
+  ('PLA-001', 'ESP-001', 'VEC-001', 'esqueje', 'disponible', 'Sol directo y riego moderado', 'Listo para intercambio local'),
+  ('PLA-002', 'ESP-002', null, 'planta', 'reservada', 'Mucha luz y poca agua', 'Reservada para entrega simulada');
+
+insert into coordinators (id, full_name, role_label, shift_label, status) values
+  ('COO-001', 'Lina Verdes', 'Coordinadora del vivero', '9 a 13 hs', 'Activa'),
+  ('ADM-001', 'Mesa del vivero', 'Administracion local', '10 a 16 hs', 'Activa');
+
+insert into exchange_requests (id, neighbor_id, plant_id, coordinator_id, requested_at, request_type, status, reservation_note, delivery_note, observations) values
+  ('INT-001', 'VEC-001', 'PLA-001', 'COO-001', '2026-05-10 10:30', 'intercambio de esqueje por semillas', 'aprobada', 'Reserva confirmada', 'Entrega pendiente', 'Actualizar disponibilidad al entregar'),
+  ('INT-002', 'VEC-002', 'PLA-002', 'ADM-001', '2026-05-11 12:00', 'reserva de suculenta', 'reservada', 'Retiro local', 'Aviso simulado listo', 'Agregar consejo basico de cuidado');
+
+insert into report_snapshots (id, snapshot_date, report_name, metric_label, metric_value, status, notes) values
+  ('REP-PLANT-001', '2026-05-05', 'Solicitudes por estado', 'Solicitudes abiertas', '16', 'controlado', 'Circuito local seguro y revisable'),
+  ('REP-PLANT-002', '2026-05-05', 'Disponibilidad por especie', 'Plantas disponibles', '42', 'revision', 'Datos mock sin base productiva');
+`,
+    }
+  }
+
   return {
     readmeContent: `# Database local
 
@@ -31705,6 +32152,13 @@ function normalizeDomainUnderstandingContract(value) {
     return null
   }
 
+  const normalizedDomainLabel =
+    typeof value.domainLabel === 'string' ? normalizeSectorDetectionText(value.domainLabel) : ''
+  const primaryModuleLimit =
+    normalizedDomainLabel === 'vivero comunitario de intercambio de plantas' ||
+    normalizedDomainLabel === 'taller barrial de reparacion de bicicletas'
+      ? 20
+      : 12
   const normalizedValue = {
     ...(typeof value.domainLabel === 'string' && value.domainLabel.trim()
       ? { domainLabel: value.domainLabel.trim() }
@@ -31715,8 +32169,8 @@ function normalizeDomainUnderstandingContract(value) {
     ...(typeof value.productKind === 'string' && value.productKind.trim()
       ? { productKind: value.productKind.trim() }
       : {}),
-    ...(summarizeUniqueExecutorStrings(value.primaryModules, 12).length > 0
-      ? { primaryModules: summarizeUniqueExecutorStrings(value.primaryModules, 12) }
+    ...(summarizeUniqueExecutorStrings(value.primaryModules, primaryModuleLimit).length > 0
+      ? { primaryModules: summarizeUniqueExecutorStrings(value.primaryModules, primaryModuleLimit) }
       : {}),
     ...(summarizeUniqueExecutorStrings(value.primaryEntities, 12).length > 0
       ? { primaryEntities: summarizeUniqueExecutorStrings(value.primaryEntities, 12) }
@@ -37889,6 +38343,9 @@ function buildFullstackLocalArchetypeAppTitle(archetype) {
   if (archetype === 'community-tool-bank') {
     return 'Banco comunitario de herramientas local'
   }
+  if (archetype === 'community-plant-nursery') {
+    return 'Vivero comunitario local'
+  }
   if (archetype === 'bike-repair-workshop') {
     return 'Taller barrial de bicicletas local'
   }
@@ -37929,6 +38386,9 @@ function buildFullstackLocalArchetypeDisplayLabel(archetype) {
   }
   if (archetype === 'community-tool-bank') {
     return 'Banco comunitario de herramientas'
+  }
+  if (archetype === 'community-plant-nursery') {
+    return 'Vivero comunitario'
   }
   if (archetype === 'bike-repair-workshop') {
     return 'Taller barrial de bicicletas'
@@ -37978,6 +38438,8 @@ function fullstackLocalDomainLabelMatchesArchetype(label, archetype) {
   const compatibilityPatterns = {
     'community-tool-bank':
       /\bherramientas?\b|\bprestamos?\b|\breservas?\b|\bdevoluciones?\b|\bvecin(?:o|os|a|as)\b|\bcomunitari[oa]s?\b/u,
+    'community-plant-nursery':
+      /\bviveros?\b|\bplantas?\b|\bespecies?\b|\besquejes?\b|\bsemillas?\b|\bintercambios?\b|\bsolicitudes?\s+de\s+intercambio\b|\breservas?\b|\bentregas?\b|\bdisponibilidad\b|\bcuidados?\s+basicos?\b|\bcoordinadores?\b|\bvecin(?:o|os|a|as)\b/u,
     'bike-repair-workshop':
       /\bbicicletas?\b|\bbicis?\b|\btaller(?:es)?\b|\breparacion(?:es)?\b|\bmecanicos?\b|\brepuestos?\b|\bordenes?\s+de\s+trabajo\b|\bpresupuestos?\s+estimados?\b|\bvecin(?:o|os|a|as)\b/u,
     'online-courses':
@@ -45095,7 +45557,19 @@ function buildGeneratedDomainUniversalMaterializationPlan({
       return ''
     }
 
+    if (/^[a-z]:[\\/]/iu.test(normalized) || /^\\\\/u.test(normalized)) {
+      return normalizePathForComparison(normalized)
+    }
+
     const candidate = normalizePathForComparison(normalized)
+    if (
+      /^\/(?:README\.md|docs\/|frontend\/|backend\/|shared\/|database\/|validation\/|scripts\/)/iu.test(
+        candidate,
+      )
+    ) {
+      return candidate.replace(/^\/+/u, '')
+    }
+
     if (!path.isAbsolute(candidate)) {
       return candidate
     }
@@ -45197,8 +45671,12 @@ function buildGeneratedDomainUniversalMaterializationPlan({
       normalizeOptionalString(contract?.root?.targetRoot) ||
       normalizeOptionalString(preview?.targetRoot) ||
       normalizeOptionalString(candidatePlan?.candidate?.targetRoot) ||
-      null
-    const normalizedProjectRoot = normalizePlanPath(projectRoot)
+      slugifySandboxFolderName(domainLabel) ||
+      'generated-domain-project'
+    const normalizedProjectRoot =
+      normalizePlanPath(projectRoot) ||
+      slugifySandboxFolderName(domainLabel) ||
+      'generated-domain-project'
     const sourceRoot =
       normalizeOptionalString(contract?.root?.sourceRoot) ||
       normalizeOptionalString(preview?.sourceRoot) ||
@@ -45750,6 +46228,37 @@ module.exports = {
   }
 }
 
+function normalizeGeneratedDomainSandboxRelativePath(value) {
+  const rawValue = normalizeOptionalString(value)
+  if (!rawValue) {
+    return ''
+  }
+
+  if (/^[a-z]:[\\/]/iu.test(rawValue) || /^\\\\/u.test(rawValue)) {
+    return ''
+  }
+
+  const normalizedPath = normalizePathForComparison(rawValue)
+  const relativePath =
+    /^\/(?:README\.md|docs\/|frontend\/|backend\/|shared\/|database\/|validation\/|scripts\/)/iu.test(
+      normalizedPath,
+    )
+      ? normalizedPath.replace(/^\/+/u, '')
+      : normalizedPath
+
+  if (
+    !relativePath ||
+    relativePath === '..' ||
+    relativePath.startsWith('../') ||
+    relativePath.includes('/../') ||
+    path.isAbsolute(relativePath)
+  ) {
+    return ''
+  }
+
+  return relativePath
+}
+
 function evaluateGeneratedDomainFileCreationApproval({
   generatedDomainUniversalMaterializationPlan,
   approvalDecision,
@@ -45859,10 +46368,14 @@ function evaluateGeneratedDomainFileCreationApproval({
 
     const filesToCreate = Array.isArray(plan.filesToCreate) ? plan.filesToCreate : []
     for (const entry of filesToCreate) {
-      const relativePath = normalizePathForComparison(entry?.path)
+      const rawPath = normalizeOptionalString(entry?.path)
+      const relativePath = normalizeGeneratedDomainSandboxRelativePath(rawPath)
+      const invalidRelativePath = Boolean(rawPath) && !relativePath
       const blockedReason =
-        !relativePath
+        !rawPath
           ? 'missing-path'
+          : invalidRelativePath
+            ? 'outside-root'
           : path.isAbsolute(relativePath) || relativePath.startsWith('../')
             ? 'outside-root'
             : /(^|\/)\.env(?:\..+)?($|\/)/iu.test(relativePath)
@@ -45888,7 +46401,7 @@ function evaluateGeneratedDomainFileCreationApproval({
 
       if (blockedReason || !insideSandbox) {
         blockedFiles.push({
-          path: relativePath || normalizeOptionalString(entry?.path) || '',
+          path: relativePath || rawPath || '',
           reason: blockedReason || 'outside-sandbox',
         })
         continue
@@ -46069,11 +46582,18 @@ function materializeGeneratedDomainSandboxPlan({
     const filesByPath = new Map(
       (Array.isArray(plan.filesToCreate) ? plan.filesToCreate : [])
         .filter((entry) => entry && typeof entry === 'object')
-        .map((entry) => [normalizePathForComparison(entry.path), entry]),
+        .map((entry) => [
+          normalizeGeneratedDomainSandboxRelativePath(entry.path) ||
+            normalizePathForComparison(entry.path),
+          entry,
+        ]),
     )
 
     for (const allowedFile of approvalEvaluation.allowedFiles || []) {
-      const planEntry = filesByPath.get(normalizePathForComparison(allowedFile.path))
+      const normalizedAllowedPath =
+        normalizeGeneratedDomainSandboxRelativePath(allowedFile.path) ||
+        normalizePathForComparison(allowedFile.path)
+      const planEntry = filesByPath.get(normalizedAllowedPath)
       if (!planEntry) {
         skipped.push(`Sin contenido planificado para ${allowedFile.path}.`)
         continue
@@ -46089,7 +46609,11 @@ function materializeGeneratedDomainSandboxPlan({
     }
 
     const reportFileRelative =
-      normalizeOptionalString(plan.report?.reportFile) || `${plan.projectRoot}/validation/report.json`
+      normalizeGeneratedDomainSandboxRelativePath(plan.report?.reportFile) ||
+      normalizeGeneratedDomainSandboxRelativePath(
+        plan.projectRoot ? `${plan.projectRoot}/validation/report.json` : 'validation/report.json',
+      ) ||
+      'validation/report.json'
     const reportFileResolved = path.resolve(sandboxRootResolved, reportFileRelative)
     fs.mkdirSync(path.dirname(reportFileResolved), { recursive: true })
     fs.writeFileSync(
@@ -52263,8 +52787,15 @@ function deriveApprovalEquivalenceFamily(...texts) {
     combinedText.includes('repo sin deploy') ||
     combinedText.includes('sin deploy') ||
     combinedText.includes('no deploy') ||
+    combinedText.includes('no quiero deploy') ||
+    combinedText.includes('no usar deploy') ||
+    combinedText.includes('no hacer deploy') ||
     combinedText.includes('no desplegar') ||
+    combinedText.includes('no quiero desplegar') ||
+    combinedText.includes('no quiero publicacion') ||
+    combinedText.includes('no quiero publicación') ||
     combinedText.includes('no publicar') ||
+    combinedText.includes('no quiero publicar') ||
     combinedText.includes('sin publicar') ||
     combinedText.includes('sin publicacion') ||
     combinedText.includes('sin publicación')
@@ -52274,6 +52805,8 @@ function deriveApprovalEquivalenceFamily(...texts) {
     combinedText.includes('no crear repo publico') ||
     combinedText.includes('no crear repo público') ||
     combinedText.includes('no subir repo') ||
+    combinedText.includes('no quiero repo publico') ||
+    combinedText.includes('no quiero repo público') ||
     combinedText.includes('sin github repo') ||
     combinedText.includes('sin public repo')
   const explicitlyLocalOnly =
@@ -52288,6 +52821,8 @@ function deriveApprovalEquivalenceFamily(...texts) {
     combinedText.includes('sin pago real') ||
     combinedText.includes('no pagos reales') ||
     combinedText.includes('no pago real') ||
+    combinedText.includes('no quiero pagos reales') ||
+    combinedText.includes('no quiero pago real') ||
     combinedText.includes('checkout simulado') ||
     combinedText.includes('sin checkout real') ||
     combinedText.includes('sin venta directa')
@@ -54851,7 +55386,9 @@ async function buildLocalStrategicBrainDecision({
     !scopedFileEditIntent &&
     !localGoalDescriptor &&
     !looksLikeWebBaseGoal &&
-    compositeSteps.length < 2 &&
+    (compositeSteps.length < 2 ||
+      fullstackLocalMaterializationIntent.matches ||
+      shouldPromoteApprovedSandboxFullstackLocalMaterialization) &&
     (!previousExecutionResult ||
       iteration === 1 ||
       approvalFeedbackResolved ||
@@ -55008,14 +55545,23 @@ async function buildLocalStrategicBrainDecision({
   if (
     (fullstackLocalMaterializationIntent.matches ||
       shouldPromoteApprovedSandboxFullstackLocalMaterialization) &&
-    !safeFirstDeliveryIntent.matches &&
+    (!safeFirstDeliveryIntent.matches ||
+      fullstackLocalMaterializationIntent.matches ||
+      shouldPromoteApprovedSandboxFullstackLocalMaterialization) &&
     !scopedFileEditIntent &&
-    !localGoalDescriptor &&
-    (!looksLikeWebBaseGoal || shouldPreferSafeFirstDeliveryForCommercialWebGoal) &&
+    (!localGoalDescriptor ||
+      fullstackLocalMaterializationIntent.matches ||
+      shouldPromoteApprovedSandboxFullstackLocalMaterialization) &&
+    (!looksLikeWebBaseGoal ||
+      shouldPreferSafeFirstDeliveryForCommercialWebGoal ||
+      fullstackLocalMaterializationIntent.matches ||
+      shouldPromoteApprovedSandboxFullstackLocalMaterialization) &&
     compositeSteps.length < 2 &&
     (!previousExecutionResult ||
       iteration === 1 ||
       approvalFeedbackResolved ||
+      fullstackLocalMaterializationIntent.matches ||
+      shouldPromoteApprovedSandboxFullstackLocalMaterialization ||
       hasRecoverableExecutionError)
   ) {
     if (shouldRequestSandboxLocationApprovalBeforeFullstackMaterialization) {
