@@ -65,6 +65,7 @@ const sections = [
       ['node', ['--check', 'scripts/ai-operator-e2e-smoke.mjs']],
       ['node', ['--check', 'scripts/ai-release-smoke.mjs']],
       ['node', ['--check', 'scripts/generated-domain-delivery-codex-task-smoke.mjs']],
+      ['node', ['--check', 'scripts/generated-domain-delivery-roundtrip-smoke.mjs']],
       ['node', ['--check', 'scripts/generated-domain-delivery-review-evidence-smoke.mjs']],
       ['node', ['--check', 'scripts/generated-domain-delivery-review-loop-smoke.mjs']],
       ['node', ['--check', 'scripts/generated-domain-electron-ui-e2e-smoke.mjs']],
@@ -102,6 +103,11 @@ const sections = [
     id: 'generated-domain-delivery-codex-task-smoke',
     label: 'Generated domain delivery Codex task smoke',
     commands: [['node', ['scripts/generated-domain-delivery-codex-task-smoke.mjs']]],
+  },
+  {
+    id: 'generated-domain-delivery-roundtrip-smoke',
+    label: 'Generated domain delivery roundtrip smoke',
+    commands: [['node', ['scripts/generated-domain-delivery-roundtrip-smoke.mjs']]],
   },
   {
     id: 'generated-domain-delivery-review-loop-smoke',
