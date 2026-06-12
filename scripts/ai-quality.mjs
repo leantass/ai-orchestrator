@@ -62,6 +62,7 @@ const sections = [
       ['node', ['--check', 'electron/generated-domain-delivery-history-ledger.cjs']],
       ['node', ['--check', 'electron/generated-domain-delivery-review.cjs']],
       ['node', ['--check', 'electron/generated-domain-delivery-supervised-workflow.cjs']],
+      ['node', ['--check', 'electron/orchestrator-tool-worker-registry.cjs']],
       ['node', ['--check', 'electron/project-context.cjs']],
       ['node', ['--check', 'electron/workspace-project-detection.cjs']],
       ['node', ['--check', 'scripts/ai-planner-smoke.mjs']],
@@ -80,6 +81,8 @@ const sections = [
       ['node', ['--check', 'scripts/generated-domain-delivery-correction-selector.mjs']],
       ['node', ['--check', 'scripts/generated-domain-delivery-history-ledger.mjs']],
       ['node', ['--check', 'scripts/generated-domain-delivery-supervised-workflow.mjs']],
+      ['node', ['--check', 'scripts/orchestrator-tool-worker-registry.mjs']],
+      ['node', ['--check', 'scripts/orchestrator-tool-worker-registry-smoke.mjs']],
       ['node', ['--check', 'scripts/wait-for-vite-dev.mjs']],
       ['node', ['--check', 'scripts/ai-quality.mjs']],
     ],
@@ -128,6 +131,11 @@ const sections = [
     id: 'generated-domain-delivery-supervised-workflow-smoke',
     label: 'Generated domain delivery supervised workflow smoke',
     commands: [['node', ['scripts/generated-domain-delivery-supervised-workflow-smoke.mjs']]],
+  },
+  {
+    id: 'orchestrator-tool-worker-registry-smoke',
+    label: 'Orchestrator tool worker registry smoke',
+    commands: [['node', ['scripts/orchestrator-tool-worker-registry-smoke.mjs']]],
   },
   {
     id: 'generated-domain-delivery-roundtrip-smoke',
