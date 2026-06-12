@@ -64,6 +64,7 @@ const sections = [
       ['node', ['--check', 'scripts/ai-planner-smoke.mjs']],
       ['node', ['--check', 'scripts/ai-operator-e2e-smoke.mjs']],
       ['node', ['--check', 'scripts/ai-release-smoke.mjs']],
+      ['node', ['--check', 'scripts/generated-domain-delivery-review-evidence-smoke.mjs']],
       ['node', ['--check', 'scripts/generated-domain-delivery-review-loop-smoke.mjs']],
       ['node', ['--check', 'scripts/generated-domain-electron-ui-e2e-smoke.mjs']],
       ['node', ['--check', 'scripts/generated-domain-sandbox-approval-battery-smoke.mjs']],
@@ -100,6 +101,11 @@ const sections = [
     id: 'generated-domain-delivery-review-loop-smoke',
     label: 'Generated domain delivery review loop smoke',
     commands: [['node', ['scripts/generated-domain-delivery-review-loop-smoke.mjs']]],
+  },
+  {
+    id: 'generated-domain-delivery-review-evidence-smoke',
+    label: 'Generated domain delivery review evidence smoke',
+    commands: [['node', ['scripts/generated-domain-delivery-review-evidence-smoke.mjs']]],
   },
   {
     id: 'generated-domain-electron-ui-e2e-smoke',
