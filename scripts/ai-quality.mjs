@@ -63,6 +63,7 @@ const sections = [
       ['node', ['--check', 'electron/generated-domain-delivery-review.cjs']],
       ['node', ['--check', 'electron/generated-domain-delivery-supervised-workflow.cjs']],
       ['node', ['--check', 'electron/generated-domain-delivery-worker-handoff.cjs']],
+      ['node', ['--check', 'electron/orchestrator-local-smoke-worker.cjs']],
       ['node', ['--check', 'electron/orchestrator-tool-worker-registry.cjs']],
       ['node', ['--check', 'electron/project-context.cjs']],
       ['node', ['--check', 'electron/workspace-project-detection.cjs']],
@@ -84,6 +85,8 @@ const sections = [
       ['node', ['--check', 'scripts/generated-domain-delivery-history-ledger.mjs']],
       ['node', ['--check', 'scripts/generated-domain-delivery-supervised-workflow.mjs']],
       ['node', ['--check', 'scripts/generated-domain-delivery-worker-handoff.mjs']],
+      ['node', ['--check', 'scripts/orchestrator-local-smoke-worker.mjs']],
+      ['node', ['--check', 'scripts/orchestrator-local-smoke-worker-smoke.mjs']],
       ['node', ['--check', 'scripts/orchestrator-tool-worker-registry.mjs']],
       ['node', ['--check', 'scripts/orchestrator-tool-worker-registry-smoke.mjs']],
       ['node', ['--check', 'scripts/wait-for-vite-dev.mjs']],
@@ -144,6 +147,11 @@ const sections = [
     id: 'orchestrator-tool-worker-registry-smoke',
     label: 'Orchestrator tool worker registry smoke',
     commands: [['node', ['scripts/orchestrator-tool-worker-registry-smoke.mjs']]],
+  },
+  {
+    id: 'orchestrator-local-smoke-worker-smoke',
+    label: 'Orchestrator local smoke worker smoke',
+    commands: [['node', ['scripts/orchestrator-local-smoke-worker-smoke.mjs']]],
   },
   {
     id: 'generated-domain-delivery-roundtrip-smoke',
