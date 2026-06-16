@@ -67,6 +67,7 @@ const sections = [
       ['node', ['--check', 'electron/orchestrator-external-tool-approval-gates.cjs']],
       ['node', ['--check', 'electron/orchestrator-external-tool-dry-run-planner.cjs']],
       ['node', ['--check', 'electron/orchestrator-external-tool-supervised-execution.cjs']],
+      ['node', ['--check', 'electron/orchestrator-external-tool-readiness-review.cjs']],
       ['node', ['--check', 'electron/orchestrator-planned-external-workers.cjs']],
       ['node', ['--check', 'electron/orchestrator-supervised-worker-workflow.cjs']],
       ['node', ['--check', 'electron/orchestrator-tool-worker-registry.cjs']],
@@ -98,6 +99,8 @@ const sections = [
       ['node', ['--check', 'scripts/orchestrator-external-tool-dry-run-planner-smoke.mjs']],
       ['node', ['--check', 'scripts/orchestrator-external-tool-supervised-execution.mjs']],
       ['node', ['--check', 'scripts/orchestrator-external-tool-supervised-execution-smoke.mjs']],
+      ['node', ['--check', 'scripts/orchestrator-external-tool-readiness-review.mjs']],
+      ['node', ['--check', 'scripts/orchestrator-external-tool-readiness-review-smoke.mjs']],
       ['node', ['--check', 'scripts/orchestrator-planned-external-workers.mjs']],
       ['node', ['--check', 'scripts/orchestrator-planned-external-workers-smoke.mjs']],
       ['node', ['--check', 'scripts/orchestrator-supervised-worker-workflow.mjs']],
@@ -182,6 +185,11 @@ const sections = [
     id: 'orchestrator-external-tool-supervised-execution-smoke',
     label: 'Orchestrator external tool supervised execution smoke',
     commands: [['node', ['scripts/orchestrator-external-tool-supervised-execution-smoke.mjs']]],
+  },
+  {
+    id: 'orchestrator-external-tool-readiness-review-smoke',
+    label: 'Orchestrator external tool readiness review smoke',
+    commands: [['node', ['scripts/orchestrator-external-tool-readiness-review-smoke.mjs']]],
   },
   {
     id: 'orchestrator-planned-external-workers-smoke',
