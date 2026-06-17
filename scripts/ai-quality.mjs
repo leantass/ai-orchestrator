@@ -69,6 +69,7 @@ const sections = [
       ['node', ['--check', 'electron/orchestrator-external-tool-supervised-execution.cjs']],
       ['node', ['--check', 'electron/orchestrator-external-tool-readiness-review.cjs']],
       ['node', ['--check', 'electron/orchestrator-external-tool-manual-execution-packet.cjs']],
+      ['node', ['--check', 'electron/orchestrator-external-tool-human-approval-record.cjs']],
       ['node', ['--check', 'electron/orchestrator-planned-external-workers.cjs']],
       ['node', ['--check', 'electron/orchestrator-supervised-worker-workflow.cjs']],
       ['node', ['--check', 'electron/orchestrator-tool-worker-registry.cjs']],
@@ -104,6 +105,8 @@ const sections = [
       ['node', ['--check', 'scripts/orchestrator-external-tool-readiness-review-smoke.mjs']],
       ['node', ['--check', 'scripts/orchestrator-external-tool-manual-execution-packet.mjs']],
       ['node', ['--check', 'scripts/orchestrator-external-tool-manual-execution-packet-smoke.mjs']],
+      ['node', ['--check', 'scripts/orchestrator-external-tool-human-approval-record.mjs']],
+      ['node', ['--check', 'scripts/orchestrator-external-tool-human-approval-record-smoke.mjs']],
       ['node', ['--check', 'scripts/orchestrator-planned-external-workers.mjs']],
       ['node', ['--check', 'scripts/orchestrator-planned-external-workers-smoke.mjs']],
       ['node', ['--check', 'scripts/orchestrator-supervised-worker-workflow.mjs']],
@@ -198,6 +201,11 @@ const sections = [
     id: 'orchestrator-external-tool-manual-execution-packet-smoke',
     label: 'Orchestrator external tool manual execution packet smoke',
     commands: [['node', ['scripts/orchestrator-external-tool-manual-execution-packet-smoke.mjs']]],
+  },
+  {
+    id: 'orchestrator-external-tool-human-approval-record-smoke',
+    label: 'Orchestrator external tool human approval record smoke',
+    commands: [['node', ['scripts/orchestrator-external-tool-human-approval-record-smoke.mjs']]],
   },
   {
     id: 'orchestrator-planned-external-workers-smoke',
