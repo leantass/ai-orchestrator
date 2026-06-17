@@ -116,6 +116,7 @@ const sections = [
       ['node', ['--check', 'scripts/orchestrator-supervised-worker-workflow-smoke.mjs']],
       ['node', ['--check', 'scripts/orchestrator-tool-worker-registry.mjs']],
       ['node', ['--check', 'scripts/orchestrator-tool-worker-registry-smoke.mjs']],
+      ['node', ['--check', 'scripts/v1-release-smoke.mjs']],
       ['node', ['--check', 'scripts/wait-for-vite-dev.mjs']],
       ['node', ['--check', 'scripts/ai-quality.mjs']],
     ],
@@ -254,6 +255,11 @@ const sections = [
     id: 'generated-domain-sandbox-approval-battery-smoke',
     label: 'Generated domain sandbox approval battery smoke',
     commands: [['node', ['scripts/generated-domain-sandbox-approval-battery-smoke.mjs']]],
+  },
+  {
+    id: 'v1-release-smoke',
+    label: 'V1 release smoke',
+    commands: [['node', ['scripts/v1-release-smoke.mjs']]],
   },
   {
     id: 'build',

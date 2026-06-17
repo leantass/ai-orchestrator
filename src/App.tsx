@@ -31,6 +31,7 @@ import { PlanOverviewPanel } from './components/PlanOverviewPanel'
 import { ProjectInputsPanel } from './components/ProjectInputsPanel'
 import { ResultSummaryPanel } from './components/ResultSummaryPanel'
 import { SimpleExperienceDashboard } from './components/SimpleExperienceDashboard'
+import { V1ClosureDashboard } from './components/V1ClosureDashboard'
 import {
   getPrepareActionButtonLabel,
   getProjectContinuationStatusLabel,
@@ -5039,6 +5040,7 @@ const applyManualReusablePreferenceToPlannerExecutionMetadata = ({
 
 type AppSectionKey =
   | 'inicio'
+  | 'v1'
   | 'objetivo'
   | 'planificacion'
   | 'ejecucion'
@@ -5068,6 +5070,11 @@ const APP_NAV_SECTIONS: Array<{
     key: 'inicio',
     label: 'Inicio',
     description: 'Estado general, resumen del flujo y acciones rápidas.',
+  },
+  {
+    key: 'v1',
+    label: 'Cierre V1',
+    description: 'Dashboard de producto, flujo, workers, permisos y limites de V1.',
   },
   {
     key: 'objetivo',
@@ -26470,6 +26477,12 @@ No usar credenciales.`
                   }
                   quickActions={[
                     {
+                      label: 'Abrir cierre V1',
+                      detail: 'Ver dashboard de producto, flujo, workers, permisos, ledger y limites.',
+                      icon: 'shield',
+                      onClick: () => setActiveSection('v1'),
+                    },
+                    {
                       label: 'Revisar objetivo y contexto',
                       detail: 'Abrir el briefing del operador, el objetivo actual y el workspace.',
                       icon: 'goal',
@@ -26550,6 +26563,16 @@ No usar credenciales.`
                   />
                 </DisclosurePanel>
               </div>
+            ) : null}
+
+            {activeSection === 'v1' ? (
+              <V1ClosureDashboard
+                headLabel="903add5 feat: bundle external tool execution permits"
+                branchLabel="main"
+                repoStatusLabel="Clean / synced with origin"
+                ciLabel="CI success for 903add5"
+                latestRunLabel="Execution Permit Bundle v0.1"
+              />
             ) : null}
 
             {activeSection === 'objetivo' ? (
