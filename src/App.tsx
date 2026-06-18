@@ -15031,9 +15031,16 @@ function App() {
     lastBrainRoutingDecision?.fallbackUsed,
     lastBrainRoutingDecision?.resolvedProvider,
     plannerExecutionMetadata.decisionKey,
+    plannerExecutionMetadata.detectedVertical,
     plannerExecutionMetadata.executionMode,
+    plannerExecutionMetadata.materializationPlan?.contractDefinition?.contractKind,
+    plannerExecutionMetadata.materializationPlan?.projectRoot,
     plannerExecutionMetadata.nextExpectedAction,
+    plannerExecutionMetadata.selectedContractKind,
+    plannerExecutionMetadata.selectedDomain,
+    plannerExecutionMetadata.sourceRoot,
     plannerExecutionMetadata.strategy,
+    plannerExecutionMetadata.targetRoot,
     plannerHasPreparedFullstackLocalMaterializationResponse,
     plannerHasPreparedSafeMaterialization,
     plannerCanPrepareFrontendProjectFromScalableReview,
@@ -20624,6 +20631,24 @@ No usar credenciales.`
     resultHumanText,
     wizardCanShowResult,
   }))
+  const handleWizardNextForBridge = useEffectEvent(() => {
+    handleWizardNext()
+  })
+  const handleWizardGeneratePlanForBridge = useEffectEvent(async () => {
+    await handleWizardGeneratePlan()
+  })
+  const handleWizardExecuteForBridge = useEffectEvent(async () => {
+    await handleWizardExecute()
+  })
+  const handleApproveOnceForBridge = useEffectEvent(async () => {
+    await handleApproveOnce()
+  })
+  const handleRejectApprovalForBridge = useEffectEvent(async () => {
+    await handleRejectApproval()
+  })
+  const handleResetSessionMemoryForBridge = useEffectEvent(() => {
+    handleResetSessionMemory()
+  })
 
   useEffect(() => {
     if (!import.meta.env.DEV || typeof window === 'undefined') {
@@ -20650,7 +20675,7 @@ No usar credenciales.`
     }
 
     bridgeTarget.__JEFE_TEST__ = {
-      resetSession: handleResetSessionMemory,
+      resetSession: handleResetSessionMemoryForBridge,
       setGoal: (value) => flushSync(() => setGoalInput(value)),
       setContext: (value) => flushSync(() => setExecutionContextInput(value)),
       setWorkspacePath: (value) => flushSync(() => setWorkspacePath(value)),
@@ -20658,15 +20683,15 @@ No usar credenciales.`
         flushSync(() => setBrainCostMode(value as typeof brainCostMode)),
       setReuseMode: (value) =>
         flushSync(() => setManualReuseMode(value as ManualReuseMode)),
-      next: handleWizardNext,
-      generatePlan: handleWizardGeneratePlan,
-      execute: handleWizardExecute,
+      next: handleWizardNextForBridge,
+      generatePlan: handleWizardGeneratePlanForBridge,
+      execute: handleWizardExecuteForBridge,
       selectApprovalOption: (value) =>
         flushSync(() => setApprovalSelectedOption(value)),
       setApprovalFreeAnswer: (value) =>
         flushSync(() => setApprovalFreeAnswer(value)),
-      approveOnce: handleApproveOnce,
-      rejectApproval: handleRejectApproval,
+      approveOnce: handleApproveOnceForBridge,
+      rejectApproval: handleRejectApprovalForBridge,
       getState: () => buildJefeDevTestBridgeState(),
     }
 
@@ -20675,13 +20700,6 @@ No usar credenciales.`
     }
   }, [
     brainCostMode,
-    buildJefeDevTestBridgeState,
-    handleApproveOnce,
-    handleRejectApproval,
-    handleResetSessionMemory,
-    handleWizardExecute,
-    handleWizardGeneratePlan,
-    handleWizardNext,
   ])
 
   const handleTestLocalConnection = async () => {
