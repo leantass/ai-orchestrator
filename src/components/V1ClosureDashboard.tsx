@@ -246,9 +246,36 @@ const v15ManualRunnerItems = [
   },
   {
     label: 'Post-execution review',
-    value: 'Siguiente',
-    detail: 'Queda preparado para un bloque futuro; V1.5 no valida calidad profunda de binarios.',
+    value: 'Disponible',
+    detail: 'V1.6 consume session e intake y decide pass, needs_revision, blocked, missing_evidence o invalid_scope.',
     icon: 'reports' as AppIconName,
+  },
+] as const
+
+const v16PostExecutionReviewItems = [
+  {
+    label: 'Review source',
+    value: 'Session + intake',
+    detail: 'Consume la sesion V1.5 y el manual evidence intake ya registrado.',
+    icon: 'files' as AppIconName,
+  },
+  {
+    label: 'Decision',
+    value: 'V1.6',
+    detail: 'Entrega un review formal con decisionSummary, rationale y nextAction.',
+    icon: 'reports' as AppIconName,
+  },
+  {
+    label: 'Estados',
+    value: '5 resultados',
+    detail: 'pass, needs_revision, blocked, missing_evidence e invalid_scope.',
+    icon: 'result' as AppIconName,
+  },
+  {
+    label: 'Execution flags',
+    value: 'Locked',
+    detail: 'executionAllowed=false, automaticExecutionAllowed=false y externalToolExecutedByJefe=false.',
+    icon: 'shield' as AppIconName,
   },
 ] as const
 
@@ -282,7 +309,7 @@ const ledgerItems = [
 const historyMilestones = [
   'V1 accepted with remote CI green.',
   'Regression baseline passed without blockers.',
-  'External tools remain planned-only in V1.',
+  'V1.5 and V1.6 keep external work human-only and local-only.',
   'Local QA evidence lives in .codex-temp and is not versioned.',
 ]
 
@@ -348,21 +375,21 @@ export function V1ClosureDashboard({
         <MetricCard
           label="Ultimo hito"
           value={latestRunLabel}
-          detail="Aceptacion documental V1 cerrada con CI remoto verde."
+          detail="Sesion manual supervisada y post-execution review local ya forman parte del flujo V1.x."
           tone="violet"
           icon="history"
         />
         <MetricCard
           label="Siguiente recomendado"
-          value="V1.1 UI Polish"
-          detail="Pulir claridad visual sin abrir ejecucion externa."
+          value="V1.7 Session UI"
+          detail="Mostrar sesiones, intake, review y proximos pasos en la app."
           tone="sky"
           icon="next"
         />
         <MetricCard
-          label="V1.5 posterior"
-          value="Manual supervised runner"
-          detail="Solo despues de cerrar polish y permisos humanos."
+          label="Bloque actual"
+          value="V1.6 Review"
+          detail="Revision segura de evidencia humana sin abrir herramientas externas."
           tone="amber"
           icon="guided"
         />
@@ -500,7 +527,7 @@ export function V1ClosureDashboard({
           <MetricCard
             label="automaticExecutionAllowed"
             value="false"
-            detail="V1.5 debera agregar runner manual-supervisado antes de cualquier ejecucion externa."
+            detail="V1.5 y V1.6 sostienen un loop manual con session, intake y review sin ejecucion real."
             tone="amber"
             icon="approval"
           />
@@ -559,7 +586,7 @@ export function V1ClosureDashboard({
         tone="amber"
       >
         <div className="mb-4 rounded-[22px] border border-amber-300/20 bg-amber-300/10 px-4 py-4 text-sm leading-6 text-amber-50">
-          JEFE no abre Blender, no abre Unity y no invoca MCP. V1.5 prepara y registra la sesion para un operador humano; el post-execution review queda para el siguiente bloque.
+          JEFE no abre Blender, no abre Unity y no invoca MCP. V1.5 prepara y registra la sesion para un operador humano; V1.6 consume ese intake para cerrar una decision formal de review.
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {v15ManualRunnerItems.map((item) => (
@@ -569,7 +596,7 @@ export function V1ClosureDashboard({
               value={item.value}
               detail={item.detail}
               icon={item.icon}
-              tone={item.value === 'Siguiente' ? 'sky' : 'amber'}
+              tone={item.label === 'Post-execution review' ? 'sky' : 'amber'}
             />
           ))}
         </div>
@@ -586,6 +613,40 @@ export function V1ClosureDashboard({
             <span className="font-semibold text-[color:var(--jefe-text-strong)]">externalToolExecutedByJefe: </span>
             false
           </div>
+        </div>
+      </ResultSectionCard>
+
+      <ResultSectionCard
+        title="V1.6 Post-Execution Review"
+        description="Capa nueva para revisar evidencia humana segura y decidir si la ejecucion manual queda aprobada, requiere correccion o debe bloquearse."
+        icon="reports"
+        badge="Review only"
+        tone="sky"
+      >
+        <div className="mb-4 rounded-[22px] border border-sky-300/20 bg-sky-300/10 px-4 py-4 text-sm leading-6 text-sky-50">
+          El review no ejecuta Blender, Unity ni MCP. Solo consume artifacts locales ya registrados y produce una decision formal para el siguiente paso humano.
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {v16PostExecutionReviewItems.map((item) => (
+            <MetricCard
+              key={item.label}
+              label={item.label}
+              value={item.value}
+              detail={item.detail}
+              icon={item.icon}
+              tone="sky"
+            />
+          ))}
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-5">
+          {['pass', 'needs_revision', 'blocked', 'missing_evidence', 'invalid_scope'].map((status) => (
+            <div
+              key={status}
+              className="rounded-[18px] border border-white/8 bg-slate-950/35 px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--jefe-text-strong)]"
+            >
+              {status}
+            </div>
+          ))}
         </div>
       </ResultSectionCard>
 
