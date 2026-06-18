@@ -225,6 +225,33 @@ const approvalLayers = [
   },
 ] as const
 
+const v15ManualRunnerItems = [
+  {
+    label: 'Permit bundle',
+    value: 'Entrada requerida',
+    detail: 'Solo avanza si el permit esta ready_for_manual_supervised_execution.',
+    icon: 'approval' as AppIconName,
+  },
+  {
+    label: 'Manual session',
+    value: 'V1.5',
+    detail: 'Prepara sesion, operator runbook, checklist, evidencia esperada y abort conditions.',
+    icon: 'guided' as AppIconName,
+  },
+  {
+    label: 'Evidence intake',
+    value: 'Seguro',
+    detail: 'Registra evidencia humana local y bloquea .env, credenciales, builds y paths fuera de scope.',
+    icon: 'files' as AppIconName,
+  },
+  {
+    label: 'Post-execution review',
+    value: 'Siguiente',
+    detail: 'Queda preparado para un bloque futuro; V1.5 no valida calidad profunda de binarios.',
+    icon: 'reports' as AppIconName,
+  },
+] as const
+
 const ledgerItems = [
   {
     label: 'Delivery history ledger',
@@ -522,6 +549,44 @@ export function V1ClosureDashboard({
             ]}
           />
         </DisclosurePanel>
+      </ResultSectionCard>
+
+      <ResultSectionCard
+        title="V1.5 Manual Supervised Execution"
+        description="Nueva capa preparada para convertir un permit bundle listo en una sesion manual supervisada con runbook, checklist e intake de evidencia."
+        icon="guided"
+        badge="Manual only"
+        tone="amber"
+      >
+        <div className="mb-4 rounded-[22px] border border-amber-300/20 bg-amber-300/10 px-4 py-4 text-sm leading-6 text-amber-50">
+          JEFE no abre Blender, no abre Unity y no invoca MCP. V1.5 prepara y registra la sesion para un operador humano; el post-execution review queda para el siguiente bloque.
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {v15ManualRunnerItems.map((item) => (
+            <MetricCard
+              key={item.label}
+              label={item.label}
+              value={item.value}
+              detail={item.detail}
+              icon={item.icon}
+              tone={item.value === 'Siguiente' ? 'sky' : 'amber'}
+            />
+          ))}
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="rounded-[18px] border border-white/8 bg-slate-950/35 px-4 py-3 text-xs leading-5 text-[color:var(--jefe-muted)]">
+            <span className="font-semibold text-[color:var(--jefe-text-strong)]">executionAllowed: </span>
+            false
+          </div>
+          <div className="rounded-[18px] border border-white/8 bg-slate-950/35 px-4 py-3 text-xs leading-5 text-[color:var(--jefe-muted)]">
+            <span className="font-semibold text-[color:var(--jefe-text-strong)]">automaticExecutionAllowed: </span>
+            false
+          </div>
+          <div className="rounded-[18px] border border-white/8 bg-slate-950/35 px-4 py-3 text-xs leading-5 text-[color:var(--jefe-muted)]">
+            <span className="font-semibold text-[color:var(--jefe-text-strong)]">externalToolExecutedByJefe: </span>
+            false
+          </div>
+        </div>
       </ResultSectionCard>
 
       <ResultSectionCard

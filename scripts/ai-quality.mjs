@@ -71,6 +71,7 @@ const sections = [
       ['node', ['--check', 'electron/orchestrator-external-tool-manual-execution-packet.cjs']],
       ['node', ['--check', 'electron/orchestrator-external-tool-human-approval-record.cjs']],
       ['node', ['--check', 'electron/orchestrator-external-tool-execution-permit-bundle.cjs']],
+      ['node', ['--check', 'electron/orchestrator-external-tool-manual-supervised-runner.cjs']],
       ['node', ['--check', 'electron/orchestrator-planned-external-workers.cjs']],
       ['node', ['--check', 'electron/orchestrator-supervised-worker-workflow.cjs']],
       ['node', ['--check', 'electron/orchestrator-tool-worker-registry.cjs']],
@@ -110,6 +111,8 @@ const sections = [
       ['node', ['--check', 'scripts/orchestrator-external-tool-human-approval-record-smoke.mjs']],
       ['node', ['--check', 'scripts/orchestrator-external-tool-execution-permit-bundle.mjs']],
       ['node', ['--check', 'scripts/orchestrator-external-tool-execution-permit-bundle-smoke.mjs']],
+      ['node', ['--check', 'scripts/orchestrator-external-tool-manual-supervised-runner.mjs']],
+      ['node', ['--check', 'scripts/orchestrator-external-tool-manual-supervised-runner-smoke.mjs']],
       ['node', ['--check', 'scripts/orchestrator-planned-external-workers.mjs']],
       ['node', ['--check', 'scripts/orchestrator-planned-external-workers-smoke.mjs']],
       ['node', ['--check', 'scripts/orchestrator-supervised-worker-workflow.mjs']],
@@ -215,6 +218,11 @@ const sections = [
     id: 'orchestrator-external-tool-execution-permit-bundle-smoke',
     label: 'Orchestrator external tool execution permit bundle smoke',
     commands: [['node', ['scripts/orchestrator-external-tool-execution-permit-bundle-smoke.mjs']]],
+  },
+  {
+    id: 'orchestrator-external-tool-manual-supervised-runner-smoke',
+    label: 'Orchestrator external tool manual supervised runner smoke',
+    commands: [['node', ['scripts/orchestrator-external-tool-manual-supervised-runner-smoke.mjs']]],
   },
   {
     id: 'orchestrator-planned-external-workers-smoke',
