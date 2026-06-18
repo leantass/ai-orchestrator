@@ -5073,8 +5073,8 @@ const APP_NAV_SECTIONS: Array<{
   },
   {
     key: 'v1',
-    label: 'Cierre V1',
-    description: 'Dashboard de producto, flujo, workers, permisos y limites de V1.',
+    label: 'Estado V1',
+    description: 'Release V1, flujo, workers, permisos, seguridad y limites.',
   },
   {
     key: 'objetivo',
@@ -26477,8 +26477,8 @@ No usar credenciales.`
                   }
                   quickActions={[
                     {
-                      label: 'Abrir cierre V1',
-                      detail: 'Ver dashboard de producto, flujo, workers, permisos, ledger y limites.',
+                      label: 'Abrir Estado V1',
+                      detail: 'Ver release V1, flujo, workers, permisos, ledger y limites.',
                       icon: 'shield',
                       onClick: () => setActiveSection('v1'),
                     },
@@ -26567,11 +26567,11 @@ No usar credenciales.`
 
             {activeSection === 'v1' ? (
               <V1ClosureDashboard
-                headLabel="903add5 feat: bundle external tool execution permits"
+                headLabel="0245b97 docs: accept V1 orchestrator release"
                 branchLabel="main"
                 repoStatusLabel="Clean / synced with origin"
-                ciLabel="CI success for 903add5"
-                latestRunLabel="Execution Permit Bundle v0.1"
+                ciLabel="CI success for 0245b97"
+                latestRunLabel="V1 Final Acceptance"
               />
             ) : null}
 

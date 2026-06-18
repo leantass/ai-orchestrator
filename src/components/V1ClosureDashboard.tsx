@@ -12,16 +12,16 @@ import {
 
 const safetyItems = [
   {
-    label: 'External tools real execution',
+    label: 'External tools',
     value: 'Disabled',
-    detail: 'Blender, Unity and MCP are prepared through packets only.',
+    detail: 'No Blender, Unity or MCP real execution in V1.',
     tone: 'emerald' as MetricTone,
     icon: 'shield' as AppIconName,
   },
   {
-    label: 'Automatic execution',
+    label: 'Automatic external execution',
     value: 'Disabled',
-    detail: 'External permits never flip executionAllowed in V1.',
+    detail: 'executionAllowed and automaticExecutionAllowed stay false.',
     tone: 'emerald' as MetricTone,
     icon: 'approval' as AppIconName,
   },
@@ -42,16 +42,16 @@ const safetyItems = [
 ]
 
 const productAreas = [
-  ['Proyecto', 'Workspace, objetivo, contexto activo y estado de la sesion.', 'Available'],
-  ['Planificacion', 'Planner, decisionKey, estrategia, memoria y accion siguiente.', 'Available'],
-  ['Sandbox', 'Materializacion local segura con approval antes de writes.', 'Available'],
-  ['Delivery review', 'Revision de evidencia, decision y estado de la entrega.', 'Available'],
-  ['Codex worker', 'Handoff manual y correccion supervisada.', 'Available'],
-  ['Smoke runner', 'Worker local para comandos allowlisted y quality.', 'Available'],
-  ['External tools', 'Blender, Unity y MCP como ejecucion futura preparada.', 'Prepared'],
-  ['Approvals', 'Approval gates, packets, records y permits.', 'Available'],
-  ['History / Ledger', 'Historial de revisiones y correcciones.', 'Available'],
-  ['QA / Release', 'Smokes, build, lint, TypeScript y CI remoto.', 'Available'],
+  ['Proyecto', 'Objetivo, workspace, contexto y estado visible.', 'Available'],
+  ['Planificacion', 'Planner, decisionKey, memoria y proxima accion.', 'Available'],
+  ['Sandbox', 'Writes locales solo en scopes aprobados.', 'Available'],
+  ['Delivery review', 'Revision de evidencia y decision de entrega.', 'Available'],
+  ['Codex worker', 'Correccion empaquetada y supervisada.', 'Available'],
+  ['Smoke runner', 'Validaciones allowlisted y quality.', 'Available'],
+  ['External tools', 'Blender, Unity y MCP quedan planificados.', 'Prepared'],
+  ['Approvals', 'Gates, packets, records y permits.', 'Available'],
+  ['History / Ledger', 'Hitos, revisiones y correcciones.', 'Available'],
+  ['QA / Release', 'Smokes, build, lint, TypeScript y CI.', 'Available'],
 ] as const
 
 const taskPipeline = [
@@ -252,6 +252,13 @@ const ledgerItems = [
   },
 ]
 
+const historyMilestones = [
+  'V1 accepted with remote CI green.',
+  'Regression baseline passed without blockers.',
+  'External tools remain planned-only in V1.',
+  'Local QA evidence lives in .codex-temp and is not versioned.',
+]
+
 export function V1ClosureDashboard({
   headLabel,
   branchLabel,
@@ -266,31 +273,44 @@ export function V1ClosureDashboard({
   latestRunLabel: string
 }) {
   return (
-    <div className="space-y-6">
-      <SectionHeader
-        eyebrow="V1 closure"
-        title="JEFE / AI Orchestrator"
-        description="A usable local control room for safe planning, approvals, sandbox materialization, delivery review, supervised workers, external-tool permits and release evidence."
-        icon="shield"
-      />
+    <div className="space-y-5">
+      <article className="overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(34,197,94,0.15),transparent_25%),radial-gradient(circle_at_70%_18%,rgba(59,130,246,0.12),transparent_22%),linear-gradient(180deg,rgba(8,13,25,0.96),rgba(10,18,32,0.9))] p-5 shadow-[0_26px_70px_rgba(0,0,0,0.32)] sm:p-6">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div>
+            <SectionHeader
+              eyebrow="V1 release status"
+              title="JEFE / AI Orchestrator"
+              description="Control room local para planificar, aprobar, materializar en sandbox, revisar entregas, coordinar workers y preparar herramientas externas sin ejecutarlas."
+              icon="shield"
+            />
+            <div className="mt-5 flex flex-wrap gap-2">
+              <ResultStatusBadge label="V1 aceptada" tone="emerald" />
+              <ResultStatusBadge label="CI verde" tone="emerald" />
+              <ResultStatusBadge label="External execution disabled" tone="amber" />
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+            <MetricCard
+              label="Estado V1"
+              value="Complete and demonstrable"
+              detail="Usable desde la app, con docs, smoke V1 y baseline visual."
+              tone="emerald"
+              icon="result"
+              emphasis="hero"
+            />
+            <MetricCard
+              label="Branch / HEAD"
+              value={branchLabel}
+              detail={headLabel}
+              tone="sky"
+              icon="git"
+            />
+          </div>
+        </div>
+      </article>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Estado V1"
-          value="Complete and demonstrable"
-          detail="The product is usable from the app, with docs and release smoke."
-          tone="emerald"
-          icon="result"
-          emphasis="hero"
-        />
-        <MetricCard
-          label="Branch / HEAD"
-          value={branchLabel}
-          detail={headLabel}
-          tone="sky"
-          icon="git"
-          emphasis="hero"
-        />
         <MetricCard
           label="Repo / CI"
           value={repoStatusLabel}
@@ -301,28 +321,40 @@ export function V1ClosureDashboard({
         <MetricCard
           label="Ultimo hito"
           value={latestRunLabel}
-          detail="Latest external-tool permit bundle closed with remote CI green."
+          detail="Aceptacion documental V1 cerrada con CI remoto verde."
           tone="violet"
           icon="history"
+        />
+        <MetricCard
+          label="Siguiente recomendado"
+          value="V1.1 UI Polish"
+          detail="Pulir claridad visual sin abrir ejecucion externa."
+          tone="sky"
+          icon="next"
+        />
+        <MetricCard
+          label="V1.5 posterior"
+          value="Manual supervised runner"
+          detail="Solo despues de cerrar polish y permisos humanos."
+          tone="amber"
+          icon="guided"
         />
       </div>
 
       <ResultSectionCard
         title="Dashboard V1"
-        description="The product surface now explains what JEFE can do, what it refuses to do, and how the pieces fit together."
+        description="Mapa compacto de lo que V1 ya permite operar desde la app y lo que queda preparado para fases posteriores."
         icon="home"
         badge="Usable"
         tone="sky"
       >
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-2 lg:grid-cols-2">
           {productAreas.map(([label, detail, status]) => (
-            <MetricCard
+            <ProductAreaRow
               key={label}
               label={label}
-              value={status}
               detail={detail}
-              icon={label.includes('External') ? 'connectors' : label.includes('History') ? 'history' : 'status'}
-              tone={status === 'Prepared' ? 'amber' : 'default'}
+              status={status}
             />
           ))}
         </div>
@@ -330,10 +362,13 @@ export function V1ClosureDashboard({
 
       <ResultSectionCard
         title="Security posture"
-        description="V1 is intentionally conservative: it prepares and validates, but keeps risky execution behind explicit human control."
+        description="La regla de V1 es simple: preparar, explicar, pedir permiso, registrar evidencia y validar antes de cualquier accion con riesgo real."
         icon="shield"
         badge="Locked"
       >
+        <div className="mb-4 rounded-[22px] border border-amber-300/20 bg-amber-300/10 px-4 py-4 text-sm leading-6 text-amber-50">
+          Blender, Unity y MCP siguen deshabilitados para ejecucion real. V1 prepara permisos y evidencia; no abre herramientas externas ni autoriza automatizacion.
+        </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {safetyItems.map((item) => (
             <MetricCard key={item.label} {...item} />
@@ -343,17 +378,17 @@ export function V1ClosureDashboard({
 
       <ResultSectionCard
         title="Flujo de tarea"
-        description="Every stage has a conceptual status, a backing module and a supervision mode."
+        description="Pipeline completo de V1, con modo operativo y modulo de respaldo."
         icon="flow"
         badge={`${taskPipeline.length} etapas`}
       >
-        <div className="grid gap-3">
+        <div className="grid gap-3 xl:grid-cols-2">
           {taskPipeline.map((stage, index) => (
             <div
               key={stage.name}
               className="rounded-[22px] border border-white/8 bg-white/[0.03] px-4 py-4"
             >
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex h-full flex-col gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <SurfaceHeaderTag>{String(index + 1).padStart(2, '0')}</SurfaceHeaderTag>
@@ -367,7 +402,7 @@ export function V1ClosureDashboard({
                     {stage.description}
                   </div>
                 </div>
-                <div className="min-w-0 rounded-[18px] border border-white/8 bg-slate-950/45 px-3 py-3 text-xs leading-5 text-slate-300 lg:w-[340px]">
+                <div className="mt-auto min-w-0 rounded-[18px] border border-white/8 bg-slate-950/45 px-3 py-3 text-xs leading-5 text-slate-300">
                   {stage.module}
                 </div>
               </div>
@@ -423,10 +458,26 @@ export function V1ClosureDashboard({
 
       <ResultSectionCard
         title="Approvals / Permits"
-        description="The approval stack explains what is prepared and why real execution remains disabled."
+        description="Cada capa reduce riesgo, pero ninguna ejecuta herramientas reales en V1."
         icon="approval"
         badge="executionAllowed false"
       >
+        <div className="mb-4 grid gap-3 md:grid-cols-2">
+          <MetricCard
+            label="executionAllowed"
+            value="false"
+            detail="El permit bundle puede estar listo para revision futura, pero no habilita ejecucion real."
+            tone="amber"
+            icon="shield"
+          />
+          <MetricCard
+            label="automaticExecutionAllowed"
+            value="false"
+            detail="V1.5 debera agregar runner manual-supervisado antes de cualquier ejecucion externa."
+            tone="amber"
+            icon="approval"
+          />
+        </div>
         <div className="grid gap-3 xl:grid-cols-2">
           {approvalLayers.map((layer) => (
             <div
@@ -475,11 +526,28 @@ export function V1ClosureDashboard({
 
       <ResultSectionCard
         title="Historial / Ledger"
-        description="V1 keeps history understandable through ledgers, run summaries and local evidence folders."
+        description="Donde mirar que paso, que se valido y que evidencia local queda fuera de Git."
         icon="history"
         badge="Navigable"
       >
-        <ResultKeyValueGrid items={ledgerItems} />
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <ResultKeyValueGrid items={ledgerItems} />
+          <div className="rounded-[22px] border border-white/8 bg-slate-950/38 px-4 py-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              V1 milestones
+            </div>
+            <div className="mt-3 grid gap-2">
+              {historyMilestones.map((milestone) => (
+                <div
+                  key={milestone}
+                  className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2 text-xs leading-5 text-slate-300"
+                >
+                  {milestone}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </ResultSectionCard>
 
       <ResultSectionCard
@@ -526,7 +594,7 @@ function WorkerRow({
   external?: boolean
 }) {
   return (
-    <div className="rounded-[22px] border border-white/8 bg-slate-950/45 px-4 py-4">
+    <div className="rounded-[22px] border border-white/8 bg-slate-950/38 px-4 py-4">
       <div className="flex flex-wrap items-center gap-2">
         <ResultStatusBadge label={worker.status} tone={external ? 'amber' : 'sky'} />
         <SurfaceHeaderTag>{worker.capability}</SurfaceHeaderTag>
@@ -534,16 +602,44 @@ function WorkerRow({
       <div className="mt-3 text-sm font-semibold text-[color:var(--jefe-text-strong)]">
         {worker.name}
       </div>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        <MetricCard label="Real execution" value={worker.realExecution} icon="shield" />
-        <MetricCard label="Approval" value={worker.approval} icon="approval" />
+      <div className="mt-3 grid gap-2 text-xs leading-5 text-[color:var(--jefe-muted)]">
+        <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
+          <span className="font-semibold text-[color:var(--jefe-text-strong)]">Execution: </span>
+          {worker.realExecution}
+        </div>
+        <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
+          <span className="font-semibold text-[color:var(--jefe-text-strong)]">Approval: </span>
+          {worker.approval}
+        </div>
+        <div>
+          <span className="font-semibold text-[color:var(--jefe-text-strong)]">Risk: </span>
+          {worker.risks}
+        </div>
+        <div>
+          <span className="font-semibold text-[color:var(--jefe-text-strong)]">Next: </span>
+          {worker.next}
+        </div>
       </div>
-      <div className="mt-3 text-xs leading-5 text-[color:var(--jefe-muted)]">
-        Risks: {worker.risks}
+    </div>
+  )
+}
+
+function ProductAreaRow({
+  label,
+  detail,
+  status,
+}: {
+  label: string
+  detail: string
+  status: 'Available' | 'Prepared'
+}) {
+  return (
+    <div className="flex min-w-0 items-start justify-between gap-3 rounded-[18px] border border-white/8 bg-slate-950/35 px-4 py-3">
+      <div className="min-w-0">
+        <div className="text-sm font-semibold text-[color:var(--jefe-text-strong)]">{label}</div>
+        <div className="mt-1 text-xs leading-5 text-[color:var(--jefe-muted)]">{detail}</div>
       </div>
-      <div className="mt-1 text-xs leading-5 text-[color:var(--jefe-muted)]">
-        Next: {worker.next}
-      </div>
+      <ResultStatusBadge label={status} tone={status === 'Prepared' ? 'amber' : 'emerald'} />
     </div>
   )
 }
