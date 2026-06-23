@@ -52,6 +52,7 @@ import { ProjectPhaseExecutionPlanCard } from './components/ProjectPhaseExecutio
 import { ProjectInputsPanel } from './components/ProjectInputsPanel'
 import { ProjectReadinessPanel } from './components/ProjectReadinessPanel'
 import { ResultSummaryPanel } from './components/ResultSummaryPanel'
+import { ResultSummaryActions } from './components/ResultSummaryActions'
 import { ResultTechnicalDetailsPanel } from './components/ResultTechnicalDetailsPanel'
 import { RuntimeApprovalPanel } from './components/RuntimeApprovalPanel'
 import { SafeFirstDeliveryPlanCard } from './components/SafeFirstDeliveryPlanCard'
@@ -20750,32 +20751,18 @@ No usar credenciales.`
         summaryText={resultHumanText}
         nextStepItems={resultNextStepItems}
         actions={
-          <>
-            {resultMaterializationNextPhaseId ? (
-              <PrimaryActionButton
-                onClick={() => handlePrepareProjectPhase(resultMaterializationNextPhaseId)}
-                disabled={isPlanning || isExecutingTask}
-                tone="sky"
-              >
-                {`Preparar ${resultMaterializationNextPhaseLabel}`}
-              </PrimaryActionButton>
-            ) : (
-              <PrimaryActionButton onClick={handleWizardStartOver} tone="sky">
-                Volver al objetivo
-              </PrimaryActionButton>
-            )}
-            {resultMaterializationNextPhaseId ? (
-              <SecondaryActionButton onClick={handleWizardStartOver}>
-                Volver al objetivo
-              </SecondaryActionButton>
-            ) : null}
-            <SecondaryActionButton onClick={() => setExperienceMode('advanced')}>
-              Abrir panel avanzado
-            </SecondaryActionButton>
-            <SecondaryActionButton onClick={() => setIsFlowConsoleOpen(true)}>
-              Ver detalle técnico
-            </SecondaryActionButton>
-          </>
+          <ResultSummaryActions
+            nextPhaseLabel={resultMaterializationNextPhaseLabel}
+            busy={isPlanning || isExecutingTask}
+            onPrepareNextPhase={
+              resultMaterializationNextPhaseId
+                ? () => handlePrepareProjectPhase(resultMaterializationNextPhaseId)
+                : null
+            }
+            onStartOver={handleWizardStartOver}
+            onOpenAdvanced={() => setExperienceMode('advanced')}
+            onOpenTechnicalDetail={() => setIsFlowConsoleOpen(true)}
+          />
         }
         technicalSections={
           <ResultTechnicalDetailsPanel
