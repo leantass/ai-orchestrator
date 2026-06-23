@@ -14437,6 +14437,32 @@ function App() {
         title: action.title,
         detail: action.detail,
       }))
+  const resultPrimaryNextStepItem = resultNextStepItems[0] || null
+  const resultRepoStatusValue = existingProjectContext?.hasGit
+    ? existingProjectContext.gitStatusSummary?.dirty
+      ? 'Git detectado / con cambios'
+      : 'Git detectado / limpio'
+    : activeProjectContext?.mode === 'existing-project'
+      ? 'Git no detectado'
+      : 'Repo no integrado'
+  const resultRepoStatusDetail = existingProjectContext?.hasGit
+    ? [
+        normalizeOptionalString(existingProjectContext.gitStatusSummary?.summary),
+        normalizeOptionalString(existingProjectContext.gitStatusSummary?.branch)
+          ? `Branch ${normalizeOptionalString(existingProjectContext.gitStatusSummary?.branch)}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' • ') || 'El proyecto activo reportó Git, pero sin resumen adicional.'
+    : activeProjectContext?.mode === 'existing-project'
+      ? 'La continuidad actual no reportó un repositorio Git detectable.'
+      : 'La salida final puede revisarse localmente aunque esta corrida no haya declarado un repo.'
+  const resultCiStatusValue = existingProjectContext?.hasGit
+    ? 'Fuera de esta corrida'
+    : 'No aplica'
+  const resultCiStatusDetail = existingProjectContext?.hasGit
+    ? 'La CI remota se confirma después del push; este cierre local no la consulta automáticamente.'
+    : 'Sin repo Git declarado, JEFE no puede exigir CI remota para aceptar este cierre.'
   const normalizedSimpleExperienceContextText = normalizeSimpleExperienceSearchText(
     [
       normalizedGoalInput,
@@ -20896,6 +20922,43 @@ No usar credenciales.`
                   </div>
                 )}
               </div>
+            </ResultSectionCard>
+
+            <ResultSectionCard
+              title="Cierre operativo"
+              description="Contrato minimo del delivery report: estado, evidencia, repo/CI y siguiente paso visible."
+            >
+              <ResultKeyValueGrid
+                items={[
+                  {
+                    label: 'Loop operativo',
+                    value: resultOperationalWorkState,
+                    detail: resultOperationalWorkStateDetail,
+                  },
+                  {
+                    label: 'Aprobación',
+                    value: activeApprovalStatusLabel,
+                    detail: activeApprovalDetailLabel,
+                  },
+                  {
+                    label: 'Repo / Git',
+                    value: resultRepoStatusValue,
+                    detail: resultRepoStatusDetail,
+                  },
+                  {
+                    label: 'CI',
+                    value: resultCiStatusValue,
+                    detail: resultCiStatusDetail,
+                  },
+                  {
+                    label: 'Siguiente paso lógico',
+                    value: resultPrimaryNextStepItem?.title || 'Sin siguiente paso visible',
+                    detail:
+                      resultPrimaryNextStepItem?.detail ||
+                      'El cierre todavía no expone una recomendación operativa resumida.',
+                  },
+                ]}
+              />
             </ResultSectionCard>
 
             <ResultSectionCard

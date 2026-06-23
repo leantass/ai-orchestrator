@@ -65,6 +65,21 @@ The quality loop should be explicit:
 
 The first implementation slice should keep the retry budget bounded to three rounds per block.
 
+## Delivery Report Expectations
+
+The final closure surface should stay explicit and operator-facing.
+
+Minimum expectations for a delivery report:
+
+- explicit work state;
+- concise summary of what JEFE did;
+- concrete evidence pointers such as files, validations, scope, and limits;
+- repo or Git status when a repository is detectable, otherwise an honest "not integrated" message;
+- CI status when it is known, otherwise an explicit note that CI is outside the current local run;
+- next logical step or human decision still required.
+
+The report should not imply `accepted` only because local files exist. It should distinguish local completion from repo sync, CI, and final human acceptance.
+
 ## Likely Surfaces
 
 - orchestration state and routing logic in `electron/`
