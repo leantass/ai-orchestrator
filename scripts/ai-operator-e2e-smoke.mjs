@@ -18,6 +18,12 @@ const currentFilePath = fileURLToPath(import.meta.url)
 const repoRoot = path.resolve(path.dirname(currentFilePath), '..')
 const mainFilePath = path.join(repoRoot, 'electron', 'main.cjs')
 const appFilePath = path.join(repoRoot, 'src', 'App.tsx')
+const resultTechnicalDetailsPanelFilePath = path.join(
+  repoRoot,
+  'src',
+  'components',
+  'ResultTechnicalDetailsPanel.tsx',
+)
 const plannerUiStateFilePath = path.join(repoRoot, 'src', 'planner-ui-state.js')
 const mainSource = fs.readFileSync(mainFilePath, 'utf8')
 const {
@@ -2994,6 +3000,11 @@ async function runUiContractSanityCase() {
 async function runUiHelperSanityCase() {
   const failures = []
   const appSource = fs.readFileSync(appFilePath, 'utf8')
+  const resultTechnicalDetailsSource = fs.readFileSync(
+    resultTechnicalDetailsPanelFilePath,
+    'utf8',
+  )
+  const resultUiSource = [appSource, resultTechnicalDetailsSource].join('\n')
 
   pushFailure(
     failures,
@@ -3057,15 +3068,15 @@ async function runUiHelperSanityCase() {
   )
   pushFailure(
     failures,
-    appSource.includes('Carpetas creadas') &&
-      appSource.includes('Archivos escritos confirmados') &&
-      appSource.includes('Archivos tocados') &&
-      appSource.includes('Archivos previstos por plan'),
+    resultUiSource.includes('Carpetas creadas') &&
+      resultUiSource.includes('Archivos escritos confirmados') &&
+      resultUiSource.includes('Archivos tocados') &&
+      resultUiSource.includes('Archivos previstos por plan'),
     'El resultado final debe resumir carpetas creadas y archivos escritos por separado.',
   )
   pushFailure(
     failures,
-    appSource.includes('MEMORIA / Context Hub'),
+    resultUiSource.includes('MEMORIA / Context Hub'),
     'La UI final debe mostrar si MEMORIA / Context Hub estuvo disponible o no.',
   )
   pushFailure(

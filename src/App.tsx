@@ -52,6 +52,7 @@ import { ProjectPhaseExecutionPlanCard } from './components/ProjectPhaseExecutio
 import { ProjectInputsPanel } from './components/ProjectInputsPanel'
 import { ProjectReadinessPanel } from './components/ProjectReadinessPanel'
 import { ResultSummaryPanel } from './components/ResultSummaryPanel'
+import { ResultTechnicalDetailsPanel } from './components/ResultTechnicalDetailsPanel'
 import { RuntimeApprovalPanel } from './components/RuntimeApprovalPanel'
 import { SafeFirstDeliveryPlanCard } from './components/SafeFirstDeliveryPlanCard'
 import { ScalableDeliveryPlanCard } from './components/ScalableDeliveryPlanCard'
@@ -20777,261 +20778,45 @@ No usar credenciales.`
           </>
         }
         technicalSections={
-          <>
-            <ResultSectionCard title="Archivos" description={resultWrittenArtifactsDescription}>
-              <ResultKeyValueGrid
-                items={[
-                  {
-                    label: 'Carpeta principal',
-                    value: resultPrimaryAffectedPathLabel || 'No disponible',
-                  },
-                  {
-                    label: 'Target actual',
-                    value: resultCurrentTargetPathLabel || 'No disponible',
-                  },
-                  {
-                    label: 'Carpetas creadas',
-                    value:
-                      resultCreatedFolderPaths.length > 0
-                        ? `${resultCreatedFolderPaths.length} carpeta(s)`
-                        : 'Sin carpetas creadas',
-                  },
-                  {
-                    label: 'Archivos escritos confirmados',
-                    value:
-                      resultWrittenFilePaths.length > 0
-                        ? `${resultWrittenFilePaths.length} archivo(s)`
-                        : 'Sin archivos escritos confirmados',
-                  },
-                  {
-                    label: 'Archivos tocados adicionales',
-                    value:
-                      resultTouchedFilePaths.length > 0
-                        ? `${resultTouchedFilePaths.length} archivo(s)`
-                        : 'Sin archivos tocados',
-                  },
-                  {
-                    label: 'Archivos previstos por plan',
-                    value:
-                      resultMaterializationFileLabels.length > 0
-                        ? `${resultMaterializationFileLabels.length} archivo(s)`
-                        : 'Sin archivos previstos',
-                  },
-                ]}
-              />
-              <div className="mt-4 grid gap-2">
-                {resultWrittenArtifactPaths.length > 0 ? (
-                  resultWrittenArtifactPaths.map((artifactPath) => (
-                    <div
-                      key={`result-artifact-${artifactPath}`}
-                      className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
-                    >
-                      {artifactPath}
-                    </div>
-                  ))
-                ) : (
-                  <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                    No se reportaron archivos previstos ni tocados.
-                  </div>
-                )}
-              </div>
-              <div className="mt-4 grid gap-2">
-                {resultMaterializationLimits.map((limitLabel) => (
-                  <div
-                    key={`result-limit-${limitLabel}`}
-                    className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
-                  >
-                    {limitLabel}
-                  </div>
-                ))}
-              </div>
-            </ResultSectionCard>
-
-            <ResultSectionCard
-              title="Validaciones"
-              description="Chequeos reportados por la ejecución para confirmar la salida material."
-            >
-              <div className="flex flex-wrap items-center gap-3">
-                <ResultStatusBadge
-                  label={
-                    latestValidationResults.length > 0
-                      ? `${latestValidationOkCount}/${latestValidationResults.length} OK`
-                      : resultExecutionNeedsMaterialReview
-                        ? 'Validación faltante'
-                        : 'Sin validaciones'
-                  }
-                  tone={
-                    latestValidationResults.length > 0 &&
-                    latestValidationOkCount === latestValidationResults.length
-                      ? 'emerald'
-                      : latestValidationResults.length > 0
-                        ? 'amber'
-                        : resultExecutionNeedsMaterialReview
-                          ? 'rose'
-                          : 'default'
-                  }
-                />
-                <div className="text-sm leading-6 text-slate-300">
-                  {effectiveResultValidationSummaryText}
-                </div>
-              </div>
-              <div className="mt-4 grid gap-2">
-                <ResultKeyValueGrid
-                  items={[
-                    {
-                      label: 'Validaciones OK',
-                      value:
-                        latestValidationResults.length > 0
-                          ? `${latestValidationOkCount}`
-                          : '0',
-                    },
-                    {
-                      label: 'Validaciones fallidas',
-                      value:
-                        latestValidationResults.length > 0
-                          ? `${latestValidationFailureCount}`
-                          : '0',
-                    },
-                  ]}
-                />
-                {resultValidationItems.length > 0 ? (
-                  resultValidationItems.map((item) => (
-                    <div
-                      key={item.key}
-                      className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3"
-                    >
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium leading-6 text-slate-100">
-                          {item.label}
-                        </div>
-                        <div className="text-xs leading-5 text-slate-400">
-                          {item.detail || 'Validación reportada'}
-                        </div>
-                      </div>
-                      <ResultStatusBadge
-                        label={item.ok ? 'OK' : 'Fallo'}
-                        tone={item.ok ? 'emerald' : 'rose'}
-                      />
-                    </div>
-                  ))
-                ) : (
-                  <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                    {resultExecutionNeedsMaterialReview
-                      ? 'La ejecución no devolvió validaciones finales para mostrar.'
-                      : 'No hay validaciones disponibles para mostrar.'}
-                  </div>
-                )}
-              </div>
-            </ResultSectionCard>
-
-            <ResultSectionCard
-              title="Cierre operativo"
-              description="Contrato minimo del delivery report: estado, evidencia, repo/CI y siguiente paso visible."
-            >
-              <ResultKeyValueGrid
-                items={[
-                  {
-                    label: 'Loop operativo',
-                    value: resultOperationalWorkState,
-                    detail: resultOperationalWorkStateDetail,
-                  },
-                  {
-                    label: 'Aprobación',
-                    value: activeApprovalStatusLabel,
-                    detail: activeApprovalDetailLabel,
-                  },
-                  {
-                    label: 'Repo / Git',
-                    value: resultRepoStatusValue,
-                    detail: resultRepoStatusDetail,
-                  },
-                  {
-                    label: 'CI',
-                    value: resultCiStatusValue,
-                    detail: resultCiStatusDetail,
-                  },
-                  {
-                    label: 'Siguiente paso lógico',
-                    value: resultPrimaryNextStepItem?.title || 'Sin siguiente paso visible',
-                    detail:
-                      resultPrimaryNextStepItem?.detail ||
-                      'El cierre todavía no expone una recomendación operativa resumida.',
-                  },
-                ]}
-              />
-            </ResultSectionCard>
-
-            <ResultSectionCard
-              title="Reusable y scope"
-              description="Aplicación real de memoria reusable y restricciones respetadas por la corrida."
-            >
-              <ResultKeyValueGrid
-                items={[
-                  {
-                    label: 'Reusable',
-                    value: latestAppliedReuseModeLabel,
-                    detail:
-                      !latestReuseApplied
-                        ? 'No se aplicó memoria reusable en esta corrida.'
-                        : resultReusableSummaryLabel,
-                  },
-                  {
-                    label: resultReusableSupportLabel,
-                    value: resultReusableSupportValue,
-                  },
-                  {
-                    label: 'Scope',
-                    value: resultScopeSummaryLabel,
-                    detail: latestContinuationAnchor || 'Sin continuation anchor reportado',
-                  },
-                  {
-                    label: 'MEMORIA / Context Hub',
-                    value: resultContextHubLabel,
-                    detail: resultContextHubDetail,
-                  },
-                  {
-                    label: 'Archivos bloqueados respetados',
-                    value:
-                      resultBlockedPaths.length > 0
-                        ? resultScopeRespected
-                          ? 'S?'
-                          : 'Revisar'
-                        : 'No aplica',
-                    detail:
-                      resultBlockedPaths.length > 0
-                        ? resultScopeRespected
-                          ? 'Los paths bloqueados no aparecen en touchedPaths ni createdPaths.'
-                          : 'Hay paths bloqueados que requieren revisión técnica.'
-                        : 'La corrida no defini? archivos bloqueados.',
-                  },
-                ]}
-              />
-              {resultAllowedPaths.length > 0 ? (
-                <div className="mt-4 grid gap-2">
-                  {resultAllowedPaths.map((pathValue) => (
-                    <div
-                      key={`allowed-${pathValue}`}
-                      className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
-                    >
-                      {pathValue}
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-              {latestScopeSuccessCriteria.length > 0 ? (
-                <div className="mt-4 grid gap-2">
-                  {latestScopeSuccessCriteria.map((criterion) => (
-                    <div
-                      key={criterion}
-                      className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-200"
-                    >
-                      {criterion}
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </ResultSectionCard>
-          </>
+          <ResultTechnicalDetailsPanel
+            writtenArtifactsDescription={resultWrittenArtifactsDescription}
+            primaryAffectedPathLabel={resultPrimaryAffectedPathLabel}
+            currentTargetPathLabel={resultCurrentTargetPathLabel}
+            createdFolderPaths={resultCreatedFolderPaths}
+            writtenFilePaths={resultWrittenFilePaths}
+            touchedFilePaths={resultTouchedFilePaths}
+            materializationFileLabels={resultMaterializationFileLabels}
+            writtenArtifactPaths={resultWrittenArtifactPaths}
+            materializationLimits={resultMaterializationLimits}
+            validationCount={latestValidationResults.length}
+            validationOkCount={latestValidationOkCount}
+            validationFailureCount={latestValidationFailureCount}
+            validationSummaryText={effectiveResultValidationSummaryText}
+            executionNeedsMaterialReview={resultExecutionNeedsMaterialReview}
+            validationItems={resultValidationItems}
+            operationalWorkState={resultOperationalWorkState}
+            operationalWorkStateDetail={resultOperationalWorkStateDetail}
+            approvalStatusLabel={activeApprovalStatusLabel}
+            approvalDetailLabel={activeApprovalDetailLabel}
+            repoStatusValue={resultRepoStatusValue}
+            repoStatusDetail={resultRepoStatusDetail}
+            ciStatusValue={resultCiStatusValue}
+            ciStatusDetail={resultCiStatusDetail}
+            primaryNextStepItem={resultPrimaryNextStepItem}
+            appliedReuseModeLabel={latestAppliedReuseModeLabel}
+            reuseApplied={latestReuseApplied}
+            reusableSummaryLabel={resultReusableSummaryLabel}
+            reusableSupportLabel={resultReusableSupportLabel}
+            reusableSupportValue={resultReusableSupportValue}
+            scopeSummaryLabel={resultScopeSummaryLabel}
+            continuationAnchor={latestContinuationAnchor}
+            contextHubLabel={resultContextHubLabel}
+            contextHubDetail={resultContextHubDetail}
+            blockedPaths={resultBlockedPaths}
+            scopeRespected={resultScopeRespected}
+            allowedPaths={resultAllowedPaths}
+            scopeSuccessCriteria={latestScopeSuccessCriteria}
+          />
         }
       />
     )
