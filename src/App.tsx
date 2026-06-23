@@ -22,8 +22,8 @@ import {
 } from './components/AppUiPrimitives'
 import { AppShell } from './components/AppShell'
 import { ApprovalRequestPanel } from './components/ApprovalRequestPanel'
-import { ContextSummaryPanel } from './components/ContextSummaryPanel'
 import { ContextHubControlPanel } from './components/ContextHubControlPanel'
+import { GuidedContextSummaryPanel } from './components/GuidedContextSummaryPanel'
 import { ExecutionTimeline } from './components/ExecutionTimeline'
 import { ExistingProjectPanel } from './components/ExistingProjectPanel'
 import { GuidedFlowShell } from './components/GuidedFlowShell'
@@ -20875,9 +20875,8 @@ No usar credenciales.`
         </GuidedFlowShell>
       }
       rightPanel={
-        <ContextSummaryPanel
-          title={activeWizardStep === 'goal' ? 'Que sigue' : 'Panel contextual'}
-          description={activeWizardStep === 'goal' ? '' : 'Ayuda breve, sin robar foco al paso actual.'}
+        <GuidedContextSummaryPanel
+          step={activeWizardStep}
           sections={contextPanelSections}
           actions={guidedSecondaryAction}
         />
