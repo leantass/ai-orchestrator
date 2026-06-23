@@ -14,6 +14,7 @@ const ledgerCliPath = path.join(repoRoot, 'scripts', 'generated-domain-delivery-
 const {
   buildDeliveryHistoryEntry,
   buildDeliveryHistoryLedger,
+  buildProjectOperationsRunEnvelopeFromDeliveryHistoryLedger,
   discoverDeliveryHistoryCases,
   writeDeliveryHistoryLedger,
 } = require(path.join(repoRoot, 'electron', 'generated-domain-delivery-history-ledger.cjs'))
@@ -213,6 +214,7 @@ runCase('Ledger y artefactos escritos', () => {
   const ledger = buildDeliveryHistoryLedger(entries)
   const output = path.join(smokeRoot, 'outputs', 'module-ledger')
   const written = writeDeliveryHistoryLedger(output, ledger)
+  const runEnvelope = JSON.parse(fs.readFileSync(written.envelopePath, 'utf8'))
 
   assert.equal(ledger.totalCases, 6)
   assert.equal(ledger.counts.completedPass, 1)
@@ -222,6 +224,24 @@ runCase('Ledger y artefactos escritos', () => {
   assert.equal(ledger.counts.missingArtifacts, 1)
   assert.ok(fs.existsSync(written.ledgerPath))
   assert.ok(fs.existsSync(written.summaryPath))
+  assert.ok(fs.existsSync(written.envelopePath))
+  assert.ok(fs.existsSync(written.envelopeSummaryPath))
+  assert.equal(runEnvelope.workState, 'blocked')
+  assert.equal(runEnvelope.review.status, 'blocked')
+  assert.equal(runEnvelope.routing.executionPath, 'local')
+})
+
+runCase('Envelope helper refleja caso exitoso filtrado', () => {
+  const artifacts = discoverDeliveryHistoryCases([roundtripRoot], {
+    caseName: 'completed-pass-case',
+  })
+  const entries = artifacts.map((artifact) => buildDeliveryHistoryEntry(artifact))
+  const ledger = buildDeliveryHistoryLedger(entries)
+  const envelope = buildProjectOperationsRunEnvelopeFromDeliveryHistoryLedger(ledger)
+
+  assert.equal(ledger.totalCases, 1)
+  assert.equal(envelope.workState, 'completed_local')
+  assert.equal(envelope.review.status, 'accepted')
 })
 
 runCase('CLI JSON mode parseable', () => {
@@ -230,6 +250,7 @@ runCase('CLI JSON mode parseable', () => {
   assert.equal(result.ledger.totalCases, 6)
   assert.equal(result.ledger.counts.completedPass, 1)
   assert.ok(fs.existsSync(path.join(output, 'delivery-history-ledger.json')))
+  assert.ok(fs.existsSync(result.written.envelopePath))
 })
 
 runCase('CLI case filter', () => {
@@ -245,6 +266,8 @@ runCase('CLI case filter', () => {
   assert.equal(result.ledger.totalCases, 1)
   assert.equal(result.ledger.entries[0].caseName, 'completed-pass-case')
   assert.equal(result.ledger.entries[0].status, 'completed_pass')
+  const envelope = JSON.parse(fs.readFileSync(result.written.envelopePath, 'utf8'))
+  assert.equal(envelope.workState, 'completed_local')
 })
 
 runCase('Output inseguro bloqueado', () => {

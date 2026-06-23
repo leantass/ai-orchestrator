@@ -183,6 +183,7 @@ function main() {
     console.log(`needsMoreRevision: ${result.ledger.counts.needsMoreRevision}`)
     console.log(`blocked: ${result.ledger.counts.blocked}`)
     console.log(`output: ${result.written.ledgerPath}`)
+    console.log(`runEnvelope: ${result.written.envelopePath}`)
   } catch (error) {
     console.error(`[history-ledger] ${error.message}`)
     process.exit(1)

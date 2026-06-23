@@ -44,6 +44,7 @@ const requiredElectronModules = [
 
 const requiredScripts = [
   'scripts/ai-quality.mjs',
+  'scripts/ai-quality-sections.mjs',
   'scripts/ai-planner-smoke.mjs',
   'scripts/ai-release-smoke.mjs',
   'scripts/ai-operator-e2e-smoke.mjs',
@@ -211,7 +212,11 @@ function assertExports() {
 }
 
 function assertQualityIntegration() {
-  const quality = readText('scripts/ai-quality.mjs')
+  const quality = [
+    readText('scripts/ai-quality.mjs'),
+    readText('scripts/ai-quality-sections.mjs'),
+  ].join('\n')
+
   for (const entry of criticalQualityEntries) {
     assert.equal(quality.includes(entry), true, `ai-quality debe incluir ${entry}`)
   }

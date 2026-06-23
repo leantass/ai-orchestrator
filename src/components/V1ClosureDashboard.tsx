@@ -279,6 +279,33 @@ const v16PostExecutionReviewItems = [
   },
 ] as const
 
+const v18ProjectOperationsLoopItems = [
+  {
+    label: 'Run envelope',
+    value: 'V1.8 slice live',
+    detail: 'Normaliza request, routing, validation, review, retryCount y nextAction en un artifact unico.',
+    icon: 'result' as AppIconName,
+  },
+  {
+    label: 'Ruta real actual',
+    value: 'History ledger',
+    detail: 'El generated-domain delivery history ledger ya emite project-operations-run-envelope.json.',
+    icon: 'history' as AppIconName,
+  },
+  {
+    label: 'Tooling',
+    value: 'CLI + smoke',
+    detail: 'Tiene script dedicado, smoke propio y cobertura dentro de ai-quality.',
+    icon: 'runs' as AppIconName,
+  },
+  {
+    label: 'Seguridad',
+    value: 'Artifact-first',
+    detail: 'No toma control de electron/main.cjs ni amplia permisos; solo consolida estado explicito.',
+    icon: 'shield' as AppIconName,
+  },
+] as const
+
 const ledgerItems = [
   {
     label: 'Delivery history ledger',
@@ -310,8 +337,21 @@ const historyMilestones = [
   'V1 accepted with remote CI green.',
   'Regression baseline passed without blockers.',
   'V1.5 and V1.6 keep external work human-only and local-only.',
+  'V1.8 now emits a project operations run envelope from the history ledger path.',
   'Local QA evidence lives in .codex-temp and is not versioned.',
 ]
+
+const v18WorkStates = [
+  'planned',
+  'requires_openai',
+  'requires_human_approval',
+  'running_codex_worker',
+  'validating',
+  'needs_revision',
+  'blocked',
+  'blocked_after_retries',
+  'completed_local',
+] as const
 
 export function V1ClosureDashboard({
   headLabel,
@@ -640,6 +680,40 @@ export function V1ClosureDashboard({
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-5">
           {['pass', 'needs_revision', 'blocked', 'missing_evidence', 'invalid_scope'].map((status) => (
+            <div
+              key={status}
+              className="rounded-[18px] border border-white/8 bg-slate-950/35 px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--jefe-text-strong)]"
+            >
+              {status}
+            </div>
+          ))}
+        </div>
+      </ResultSectionCard>
+
+      <ResultSectionCard
+        title="V1.8 Project Operations Loop"
+        description="Nueva capa para hacer visible el estado operativo del bloque de trabajo sin tocar todavia el runtime central."
+        icon="guided"
+        badge="Artifact-first"
+        tone="emerald"
+      >
+        <div className="mb-4 rounded-[22px] border border-emerald-300/20 bg-emerald-300/10 px-4 py-4 text-sm leading-6 text-emerald-50">
+          El primer slice V1.8 ya corre sobre una ruta real: el history ledger genera un run envelope con estado, evidencia, nextAction y resumen de revision. Sigue siendo local, explicito y sin ampliar autonomia.
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {v18ProjectOperationsLoopItems.map((item) => (
+            <MetricCard
+              key={item.label}
+              label={item.label}
+              value={item.value}
+              detail={item.detail}
+              icon={item.icon}
+              tone="emerald"
+            />
+          ))}
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-5">
+          {v18WorkStates.map((status) => (
             <div
               key={status}
               className="rounded-[18px] border border-white/8 bg-slate-950/35 px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--jefe-text-strong)]"

@@ -1,6 +1,11 @@
 const fs = require('node:fs')
 const path = require('node:path')
 
+const {
+  buildProjectOperationsRunEnvelope,
+  writeProjectOperationsRunEnvelope,
+} = require('./project-operations-run-envelope.cjs')
+
 function readTextFileIfExists(filePath) {
   try {
     if (!filePath || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
@@ -394,6 +399,134 @@ function summarizeDeliveryHistoryLedger(ledger) {
   ].join('\n')
 }
 
+function deriveReviewStatusFromLedger(ledger) {
+  if (ledger.counts.blocked > 0 || ledger.counts.missingArtifacts > 0) {
+    return 'blocked'
+  }
+  if (ledger.counts.awaitingManualCorrection > 0 || ledger.counts.needsMoreRevision > 0) {
+    return 'needs_revision'
+  }
+  if (ledger.totalCases > 0 && ledger.counts.pass === ledger.totalCases) {
+    return 'accepted'
+  }
+  return ledger.totalCases > 0 ? 'pending' : 'unknown'
+}
+
+function deriveValidationStatusFromLedger(ledger) {
+  if (!ledger.totalCases) {
+    return 'unknown'
+  }
+  if (ledger.counts.missingArtifacts > 0) {
+    return 'failed'
+  }
+  return 'passed'
+}
+
+function deriveBlockerReasonFromLedger(ledger) {
+  if (ledger.counts.blocked > 0) {
+    return 'Hay casos bloqueados que requieren revision humana antes de cerrar el loop.'
+  }
+  if (ledger.counts.missingArtifacts > 0) {
+    return 'Faltan artefactos requeridos para consolidar algunos casos del ledger.'
+  }
+  return ''
+}
+
+function collectLedgerEvidencePaths(entries) {
+  return unique(
+    entries.flatMap((entry) => (Array.isArray(entry?.evidencePaths) ? entry.evidencePaths : [])),
+  )
+}
+
+function collectLedgerSourceRoots(entries) {
+  return unique(entries.map((entry) => entry?.metadata?.source || ''))
+}
+
+function buildProjectOperationsRunEnvelopeFromDeliveryHistoryLedger(ledger, options = {}) {
+  const sourceRoots = collectLedgerSourceRoots(ledger.entries || [])
+  const evidencePaths = collectLedgerEvidencePaths(ledger.entries || [])
+  const blockerReason = deriveBlockerReasonFromLedger(ledger)
+  const reviewStatus = deriveReviewStatusFromLedger(ledger)
+  const validationStatus = deriveValidationStatusFromLedger(ledger)
+  const objective =
+    options.objective ||
+    `Consolidar ledger de delivery review para ${ledger.totalCases} caso(s).`
+
+  return buildProjectOperationsRunEnvelope({
+    request: {
+      requestId: options.requestId || 'generated-domain-delivery-history-ledger',
+      objective,
+      summary: summarizeDeliveryHistoryLedger(ledger),
+      requestedBy: options.requestedBy || 'JEFE',
+      workspacePath: options.workspacePath || '.',
+    },
+    project: {
+      projectPath: options.projectPath || sourceRoots[0] || '',
+      projectKind: 'generated-domain-delivery-ledger',
+      continuationMode: 'history-ledger',
+      contextSources: sourceRoots,
+    },
+    preflight: {
+      gitBranch: options.gitBranch || '',
+      gitHead: options.gitHead || '',
+      workingTreeStatus: options.workingTreeStatus || 'unknown',
+      ciStatus: options.ciStatus || 'unknown',
+      risks: ledger.counts.blocked > 0 || ledger.counts.missingArtifacts > 0
+        ? ledger.recommendations || []
+        : [],
+      summary: ledger.summary,
+    },
+    routing: {
+      reasoningProvider: 'local-rules',
+      executionPath: 'local',
+      requiresOpenAI: false,
+      requiresHumanApproval: false,
+      selectedWorkerId: '',
+      capability: 'generated-domain.delivery.history-ledger',
+      rationale: 'El ledger se construye con parsing local de artefactos existentes.',
+    },
+    execution: {
+      status: 'completed',
+      executionMode: 'local',
+      workerId: '',
+      capability: 'generated-domain.delivery.history-ledger',
+      outputArtifacts: options.outputArtifacts || [],
+      validationCommands: options.validationCommands || [],
+      blockerReason,
+      externalToolExecutedByJefe: false,
+    },
+    validation: {
+      status: validationStatus,
+      ciStatus: options.ciStatus || 'unknown',
+      commands: options.validationCommands || [],
+      evidence: evidencePaths,
+      summary: ledger.summary,
+    },
+    review: {
+      status: reviewStatus,
+      reviewer: options.reviewer || 'local-ledger-review',
+      summary: ledger.recommendations?.join(' ') || 'No action needed.',
+      blockerReason,
+    },
+    revisionLoop: {
+      retryCount: 0,
+      maxRetries: 3,
+      nextAction: ledger.recommendations?.[0] || 'No action needed.',
+      blockerReason,
+    },
+    history: {
+      previousState: '',
+      transitionReason: 'Derived from generated-domain delivery history entries.',
+      relatedArtifacts: evidencePaths,
+    },
+    metadata: {
+      notes: options.notes || 'Derived from delivery history ledger.',
+      sourcePaths: sourceRoots,
+      noExternalToolExecuted: true,
+    },
+  })
+}
+
 function renderLedgerSummaryMarkdown(ledger) {
   const lines = [
     '# Delivery Review History Ledger',
@@ -437,15 +570,22 @@ function writeDeliveryHistoryLedger(outputDir, ledger) {
   const summaryPath = path.join(outputDir, 'delivery-history-summary.md')
   writeTextFile(ledgerPath, `${JSON.stringify(ledger, null, 2)}\n`)
   writeTextFile(summaryPath, renderLedgerSummaryMarkdown(ledger))
+  const runEnvelope = buildProjectOperationsRunEnvelopeFromDeliveryHistoryLedger(ledger, {
+    outputArtifacts: [ledgerPath, summaryPath],
+  })
+  const writtenEnvelope = writeProjectOperationsRunEnvelope(outputDir, runEnvelope)
   return {
     ledgerPath,
     summaryPath,
+    envelopePath: writtenEnvelope.envelopePath,
+    envelopeSummaryPath: writtenEnvelope.summaryPath,
   }
 }
 
 module.exports = {
   buildDeliveryHistoryEntry,
   buildDeliveryHistoryLedger,
+  buildProjectOperationsRunEnvelopeFromDeliveryHistoryLedger,
   loadDeliveryRoundtripArtifacts,
   discoverDeliveryHistoryCases,
   writeDeliveryHistoryLedger,
