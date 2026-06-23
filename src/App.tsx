@@ -27,6 +27,7 @@ import { ContextHubControlPanel } from './components/ContextHubControlPanel'
 import { ExecutionTimeline } from './components/ExecutionTimeline'
 import { ExistingProjectPanel } from './components/ExistingProjectPanel'
 import { GuidedFlowShell } from './components/GuidedFlowShell'
+import { GuidedSidebarActions } from './components/GuidedSidebarActions'
 import { HomeDashboardPanel } from './components/HomeDashboardPanel'
 import { DetectedProjectBanner } from './components/DetectedProjectBanner'
 import { ImplementationRoadmapCard } from './components/ImplementationRoadmapCard'
@@ -20823,36 +20824,18 @@ No usar credenciales.`
       </PrimaryActionButton>
     ) : null
 
-  const guidedSecondaryAction =
-    activeWizardStep === 'goal' ? (
-      <>
-        <SecondaryActionButton
-          onClick={() => {
-            setExperienceMode('advanced')
-            setActiveSection('corridas')
-          }}
-        >
-          Ver ultima corrida
-        </SecondaryActionButton>
-        <SecondaryActionButton onClick={handleResetSessionMemory}>
-          Reiniciar sesion
-        </SecondaryActionButton>
-      </>
-    ) : activeWizardStep === 'context' ? (
-      <SecondaryActionButton
-        onClick={() => setFlowConsoleVisibility({ open: true, pinned: true })}
-      >
-        Ver detalle técnico
-      </SecondaryActionButton>
-    ) : activeWizardStep === 'brain' ? (
-      <SecondaryActionButton onClick={() => setExperienceMode('advanced')}>
-        Ver panel avanzado
-      </SecondaryActionButton>
-    ) : activeWizardStep === 'memory' ? (
-      <SecondaryActionButton onClick={() => setExperienceMode('advanced')}>
-        Abrir panel avanzado
-      </SecondaryActionButton>
-    ) : null
+  const guidedSecondaryAction = (
+    <GuidedSidebarActions
+      step={activeWizardStep}
+      onOpenLatestRun={() => {
+        setExperienceMode('advanced')
+        setActiveSection('corridas')
+      }}
+      onResetSession={handleResetSessionMemory}
+      onOpenTechnicalDetail={() => setFlowConsoleVisibility({ open: true, pinned: true })}
+      onOpenAdvanced={() => setExperienceMode('advanced')}
+    />
+  )
 
   const guidedFooterNote =
     activeWizardStep === 'goal'
