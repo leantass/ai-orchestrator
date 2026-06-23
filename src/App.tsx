@@ -23,6 +23,7 @@ import {
 import { AppShell } from './components/AppShell'
 import { ApprovalRequestPanel } from './components/ApprovalRequestPanel'
 import { ContextHubControlPanel } from './components/ContextHubControlPanel'
+import { ExperienceModeSwitcher } from './components/ExperienceModeSwitcher'
 import { GuidedContextSummaryPanel } from './components/GuidedContextSummaryPanel'
 import { ExecutionTimeline } from './components/ExecutionTimeline'
 import { ExistingProjectPanel } from './components/ExistingProjectPanel'
@@ -20883,28 +20884,15 @@ No usar credenciales.`
   )
 
   const experienceModeSwitcher = (
-    <div className="jefe-toggle-shell inline-flex w-full rounded-[18px] p-1">
-      {([
-        { key: 'simple', label: 'Simple' },
-        { key: 'advanced', label: 'Avanzado' },
-        { key: 'technical', label: 'Técnico' },
-      ] as Array<{ key: ExperienceMode; label: string }>).map((option) => (
-        <button
-          key={option.key}
-          type="button"
-          data-active={experienceMode === option.key}
-          onClick={() => {
-            setExperienceMode(option.key)
-            if (option.key === 'technical') {
-              setIsFlowConsoleOpen(true)
-            }
-          }}
-          className="jefe-toggle-option min-w-0 flex-1 rounded-[14px] px-3 py-2 text-sm font-semibold transition"
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
+    <ExperienceModeSwitcher
+      experienceMode={experienceMode}
+      onSelectMode={(mode) => {
+        setExperienceMode(mode)
+        if (mode === 'technical') {
+          setIsFlowConsoleOpen(true)
+        }
+      }}
+    />
   )
 
   const themeModeSwitcher = (
