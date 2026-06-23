@@ -127,3 +127,31 @@ Los outputs deben ir a `.codex-temp` o una carpeta temporal segura.
 - [ ] `npm run quality:ci` pasa.
 - [ ] No hay cambios en `.env`, `web-prueba`, packages, Docker ni `electron/main.cjs`.
 - [ ] CI remoto verde despues del push.
+
+## Cierre rapido de pasada
+
+Usar este bloque cuando el trabajo ya esta implementado y queres cerrar una pasada sin improvisar el orden:
+
+```bash
+git status -sb
+git diff --check
+git diff --cached --stat
+npm run quality:ci
+git log --oneline origin/main..HEAD
+git push origin main
+```
+
+Lectura esperada:
+
+- `git status -sb`: confirmar branch actual, ahead local y que no queden cambios sueltos antes del push.
+- `git diff --check`: cortar si aparecen problemas de whitespace o formato obvios.
+- `git diff --cached --stat`: revisar que el corte staged siga siendo chico y coherente.
+- `npm run quality:ci`: validacion fuerte antes de empujar.
+- `git log --oneline origin/main..HEAD`: auditar que los commits locales cuenten una historia clara.
+- `git push origin main`: solo despues de que todo lo anterior quede verde.
+
+Si la pasada toca wiring de quality, readiness docs o el bloque V1.8 del project operations loop, sumar tambien:
+
+```bash
+node scripts/v1-release-smoke.mjs
+```

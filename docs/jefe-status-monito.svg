@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1100" viewBox="0 0 1600 1100" role="img" aria-labelledby="title desc">
+  <title id="title">JEFE project status overview</title>
+  <desc id="desc">Resumen visual profesional del estado actual de JEFE, del camino correcto de corto plazo y de lo que todavia no conviene hacer.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f5f8fc" />
+      <stop offset="100%" stop-color="#eef4fb" />
+    </linearGradient>
+    <linearGradient id="hero" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#16324f" />
+      <stop offset="100%" stop-color="#224f78" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#0f172a" flood-opacity="0.12" />
+    </filter>
+    <style>
+      .title { font: 900 54px 'Segoe UI', 'Trebuchet MS', sans-serif; fill: #ffffff; }
+      .heroText { font: 700 24px 'Segoe UI', 'Trebuchet MS', sans-serif; fill: #dbe8f5; }
+      .cardTitle { font: 900 26px 'Segoe UI', 'Trebuchet MS', sans-serif; fill: #17324d; }
+      .sectionTitle { font: 900 34px 'Segoe UI', 'Trebuchet MS', sans-serif; fill: #17324d; }
+      .body { font: 700 22px 'Segoe UI', 'Trebuchet MS', sans-serif; fill: #233548; }
+      .small { font: 700 18px 'Segoe UI', 'Trebuchet MS', sans-serif; fill: #516579; }
+      .tiny { font: 700 16px 'Segoe UI', 'Trebuchet MS', sans-serif; fill: #607487; }
+      .white { fill: #ffffff; }
+      .ok { fill: #1f9d68; }
+      .warn { fill: #d98b1b; }
+      .bad { fill: #ca4d4d; }
+      .muted { fill: #7a8c9f; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1100" fill="url(#bg)" />
+
+  <rect x="50" y="40" width="1500" height="180" rx="34" fill="url(#hero)" filter="url(#shadow)" />
+  <text x="100" y="110" class="title">JEFE / AI ORCHESTRATOR</text>
+  <text x="100" y="155" class="heroText">Estado actual del proyecto y criterio para saber si vamos por el camino correcto.</text>
+  <text x="100" y="190" class="heroText">Diagnostico corto: el camino actual es correcto si el siguiente bloque es V1.7 Session UI y no una integracion real prematura.</text>
+
+  <rect x="70" y="255" width="335" height="160" rx="26" fill="#ffffff" stroke="#d8e3ee" stroke-width="3" filter="url(#shadow)" />
+  <text x="95" y="300" class="cardTitle">YA FUNCIONA</text>
+  <text x="95" y="338" class="body">Planner seguro local</text>
+  <text x="95" y="370" class="body">Continuidad de proyectos</text>
+  <text x="95" y="402" class="body">MEMORIA / Context Hub</text>
+
+  <rect x="440" y="255" width="335" height="160" rx="26" fill="#ffffff" stroke="#d8e3ee" stroke-width="3" filter="url(#shadow)" />
+  <text x="465" y="300" class="cardTitle">BLOQUE ACTUAL</text>
+  <text x="465" y="338" class="body">V1.6 terminado</text>
+  <text x="465" y="370" class="body">Review post-ejecucion listo</text>
+  <text x="465" y="402" class="small">Validado con lint, build, quality y release smoke</text>
+
+  <rect x="810" y="255" width="335" height="160" rx="26" fill="#ffffff" stroke="#d8e3ee" stroke-width="3" filter="url(#shadow)" />
+  <text x="835" y="300" class="cardTitle">SIGUIENTE BLOQUE</text>
+  <text x="835" y="338" class="body">V1.7 Session UI</text>
+  <text x="835" y="370" class="body">Mostrar session, intake y review</text>
+  <text x="835" y="402" class="small">Mas claridad operativa, no mas autonomia real</text>
+
+  <rect x="1180" y="255" width="350" height="160" rx="26" fill="#ffffff" stroke="#d8e3ee" stroke-width="3" filter="url(#shadow)" />
+  <text x="1205" y="300" class="cardTitle">RIESGOS ABIERTOS</text>
+  <text x="1205" y="338" class="body">App.tsx grande</text>
+  <text x="1205" y="370" class="body">main.cjs grande</text>
+  <text x="1205" y="402" class="small">La deuda es de estructura y legibilidad, no de direccion de producto</text>
+
+  <rect x="70" y="455" width="720" height="355" rx="30" fill="#ffffff" stroke="#cfe0d6" stroke-width="3" filter="url(#shadow)" />
+  <text x="100" y="510" class="sectionTitle">CAMINO CORRECTO AHORA</text>
+
+  <circle cx="112" cy="565" r="16" fill="#1f9d68" />
+  <text x="147" y="573" class="body">Mantener trabajo local, humano y supervisado</text>
+
+  <circle cx="112" cy="623" r="16" fill="#1f9d68" />
+  <text x="147" y="631" class="body">Hacer visible V1.5 + V1.6 dentro de la UI</text>
+
+  <circle cx="112" cy="681" r="16" fill="#1f9d68" />
+  <text x="147" y="689" class="body">Seguir usando smokes, build, lint y CI como verdad tecnica</text>
+
+  <circle cx="112" cy="739" r="16" fill="#1f9d68" />
+  <text x="147" y="747" class="body">Bajar deuda tecnica mientras el flujo sigue entendible</text>
+
+  <rect x="100" y="766" width="650" height="28" rx="14" fill="#dff4e7" />
+  <text x="425" y="786" text-anchor="middle" class="small">Esto consolida el producto antes de abrir integraciones o ejecucion real.</text>
+
+  <rect x="810" y="455" width="720" height="355" rx="30" fill="#ffffff" stroke="#ead3d3" stroke-width="3" filter="url(#shadow)" />
+  <text x="840" y="510" class="sectionTitle">SERIA UN DESVIO AHORA</text>
+
+  <circle cx="852" cy="565" r="16" fill="#ca4d4d" />
+  <text x="887" y="573" class="body">Abrir Blender, Unity o MCP sin supervision humana</text>
+
+  <circle cx="852" cy="623" r="16" fill="#ca4d4d" />
+  <text x="887" y="631" class="body">Meter deploy, produccion o secretos en esta etapa</text>
+
+  <circle cx="852" cy="681" r="16" fill="#ca4d4d" />
+  <text x="887" y="689" class="body">Saltar directo a integraciones reales antes de V1.7</text>
+
+  <circle cx="852" cy="739" r="16" fill="#ca4d4d" />
+  <text x="887" y="747" class="body">Ir a V2 sin cerrar primero la visibilidad operativa del loop actual</text>
+
+  <rect x="840" y="766" width="650" height="28" rx="14" fill="#fde8e8" />
+  <text x="1165" y="786" text-anchor="middle" class="small">Eso agregaria riesgo antes de terminar de explicar bien lo que la plataforma ya hace.</text>
+
+  <rect x="70" y="845" width="1460" height="160" rx="30" fill="#ffffff" stroke="#d8e3ee" stroke-width="3" filter="url(#shadow)" />
+  <text x="100" y="895" class="sectionTitle">MAPA DE HITOS</text>
+  <line x1="170" y1="945" x2="1370" y2="945" stroke="#c6d4e2" stroke-width="10" stroke-linecap="round" />
+  <line x1="170" y1="945" x2="930" y2="945" stroke="#2d7ff0" stroke-width="10" stroke-linecap="round" />
+
+  <circle cx="220" cy="945" r="26" fill="#2d7ff0" />
+  <text x="220" y="953" text-anchor="middle" class="small white">V1</text>
+  <text x="220" y="995" text-anchor="middle" class="tiny">base local segura</text>
+
+  <circle cx="470" cy="945" r="26" fill="#2d7ff0" />
+  <text x="470" y="953" text-anchor="middle" class="small white">V1.5</text>
+  <text x="470" y="995" text-anchor="middle" class="tiny">session manual</text>
+
+  <circle cx="720" cy="945" r="26" fill="#2d7ff0" />
+  <text x="720" y="953" text-anchor="middle" class="small white">V1.6</text>
+  <text x="720" y="995" text-anchor="middle" class="tiny">review formal</text>
+
+  <circle cx="970" cy="945" r="30" fill="#f5a623" stroke="#d98b1b" stroke-width="4" />
+  <text x="970" y="953" text-anchor="middle" class="small white">V1.7</text>
+  <text x="970" y="995" text-anchor="middle" class="tiny">UI del loop completo</text>
+  <text x="970" y="1030" text-anchor="middle" class="tiny">ahi estamos apuntando</text>
+
+  <circle cx="1220" cy="945" r="26" fill="#f0f4f8" stroke="#b9c7d6" stroke-width="4" />
+  <text x="1220" y="953" text-anchor="middle" class="small" fill="#718096">V2</text>
+  <text x="1220" y="995" text-anchor="middle" class="tiny">integraciones mas grandes</text>
+
+  <rect x="70" y="1025" width="1460" height="45" rx="20" fill="#17324d" />
+  <text x="800" y="1054" text-anchor="middle" class="heroText">Conclusion: no estamos yendo mal; el siguiente paso sano es hacer V1.7 visible y entendible antes de abrir mas poder o mas riesgo.</text>
+</svg>

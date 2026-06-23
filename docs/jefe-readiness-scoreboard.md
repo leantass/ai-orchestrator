@@ -1,24 +1,25 @@
 # JEFE Readiness Scoreboard
 
-Fecha de actualizacion: 2026-05-07
+Fecha de actualizacion: 2026-06-23
 
 ## Objetivo
 
 Este scoreboard resume el estado real de madurez operativa local de JEFE despues de la pasada de release candidate enfocada en estabilidad, claridad operativa y uso honesto de MEMORIA / Context Hub.
 
-Estado consolidado: release candidate local operativo, con deuda critica conocida en 0.
+Estado consolidado: release candidate local operativo, con deuda critica conocida en 0. La rama de trabajo actual volvió a quedar verde con `npm run quality:ci`, `node scripts/v1-release-smoke.mjs` y `npm run build`; el slice V1.8 artifact-first ya está vivo, pero la visibilidad operativa más amplia todavía no quedó cerrada como producto.
 
 ## Scoreboard
 
 | Area | Estado estimado | Evidencia concreta | Deuda o limite restante |
 | --- | --- | --- | --- |
-| Flujo guiado UI 01 a 07 | 95% | Paso 1 carga sin pantalla blanca, Paso 4 muestra MEMORIA conectada/no disponible y Paso 7 ya distingue mejor escritos unicos, tocados adicionales, previstos, readiness y siguiente fase segura. | `src/App.tsx` sigue siendo grande. |
+| Flujo guiado UI 01 a 07 | 95% | Paso 1 carga sin pantalla blanca, Paso 4 muestra MEMORIA conectada/no disponible y Paso 7 ya distingue mejor escritos unicos, tocados adicionales, previstos, readiness y siguiente fase segura. Las tarjetas de arquitectura de producto, primera entrega segura, plan escalable, roadmap, próximo paso y validación ya fueron extraídas a componentes propios, con helpers visuales compartidos, para bajar acople dentro del renderer. | `src/App.tsx` sigue siendo grande. |
 | Planificacion local / Cerebro fallback | 95% | Planner, continuidad y rutas seguras siguen pasando `ai-planner-smoke` completo, incluyendo pedido portuario nuevo con workspace ya ocupado, continuidad explicita sobre proyecto existente y otro dominio nuevo sin pegarse a veterinaria. | La logica sigue concentrada en `electron/main.cjs`. |
 | Materializacion segura local | 95% | Fullstack local, fases seguras, safe-first-delivery y modulos soportados siguen pasando planner smoke, release smoke y operator E2E. | Falta seguir reduciendo acoplamiento entre planner y materializador. |
 | Entrega funcional local fullstack | 93% | Copy visible y artefactos nuevos priorizan entrega funcional local, siguen siendo `file://` compatibles y no venden runtime real como hecho. | El proyecto veterinaria ya existente no fue retro-migrado automaticamente. |
 | Continuidad por fases | 97% | `review-and-expand` y `prepare-reusable-candidate-plan` mantienen continuidad segura, y ahora un proyecto existente no domina pedidos nuevos de otro dominio. | Conviene sumar mas casos de continuidad sobre workspaces largos. |
+| Project operations loop V1.8 | 82% | El `generated-domain delivery history ledger` ya emite `project-operations-run-envelope.json`, la UI V1 expone el bloque `V1.8 Project Operations Loop`, aparecen estados como `blocked_after_retries` y existe smoke dedicado dentro de `quality:ci`. | Falta alinear mejor V1.7 Session UI con este loop y cerrar una expectativa más explícita del delivery report final. |
 | Resultado final entendible para operador | 97% | Paso 7 informa motor, memoria, readiness, archivos escritos unicos, tocados adicionales, previstos y validaciones previstas/OK/fallidas, y si MEMORIA no estaba disponible ya no ensucia el cierre principal como si hubiera fallado la materializacion. | Todavia hay mucha informacion en una sola pantalla. |
-| Validaciones / smoke / seguridad | 97% | `npm audit`, `lint`, `tsc`, `ai-planner-smoke`, `ai-release-smoke`, `ai-operator-e2e-smoke`, `quality:ci` y `build` pasaron. | La deuda principal ya no es el warning de chunk, sino el tamaño estructural de `src/App.tsx` y `electron/main.cjs`. |
+| Validaciones / smoke / seguridad | 97% | `lint`, `tsc`, `ai-planner-smoke`, `ai-release-smoke`, `ai-operator-e2e-smoke`, `quality:ci`, `node scripts/v1-release-smoke.mjs` y `build` volvieron a pasar en la rama actual el 2026-06-23. | La deuda principal ya no es un bloqueo técnico activo, sino el tamaño estructural de `src/App.tsx` y `electron/main.cjs`. |
 | MEMORIA / Context Hub integrada | 97% | JEFE detecta API y UI real por separado, permite reintentar, levantar la API local, abrir UI real o endpoint tecnico y mostrar el ultimo evento emitido a MEMORIA en la sesion. | Falta historial mas largo por corrida si se quiere trazabilidad fina. |
 | Centro de contexto e insumos | 93% | Paso 2 ya permite adjuntar archivos o carpetas como metadata segura, seleccionar un proyecto existente, analizarlo en modo read-only y enviar ese contexto al planner sin leer `.env` ni ejecutar scripts. | La V1 no previsualiza contenido ni copia assets al workspace por defecto. |
 | Autonomia alta segura | 93% | JEFE sigue resolviendo rutas locales, continuidad y materializacion sin depender de runtime real ni de MEMORIA encendida. | La autonomia segura todavia depende de heuristicas grandes en `main.cjs`. |
@@ -29,6 +30,7 @@ Estado consolidado: release candidate local operativo, con deuda critica conocid
 
 - `npm run desktop:dev` ya no puede engancharse silenciosamente a otro Vite en `5173`.
 - La suite fuerte local ahora puede correrse con `npm run quality:ci` y el mismo bloque minimo queda versionado en GitHub Actions para `push` a `main` y `pull_request`.
+- `v1-release-smoke` ya valida el wiring real de `ai-quality` incluso con los comandos repartidos entre `scripts/ai-quality.mjs` y `scripts/ai-quality-sections.mjs`.
 - El renderer tiene `ErrorBoundary` y fallback de bootstrap para evitar pantalla blanca muda.
 - Paso 4 muestra un panel de MEMORIA con estado vivo, reintento, arranque local y apertura honesta.
 - El panel de MEMORIA ahora muestra tambien el ultimo evento emitido por JEFE hacia Context Hub.
@@ -38,16 +40,18 @@ Estado consolidado: release candidate local operativo, con deuda critica conocid
 - Context Hub puede estar apagado sin romper JEFE; la UI lo muestra y el launcher permite iniciar solo la API local desde la propia app.
 - La lectura final de safe-first-delivery ahora cae en `Primera entrega local generada`, `Revision visual local` y `Pendiente de revision visual` cuando no existe una fase formal en manifest.
 - Paso 2 ahora puede adjuntar insumos reales y analizar un proyecto local existente sin salir del modo seguro ni tocar archivos sensibles.
+- El primer slice V1.8 ya corre por una ruta real: el history ledger genera `project-operations-run-envelope.json`, resume `nextAction`, refleja estados como `blocked_after_retries` y pasa su smoke dedicado dentro de `quality:ci`.
 
 ## Riesgos restantes
 
-- `src/App.tsx` sigue superando el umbral que dispara deopt de Babel.
+- `src/App.tsx` sigue superando el umbral que dispara deopt de Babel, aunque ya perdió varios bloques presentacionales al mover `ProductArchitectureCard`, `SafeFirstDeliveryPlanCard`, `ScalableDeliveryPlanCard`, `ImplementationRoadmapCard`, `NextActionPlanCard` y `ValidationPlanCard` a `src/components/`.
 - `electron/main.cjs` sigue siendo el mayor foco de deuda tecnica y riesgo de mantenimiento.
+- V1.8 ya tiene slice artifact-first validado, pero V1.7 Session UI y el cierre más legible del loop todavía no están terminados como capa de producto.
 - La entrega/proyecto veterinaria ya materializada en `web-prueba` puede seguir teniendo copy historico si no se la resincroniza aparte.
 - El warning de chunk grande quedo resuelto con split real de build; el deopt de Babel sigue presente y no bloquea release candidate.
 
 ## Clasificacion honesta de deuda
 
 - Cerrada: apertura honesta de MEMORIA, estado operativo local de Context Hub, observabilidad minima del ultimo evento emitido, panel mas estable para automatizacion, distincion explicita entre proyecto nuevo vs continuidad real y separacion entre archivos escritos unicos, tocados adicionales y previstos.
-- Mitigada: `src/App.tsx` y `electron/main.cjs` siguen grandes, pero la deuda ya no queda mezclada con el runtime de MEMORIA y el panel critico ahora esta mejor aislado.
+- Mitigada: `src/App.tsx` y `electron/main.cjs` siguen grandes, pero la deuda ya no queda mezclada con el runtime de MEMORIA, el panel crítico ahora está mejor aislado y varias tarjetas grandes del flujo guiado ya salieron de `App.tsx` a componentes dedicados.
 - No bloqueante justificada: warning de chunk grande y deopt de Babel. Bajar eso mas ahora implicaria mover demasiada UI y logica critica para el beneficio inmediato que da.
