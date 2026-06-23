@@ -12,7 +12,7 @@
 
 ## 3. Operator visibility
 - [x] 3.1 Decide which states must be visible in UI first.
-- [ ] 3.2 Align V1.7 session UI with the broader operating loop.
+- [x] 3.2 Align V1.7 session UI with the broader operating loop.
 - [x] 3.3 Define delivery report expectations for final closure.
 
 ## 4. Validation and rollout
