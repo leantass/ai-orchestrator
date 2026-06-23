@@ -29,6 +29,7 @@ import { ExistingProjectPanel } from './components/ExistingProjectPanel'
 import { GuidedFlowShell } from './components/GuidedFlowShell'
 import { GuidedFooterActions } from './components/GuidedFooterActions'
 import { getGuidedFooterNote } from './components/GuidedFooterNote'
+import { GuidedModeSwitcher } from './components/GuidedModeSwitcher'
 import { GuidedPrimaryAction } from './components/GuidedPrimaryAction'
 import { GuidedSidebarActions } from './components/GuidedSidebarActions'
 import { HomeDashboardPanel } from './components/HomeDashboardPanel'
@@ -20853,11 +20854,7 @@ No usar credenciales.`
       eyebrow={`Paso ${activeWizardStepIndex + 1} de ${GUIDED_WIZARD_STEPS.length}`}
       title={activeWizardStepConfig.label}
       description=""
-      modeSwitcher={
-        <SecondaryActionButton onClick={() => setExperienceMode('advanced')} className="w-auto">
-          Panel avanzado
-        </SecondaryActionButton>
-      }
+      modeSwitcher={<GuidedModeSwitcher onOpenAdvanced={() => setExperienceMode('advanced')} />}
       navItems={appShellNavItems}
       showSidebar={false}
       showMobileNav={false}
