@@ -27,6 +27,7 @@ import { ContextHubControlPanel } from './components/ContextHubControlPanel'
 import { ExecutionTimeline } from './components/ExecutionTimeline'
 import { ExistingProjectPanel } from './components/ExistingProjectPanel'
 import { GuidedFlowShell } from './components/GuidedFlowShell'
+import { GuidedFooterActions } from './components/GuidedFooterActions'
 import { GuidedSidebarActions } from './components/GuidedSidebarActions'
 import { HomeDashboardPanel } from './components/HomeDashboardPanel'
 import { DetectedProjectBanner } from './components/DetectedProjectBanner'
@@ -20851,15 +20852,11 @@ No usar credenciales.`
           : 'Completa este bloque y segui al proximo paso.'
 
   const guidedFooterActions = (
-    <>
-      {activeWizardStep !== 'goal' &&
-      activeWizardStep !== 'plan' &&
-      activeWizardStep !== 'execution' &&
-      activeWizardStep !== 'result' ? (
-        <SecondaryActionButton onClick={handleWizardBack} className="sm:w-auto">Atrás</SecondaryActionButton>
-      ) : null}
-      {guidedPrimaryAction ? <div className="sm:min-w-[220px]">{guidedPrimaryAction}</div> : null}
-    </>
+    <GuidedFooterActions
+      step={activeWizardStep}
+      primaryAction={guidedPrimaryAction}
+      onBack={handleWizardBack}
+    />
   )
 
   const guidedShell = (
