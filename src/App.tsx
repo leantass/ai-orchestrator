@@ -28,6 +28,7 @@ import { ExecutionTimeline } from './components/ExecutionTimeline'
 import { ExistingProjectPanel } from './components/ExistingProjectPanel'
 import { GuidedFlowShell } from './components/GuidedFlowShell'
 import { GuidedFooterActions } from './components/GuidedFooterActions'
+import { GuidedPrimaryAction } from './components/GuidedPrimaryAction'
 import { GuidedSidebarActions } from './components/GuidedSidebarActions'
 import { HomeDashboardPanel } from './components/HomeDashboardPanel'
 import { DetectedProjectBanner } from './components/DetectedProjectBanner'
@@ -20810,20 +20811,15 @@ No usar credenciales.`
       />
     )
 
-  const guidedPrimaryAction =
-    activeWizardStep === 'brain' ? (
-      <PrimaryActionButton onClick={handleWizardNext} tone="sky">
-        Continuar
-      </PrimaryActionButton>
-    ) : activeWizardStep === 'memory' ? (
-      <PrimaryActionButton
-        onClick={handleWizardGeneratePlan}
-        disabled={isPlanning || !goalInput.trim()}
-        tone="sky"
-      >
-        {isPlanning ? 'Generando plan...' : 'Generar plan'}
-      </PrimaryActionButton>
-    ) : null
+  const guidedPrimaryAction = (
+    <GuidedPrimaryAction
+      step={activeWizardStep}
+      isPlanning={isPlanning}
+      canGeneratePlan={Boolean(goalInput.trim())}
+      onContinue={handleWizardNext}
+      onGeneratePlan={handleWizardGeneratePlan}
+    />
+  )
 
   const guidedSecondaryAction = (
     <GuidedSidebarActions
