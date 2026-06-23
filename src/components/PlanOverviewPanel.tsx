@@ -36,8 +36,8 @@ export function PlanOverviewPanel({
   callout?: ReactNode
   technicalDetails?: ReactNode
 }) {
-  const leadMetrics = metrics.slice(0, 1)
-  const supportMetrics = metrics.slice(1)
+  const leadMetrics = metrics.slice(0, 2)
+  const supportMetrics = metrics.slice(2)
 
   return (
     <div className="space-y-4">

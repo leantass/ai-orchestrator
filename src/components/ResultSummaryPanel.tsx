@@ -48,8 +48,8 @@ export function ResultSummaryPanel({
   actions?: ReactNode
   technicalSections?: ReactNode
 }) {
-  const heroItems = summaryItems.slice(0, 1)
-  const supportItems = summaryItems.slice(1)
+  const heroItems = summaryItems.slice(0, 2)
+  const supportItems = summaryItems.slice(2)
   const visibleNextSteps = nextStepItems.slice(0, 1)
   const hiddenNextSteps = nextStepItems.slice(1)
 

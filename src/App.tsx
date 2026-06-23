@@ -12918,6 +12918,25 @@ function App() {
     : resultStatusPresentation
   const resultExecutionCompleted =
     effectiveResultStatusPresentation.label === 'Ejecución completada'
+  const resultOperationalWorkState = decisionPending
+    ? 'requires_human_approval'
+    : resultExecutionNeedsMaterialReview
+      ? 'needs_revision'
+      : effectiveResultStatusPresentation.tone === 'rose'
+        ? 'blocked'
+        : resultExecutionCompleted
+          ? 'completed_local'
+          : 'in_progress'
+  const resultOperationalWorkStateDetail = decisionPending
+    ? activeApprovalDetailLabel || 'Hay una decisión humana pendiente antes de seguir.'
+    : resultOperationalWorkState === 'needs_revision'
+      ? effectiveResultStatusPresentation.detail
+      : resultOperationalWorkState === 'blocked'
+        ? effectiveResultStatusPresentation.detail ||
+          'El flujo quedó bloqueado y requiere intervención humana para seguir.'
+        : resultOperationalWorkState === 'completed_local'
+          ? 'La salida ya quedó registrada localmente; el siguiente paso seguro es validar, revisar o continuar la fase que JEFE dejó preparada.'
+          : 'JEFE todavía no cerró este bloque como entrega final.'
   const resultCodexLabel = fastRouteDetected
     ? 'No requerido'
     : latestBridgeModeValue.toLocaleLowerCase() === 'codex' ||
@@ -13393,6 +13412,20 @@ function App() {
             executionMode: plannerExecutionMetadata.executionMode,
           })
         : currentStep
+  const planOperationalWorkState = decisionPending
+    ? 'requires_human_approval'
+    : plannerNeedsUserClarification
+      ? 'needs_revision'
+      : isPlanning
+        ? 'in_progress'
+        : 'planned'
+  const planOperationalWorkStateDetail = decisionPending
+    ? activeApprovalDetailLabel || 'Hay una decisión humana pendiente antes de ejecutar.'
+    : plannerNeedsUserClarification
+      ? visibleCurrentStepLabel
+      : isPlanning
+        ? 'JEFE sigue armando el plan operativo antes de habilitar la siguiente acción.'
+        : visibleCurrentStepLabel
   const liveActivityEvents = [...sessionEvents].slice(-6).reverse()
   const latestFlowMessage = flowMessages.at(-1)
   const flowExecutionFinished =
@@ -14051,6 +14084,17 @@ function App() {
   }))
   const planOverviewMetrics = [
     {
+      label: 'Loop operativo',
+      value: planOperationalWorkState,
+      detail: planOperationalWorkStateDetail,
+      tone: decisionPending
+        ? ('amber' as const)
+        : plannerNeedsUserClarification
+          ? ('rose' as const)
+          : ('sky' as const),
+      icon: 'status' as const,
+    },
+    {
       label: 'Tipo de plan',
       value: plannerReviewStatusLabel,
       detail: activePlannerStrategyLabel,
@@ -14320,6 +14364,11 @@ function App() {
     },
   ]
   const resultSummaryItems = [
+    {
+      label: 'Loop operativo',
+      value: resultOperationalWorkState,
+      detail: resultOperationalWorkStateDetail,
+    },
     {
       label: 'Validaciones',
       value: resultMaterializationValidationsLabel,
