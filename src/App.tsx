@@ -28,6 +28,7 @@ import { ExecutionTimeline } from './components/ExecutionTimeline'
 import { ExistingProjectPanel } from './components/ExistingProjectPanel'
 import { GuidedFlowShell } from './components/GuidedFlowShell'
 import { GuidedFooterActions } from './components/GuidedFooterActions'
+import { getGuidedFooterNote } from './components/GuidedFooterNote'
 import { GuidedPrimaryAction } from './components/GuidedPrimaryAction'
 import { GuidedSidebarActions } from './components/GuidedSidebarActions'
 import { HomeDashboardPanel } from './components/HomeDashboardPanel'
@@ -20834,18 +20835,10 @@ No usar credenciales.`
     />
   )
 
-  const guidedFooterNote =
-    activeWizardStep === 'goal'
-      ? ''
-      : activeWizardStep === 'plan'
-      ? plannerIsReviewOnly
-        ? 'El CTA principal prepara la siguiente accion segura; todavia no ejecuta archivos.'
-        : 'El CTA principal ejecuta la instruccion actual con el modo y el scope activos.'
-      : activeWizardStep === 'execution'
-        ? 'Si aparece una aprobacion, el flujo queda bloqueado de forma explicita hasta resolverla.'
-        : activeWizardStep === 'result'
-          ? 'La salida final ya separa lo operativo de lo tecnico para iterar con menos ruido.'
-          : 'Completa este bloque y segui al proximo paso.'
+  const guidedFooterNote = getGuidedFooterNote({
+    step: activeWizardStep,
+    plannerIsReviewOnly,
+  })
 
   const guidedFooterActions = (
     <GuidedFooterActions
