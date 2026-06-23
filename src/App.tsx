@@ -21,16 +21,42 @@ import {
   type MetricTone,
 } from './components/AppUiPrimitives'
 import { AppShell } from './components/AppShell'
+import { ApprovalRequestPanel } from './components/ApprovalRequestPanel'
 import { ContextSummaryPanel } from './components/ContextSummaryPanel'
 import { ContextHubControlPanel } from './components/ContextHubControlPanel'
 import { ExecutionTimeline } from './components/ExecutionTimeline'
 import { ExistingProjectPanel } from './components/ExistingProjectPanel'
 import { GuidedFlowShell } from './components/GuidedFlowShell'
 import { HomeDashboardPanel } from './components/HomeDashboardPanel'
+import { DetectedProjectBanner } from './components/DetectedProjectBanner'
+import { ImplementationRoadmapCard } from './components/ImplementationRoadmapCard'
+import { LocalProjectManifestCard } from './components/LocalProjectManifestCard'
+import { NextActionPlanCard } from './components/NextActionPlanCard'
 import { PlanOverviewPanel } from './components/PlanOverviewPanel'
+import { PhaseExpansionPlanCard } from './components/PhaseExpansionPlanCard'
+import { ProductArchitectureCard } from './components/ProductArchitectureCard'
+import { ProductArchitectureGroup } from './components/ProductArchitectureGroup'
+import { PreparedModuleExpansionCard } from './components/PreparedModuleExpansionCard'
+import { ProjectBlueprintCard } from './components/ProjectBlueprintCard'
+import {
+  ProjectContinuationActionSection,
+  type ProjectContinuationActionSectionItem,
+} from './components/ProjectContinuationActionSection'
+import { ProjectContinuationGroupsPanel } from './components/ProjectContinuationGroupsPanel'
+import {
+  ProjectContinuationModulesSection,
+  type ProjectContinuationModuleSectionItem,
+} from './components/ProjectContinuationModulesSection'
+import { ProjectContinuityOverviewCard } from './components/ProjectContinuityOverviewCard'
+import { ProjectPhaseExecutionPlanCard } from './components/ProjectPhaseExecutionPlanCard'
 import { ProjectInputsPanel } from './components/ProjectInputsPanel'
+import { ProjectReadinessPanel } from './components/ProjectReadinessPanel'
 import { ResultSummaryPanel } from './components/ResultSummaryPanel'
+import { RuntimeApprovalPanel } from './components/RuntimeApprovalPanel'
+import { SafeFirstDeliveryPlanCard } from './components/SafeFirstDeliveryPlanCard'
+import { ScalableDeliveryPlanCard } from './components/ScalableDeliveryPlanCard'
 import { SimpleExperienceDashboard } from './components/SimpleExperienceDashboard'
+import { ValidationPlanCard } from './components/ValidationPlanCard'
 import { V1ClosureDashboard } from './components/V1ClosureDashboard'
 import {
   getPrepareActionButtonLabel,
@@ -55,288 +81,6 @@ import {
 
 type FlowMessage = {
   id: number
-  source: 'operador' | 'orquestador' | 'planificador' | 'executor' | 'codex' | 'bridge'
-  title: string
-  content: string
-  raw?: string
-  status?: 'info' | 'success' | 'warning' | 'error'
-}
-
-type ExecutorTraceEntry = Omit<FlowMessage, 'id'>
-type ExecutionEventPayload = ExecutorTraceEntry & {
-  requestId?: string
-}
-
-type ExecutorValidationResult = {
-  type?: string
-  targetPath?: string
-  expectedKind?: string
-  expectedText?: string
-  ok?: boolean
-  reason?: string
-}
-
-type ExecutorFailureContext = {
-  timestamp?: string
-  decisionKey?: string
-  failureType?: string
-  executorMode?: string
-  executorModeSource?: string
-  bridgeMode?: string
-  bridgeModeSource?: string
-  executorCommand?: string
-  origin?: string
-  stepIndex?: number
-  totalSteps?: number
-  currentStep?: string
-  currentSubtask?: string
-  currentAction?: string
-  currentCommand?: string
-  currentTargetPath?: string
-  touchedPaths?: string[]
-  createdPaths?: string[]
-  stdout?: string
-  stderr?: string
-  lastProgressAt?: string
-  lastMaterialProgressAt?: string
-  hasMaterialProgress?: boolean
-  materialState?: string
-  strategy?: string
-  brainStrategy?: string
-  reasoningLayer?: string
-  materializationLayer?: string
-  materializationPlanSource?: string
-  materializationPlan?: MaterializationPlanContract | null
-  validationResults?: ExecutorValidationResult[]
-  appliedReuseMode?: string
-  reusedStyleFromArtifactId?: string
-  reusedStructureFromArtifactId?: string
-  reuseAppliedFields?: string[]
-  acceptedAt?: string
-  attemptScope?: 'broad' | 'targeted' | 'subtask' | 'continuation'
-  fingerprint?: string
-  isRecoveryAttempt?: boolean
-  repeatedFailureCount?: number
-  lastAttemptScope?: 'broad' | 'targeted' | 'subtask' | 'continuation'
-  blockedRecoveryModes?: string[]
-  lastFailure?: ExecutorFailureContext
-  recentFailures?: ExecutorFailureContext[]
-}
-
-type ExecutionCompletePayload = {
-  requestId?: string
-  ok?: boolean
-  trace?: ExecutorTraceEntry[]
-  instruction?: string
-  result?: string
-  resultPreview?: string
-  approvalRequired?: boolean
-  approvalReason?: string
-  error?: string
-  failureType?: string
-  executorMode?: string
-  executorModeSource?: string
-  bridgeMode?: string
-  bridgeModeSource?: string
-  details?: ExecutorFailureContext
-}
-
-type ExecutorContinuationAnchor = {
-  targetPath?: string
-  subtask?: string
-  action?: string
-}
-
-type ExecutorExecutionScope = {
-  objectiveScope?: 'single-target' | 'single-subtask' | 'continuation'
-  allowedTargetPaths?: string[]
-  blockedTargetPaths?: string[]
-  successCriteria?: string[]
-  continuationAnchor?: ExecutorContinuationAnchor
-  enforceNarrowScope?: boolean
-}
-
-type ReusableArtifactLookupMatch = {
-  id: string
-  type?: string
-  sector?: string
-  visualStyle?: string
-  layoutVariant?: string
-  heroStyle?: string
-  localPath?: string
-  primaryCta?: string
-  secondaryCta?: string
-  typography?: {
-    headingFamily?: string
-    bodyFamily?: string
-    fontHref?: string
-  }
-  colors?: Record<string, string>
-  preview?: {
-    status?: string
-    imagePath?: string
-    generatedAt?: string
-    source?: string
-    errorMessage?: string
-  }
-  metadata?: Record<string, unknown>
-  matchReasons?: string[]
-}
-
-type ReusableArtifactLookupContract = {
-  executed: boolean
-  foundCount: number
-  matches: ReusableArtifactLookupMatch[]
-}
-
-type ReusableArtifactRecord = ReusableArtifactLookupMatch & {
-  sectorLabel?: string
-  tags?: string[]
-  createdAt?: string
-  updatedAt?: string
-}
-
-type ManualReuseMode =
-  | 'auto'
-  | 'none'
-  | 'inspiration-only'
-  | 'reuse-style'
-  | 'reuse-structure'
-  | 'reuse-style-and-structure'
-
-type ManualReusablePreference = {
-  artifactId?: string
-  reuseMode: Exclude<ManualReuseMode, 'auto'>
-  source?: string
-}
-
-type ProductArchitectureContract = {
-  productType?: string
-  domain?: string
-  users?: string[]
-  roles?: string[]
-  coreModules?: string[]
-  dataEntities?: string[]
-  keyFlows?: string[]
-  integrations?: string[]
-  criticalRisks?: string[]
-  approvalRequiredFor?: string[]
-  suggestedArchitecture?: {
-    frontend?: string
-    backend?: string
-    database?: string
-    auth?: string
-    payments?: string
-    storage?: string
-  }
-  phases?: string[]
-  safeFirstDelivery?: string[]
-  outOfScopeForFirstIteration?: string[]
-}
-
-type SafeFirstDeliveryPlanContract = {
-  scope?: string[]
-  modules?: string[]
-  mockData?: string[]
-  screens?: string[]
-  localBehavior?: string[]
-  explicitExclusions?: string[]
-  approvalRequiredLater?: string[]
-  successCriteria?: string[]
-}
-
-type SafeFirstDeliveryMaterializationContract = {
-  domainLabel?: string
-  productType?: string
-  modules?: string[]
-  screens?: string[]
-  entities?: string[]
-  mockCollections?: string[]
-  localActions?: string[]
-  stateHints?: string[]
-  approvalThemes?: string[]
-  explicitExclusions?: string[]
-}
-
-type DomainUnderstandingContract = {
-  domainLabel?: string
-  intentLabel?: string
-  productKind?: string
-  primaryModules?: string[]
-  primaryEntities?: string[]
-  secondaryEntities?: string[]
-  roles?: string[]
-  coreFlows?: string[]
-  stateModel?: string[]
-  localActions?: string[]
-  riskThemes?: string[]
-  approvalThemes?: string[]
-  explicitExclusions?: string[]
-}
-
-type ScalableDeliveryPlanFileContract = {
-  path?: string
-  purpose?: string
-  required?: boolean
-}
-
-type ScalableDeliveryPlanContract = {
-  deliveryLevel?:
-    | 'safe-first-delivery'
-    | 'frontend-project'
-    | 'fullstack-local'
-    | 'monorepo-local'
-    | 'infra-local-plan'
-  reason?: string
-  targetStructure?: string[]
-  allowedRootPaths?: string[]
-  modules?: string[]
-  directories?: string[]
-  filesToCreate?: ScalableDeliveryPlanFileContract[]
-  localOnlyConstraints?: string[]
-  explicitExclusions?: string[]
-  approvalRequiredLater?: string[]
-  successCriteria?: string[]
-}
-
-type ProjectBlueprintIntegrationContract = {
-  name?: string
-  type?: string
-  requiredNow?: boolean
-  approvalRequired?: boolean
-  reason?: string
-}
-
-type ProjectBlueprintPhaseContract = {
-  phase?: string
-  goal?: string
-  deliveryLevel?: ScalableDeliveryPlanContract['deliveryLevel'] | string
-  executableNow?: boolean
-  approvalRequired?: boolean
-}
-
-type ProjectBlueprintContract = {
-  productType?: string
-  domain?: string
-  intent?: string
-  deliveryLevel?: ScalableDeliveryPlanContract['deliveryLevel'] | string
-  confidence?: 'low' | 'medium' | 'high' | string
-  stackProfile?: {
-    frontend?: string
-    backend?: string
-    database?: string
-    apiStyle?: string
-    auth?: string
-    styling?: string
-    testing?: string
-    packageManager?: string
-    runtime?: string
-  }
-  roles?: string[]
-  modules?: string[]
-  entities?: string[]
-  coreFlows?: string[]
-  integrations?: ProjectBlueprintIntegrationContract[]
   dataSensitivity?: 'none' | 'low' | 'medium' | 'high' | string
   riskLevel?: 'low' | 'medium' | 'high' | string
   assumptions?: string[]
@@ -426,166 +170,6 @@ type ValidationPlanContract = {
   successCriteria?: string[]
 }
 
-type PhaseExpansionPlanContract = {
-  phaseId?: string
-  goal?: string
-  targetFiles?: string[]
-  changesExpected?: string[]
-  risks?: string[]
-  validationPlan?: ValidationPlanContract | null
-  executableNow?: boolean
-  approvalRequired?: boolean
-  nextExpectedAction?: string
-}
-
-type ExpansionOptionContract = {
-  id?: string
-  label?: string
-  description?: string
-  expansionType?: string
-  riskLevel?: 'low' | 'medium' | 'high' | string
-  safeToPrepare?: boolean
-  safeToMaterialize?: boolean
-  requiresApproval?: boolean
-  targetStrategy?: string
-  expectedFiles?: string[]
-  reason?: string
-}
-
-type ExpansionOptionsContract = {
-  projectRoot?: string
-  currentPhase?: string
-  recommendedOptionId?: string
-  options?: ExpansionOptionContract[]
-}
-
-type ModuleExpansionExpectedChangeContract = {
-  layer?: string
-  targetPath?: string
-  purpose?: string
-}
-
-type ModuleExpansionPlanContract = {
-  moduleId?: string
-  moduleName?: string
-  projectRoot?: string
-  domain?: string
-  expansionType?: string
-  reason?: string
-  safeToPrepare?: boolean
-  safeToMaterialize?: boolean
-  approvalRequired?: boolean
-  riskLevel?: 'low' | 'medium' | 'high' | string
-  affectedLayers?: string[]
-  targetFiles?: string[]
-  allowedTargetPaths?: string[]
-  forbiddenPaths?: string[]
-  blockers?: string[]
-  expectedChanges?: ModuleExpansionExpectedChangeContract[]
-  validationPlan?: ValidationPlanContract | null
-  explicitExclusions?: string[]
-  successCriteria?: string[]
-}
-
-type ModuleExpansionActionPayload = {
-  moduleId?: string
-  moduleName?: string
-  optionType?: string
-  targetStrategy?: string
-  expectedFiles?: string[] | null
-  safeToPrepare?: boolean
-  safeToMaterialize?: boolean
-  requiresApproval?: boolean
-  reason?: string
-}
-
-type ContinuationActionContract = {
-  id?: string
-  title?: string
-  description?: string
-  category?: string
-  targetStrategy?: string
-  safeToPrepare?: boolean
-  safeToMaterialize?: boolean
-  requiresApproval?: boolean
-  blocked?: boolean
-  blocker?: string
-  approvalType?: string
-  expectedOutcome?: string
-  recommended?: boolean
-  priority?: number
-  phaseId?: string
-  moduleId?: string
-  riskLevel?: 'low' | 'medium' | 'high' | string
-  projectRoot?: string
-  deliveryLevel?: ScalableDeliveryPlanContract['deliveryLevel'] | string
-  reason?: string
-  targetFiles?: string[]
-  allowedTargetPaths?: string[]
-  explicitExclusions?: string[]
-  successCriteria?: string[]
-  risks?: string[]
-  validationPlan?: ValidationPlanContract | null
-}
-
-type ProjectContinuationStateContract = {
-  projectStatus?: string
-  completedPhases?: string[]
-  pendingPhases?: string[]
-  availableSafeActions?: ContinuationActionContract[]
-  availablePlanningActions?: ContinuationActionContract[]
-  approvalRequiredActions?: ContinuationActionContract[]
-  blockedActions?: ContinuationActionContract[]
-  modulesDone?: string[]
-  modulesAvailable?: string[]
-  modulesBlocked?: string[]
-  nextRecommendedAction?: ContinuationActionContract | null
-  nextRecommendedPhase?: string
-  nextRecommendedModule?: string
-  risks?: string[]
-  blockers?: string[]
-  summary?: string
-  operatorMessage?: string
-}
-
-type ApprovalRequestPlanContract = {
-  id?: string
-  title?: string
-  description?: string
-  approvalType?: string
-  status?: string
-  riskLevel?: 'low' | 'medium' | 'high' | string
-  requiresApproval?: boolean
-  blockedByDefault?: boolean
-  forbiddenInCurrentTask?: boolean
-  operatorMessage?: string
-  areaSummary?: string
-  touches?: string[]
-  willNotTouch?: string[]
-  validationsRequired?: string[]
-  safeAlternative?: string
-  approvalCopy?: string
-  explicitApprovalText?: string
-  targetStrategy?: string
-  projectRoot?: string
-  approvalPhrase?: string
-  operatorMustConfirm?: string
-  notExecutedDisclaimer?: string
-  expectedOutcome?: string
-  blockedReason?: string
-  relatedReadinessArea?: string
-  createdAt?: string
-  expiresAt?: string
-  commandsPreview?: string[]
-  filesPreview?: string[]
-  directoriesPreview?: string[]
-  envRequirements?: string[]
-  secretsRequired?: string[]
-  rollbackPlan?: string[]
-  validationPlan?: ValidationPlanContract | null
-  warnings?: string[]
-}
-
 type ProjectReadinessStateContract = {
   readinessLevel?: string
   demoReady?: boolean
@@ -609,6 +193,12 @@ type ProjectReadinessStateContract = {
   recommendedDemoScript?: string[]
   warnings?: string[]
   blockers?: string[]
+  lastApprovalRequest?: string
+  realExecutionReadiness?: string
+  pendingApprovals?: string[]
+  blockedRuntimeActions?: string[]
+  approvedActions?: string[]
+  approvalHistory?: LocalProjectManifestHistoryContract[]
 }
 
 type RuntimeApprovalStateContract = {
@@ -5158,1144 +4748,6 @@ const GUIDED_WIZARD_STEPS: Array<{
 const joinClasses = (...tokens: Array<string | false | null | undefined>) =>
   tokens.filter(Boolean).join(' ')
 
-const PRODUCT_ARCHITECTURE_TYPE_LABELS: Record<string, string> = {
-  'business-system': 'Sistema de negocio',
-  ecommerce: 'Ecommerce',
-  crm: 'CRM',
-  erp: 'ERP',
-  marketplace: 'Marketplace',
-  saas: 'SaaS',
-  'internal-tool': 'Herramienta interna',
-  unknown: 'No definido',
-}
-
-const getProductArchitectureTypeLabel = (value: unknown) => {
-  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
-
-  if (!normalizedValue) {
-    return 'No definido'
-  }
-
-  return (
-    PRODUCT_ARCHITECTURE_TYPE_LABELS[normalizedValue] ||
-    normalizeOptionalString(value).replace(/-/g, ' ')
-  )
-}
-
-function ProductArchitectureList({
-  items,
-  compact = false,
-}: {
-  items?: string[]
-  compact?: boolean
-}) {
-  const normalizedItems = normalizeOptionalStringArray(items)
-  const visibleItems = compact ? normalizedItems.slice(0, 4) : normalizedItems
-
-  if (visibleItems.length === 0) {
-    return (
-      <div className="text-xs leading-5 text-slate-500">Sin datos definidos</div>
-    )
-  }
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {visibleItems.map((item) => (
-        <span
-          key={item}
-          className="rounded-full border border-white/10 bg-slate-950/60 px-3 py-1 text-xs leading-5 text-slate-200"
-        >
-          {item}
-        </span>
-      ))}
-      {compact && normalizedItems.length > visibleItems.length ? (
-        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs leading-5 text-slate-400">
-          +{normalizedItems.length - visibleItems.length} más
-        </span>
-      ) : null}
-    </div>
-  )
-}
-
-function ProductArchitectureDetailBlock({
-  label,
-  value,
-}: {
-  label: string
-  value?: string
-}) {
-  const normalizedValue = normalizeOptionalString(value)
-
-  if (!normalizedValue) {
-    return null
-  }
-
-  return (
-    <div className="rounded-xl border border-white/8 bg-slate-950/50 px-4 py-3">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-        {label}
-      </div>
-      <div className="mt-2 text-sm leading-6 text-slate-100">{normalizedValue}</div>
-    </div>
-  )
-}
-
-function ProductArchitectureGroup({
-  title,
-  items,
-  compact = false,
-  tone = 'default',
-}: {
-  title: string
-  items?: string[]
-  compact?: boolean
-  tone?: 'default' | 'amber' | 'rose' | 'emerald'
-}) {
-  const toneClassName =
-    tone === 'rose'
-      ? 'border-rose-300/20 bg-rose-300/8'
-      : tone === 'amber'
-        ? 'border-amber-300/20 bg-amber-300/8'
-        : tone === 'emerald'
-          ? 'border-emerald-300/20 bg-emerald-300/8'
-          : 'border-white/8 bg-white/[0.03]'
-
-  return (
-    <article className={joinClasses('rounded-2xl border px-4 py-4', toneClassName)}>
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-        {title}
-      </div>
-      <div className="mt-3">
-        <ProductArchitectureList items={items} compact={compact} />
-      </div>
-    </article>
-  )
-}
-
-function ProductArchitectureCard({
-  architecture,
-  compact = false,
-  reviewOnly = false,
-  onPrepareSafeFirstDelivery,
-}: {
-  architecture: ProductArchitectureContract
-  compact?: boolean
-  reviewOnly?: boolean
-  onPrepareSafeFirstDelivery?: (() => void) | null
-}) {
-  const canPrepareSafeFirstDelivery =
-    reviewOnly &&
-    typeof onPrepareSafeFirstDelivery === 'function' &&
-    (normalizeOptionalStringArray(architecture.safeFirstDelivery).length > 0 ||
-      normalizeOptionalStringArray(architecture.phases).length > 0)
-  const suggestedArchitectureEntries = [
-    ['Frontend', architecture.suggestedArchitecture?.frontend],
-    ['Backend', architecture.suggestedArchitecture?.backend],
-    ['Database', architecture.suggestedArchitecture?.database],
-    ['Auth', architecture.suggestedArchitecture?.auth],
-    ['Payments', architecture.suggestedArchitecture?.payments],
-    ['Storage', architecture.suggestedArchitecture?.storage],
-  ].filter(([, value]) => normalizeOptionalString(value))
-  const hasSuggestedArchitecture = suggestedArchitectureEntries.length > 0
-
-  return (
-    <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Arquitectura del producto
-          </div>
-          <div className="mt-2 text-sm leading-6 text-slate-400">
-            {reviewOnly
-              ? 'Este bloque resume la arquitectura propuesta por el Cerebro para revisión, no para ejecución inmediata.'
-              : 'Resumen estructurado de la arquitectura propuesta por el planner.'}
-          </div>
-        </div>
-        {reviewOnly ? (
-          <div className="flex flex-wrap gap-2">
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-              Revisión manual
-            </span>
-            {canPrepareSafeFirstDelivery ? (
-              <button
-                type="button"
-                onClick={onPrepareSafeFirstDelivery || undefined}
-                className="rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-1 text-xs font-medium text-sky-100 transition hover:bg-sky-300/15"
-              >
-                Preparar primera entrega segura
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <MetricCard
-          label="Tipo de producto"
-          value={getProductArchitectureTypeLabel(architecture.productType)}
-          tone="sky"
-        />
-        <MetricCard
-          label="Dominio"
-          value={normalizeOptionalString(architecture.domain) || 'Sin datos definidos'}
-        />
-        <MetricCard
-          label="Primera entrega segura"
-          value={
-            normalizeOptionalStringArray(architecture.safeFirstDelivery)[0] ||
-            'Sin datos definidos'
-          }
-          tone="emerald"
-        />
-      </div>
-
-      <div className="mt-4 grid gap-3 xl:grid-cols-2">
-        <ProductArchitectureGroup
-          title="Usuarios"
-          items={architecture.users}
-          compact={compact}
-        />
-        <ProductArchitectureGroup
-          title="Roles"
-          items={architecture.roles}
-          compact={compact}
-        />
-        <ProductArchitectureGroup
-          title="Módulos principales"
-          items={architecture.coreModules}
-          compact={compact}
-          tone="sky"
-        />
-        <ProductArchitectureGroup
-          title="Entidades de datos"
-          items={architecture.dataEntities}
-          compact={compact}
-        />
-        <ProductArchitectureGroup
-          title="Flujos clave"
-          items={architecture.keyFlows}
-          compact={compact}
-        />
-        <ProductArchitectureGroup
-          title="Integraciones"
-          items={architecture.integrations}
-          compact={compact}
-        />
-      </div>
-
-      <div className="mt-4 grid gap-3 xl:grid-cols-2">
-        <ProductArchitectureGroup
-          title="Riesgos críticos"
-          items={architecture.criticalRisks}
-          compact={compact}
-          tone="rose"
-        />
-        <ProductArchitectureGroup
-          title="Aprobaciones necesarias"
-          items={architecture.approvalRequiredFor}
-          compact={compact}
-          tone="amber"
-        />
-      </div>
-
-      {hasSuggestedArchitecture ? (
-        <div className="mt-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Arquitectura sugerida
-          </div>
-          <div className="mt-3 grid gap-3 xl:grid-cols-2">
-            {suggestedArchitectureEntries.map(([label, value]) => (
-              <ProductArchitectureDetailBlock
-                key={label}
-                label={label}
-                value={normalizeOptionalString(value)}
-              />
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      <div className="mt-4 grid gap-3 xl:grid-cols-2">
-        <ProductArchitectureGroup
-          title="Fases sugeridas"
-          items={architecture.phases}
-          compact={compact}
-          tone="emerald"
-        />
-        <ProductArchitectureGroup
-          title="Fuera de alcance de la primera iteración"
-          items={architecture.outOfScopeForFirstIteration}
-          compact={compact}
-        />
-      </div>
-
-      {!compact ? (
-        <div className="mt-4">
-          <ProductArchitectureGroup
-            title="Primera entrega segura"
-            items={architecture.safeFirstDelivery}
-            tone="emerald"
-          />
-        </div>
-      ) : null}
-    </article>
-  )
-}
-
-function SafeFirstDeliveryPlanCard({
-  plan,
-  compact = false,
-  reviewOnly = false,
-  onPrepareMaterialization,
-  materializationActionState = 'idle',
-  hideActionButton = false,
-}: {
-  plan: SafeFirstDeliveryPlanContract
-  compact?: boolean
-  reviewOnly?: boolean
-  onPrepareMaterialization?: (() => void) | null
-  materializationActionState?: 'idle' | 'preparing' | 'prepared'
-  hideActionButton?: boolean
-}) {
-  const canPrepareMaterialization =
-    reviewOnly &&
-    typeof onPrepareMaterialization === 'function' &&
-    (normalizeOptionalStringArray(plan.scope).length > 0 ||
-      normalizeOptionalStringArray(plan.modules).length > 0 ||
-      normalizeOptionalStringArray(plan.screens).length > 0)
-  const preparingMaterialization = materializationActionState === 'preparing'
-  const preparedMaterialization = materializationActionState === 'prepared'
-  const scopeSummary =
-    normalizeOptionalStringArray(plan.scope)[0] || 'Sin datos definidos'
-  const moduleSummary =
-    normalizeOptionalStringArray(plan.modules)[0] || 'Sin datos definidos'
-  const exclusionSummary =
-    normalizeOptionalStringArray(plan.explicitExclusions)[0] || 'Sin datos definidos'
-
-  return (
-    <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Primera entrega segura
-          </div>
-          <div className="mt-2 text-sm leading-6 text-slate-400">
-            {preparedMaterialization
-              ? 'Este bloque conserva el alcance aprobado y la materializacion ya quedo lista en el CTA principal.'
-              : 'Este bloque resume la primera fase segura propuesta por el Cerebro y no ejecuta cambios todavia.'}
-          </div>
-          {canPrepareMaterialization ? (
-            <div className="mt-2 text-xs leading-5 text-slate-500">
-              {preparingMaterialization
-                ? 'JEFE esta preparando un plan ejecutable acotado para materializar la entrega.'
-                : 'Esto genera un plan ejecutable acotado; no ejecuta cambios todavia.'}
-            </div>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-            {preparedMaterialization
-              ? 'Lista para materializar'
-              : preparingMaterialization
-                ? 'Preparando materializacion'
-                : reviewOnly
-                  ? 'Revision manual'
-                  : 'Resumen activo'}
-          </span>
-          {canPrepareMaterialization && !hideActionButton ? (
-            <button
-              type="button"
-              onClick={onPrepareMaterialization || undefined}
-              disabled={preparingMaterialization}
-              className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-medium text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-            >
-              {preparingMaterialization
-                ? 'Preparando materializacion...'
-                : 'Preparar materializacion segura'}
-            </button>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
-        <MetricCard label="Alcance inicial" value={scopeSummary} tone="sky" />
-        <MetricCard
-          label="Módulo priorizado"
-          value={moduleSummary}
-          tone="emerald"
-        />
-        <MetricCard
-          label="Exclusión clave"
-          value={exclusionSummary}
-          tone="amber"
-        />
-      </div>
-
-      <div className="mt-4 grid gap-3 xl:grid-cols-2">
-        <ProductArchitectureGroup
-          title="Alcance"
-          items={plan.scope}
-          compact={compact}
-          tone="sky"
-        />
-        <ProductArchitectureGroup
-          title="Módulos"
-          items={plan.modules}
-          compact={compact}
-          tone="emerald"
-        />
-        <ProductArchitectureGroup
-          title="Datos mock"
-          items={plan.mockData}
-          compact={compact}
-        />
-        <ProductArchitectureGroup
-          title="Pantallas"
-          items={plan.screens}
-          compact={compact}
-        />
-        <ProductArchitectureGroup
-          title="Comportamiento local"
-          items={plan.localBehavior}
-          compact={compact}
-        />
-        <ProductArchitectureGroup
-          title="Criterios de éxito"
-          items={plan.successCriteria}
-          compact={compact}
-          tone="emerald"
-        />
-      </div>
-
-      <div className="mt-4 grid gap-3 xl:grid-cols-2">
-        <ProductArchitectureGroup
-          title="Exclusiones explícitas"
-          items={plan.explicitExclusions}
-          compact={compact}
-          tone="amber"
-        />
-        <ProductArchitectureGroup
-          title="Aprobaciones más adelante"
-          items={plan.approvalRequiredLater}
-          compact={compact}
-          tone="rose"
-        />
-      </div>
-    </article>
-  )
-}
-
-function ScalableDeliveryPlanCard({
-  plan,
-  compact = false,
-  reviewOnly = false,
-  nextExpectedAction,
-  prepareMaterializationKind = '',
-  onPrepareMaterialization,
-}: {
-  plan: ScalableDeliveryPlanContract
-  compact?: boolean
-  reviewOnly?: boolean
-  nextExpectedAction?: string
-  prepareMaterializationKind?: string
-  onPrepareMaterialization?: (() => void) | null
-}) {
-  const normalizedDeliveryLevel = normalizeOptionalString(plan.deliveryLevel)
-  const normalizedPrepareMaterializationKind = normalizeOptionalString(
-    prepareMaterializationKind,
-  ).toLocaleLowerCase()
-  const planReason =
-    normalizeOptionalString(plan.reason) || 'Sin motivo resumido disponible.'
-  const typeLabel = getScalableDeliveryPlanTypeLabel(normalizedDeliveryLevel)
-  const reviewStateLabel = reviewOnly ? 'No ejecuta todavía' : 'Plan informado'
-  const nextActionLabel = getNextExpectedActionLabel(nextExpectedAction)
-  const canPrepareFrontendMaterialization =
-    reviewOnly &&
-    normalizedPrepareMaterializationKind === 'frontend-project' &&
-    typeof onPrepareMaterialization === 'function'
-  const canPrepareFullstackMaterialization =
-    reviewOnly &&
-    normalizedPrepareMaterializationKind === 'fullstack-local' &&
-    typeof onPrepareMaterialization === 'function'
-  const prepareMaterializationLabel = canPrepareFrontendMaterialization
-    ? 'Preparar materialización frontend'
-    : canPrepareFullstackMaterialization
-      ? 'Preparar materialización fullstack local'
-      : ''
-  const prepareMaterializationHelperCopy = canPrepareFrontendMaterialization
-    ? 'Después de revisar este plan, este es el paso para convertirlo en un scaffold frontend local y ejecutable de forma segura.'
-    : canPrepareFullstackMaterialization
-      ? 'Después de revisar este plan, este es el paso para preparar el scaffold fullstack local que sí se puede materializar de forma segura.'
-      : ''
-  const fileEntries = Array.isArray(plan.filesToCreate)
-    ? plan.filesToCreate
-        .map((entry) =>
-          entry && typeof entry === 'object'
-            ? {
-                path: normalizeOptionalString(entry.path),
-                purpose: normalizeOptionalString(entry.purpose),
-                required: entry.required !== false,
-              }
-            : null,
-        )
-        .filter(
-          (
-            entry,
-          ): entry is { path: string; purpose: string; required: boolean } =>
-            Boolean(entry?.path || entry?.purpose),
-        )
-    : []
-  const visibleFileEntries = compact ? fileEntries.slice(0, 4) : fileEntries
-
-  return (
-    <article className="rounded-3xl border border-sky-300/15 bg-sky-300/[0.06] p-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Plan escalable
-          </div>
-          <div className="mt-2 text-sm leading-6 text-slate-400">
-            Este bloque resume una entrega local más grande que la primera entrega segura y queda en revisión; no ejecuta cambios todavía.
-          </div>
-          <div className="mt-2 text-xs leading-5 text-slate-500">
-            {getScalableDeliverySummary(plan)}
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-            Plan revisable
-          </span>
-          <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-medium text-amber-100">
-            No ejecuta todavía
-          </span>
-        </div>
-      </div>
-
-      {prepareMaterializationLabel ? (
-        <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-sky-300/20 bg-slate-950/45 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="text-sm font-semibold leading-6 text-white">
-              Paso siguiente para este plan
-            </div>
-            <div className="mt-1 text-sm leading-6 text-slate-300">
-              {prepareMaterializationHelperCopy}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onPrepareMaterialization || undefined}
-            className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-sky-300/25 bg-sky-300/15 px-4 py-3 text-sm font-semibold text-sky-100 transition hover:bg-sky-300/20"
-          >
-            {prepareMaterializationLabel}
-          </button>
-        </div>
-      ) : null}
-
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Nivel de entrega"
-          value={getDeliveryLevelLabel(normalizedDeliveryLevel)}
-          tone={getDeliveryLevelTone(normalizedDeliveryLevel)}
-        />
-        <MetricCard
-          label="Tipo de plan"
-          value={typeLabel}
-          detail="Salida planner-only para revisar antes de materializar."
-          tone="sky"
-        />
-        <MetricCard
-          label="Estado"
-          value={reviewStateLabel}
-          detail="JEFE no debería ejecutar archivos grandes desde este paso."
-          tone="amber"
-        />
-        <MetricCard
-          label="Siguiente acción"
-          value={nextActionLabel}
-          detail={normalizeOptionalString(nextExpectedAction) || 'Sin clave declarada'}
-        />
-      </div>
-
-      <div className="mt-4 grid gap-3 xl:grid-cols-2">
-        <ProductArchitectureGroup
-          title="Estructura propuesta"
-          items={plan.targetStructure}
-          compact={compact}
-          tone="emerald"
-        />
-        <ProductArchitectureGroup
-          title="Directorios principales"
-          items={plan.directories}
-          compact={compact}
-          tone="sky"
-        />
-        <ProductArchitectureGroup
-          title="Módulos principales"
-          items={plan.modules}
-          compact={compact}
-        />
-        <ProductArchitectureGroup
-          title="Roots permitidos"
-          items={plan.allowedRootPaths}
-          compact={compact}
-        />
-      </div>
-
-      <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/40 px-4 py-4">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-          Razón del nivel elegido
-        </div>
-        <div className="mt-3 text-sm leading-6 text-slate-100">{planReason}</div>
-      </div>
-
-      <div className="mt-4 rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-          Archivos propuestos
-        </div>
-        <div className="mt-3 grid gap-3 xl:grid-cols-2">
-          {visibleFileEntries.length > 0 ? (
-            visibleFileEntries.map((entry) => (
-              <div
-                key={`${entry.path || entry.purpose}-${entry.required ? 'required' : 'optional'}`}
-                className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3"
-              >
-                <div className="text-sm font-medium leading-6 text-slate-100">
-                  {entry.path || 'Ruta no declarada'}
-                </div>
-                <div className="mt-2 text-xs leading-5 text-slate-400">
-                  {entry.purpose || 'Sin propósito declarado'}
-                </div>
-                <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  {entry.required ? 'Requerido' : 'Opcional'}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300 xl:col-span-2">
-              El planner no dejó archivos propuestos estructurados para este nivel.
-            </div>
-          )}
-        </div>
-        {compact && fileEntries.length > visibleFileEntries.length ? (
-          <div className="mt-3 text-xs leading-5 text-slate-500">
-            +{fileEntries.length - visibleFileEntries.length} archivo(s) más en la propuesta completa.
-          </div>
-        ) : null}
-      </div>
-
-      <div className="mt-4 grid gap-3 xl:grid-cols-2">
-        <ProductArchitectureGroup
-          title="Restricciones locales"
-          items={plan.localOnlyConstraints}
-          compact={compact}
-          tone="amber"
-        />
-        <ProductArchitectureGroup
-          title="Exclusiones explícitas"
-          items={plan.explicitExclusions}
-          compact={compact}
-          tone="rose"
-        />
-        <ProductArchitectureGroup
-          title="Aprobaciones futuras"
-          items={plan.approvalRequiredLater}
-          compact={compact}
-          tone="amber"
-        />
-        <ProductArchitectureGroup
-          title="Criterios de éxito"
-          items={plan.successCriteria}
-          compact={compact}
-          tone="emerald"
-        />
-      </div>
-    </article>
-  )
-}
-
-const getRoadmapPhaseStatusLabel = (value: unknown) => {
-  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
-
-  if (normalizedValue === 'ready') {
-    return 'Lista'
-  }
-  if (normalizedValue === 'blocked') {
-    return 'Bloqueada'
-  }
-  if (normalizedValue === 'done') {
-    return 'Hecha'
-  }
-  if (normalizedValue === 'planned') {
-    return 'Planificada'
-  }
-
-  return normalizeOptionalString(value) || 'Sin estado'
-}
-
-const getRoadmapPhaseTone = (
-  value: unknown,
-): 'default' | 'sky' | 'emerald' | 'amber' | 'rose' => {
-  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
-
-  if (normalizedValue === 'ready') {
-    return 'emerald'
-  }
-  if (normalizedValue === 'blocked') {
-    return 'rose'
-  }
-  if (normalizedValue === 'done') {
-    return 'sky'
-  }
-
-  return 'amber'
-}
-
-const getNextActionTypeLabel = (value: unknown) => {
-  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
-
-  if (normalizedValue === 'prepare-materialization') {
-    return 'Preparar materialización'
-  }
-  if (normalizedValue === 'execute-materialization') {
-    return 'Ejecutar materialización'
-  }
-  if (normalizedValue === 'validate-result') {
-    return 'Validar resultado'
-  }
-  if (normalizedValue === 'expand-next-phase') {
-    return 'Expandir siguiente fase'
-  }
-  if (normalizedValue === 'ask-blocking-question') {
-    return 'Pregunta bloqueante'
-  }
-  if (normalizedValue === 'request-approval') {
-    return 'Pedir aprobación'
-  }
-
-  return 'Revisar plan'
-}
-
-const getValidationLevelLabel = (value: unknown) => {
-  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
-
-  if (normalizedValue === 'full') {
-    return 'Completa'
-  }
-  if (normalizedValue === 'medium') {
-    return 'Media'
-  }
-
-  return 'Ligera'
-}
-
-function ImplementationRoadmapCard({
-  roadmap,
-  compact = false,
-}: {
-  roadmap: ImplementationRoadmapContract
-  compact?: boolean
-}) {
-  const phases = roadmap.phases || []
-  const visiblePhases = compact ? phases.slice(0, 4) : phases
-  const blockers = roadmap.blockers || []
-  const nextPhaseLabel =
-    phases.find((phase) => phase.id === roadmap.nextRecommendedPhase)?.title ||
-    roadmap.nextRecommendedPhase ||
-    'Sin siguiente fase declarada'
-
-  return (
-    <article className="rounded-3xl border border-sky-300/15 bg-sky-300/[0.05] p-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Roadmap de implementación
-          </div>
-          <div className="mt-2 text-sm leading-6 text-slate-400">
-            Ordena las fases del proyecto, qué puede avanzar ahora y qué queda bloqueado o sujeto a aprobación.
-          </div>
-          <div className="mt-2 text-xs leading-5 text-slate-500">
-            {normalizeOptionalString(roadmap.suggestedNextAction) ||
-              'Sin siguiente paso resumido.'}
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-            {getDeliveryLevelLabel(roadmap.deliveryLevel)}
-          </span>
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Proyecto"
-          value={normalizeOptionalString(roadmap.projectSlug) || 'Sin slug'}
-          detail={normalizeOptionalString(roadmap.domain) || 'Sin dominio declarado'}
-          tone="sky"
-        />
-        <MetricCard
-          label="Fase actual"
-          value={normalizeOptionalString(roadmap.currentPhase) || 'Sin fase actual'}
-          detail={normalizeOptionalString(roadmap.projectType) || 'Sin tipo declarado'}
-        />
-        <MetricCard
-          label="Siguiente fase"
-          value={nextPhaseLabel}
-          detail={normalizeOptionalString(roadmap.nextRecommendedPhase) || 'Sin id'}
-          tone="emerald"
-        />
-        <MetricCard
-          label="Bloqueos"
-          value={blockers.length > 0 ? `${blockers.length} activo(s)` : 'Sin bloqueos'}
-          detail={blockers[0] || 'No hay preguntas sensibles pendientes'}
-          tone={blockers.length > 0 ? 'rose' : 'default'}
-        />
-      </div>
-
-      <div className="mt-4 grid gap-3">
-        {visiblePhases.map((phase) => (
-          <article
-            key={phase.id || phase.title}
-            className="rounded-2xl border border-white/8 bg-slate-950/45 px-4 py-4"
-          >
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div className="text-sm font-medium leading-6 text-slate-100">
-                  {phase.title || 'Fase sin título'}
-                </div>
-                <div className="mt-1 text-xs leading-5 text-slate-400">
-                  {phase.goal || 'Sin objetivo declarado'}
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <span
-                  className={joinClasses(
-                    'rounded-full border px-3 py-1 text-xs font-medium',
-                    getRoadmapPhaseTone(phase.status) === 'emerald'
-                      ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100'
-                      : getRoadmapPhaseTone(phase.status) === 'rose'
-                        ? 'border-rose-300/20 bg-rose-300/10 text-rose-100'
-                        : getRoadmapPhaseTone(phase.status) === 'sky'
-                          ? 'border-sky-300/20 bg-sky-300/10 text-sky-100'
-                          : 'border-amber-300/20 bg-amber-300/10 text-amber-100',
-                  )}
-                >
-                  {getRoadmapPhaseStatusLabel(phase.status)}
-                </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-300">
-                  {phase.executableNow ? 'Ejecutable ahora' : 'Revisión'}
-                </span>
-                {phase.approvalRequired ? (
-                  <span className="rounded-full border border-rose-300/20 bg-rose-300/10 px-3 py-1 text-xs font-medium text-rose-100">
-                    Requiere aprobación
-                  </span>
-                ) : null}
-              </div>
-            </div>
-            <div className="mt-3 grid gap-3 xl:grid-cols-3">
-              <ProductArchitectureGroup
-                title="Outputs esperados"
-                items={phase.expectedOutputs}
-                compact={compact}
-                tone="sky"
-              />
-              <ProductArchitectureGroup
-                title="Dependencias"
-                items={phase.dependencies}
-                compact={compact}
-              />
-              <ProductArchitectureGroup
-                title="Validación"
-                items={phase.validationStrategy}
-                compact={compact}
-                tone="emerald"
-              />
-            </div>
-          </article>
-        ))}
-      </div>
-
-      {compact && phases.length > visiblePhases.length ? (
-        <div className="mt-3 text-xs leading-5 text-slate-500">
-          +{phases.length - visiblePhases.length} fase(s) más en el roadmap completo.
-        </div>
-      ) : null}
-    </article>
-  )
-}
-
-function NextActionPlanCard({
-  plan,
-}: {
-  plan: NextActionPlanContract
-}) {
-  const tone: 'default' | 'sky' | 'emerald' | 'amber' | 'rose' =
-    plan.requiresApproval
-      ? 'rose'
-      : plan.safeToRunNow
-        ? 'emerald'
-        : plan.actionType === 'review-plan'
-          ? 'sky'
-          : 'amber'
-
-  return (
-    <article className="rounded-3xl border border-amber-300/15 bg-amber-300/[0.05] p-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Próximo paso recomendado
-          </div>
-          <div className="mt-2 text-lg font-semibold text-white">
-            {normalizeOptionalString(plan.userFacingLabel) || 'Sin etiqueta declarada'}
-          </div>
-          <div className="mt-2 text-sm leading-6 text-slate-300">
-            {normalizeOptionalString(plan.recommendedAction) ||
-              'Sin acción recomendada.'}
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-            {getNextActionTypeLabel(plan.actionType)}
-          </span>
-          <span
-            className={joinClasses(
-              'rounded-full border px-3 py-1 text-xs font-medium',
-              tone === 'emerald'
-                ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100'
-                : tone === 'rose'
-                  ? 'border-rose-300/20 bg-rose-300/10 text-rose-100'
-                  : tone === 'sky'
-                    ? 'border-sky-300/20 bg-sky-300/10 text-sky-100'
-                    : 'border-amber-300/20 bg-amber-300/10 text-amber-100',
-            )}
-          >
-            {plan.safeToRunNow ? 'Seguro ahora' : 'No correr todavía'}
-          </span>
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Estrategia objetivo"
-          value={normalizeOptionalString(plan.targetStrategy) || 'Sin estrategia'}
-          detail={normalizeOptionalString(plan.technicalLabel) || 'Sin label técnico'}
-          tone={tone}
-        />
-        <MetricCard
-          label="Delivery level"
-          value={getDeliveryLevelLabel(plan.targetDeliveryLevel)}
-          detail={normalizeOptionalString(plan.currentState) || 'Sin estado'}
-        />
-        <MetricCard
-          label="Approval"
-          value={plan.requiresApproval ? 'Sí' : 'No'}
-          detail={normalizeOptionalString(plan.reason) || 'Sin razón declarada'}
-          tone={plan.requiresApproval ? 'rose' : 'emerald'}
-        />
-        <MetricCard
-          label="Outcome esperado"
-          value={normalizeOptionalString(plan.expectedOutcome) || 'Sin outcome'}
-        />
-      </div>
-    </article>
-  )
-}
-
-function ValidationPlanCard({
-  plan,
-  compact = false,
-}: {
-  plan: ValidationPlanContract
-  compact?: boolean
-}) {
-  const fileChecks = plan.fileChecks || []
-  const visibleFileChecks = compact ? fileChecks.slice(0, 4) : fileChecks
-
-  return (
-    <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Plan de validación
-          </div>
-          <div className="mt-2 text-sm leading-6 text-slate-400">
-            Resume cómo validar el plan o la materialización sin instalar dependencias ni levantar servicios reales.
-          </div>
-        </div>
-        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-          {getValidationLevelLabel(plan.level)}
-        </span>
-      </div>
-
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Scope"
-          value={normalizeOptionalString(plan.scope) || 'Sin scope'}
-          tone="sky"
-        />
-        <MetricCard
-          label="Commands"
-          value={
-            normalizeOptionalStringArray(plan.commands).length > 0
-              ? `${normalizeOptionalStringArray(plan.commands).length} comando(s)`
-              : 'Sin comandos'
-          }
-          detail={normalizeOptionalStringArray(plan.commands)[0] || 'No hace falta ejecutar comandos'}
-        />
-        <MetricCard
-          label="File checks"
-          value={fileChecks.length > 0 ? `${fileChecks.length} check(s)` : 'Sin file checks'}
-          detail={normalizeOptionalString(visibleFileChecks[0]?.path) || 'Sin path declarado'}
-        />
-        <MetricCard
-          label="Paths prohibidos"
-          value={
-            normalizeOptionalStringArray(plan.forbiddenPaths).length > 0
-              ? `${normalizeOptionalStringArray(plan.forbiddenPaths).length} path(s)`
-              : 'Sin paths prohibidos'
-          }
-          detail={normalizeOptionalStringArray(plan.forbiddenPaths)[0] || 'Sin restricciones extra'}
-          tone="amber"
-        />
-      </div>
-
-      <div className="mt-4 grid gap-3 xl:grid-cols-2">
-        <article className="rounded-2xl border border-white/8 bg-slate-950/45 px-4 py-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            File checks
-          </div>
-          <div className="mt-3 grid gap-3">
-            {visibleFileChecks.length > 0 ? (
-              visibleFileChecks.map((entry) => (
-                <div
-                  key={`${entry.path || 'path'}-${entry.expectation || 'expectation'}`}
-                  className="rounded-xl border border-white/8 bg-slate-900/60 px-4 py-3"
-                >
-                  <div className="text-sm font-medium leading-6 text-slate-100">
-                    {entry.path || 'Path no declarado'}
-                  </div>
-                  <div className="mt-1 text-xs leading-5 text-slate-400">
-                    {entry.expectation || 'Sin expectativa declarada'}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-sm leading-6 text-slate-300">
-                Este plan valida contrato y revisión manual, no filesystem real todavía.
-              </div>
-            )}
-          </div>
-          {compact && fileChecks.length > visibleFileChecks.length ? (
-            <div className="mt-3 text-xs leading-5 text-slate-500">
-              +{fileChecks.length - visibleFileChecks.length} file check(s) más.
-            </div>
-          ) : null}
-        </article>
-        <div className="grid gap-3">
-          <ProductArchitectureGroup
-            title="Checks de runtime"
-            items={plan.runtimeChecks}
-            compact={compact}
-          />
-          <ProductArchitectureGroup
-            title="Checks manuales"
-            items={plan.manualChecks}
-            compact={compact}
-            tone="sky"
-          />
-          <ProductArchitectureGroup
-            title="Criterios de éxito"
-            items={plan.successCriteria}
-            compact={compact}
-            tone="emerald"
-          />
-        </div>
-      </div>
-    </article>
-  )
-}
-
-function PhaseExpansionPlanCard({
-  plan,
-  compact = false,
-}: {
-  plan: PhaseExpansionPlanContract
-  compact?: boolean
-}) {
-  return (
-    <article className="rounded-3xl border border-emerald-300/15 bg-emerald-300/[0.05] p-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Expansión de siguiente fase
-          </div>
-          <div className="mt-2 text-sm leading-6 text-slate-400">
-            Propuesta acotada para la próxima mejora de fase; no se ejecuta automáticamente.
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-            {normalizeOptionalString(plan.phaseId) || 'Sin phaseId'}
-          </span>
-          <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-medium text-emerald-100">
-            {plan.executableNow ? 'Ejecutable ahora' : 'Solo propuesta'}
-          </span>
-          {plan.approvalRequired ? (
-            <span className="rounded-full border border-rose-300/20 bg-rose-300/10 px-3 py-1 text-xs font-medium text-rose-100">
-              Requiere aprobación
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Objetivo"
-          value={normalizeOptionalString(plan.goal) || 'Sin objetivo'}
-          tone="emerald"
-        />
-        <MetricCard
-          label="Siguiente acción"
-          value={normalizeOptionalString(plan.nextExpectedAction) || 'Sin acción'}
-        />
-        <MetricCard
-          label="Target files"
-          value={
-            normalizeOptionalStringArray(plan.targetFiles).length > 0
-              ? `${normalizeOptionalStringArray(plan.targetFiles).length} archivo(s)`
-              : 'Sin archivos'
-          }
-          detail={normalizeOptionalStringArray(plan.targetFiles)[0] || 'Sin target declarado'}
-        />
-        <MetricCard
-          label="Riesgos"
-          value={
-            normalizeOptionalStringArray(plan.risks).length > 0
-              ? `${normalizeOptionalStringArray(plan.risks).length} riesgo(s)`
-              : 'Sin riesgos'
-          }
-          detail={normalizeOptionalStringArray(plan.risks)[0] || 'Sin detalle'}
-          tone="amber"
-        />
-      </div>
-
-      <div className="mt-4 grid gap-3 xl:grid-cols-2">
-        <ProductArchitectureGroup
-          title="Cambios esperados"
-          items={plan.changesExpected}
-          compact={compact}
-          tone="emerald"
-        />
-        <ProductArchitectureGroup
-          title="Target files"
-          items={plan.targetFiles}
-          compact={compact}
-          tone="sky"
-        />
-      </div>
-    </article>
-  )
-}
-
 function getManifestPhaseStatusLabel(value?: string) {
   const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
 
@@ -6470,238 +4922,609 @@ const getContinuationCategoryLabel = (value?: string) => {
   return getExpansionTypeLabel(value)
 }
 
-function LocalProjectManifestCard({
-  manifest,
-  compact = false,
+type ProjectManifestPhaseEntry = NonNullable<LocalProjectManifestContract['phases']>[number]
+type ProjectManifestModuleEntry = NonNullable<LocalProjectManifestContract['modules']>[number]
+type ExpansionOptionEntry = NonNullable<ExpansionOptionsContract['options']>[number]
+type ContinuityToneKey = Parameters<typeof getContinuityStateToneClass>[0]
+
+const findMatchingManifestModule = (
+  manifestModules: ProjectManifestModuleEntry[],
+  candidateId: string,
+) =>
+  manifestModules.find(
+    (moduleEntry) =>
+      normalizeModuleUiId(moduleEntry.id || moduleEntry.name) === candidateId,
+  ) || null
+
+const buildProjectContinuityOptionItems = ({
+  visibleOptions,
+  manifestModules,
+  recommendedOptionId,
+  onPrepareModuleExpansion,
+  onMaterializeModuleExpansion,
+}: {
+  visibleOptions: ExpansionOptionEntry[]
+  manifestModules: ProjectManifestModuleEntry[]
+  recommendedOptionId: string
+  onPrepareModuleExpansion?: (payload: ModuleExpansionActionPayload) => void
+  onMaterializeModuleExpansion?: (payload: ModuleExpansionActionPayload) => void
+}): ProjectContinuationActionSectionItem[] =>
+  visibleOptions.map((option) => {
+    const normalizedOptionId = normalizeModuleUiId(option.id)
+    const matchingModule = findMatchingManifestModule(manifestModules, normalizedOptionId)
+    const alreadyDone =
+      normalizeOptionalString(matchingModule?.status).toLocaleLowerCase() === 'done'
+    const visualState = getContinuityVisualState({
+      safeToPrepare: option.safeToPrepare,
+      safeToMaterialize: option.safeToMaterialize,
+      requiresApproval: option.requiresApproval,
+      blocked: option.blocked,
+      alreadyDone,
+    })
+    const optionPayload: ModuleExpansionActionPayload = {
+      moduleId: option.id,
+      moduleName: option.label,
+      optionType: option.expansionType,
+      targetStrategy: option.targetStrategy,
+      expectedFiles: option.expectedFiles,
+      safeToPrepare: option.safeToPrepare,
+      safeToMaterialize: option.safeToMaterialize,
+      requiresApproval: option.requiresApproval,
+      reason: option.reason,
+    }
+    const canPrepare =
+      Boolean(onPrepareModuleExpansion) && option.safeToPrepare !== false
+    const canMaterialize =
+      Boolean(onMaterializeModuleExpansion) &&
+      option.safeToMaterialize === true &&
+      !option.requiresApproval &&
+      !alreadyDone
+
+    return {
+      key: option.id || option.label,
+      title: normalizeOptionalString(option.label) || 'Opción sin título',
+      description:
+        normalizeOptionalString(option.description) || 'Sin descripción declarada.',
+      detail: normalizeOptionalString(option.reason) || visualState.detail,
+      recommended:
+        Boolean(recommendedOptionId) && recommendedOptionId === normalizedOptionId,
+      statusLabel: visualState.label,
+      statusToneClass: getContinuityStateToneClass(visualState.tone),
+      categoryLabel: getExpansionTypeLabel(option.expansionType),
+      categoryToneClass: '',
+      metrics: [
+        {
+          label: 'Estrategia sugerida',
+          value: getOperatorStrategyLabel(option.targetStrategy),
+          detail: alreadyDone
+            ? 'Ya existe en el proyecto y conviene revisarlo antes de volver a expandirlo.'
+            : option.safeToMaterialize
+              ? 'Tiene una ruta segura y revisable dentro del flujo actual.'
+              : option.requiresApproval
+                ? 'Necesita revisión humana antes de salir del modo seguro.'
+                : option.safeToPrepare === false
+                  ? 'Todavía no está lista para prepararse desde la interfaz.'
+                  : 'Se puede dejar lista como plan revisable sin ejecutar cambios todavía.',
+          tone: 'sky',
+        },
+        {
+          label: 'Riesgo',
+          value: getRiskLabel(option.riskLevel),
+          detail: visualState.detail,
+          tone: getRiskTone(option.riskLevel),
+        },
+        {
+          label: 'Preparación',
+          value: option.safeToPrepare === false ? 'No' : 'Sí',
+          detail: option.requiresApproval
+            ? 'Necesita revisión humana'
+            : 'Puede dejar un plan revisable',
+          tone: option.safeToPrepare === false ? 'rose' : 'emerald',
+        },
+        {
+          label: 'Materialización',
+          value: option.safeToMaterialize ? 'Segura' : 'No disponible',
+          detail: alreadyDone
+            ? 'Ya existe en el proyecto'
+            : option.safeToMaterialize
+              ? 'Existe una ruta local y revisable'
+              : 'Todavía no tiene materializador seguro',
+          tone: alreadyDone
+            ? 'sky'
+            : option.safeToMaterialize
+              ? 'emerald'
+              : option.requiresApproval
+                ? 'rose'
+                : 'amber',
+        },
+      ],
+      prepareLabel: canPrepare ? (alreadyDone ? 'Revisar primero' : 'Preparar plan') : undefined,
+      onPrepare: canPrepare ? () => onPrepareModuleExpansion?.(optionPayload) : undefined,
+      materializeLabel: canMaterialize ? 'Materializar módulo' : undefined,
+      onMaterialize: canMaterialize
+        ? () => onMaterializeModuleExpansion?.(optionPayload)
+        : undefined,
+      footerMessage: canMaterialize
+        ? undefined
+        : alreadyDone
+          ? 'Ya agregado al proyecto.'
+          : option.requiresApproval
+            ? 'Requiere aprobación antes de salir del modo seguro.'
+            : option.safeToMaterialize
+              ? 'Listo para revisar antes de ejecutar.'
+              : 'Todavía no tiene materializador seguro.',
+    }
+  })
+
+const buildContinuationOptionItems = ({
+  visibleOptions,
+  manifestModules,
+  recommendedOptionId,
+  dispatchPrepareAction,
+  dispatchMaterializeAction,
+}: {
+  visibleOptions: ExpansionOptionEntry[]
+  manifestModules: ProjectManifestModuleEntry[]
+  recommendedOptionId: string
+  dispatchPrepareAction: (action: ContinuationActionContract) => void
+  dispatchMaterializeAction: (action: ContinuationActionContract) => void
+}): ProjectContinuationActionSectionItem[] =>
+  visibleOptions.map((option) => {
+    const normalizedOptionId = normalizeModuleUiId(option.id)
+    const matchingModule = findMatchingManifestModule(manifestModules, normalizedOptionId)
+    const alreadyDone =
+      normalizeOptionalString(matchingModule?.status).toLocaleLowerCase() === 'done'
+    const visualState = getContinuityVisualState({
+      safeToPrepare: option.safeToPrepare,
+      safeToMaterialize: option.safeToMaterialize,
+      requiresApproval: option.requiresApproval,
+      alreadyDone,
+    })
+    const isModuleOption =
+      normalizeOptionalString(option.targetStrategy).includes('module-expansion') ||
+      option.safeToMaterialize === true
+    const optionAction: ContinuationActionContract = {
+      id: normalizeOptionalString(option.id),
+      title:
+        normalizeOptionalString(option.label) ||
+        normalizeOptionalString(option.id) ||
+        'Opción sin título',
+      description: normalizeOptionalString(option.description),
+      category: normalizeOptionalString(option.expansionType),
+      targetStrategy: normalizeOptionalString(option.targetStrategy),
+      safeToPrepare: option.safeToPrepare !== false,
+      safeToMaterialize: option.safeToMaterialize === true,
+      requiresApproval: option.requiresApproval === true,
+      blocked: option.blocked === true || alreadyDone,
+      blocker: alreadyDone
+        ? 'Ya agregado al proyecto.'
+        : normalizeOptionalString(option.blocker),
+      moduleId: isModuleOption ? normalizeOptionalString(option.id) : '',
+      riskLevel: option.riskLevel,
+      reason: normalizeOptionalString(option.reason),
+      targetFiles: option.expectedFiles || [],
+    }
+    const canPrepare = option.safeToPrepare !== false && !alreadyDone
+    const canMaterialize =
+      option.safeToMaterialize === true &&
+      !option.requiresApproval &&
+      !option.blocked &&
+      !alreadyDone
+
+    return {
+      key: option.id || option.label,
+      title: normalizeOptionalString(option.label) || 'Opción sin título',
+      description:
+        normalizeOptionalString(option.description) || 'Sin descripción declarada.',
+      detail: normalizeOptionalString(option.reason) || visualState.detail,
+      recommended:
+        Boolean(recommendedOptionId) && recommendedOptionId === normalizedOptionId,
+      statusLabel: visualState.label,
+      statusToneClass: getContinuityStateToneClass(visualState.tone),
+      categoryLabel: getContinuationCategoryLabel(option.expansionType),
+      categoryToneClass: '',
+      metrics: [
+        {
+          label: 'Cómo sigue',
+          value: getOperatorStrategyLabel(option.targetStrategy),
+          detail: alreadyDone
+            ? 'Ya existe en el proyecto y conviene revisarlo antes de volver a expandirlo.'
+            : option.safeToMaterialize
+              ? 'Tiene una ruta segura y revisable dentro del flujo actual.'
+              : option.requiresApproval
+                ? 'Necesita revision humana antes de salir del modo seguro.'
+                : option.safeToPrepare === false
+                  ? 'Todavía no está lista para prepararse desde la interfaz.'
+                  : 'Se puede dejar lista como plan revisable sin ejecutar cambios todavía.',
+          tone: 'sky',
+        },
+        {
+          label: 'Riesgo',
+          value: getRiskLabel(option.riskLevel),
+          detail: normalizeOptionalString(option.reason) || visualState.detail,
+          tone: getRiskTone(option.riskLevel),
+        },
+        {
+          label: 'Preparación',
+          value: option.safeToPrepare === false ? 'No' : 'Si',
+          detail: option.requiresApproval
+            ? 'Necesita revisión humana'
+            : 'Puede dejar un plan revisable',
+          tone: option.safeToPrepare === false ? 'rose' : 'emerald',
+        },
+        {
+          label: 'Materialización',
+          value: option.safeToMaterialize ? 'Segura' : 'No disponible',
+          detail: alreadyDone
+            ? 'Ya existe en el proyecto'
+            : option.safeToMaterialize
+              ? 'Existe una ruta local y revisable'
+              : 'Todavía no tiene materializador seguro',
+          tone: alreadyDone
+            ? 'sky'
+            : option.safeToMaterialize
+              ? 'emerald'
+              : option.requiresApproval
+                ? 'rose'
+                : 'amber',
+        },
+      ],
+      prepareLabel: canPrepare
+        ? getPrepareActionButtonLabel({
+            alreadyDone,
+            requiresApproval: option.requiresApproval,
+            blocked: option.blocked,
+          })
+        : undefined,
+      onPrepare: canPrepare ? () => dispatchPrepareAction(optionAction) : undefined,
+      materializeLabel: canMaterialize ? 'Materializar módulo' : undefined,
+      onMaterialize: canMaterialize ? () => dispatchMaterializeAction(optionAction) : undefined,
+      footerMessage: canMaterialize
+        ? undefined
+        : alreadyDone
+          ? 'Ya agregado al proyecto.'
+          : option.requiresApproval
+            ? 'Requiere aprobación antes de salir del modo seguro.'
+            : option.safeToMaterialize
+              ? 'Listo para revisar antes de ejecutar.'
+              : normalizeOptionalString(option.blocker) ||
+                'Todavía no tiene materializador seguro.',
+    }
+  })
+
+const buildContinuationModuleItems = ({
+  visibleModules,
+  unnamedTitle,
+  getStatusLabel,
+  getStatusTone,
+}: {
+  visibleModules: ProjectManifestModuleEntry[]
+  unnamedTitle: string
+  getStatusLabel: (
+    moduleEntry: ProjectManifestModuleEntry,
+    normalizedStatus: string,
+  ) => string
+  getStatusTone: (normalizedStatus: string) => ContinuityToneKey
+}): ProjectContinuationModuleSectionItem[] =>
+  visibleModules.map((moduleEntry) => {
+    const normalizedStatus = normalizeOptionalString(moduleEntry.status).toLocaleLowerCase()
+
+    return {
+      key: moduleEntry.id || moduleEntry.name,
+      title:
+        normalizeOptionalString(moduleEntry.name) ||
+        normalizeOptionalString(moduleEntry.id) ||
+        unnamedTitle,
+      timestamp: normalizeOptionalString(moduleEntry.addedAt) || 'Sin fecha declarada',
+      statusLabel: getStatusLabel(moduleEntry, normalizedStatus),
+      statusToneClass: getContinuityStateToneClass(getStatusTone(normalizedStatus)),
+      layersValue:
+        normalizeOptionalStringArray(moduleEntry.layers).length > 0
+          ? `${normalizeOptionalStringArray(moduleEntry.layers).length} capa(s)`
+          : 'Sin capas',
+      layersDetail: normalizeOptionalStringArray(moduleEntry.layers)[0] || 'Sin detalle',
+      filesValue:
+        normalizeOptionalStringArray(moduleEntry.files).length > 0
+          ? `${normalizeOptionalStringArray(moduleEntry.files).length} archivo(s)`
+          : 'Sin archivos',
+      filesDetail: normalizeOptionalStringArray(moduleEntry.files)[0] || 'Sin detalle',
+    }
+  })
+
+const dispatchPrepareContinuationAction = ({
+  action,
+  onPrepareContinuationAction,
   onPreparePhase,
+  onPrepareModuleExpansion,
 }: {
-  manifest: LocalProjectManifestContract
-  compact?: boolean
+  action: ContinuationActionContract
+  onPrepareContinuationAction?: (action: ContinuationActionContract) => void
   onPreparePhase?: (phaseId: string) => void
-}) {
-  const phases = manifest.phases || []
-  const visiblePhases = compact ? phases.slice(0, 3) : phases
-  const nextRecommendedPhase = normalizeOptionalString(manifest.nextRecommendedPhase)
+  onPrepareModuleExpansion?: (payload: ModuleExpansionActionPayload) => void
+}) => {
+  if (onPrepareContinuationAction) {
+    onPrepareContinuationAction(action)
+    return
+  }
 
-  return (
-    <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Fases del proyecto
-          </div>
-          <div className="mt-2 text-sm leading-6 text-slate-400">
-            Estado local del proyecto materializado y fases seguras que JEFE puede seguir preparando.
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-            {normalizeOptionalString(manifest.projectType) || 'Proyecto local'}
-          </span>
-          {nextRecommendedPhase ? (
-            <span className="rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-1 text-xs font-medium text-sky-100">
-              Siguiente: {nextRecommendedPhase}
-            </span>
-          ) : null}
-        </div>
-      </div>
+  const normalizedPhaseId = normalizeOptionalString(action.phaseId)
+  const normalizedModuleId = normalizeOptionalString(action.moduleId)
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Dominio"
-          value={normalizeOptionalString(manifest.domain) || 'Sin dominio'}
-          detail={getDeliveryLevelLabel(manifest.deliveryLevel)}
-          tone="sky"
-        />
-        <MetricCard
-          label="Creado por"
-          value={normalizeOptionalString(manifest.createdBy) || 'Sin origen'}
-          detail={normalizeOptionalString(manifest.materializationLayer) || 'Sin capa'}
-        />
-        <MetricCard
-          label="Fases"
-          value={phases.length > 0 ? `${phases.length} fase(s)` : 'Sin fases'}
-          detail={visiblePhases[0]?.id || 'Sin detalle'}
-        />
-        <MetricCard
-          label="Paths bloqueados"
-          value={
-            normalizeOptionalStringArray(manifest.forbiddenPaths).length > 0
-              ? `${normalizeOptionalStringArray(manifest.forbiddenPaths).length} path(s)`
-              : 'Sin restricciones'
-          }
-          detail={normalizeOptionalStringArray(manifest.forbiddenPaths)[0] || 'Sin detalle'}
-          tone="amber"
-        />
-      </div>
+  if (normalizedPhaseId && onPreparePhase) {
+    onPreparePhase(normalizedPhaseId)
+    return
+  }
 
-      <div className="mt-4 grid gap-3">
-        {visiblePhases.map((phase) => (
-          <article
-            key={phase.id || phase.createdAt}
-            className="rounded-2xl border border-white/8 bg-slate-950/45 px-4 py-4"
-          >
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div className="text-sm font-medium leading-6 text-slate-100">
-                  {normalizeOptionalString(phase.id) || 'Fase sin id'}
-                </div>
-                <div className="mt-1 text-xs leading-5 text-slate-400">
-                  {normalizeOptionalString(phase.createdAt) || 'Sin timestamp declarativo'}
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-                  {getManifestPhaseStatusLabel(phase.status)}
-                </span>
-                {onPreparePhase &&
-                normalizeOptionalString(phase.status).toLocaleLowerCase() === 'available' ? (
-                  <button
-                    type="button"
-                    onClick={() => onPreparePhase(normalizeOptionalString(phase.id))}
-                    className="rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-1 text-xs font-medium text-sky-100 transition hover:bg-sky-300/15"
-                  >
-                    Preparar fase
-                  </button>
-                ) : null}
-              </div>
-            </div>
-            <ProductArchitectureGroup
-              title="Archivos"
-              items={phase.files}
-              compact={compact}
-              tone="sky"
-            />
-          </article>
-        ))}
-      </div>
-
-      {compact && phases.length > visiblePhases.length ? (
-        <div className="mt-3 text-xs leading-5 text-slate-500">
-          +{phases.length - visiblePhases.length} fase(s) más en el manifiesto local.
-        </div>
-      ) : null}
-    </article>
-  )
+  if (normalizedModuleId && onPrepareModuleExpansion) {
+    onPrepareModuleExpansion({
+      moduleId: normalizedModuleId,
+      moduleName: action.title,
+      optionType: action.category,
+      targetStrategy: action.targetStrategy,
+      expectedFiles: action.targetFiles || null,
+      safeToPrepare: action.safeToPrepare,
+      safeToMaterialize: action.safeToMaterialize,
+      requiresApproval: action.requiresApproval,
+      reason: action.reason || action.blocker || action.description,
+    })
+  }
 }
 
-function ProjectPhaseExecutionPlanCard({
-  plan,
-  compact = false,
+const dispatchMaterializeContinuationAction = ({
+  action,
+  onMaterializeContinuationAction,
   onMaterializePhase,
+  onMaterializeModuleExpansion,
 }: {
-  plan: ProjectPhaseExecutionPlanContract
-  compact?: boolean
+  action: ContinuationActionContract
+  onMaterializeContinuationAction?: (action: ContinuationActionContract) => void
   onMaterializePhase?: (phaseId: string) => void
-}) {
-  const operationsPreview = plan.operationsPreview || []
-  const visibleOperations = compact ? operationsPreview.slice(0, 3) : operationsPreview
-  const tone: 'default' | 'sky' | 'emerald' | 'amber' | 'rose' = plan.approvalRequired
-    ? 'rose'
-    : plan.executableNow
-      ? 'emerald'
-      : 'amber'
+  onMaterializeModuleExpansion?: (payload: ModuleExpansionActionPayload) => void
+}) => {
+  if (action.safeToMaterialize !== true) {
+    return
+  }
 
-  return (
-    <article className="rounded-3xl border border-sky-300/15 bg-sky-300/[0.05] p-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Ejecucion de fase segura
-          </div>
-          <div className="mt-2 text-lg font-semibold text-white">
-            {normalizeOptionalString(plan.phaseId) || 'Fase sin id'}
-          </div>
-          <div className="mt-2 text-sm leading-6 text-slate-300">
-            {normalizeOptionalString(plan.reason) || 'Sin razón declarada.'}
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-                  {plan.executableNow ? 'Lista para materializar' : 'Solo planificacion'}
-          </span>
-          {onMaterializePhase && plan.executableNow ? (
-            <button
-              type="button"
-              onClick={() => onMaterializePhase(normalizeOptionalString(plan.phaseId))}
-              className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-medium text-emerald-100 transition hover:bg-emerald-300/15"
-            >
-              Materializar fase
-            </button>
-          ) : null}
-        </div>
-      </div>
+  if (onMaterializeContinuationAction) {
+    onMaterializeContinuationAction(action)
+    return
+  }
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Proyecto local"
-          value={normalizeOptionalString(plan.projectRoot) || 'Sin root'}
-          detail={getDeliveryLevelLabel(plan.deliveryLevel)}
-          tone="sky"
-        />
-        <MetricCard
-          label="Estrategias"
-          value={normalizeOptionalString(plan.sourceStrategy) || 'Sin source'}
-          detail={normalizeOptionalString(plan.targetStrategy) || 'Sin target'}
-        />
-        <MetricCard
-          label="Riesgo"
-          value={getRiskLabel(plan.riskLevel)}
-          detail={normalizeOptionalString(plan.goal) || 'Sin objetivo'}
-          tone={tone}
-        />
-        <MetricCard
-          label="Archivos objetivo"
-          value={
-            normalizeOptionalStringArray(plan.targetFiles).length > 0
-              ? `${normalizeOptionalStringArray(plan.targetFiles).length} archivo(s)`
-              : 'Sin archivos'
-          }
-          detail={normalizeOptionalStringArray(plan.targetFiles)[0] || 'Sin target'}
-        />
-      </div>
+  const normalizedPhaseId = normalizeOptionalString(action.phaseId)
+  const normalizedModuleId = normalizeOptionalString(action.moduleId)
 
-      <div className="mt-4 grid gap-3 xl:grid-cols-2">
-        <ProductArchitectureGroup
-          title="Paths permitidos"
-          items={plan.allowedTargetPaths}
-          compact={compact}
-          tone="emerald"
-        />
-        <ProductArchitectureGroup
-          title="Exclusiones"
-          items={plan.explicitExclusions}
-          compact={compact}
-          tone="amber"
-        />
-      </div>
+  if (normalizedPhaseId && onMaterializePhase) {
+    onMaterializePhase(normalizedPhaseId)
+    return
+  }
 
-      <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/45 px-4 py-4">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-          Preview de operaciones
-        </div>
-        <div className="mt-3 grid gap-3">
-          {visibleOperations.map((operation) => (
-            <div
-              key={`${operation.type || 'op'}-${operation.targetPath || 'path'}`}
-              className="rounded-xl border border-white/8 bg-slate-900/60 px-4 py-3"
-            >
-              <div className="text-sm font-medium leading-6 text-slate-100">
-                {normalizeOptionalString(operation.type) || 'Operación'}
-              </div>
-              <div className="mt-1 text-xs leading-5 text-slate-400">
-                {normalizeOptionalString(operation.targetPath) || 'Sin target path'}
-              </div>
-              <div className="mt-1 text-xs leading-5 text-slate-500">
-                {normalizeOptionalString(operation.purpose) || 'Sin propósito declarado'}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </article>
-  )
+  if (normalizedModuleId && onMaterializeModuleExpansion) {
+    onMaterializeModuleExpansion({
+      moduleId: normalizedModuleId,
+      moduleName: action.title,
+      optionType: action.category,
+      targetStrategy: action.targetStrategy,
+      expectedFiles: action.targetFiles || null,
+      safeToPrepare: action.safeToPrepare,
+      safeToMaterialize: action.safeToMaterialize,
+      requiresApproval: action.requiresApproval,
+      reason: action.reason || action.description,
+    })
+  }
 }
+
+const buildContinuationActionSectionItems = ({
+  actions,
+  sectionTone,
+  manifestModules,
+  dispatchPrepareAction,
+  dispatchMaterializeAction,
+}: {
+  actions: ContinuationActionContract[]
+  sectionTone: 'emerald' | 'amber' | 'rose' | 'sky'
+  manifestModules: ProjectManifestModuleEntry[]
+  dispatchPrepareAction: (action: ContinuationActionContract) => void
+  dispatchMaterializeAction: (action: ContinuationActionContract) => void
+}): ProjectContinuationActionSectionItem[] =>
+  actions.map((action) => {
+    const normalizedModuleId = normalizeModuleUiId(action.moduleId || '')
+    const matchingModule = findMatchingManifestModule(manifestModules, normalizedModuleId)
+    const alreadyDone =
+      normalizeOptionalString(matchingModule?.status).toLocaleLowerCase() === 'done'
+    const visualState = getContinuityVisualState({
+      safeToPrepare: action.safeToPrepare,
+      safeToMaterialize: action.safeToMaterialize,
+      requiresApproval: action.requiresApproval,
+      blocked: action.blocked,
+      alreadyDone,
+    })
+    const detailCopy =
+      normalizeOptionalString(action.blocker) ||
+      normalizeOptionalString(action.reason) ||
+      normalizeOptionalString(action.description) ||
+      visualState.detail
+    const canPrepare = action.safeToPrepare !== false && !alreadyDone
+    const canMaterialize =
+      action.safeToMaterialize === true &&
+      !action.requiresApproval &&
+      !action.blocked &&
+      !alreadyDone
+
+    return {
+      key: action.id || action.title,
+      title: normalizeOptionalString(action.title) || 'Acción sin título',
+      description:
+        normalizeOptionalString(action.description) || 'Sin descripción declarada.',
+      detail: detailCopy,
+      recommended: action.recommended,
+      statusLabel: visualState.label,
+      statusToneClass: getContinuityStateToneClass(visualState.tone),
+      categoryLabel: getContinuationCategoryLabel(action.category),
+      categoryToneClass: getContinuityStateToneClass(sectionTone),
+      metrics: [
+        {
+          label: 'Cómo sigue',
+          value: getOperatorStrategyLabel(action.targetStrategy),
+          detail:
+            normalizeOptionalString(action.expectedOutcome) ||
+            'Sin resultado esperado declarado.',
+          tone: 'sky',
+        },
+        {
+          label: 'Riesgo',
+          value: getRiskLabel(action.riskLevel),
+          detail: detailCopy,
+          tone: getRiskTone(action.riskLevel),
+        },
+        {
+          label: 'Preparación',
+          value: action.safeToPrepare === false ? 'No' : 'Sí',
+          detail: action.requiresApproval
+            ? 'Requiere aprobación antes de salir del modo seguro.'
+            : action.blocked
+              ? 'Conviene revisar el bloqueo primero.'
+              : 'Se puede dejar lista como siguiente acción revisable.',
+          tone: action.safeToPrepare === false ? 'rose' : 'emerald',
+        },
+        {
+          label: 'Materialización',
+          value: action.safeToMaterialize ? 'Segura' : 'No disponible',
+          detail: alreadyDone
+            ? 'Ya agregado al proyecto.'
+            : action.safeToMaterialize
+              ? 'Existe una ruta local y revisable.'
+              : action.requiresApproval
+                ? 'Necesita aprobación antes de ejecutar.'
+                : action.blocked
+                  ? 'Bloqueado por seguridad.'
+                  : 'Todavía no se puede ejecutar sola.',
+          tone: alreadyDone
+            ? 'sky'
+            : action.safeToMaterialize
+              ? 'emerald'
+              : action.requiresApproval || action.blocked
+                ? 'rose'
+                : 'amber',
+        },
+      ],
+      prepareLabel: canPrepare
+        ? getPrepareActionButtonLabel({
+            alreadyDone,
+            requiresApproval: action.requiresApproval,
+            blocked: action.blocked,
+          })
+        : undefined,
+      onPrepare: canPrepare ? () => dispatchPrepareAction(action) : undefined,
+      materializeLabel: canMaterialize ? 'Materializar seguro' : undefined,
+      onMaterialize: canMaterialize ? () => dispatchMaterializeAction(action) : undefined,
+      footerMessage: canMaterialize
+        ? undefined
+        : alreadyDone
+          ? 'Ya agregado al proyecto.'
+          : action.requiresApproval
+            ? 'Requiere aprobación antes de salir del modo seguro.'
+            : action.blocked
+              ? normalizeOptionalString(action.blocker) || 'Bloqueado por seguridad.'
+              : 'Todavía no se puede ejecutar sola.',
+    }
+  })
+
+const resolveProjectContinuityCenterNextRecommendedAction = ({
+  projectContinuationState,
+  projectReadinessState,
+  continuationActionPlan,
+  moduleExpansionPlan,
+  projectPhaseExecutionPlan,
+  localProjectManifest,
+  manifestPhases,
+}: {
+  projectContinuationState?: ProjectContinuationStateContract | null
+  projectReadinessState?: ProjectReadinessStateContract | null
+  continuationActionPlan?: ContinuationActionContract | null
+  moduleExpansionPlan?: ModuleExpansionPlanContract | null
+  projectPhaseExecutionPlan?: ProjectPhaseExecutionPlanContract | null
+  localProjectManifest?: LocalProjectManifestContract | null
+  manifestPhases: ProjectManifestPhaseEntry[]
+}): ContinuationActionContract | null =>
+  resolveProjectContinuityNextRecommendedActionForUi({
+    projectContinuationState,
+    projectReadinessState,
+    continuationActionPlan,
+    moduleExpansionPlan,
+    projectPhaseExecutionPlan,
+    localProjectManifest,
+  }) ||
+  projectContinuationState?.nextRecommendedAction ||
+  continuationActionPlan ||
+  (moduleExpansionPlan?.moduleId
+    ? {
+        id: `prepared-module-${normalizeOptionalString(moduleExpansionPlan.moduleId)}`,
+        title:
+          normalizeOptionalString(moduleExpansionPlan.moduleName) ||
+          normalizeOptionalString(moduleExpansionPlan.moduleId) ||
+          'Modulo preparado',
+        description:
+          normalizeOptionalString(moduleExpansionPlan.reason) ||
+          'Hay una expansion preparada para revisar.',
+        category: normalizeOptionalString(moduleExpansionPlan.expansionType),
+        targetStrategy:
+          moduleExpansionPlan.safeToMaterialize === true
+            ? 'materialize-module-expansion-plan'
+            : 'prepare-module-expansion-plan',
+        safeToPrepare: moduleExpansionPlan.safeToPrepare !== false,
+        safeToMaterialize: moduleExpansionPlan.safeToMaterialize === true,
+        requiresApproval: moduleExpansionPlan.approvalRequired === true,
+        blocked: normalizeOptionalStringArray(moduleExpansionPlan.blockers).length > 0,
+        blocker: normalizeOptionalStringArray(moduleExpansionPlan.blockers)[0] || '',
+        moduleId: normalizeOptionalString(moduleExpansionPlan.moduleId),
+        riskLevel: moduleExpansionPlan.riskLevel,
+        projectRoot: normalizeOptionalString(moduleExpansionPlan.projectRoot),
+        reason: normalizeOptionalString(moduleExpansionPlan.reason),
+        targetFiles: moduleExpansionPlan.targetFiles || [],
+        allowedTargetPaths: moduleExpansionPlan.allowedTargetPaths || [],
+        explicitExclusions: moduleExpansionPlan.explicitExclusions || [],
+        successCriteria: moduleExpansionPlan.successCriteria || [],
+        expectedOutcome:
+          'Dejar la expansión del módulo lista para revisión o materialización segura.',
+      }
+    : null) ||
+  (projectPhaseExecutionPlan?.phaseId
+    ? {
+        id: `prepared-phase-${normalizeOptionalString(projectPhaseExecutionPlan.phaseId)}`,
+        title:
+          normalizeOptionalString(
+            manifestPhases.find(
+              (phase) =>
+                normalizeOptionalString(phase.id) ===
+                normalizeOptionalString(projectPhaseExecutionPlan.phaseId),
+            )?.title,
+          ) ||
+          normalizeOptionalString(projectPhaseExecutionPlan.phaseId) ||
+          'Fase preparada',
+        description:
+          normalizeOptionalString(projectPhaseExecutionPlan.reason) ||
+          'Hay una fase preparada para revisar.',
+        category: 'project-phase',
+        targetStrategy:
+          normalizeOptionalString(projectPhaseExecutionPlan.targetStrategy) ||
+          'prepare-project-phase-plan',
+        safeToPrepare: true,
+        safeToMaterialize: projectPhaseExecutionPlan.executableNow === true,
+        requiresApproval: projectPhaseExecutionPlan.approvalRequired === true,
+        blocked: normalizeOptionalStringArray(projectPhaseExecutionPlan.blockers).length > 0,
+        blocker: normalizeOptionalStringArray(projectPhaseExecutionPlan.blockers)[0] || '',
+        phaseId: normalizeOptionalString(projectPhaseExecutionPlan.phaseId),
+        riskLevel: projectPhaseExecutionPlan.riskLevel,
+        projectRoot: normalizeOptionalString(projectPhaseExecutionPlan.projectRoot),
+        reason: normalizeOptionalString(projectPhaseExecutionPlan.reason),
+        targetFiles: projectPhaseExecutionPlan.targetFiles || [],
+        allowedTargetPaths: projectPhaseExecutionPlan.allowedTargetPaths || [],
+        explicitExclusions: projectPhaseExecutionPlan.explicitExclusions || [],
+        successCriteria: projectPhaseExecutionPlan.successCriteria || [],
+        expectedOutcome:
+          'Dejar la fase lista para revision o materializacion segura.',
+      }
+    : null)
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ProjectContinuityCard({
@@ -6815,420 +5638,150 @@ function ProjectContinuityCard({
           reason: moduleExpansionPlan.reason,
         }
       : null
+  const visibleOptionItems = buildProjectContinuityOptionItems({
+    visibleOptions,
+    manifestModules,
+    recommendedOptionId,
+    onPrepareModuleExpansion,
+    onMaterializeModuleExpansion,
+  })
+  const visibleModuleItems = buildContinuationModuleItems({
+    visibleModules,
+    unnamedTitle: 'Módulo sin nombre',
+    getStatusLabel: (moduleEntry) => getManifestPhaseStatusLabel(moduleEntry.status),
+    getStatusTone: (normalizedStatus) =>
+      normalizedStatus === 'done'
+        ? 'sky'
+        : normalizedStatus === 'blocked'
+          ? 'rose'
+          : 'amber',
+  })
 
   return (
     <article className="rounded-3xl border border-emerald-300/15 bg-emerald-300/[0.05] p-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Continuidad del proyecto
-          </div>
-          <div className="mt-2 text-lg font-semibold text-white">
-            Próximo paso recomendado
-          </div>
-          <div className="mt-2 text-sm leading-6 text-slate-300">{nextStepReason}</div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <span
-            className={joinClasses(
-              'rounded-full border px-3 py-1 text-xs font-medium',
-              getContinuityStateToneClass(nextStepVisualState.tone),
-            )}
-          >
-            {nextStepVisualState.label}
-          </span>
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-            {nextStepTitle}
-          </span>
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Siguiente acción"
-          value={nextStepTitle}
-          detail={nextStepVisualState.detail}
-          tone={nextStepVisualState.tone}
-        />
-        <MetricCard
-          label="Estado"
-          value={nextStepVisualState.label}
-          detail={nextStepVisualState.detail}
-          tone={nextStepVisualState.tone}
-        />
-        <MetricCard
-          label="Fase actual"
-          value={currentPhaseLabel}
-          detail={normalizeOptionalString(localProjectManifest?.projectType) || 'Proyecto local'}
-          tone="sky"
-        />
-        <MetricCard
-          label="Módulos agregados"
-          value={manifestModules.length > 0 ? `${manifestModules.length} módulo(s)` : 'Sin módulos'}
-          detail={visibleModules[0]?.name || visibleModules[0]?.id || 'Todavía no hay módulos declarados'}
-        />
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        {onPreparePhase && nextRecommendedPhaseId && nextManifestPhase ? (
-          <button
-            type="button"
-            onClick={() => onPreparePhase(nextRecommendedPhaseId)}
-            disabled={busy}
-            className="rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-2 text-xs font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-          >
-            Preparar siguiente fase
-          </button>
-        ) : null}
-        {onMaterializePhase &&
-        projectPhaseExecutionPlan?.executableNow &&
-        normalizeOptionalString(projectPhaseExecutionPlan.phaseId) ? (
-          <button
-            type="button"
-            onClick={() =>
-              onMaterializePhase(normalizeOptionalString(projectPhaseExecutionPlan.phaseId))
-            }
-            disabled={busy}
-            className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-2 text-xs font-medium text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-          >
-            Materializar fase segura
-          </button>
-        ) : null}
-        {onMaterializeModuleExpansion &&
-        preparedModulePayload &&
-        moduleExpansionPlan?.safeToMaterialize ? (
-          <button
-            type="button"
-            onClick={() => onMaterializeModuleExpansion(preparedModulePayload)}
-            disabled={busy}
-            className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-2 text-xs font-medium text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-          >
-            Materializar módulo preparado
-          </button>
-        ) : null}
-      </div>
+      <ProjectContinuityOverviewCard
+        description={nextStepReason}
+        statusLabel={nextStepVisualState.label}
+        statusToneClass={getContinuityStateToneClass(nextStepVisualState.tone)}
+        nextStepTitle={nextStepTitle}
+        nextActionValue={nextStepTitle}
+        nextActionDetail={nextStepVisualState.detail}
+        nextActionTone={nextStepVisualState.tone}
+        stateValue={nextStepVisualState.label}
+        stateDetail={nextStepVisualState.detail}
+        stateTone={nextStepVisualState.tone}
+        currentPhaseValue={currentPhaseLabel}
+        currentPhaseDetail={
+          normalizeOptionalString(localProjectManifest?.projectType) || 'Proyecto local'
+        }
+        modulesValue={
+          manifestModules.length > 0 ? `${manifestModules.length} módulo(s)` : 'Sin módulos'
+        }
+        modulesDetail={
+          visibleModules[0]?.name ||
+          visibleModules[0]?.id ||
+          'Todavía no hay módulos declarados'
+        }
+        actions={[
+          ...(onPreparePhase && nextRecommendedPhaseId && nextManifestPhase
+            ? [
+                {
+                  label: 'Preparar siguiente fase',
+                  tone: 'sky' as const,
+                  onClick: () => onPreparePhase(nextRecommendedPhaseId),
+                },
+              ]
+            : []),
+          ...(onMaterializePhase &&
+          projectPhaseExecutionPlan?.executableNow &&
+          normalizeOptionalString(projectPhaseExecutionPlan.phaseId)
+            ? [
+                {
+                  label: 'Materializar fase segura',
+                  tone: 'emerald' as const,
+                  onClick: () =>
+                    onMaterializePhase(
+                      normalizeOptionalString(projectPhaseExecutionPlan.phaseId),
+                    ),
+                },
+              ]
+            : []),
+          ...(onMaterializeModuleExpansion &&
+          preparedModulePayload &&
+          moduleExpansionPlan?.safeToMaterialize
+            ? [
+                {
+                  label: 'Materializar módulo preparado',
+                  tone: 'emerald' as const,
+                  onClick: () => onMaterializeModuleExpansion(preparedModulePayload),
+                },
+              ]
+            : []),
+        ]}
+        busy={busy}
+      />
 
       {moduleExpansionPlan?.moduleId ? (
-        <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/45 px-4 py-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Plan del módulo preparado
-              </div>
-              <div className="mt-2 text-base font-semibold text-white">
-                {normalizeOptionalString(moduleExpansionPlan.moduleName) ||
-                  normalizeOptionalString(moduleExpansionPlan.moduleId) ||
-                  'Módulo sin nombre'}
-              </div>
-              <div className="mt-2 text-sm leading-6 text-slate-300">
-                {normalizeOptionalString(moduleExpansionPlan.reason) ||
-                  'JEFE dejó una expansión lista para revisar o materializar en modo seguro.'}
-              </div>
-            </div>
-            <span
-              className={joinClasses(
-                'rounded-full border px-3 py-1 text-xs font-medium',
-                getContinuityStateToneClass(preparedModuleVisualState.tone),
-              )}
-            >
-              {preparedModuleVisualState.label}
-            </span>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <MetricCard
-              label="Tipo"
-              value={getExpansionTypeLabel(moduleExpansionPlan.expansionType)}
-              detail={normalizeOptionalString(moduleExpansionPlan.domain) || 'Sin dominio'}
-              tone="sky"
-            />
-            <MetricCard
-              label="Riesgo"
-              value={getRiskLabel(moduleExpansionPlan.riskLevel)}
-              detail={normalizeOptionalString(moduleExpansionPlan.projectRoot) || 'Sin root'}
-              tone={getRiskTone(moduleExpansionPlan.riskLevel)}
-            />
-            <MetricCard
-              label="Capas afectadas"
-              value={
-                normalizeOptionalStringArray(moduleExpansionPlan.affectedLayers).length > 0
-                  ? `${normalizeOptionalStringArray(moduleExpansionPlan.affectedLayers).length} capa(s)`
-                  : 'Sin capas'
-              }
-              detail={normalizeOptionalStringArray(moduleExpansionPlan.affectedLayers)[0] || 'Sin detalle'}
-            />
-            <MetricCard
-              label="Archivos objetivo"
-              value={
-                normalizeOptionalStringArray(moduleExpansionPlan.targetFiles).length > 0
-                  ? `${normalizeOptionalStringArray(moduleExpansionPlan.targetFiles).length} archivo(s)`
-                  : 'Sin archivos'
-              }
-              detail={normalizeOptionalStringArray(moduleExpansionPlan.targetFiles)[0] || 'Sin detalle'}
-            />
-          </div>
-          <div className="mt-4 grid gap-3 xl:grid-cols-2">
-            <ProductArchitectureGroup
-              title="Capas afectadas"
-              items={moduleExpansionPlan.affectedLayers}
-              compact={compact}
-              tone="emerald"
-            />
-            <ProductArchitectureGroup
-              title="Bloqueos o notas"
-              items={
-                modulePlanBlockers.length > 0
-                  ? modulePlanBlockers
-                  : [preparedModuleVisualState.detail]
-              }
-              compact={compact}
-              tone={modulePlanBlockers.length > 0 ? 'rose' : 'amber'}
-            />
-          </div>
-        </div>
+        <PreparedModuleExpansionCard
+          title={
+            normalizeOptionalString(moduleExpansionPlan.moduleName) ||
+            normalizeOptionalString(moduleExpansionPlan.moduleId) ||
+            'Módulo sin nombre'
+          }
+          description={
+            normalizeOptionalString(moduleExpansionPlan.reason) ||
+            'JEFE dejó una expansión lista para revisar o materializar en modo seguro.'
+          }
+          statusLabel={preparedModuleVisualState.label}
+          statusToneClass={getContinuityStateToneClass(preparedModuleVisualState.tone)}
+          typeLabel={getExpansionTypeLabel(moduleExpansionPlan.expansionType)}
+          domainLabel={normalizeOptionalString(moduleExpansionPlan.domain) || 'Sin dominio'}
+          riskLabel={getRiskLabel(moduleExpansionPlan.riskLevel)}
+          riskTone={getRiskTone(moduleExpansionPlan.riskLevel)}
+          projectRoot={normalizeOptionalString(moduleExpansionPlan.projectRoot) || 'Sin root'}
+          affectedLayersValue={
+            normalizeOptionalStringArray(moduleExpansionPlan.affectedLayers).length > 0
+              ? `${normalizeOptionalStringArray(moduleExpansionPlan.affectedLayers).length} capa(s)`
+              : 'Sin capas'
+          }
+          affectedLayersDetail={
+            normalizeOptionalStringArray(moduleExpansionPlan.affectedLayers)[0] ||
+            'Sin detalle'
+          }
+          targetFilesValue={
+            normalizeOptionalStringArray(moduleExpansionPlan.targetFiles).length > 0
+              ? `${normalizeOptionalStringArray(moduleExpansionPlan.targetFiles).length} archivo(s)`
+              : 'Sin archivos'
+          }
+          targetFilesDetail={
+            normalizeOptionalStringArray(moduleExpansionPlan.targetFiles)[0] || 'Sin detalle'
+          }
+          affectedLayers={moduleExpansionPlan.affectedLayers || []}
+          notes={
+            modulePlanBlockers.length > 0
+              ? modulePlanBlockers
+              : [preparedModuleVisualState.detail]
+          }
+          notesTone={modulePlanBlockers.length > 0 ? 'rose' : 'amber'}
+          compact={compact}
+        />
       ) : null}
 
-      {visibleOptions.length > 0 ? (
+      {visibleOptionItems.length > 0 ? (
         <div className="mt-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Opciones para seguir
-          </div>
-          <div className="mt-3 grid gap-3">
-            {visibleOptions.map((option) => {
-              const normalizedOptionId = normalizeModuleUiId(option.id)
-              const matchingModule =
-                manifestModules.find(
-                  (moduleEntry) =>
-                    normalizeModuleUiId(moduleEntry.id || moduleEntry.name) ===
-                    normalizedOptionId,
-                ) || null
-              const alreadyDone =
-                normalizeOptionalString(matchingModule?.status).toLocaleLowerCase() ===
-                'done'
-              const visualState = getContinuityVisualState({
-                safeToPrepare: option.safeToPrepare,
-                safeToMaterialize: option.safeToMaterialize,
-                requiresApproval: option.requiresApproval,
-                blocked: option.blocked,
-                alreadyDone,
-              })
-              const optionPayload: ModuleExpansionActionPayload = {
-                moduleId: option.id,
-                moduleName: option.label,
-                optionType: option.expansionType,
-                targetStrategy: option.targetStrategy,
-                expectedFiles: option.expectedFiles,
-                safeToPrepare: option.safeToPrepare,
-                safeToMaterialize: option.safeToMaterialize,
-                requiresApproval: option.requiresApproval,
-                reason: option.reason,
-              }
-              const canPrepare =
-                Boolean(onPrepareModuleExpansion) && option.safeToPrepare !== false
-              const canMaterialize =
-                Boolean(onMaterializeModuleExpansion) &&
-                option.safeToMaterialize === true &&
-                !option.requiresApproval &&
-                !alreadyDone
-
-              return (
-                <article
-                  key={option.id || option.label}
-                  className="rounded-2xl border border-white/8 bg-slate-950/45 px-4 py-4"
-                >
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="text-sm font-medium leading-6 text-slate-100">
-                          {normalizeOptionalString(option.label) || 'Opción sin título'}
-                        </div>
-                        {recommendedOptionId &&
-                        recommendedOptionId === normalizedOptionId ? (
-                          <span className="rounded-full border border-sky-300/20 bg-sky-300/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-100">
-                            Recomendado
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="mt-2 text-sm leading-6 text-slate-300">
-                        {normalizeOptionalString(option.description) ||
-                          'Sin descripción declarada.'}
-                      </div>
-                      <div className="mt-2 text-xs leading-5 text-slate-400">
-                        {normalizeOptionalString(option.reason) || visualState.detail}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <span
-                        className={joinClasses(
-                          'rounded-full border px-3 py-1 text-xs font-medium',
-                          getContinuityStateToneClass(visualState.tone),
-                        )}
-                      >
-                        {visualState.label}
-                      </span>
-                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-                        {getExpansionTypeLabel(option.expansionType)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <MetricCard
-                      label="Estrategia sugerida"
-                      value={getOperatorStrategyLabel(option.targetStrategy)}
-                      detail={
-                        alreadyDone
-                          ? 'Ya existe en el proyecto y conviene revisarlo antes de volver a expandirlo.'
-                          : option.safeToMaterialize
-                            ? 'Tiene una ruta segura y revisable dentro del flujo actual.'
-                            : option.requiresApproval
-                              ? 'Necesita revisión humana antes de salir del modo seguro.'
-                              : option.safeToPrepare === false
-                                ? 'Todavía no está lista para prepararse desde la interfaz.'
-                                : 'Se puede dejar lista como plan revisable sin ejecutar cambios todavía.'
-                      }
-                      tone="sky"
-                    />
-                    <MetricCard
-                      label="Riesgo"
-                      value={getRiskLabel(option.riskLevel)}
-                      detail={visualState.detail}
-                      tone={getRiskTone(option.riskLevel)}
-                    />
-                    <MetricCard
-                      label="Preparación"
-                      value={option.safeToPrepare === false ? 'No' : 'Sí'}
-                      detail={
-                        option.requiresApproval
-                          ? 'Necesita revisión humana'
-                          : 'Puede dejar un plan revisable'
-                      }
-                      tone={option.safeToPrepare === false ? 'rose' : 'emerald'}
-                    />
-                    <MetricCard
-                      label="Materialización"
-                      value={option.safeToMaterialize ? 'Segura' : 'No disponible'}
-                      detail={
-                        alreadyDone
-                          ? 'Ya existe en el proyecto'
-                          : option.safeToMaterialize
-                            ? 'Existe una ruta local y revisable'
-                            : 'Todavía no tiene materializador seguro'
-                      }
-                      tone={
-                        alreadyDone
-                          ? 'sky'
-                          : option.safeToMaterialize
-                            ? 'emerald'
-                            : option.requiresApproval
-                              ? 'rose'
-                              : 'amber'
-                      }
-                    />
-                  </div>
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
-                    {canPrepare ? (
-                      <button
-                        type="button"
-                        onClick={() => onPrepareModuleExpansion?.(optionPayload)}
-                        disabled={busy}
-                        className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-2.5 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-                      >
-                        {alreadyDone ? 'Revisar primero' : 'Preparar plan'}
-                      </button>
-                    ) : null}
-                    {canMaterialize ? (
-                      <button
-                        type="button"
-                        onClick={() => onMaterializeModuleExpansion?.(optionPayload)}
-                        disabled={busy}
-                        className="rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-2.5 text-sm font-medium text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-                      >
-                        Materializar módulo
-                      </button>
-                    ) : (
-                      <span className="text-sm leading-6 text-slate-400">
-                        {alreadyDone
-                          ? 'Ya agregado al proyecto.'
-                          : option.requiresApproval
-                            ? 'Requiere aprobación antes de salir del modo seguro.'
-                            : option.safeToMaterialize
-                              ? 'Listo para revisar antes de ejecutar.'
-                              : 'Todavía no tiene materializador seguro.'}
-                      </span>
-                    )}
-                  </div>
-                </article>
-              )
-            })}
-          </div>
+          <ProjectContinuationActionSection
+            title="Opciones para seguir"
+            emptyCopy=""
+            items={visibleOptionItems}
+            busy={busy}
+          />
         </div>
       ) : null}
 
-      {visibleModules.length > 0 ? (
-        <div className="mt-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Módulos ya agregados
-          </div>
-          <div className="mt-3 grid gap-3 xl:grid-cols-2">
-            {visibleModules.map((moduleEntry) => (
-              <article
-                key={moduleEntry.id || moduleEntry.name}
-                className="rounded-2xl border border-white/8 bg-slate-950/45 px-4 py-4"
-              >
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <div className="text-sm font-medium leading-6 text-slate-100">
-                      {normalizeOptionalString(moduleEntry.name) ||
-                        normalizeOptionalString(moduleEntry.id) ||
-                        'Módulo sin nombre'}
-                    </div>
-                    <div className="mt-1 text-xs leading-5 text-slate-400">
-                      {normalizeOptionalString(moduleEntry.addedAt) ||
-                        'Sin fecha declarada'}
-                    </div>
-                  </div>
-                  <span
-                    className={joinClasses(
-                      'rounded-full border px-3 py-1 text-xs font-medium',
-                      getContinuityStateToneClass(
-                        normalizeOptionalString(moduleEntry.status).toLocaleLowerCase() ===
-                          'done'
-                          ? 'sky'
-                          : normalizeOptionalString(moduleEntry.status).toLocaleLowerCase() ===
-                              'blocked'
-                            ? 'rose'
-                            : 'amber',
-                      ),
-                    )}
-                  >
-                    {getManifestPhaseStatusLabel(moduleEntry.status)}
-                  </span>
-                </div>
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <MetricCard
-                    label="Capas"
-                    value={
-                      normalizeOptionalStringArray(moduleEntry.layers).length > 0
-                        ? `${normalizeOptionalStringArray(moduleEntry.layers).length} capa(s)`
-                        : 'Sin capas'
-                    }
-                    detail={normalizeOptionalStringArray(moduleEntry.layers)[0] || 'Sin detalle'}
-                  />
-                  <MetricCard
-                    label="Archivos"
-                    value={
-                      normalizeOptionalStringArray(moduleEntry.files).length > 0
-                        ? `${normalizeOptionalStringArray(moduleEntry.files).length} archivo(s)`
-                        : 'Sin archivos'
-                    }
-                    detail={normalizeOptionalStringArray(moduleEntry.files)[0] || 'Sin detalle'}
-                    tone="sky"
-                  />
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      ) : null}
+      <ProjectContinuationModulesSection
+        title="Módulos ya agregados"
+        items={visibleModuleItems}
+      />
     </article>
   )
 }
@@ -7375,89 +5928,15 @@ function ProjectContinuityCenterCard({
     (Boolean(projectPhaseExecutionPlan) ||
       Boolean(moduleExpansionPlan) ||
       Boolean(continuationActionPlan))
-  const nextRecommendedAction =
-    resolveProjectContinuityNextRecommendedActionForUi({
-      projectContinuationState,
-      projectReadinessState,
-      continuationActionPlan,
-      moduleExpansionPlan,
-      projectPhaseExecutionPlan,
-      localProjectManifest,
-    }) ||
-    projectContinuationState?.nextRecommendedAction ||
-    continuationActionPlan ||
-    (moduleExpansionPlan?.moduleId
-      ? {
-          id: `prepared-module-${normalizeOptionalString(moduleExpansionPlan.moduleId)}`,
-          title:
-            normalizeOptionalString(moduleExpansionPlan.moduleName) ||
-            normalizeOptionalString(moduleExpansionPlan.moduleId) ||
-            'Modulo preparado',
-          description:
-            normalizeOptionalString(moduleExpansionPlan.reason) ||
-            'Hay una expansion preparada para revisar.',
-          category: normalizeOptionalString(moduleExpansionPlan.expansionType),
-          targetStrategy:
-            moduleExpansionPlan.safeToMaterialize === true
-              ? 'materialize-module-expansion-plan'
-              : 'prepare-module-expansion-plan',
-          safeToPrepare: moduleExpansionPlan.safeToPrepare !== false,
-          safeToMaterialize: moduleExpansionPlan.safeToMaterialize === true,
-          requiresApproval: moduleExpansionPlan.approvalRequired === true,
-          blocked:
-            normalizeOptionalStringArray(moduleExpansionPlan.blockers).length > 0,
-          blocker: normalizeOptionalStringArray(moduleExpansionPlan.blockers)[0] || '',
-          moduleId: normalizeOptionalString(moduleExpansionPlan.moduleId),
-          riskLevel: moduleExpansionPlan.riskLevel,
-          projectRoot: normalizeOptionalString(moduleExpansionPlan.projectRoot),
-          reason: normalizeOptionalString(moduleExpansionPlan.reason),
-          targetFiles: moduleExpansionPlan.targetFiles || [],
-          allowedTargetPaths: moduleExpansionPlan.allowedTargetPaths || [],
-          explicitExclusions: moduleExpansionPlan.explicitExclusions || [],
-          successCriteria: moduleExpansionPlan.successCriteria || [],
-          expectedOutcome:
-            'Dejar la expansión del módulo lista para revisión o materialización segura.',
-        }
-      : null) ||
-    (projectPhaseExecutionPlan?.phaseId
-      ? {
-          id: `prepared-phase-${normalizeOptionalString(projectPhaseExecutionPlan.phaseId)}`,
-          title:
-            normalizeOptionalString(
-              manifestPhases.find(
-                (phase) =>
-                  normalizeOptionalString(phase.id) ===
-                  normalizeOptionalString(projectPhaseExecutionPlan.phaseId),
-              )?.title,
-            ) ||
-            normalizeOptionalString(projectPhaseExecutionPlan.phaseId) ||
-            'Fase preparada',
-          description:
-            normalizeOptionalString(projectPhaseExecutionPlan.reason) ||
-            'Hay una fase preparada para revisar.',
-          category: 'project-phase',
-          targetStrategy:
-            normalizeOptionalString(projectPhaseExecutionPlan.targetStrategy) ||
-            'prepare-project-phase-plan',
-          safeToPrepare: true,
-          safeToMaterialize: projectPhaseExecutionPlan.executableNow === true,
-          requiresApproval: projectPhaseExecutionPlan.approvalRequired === true,
-          blocked:
-            normalizeOptionalStringArray(projectPhaseExecutionPlan.blockers).length > 0,
-          blocker:
-            normalizeOptionalStringArray(projectPhaseExecutionPlan.blockers)[0] || '',
-          phaseId: normalizeOptionalString(projectPhaseExecutionPlan.phaseId),
-          riskLevel: projectPhaseExecutionPlan.riskLevel,
-          projectRoot: normalizeOptionalString(projectPhaseExecutionPlan.projectRoot),
-          reason: normalizeOptionalString(projectPhaseExecutionPlan.reason),
-          targetFiles: projectPhaseExecutionPlan.targetFiles || [],
-          allowedTargetPaths: projectPhaseExecutionPlan.allowedTargetPaths || [],
-          explicitExclusions: projectPhaseExecutionPlan.explicitExclusions || [],
-          successCriteria: projectPhaseExecutionPlan.successCriteria || [],
-          expectedOutcome:
-            'Dejar la fase lista para revision o materializacion segura.',
-        }
-      : null)
+  const nextRecommendedAction = resolveProjectContinuityCenterNextRecommendedAction({
+    projectContinuationState,
+    projectReadinessState,
+    continuationActionPlan,
+    moduleExpansionPlan,
+    projectPhaseExecutionPlan,
+    localProjectManifest,
+    manifestPhases,
+  })
   const nextStepTitle =
     normalizeOptionalString(nextRecommendedAction?.title) ||
     normalizeOptionalString(nextActionPlan?.userFacingLabel) ||
@@ -7683,261 +6162,64 @@ function ProjectContinuityCenterCard({
             : 'La fase segura actual no necesita aprobación. Lo sensible queda para más adelante.',
         ]
 
-  const dispatchPrepareAction = (action: ContinuationActionContract) => {
-    if (onPrepareContinuationAction) {
-      onPrepareContinuationAction(action)
-      return
-    }
+  const dispatchPrepareAction = (action: ContinuationActionContract) =>
+    dispatchPrepareContinuationAction({
+      action,
+      onPrepareContinuationAction,
+      onPreparePhase,
+      onPrepareModuleExpansion,
+    })
 
-    const normalizedPhaseId = normalizeOptionalString(action.phaseId)
-    const normalizedModuleId = normalizeOptionalString(action.moduleId)
-
-    if (normalizedPhaseId && onPreparePhase) {
-      onPreparePhase(normalizedPhaseId)
-      return
-    }
-
-    if (normalizedModuleId && onPrepareModuleExpansion) {
-      onPrepareModuleExpansion({
-        moduleId: normalizedModuleId,
-        moduleName: action.title,
-        optionType: action.category,
-        targetStrategy: action.targetStrategy,
-        expectedFiles: action.targetFiles || null,
-        safeToPrepare: action.safeToPrepare,
-        safeToMaterialize: action.safeToMaterialize,
-        requiresApproval: action.requiresApproval,
-        reason: action.reason || action.blocker || action.description,
-      })
-    }
-  }
-
-  const dispatchMaterializeAction = (action: ContinuationActionContract) => {
-    if (action.safeToMaterialize !== true) {
-      return
-    }
-
-    if (onMaterializeContinuationAction) {
-      onMaterializeContinuationAction(action)
-      return
-    }
-
-    const normalizedPhaseId = normalizeOptionalString(action.phaseId)
-    const normalizedModuleId = normalizeOptionalString(action.moduleId)
-
-    if (normalizedPhaseId && onMaterializePhase) {
-      onMaterializePhase(normalizedPhaseId)
-      return
-    }
-
-    if (normalizedModuleId && onMaterializeModuleExpansion) {
-      onMaterializeModuleExpansion({
-        moduleId: normalizedModuleId,
-        moduleName: action.title,
-        optionType: action.category,
-        targetStrategy: action.targetStrategy,
-        expectedFiles: action.targetFiles || null,
-        safeToPrepare: action.safeToPrepare,
-        safeToMaterialize: action.safeToMaterialize,
-        requiresApproval: action.requiresApproval,
-        reason: action.reason || action.description,
-      })
-    }
-  }
+  const dispatchMaterializeAction = (action: ContinuationActionContract) =>
+    dispatchMaterializeContinuationAction({
+      action,
+      onMaterializeContinuationAction,
+      onMaterializePhase,
+      onMaterializeModuleExpansion,
+    })
 
   const renderActionCards = (
     title: string,
     actions: ContinuationActionContract[],
     emptyCopy: string,
     sectionTone: 'emerald' | 'amber' | 'rose' | 'sky',
-  ) => {
-    if (actions.length === 0) {
-      return (
-        <div className="rounded-2xl border border-white/8 bg-slate-950/35 px-4 py-4 text-sm leading-6 text-slate-400">
-          {emptyCopy}
-        </div>
-      )
-    }
-
-    return (
-      <div className="space-y-3">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-          {title}
-        </div>
-        <div className="grid gap-3">
-          {actions.map((action) => {
-            const normalizedModuleId = normalizeModuleUiId(action.moduleId || '')
-            const matchingModule =
-              manifestModules.find(
-                (moduleEntry) =>
-                  normalizeModuleUiId(moduleEntry.id || moduleEntry.name) ===
-                  normalizedModuleId,
-              ) || null
-            const alreadyDone =
-              normalizeOptionalString(matchingModule?.status).toLocaleLowerCase() ===
-              'done'
-            const visualState = getContinuityVisualState({
-              safeToPrepare: action.safeToPrepare,
-              safeToMaterialize: action.safeToMaterialize,
-              requiresApproval: action.requiresApproval,
-              blocked: action.blocked,
-              alreadyDone,
-            })
-            const detailCopy =
-              normalizeOptionalString(action.blocker) ||
-              normalizeOptionalString(action.reason) ||
-              normalizeOptionalString(action.description) ||
-              visualState.detail
-            const canPrepare = action.safeToPrepare !== false && !alreadyDone
-            const canMaterialize =
-              action.safeToMaterialize === true &&
-              !action.requiresApproval &&
-              !action.blocked &&
-              !alreadyDone
-
-            return (
-              <article
-                key={action.id || action.title}
-                className="rounded-2xl border border-white/8 bg-slate-950/45 px-4 py-4"
-              >
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="text-sm font-medium leading-6 text-slate-100">
-                        {normalizeOptionalString(action.title) || 'Acción sin título'}
-                      </div>
-                      {action.recommended ? (
-                        <span className="rounded-full border border-sky-300/20 bg-sky-300/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-100">
-                          Recomendado
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="mt-2 text-sm leading-6 text-slate-300">
-                      {normalizeOptionalString(action.description) ||
-                        'Sin descripción declarada.'}
-                    </div>
-                    <div className="mt-2 text-xs leading-5 text-slate-400">
-                      {detailCopy}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <span
-                      className={joinClasses(
-                        'rounded-full border px-3 py-1 text-xs font-medium',
-                        getContinuityStateToneClass(visualState.tone),
-                      )}
-                    >
-                      {visualState.label}
-                    </span>
-                    <span
-                      className={joinClasses(
-                        'rounded-full border px-3 py-1 text-xs font-medium',
-                        getContinuityStateToneClass(sectionTone),
-                      )}
-                    >
-                      {getContinuationCategoryLabel(action.category)}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <MetricCard
-                    label="Cómo sigue"
-                    value={getOperatorStrategyLabel(action.targetStrategy)}
-                    detail={
-                      normalizeOptionalString(action.expectedOutcome) ||
-                      'Sin resultado esperado declarado.'
-                    }
-                    tone="sky"
-                  />
-                  <MetricCard
-                    label="Riesgo"
-                    value={getRiskLabel(action.riskLevel)}
-                    detail={detailCopy}
-                    tone={getRiskTone(action.riskLevel)}
-                  />
-                  <MetricCard
-                    label="Preparación"
-                    value={action.safeToPrepare === false ? 'No' : 'Sí'}
-                    detail={
-                      action.requiresApproval
-                        ? 'Requiere aprobación antes de salir del modo seguro.'
-                        : action.blocked
-                          ? 'Conviene revisar el bloqueo primero.'
-                          : 'Se puede dejar lista como siguiente acción revisable.'
-                    }
-                    tone={action.safeToPrepare === false ? 'rose' : 'emerald'}
-                  />
-                  <MetricCard
-                    label="Materialización"
-                    value={action.safeToMaterialize ? 'Segura' : 'No disponible'}
-                    detail={
-                      alreadyDone
-                        ? 'Ya agregado al proyecto.'
-                        : action.safeToMaterialize
-                          ? 'Existe una ruta local y revisable.'
-                          : action.requiresApproval
-                            ? 'Necesita aprobación antes de ejecutar.'
-                            : action.blocked
-                              ? 'Bloqueado por seguridad.'
-                              : 'Todavía no se puede ejecutar sola.'
-                    }
-                    tone={
-                      alreadyDone
-                        ? 'sky'
-                        : action.safeToMaterialize
-                          ? 'emerald'
-                          : action.requiresApproval || action.blocked
-                            ? 'rose'
-                            : 'amber'
-                    }
-                  />
-                </div>
-
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  {canPrepare ? (
-                    <button
-                      type="button"
-                      onClick={() => dispatchPrepareAction(action)}
-                      disabled={busy}
-                      className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-2.5 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-                    >
-                      {getPrepareActionButtonLabel({
-                        alreadyDone,
-                        requiresApproval: action.requiresApproval,
-                        blocked: action.blocked,
-                      })}
-                    </button>
-                  ) : null}
-                  {canMaterialize ? (
-                    <button
-                      type="button"
-                      onClick={() => dispatchMaterializeAction(action)}
-                      disabled={busy}
-                      className="rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-2.5 text-sm font-medium text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-                    >
-                      Materializar seguro
-                    </button>
-                  ) : (
-                    <span className="text-sm leading-6 text-slate-400">
-                      {alreadyDone
-                        ? 'Ya agregado al proyecto.'
-                        : action.requiresApproval
-                          ? 'Requiere aprobación antes de salir del modo seguro.'
-                          : action.blocked
-                            ? normalizeOptionalString(action.blocker) ||
-                              'Bloqueado por seguridad.'
-                            : 'Todavía no se puede ejecutar sola.'}
-                    </span>
-                  )}
-                </div>
-              </article>
-            )
-          })}
-        </div>
-      </div>
-    )
-  }
+  ) => (
+    <ProjectContinuationActionSection
+      title={title}
+      emptyCopy={emptyCopy}
+      items={buildContinuationActionSectionItems({
+        actions,
+        sectionTone,
+        manifestModules,
+        dispatchPrepareAction,
+        dispatchMaterializeAction,
+      })}
+      busy={busy}
+    />
+  )
+  const visibleOptionItems = buildContinuationOptionItems({
+    visibleOptions,
+    manifestModules,
+    recommendedOptionId,
+    dispatchPrepareAction,
+    dispatchMaterializeAction,
+  })
+  const visibleModuleItems = buildContinuationModuleItems({
+    visibleModules,
+    unnamedTitle: 'Modulo sin nombre',
+    getStatusLabel: (moduleEntry, normalizedStatus) =>
+      normalizedStatus === 'done'
+        ? 'Ya agregado al proyecto'
+        : getManifestPhaseStatusLabel(moduleEntry.status),
+    getStatusTone: (normalizedStatus) =>
+      normalizedStatus === 'done'
+        ? 'sky'
+        : normalizedStatus === 'blocked'
+          ? 'rose'
+          : normalizedStatus === 'partial' || normalizedStatus === 'planned'
+            ? 'amber'
+            : 'default',
+  })
 
   return (
     <article className="rounded-3xl border border-emerald-300/15 bg-emerald-300/[0.05] p-5">
@@ -8049,570 +6331,289 @@ function ProjectContinuityCenterCard({
       </div>
 
       {shouldShowDetectedProjectBanner ? (
-        <div className="mt-4 rounded-2xl border border-sky-300/15 bg-sky-300/[0.05] px-4 py-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Proyecto existente detectado
-          </div>
-          <div className="mt-2 text-sm leading-6 text-slate-200">
-            JEFE leyó un proyecto local ya materializado dentro del workspace y va a continuar
-            desde el manifest actual en vez de recrear el scaffold.
-          </div>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <MetricCard
-              label="Carpeta detectada"
-              value={detectedProjectRoot || 'Sin carpeta declarada'}
-              detail="Origen de continuidad leído desde disco."
-              tone="sky"
-            />
-            <MetricCard
-              label="Última fase completada"
-              value={lastCompletedPhaseLabel}
-              detail="La siguiente acción segura se calcula desde este estado."
-              tone="emerald"
-            />
-          </div>
-        </div>
+        <DetectedProjectBanner
+          projectRoot={detectedProjectRoot || 'Sin carpeta declarada'}
+          lastCompletedPhaseLabel={lastCompletedPhaseLabel}
+        />
       ) : null}
 
       {projectReadinessState ? (
-        <div className="mt-4 rounded-2xl border border-white/8 bg-slate-950/45 px-4 py-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Estado para demo
-              </div>
-              <div className="mt-2 text-base font-semibold text-white">{readinessLabel}</div>
-              <div className="mt-2 text-sm leading-6 text-slate-300">{readinessSummary}</div>
-              <div className="mt-2 text-xs leading-5 text-slate-400">
-                {projectReadinessState.demoReady || projectReadinessState.safeLocalDemoReady
-                  ? 'No se ejecutó nada real. La demo sigue apoyada en archivos locales y mocks revisables.'
-                  : 'No se toca nada real sin aprobación. El proyecto puede seguir creciendo por fases seguras.'}
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <span
-                className={joinClasses(
-                  'rounded-full border px-3 py-1 text-xs font-medium',
-                  getContinuityStateToneClass(readinessTone),
-                )}
-              >
-                {readinessLabel}
-              </span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-                {getValidationStatusLabel(projectReadinessState.validationStatus)}
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <MetricCard
-              label="Estado para demo"
-              value={readinessLabel}
-              detail={normalizeOptionalString(projectReadinessState.operatorSummary) || readinessSummary}
-              tone={readinessTone}
-            />
-            <MetricCard
-              label="Flujo base"
-              value={projectReadinessState.completedCoreFlow ? 'Completo' : 'Incompleto'}
-              detail={
-                projectReadinessState.completedCoreFlow
-                  ? 'La base segura ya cerró frontend, backend, datos y validación local.'
-                  : readinessMissingCorePhases[0] || 'Todavía falta completar la base segura.'
-              }
-              tone={projectReadinessState.completedCoreFlow ? 'emerald' : 'amber'}
-            />
-            <MetricCard
-              label="Validación local"
-              value={getValidationStatusLabel(projectReadinessState.validationStatus)}
-              detail={
-                normalizeOptionalString(projectReadinessState.lastValidationSummary) ||
-                normalizeOptionalString(localProjectManifest?.lastValidationSummary) ||
-                'Sin resumen de validación declarado.'
-              }
-              tone={readinessTone}
-            />
-            <MetricCard
-              label="Guía rápida"
-              value={
-                recommendedDemoScript.length > 0
-                  ? `${recommendedDemoScript.length} paso(s)`
-                  : 'Sin guía'
-              }
-              detail={recommendedDemoScript[0] || 'Todavía no hay una guía rápida declarada.'}
-              tone="sky"
-            />
-          </div>
-
-          <div className="mt-4 grid gap-4 xl:grid-cols-2">
-            <ProductArchitectureGroup
-              title="Qué ya está construido"
-              items={[
-                ...readinessCompletedPhases,
-                ...readinessCompletedModules,
-                ...readinessRealFilesystemAreas,
-              ]}
-              compact={compact}
-              tone="emerald"
-            />
-            <ProductArchitectureGroup
-              title="Qué sigue siendo mock"
-              items={
-                readinessMockOnlyAreas.length > 0
-                  ? readinessMockOnlyAreas
-                  : ['Esto es mock, no producción.']
-              }
-              compact={compact}
-              tone="amber"
-            />
-          </div>
-
-          <div className="mt-4 grid gap-4 xl:grid-cols-2">
-            <ProductArchitectureGroup
-              title={readinessApprovalTitle}
-              items={readinessApprovalItems}
-              compact={compact}
-              tone="rose"
-            />
-            <ProductArchitectureGroup
-              title="Bloqueado por seguridad"
-              items={
-                readinessBlockedAreas.length > 0
-                  ? readinessBlockedAreas
-                  : readinessBlockers.length > 0
-                    ? readinessBlockers
-                    : ['No hay bloqueos adicionales para la entrega funcional local segura.']
-              }
-              compact={compact}
-              tone="rose"
-            />
-          </div>
-
-          <div className="mt-4 grid gap-4 xl:grid-cols-2">
-            <ProductArchitectureGroup
-              title="Todavía falta completar"
-              items={[
-                ...readinessMissingCorePhases,
-                ...readinessMissingRecommendedModules,
-                ...readinessPlannerOnlyAreas,
-              ]}
-              compact={compact}
-              tone="amber"
-            />
-            <ProductArchitectureGroup
-              title="Guía rápida para probar"
-              items={
-                recommendedDemoScript.length > 0
-                  ? recommendedDemoScript
-                  : ['Seguir el runbook local y revisar los archivos generados.']
-              }
-              compact={compact}
-              tone="sky"
-            />
-          </div>
-
-          {readinessWarnings.length > 0 || continuationRisks.length > 0 ? (
-            <div className="mt-4">
-              <ProductArchitectureGroup
-                title="Riesgos pendientes"
-                items={
-                  readinessWarnings.length > 0
-                    ? readinessWarnings
-                    : continuationRisks.length > 0
-                      ? continuationRisks
-                      : ['No se detectaron riesgos nuevos.']
-                }
-                compact={compact}
-                tone="amber"
-              />
-            </div>
-          ) : null}
-        </div>
+        <ProjectReadinessPanel
+          readinessLabel={readinessLabel}
+          readinessSummary={readinessSummary}
+          readinessDescription={
+            projectReadinessState.demoReady || projectReadinessState.safeLocalDemoReady
+              ? 'No se ejecutó nada real. La demo sigue apoyada en archivos locales y mocks revisables.'
+              : 'No se toca nada real sin aprobación. El proyecto puede seguir creciendo por fases seguras.'
+          }
+          readinessTone={readinessTone}
+          validationStatusLabel={getValidationStatusLabel(projectReadinessState.validationStatus)}
+          readinessStatusDetail={
+            normalizeOptionalString(projectReadinessState.operatorSummary) || readinessSummary
+          }
+          coreFlowLabel={projectReadinessState.completedCoreFlow ? 'Completo' : 'Incompleto'}
+          coreFlowDetail={
+            projectReadinessState.completedCoreFlow
+              ? 'La base segura ya cerró frontend, backend, datos y validación local.'
+              : readinessMissingCorePhases[0] || 'Todavía falta completar la base segura.'
+          }
+          coreFlowTone={projectReadinessState.completedCoreFlow ? 'emerald' : 'amber'}
+          validationDetail={
+            normalizeOptionalString(projectReadinessState.lastValidationSummary) ||
+            normalizeOptionalString(localProjectManifest?.lastValidationSummary) ||
+            'Sin resumen de validación declarado.'
+          }
+          quickGuideValue={
+            recommendedDemoScript.length > 0
+              ? `${recommendedDemoScript.length} paso(s)`
+              : 'Sin guía'
+          }
+          quickGuideDetail={
+            recommendedDemoScript[0] || 'Todavía no hay una guía rápida declarada.'
+          }
+          builtItems={[
+            ...readinessCompletedPhases,
+            ...readinessCompletedModules,
+            ...readinessRealFilesystemAreas,
+          ]}
+          mockItems={
+            readinessMockOnlyAreas.length > 0
+              ? readinessMockOnlyAreas
+              : ['Esto es mock, no producción.']
+          }
+          approvalTitle={readinessApprovalTitle}
+          approvalItems={readinessApprovalItems}
+          blockedItems={
+            readinessBlockedAreas.length > 0
+              ? readinessBlockedAreas
+              : readinessBlockers.length > 0
+                ? readinessBlockers
+                : ['No hay bloqueos adicionales para la entrega funcional local segura.']
+          }
+          missingItems={[
+            ...readinessMissingCorePhases,
+            ...readinessMissingRecommendedModules,
+            ...readinessPlannerOnlyAreas,
+          ]}
+          guideItems={
+            recommendedDemoScript.length > 0
+              ? recommendedDemoScript
+              : ['Seguir el runbook local y revisar los archivos generados.']
+          }
+          riskItems={
+            readinessWarnings.length > 0
+              ? readinessWarnings
+              : continuationRisks.length > 0
+                ? continuationRisks
+                : []
+          }
+          compact={compact}
+        />
       ) : null}
 
       {shouldShowRuntimeApprovalPanel ? (
-        <div className="mt-4 rounded-2xl border border-rose-300/20 bg-rose-300/[0.06] px-4 py-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Aprobaciones pendientes
-              </div>
-              <div className="mt-2 text-base font-semibold text-white">
-                {normalizeOptionalString(runtimeApprovalState.title) ||
-                  'Pasar a ejecución real'}
-              </div>
-              <div className="mt-2 text-sm leading-6 text-slate-300">
-                {normalizeOptionalString(runtimeApprovalState.notExecutedDisclaimer) ||
-                  'No se ejecutó nada todavía.'}
-              </div>
-              <div className="mt-2 text-xs leading-5 text-slate-400">
-                {normalizeOptionalString(runtimeApprovalState.description) ||
-                  normalizeOptionalString(runtimeApprovalState.safeAlternative) ||
-                  'JEFE preparó un preview controlado sin salir del modo local seguro.'}
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <span
-                className={joinClasses(
-                  'rounded-full border px-3 py-1 text-xs font-medium',
-                  getContinuityStateToneClass(runtimeApprovalTone),
-                )}
-              >
-                {runtimeApprovalStatusLabel}
-              </span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-                {getRiskLabel(runtimeApprovalState.riskLevel)}
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <MetricCard
-              label="Pasar a ejecución real"
-              value={runtimeApprovalStatusLabel}
-              detail={
-                normalizeOptionalString(runtimeApprovalState.relatedReadinessArea) ||
-                'La ejecución real sigue bloqueada hasta aprobación explícita.'
-              }
-              tone={runtimeApprovalTone}
-            />
-            <MetricCard
-              label="Comandos propuestos"
-              value={
-                runtimeApprovalCommands.length > 0
-                  ? `${runtimeApprovalCommands.length} comando(s)`
-                  : 'Sin comandos'
-              }
-              detail={
-                runtimeApprovalCommands[0] ||
-                'No hay comandos propuestos para esta aprobación.'
-              }
-              tone="amber"
-            />
-            <MetricCard
-              label="Validaciones obligatorias"
-              value={
-                runtimeApprovalValidations.length > 0
-                  ? `${runtimeApprovalValidations.length} check(s)`
-                  : 'Sin checks'
-              }
-              detail={
-                runtimeApprovalValidations[0] ||
-                'Primero hay que revisar riesgo, alcance y alternativa segura.'
-              }
-              tone="sky"
-            />
-            <MetricCard
-              label="Alternativa segura"
-              value={
-                normalizeOptionalString(runtimeApprovalState.safeAlternative) ||
-                'Seguir en modo local seguro'
-              }
-              detail={
-                normalizeOptionalString(runtimeApprovalState.expectedOutcome) ||
-                'Todavía no se ejecuta nada real.'
-              }
-              tone="emerald"
-            />
-          </div>
-
-          <div className="mt-4 grid gap-4 xl:grid-cols-2">
-            <ProductArchitectureGroup
-              title="Comandos propuestos"
-              items={
-                runtimeApprovalCommands.length > 0
-                  ? runtimeApprovalCommands
-                  : ['Todavía no hay comandos propuestos para esta aprobación.']
-              }
-              compact={compact}
-              tone="amber"
-            />
-            <ProductArchitectureGroup
-              title="Archivos que podrían cambiar"
-              items={
-                runtimeApprovalFiles.length > 0
-                  ? runtimeApprovalFiles
-                  : approvalPacketTouches.length > 0
-                    ? approvalPacketTouches
-                    : ['El alcance sigue siendo solo informativo por ahora.']
-              }
-              compact={compact}
-              tone="amber"
-            />
-          </div>
-
-          <div className="mt-4 grid gap-4 xl:grid-cols-2">
-            <ProductArchitectureGroup
-              title="Directorios y entorno"
-              items={
-                [
+        <RuntimeApprovalPanel
+          title={normalizeOptionalString(runtimeApprovalState.title) || 'Pasar a ejecución real'}
+          disclaimer={
+            normalizeOptionalString(runtimeApprovalState.notExecutedDisclaimer) ||
+            'No se ejecutó nada todavía.'
+          }
+          description={
+            normalizeOptionalString(runtimeApprovalState.description) ||
+            normalizeOptionalString(runtimeApprovalState.safeAlternative) ||
+            'JEFE preparó un preview controlado sin salir del modo local seguro.'
+          }
+          statusLabel={runtimeApprovalStatusLabel}
+          statusToneClass={getContinuityStateToneClass(runtimeApprovalTone)}
+          riskLabel={getRiskLabel(runtimeApprovalState.riskLevel)}
+          gateDetail={
+            normalizeOptionalString(runtimeApprovalState.relatedReadinessArea) ||
+            'La ejecución real sigue bloqueada hasta aprobación explícita.'
+          }
+          commandsValue={
+            runtimeApprovalCommands.length > 0
+              ? `${runtimeApprovalCommands.length} comando(s)`
+              : 'Sin comandos'
+          }
+          commandsDetail={
+            runtimeApprovalCommands[0] ||
+            'No hay comandos propuestos para esta aprobación.'
+          }
+          validationsValue={
+            runtimeApprovalValidations.length > 0
+              ? `${runtimeApprovalValidations.length} check(s)`
+              : 'Sin checks'
+          }
+          validationsDetail={
+            runtimeApprovalValidations[0] ||
+            'Primero hay que revisar riesgo, alcance y alternativa segura.'
+          }
+          safeAlternativeValue={
+            normalizeOptionalString(runtimeApprovalState.safeAlternative) ||
+            'Seguir en modo local seguro'
+          }
+          safeAlternativeDetail={
+            normalizeOptionalString(runtimeApprovalState.expectedOutcome) ||
+            'Todavía no se ejecuta nada real.'
+          }
+          statusTone={runtimeApprovalTone}
+          proposedCommands={
+            runtimeApprovalCommands.length > 0
+              ? runtimeApprovalCommands
+              : ['Todavía no hay comandos propuestos para esta aprobación.']
+          }
+          touchedFiles={
+            runtimeApprovalFiles.length > 0
+              ? runtimeApprovalFiles
+              : approvalPacketTouches.length > 0
+                ? approvalPacketTouches
+                : ['El alcance sigue siendo solo informativo por ahora.']
+          }
+          directoriesAndEnv={
+            [
+              ...runtimeApprovalDirectories,
+              ...runtimeApprovalEnv,
+              ...runtimeApprovalSecrets,
+            ].length > 0
+              ? [
                   ...runtimeApprovalDirectories,
                   ...runtimeApprovalEnv,
                   ...runtimeApprovalSecrets,
-                ].length > 0
-                  ? [
-                      ...runtimeApprovalDirectories,
-                      ...runtimeApprovalEnv,
-                      ...runtimeApprovalSecrets,
-                    ]
-                  : ['No se toca nada real sin aprobación.']
-              }
-              compact={compact}
-              tone="rose"
-            />
-            <ProductArchitectureGroup
-              title="Validaciones obligatorias"
-              items={
-                runtimeApprovalValidations.length > 0
-                  ? runtimeApprovalValidations
-                  : approvalPacketValidations.length > 0
-                    ? approvalPacketValidations
-                    : ['Revisar alcance, riesgo y alternativa segura antes de aprobar.']
-              }
-              compact={compact}
-              tone="sky"
-            />
-          </div>
-
-          <div className="mt-4 grid gap-4 xl:grid-cols-2">
-            <ProductArchitectureGroup
-              title="Alternativa segura"
-              items={
-                runtimeApprovalAlternativeItems.length > 0
-                  ? runtimeApprovalAlternativeItems
-                  : approvalPacketWillNotTouch.length > 0
-                    ? approvalPacketWillNotTouch
-                    : ['No se ejecutó nada todavía.']
-              }
-              compact={compact}
-              tone="emerald"
-            />
-            <ProductArchitectureGroup
-              title="Riesgo"
-              items={
-                runtimeApprovalRiskItems.length > 0
-                  ? runtimeApprovalRiskItems
-                  : ['No se toca nada real sin aprobación.']
-              }
-              compact={compact}
-              tone="rose"
-            />
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            {runtimeApprovalAction && runtimeApprovalAction.safeToPrepare !== false ? (
-              <button
-                type="button"
-                onClick={() => dispatchPrepareAction(runtimeApprovalAction)}
-                disabled={busy}
-                className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-2.5 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-              >
-                Preparar aprobación
-              </button>
-            ) : null}
-            <span className="text-sm leading-6 text-slate-400">
-              {normalizeOptionalString(runtimeApprovalState.approvalPhrase) ||
-                normalizeOptionalString(runtimeApprovalState.notExecutedDisclaimer) ||
-                'No se ejecutó todavía. Primero hace falta revisar y aprobar el alcance.'}
-            </span>
-          </div>
-        </div>
-      ) : shouldShowApprovalRequestPanel ? (
-        <div className="mt-4 rounded-2xl border border-rose-300/20 bg-rose-300/[0.06] px-4 py-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Requiere aprobación
-              </div>
-              <div className="mt-2 text-base font-semibold text-white">
-                {normalizeOptionalString(approvalRequestPlan.title) ||
-                  'Acción sensible pendiente'}
-              </div>
-              <div className="mt-2 text-sm leading-6 text-slate-300">
-                {normalizeOptionalString(approvalRequestPlan.operatorMessage) ||
-                  normalizeOptionalString(approvalRequestPlan.description) ||
-                  'Todavía no se ejecutó nada real.'}
-              </div>
-              <div className="mt-2 text-xs leading-5 text-slate-400">
-                {normalizeOptionalString(approvalRequestPlan.areaSummary) ||
-                  normalizeOptionalString(approvalRequestPlan.safeAlternative) ||
-                  'JEFE preparó el paquete de aprobación sin salir del modo local seguro.'}
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <span
-                className={joinClasses(
-                  'rounded-full border px-3 py-1 text-xs font-medium',
-                  getContinuityStateToneClass(
-                    approvalRequestPlan.blockedByDefault ? 'rose' : 'amber',
-                  ),
-                )}
-              >
-                {approvalRequestPlan.blockedByDefault
-                  ? 'Bloqueado por seguridad'
-                  : 'Requiere aprobación'}
-              </span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-                {getRiskLabel(approvalRequestPlan.riskLevel)}
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <MetricCard
-              label="Riesgo"
-              value={getRiskLabel(approvalRequestPlan.riskLevel)}
-              detail={normalizeOptionalString(approvalRequestPlan.approvalType) || 'Sin tipo'}
-              tone={getRiskTone(approvalRequestPlan.riskLevel)}
-            />
-            <MetricCard
-              label="Qué se aprobaría"
-              value={
-                approvalPacketTouches.length > 0
-                  ? `${approvalPacketTouches.length} area(s)`
-                  : 'Sin áreas'
-              }
-              detail={approvalPacketTouches[0] || 'Sin alcance declarado'}
-              tone="amber"
-            />
-            <MetricCard
-              label="Alternativa segura"
-              value={
-                normalizeOptionalString(approvalRequestPlan.safeAlternative) ||
-                'Seguir en modo local seguro'
-              }
-              detail={normalizeOptionalString(approvalRequestPlan.approvalCopy) || 'Sin copy'}
-              tone="sky"
-            />
-            <MetricCard
-              label="Estado"
-              value={
-                approvalRequestPlan.blockedByDefault
-                  ? 'Bloqueado'
-                  : approvalRequestPlan.requiresApproval
-                    ? 'Pendiente'
-                    : 'Revisable'
-              }
-              detail={
-                approvalRequestPlan.forbiddenInCurrentTask
-                  ? 'No se ejecuta en esta tarea.'
-                  : 'Todavía no se ejecutó nada real.'
-              }
-              tone={approvalRequestPlan.blockedByDefault ? 'rose' : 'amber'}
-            />
-          </div>
-
-          <div className="mt-4 grid gap-4 xl:grid-cols-2">
-            <ProductArchitectureGroup
-              title="Qué tocaría"
-              items={
-                approvalPacketTouches.length > 0
-                  ? approvalPacketTouches
-                  : ['El alcance sigue siendo solo informativo por ahora.']
-              }
-              compact={compact}
-              tone="amber"
-            />
-            <ProductArchitectureGroup
-              title="No se ejecutó todavía"
-              items={
-                approvalPacketWillNotTouch.length > 0
-                  ? approvalPacketWillNotTouch
-                  : ['No se toca nada real sin aprobación.']
-              }
-              compact={compact}
-              tone="emerald"
-            />
-          </div>
-
-          <div className="mt-4 grid gap-4 xl:grid-cols-2">
-            <ProductArchitectureGroup
-              title="Validaciones pedidas"
-              items={
-                approvalPacketValidations.length > 0
-                  ? approvalPacketValidations
-                  : ['Revisar alcance, riesgo y alternativa segura antes de aprobar.']
-              }
-              compact={compact}
-              tone="sky"
-            />
-            <ProductArchitectureGroup
-              title="Alertas del paquete"
-              items={
-                approvalPacketWarnings.length > 0
-                  ? approvalPacketWarnings
-                  : [
-                      normalizeOptionalString(approvalRequestPlan.explicitApprovalText) ||
-                        'No se ejecuta nada real en esta corrida.',
-                    ]
-              }
-              compact={compact}
-              tone="rose"
-            />
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            {approvalPacketAction && approvalPacketAction.safeToPrepare !== false ? (
-              <button
-                type="button"
-                onClick={() => dispatchPrepareAction(approvalPacketAction)}
-                disabled={busy}
-                className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-2.5 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-              >
-                Preparar aprobación
-              </button>
-            ) : null}
-            <span className="text-sm leading-6 text-slate-400">
-              {normalizeOptionalString(approvalRequestPlan.explicitApprovalText) ||
-                'No se ejecutó todavía. Primero hace falta revisar y aprobar el alcance.'}
-            </span>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="mt-4 grid gap-4 xl:grid-cols-2">
-        <ProductArchitectureGroup
-          title="Ya completado"
-          items={completedPhases}
-          compact={compact}
-          tone="sky"
-        />
-        <ProductArchitectureGroup
-          title="Falta resolver"
-          items={pendingPhases}
-          compact={compact}
-          tone={pendingPhases.length > 0 ? 'amber' : 'emerald'}
-        />
-      </div>
-
-      <div className="mt-4 grid gap-4 xl:grid-cols-2">
-        <ProductArchitectureGroup
-          title="Podría sumar después"
-          items={modulesAvailable}
-          compact={compact}
-          tone="emerald"
-        />
-        <ProductArchitectureGroup
-          title="Riesgo controlado"
-          items={
-            continuationRisks.length > 0
-              ? continuationRisks
+                ]
               : ['No se toca nada real sin aprobación.']
           }
+          validationItems={
+            runtimeApprovalValidations.length > 0
+              ? runtimeApprovalValidations
+              : approvalPacketValidations.length > 0
+                ? approvalPacketValidations
+                : ['Revisar alcance, riesgo y alternativa segura antes de aprobar.']
+          }
+          safeAlternativeItems={
+            runtimeApprovalAlternativeItems.length > 0
+              ? runtimeApprovalAlternativeItems
+              : approvalPacketWillNotTouch.length > 0
+                ? approvalPacketWillNotTouch
+                : ['No se ejecutó nada todavía.']
+          }
+          riskItems={
+            runtimeApprovalRiskItems.length > 0
+              ? runtimeApprovalRiskItems
+              : ['No se toca nada real sin aprobación.']
+          }
+          footerMessage={
+            normalizeOptionalString(runtimeApprovalState.approvalPhrase) ||
+            normalizeOptionalString(runtimeApprovalState.notExecutedDisclaimer) ||
+            'No se ejecutó todavía. Primero hace falta revisar y aprobar el alcance.'
+          }
           compact={compact}
-          tone="amber"
+          busy={busy}
+          onPrepare={
+            runtimeApprovalAction && runtimeApprovalAction.safeToPrepare !== false
+              ? () => dispatchPrepareAction(runtimeApprovalAction)
+              : undefined
+          }
         />
-      </div>
-
-      {continuationBlockers.length > 0 ? (
-        <div className="mt-4">
-          <ProductArchitectureGroup
-            title="Bloqueos actuales"
-            items={continuationBlockers}
-            compact={compact}
-            tone="rose"
-          />
-        </div>
+      ) : shouldShowApprovalRequestPanel ? (
+        <ApprovalRequestPanel
+          title={
+            normalizeOptionalString(approvalRequestPlan.title) || 'Acción sensible pendiente'
+          }
+          operatorMessage={
+            normalizeOptionalString(approvalRequestPlan.operatorMessage) ||
+            normalizeOptionalString(approvalRequestPlan.description) ||
+            'Todavía no se ejecutó nada real.'
+          }
+          areaSummary={
+            normalizeOptionalString(approvalRequestPlan.areaSummary) ||
+            normalizeOptionalString(approvalRequestPlan.safeAlternative) ||
+            'JEFE preparó el paquete de aprobación sin salir del modo local seguro.'
+          }
+          statusLabel={
+            approvalRequestPlan.blockedByDefault
+              ? 'Bloqueado por seguridad'
+              : 'Requiere aprobación'
+          }
+          statusToneClass={getContinuityStateToneClass(
+            approvalRequestPlan.blockedByDefault ? 'rose' : 'amber',
+          )}
+          riskLabel={getRiskLabel(approvalRequestPlan.riskLevel)}
+          riskTone={getRiskTone(approvalRequestPlan.riskLevel)}
+          riskDetail={normalizeOptionalString(approvalRequestPlan.approvalType) || 'Sin tipo'}
+          approvalAreasValue={
+            approvalPacketTouches.length > 0
+              ? `${approvalPacketTouches.length} area(s)`
+              : 'Sin áreas'
+          }
+          approvalAreasDetail={approvalPacketTouches[0] || 'Sin alcance declarado'}
+          safeAlternativeValue={
+            normalizeOptionalString(approvalRequestPlan.safeAlternative) ||
+            'Seguir en modo local seguro'
+          }
+          safeAlternativeDetail={
+            normalizeOptionalString(approvalRequestPlan.approvalCopy) || 'Sin copy'
+          }
+          stateValue={
+            approvalRequestPlan.blockedByDefault
+              ? 'Bloqueado'
+              : approvalRequestPlan.requiresApproval
+                ? 'Pendiente'
+                : 'Revisable'
+          }
+          stateDetail={
+            approvalRequestPlan.forbiddenInCurrentTask
+              ? 'No se ejecuta en esta tarea.'
+              : 'Todavía no se ejecutó nada real.'
+          }
+          touchedAreas={
+            approvalPacketTouches.length > 0
+              ? approvalPacketTouches
+              : ['El alcance sigue siendo solo informativo por ahora.']
+          }
+          untouchedAreas={
+            approvalPacketWillNotTouch.length > 0
+              ? approvalPacketWillNotTouch
+              : ['No se toca nada real sin aprobación.']
+          }
+          validationItems={
+            approvalPacketValidations.length > 0
+              ? approvalPacketValidations
+              : ['Revisar alcance, riesgo y alternativa segura antes de aprobar.']
+          }
+          warningItems={
+            approvalPacketWarnings.length > 0
+              ? approvalPacketWarnings
+              : [
+                  normalizeOptionalString(approvalRequestPlan.explicitApprovalText) ||
+                    'No se ejecuta nada real en esta corrida.',
+                ]
+          }
+          footerMessage={
+            normalizeOptionalString(approvalRequestPlan.explicitApprovalText) ||
+            'No se ejecutó todavía. Primero hace falta revisar y aprobar el alcance.'
+          }
+          compact={compact}
+          busy={busy}
+          onPrepare={
+            approvalPacketAction && approvalPacketAction.safeToPrepare !== false
+              ? () => dispatchPrepareAction(approvalPacketAction)
+              : undefined
+          }
+        />
       ) : null}
+
+      <ProjectContinuationGroupsPanel
+        completedPhases={completedPhases}
+        pendingPhases={pendingPhases}
+        modulesAvailable={modulesAvailable}
+        riskItems={
+          continuationRisks.length > 0
+            ? continuationRisks
+            : ['No se toca nada real sin aprobación.']
+        }
+        blockerItems={continuationBlockers}
+        compact={compact}
+      />
 
       <div className="mt-4 space-y-4">
         {renderActionCards(
@@ -8643,278 +6644,21 @@ function ProjectContinuityCenterCard({
         )}
       </div>
 
-      {visibleOptions.length > 0 ? (
+      {visibleOptionItems.length > 0 ? (
         <div className="mt-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Opciones para seguir
-          </div>
-          <div className="mt-3 grid gap-3">
-            {visibleOptions.map((option) => {
-              const normalizedOptionId = normalizeModuleUiId(option.id)
-              const matchingModule =
-                manifestModules.find(
-                  (moduleEntry) =>
-                    normalizeModuleUiId(moduleEntry.id || moduleEntry.name) ===
-                    normalizedOptionId,
-                ) || null
-              const alreadyDone =
-                normalizeOptionalString(matchingModule?.status).toLocaleLowerCase() ===
-                'done'
-              const visualState = getContinuityVisualState({
-                safeToPrepare: option.safeToPrepare,
-                safeToMaterialize: option.safeToMaterialize,
-                requiresApproval: option.requiresApproval,
-                alreadyDone,
-              })
-              const isModuleOption =
-                normalizeOptionalString(option.targetStrategy).includes(
-                  'module-expansion',
-                ) || option.safeToMaterialize === true
-              const optionAction: ContinuationActionContract = {
-                id: normalizeOptionalString(option.id),
-                title:
-                  normalizeOptionalString(option.label) ||
-                  normalizeOptionalString(option.id) ||
-                  'Opción sin título',
-                description: normalizeOptionalString(option.description),
-                category: normalizeOptionalString(option.expansionType),
-                targetStrategy: normalizeOptionalString(option.targetStrategy),
-                safeToPrepare: option.safeToPrepare !== false,
-                safeToMaterialize: option.safeToMaterialize === true,
-                requiresApproval: option.requiresApproval === true,
-                blocked: option.blocked === true || alreadyDone,
-                blocker:
-                  alreadyDone
-                    ? 'Ya agregado al proyecto.'
-                    : normalizeOptionalString(option.blocker),
-                moduleId: isModuleOption ? normalizeOptionalString(option.id) : '',
-                riskLevel: option.riskLevel,
-                reason: normalizeOptionalString(option.reason),
-                targetFiles: option.expectedFiles || [],
-              }
-              const canPrepare = option.safeToPrepare !== false && !alreadyDone
-              const canMaterialize =
-                option.safeToMaterialize === true &&
-                !option.requiresApproval &&
-                !option.blocked &&
-                !alreadyDone
-
-              return (
-                <article
-                  key={option.id || option.label}
-                  className="rounded-2xl border border-white/8 bg-slate-950/45 px-4 py-4"
-                >
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="text-sm font-medium leading-6 text-slate-100">
-                          {normalizeOptionalString(option.label) || 'Opción sin título'}
-                        </div>
-                        {recommendedOptionId &&
-                        recommendedOptionId === normalizedOptionId ? (
-                          <span className="rounded-full border border-sky-300/20 bg-sky-300/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-100">
-                            Recomendado
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="mt-2 text-sm leading-6 text-slate-300">
-                        {normalizeOptionalString(option.description) ||
-                          'Sin descripción declarada.'}
-                      </div>
-                      <div className="mt-2 text-xs leading-5 text-slate-400">
-                        {normalizeOptionalString(option.reason) || visualState.detail}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <span
-                        className={joinClasses(
-                          'rounded-full border px-3 py-1 text-xs font-medium',
-                          getContinuityStateToneClass(visualState.tone),
-                        )}
-                      >
-                        {visualState.label}
-                      </span>
-                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-                        {getContinuationCategoryLabel(option.expansionType)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <MetricCard
-                      label="Cómo sigue"
-                      value={getOperatorStrategyLabel(option.targetStrategy)}
-                      detail={
-                        alreadyDone
-                          ? 'Ya existe en el proyecto y conviene revisarlo antes de volver a expandirlo.'
-                          : option.safeToMaterialize
-                            ? 'Tiene una ruta segura y revisable dentro del flujo actual.'
-                            : option.requiresApproval
-                              ? 'Necesita revision humana antes de salir del modo seguro.'
-                              : option.safeToPrepare === false
-                                ? 'Todavía no está lista para prepararse desde la interfaz.'
-                                : 'Se puede dejar lista como plan revisable sin ejecutar cambios todavía.'
-                      }
-                      tone="sky"
-                    />
-                    <MetricCard
-                      label="Riesgo"
-                      value={getRiskLabel(option.riskLevel)}
-                      detail={normalizeOptionalString(option.reason) || visualState.detail}
-                      tone={getRiskTone(option.riskLevel)}
-                    />
-                    <MetricCard
-                      label="Preparación"
-                      value={option.safeToPrepare === false ? 'No' : 'Si'}
-                      detail={
-                        option.requiresApproval
-                          ? 'Necesita revisión humana'
-                          : 'Puede dejar un plan revisable'
-                      }
-                      tone={option.safeToPrepare === false ? 'rose' : 'emerald'}
-                    />
-                    <MetricCard
-                      label="Materialización"
-                      value={option.safeToMaterialize ? 'Segura' : 'No disponible'}
-                      detail={
-                        alreadyDone
-                          ? 'Ya existe en el proyecto'
-                          : option.safeToMaterialize
-                            ? 'Existe una ruta local y revisable'
-                            : 'Todavía no tiene materializador seguro'
-                      }
-                      tone={
-                        alreadyDone
-                          ? 'sky'
-                          : option.safeToMaterialize
-                            ? 'emerald'
-                            : option.requiresApproval
-                              ? 'rose'
-                              : 'amber'
-                      }
-                    />
-                  </div>
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
-                    {canPrepare ? (
-                      <button
-                        type="button"
-                        onClick={() => dispatchPrepareAction(optionAction)}
-                        disabled={busy}
-                        className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-2.5 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-                      >
-                        {getPrepareActionButtonLabel({
-                          alreadyDone,
-                          requiresApproval: option.requiresApproval,
-                          blocked: option.blocked,
-                        })}
-                      </button>
-                    ) : null}
-                    {canMaterialize ? (
-                      <button
-                        type="button"
-                        onClick={() => dispatchMaterializeAction(optionAction)}
-                        disabled={busy}
-                        className="rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-2.5 text-sm font-medium text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-                      >
-                        Materializar módulo
-                      </button>
-                    ) : (
-                      <span className="text-sm leading-6 text-slate-400">
-                        {alreadyDone
-                          ? 'Ya agregado al proyecto.'
-                          : option.requiresApproval
-                            ? 'Requiere aprobación antes de salir del modo seguro.'
-                            : option.safeToMaterialize
-                              ? 'Listo para revisar antes de ejecutar.'
-                              : normalizeOptionalString(option.blocker) ||
-                                'Todavía no tiene materializador seguro.'}
-                      </span>
-                    )}
-                  </div>
-                </article>
-              )
-            })}
-          </div>
+          <ProjectContinuationActionSection
+            title="Opciones para seguir"
+            emptyCopy=""
+            items={visibleOptionItems}
+            busy={busy}
+          />
         </div>
       ) : null}
 
-      {visibleModules.length > 0 ? (
-        <div className="mt-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Módulos del proyecto
-          </div>
-          <div className="mt-3 grid gap-3 xl:grid-cols-2">
-            {visibleModules.map((moduleEntry) => {
-              const normalizedStatus = normalizeOptionalString(
-                moduleEntry.status,
-              ).toLocaleLowerCase()
-              const moduleTone =
-                normalizedStatus === 'done'
-                  ? 'sky'
-                  : normalizedStatus === 'blocked'
-                    ? 'rose'
-                    : normalizedStatus === 'partial' || normalizedStatus === 'planned'
-                      ? 'amber'
-                      : 'default'
-
-              return (
-                <article
-                  key={moduleEntry.id || moduleEntry.name}
-                  className="rounded-2xl border border-white/8 bg-slate-950/45 px-4 py-4"
-                >
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                      <div className="text-sm font-medium leading-6 text-slate-100">
-                        {normalizeOptionalString(moduleEntry.name) ||
-                          normalizeOptionalString(moduleEntry.id) ||
-                          'Modulo sin nombre'}
-                      </div>
-                      <div className="mt-1 text-xs leading-5 text-slate-400">
-                        {normalizeOptionalString(moduleEntry.addedAt) ||
-                          'Sin fecha declarada'}
-                      </div>
-                    </div>
-                    <span
-                      className={joinClasses(
-                        'rounded-full border px-3 py-1 text-xs font-medium',
-                        getContinuityStateToneClass(moduleTone),
-                      )}
-                    >
-                      {normalizedStatus === 'done'
-                        ? 'Ya agregado al proyecto'
-                        : getManifestPhaseStatusLabel(moduleEntry.status)}
-                    </span>
-                  </div>
-                  <div className="mt-4 grid gap-3 md:grid-cols-2">
-                    <MetricCard
-                      label="Capas"
-                      value={
-                        normalizeOptionalStringArray(moduleEntry.layers).length > 0
-                          ? `${normalizeOptionalStringArray(moduleEntry.layers).length} capa(s)`
-                          : 'Sin capas'
-                      }
-                      detail={
-                        normalizeOptionalStringArray(moduleEntry.layers)[0] || 'Sin detalle'
-                      }
-                    />
-                    <MetricCard
-                      label="Archivos"
-                      value={
-                        normalizeOptionalStringArray(moduleEntry.files).length > 0
-                          ? `${normalizeOptionalStringArray(moduleEntry.files).length} archivo(s)`
-                          : 'Sin archivos'
-                      }
-                      detail={
-                        normalizeOptionalStringArray(moduleEntry.files)[0] || 'Sin detalle'
-                      }
-                      tone="sky"
-                    />
-                  </div>
-                </article>
-              )
-            })}
-          </div>
-        </div>
-      ) : null}
+      <ProjectContinuationModulesSection
+        title="Módulos del proyecto"
+        items={visibleModuleItems}
+      />
 
       {modulesBlocked.length > 0 ? (
         <div className="mt-4">
@@ -8924,288 +6668,6 @@ function ProjectContinuityCenterCard({
             compact={compact}
             tone="rose"
           />
-        </div>
-      ) : null}
-    </article>
-  )
-}
-
-function ProjectBlueprintCard({
-  blueprint,
-  questionPolicy,
-  compact = false,
-}: {
-  blueprint: ProjectBlueprintContract
-  questionPolicy?: QuestionPolicyContract | null
-  compact?: boolean
-}) {
-  const stackProfile = blueprint.stackProfile || null
-  const stackItems = [
-    stackProfile?.frontend
-      ? `Frontend: ${stackProfile.frontend}`
-      : '',
-    stackProfile?.backend ? `Backend: ${stackProfile.backend}` : '',
-    stackProfile?.database ? `Base de datos: ${stackProfile.database}` : '',
-    stackProfile?.apiStyle ? `API: ${stackProfile.apiStyle}` : '',
-    stackProfile?.auth ? `Auth: ${stackProfile.auth}` : '',
-    stackProfile?.styling ? `Styling: ${stackProfile.styling}` : '',
-    stackProfile?.testing ? `Testing: ${stackProfile.testing}` : '',
-    stackProfile?.packageManager
-      ? `Package manager: ${stackProfile.packageManager}`
-      : '',
-    stackProfile?.runtime ? `Runtime: ${stackProfile.runtime}` : '',
-  ].filter(Boolean)
-  const visibleStackItems = compact ? stackItems.slice(0, 5) : stackItems
-  const visibleIntegrations = compact
-    ? (blueprint.integrations || []).slice(0, 3)
-    : blueprint.integrations || []
-  const visiblePhasePlan = compact
-    ? (blueprint.phasePlan || []).slice(0, 3)
-    : blueprint.phasePlan || []
-
-  return (
-    <article className="rounded-3xl border border-emerald-300/15 bg-emerald-300/[0.06] p-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Blueprint del proyecto
-          </div>
-          <div className="mt-2 text-sm leading-6 text-slate-400">
-            Esta lectura resume el tipo de producto, el stack recomendado, los módulos
-            y las decisiones de arquitectura que JEFE está usando para planificar.
-          </div>
-          <div className="mt-2 text-xs leading-5 text-slate-500">
-            {normalizeOptionalString(blueprint.intent) ||
-              'Sin intención resumida disponible.'}
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-            Arquitectura dinámica
-          </span>
-          <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-medium text-emerald-100">
-            {getDeliveryLevelLabel(blueprint.deliveryLevel)}
-          </span>
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Tipo de producto"
-          value={normalizeOptionalString(blueprint.productType) || 'No definido'}
-          detail={normalizeOptionalString(blueprint.domain) || 'Sin dominio declarado'}
-          tone="emerald"
-        />
-        <MetricCard
-          label="Delivery level"
-          value={getDeliveryLevelLabel(blueprint.deliveryLevel)}
-          detail={getScalableDeliveryPlanTypeLabel(blueprint.deliveryLevel)}
-          tone={getDeliveryLevelTone(blueprint.deliveryLevel)}
-        />
-        <MetricCard
-          label="Confianza"
-          value={getBlueprintConfidenceLabel(blueprint.confidence)}
-          detail={getStackProfileSummary(blueprint)}
-          tone="sky"
-        />
-        <MetricCard
-          label="Riesgo"
-          value={getRiskLabel(blueprint.riskLevel)}
-          detail={`Sensibilidad: ${getSensitivityLabel(blueprint.dataSensitivity)}`}
-          tone={getRiskTone(blueprint.riskLevel)}
-        />
-      </div>
-
-      <div className="mt-4 grid gap-3 xl:grid-cols-2">
-        <ProductArchitectureGroup
-          title="Roles"
-          items={blueprint.roles}
-          compact={compact}
-          tone="sky"
-        />
-        <ProductArchitectureGroup
-          title="Módulos"
-          items={blueprint.modules}
-          compact={compact}
-          tone="emerald"
-        />
-        <ProductArchitectureGroup
-          title="Entidades"
-          items={blueprint.entities}
-          compact={compact}
-        />
-        <ProductArchitectureGroup
-          title="Flujos principales"
-          items={blueprint.coreFlows}
-          compact={compact}
-        />
-      </div>
-
-      <div className="mt-4 rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-          Stack recomendado
-        </div>
-        <div className="mt-3 grid gap-3 xl:grid-cols-2">
-          {visibleStackItems.length > 0 ? (
-            visibleStackItems.map((item) => (
-              <div
-                key={item}
-                className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3 text-sm leading-6 text-slate-100"
-              >
-                {item}
-              </div>
-            ))
-          ) : (
-            <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300 xl:col-span-2">
-              El Cerebro todavía no dejó un stack profile estructurado.
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-3 xl:grid-cols-2">
-        <ProductArchitectureGroup
-          title="Supuestos"
-          items={blueprint.assumptions}
-          compact={compact}
-        />
-        <ProductArchitectureGroup
-          title="Decisiones delegadas"
-          items={blueprint.delegatedDecisions || questionPolicy?.delegatedDecisions}
-          compact={compact}
-          tone="emerald"
-        />
-        <ProductArchitectureGroup
-          title="Preguntas bloqueantes"
-          items={blueprint.blockingQuestions || questionPolicy?.blockingQuestions}
-          compact={compact}
-          tone="amber"
-        />
-        <ProductArchitectureGroup
-          title="Aprobaciones futuras"
-          items={blueprint.approvalRequiredLater}
-          compact={compact}
-          tone="rose"
-        />
-      </div>
-
-      <div className="mt-4 grid gap-3 xl:grid-cols-2">
-        <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Política de preguntas
-          </div>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <MetricCard
-              label="Modo"
-              value={getQuestionPolicyModeLabel(questionPolicy?.mode)}
-              detail={normalizeOptionalString(questionPolicy?.reason) || 'Sin razón declarada'}
-              tone="amber"
-            />
-            <MetricCard
-              label="Antes de planificar"
-              value={questionPolicy?.shouldAskBeforePlanning ? 'Preguntar' : 'Seguir'}
-              detail={
-                questionPolicy?.shouldAskBeforeMaterialization
-                  ? 'También podría frenar antes de materializar'
-                  : 'No hace falta bloquear la materialización por ahora'
-              }
-              tone={questionPolicy?.shouldAskBeforePlanning ? 'amber' : 'emerald'}
-            />
-          </div>
-          {normalizeOptionalStringArray(questionPolicy?.optionalQuestions).length > 0 ? (
-            <div className="mt-4">
-              <ProductArchitectureGroup
-                title="Preguntas opcionales"
-                items={questionPolicy?.optionalQuestions}
-                compact={compact}
-              />
-            </div>
-          ) : null}
-        </article>
-
-        <article className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Fases propuestas
-          </div>
-          <div className="mt-3 grid gap-3">
-            {visiblePhasePlan.length > 0 ? (
-              visiblePhasePlan.map((phaseEntry) => (
-                <div
-                  key={`${phaseEntry.phase || 'phase'}-${phaseEntry.goal || 'goal'}`}
-                  className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3"
-                >
-                  <div className="text-sm font-medium leading-6 text-slate-100">
-                    {phaseEntry.phase || 'Fase sin nombre'}
-                  </div>
-                  <div className="mt-1 text-xs leading-5 text-slate-400">
-                    {phaseEntry.goal || 'Sin objetivo declarado'}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    <span>{getDeliveryLevelLabel(phaseEntry.deliveryLevel)}</span>
-                    <span>
-                      {phaseEntry.executableNow ? 'ejecutable ahora' : 'no ejecutable todavía'}
-                    </span>
-                    <span>
-                      {phaseEntry.approvalRequired
-                        ? 'requiere aprobación'
-                        : 'sin aprobación previa'}
-                    </span>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
-                El blueprint todavía no dejó fases estructuradas.
-              </div>
-            )}
-          </div>
-        </article>
-      </div>
-
-      <div className="mt-4 grid gap-3 xl:grid-cols-2">
-        <ProductArchitectureGroup
-          title="Exclusiones explícitas"
-          items={blueprint.explicitExclusions}
-          compact={compact}
-          tone="rose"
-        />
-        <ProductArchitectureGroup
-          title="Criterios de éxito"
-          items={blueprint.successCriteria}
-          compact={compact}
-          tone="emerald"
-        />
-      </div>
-
-      {visibleIntegrations.length > 0 ? (
-        <div className="mt-4 rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Integraciones consideradas
-          </div>
-          <div className="mt-3 grid gap-3 xl:grid-cols-2">
-            {visibleIntegrations.map((integration) => (
-              <div
-                key={`${integration.name || 'integration'}-${integration.type || 'type'}`}
-                className="rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-3"
-              >
-                <div className="text-sm font-medium leading-6 text-slate-100">
-                  {integration.name || 'Integración sin nombre'}
-                </div>
-                <div className="mt-1 text-xs leading-5 text-slate-400">
-                  {integration.reason || 'Sin motivo declarado'}
-                </div>
-                <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  <span>{integration.type || 'tipo no declarado'}</span>
-                  <span>{integration.requiredNow ? 'requerida ahora' : 'no requerida ahora'}</span>
-                  <span>
-                    {integration.approvalRequired
-                      ? 'requiere aprobación'
-                      : 'sin aprobación previa'}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       ) : null}
     </article>
@@ -11328,151 +8790,6 @@ const getPlannerStrategyLabel = (value: unknown) => {
   return normalizeOptionalString(value).replace(/-/g, ' ')
 }
 
-const DELIVERY_LEVEL_LABELS: Record<string, string> = {
-  'safe-first-delivery': 'Primera entrega segura',
-  'frontend-project': 'Frontend project',
-  'fullstack-local': 'Fullstack local',
-  'monorepo-local': 'Monorepo local',
-  'infra-local-plan': 'Infra local plan',
-}
-
-const getDeliveryLevelLabel = (value: unknown) => {
-  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
-
-  if (!normalizedValue) {
-    return 'No definido'
-  }
-
-  return (
-    DELIVERY_LEVEL_LABELS[normalizedValue] ||
-    normalizeOptionalString(value).replace(/-/g, ' ')
-  )
-}
-
-const getDeliveryLevelTone = (
-  value: unknown,
-): 'default' | 'sky' | 'emerald' | 'amber' | 'rose' => {
-  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
-
-  if (normalizedValue === 'infra-local-plan') {
-    return 'amber'
-  }
-
-  if (normalizedValue === 'fullstack-local') {
-    return 'emerald'
-  }
-
-  if (
-    normalizedValue === 'frontend-project' ||
-    normalizedValue === 'monorepo-local'
-  ) {
-    return 'sky'
-  }
-
-  return 'default'
-}
-
-const getScalableDeliveryPlanTypeLabel = (value: unknown) => {
-  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
-
-  if (!normalizedValue) {
-    return 'Plan escalable local'
-  }
-
-  if (normalizedValue === 'frontend-project') {
-    return 'Proyecto frontend local'
-  }
-
-  if (normalizedValue === 'fullstack-local') {
-    return 'Proyecto fullstack local'
-  }
-
-  if (normalizedValue === 'monorepo-local') {
-    return 'Monorepo local'
-  }
-
-  if (normalizedValue === 'infra-local-plan') {
-    return 'Infraestructura local planificada'
-  }
-
-  return 'Plan escalable local'
-}
-
-const getScalableDeliverySummary = (plan?: ScalableDeliveryPlanContract | null) => {
-  if (!plan) {
-    return 'JEFE detectó una entrega escalable y la dejó en revisión manual.'
-  }
-
-  const firstStructureEntry = normalizeOptionalStringArray(plan.targetStructure)[0]
-  const firstDirectoryEntry = normalizeOptionalStringArray(plan.directories)[0]
-  const firstFileEntry = normalizeOptionalString(plan.filesToCreate?.[0]?.path)
-
-  return (
-    firstStructureEntry ||
-    firstDirectoryEntry ||
-    firstFileEntry ||
-    'JEFE detectó una entrega escalable y la dejó en revisión manual.'
-  )
-}
-
-const getBlueprintConfidenceLabel = (value: unknown) => {
-  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
-
-  if (normalizedValue === 'high') {
-    return 'Alta'
-  }
-
-  if (normalizedValue === 'medium') {
-    return 'Media'
-  }
-
-  if (normalizedValue === 'low') {
-    return 'Baja'
-  }
-
-  return normalizeOptionalString(value) || 'No definida'
-}
-
-const getQuestionPolicyModeLabel = (value: unknown) => {
-  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
-
-  if (normalizedValue === 'brain-decides-missing') {
-    return 'El Cerebro decide faltantes menores'
-  }
-
-  if (normalizedValue === 'user-will-contribute') {
-    return 'El usuario puede aportar definiciones'
-  }
-
-  if (normalizedValue === 'ask-only-if-blocking') {
-    return 'Preguntar solo si bloquea'
-  }
-
-  return normalizeOptionalString(value) || 'No definida'
-}
-
-const getSensitivityLabel = (value: unknown) => {
-  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
-
-  if (normalizedValue === 'high') {
-    return 'Alta'
-  }
-
-  if (normalizedValue === 'medium') {
-    return 'Media'
-  }
-
-  if (normalizedValue === 'low') {
-    return 'Baja'
-  }
-
-  if (normalizedValue === 'none') {
-    return 'Nula'
-  }
-
-  return normalizeOptionalString(value) || 'No definida'
-}
-
 const getRiskLabel = (value: unknown) => {
   const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
 
@@ -11509,22 +8826,6 @@ const getRiskTone = (
   }
 
   return 'default'
-}
-
-const getStackProfileSummary = (blueprint?: ProjectBlueprintContract | null) => {
-  if (!blueprint?.stackProfile) {
-    return 'Sin stack recomendado'
-  }
-
-  return (
-    [
-      normalizeOptionalString(blueprint.stackProfile.frontend),
-      normalizeOptionalString(blueprint.stackProfile.backend),
-      normalizeOptionalString(blueprint.stackProfile.database),
-    ]
-      .filter(Boolean)
-      .join(' ? ') || 'Sin stack recomendado'
-  )
 }
 
 const getTechnicalDiagnosticLabel = (value: unknown, fallback = 'No disponible') => {
