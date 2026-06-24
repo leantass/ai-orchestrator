@@ -1,5 +1,6 @@
 const {
   buildGenericSafeFirstDeliveryMaterializationPlan,
+  buildLocalMaterializationTask,
 } = require('./local-deterministic-executor.cjs')
 
 function extractLocalMaterializationPlan(value) {
@@ -38,6 +39,46 @@ function buildDerivedLocalMaterializationPlan({
     businessSector,
     businessSectorLabel,
     safeFirstDeliveryMaterialization,
+  })
+}
+
+function buildLocalDeterministicTaskFromPlan({
+  plan,
+  workspacePath,
+  requestId,
+  instruction,
+  brainStrategy,
+  businessSector,
+  businessSectorLabel,
+  creativeDirection,
+  reusableArtifactLookup,
+  reusableArtifactsFound,
+  reuseDecision,
+  reuseReason,
+  reusedArtifactIds,
+  reuseMode,
+  reuseMaterialization,
+  materializationPlanSource,
+  expectedTargetPaths,
+}) {
+  return buildLocalMaterializationTask({
+    plan,
+    workspacePath,
+    requestId,
+    instruction,
+    brainStrategy,
+    businessSector,
+    businessSectorLabel,
+    creativeDirection,
+    reusableArtifactLookup,
+    reusableArtifactsFound,
+    reuseDecision,
+    reuseReason,
+    reusedArtifactIds,
+    reuseMode,
+    reuseMaterialization,
+    materializationPlanSource,
+    expectedTargetPaths,
   })
 }
 
@@ -394,6 +435,7 @@ function buildMaterializeProjectPhaseLocalFailureResponse({
 module.exports = {
   extractLocalMaterializationPlan,
   buildDerivedLocalMaterializationPlan,
+  buildLocalDeterministicTaskFromPlan,
   extractMaterializationPlanTargetPaths,
   isMaterializationPlanWithinAllowedTargetPaths,
   buildMaterializeSafeFirstDeliveryLocalPlanSkipReason,

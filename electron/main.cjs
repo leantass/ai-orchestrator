@@ -28,6 +28,7 @@ const {
 const {
   extractLocalMaterializationPlan,
   buildDerivedLocalMaterializationPlan,
+  buildLocalDeterministicTaskFromPlan,
   buildMaterializeSafeFirstDeliveryLocalPlanSkipReason,
   buildMaterializeFrontendProjectLocalPlanSkipReason,
   buildMaterializeFullstackLocalPlanSkipReason,
@@ -4869,46 +4870,6 @@ function attachExecutorRuntimeMetadata(response, runtimeMetadata) {
         : {}),
     },
   }
-}
-
-function buildLocalDeterministicTaskFromPlan({
-  plan,
-  workspacePath,
-  requestId,
-  instruction,
-  brainStrategy,
-  businessSector,
-  businessSectorLabel,
-  creativeDirection,
-  reusableArtifactLookup,
-  reusableArtifactsFound,
-  reuseDecision,
-  reuseReason,
-  reusedArtifactIds,
-  reuseMode,
-  reuseMaterialization,
-  materializationPlanSource,
-  expectedTargetPaths,
-}) {
-  return buildLocalMaterializationTask({
-    plan,
-    workspacePath,
-    requestId,
-    instruction,
-    brainStrategy,
-    businessSector,
-    businessSectorLabel,
-    creativeDirection,
-    reusableArtifactLookup,
-    reusableArtifactsFound,
-    reuseDecision,
-    reuseReason,
-    reusedArtifactIds,
-    reuseMode,
-    reuseMaterialization,
-    materializationPlanSource,
-    expectedTargetPaths,
-  })
 }
 
 function mergeExecutorMaterializationResponse({
