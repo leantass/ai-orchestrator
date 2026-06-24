@@ -16,6 +16,10 @@ const {
   normalizeEventStringList: normalizeEventStringListHelper,
   normalizeEventStringValue: normalizeEventStringValueHelper,
 } = require('./main-normalizers.cjs')
+const {
+  hasMarkedExecutionEventRequestId: hasMarkedExecutionEventRequestIdHelper,
+  markExecutionEventRequestId: markExecutionEventRequestIdHelper,
+} = require('./main-event-request-ids.cjs')
 
 function isElectronExecutablePath(executablePath) {
   if (typeof executablePath !== 'string' || !executablePath.trim()) {
@@ -4642,37 +4646,15 @@ function normalizeEventStringList(entries) {
 }
 
 function hasMarkedExecutionEventRequestId(eventSet, requestId) {
-  const normalizedRequestId = normalizeEventStringValue(requestId)
-
-  if (!normalizedRequestId) {
-    return false
-  }
-
-  return eventSet.has(normalizedRequestId)
+  return hasMarkedExecutionEventRequestIdHelper(eventSet, requestId)
 }
 
 function markExecutionEventRequestId(eventSet, requestId) {
-  const normalizedRequestId = normalizeEventStringValue(requestId)
-
-  if (!normalizedRequestId) {
-    return true
-  }
-
-  if (eventSet.has(normalizedRequestId)) {
-    return false
-  }
-
-  eventSet.add(normalizedRequestId)
-
-  if (eventSet.size > MAX_EMITTED_EXECUTION_FINAL_EVENT_IDS) {
-    const oldestRequestId = eventSet.values().next().value
-
-    if (oldestRequestId) {
-      eventSet.delete(oldestRequestId)
-    }
-  }
-
-  return true
+  return markExecutionEventRequestIdHelper(
+    eventSet,
+    requestId,
+    MAX_EMITTED_EXECUTION_FINAL_EVENT_IDS,
+  )
 }
 
 function emitExecutionFinishedEventBestEffort({
