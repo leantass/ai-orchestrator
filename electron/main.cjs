@@ -20,6 +20,11 @@ const {
   hasMarkedExecutionEventRequestId: hasMarkedExecutionEventRequestIdHelper,
   markExecutionEventRequestId: markExecutionEventRequestIdHelper,
 } = require('./main-event-request-ids.cjs')
+const {
+  resolveExecutorMode,
+  resolveExecutorBridgeMode,
+  resolveExecutorCommandValue,
+} = require('./main-executor-runtime-config.cjs')
 
 function isElectronExecutablePath(executablePath) {
   if (typeof executablePath !== 'string' || !executablePath.trim()) {
@@ -4826,48 +4831,6 @@ function emitExecutionFailedEventBestEffort({
 
 function getArtifactMemoryUserDataPath() {
   return app.getPath('userData')
-}
-
-function buildDefaultExecutorCommand() {
-  return `node "${defaultExecutorBridgePath}"`
-}
-
-function normalizeConfiguredRuntimeMode(value, validModes) {
-  if (typeof value !== 'string' || !value.trim()) {
-    return ''
-  }
-
-  const normalizedValue = value.trim().toLocaleLowerCase()
-
-  return validModes.has(normalizedValue) ? normalizedValue : ''
-}
-
-function resolveExecutorMode() {
-  const configuredMode = normalizeConfiguredRuntimeMode(
-    process.env.AI_ORCHESTRATOR_EXECUTOR_MODE,
-    VALID_EXECUTOR_MODES,
-  )
-
-  return {
-    mode: configuredMode || 'command',
-    source: configuredMode ? 'env' : 'default',
-  }
-}
-
-function resolveExecutorBridgeMode() {
-  const configuredMode = normalizeConfiguredRuntimeMode(
-    process.env.AI_ORCHESTRATOR_BRIDGE_MODE,
-    VALID_BRIDGE_MODES,
-  )
-
-  return {
-    mode: configuredMode || 'codex',
-    source: configuredMode ? 'env' : 'default',
-  }
-}
-
-function resolveExecutorCommandValue() {
-  return process.env.AI_ORCHESTRATOR_EXECUTOR_COMMAND?.trim() || buildDefaultExecutorCommand()
 }
 
 function attachExecutorRuntimeMetadata(response, runtimeMetadata) {
@@ -60619,7 +60582,10 @@ function runCommandExecutorTask({
       context: executorContext || context,
       executionScope,
     })
-  const bridgeModeResolution = resolveExecutorBridgeMode()
+  const bridgeModeResolution = resolveExecutorBridgeMode(
+    process.env.AI_ORCHESTRATOR_BRIDGE_MODE,
+    VALID_BRIDGE_MODES,
+  )
   const usesCodexBrainExecutor = bridgeModeResolution.mode === 'codex'
   const materialProgressTimeoutMs =
     usesStructuredMaterializationIntent || usesCodexBrainExecutor
@@ -60628,7 +60594,10 @@ function runCommandExecutorTask({
           EXECUTOR_TIMEOUT_MS + 60000,
         )
       : EXECUTOR_MATERIAL_PROGRESS_TIMEOUT_MS
-  const executorCommandValue = resolveExecutorCommandValue()
+  const executorCommandValue = resolveExecutorCommandValue(
+    process.env.AI_ORCHESTRATOR_EXECUTOR_COMMAND,
+    defaultExecutorBridgePath,
+  )
   const parsedExecutorCommand = parseExecutorCommand(executorCommandValue)
 
   if (!parsedExecutorCommand) {
@@ -61416,10 +61385,21 @@ function runExecutorTask({
   requestId,
   emitEvent,
 }) {
-  const executorModeResolution = resolveExecutorMode()
-  const bridgeModeResolution = resolveExecutorBridgeMode()
+  const executorModeResolution = resolveExecutorMode(
+    process.env.AI_ORCHESTRATOR_EXECUTOR_MODE,
+    VALID_EXECUTOR_MODES,
+  )
+  const bridgeModeResolution = resolveExecutorBridgeMode(
+    process.env.AI_ORCHESTRATOR_BRIDGE_MODE,
+    VALID_BRIDGE_MODES,
+  )
   const executorCommandValue =
-    executorModeResolution.mode === 'command' ? resolveExecutorCommandValue() : ''
+    executorModeResolution.mode === 'command'
+      ? resolveExecutorCommandValue(
+          process.env.AI_ORCHESTRATOR_EXECUTOR_COMMAND,
+          defaultExecutorBridgePath,
+        )
+      : ''
   const runtimeMetadata = {
     executorMode: executorModeResolution.mode,
     executorModeSource: executorModeResolution.source,
@@ -61569,8 +61549,14 @@ function runExecutorTask({
 }
 
 ipcMain.handle('ai-orchestrator:get-runtime-status', () => {
-  const executorModeResolution = resolveExecutorMode()
-  const bridgeModeResolution = resolveExecutorBridgeMode()
+  const executorModeResolution = resolveExecutorMode(
+    process.env.AI_ORCHESTRATOR_EXECUTOR_MODE,
+    VALID_EXECUTOR_MODES,
+  )
+  const bridgeModeResolution = resolveExecutorBridgeMode(
+    process.env.AI_ORCHESTRATOR_BRIDGE_MODE,
+    VALID_BRIDGE_MODES,
+  )
 
   return {
     ok: true,
