@@ -32,6 +32,10 @@ const {
   buildMaterializeFrontendProjectLocalPlanSkipReason,
   buildMaterializeFullstackLocalPlanSkipReason,
   buildMaterializeProjectPhaseLocalPlanSkipReason,
+  buildMaterializeSafeFirstDeliveryLocalFailureResponse,
+  buildMaterializeFrontendProjectLocalFailureResponse,
+  buildMaterializeFullstackLocalFailureResponse,
+  buildMaterializeProjectPhaseLocalFailureResponse,
 } = require('./main-materialization-plan-helpers.cjs')
 
 function isElectronExecutablePath(executablePath) {
@@ -4863,162 +4867,6 @@ function attachExecutorRuntimeMetadata(response, runtimeMetadata) {
       ...(runtimeMetadata.executorCommand
         ? { executorCommand: runtimeMetadata.executorCommand }
         : {}),
-    },
-  }
-}
-
-function buildMaterializeSafeFirstDeliveryLocalFailureResponse({
-  requestId,
-  instruction,
-  decisionKey,
-  executionScope,
-  reason,
-}) {
-  const allowedTargetPaths = summarizeUniqueExecutorStrings(
-    executionScope?.allowedTargetPaths,
-    12,
-  )
-
-  return {
-    ok: false,
-    ...(requestId ? { requestId } : {}),
-    instruction,
-    error:
-      'No se pudo preparar la materializacion segura local porque el alcance permitido es invalido o incompleto.',
-    resultPreview:
-      'La materializacion segura local no pudo iniciarse por un alcance permitido invalido.',
-    failureType: 'invalid_local_safe_first_delivery_scope',
-    reasoningLayer: 'local-rules',
-    materializationLayer: 'local-deterministic',
-    details: {
-      decisionKey,
-      strategy: decisionKey,
-      executionMode: 'executor',
-      currentAction: 'build-local-materialization-plan',
-      currentTargetPath: allowedTargetPaths[0] || undefined,
-      createdPaths: [],
-      touchedPaths: [],
-      hasMaterialProgress: false,
-      materialState: 'local-deterministic-plan-invalid',
-      allowedTargetPaths,
-      errorMessage: reason,
-    },
-  }
-}
-
-function buildMaterializeFrontendProjectLocalFailureResponse({
-  requestId,
-  instruction,
-  decisionKey,
-  executionScope,
-  reason,
-}) {
-  const allowedTargetPaths = summarizeUniqueExecutorStrings(
-    executionScope?.allowedTargetPaths,
-    12,
-  )
-
-  return {
-    ok: false,
-    ...(requestId ? { requestId } : {}),
-    instruction,
-    error:
-      'No se pudo preparar la materializacion frontend local porque el alcance permitido es invalido o el plan excede los targets permitidos.',
-    resultPreview:
-      'La materializacion frontend local no pudo iniciarse por un alcance permitido invalido o porque el plan excede los targets permitidos.',
-    failureType: 'invalid_local_frontend_project_scope',
-    reasoningLayer: 'local-rules',
-    materializationLayer: 'local-deterministic',
-    details: {
-      decisionKey,
-      strategy: decisionKey,
-      executionMode: 'executor',
-      currentAction: 'build-local-materialization-plan',
-      currentTargetPath: allowedTargetPaths[0] || undefined,
-      createdPaths: [],
-      touchedPaths: [],
-      hasMaterialProgress: false,
-      materialState: 'local-deterministic-plan-invalid',
-      allowedTargetPaths,
-      errorMessage: reason,
-    },
-  }
-}
-
-function buildMaterializeFullstackLocalFailureResponse({
-  requestId,
-  instruction,
-  decisionKey,
-  executionScope,
-  reason,
-}) {
-  const allowedTargetPaths = summarizeUniqueExecutorStrings(
-    executionScope?.allowedTargetPaths,
-    24,
-  )
-
-  return {
-    ok: false,
-    ...(requestId ? { requestId } : {}),
-    instruction,
-    error:
-      'No se pudo preparar la materializacion fullstack local porque el alcance permitido es invalido o el plan excede los targets permitidos.',
-    resultPreview:
-      'La materializacion fullstack local no pudo iniciarse por un alcance permitido invalido o porque el plan excede los targets permitidos.',
-    failureType: 'invalid_local_fullstack_local_scope',
-    reasoningLayer: 'local-rules',
-    materializationLayer: 'local-deterministic',
-    details: {
-      decisionKey,
-      strategy: decisionKey,
-      executionMode: 'executor',
-      currentAction: 'build-local-materialization-plan',
-      currentTargetPath: allowedTargetPaths[0] || undefined,
-      createdPaths: [],
-      touchedPaths: [],
-      hasMaterialProgress: false,
-      materialState: 'local-deterministic-plan-invalid',
-      allowedTargetPaths,
-      errorMessage: reason,
-    },
-  }
-}
-
-function buildMaterializeProjectPhaseLocalFailureResponse({
-  requestId,
-  instruction,
-  decisionKey,
-  executionScope,
-  reason,
-}) {
-  const allowedTargetPaths = summarizeUniqueExecutorStrings(
-    executionScope?.allowedTargetPaths,
-    24,
-  )
-
-  return {
-    ok: false,
-    ...(requestId ? { requestId } : {}),
-    instruction,
-    error:
-      'No se pudo preparar la materializacion de la fase segura porque el alcance permitido es invalido o el plan excede los targets permitidos.',
-    resultPreview:
-      'La materializacion de la fase segura no pudo iniciarse por un alcance permitido invalido o porque el plan excede los targets permitidos.',
-    failureType: 'invalid_local_project_phase_scope',
-    reasoningLayer: 'local-rules',
-    materializationLayer: 'local-deterministic',
-    details: {
-      decisionKey,
-      strategy: decisionKey,
-      executionMode: 'executor',
-      currentAction: 'build-local-project-phase-materialization',
-      currentTargetPath: allowedTargetPaths[0] || undefined,
-      createdPaths: [],
-      touchedPaths: [],
-      hasMaterialProgress: false,
-      materialState: 'local-deterministic-plan-invalid',
-      allowedTargetPaths,
-      errorMessage: reason,
     },
   }
 }
@@ -62858,13 +62706,21 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
             isMaterializationPlanWithinAllowedTargetPaths,
           })
         const localPlanFailureResponseBuilder =
-          requiresLocalProjectPhaseMaterialization
-            ? buildMaterializeProjectPhaseLocalFailureResponse
-            : requiresLocalFullstackLocalMaterialization
-              ? buildMaterializeFullstackLocalFailureResponse
-              : requiresLocalFrontendProjectMaterialization
-                ? buildMaterializeFrontendProjectLocalFailureResponse
-                : buildMaterializeSafeFirstDeliveryLocalFailureResponse
+          ({ requestId, instruction, decisionKey, executionScope, reason }) =>
+            (requiresLocalProjectPhaseMaterialization
+              ? buildMaterializeProjectPhaseLocalFailureResponse
+              : requiresLocalFullstackLocalMaterialization
+                ? buildMaterializeFullstackLocalFailureResponse
+                : requiresLocalFrontendProjectMaterialization
+                  ? buildMaterializeFrontendProjectLocalFailureResponse
+                  : buildMaterializeSafeFirstDeliveryLocalFailureResponse)({
+              requestId,
+              instruction,
+              decisionKey,
+              executionScope,
+              reason,
+              summarizeUniqueExecutorStrings,
+            })
         const resolvedMaterializationPlan =
           materializationPlan || derivedMaterializationPlan
 
