@@ -41,6 +41,7 @@ const {
   buildMaterializeFullstackLocalFailureResponse,
   buildMaterializeProjectPhaseLocalFailureResponse,
 } = require('./main-materialization-plan-helpers.cjs')
+const { buildExecutionEventEmitters } = require('./main-execution-events.cjs')
 
 function isElectronExecutablePath(executablePath) {
   if (typeof executablePath !== 'string' || !executablePath.trim()) {
@@ -229,6 +230,10 @@ const EXECUTION_EVENT_CHANNEL = 'ai-orchestrator:execution-event'
 const EXECUTION_COMPLETE_CHANNEL = 'ai-orchestrator:execution-complete'
 const VALID_EXECUTOR_MODES = new Set(['command', 'mock'])
 const VALID_BRIDGE_MODES = new Set(['codex', 'mock'])
+const { emitExecutionEvent, emitExecutionCompleteEvent } = buildExecutionEventEmitters({
+  executionEventChannel: EXECUTION_EVENT_CHANNEL,
+  executionCompleteChannel: EXECUTION_COMPLETE_CHANNEL,
+})
 const executorProgressSnapshots = new Map()
 const executorRecoveryHistories = new Map()
 const emittedExecutionFailedRequestIds = new Set()
@@ -4895,36 +4900,6 @@ function toSerializableIpcResult(value, fallbackErrorMessage) {
         ),
       ],
     }
-  }
-}
-
-function emitExecutionEvent(webContents, eventPayload) {
-  if (!webContents || webContents.isDestroyed()) {
-    return
-  }
-
-  try {
-    webContents.send(
-      EXECUTION_EVENT_CHANNEL,
-      JSON.parse(JSON.stringify(eventPayload)),
-    )
-  } catch {
-    // Ignora errores de emisión para no romper la respuesta principal.
-  }
-}
-
-function emitExecutionCompleteEvent(webContents, eventPayload) {
-  if (!webContents || webContents.isDestroyed()) {
-    return
-  }
-
-  try {
-    webContents.send(
-      EXECUTION_COMPLETE_CHANNEL,
-      JSON.parse(JSON.stringify(eventPayload)),
-    )
-  } catch {
-    // Ignora errores de emision para no romper la respuesta principal.
   }
 }
 
