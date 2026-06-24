@@ -251,6 +251,58 @@ async function resolveReusableArtifactHtmlEntry(artifact) {
   return ''
 }
 
+async function captureReusableArtifactPreview({
+  artifact,
+  userDataPath,
+  BrowserWindow,
+  pathToFileURL,
+}) {
+  const htmlEntryPath = await resolveReusableArtifactHtmlEntry(artifact)
+
+  if (!htmlEntryPath) {
+    return {
+      status: 'unavailable',
+      source: 'capture-page',
+      errorMessage:
+        'No se pudo resolver un index.html local para generar la preview real.',
+    }
+  }
+
+  const { previewsDir } = await ensureArtifactMemoryStorage({ userDataPath })
+  const previewPath = path.join(previewsDir, `${artifact.id}.png`)
+  const previewWindow = new BrowserWindow({
+    width: 1280,
+    height: 900,
+    show: false,
+    backgroundColor: '#0b1120',
+  })
+
+  try {
+    await previewWindow.loadURL(pathToFileURL(htmlEntryPath).href)
+    await new Promise((resolve) => setTimeout(resolve, 450))
+    const image = await previewWindow.webContents.capturePage()
+    await fs.promises.writeFile(previewPath, image.toPNG())
+
+    return {
+      status: 'generated',
+      imagePath: previewPath,
+      generatedAt: new Date().toISOString(),
+      source: 'capture-page',
+    }
+  } catch (error) {
+    return {
+      status: 'failed',
+      generatedAt: new Date().toISOString(),
+      source: 'capture-page',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    }
+  } finally {
+    if (!previewWindow.isDestroyed()) {
+      previewWindow.destroy()
+    }
+  }
+}
+
 async function ensureArtifactMemoryStorage({ userDataPath }) {
   const { rootDir, catalogPath, artifactsDir, previewsDir } =
     buildArtifactMemoryPaths(userDataPath)
@@ -794,6 +846,7 @@ function buildReusableArtifactFromWebScaffold({
 }
 
 module.exports = {
+  captureReusableArtifactPreview,
   ensureArtifactMemoryStorage,
   saveReusableArtifact,
   listReusableArtifacts,
