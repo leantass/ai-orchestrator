@@ -13,8 +13,8 @@ const {
   summarizeGeneratedDomainContractDebugEntries,
 } = require('./main-debug-summaries.cjs')
 const {
-  normalizeEventStringList: normalizeEventStringListHelper,
-  normalizeEventStringValue: normalizeEventStringValueHelper,
+  normalizeEventStringList,
+  normalizeEventStringValue,
 } = require('./main-normalizers.cjs')
 const {
   hasMarkedExecutionEventRequestId: hasMarkedExecutionEventRequestIdHelper,
@@ -4635,14 +4635,6 @@ function buildGeneratedDomainMaterializationSwitchReadinessReport({
 
 function buildSafeGeneratedDomainContractObservationErrorPreview(value) {
   return buildSafeGeneratedDomainContractObservationErrorPreviewHelper(value)
-}
-
-function normalizeEventStringValue(value) {
-  return normalizeEventStringValueHelper(value)
-}
-
-function normalizeEventStringList(entries) {
-  return normalizeEventStringListHelper(entries)
 }
 
 function hasMarkedExecutionEventRequestId(eventSet, requestId) {
