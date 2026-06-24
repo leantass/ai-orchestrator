@@ -28,6 +28,10 @@ const {
 const {
   extractLocalMaterializationPlan,
   buildDerivedLocalMaterializationPlan,
+  buildMaterializeSafeFirstDeliveryLocalPlanSkipReason,
+  buildMaterializeFrontendProjectLocalPlanSkipReason,
+  buildMaterializeFullstackLocalPlanSkipReason,
+  buildMaterializeProjectPhaseLocalPlanSkipReason,
 } = require('./main-materialization-plan-helpers.cjs')
 
 function isElectronExecutablePath(executablePath) {
@@ -4861,120 +4865,6 @@ function attachExecutorRuntimeMetadata(response, runtimeMetadata) {
         : {}),
     },
   }
-}
-
-function buildMaterializeSafeFirstDeliveryLocalPlanSkipReason({
-  executionScope,
-  instruction,
-  plan,
-  expectedBasenames = ['index.html', 'styles.css', 'script.js', 'mock-data.json'],
-}) {
-  const allowedTargetPaths = summarizeUniqueExecutorStrings(
-    executionScope?.allowedTargetPaths,
-    12,
-  )
-
-  if (allowedTargetPaths.length === 0) {
-    return 'missing-allowed-target-paths'
-  }
-
-  const normalizedInstruction =
-    typeof instruction === 'string' ? instruction.toLocaleLowerCase() : ''
-  const normalizedAllowedPaths = allowedTargetPaths.map((entry) =>
-    entry.toLocaleLowerCase(),
-  )
-  const missingBasenames = expectedBasenames.filter(
-    (basename) =>
-      !normalizedAllowedPaths.some(
-        (entry) => entry.endsWith(`\\${basename}`) || entry.endsWith(`/${basename}`),
-      ),
-  )
-
-  if (
-    missingBasenames.length > 0 &&
-    !missingBasenames.every((basename) => normalizedInstruction.includes(basename))
-  ) {
-    return `invalid-allowed-target-paths:${missingBasenames.join(',')}`
-  }
-
-  if (plan && !isMaterializationPlanWithinAllowedTargetPaths(plan, allowedTargetPaths)) {
-    return 'plan-target-outside-allowed-paths'
-  }
-
-  return 'task-build-failed'
-}
-
-function buildMaterializeFrontendProjectLocalPlanSkipReason({
-  executionScope,
-  instruction,
-  plan,
-}) {
-  return buildMaterializeSafeFirstDeliveryLocalPlanSkipReason({
-    executionScope,
-    instruction,
-    plan,
-    expectedBasenames: [
-      'package.json',
-      'index.html',
-      'README.md',
-      'main.js',
-      'styles.css',
-      'mock-data.js',
-      'App.js',
-    ],
-  })
-}
-
-function buildMaterializeFullstackLocalPlanSkipReason({
-  executionScope,
-  instruction,
-  plan,
-}) {
-  return buildMaterializeSafeFirstDeliveryLocalPlanSkipReason({
-    executionScope,
-    instruction,
-    plan,
-    expectedBasenames: [
-      'README.md',
-      'package.json',
-      'index.html',
-      'main.js',
-      'styles.css',
-      'mock-data.js',
-      'App.js',
-      'server.js',
-      'health.js',
-      'appointments.js',
-      'response.js',
-      'domain.js',
-      'contracts.js',
-      'schema.sql',
-      'seed-local.sql',
-      'seed-local.js',
-      'architecture.md',
-      'local-runbook.md',
-    ],
-  })
-}
-
-function buildMaterializeProjectPhaseLocalPlanSkipReason({
-  executionScope,
-  plan,
-}) {
-  const allowedTargetPaths = summarizeUniqueExecutorStrings(
-    executionScope?.allowedTargetPaths,
-    24,
-  )
-
-  if (allowedTargetPaths.length === 0) {
-    return 'missing-allowed-target-paths'
-  }
-
-  if (plan && !isMaterializationPlanWithinAllowedTargetPaths(plan, allowedTargetPaths)) {
-    return 'plan-target-outside-allowed-paths'
-  }
-
-  return 'task-build-failed'
 }
 
 function buildMaterializeSafeFirstDeliveryLocalFailureResponse({
@@ -62953,13 +62843,20 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
             : requiresLocalFrontendProjectMaterialization
               ? 'materialize-frontend-project-plan'
               : 'materialize-safe-first-delivery-plan'
-        const localPlanSkipReason = requiresLocalProjectPhaseMaterialization
-          ? buildMaterializeProjectPhaseLocalPlanSkipReason
-          : requiresLocalFullstackLocalMaterialization
-            ? buildMaterializeFullstackLocalPlanSkipReason
-            : requiresLocalFrontendProjectMaterialization
-              ? buildMaterializeFrontendProjectLocalPlanSkipReason
-              : buildMaterializeSafeFirstDeliveryLocalPlanSkipReason
+        const localPlanSkipReason = ({ executionScope, instruction, plan }) =>
+          (requiresLocalProjectPhaseMaterialization
+            ? buildMaterializeProjectPhaseLocalPlanSkipReason
+            : requiresLocalFullstackLocalMaterialization
+              ? buildMaterializeFullstackLocalPlanSkipReason
+              : requiresLocalFrontendProjectMaterialization
+                ? buildMaterializeFrontendProjectLocalPlanSkipReason
+                : buildMaterializeSafeFirstDeliveryLocalPlanSkipReason)({
+            executionScope,
+            instruction,
+            plan,
+            summarizeUniqueExecutorStrings,
+            isMaterializationPlanWithinAllowedTargetPaths,
+          })
         const localPlanFailureResponseBuilder =
           requiresLocalProjectPhaseMaterialization
             ? buildMaterializeProjectPhaseLocalFailureResponse
