@@ -4871,54 +4871,6 @@ function attachExecutorRuntimeMetadata(response, runtimeMetadata) {
   }
 }
 
-function extractMaterializationPlanTargetPaths(plan) {
-  if (!plan || typeof plan !== 'object') {
-    return []
-  }
-
-  const targetPaths = []
-
-  for (const operation of Array.isArray(plan.operations) ? plan.operations : []) {
-    if (typeof operation?.targetPath === 'string' && operation.targetPath.trim()) {
-      targetPaths.push(operation.targetPath.trim())
-    }
-  }
-
-  for (const validation of Array.isArray(plan.validations) ? plan.validations : []) {
-    if (typeof validation?.targetPath === 'string' && validation.targetPath.trim()) {
-      targetPaths.push(validation.targetPath.trim())
-    }
-  }
-
-  return summarizeUniqueExecutorStrings(targetPaths, 64)
-}
-
-function isMaterializationPlanWithinAllowedTargetPaths(plan, allowedTargetPaths) {
-  const normalizedAllowedTargetPaths = summarizeUniqueExecutorStrings(
-    allowedTargetPaths,
-    32,
-  ).map((entry) => entry.replace(/\\/g, '/').toLocaleLowerCase())
-
-  if (normalizedAllowedTargetPaths.length === 0) {
-    return false
-  }
-
-  const normalizedPlanTargets = extractMaterializationPlanTargetPaths(plan).map((entry) =>
-    entry.replace(/\\/g, '/').toLocaleLowerCase(),
-  )
-
-  if (normalizedPlanTargets.length === 0) {
-    return false
-  }
-
-  return normalizedPlanTargets.every((targetPath) =>
-    normalizedAllowedTargetPaths.some(
-      (allowedPath) =>
-        targetPath === allowedPath || targetPath.startsWith(`${allowedPath}/`),
-    ),
-  )
-}
-
 function buildLocalDeterministicTaskFromPlan({
   plan,
   workspacePath,
@@ -62703,7 +62655,6 @@ ipcMain.handle('ai-orchestrator:execute-task', (_event, payload) => {
             instruction,
             plan,
             summarizeUniqueExecutorStrings,
-            isMaterializationPlanWithinAllowedTargetPaths,
           })
         const localPlanFailureResponseBuilder =
           ({ requestId, instruction, decisionKey, executionScope, reason }) =>
