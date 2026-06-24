@@ -205,6 +205,52 @@ function buildEmptyCatalog() {
   }
 }
 
+async function pathExists(targetPath) {
+  try {
+    await fs.promises.access(targetPath, fs.constants.F_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function resolveReusableArtifactHtmlEntry(artifact) {
+  if (!artifact || typeof artifact !== 'object') {
+    return ''
+  }
+
+  const candidatePaths = [
+    ...(Array.isArray(artifact?.metadata?.createdPaths) ? artifact.metadata.createdPaths : []),
+    artifact.localPath,
+  ]
+    .filter((entry) => typeof entry === 'string' && entry.trim())
+    .map((entry) => path.normalize(entry.trim()))
+
+  for (const candidatePath of candidatePaths) {
+    const basename = path.basename(candidatePath).toLocaleLowerCase()
+
+    if (basename === 'index.html' && (await pathExists(candidatePath))) {
+      return candidatePath
+    }
+
+    if (await pathExists(candidatePath)) {
+      try {
+        const stats = await fs.promises.stat(candidatePath)
+        if (stats.isDirectory()) {
+          const indexPath = path.join(candidatePath, 'index.html')
+          if (await pathExists(indexPath)) {
+            return indexPath
+          }
+        }
+      } catch {
+        // Sigue con el siguiente candidato si este path no se puede inspeccionar.
+      }
+    }
+  }
+
+  return ''
+}
+
 async function ensureArtifactMemoryStorage({ userDataPath }) {
   const { rootDir, catalogPath, artifactsDir, previewsDir } =
     buildArtifactMemoryPaths(userDataPath)
@@ -755,4 +801,5 @@ module.exports = {
   lookupReusableArtifactsForPlanning,
   buildReusableArtifactFromWebScaffold,
   isReusableArtifactTrusted,
+  resolveReusableArtifactHtmlEntry,
 }
