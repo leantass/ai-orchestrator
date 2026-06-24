@@ -3,6 +3,7 @@ const fs = require('fs')
 const path = require('path')
 const { pathToFileURL } = require('url')
 const {
+  buildMainTraceEntry,
   buildOutputPreview,
   buildSafeGeneratedDomainContractObservationErrorPreview:
     buildSafeGeneratedDomainContractObservationErrorPreviewHelper,
@@ -4949,16 +4950,6 @@ function mergeExecutorMaterializationResponse({
         undefined,
       materializationAppliedAt: new Date().toISOString(),
     },
-  }
-}
-
-function buildMainTraceEntry(title, content, status = 'info', raw) {
-  return {
-    source: 'orquestador',
-    title,
-    content,
-    status,
-    ...(raw ? { raw } : {}),
   }
 }
 

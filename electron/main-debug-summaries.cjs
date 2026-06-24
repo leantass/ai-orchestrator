@@ -140,7 +140,18 @@ function buildSafeGeneratedDomainContractObservationErrorPreview(value) {
   return sanitizeGeneratedDomainContractDebugPreview(value, 180)
 }
 
+function buildMainTraceEntry(title, content, status = 'info', raw) {
+  return {
+    source: 'orquestador',
+    title,
+    content,
+    status,
+    ...(raw ? { raw } : {}),
+  }
+}
+
 module.exports = {
+  buildMainTraceEntry,
   buildOutputPreview,
   buildSafeGeneratedDomainContractObservationErrorPreview,
   compactGeneratedDomainContractDebugAbsolutePath,
