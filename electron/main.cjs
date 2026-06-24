@@ -31,6 +31,7 @@ const {
   extractLocalMaterializationPlan,
   buildDerivedLocalMaterializationPlan,
   buildLocalDeterministicTaskFromPlan,
+  mergeExecutorMaterializationResponse,
   buildMaterializeSafeFirstDeliveryLocalPlanSkipReason,
   buildMaterializeFrontendProjectLocalPlanSkipReason,
   buildMaterializeFullstackLocalPlanSkipReason,
@@ -4870,85 +4871,6 @@ function attachExecutorRuntimeMetadata(response, runtimeMetadata) {
       ...(runtimeMetadata.executorCommand
         ? { executorCommand: runtimeMetadata.executorCommand }
         : {}),
-    },
-  }
-}
-
-function mergeExecutorMaterializationResponse({
-  executorResponse,
-  materializationResponse,
-  task,
-}) {
-  if (!materializationResponse || typeof materializationResponse !== 'object') {
-    return executorResponse
-  }
-
-  const executorDetails =
-    executorResponse?.details && typeof executorResponse.details === 'object'
-      ? executorResponse.details
-      : {}
-  const materializationDetails =
-    materializationResponse?.details &&
-    typeof materializationResponse.details === 'object'
-      ? materializationResponse.details
-      : {}
-  const combinedResult = [
-    typeof executorResponse?.result === 'string' && executorResponse.result.trim()
-      ? executorResponse.result.trim()
-      : '',
-    typeof materializationResponse?.result === 'string' &&
-    materializationResponse.result.trim()
-      ? materializationResponse.result.trim()
-      : '',
-  ]
-    .filter(Boolean)
-    .join('\n\n')
-
-  return {
-    ...executorResponse,
-    ...materializationResponse,
-    instruction:
-      materializationResponse?.instruction ||
-      executorResponse?.instruction ||
-      task?.instruction,
-    result: combinedResult || materializationResponse?.result || executorResponse?.result,
-    resultPreview:
-      materializationResponse?.resultPreview ||
-      executorResponse?.resultPreview ||
-      buildOutputPreview(combinedResult),
-    reasoningLayer:
-      materializationDetails.reasoningLayer ||
-      executorDetails.reasoningLayer ||
-      task?.reasoningLayer ||
-      undefined,
-    materializationLayer:
-      materializationDetails.materializationLayer ||
-      executorDetails.materializationLayer ||
-      task?.materializationLayer ||
-      undefined,
-    details: {
-      ...executorDetails,
-      ...materializationDetails,
-      reasoningLayer:
-        materializationDetails.reasoningLayer ||
-        executorDetails.reasoningLayer ||
-        task?.reasoningLayer ||
-        undefined,
-      materializationLayer:
-        materializationDetails.materializationLayer ||
-        executorDetails.materializationLayer ||
-        task?.materializationLayer ||
-        undefined,
-      materializationPlanVersion:
-        materializationDetails.materializationPlanVersion ||
-        executorDetails.materializationPlanVersion ||
-        task?.planVersion ||
-        undefined,
-      materializationPlanSource:
-        materializationDetails.materializationPlanSource ||
-        task?.materializationPlanSource ||
-        undefined,
-      materializationAppliedAt: new Date().toISOString(),
     },
   }
 }
