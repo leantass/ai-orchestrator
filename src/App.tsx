@@ -4428,6 +4428,20 @@ type ReusableArtifactPreviewModel = {
   previewCta: string
 }
 
+type ReusableArtifactPreviewTone =
+  | 'sky'
+  | 'emerald'
+  | 'amber'
+  | 'rose'
+  | 'violet'
+  | 'slate'
+
+type ReusableArtifactPreviewPresentationClasses = {
+  toneClass: string
+  headingFontClass: string
+  bodyFontClass: string
+}
+
 type ReusableArtifactStoredPreview = {
   status?: string
   imagePath?: string
@@ -4471,6 +4485,186 @@ const buildReusableArtifactPreviewModel = (
     previewCta: artifact.primaryCta || artifact.secondaryCta || 'Ver propuesta',
   }
 }
+
+const parseReusableArtifactPreviewColor = (
+  value?: string,
+): { red: number; green: number; blue: number } | null => {
+  const normalizedValue = normalizeOptionalString(value)
+
+  if (!normalizedValue) {
+    return null
+  }
+
+  const hexMatch = normalizedValue.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/iu)
+
+  if (hexMatch) {
+    const expandedHex =
+      hexMatch[1].length === 3
+        ? hexMatch[1]
+            .split('')
+            .map((entry) => `${entry}${entry}`)
+            .join('')
+        : hexMatch[1]
+
+    return {
+      red: Number.parseInt(expandedHex.slice(0, 2), 16),
+      green: Number.parseInt(expandedHex.slice(2, 4), 16),
+      blue: Number.parseInt(expandedHex.slice(4, 6), 16),
+    }
+  }
+
+  const rgbMatch = normalizedValue.match(/^rgba?\(([^)]+)\)$/iu)
+
+  if (!rgbMatch) {
+    return null
+  }
+
+  const colorParts = rgbMatch[1]
+    .split(',')
+    .slice(0, 3)
+    .map((entry) => Number.parseFloat(entry.trim()))
+
+  if (
+    colorParts.length !== 3 ||
+    colorParts.some((entry) => !Number.isFinite(entry))
+  ) {
+    return null
+  }
+
+  return {
+    red: Math.max(0, Math.min(255, Math.round(colorParts[0]))),
+    green: Math.max(0, Math.min(255, Math.round(colorParts[1]))),
+    blue: Math.max(0, Math.min(255, Math.round(colorParts[2]))),
+  }
+}
+
+const getReusableArtifactPreviewHue = (color: {
+  red: number
+  green: number
+  blue: number
+}) => {
+  const normalizedRed = color.red / 255
+  const normalizedGreen = color.green / 255
+  const normalizedBlue = color.blue / 255
+  const maxChannel = Math.max(normalizedRed, normalizedGreen, normalizedBlue)
+  const minChannel = Math.min(normalizedRed, normalizedGreen, normalizedBlue)
+  const delta = maxChannel - minChannel
+
+  if (delta === 0) {
+    return null
+  }
+
+  let hue = 0
+
+  switch (maxChannel) {
+    case normalizedRed:
+      hue = ((normalizedGreen - normalizedBlue) / delta) % 6
+      break
+    case normalizedGreen:
+      hue = (normalizedBlue - normalizedRed) / delta + 2
+      break
+    default:
+      hue = (normalizedRed - normalizedGreen) / delta + 4
+      break
+  }
+
+  return Math.round((hue * 60 + 360) % 360)
+}
+
+const getReusableArtifactPreviewTone = (value?: string): ReusableArtifactPreviewTone => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+  const parsedColor = parseReusableArtifactPreviewColor(normalizedValue)
+
+  if (parsedColor) {
+    const channelSpread =
+      Math.max(parsedColor.red, parsedColor.green, parsedColor.blue) -
+      Math.min(parsedColor.red, parsedColor.green, parsedColor.blue)
+
+    if (channelSpread < 18) {
+      return 'slate'
+    }
+
+    const hue = getReusableArtifactPreviewHue(parsedColor)
+
+    if (hue === null) {
+      return 'slate'
+    }
+
+    if (hue < 20 || hue >= 330) {
+      return 'rose'
+    }
+
+    if (hue < 75) {
+      return 'amber'
+    }
+
+    if (hue < 170) {
+      return 'emerald'
+    }
+
+    if (hue < 255) {
+      return 'sky'
+    }
+
+    return 'violet'
+  }
+
+  if (/rose|pink|red|crimson/iu.test(normalizedValue)) {
+    return 'rose'
+  }
+
+  if (/amber|gold|yellow|orange/iu.test(normalizedValue)) {
+    return 'amber'
+  }
+
+  if (/emerald|green|mint|lime/iu.test(normalizedValue)) {
+    return 'emerald'
+  }
+
+  if (/violet|purple|indigo|magenta/iu.test(normalizedValue)) {
+    return 'violet'
+  }
+
+  if (/slate|gray|grey|stone|neutral/iu.test(normalizedValue)) {
+    return 'slate'
+  }
+
+  return 'sky'
+}
+
+const getReusableArtifactPreviewFontClass = (
+  value?: string,
+  fallback: 'serif' | 'sans' = 'sans',
+) => {
+  const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
+
+  if (!normalizedValue) {
+    return fallback === 'serif' ? 'jefe-preview-font-serif' : 'jefe-preview-font-sans'
+  }
+
+  if (/mono|code|courier|consolas|jetbrains|fira mono|ibm plex mono|monospace/iu.test(normalizedValue)) {
+    return 'jefe-preview-font-mono'
+  }
+
+  if (/serif|playfair|merriweather|garamond|georgia|times|lora|baskerville|bodoni|didot|abril|cormorant/iu.test(normalizedValue)) {
+    return 'jefe-preview-font-serif'
+  }
+
+  return 'jefe-preview-font-sans'
+}
+
+const getReusableArtifactPreviewPresentationClasses = (
+  preview: ReusableArtifactPreviewModel,
+): ReusableArtifactPreviewPresentationClasses => ({
+  toneClass: `jefe-reusable-preview--${getReusableArtifactPreviewTone(
+    preview.accentStrong || preview.accent,
+  )}`,
+  headingFontClass: getReusableArtifactPreviewFontClass(preview.headingFont, 'serif'),
+  bodyFontClass: getReusableArtifactPreviewFontClass(preview.bodyFont, 'sans'),
+})
+
+const getReusableArtifactColorChipToneClass = (value?: string) =>
+  `jefe-color-chip--${getReusableArtifactPreviewTone(value)}`
 
 const normalizeReusableArtifactStoredPreview = (
   preview?: ReusableArtifactStoredPreview | null,
@@ -20248,12 +20442,18 @@ No usar credenciales.`
                 Espacio de trabajo
               </div>
               <div className="mt-2 text-xl font-semibold text-white">Dónde va a operar JEFE</div>
+              <label
+                htmlFor="guided-workspace-path"
+                className="mt-4 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+              >
+                Ruta del workspace
+              </label>
               <textarea
                 id="guided-workspace-path"
                 value={workspacePath}
                 onChange={(event) => setWorkspacePath(event.target.value)}
                 rows={4}
-                className="mt-4 w-full rounded-[24px] border border-white/10 bg-slate-950/80 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300/30"
+                className="mt-2 w-full rounded-[24px] border border-white/10 bg-slate-950/80 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300/30"
               />
               <div className="mt-3 rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-4 text-sm leading-6 text-slate-300">
                 {workspaceStatusLabel}
@@ -20478,22 +20678,39 @@ No usar credenciales.`
                         : 'border-white/8 bg-slate-950/50',
                     )}
                   >
+                    {(() => {
+                      const previewClasses = getReusableArtifactPreviewPresentationClasses(preview)
+
+                      return (
                     <div
                       data-reusable-artifact-preview={artifact.id}
-                      className="rounded-2xl border border-white/10 p-4"
-                      style={{
-                        background: preview.background,
-                        color: preview.text,
-                      }}
+                      className={joinClasses(
+                        'jefe-reusable-preview rounded-2xl border border-white/10 p-4',
+                        previewClasses.toneClass,
+                      )}
                     >
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.24em]">
+                      <div className="jefe-reusable-preview__eyebrow text-[10px] font-semibold uppercase tracking-[0.24em]">
                         {preview.heroLabel}
                       </div>
-                      <div className="mt-2 text-lg font-semibold">
+                      <div
+                        className={joinClasses(
+                          'jefe-reusable-preview__heading mt-2 text-lg font-semibold',
+                          previewClasses.headingFontClass,
+                        )}
+                      >
                         {artifact.sectorLabel || artifact.sector || artifact.id}
                       </div>
-                      <div className="mt-2 text-xs leading-5">{preview.previewBody}</div>
+                      <div
+                        className={joinClasses(
+                          'jefe-reusable-preview__body mt-2 text-xs leading-5',
+                          previewClasses.bodyFontClass,
+                        )}
+                      >
+                        {preview.previewBody}
+                      </div>
                     </div>
+                      )
+                    })()}
                     <div className="mt-4 flex flex-wrap gap-2">
                       <button
                         type="button"
@@ -22298,7 +22515,7 @@ No usar credenciales.`
                           : 'Sin selección manual: se mantiene la búsqueda automática.'}
                       </div>
                       <button
-                        id="clear-reusable-artifact-selection"
+                        id="clear-reusable-artifact-selection-guided"
                         type="button"
                         onClick={() => {
                           setSelectedReusableArtifact(null)
@@ -22331,6 +22548,8 @@ No usar credenciales.`
                       reusableArtifacts.map((artifact) => {
                         const isSelected = selectedReusableArtifact?.id === artifact.id
                         const preview = buildReusableArtifactPreviewModel(artifact)
+                        const previewClasses =
+                          getReusableArtifactPreviewPresentationClasses(preview)
                         const visibleColors = Object.values(artifact.colors || {}).slice(0, 4)
                         const badgeValues = [
                           artifact.sectorLabel || artifact.sector,
@@ -22386,11 +22605,10 @@ No usar credenciales.`
                             <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/70 p-3">
                               <div
                                 data-reusable-artifact-preview={artifact.id}
-                                className="overflow-hidden rounded-2xl border border-white/10"
-                                style={{
-                                  background: preview.background,
-                                  color: preview.text,
-                                }}
+                                className={joinClasses(
+                                  'jefe-reusable-preview overflow-hidden rounded-2xl border border-white/10',
+                                  previewClasses.toneClass,
+                                )}
                               >
                                 {realPreviewSrc ? (
                                   <div className="relative">
@@ -22404,12 +22622,7 @@ No usar credenciales.`
                                         Vista previa real
                                       </span>
                                       <span
-                                        className="rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]"
-                                        style={{
-                                          borderColor: `${preview.accent}66`,
-                                          backgroundColor: 'rgba(2, 6, 23, 0.72)',
-                                          color: preview.text,
-                                        }}
+                                        className="jefe-reusable-preview__badge rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]"
                                       >
                                         {preview.heroLabel}
                                       </span>
@@ -22419,23 +22632,23 @@ No usar credenciales.`
                                   <div className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1.3fr)_120px]">
                                     <div className="min-w-0">
                                       <div
-                                        className="text-[10px] font-semibold uppercase tracking-[0.24em]"
-                                        style={{ color: preview.muted }}
+                                        className="jefe-reusable-preview__eyebrow text-[10px] font-semibold uppercase tracking-[0.24em]"
                                       >
                                         {preview.heroLabel}
                                       </div>
                                       <div
-                                        className="mt-2 text-xl leading-tight"
-                                        style={{ fontFamily: preview.headingFont }}
+                                        className={joinClasses(
+                                          'jefe-reusable-preview__heading mt-2 text-xl leading-tight',
+                                          previewClasses.headingFontClass,
+                                        )}
                                       >
                                         {preview.previewHeading}
                                       </div>
                                       <div
-                                        className="mt-2 max-w-sm text-xs leading-5"
-                                        style={{
-                                          color: preview.muted,
-                                          fontFamily: preview.bodyFont,
-                                        }}
+                                        className={joinClasses(
+                                          'jefe-reusable-preview__body mt-2 max-w-sm text-xs leading-5',
+                                          previewClasses.bodyFontClass,
+                                        )}
                                       >
                                         {preview.previewBody}
                                       </div>
@@ -22443,88 +22656,64 @@ No usar credenciales.`
                                         {badgeValues.slice(0, 4).map((badgeValue) => (
                                           <span
                                             key={`${artifact.id}-${badgeValue}`}
-                                            className="rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
-                                            style={{
-                                              borderColor: `${preview.accent}55`,
-                                              backgroundColor: preview.surface,
-                                              color: preview.text,
-                                            }}
+                                            className="jefe-reusable-preview__badge rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
                                           >
                                             {badgeValue}
                                           </span>
                                         ))}
                                       </div>
                                       <div
-                                        className="mt-4 inline-flex items-center rounded-full px-3 py-1.5 text-[11px] font-semibold"
-                                        style={{
-                                          backgroundColor: preview.accent,
-                                          color: '#020617',
-                                          fontFamily: preview.bodyFont,
-                                        }}
+                                        className={joinClasses(
+                                          'jefe-reusable-preview__cta jefe-reusable-preview__cta--solid mt-4 inline-flex items-center rounded-full px-3 py-1.5 text-[11px] font-semibold',
+                                          previewClasses.bodyFontClass,
+                                        )}
                                       >
                                         {preview.previewCta}
                                       </div>
                                     </div>
                                     <div className="flex flex-col gap-2">
                                       <div
-                                        className="rounded-2xl border p-3"
-                                        style={{
-                                          borderColor: `${preview.accentStrong}55`,
-                                          backgroundColor: preview.surface,
-                                        }}
+                                        className="jefe-reusable-preview__panel jefe-reusable-preview__panel--strong rounded-2xl border p-3"
                                       >
                                         <div
-                                          className="text-[10px] font-semibold uppercase tracking-[0.2em]"
-                                          style={{ color: preview.muted }}
+                                          className="jefe-reusable-preview__eyebrow text-[10px] font-semibold uppercase tracking-[0.2em]"
                                         >
                                           Estructura
                                         </div>
                                         <div
-                                          className="mt-2 text-sm leading-5"
-                                          style={{ fontFamily: preview.headingFont }}
+                                          className={joinClasses(
+                                            'jefe-reusable-preview__heading mt-2 text-sm leading-5',
+                                            previewClasses.headingFontClass,
+                                          )}
                                         >
                                           {preview.layoutLabel}
                                         </div>
                                       </div>
                                       <div className="grid grid-cols-2 gap-2">
                                         <div
-                                          className="rounded-xl border px-3 py-4"
-                                          style={{
-                                            borderColor: `${preview.accent}44`,
-                                            backgroundColor: preview.surface,
-                                          }}
+                                          className="jefe-reusable-preview__panel rounded-xl border px-3 py-4"
                                         >
                                           <div
-                                            className="h-2 rounded-full"
-                                            style={{ backgroundColor: preview.accent }}
+                                            className="jefe-reusable-preview__bar--accent h-2 rounded-full"
                                           />
                                           <div
-                                            className="mt-3 h-2 rounded-full"
-                                            style={{ backgroundColor: `${preview.text}33` }}
+                                            className="jefe-reusable-preview__bar--text-strong mt-3 h-2 rounded-full"
                                           />
                                           <div
-                                            className="mt-2 h-2 w-4/5 rounded-full"
-                                            style={{ backgroundColor: `${preview.text}22` }}
+                                            className="jefe-reusable-preview__bar--text-soft mt-2 h-2 w-4/5 rounded-full"
                                           />
                                         </div>
                                         <div
-                                          className="rounded-xl border px-3 py-4"
-                                          style={{
-                                            borderColor: `${preview.accentStrong}44`,
-                                            backgroundColor: preview.surface,
-                                          }}
+                                          className="jefe-reusable-preview__panel jefe-reusable-preview__panel--strong rounded-xl border px-3 py-4"
                                         >
                                           <div
-                                            className="h-8 rounded-lg"
-                                            style={{ backgroundColor: `${preview.accentStrong}33` }}
+                                            className="jefe-reusable-preview__bar--accent-strong h-8 rounded-lg"
                                           />
                                           <div
-                                            className="mt-2 h-2 rounded-full"
-                                            style={{ backgroundColor: `${preview.text}33` }}
+                                            className="jefe-reusable-preview__bar--text-strong mt-2 h-2 rounded-full"
                                           />
                                           <div
-                                            className="mt-2 h-2 w-3/4 rounded-full"
-                                            style={{ backgroundColor: `${preview.text}22` }}
+                                            className="jefe-reusable-preview__bar--text-soft mt-2 h-2 w-3/4 rounded-full"
                                           />
                                         </div>
                                       </div>
@@ -22584,8 +22773,10 @@ No usar credenciales.`
                                       <span
                                         key={`${artifact.id}-${colorValue}`}
                                         title={colorValue}
-                                        className="h-6 w-6 rounded-full border border-white/10"
-                                        style={{ backgroundColor: colorValue }}
+                                        className={joinClasses(
+                                          'jefe-color-chip h-6 w-6 rounded-full border border-white/10',
+                                          getReusableArtifactColorChipToneClass(colorValue),
+                                        )}
                                       />
                                     ))
                                   ) : (
@@ -24606,7 +24797,7 @@ No usar credenciales.`
                         : 'Sin selección manual: se mantiene la búsqueda automática.'}
                     </div>
                     <button
-                      id="clear-reusable-artifact-selection"
+                      id="clear-reusable-artifact-selection-library"
                       type="button"
                       onClick={() => {
                         setSelectedReusableArtifact(null)
@@ -24639,6 +24830,8 @@ No usar credenciales.`
                     reusableArtifacts.map((artifact) => {
                       const isSelected = selectedReusableArtifact?.id === artifact.id
                       const preview = buildReusableArtifactPreviewModel(artifact)
+                      const previewClasses =
+                        getReusableArtifactPreviewPresentationClasses(preview)
                       const realPreviewSrc =
                         artifact.preview?.status === 'generated'
                           ? buildLocalFileUrl(artifact.preview.imagePath)
@@ -24699,11 +24892,10 @@ No usar credenciales.`
 
                           <div
                             data-reusable-artifact-preview={artifact.id}
-                            className="mt-4 overflow-hidden rounded-2xl border border-white/10"
-                            style={{
-                              background: preview.background,
-                              color: preview.text,
-                            }}
+                            className={joinClasses(
+                              'jefe-reusable-preview mt-4 overflow-hidden rounded-2xl border border-white/10',
+                              previewClasses.toneClass,
+                            )}
                           >
                             {realPreviewSrc ? (
                               <img
@@ -24714,30 +24906,31 @@ No usar credenciales.`
                             ) : (
                               <div className="p-4">
                                 <div
-                                  className="text-[10px] font-semibold uppercase tracking-[0.24em]"
-                                  style={{ color: preview.muted }}
+                                  className="jefe-reusable-preview__eyebrow text-[10px] font-semibold uppercase tracking-[0.24em]"
                                 >
                                   {preview.heroLabel}
                                 </div>
                                 <div
-                                  className="mt-2 text-xl leading-tight"
-                                  style={{ fontFamily: preview.headingFont }}
+                                  className={joinClasses(
+                                    'jefe-reusable-preview__heading mt-2 text-xl leading-tight',
+                                    previewClasses.headingFontClass,
+                                  )}
                                 >
                                   {preview.previewHeading}
                                 </div>
                                 <div
-                                  className="mt-2 text-xs leading-5"
-                                  style={{ color: preview.muted }}
+                                  className={joinClasses(
+                                    'jefe-reusable-preview__body mt-2 text-xs leading-5',
+                                    previewClasses.bodyFontClass,
+                                  )}
                                 >
                                   {preview.previewBody}
                                 </div>
                                 <div
-                                  className="mt-4 inline-flex rounded-full border px-3 py-1 text-xs font-medium"
-                                  style={{
-                                    borderColor: `${preview.accent}66`,
-                                    color: preview.text,
-                                    backgroundColor: preview.surface,
-                                  }}
+                                  className={joinClasses(
+                                    'jefe-reusable-preview__cta mt-4 inline-flex rounded-full border px-3 py-1 text-xs font-medium',
+                                    previewClasses.bodyFontClass,
+                                  )}
                                 >
                                   {preview.previewCta}
                                 </div>
@@ -24768,8 +24961,10 @@ No usar credenciales.`
                               {visibleColors.map((colorValue, index) => (
                                 <span
                                   key={`${artifact.id}-color-${index + 1}`}
-                                  className="h-6 w-6 rounded-full border border-white/10"
-                                  style={{ backgroundColor: colorValue }}
+                                  className={joinClasses(
+                                    'jefe-color-chip h-6 w-6 rounded-full border border-white/10',
+                                    getReusableArtifactColorChipToneClass(colorValue),
+                                  )}
                                 />
                               ))}
                             </div>
@@ -25094,6 +25289,8 @@ No usar credenciales.`
             <div className="space-y-4">
               {(() => {
                 const preview = buildReusableArtifactPreviewModel(detailReusableArtifact)
+                const previewClasses =
+                  getReusableArtifactPreviewPresentationClasses(preview)
                 const realPreviewSrc =
                   detailReusableArtifact.preview?.status === 'generated'
                     ? buildLocalFileUrl(detailReusableArtifact.preview.imagePath)
@@ -25103,11 +25300,10 @@ No usar credenciales.`
                 return (
                   <>
                     <div
-                      className="overflow-hidden rounded-3xl border border-white/10"
-                      style={{
-                        background: preview.background,
-                        color: preview.text,
-                      }}
+                      className={joinClasses(
+                        'jefe-reusable-preview overflow-hidden rounded-3xl border border-white/10',
+                        previewClasses.toneClass,
+                      )}
                     >
                       {realPreviewSrc ? (
                         <img
@@ -25119,40 +25315,37 @@ No usar credenciales.`
                         <div className="grid gap-4 p-6 lg:grid-cols-[minmax(0,1.1fr)_260px]">
                           <div className="min-w-0">
                             <div
-                              className="text-[11px] font-semibold uppercase tracking-[0.24em]"
-                              style={{ color: preview.muted }}
+                              className="jefe-reusable-preview__eyebrow text-[11px] font-semibold uppercase tracking-[0.24em]"
                             >
                               {preview.heroLabel}
                             </div>
                             <div
-                              className="mt-3 text-3xl leading-tight"
-                              style={{ fontFamily: preview.headingFont }}
+                              className={joinClasses(
+                                'jefe-reusable-preview__heading mt-3 text-3xl leading-tight',
+                                previewClasses.headingFontClass,
+                              )}
                             >
                               {preview.previewHeading}
                             </div>
                             <div
-                              className="mt-3 max-w-xl text-sm leading-7"
-                              style={{ color: preview.muted }}
+                              className={joinClasses(
+                                'jefe-reusable-preview__body mt-3 max-w-xl text-sm leading-7',
+                                previewClasses.bodyFontClass,
+                              )}
                             >
                               {preview.previewBody}
                             </div>
                             <div
-                              className="mt-5 inline-flex rounded-full border px-4 py-2 text-sm font-medium"
-                              style={{
-                                borderColor: `${preview.accent}66`,
-                                backgroundColor: preview.surface,
-                                color: preview.text,
-                              }}
+                              className={joinClasses(
+                                'jefe-reusable-preview__cta mt-5 inline-flex rounded-full border px-4 py-2 text-sm font-medium',
+                                previewClasses.bodyFontClass,
+                              )}
                             >
                               {preview.previewCta}
                             </div>
                           </div>
                           <div
-                            className="rounded-3xl border p-4"
-                            style={{
-                              borderColor: `${preview.accent}33`,
-                              backgroundColor: preview.surface,
-                            }}
+                            className="jefe-reusable-preview__panel rounded-3xl border p-4"
                           >
                             <div className="text-sm font-medium text-white">
                               {preview.layoutLabel}
@@ -25225,8 +25418,10 @@ No usar credenciales.`
                                   <div className="text-sm text-slate-200">{colorKey}</div>
                                   <div className="flex items-center gap-2">
                                     <span
-                                      className="h-5 w-5 rounded-full border border-white/10"
-                                      style={{ backgroundColor: colorValue }}
+                                      className={joinClasses(
+                                        'jefe-color-chip h-5 w-5 rounded-full border border-white/10',
+                                        getReusableArtifactColorChipToneClass(colorValue),
+                                      )}
                                     />
                                     <span className="text-xs text-slate-400">
                                       {colorValue}
