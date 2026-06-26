@@ -13120,6 +13120,32 @@ function App() {
     : resultStatusPresentation
   const resultExecutionCompleted =
     effectiveResultStatusPresentation.label === 'Ejecución completada'
+  const latestHumanDecision = [...resolvedDecisions]
+    .filter(
+      (record) =>
+        Boolean(normalizeOptionalString(record.selectedOption)) ||
+        Boolean(normalizeOptionalString(record.freeAnswer)) ||
+        record.status === 'approved' ||
+        record.status === 'rejected',
+    )
+    .sort((leftRecord, rightRecord) =>
+      resolveLatestDecisionTimestamp(rightRecord).localeCompare(
+        resolveLatestDecisionTimestamp(leftRecord),
+      ),
+    )[0]
+  const latestHumanDecisionSummary = latestHumanDecision
+    ? [
+        getResolvedDecisionStatusLabel(latestHumanDecision),
+        normalizeOptionalString(latestHumanDecision.selectedOption),
+        normalizeOptionalString(latestHumanDecision.freeAnswer),
+        normalizeOptionalString(latestHumanDecision.summary),
+      ]
+        .filter(Boolean)
+        .join(' ? ')
+    : 'Todavía no hay una respuesta humana relevante registrada'
+  const activeApprovalDetailLabel = decisionPending
+    ? summarizeInlineText(approvalMessage || visiblePendingInstruction, 180)
+    : latestHumanDecisionSummary
   const resultOperationalWorkState = decisionPending
     ? 'requires_human_approval'
     : resultExecutionNeedsMaterialReview
@@ -13472,29 +13498,6 @@ function App() {
     'Validar las acciones locales y el log de actividad de la entrega funcional local.',
     'Recien despues evaluar si hace falta una aprobacion futura para runtime real.',
   ]
-  const latestHumanDecision = [...resolvedDecisions]
-    .filter(
-      (record) =>
-        Boolean(normalizeOptionalString(record.selectedOption)) ||
-        Boolean(normalizeOptionalString(record.freeAnswer)) ||
-        record.status === 'approved' ||
-        record.status === 'rejected',
-    )
-    .sort((leftRecord, rightRecord) =>
-      resolveLatestDecisionTimestamp(rightRecord).localeCompare(
-        resolveLatestDecisionTimestamp(leftRecord),
-      ),
-    )[0]
-  const latestHumanDecisionSummary = latestHumanDecision
-    ? [
-        getResolvedDecisionStatusLabel(latestHumanDecision),
-        normalizeOptionalString(latestHumanDecision.selectedOption),
-        normalizeOptionalString(latestHumanDecision.freeAnswer),
-        normalizeOptionalString(latestHumanDecision.summary),
-      ]
-        .filter(Boolean)
-        .join(' ? ')
-    : 'Todavía no hay una respuesta humana relevante registrada'
   const activeApprovalStatusLabel = decisionPending
     ? `Pendiente desde ${approvalSource === 'executor' ? 'el Ejecutor' : 'el Planificador'}`
     : projectPolicyAllowed
@@ -13514,9 +13517,6 @@ function App() {
       ),
     )
     .slice(0, 5)
-  const activeApprovalDetailLabel = decisionPending
-    ? summarizeInlineText(approvalMessage || visiblePendingInstruction, 180)
-    : latestHumanDecisionSummary
   const activeOperationalE2eScenarioLabel =
     shouldShowLatestExecutionRunSummaryInOperationalReading && latestExecutionRunSummary
       ? latestExecutionRunSummary.scenarioLabel

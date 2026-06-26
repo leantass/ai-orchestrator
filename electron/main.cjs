@@ -101,6 +101,7 @@ relaunchElectronRuntimeIfNeeded()
 
 const electronModule = require('electron')
 const { app, BrowserWindow, dialog, ipcMain, shell } = electronModule
+let mainWindow = null
 
 if (
   !electronModule ||
@@ -10430,6 +10431,24 @@ function detectScalableDeliveryPlanningIntent(goal, context) {
       : '',
     /\bsin credenciales\b/u.test(normalizedText) ? 'sin credenciales' : '',
   ].filter(Boolean)
+  const modernFullstackSignals = [
+    /\bnext(?:\.js|js)\b/u.test(normalizedText) ? 'nextjs' : '',
+    /\bapp router\b/u.test(normalizedText) ? 'app router' : '',
+    /\bprisma\b/u.test(normalizedText) ? 'prisma' : '',
+    /\bzod\b/u.test(normalizedText) ? 'zod' : '',
+    /\bhttp\s*only\b/u.test(normalizedText) ? 'httpOnly' : '',
+    /\bcookie\s+httponly\b/u.test(normalizedText) ? 'cookie httpOnly' : '',
+    /\bbcrypt\b/u.test(normalizedText) ? 'bcrypt' : '',
+    /\brbac\b/u.test(normalizedText) ? 'rbac' : '',
+    /\/api\//u.test(normalizedText) ? 'api routes' : '',
+    /\bcron_secret\b/u.test(normalizedText) ? 'cron secret' : '',
+    /\betiquetas?\b/u.test(normalizedText) ? 'etiquetas' : '',
+    /\bcomandas?\b/u.test(normalizedText) ? 'comandas' : '',
+    /\bcsv\b/u.test(normalizedText) ? 'csv' : '',
+    /\bempleados?\b/u.test(normalizedText) ? 'empleados' : '',
+    /\badmin\s+restaurante\b/u.test(normalizedText) ? 'admin restaurante' : '',
+    /\badmin\s+empresa\b/u.test(normalizedText) ? 'admin empresa' : '',
+  ].filter(Boolean)
 
   const matchesInfraPlan =
     infraSignals.length >= 2 &&
@@ -10460,7 +10479,25 @@ function detectScalableDeliveryPlanningIntent(goal, context) {
     (localFunctionalDeliverySignals.length > 0 &&
       operationalDomainSignals.length >= 3 &&
       localOnlySignals.length >= 3 &&
-      dataModelSignals.length >= 2)
+      dataModelSignals.length >= 2) ||
+    ((modernFullstackSignals.includes('nextjs') ||
+      modernFullstackSignals.includes('app router')) &&
+      (modernFullstackSignals.includes('prisma') ||
+        fullstackSignals.includes('sqlite') ||
+        fullstackSignals.includes('base de datos local') ||
+        modernFullstackSignals.includes('api routes')) &&
+      (modernFullstackSignals.includes('rbac') ||
+        modernFullstackSignals.includes('bcrypt') ||
+        modernFullstackSignals.includes('cookie httpOnly') ||
+        operationalDomainSignals.includes('roles') ||
+        operationalDomainSignals.includes('usuarios')) &&
+      (modernFullstackSignals.includes('admin restaurante') ||
+        modernFullstackSignals.includes('admin empresa') ||
+        modernFullstackSignals.includes('empleados') ||
+        modernFullstackSignals.includes('etiquetas') ||
+        modernFullstackSignals.includes('comandas') ||
+        modernFullstackSignals.includes('csv') ||
+        operationalDomainSignals.includes('reportes')))
   const matchesFrontendPlan =
     (frontendSignals.includes('react') || frontendSignals.includes('frontend real')) &&
     frontendSignals.length >= 3
@@ -59299,7 +59336,7 @@ async function requestStrategicBrainDecision(input) {
 }
 
 function createWindow() {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 820,
     minWidth: 960,
@@ -59312,14 +59349,23 @@ function createWindow() {
     },
   })
 
-  maybeRunElectronVisualE2EDriver(mainWindow)
+  const activeWindow = mainWindow
+
+  activeWindow.on('closed', () => {
+    if (mainWindow === activeWindow) {
+      mainWindow = null
+    }
+  })
+
+  maybeRunElectronVisualE2EDriver(activeWindow)
 
   if (isDev) {
-    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL)
-    return
+    activeWindow.loadURL(process.env.VITE_DEV_SERVER_URL)
+    return activeWindow
   }
 
-  mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
+  activeWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
+  return activeWindow
 }
 
 function maybeRunElectronVisualE2EDriver(mainWindow) {

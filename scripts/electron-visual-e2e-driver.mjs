@@ -575,6 +575,23 @@ async function driveScenario(
     await clearPersistedRendererState(mainWindow)
     await callBridge(mainWindow, 'resetSession')
     await clearPersistedRendererState(mainWindow)
+    const hasInitialGoalInput = await execute(
+      mainWindow,
+      `Boolean(document.querySelector('#guided-goal-input, #simple-goal-input'))`,
+    )
+    if (!hasInitialGoalInput) {
+      const objectiveSurfaceButton = await clickButtonByText(mainWindow, [
+        'Objetivo y contexto',
+        'Revisar objetivo y contexto',
+        'Nuevo pedido',
+      ])
+      if (objectiveSurfaceButton) {
+        stepLog.push({
+          kind: 'objective-surface-open',
+          clickedButton: objectiveSurfaceButton,
+        })
+      }
+    }
     await waitFor(
       mainWindow,
       'goal input',
