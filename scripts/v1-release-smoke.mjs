@@ -141,6 +141,15 @@ function assertTextIncludes(relativePath, expectedText) {
   )
 }
 
+function assertTextIncludesOneOf(relativePath, expectedTexts) {
+  const content = readText(relativePath)
+  assert.equal(
+    expectedTexts.some((expectedText) => content.includes(expectedText)),
+    true,
+    `${relativePath} debe incluir alguno de: ${expectedTexts.join(' | ')}`,
+  )
+}
+
 function run(command, args) {
   const shouldUseCmdWrapper =
     process.platform === 'win32' && typeof command === 'string' && command.endsWith('.cmd')
@@ -223,10 +232,13 @@ function assertQualityIntegration() {
 }
 
 function assertUiWiring() {
-  assertTextIncludes('src/App.tsx', "import { V1ClosureDashboard }")
+  assertTextIncludesOneOf('src/App.tsx', [
+    "import { V1ClosureDashboard }",
+    'const LazyV1ClosureDashboard = lazy(() =>',
+  ])
   assertTextIncludes('src/App.tsx', "| 'v1'")
   assertTextIncludes('src/App.tsx', "key: 'v1'")
-  assertTextIncludes('src/App.tsx', "<V1ClosureDashboard")
+  assertTextIncludesOneOf('src/App.tsx', ['<V1ClosureDashboard', '<LazyV1ClosureDashboard'])
   assertTextIncludes('src/components/V1ClosureDashboard.tsx', 'export function V1ClosureDashboard')
 }
 
