@@ -1,4 +1,6 @@
 import {
+  Suspense,
+  lazy,
   useCallback,
   useEffect,
   useEffectEvent,
@@ -53,6 +55,7 @@ import {
   ProjectContinuationModulesSection,
   type ProjectContinuationModuleSectionItem,
 } from './components/ProjectContinuationModulesSection'
+import { ProjectContinuationSummaryCard } from './components/ProjectContinuationSummaryCard'
 import { ProjectContinuityOverviewCard } from './components/ProjectContinuityOverviewCard'
 import { ProjectPhaseExecutionPlanCard } from './components/ProjectPhaseExecutionPlanCard'
 import { ProjectInputsPanel } from './components/ProjectInputsPanel'
@@ -65,14 +68,15 @@ import { SafeFirstDeliveryPlanCard } from './components/SafeFirstDeliveryPlanCar
 import { ScalableDeliveryPlanCard } from './components/ScalableDeliveryPlanCard'
 import { SimpleExperienceDashboard } from './components/SimpleExperienceDashboard'
 import { ValidationPlanCard } from './components/ValidationPlanCard'
-import { V1ClosureDashboard } from './components/V1ClosureDashboard'
+import {
+  buildProjectContinuationApprovalPanelsViewModel,
+  buildProjectContinuationSummaryCardViewModel,
+} from './project-continuity-view-models'
 import {
   getPrepareActionButtonLabel,
   getProjectContinuationStatusLabel,
   getProjectReadinessLevelLabel,
   getProjectReadinessTone,
-  getRuntimeApprovalStatusLabel,
-  getRuntimeApprovalTone,
   getValidationStatusLabel,
 } from './project-state-labels'
 import {
@@ -87,8 +91,19 @@ import {
   resolveProjectContinuityNextRecommendedActionForUi,
 } from './planner-ui-state.js'
 
+const LazyV1ClosureDashboard = lazy(() =>
+  import('./components/V1ClosureDashboard').then((module) => ({
+    default: module.V1ClosureDashboard,
+  })),
+)
+
 type FlowMessage = {
   id: number
+  source?: string
+  title?: string
+  content?: string
+  raw?: string
+  status?: string
   dataSensitivity?: 'none' | 'low' | 'medium' | 'high' | string
   riskLevel?: 'low' | 'medium' | 'high' | string
   assumptions?: string[]
@@ -165,101 +180,6 @@ type NextActionPlanContract = {
 type ValidationPlanFileCheckContract = {
   path?: string
   expectation?: string
-}
-
-type ValidationPlanContract = {
-  scope?: string
-  level?: 'light' | 'medium' | 'full' | string
-  commands?: string[]
-  fileChecks?: ValidationPlanFileCheckContract[]
-  forbiddenPaths?: string[]
-  runtimeChecks?: string[]
-  manualChecks?: string[]
-  successCriteria?: string[]
-}
-
-type ProjectReadinessStateContract = {
-  readinessLevel?: string
-  demoReady?: boolean
-  safeLocalDemoReady?: boolean
-  completedCoreFlow?: boolean
-  completedPhases?: string[]
-  missingCorePhases?: string[]
-  completedModules?: string[]
-  missingRecommendedModules?: string[]
-  mockOnlyAreas?: string[]
-  realFilesystemAreas?: string[]
-  plannerOnlyAreas?: string[]
-  approvalRequiredAreas?: string[]
-  blockedAreas?: string[]
-  runtimeReadiness?: string
-  realExecutionReady?: boolean
-  validationStatus?: string
-  lastValidationSummary?: string
-  operatorSummary?: string
-  nextBestAction?: ContinuationActionContract | null
-  recommendedDemoScript?: string[]
-  warnings?: string[]
-  blockers?: string[]
-  lastApprovalRequest?: string
-  realExecutionReadiness?: string
-  pendingApprovals?: string[]
-  blockedRuntimeActions?: string[]
-  approvedActions?: string[]
-  approvalHistory?: LocalProjectManifestHistoryContract[]
-}
-
-type RuntimeApprovalStateContract = {
-  approvalId?: string
-  actionId?: string
-  title?: string
-  description?: string
-  status?: string
-  riskLevel?: 'low' | 'medium' | 'high' | string
-  requiresExplicitApproval?: boolean
-  approvalPhrase?: string
-  operatorMustConfirm?: string
-  commandsPreview?: string[]
-  filesPreview?: string[]
-  directoriesPreview?: string[]
-  envRequirements?: string[]
-  secretsRequired?: string[]
-  validationPlan?: ValidationPlanContract | null
-  rollbackPlan?: string[]
-  safeAlternative?: string
-  blockedReason?: string
-  expectedOutcome?: string
-  notExecutedDisclaimer?: string
-  createdAt?: string
-  expiresAt?: string
-  relatedReadinessArea?: string
-  relatedContinuationAction?: ContinuationActionContract | null
-  warnings?: string[]
-}
-
-type ProjectPhaseExecutionOperationPreviewContract = {
-  type?: string
-  targetPath?: string
-  purpose?: string
-}
-
-type ProjectPhaseExecutionPlanContract = {
-  phaseId?: string
-  sourceStrategy?: string
-  targetStrategy?: string
-  deliveryLevel?: ScalableDeliveryPlanContract['deliveryLevel'] | string
-  projectRoot?: string
-  goal?: string
-  reason?: string
-  executableNow?: boolean
-  approvalRequired?: boolean
-  riskLevel?: 'low' | 'medium' | 'high' | string
-  targetFiles?: string[]
-  allowedTargetPaths?: string[]
-  operationsPreview?: ProjectPhaseExecutionOperationPreviewContract[]
-  validationPlan?: ValidationPlanContract | null
-  explicitExclusions?: string[]
-  successCriteria?: string[]
 }
 
 type LocalProjectManifestPhaseContract = {
@@ -432,7 +352,568 @@ type ExistingProjectContext = {
 
 type ProjectWorkMode = 'auto' | 'new-project' | 'continue-existing'
 
-type MaterializationPlanContract = Record<string, unknown>
+type MaterializationPlanContract = Record<string, unknown> & {
+  contractDefinition?: {
+    contractKind?: string
+  }
+  projectRoot?: string
+}
+
+type ExecutorTraceEntry = Omit<FlowMessage, 'id'>
+
+type ExecutionEventPayload = ExecutorTraceEntry & {
+  requestId?: string
+}
+
+type ExecutorValidationResult = {
+  type?: string
+  targetPath?: string
+  expectedKind?: string
+  expectedText?: string
+  ok?: boolean
+  reason?: string
+}
+
+type ExecutorFailureContext = {
+  timestamp?: string
+  decisionKey?: string
+  failureType?: string
+  executorMode?: string
+  executorModeSource?: string
+  bridgeMode?: string
+  bridgeModeSource?: string
+  executorCommand?: string
+  origin?: string
+  stepIndex?: number
+  totalSteps?: number
+  currentStep?: string
+  currentSubtask?: string
+  currentAction?: string
+  currentCommand?: string
+  currentTargetPath?: string
+  touchedPaths?: string[]
+  createdPaths?: string[]
+  stdout?: string
+  stderr?: string
+  lastProgressAt?: string
+  lastMaterialProgressAt?: string
+  hasMaterialProgress?: boolean
+  materialState?: string
+  strategy?: string
+  brainStrategy?: string
+  reasoningLayer?: string
+  materializationLayer?: string
+  materializationPlanSource?: string
+  materializationPlan?: MaterializationPlanContract | null
+  validationResults?: ExecutorValidationResult[]
+  appliedReuseMode?: string
+  reusedStyleFromArtifactId?: string
+  reusedStructureFromArtifactId?: string
+  reuseAppliedFields?: string[]
+  acceptedAt?: string
+  attemptScope?: 'broad' | 'targeted' | 'subtask' | 'continuation'
+  fingerprint?: string
+  isRecoveryAttempt?: boolean
+  repeatedFailureCount?: number
+  lastAttemptScope?: 'broad' | 'targeted' | 'subtask' | 'continuation'
+  blockedRecoveryModes?: string[]
+  lastFailure?: ExecutorFailureContext
+  recentFailures?: ExecutorFailureContext[]
+}
+
+type ExecutionCompletePayload = {
+  requestId?: string
+  ok?: boolean
+  trace?: ExecutorTraceEntry[]
+  instruction?: string
+  result?: string
+  resultPreview?: string
+  approvalRequired?: boolean
+  approvalReason?: string
+  error?: string
+  failureType?: string
+  executorMode?: string
+  executorModeSource?: string
+  bridgeMode?: string
+  bridgeModeSource?: string
+  details?: ExecutorFailureContext
+}
+
+type ExecutorContinuationAnchor = {
+  targetPath?: string
+  subtask?: string
+  action?: string
+}
+
+type ExecutorExecutionScope = {
+  objectiveScope?: 'single-target' | 'single-subtask' | 'continuation'
+  allowedTargetPaths?: string[]
+  blockedTargetPaths?: string[]
+  successCriteria?: string[]
+  continuationAnchor?: ExecutorContinuationAnchor
+  enforceNarrowScope?: boolean
+}
+
+type ReusableArtifactLookupMatch = {
+  id: string
+  type?: string
+  sector?: string
+  visualStyle?: string
+  layoutVariant?: string
+  heroStyle?: string
+  localPath?: string
+  primaryCta?: string
+  secondaryCta?: string
+  typography?: {
+    headingFamily?: string
+    bodyFamily?: string
+    fontHref?: string
+  }
+  colors?: Record<string, string>
+  preview?: {
+    status?: string
+    imagePath?: string
+    generatedAt?: string
+    source?: string
+    errorMessage?: string
+  }
+  metadata?: Record<string, unknown>
+  matchReasons?: string[]
+}
+
+type ReusableArtifactLookupContract = {
+  executed: boolean
+  foundCount: number
+  matches: ReusableArtifactLookupMatch[]
+}
+
+type ReusableArtifactRecord = ReusableArtifactLookupMatch & {
+  sectorLabel?: string
+  tags?: string[]
+  createdAt?: string
+  updatedAt?: string
+}
+
+type ManualReuseMode =
+  | 'auto'
+  | 'none'
+  | 'inspiration-only'
+  | 'reuse-style'
+  | 'reuse-structure'
+  | 'reuse-style-and-structure'
+
+type ManualReusablePreference = {
+  artifactId?: string
+  reuseMode: Exclude<ManualReuseMode, 'auto'>
+  source?: string
+}
+
+type ProductArchitectureContract = {
+  source?: string
+  productType?: string
+  productName?: string
+  projectType?: string
+  domain?: string
+  domainLabel?: string
+  domainSlug?: string
+  users?: string[]
+  roles?: string[]
+  coreModules?: string[]
+  dataEntities?: string[]
+  keyFlows?: string[]
+  integrations?: string[]
+  criticalRisks?: string[]
+  approvalRequiredFor?: string[]
+  suggestedArchitecture?: {
+    frontend?: string
+    backend?: string
+    database?: string
+    auth?: string
+    payments?: string
+    storage?: string
+  }
+  phases?: string[]
+  safeFirstDelivery?: string[]
+  outOfScopeForFirstIteration?: string[]
+}
+
+type SafeFirstDeliveryPlanContract = {
+  scope?: string[]
+  modules?: string[]
+  mockData?: string[]
+  screens?: string[]
+  localBehavior?: string[]
+  explicitExclusions?: string[]
+  approvalRequiredLater?: string[]
+  successCriteria?: string[]
+}
+
+type SafeFirstDeliveryMaterializationContract = {
+  domainLabel?: string
+  productType?: string
+  modules?: string[]
+  screens?: string[]
+  entities?: string[]
+  mockCollections?: string[]
+  localActions?: string[]
+  stateHints?: string[]
+  approvalThemes?: string[]
+  explicitExclusions?: string[]
+}
+
+type DomainUnderstandingContract = {
+  domainLabel?: string
+  intentLabel?: string
+  productKind?: string
+  primaryModules?: string[]
+  primaryEntities?: string[]
+  secondaryEntities?: string[]
+  roles?: string[]
+  coreFlows?: string[]
+  stateModel?: string[]
+  localActions?: string[]
+  riskThemes?: string[]
+  approvalThemes?: string[]
+  explicitExclusions?: string[]
+}
+
+type ScalableDeliveryPlanFileContract = {
+  path?: string
+  purpose?: string
+  required?: boolean
+}
+
+type ScalableDeliveryPlanContract = {
+  deliveryLevel?:
+    | 'safe-first-delivery'
+    | 'frontend-project'
+    | 'fullstack-local'
+    | 'monorepo-local'
+    | 'infra-local-plan'
+  domainLabel?: string
+  domainSlug?: string
+  businessSector?: string
+  projectType?: string
+  targetRoot?: string
+  reason?: string
+  targetStructure?: string[]
+  allowedRootPaths?: string[]
+  modules?: string[]
+  directories?: string[]
+  filesToCreate?: ScalableDeliveryPlanFileContract[]
+  localOnlyConstraints?: string[]
+  explicitExclusions?: string[]
+  approvalRequiredLater?: string[]
+  successCriteria?: string[]
+}
+
+type ProjectBlueprintIntegrationContract = {
+  name?: string
+  type?: string
+  requiredNow?: boolean
+  approvalRequired?: boolean
+  reason?: string
+}
+
+type ProjectBlueprintPhaseContract = {
+  phase?: string
+  goal?: string
+  deliveryLevel?: ScalableDeliveryPlanContract['deliveryLevel'] | string
+  executableNow?: boolean
+  approvalRequired?: boolean
+}
+
+type ProjectBlueprintContract = {
+  productType?: string
+  domain?: string
+  intent?: string
+  deliveryLevel?: ScalableDeliveryPlanContract['deliveryLevel'] | string
+  confidence?: 'low' | 'medium' | 'high' | string
+  stackProfile?: {
+    frontend?: string
+    backend?: string
+    database?: string
+    apiStyle?: string
+    auth?: string
+    styling?: string
+    testing?: string
+    packageManager?: string
+    runtime?: string
+  }
+  roles?: string[]
+  modules?: string[]
+  entities?: string[]
+  coreFlows?: string[]
+  integrations?: ProjectBlueprintIntegrationContract[]
+  dataSensitivity?: 'none' | 'low' | 'medium' | 'high' | string
+  riskLevel?: 'low' | 'medium' | 'high' | string
+  assumptions?: string[]
+  blockingQuestions?: string[]
+  delegatedDecisions?: string[]
+  phasePlan?: ProjectBlueprintPhaseContract[]
+  explicitExclusions?: string[]
+  approvalRequiredLater?: string[]
+  successCriteria?: string[]
+}
+
+type ValidationPlanContract = {
+  scope?: string
+  level?: 'light' | 'medium' | 'full' | string
+  commands?: string[]
+  fileChecks?: ValidationPlanFileCheckContract[]
+  forbiddenPaths?: string[]
+  runtimeChecks?: string[]
+  manualChecks?: string[]
+  successCriteria?: string[]
+}
+
+type PhaseExpansionPlanContract = {
+  phaseId?: string
+  goal?: string
+  targetFiles?: string[]
+  changesExpected?: string[]
+  risks?: string[]
+  validationPlan?: ValidationPlanContract | null
+  executableNow?: boolean
+  approvalRequired?: boolean
+  nextExpectedAction?: string
+}
+
+type ExpansionOptionContract = {
+  id?: string
+  label?: string
+  description?: string
+  expansionType?: string
+  riskLevel?: 'low' | 'medium' | 'high' | string
+  safeToPrepare?: boolean
+  safeToMaterialize?: boolean
+  requiresApproval?: boolean
+  blocked?: boolean
+  blocker?: string
+  targetStrategy?: string
+  expectedFiles?: string[]
+  reason?: string
+}
+
+type ExpansionOptionsContract = {
+  projectRoot?: string
+  currentPhase?: string
+  recommendedOptionId?: string
+  options?: ExpansionOptionContract[]
+}
+
+type ModuleExpansionExpectedChangeContract = {
+  layer?: string
+  targetPath?: string
+  purpose?: string
+}
+
+type ModuleExpansionPlanContract = {
+  moduleId?: string
+  moduleName?: string
+  projectRoot?: string
+  domain?: string
+  expansionType?: string
+  reason?: string
+  safeToPrepare?: boolean
+  safeToMaterialize?: boolean
+  approvalRequired?: boolean
+  riskLevel?: 'low' | 'medium' | 'high' | string
+  affectedLayers?: string[]
+  targetFiles?: string[]
+  allowedTargetPaths?: string[]
+  forbiddenPaths?: string[]
+  blockers?: string[]
+  expectedChanges?: ModuleExpansionExpectedChangeContract[]
+  validationPlan?: ValidationPlanContract | null
+  explicitExclusions?: string[]
+  successCriteria?: string[]
+}
+
+type ModuleExpansionActionPayload = {
+  moduleId?: string
+  moduleName?: string
+  optionType?: string
+  targetStrategy?: string
+  expectedFiles?: string[] | null
+  safeToPrepare?: boolean
+  safeToMaterialize?: boolean
+  requiresApproval?: boolean
+  reason?: string
+}
+
+type ContinuationActionContract = {
+  id?: string
+  actionId?: string
+  title?: string
+  description?: string
+  category?: string
+  targetStrategy?: string
+  safeToPrepare?: boolean
+  safeToMaterialize?: boolean
+  requiresApproval?: boolean
+  blocked?: boolean
+  blocker?: string
+  approvalType?: string
+  expectedOutcome?: string
+  recommended?: boolean
+  priority?: number
+  phaseId?: string
+  moduleId?: string
+  riskLevel?: 'low' | 'medium' | 'high' | string
+  projectRoot?: string
+  deliveryLevel?: ScalableDeliveryPlanContract['deliveryLevel'] | string
+  reason?: string
+  targetFiles?: string[]
+  allowedTargetPaths?: string[]
+  explicitExclusions?: string[]
+  successCriteria?: string[]
+  risks?: string[]
+  validationPlan?: ValidationPlanContract | null
+}
+
+type ProjectContinuationStateContract = {
+  projectStatus?: string
+  completedPhases?: string[]
+  pendingPhases?: string[]
+  availableSafeActions?: ContinuationActionContract[]
+  availablePlanningActions?: ContinuationActionContract[]
+  approvalRequiredActions?: ContinuationActionContract[]
+  blockedActions?: ContinuationActionContract[]
+  modulesDone?: string[]
+  modulesAvailable?: string[]
+  modulesBlocked?: string[]
+  nextRecommendedAction?: ContinuationActionContract | null
+  nextRecommendedPhase?: string
+  nextRecommendedModule?: string
+  risks?: string[]
+  blockers?: string[]
+  summary?: string
+  operatorMessage?: string
+}
+
+type ApprovalRequestPlanContract = {
+  id?: string
+  title?: string
+  description?: string
+  approvalType?: string
+  status?: string
+  riskLevel?: 'low' | 'medium' | 'high' | string
+  requiresApproval?: boolean
+  blockedByDefault?: boolean
+  forbiddenInCurrentTask?: boolean
+  operatorMessage?: string
+  areaSummary?: string
+  touches?: string[]
+  willNotTouch?: string[]
+  validationsRequired?: string[]
+  safeAlternative?: string
+  approvalCopy?: string
+  explicitApprovalText?: string
+  targetStrategy?: string
+  projectRoot?: string
+  approvalPhrase?: string
+  operatorMustConfirm?: string
+  notExecutedDisclaimer?: string
+  expectedOutcome?: string
+  blockedReason?: string
+  relatedReadinessArea?: string
+  createdAt?: string
+  expiresAt?: string
+  commandsPreview?: string[]
+  filesPreview?: string[]
+  directoriesPreview?: string[]
+  envRequirements?: string[]
+  secretsRequired?: string[]
+  rollbackPlan?: string[]
+  validationPlan?: ValidationPlanContract | null
+  warnings?: string[]
+}
+
+type ProjectReadinessStateContract = {
+  readinessLevel?: string
+  demoReady?: boolean
+  safeLocalDemoReady?: boolean
+  completedCoreFlow?: boolean
+  lastApprovalRequest?: string
+  realExecutionReadiness?: string
+  pendingApprovals?: string[]
+  blockedRuntimeActions?: string[]
+  approvedActions?: string[]
+  approvalHistory?: LocalProjectManifestHistoryContract[]
+  completedPhases?: string[]
+  missingCorePhases?: string[]
+  completedModules?: string[]
+  missingRecommendedModules?: string[]
+  mockOnlyAreas?: string[]
+  realFilesystemAreas?: string[]
+  plannerOnlyAreas?: string[]
+  approvalRequiredAreas?: string[]
+  blockedAreas?: string[]
+  runtimeReadiness?: string
+  realExecutionReady?: boolean
+  validationStatus?: string
+  lastValidationSummary?: string
+  operatorSummary?: string
+  nextBestAction?: ContinuationActionContract | null
+  recommendedDemoScript?: string[]
+  warnings?: string[]
+  blockers?: string[]
+}
+
+type RuntimeApprovalStateContract = {
+  approvalId?: string
+  actionId?: string
+  title?: string
+  description?: string
+  status?: string
+  riskLevel?: 'low' | 'medium' | 'high' | string
+  requiresExplicitApproval?: boolean
+  approvalPhrase?: string
+  operatorMustConfirm?: string
+  commandsPreview?: string[]
+  filesPreview?: string[]
+  directoriesPreview?: string[]
+  envRequirements?: string[]
+  secretsRequired?: string[]
+  validationPlan?: ValidationPlanContract | null
+  rollbackPlan?: string[]
+  safeAlternative?: string
+  blockedReason?: string
+  expectedOutcome?: string
+  notExecutedDisclaimer?: string
+  createdAt?: string
+  expiresAt?: string
+  relatedReadinessArea?: string
+  relatedContinuationAction?: ContinuationActionContract | null
+  warnings?: string[]
+}
+
+type ProjectPhaseExecutionOperationPreviewContract = {
+  type?: string
+  targetPath?: string
+  purpose?: string
+}
+
+type ProjectPhaseExecutionPlanContract = {
+  phaseId?: string
+  sourceStrategy?: string
+  targetStrategy?: string
+  deliveryLevel?: ScalableDeliveryPlanContract['deliveryLevel'] | string
+  projectRoot?: string
+  goal?: string
+  reason?: string
+  executableNow?: boolean
+  approvalRequired?: boolean
+  riskLevel?: 'low' | 'medium' | 'high' | string
+  targetFiles?: string[]
+  allowedTargetPaths?: string[]
+  blockers?: string[]
+  operationsPreview?: ProjectPhaseExecutionOperationPreviewContract[]
+  validationPlan?: ValidationPlanContract | null
+  explicitExclusions?: string[]
+  successCriteria?: string[]
+}
 
 type GeneratedDomainMaterializationApprovalSurfaceContract = {
   present: boolean
@@ -499,6 +980,12 @@ type PlannerExecutionMetadata = {
   decisionKey: string
   businessSector: string
   businessSectorLabel: string
+  selectedDomain?: string
+  detectedVertical?: string
+  contractKind?: string
+  selectedContractKind?: string
+  sourceRoot?: string
+  targetRoot?: string
   creativeDirection: WebCreativeDirectionContract | null
   executionScope: ExecutorExecutionScope | null
   strategy: string
@@ -599,7 +1086,7 @@ type PlannerExecutionMetadata = {
   generatedDomainUniversalMaterializationPlan: Record<string, unknown> | null
   generatedDomainFileCreationApprovalEvaluation: Record<string, unknown> | null
   generatedDomainControlledRuntimeMaterializationSource: Record<string, unknown> | null
-  generatedDomainMaterializationApprovalSurface: GeneratedDomainMaterializationApprovalSurfaceContract
+  generatedDomainMaterializationApprovalSurface: GeneratedDomainMaterializationApprovalSurfaceContract | null
 }
 
 type PlannerRequestSnapshot = {
@@ -871,6 +1358,9 @@ type PlannerDecisionResponse = {
   generatedDomainContractDiagnostics?: PlannerExecutionMetadata['generatedDomainContractDiagnostics']
   generatedDomainContractComparison?: PlannerExecutionMetadata['generatedDomainContractComparison']
   generatedDomainContractObservation?: PlannerExecutionMetadata['generatedDomainContractObservation']
+  generatedDomainUniversalMaterializationPlan?: PlannerExecutionMetadata['generatedDomainUniversalMaterializationPlan']
+  generatedDomainFileCreationApprovalEvaluation?: PlannerExecutionMetadata['generatedDomainFileCreationApprovalEvaluation']
+  generatedDomainControlledRuntimeMaterializationSource?: PlannerExecutionMetadata['generatedDomainControlledRuntimeMaterializationSource']
   generatedDomainMaterializationApprovalSurface?: PlannerExecutionMetadata['generatedDomainMaterializationApprovalSurface']
   brainAdapter?: {
     id?: string
@@ -1298,7 +1788,11 @@ function normalizeContextHubRuntimeState(
     healthUrl: normalizeOptionalString(value.healthUrl),
     managedByJefe: value.managedByJefe === true,
     processId:
-      Number.isInteger(value.processId) && value.processId > 0 ? value.processId : null,
+      typeof value.processId === 'number' &&
+      Number.isInteger(value.processId) &&
+      value.processId > 0
+        ? value.processId
+        : null,
     canStart: value.canStart === true,
     canOpen: value.canOpen === true,
     appPath: normalizeOptionalString(value.appPath),
@@ -1343,6 +1837,7 @@ function normalizeContextHubRuntimeState(
             updatedAt: normalizeOptionalString(value.lastEventStatus.updatedAt),
             reason: normalizeOptionalString(value.lastEventStatus.reason),
             statusCode:
+              typeof value.lastEventStatus.statusCode === 'number' &&
               Number.isInteger(value.lastEventStatus.statusCode) &&
               value.lastEventStatus.statusCode >= 100
                 ? value.lastEventStatus.statusCode
@@ -1774,7 +2269,7 @@ const normalizeScalableDeliveryPlanContract = (
           (
             entry,
           ): entry is ScalableDeliveryPlanFileContract =>
-            Boolean(entry) && Object.keys(entry).length > 0,
+            hasNonEmptyObject(entry),
         )
     : []
 
@@ -1864,7 +2359,7 @@ const normalizeProjectBlueprintContract = (
         )
         .filter(
           (entry): entry is ProjectBlueprintIntegrationContract =>
-            Boolean(entry) && Object.keys(entry).length > 0,
+            hasNonEmptyObject(entry),
         )
     : []
   const normalizedPhasePlan = Array.isArray(contract.phasePlan)
@@ -1896,7 +2391,7 @@ const normalizeProjectBlueprintContract = (
         )
         .filter(
           (entry): entry is ProjectBlueprintPhaseContract =>
-            Boolean(entry) && Object.keys(entry).length > 0,
+            hasNonEmptyObject(entry),
         )
     : []
 
@@ -2137,7 +2632,7 @@ const normalizeImplementationRoadmapContract = (
         )
         .filter(
           (entry): entry is ImplementationRoadmapPhaseContract =>
-            Boolean(entry) && Object.keys(entry).length > 0,
+            hasNonEmptyObject(entry),
         )
     : []
 
@@ -2801,7 +3296,7 @@ const normalizeProjectReadinessStateContract = (
             )
             .filter(
               (entry): entry is LocalProjectManifestHistoryContract =>
-                Boolean(entry) && Object.keys(entry).length > 0,
+                hasNonEmptyObject(entry),
             ),
         }
       : {}),
@@ -2840,7 +3335,7 @@ const normalizeValidationPlanContract = (
         )
         .filter(
           (entry): entry is ValidationPlanFileCheckContract =>
-            Boolean(entry) && Object.keys(entry).length > 0,
+            hasNonEmptyObject(entry),
         )
     : []
 
@@ -3016,7 +3511,7 @@ const normalizeModuleExpansionPlanContract = (
         )
         .filter(
           (entry): entry is ModuleExpansionExpectedChangeContract =>
-            Boolean(entry) && Object.keys(entry).length > 0,
+            hasNonEmptyObject(entry),
         )
     : []
 
@@ -3114,7 +3609,7 @@ const normalizeProjectPhaseExecutionPlanContract = (
         )
         .filter(
           (entry): entry is ProjectPhaseExecutionOperationPreviewContract =>
-            Boolean(entry) && Object.keys(entry).length > 0,
+            hasNonEmptyObject(entry),
         )
     : []
 
@@ -3255,7 +3750,7 @@ const normalizeLocalProjectManifestContract = (
         )
         .filter(
           (entry): entry is LocalProjectManifestPhaseContract =>
-            Boolean(entry) && Object.keys(entry).length > 0,
+            hasNonEmptyObject(entry),
         )
     : []
   const normalizedModules = Array.isArray(contract.modules)
@@ -3286,7 +3781,7 @@ const normalizeLocalProjectManifestContract = (
         )
         .filter(
           (entry): entry is LocalProjectManifestModuleContract =>
-            Boolean(entry) && Object.keys(entry).length > 0,
+            hasNonEmptyObject(entry),
         )
     : []
   const normalizedHistory = Array.isArray(contract.history)
@@ -3314,7 +3809,7 @@ const normalizeLocalProjectManifestContract = (
         )
         .filter(
           (entry): entry is LocalProjectManifestHistoryContract =>
-            Boolean(entry) && Object.keys(entry).length > 0,
+            hasNonEmptyObject(entry),
         )
     : []
 
@@ -3505,7 +4000,7 @@ const normalizeGeneratedDomainMaterializationApprovalSurfaceContract = (
             NonNullable<
               NonNullable<GeneratedDomainMaterializationApprovalSurfaceContract>['validations']
             >['fileChecks']
-          >[number] => Boolean(entry) && Object.keys(entry).length > 0,
+          >[number] => hasNonEmptyObject(entry),
         )
     : []
 
@@ -3708,6 +4203,9 @@ const extractPlannerExecutionMetadata = (payload?: {
   generatedDomainContractDiagnostics?: PlannerExecutionMetadata['generatedDomainContractDiagnostics']
   generatedDomainContractComparison?: PlannerExecutionMetadata['generatedDomainContractComparison']
   generatedDomainContractObservation?: PlannerExecutionMetadata['generatedDomainContractObservation']
+  generatedDomainUniversalMaterializationPlan?: PlannerExecutionMetadata['generatedDomainUniversalMaterializationPlan']
+  generatedDomainFileCreationApprovalEvaluation?: PlannerExecutionMetadata['generatedDomainFileCreationApprovalEvaluation']
+  generatedDomainControlledRuntimeMaterializationSource?: PlannerExecutionMetadata['generatedDomainControlledRuntimeMaterializationSource']
   generatedDomainMaterializationApprovalSurface?: PlannerExecutionMetadata['generatedDomainMaterializationApprovalSurface']
   tasks?: unknown[]
   assumptions?: string[]
@@ -3737,6 +4235,7 @@ const extractPlannerExecutionMetadata = (payload?: {
       ? {
           executed: payload.reusableArtifactLookup.executed === true,
           foundCount:
+            typeof payload.reusableArtifactLookup.foundCount === 'number' &&
             Number.isInteger(payload.reusableArtifactLookup.foundCount) &&
             payload.reusableArtifactLookup.foundCount >= 0
               ? payload.reusableArtifactLookup.foundCount
@@ -3812,7 +4311,8 @@ const extractPlannerExecutionMetadata = (payload?: {
         }
       : null,
   reusableArtifactsFound:
-    Number.isInteger(payload?.reusableArtifactsFound) &&
+    typeof payload?.reusableArtifactsFound === 'number' &&
+    Number.isInteger(payload.reusableArtifactsFound) &&
     payload.reusableArtifactsFound >= 0
       ? payload.reusableArtifactsFound
       : 0,
@@ -3846,11 +4346,13 @@ const extractPlannerExecutionMetadata = (payload?: {
           payload.contextHubStatus.title.trim()
             ? { title: payload.contextHubStatus.title.trim() }
             : {}),
-          ...(Number.isInteger(payload.contextHubStatus.itemsCount) &&
+          ...(typeof payload.contextHubStatus.itemsCount === 'number' &&
+          Number.isInteger(payload.contextHubStatus.itemsCount) &&
           payload.contextHubStatus.itemsCount >= 0
             ? { itemsCount: payload.contextHubStatus.itemsCount }
             : {}),
-          ...(Number.isFinite(payload.contextHubStatus.estimatedTokens) &&
+          ...(typeof payload.contextHubStatus.estimatedTokens === 'number' &&
+          Number.isFinite(payload.contextHubStatus.estimatedTokens) &&
           payload.contextHubStatus.estimatedTokens >= 0
             ? { estimatedTokens: payload.contextHubStatus.estimatedTokens }
             : {}),
@@ -4235,7 +4737,12 @@ const extractPlannerExecutionMetadata = (payload?: {
               }
             : null,
         )
-        .filter(Boolean)
+        .filter(
+          (
+            task,
+          ): task is NonNullable<PlannerExecutionMetadata['tasks'][number]> =>
+            task !== null,
+        )
     : [],
   assumptions: Array.isArray(payload?.assumptions)
     ? payload.assumptions
@@ -5023,9 +5530,7 @@ const getOperatorStrategyLabel = (value: unknown) => {
   return getTechnicalDiagnosticLabel(value, 'Sin estrategia')
 }
 
-const getContinuityStateToneClass = (
-  tone: 'default' | 'sky' | 'emerald' | 'amber' | 'rose',
-) =>
+const getContinuityStateToneClass = (tone: MetricTone) =>
   tone === 'emerald'
     ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100'
     : tone === 'rose'
@@ -5151,7 +5656,7 @@ const buildProjectContinuityOptionItems = ({
   onPrepareModuleExpansion?: (payload: ModuleExpansionActionPayload) => void
   onMaterializeModuleExpansion?: (payload: ModuleExpansionActionPayload) => void
 }): ProjectContinuationActionSectionItem[] =>
-  visibleOptions.map((option) => {
+  visibleOptions.map((option, optionIndex) => {
     const normalizedOptionId = normalizeModuleUiId(option.id)
     const matchingModule = findMatchingManifestModule(manifestModules, normalizedOptionId)
     const alreadyDone =
@@ -5183,7 +5688,7 @@ const buildProjectContinuityOptionItems = ({
       !alreadyDone
 
     return {
-      key: option.id || option.label,
+      key: normalizeOptionalString(option.id || option.label) || `project-option-${optionIndex}`,
       title: normalizeOptionalString(option.label) || 'Opción sin título',
       description:
         normalizeOptionalString(option.description) || 'Sin descripción declarada.',
@@ -5271,7 +5776,7 @@ const buildContinuationOptionItems = ({
   dispatchPrepareAction: (action: ContinuationActionContract) => void
   dispatchMaterializeAction: (action: ContinuationActionContract) => void
 }): ProjectContinuationActionSectionItem[] =>
-  visibleOptions.map((option) => {
+  visibleOptions.map((option, optionIndex) => {
     const normalizedOptionId = normalizeModuleUiId(option.id)
     const matchingModule = findMatchingManifestModule(manifestModules, normalizedOptionId)
     const alreadyDone =
@@ -5314,7 +5819,7 @@ const buildContinuationOptionItems = ({
       !alreadyDone
 
     return {
-      key: option.id || option.label,
+      key: normalizeOptionalString(option.id || option.label) || `continuation-option-${optionIndex}`,
       title: normalizeOptionalString(option.label) || 'Opción sin título',
       description:
         normalizeOptionalString(option.description) || 'Sin descripción declarada.',
@@ -5408,11 +5913,11 @@ const buildContinuationModuleItems = ({
   ) => string
   getStatusTone: (normalizedStatus: string) => ContinuityToneKey
 }): ProjectContinuationModuleSectionItem[] =>
-  visibleModules.map((moduleEntry) => {
+  visibleModules.map((moduleEntry, moduleIndex) => {
     const normalizedStatus = normalizeOptionalString(moduleEntry.status).toLocaleLowerCase()
 
     return {
-      key: moduleEntry.id || moduleEntry.name,
+      key: normalizeOptionalString(moduleEntry.id || moduleEntry.name) || `module-${moduleIndex}`,
       title:
         normalizeOptionalString(moduleEntry.name) ||
         normalizeOptionalString(moduleEntry.id) ||
@@ -5528,7 +6033,7 @@ const buildContinuationActionSectionItems = ({
   dispatchPrepareAction: (action: ContinuationActionContract) => void
   dispatchMaterializeAction: (action: ContinuationActionContract) => void
 }): ProjectContinuationActionSectionItem[] =>
-  actions.map((action) => {
+  actions.map((action, actionIndex) => {
     const normalizedModuleId = normalizeModuleUiId(action.moduleId || '')
     const matchingModule = findMatchingManifestModule(manifestModules, normalizedModuleId)
     const alreadyDone =
@@ -5553,7 +6058,7 @@ const buildContinuationActionSectionItems = ({
       !alreadyDone
 
     return {
-      key: action.id || action.title,
+      key: normalizeOptionalString(action.id || action.title) || `action-${actionIndex}`,
       title: normalizeOptionalString(action.title) || 'Acción sin título',
       description:
         normalizeOptionalString(action.description) || 'Sin descripción declarada.',
@@ -5728,8 +6233,7 @@ const resolveProjectContinuityCenterNextRecommendedAction = ({
       }
     : null)
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function ProjectContinuityCard({
+export function ProjectContinuityCard({
   nextActionPlan,
   implementationRoadmap,
   phaseExpansionPlan,
@@ -6289,8 +6793,6 @@ function ProjectContinuityCenterCard({
     ],
     24,
   )
-  const runtimeApprovalStatusLabel = getRuntimeApprovalStatusLabel(runtimeApprovalState?.status)
-  const runtimeApprovalTone = getRuntimeApprovalTone(runtimeApprovalState?.status)
   const approvalPacketTouches = normalizeOptionalStringArray(approvalRequestPlan?.touches)
   const approvalPacketWillNotTouch = normalizeOptionalStringArray(
     approvalRequestPlan?.willNotTouch,
@@ -6334,35 +6836,26 @@ function ProjectContinuityCenterCard({
     nextRecommendedAction &&
       (nextRecommendedAction.requiresApproval || nextRecommendedAction.blocked),
   )
-  const hasActiveApprovalFlow = Boolean(
-    (runtimeApprovalAction &&
-      runtimeApprovalState &&
-      (runtimeApprovalAction.requiresApproval || runtimeApprovalAction.blocked)) ||
-      nextRecommendedNeedsApproval,
-  )
-  const shouldShowRuntimeApprovalPanel = Boolean(
-    runtimeApprovalState &&
-      runtimeApprovalAction &&
-      (runtimeApprovalAction.requiresApproval || runtimeApprovalAction.blocked),
-  )
-  const shouldShowApprovalRequestPanel = Boolean(
-    !shouldShowRuntimeApprovalPanel &&
-      approvalRequestPlan &&
-      approvalPacketAction &&
-      nextRecommendedNeedsApproval &&
-      (approvalPacketAction.requiresApproval || approvalPacketAction.blocked),
-  )
-  const readinessApprovalTitle = hasActiveApprovalFlow
-    ? 'Requiere aprobación'
-    : 'Aprobaciones futuras'
-  const readinessApprovalItems =
-    readinessApprovalAreas.length > 0
-      ? readinessApprovalAreas
-      : [
-          hasActiveApprovalFlow
-            ? 'No se toca nada real sin aprobación.'
-            : 'La fase segura actual no necesita aprobación. Lo sensible queda para más adelante.',
-        ]
+  const approvalPanelsViewModel = buildProjectContinuationApprovalPanelsViewModel({
+    runtimeApprovalState,
+    runtimeApprovalAction,
+    approvalRequestPlan,
+    approvalPacketAction,
+    nextRecommendedNeedsApproval,
+    readinessApprovalAreas,
+    runtimeApprovalCommands,
+    runtimeApprovalFiles,
+    runtimeApprovalDirectories,
+    runtimeApprovalEnv,
+    runtimeApprovalSecrets,
+    runtimeApprovalValidations,
+    runtimeApprovalAlternativeItems,
+    runtimeApprovalRiskItems,
+    approvalPacketTouches,
+    approvalPacketWillNotTouch,
+    approvalPacketValidations,
+    approvalPacketWarnings,
+  })
 
   const dispatchPrepareAction = (action: ContinuationActionContract) =>
     dispatchPrepareContinuationAction({
@@ -6422,115 +6915,42 @@ function ProjectContinuityCenterCard({
             ? 'amber'
             : 'default',
   })
+  const summaryCardViewModel = buildProjectContinuationSummaryCardViewModel({
+    operatorMessage,
+    nextStepReason,
+    statusLabel: nextStepVisualState.label,
+    statusToneClass: getContinuityStateToneClass(nextStepVisualState.tone),
+    nextStepTitle,
+    projectStatusLabel,
+    currentPhaseLabel,
+    projectStatusTone: nextStepVisualState.tone,
+    completedPhases,
+    pendingPhases,
+    nextRecommendedPhaseId,
+    manifestModules,
+    modulesDone,
+    visibleModules,
+    nextRecommendedAction,
+  })
 
   return (
     <article className="rounded-3xl border border-emerald-300/15 bg-emerald-300/[0.05] p-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Centro de continuidad
-          </div>
-          <div className="mt-2 text-lg font-semibold text-white">
-            Próximo paso recomendado
-          </div>
-          <div className="mt-2 text-sm leading-6 text-slate-300">
-            {operatorMessage}
-          </div>
-          <div className="mt-2 text-xs leading-5 text-slate-400">{nextStepReason}</div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <span
-            className={joinClasses(
-              'rounded-full border px-3 py-1 text-xs font-medium',
-              getContinuityStateToneClass(nextStepVisualState.tone),
-            )}
-          >
-            {nextStepVisualState.label}
-          </span>
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-            {nextStepTitle}
-          </span>
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
-            {projectStatusLabel}
-          </span>
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Estado del proyecto"
-          value={projectStatusLabel}
-          detail={currentPhaseLabel}
-          tone={nextStepVisualState.tone}
-        />
-        <MetricCard
-          label="Ya completado"
-          value={
-            completedPhases.length > 0
-              ? `${completedPhases.length} fase(s)`
-              : 'Nada declarado'
-          }
-          detail={completedPhases[0] || 'Todav\u00eda no hay fases completas declaradas'}
-          tone="sky"
-        />
-        <MetricCard
-          label="Falta resolver"
-          value={
-            pendingPhases.length > 0
-              ? `${pendingPhases.length} fase(s)`
-              : 'Base segura completa'
-          }
-          detail={
-            pendingPhases[0] ||
-            nextRecommendedPhaseId ||
-            'Conviene revisar la siguiente expansión'
-          }
-          tone={pendingPhases.length > 0 ? 'amber' : 'emerald'}
-        />
-        <MetricCard
-          label="Módulos del proyecto"
-          value={
-            manifestModules.length > 0 ? `${manifestModules.length} módulo(s)` : 'Sin módulos'
-          }
-          detail={
-            modulesDone[0] ||
-            visibleModules[0]?.name ||
-            visibleModules[0]?.id ||
-            'Todavía no hay módulos declarados'
-          }
-          tone="emerald"
-        />
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        {nextRecommendedAction?.safeToPrepare !== false ? (
-          <button
-            type="button"
-            onClick={() => nextRecommendedAction && dispatchPrepareAction(nextRecommendedAction)}
-            disabled={busy || !nextRecommendedAction}
-            className="rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-2 text-xs font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-          >
-            {getPrepareActionButtonLabel({
-              requiresApproval: nextRecommendedAction?.requiresApproval,
-              blocked: nextRecommendedAction?.blocked,
-            })}
-          </button>
-        ) : null}
-        {nextRecommendedAction?.safeToMaterialize === true &&
-        !nextRecommendedAction.requiresApproval &&
-        !nextRecommendedAction.blocked ? (
-          <button
-            type="button"
-            onClick={() =>
-              nextRecommendedAction && dispatchMaterializeAction(nextRecommendedAction)
-            }
-            disabled={busy || !nextRecommendedAction}
-            className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-2 text-xs font-medium text-emerald-100 transition hover:bg-emerald-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
-          >
-            Materializar seguro
-          </button>
-        ) : null}
-      </div>
+      <ProjectContinuationSummaryCard
+          {...summaryCardViewModel}
+        onPrepare={
+          nextRecommendedAction && nextRecommendedAction.safeToPrepare !== false
+            ? () => dispatchPrepareAction(nextRecommendedAction)
+            : undefined
+        }
+        onMaterialize={
+          nextRecommendedAction?.safeToMaterialize === true &&
+          !nextRecommendedAction.requiresApproval &&
+          !nextRecommendedAction.blocked
+            ? () => nextRecommendedAction && dispatchMaterializeAction(nextRecommendedAction)
+            : undefined
+        }
+        busy={busy}
+      />
 
       {shouldShowDetectedProjectBanner ? (
         <DetectedProjectBanner
@@ -6583,8 +7003,8 @@ function ProjectContinuityCenterCard({
               ? readinessMockOnlyAreas
               : ['Esto es mock, no producción.']
           }
-          approvalTitle={readinessApprovalTitle}
-          approvalItems={readinessApprovalItems}
+          approvalTitle={approvalPanelsViewModel.readinessApprovalTitle}
+          approvalItems={approvalPanelsViewModel.readinessApprovalItems}
           blockedItems={
             readinessBlockedAreas.length > 0
               ? readinessBlockedAreas
@@ -6613,101 +7033,31 @@ function ProjectContinuityCenterCard({
         />
       ) : null}
 
-      {shouldShowRuntimeApprovalPanel ? (
+      {approvalPanelsViewModel.showRuntimeApprovalPanel && runtimeApprovalState ? (
         <RuntimeApprovalPanel
-          title={normalizeOptionalString(runtimeApprovalState.title) || 'Pasar a ejecución real'}
-          disclaimer={
-            normalizeOptionalString(runtimeApprovalState.notExecutedDisclaimer) ||
-            'No se ejecutó nada todavía.'
-          }
-          description={
-            normalizeOptionalString(runtimeApprovalState.description) ||
-            normalizeOptionalString(runtimeApprovalState.safeAlternative) ||
-            'JEFE preparó un preview controlado sin salir del modo local seguro.'
-          }
-          statusLabel={runtimeApprovalStatusLabel}
-          statusToneClass={getContinuityStateToneClass(runtimeApprovalTone)}
+          title={approvalPanelsViewModel.runtimeApprovalTitle}
+          disclaimer={approvalPanelsViewModel.runtimeApprovalDisclaimer}
+          description={approvalPanelsViewModel.runtimeApprovalDescription}
+          statusLabel={approvalPanelsViewModel.runtimeApprovalStatusLabel}
+          statusToneClass={getContinuityStateToneClass(
+            approvalPanelsViewModel.runtimeApprovalStatusTone,
+          )}
           riskLabel={getRiskLabel(runtimeApprovalState.riskLevel)}
-          gateDetail={
-            normalizeOptionalString(runtimeApprovalState.relatedReadinessArea) ||
-            'La ejecución real sigue bloqueada hasta aprobación explícita.'
-          }
-          commandsValue={
-            runtimeApprovalCommands.length > 0
-              ? `${runtimeApprovalCommands.length} comando(s)`
-              : 'Sin comandos'
-          }
-          commandsDetail={
-            runtimeApprovalCommands[0] ||
-            'No hay comandos propuestos para esta aprobación.'
-          }
-          validationsValue={
-            runtimeApprovalValidations.length > 0
-              ? `${runtimeApprovalValidations.length} check(s)`
-              : 'Sin checks'
-          }
-          validationsDetail={
-            runtimeApprovalValidations[0] ||
-            'Primero hay que revisar riesgo, alcance y alternativa segura.'
-          }
-          safeAlternativeValue={
-            normalizeOptionalString(runtimeApprovalState.safeAlternative) ||
-            'Seguir en modo local seguro'
-          }
-          safeAlternativeDetail={
-            normalizeOptionalString(runtimeApprovalState.expectedOutcome) ||
-            'Todavía no se ejecuta nada real.'
-          }
-          statusTone={runtimeApprovalTone}
-          proposedCommands={
-            runtimeApprovalCommands.length > 0
-              ? runtimeApprovalCommands
-              : ['Todavía no hay comandos propuestos para esta aprobación.']
-          }
-          touchedFiles={
-            runtimeApprovalFiles.length > 0
-              ? runtimeApprovalFiles
-              : approvalPacketTouches.length > 0
-                ? approvalPacketTouches
-                : ['El alcance sigue siendo solo informativo por ahora.']
-          }
-          directoriesAndEnv={
-            [
-              ...runtimeApprovalDirectories,
-              ...runtimeApprovalEnv,
-              ...runtimeApprovalSecrets,
-            ].length > 0
-              ? [
-                  ...runtimeApprovalDirectories,
-                  ...runtimeApprovalEnv,
-                  ...runtimeApprovalSecrets,
-                ]
-              : ['No se toca nada real sin aprobación.']
-          }
-          validationItems={
-            runtimeApprovalValidations.length > 0
-              ? runtimeApprovalValidations
-              : approvalPacketValidations.length > 0
-                ? approvalPacketValidations
-                : ['Revisar alcance, riesgo y alternativa segura antes de aprobar.']
-          }
-          safeAlternativeItems={
-            runtimeApprovalAlternativeItems.length > 0
-              ? runtimeApprovalAlternativeItems
-              : approvalPacketWillNotTouch.length > 0
-                ? approvalPacketWillNotTouch
-                : ['No se ejecutó nada todavía.']
-          }
-          riskItems={
-            runtimeApprovalRiskItems.length > 0
-              ? runtimeApprovalRiskItems
-              : ['No se toca nada real sin aprobación.']
-          }
-          footerMessage={
-            normalizeOptionalString(runtimeApprovalState.approvalPhrase) ||
-            normalizeOptionalString(runtimeApprovalState.notExecutedDisclaimer) ||
-            'No se ejecutó todavía. Primero hace falta revisar y aprobar el alcance.'
-          }
+          gateDetail={approvalPanelsViewModel.runtimeApprovalGateDetail}
+          commandsValue={approvalPanelsViewModel.runtimeApprovalCommandsValue}
+          commandsDetail={approvalPanelsViewModel.runtimeApprovalCommandsDetail}
+          validationsValue={approvalPanelsViewModel.runtimeApprovalValidationsValue}
+          validationsDetail={approvalPanelsViewModel.runtimeApprovalValidationsDetail}
+          safeAlternativeValue={approvalPanelsViewModel.runtimeApprovalSafeAlternativeValue}
+          safeAlternativeDetail={approvalPanelsViewModel.runtimeApprovalSafeAlternativeDetail}
+          statusTone={approvalPanelsViewModel.runtimeApprovalStatusTone}
+          proposedCommands={approvalPanelsViewModel.runtimeApprovalProposedCommands}
+          touchedFiles={approvalPanelsViewModel.runtimeApprovalTouchedFiles}
+          directoriesAndEnv={approvalPanelsViewModel.runtimeApprovalDirectoriesAndEnv}
+          validationItems={approvalPanelsViewModel.runtimeApprovalValidationItems}
+          safeAlternativeItems={approvalPanelsViewModel.runtimeApprovalSafeAlternativeItems}
+          riskItems={approvalPanelsViewModel.runtimeApprovalRiskItems}
+          footerMessage={approvalPanelsViewModel.runtimeApprovalFooterMessage}
           compact={compact}
           busy={busy}
           onPrepare={
@@ -6716,84 +7066,29 @@ function ProjectContinuityCenterCard({
               : undefined
           }
         />
-      ) : shouldShowApprovalRequestPanel ? (
+      ) : approvalPanelsViewModel.showApprovalRequestPanel && approvalRequestPlan ? (
         <ApprovalRequestPanel
-          title={
-            normalizeOptionalString(approvalRequestPlan.title) || 'Acción sensible pendiente'
-          }
-          operatorMessage={
-            normalizeOptionalString(approvalRequestPlan.operatorMessage) ||
-            normalizeOptionalString(approvalRequestPlan.description) ||
-            'Todavía no se ejecutó nada real.'
-          }
-          areaSummary={
-            normalizeOptionalString(approvalRequestPlan.areaSummary) ||
-            normalizeOptionalString(approvalRequestPlan.safeAlternative) ||
-            'JEFE preparó el paquete de aprobación sin salir del modo local seguro.'
-          }
-          statusLabel={
-            approvalRequestPlan.blockedByDefault
-              ? 'Bloqueado por seguridad'
-              : 'Requiere aprobación'
-          }
+          title={approvalPanelsViewModel.approvalRequestTitle}
+          operatorMessage={approvalPanelsViewModel.approvalRequestOperatorMessage}
+          areaSummary={approvalPanelsViewModel.approvalRequestAreaSummary}
+          statusLabel={approvalPanelsViewModel.approvalRequestStatusLabel}
           statusToneClass={getContinuityStateToneClass(
-            approvalRequestPlan.blockedByDefault ? 'rose' : 'amber',
+            approvalPanelsViewModel.approvalRequestStatusTone,
           )}
           riskLabel={getRiskLabel(approvalRequestPlan.riskLevel)}
           riskTone={getRiskTone(approvalRequestPlan.riskLevel)}
-          riskDetail={normalizeOptionalString(approvalRequestPlan.approvalType) || 'Sin tipo'}
-          approvalAreasValue={
-            approvalPacketTouches.length > 0
-              ? `${approvalPacketTouches.length} area(s)`
-              : 'Sin áreas'
-          }
-          approvalAreasDetail={approvalPacketTouches[0] || 'Sin alcance declarado'}
-          safeAlternativeValue={
-            normalizeOptionalString(approvalRequestPlan.safeAlternative) ||
-            'Seguir en modo local seguro'
-          }
-          safeAlternativeDetail={
-            normalizeOptionalString(approvalRequestPlan.approvalCopy) || 'Sin copy'
-          }
-          stateValue={
-            approvalRequestPlan.blockedByDefault
-              ? 'Bloqueado'
-              : approvalRequestPlan.requiresApproval
-                ? 'Pendiente'
-                : 'Revisable'
-          }
-          stateDetail={
-            approvalRequestPlan.forbiddenInCurrentTask
-              ? 'No se ejecuta en esta tarea.'
-              : 'Todavía no se ejecutó nada real.'
-          }
-          touchedAreas={
-            approvalPacketTouches.length > 0
-              ? approvalPacketTouches
-              : ['El alcance sigue siendo solo informativo por ahora.']
-          }
-          untouchedAreas={
-            approvalPacketWillNotTouch.length > 0
-              ? approvalPacketWillNotTouch
-              : ['No se toca nada real sin aprobación.']
-          }
-          validationItems={
-            approvalPacketValidations.length > 0
-              ? approvalPacketValidations
-              : ['Revisar alcance, riesgo y alternativa segura antes de aprobar.']
-          }
-          warningItems={
-            approvalPacketWarnings.length > 0
-              ? approvalPacketWarnings
-              : [
-                  normalizeOptionalString(approvalRequestPlan.explicitApprovalText) ||
-                    'No se ejecuta nada real en esta corrida.',
-                ]
-          }
-          footerMessage={
-            normalizeOptionalString(approvalRequestPlan.explicitApprovalText) ||
-            'No se ejecutó todavía. Primero hace falta revisar y aprobar el alcance.'
-          }
+          riskDetail={approvalPanelsViewModel.approvalRequestRiskDetail}
+          approvalAreasValue={approvalPanelsViewModel.approvalRequestAreasValue}
+          approvalAreasDetail={approvalPanelsViewModel.approvalRequestAreasDetail}
+          safeAlternativeValue={approvalPanelsViewModel.approvalRequestSafeAlternativeValue}
+          safeAlternativeDetail={approvalPanelsViewModel.approvalRequestSafeAlternativeDetail}
+          stateValue={approvalPanelsViewModel.approvalRequestStateValue}
+          stateDetail={approvalPanelsViewModel.approvalRequestStateDetail}
+          touchedAreas={approvalPanelsViewModel.approvalRequestTouchedAreas}
+          untouchedAreas={approvalPanelsViewModel.approvalRequestUntouchedAreas}
+          validationItems={approvalPanelsViewModel.approvalRequestValidationItems}
+          warningItems={approvalPanelsViewModel.approvalRequestWarningItems}
+          footerMessage={approvalPanelsViewModel.approvalRequestFooterMessage}
           compact={compact}
           busy={busy}
           onPrepare={
@@ -6831,9 +7126,11 @@ function ProjectContinuityCenterCard({
           'amber',
         )}
         {renderActionCards(
-          hasActiveApprovalFlow ? 'Requiere aprobación' : 'Aprobaciones futuras',
+          approvalPanelsViewModel.hasActiveApprovalFlow
+            ? 'Requiere aprobación'
+            : 'Aprobaciones futuras',
           approvalRequiredActions,
-          hasActiveApprovalFlow
+          approvalPanelsViewModel.hasActiveApprovalFlow
             ? 'No hay acciones pendientes de aprobación en esta corrida.'
             : 'No hay aprobaciones futuras nuevas en esta corrida.',
           'rose',
@@ -8045,6 +8342,9 @@ const normalizeOptionalStringArray = (value: unknown) =>
       )
     : []
 
+const hasNonEmptyObject = <T extends object>(value: T | null | undefined): value is T =>
+  value !== null && value !== undefined && Object.keys(value).length > 0
+
 const summarizeUniqueStrings = (value: unknown, limit = 10) => {
   const uniqueValues: string[] = []
 
@@ -8548,7 +8848,7 @@ const normalizeMaterializationPlanOperations = (
 ): Array<{ type: string; targetPath: string }> =>
   Array.isArray(value)
     ? value
-        .map((entry) => {
+        .map<ExecutorValidationResult | null>((entry) => {
           if (!entry || typeof entry !== 'object') {
             return null
           }
@@ -8572,7 +8872,7 @@ const normalizeMaterializationPlanValidationEntries = (
 ): ExecutorValidationResult[] =>
   Array.isArray(value)
     ? value
-        .map((entry) => {
+        .map<ExecutorValidationResult | null>((entry) => {
           if (!entry || typeof entry !== 'object') {
             return null
           }
@@ -9246,8 +9546,10 @@ const deriveExecutionRunScenarioLabel = (
   return 'Caso feliz base'
 }
 
+type ExecutionRunSummaryInput = Omit<ExecutionRunSummary, 'scenarioLabel'>
+
 const buildExecutionRunSummary = (
-  partialSummary: Omit<ExecutionRunSummary, 'scenarioLabel'>,
+  partialSummary: ExecutionRunSummaryInput,
 ): ExecutionRunSummary => ({
   ...partialSummary,
   scenarioLabel: deriveExecutionRunScenarioLabel(partialSummary),
@@ -9666,7 +9968,7 @@ const mergeResolvedDecisionRecords = (
   // nueva decisión de la misma familia debe reemplazar a la anterior en vez de
   // convivir con ella y dejar al planner en un estado ambiguo.
   const normalizedIncomingRecords = incomingRecords
-    .map((record) => {
+    .map<ResolvedDecisionRecord | null>((record) => {
       const normalizedKey = normalizeResolvedDecisionKey(record?.key)
 
       if (!normalizedKey) {
@@ -10540,7 +10842,7 @@ const getStoredResolvedDecisions = (): ResolvedDecisionRecord[] => {
     }
 
     return parsedValue
-      .map((record) => {
+      .map<ResolvedDecisionRecord | null>((record) => {
         const normalizedKey = normalizeResolvedDecisionKey(record?.key)
 
         if (!normalizedKey) {
@@ -10590,14 +10892,14 @@ const getStoredResolvedDecisions = (): ResolvedDecisionRecord[] => {
           ...(Array.isArray(record?.allowsNow)
             ? {
                 allowsNow: record.allowsNow
-                  .map((entry) => normalizeOptionalString(entry))
+                  .map((entry: unknown) => normalizeOptionalString(entry))
                   .filter(Boolean),
               }
             : {}),
           ...(Array.isArray(record?.forbidsNow)
             ? {
                 forbidsNow: record.forbidsNow
-                  .map((entry) => normalizeOptionalString(entry))
+                  .map((entry: unknown) => normalizeOptionalString(entry))
                   .filter(Boolean),
               }
             : {}),
@@ -15303,7 +15605,7 @@ No usar credenciales.`
   const updateLastRunSummary = (
     summary: Partial<typeof DEFAULT_LAST_RUN_SUMMARY>,
   ) => {
-    setLastRunSummary((currentSummary) => ({
+    setLastRunSummary((currentSummary: typeof DEFAULT_LAST_RUN_SUMMARY) => ({
       ...currentSummary,
       context: currentExecutionContextSummary,
       workspacePath: currentWorkspaceSummary,
@@ -15361,7 +15663,7 @@ No usar credenciales.`
   }
   const upsertExecutionRunSummary = (
     runId: string,
-    updater: (currentSummary: ExecutionRunSummary | null) => ExecutionRunSummary,
+    updater: (currentSummary: ExecutionRunSummary | null) => ExecutionRunSummaryInput,
   ) => {
     if (!runId) {
       return
@@ -15383,7 +15685,7 @@ No usar credenciales.`
     })
   }
   const updateActiveExecutionRunSummary = (
-    updater: (currentSummary: ExecutionRunSummary) => ExecutionRunSummary,
+    updater: (currentSummary: ExecutionRunSummary) => ExecutionRunSummaryInput,
   ) => {
     const activeRunId = activeExecutionRunIdRef.current
 
@@ -15840,7 +16142,7 @@ No usar credenciales.`
           : decisionProfile.decisionValue === 'approved'
             ? 'approved'
             : 'resolved'
-      ) as const,
+      ) as ResolvedDecisionRecord['status'],
       source: (approvalSource || 'planner') as ResolvedDecisionRecord['source'],
       decision: decisionProfile.decisionValue,
       label: decisionProfile.decisionLabel,
@@ -17018,7 +17320,7 @@ No usar credenciales.`
         setCurrentStep('El Cerebro no pudo definir una acción ejecutable')
         updateLastRunSummary({
           objective: normalizedGoalInput,
-          instruction: instructionToExecute,
+          instruction: replanGoal,
           result:
             'La replanificación no devolvió una instrucción utilizable para continuar.',
           approval: approvedByProjectRule
@@ -17080,16 +17382,15 @@ No usar credenciales.`
 
         openApprovalCheckpoint({
           source: 'planner',
-          instruction: effectiveResponse.instruction,
+          instruction: normalizeOptionalString(effectiveResponse.instruction),
           payload: effectiveResponse,
-          planCompletion: effectiveResponse.completed === true,
         })
         clearVisibleExecutionRuntimeState()
         setSessionStatus('Esperando aprobación para continuar')
         setCurrentStep('El Cerebro necesita una decision humana antes de seguir')
         updateLastRunSummary({
           objective: normalizedGoalInput,
-          instruction: effectiveResponse.instruction,
+          instruction: normalizeOptionalString(effectiveResponse.instruction),
           result: 'Pendiente de aprobación',
           approval: 'Manual requerida',
           finalStatus: 'Esperando aprobación para continuar',
@@ -17106,7 +17407,7 @@ No usar credenciales.`
         setCurrentStep('El Cerebro necesita una nueva definición antes de ejecutar')
         updateLastRunSummary({
           objective: normalizedGoalInput,
-          instruction: effectiveResponse.instruction,
+          instruction: normalizeOptionalString(effectiveResponse.instruction),
           result: effectiveResponse.instruction,
           approval: approvedByProjectRule
             ? 'Autoaprobada por regla del proyecto'
@@ -18366,7 +18667,7 @@ No usar credenciales.`
     validateResponse?: (
       response: PlannerDecisionResponse,
       metadata: PlannerExecutionMetadata,
-    ) => string
+    ) => string | undefined
   }) => {
     const plannerGoal = normalizeOptionalString(options?.goal) || goalInput
     const plannerContext =
@@ -18551,7 +18852,7 @@ No usar credenciales.`
 
         openApprovalCheckpoint({
           source: 'planner',
-          instruction: effectiveResponse.instruction,
+          instruction: normalizeOptionalString(effectiveResponse.instruction),
           payload: effectiveResponse,
         })
         clearVisibleExecutionRuntimeState()
@@ -18704,7 +19005,7 @@ No usar credenciales.`
         setSessionStatus('Plan generado')
         setCurrentStep(
           buildPlannedCurrentStepLabel({
-            plannerInstruction: effectiveResponse.instruction,
+            plannerInstruction: normalizeOptionalString(effectiveResponse.instruction),
             executionMode: nextExecutionMetadata.executionMode,
           }),
         )
@@ -22028,7 +22329,9 @@ No usar credenciales.`
                   <button
                     id="generate-next-step-button"
                     type="button"
-                    onClick={handleGenerateNextStep}
+                    onClick={() => {
+                      void handleGenerateNextStep()
+                    }}
                     disabled={isPlanning}
                     className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
                   >
@@ -22042,7 +22345,9 @@ No usar credenciales.`
                     <button
                       id="execute-current-instruction-button"
                       type="button"
-                      onClick={handleExecuteCurrentInstruction}
+                      onClick={() => {
+                        void handleExecuteCurrentInstruction()
+                      }}
                       disabled={!canExecuteInstruction || isExecutingTask}
                       className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
                     >
@@ -23666,7 +23971,9 @@ No usar credenciales.`
               <div className="mt-3 grid gap-2">
                 <button
                   type="button"
-                  onClick={handleGenerateNextStep}
+                  onClick={() => {
+                    void handleGenerateNextStep()
+                  }}
                   disabled={isPlanning}
                   className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
                 >
@@ -23693,7 +24000,9 @@ No usar credenciales.`
                 ) : null}
                 <button
                   type="button"
-                  onClick={handleExecuteCurrentInstruction}
+                  onClick={() => {
+                    void handleExecuteCurrentInstruction()
+                  }}
                   hidden={plannerIsReviewOnly}
                   disabled={!canExecuteInstruction || isExecutingTask}
                   className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
@@ -23913,13 +24222,21 @@ No usar credenciales.`
             ) : null}
 
             {activeSection === 'v1' ? (
-              <V1ClosureDashboard
-                headLabel="0245b97 docs: accept V1 orchestrator release"
-                branchLabel="main"
-                repoStatusLabel="Clean / synced with origin"
-                ciLabel="CI success for 0245b97"
-                latestRunLabel="V1 Final Acceptance"
-              />
+              <Suspense
+                fallback={
+                  <article className="rounded-3xl border border-white/8 bg-white/[0.03] p-6 text-sm leading-6 text-slate-300">
+                    Cargando tablero de cierre V1...
+                  </article>
+                }
+              >
+                <LazyV1ClosureDashboard
+                  headLabel="0245b97 docs: accept V1 orchestrator release"
+                  branchLabel="main"
+                  repoStatusLabel="Clean / synced with origin"
+                  ciLabel="CI success for 0245b97"
+                  latestRunLabel="V1 Final Acceptance"
+                />
+              </Suspense>
             ) : null}
 
             {activeSection === 'objetivo' ? (
@@ -23931,7 +24248,9 @@ No usar credenciales.`
                   actions={
                     <button
                       type="button"
-                      onClick={handleGenerateNextStep}
+                      onClick={() => {
+                        void handleGenerateNextStep()
+                      }}
                       disabled={isPlanning}
                       className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
                     >
@@ -24103,7 +24422,9 @@ No usar credenciales.`
                       <button
                         id="generate-next-step-button"
                         type="button"
-                        onClick={handleGenerateNextStep}
+                        onClick={() => {
+                          void handleGenerateNextStep()
+                        }}
                         disabled={isPlanning}
                         className="rounded-xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"
                       >
@@ -24403,7 +24724,9 @@ No usar credenciales.`
                       <button
                         id="execute-current-instruction-button"
                         type="button"
-                        onClick={handleExecuteCurrentInstruction}
+                        onClick={() => {
+                          void handleExecuteCurrentInstruction()
+                        }}
                         hidden={plannerIsReviewOnly}
                         disabled={!canExecuteInstruction || isExecutingTask}
                         className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-500"

@@ -20,6 +20,7 @@
     "quality:ci": "node scripts/ai-quality.mjs",
     "ai-planner-smoke": "node scripts/ai-planner-smoke.mjs",
     "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit",
     "preview": "vite preview --config vite.config.ts --configLoader native"
   },
   "dependencies": {

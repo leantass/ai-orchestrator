@@ -39,6 +39,13 @@ const PRODUCT_ARCHITECTURE_TYPE_LABELS: Record<string, string> = {
 const normalizeOptionalString = (value: unknown) =>
   typeof value === 'string' ? value.trim() : ''
 
+const normalizeOptionalStringArray = (value: unknown) =>
+  Array.isArray(value)
+    ? value.filter(
+        (entry): entry is string => typeof entry === 'string' && entry.trim() !== '',
+      )
+    : []
+
 const getProductArchitectureTypeLabel = (value: unknown) => {
   const normalizedValue = normalizeOptionalString(value).toLocaleLowerCase()
 
@@ -98,7 +105,7 @@ export function ProductArchitectureCard({
     ['Auth', architecture.suggestedArchitecture?.auth],
     ['Payments', architecture.suggestedArchitecture?.payments],
     ['Storage', architecture.suggestedArchitecture?.storage],
-  ].filter(([, value]) => normalizeOptionalString(value))
+  ].filter((entry): entry is [string, string] => normalizeOptionalString(entry[1]) !== '')
   const hasSuggestedArchitecture = suggestedArchitectureEntries.length > 0
 
   return (
