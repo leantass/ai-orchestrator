@@ -1,3 +1,11 @@
+import fs from 'node:fs'
+
+const autoDiscoveredMainHelperSyntaxChecks = fs
+  .readdirSync(new URL('../electron/', import.meta.url))
+  .filter((name) => /^main-.*-helpers\.cjs$/u.test(name))
+  .sort((left, right) => left.localeCompare(right))
+  .map((name) => ['node', ['--check', `electron/${name}`]])
+
 export function buildAiQualitySections({ npmCommand, npxCommand }) {
   return [
     {
@@ -5,6 +13,7 @@ export function buildAiQualitySections({ npmCommand, npxCommand }) {
       label: 'Syntax checks',
       commands: [
         ['node', ['--check', 'electron/main.cjs']],
+        ...autoDiscoveredMainHelperSyntaxChecks,
         ['node', ['--check', 'electron/local-deterministic-executor.cjs']],
         ['node', ['--check', 'electron/context-hub-client.cjs']],
         ['node', ['--check', 'electron/context-hub-events.cjs']],

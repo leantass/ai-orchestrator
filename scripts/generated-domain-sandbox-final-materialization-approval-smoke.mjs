@@ -5,9 +5,13 @@ import vm from 'node:vm'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 
+import { loadMainPlannerExtractedHelperDependencies } from './main-planner-extracted-helper-dependencies.mjs'
+
 const require = createRequire(import.meta.url)
 const currentFilePath = fileURLToPath(import.meta.url)
 const repoRoot = path.resolve(path.dirname(currentFilePath), '..')
+const mainPlannerExtractedHelperDependencies =
+  loadMainPlannerExtractedHelperDependencies(repoRoot)
 const mainFilePath = path.join(repoRoot, 'electron', 'main.cjs')
 const mainSource = fs.readFileSync(mainFilePath, 'utf8')
 const {
@@ -93,6 +97,7 @@ module.exports = {
     FULLSTACK_LOCAL_BASE_PHASES,
     getFullstackLocalBasePhaseDefinition,
     buildFullstackLocalManifestPhaseBlueprints,
+    ...mainPlannerExtractedHelperDependencies,
     classifyWorkspaceProjectIntent,
     selectBestWorkspaceProjectCandidate,
     shouldIgnoreWorkspaceDirectoryEntry,
