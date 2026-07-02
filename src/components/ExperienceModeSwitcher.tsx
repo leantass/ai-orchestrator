@@ -17,14 +17,14 @@ export function ExperienceModeSwitcher({
   onSelectMode,
 }: ExperienceModeSwitcherProps) {
   return (
-    <div className="jefe-toggle-shell inline-flex w-full rounded-[18px] p-1">
+    <div className="jefe-toggle-shell inline-flex w-full flex-wrap rounded-[18px] p-1">
       {EXPERIENCE_MODE_OPTIONS.map((option) => (
         <button
           key={option.key}
           type="button"
           data-active={experienceMode === option.key}
           onClick={() => onSelectMode(option.key)}
-          className="jefe-toggle-option min-w-0 flex-1 rounded-[14px] px-3 py-2 text-sm font-semibold transition"
+          className="jefe-toggle-option min-w-[78px] flex-1 rounded-[14px] px-2 py-2 text-xs font-semibold transition sm:px-3 sm:text-sm"
         >
           {option.label}
         </button>

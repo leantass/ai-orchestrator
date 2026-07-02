@@ -94,7 +94,7 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-transparent text-[color:var(--jefe-text)]">
-      <div className="mx-auto flex w-full max-w-[1720px] gap-4 px-4 py-4 sm:px-6 xl:px-8">
+      <div className="mx-auto flex w-full max-w-[1720px] gap-4 px-3 py-3 sm:px-6 sm:py-4 xl:px-8">
         <aside className={joinClasses('hidden w-[248px] shrink-0 xl:block', showSidebar ? '' : 'xl:hidden')}>
           <div className="sticky top-4 space-y-4">
             <section className="jefe-surface-sidebar overflow-hidden rounded-[22px] p-5">
@@ -198,9 +198,9 @@ export function AppShell({
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="jefe-surface-hero overflow-hidden rounded-[20px] px-4 py-4 sm:px-5">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0 max-w-2xl">
+          <header className="jefe-surface-hero overflow-hidden rounded-[20px] px-3 py-3 sm:px-5 sm:py-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+              <div className="relative z-0 min-w-0 max-w-2xl lg:flex-1">
                 {eyebrow ? (
                   <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[color:var(--jefe-primary)]">
                     {eyebrow}
@@ -214,7 +214,7 @@ export function AppShell({
                 ) : null}
               </div>
 
-              <div className="flex w-full flex-col gap-2 lg:max-w-[420px] lg:items-end">
+              <div className="relative z-10 flex w-full flex-col gap-2 lg:w-[420px] lg:shrink-0 lg:items-end">
                 <div className="w-full lg:max-w-[260px]">{modeSwitcher}</div>
                 {quickActions ? <div className="flex w-full flex-wrap gap-2 lg:justify-end">{quickActions}</div> : null}
               </div>

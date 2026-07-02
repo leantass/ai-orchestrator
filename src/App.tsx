@@ -14142,7 +14142,7 @@ function App() {
     },
     {
       key: 'guided',
-      label: 'Nuevo pedido',
+      label: 'Nueva misión',
       group: 'Operacion',
       icon: 'guided' as const,
       description: 'Paso a paso.',
@@ -14152,7 +14152,7 @@ function App() {
     },
     {
       key: 'advanced',
-      label: 'Mis proyectos',
+      label: 'Proyectos',
       group: 'Operacion',
       icon: 'advanced' as const,
       description: 'Vista avanzada.',
@@ -14176,7 +14176,7 @@ function App() {
     },
     {
       key: 'history',
-      label: 'Historial',
+      label: 'Actividad',
       group: 'Supervision',
       icon: 'history' as const,
       description: 'Queda visible como proxima capa del shell.',
@@ -14260,7 +14260,7 @@ function App() {
     },
     {
       key: 'request-simple',
-      label: 'Nuevo pedido',
+      label: 'Nueva misión',
       description: 'Contar la idea y revisar el plan.',
       group: 'Operacion',
       icon: 'guided' as const,
@@ -14271,7 +14271,7 @@ function App() {
     },
     {
       key: 'projects-simple',
-      label: 'Mis proyectos',
+      label: 'Proyectos',
       description: 'Proyecto actual y continuidad.',
       group: 'Operacion',
       icon: 'projects' as const,
@@ -14282,7 +14282,7 @@ function App() {
     },
     {
       key: 'history-simple',
-      label: 'Historial',
+      label: 'Actividad',
       description: 'Últimas corridas.',
       group: 'Operacion',
       icon: 'history' as const,
@@ -14293,7 +14293,7 @@ function App() {
     },
     {
       key: 'settings-simple',
-      label: 'Configuración',
+      label: 'Auditoría',
       description: 'Memoria, modos y detalle.',
       group: 'Soporte',
       icon: 'settings' as const,
@@ -14304,7 +14304,7 @@ function App() {
     },
     {
       key: 'help-simple',
-      label: 'Ayuda',
+      label: 'Detalle técnico',
       description: 'Ver detalle técnico y apoyo.',
       group: 'Soporte',
       icon: 'context' as const,
@@ -15202,7 +15202,7 @@ No usar credenciales.`
       : simpleHeroState === 'blocked'
         ? 'Bloqueado por seguridad'
         : simpleHeroState === 'no-change'
-          ? 'No se creó nada'
+          ? 'Listo para empezar'
           : simpleHeroState === 'paused'
             ? 'Trabajo pausado'
             : simpleHeroState === 'approval'
@@ -15216,7 +15216,7 @@ No usar credenciales.`
     simpleHeroState === 'blocked'
       ? 'JEFE frenó la acción para cuidar el proyecto. No se creó nada y el detalle técnico sigue disponible.'
       : simpleHeroState === 'no-change'
-        ? 'Decidiste dejar solo el plan. No se creó ningún archivo y podés retomarlo cuando quieras.'
+        ? 'El plan quedó listo para retomar cuando quieras.'
         : simpleHeroState === 'paused'
           ? 'El pedido queda pausado por ahora. El plan sigue visible para retomarlo más adelante.'
           : simpleHeroState === 'approval'
@@ -21562,7 +21562,7 @@ No usar credenciales.`
                 onChange={(event) => setGoalInput(event.target.value)}
                 rows={4}
                 className="jefe-input mt-3 w-full rounded-[24px] px-4 py-4 text-sm leading-7"
-                placeholder="Ejemplo: Quiero una app local para un banco comunitario de herramientas donde los vecinos puedan pedir prestado y devolver herramientas."
+                placeholder="Describí el proyecto, mejora o problema que querés resolver..."
               />
               <label
                 htmlFor="simple-context-input"
@@ -21586,14 +21586,14 @@ No usar credenciales.`
                   tone="sky"
                   className="sm:w-auto sm:min-w-[220px]"
                 >
-                  {isPlanning ? 'Entendiendo pedido...' : 'Enviar pedido'}
+                  {isPlanning ? 'Entendiendo pedido...' : 'Crear plan'}
                 </PrimaryActionButton>
                 <SecondaryActionButton
                   onClick={handleAttachInputFiles}
                   disabled={isProjectContextBusy}
                   className="sm:w-auto"
                 >
-                  Adjuntar archivos
+                  Adjuntar contexto
                 </SecondaryActionButton>
                 <SecondaryActionButton
                   onClick={handleAttachInputFolder}
@@ -21751,7 +21751,7 @@ No usar credenciales.`
                       disabled={!canSendRichApprovalResponse}
                       tone="sky"
                     >
-                      Crear primera versión de prueba
+                      Ejecutar con supervisión
                     </PrimaryActionButton>
                   )}
                   <SecondaryActionButton onClick={handleRejectApproval}>
@@ -21774,7 +21774,7 @@ No usar credenciales.`
                     disabled={!canSendRichApprovalResponse}
                     tone="sky"
                   >
-                    Crear primera versión de prueba
+                    Ejecutar con supervisión
                   </PrimaryActionButton>
                   <SecondaryActionButton onClick={handleRejectApproval}>
                     Dejar solo el plan
@@ -21884,7 +21884,7 @@ No usar credenciales.`
             simpleShouldShowMaterializedResult
               ? 'Primera versión creada correctamente'
               : simpleResultKind === 'rejected' || simpleResultKind === 'no-change'
-                ? 'No se creó nada'
+                ? 'Listo para empezar'
                 : simpleResultKind === 'deferred'
                   ? 'Trabajo pausado'
                   : simpleResultKind === 'blocked'
@@ -21895,7 +21895,7 @@ No usar credenciales.`
             simpleShouldShowMaterializedResult
               ? 'Ya podés revisar qué se creó, dónde quedó y cuál es el próximo paso recomendado.'
               : simpleResultKind === 'rejected'
-                ? 'Decidiste mantener solo el plan. No se crearon archivos.'
+                ? 'El plan queda listo para continuar cuando quieras.'
                 : simpleResultKind === 'deferred'
                   ? 'Decidiste no crear archivos por ahora. El plan queda disponible para continuar después.'
                   : simpleResultKind === 'blocked'
