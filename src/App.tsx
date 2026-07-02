@@ -21406,9 +21406,7 @@ No usar credenciales.`
       experienceMode={experienceMode}
       onSelectMode={(mode) => {
         setExperienceMode(mode)
-        if (mode === 'technical') {
-          setIsFlowConsoleOpen(true)
-        }
+        setIsFlowConsoleOpen(mode === 'technical')
       }}
     />
   )
