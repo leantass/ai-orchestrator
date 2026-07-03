@@ -44,11 +44,17 @@ const {
 const { buildExecutionEventEmitters } = require('./main-execution-events.cjs')
 const { buildExecutorProgressHelpers } = require('./main-executor-progress-helpers.cjs')
 const {
-  buildNextActionPlanFromProjectRouting,
-} = require('./main-project-operations-routing-helpers.cjs')
+  buildExplicitRequestedStackProfile,
+  buildStackProfile,
+} = require('./main-stack-profile-helpers.cjs')
 const {
-  buildPlanningApprovalBundle,
-} = require('./main-project-approval-bundle-helpers.cjs')
+  buildDefaultGeneratedDomainGeneratorReadiness,
+  buildDefaultGeneratedDomainStackProfile,
+  normalizeGeneratedDomainGeneratorReadiness,
+  normalizeGeneratedDomainStackProfile,
+  isGeneratedDomainUnsupportedRequestedStack,
+  shouldUseGeneratedDomainSpecializedTemplateBundle,
+} = require('./main-generated-domain-stack-readiness-helpers.cjs')
 const {
   resolveFullstackLocalSpecializedContractFlags,
   buildFullstackLocalSpecializedPathPlan,
@@ -61,6 +67,12 @@ const {
   buildFullstackLocalSpecializedBackendContentBundle,
   buildFullstackLocalSpecializedMaterializationOperations,
 } = require('./main-fullstack-local-specialized-operations-helpers.cjs')
+const {
+  buildNextActionPlanFromProjectRouting,
+} = require('./main-project-operations-routing-helpers.cjs')
+const {
+  buildPlanningApprovalBundle,
+} = require('./main-project-approval-bundle-helpers.cjs')
 
 function isElectronExecutablePath(executablePath) {
   if (typeof executablePath !== 'string' || !executablePath.trim()) {
@@ -17119,155 +17131,6 @@ function detectBlueprintDataSensitivity(goal, context, domainUnderstanding) {
   return 'low'
 }
 
-function detectStackPreference(text, candidates) {
-  const normalizedText = normalizeSectorDetectionText(text)
-
-  for (const candidate of candidates) {
-    if (candidate.pattern.test(normalizedText)) {
-      return candidate.value
-    }
-  }
-
-  return ''
-}
-
-function buildStackProfile({
-  goal,
-  context,
-  deliveryLevel,
-  domainUnderstanding,
-}) {
-  const normalizedDeliveryLevel =
-    typeof deliveryLevel === 'string' && deliveryLevel.trim()
-      ? deliveryLevel.trim()
-      : 'safe-first-delivery'
-  const combinedText = [goal, context, domainUnderstanding?.domainLabel]
-    .filter((value) => typeof value === 'string' && value.trim())
-    .join(' ')
-  const normalizedText = normalizeSectorDetectionText(combinedText)
-  const frontendPreference = detectStackPreference(combinedText, [
-    { pattern: /\bnext(?:\.js|js)?\b/u, value: 'nextjs-app-router-plan' },
-    { pattern: /\breact\b/u, value: 'react-ready-static' },
-    { pattern: /\bvue\b/u, value: 'vue-local-plan' },
-    { pattern: /\bangular\b/u, value: 'angular-local-plan' },
-    { pattern: /\bsvelte\b/u, value: 'svelte-local-plan' },
-    { pattern: /\bastro\b/u, value: 'astro-local-plan' },
-  ])
-  const backendPreference = detectStackPreference(combinedText, [
-    { pattern: /\bfastapi\b/u, value: 'fastapi-style' },
-    { pattern: /\bdjango\b/u, value: 'django-style' },
-    { pattern: /\blaravel\b|\bphp\b/u, value: 'laravel-style' },
-    { pattern: /\b\.net\b|\bdotnet\b|\bc#\b/u, value: 'dotnet-webapi-style' },
-    { pattern: /\bspring\b|\bjava\b/u, value: 'spring-style' },
-    { pattern: /\bexpress\b/u, value: 'node-express-style' },
-  ])
-  const databasePreference = detectStackPreference(combinedText, [
-    { pattern: /\bpostgres(?:ql)?\b/u, value: 'postgres-ready-local-design' },
-    { pattern: /\bsqlite\b/u, value: 'sqlite-local-design' },
-    { pattern: /\bmysql\b/u, value: 'mysql-ready-local-design' },
-    { pattern: /\bmongo(?:db)?\b/u, value: 'mongo-ready-local-design' },
-    { pattern: /\bredis\b/u, value: 'redis-local-plan' },
-  ])
-  const packageManagerPreference = detectStackPreference(combinedText, [
-    { pattern: /\bpnpm\b/u, value: 'pnpm-deferred' },
-    { pattern: /\byarn\b/u, value: 'yarn-deferred' },
-    { pattern: /\bbun\b/u, value: 'bun-deferred' },
-    { pattern: /\bcomposer\b/u, value: 'composer-deferred' },
-    { pattern: /\bpip\b/u, value: 'pip-deferred' },
-    { pattern: /\bdotnet\b|\b\.net\b/u, value: 'dotnet-cli-deferred' },
-  ])
-
-  if (normalizedDeliveryLevel === 'infra-local-plan') {
-    return {
-      frontend: frontendPreference || 'none',
-      backend: backendPreference || 'service-runtime-deferred',
-      database: databasePreference || 'postgres-local-plan',
-      apiStyle: 'runtime-plan',
-      auth: 'deferred',
-      styling: 'n/a',
-      testing: 'manual-safety-review',
-      packageManager: packageManagerPreference || 'deferred',
-      runtime: 'local-infra-plan',
-    }
-  }
-
-  if (normalizedDeliveryLevel === 'monorepo-local') {
-    return {
-      frontend: frontendPreference || 'app-web',
-      backend: backendPreference || 'api-service',
-      database: databasePreference || 'local-design',
-      apiStyle: 'rest',
-      auth: normalizedText.includes('auth real') ? 'approval-required' : 'deferred',
-      styling:
-        frontendPreference && frontendPreference.includes('nextjs')
-          ? 'component-system-plan'
-          : 'css-modular-simple',
-      testing: 'manual-smoke-first',
-      packageManager: packageManagerPreference || 'workspace-deferred',
-      runtime: 'multi-service-local-plan',
-    }
-  }
-
-  if (normalizedDeliveryLevel === 'fullstack-local') {
-    return {
-      frontend: frontendPreference || 'react-ready-static',
-      backend: backendPreference || 'node-express-style',
-      database:
-        databasePreference ||
-        (/\bbase de datos\b|\bsql\b/u.test(normalizedText)
-          ? 'sql-local-design'
-          : 'mock-data'),
-      apiStyle: /\bgraphql\b/u.test(normalizedText) ? 'graphql' : 'rest',
-      auth: normalizedText.includes('auth real') ? 'approval-required' : 'deferred',
-      styling:
-        frontendPreference && frontendPreference.includes('vue')
-          ? 'component-css-plan'
-          : 'css-modular-simple',
-      testing: 'manual-smoke-first',
-      packageManager: packageManagerPreference || 'npm-deferred',
-      runtime:
-        backendPreference === 'fastapi-style'
-          ? 'python-local-plan'
-          : backendPreference === 'laravel-style'
-            ? 'php-local-plan'
-            : backendPreference === 'dotnet-webapi-style'
-              ? 'dotnet-local-plan'
-              : backendPreference === 'spring-style'
-                ? 'jvm-local-plan'
-                : 'node-local-plan',
-    }
-  }
-
-  if (normalizedDeliveryLevel === 'frontend-project') {
-    return {
-      frontend: frontendPreference || 'react-ready-static',
-      backend: 'none',
-      database: 'mock-data',
-      apiStyle: 'none/local-mock',
-      auth: 'deferred',
-      styling:
-        frontendPreference === 'nextjs-app-router-plan'
-          ? 'component-system-plan'
-          : 'css-modular-simple',
-      testing: 'manual-smoke-first',
-      packageManager: packageManagerPreference || 'none-yet',
-      runtime: 'static-local-review',
-    }
-  }
-
-  return {
-    frontend: frontendPreference || 'vanilla-js-static',
-    backend: 'none',
-    database: 'mock-data',
-    apiStyle: 'none/local-mock',
-    auth: 'deferred',
-    styling: 'css-simple',
-    testing: 'manual-smoke-first',
-    packageManager: 'none-yet',
-    runtime: 'static-local-review',
-  }
-}
-
 function buildBlueprintRoles({
   goal,
   context,
@@ -17988,6 +17851,13 @@ function buildProjectBlueprint({
     deliveryLevel: normalizedDeliveryLevel,
     domainUnderstanding: normalizedDomainUnderstanding,
   })
+  const resolvedStackProfile = {
+    ...stackProfile,
+    ...((normalizedScalablePlan?.stackProfile &&
+    typeof normalizedScalablePlan.stackProfile === 'object'
+      ? normalizedScalablePlan.stackProfile
+      : null) || {}),
+  }
   const roles = buildBlueprintRoles({
     goal,
     context,
@@ -18078,7 +17948,7 @@ function buildProjectBlueprint({
         : 'low'
   const phasePlan = buildProjectBlueprintPhasePlan({
     deliveryLevel: normalizedDeliveryLevel,
-    stackProfile,
+    stackProfile: resolvedStackProfile,
     questionPolicy,
   })
   const successCriteria = summarizeUniqueExecutorStrings(
@@ -18116,7 +17986,7 @@ function buildProjectBlueprint({
     intent,
     deliveryLevel: normalizedDeliveryLevel,
     confidence,
-    stackProfile,
+    stackProfile: resolvedStackProfile,
     roles,
     modules,
     entities,
@@ -19465,6 +19335,16 @@ function buildScalableDeliveryPlan({
         })
   const normalizedProjectBlueprint =
     projectBlueprint && typeof projectBlueprint === 'object' ? projectBlueprint : null
+  const scalablePlanStackProfile =
+    normalizedProjectBlueprint?.stackProfile &&
+    typeof normalizedProjectBlueprint.stackProfile === 'object'
+      ? normalizedProjectBlueprint.stackProfile
+      : buildExplicitRequestedStackProfile({
+          goal,
+          context,
+          deliveryLevel: normalizedDeliveryLevel,
+          domainUnderstanding: normalizedDomainUnderstanding,
+        })
   const targetStructure = []
   const allowedRootPaths = []
   const modules = []
@@ -20196,6 +20076,7 @@ function buildScalableDeliveryPlan({
           : `Plan de materializacion escalable en nivel ${normalizedDeliveryLevel}.`,
       targetStructure,
       allowedRootPaths,
+      ...(scalablePlanStackProfile ? { stackProfile: scalablePlanStackProfile } : {}),
       modules: summarizeUniqueExecutorStrings(modules, 20),
       directories: summarizeUniqueExecutorStrings(directories, 20),
       filesToCreate: filesToCreate
@@ -29667,6 +29548,12 @@ module.exports = {
     allowedTargetPaths.map((entry) => toGeneratedDomainContractPath(entry)),
     128,
   ).filter(Boolean)
+  const generatedDomainRequestedStackProfile = buildExplicitRequestedStackProfile({
+    goal,
+    context,
+    deliveryLevel: 'fullstack-local',
+    domainUnderstanding: normalizedDomainUnderstanding,
+  })
   const generatedDomainContractRequiredFiles = summarizeUniqueExecutorStrings(
     [
       rootReadmePath,
@@ -29709,6 +29596,9 @@ module.exports = {
       sourceRoot: rootFolder,
       targetRoot: rootFolder,
     },
+    ...(generatedDomainRequestedStackProfile
+      ? { stackProfile: generatedDomainRequestedStackProfile }
+      : {}),
     roles: generatedDomainContractRoles,
     entities: generatedDomainContractEntities,
     states: {
@@ -30375,6 +30265,39 @@ function normalizeScalableDeliveryPlanContract(value) {
     return null
   }
 
+  const stackProfile =
+    value.stackProfile && typeof value.stackProfile === 'object'
+      ? {
+          ...(typeof value.stackProfile.frontend === 'string' && value.stackProfile.frontend.trim()
+            ? { frontend: value.stackProfile.frontend.trim() }
+            : {}),
+          ...(typeof value.stackProfile.backend === 'string' && value.stackProfile.backend.trim()
+            ? { backend: value.stackProfile.backend.trim() }
+            : {}),
+          ...(typeof value.stackProfile.database === 'string' && value.stackProfile.database.trim()
+            ? { database: value.stackProfile.database.trim() }
+            : {}),
+          ...(typeof value.stackProfile.apiStyle === 'string' && value.stackProfile.apiStyle.trim()
+            ? { apiStyle: value.stackProfile.apiStyle.trim() }
+            : {}),
+          ...(typeof value.stackProfile.auth === 'string' && value.stackProfile.auth.trim()
+            ? { auth: value.stackProfile.auth.trim() }
+            : {}),
+          ...(typeof value.stackProfile.styling === 'string' && value.stackProfile.styling.trim()
+            ? { styling: value.stackProfile.styling.trim() }
+            : {}),
+          ...(typeof value.stackProfile.testing === 'string' && value.stackProfile.testing.trim()
+            ? { testing: value.stackProfile.testing.trim() }
+            : {}),
+          ...(typeof value.stackProfile.packageManager === 'string' && value.stackProfile.packageManager.trim()
+            ? { packageManager: value.stackProfile.packageManager.trim() }
+            : {}),
+          ...(typeof value.stackProfile.runtime === 'string' && value.stackProfile.runtime.trim()
+            ? { runtime: value.stackProfile.runtime.trim() }
+            : {}),
+        }
+      : null
+
   const normalizedFilesToCreate = Array.isArray(value.filesToCreate)
     ? value.filesToCreate
         .map((entry) =>
@@ -30408,6 +30331,7 @@ function normalizeScalableDeliveryPlanContract(value) {
     ...(summarizeUniqueExecutorStrings(value.allowedRootPaths, 20).length > 0
       ? { allowedRootPaths: summarizeUniqueExecutorStrings(value.allowedRootPaths, 20) }
       : {}),
+    ...(stackProfile && Object.keys(stackProfile).length > 0 ? { stackProfile } : {}),
     ...(summarizeUniqueExecutorStrings(value.modules, 20).length > 0
       ? { modules: summarizeUniqueExecutorStrings(value.modules, 20) }
       : {}),
@@ -42213,6 +42137,8 @@ function buildGeneratedDomainUniversalMaterializationPlanPreview({
     requiredPathGroups: [],
     forbiddenSignals: [],
     approvalRequired: true,
+    stackProfile: buildDefaultGeneratedDomainStackProfile(),
+    generatorReadiness: buildDefaultGeneratedDomainGeneratorReadiness(),
     canBecomeMaterializationPlan: false,
     warnings: [],
     errors: [],
@@ -42493,6 +42419,10 @@ function buildGeneratedDomainUniversalMaterializationPlanPreview({
       safetyResult.ok === true ||
       candidatePlan?.candidate?.safety?.safeForLocalMaterialization === true ||
       capabilityProfile?.safety?.safeForLocalMaterialization === true
+    const stackProfile = normalizeGeneratedDomainStackProfile(capabilityProfile?.stackProfile)
+    const generatorReadiness = normalizeGeneratedDomainGeneratorReadiness({
+      generatorReadiness: capabilityProfile?.generatorReadiness,
+    })
     const domainMismatch = isGeneratedDomainDomainConsistencyBlocked(consistency)
     const approvalRequired = approvalPolicy?.approvalRequired !== false
 
@@ -42598,6 +42528,8 @@ function buildGeneratedDomainUniversalMaterializationPlanPreview({
       requiredPathGroups,
       forbiddenSignals,
       approvalRequired,
+      stackProfile,
+      generatorReadiness,
       canBecomeMaterializationPlan: false,
       warnings,
       errors,
@@ -42641,6 +42573,18 @@ function buildGeneratedDomainUniversalMaterializationPlanPreview({
         'El preview universal detecto señales ejecutables (commands o writes) y debe seguir siendo solo observacional.',
       )
     }
+    if (isGeneratedDomainUnsupportedRequestedStack(generatorReadiness)) {
+      pushMessage(
+        errors,
+        'El stackProfile pedido requiere un generador especializado; el preview universal no puede degradarse al scaffold generico actual.',
+      )
+      ;(Array.isArray(generatorReadiness.blockingReasons)
+        ? generatorReadiness.blockingReasons
+        : []
+      ).forEach((entry) => {
+        pushMessage(warnings, entry)
+      })
+    }
 
     const structurallyReady =
       preview.frontend.present &&
@@ -42652,6 +42596,7 @@ function buildGeneratedDomainUniversalMaterializationPlanPreview({
       validationResult.ok === true &&
       safeForLocalMaterialization === true &&
       structurallyReady &&
+      generatorReadiness.supportedNow === true &&
       !domainMismatch &&
       preview.safety.noDotEnv === true &&
       preview.safety.noNodeModules === true &&
@@ -43693,6 +43638,8 @@ function buildGeneratedDomainUniversalMaterializationPlan({
       reportFile: null,
       generatedAtStage: 'preview-only',
     },
+    stackProfile: buildDefaultGeneratedDomainStackProfile(),
+    generatorReadiness: buildDefaultGeneratedDomainGeneratorReadiness(),
     warnings: [],
     errors: [],
     warningsCount: 0,
@@ -43850,6 +43797,14 @@ function buildGeneratedDomainUniversalMaterializationPlan({
     const previewBuilt = preview?.built === true
     const previewSafe = preview?.safety?.safeForLocalMaterialization === true
     const approvalBlocked = approvalPolicy?.status === 'blocked'
+    const generatorReadiness = normalizeGeneratedDomainGeneratorReadiness({
+      generatorReadiness: preview?.generatorReadiness,
+      structuralCapabilities,
+    })
+    const stackProfile = normalizeGeneratedDomainStackProfile(
+      preview?.stackProfile,
+      structuralCapabilities,
+    )
     const rootLooksUnsafe =
       !normalizedProjectRoot ||
       path.isAbsolute(normalizedProjectRoot) ||
@@ -43857,6 +43812,182 @@ function buildGeneratedDomainUniversalMaterializationPlan({
       /(^|\/)\.env(?:\..+)?($|\/)/iu.test(normalizedProjectRoot) ||
       /(^|\/)node_modules($|\/)/iu.test(normalizedProjectRoot) ||
       /(^|\/)web-prueba($|\/)/iu.test(normalizedProjectRoot)
+    const specializedTemplateBundle =
+      shouldUseGeneratedDomainSpecializedTemplateBundle(generatorReadiness)
+        ? generatedDomainOrchestrationDiagnostics.buildGeneratedDomainSpecializedTemplateArtifacts({
+            templateFamily: generatorReadiness.templateFamily,
+            projectRoot: normalizedProjectRoot,
+            domainLabel,
+            deliveryLevel,
+            generatedDomainContract: contract,
+            stackProfile,
+          })
+        : null
+    const specializedTemplateRequested =
+      shouldUseGeneratedDomainSpecializedTemplateBundle(generatorReadiness)
+
+    if (specializedTemplateRequested && specializedTemplateBundle?.present !== true) {
+      pushMessage(
+        errors,
+        'La familia de stack soportada no pudo construir su bundle especializado; el plan universal debe quedar bloqueado.',
+      )
+    }
+
+    if (specializedTemplateBundle?.present === true) {
+      const allPlannedPaths = summarizeUniqueExecutorStrings(
+        [normalizedProjectRoot, ...specializedTemplateBundle.allowedTargetPaths],
+        256,
+      ).filter(Boolean)
+      const forbiddenSignals = summarizeUniqueExecutorStrings(
+        [
+          '.env',
+          'node_modules',
+          'Dockerfile',
+          'docker-compose.yml',
+          'deploy',
+          'web-prueba',
+          ...(contract ? deriveForbiddenSearchPatternsFromContract(contract) : []),
+          ...(Array.isArray(specializedTemplateBundle.forbiddenSignals)
+            ? specializedTemplateBundle.forbiddenSignals
+            : []),
+        ],
+        48,
+      ).filter(Boolean)
+
+      const plan = {
+        ...emptyPlan,
+        present: true,
+        projectRoot: normalizedProjectRoot,
+        sourceRoot: normalizePlanPath(sourceRoot, normalizedProjectRoot),
+        targetRoot: normalizePlanPath(targetRoot, normalizedProjectRoot),
+        deliveryLevel,
+        allowedTargetPaths: allPlannedPaths,
+        requiredPathGroups: summarizeUniqueExecutorObjects(
+          Array.isArray(specializedTemplateBundle.requiredPathGroups)
+            ? specializedTemplateBundle.requiredPathGroups
+            : [],
+          48,
+        ),
+        filesToCreate: Array.isArray(specializedTemplateBundle.filesToCreate)
+          ? specializedTemplateBundle.filesToCreate
+          : [],
+        fileChecks: summarizeUniqueExecutorObjects(
+          Array.isArray(specializedTemplateBundle.fileChecks)
+            ? specializedTemplateBundle.fileChecks
+            : [],
+          96,
+        ),
+        validationPlan:
+          specializedTemplateBundle.validationPlan &&
+          typeof specializedTemplateBundle.validationPlan === 'object'
+            ? specializedTemplateBundle.validationPlan
+            : {
+                syntaxChecks: [],
+                jsonChecks: [],
+                pathChecks: [normalizedProjectRoot],
+                forbiddenPathChecks: [],
+              },
+        forbiddenSignals,
+        approvalRequired: true,
+        approved: false,
+        canBecomeMaterializationPlan: preview?.canBecomeMaterializationPlan === true,
+        canMaterializeInSandbox: false,
+        safety: {
+          safeForLocalMaterialization:
+            previewSafe &&
+            approvalPolicy?.safeguards?.noDotEnv === true &&
+            approvalPolicy?.safeguards?.noNodeModules === true &&
+            approvalPolicy?.safeguards?.noDocker === true &&
+            approvalPolicy?.safeguards?.noDeploy === true &&
+            approvalPolicy?.safeguards?.noExternalServices === true &&
+            approvalPolicy?.safeguards?.noRealPayments === true &&
+            approvalPolicy?.safeguards?.noCommands === true &&
+            approvalPolicy?.safeguards?.noWebPrueba === true &&
+            !rootLooksUnsafe,
+          noDotEnv:
+            approvalPolicy?.safeguards?.noDotEnv === true &&
+            !allPlannedPaths.some((entry) => /(^|\/)\.env(?:\..+)?($|\/)/iu.test(entry)),
+          noNodeModules:
+            approvalPolicy?.safeguards?.noNodeModules === true &&
+            !allPlannedPaths.some((entry) => /(^|\/)node_modules($|\/)/iu.test(entry)),
+          noDocker:
+            approvalPolicy?.safeguards?.noDocker === true &&
+            !allPlannedPaths.some((entry) =>
+              /(^|\/)(?:dockerfile|docker-compose\.yml|docker-compose\.yaml)($|\/)/iu.test(entry),
+            ),
+          noDeploy:
+            approvalPolicy?.safeguards?.noDeploy === true &&
+            !allPlannedPaths.some((entry) => /(^|\/)deploy($|\/)/iu.test(entry)),
+          noExternalServices: approvalPolicy?.safeguards?.noExternalServices === true,
+          noRealPayments: approvalPolicy?.safeguards?.noRealPayments === true,
+          noCredentials: true,
+          noCommands: approvalPolicy?.safeguards?.noCommands === true,
+          sandboxOnly: true,
+        },
+        rollback: {
+          strategy: 'remove-sandbox-root-only',
+          destructiveCommandsAllowed: false,
+          hint:
+            'Si hace falta revertir, eliminar solo el root del sandbox controlado y no tocar otros proyectos.',
+        },
+        report: {
+          reportFile: `${normalizedProjectRoot}/validation/report.json`,
+          generatedAtStage: 'universal-plan',
+        },
+        stackProfile,
+        generatorReadiness,
+        warnings,
+        errors,
+      }
+
+      if (!previewBuilt) {
+        pushMessage(
+          warnings,
+          'El universal materialization preview todavia no esta completamente built, por lo que este plan sigue en modo candidato.',
+        )
+      }
+      if (domainMismatch) {
+        pushMessage(
+          errors,
+          'La consistencia de dominio o la consistencia semantica siguen en mismatch, por lo que el plan universal queda bloqueado.',
+        )
+      }
+      if (approvalBlocked) {
+        pushMessage(
+          errors,
+          'La policy de aprobacion de archivos sigue bloqueada, por lo que el plan universal no puede promoverse a escritura segura.',
+        )
+      }
+      if (rootLooksUnsafe) {
+        pushMessage(
+          errors,
+          'El root del plan universal es inseguro o incluye rutas bloqueadas para materializacion.',
+        )
+      }
+
+      if (!normalizedProjectRoot || domainMismatch || approvalBlocked || rootLooksUnsafe) {
+        plan.status = 'blocked'
+        plan.built = false
+        plan.canMaterializeInSandbox = false
+      } else if (
+        plan.safety.safeForLocalMaterialization === true &&
+        plan.filesToCreate.length > 0 &&
+        previewBuilt
+      ) {
+        plan.status = 'built'
+        plan.built = true
+        plan.canMaterializeInSandbox = true
+      } else {
+        plan.status = 'partial'
+        plan.built = false
+        plan.canMaterializeInSandbox = false
+      }
+
+      plan.warningsCount = plan.warnings.length
+      plan.errorsCount = plan.errors.length
+      return plan
+    }
+
     const hasFrontend =
       preview?.frontend?.present === true ||
       structuralCapabilities?.hasPublicFrontend === true ||
@@ -44324,6 +44455,8 @@ module.exports = {
         reportFile: `${normalizedProjectRoot}/validation/report.json`,
         generatedAtStage: 'universal-plan',
       },
+      stackProfile,
+      generatorReadiness,
       warnings,
       errors,
     }
@@ -44352,8 +44485,29 @@ module.exports = {
         'El root del plan universal es inseguro o incluye rutas bloqueadas para materializacion.',
       )
     }
+    if (
+      generatorReadiness.requested === true &&
+      generatorReadiness.supportedNow !== true
+    ) {
+      pushMessage(
+        errors,
+        'El plan universal detecto un stack especializado no soportado y debe bloquear la materializacion generica en sandbox.',
+      )
+      ;(Array.isArray(generatorReadiness.blockingReasons)
+        ? generatorReadiness.blockingReasons
+        : []
+      ).forEach((entry) => {
+        pushMessage(warnings, entry)
+      })
+    }
 
-    if (!normalizedProjectRoot || domainMismatch || approvalBlocked || rootLooksUnsafe) {
+    if (
+      !normalizedProjectRoot ||
+      domainMismatch ||
+      approvalBlocked ||
+      rootLooksUnsafe ||
+      generatorReadiness.supportedNow !== true
+    ) {
       plan.status = 'blocked'
       plan.built = false
       plan.canMaterializeInSandbox = false
@@ -55552,6 +55706,21 @@ function buildOpenAIGeneratedDomainContractSchema() {
           targetRoot: { type: 'string' },
         },
       },
+      stackProfile: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          frontend: { type: 'string' },
+          backend: { type: 'string' },
+          database: { type: 'string' },
+          apiStyle: { type: 'string' },
+          auth: { type: 'string' },
+          styling: { type: 'string' },
+          testing: { type: 'string' },
+          packageManager: { type: 'string' },
+          runtime: { type: 'string' },
+        },
+      },
       roles: {
         type: 'array',
         items: {
@@ -56562,6 +56731,7 @@ Modo especial de esta corrida:
 - strategy y executionMode pertenecen a la decision del planner, no al contrato universal.
 - El dominio debe tratarse como datos y no como lista de rubros conocidos.
 - Preferí root.slug, sourceRoot y targetRoot relativos y coherentes.
+- Si el pedido menciona framework, ORM, auth, estilo, testing, package manager o runtime deseado, reflejalo en generatedDomainContract.stackProfile.
 - No materialices nada. No propongas comandos. No escribas archivos reales.
 - Integraciones reales bloqueadas. Mock-only permitido.
 - No incluyas tokens, secretos, .env, Docker, deploy ni APIs reales.
@@ -56603,6 +56773,17 @@ function buildGeneratedDomainContractObservationUserPrompt({
             slug: '...',
             sourceRoot: '...',
             targetRoot: '...',
+          },
+          stackProfile: {
+            frontend: '...',
+            backend: '...',
+            database: '...',
+            apiStyle: '...',
+            auth: '...',
+            styling: '...',
+            testing: '...',
+            packageManager: '...',
+            runtime: '...',
           },
           roles: [],
           entities: [],

@@ -1,4 +1,5 @@
 const path = require('node:path')
+const generatedDomainOrchestrationDiagnostics = require('./generated-domain-orchestration-diagnostics.cjs')
 
 const DEFAULT_CONTRACT_VERSION = '1.0'
 const DEFAULT_DELIVERY_LEVEL = 'fullstack-local'
@@ -267,6 +268,28 @@ function normalizeRouteEntry(entry) {
   }
 }
 
+function normalizeGeneratedDomainStackProfile(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null
+  }
+
+  const normalized = {
+    ...(asNonEmptyString(value.frontend) ? { frontend: asNonEmptyString(value.frontend) } : {}),
+    ...(asNonEmptyString(value.backend) ? { backend: asNonEmptyString(value.backend) } : {}),
+    ...(asNonEmptyString(value.database) ? { database: asNonEmptyString(value.database) } : {}),
+    ...(asNonEmptyString(value.apiStyle) ? { apiStyle: asNonEmptyString(value.apiStyle) } : {}),
+    ...(asNonEmptyString(value.auth) ? { auth: asNonEmptyString(value.auth) } : {}),
+    ...(asNonEmptyString(value.styling) ? { styling: asNonEmptyString(value.styling) } : {}),
+    ...(asNonEmptyString(value.testing) ? { testing: asNonEmptyString(value.testing) } : {}),
+    ...(asNonEmptyString(value.packageManager)
+      ? { packageManager: asNonEmptyString(value.packageManager) }
+      : {}),
+    ...(asNonEmptyString(value.runtime) ? { runtime: asNonEmptyString(value.runtime) } : {}),
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : null
+}
+
 function normalizeGeneratedDomainDeliveryLevelToken(value, fallback = '') {
   const normalized = asNonEmptyString(value, fallback)
     .normalize('NFKD')
@@ -408,6 +431,7 @@ function normalizeGeneratedDomainContract(input) {
   const absoluteRootCandidates = buildAbsoluteRootCandidates([rawSourceRoot, rawTargetRoot])
   const sourceRoot = normalizeContractRootPath(rawSourceRoot || rootSlug, rootSlug, absoluteRootCandidates)
   const targetRoot = normalizeContractRootPath(rawTargetRoot || rootSlug, rootSlug, absoluteRootCandidates)
+  const stackProfile = normalizeGeneratedDomainStackProfile(source.stackProfile)
 
   const normalized = {
     contractVersion: asNonEmptyString(source.contractVersion, DEFAULT_CONTRACT_VERSION),
@@ -425,6 +449,7 @@ function normalizeGeneratedDomainContract(input) {
       sourceRoot,
       targetRoot,
     },
+    stackProfile,
     roles: asArray(source.roles),
     entities: asArray(source.entities),
     states: asObject(source.states),
@@ -873,6 +898,7 @@ function collectGeneratedDomainCapabilitySignalTexts(contract) {
   const safety = asObject(normalizedContract.safety)
   const materialization = asObject(normalizedContract.materialization)
   const validation = asObject(normalizedContract.validation)
+  const stackProfile = normalizeGeneratedDomainStackProfile(normalizedContract.stackProfile)
 
   return unique(
     [
@@ -884,6 +910,7 @@ function collectGeneratedDomainCapabilitySignalTexts(contract) {
       ...asArray(normalizedContract.entities),
       ...Object.keys(asObject(normalizedContract.states)),
       ...asArray(normalizedContract.workflows),
+      ...(stackProfile ? Object.values(stackProfile) : []),
       ...frontendSurfaces.flatMap((surface) => {
         const value = asObject(surface)
         return [value.key, value.label, value.path, ...asArray(value.screens)]
@@ -966,6 +993,12 @@ function countGeneratedDomainCapabilityEntries(entries) {
   }).length
 }
 
+function buildGeneratedDomainGeneratorReadiness(normalizedContract) {
+  return generatedDomainOrchestrationDiagnostics.resolveGeneratedDomainGeneratorReadiness({
+    stackProfile: normalizeGeneratedDomainStackProfile(asObject(normalizedContract).stackProfile),
+  })
+}
+
 function buildGeneratedDomainCapabilityProfile(generatedDomainContract, diagnostics = null) {
   const emptyProfile = {
     capabilityProfileVersion: '0.1',
@@ -981,6 +1014,25 @@ function buildGeneratedDomainCapabilityProfile(generatedDomainContract, diagnost
       plannerOnly: false,
       localOnly: false,
       deployRequested: false,
+    },
+    stackProfile: {
+      requested: false,
+      frontend: null,
+      backend: null,
+      database: null,
+      apiStyle: null,
+      auth: null,
+      styling: null,
+      testing: null,
+      packageManager: null,
+      runtime: null,
+    },
+    generatorReadiness: {
+      requested: false,
+      supportedNow: true,
+      specializedGeneratorRequired: false,
+      templateFamily: 'generic-sandbox-fullstack-local',
+      blockingReasons: [],
     },
     surfaces: {
       public: false,
@@ -1054,6 +1106,9 @@ function buildGeneratedDomainCapabilityProfile(generatedDomainContract, diagnost
             { generatedDomainContract: normalizedContract },
             '.',
           )
+    const resolvedStackProfile =
+      normalizeGeneratedDomainStackProfile(normalizedContract.stackProfile)
+    const generatorReadiness = buildGeneratedDomainGeneratorReadiness(normalizedContract)
     const capabilityTexts = collectGeneratedDomainCapabilitySignalTexts(normalizedContract)
     const frontendSurfaces = asArray(normalizedContract.frontendSurfaces)
     const backend = asObject(normalizedContract.backend)
@@ -1140,6 +1195,30 @@ function buildGeneratedDomainCapabilityProfile(generatedDomainContract, diagnost
           resolvedDiagnostics.safeForLocalMaterialization === true ||
           forbidsDeploy,
         deployRequested: !forbidsDeploy && detectGeneratedDomainCapabilitySignal(capabilityTexts, [/\bdeploy\b/u]),
+      },
+      stackProfile: {
+        requested: generatorReadiness.requested === true,
+        frontend: asNonEmptyString(resolvedStackProfile?.frontend) || null,
+        backend: asNonEmptyString(resolvedStackProfile?.backend) || null,
+        database: asNonEmptyString(resolvedStackProfile?.database) || null,
+        apiStyle: asNonEmptyString(resolvedStackProfile?.apiStyle) || null,
+        auth: asNonEmptyString(resolvedStackProfile?.auth) || null,
+        styling: asNonEmptyString(resolvedStackProfile?.styling) || null,
+        testing: asNonEmptyString(resolvedStackProfile?.testing) || null,
+        packageManager: asNonEmptyString(resolvedStackProfile?.packageManager) || null,
+        runtime: asNonEmptyString(resolvedStackProfile?.runtime) || null,
+      },
+      generatorReadiness: {
+        requested: generatorReadiness.requested === true,
+        supportedNow: generatorReadiness.supportedNow !== false,
+        specializedGeneratorRequired:
+          generatorReadiness.specializedGeneratorRequired === true,
+        templateFamily:
+          asNonEmptyString(generatorReadiness.templateFamily) ||
+          'generic-sandbox-fullstack-local',
+        blockingReasons: Array.isArray(generatorReadiness.blockingReasons)
+          ? generatorReadiness.blockingReasons.slice(0, 8)
+          : [],
       },
       surfaces: {
         public: detectGeneratedDomainCapabilitySignal(capabilityTexts, [
@@ -1286,6 +1365,18 @@ function buildGeneratedDomainCapabilityProfile(generatedDomainContract, diagnost
         'El generatedDomainContract no expone requiredPathGroups comparables.',
       )
     }
+    if (
+      profile.generatorReadiness.requested === true &&
+      profile.generatorReadiness.supportedNow !== true
+    ) {
+      pushUniqueMessage(
+        profile.warnings,
+        'El stackProfile pedido requiere un generador especializado que el sandbox universal actual todavia no soporta.',
+      )
+      profile.generatorReadiness.blockingReasons.forEach((entry) => {
+        pushUniqueMessage(profile.warnings, entry)
+      })
+    }
 
     profile.warningsCount = profile.warnings.length
     profile.errorsCount = profile.errors.length
@@ -1326,6 +1417,25 @@ function buildGeneratedDomainMaterializationShadowPlan(
     root: null,
     sourceRoot: null,
     targetRoot: null,
+    stackProfile: {
+      requested: false,
+      frontend: null,
+      backend: null,
+      database: null,
+      apiStyle: null,
+      auth: null,
+      styling: null,
+      testing: null,
+      packageManager: null,
+      runtime: null,
+    },
+    generatorReadiness: {
+      requested: false,
+      supportedNow: true,
+      specializedGeneratorRequired: false,
+      templateFamily: 'generic-sandbox-fullstack-local',
+      blockingReasons: [],
+    },
     allowedTargetPathsCount: 0,
     requiredPathGroupsCount: 0,
     frontendSurfacesCount: 0,
@@ -1376,6 +1486,11 @@ function buildGeneratedDomainMaterializationShadowPlan(
       capabilityProfile && typeof capabilityProfile === 'object'
         ? capabilityProfile
         : buildGeneratedDomainCapabilityProfile(normalizedContract, resolvedDiagnostics)
+    const resolvedGeneratorReadiness =
+      resolvedCapabilityProfile?.generatorReadiness &&
+      typeof resolvedCapabilityProfile.generatorReadiness === 'object'
+        ? resolvedCapabilityProfile.generatorReadiness
+        : buildGeneratedDomainGeneratorReadiness(normalizedContract)
     const derivedFilePaths = deriveContractFilePaths(normalizedContract)
     const derivedRequiredPathGroups =
       Array.isArray(resolvedDiagnostics.requiredPathGroups) &&
@@ -1444,6 +1559,23 @@ function buildGeneratedDomainMaterializationShadowPlan(
       root: asNonEmptyString(normalizedContract.root.slug, null),
       sourceRoot: asNonEmptyString(normalizedContract.root.sourceRoot, null),
       targetRoot: asNonEmptyString(normalizedContract.root.targetRoot, null),
+      stackProfile:
+        resolvedCapabilityProfile?.stackProfile &&
+        typeof resolvedCapabilityProfile.stackProfile === 'object'
+          ? resolvedCapabilityProfile.stackProfile
+          : emptyPlan.stackProfile,
+      generatorReadiness: {
+        requested: resolvedGeneratorReadiness.requested === true,
+        supportedNow: resolvedGeneratorReadiness.supportedNow !== false,
+        specializedGeneratorRequired:
+          resolvedGeneratorReadiness.specializedGeneratorRequired === true,
+        templateFamily:
+          asNonEmptyString(resolvedGeneratorReadiness.templateFamily) ||
+          'generic-sandbox-fullstack-local',
+        blockingReasons: Array.isArray(resolvedGeneratorReadiness.blockingReasons)
+          ? resolvedGeneratorReadiness.blockingReasons.slice(0, 8)
+          : [],
+      },
       allowedTargetPathsCount: Number.isInteger(resolvedDiagnostics.allowedTargetPathsCount)
         ? resolvedDiagnostics.allowedTargetPathsCount
         : 0,
@@ -1533,6 +1665,18 @@ function buildGeneratedDomainMaterializationShadowPlan(
         'El shadow plan no detecta una capa database comparable.',
       )
     }
+    if (
+      shadowPlan.generatorReadiness.requested === true &&
+      shadowPlan.generatorReadiness.supportedNow !== true
+    ) {
+      pushUniqueMessage(
+        shadowPlan.warnings,
+        'El shadow plan reconoce un stack especializado pedido, pero el generador universal actual todavia no soporta esa familia.',
+      )
+      shadowPlan.generatorReadiness.blockingReasons.forEach((entry) => {
+        pushUniqueMessage(shadowPlan.warnings, entry)
+      })
+    }
 
     shadowPlan.warningsCount = shadowPlan.warnings.length
     shadowPlan.errorsCount = shadowPlan.errors.length
@@ -1542,6 +1686,7 @@ function buildGeneratedDomainMaterializationShadowPlan(
       resolvedCapabilityProfile?.delivery?.fullstackLocal === true &&
       shadowPlan.allowedTargetPathsCount > 0 &&
       shadowPlan.requiredPathGroupsCount > 0 &&
+      shadowPlan.generatorReadiness.supportedNow === true &&
       shadowPlan.plannedBuckets.backend.present === true &&
       shadowPlan.plannedBuckets.database.present === true
     shadowPlan.status =

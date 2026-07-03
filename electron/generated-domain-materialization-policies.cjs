@@ -3273,6 +3273,18 @@ function buildGeneratedDomainMvpReadinessExecutiveReport({
         'Las capacidades estructurales todavia no demuestran completamente una materializacion local segura en todos los casos.',
       )
     }
+    if (structuralCapabilities?.generatorSupportedNow === false) {
+      pushUniqueMessage(
+        blockers,
+        'El stackProfile pedido requiere un generador especializado que la ruta universal actual todavia no soporta.',
+      )
+      ;(Array.isArray(structuralCapabilities?.unsupportedStackReasons)
+        ? structuralCapabilities.unsupportedStackReasons
+        : []
+      ).forEach((entry) => {
+        pushUniqueMessage(risks, entry)
+      })
+    }
 
     if (runtimeReadiness?.status === 'ready-for-harness') {
       pushUniqueMessage(
