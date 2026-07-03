@@ -49,6 +49,18 @@ const {
 const {
   buildPlanningApprovalBundle,
 } = require('./main-project-approval-bundle-helpers.cjs')
+const {
+  resolveFullstackLocalSpecializedContractFlags,
+  buildFullstackLocalSpecializedPathPlan,
+} = require('./main-fullstack-local-specialized-path-helpers.cjs')
+const {
+  buildFullstackLocalSpecializedFrontendContentBundle,
+  buildFullstackLocalSpecializedDocumentationContentBundle,
+} = require('./main-fullstack-local-specialized-content-helpers.cjs')
+const {
+  buildFullstackLocalSpecializedBackendContentBundle,
+  buildFullstackLocalSpecializedMaterializationOperations,
+} = require('./main-fullstack-local-specialized-operations-helpers.cjs')
 
 function isElectronExecutablePath(executablePath) {
   if (typeof executablePath !== 'string' || !executablePath.trim()) {
@@ -28994,41 +29006,41 @@ function buildFullstackLocalMaterializationPlan({
     rootFolder,
     fullstackContractProfile,
   })
-  const usesLogisticsFullstackContract =
-    fullstackContractProfile.archetype === 'logistics-tracking'
-  const usesOnlineCoursesFullstackContract =
-    fullstackContractProfile.archetype === 'online-courses'
-  const usesCanonicalSpecializedFullstackContract =
-    usesLogisticsFullstackContract || usesOnlineCoursesFullstackContract
-  const usesLegacyMaterializationProfile =
-    typeof fullstackContractProfile?.archetype === 'string' &&
-    fullstackContractProfile.archetype.trim() &&
-    fullstackContractProfile.archetype.trim() !== 'operations'
+  const {
+    usesLogisticsFullstackContract,
+    usesOnlineCoursesFullstackContract,
+    usesCanonicalSpecializedFullstackContract,
+    usesLegacyMaterializationProfile,
+  } = resolveFullstackLocalSpecializedContractFlags(fullstackContractProfile)
   const frontendFeaturePath = path.join(
     frontendFeaturesFolder,
     `${fullstackContractProfile.frontendFeatureBasename}.js`,
   )
-  const genericFrontendFolders = usesCanonicalSpecializedFullstackContract
-    ? []
-    : [
-        frontendSrcFolder,
-        frontendRoutesFolder,
-        frontendFeaturesFolder,
-        frontendComponentsFolder,
-      ]
-  const genericFrontendFiles = usesCanonicalSpecializedFullstackContract
-    ? []
-    : [
-        frontendIndexHtmlPath,
-        fullstackContractPaths.frontendAdminIndexPath,
-        fullstackContractPaths.frontendPublicIndexPath,
-        frontendMainJsPath,
-        frontendRoutesPath,
-        frontendFeaturePath,
-        frontendStylesPath,
-        frontendMockDataPath,
-        frontendAppComponentPath,
-      ]
+  const {
+    genericFrontendFolders,
+    genericFrontendFiles,
+    additionalAllowedFolderTargets,
+    additionalAllowedTargetPaths,
+    additionalScaffoldFiles,
+  } = buildFullstackLocalSpecializedPathPlan({
+    fullstackContractPaths,
+    frontendStudentFolder,
+    backendServicesFolder,
+    frontendSrcFolder,
+    frontendRoutesFolder,
+    frontendFeaturesFolder,
+    frontendComponentsFolder,
+    frontendIndexHtmlPath,
+    frontendMainJsPath,
+    frontendRoutesPath,
+    frontendFeaturePath,
+    frontendStylesPath,
+    frontendMockDataPath,
+    frontendAppComponentPath,
+    usesLogisticsFullstackContract,
+    usesOnlineCoursesFullstackContract,
+    usesCanonicalSpecializedFullstackContract,
+  })
   const backendPrimaryRoutePath = path.join(
     backendRoutesFolder,
     `${fullstackContractProfile.backendRouteBasename}.js`,
@@ -29042,14 +29054,13 @@ function buildFullstackLocalMaterializationPlan({
     frontendFolder,
     frontendAdminFolder,
     frontendPublicFolder,
-    ...(usesOnlineCoursesFullstackContract ? [frontendStudentFolder] : []),
+    ...additionalAllowedFolderTargets,
     ...genericFrontendFolders,
     backendFolder,
     backendSrcFolder,
     backendRoutesFolder,
     backendModulesFolder,
     backendLibFolder,
-    ...(usesOnlineCoursesFullstackContract ? [backendServicesFolder] : []),
     sharedFolder,
     sharedContractsFolder,
     sharedTypesFolder,
@@ -29080,48 +29091,7 @@ function buildFullstackLocalMaterializationPlan({
     docsArchitecturePath,
     docsApiPath,
     docsDataModelPath,
-    ...(usesCanonicalSpecializedFullstackContract
-      ? [
-          fullstackContractPaths.frontendAdminIndexPath,
-          fullstackContractPaths.frontendAdminAppPath,
-          fullstackContractPaths.frontendAdminStylesPath,
-          fullstackContractPaths.frontendPublicIndexPath,
-          fullstackContractPaths.frontendPublicAppPath,
-          fullstackContractPaths.frontendPublicStylesPath,
-          fullstackContractPaths.docsArchitecturePath,
-          fullstackContractPaths.docsApiPath,
-          fullstackContractPaths.docsDbSchemaPath,
-        ]
-      : []),
-    ...(usesLogisticsFullstackContract
-      ? [
-          fullstackContractPaths.backendTrackingRoutePath,
-          fullstackContractPaths.backendReportsRoutePath,
-          fullstackContractPaths.sharedStatusesPath,
-        ]
-      : []),
-    ...(usesOnlineCoursesFullstackContract
-      ? [
-          fullstackContractPaths.frontendStudentIndexPath,
-          fullstackContractPaths.frontendStudentAppPath,
-          fullstackContractPaths.frontendStudentStylesPath,
-          fullstackContractPaths.frontendStudentReadmePath,
-          fullstackContractPaths.backendCategoriesRoutePath,
-          fullstackContractPaths.backendModulesRoutePath,
-          fullstackContractPaths.backendLessonsRoutePath,
-          fullstackContractPaths.backendStudentsRoutePath,
-          fullstackContractPaths.backendEnrollmentsRoutePath,
-          fullstackContractPaths.backendPlansRoutePath,
-          fullstackContractPaths.backendPaymentsRoutePath,
-          fullstackContractPaths.backendProgressRoutePath,
-          fullstackContractPaths.backendMockMercadoPagoServicePath,
-          fullstackContractPaths.sharedPlansPath,
-          fullstackContractPaths.sharedPaymentStatusesPath,
-          fullstackContractPaths.sharedCourseStatusesPath,
-          fullstackContractPaths.docsPaymentsMockPath,
-          fullstackContractPaths.docsLocalValidationPath,
-        ]
-      : []),
+    ...additionalAllowedTargetPaths,
     docsRunbookPath,
     projectManifestPath,
   ]
@@ -29222,47 +29192,7 @@ function buildFullstackLocalMaterializationPlan({
     docsArchitecturePath,
     docsApiPath,
     docsDataModelPath,
-    ...(usesCanonicalSpecializedFullstackContract
-      ? [
-          fullstackContractPaths.frontendAdminIndexPath,
-          fullstackContractPaths.frontendAdminAppPath,
-          fullstackContractPaths.frontendAdminStylesPath,
-          fullstackContractPaths.frontendPublicIndexPath,
-          fullstackContractPaths.frontendPublicAppPath,
-          fullstackContractPaths.frontendPublicStylesPath,
-          fullstackContractPaths.docsArchitecturePath,
-          fullstackContractPaths.docsApiPath,
-          fullstackContractPaths.docsDbSchemaPath,
-        ]
-      : []),
-    ...(usesLogisticsFullstackContract
-      ? [
-          fullstackContractPaths.backendTrackingRoutePath,
-          fullstackContractPaths.backendReportsRoutePath,
-          fullstackContractPaths.sharedStatusesPath,
-        ]
-      : []),
-    ...(usesOnlineCoursesFullstackContract
-      ? [
-          fullstackContractPaths.frontendStudentIndexPath,
-          fullstackContractPaths.frontendStudentAppPath,
-          fullstackContractPaths.frontendStudentStylesPath,
-          fullstackContractPaths.backendCategoriesRoutePath,
-          fullstackContractPaths.backendModulesRoutePath,
-          fullstackContractPaths.backendLessonsRoutePath,
-          fullstackContractPaths.backendStudentsRoutePath,
-          fullstackContractPaths.backendEnrollmentsRoutePath,
-          fullstackContractPaths.backendPlansRoutePath,
-          fullstackContractPaths.backendPaymentsRoutePath,
-          fullstackContractPaths.backendProgressRoutePath,
-          fullstackContractPaths.backendMockMercadoPagoServicePath,
-          fullstackContractPaths.sharedPlansPath,
-          fullstackContractPaths.sharedPaymentStatusesPath,
-          fullstackContractPaths.sharedCourseStatusesPath,
-          fullstackContractPaths.docsPaymentsMockPath,
-          fullstackContractPaths.docsLocalValidationPath,
-        ]
-      : []),
+    ...additionalScaffoldFiles,
     docsRunbookPath,
   ]
   const reviewPhaseFiles = usesLogisticsFullstackContract
@@ -29434,264 +29364,44 @@ function buildFullstackLocalMaterializationPlan({
 </html>
 `
   const rootReadmeContent = documentationBundle.readmeContent
-  const frontendAdminReadmeContent = usesOnlineCoursesFullstackContract
-    ? `# Frontend admin local
-
-Esta carpeta describe la experiencia administrativa local para ${appTitle}.
-
-- Revisar cursos, categorías, módulos, clases, planes y reportes mock.
-- No instalar dependencias ni levantar servicios desde esta fase.
-- El contenido sigue siendo local, editable y acotado al workspace.
-`
-    : `# Frontend admin local
-
-Esta carpeta describe la experiencia administrativa local para ${appTitle}.
-
-- Revisar dashboard, operaciones internas y estados mock sin backend real.
-- No instalar dependencias ni levantar servicios desde esta fase.
-- El contenido sigue siendo local, editable y acotado al workspace.
-`
-  const frontendPublicReadmeContent = usesOnlineCoursesFullstackContract
-    ? `# Frontend publico local
-
-Esta carpeta describe el catálogo público local para ${appTitle}.
-
-- Mostrar cursos, categorías y planes sin exponer servicios reales.
-- No publicar, no desplegar y no conectar APIs externas.
-- Mantener la experiencia en modo local y revisable.
-`
-    : `# Frontend publico local
-
-Esta carpeta describe la consulta publica local por codigo para ${appTitle}.
-
-- Mostrar tracking o estado publico mock sin exponer servicios reales.
-- No publicar, no desplegar y no conectar APIs externas.
-- Mantener la experiencia en modo local y revisable.
-`
-  const frontendStudentReadmeContent = `# Frontend alumno local
-
-Esta carpeta describe el panel del alumno local para ${appTitle}.
-
-- Revisar inscripciones, progreso por clase y estado del plan sin auth real.
-- No instalar dependencias ni levantar servicios.
-- La simulación de pagos queda limitada a mock local documentado.
-`
-  const logisticsAdminIndexHtmlContent = `<!doctype html>
-<html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${appTitle} | Panel admin local</title>
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
-  <body data-surface="admin">
-    <main id="app"></main>
-    <script src="./app.js"></script>
-  </body>
-</html>
-`
-  const logisticsPublicIndexHtmlContent = `<!doctype html>
-<html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${appTitle} | Tracking local</title>
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
-  <body data-surface="public">
-    <main id="app"></main>
-    <script src="./app.js"></script>
-  </body>
-</html>
-`
-  const logisticsAdminAppJsContent = `const adminPlan = ${JSON.stringify(
-    {
-      title: `${appTitle} · Panel administrativo local`,
-      subtitle:
-        'Vista local y revisable de envíos, estados, incidencias y reportes básicos, sin backend real.',
-      metrics: fullstackLocalDemoData?.metrics || [],
-      alerts: fullstackLocalDemoData?.alerts || [],
-      events: fullstackLocalDemoData?.trackingEvents || [],
-      entities: fullstackLocalDemoData?.domainEntities || [],
-    },
-    null,
-    2,
-  )}
-
-const root = document.getElementById('app')
-if (root) {
-  root.innerHTML = [
-    '<section class="hero"><span class="eyebrow">Admin local</span><h1>' + adminPlan.title + '</h1><p>' + adminPlan.subtitle + '</p></section>',
-    '<section class="grid">' +
-      adminPlan.metrics.map((entry) => '<article class="card"><strong>' + entry.label + '</strong><span>' + entry.value + '</span><p>' + entry.detail + '</p></article>').join('') +
-    '</section>',
-    '<section class="columns"><article class="card"><h2>Entidades</h2><ul>' +
-      adminPlan.entities.map((entry) => '<li>' + entry + '</li>').join('') +
-    '</ul></article><article class="card"><h2>Eventos de tracking</h2><ul>' +
-      adminPlan.events.map((entry) => '<li><strong>' + (entry.patient || entry.shipment || entry.label || entry.id || 'Evento') + '</strong> <span>' + (entry.status || entry.eventStatus || '') + '</span></li>').join('') +
-    '</ul></article></section>',
-    '<section class="card"><h2>Alertas</h2><ul>' +
-      adminPlan.alerts.map((entry) => '<li><strong>' + entry.title + '</strong><p>' + entry.detail + '</p></li>').join('') +
-    '</ul></section>',
-  ].join('')
-}
-`
-  const logisticsPublicAppJsContent = `const publicTrackingPlan = ${JSON.stringify(
-    {
-      title: `${appTitle} · Consulta pública por código`,
-      subtitle:
-        'Simulación local para revisar trackingCode, historial de estados e incidencias sin servicios externos.',
-      constraints: fullstackLocalDemoData?.constraints || [],
-      events: fullstackLocalDemoData?.trackingEvents || [],
-    },
-    null,
-    2,
-  )}
-
-const root = document.getElementById('app')
-if (root) {
-  root.innerHTML = [
-    '<section class="hero"><span class="eyebrow">Tracking público local</span><h1>' + publicTrackingPlan.title + '</h1><p>' + publicTrackingPlan.subtitle + '</p></section>',
-    '<section class="card search-card"><label for="tracking-code">Código de seguimiento</label><input id="tracking-code" value="TRK-001" readonly /><p>Mock local, sin API real ni base activa.</p></section>',
-    '<section class="card"><h2>Timeline local</h2><ul>' +
-      publicTrackingPlan.events.map((entry) => '<li><strong>' + (entry.patient || entry.shipment || entry.label || entry.id || 'Evento') + '</strong><span>' + (entry.status || entry.eventStatus || '') + '</span></li>').join('') +
-    '</ul></section>',
-    '<section class="card"><h2>Restricciones</h2><ul>' +
-      publicTrackingPlan.constraints.map((entry) => '<li>' + entry + '</li>').join('') +
-    '</ul></section>',
-  ].join('')
-}
-`
-  const logisticsSurfaceStylesContent = `.hero { padding: 24px; border-radius: 18px; background: linear-gradient(135deg, #0f2438, #1c4f6d); color: #f5fbff; margin-bottom: 20px; }
-.eyebrow { display: inline-block; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.8; margin-bottom: 8px; }
-.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 20px; }
-.columns { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-bottom: 20px; }
-.card { background: #ffffff; border: 1px solid #d9e5ef; border-radius: 16px; padding: 18px; box-shadow: 0 14px 30px rgba(15, 36, 56, 0.08); }
-.card h2 { margin-top: 0; }
-.card ul { margin: 0; padding-left: 0; list-style: none; }
-.card li { margin-bottom: 12px; }
-.card li:last-child { margin-bottom: 0; }
-.card-title { display: block; margin: 0 0 8px; font-size: 1.02rem; line-height: 1.35; }
-.meta-line { display: block; margin: 0 0 6px; color: #36546a; line-height: 1.45; }
-.meta-label { font-weight: 600; color: #163247; }
-.badge { display: inline-block; margin: 0 0 8px; padding: 4px 10px; border-radius: 999px; background: #e4f0f8; color: #174161; font-size: 0.82rem; font-weight: 600; }
-.metric-card { display: flex; flex-direction: column; gap: 6px; }
-.metric-label { font-size: 0.92rem; color: #476579; }
-.metric-value { display: block; font-size: 1.8rem; line-height: 1; color: #163247; }
-.metric-detail { margin: 0; color: #4f6a7d; line-height: 1.45; }
-.card-note { margin: 10px 0 0; color: #4f6a7d; line-height: 1.5; }
-.search-card input { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid #aac3d6; background: #f7fbfe; font: inherit; }
-body { margin: 0; padding: 24px; background: #eef5f9; color: #163247; font-family: 'Segoe UI', sans-serif; }
-`
-  const onlineCoursesAdminIndexHtmlContent = `<!doctype html>
-<html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${appTitle} | Admin local</title>
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
-  <body data-surface="admin">
-    <main id="app"></main>
-    <script src="./app.js"></script>
-  </body>
-</html>
-`
-  const onlineCoursesPublicIndexHtmlContent = `<!doctype html>
-<html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${appTitle} | Público local</title>
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
-  <body data-surface="public">
-    <main id="app"></main>
-    <script src="./app.js"></script>
-  </body>
-</html>
-`
-  const onlineCoursesStudentIndexHtmlContent = `<!doctype html>
-<html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${appTitle} | Alumno local</title>
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
-  <body data-surface="student">
-    <main id="app"></main>
-    <script src="./app.js"></script>
-  </body>
-</html>
-`
-  const onlineCoursesAdminAppJsContent = `const adminPlan = ${JSON.stringify(
-    {
-      title: `${appTitle} · Panel administrativo local`,
-      subtitle:
-        'Vista local y revisable de cursos, categorías, planes, pagos mock y reportes, sin backend real.',
-      metrics: fullstackLocalDemoData?.metrics || [],
-      alerts: fullstackLocalDemoData?.alerts || [],
-      courses: onlineCoursesCourses,
-      reports: onlineCoursesReports,
-    },
-    null,
-    2,
-  )}
-
-const root = document.getElementById('app')
-if (root) {
-  root.innerHTML = [
-    '<section class="hero"><span class="eyebrow">Admin local</span><h1>' + adminPlan.title + '</h1><p>' + adminPlan.subtitle + '</p></section>',
-    '<section class="grid">' + adminPlan.metrics.map((entry) => '<article class="card metric-card"><span class="metric-label">' + entry.label + '</span><strong class="metric-value">' + entry.value + '</strong><p class="metric-detail">' + entry.detail + '</p></article>').join('') + '</section>',
-    '<section class="columns"><article class="card"><h2>Cursos</h2><ul>' + adminPlan.courses.map((entry) => '<li><strong class="card-title">' + entry.title + '</strong><span class="badge">Estado: ' + entry.status + '</span><p class="meta-line"><span class="meta-label">Plan requerido:</span> ' + entry.plan + '</p><p class="meta-line"><span class="meta-label">Clases:</span> ' + entry.lessons + '</p><p class="card-note">' + entry.note + '</p></li>').join('') + '</ul></article><article class="card"><h2>Reportes</h2><ul>' + adminPlan.reports.map((entry) => '<li><strong class="card-title">' + entry.name + '</strong><p class="meta-line"><span class="meta-label">Valor:</span> ' + entry.value + '</p><p class="card-note">' + entry.detail + '</p></li>').join('') + '</ul></article></section>',
-    '<section class="card"><h2>Alertas</h2><ul>' + adminPlan.alerts.map((entry) => '<li><strong>' + entry.title + '</strong><p>' + entry.detail + '</p></li>').join('') + '</ul></section>',
-  ].join('')
-}
-`
-  const onlineCoursesPublicAppJsContent = `const publicPlan = ${JSON.stringify(
-    {
-      title: `${appTitle} · Catálogo público local`,
-      subtitle:
-        'Simulación local del catálogo de cursos, categorías y planes sin servicios externos ni checkout real.',
-      courses: onlineCoursesCourses,
-      constraints: fullstackLocalDemoData?.constraints || [],
-    },
-    null,
-    2,
-  )}
-
-const root = document.getElementById('app')
-if (root) {
-  root.innerHTML = [
-    '<section class="hero"><span class="eyebrow">Público local</span><h1>' + publicPlan.title + '</h1><p>' + publicPlan.subtitle + '</p></section>',
-    '<section class="columns">' + publicPlan.courses.map((entry) => '<article class="card"><strong class="card-title">' + entry.title + '</strong><p class="meta-line"><span class="meta-label">Categoría:</span> ' + entry.category + '</p><p class="meta-line"><span class="meta-label">Plan base:</span> ' + entry.plan + '</p><p class="meta-line"><span class="meta-label">Clases:</span> ' + entry.access + '</p><p class="card-note">' + entry.note + '</p></article>').join('') + '</section>',
-    '<section class="card"><h2>Restricciones</h2><ul>' + publicPlan.constraints.map((entry) => '<li>' + entry + '</li>').join('') + '</ul></section>',
-  ].join('')
-}
-`
-  const onlineCoursesStudentAppJsContent = `const studentPlan = ${JSON.stringify(
-    {
-      title: `${appTitle} · Panel del alumno local`,
-      subtitle:
-        'Vista local y revisable de inscripciones, progreso y pagos mock, sin auth real ni servicios externos.',
-      students: onlineCoursesStudents,
-      progress: onlineCoursesProgress,
-      payments: onlineCoursesPayments,
-    },
-    null,
-    2,
-  )}
-
-const root = document.getElementById('app')
-if (root) {
-  root.innerHTML = [
-    '<section class="hero"><span class="eyebrow">Alumno local</span><h1>' + studentPlan.title + '</h1><p>' + studentPlan.subtitle + '</p></section>',
-    '<section class="columns"><article class="card"><h2>Alumnos mock</h2><ul>' + studentPlan.students.map((entry) => '<li><strong class="card-title">' + entry.name + '</strong><p class="meta-line"><span class="meta-label">Plan:</span> ' + entry.plan + '</p><p class="meta-line"><span class="meta-label">Acceso:</span> ' + entry.access + '</p></li>').join('') + '</ul></article><article class="card"><h2>Progreso</h2><ul>' + studentPlan.progress.map((entry) => '<li><strong class="card-title">' + entry.course + '</strong><p class="meta-line"><span class="meta-label">Avance:</span> ' + entry.completion + '</p><p class="card-note">' + entry.note + '</p></li>').join('') + '</ul></article></section>',
-    '<section class="card"><h2>Pagos mock</h2><ul>' + studentPlan.payments.map((entry) => '<li><strong class="card-title">' + entry.plan + '</strong><p class="meta-line"><span class="meta-label">Estado:</span> ' + entry.status + '</p><p class="meta-line"><span class="meta-label">Monto:</span> ' + entry.amount + '</p><p class="card-note">' + entry.note + '</p></li>').join('') + '</ul></section>',
-  ].join('')
-}
-`
+  const dataModelEntityLines = summarizeUniqueExecutorStrings(
+    fullstackLocalDemoData?.domainEntities,
+    12,
+  )
+    .map((entry) => `- ${entry}`)
+    .join('\n')
+  const dataModelRelationshipLines = buildFullstackLocalEntityRelationships(
+    fullstackLocalDemoData,
+  )
+    .map((entry) => `- ${entry.from} -> ${entry.to}: ${entry.detail}`)
+    .join('\n')
+  const specializedFrontendContentBundle =
+    buildFullstackLocalSpecializedFrontendContentBundle({
+      appTitle,
+      fullstackLocalDemoData,
+      onlineCoursesCourses,
+      onlineCoursesReports,
+      onlineCoursesStudents,
+      onlineCoursesProgress,
+      onlineCoursesPayments,
+      usesOnlineCoursesFullstackContract,
+    })
+  const {
+    frontendAdminReadmeContent,
+    frontendPublicReadmeContent,
+    frontendStudentReadmeContent,
+    logisticsAdminIndexHtmlContent,
+    logisticsPublicIndexHtmlContent,
+    logisticsAdminAppJsContent,
+    logisticsPublicAppJsContent,
+    logisticsSurfaceStylesContent,
+    onlineCoursesAdminIndexHtmlContent,
+    onlineCoursesPublicIndexHtmlContent,
+    onlineCoursesStudentIndexHtmlContent,
+    onlineCoursesAdminAppJsContent,
+    onlineCoursesPublicAppJsContent,
+    onlineCoursesStudentAppJsContent,
+  } = specializedFrontendContentBundle
   const frontendStylesContent = buildFullstackLocalInteractiveFrontendStyles()
   const frontendMockDataContent = buildBrowserWindowDataScript(
     'fullstackPlan',
@@ -29750,28 +29460,6 @@ module.exports = {
   ok,
 }
 `
-  const backendMockMercadoPagoServiceContent = usesOnlineCoursesFullstackContract
-    ? `const PAYMENT_STATUSES = ['pending', 'approved', 'rejected', 'cancelled']
-
-function createMockPreference(input = {}) {
-  return {
-    provider: 'mock-mercado-pago',
-    mode: 'sandbox-local',
-    externalCall: false,
-    credentialsRequired: false,
-    studentId: input.studentId || '',
-    planCode: input.planCode || 'free',
-    amountLabel: input.amountLabel || '$0',
-    status: PAYMENT_STATUSES.includes(input.status) ? input.status : 'pending',
-  }
-}
-
-module.exports = {
-  PAYMENT_STATUSES,
-  createMockPreference,
-}
-`
-    : ''
   const backendHealthRouteContent =
     buildFullstackLocalBackendHealthRouteContent(fullstackLocalDemoData)
   const backendPrimaryModuleContent =
@@ -29794,58 +29482,12 @@ module.exports = {
     buildFullstackLocalSharedDomainContent(fullstackLocalDemoData)
   const sharedContractsContent =
     buildFullstackLocalSharedContractsContent(fullstackLocalDemoData)
-  const sharedStatusesContent = usesLogisticsFullstackContract
-    ? `const SHIPMENT_STATUSES = ['pendiente', 'en preparación', 'en tránsito', 'entregado', 'incidencia']
-const INCIDENT_STATUSES = ['pendiente', 'en revisión', 'resuelto']
-const TRACKING_EVENT_TYPES = ['alta', 'salida de depósito', 'en tránsito', 'incidencia', 'entrega']
-
-module.exports = {
-  SHIPMENT_STATUSES,
-  INCIDENT_STATUSES,
-  TRACKING_EVENT_TYPES,
-}
-`
-    : ''
-  const sharedPlansContent = usesOnlineCoursesFullstackContract
-    ? `const PLAN_RULES = {
-  Free: {
-    code: 'free',
-    access: ['free-lessons'],
-    description: 'Acceso limitado a clases gratuitas.',
-  },
-  Plata: {
-    code: 'plata',
-    access: ['free-lessons', 'selected-courses', 'full-progress'],
-    description: 'Acceso a cursos seleccionados y progreso completo.',
-  },
-  Oro: {
-    code: 'oro',
-    access: ['free-lessons', 'selected-courses', 'all-courses', 'full-progress', 'advanced-reports'],
-    description: 'Acceso completo y beneficios simulados.',
-  },
-}
-
-module.exports = {
-  PLAN_RULES,
-}
-`
-    : ''
-  const sharedPaymentStatusesContent = usesOnlineCoursesFullstackContract
-    ? `const PAYMENT_STATUSES = ['pending', 'approved', 'rejected', 'cancelled']
-
-module.exports = {
-  PAYMENT_STATUSES,
-}
-`
-    : ''
-  const sharedCourseStatusesContent = usesOnlineCoursesFullstackContract
-    ? `const COURSE_STATUSES = ['draft', 'published', 'archived']
-
-module.exports = {
-  COURSE_STATUSES,
-}
-`
-    : ''
+  const specializedBackendContentBundle =
+    buildFullstackLocalSpecializedBackendContentBundle({
+      fullstackContractProfile,
+      usesLogisticsFullstackContract,
+      usesOnlineCoursesFullstackContract,
+    })
   const databaseReadmeContent = databaseArtifacts.readmeContent
   const databaseSchemaContent = databaseArtifacts.schemaContent
   const databaseSeedContent = databaseArtifacts.seedContent
@@ -29871,151 +29513,36 @@ module.exports = {
   seedManifest,
 }
 `
-  const docsArchitectureContent = documentationBundle.architectureContent
-  const docsCanonicalArchitectureContent = usesCanonicalSpecializedFullstackContract
-    ? documentationBundle.architectureContent
-    : ''
-  const docsApiContent = usesOnlineCoursesFullstackContract
-    ? `# API local prevista
-
-## Alcance
-
-- strategy esperada: \`materialize-fullstack-local-plan\`
-- executionMode esperado: \`executor\`
-- nextExpectedAction esperado: \`execute-plan\`
-- runtime real: deshabilitado
-
-## Endpoints locales revisables
-
-- \`GET /health\`: contrato de salud conceptual.
-- \`GET /courses\`: listado mock de cursos y acceso por plan.
-- \`GET /categories\`: categorías del catálogo local.
-- \`GET /modules\`: módulos por curso.
-- \`GET /lessons\`: clases gratuitas y premium.
-- \`GET /students\`: alumnos mock y plan activo.
-- \`GET /enrollments\`: inscripciones y acceso por plan.
-- \`GET /plans\`: reglas Free, Plata y Oro.
-- \`GET /payments\`: pagos simulados por mock-mercado-pago.
-- \`GET /progress\`: avance del alumno por clase.
-
-## Restricciones
-
-- Sin auth real, sin sesiones persistentes, sin integraciones externas.
-- Sin deploy, sin Docker, sin credenciales y sin servicios activos.
-`
-    : `# API local prevista
-
-## Alcance
-
-- strategy esperada: \`materialize-fullstack-local-plan\`
-- executionMode esperado: \`executor\`
-- nextExpectedAction esperado: \`execute-plan\`
-- runtime real: deshabilitado
-
-## Endpoints locales revisables
-
-- \`GET /health\`: contrato de salud conceptual.
-- \`GET ${fullstackContractProfile.primaryRoutePath}\`: ${fullstackContractProfile.primaryRoutePurpose}
-${fullstackContractProfile.publicRoutePath ? `- \`GET ${fullstackContractProfile.publicRoutePath}\`: ${fullstackContractProfile.publicRoutePurpose}\n` : ''}- \`GET /reports\`: resumen local sin exportacion real.
-
-## Restricciones
-
-- Sin auth real, sin sesiones persistentes, sin integraciones externas.
-- Sin deploy, sin Docker, sin credenciales y sin servicios activos.
-`
-  const docsCanonicalApiContent = usesCanonicalSpecializedFullstackContract
-    ? docsApiContent
-    : ''
-  const docsDataModelContent = `# Modelo de datos local
-
-## Entidades principales
-
-${summarizeUniqueExecutorStrings(fullstackLocalDemoData?.domainEntities, 12)
-  .map((entry) => `- ${entry}`)
-  .join('\n')}
-
-## Relaciones base
-
-${buildFullstackLocalEntityRelationships(fullstackLocalDemoData)
-  .map((entry) => `- ${entry.from} -> ${entry.to}: ${entry.detail}`)
-  .join('\n')}
-
-## Restricciones
-
-- SQLite o base local solo como referencia revisable.
-- Sin migraciones ejecutadas ni conexiones reales.
-- Los seeds se documentan en \`database/seed.sql\` y \`database/seeds/seed-local.sql\`, sin ejecutarse automaticamente.
-`
-  const docsCanonicalDbSchemaContent = usesCanonicalSpecializedFullstackContract
-    ? `# Contrato SQL local
-
-## Archivos obligatorios
-
-- \`database/schema.sql\`
-- \`database/seed.sql\`
-- \`database/seeds/seed-local.sql\` como compatibilidad local adicional
-
-## Entidades esperadas
-
-${summarizeUniqueExecutorStrings(fullstackLocalDemoData?.domainEntities, 16)
-  .map((entry) => `- ${entry}`)
-  .join('\n')}
-
-## Notas
-
-- SQLite o base local solamente como referencia revisable.
-- No se ejecutan migraciones, seeds ni servicios.
-- JSON puede existir como fixture auxiliar de frontend, pero no reemplaza el contrato SQL local.
-`
-    : ''
-  const docsPaymentsMockContent = usesOnlineCoursesFullstackContract
-    ? `# Pagos mock locales
-
-## Objetivo
-
-Modelar una integración futura con Mercado Pago sin credenciales, sin checkout real y sin llamadas externas.
-
-## Adaptador local
-
-- Archivo: \`backend/src/services/mock-mercado-pago.js\`
-- Modo: \`review-only\`
-- HTTP externo: deshabilitado
-- Tokens: no se usan
-- Archivos locales con secretos: fuera de alcance
-
-## Estados soportados
-
-- \`pending\`
-- \`approved\`
-- \`rejected\`
-- \`cancelled\`
-
-## Notas
-
-- Los pagos son solo datos mock y documentación de integración futura.
-- Cualquier integración real requiere aprobación humana explícita.
-`
-    : ''
-  const docsLocalValidationContent = usesOnlineCoursesFullstackContract
-    ? `# Local validation
-
-## Qué revisar
-
-1. Abrir \`frontend/public/index.html\`, \`frontend/admin/index.html\` y \`frontend/student/index.html\` por \`file://\`.
-2. Confirmar que el catálogo, panel admin y panel alumno muestren cursos, alumnos, pagos mock y progreso.
-3. Revisar \`database/schema.sql\` y \`database/seed.sql\` como contrato SQL local.
-4. Validar que \`backend/src/services/mock-mercado-pago.js\` no tenga tokens, fetch ni llamadas externas.
-5. Confirmar que los planes \`Free\`, \`Plata\` y \`Oro\` gobiernen el acceso de forma mock.
-
-## Qué no hacer
-
-- No crear archivos locales con secretos
-- No instalar dependencias
-- No levantar runtime real
-- No usar APIs externas reales
-`
-    : ''
+  const specializedDocumentationContentBundle =
+    buildFullstackLocalSpecializedDocumentationContentBundle({
+      documentationBundle,
+      fullstackContractProfile,
+      usesCanonicalSpecializedFullstackContract,
+      usesOnlineCoursesFullstackContract,
+      dataModelEntityLines,
+      dataModelRelationshipLines,
+    })
+  const {
+    docsArchitectureContent,
+    docsCanonicalArchitectureContent,
+    docsApiContent,
+    docsCanonicalApiContent,
+    docsDataModelContent,
+    docsCanonicalDbSchemaContent,
+    docsPaymentsMockContent,
+    docsLocalValidationContent,
+  } = specializedDocumentationContentBundle
   const docsRunbookContent = documentationBundle.runbookContent
+  const specializedMaterializationOperations =
+    buildFullstackLocalSpecializedMaterializationOperations({
+      usesLogisticsFullstackContract,
+      usesOnlineCoursesFullstackContract,
+      fullstackContractPaths,
+      frontendContentBundle: specializedFrontendContentBundle,
+      documentationContentBundle: specializedDocumentationContentBundle,
+      backendContentBundle: specializedBackendContentBundle,
+      databaseCanonicalSeedContent,
+    })
   const validationReportJsonContent = `${JSON.stringify(
     {
       status: 'materialized',
@@ -30404,6 +29931,7 @@ Modelar una integración futura con Mercado Pago sin credenciales, sin checkout 
         { type: 'replace-file', targetPath: frontendPackageJsonPath, nextContent: frontendPackageJsonContent },
         { type: 'replace-file', targetPath: frontendAdminReadmePath, nextContent: frontendAdminReadmeContent },
         { type: 'replace-file', targetPath: frontendPublicReadmePath, nextContent: frontendPublicReadmeContent },
+        ...specializedMaterializationOperations.preCoreOperations,
         ...(usesCanonicalSpecializedFullstackContract
           ? []
           : [
@@ -30435,347 +29963,14 @@ Modelar una integración futura con Mercado Pago sin credenciales, sin checkout 
         { type: 'replace-file', targetPath: sharedContractsPath, nextContent: sharedContractsContent },
         { type: 'replace-file', targetPath: databaseReadmePath, nextContent: databaseReadmeContent },
         { type: 'replace-file', targetPath: databaseSchemaPath, nextContent: databaseSchemaContent },
-        ...(usesLogisticsFullstackContract
-          ? [
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.frontendAdminIndexPath,
-                nextContent: logisticsAdminIndexHtmlContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.frontendAdminAppPath,
-                nextContent: logisticsAdminAppJsContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.frontendAdminStylesPath,
-                nextContent: logisticsSurfaceStylesContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.frontendPublicIndexPath,
-                nextContent: logisticsPublicIndexHtmlContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.frontendPublicAppPath,
-                nextContent: logisticsPublicAppJsContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.frontendPublicStylesPath,
-                nextContent: logisticsSurfaceStylesContent,
-              },
-            ]
-          : []),
-        ...(usesOnlineCoursesFullstackContract
-          ? [
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.frontendStudentReadmePath,
-                nextContent: frontendStudentReadmeContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.frontendAdminIndexPath,
-                nextContent: onlineCoursesAdminIndexHtmlContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.frontendAdminAppPath,
-                nextContent: onlineCoursesAdminAppJsContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.frontendAdminStylesPath,
-                nextContent: logisticsSurfaceStylesContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.frontendPublicIndexPath,
-                nextContent: onlineCoursesPublicIndexHtmlContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.frontendPublicAppPath,
-                nextContent: onlineCoursesPublicAppJsContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.frontendPublicStylesPath,
-                nextContent: logisticsSurfaceStylesContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.frontendStudentIndexPath,
-                nextContent: onlineCoursesStudentIndexHtmlContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.frontendStudentAppPath,
-                nextContent: onlineCoursesStudentAppJsContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.frontendStudentStylesPath,
-                nextContent: logisticsSurfaceStylesContent,
-              },
-            ]
-          : []),
         { type: 'replace-file', targetPath: databaseSeedPath, nextContent: databaseSeedContent },
-        ...(usesLogisticsFullstackContract
-          ? [
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.databaseSeedPath,
-                nextContent: databaseCanonicalSeedContent,
-              },
-            ]
-          : []),
-        ...(usesOnlineCoursesFullstackContract
-          ? [
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.databaseSeedPath,
-                nextContent: databaseCanonicalSeedContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.sharedPlansPath,
-                nextContent: sharedPlansContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.sharedPaymentStatusesPath,
-                nextContent: sharedPaymentStatusesContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.sharedCourseStatusesPath,
-                nextContent: sharedCourseStatusesContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.backendCategoriesRoutePath,
-                nextContent: `const routeContract = {
-  method: 'GET',
-  path: '/categories',
-  purpose: 'Listar categorias locales del catálogo de cursos.',
-  localOnly: true,
-  activeRuntime: false,
-}
-
-module.exports = {
-  routeContract,
-}
-`,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.backendModulesRoutePath,
-                nextContent: `const routeContract = {
-  method: 'GET',
-  path: '/modules',
-  purpose: 'Listar modulos locales por curso.',
-  localOnly: true,
-  activeRuntime: false,
-}
-
-module.exports = {
-  routeContract,
-}
-`,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.backendLessonsRoutePath,
-                nextContent: `const routeContract = {
-  method: 'GET',
-  path: '/lessons',
-  purpose: 'Listar clases locales y su acceso gratuito o premium.',
-  localOnly: true,
-  activeRuntime: false,
-}
-
-module.exports = {
-  routeContract,
-}
-`,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.backendStudentsRoutePath,
-                nextContent: `const routeContract = {
-  method: 'GET',
-  path: '/students',
-  purpose: 'Listar alumnos mock y su plan activo.',
-  localOnly: true,
-  activeRuntime: false,
-}
-
-module.exports = {
-  routeContract,
-}
-`,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.backendEnrollmentsRoutePath,
-                nextContent: `const routeContract = {
-  method: 'GET',
-  path: '/enrollments',
-  purpose: 'Listar inscripciones locales y acceso por plan.',
-  localOnly: true,
-  activeRuntime: false,
-}
-
-module.exports = {
-  routeContract,
-}
-`,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.backendPlansRoutePath,
-                nextContent: `const routeContract = {
-  method: 'GET',
-  path: '/plans',
-  purpose: 'Exponer reglas mock de Free, Plata y Oro.',
-  localOnly: true,
-  activeRuntime: false,
-}
-
-module.exports = {
-  routeContract,
-}
-`,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.backendPaymentsRoutePath,
-                nextContent: `const routeContract = {
-  method: 'GET',
-  path: '/payments',
-  purpose: 'Listar pagos simulados y estados mock sin pasarela real.',
-  localOnly: true,
-  activeRuntime: false,
-}
-
-module.exports = {
-  routeContract,
-}
-`,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.backendProgressRoutePath,
-                nextContent: `const routeContract = {
-  method: 'GET',
-  path: '/progress',
-  purpose: 'Listar progreso local por curso, modulo y clase.',
-  localOnly: true,
-  activeRuntime: false,
-}
-
-module.exports = {
-  routeContract,
-}
-`,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.backendMockMercadoPagoServicePath,
-                nextContent: backendMockMercadoPagoServiceContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.docsArchitecturePath,
-                nextContent: docsCanonicalArchitectureContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.docsApiPath,
-                nextContent: docsCanonicalApiContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.docsDbSchemaPath,
-                nextContent: docsCanonicalDbSchemaContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.docsPaymentsMockPath,
-                nextContent: docsPaymentsMockContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.docsLocalValidationPath,
-                nextContent: docsLocalValidationContent,
-              },
-            ]
-          : []),
+        ...specializedMaterializationOperations.coreExtensionOperations,
         { type: 'replace-file', targetPath: scriptsReadmePath, nextContent: scriptsReadmeContent },
         { type: 'replace-file', targetPath: scriptsSeedPath, nextContent: scriptsSeedContent },
         { type: 'replace-file', targetPath: docsArchitecturePath, nextContent: docsArchitectureContent },
         { type: 'replace-file', targetPath: docsApiPath, nextContent: docsApiContent },
         { type: 'replace-file', targetPath: docsDataModelPath, nextContent: docsDataModelContent },
-        ...(usesLogisticsFullstackContract
-          ? [
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.sharedStatusesPath,
-                nextContent: sharedStatusesContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.backendTrackingRoutePath,
-                nextContent: `const routeContract = {
-  method: 'GET',
-  path: ${JSON.stringify(fullstackContractProfile.publicRoutePath || '/tracking/:code')},
-  purpose: ${JSON.stringify(fullstackContractProfile.publicRoutePurpose || 'Consultar tracking publico mock por codigo sin servicios reales.')},
-  localOnly: true,
-  activeRuntime: false,
-}
-
-module.exports = {
-  routeContract,
-}
-`,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.backendReportsRoutePath,
-                nextContent: `const routeContract = {
-  method: 'GET',
-  path: '/reports',
-  purpose: 'Resumen local de envíos, incidencias y métricas básicas sin exportación real.',
-  localOnly: true,
-  activeRuntime: false,
-}
-
-module.exports = {
-  routeContract,
-}
-`,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.docsArchitecturePath,
-                nextContent: docsCanonicalArchitectureContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.docsApiPath,
-                nextContent: docsCanonicalApiContent,
-              },
-              {
-                type: 'replace-file',
-                targetPath: fullstackContractPaths.docsDbSchemaPath,
-                nextContent: docsCanonicalDbSchemaContent,
-              },
-            ]
-          : []),
+        ...specializedMaterializationOperations.postCoreOperations,
         { type: 'replace-file', targetPath: docsRunbookPath, nextContent: docsRunbookContent },
         {
           type: 'replace-file',
