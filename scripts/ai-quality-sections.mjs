@@ -44,6 +44,7 @@ export function buildAiQualitySections({ npmCommand, npxCommand }) {
         ['node', ['--check', 'scripts/ai-planner-smoke.mjs']],
         ['node', ['--check', 'scripts/ai-operator-e2e-smoke.mjs']],
         ['node', ['--check', 'scripts/ai-release-smoke.mjs']],
+        ['node', ['--check', 'scripts/generated-domain-contract-smoke.mjs']],
         ['node', ['--check', 'scripts/generated-domain-delivery-codex-task-smoke.mjs']],
         ['node', ['--check', 'scripts/generated-domain-delivery-correction-selector-smoke.mjs']],
         ['node', ['--check', 'scripts/generated-domain-delivery-history-ledger-smoke.mjs']],
@@ -116,6 +117,11 @@ export function buildAiQualitySections({ npmCommand, npxCommand }) {
       id: 'operator-e2e-smoke',
       label: 'Operator E2E smoke',
       commands: [['node', ['scripts/ai-operator-e2e-smoke.mjs']]],
+    },
+    {
+      id: 'generated-domain-contract-smoke',
+      label: 'Generated domain contract smoke',
+      commands: [['node', ['scripts/generated-domain-contract-smoke.mjs']]],
     },
     {
       id: 'generated-domain-delivery-codex-task-smoke',

@@ -39,6 +39,17 @@ JSON conceptual:
     "sourceRoot": "carnivorous-plants-local",
     "targetRoot": "carnivorous-plants-local"
   },
+  "stackProfile": {
+    "frontend": "vanilla-static-html",
+    "backend": "node-local-js",
+    "database": "sqlite-schema-design",
+    "apiStyle": "rest-mock",
+    "auth": "deferred",
+    "styling": "vanilla-css",
+    "testing": "manual-smoke",
+    "packageManager": "npm",
+    "runtime": "node-local"
+  },
   "roles": [],
   "entities": [],
   "states": {},
@@ -131,6 +142,35 @@ Campos:
 - `slug`: requerido
 - `sourceRoot`: requerido
 - `targetRoot`: requerido
+
+### `stackProfile`
+
+- opcional pero fuertemente recomendado cuando el pedido menciona stack especifico
+- objeto con preferencias tecnicas pedidas por el usuario
+- no materializa por si solo, pero evita que JEFE degrade un pedido especializado a un scaffold generico incompatible
+
+Campos sugeridos:
+
+- `frontend`
+- `backend`
+- `database`
+- `apiStyle`
+- `auth`
+- `styling`
+- `testing`
+- `packageManager`
+- `runtime`
+
+Ejemplos:
+
+- `frontend: "nextjs-app-router"`
+- `database: "prisma-sqlite"`
+- `auth: "http-only-cookie-rbac-bcrypt"`
+- `styling: "tailwindcss"`
+
+Regla operativa:
+
+- si `stackProfile` pide una familia tecnologica no soportada por el generador universal actual, JEFE debe bloquear la materializacion generica y reportar el gap en vez de fingir una entrega correcta
 
 ### `roles`
 
@@ -376,6 +416,17 @@ Si el schema sirve para este caso, entonces la arquitectura empieza a ser realme
     "slug": "carnivorous-plants-local",
     "sourceRoot": "carnivorous-plants-local",
     "targetRoot": "carnivorous-plants-local"
+  },
+  "stackProfile": {
+    "frontend": "vanilla-static-html",
+    "backend": "node-local-js",
+    "database": "sqlite-schema-design",
+    "apiStyle": "rest-mock",
+    "auth": "deferred",
+    "styling": "vanilla-css",
+    "testing": "manual-smoke",
+    "packageManager": "npm",
+    "runtime": "node-local"
   },
   "roles": ["visitor", "caretaker", "nursery-admin"],
   "entities": [

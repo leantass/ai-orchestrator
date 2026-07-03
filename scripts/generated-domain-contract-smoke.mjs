@@ -28,6 +28,21 @@ const {
   buildGeneratedDomainContractComparison,
 } = require('../electron/generated-domain-contract.cjs')
 const {
+  buildMainTraceEntry,
+  buildOutputPreview,
+  buildSafeGeneratedDomainContractObservationErrorPreview:
+    buildSafeGeneratedDomainContractObservationErrorPreviewHelper,
+  compactGeneratedDomainContractDebugAbsolutePath,
+  compactGeneratedDomainContractDebugAbsolutePaths,
+  formatMainDebugDetails: formatMainDebugDetailsHelper,
+  sanitizeGeneratedDomainContractDebugPreview,
+  summarizeGeneratedDomainContractDebugEntries,
+} = require(path.join(repoRoot, 'electron', 'main-debug-summaries.cjs'))
+const {
+  normalizeEventStringList,
+  normalizeEventStringValue,
+} = require(path.join(repoRoot, 'electron', 'main-normalizers.cjs'))
+const {
   LOCAL_MATERIALIZATION_PLAN_VERSION,
 } = require(path.join(repoRoot, 'electron', 'local-deterministic-executor.cjs'))
 const {
@@ -177,6 +192,15 @@ module.exports = {
     Buffer,
     fs,
     path,
+    buildMainTraceEntry,
+    buildOutputPreview,
+    buildSafeGeneratedDomainContractObservationErrorPreviewHelper,
+    compactGeneratedDomainContractDebugAbsolutePath,
+    compactGeneratedDomainContractDebugAbsolutePaths,
+    formatMainDebugDetailsHelper,
+    sanitizeGeneratedDomainContractDebugPreview,
+    normalizeEventStringList,
+    normalizeEventStringValue,
     LOCAL_MATERIALIZATION_PLAN_VERSION,
     FULLSTACK_LOCAL_BASE_PHASES,
     getFullstackLocalBasePhaseDefinition,
@@ -185,6 +209,7 @@ module.exports = {
     classifyWorkspaceProjectIntent,
     selectBestWorkspaceProjectCandidate,
     shouldIgnoreWorkspaceDirectoryEntry,
+    summarizeGeneratedDomainContractDebugEntries,
     normalizeGeneratedDomainContract,
     validateGeneratedDomainContract,
     deriveAllowedTargetPathsFromContract,
@@ -200,6 +225,7 @@ module.exports = {
     generatedDomainMaterializationPolicies,
     generatedDomainInspectionDiagnostics,
     generatedDomainMaterializationPlanDiagnostics,
+    summarizeGeneratedDomainContractDebugEntries,
     extractGeneratedDomainContractCandidate:
       require('../electron/generated-domain-contract.cjs').extractGeneratedDomainContractCandidate,
     AbortController,
@@ -239,6 +265,17 @@ function createValidInventedContract() {
       slug: 'carnivorous-plants-local',
       sourceRoot: 'carnivorous-plants-local',
       targetRoot: 'carnivorous-plants-local',
+    },
+    stackProfile: {
+      frontend: 'vanilla-static-html',
+      backend: 'node-local-js',
+      database: 'sqlite-schema-design',
+      apiStyle: 'rest-mock',
+      auth: 'deferred',
+      styling: 'vanilla-css',
+      testing: 'manual-smoke',
+      packageManager: 'npm',
+      runtime: 'node-local',
     },
     roles: ['visitor', 'caretaker', 'nursery-admin'],
     entities: [
@@ -350,6 +387,75 @@ function createValidInventedContract() {
       },
     ],
   }
+}
+
+function createSupportedViandasStackContract() {
+  const contract = createValidInventedContract()
+  contract.domain = {
+    label: 'Viandas Corporativas B2B',
+    slug: 'viandas-corporativas-b2b',
+    summary:
+      'Gestion local de empresas, menus, pedidos, auth y reportes operativos con stack moderno especifico.',
+  }
+  contract.root = {
+    slug: 'viandas-corporativas-b2b-local',
+    sourceRoot: 'viandas-corporativas-b2b-local',
+    targetRoot: 'viandas-corporativas-b2b-local',
+  }
+  contract.stackProfile = {
+    frontend: 'nextjs-app-router',
+    backend: 'nextjs-route-handlers',
+    database: 'prisma-sqlite',
+    apiStyle: 'route-handlers',
+    auth: 'http-only-cookie-rbac-bcrypt',
+    styling: 'tailwindcss',
+    testing: 'playwright-vitest',
+    packageManager: 'npm',
+    runtime: 'node18',
+  }
+  contract.roles = ['platform-admin', 'company-admin', 'employee', 'kitchen-operator']
+  contract.entities = [
+    'companies',
+    'employees',
+    'menus',
+    'orders',
+    'order-items',
+    'delivery-labels',
+  ]
+  contract.workflows = [
+    'company-ordering',
+    'kitchen-preparation',
+    'label-printing',
+    'csv-reporting',
+  ]
+  return contract
+}
+
+function createUnsupportedSpecializedStackContract() {
+  const contract = createSupportedViandasStackContract()
+  contract.domain = {
+    label: 'Dispatch Platform Zero',
+    slug: 'dispatch-platform-zero',
+    summary:
+      'Operacion local con stack moderno no soportado todavia por el generador especializado actual.',
+  }
+  contract.root = {
+    slug: 'dispatch-platform-zero-local',
+    sourceRoot: 'dispatch-platform-zero-local',
+    targetRoot: 'dispatch-platform-zero-local',
+  }
+  contract.stackProfile = {
+    frontend: 'sveltekit',
+    backend: 'graphql-gateway',
+    database: 'drizzle-postgres',
+    apiStyle: 'graphql',
+    auth: 'auth0-jwt',
+    styling: 'chakra-ui',
+    testing: 'playwright-vitest',
+    packageManager: 'pnpm',
+    runtime: 'bun',
+  }
+  return contract
 }
 
 function createWindowsDoubleSlashRootContract({ absoluteOperationPaths = false } = {}) {
@@ -1043,6 +1149,10 @@ function runOpenAIPromptContractRequestCase() {
     observationPrompt.includes('No uses planner-only, scalable-delivery-plan, strategy ni executionMode como deliveryLevel del contrato.'),
     'El prompt de observacion debe reforzar la prohibicion de etiquetas mezcladas.',
   )
+  assert.ok(
+    observationPrompt.includes('generatedDomainContract.stackProfile'),
+    'El prompt de observacion debe pedir stackProfile cuando el brief defina una familia tecnologica.',
+  )
 }
 
 function runOpenAISchemaContractFieldCase() {
@@ -1052,6 +1162,14 @@ function runOpenAISchemaContractFieldCase() {
   assert.equal(contractSchema.type, 'object')
   assert.ok(contractSchema.properties?.domain, 'El schema debe incluir domain.')
   assert.ok(contractSchema.properties?.root, 'El schema debe incluir root.')
+  assert.ok(
+    contractSchema.properties?.stackProfile,
+    'El schema debe incluir stackProfile para capturar stack pedido.',
+  )
+  assert.ok(
+    contractSchema.properties?.stackProfile?.properties?.frontend,
+    'stackProfile.frontend debe estar tipado en el schema.',
+  )
   assert.ok(contractSchema.properties?.frontendSurfaces, 'El schema debe incluir frontendSurfaces.')
   assert.ok(contractSchema.properties?.materialization, 'El schema debe incluir materialization.')
   assert.ok(contractSchema.properties?.validation, 'El schema debe incluir validation.')
@@ -5973,6 +6091,61 @@ function runGeneratedDomainStructuralCapabilitiesInventedCase() {
   assert.equal(debugSummary?.hasSafeLocalMaterialization, true)
 }
 
+function runGeneratedDomainStructuralCapabilitiesSupportedViandasStackCase() {
+  const contract = createSupportedViandasStackContract()
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision({
+    generatedDomainContract: contract,
+    decisionKey: 'generated-domain-supported-viandas-specialized-materialization',
+  })
+  const capabilities = decision.generatedDomainStructuralCapabilities
+
+  assert.equal(decision.generatedDomainUniversalMaterializationPlanPreview?.present, true)
+  assert.equal(decision.generatedDomainUniversalMaterializationPlanPreview?.status, 'built')
+  assert.equal(
+    decision.generatedDomainUniversalMaterializationPlanPreview?.canBecomeMaterializationPlan,
+    true,
+  )
+  assert.equal(decision.generatedDomainUniversalMaterializationPlan?.present, true)
+  assert.equal(decision.generatedDomainUniversalMaterializationPlan?.status, 'built')
+  assert.equal(decision.generatedDomainUniversalMaterializationPlan?.built, true)
+  assert.equal(
+    decision.generatedDomainUniversalMaterializationPlan?.canMaterializeInSandbox,
+    true,
+  )
+  assert.equal(capabilities?.present, true)
+  assert.equal(capabilities?.stackProfileRequested, true)
+  assert.equal(capabilities?.requiresSpecializedGenerator, true)
+  assert.equal(capabilities?.generatorSupportedNow, true)
+  assert.equal(capabilities?.capabilities?.hasBackend, true)
+}
+
+function runGeneratedDomainStructuralCapabilitiesUnsupportedStackCase() {
+  const contract = createUnsupportedSpecializedStackContract()
+  const decision = createGeneratedDomainAlignedApprovalObservationDecision({
+    generatedDomainContract: contract,
+    decisionKey: 'generated-domain-unsupported-stack-blocks-generic-materialization',
+  })
+  const capabilities = decision.generatedDomainStructuralCapabilities
+
+  assert.equal(decision.generatedDomainUniversalMaterializationPlanPreview?.present, true)
+  assert.equal(decision.generatedDomainUniversalMaterializationPlanPreview?.status, 'blocked')
+  assert.equal(
+    decision.generatedDomainUniversalMaterializationPlanPreview?.canBecomeMaterializationPlan,
+    false,
+  )
+  assert.equal(decision.generatedDomainUniversalMaterializationPlan?.present, true)
+  assert.equal(decision.generatedDomainUniversalMaterializationPlan?.status, 'blocked')
+  assert.equal(decision.generatedDomainUniversalMaterializationPlan?.built, false)
+  assert.equal(
+    decision.generatedDomainUniversalMaterializationPlan?.canMaterializeInSandbox,
+    false,
+  )
+  assert.equal(capabilities?.present, true)
+  assert.equal(capabilities?.stackProfileRequested, true)
+  assert.equal(capabilities?.requiresSpecializedGenerator, true)
+  assert.equal(capabilities?.generatorSupportedNow, false)
+}
+
 function runLegacyDomainHardcodingDebtReportCase() {
   const decision = createGeneratedDomainAlignedApprovalObservationDecision()
   const report = decision.legacyDomainHardcodingDebtReport
@@ -6802,6 +6975,8 @@ function runGeneratedDomainCapabilityProfileBuiltCase() {
   assert.equal(profile.materialization.hasAllowedTargets, true)
   assert.equal(profile.materialization.hasRequiredGroups, true)
   assert.equal(profile.safety.safeForLocalMaterialization, true)
+  assert.equal(profile.stackProfile.requested, true)
+  assert.equal(profile.generatorReadiness.supportedNow, true)
 }
 
 function runGeneratedDomainCapabilityProfileNotAvailableCase() {
@@ -6884,6 +7059,91 @@ function runGeneratedDomainMaterializationShadowPlanPartialCase() {
   assert.equal(shadowPlan.status, 'partial')
   assert.equal(shadowPlan.behaviorChanged, false)
   assert.ok(shadowPlan.warningsCount > 0)
+}
+
+function runGeneratedDomainCapabilityProfileUnsupportedStackCase() {
+  const contract = createUnsupportedSpecializedStackContract()
+  const diagnostics = buildGeneratedDomainContractDiagnostics(
+    { generatedDomainContract: contract },
+    repoRoot,
+  )
+  const profile = buildGeneratedDomainCapabilityProfile(contract, diagnostics)
+
+  assert.equal(profile.present, true)
+  assert.equal(profile.built, true)
+  assert.equal(profile.stackProfile.requested, true)
+  assert.equal(profile.stackProfile.frontend, 'sveltekit')
+  assert.equal(profile.stackProfile.database, 'drizzle-postgres')
+  assert.equal(profile.generatorReadiness.specializedGeneratorRequired, true)
+  assert.equal(profile.generatorReadiness.supportedNow, false)
+  assert.equal(profile.generatorReadiness.templateFamily, 'unsupported-specialized-stack')
+  assert.ok(profile.warningsCount > 0)
+}
+
+function runGeneratedDomainCapabilityProfileSupportedViandasStackCase() {
+  const contract = createSupportedViandasStackContract()
+  const diagnostics = buildGeneratedDomainContractDiagnostics(
+    { generatedDomainContract: contract },
+    repoRoot,
+  )
+  const profile = buildGeneratedDomainCapabilityProfile(contract, diagnostics)
+
+  assert.equal(profile.present, true)
+  assert.equal(profile.built, true)
+  assert.equal(profile.stackProfile.requested, true)
+  assert.equal(profile.stackProfile.frontend, 'nextjs-app-router')
+  assert.equal(profile.generatorReadiness.specializedGeneratorRequired, true)
+  assert.equal(profile.generatorReadiness.supportedNow, true)
+  assert.equal(
+    profile.generatorReadiness.templateFamily,
+    'nextjs-app-router-prisma-sqlite-tailwind',
+  )
+}
+
+function runGeneratedDomainMaterializationShadowPlanUnsupportedStackCase() {
+  const contract = createUnsupportedSpecializedStackContract()
+  const diagnostics = buildGeneratedDomainContractDiagnostics(
+    { generatedDomainContract: contract },
+    repoRoot,
+  )
+  const capabilityProfile = buildGeneratedDomainCapabilityProfile(contract, diagnostics)
+  const shadowPlan = buildGeneratedDomainMaterializationShadowPlan(
+    contract,
+    diagnostics,
+    capabilityProfile,
+  )
+
+  assert.equal(shadowPlan.present, true)
+  assert.equal(shadowPlan.built, false)
+  assert.equal(shadowPlan.status, 'partial')
+  assert.equal(shadowPlan.stackProfile.requested, true)
+  assert.equal(shadowPlan.generatorReadiness.specializedGeneratorRequired, true)
+  assert.equal(shadowPlan.generatorReadiness.supportedNow, false)
+  assert.ok(shadowPlan.warningsCount > 0)
+}
+
+function runGeneratedDomainMaterializationShadowPlanSupportedViandasStackCase() {
+  const contract = createSupportedViandasStackContract()
+  const diagnostics = buildGeneratedDomainContractDiagnostics(
+    { generatedDomainContract: contract },
+    repoRoot,
+  )
+  const capabilityProfile = buildGeneratedDomainCapabilityProfile(contract, diagnostics)
+  const shadowPlan = buildGeneratedDomainMaterializationShadowPlan(
+    contract,
+    diagnostics,
+    capabilityProfile,
+  )
+
+  assert.equal(shadowPlan.present, true)
+  assert.equal(shadowPlan.built, true)
+  assert.equal(shadowPlan.status, 'built')
+  assert.equal(shadowPlan.stackProfile.requested, true)
+  assert.equal(shadowPlan.generatorReadiness.supportedNow, true)
+  assert.equal(
+    shadowPlan.generatorReadiness.templateFamily,
+    'nextjs-app-router-prisma-sqlite-tailwind',
+  )
 }
 
 async function runPlannerObservationNormalizeAvailabilityCase() {
@@ -7050,9 +7310,13 @@ async function main() {
   runGeneratedDomainCapabilityProfileBuiltCase()
   runGeneratedDomainCapabilityProfileNotAvailableCase()
   runGeneratedDomainCapabilityProfilePartialCase()
+  runGeneratedDomainCapabilityProfileSupportedViandasStackCase()
+  runGeneratedDomainCapabilityProfileUnsupportedStackCase()
   runGeneratedDomainMaterializationShadowPlanBuiltCase()
   runGeneratedDomainMaterializationShadowPlanNotAvailableCase()
   runGeneratedDomainMaterializationShadowPlanPartialCase()
+  runGeneratedDomainMaterializationShadowPlanSupportedViandasStackCase()
+  runGeneratedDomainMaterializationShadowPlanUnsupportedStackCase()
   runBrainDecisionContractObservationCase()
   runLegacyDomainResolutionDiagnosticsUsedCase()
   runLegacyDomainResolutionDiagnosticsWithGeneratedContractCase()
@@ -7149,6 +7413,8 @@ runGeneratedDomainMaterializationApprovalSurfaceWebPruebaBlockedCase()
 runGeneratedDomainMaterializationApprovalSurfaceForbiddenFilesBlockedCase()
   runGeneratedDomainUniversalMaterializationPlanPreviewInventedDomainsCase()
   runGeneratedDomainStructuralCapabilitiesInventedCase()
+  runGeneratedDomainStructuralCapabilitiesSupportedViandasStackCase()
+  runGeneratedDomainStructuralCapabilitiesUnsupportedStackCase()
   runLegacyDomainHardcodingDebtReportCase()
   runLocalDeterministicExecutorLegacyDebtReportCase()
   runLocalDeterministicExecutorCapabilityMigrationPlanCase()

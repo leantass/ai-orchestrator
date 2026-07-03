@@ -48,6 +48,7 @@ const requiredScripts = [
   'scripts/ai-planner-smoke.mjs',
   'scripts/ai-release-smoke.mjs',
   'scripts/ai-operator-e2e-smoke.mjs',
+  'scripts/generated-domain-contract-smoke.mjs',
   'scripts/generated-domain-delivery-history-ledger-smoke.mjs',
   'scripts/generated-domain-delivery-supervised-workflow-smoke.mjs',
   'scripts/generated-domain-materialization-sandbox-smoke.mjs',
@@ -67,6 +68,7 @@ const requiredScripts = [
 ]
 
 const criticalQualityEntries = [
+  'scripts/generated-domain-contract-smoke.mjs',
   'scripts/generated-domain-delivery-history-ledger-smoke.mjs',
   'scripts/generated-domain-delivery-supervised-workflow-smoke.mjs',
   'scripts/orchestrator-tool-worker-registry-smoke.mjs',
