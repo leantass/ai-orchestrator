@@ -22,6 +22,7 @@ export function buildAiQualitySections({ npmCommand, npxCommand }) {
         ['node', ['--check', 'electron/fullstack-phase-contracts.cjs']],
         ['node', ['--check', 'electron/generated-domain-delivery-correction-selector.cjs']],
         ['node', ['--check', 'electron/generated-domain-delivery-history-ledger.cjs']],
+        ['node', ['--check', 'electron/generated-domain-real-project-artifacts.cjs']],
         ['node', ['--check', 'electron/generated-domain-delivery-review.cjs']],
         ['node', ['--check', 'electron/generated-domain-delivery-supervised-workflow.cjs']],
         ['node', ['--check', 'electron/generated-domain-delivery-worker-handoff.cjs']],
@@ -45,6 +46,7 @@ export function buildAiQualitySections({ npmCommand, npxCommand }) {
         ['node', ['--check', 'scripts/ai-operator-e2e-smoke.mjs']],
         ['node', ['--check', 'scripts/ai-release-smoke.mjs']],
         ['node', ['--check', 'scripts/generated-domain-contract-smoke.mjs']],
+        ['node', ['--check', 'scripts/generated-domain-real-project-mode-smoke.mjs']],
         ['node', ['--check', 'scripts/generated-domain-delivery-codex-task-smoke.mjs']],
         ['node', ['--check', 'scripts/generated-domain-delivery-correction-selector-smoke.mjs']],
         ['node', ['--check', 'scripts/generated-domain-delivery-history-ledger-smoke.mjs']],
@@ -122,6 +124,11 @@ export function buildAiQualitySections({ npmCommand, npxCommand }) {
       id: 'generated-domain-contract-smoke',
       label: 'Generated domain contract smoke',
       commands: [['node', ['scripts/generated-domain-contract-smoke.mjs']]],
+    },
+    {
+      id: 'generated-domain-real-project-mode-smoke',
+      label: 'Generated domain real project mode smoke',
+      commands: [['node', ['scripts/generated-domain-real-project-mode-smoke.mjs']]],
     },
     {
       id: 'generated-domain-delivery-codex-task-smoke',

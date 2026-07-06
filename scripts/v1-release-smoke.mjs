@@ -28,6 +28,7 @@ const requiredElectronModules = [
   'electron/generated-domain-delivery-worker-handoff.cjs',
   'electron/generated-domain-delivery-correction-selector.cjs',
   'electron/generated-domain-delivery-history-ledger.cjs',
+  'electron/generated-domain-real-project-artifacts.cjs',
   'electron/generated-domain-delivery-supervised-workflow.cjs',
   'electron/orchestrator-tool-worker-registry.cjs',
   'electron/orchestrator-local-smoke-worker.cjs',
@@ -49,6 +50,7 @@ const requiredScripts = [
   'scripts/ai-release-smoke.mjs',
   'scripts/ai-operator-e2e-smoke.mjs',
   'scripts/generated-domain-contract-smoke.mjs',
+  'scripts/generated-domain-real-project-mode-smoke.mjs',
   'scripts/generated-domain-delivery-history-ledger-smoke.mjs',
   'scripts/generated-domain-delivery-supervised-workflow-smoke.mjs',
   'scripts/generated-domain-materialization-sandbox-smoke.mjs',
@@ -69,6 +71,7 @@ const requiredScripts = [
 
 const criticalQualityEntries = [
   'scripts/generated-domain-contract-smoke.mjs',
+  'scripts/generated-domain-real-project-mode-smoke.mjs',
   'scripts/generated-domain-delivery-history-ledger-smoke.mjs',
   'scripts/generated-domain-delivery-supervised-workflow-smoke.mjs',
   'scripts/orchestrator-tool-worker-registry-smoke.mjs',
@@ -79,6 +82,12 @@ const criticalQualityEntries = [
 ]
 
 const expectedExports = [
+  [
+    'electron/generated-domain-real-project-artifacts.cjs',
+    [
+      'buildGeneratedDomainRealProjectArtifacts',
+    ],
+  ],
   [
     'electron/orchestrator-external-tool-execution-permit-bundle.cjs',
     [

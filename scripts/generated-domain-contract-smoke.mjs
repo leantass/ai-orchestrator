@@ -431,6 +431,37 @@ function createSupportedViandasStackContract() {
   return contract
 }
 
+function createSupportedRealProjectStackContract() {
+  const contract = createValidInventedContract()
+  contract.domain = {
+    label: 'Sistema de tickets de soporte',
+    slug: 'sistema-tickets-soporte',
+    summary: 'Helpdesk local con SQLite, API REST y backoffice CRUD.',
+  }
+  contract.root = {
+    slug: '03-sistema-tickets-soporte',
+    sourceRoot: '03-sistema-tickets-soporte',
+    targetRoot: '03-sistema-tickets-soporte',
+  }
+  contract.stackProfile = {
+    frontend: 'vanilla-static-html',
+    backend: 'node-local-js',
+    database: 'node-sqlite',
+    apiStyle: 'rest-crud',
+    auth: 'mock-roles',
+    styling: 'vanilla-css',
+    testing: 'node-smoke',
+    packageManager: 'npm',
+    runtime: 'node-local',
+  }
+  contract.roles = ['client', 'agent', 'admin']
+  contract.entities = ['users', 'tickets', 'comments', 'slaEvents']
+  contract.states = { ticket: ['open', 'in_progress', 'resolved', 'closed'] }
+  contract.workflows = ['create ticket', 'comment ticket', 'resolve ticket', 'review sla']
+  contract.database.tables = ['users', 'tickets', 'comments', 'slaEvents']
+  return contract
+}
+
 function createUnsupportedSpecializedStackContract() {
   const contract = createSupportedViandasStackContract()
   contract.domain = {
@@ -7100,6 +7131,59 @@ function runGeneratedDomainCapabilityProfileSupportedViandasStackCase() {
   )
 }
 
+function runGeneratedDomainCapabilityProfileSupportedRealProjectStackCase() {
+  const contract = createSupportedRealProjectStackContract()
+  const diagnostics = buildGeneratedDomainContractDiagnostics(
+    { generatedDomainContract: contract },
+    repoRoot,
+  )
+  const profile = buildGeneratedDomainCapabilityProfile(contract, diagnostics)
+
+  assert.equal(profile.present, true)
+  assert.equal(profile.built, true)
+  assert.equal(profile.stackProfile.requested, true)
+  assert.equal(profile.stackProfile.frontend, 'vanilla-static-html')
+  assert.equal(profile.stackProfile.database, 'node-sqlite')
+  assert.equal(profile.generatorReadiness.specializedGeneratorRequired, true)
+  assert.equal(profile.generatorReadiness.supportedNow, true)
+  assert.equal(profile.generatorReadiness.templateFamily, 'node-sqlite-rest-backoffice')
+}
+
+function runGeneratedDomainSpecializedTemplateArtifactsSupportedRealProjectCase() {
+  const contract = createSupportedRealProjectStackContract()
+  const artifacts = generatedDomainOrchestrationDiagnostics.buildGeneratedDomainSpecializedTemplateArtifacts({
+    templateFamily: 'node-sqlite-rest-backoffice',
+    projectRoot: contract.root.targetRoot,
+    domainLabel: contract.domain.label,
+    deliveryLevel: contract.deliveryLevel,
+    generatedDomainContract: contract,
+    stackProfile: contract.stackProfile,
+  })
+
+  assert.equal(artifacts.present, true)
+  assert.equal(artifacts.built, true)
+  assert.equal(artifacts.templateFamily, 'node-sqlite-rest-backoffice')
+  assert.ok(artifacts.allowedTargetPaths.includes('03-sistema-tickets-soporte/src/db.mjs'))
+  assert.ok(
+    artifacts.filesToCreate.some(
+      (entry) => entry.path === '03-sistema-tickets-soporte/src/db.mjs' && entry.content.includes('node:sqlite'),
+    ),
+  )
+  assert.ok(
+    artifacts.filesToCreate.some(
+      (entry) => entry.path === '03-sistema-tickets-soporte/public/app.js' && entry.content.includes('data-delete'),
+    ),
+  )
+  assert.ok(
+    artifacts.filesToCreate.some(
+      (entry) => entry.path === '03-sistema-tickets-soporte/scripts/smoke.mjs' && entry.content.includes('admin create failed'),
+    ),
+  )
+  assert.ok(
+    artifacts.requiredPathGroups.some((group) => group.label === 'sqlite-db-layer'),
+  )
+}
+
 function runGeneratedDomainMaterializationShadowPlanUnsupportedStackCase() {
   const contract = createUnsupportedSpecializedStackContract()
   const diagnostics = buildGeneratedDomainContractDiagnostics(
@@ -7311,6 +7395,8 @@ async function main() {
   runGeneratedDomainCapabilityProfileNotAvailableCase()
   runGeneratedDomainCapabilityProfilePartialCase()
   runGeneratedDomainCapabilityProfileSupportedViandasStackCase()
+  runGeneratedDomainCapabilityProfileSupportedRealProjectStackCase()
+  runGeneratedDomainSpecializedTemplateArtifactsSupportedRealProjectCase()
   runGeneratedDomainCapabilityProfileUnsupportedStackCase()
   runGeneratedDomainMaterializationShadowPlanBuiltCase()
   runGeneratedDomainMaterializationShadowPlanNotAvailableCase()

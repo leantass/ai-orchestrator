@@ -5,6 +5,9 @@ const {
   normalizeGeneratedDomainRequestedStackProfile,
   resolveGeneratedDomainGeneratorReadiness,
 } = require('./generated-domain-template-capabilities.cjs')
+const {
+  buildGeneratedDomainRealProjectArtifacts,
+} = require('./generated-domain-real-project-artifacts.cjs')
 
 function normalizeOptionalString(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : ''
@@ -81,7 +84,22 @@ function buildGeneratedDomainSpecializedTemplateArtifacts({
     normalizedTemplateFamily,
   )
 
-  if (!templateCapability || templateCapability.artifactBuilderKey !== 'nextjs-app-router-prisma-sqlite-tailwind' || !normalizedProjectRoot) {
+  if (!templateCapability || !normalizedProjectRoot) {
+    return null
+  }
+
+  if (templateCapability.artifactBuilderKey === 'node-sqlite-rest-backoffice') {
+    return buildGeneratedDomainRealProjectArtifacts({
+      templateFamily: normalizedTemplateFamily,
+      projectRoot: normalizedProjectRoot,
+      domainLabel: normalizedDomainLabel,
+      deliveryLevel: normalizedDeliveryLevel,
+      generatedDomainContract: contract,
+      stackProfile: normalizedStackProfile,
+    })
+  }
+
+  if (templateCapability.artifactBuilderKey !== 'nextjs-app-router-prisma-sqlite-tailwind') {
     return null
   }
 

@@ -4,6 +4,32 @@ function normalizeOptionalString(value) {
 
 const GENERATED_DOMAIN_SPECIALIZED_TEMPLATE_CAPABILITIES = [
   {
+    id: 'node-sqlite-rest-backoffice',
+    artifactBuilderKey: 'node-sqlite-rest-backoffice',
+    rules: {
+      frontend: { pattern: /vanilla|static|html|css/u },
+      backend: { pattern: /node|http|local-js|local/u },
+      database: { pattern: /sqlite|node:sqlite|node-sqlite|sqlite-schema/u },
+      apiStyle: { pattern: /rest|crud|http|mock/u },
+      auth: {
+        optional: true,
+        pattern: /deferred|mock|none|role|rbac/u,
+      },
+      styling: {
+        optional: true,
+        pattern: /vanilla|css|plain|none/u,
+      },
+      testing: {
+        optional: true,
+        pattern: /smoke|manual|node/u,
+      },
+      runtime: {
+        optional: true,
+        pattern: /node|local/u,
+      },
+    },
+  },
+  {
     id: 'nextjs-app-router-prisma-sqlite-tailwind',
     artifactBuilderKey: 'nextjs-app-router-prisma-sqlite-tailwind',
     rules: {
