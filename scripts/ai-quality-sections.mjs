@@ -46,6 +46,8 @@ export function buildAiQualitySections({ npmCommand, npxCommand }) {
         ['node', ['--check', 'scripts/ai-operator-e2e-smoke.mjs']],
         ['node', ['--check', 'scripts/ai-release-smoke.mjs']],
         ['node', ['--check', 'scripts/generated-domain-contract-smoke.mjs']],
+        ['node', ['--check', 'scripts/generated-domain-real-project-from-brief.mjs']],
+        ['node', ['--check', 'scripts/generated-domain-real-project-from-brief-smoke.mjs']],
         ['node', ['--check', 'scripts/generated-domain-real-project-mode-smoke.mjs']],
         ['node', ['--check', 'scripts/generated-domain-delivery-codex-task-smoke.mjs']],
         ['node', ['--check', 'scripts/generated-domain-delivery-correction-selector-smoke.mjs']],
@@ -129,6 +131,11 @@ export function buildAiQualitySections({ npmCommand, npxCommand }) {
       id: 'generated-domain-real-project-mode-smoke',
       label: 'Generated domain real project mode smoke',
       commands: [['node', ['scripts/generated-domain-real-project-mode-smoke.mjs']]],
+    },
+    {
+      id: 'generated-domain-real-project-from-brief-smoke',
+      label: 'Generated domain real project from brief smoke',
+      commands: [['node', ['scripts/generated-domain-real-project-from-brief-smoke.mjs']]],
     },
     {
       id: 'generated-domain-delivery-codex-task-smoke',
