@@ -251,6 +251,136 @@ function buildSeedRows(collectionName, fields, roles) {
   })
 }
 
+function replaceCollection(collections, name, label, fields, seed) {
+  if (!collections[name]) {
+    return
+  }
+  collections[name] = { label, fields, seed }
+}
+
+function applyOperationalB2BCollections(collections) {
+  replaceCollection(
+    collections,
+    'companies',
+    'Empresas',
+    { name: field('string'), status: field('enum:active,paused'), active: field('boolean') },
+    [
+      { name: 'Acme Salud', status: 'active', active: true },
+      { name: 'Norte Logistica', status: 'active', active: true },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'costCenters',
+    'Centros de costo',
+    { name: field('string'), companyId: field('string'), active: field('boolean') },
+    [
+      { name: 'Planta Norte', companyId: 'seed-companies-1', active: true },
+      { name: 'Administracion Central', companyId: 'seed-companies-1', active: true },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'employees',
+    'Empleados',
+    { name: field('string'), email: field('email'), role: field('enum:employee,company_admin,kitchen_operator,restaurant_admin,system_admin'), companyId: field('string'), costCenterId: field('string'), active: field('boolean') },
+    [
+      { name: 'Lucia Perez', email: 'lucia.perez@example.test', role: 'employee', companyId: 'seed-companies-1', costCenterId: 'seed-costCenters-1', active: true },
+      { name: 'Mateo Gomez', email: 'mateo.gomez@example.test', role: 'employee', companyId: 'seed-companies-1', costCenterId: 'seed-costCenters-2', active: false },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'menus',
+    'Menus',
+    { name: field('string'), date: field('date'), active: field('boolean') },
+    [
+      { name: 'Menu ejecutivo lunes', date: '2026-07-20', active: true },
+      { name: 'Menu vegetariano lunes', date: '2026-07-20', active: true },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'menuItems',
+    'Platos',
+    { name: field('string'), menuId: field('string'), category: field('string'), price: field('number'), active: field('boolean') },
+    [
+      { name: 'Milanesa con pure', menuId: 'seed-menus-1', category: 'principal', price: 5200, active: true },
+      { name: 'Ensalada completa', menuId: 'seed-menus-2', category: 'principal', price: 4800, active: true },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'extras',
+    'Extras',
+    { name: field('string'), price: field('number'), active: field('boolean') },
+    [
+      { name: 'Pan integral', price: 300, active: true },
+      { name: 'Fruta', price: 450, active: true },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'orders',
+    'Pedidos',
+    { employeeId: field('string'), companyId: field('string'), costCenterId: field('string'), menuId: field('string'), menuItemId: field('string'), extras: field('string'), date: field('date'), cutoffHour: field('number'), total: field('number'), status: field('enum:draft,pending,confirmed,preparing,prepared,delivered,cancelled') },
+    [
+      { employeeId: 'seed-employees-1', companyId: 'seed-companies-1', costCenterId: 'seed-costCenters-1', menuId: 'seed-menus-1', menuItemId: 'seed-menuItems-1', extras: 'Pan integral', date: '2026-07-19', cutoffHour: 11, total: 5500, status: 'confirmed' },
+      { employeeId: 'seed-employees-1', companyId: 'seed-companies-1', costCenterId: 'seed-costCenters-2', menuId: 'seed-menus-2', menuItemId: 'seed-menuItems-2', extras: 'Fruta', date: '2026-07-18', cutoffHour: 11, total: 5250, status: 'cancelled' },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'orderStates',
+    'Estados de pedido',
+    { orderId: field('string'), status: field('enum:confirmed,prepared,cancelled'), note: field('string'), active: field('boolean') },
+    [
+      { orderId: 'seed-orders-1', status: 'confirmed', note: 'Pedido confirmado', active: true },
+      { orderId: 'seed-orders-2', status: 'cancelled', note: 'Cancelado antes del corte', active: true },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'productionItems',
+    'Produccion',
+    { companyId: field('string'), menuItemId: field('string'), dish: field('string'), date: field('date'), quantity: field('number'), status: field('enum:pending,preparing,prepared') },
+    [
+      { companyId: 'seed-companies-1', menuItemId: 'seed-menuItems-1', dish: 'Milanesa con pure', date: '2026-07-19', quantity: 1, status: 'pending' },
+      { companyId: 'seed-companies-1', menuItemId: 'seed-menuItems-2', dish: 'Ensalada completa', date: '2026-07-18', quantity: 0, status: 'prepared' },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'labels',
+    'Etiquetas',
+    { orderId: field('string'), employee: field('string'), company: field('string'), costCenter: field('string'), dish: field('string'), extras: field('string'), date: field('date'), status: field('enum:ready,printed_mock') },
+    [
+      { orderId: 'seed-orders-1', employee: 'Lucia Perez', company: 'Acme Salud', costCenter: 'Planta Norte', dish: 'Milanesa con pure', extras: 'Pan integral', date: '2026-07-19', status: 'ready' },
+      { orderId: 'seed-orders-2', employee: 'Lucia Perez', company: 'Acme Salud', costCenter: 'Administracion Central', dish: 'Ensalada completa', extras: 'Fruta', date: '2026-07-18', status: 'printed_mock' },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'reports',
+    'Reportes',
+    { companyId: field('string'), date: field('date'), totalOrders: field('number'), cancelledOrders: field('number'), topDish: field('string'), productionTotal: field('number'), status: field('enum:draft,ready') },
+    [
+      { companyId: 'seed-companies-1', date: '2026-07-19', totalOrders: 1, cancelledOrders: 0, topDish: 'Milanesa con pure', productionTotal: 1, status: 'ready' },
+      { companyId: 'seed-companies-1', date: '2026-07-18', totalOrders: 1, cancelledOrders: 1, topDish: 'Ensalada completa', productionTotal: 0, status: 'ready' },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'cutoffRules',
+    'Reglas de corte',
+    { companyId: field('string'), cutoffHour: field('number'), active: field('boolean') },
+    [
+      { companyId: 'seed-companies-1', cutoffHour: 11, active: true },
+      { companyId: 'seed-companies-2', cutoffHour: 10, active: true },
+    ],
+  )
+}
+
 function buildCollections(contract) {
   const roles = uniqueStrings(contract.roles, 12)
   const workflowsText = uniqueStrings(contract.workflows, 24).join(' ').toLocaleLowerCase()
@@ -273,6 +403,10 @@ function buildCollections(contract) {
       fields,
       seed: buildSeedRows(collectionName, fields, roles),
     }
+  }
+
+  if (hasOperationalB2BSignals({ contract, collections })) {
+    applyOperationalB2BCollections(collections)
   }
 
   return collections
@@ -683,6 +817,129 @@ export function dashboardSummary() { return withDatabase((database) => Object.fr
 `
 }
 
+function buildDomainRulesMjs() {
+  return `import { PROJECT } from './domain.mjs'
+import { createRecord, listRecords, updateRecord } from './db.mjs'
+
+const roleMode = (PROJECT.rolePages || []).length > 0
+const mappedCollections = PROJECT.rolePages?.[0]?.collections || {}
+function collection(key) { return mappedCollections[key] || key }
+function rows(key) { return listRecords(collection(key)) }
+function byId(key, id) { return rows(key).find((row) => row.id === id) }
+function ok(status, body) { return { status, body } }
+function readBody(req) { return new Promise((resolve) => { let body = ''; req.on('data', (chunk) => { body += chunk }); req.on('end', () => { try { resolve(body ? JSON.parse(body) : {}) } catch { resolve({}) } }) }) }
+function firstActive(key) { return rows(key).find((row) => row.active !== false) }
+function money(value) { const amount = Number(value); return Number.isFinite(amount) ? amount : 0 }
+function sameDate(left, right) { return String(left || '') === String(right || '') }
+function activeOrders() { return rows('orders').filter((order) => order.status !== 'cancelled') }
+function dishFor(order) { return byId('menuItems', order.menuItemId)?.name || order.menuItemId || 'plato' }
+function companyFor(order) { return byId('companies', order.companyId)?.name || order.companyId || 'empresa' }
+function employeeFor(order) { return byId('employees', order.employeeId)?.name || order.employeeId || 'empleado' }
+function costCenterFor(order) { return byId('costCenters', order.costCenterId)?.name || order.costCenterId || 'centro de costo' }
+function orderExtras(order) { return order.extras || 'sin extras' }
+function getCutoffHour(companyId, fallback) { const rule = rows('cutoffRules').find((entry) => entry.companyId === companyId && entry.active !== false); return money(rule?.cutoffHour || fallback || 11) }
+function sampleOrderDefaults() {
+  const employee = firstActive('employees')
+  const menu = firstActive('menus')
+  const dish = firstActive('menuItems')
+  const extra = firstActive('extras')
+  return { employee, menu, dish, extra }
+}
+function createDomainOrder(input) {
+  const defaults = sampleOrderDefaults()
+  const employee = byId('employees', input.employeeId) || defaults.employee
+  if (!employee) return { ok: false, status: 409, code: 'missing_employee', warning: 'No active employee available' }
+  if (employee.active === false) return { ok: false, status: 409, code: 'inactive_employee', warning: 'Empleado inactivo no puede pedir' }
+  const date = input.date || '2026-07-20'
+  const duplicate = rows('orders').find((order) => order.employeeId === employee.id && sameDate(order.date, date) && order.status !== 'cancelled')
+  if (duplicate) return { ok: false, status: 409, code: 'duplicate_order', warning: 'Ya existe un pedido principal para ese empleado y dia', data: duplicate }
+  const dish = byId('menuItems', input.menuItemId) || defaults.dish
+  const extra = byId('extras', input.extraId) || defaults.extra
+  const menu = byId('menus', input.menuId) || defaults.menu
+  const total = money(dish?.price) + money(extra?.price)
+  const companyId = input.companyId || employee.companyId || firstActive('companies')?.id
+  const costCenterId = input.costCenterId || employee.costCenterId || firstActive('costCenters')?.id
+  const cutoffHour = getCutoffHour(companyId, input.cutoffHour)
+  return createRecord(collection('orders'), {
+    employeeId: employee.id,
+    companyId,
+    costCenterId,
+    menuId: menu?.id || 'manual-menu',
+    menuItemId: dish?.id || 'manual-dish',
+    extras: extra?.name || input.extras || 'sin extras',
+    date,
+    cutoffHour,
+    total,
+    status: 'confirmed',
+  })
+}
+function cancelDomainOrder(orderId, input) {
+  const order = byId('orders', orderId)
+  if (!order) return { ok: false, status: 404, code: 'missing_order', warning: 'Pedido inexistente' }
+  const nowHour = money(input.nowHour ?? 9)
+  const cutoffHour = getCutoffHour(order.companyId, order.cutoffHour)
+  if (nowHour > cutoffHour) return { ok: false, status: 409, code: 'cutoff_passed', warning: 'Cancelacion fuera de corte requiere revision manual', data: { orderId, cutoffHour, nowHour } }
+  return updateRecord(collection('orders'), orderId, { status: 'cancelled' })
+}
+function markOrderPrepared(orderId) {
+  const order = byId('orders', orderId)
+  if (!order) return { ok: false, status: 404, code: 'missing_order', warning: 'Pedido inexistente' }
+  return updateRecord(collection('orders'), orderId, { status: 'prepared' })
+}
+function productionSummary(date) {
+  const groups = new Map()
+  for (const order of activeOrders().filter((entry) => !date || sameDate(entry.date, date))) {
+    const key = order.companyId + '|' + order.menuItemId
+    const current = groups.get(key) || { companyId: order.companyId, company: companyFor(order), menuItemId: order.menuItemId, dish: dishFor(order), date: order.date, quantity: 0, orderIds: [] }
+    current.quantity += 1
+    current.orderIds.push(order.id)
+    groups.set(key, current)
+  }
+  return Array.from(groups.values())
+}
+function generateLabel(orderId) {
+  const order = byId('orders', orderId)
+  if (!order) return { ok: false, status: 404, code: 'missing_order', warning: 'Pedido inexistente' }
+  return createRecord(collection('labels'), {
+    orderId: order.id,
+    employee: employeeFor(order),
+    company: companyFor(order),
+    costCenter: costCenterFor(order),
+    dish: dishFor(order),
+    extras: orderExtras(order),
+    date: order.date,
+    status: 'ready',
+  })
+}
+function reportFor(query) {
+  const companyId = query.get('companyId') || firstActive('companies')?.id
+  const date = query.get('date') || '2026-07-20'
+  const filtered = rows('orders').filter((order) => (!companyId || order.companyId === companyId) && (!date || sameDate(order.date, date)))
+  const production = productionSummary(date).filter((entry) => !companyId || entry.companyId === companyId)
+  const cancelled = filtered.filter((order) => order.status === 'cancelled')
+  const topDish = production.sort((left, right) => right.quantity - left.quantity)[0]?.dish || 'sin produccion'
+  return { companyId, company: companyId ? byId('companies', companyId)?.name : 'todas', date, totalOrders: filtered.length, cancelledOrders: cancelled.length, productionTotal: production.reduce((sum, entry) => sum + entry.quantity, 0), topDish, production, extras: filtered.map((order) => order.extras).filter(Boolean) }
+}
+function filteredOrders(query) {
+  const companyId = query.get('companyId')
+  const costCenterId = query.get('costCenterId')
+  return rows('orders').filter((order) => (!companyId || order.companyId === companyId) && (!costCenterId || order.costCenterId === costCenterId))
+}
+export async function handleDomainRequest(req, url) {
+  if (!roleMode || !url.pathname.startsWith('/api/domain/')) return null
+  const parts = url.pathname.split('/').filter(Boolean)
+  if (req.method === 'GET' && url.pathname === '/api/domain/orders') return ok(200, { ok: true, items: filteredOrders(url.searchParams) })
+  if (req.method === 'POST' && url.pathname === '/api/domain/orders') { const result = createDomainOrder(await readBody(req)); return ok(result.status || 201, result) }
+  if (req.method === 'POST' && parts[2] === 'orders' && parts[4] === 'cancel') { const result = cancelDomainOrder(parts[3], await readBody(req)); return ok(result.status || 200, result) }
+  if (req.method === 'POST' && parts[2] === 'orders' && parts[4] === 'prepared') { const result = markOrderPrepared(parts[3]); return ok(result.status || 200, result) }
+  if (req.method === 'GET' && url.pathname === '/api/domain/production') return ok(200, { ok: true, items: productionSummary(url.searchParams.get('date')) })
+  if (req.method === 'POST' && url.pathname === '/api/domain/labels') { const body = await readBody(req); const result = generateLabel(body.orderId); return ok(result.status || 201, result) }
+  if (req.method === 'GET' && url.pathname === '/api/domain/reports') return ok(200, { ok: true, data: reportFor(url.searchParams) })
+  return ok(404, { ok: false, error: 'Unknown domain endpoint' })
+}
+`
+}
+
 function buildServerMjs() {
   return `import http from 'node:http'
 import fs from 'node:fs'
@@ -690,6 +947,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PROJECT } from './domain.mjs'
 import { createRecord, dashboardSummary, deleteRecord, listCollections, listRecords, seedDatabase, updateRecord } from './db.mjs'
+import { handleDomainRequest } from './domain-rules.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const PUBLIC = path.join(ROOT, 'public')
@@ -705,6 +963,8 @@ export function createAppServer() {
     if (req.method === 'GET' && url.pathname === '/api/config') return send(res, 200, PROJECT)
     if (req.method === 'GET' && url.pathname === '/api/dashboard') return send(res, 200, { summary: dashboardSummary() })
     if (req.method === 'POST' && url.pathname === '/api/seed') return send(res, 200, seedDatabase(true))
+    const domainResult = await handleDomainRequest(req, url)
+    if (domainResult) return send(res, domainResult.status, domainResult.body)
     const match = url.pathname.match(/^\\/api\\/collections\\/([^/]+)(?:\\/([^/]+))?$/)
     if (match) {
       const [, collection, id] = match
@@ -737,7 +997,7 @@ import { PROJECT } from '../src/domain.mjs'
 import { seedDatabase, DB_FILE } from '../src/db.mjs'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const rolePagePaths = (PROJECT.rolePages || []).map((page) => page.path)
-const required = ['README.md','package.json','src/server.mjs','src/db.mjs','src/validation.mjs','public/index.html','public/admin.html','public/app.js','database/schema.sql','data/seed.json','scripts/domain-smoke.mjs', ...rolePagePaths]
+const required = ['README.md','package.json','src/server.mjs','src/db.mjs','src/domain-rules.mjs','src/validation.mjs','public/index.html','public/admin.html','public/app.js','database/schema.sql','data/seed.json','scripts/domain-smoke.mjs', ...rolePagePaths]
 if (rolePagePaths.length > 0) required.push('public/role-app.js')
 const missing = required.filter((entry) => !fs.existsSync(path.join(root, entry)))
 const snapshot = seedDatabase(false)
@@ -990,36 +1250,104 @@ seedDatabase(true)
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const server = createAppServer()
 const failures = []
+const flows = []
 function fail(message) { failures.push(message) }
+function record(flow, ok, evidence = '') { flows.push({ flow, ok, evidence }); if (!ok) fail(flow + (evidence ? ': ' + evidence : '')) }
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
 const base = 'http://127.0.0.1:' + server.address().port
 async function getJson(url, options) { const response = await fetch(base + url, options); return { status: response.status, body: await response.json() } }
+async function createCollection(collection, body) { return getJson('/api/collections/' + collection, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }) }
+const mappedCollections = PROJECT.rolePages?.[0]?.collections || {}
+function collection(key) { return mappedCollections[key] || key }
+async function list(collectionName) { return getJson('/api/collections/' + collectionName).then((result) => result.body.items || []) }
 try {
   const config = await getJson('/api/config')
-  if (config.status !== 200 || !Array.isArray(config.body.rolePages)) fail('config missing role pages')
+  record('config exposes role pages', config.status === 200 && Array.isArray(config.body.rolePages), 'rolePages=' + (config.body.rolePages || []).length)
   for (const page of PROJECT.rolePages || []) {
     const pageUrl = page.path.startsWith('public/') ? page.path.slice(7) : page.path
     const response = await fetch(base + '/' + pageUrl)
     const html = await response.text()
-    if (response.status !== 200) fail('role page missing: ' + page.path)
-    for (const term of page.requiredTerms || []) if (!html.toLocaleLowerCase().includes(term)) fail(page.key + ' missing ' + term)
+    record('role page exists: ' + page.key, response.status === 200, page.path)
+    for (const term of page.requiredTerms || []) record('role page term: ' + page.key + ' ' + term, html.toLocaleLowerCase().includes(term), page.path)
     for (const action of page.actions || []) {
-      if (!PROJECT.collections[action.collection]) fail(page.key + ' action references unknown collection ' + action.collection)
+      record('role action collection: ' + page.key + ' ' + action.action, Boolean(PROJECT.collections[action.collection]), action.collection)
     }
   }
   const dashboard = await getJson('/api/dashboard')
-  if (!dashboard.body.summary || typeof dashboard.body.summary !== 'object') fail('dashboard unavailable')
-  const orderCollection = Object.keys(PROJECT.collections).find((name) => name.toLocaleLowerCase().includes('order')) || PROJECT.mainCollection
-  const orders = await getJson('/api/collections/' + orderCollection)
-  if (!Array.isArray(orders.body.items) || orders.body.items.length === 0) fail('orders collection has no rows')
+  record('dashboard summary available', Boolean(dashboard.body.summary && typeof dashboard.body.summary === 'object'), 'collections=' + Object.keys(dashboard.body.summary || {}).length)
+  const companies = collection('companies')
+  const employees = collection('employees')
+  const costCenters = collection('costCenters')
+  const menus = collection('menus')
+  const menuItems = collection('menuItems')
+  const extras = collection('extras')
+  const orders = collection('orders')
+  const cutoffRules = collection('cutoffRules')
+  const seededCompany = (await list(companies))[0]
+  const seededEmployee = (await list(employees)).find((employee) => employee.active !== false)
+  const seededCostCenter = (await list(costCenters))[0]
+  const seededMenu = (await list(menus))[0]
+  const seededDish = (await list(menuItems))[0]
+  const seededExtra = (await list(extras))[0]
+  const seededCutoff = (await list(cutoffRules))[0]
+  record('seeded company exists', Boolean(seededCompany?.id), seededCompany?.id)
+  record('seeded active employee exists', Boolean(seededEmployee?.id), seededEmployee?.id)
+  record('seeded cost center exists', Boolean(seededCostCenter?.id), seededCostCenter?.id)
+  record('seeded menu exists', Boolean(seededMenu?.id), seededMenu?.id)
+  record('seeded dish exists', Boolean(seededDish?.id), seededDish?.id)
+  record('seeded extra exists', Boolean(seededExtra?.id), seededExtra?.id)
+  record('seeded cutoff rule exists', Boolean(seededCutoff?.id), seededCutoff?.id)
+  const company = await createCollection(companies, { name: 'V3 Empresa', status: 'active', active: true })
+  record('create/read company', company.status === 201 && Boolean(company.body.data?.id), company.body.data?.id)
+  const costCenter = await createCollection(costCenters, { name: 'V3 Centro', companyId: company.body.data.id, active: true })
+  record('create/read cost center', costCenter.status === 201 && Boolean(costCenter.body.data?.id), costCenter.body.data?.id)
+  const activeEmployee = await createCollection(employees, { name: 'V3 Empleado Activo', email: 'v3.activo@example.test', role: 'employee', companyId: company.body.data.id, costCenterId: costCenter.body.data.id, active: true })
+  record('create/read active employee', activeEmployee.status === 201 && Boolean(activeEmployee.body.data?.id), activeEmployee.body.data?.id)
+  const inactiveEmployee = await createCollection(employees, { name: 'V3 Empleado Inactivo', email: 'v3.inactivo@example.test', role: 'employee', companyId: company.body.data.id, costCenterId: costCenter.body.data.id, active: false })
+  record('create/read inactive employee', inactiveEmployee.status === 201 && Boolean(inactiveEmployee.body.data?.id), inactiveEmployee.body.data?.id)
+  const menu = await createCollection(menus, { name: 'V3 Menu', date: '2026-07-20', active: true })
+  record('create/read menu', menu.status === 201 && Boolean(menu.body.data?.id), menu.body.data?.id)
+  const dish = await createCollection(menuItems, { name: 'V3 Plato', menuId: menu.body.data.id, category: 'principal', price: 6000, active: true })
+  record('create/read dish', dish.status === 201 && Boolean(dish.body.data?.id), dish.body.data?.id)
+  const extra = await createCollection(extras, { name: 'V3 Extra', price: 500, active: true })
+  record('create/read extra', extra.status === 201 && Boolean(extra.body.data?.id), extra.body.data?.id)
+  const orderPayload = { employeeId: activeEmployee.body.data.id, companyId: company.body.data.id, costCenterId: costCenter.body.data.id, menuId: menu.body.data.id, menuItemId: dish.body.data.id, extraId: extra.body.data.id, date: '2026-07-20', cutoffHour: 11 }
+  const createdOrder = await getJson('/api/domain/orders', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(orderPayload) })
+  record('create confirmed order', createdOrder.status === 201 && createdOrder.body.data?.status === 'confirmed', createdOrder.body.data?.id)
+  const duplicateOrder = await getJson('/api/domain/orders', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(orderPayload) })
+  record('block duplicate order per employee/day', duplicateOrder.status === 409 && duplicateOrder.body.code === 'duplicate_order' && Boolean(duplicateOrder.body.warning), duplicateOrder.body.warning)
+  const inactiveOrder = await getJson('/api/domain/orders', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...orderPayload, employeeId: inactiveEmployee.body.data.id, date: '2026-07-20' }) })
+  record('block inactive employee order', inactiveOrder.status === 409 && inactiveOrder.body.code === 'inactive_employee', inactiveOrder.body.warning)
+  const cancelOrder = await getJson('/api/domain/orders', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...orderPayload, date: '2026-07-21' }) })
+  const cancelled = await getJson('/api/domain/orders/' + cancelOrder.body.data.id + '/cancel', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nowHour: 9 }) })
+  record('cancel before cutoff', cancelled.status === 200 && cancelled.body.data?.status === 'cancelled', cancelled.body.data?.id)
+  const lateOrder = await getJson('/api/domain/orders', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...orderPayload, date: '2026-07-22' }) })
+  const lateCancel = await getJson('/api/domain/orders/' + lateOrder.body.data.id + '/cancel', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nowHour: 18 }) })
+  record('warn/block cancellation after cutoff', lateCancel.status === 409 && lateCancel.body.code === 'cutoff_passed' && Boolean(lateCancel.body.warning), lateCancel.body.warning)
+  const production = await getJson('/api/domain/production?date=2026-07-20')
+  record('production groups by dish', production.status === 200 && production.body.items.some((item) => item.dish === 'V3 Plato' && item.quantity >= 1), JSON.stringify(production.body.items))
+  record('production groups by company', production.body.items.some((item) => item.companyId === company.body.data.id), company.body.data.id)
+  const cancelledProduction = await getJson('/api/domain/production?date=2026-07-21')
+  record('cancelled orders excluded from production', cancelledProduction.status === 200 && !cancelledProduction.body.items.some((item) => item.orderIds.includes(cancelOrder.body.data.id)), cancelOrder.body.data.id)
+  const prepared = await getJson('/api/domain/orders/' + createdOrder.body.data.id + '/prepared', { method: 'POST' })
+  record('change order state to prepared', prepared.status === 200 && prepared.body.data?.status === 'prepared', prepared.body.data?.id)
+  const label = await getJson('/api/domain/labels', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ orderId: createdOrder.body.data.id }) })
+  record('generate label with order details', label.status === 201 && Boolean(label.body.data?.employee) && Boolean(label.body.data?.company) && Boolean(label.body.data?.costCenter) && Boolean(label.body.data?.dish) && Boolean(label.body.data?.date) && label.body.data?.orderId === createdOrder.body.data.id, JSON.stringify(label.body.data))
+  const report = await getJson('/api/domain/reports?companyId=' + company.body.data.id + '&date=2026-07-20')
+  record('generate company/day report', report.status === 200 && report.body.data?.companyId === company.body.data.id && report.body.data?.productionTotal >= 1, JSON.stringify(report.body.data))
+  record('report includes dish quantities and extras', Array.isArray(report.body.data?.production) && report.body.data.production.some((item) => item.dish === 'V3 Plato') && report.body.data.extras.includes('V3 Extra'), JSON.stringify(report.body.data))
+  const byCompany = await getJson('/api/domain/orders?companyId=' + company.body.data.id)
+  record('filter orders by company', byCompany.status === 200 && byCompany.body.items.every((order) => order.companyId === company.body.data.id), 'items=' + byCompany.body.items.length)
+  const byCostCenter = await getJson('/api/domain/orders?costCenterId=' + costCenter.body.data.id)
+  record('filter orders by cost center', byCostCenter.status === 200 && byCostCenter.body.items.every((order) => order.costCenterId === costCenter.body.data.id), 'items=' + byCostCenter.body.items.length)
 } finally {
   await new Promise((resolve) => server.close(resolve))
 }
-const report = { ok: failures.length === 0, failures, project: PROJECT.slug, rolePages: (PROJECT.rolePages || []).map((page) => page.key), checkedAt: new Date().toISOString() }
+const report = { ok: failures.length === 0, failures, flows, project: PROJECT.slug, rolePages: (PROJECT.rolePages || []).map((page) => page.key), checkedAt: new Date().toISOString() }
 fs.mkdirSync(path.join(root, 'validation'), { recursive: true })
 fs.writeFileSync(path.join(root, 'validation', 'domain-smoke-report.json'), JSON.stringify(report, null, 2))
 if (!report.ok) { console.error(JSON.stringify(report, null, 2)); process.exit(1) }
-console.log('Domain smoke passed for ' + PROJECT.slug)
+console.log('Domain smoke passed for ' + PROJECT.slug + ' with ' + flows.length + ' flows')
 `
 }
 
@@ -1057,6 +1385,7 @@ function buildGeneratedDomainRealProjectArtifacts({
     { path: `${normalizedProjectRoot}/src/domain.mjs`, area: 'shared', content: buildDomainMjs({ projectSlug, domainLabel: normalizedDomainLabel, deliveryLevel: normalizedDeliveryLevel, roles, collections, rolePages, contract }) },
     { path: `${normalizedProjectRoot}/src/validation.mjs`, area: 'shared', content: buildValidationMjs() },
     { path: `${normalizedProjectRoot}/src/db.mjs`, area: 'database', content: buildDbMjs() },
+    { path: `${normalizedProjectRoot}/src/domain-rules.mjs`, area: 'backend', content: buildDomainRulesMjs() },
     { path: `${normalizedProjectRoot}/src/server.mjs`, area: 'backend', content: buildServerMjs() },
     { path: `${normalizedProjectRoot}/public/index.html`, area: 'frontend', content: buildHtml({ domainLabel: normalizedDomainLabel, deliveryLevel: normalizedDeliveryLevel, screens: publicScreens.length > 0 ? publicScreens : ['dashboard', 'records', 'create'], admin: false }) },
     { path: `${normalizedProjectRoot}/public/admin.html`, area: 'frontend', content: buildHtml({ domainLabel: normalizedDomainLabel, deliveryLevel: normalizedDeliveryLevel, screens: adminScreens, admin: true }) },
@@ -1076,7 +1405,7 @@ function buildGeneratedDomainRealProjectArtifacts({
   const requiredPathGroups = [
     { label: 'runtime-root', candidates: [`${normalizedProjectRoot}/package.json`] },
     { label: 'sqlite-db-layer', candidates: [`${normalizedProjectRoot}/src/db.mjs`, `${normalizedProjectRoot}/database/schema.sql`] },
-    { label: 'rest-api', candidates: [`${normalizedProjectRoot}/src/server.mjs`] },
+    { label: 'rest-api', candidates: [`${normalizedProjectRoot}/src/server.mjs`, `${normalizedProjectRoot}/src/domain-rules.mjs`] },
     { label: 'backoffice', candidates: [`${normalizedProjectRoot}/public/admin.html`, `${normalizedProjectRoot}/public/app.js`] },
     ...(rolePages.length > 0 ? [{ label: 'role-ux', candidates: rolePages.map((page) => `${normalizedProjectRoot}/${page.path}`) }] : []),
     { label: 'validation', candidates: [`${normalizedProjectRoot}/scripts/build.mjs`, `${normalizedProjectRoot}/scripts/smoke.mjs`] },
@@ -1084,6 +1413,7 @@ function buildGeneratedDomainRealProjectArtifacts({
   const fileChecks = filesToCreate.flatMap((entry) => {
     const checks = [{ type: 'exists', targetPath: entry.path }]
     if (entry.path.endsWith('/src/db.mjs')) checks.push({ type: 'file-contains', targetPath: entry.path, text: 'node:sqlite' })
+    if (entry.path.endsWith('/src/domain-rules.mjs')) checks.push({ type: 'file-contains', targetPath: entry.path, text: 'duplicate_order' })
     if (entry.path.endsWith('/public/app.js')) checks.push({ type: 'file-contains', targetPath: entry.path, text: 'data-delete' })
     if (entry.path.endsWith('/public/employee.html')) checks.push({ type: 'file-contains', targetPath: entry.path, text: 'Cancelar pedido' })
     if (entry.path.endsWith('/public/kitchen.html')) checks.push({ type: 'file-contains', targetPath: entry.path, text: 'Marcar preparado' })
@@ -1108,7 +1438,7 @@ function buildGeneratedDomainRealProjectArtifacts({
     fileChecks,
     validationPlan: {
       commands: ['npm run seed', 'npm run build', 'npm run smoke', 'npm run domain-smoke'],
-      syntaxChecks: [`${normalizedProjectRoot}/src/server.mjs`, `${normalizedProjectRoot}/src/db.mjs`, `${normalizedProjectRoot}/public/app.js`, ...(rolePages.length > 0 ? [`${normalizedProjectRoot}/public/role-app.js`] : [])],
+      syntaxChecks: [`${normalizedProjectRoot}/src/server.mjs`, `${normalizedProjectRoot}/src/db.mjs`, `${normalizedProjectRoot}/src/domain-rules.mjs`, `${normalizedProjectRoot}/public/app.js`, ...(rolePages.length > 0 ? [`${normalizedProjectRoot}/public/role-app.js`] : [])],
       jsonChecks: [`${normalizedProjectRoot}/package.json`, `${normalizedProjectRoot}/data/seed.json`, `${normalizedProjectRoot}/validation/report.json`],
       pathChecks: [normalizedProjectRoot, `${normalizedProjectRoot}/data/app.sqlite`],
       forbiddenPathChecks: ['.env', 'node_modules', 'Dockerfile', 'docker-compose.yml', 'deploy', 'web-prueba'],
