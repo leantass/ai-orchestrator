@@ -258,6 +258,129 @@ function replaceCollection(collections, name, label, fields, seed) {
   collections[name] = { label, fields, seed }
 }
 
+function applyLaundryB2BCollections(collections) {
+  replaceCollection(
+    collections,
+    'companies',
+    'Empresas',
+    { name: field('string'), status: field('enum:active,paused'), active: field('boolean') },
+    [
+      { name: 'Acme Salud', status: 'active', active: true },
+      { name: 'Norte Logistica', status: 'active', active: true },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'costCenters',
+    'Centros de costo',
+    { name: field('string'), companyId: field('string'), active: field('boolean') },
+    [
+      { name: 'Planta Norte', companyId: 'seed-companies-1', active: true },
+      { name: 'Administracion Central', companyId: 'seed-companies-1', active: true },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'employees',
+    'Empleados',
+    { name: field('string'), email: field('email'), role: field('enum:employee,company_admin,plant_operator,laundry_admin,system_admin'), companyId: field('string'), costCenterId: field('string'), active: field('boolean') },
+    [
+      { name: 'Lucia Perez', email: 'lucia.perez@example.test', role: 'employee', companyId: 'seed-companies-1', costCenterId: 'seed-costCenters-1', active: true },
+      { name: 'Mateo Gomez', email: 'mateo.gomez@example.test', role: 'employee', companyId: 'seed-companies-1', costCenterId: 'seed-costCenters-2', active: false },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'services',
+    'Servicios',
+    { name: field('string'), category: field('enum:lavado,reposicion,entrega'), price: field('number'), active: field('boolean') },
+    [
+      { name: 'Lavado semanal de uniformes', category: 'lavado', price: 3200, active: true },
+      { name: 'Reposicion de uniforme', category: 'reposicion', price: 8800, active: true },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'garmentTypes',
+    'Tipos de prenda',
+    { name: field('string'), category: field('enum:camisa,pantalon,chaqueta,ambo'), price: field('number'), active: field('boolean') },
+    [
+      { name: 'Camisa operativa', category: 'camisa', price: 0, active: true },
+      { name: 'Pantalon de trabajo', category: 'pantalon', price: 0, active: true },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'requests',
+    'Solicitudes',
+    { employeeId: field('string'), companyId: field('string'), costCenterId: field('string'), serviceId: field('string'), garmentTypeId: field('string'), quantity: field('number'), observations: field('string'), date: field('date'), cutoffHour: field('number'), status: field('enum:pending,confirmed,received,washing,ready,delivered,cancelled') },
+    [
+      { employeeId: 'seed-employees-1', companyId: 'seed-companies-1', costCenterId: 'seed-costCenters-1', serviceId: 'seed-services-1', garmentTypeId: 'seed-garmentTypes-1', quantity: 3, observations: 'Retiro por recepcion', date: '2026-07-19', cutoffHour: 11, status: 'confirmed' },
+      { employeeId: 'seed-employees-1', companyId: 'seed-companies-1', costCenterId: 'seed-costCenters-2', serviceId: 'seed-services-2', garmentTypeId: 'seed-garmentTypes-2', quantity: 2, observations: 'Entrega parcial solicitada', date: '2026-07-18', cutoffHour: 11, status: 'cancelled' },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'requestStates',
+    'Estados de solicitud',
+    { requestId: field('string'), status: field('enum:confirmed,received,washing,ready,delivered,cancelled'), note: field('string'), active: field('boolean') },
+    [
+      { requestId: 'seed-requests-1', status: 'confirmed', note: 'Solicitud confirmada', active: true },
+      { requestId: 'seed-requests-2', status: 'cancelled', note: 'Cancelada antes del retiro', active: true },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'productionItems',
+    'Produccion',
+    { companyId: field('string'), garmentTypeId: field('string'), garmentType: field('string'), service: field('string'), date: field('date'), quantity: field('number'), status: field('enum:pending,received,washing,ready,delivered') },
+    [
+      { companyId: 'seed-companies-1', garmentTypeId: 'seed-garmentTypes-1', garmentType: 'Camisa operativa', service: 'Lavado semanal de uniformes', date: '2026-07-19', quantity: 3, status: 'pending' },
+      { companyId: 'seed-companies-1', garmentTypeId: 'seed-garmentTypes-2', garmentType: 'Pantalon de trabajo', service: 'Reposicion de uniforme', date: '2026-07-18', quantity: 0, status: 'ready' },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'labels',
+    'Etiquetas',
+    { requestId: field('string'), employee: field('string'), company: field('string'), costCenter: field('string'), garmentType: field('string'), quantity: field('number'), service: field('string'), date: field('date'), observations: field('string'), status: field('enum:ready,printed_mock') },
+    [
+      { requestId: 'seed-requests-1', employee: 'Lucia Perez', company: 'Acme Salud', costCenter: 'Planta Norte', garmentType: 'Camisa operativa', quantity: 3, service: 'Lavado semanal de uniformes', date: '2026-07-19', observations: 'Retiro por recepcion', status: 'ready' },
+      { requestId: 'seed-requests-2', employee: 'Lucia Perez', company: 'Acme Salud', costCenter: 'Administracion Central', garmentType: 'Pantalon de trabajo', quantity: 2, service: 'Reposicion de uniforme', date: '2026-07-18', observations: 'Entrega parcial solicitada', status: 'printed_mock' },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'reports',
+    'Reportes',
+    { companyId: field('string'), date: field('date'), totalRequests: field('number'), cancelledRequests: field('number'), topGarment: field('string'), productionTotal: field('number'), status: field('enum:draft,ready') },
+    [
+      { companyId: 'seed-companies-1', date: '2026-07-19', totalRequests: 1, cancelledRequests: 0, topGarment: 'Camisa operativa', productionTotal: 3, status: 'ready' },
+      { companyId: 'seed-companies-1', date: '2026-07-18', totalRequests: 1, cancelledRequests: 1, topGarment: 'Pantalon de trabajo', productionTotal: 0, status: 'ready' },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'deliveryRoutes',
+    'Rutas de retiro y entrega',
+    { companyId: field('string'), name: field('string'), pickupWindow: field('string'), deliveryWindow: field('string'), active: field('boolean') },
+    [
+      { companyId: 'seed-companies-1', name: 'Ruta Norte', pickupWindow: '09:00-11:00', deliveryWindow: '16:00-18:00', active: true },
+      { companyId: 'seed-companies-2', name: 'Ruta Logistica', pickupWindow: '08:00-10:00', deliveryWindow: '15:00-17:00', active: true },
+    ],
+  )
+  replaceCollection(
+    collections,
+    'quotaRules',
+    'Cupos por empleado',
+    { companyId: field('string'), maxItemsPerRequest: field('number'), active: field('boolean') },
+    [
+      { companyId: 'seed-companies-1', maxItemsPerRequest: 8, active: true },
+      { companyId: 'seed-companies-2', maxItemsPerRequest: 6, active: true },
+    ],
+  )
+}
+
 function applyOperationalB2BCollections(collections) {
   replaceCollection(
     collections,
@@ -405,7 +528,9 @@ function buildCollections(contract) {
     }
   }
 
-  if (hasOperationalB2BSignals({ contract, collections })) {
+  if (hasLaundryB2BSignals({ contract, collections })) {
+    applyLaundryB2BCollections(collections)
+  } else if (hasOperationalB2BSignals({ contract, collections })) {
     applyOperationalB2BCollections(collections)
   }
 
@@ -438,9 +563,151 @@ function hasOperationalB2BSignals({ contract, collections }) {
   return signals.filter((signal) => haystack.includes(signal)).length >= 5
 }
 
+function hasLaundryB2BSignals({ contract, collections }) {
+  const surfaceText = asArray(contract.frontendSurfaces)
+    .flatMap((surface) => [surface?.key, surface?.label, surface?.path, ...asArray(surface?.screens)])
+  const haystack = [
+    ...Object.keys(collections),
+    ...uniqueStrings(contract.roles, 24),
+    ...uniqueStrings(contract.workflows, 48),
+    ...uniqueStrings(contract.entities, 48),
+    ...surfaceText,
+    normalizeOptionalString(contract?.domain?.summary),
+    normalizeOptionalString(contract?.domain?.label),
+    normalizeOptionalString(contract?.domain?.slug),
+  ].join(' ').toLocaleLowerCase()
+  const signals = ['lavander', 'uniform', 'prenda', 'garment', 'service', 'servicio', 'retiro', 'entrega', 'lavado']
+  return signals.filter((signal) => haystack.includes(signal)).length >= 4
+}
+
+function buildLaundryRolePageDefinitions(collections) {
+  const requests = findCollectionName(collections, ['request', 'solicitud', 'order', 'pedido'])
+  const services = findCollectionName(collections, ['service', 'servicio'])
+  const garmentTypes = findCollectionName(collections, ['garment', 'prenda', 'uniform', 'item'], services)
+  const employees = findCollectionName(collections, ['employee', 'empleado', 'user', 'member'])
+  const companies = findCollectionName(collections, ['company', 'empresa', 'client', 'customer'])
+  const costCenters = findCollectionName(collections, ['costcenter', 'centro', 'cost'], companies)
+  const production = findCollectionName(collections, ['production', 'produccion'], requests)
+  const labels = findCollectionName(collections, ['label', 'etiqueta'], requests)
+  const reports = findCollectionName(collections, ['report', 'metric'], requests)
+  const routes = findCollectionName(collections, ['route', 'ruta'], companies)
+  const quotas = findCollectionName(collections, ['quota', 'cupo'], employees)
+  const sharedCollections = { orders: requests, menus: services, menuItems: garmentTypes, extras: services, employees, companies, costCenters, production, labels, reports, routes, quotas, cutoffRules: quotas }
+
+  return [
+    {
+      key: 'employee',
+      path: 'public/employee.html',
+      title: 'Portal empleado',
+      subtitle: 'Solicita lavado o reposicion de uniformes, agrega observaciones y consulta el estado.',
+      collections: sharedCollections,
+      requiredTerms: ['servicios', 'prenda', 'solicitud', 'estado'],
+      sections: [
+        { title: 'Servicios disponibles', body: 'Lavado, reposicion y entrega de uniformes desde el celular.' },
+        { title: 'Solicitud actual', body: 'Tipo de prenda, cantidad, observaciones y estado visible.' },
+        { title: 'Historial simple', body: 'Ultimas solicitudes y cancelacion si siguen pendientes o confirmadas.' },
+      ],
+      actions: [
+        { label: 'Crear solicitud', action: 'create-order', collection: requests },
+        { label: 'Cancelar solicitud', action: 'cancel-order', collection: requests },
+      ],
+    },
+    {
+      key: 'company',
+      path: 'public/company.html',
+      title: 'Panel empresa',
+      subtitle: 'Empleados, centros de costo, cupos y reportes por prenda, fecha y estado.',
+      collections: sharedCollections,
+      requiredTerms: ['empleados', 'centros', 'cupos', 'reportes'],
+      sections: [
+        { title: 'Empleados', body: 'Gestiona empleados activos, centros de costo y limites operativos.' },
+        { title: 'Solicitudes', body: 'Audita solicitudes por empleado, fecha, centro y tipo de prenda.' },
+        { title: 'Reportes', body: 'Resumen de volumen por prenda, servicio, estado y cancelados.' },
+      ],
+      actions: [
+        { label: 'Ver reporte del dia', action: 'focus-collection', collection: reports },
+        { label: 'Administrar empleados', action: 'focus-collection', collection: employees },
+      ],
+    },
+    {
+      key: 'provider',
+      path: 'public/provider.html',
+      title: 'Panel lavanderia',
+      subtitle: 'Empresas, servicios, prendas, retiros, etiquetas y reportes.',
+      collections: sharedCollections,
+      requiredTerms: ['servicios', 'prendas', 'retiro', 'entrega', 'produccion'],
+      sections: [
+        { title: 'Servicios y prendas', body: 'Administra lavado, reposicion, entrega y tipos de uniforme.' },
+        { title: 'Solicitudes consolidadas', body: 'Agrupa por empresa, centro de costo, servicio y prenda.' },
+        { title: 'Rutas, etiquetas y reportes', body: 'Coordina retiro/entrega y datos imprimibles por solicitud.' },
+      ],
+      actions: [
+        { label: 'Ver produccion', action: 'focus-collection', collection: production },
+        { label: 'Generar etiquetas', action: 'focus-collection', collection: labels },
+        { label: 'Ver reportes', action: 'focus-collection', collection: reports },
+      ],
+    },
+    {
+      key: 'kitchen',
+      path: 'public/kitchen.html',
+      title: 'Panel planta',
+      subtitle: 'Trabajos pendientes, prendas recibidas, en lavado, listas y entregadas.',
+      collections: sharedCollections,
+      requiredTerms: ['planta', 'recibidas', 'lavado', 'listas'],
+      sections: [
+        { title: 'Pendientes', body: 'Cola de solicitudes pendientes por empresa, ruta y tipo de prenda.' },
+        { title: 'Procesamiento', body: 'Marca prendas como recibidas, en lavado, listas y entregadas.' },
+        { title: 'Agrupacion', body: 'Volumen consolidado por empresa, centro de costo y prenda.' },
+      ],
+      actions: [
+        { label: 'Marcar lista', action: 'mark-prepared', collection: requests },
+        { label: 'Ver produccion', action: 'focus-collection', collection: production },
+      ],
+    },
+    {
+      key: 'labels',
+      path: 'public/labels.html',
+      title: 'Etiquetas',
+      subtitle: 'Etiqueta imprimible con empleado, empresa, prenda, cantidad, servicio, fecha e ID solicitud.',
+      collections: sharedCollections,
+      requiredTerms: ['etiqueta', 'empleado', 'empresa', 'prenda', 'servicio'],
+      sections: [
+        { title: 'Datos de etiqueta', body: 'Empleado, empresa, centro de costo, prenda, cantidad, servicio y observaciones.' },
+        { title: 'ID solicitud', body: 'Cada etiqueta conserva el ID de solicitud para trazabilidad de entrega.' },
+        { title: 'Impresion simulada', body: 'La salida queda lista para impresion manual en entorno local.' },
+      ],
+      actions: [
+        { label: 'Imprimir etiquetas', action: 'focus-collection', collection: labels },
+        { label: 'Ver solicitudes', action: 'focus-collection', collection: requests },
+      ],
+    },
+    {
+      key: 'reports',
+      path: 'public/reports.html',
+      title: 'Reportes operativos',
+      subtitle: 'Solicitudes por dia, empresa, centro, prenda, estados, cancelados y produccion.',
+      collections: sharedCollections,
+      requiredTerms: ['solicitudes', 'empresa', 'prenda', 'produccion'],
+      sections: [
+        { title: 'Solicitudes por empresa', body: 'Indicadores por empresa, centro de costo y empleado.' },
+        { title: 'Volumen por prenda', body: 'Reporte de prendas, servicios y produccion requerida.' },
+        { title: 'Estados y cancelados', body: 'Control de pendientes, en lavado, listas, entregadas y canceladas.' },
+      ],
+      actions: [
+        { label: 'Ver reportes', action: 'focus-collection', collection: reports },
+        { label: 'Ver produccion', action: 'focus-collection', collection: production },
+      ],
+    },
+  ]
+}
+
 function buildRolePageDefinitions({ contract, collections }) {
   if (!hasOperationalB2BSignals({ contract, collections })) {
     return []
+  }
+
+  if (hasLaundryB2BSignals({ contract, collections })) {
+    return buildLaundryRolePageDefinitions(collections)
   }
 
   const orders = findCollectionName(collections, ['order', 'pedido', 'booking', 'request'])
@@ -833,11 +1100,21 @@ function firstActive(key) { return rows(key).find((row) => row.active !== false)
 function money(value) { const amount = Number(value); return Number.isFinite(amount) ? amount : 0 }
 function sameDate(left, right) { return String(left || '') === String(right || '') }
 function activeOrders() { return rows('orders').filter((order) => order.status !== 'cancelled') }
-function dishFor(order) { return byId('menuItems', order.menuItemId)?.name || order.menuItemId || 'plato' }
+function collectionDef(key) { return PROJECT.collections[collection(key)] || {} }
+function fieldsFor(key) { return collectionDef(key).fields || {} }
+function hasField(key, field) { return Object.prototype.hasOwnProperty.call(fieldsFor(key), field) }
+function fallbackValue(type, prefix) { if (type === 'number') return 1; if (type === 'boolean') return true; if (type === 'email') return prefix.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '@example.test'; if (type === 'date') return '2026-07-20'; if (type.startsWith('enum:')) return type.slice(5).split(',')[0]; return prefix }
+function completePayload(key, payload, prefix) { const fields = fieldsFor(key); for (const [field, type] of Object.entries(fields)) if (payload[field] === undefined || payload[field] === null || payload[field] === '') payload[field] = fallbackValue(type, prefix + ' ' + field); return payload }
+function itemIdFor(order) { return order.menuItemId || order.garmentTypeId || order.itemId }
+function serviceIdFor(order) { return order.serviceId || order.extraId || order.menuId }
+function itemFor(order) { const itemId = itemIdFor(order); return byId('menuItems', itemId)?.name || order.garmentType || order.dish || itemId || 'item' }
+function serviceFor(order) { const serviceId = serviceIdFor(order); return byId('extras', serviceId)?.name || byId('menus', serviceId)?.name || order.service || order.extras || serviceId || 'servicio' }
+function quantityFor(order) { const quantity = money(order.quantity); return quantity > 0 ? quantity : 1 }
+function dishFor(order) { return itemFor(order) }
 function companyFor(order) { return byId('companies', order.companyId)?.name || order.companyId || 'empresa' }
 function employeeFor(order) { return byId('employees', order.employeeId)?.name || order.employeeId || 'empleado' }
 function costCenterFor(order) { return byId('costCenters', order.costCenterId)?.name || order.costCenterId || 'centro de costo' }
-function orderExtras(order) { return order.extras || 'sin extras' }
+function orderExtras(order) { return order.extras || order.observations || serviceFor(order) || 'sin observaciones' }
 function getCutoffHour(companyId, fallback) { const rule = rows('cutoffRules').find((entry) => entry.companyId === companyId && entry.active !== false); return money(rule?.cutoffHour || fallback || 11) }
 function sampleOrderDefaults() {
   const employee = firstActive('employees')
@@ -857,22 +1134,28 @@ function createDomainOrder(input) {
   const dish = byId('menuItems', input.menuItemId) || defaults.dish
   const extra = byId('extras', input.extraId) || defaults.extra
   const menu = byId('menus', input.menuId) || defaults.menu
-  const total = money(dish?.price) + money(extra?.price)
+  const service = byId('extras', input.serviceId) || byId('menus', input.serviceId) || extra || menu
+  const total = money(dish?.price) + money(service?.price) + money(extra?.price)
   const companyId = input.companyId || employee.companyId || firstActive('companies')?.id
   const costCenterId = input.costCenterId || employee.costCenterId || firstActive('costCenters')?.id
   const cutoffHour = getCutoffHour(companyId, input.cutoffHour)
-  return createRecord(collection('orders'), {
+  const payload = {
     employeeId: employee.id,
     companyId,
     costCenterId,
     menuId: menu?.id || 'manual-menu',
     menuItemId: dish?.id || 'manual-dish',
+    serviceId: service?.id || menu?.id || 'manual-service',
+    garmentTypeId: dish?.id || input.garmentTypeId || 'manual-garment',
+    quantity: money(input.quantity || 1) || 1,
+    observations: input.observations || input.extras || 'Solicitud generada desde portal empleado',
     extras: extra?.name || input.extras || 'sin extras',
     date,
     cutoffHour,
     total,
     status: 'confirmed',
-  })
+  }
+  return createRecord(collection('orders'), completePayload('orders', payload, 'Solicitud'))
 }
 function cancelDomainOrder(orderId, input) {
   const order = byId('orders', orderId)
@@ -885,14 +1168,17 @@ function cancelDomainOrder(orderId, input) {
 function markOrderPrepared(orderId) {
   const order = byId('orders', orderId)
   if (!order) return { ok: false, status: 404, code: 'missing_order', warning: 'Pedido inexistente' }
-  return updateRecord(collection('orders'), orderId, { status: 'prepared' })
+  const statusOptions = String(fieldsFor('orders').status || '').startsWith('enum:') ? String(fieldsFor('orders').status).slice(5).split(',') : []
+  const nextStatus = statusOptions.includes('ready') && !statusOptions.includes('prepared') ? 'ready' : 'prepared'
+  return updateRecord(collection('orders'), orderId, { status: nextStatus })
 }
 function productionSummary(date) {
   const groups = new Map()
   for (const order of activeOrders().filter((entry) => !date || sameDate(entry.date, date))) {
-    const key = order.companyId + '|' + order.menuItemId
-    const current = groups.get(key) || { companyId: order.companyId, company: companyFor(order), menuItemId: order.menuItemId, dish: dishFor(order), date: order.date, quantity: 0, orderIds: [] }
-    current.quantity += 1
+    const itemId = itemIdFor(order)
+    const key = order.companyId + '|' + itemId
+    const current = groups.get(key) || { companyId: order.companyId, company: companyFor(order), menuItemId: order.menuItemId, garmentTypeId: order.garmentTypeId, dish: itemFor(order), garmentType: itemFor(order), service: serviceFor(order), date: order.date, quantity: 0, orderIds: [] }
+    current.quantity += quantityFor(order)
     current.orderIds.push(order.id)
     groups.set(key, current)
   }
@@ -901,16 +1187,22 @@ function productionSummary(date) {
 function generateLabel(orderId) {
   const order = byId('orders', orderId)
   if (!order) return { ok: false, status: 404, code: 'missing_order', warning: 'Pedido inexistente' }
-  return createRecord(collection('labels'), {
+  const payload = {
     orderId: order.id,
+    requestId: order.id,
     employee: employeeFor(order),
     company: companyFor(order),
     costCenter: costCenterFor(order),
     dish: dishFor(order),
+    garmentType: itemFor(order),
+    quantity: quantityFor(order),
+    service: serviceFor(order),
     extras: orderExtras(order),
     date: order.date,
+    observations: order.observations || order.extras || 'Sin observaciones',
     status: 'ready',
-  })
+  }
+  return createRecord(collection('labels'), completePayload('labels', payload, 'Etiqueta'))
 }
 function reportFor(query) {
   const companyId = query.get('companyId') || firstActive('companies')?.id
@@ -918,8 +1210,8 @@ function reportFor(query) {
   const filtered = rows('orders').filter((order) => (!companyId || order.companyId === companyId) && (!date || sameDate(order.date, date)))
   const production = productionSummary(date).filter((entry) => !companyId || entry.companyId === companyId)
   const cancelled = filtered.filter((order) => order.status === 'cancelled')
-  const topDish = production.sort((left, right) => right.quantity - left.quantity)[0]?.dish || 'sin produccion'
-  return { companyId, company: companyId ? byId('companies', companyId)?.name : 'todas', date, totalOrders: filtered.length, cancelledOrders: cancelled.length, productionTotal: production.reduce((sum, entry) => sum + entry.quantity, 0), topDish, production, extras: filtered.map((order) => order.extras).filter(Boolean) }
+  const topItem = production.sort((left, right) => right.quantity - left.quantity)[0]?.dish || 'sin produccion'
+  return { companyId, company: companyId ? byId('companies', companyId)?.name : 'todas', date, totalOrders: filtered.length, totalRequests: filtered.length, cancelledOrders: cancelled.length, cancelledRequests: cancelled.length, productionTotal: production.reduce((sum, entry) => sum + entry.quantity, 0), topDish: topItem, topGarment: topItem, production, extras: filtered.map((order) => order.extras || order.observations).filter(Boolean), services: filtered.map((order) => serviceFor(order)).filter(Boolean) }
 }
 function filteredOrders(query) {
   const companyId = query.get('companyId')
@@ -929,10 +1221,12 @@ function filteredOrders(query) {
 export async function handleDomainRequest(req, url) {
   if (!roleMode || !url.pathname.startsWith('/api/domain/')) return null
   const parts = url.pathname.split('/').filter(Boolean)
-  if (req.method === 'GET' && url.pathname === '/api/domain/orders') return ok(200, { ok: true, items: filteredOrders(url.searchParams) })
-  if (req.method === 'POST' && url.pathname === '/api/domain/orders') { const result = createDomainOrder(await readBody(req)); return ok(result.status || 201, result) }
-  if (req.method === 'POST' && parts[2] === 'orders' && parts[4] === 'cancel') { const result = cancelDomainOrder(parts[3], await readBody(req)); return ok(result.status || 200, result) }
-  if (req.method === 'POST' && parts[2] === 'orders' && parts[4] === 'prepared') { const result = markOrderPrepared(parts[3]); return ok(result.status || 200, result) }
+  const isRequestPath = url.pathname === '/api/domain/orders' || url.pathname === '/api/domain/requests'
+  const isRequestPart = parts[2] === 'orders' || parts[2] === 'requests'
+  if (req.method === 'GET' && isRequestPath) return ok(200, { ok: true, items: filteredOrders(url.searchParams) })
+  if (req.method === 'POST' && isRequestPath) { const result = createDomainOrder(await readBody(req)); return ok(result.status || 201, result) }
+  if (req.method === 'POST' && isRequestPart && parts[4] === 'cancel') { const result = cancelDomainOrder(parts[3], await readBody(req)); return ok(result.status || 200, result) }
+  if (req.method === 'POST' && isRequestPart && (parts[4] === 'prepared' || parts[4] === 'ready')) { const result = markOrderPrepared(parts[3]); return ok(result.status || 200, result) }
   if (req.method === 'GET' && url.pathname === '/api/domain/production') return ok(200, { ok: true, items: productionSummary(url.searchParams.get('date')) })
   if (req.method === 'POST' && url.pathname === '/api/domain/labels') { const body = await readBody(req); const result = generateLabel(body.orderId); return ok(result.status || 201, result) }
   if (req.method === 'GET' && url.pathname === '/api/domain/reports') return ok(200, { ok: true, data: reportFor(url.searchParams) })
@@ -1094,7 +1388,7 @@ let activeCollection = isAdmin ? config.adminCollection : config.mainCollection
 function escapeHtml(value) { const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }; return String(value).replace(/[&<>"']/g, (character) => map[character]) }
 function humanize(value) { return String(value || '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').trim().split(' ').filter(Boolean).map((part) => part.charAt(0).toLocaleUpperCase() + part.slice(1)).join(' ') }
 function labelFor(collection) { return config.collections[collection]?.label || humanize(collection) }
-function metricLabelFor(collection) { const normalized = String(collection || '').toLocaleLowerCase(); if (normalized.includes('order') || normalized.includes('pedido')) return 'pedidos activos'; if (normalized.includes('company') || normalized.includes('empresa')) return 'empresas'; if (normalized.includes('production') || normalized.includes('produccion')) return 'produccion del dia'; if (normalized.includes('menuitem') || normalized.includes('plato') || normalized.includes('product')) return 'platos'; if (normalized.includes('employee') || normalized.includes('empleado')) return 'empleados activos'; if (normalized.includes('report')) return 'reportes'; return labelFor(collection) }
+function metricLabelFor(collection) { const normalized = String(collection || '').toLocaleLowerCase(); if (normalized.includes('request') || normalized.includes('solicitud')) return 'solicitudes activas'; if (normalized.includes('order') || normalized.includes('pedido')) return 'pedidos activos'; if (normalized.includes('company') || normalized.includes('empresa')) return 'empresas'; if (normalized.includes('production') || normalized.includes('produccion')) return 'produccion del dia'; if (normalized.includes('garment') || normalized.includes('prenda') || normalized.includes('uniform')) return 'prendas'; if (normalized.includes('service') || normalized.includes('servicio')) return 'servicios'; if (normalized.includes('menuitem') || normalized.includes('plato') || normalized.includes('product')) return 'platos'; if (normalized.includes('employee') || normalized.includes('empleado')) return 'empleados activos'; if (normalized.includes('report')) return 'reportes'; return labelFor(collection) }
 function isIdField(field) { const normalized = String(field || '').toLocaleLowerCase(); return normalized === 'id' || normalized.endsWith('id') }
 function shortValue(value) { const text = String(value ?? ''); return text.length > 28 ? text.slice(0, 18) + '...' + text.slice(-6) : text }
 function formatValue(field, value) { if (value === true) return 'Si'; if (value === false) return 'No'; if (value === null || value === undefined || value === '') return 'Sin dato'; if (Array.isArray(value)) return value.map((item) => formatValue(field, item)).join(', '); if (typeof value === 'object') return Object.entries(value).map(([key, item]) => humanize(key) + ': ' + formatValue(key, item)).join(' · '); if (typeof value === 'number' && /price|total|amount|cost|value/i.test(field)) return '$ ' + new Intl.NumberFormat('es-AR').format(value); return isIdField(field) ? shortValue(value) : String(value) }
@@ -1106,7 +1400,7 @@ function renderStatusBadge(row) { const status = statusForRow(row); return statu
 function renderRecordCard(row, definition, withActions = false) { const actions = withActions ? '<div class="record-actions"><button data-edit="' + escapeHtml(row.id) + '">Editar</button><button data-delete="' + escapeHtml(row.id) + '">Eliminar</button></div>' : ''; return '<article class="record-card"><div class="record-card-header"><strong>' + escapeHtml(titleForRow(row)) + '</strong>' + renderStatusBadge(row) + '</div>' + renderRecordFields(row, definition) + actions + '</article>' }
 function renderEmpty(label) { return '<div class="empty-state"><strong>No hay registros</strong><span>La coleccion ' + escapeHtml(label) + ' todavia no tiene datos visibles.</span></div>' }
 function renderFeedback(body, successLabel) { const ok = body?.ok !== false; const detail = body?.warning || body?.error || body?.data?.id || body?.message || ''; feedback.innerHTML = '<div class="notice ' + (ok ? 'success' : 'danger') + '"><strong>' + escapeHtml(ok ? successLabel : 'Operacion con alerta') + '</strong><span>' + escapeHtml(detail ? formatValue('detalle', detail) : 'Sin detalles adicionales') + '</span></div>' }
-function collectionPriority(collection) { const normalized = collection.toLocaleLowerCase(); const weights = [['order', 'pedido'], ['company', 'empresa'], ['menuitem', 'plato', 'product'], ['production', 'produccion'], ['employee', 'empleado'], ['menu'], ['label', 'etiqueta'], ['report']]; const index = weights.findIndex((signals) => signals.some((signal) => normalized.includes(signal))); return index === -1 ? 99 : index }
+function collectionPriority(collection) { const normalized = collection.toLocaleLowerCase(); const weights = [['request', 'solicitud', 'order', 'pedido'], ['company', 'empresa'], ['garment', 'prenda', 'uniform', 'menuitem', 'plato', 'product'], ['service', 'servicio'], ['production', 'produccion'], ['employee', 'empleado'], ['menu'], ['label', 'etiqueta'], ['report']]; const index = weights.findIndex((signals) => signals.some((signal) => normalized.includes(signal))); return index === -1 ? 99 : index }
 function summaryEntries(dashboard, limit) { const entries = Object.entries(dashboard.summary || {}).sort(([left], [right]) => collectionPriority(left) - collectionPriority(right)); const visible = entries.slice(0, limit); const remaining = Math.max(entries.length - visible.length, 0); return { visible, remaining } }
 async function renderSummary() { const dashboard = await api('/api/dashboard').then((result) => result.body); const { visible, remaining } = summaryEntries(dashboard, isAdmin ? 8 : 4); summary.innerHTML = visible.map(([collection, count]) => '<article class="metric-card"><strong>' + escapeHtml(count) + '</strong><span>' + escapeHtml(metricLabelFor(collection)) + '</span></article>').join('') + (remaining > 0 && isAdmin ? '<article class="metric-card metric-card-muted"><strong>+' + escapeHtml(remaining) + '</strong><span>areas conectadas</span></article>' : '') }
 function patchForQuickEdit(definition) { for (const [field, type] of Object.entries(definition.fields)) if (type.startsWith('enum:')) { const options = type.slice(5).split(','); return { [field]: options[1] || options[0] } } for (const [field, type] of Object.entries(definition.fields)) { if (type === 'boolean') return { [field]: false }; if (type === 'number') return { [field]: 99 }; if (type === 'email') return { [field]: 'updated@example.test' }; if (type === 'date') return { [field]: '2026-07-21' }; return { [field]: 'Updated ' + field } } return {} }
@@ -1138,18 +1432,18 @@ const page = (config.rolePages || []).find((entry) => entry.key === currentRole)
 function escapeHtml(value) { const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }; return String(value).replace(/[&<>"']/g, (character) => map[character]) }
 function humanize(value) { return String(value || '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').trim().split(' ').filter(Boolean).map((part) => part.charAt(0).toLocaleUpperCase() + part.slice(1)).join(' ') }
 function labelFor(collection) { return config.collections[collection]?.label || humanize(collection) }
-function metricLabelFor(collection) { const normalized = String(collection || '').toLocaleLowerCase(); if (normalized.includes('order') || normalized.includes('pedido')) return 'Pedidos'; if (normalized.includes('company') || normalized.includes('empresa')) return 'Empresas'; if (normalized.includes('production') || normalized.includes('produccion')) return 'Produccion'; if (normalized.includes('menuitem') || normalized.includes('plato') || normalized.includes('product')) return 'Platos'; if (normalized.includes('employee') || normalized.includes('empleado')) return 'Empleados'; if (normalized.includes('label') || normalized.includes('etiqueta')) return 'Etiquetas'; if (normalized.includes('report')) return 'Reportes'; return labelFor(collection) }
+function metricLabelFor(collection) { const normalized = String(collection || '').toLocaleLowerCase(); if (normalized.includes('request') || normalized.includes('solicitud')) return 'Solicitudes'; if (normalized.includes('order') || normalized.includes('pedido')) return 'Pedidos'; if (normalized.includes('company') || normalized.includes('empresa')) return 'Empresas'; if (normalized.includes('production') || normalized.includes('produccion')) return 'Produccion'; if (normalized.includes('garment') || normalized.includes('prenda') || normalized.includes('uniform')) return 'Prendas'; if (normalized.includes('service') || normalized.includes('servicio')) return 'Servicios'; if (normalized.includes('menuitem') || normalized.includes('plato') || normalized.includes('product')) return 'Platos'; if (normalized.includes('employee') || normalized.includes('empleado')) return 'Empleados'; if (normalized.includes('label') || normalized.includes('etiqueta')) return 'Etiquetas'; if (normalized.includes('report')) return 'Reportes'; return labelFor(collection) }
 function shortValue(value) { const text = String(value ?? ''); return text.length > 28 ? text.slice(0, 18) + '...' + text.slice(-6) : text }
 function isIdField(field) { const normalized = String(field || '').toLocaleLowerCase(); return normalized === 'id' || normalized.endsWith('id') }
 function formatValue(field, value) { if (value === true) return 'Si'; if (value === false) return 'No'; if (value === null || value === undefined || value === '') return 'Sin dato'; if (Array.isArray(value)) return value.map((item) => formatValue(field, item)).join(', '); if (typeof value === 'object') return Object.entries(value).map(([key, item]) => humanize(key) + ': ' + formatValue(key, item)).join(' · '); if (typeof value === 'number' && /price|total|amount|cost|value/i.test(field)) return '$ ' + new Intl.NumberFormat('es-AR').format(value); return isIdField(field) ? shortValue(value) : String(value) }
-function titleForRow(row) { return row.title || row.name || row.employee || row.company || row.dish || row.customer || row.code || shortValue(row.id || 'Registro') }
+function titleForRow(row) { return row.title || row.name || row.employee || row.company || row.garmentType || row.service || row.dish || row.customer || row.code || shortValue(row.id || 'Registro') }
 function statusForRow(row) { if (row.status) return row.status; if (row.active === true) return 'activo'; if (row.active === false) return 'inactivo'; return '' }
-function semanticClass(collection) { const normalized = collection.toLocaleLowerCase(); if (normalized.includes('label') || normalized.includes('etiqueta')) return ' printable-label'; if (normalized.includes('report') || normalized.includes('metric')) return ' report-card'; if (normalized.includes('production') || normalized.includes('produccion')) return ' production-card'; if (normalized.includes('order') || normalized.includes('pedido')) return ' order-card'; return '' }
+function semanticClass(collection) { const normalized = collection.toLocaleLowerCase(); if (normalized.includes('label') || normalized.includes('etiqueta')) return ' printable-label'; if (normalized.includes('report') || normalized.includes('metric')) return ' report-card'; if (normalized.includes('production') || normalized.includes('produccion')) return ' production-card'; if (normalized.includes('request') || normalized.includes('solicitud') || normalized.includes('order') || normalized.includes('pedido')) return ' order-card'; return '' }
 function visibleEntries(row, definition, collection = '') { const preferred = Object.keys(definition.fields || {}).filter((field) => Object.prototype.hasOwnProperty.call(row, field)); const fields = preferred.length > 0 ? preferred : Object.keys(row); const keepIds = /label|etiqueta|order|pedido/i.test(collection); const visible = fields.filter((field) => field !== 'id' && row[field] !== undefined && row[field] !== null && row[field] !== ''); const business = visible.filter((field) => keepIds || !isIdField(field)); const selected = business.length >= 3 ? business : visible; return selected.slice(0, 6).map((field) => [field, row[field]]) }
 function renderStatusBadge(row) { const status = statusForRow(row); return status ? '<span class="status-badge">' + escapeHtml(humanize(status)) + '</span>' : '' }
 function renderRecordFields(collection, row, definition) { const entries = visibleEntries(row, definition, collection); if (entries.length === 0) return '<p class="muted">Sin campos visibles.</p>'; return '<dl class="record-fields">' + entries.map(([field, value]) => '<div><dt>' + escapeHtml(humanize(field)) + '</dt><dd>' + escapeHtml(formatValue(field, value)) + '</dd></div>').join('') + '</dl>' }
 function renderRecordCard(collection, row, definition) { return '<article class="record-card' + semanticClass(collection) + '"><div class="record-card-header"><strong>' + escapeHtml(titleForRow(row)) + '</strong>' + renderStatusBadge(row) + '</div>' + renderRecordFields(collection, row, definition) + '</article>' }
-function renderCollectionIntro(collection, rows) { const normalized = collection.toLocaleLowerCase(); if (normalized.includes('label') || normalized.includes('etiqueta')) return '<p class="muted">Etiquetas listas para impresion manual y control de entrega.</p>'; if (normalized.includes('report') || normalized.includes('metric')) return '<p class="muted">Resumen operativo para consumo, cancelados, extras y produccion.</p>'; if (normalized.includes('production') || normalized.includes('produccion')) return '<p class="muted">Produccion agrupada para cocina y despacho diario.</p>'; if (normalized.includes('order') || normalized.includes('pedido')) return '<p class="muted">Pedidos activos, estados y trazabilidad por empleado.</p>'; return '<p class="muted">' + rows.length + ' registros disponibles para este rol.</p>' }
+function renderCollectionIntro(collection, rows) { const normalized = collection.toLocaleLowerCase(); if (normalized.includes('label') || normalized.includes('etiqueta')) return '<p class="muted">Etiquetas listas para impresion manual y control de entrega.</p>'; if (normalized.includes('report') || normalized.includes('metric')) return '<p class="muted">Resumen operativo para consumo, cancelados, servicios y produccion.</p>'; if (normalized.includes('production') || normalized.includes('produccion')) return '<p class="muted">Produccion agrupada para planta y despacho diario.</p>'; if (normalized.includes('request') || normalized.includes('solicitud')) return '<p class="muted">Solicitudes activas, estados y trazabilidad por empleado.</p>'; if (normalized.includes('garment') || normalized.includes('prenda')) return '<p class="muted">Tipos de prenda disponibles para lavado o reposicion.</p>'; if (normalized.includes('service') || normalized.includes('servicio')) return '<p class="muted">Servicios activos para lavado, reposicion y entrega.</p>'; if (normalized.includes('order') || normalized.includes('pedido')) return '<p class="muted">Pedidos activos, estados y trazabilidad por empleado.</p>'; return '<p class="muted">' + rows.length + ' registros disponibles para este rol.</p>' }
 function renderFeedback(body, successLabel) { const ok = body?.ok !== false; const detail = body?.warning || body?.error || body?.data?.id || body?.message || ''; feedback.innerHTML = '<div class="notice ' + (ok ? 'success' : 'danger') + '"><strong>' + escapeHtml(ok ? successLabel : 'Operacion con alerta') + '</strong><span>' + escapeHtml(detail ? formatValue('detalle', detail) : 'Sin detalles adicionales') + '</span></div>' }
 function sampleForCollection(collection, prefix) { const definition = config.collections[collection]; const data = {}; for (const [field, type] of Object.entries(definition?.fields || {})) { if (type === 'number') data[field] = 7; else if (type === 'boolean') data[field] = true; else if (type === 'email') data[field] = prefix.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '@example.test'; else if (type === 'date') data[field] = '2026-07-20'; else if (type.startsWith('enum:')) data[field] = type.slice(5).split(',')[0]; else data[field] = prefix + ' ' + field } return data }
 function patchForState(collection, desiredStates) { const fields = config.collections[collection]?.fields || {}; for (const [field, type] of Object.entries(fields)) { if (type.startsWith('enum:')) { const options = type.slice(5).split(','); const selected = options.find((option) => desiredStates.includes(option)) || options[0]; return { [field]: selected } } } return {} }
@@ -1165,6 +1459,9 @@ await renderSummary()
 }
 
 function navLabelForKey(key, fallback) {
+  const loweredFallback = normalizeOptionalString(fallback).toLocaleLowerCase()
+  if (key === 'provider' && loweredFallback.includes('lavander')) return 'Lavanderia'
+  if (key === 'kitchen' && loweredFallback.includes('planta')) return 'Planta'
   return {
     home: 'Inicio',
     employee: 'Empleado',
@@ -1175,6 +1472,18 @@ function navLabelForKey(key, fallback) {
     reports: 'Reportes',
     admin: 'Admin',
   }[key] || fallback
+}
+
+function brandInitials(domainLabel) {
+  const words = normalizeOptionalString(domainLabel).split(/\s+/u).filter(Boolean)
+  return words.slice(0, 2).map((word) => word[0]?.toLocaleUpperCase()).join('') || 'B2B'
+}
+
+function brandDisplayName(domainLabel) {
+  const label = normalizeOptionalString(domainLabel)
+  if (label.toLocaleLowerCase().includes('lavander')) return 'Lavanderia Corporativa'
+  if (label.toLocaleLowerCase().includes('vianda')) return 'Viandas Corporativas'
+  return label || 'Operaciones B2B'
 }
 
 function navigationItems(rolePages) {
@@ -1189,9 +1498,9 @@ function buildNavLinks({ activeKey, rolePages, className = '' }) {
   return navigationItems(rolePages).map((item) => `<a class="${className}${item.key === activeKey ? ' active' : ''}" href="${item.href}">${item.label}</a>`).join('')
 }
 
-function buildAppShell({ title, activeKey, rolePages }) {
+function buildAppShell({ title, activeKey, rolePages, domainLabel }) {
   const links = buildNavLinks({ activeKey, rolePages, className: 'nav-link' })
-  return `<header class="app-topbar"><a class="brand" href="/"><span class="brand-mark">VC</span><span>Viandas Corporativas</span></a><nav class="desktop-topnav">${links}</nav><button class="nav-toggle" type="button" aria-label="Abrir menu" aria-controls="mobile-menu" aria-expanded="false" data-nav-toggle><span></span><span></span><span></span></button></header><div class="drawer-backdrop" data-nav-backdrop></div><aside class="mobile-drawer" id="mobile-menu" aria-hidden="true" data-mobile-drawer><div class="drawer-header"><strong>${title}</strong><button type="button" aria-label="Cerrar menu" data-nav-close>Cerrar</button></div><nav>${links}</nav></aside>`
+  return `<header class="app-topbar"><a class="brand" href="/"><span class="brand-mark">${brandInitials(domainLabel)}</span><span>${brandDisplayName(domainLabel)}</span></a><nav class="desktop-topnav">${links}</nav><button class="nav-toggle" type="button" aria-label="Abrir menu" aria-controls="mobile-menu" aria-expanded="false" data-nav-toggle><span></span><span></span><span></span></button></header><div class="drawer-backdrop" data-nav-backdrop></div><aside class="mobile-drawer" id="mobile-menu" aria-hidden="true" data-mobile-drawer><div class="drawer-header"><strong>${title}</strong><button type="button" aria-label="Cerrar menu" data-nav-close>Cerrar</button></div><nav>${links}</nav></aside>`
 }
 
 function buildDesktopSidebar({ activeKey, rolePages }) {
@@ -1216,7 +1525,30 @@ function hrefForRole(rolePages, key) {
   return page ? `/${page.path.replace(/^public\//u, '')}` : '/'
 }
 
+function isLaundryRolePage(rolePage) {
+  const haystack = [rolePage.title, rolePage.subtitle, ...rolePage.requiredTerms, ...rolePage.sections.flatMap((section) => [section.title, section.body])].join(' ').toLocaleLowerCase()
+  return ['lavander', 'uniform', 'prenda', 'servicio', 'solicitud'].some((signal) => haystack.includes(signal))
+}
+
 function buildRoleCommercialSection(rolePage, rolePages) {
+  if (isLaundryRolePage(rolePage)) {
+    if (rolePage.key === 'employee') {
+      return `<section class="product-panel employee-product"><div class="employee-greeting"><p class="eyebrow">Hola, Lucia</p><h2>Tu solicitud de uniforme</h2><p>Servicio disponible para lavado semanal o reposicion. Carga prenda, cantidad y observaciones antes del corte.</p><div class="role-actions">${roleButton(rolePage, 'Crear solicitud', 'create-order', 0, 'primary')}${roleButton(rolePage, 'Cancelar solicitud', 'cancel-order', 1, 'secondary')}</div></div><article class="meal-card"><span class="status-badge">Servicio sugerido</span><h3>Lavado semanal de uniformes</h3><p>Camisas operativas, pantalones y ambos listos para retiro coordinado.</p><div class="chip-row"><span>3 prendas</span><span>Retiro por recepcion</span><span>Entrega programada</span></div></article><article class="status-card"><p class="eyebrow">Solicitud actual</p><strong>Pendiente de confirmar</strong><span>Corte: 11:00</span><small>Historial: lavado semanal ayer, reposicion solicitada anteayer.</small></article></section>`
+    }
+    if (rolePage.key === 'company') {
+      return `<section class="product-panel company-product"><article class="insight-card"><p class="eyebrow">RRHH</p><strong>4 empleados activos</strong><span>2 centros de costo con cupos vigentes.</span></article><article class="insight-card"><p class="eyebrow">Hoy</p><strong>7 prendas</strong><span>1 solicitud cancelada, 6 siguen a planta.</span></article><article class="cost-card"><h3>Volumen por centro de costo</h3><div><span>Planta Norte</span><strong>5 prendas</strong></div><div><span>Administracion Central</span><strong>2 prendas</strong></div></article><div class="role-actions">${roleButton(rolePage, 'Ver reporte del dia', 'focus-collection', 0, 'primary')}${roleButton(rolePage, 'Administrar empleados', 'focus-collection', 1, 'secondary')}</div></section>`
+    }
+    if (rolePage.key === 'provider') {
+      return `<section class="product-panel provider-product"><article class="production-hero"><p class="eyebrow">Produccion consolidada</p><h2>42 prendas en circuito</h2><p>Solicitudes agrupadas por empresa, servicio, prenda y ruta de retiro/entrega.</p><div class="role-actions">${roleButton(rolePage, 'Ver produccion', 'focus-collection', 0, 'primary')}<a class="secondary-link" href="${hrefForRole(rolePages, 'labels')}">Generar etiquetas</a><a class="secondary-link" href="${hrefForRole(rolePages, 'reports')}">Ver reportes</a></div></article><article class="menu-card"><h3>Servicios activos</h3><p>Lavado semanal, reposicion de uniforme y entrega programada.</p><div class="chip-row"><span>3 empresas cliente</span><span>2 rutas activas</span><span>Etiquetas listas</span></div></article><article class="status-card"><p class="eyebrow">Estado</p><strong>En lavado</strong><span>Acceso directo a planta y etiquetas.</span><a href="${hrefForRole(rolePages, 'kitchen')}">Abrir planta</a></article></section>`
+    }
+    if (rolePage.key === 'kitchen') {
+      return `<section class="product-panel kitchen-product"><article class="kitchen-total"><p class="eyebrow">Planta del dia</p><strong>42</strong><span>prendas pendientes</span>${roleButton(rolePage, 'Marcar lista', 'mark-prepared', 0, 'primary')}</article><article class="prep-list"><h3>Volumen por prenda</h3><div><span>Camisa operativa</span><strong>24</strong></div><div><span>Pantalon de trabajo</span><strong>12</strong></div><div><span>Ambo sanitario</span><strong>6</strong></div></article><article class="prep-list"><h3>Estados</h3><div><span>Recibidas</span><strong>18</strong></div><div><span>En lavado</span><strong>16</strong></div><div><span>Listas</span><strong>8</strong></div></article></section>`
+    }
+    if (rolePage.key === 'labels') {
+      return `<section class="product-panel labels-product"><article class="print-label"><p class="eyebrow">Etiqueta imprimible</p><h3>Lucia Perez</h3><dl><div><dt>Empresa</dt><dd>Acme Salud</dd></div><div><dt>Centro de costo</dt><dd>Planta Norte</dd></div><div><dt>Prenda</dt><dd>Camisa operativa</dd></div><div><dt>Cantidad</dt><dd>3</dd></div><div><dt>Servicio</dt><dd>Lavado semanal</dd></div><div><dt>ID solicitud</dt><dd>seed-requests-1</dd></div></dl></article><article class="print-label"><p class="eyebrow">Etiqueta imprimible</p><h3>Diego Ramos</h3><dl><div><dt>Empresa</dt><dd>Norte Logistica</dd></div><div><dt>Centro de costo</dt><dd>Operaciones</dd></div><div><dt>Prenda</dt><dd>Pantalon de trabajo</dd></div><div><dt>Cantidad</dt><dd>2</dd></div><div><dt>Servicio</dt><dd>Reposicion</dd></div><div><dt>ID solicitud</dt><dd>seed-requests-2</dd></div></dl></article><div class="role-actions">${roleButton(rolePage, 'Imprimir etiquetas', 'focus-collection', 0, 'primary')}</div></section>`
+    }
+    return `<section class="product-panel reports-product"><article class="insight-card"><p class="eyebrow">Resumen</p><strong>6 solicitudes</strong><span>5 confirmadas, 1 cancelada antes del retiro.</span></article><article class="report-table"><h3>Volumen por prenda</h3><div><span>Camisa operativa</span><strong>24</strong></div><div><span>Pantalon de trabajo</span><strong>12</strong></div><div><span>Ambo sanitario</span><strong>6</strong></div></article><article class="report-table"><h3>Solicitudes por empresa</h3><div><span>Acme Salud</span><strong>4</strong></div><div><span>Norte Logistica</span><strong>2</strong></div><div><span>Canceladas</span><strong>1</strong></div></article><div class="role-actions">${roleButton(rolePage, 'Ver reportes', 'focus-collection', 0, 'primary')}${roleButton(rolePage, 'Ver produccion', 'focus-collection', 1, 'secondary')}</div></section>`
+  }
   if (rolePage.key === 'employee') {
     return `<section class="product-panel employee-product"><div class="employee-greeting"><p class="eyebrow">Hola, Lucia</p><h2>Tu vianda para hoy</h2><p>Pedido abierto hasta las 10:30. Confirma el plato principal y suma extras antes del corte.</p><div class="role-actions">${roleButton(rolePage, 'Confirmar pedido', 'create-order', 0, 'primary')}${roleButton(rolePage, 'Cancelar antes del corte', 'cancel-order', 1, 'secondary')}</div></div><article class="meal-card"><span class="status-badge">Recomendado</span><h3>Milanesa con pure</h3><p>Incluye pan integral y fruta. Opcion lista para produccion si confirmas ahora.</p><div class="chip-row"><span>Extra fruta</span><span>Pan integral</span><span>Sin sal agregada</span></div></article><article class="status-card"><p class="eyebrow">Pedido actual</p><strong>Pendiente de confirmar</strong><span>Corte: 10:30</span><small>Historial: ensalada completa ayer, menu ejecutivo anteayer.</small></article></section>`
   }
@@ -1246,9 +1578,10 @@ function buildRoleHtml({ domainLabel, deliveryLevel, rolePage, rolePages }) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${domainLabel} - ${rolePage.title}</title>
   <link rel="stylesheet" href="/styles.css">
+  <style>.insight-card strong{display:block;line-height:1.15}.insight-card span{display:block;margin-top:6px;color:var(--muted);line-height:1.45}@media (max-width:760px){html,body,.role-page{width:100%;overflow-x:hidden}.app-frame{display:block;width:100%;max-width:100%;padding:14px}.role-layout{width:100%;max-width:100%;margin:0;padding:0;gap:18px}.role-hero,.panel,.product-panel{max-width:100%;overflow:hidden}.role-hero h1{max-width:100%;font-size:clamp(1.85rem,10vw,2.35rem);line-height:1.06;overflow-wrap:anywhere}.metrics{grid-template-columns:1fr}.metric-card{width:100%;min-width:0;padding:14px}.metric-card span{font-size:.68rem;overflow-wrap:anywhere}.role-actions{display:grid;grid-template-columns:1fr;gap:10px;width:100%}.primary-action,.secondary-action,.secondary-link{width:100%;max-width:100%;white-space:normal;text-align:center}.employee-product,.provider-product,.kitchen-product,.company-product,.labels-product,.reports-product{grid-template-columns:1fr}}@media (max-width:480px){.role-hero>*,.metrics,.metric-card,.product-panel>*,.role-actions{max-width:300px}.role-hero,.panel,.product-panel{padding:18px}}</style>
 </head>
 <body class="role-page role-${rolePage.key}" data-role-page="${rolePage.key}" data-delivery-level="${deliveryLevel}">
-  ${buildAppShell({ title: rolePage.title, activeKey: rolePage.key, rolePages })}
+  ${buildAppShell({ title: rolePage.title, activeKey: rolePage.key, rolePages, domainLabel })}
   <div class="app-frame">
     ${buildDesktopSidebar({ activeKey: rolePage.key, rolePages })}
     <main class="layout role-layout">
@@ -1276,13 +1609,14 @@ function buildCommercialCss() {
 function buildHtml({ domainLabel, deliveryLevel, screens, rolePages = [], admin = false }) {
   const title = admin ? `${domainLabel} - Backoffice` : domainLabel
   const activeKey = admin ? 'admin' : 'home'
+  const isLaundry = domainLabel.toLocaleLowerCase().includes('lavander')
   const employeeHref = hrefForRole(rolePages, 'employee')
   const providerHref = hrefForRole(rolePages, 'provider')
   const reportsHref = hrefForRole(rolePages, 'reports')
   const roleCards = ['employee', 'company', 'provider', 'kitchen'].map((key) => rolePages.find((page) => page.key === key)).filter(Boolean).map((page) => `<a class="role-link-card" href="/${page.path.replace(/^public\//u, '')}"><strong>${navLabelForKey(page.key, page.title)}</strong><span>${page.subtitle}</span></a>`).join('')
-  const howSteps = ['La empresa carga empleados', 'El empleado pide su vianda', 'Cocina prepara por cantidades', 'Se entregan etiquetas y reportes'].map((step, index) => `<article class="how-step"><span class="step-badge">${index + 1}</span><strong>${step}</strong></article>`).join('')
+  const howSteps = (isLaundry ? ['La empresa carga empleados y cupos', 'El empleado solicita lavado o uniforme', 'Planta procesa por prendas', 'Se entregan etiquetas y reportes'] : ['La empresa carga empleados', 'El empleado pide su vianda', 'Cocina prepara por cantidades', 'Se entregan etiquetas y reportes']).map((step, index) => `<article class="how-step"><span class="step-badge">${index + 1}</span><strong>${step}</strong></article>`).join('')
   const adminMain = `<section class="hero admin-hero"><p class="eyebrow">Operacion interna</p><h1>Backoffice operativo</h1><p>CRUD general para administrar colecciones, revisar datos conectados y sostener soporte interno.</p><div id="summary" class="metrics">Cargando datos...</div></section><section class="panel admin-workspace"><div><div class="section-heading"><p>Colecciones</p><h2>Selector y registros</h2></div><div id="collection-list"></div></div><div><div class="section-heading"><p>Formulario</p><h2>Crear registro</h2></div><form id="record-form"></form><pre id="feedback"></pre></div></section>`
-  const homeMain = `<section class="hero commercial-hero"><div><p class="eyebrow">SaaS B2B para viandas corporativas</p><h1>Viandas corporativas sin planillas ni caos operativo</h1><p>Pedidos, produccion, etiquetas y reportes conectados para empresas, empleados y cocina.</p><div class="hero-actions"><a class="primary-link" href="${employeeHref}">Ver portal empleado</a><a class="secondary-link" href="${providerHref}">Ver panel restaurante</a><a class="secondary-link" href="${reportsHref}">Ver reportes</a></div></div><div class="hero-summary"><div id="summary" class="metrics">Cargando datos...</div></div></section><section class="panel"><div class="section-heading"><p>Roles operativos</p><h2>Una demo para cada usuario</h2></div><div class="role-card-grid">${roleCards}</div></section><section class="panel"><div class="section-heading"><p>Como funciona</p><h2>Del pedido a la entrega</h2></div><div class="how-grid">${howSteps}</div></section><section class="panel live-data-panel"><div class="section-heading"><p>Datos conectados</p><h2>Vista publica del sistema</h2></div><div id="collection-list"></div><form id="record-form"></form><pre id="feedback"></pre></section>`
+  const homeMain = isLaundry ? `<section class="hero commercial-hero"><div><p class="eyebrow">SaaS B2B para lavanderia corporativa</p><h1>Lavanderia corporativa sin planillas ni prendas perdidas</h1><p>Solicitudes, retiros, planta, etiquetas y reportes conectados para empresas, empleados y lavanderia.</p><div class="hero-actions"><a class="primary-link" href="${employeeHref}">Ver portal empleado</a><a class="secondary-link" href="${providerHref}">Ver panel lavanderia</a><a class="secondary-link" href="${reportsHref}">Ver reportes</a></div></div><div class="hero-summary"><div id="summary" class="metrics">Cargando datos...</div></div></section><section class="panel"><div class="section-heading"><p>Roles operativos</p><h2>Una demo para cada usuario</h2></div><div class="role-card-grid">${roleCards}</div></section><section class="panel"><div class="section-heading"><p>Como funciona</p><h2>Del retiro a la entrega</h2></div><div class="how-grid">${howSteps}</div></section><section class="panel live-data-panel"><div class="section-heading"><p>Datos conectados</p><h2>Vista publica del sistema</h2></div><div id="collection-list"></div><form id="record-form"></form><pre id="feedback"></pre></section>` : `<section class="hero commercial-hero"><div><p class="eyebrow">SaaS B2B para viandas corporativas</p><h1>Viandas corporativas sin planillas ni caos operativo</h1><p>Pedidos, produccion, etiquetas y reportes conectados para empresas, empleados y cocina.</p><div class="hero-actions"><a class="primary-link" href="${employeeHref}">Ver portal empleado</a><a class="secondary-link" href="${providerHref}">Ver panel restaurante</a><a class="secondary-link" href="${reportsHref}">Ver reportes</a></div></div><div class="hero-summary"><div id="summary" class="metrics">Cargando datos...</div></div></section><section class="panel"><div class="section-heading"><p>Roles operativos</p><h2>Una demo para cada usuario</h2></div><div class="role-card-grid">${roleCards}</div></section><section class="panel"><div class="section-heading"><p>Como funciona</p><h2>Del pedido a la entrega</h2></div><div class="how-grid">${howSteps}</div></section><section class="panel live-data-panel"><div class="section-heading"><p>Datos conectados</p><h2>Vista publica del sistema</h2></div><div id="collection-list"></div><form id="record-form"></form><pre id="feedback"></pre></section>`
   return `<!doctype html>
 <html lang="es">
 <head>
@@ -1292,7 +1626,7 @@ function buildHtml({ domainLabel, deliveryLevel, screens, rolePages = [], admin 
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body class="${admin ? 'admin-page' : 'home-page'}" data-admin="${admin ? 'true' : 'false'}" data-delivery-level="${deliveryLevel}">
-  ${buildAppShell({ title, activeKey, rolePages })}
+  ${buildAppShell({ title, activeKey, rolePages, domainLabel })}
   <div class="app-frame">
     ${buildDesktopSidebar({ activeKey, rolePages })}
     <main class="layout ${admin ? 'admin-layout' : 'home-layout'}">
@@ -1405,20 +1739,23 @@ try {
   const extras = collection('extras')
   const orders = collection('orders')
   const cutoffRules = collection('cutoffRules')
+  const isLaundry = orders === 'requests' || Boolean(PROJECT.collections.requests)
+  const requestPath = isLaundry ? '/api/domain/requests' : '/api/domain/orders'
+  const readyPath = isLaundry ? 'ready' : 'prepared'
   const seededCompany = (await list(companies))[0]
   const seededEmployee = (await list(employees)).find((employee) => employee.active !== false)
   const seededCostCenter = (await list(costCenters))[0]
-  const seededMenu = (await list(menus))[0]
-  const seededDish = (await list(menuItems))[0]
+  const seededService = (await list(menus))[0]
+  const seededGarment = (await list(menuItems))[0]
   const seededExtra = (await list(extras))[0]
   const seededCutoff = (await list(cutoffRules))[0]
   record('seeded company exists', Boolean(seededCompany?.id), seededCompany?.id)
   record('seeded active employee exists', Boolean(seededEmployee?.id), seededEmployee?.id)
   record('seeded cost center exists', Boolean(seededCostCenter?.id), seededCostCenter?.id)
-  record('seeded menu exists', Boolean(seededMenu?.id), seededMenu?.id)
-  record('seeded dish exists', Boolean(seededDish?.id), seededDish?.id)
-  record('seeded extra exists', Boolean(seededExtra?.id), seededExtra?.id)
-  record('seeded cutoff rule exists', Boolean(seededCutoff?.id), seededCutoff?.id)
+  record(isLaundry ? 'seeded service exists' : 'seeded menu exists', Boolean(seededService?.id), seededService?.id)
+  record(isLaundry ? 'seeded garment type exists' : 'seeded dish exists', Boolean(seededGarment?.id), seededGarment?.id)
+  record(isLaundry ? 'seeded service alias exists' : 'seeded extra exists', Boolean(seededExtra?.id), seededExtra?.id)
+  record(isLaundry ? 'seeded quota rule exists' : 'seeded cutoff rule exists', Boolean(seededCutoff?.id), seededCutoff?.id)
   const company = await createCollection(companies, { name: 'V3 Empresa', status: 'active', active: true })
   record('create/read company', company.status === 201 && Boolean(company.body.data?.id), company.body.data?.id)
   const costCenter = await createCollection(costCenters, { name: 'V3 Centro', companyId: company.body.data.id, active: true })
@@ -1427,40 +1764,42 @@ try {
   record('create/read active employee', activeEmployee.status === 201 && Boolean(activeEmployee.body.data?.id), activeEmployee.body.data?.id)
   const inactiveEmployee = await createCollection(employees, { name: 'V3 Empleado Inactivo', email: 'v3.inactivo@example.test', role: 'employee', companyId: company.body.data.id, costCenterId: costCenter.body.data.id, active: false })
   record('create/read inactive employee', inactiveEmployee.status === 201 && Boolean(inactiveEmployee.body.data?.id), inactiveEmployee.body.data?.id)
-  const menu = await createCollection(menus, { name: 'V3 Menu', date: '2026-07-20', active: true })
-  record('create/read menu', menu.status === 201 && Boolean(menu.body.data?.id), menu.body.data?.id)
-  const dish = await createCollection(menuItems, { name: 'V3 Plato', menuId: menu.body.data.id, category: 'principal', price: 6000, active: true })
-  record('create/read dish', dish.status === 201 && Boolean(dish.body.data?.id), dish.body.data?.id)
-  const extra = await createCollection(extras, { name: 'V3 Extra', price: 500, active: true })
-  record('create/read extra', extra.status === 201 && Boolean(extra.body.data?.id), extra.body.data?.id)
-  const orderPayload = { employeeId: activeEmployee.body.data.id, companyId: company.body.data.id, costCenterId: costCenter.body.data.id, menuId: menu.body.data.id, menuItemId: dish.body.data.id, extraId: extra.body.data.id, date: '2026-07-20', cutoffHour: 11 }
-  const createdOrder = await getJson('/api/domain/orders', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(orderPayload) })
-  record('create confirmed order', createdOrder.status === 201 && createdOrder.body.data?.status === 'confirmed', createdOrder.body.data?.id)
-  const duplicateOrder = await getJson('/api/domain/orders', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(orderPayload) })
-  record('block duplicate order per employee/day', duplicateOrder.status === 409 && duplicateOrder.body.code === 'duplicate_order' && Boolean(duplicateOrder.body.warning), duplicateOrder.body.warning)
-  const inactiveOrder = await getJson('/api/domain/orders', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...orderPayload, employeeId: inactiveEmployee.body.data.id, date: '2026-07-20' }) })
-  record('block inactive employee order', inactiveOrder.status === 409 && inactiveOrder.body.code === 'inactive_employee', inactiveOrder.body.warning)
-  const cancelOrder = await getJson('/api/domain/orders', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...orderPayload, date: '2026-07-21' }) })
-  const cancelled = await getJson('/api/domain/orders/' + cancelOrder.body.data.id + '/cancel', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nowHour: 9 }) })
-  record('cancel before cutoff', cancelled.status === 200 && cancelled.body.data?.status === 'cancelled', cancelled.body.data?.id)
-  const lateOrder = await getJson('/api/domain/orders', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...orderPayload, date: '2026-07-22' }) })
-  const lateCancel = await getJson('/api/domain/orders/' + lateOrder.body.data.id + '/cancel', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nowHour: 18 }) })
+  const service = await createCollection(menus, isLaundry ? { name: 'V3 Lavado semanal', category: 'lavado', price: 700, active: true } : { name: 'V3 Menu', date: '2026-07-20', active: true })
+  record(isLaundry ? 'create/read service' : 'create/read menu', service.status === 201 && Boolean(service.body.data?.id), service.body.data?.id)
+  const garment = await createCollection(menuItems, isLaundry ? { name: 'V3 Camisa operativa', category: 'camisa', price: 0, active: true } : { name: 'V3 Plato', menuId: service.body.data.id, category: 'principal', price: 6000, active: true })
+  record(isLaundry ? 'create/read garment type' : 'create/read dish', garment.status === 201 && Boolean(garment.body.data?.id), garment.body.data?.id)
+  const extra = isLaundry ? service : await createCollection(extras, { name: 'V3 Extra', price: 500, active: true })
+  record(isLaundry ? 'service can be selected for request' : 'create/read extra', extra.status === 201 && Boolean(extra.body.data?.id), extra.body.data?.id)
+  const orderPayload = isLaundry
+    ? { employeeId: activeEmployee.body.data.id, companyId: company.body.data.id, costCenterId: costCenter.body.data.id, serviceId: service.body.data.id, garmentTypeId: garment.body.data.id, quantity: 4, observations: 'V3 retiro por recepcion', date: '2026-07-20', cutoffHour: 11 }
+    : { employeeId: activeEmployee.body.data.id, companyId: company.body.data.id, costCenterId: costCenter.body.data.id, menuId: service.body.data.id, menuItemId: garment.body.data.id, extraId: extra.body.data.id, date: '2026-07-20', cutoffHour: 11 }
+  const createdOrder = await getJson(requestPath, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(orderPayload) })
+  record(isLaundry ? 'create confirmed request' : 'create confirmed order', createdOrder.status === 201 && createdOrder.body.data?.status === 'confirmed', createdOrder.body.data?.id)
+  const duplicateOrder = await getJson(requestPath, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(orderPayload) })
+  record(isLaundry ? 'block duplicate request per employee/day' : 'block duplicate order per employee/day', duplicateOrder.status === 409 && duplicateOrder.body.code === 'duplicate_order' && Boolean(duplicateOrder.body.warning), duplicateOrder.body.warning)
+  const inactiveOrder = await getJson(requestPath, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...orderPayload, employeeId: inactiveEmployee.body.data.id, date: '2026-07-20' }) })
+  record(isLaundry ? 'block inactive employee request' : 'block inactive employee order', inactiveOrder.status === 409 && inactiveOrder.body.code === 'inactive_employee', inactiveOrder.body.warning)
+  const cancelOrder = await getJson(requestPath, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...orderPayload, date: '2026-07-21' }) })
+  const cancelled = await getJson(requestPath + '/' + cancelOrder.body.data.id + '/cancel', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nowHour: 9 }) })
+  record(isLaundry ? 'cancel valid request before cutoff' : 'cancel before cutoff', cancelled.status === 200 && cancelled.body.data?.status === 'cancelled', cancelled.body.data?.id)
+  const lateOrder = await getJson(requestPath, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...orderPayload, date: '2026-07-22' }) })
+  const lateCancel = await getJson(requestPath + '/' + lateOrder.body.data.id + '/cancel', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nowHour: 18 }) })
   record('warn/block cancellation after cutoff', lateCancel.status === 409 && lateCancel.body.code === 'cutoff_passed' && Boolean(lateCancel.body.warning), lateCancel.body.warning)
   const production = await getJson('/api/domain/production?date=2026-07-20')
-  record('production groups by dish', production.status === 200 && production.body.items.some((item) => item.dish === 'V3 Plato' && item.quantity >= 1), JSON.stringify(production.body.items))
+  record(isLaundry ? 'production groups by garment type' : 'production groups by dish', production.status === 200 && production.body.items.some((item) => (isLaundry ? item.garmentType === 'V3 Camisa operativa' && item.quantity >= 4 : item.dish === 'V3 Plato' && item.quantity >= 1)), JSON.stringify(production.body.items))
   record('production groups by company', production.body.items.some((item) => item.companyId === company.body.data.id), company.body.data.id)
   const cancelledProduction = await getJson('/api/domain/production?date=2026-07-21')
-  record('cancelled orders excluded from production', cancelledProduction.status === 200 && !cancelledProduction.body.items.some((item) => item.orderIds.includes(cancelOrder.body.data.id)), cancelOrder.body.data.id)
-  const prepared = await getJson('/api/domain/orders/' + createdOrder.body.data.id + '/prepared', { method: 'POST' })
-  record('change order state to prepared', prepared.status === 200 && prepared.body.data?.status === 'prepared', prepared.body.data?.id)
-  const label = await getJson('/api/domain/labels', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ orderId: createdOrder.body.data.id }) })
-  record('generate label with order details', label.status === 201 && Boolean(label.body.data?.employee) && Boolean(label.body.data?.company) && Boolean(label.body.data?.costCenter) && Boolean(label.body.data?.dish) && Boolean(label.body.data?.date) && label.body.data?.orderId === createdOrder.body.data.id, JSON.stringify(label.body.data))
+  record(isLaundry ? 'cancelled requests excluded from production' : 'cancelled orders excluded from production', cancelledProduction.status === 200 && !cancelledProduction.body.items.some((item) => item.orderIds.includes(cancelOrder.body.data.id)), cancelOrder.body.data.id)
+  const prepared = await getJson(requestPath + '/' + createdOrder.body.data.id + '/' + readyPath, { method: 'POST' })
+  record(isLaundry ? 'change request state to ready' : 'change order state to prepared', prepared.status === 200 && (isLaundry ? prepared.body.data?.status === 'prepared' || prepared.body.data?.status === 'ready' : prepared.body.data?.status === 'prepared'), prepared.body.data?.id)
+  const label = await getJson('/api/domain/labels', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(isLaundry ? { orderId: createdOrder.body.data.id, requestId: createdOrder.body.data.id } : { orderId: createdOrder.body.data.id }) })
+  record(isLaundry ? 'generate label with request details' : 'generate label with order details', label.status === 201 && Boolean(label.body.data?.employee) && Boolean(label.body.data?.company) && Boolean(label.body.data?.costCenter) && Boolean(isLaundry ? label.body.data?.garmentType : label.body.data?.dish) && Boolean(label.body.data?.date) && (isLaundry ? label.body.data?.requestId === createdOrder.body.data.id && label.body.data?.quantity >= 1 && Boolean(label.body.data?.service) : label.body.data?.orderId === createdOrder.body.data.id), JSON.stringify(label.body.data))
   const report = await getJson('/api/domain/reports?companyId=' + company.body.data.id + '&date=2026-07-20')
-  record('generate company/day report', report.status === 200 && report.body.data?.companyId === company.body.data.id && report.body.data?.productionTotal >= 1, JSON.stringify(report.body.data))
-  record('report includes dish quantities and extras', Array.isArray(report.body.data?.production) && report.body.data.production.some((item) => item.dish === 'V3 Plato') && report.body.data.extras.includes('V3 Extra'), JSON.stringify(report.body.data))
-  const byCompany = await getJson('/api/domain/orders?companyId=' + company.body.data.id)
+  record(isLaundry ? 'generate company/day request report' : 'generate company/day report', report.status === 200 && report.body.data?.companyId === company.body.data.id && report.body.data?.productionTotal >= (isLaundry ? 4 : 1), JSON.stringify(report.body.data))
+  record(isLaundry ? 'report includes garment quantities and services' : 'report includes dish quantities and extras', Array.isArray(report.body.data?.production) && report.body.data.production.some((item) => isLaundry ? item.garmentType === 'V3 Camisa operativa' : item.dish === 'V3 Plato') && (isLaundry ? report.body.data.services.includes('V3 Lavado semanal') : report.body.data.extras.includes('V3 Extra')), JSON.stringify(report.body.data))
+  const byCompany = await getJson(requestPath + '?companyId=' + company.body.data.id)
   record('filter orders by company', byCompany.status === 200 && byCompany.body.items.every((order) => order.companyId === company.body.data.id), 'items=' + byCompany.body.items.length)
-  const byCostCenter = await getJson('/api/domain/orders?costCenterId=' + costCenter.body.data.id)
+  const byCostCenter = await getJson(requestPath + '?costCenterId=' + costCenter.body.data.id)
   record('filter orders by cost center', byCostCenter.status === 200 && byCostCenter.body.items.every((order) => order.costCenterId === costCenter.body.data.id), 'items=' + byCostCenter.body.items.length)
 } finally {
   await new Promise((resolve) => server.close(resolve))

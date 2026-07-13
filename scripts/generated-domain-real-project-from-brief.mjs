@@ -79,8 +79,10 @@ function relativeProjectRoot(outputPath) {
 
 function detectBriefKind(briefText) {
   const text = briefText.toLocaleLowerCase()
+  const laundrySignals = ['lavander', 'uniform', 'prenda', 'servicio', 'retiro', 'entrega', 'lavado']
   const viandasSignals = ['viandas', 'corporativas', 'empleados', 'centro de costo', 'produccion', 'etiquetas']
   const b2bSignals = ['empresa', 'empleado', 'menu', 'pedido', 'reporte']
+  if (laundrySignals.filter((signal) => text.includes(signal)).length >= 4) return 'lavanderia-corporativa-b2b'
   if (viandasSignals.filter((signal) => text.includes(signal)).length >= 4) return 'viandas-corporativas-b2b'
   if (b2bSignals.filter((signal) => text.includes(signal)).length >= 4) return 'b2b-operations'
   return 'unsupported'
@@ -242,11 +244,88 @@ function buildViandasContract({ briefText, outputPath }) {
   }
 }
 
+function buildLaundryContract({ briefText, outputPath }) {
+  const contract = buildViandasContract({ briefText, outputPath })
+  contract.domain = {
+    label: 'Lavanderia Corporativa B2B',
+    slug: slugify(relativeProjectRoot(outputPath), 'lavanderia-corporativa-b2b'),
+    summary: 'Sistema B2B mobile-first para solicitudes de lavanderia corporativa, uniformes, retiros, procesamiento, etiquetas y reportes.',
+  }
+  contract.roles = [
+    'laundry_admin',
+    'company_admin',
+    'employee',
+    'plant_operator',
+    'system_admin',
+  ]
+  contract.entities = [
+    'companies',
+    'employees',
+    'costCenters',
+    'services',
+    'garmentTypes',
+    'requests',
+    'requestStates',
+    'productionItems',
+    'labels',
+    'reports',
+    'deliveryRoutes',
+    'quotaRules',
+  ]
+  contract.states = {
+    request: ['pending', 'confirmed', 'received', 'washing', 'ready', 'delivered', 'cancelled'],
+    productionItem: ['pending', 'received', 'washing', 'ready', 'delivered'],
+    label: ['ready', 'printed_mock'],
+    report: ['draft', 'ready'],
+  }
+  contract.workflows = [
+    'employee requests garment laundry or uniform delivery from mobile portal',
+    'employee cancels pending or confirmed request',
+    'company admin reviews requests by employee and cost center',
+    'laundry provider manages companies services garment types delivery routes and reports',
+    'plant operator receives garments and marks washing ready and delivered states',
+    'system generates printable label data for confirmed requests',
+    'system generates production and company reports by date garment service and status',
+  ]
+  contract.frontendSurfaces = [
+    { key: 'employee-portal', label: 'Portal empleado mobile-first', path: 'public/employee.html', screens: ['servicios disponibles', 'solicitar lavado', 'tipo de prenda', 'cantidad', 'observaciones', 'estado', 'cancelacion', 'historial'] },
+    { key: 'company-panel', label: 'Panel empresa', path: 'public/company.html', screens: ['empleados', 'centros de costo', 'solicitudes por empleado', 'cupos', 'reportes por fecha', 'volumen por prenda'] },
+    { key: 'provider-panel', label: 'Panel lavanderia proveedor', path: 'public/provider.html', screens: ['empresas cliente', 'servicios', 'tipos de prenda', 'solicitudes consolidadas', 'retiro y entrega', 'etiquetas', 'reportes'] },
+    { key: 'plant-panel', label: 'Panel planta produccion', path: 'public/kitchen.html', screens: ['trabajos pendientes', 'prendas recibidas', 'en lavado', 'listas', 'entregadas', 'agrupacion por empresa y prenda'] },
+    { key: 'labels', label: 'Etiquetas imprimibles', path: 'public/labels.html', screens: ['empleado', 'empresa', 'centro de costo', 'prenda', 'cantidad', 'servicio', 'fecha', 'observaciones', 'id solicitud'] },
+    { key: 'reports', label: 'Reportes operativos', path: 'public/reports.html', screens: ['solicitudes por dia', 'solicitudes por empresa', 'centros de costo', 'volumen por prenda', 'estados', 'cancelados', 'produccion'] },
+  ]
+  contract.database.tables = [
+    'companies',
+    'employees',
+    'costCenters',
+    'services',
+    'garmentTypes',
+    'requests',
+    'requestStates',
+    'productionItems',
+    'labels',
+    'reports',
+    'deliveryRoutes',
+    'quotaRules',
+  ]
+  contract.database.relationships = [
+    'employees belong to companies and cost centers',
+    'requests belong to employees companies cost centers services and garment types',
+    'production items summarize non-cancelled requests by company and garment type',
+    'labels belong to requests',
+    'reports aggregate requests by day company cost center garment service and status',
+  ]
+  contract.database.seedData = ['sample companies employees cost centers services garment types requests production labels reports routes quotas']
+  return contract
+}
+
 function buildContractFromBrief({ briefText, outputPath }) {
   const kind = detectBriefKind(briefText)
   if (kind === 'unsupported') {
     throw new Error('Brief no soportado por el mapper minimo actual. Se requieren señales B2B operativas como empresas, empleados, menus, pedidos, produccion, etiquetas y reportes.')
   }
+  if (kind === 'lavanderia-corporativa-b2b') return buildLaundryContract({ briefText, outputPath })
   return buildViandasContract({ briefText, outputPath })
 }
 
