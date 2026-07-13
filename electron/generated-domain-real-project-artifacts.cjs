@@ -1,3 +1,8 @@
+const {
+  buildRevenuePlatformArtifacts,
+  hasRevenuePlatformSignals,
+} = require('./generated-domain-revenue-platform-artifacts.cjs')
+
 function normalizeOptionalString(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : ''
 }
@@ -1829,6 +1834,16 @@ function buildGeneratedDomainRealProjectArtifacts({
   const contract = generatedDomainContract && typeof generatedDomainContract === 'object' ? generatedDomainContract : {}
   const normalizedDomainLabel = normalizeOptionalString(domainLabel) || normalizeOptionalString(contract?.domain?.label) || 'Generated Real Project'
   const normalizedDeliveryLevel = normalizeOptionalString(deliveryLevel) || normalizeOptionalString(contract.deliveryLevel) || 'fullstack-local'
+  if (hasRevenuePlatformSignals({ contract })) {
+    return buildRevenuePlatformArtifacts({
+      templateFamily: normalizedTemplateFamily,
+      projectRoot: normalizedProjectRoot,
+      domainLabel: normalizedDomainLabel,
+      deliveryLevel: normalizedDeliveryLevel,
+      generatedDomainContract: contract,
+      stackProfile,
+    })
+  }
   const projectSlug = slugify(contract?.domain?.slug || normalizedDomainLabel)
   const roles = uniqueStrings(contract.roles, 12)
   const collections = buildCollections(contract)

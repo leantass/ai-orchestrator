@@ -79,9 +79,11 @@ function relativeProjectRoot(outputPath) {
 
 function detectBriefKind(briefText) {
   const text = briefText.toLocaleLowerCase()
+  const revenueSignals = ['revenue intelligence', 'floe', 'scarlett', 'opportunity', 'campaign', 'pipeline', 'learning loop', 'revenue board']
   const laundrySignals = ['lavander', 'uniform', 'prenda', 'servicio', 'retiro', 'entrega', 'lavado']
   const viandasSignals = ['viandas', 'corporativas', 'empleados', 'centro de costo', 'produccion', 'etiquetas']
   const b2bSignals = ['empresa', 'empleado', 'menu', 'pedido', 'reporte']
+  if (revenueSignals.filter((signal) => text.includes(signal)).length >= 5) return 'revenue-intelligence-platform'
   if (laundrySignals.filter((signal) => text.includes(signal)).length >= 4) return 'lavanderia-corporativa-b2b'
   if (viandasSignals.filter((signal) => text.includes(signal)).length >= 4) return 'viandas-corporativas-b2b'
   if (b2bSignals.filter((signal) => text.includes(signal)).length >= 4) return 'b2b-operations'
@@ -320,11 +322,194 @@ function buildLaundryContract({ briefText, outputPath }) {
   return contract
 }
 
+function buildRevenueContract({ outputPath }) {
+  const projectRoot = relativeProjectRoot(outputPath)
+  const projectSlug = slugify(projectRoot, 'revenue-intelligence-platform')
+  const entities = [
+    'organizations',
+    'workspaces',
+    'users',
+    'memberships',
+    'roles',
+    'permissions',
+    'brands',
+    'domains',
+    'externalConnections',
+    'credentialReferences',
+    'floeAnalyses',
+    'floeAnalysisSnapshots',
+    'importJobs',
+    'businessProfiles',
+    'products',
+    'services',
+    'icps',
+    'buyerPersonas',
+    'accounts',
+    'accountDomains',
+    'branches',
+    'contacts',
+    'contactChannels',
+    'consents',
+    'suppressions',
+    'sources',
+    'evidence',
+    'signals',
+    'opportunities',
+    'opportunityScores',
+    'opportunityExplanations',
+    'campaigns',
+    'segments',
+    'sequences',
+    'sequenceSteps',
+    'messageTemplates',
+    'generatedMessages',
+    'messages',
+    'deliveryEvents',
+    'conversations',
+    'conversationParticipants',
+    'conversationSummaries',
+    'qualifications',
+    'objections',
+    'handoffs',
+    'meetings',
+    'deals',
+    'dealStages',
+    'activities',
+    'tasks',
+    'notes',
+    'attributions',
+    'recommendations',
+    'knowledgeSources',
+    'knowledgeDocuments',
+    'automations',
+    'automationRuns',
+    'webhookEndpoints',
+    'webhookDeliveries',
+    'integrationEvents',
+    'auditLogs',
+    'usageRecords',
+    'subscriptions',
+    'invoices',
+    'featureFlags',
+    'providerConfigurations',
+  ]
+
+  return {
+    contractVersion: '1.0',
+    deliveryLevel: 'fullstack-local',
+    domain: {
+      label: 'Revenue Intelligence Platform',
+      slug: projectSlug,
+      summary: 'Sistema integral FLOE-style para convertir analisis AISO en oportunidades, campanas, conversaciones Scarlett mock, pipeline, revenue board y learning loop.',
+    },
+    root: {
+      slug: projectRoot,
+      sourceRoot: projectRoot,
+      targetRoot: projectRoot,
+    },
+    stackProfile: {
+      frontend: 'vanilla-static-html',
+      backend: 'node-local-js',
+      database: 'node-sqlite',
+      apiStyle: 'rest-versioned-mock-integrations',
+      auth: 'mock-rbac-tenancy',
+      styling: 'floe-system-css',
+      testing: 'node-smoke',
+      packageManager: 'npm',
+      runtime: 'node-local',
+    },
+    roles: ['owner', 'revenue_operator', 'sales_rep', 'scarlett_supervisor', 'internal_admin'],
+    entities,
+    states: {
+      opportunity: ['detected', 'pending_review', 'approved', 'in_campaign', 'contacted', 'replied', 'qualified', 'meeting_requested', 'meeting_scheduled', 'proposal', 'negotiation', 'won', 'lost', 'no_contact'],
+      campaign: ['draft', 'approved', 'running', 'paused', 'completed'],
+      conversation: ['created', 'active', 'qualified', 'handoff_requested', 'closed'],
+      deal: ['detected', 'qualified', 'meeting_scheduled', 'proposal', 'negotiation', 'won', 'lost'],
+      connector: ['connected', 'disconnected', 'error', 'sandbox'],
+    },
+    workflows: [
+      'FLOE analysis import generates normalized snapshot and business profile',
+      'business profile drives products ICP accounts signals and opportunities',
+      'opportunity engine scores with explanation evidence and recommended channel',
+      'approval gates campaigns messages and mock channel sends',
+      'Scarlett mock creates conversations qualification objections handoff and meetings',
+      'CRM pipeline tracks deals proposals wins losses attribution usage and learning loop',
+      'internal admin monitors audit logs jobs webhooks feature flags billing and providers',
+    ],
+    frontendSurfaces: [
+      { key: 'home', label: 'Home / Resumen', path: 'public/index.html', screens: ['estado general', 'metricas', 'actividad reciente'] },
+      { key: 'onboarding', label: 'Onboarding', path: 'public/onboarding.html', screens: ['conectar FLOE', 'importar analisis', 'configurar workspace'] },
+      { key: 'floe-connector', label: 'FLOE Connector', path: 'public/floe.html', screens: ['api key mock', 'scopes', 'snapshots', 'auditoria'] },
+      { key: 'business-profile', label: 'ADN Comercial', path: 'public/business-profile.html', screens: ['perfil', 'productos', 'objeciones', 'buyer personas'] },
+      { key: 'products-icp', label: 'Productos e ICP', path: 'public/products-icp.html', screens: ['catalogo', 'segmentos', 'reglas', 'icp builder'] },
+      { key: 'accounts-contacts', label: 'Accounts & Contacts', path: 'public/accounts-contacts.html', screens: ['empresas', 'contactos', 'consentimiento', 'supresion'] },
+      { key: 'signals', label: 'Signals', path: 'public/signals.html', screens: ['senales', 'fuente', 'confianza', 'vida util'] },
+      { key: 'opportunity-radar', label: 'Opportunity Radar', path: 'public/opportunity-radar.html', screens: ['score', 'evidencia', 'canal recomendado'] },
+      { key: 'opportunity-detail', label: 'Opportunity Detail', path: 'public/opportunity-detail.html', screens: ['explicacion', 'aprobacion', 'exclusion', 'campana sugerida'] },
+      { key: 'campaigns', label: 'Campaigns', path: 'public/campaigns.html', screens: ['campanas', 'secuencias', 'limites', 'variantes'] },
+      { key: 'message-studio', label: 'Message Studio', path: 'public/message-studio.html', screens: ['templates', 'claims', 'preview', 'ab testing'] },
+      { key: 'conversations', label: 'Conversations', path: 'public/conversations.html', screens: ['Scarlett mock', 'timeline', 'calificacion', 'objeciones'] },
+      { key: 'human-handoff', label: 'Human Handoff', path: 'public/human-handoff.html', screens: ['bandeja humana', 'urgencia', 'proxima accion'] },
+      { key: 'pipeline', label: 'Pipeline', path: 'public/pipeline.html', screens: ['deals', 'stages', 'actividades', 'ganadas perdidas'] },
+      { key: 'meetings', label: 'Meetings', path: 'public/meetings.html', screens: ['agenda mock', 'round robin', 'no-show'] },
+      { key: 'revenue-board', label: 'Revenue Board', path: 'public/revenue-board.html', screens: ['metricas reales', 'rendimiento canal', 'pipeline'] },
+      { key: 'learning-loop', label: 'Learning Loop', path: 'public/learning-loop.html', screens: ['objeciones', 'mensajes efectivos', 'recomendaciones FLOE'] },
+      { key: 'knowledge-base', label: 'Knowledge Base', path: 'public/knowledge-base.html', screens: ['fuentes', 'documentos', 'allowed claims', 'vigencia'] },
+      { key: 'automations', label: 'Automations', path: 'public/automations.html', screens: ['reglas', 'runs', 'logs', 'simulacion'] },
+      { key: 'integrations', label: 'Integrations', path: 'public/integrations.html', screens: ['FLOE', 'Scarlett', 'Meta', 'Email', 'Webhooks'] },
+      { key: 'billing', label: 'Billing', path: 'public/billing.html', screens: ['plan', 'creditos', 'usage', 'invoices'] },
+      { key: 'audit', label: 'Audit', path: 'public/audit.html', screens: ['audit logs', 'eventos', 'acciones sensibles'] },
+      { key: 'admin', label: 'Internal Admin', path: 'public/admin.html', screens: ['orgs', 'jobs', 'feature flags', 'providers', 'salud'] },
+      { key: 'settings', label: 'Settings', path: 'public/settings.html', screens: ['organizacion', 'workspace', 'usuarios', 'roles', 'tema'] },
+    ],
+    backend: {
+      packageFile: 'package.json',
+      entryFile: 'src/server.mjs',
+      routes: ['src/server.mjs'],
+      services: ['src/db.mjs', 'src/domain-rules.mjs'],
+      modules: ['src/domain.mjs'],
+    },
+    database: {
+      schemaFile: 'database/schema.sql',
+      seedFile: 'data/seed.json',
+      tables: entities,
+      relationships: ['tenant boundary by organizationId and workspaceId', 'FLOE snapshots drive business profile opportunities campaigns conversations deals learning and usage'],
+      seedData: ['sandbox organization workspace users FLOE analysis opportunities campaigns Scarlett conversations revenue board learning billing admin'],
+    },
+    shared: { files: ['src/domain.mjs'] },
+    docs: ['README.md', 'docs/ARCHITECTURE.md', 'docs/API_CONTRACTS.md', 'docs/SECURITY_COMPLIANCE.md', 'docs/MOCK_LIMITS.md'],
+    scripts: ['scripts/seed.mjs', 'scripts/build.mjs', 'scripts/smoke.mjs', 'scripts/domain-smoke.mjs'],
+    integrations: ['floe-mock', 'scarlett-mock', 'meta-mock', 'whatsapp-mock', 'instagram-mock', 'messenger-mock', 'email-mock', 'calendar-mock', 'crm-mock', 'webhooks-mock'],
+    safety: {
+      forbiddenFiles: ['.env', 'Dockerfile', 'docker-compose.yml'],
+      forbiddenSignals: ['ACCESS_TOKEN', 'client_secret', 'api.meta.com', 'api.whatsapp.com', 'smtp_password'],
+      explicitExclusions: ['deploy', 'node_modules', 'web-prueba', 'production database', 'real message sending', 'real FLOE or Scarlett API'],
+    },
+    materialization: {
+      requiredFiles: ['README.md', 'package.json', 'src/server.mjs', 'src/db.mjs', 'src/domain-rules.mjs', 'public/index.html', 'database/schema.sql', 'data/seed.json', 'scripts/seed.mjs', 'scripts/build.mjs', 'scripts/smoke.mjs', 'scripts/domain-smoke.mjs', 'validation/report.json'],
+      operations: [],
+      allowedTargetPaths: [projectRoot],
+    },
+    validation: {
+      syntaxChecks: ['node --check src/server.mjs', 'node --check src/db.mjs', 'node --check src/domain-rules.mjs', 'node --check scripts/domain-smoke.mjs'],
+      requiredPathGroups: [
+        { label: 'db', candidates: ['src/db.mjs', 'database/schema.sql'] },
+        { label: 'api', candidates: ['src/server.mjs', 'src/domain-rules.mjs'] },
+        { label: 'frontend', candidates: ['public/index.html', 'public/opportunity-radar.html', 'public/revenue-board.html', 'public/admin.html'] },
+        { label: 'smoke', candidates: ['scripts/smoke.mjs', 'scripts/domain-smoke.mjs'] },
+      ],
+      forbiddenSearchPatterns: ['ACCESS_TOKEN', 'client_secret', '.env', 'api.whatsapp.com', 'smtp_password'],
+    },
+    approvals: [],
+  }
+}
+
 function buildContractFromBrief({ briefText, outputPath }) {
   const kind = detectBriefKind(briefText)
   if (kind === 'unsupported') {
     throw new Error('Brief no soportado por el mapper minimo actual. Se requieren señales B2B operativas como empresas, empleados, menus, pedidos, produccion, etiquetas y reportes.')
   }
+  if (kind === 'revenue-intelligence-platform') return buildRevenueContract({ outputPath })
   if (kind === 'lavanderia-corporativa-b2b') return buildLaundryContract({ briefText, outputPath })
   return buildViandasContract({ briefText, outputPath })
 }
