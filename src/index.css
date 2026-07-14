@@ -1002,6 +1002,36 @@ html[data-theme="dark"] .jefe-tone-badge-violet {
   padding-top: 12px;
 }
 
+.jefe-commercial-artifact-list {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--jefe-line);
+  padding-top: 12px;
+}
+
+.jefe-commercial-artifact-list > span {
+  color: var(--jefe-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.jefe-commercial-artifact-list p {
+  display: grid;
+  grid-template-columns: minmax(74px, max-content) minmax(0, 1fr);
+  gap: 8px;
+  margin: 0;
+  color: var(--jefe-muted);
+  font-size: 12px;
+}
+
+.jefe-commercial-artifact-list code {
+  overflow-wrap: anywhere;
+  color: var(--jefe-text-strong);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
+  white-space: normal;
+}
+
 .jefe-commercial-log-list p {
   margin: 0;
 }
@@ -1056,7 +1086,7 @@ html[data-theme="dark"] .jefe-tone-badge-violet {
   position: fixed;
   top: 0;
   right: 0;
-  z-index: 50;
+  z-index: 70;
   width: min(420px, 92vw);
   height: 100vh;
   overflow-y: auto;
@@ -1179,9 +1209,14 @@ html[data-theme="dark"] .jefe-tone-badge-violet {
 .jefe-commercial-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: 60;
   border: 0;
-  background: rgba(21, 21, 21, 0.26);
+  background: #f8f8fa;
+  backdrop-filter: blur(10px);
+}
+
+html[data-theme="dark"] .jefe-commercial-backdrop {
+  background: #1d1d1e;
 }
 
 .jefe-commercial-footer {

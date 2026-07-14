@@ -73,6 +73,12 @@ const {
 const {
   buildPlanningApprovalBundle,
 } = require('./main-project-approval-bundle-helpers.cjs')
+const {
+  createDryRun: createJefeDryRun,
+  updateDryRunStatus: updateJefeDryRunStatus,
+  readDryRun: readJefeDryRun,
+  listDryRuns: listJefeDryRuns,
+} = require('./jefe-run-persistence.cjs')
 
 function isElectronExecutablePath(executablePath) {
   if (typeof executablePath !== 'string' || !executablePath.trim()) {
@@ -60052,6 +60058,20 @@ ipcMain.handle('ai-orchestrator:test-return', (_event, payload) => {
     marker: 'test-return-ok',
   }
 })
+
+ipcMain.handle('jefe-runs:create-dry-run', async (_event, payload) =>
+  createJefeDryRun(payload),
+)
+
+ipcMain.handle('jefe-runs:update-dry-run-status', async (_event, payload) =>
+  updateJefeDryRunStatus(payload?.runId, payload?.statusPayload),
+)
+
+ipcMain.handle('jefe-runs:read-dry-run', async (_event, payload) =>
+  readJefeDryRun(payload?.runId),
+)
+
+ipcMain.handle('jefe-runs:list-dry-runs', async () => listJefeDryRuns())
 
 ipcMain.handle('ai-orchestrator:list-reusable-artifacts', async (_event, payload) => {
   return {

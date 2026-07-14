@@ -261,3 +261,14 @@ contextBridge.exposeInMainWorld('aiOrchestrator', {
     return result
   },
 })
+
+contextBridge.exposeInMainWorld('jefeRunBridge', {
+  createDryRun: (payload) => ipcRenderer.invoke('jefe-runs:create-dry-run', payload),
+  updateDryRunStatus: (runId, statusPayload) =>
+    ipcRenderer.invoke('jefe-runs:update-dry-run-status', {
+      runId,
+      statusPayload,
+    }),
+  readDryRun: (runId) => ipcRenderer.invoke('jefe-runs:read-dry-run', { runId }),
+  listDryRuns: () => ipcRenderer.invoke('jefe-runs:list-dry-runs'),
+})

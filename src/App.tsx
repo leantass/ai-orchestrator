@@ -121,12 +121,15 @@ type CommercialUiRun = {
   projectName: string
   status: 'running' | 'completed' | 'error'
   runType: 'dry-run'
+  persistenceStatus: 'pending' | 'persisted' | 'unavailable' | 'error'
+  persistenceMessage: string
   currentStepIndex: number
   createdAt: string
   expectedRunPath: string
   expectedOutputPath: string
   expectedReportsPath: string
   expectedScreenshotsPath: string
+  persistedArtifacts?: Record<string, string>
   validationStatus: string
   warnings: string[]
   logs: string[]
@@ -1453,6 +1456,63 @@ type OrchestratorPlannerFeedback = {
 
 declare global {
   interface Window {
+    jefeRunBridge?: {
+      createDryRun?: (payload: {
+        runId: string
+        title: string
+        brief: string
+        runType: 'dry-run'
+        createdAt: string
+        status?: string
+        currentStep?: string
+        validation?: string
+        steps: Array<{ label: string; status: string }>
+        expectedArtifacts: string[]
+        warnings: string[]
+      }) => Promise<{
+        ok: boolean
+        runId?: string
+        path?: string
+        artifacts?: Record<string, string>
+        error?: string
+      }>
+      updateDryRunStatus?: (
+        runId: string,
+        statusPayload: {
+          status: string
+          currentStep: string
+          validation: string
+          steps: Array<{ label: string; status: string }>
+          warnings?: string[]
+          errors?: string[]
+          completedAt?: string
+        },
+      ) => Promise<{
+        ok: boolean
+        runId?: string
+        path?: string
+        error?: string
+      }>
+      readDryRun?: (runId: string) => Promise<{
+        ok: boolean
+        run?: unknown
+        status?: unknown
+        summary?: string
+        error?: string
+      }>
+      listDryRuns?: () => Promise<{
+        ok: boolean
+        runs?: Array<{
+          runId: string
+          title: string
+          status: string
+          runType: string
+          updatedAt: string
+          path: string
+        }>
+        error?: string
+      }>
+    }
     aiOrchestrator?: {
       platform?: string
       getRuntimeStatus?: () => Promise<{
@@ -11413,6 +11473,7 @@ function App() {
     useState<WizardStepKey>('goal')
   const [commercialGenerationStarted, setCommercialGenerationStarted] = useState(false)
   const [commercialUiRun, setCommercialUiRun] = useState<CommercialUiRun | null>(null)
+  const commercialRunPersistenceSnapshotRef = useRef('')
 
   useEffect(() => {
     executionRunSummariesRef.current = executionRunSummaries
@@ -11434,7 +11495,9 @@ function App() {
             validationStatus: 'Dry-run PASS',
             logs: [
               ...currentRun.logs,
-              'Dry-run finalizado: no se materializaron archivos desde la UI.',
+              currentRun.persistenceStatus === 'persisted'
+                ? 'Dry-run finalizado: artefactos persistidos desde IPC seguro.'
+                : 'Dry-run finalizado: no se confirmo persistencia fisica desde la UI.',
               `Resultado preparado para revisar en ${currentRun.expectedRunPath}.`,
             ],
           }
@@ -11467,6 +11530,75 @@ function App() {
     }, 850)
 
     return () => window.clearTimeout(stepTimer)
+  }, [commercialUiRun])
+
+  useEffect(() => {
+    if (!commercialUiRun || commercialUiRun.persistenceStatus !== 'persisted') {
+      return
+    }
+
+    const bridge = window.jefeRunBridge
+    if (!bridge?.updateDryRunStatus) {
+      return
+    }
+
+    const snapshotKey = [
+      commercialUiRun.id,
+      commercialUiRun.status,
+      commercialUiRun.currentStepIndex,
+      commercialUiRun.validationStatus,
+    ].join(':')
+
+    if (commercialRunPersistenceSnapshotRef.current === snapshotKey) {
+      return
+    }
+
+    commercialRunPersistenceSnapshotRef.current = snapshotKey
+
+    const steps = COMMERCIAL_RUN_STEP_LABELS.map((label, index) => ({
+      label,
+      status:
+        commercialUiRun.status === 'completed' || index < commercialUiRun.currentStepIndex
+          ? 'completed'
+          : index === commercialUiRun.currentStepIndex
+            ? commercialUiRun.status === 'error'
+              ? 'error'
+              : 'in-progress'
+            : 'pending',
+    }))
+    const currentStep =
+      COMMERCIAL_RUN_STEP_LABELS[commercialUiRun.currentStepIndex] ||
+      COMMERCIAL_RUN_STEP_LABELS[0]
+
+    void bridge
+      .updateDryRunStatus(commercialUiRun.id, {
+        status: commercialUiRun.status,
+        currentStep,
+        validation: commercialUiRun.validationStatus,
+        steps,
+        warnings: commercialUiRun.warnings,
+        errors: commercialUiRun.status === 'error' ? [commercialUiRun.persistenceMessage] : [],
+        completedAt:
+          commercialUiRun.status === 'completed' ? new Date().toISOString() : undefined,
+      })
+      .then((response) => {
+        if (!response?.ok) {
+          setCommercialUiRun((currentRun) => {
+            if (!currentRun || currentRun.id !== commercialUiRun.id) return currentRun
+
+            return {
+              ...currentRun,
+              persistenceStatus: 'error',
+              persistenceMessage:
+                response?.error || 'No se pudo actualizar el status persistido del run.',
+              warnings: [
+                ...currentRun.warnings,
+                'La persistencia del status fallo; el dry-run visual sigue disponible.',
+              ],
+            }
+          })
+        }
+      })
   }, [commercialUiRun])
 
   useEffect(() => {
@@ -15637,23 +15769,37 @@ No usar credenciales.`
     const runId = buildCommercialRunId()
     const paths = buildCommercialRunPaths(runId)
     const projectName = inferCommercialProjectName(normalizedBrief)
+    const createdAt = new Date().toISOString()
+    const initialSteps = COMMERCIAL_RUN_STEP_LABELS.map((label, index) => ({
+      label,
+      status: index === 0 ? 'in-progress' : 'pending',
+    }))
+    const expectedArtifacts = [
+      'run.json',
+      'brief.md',
+      'status.json',
+      'logs/events.log',
+      'reports/RUN_SUMMARY.md',
+    ]
     const nextRun: CommercialUiRun = {
       id: runId,
       brief: normalizedBrief,
       projectName,
       status: 'running',
       runType: 'dry-run',
+      persistenceStatus: 'pending',
+      persistenceMessage: 'Persistiendo run controlado en .codex-temp.',
       currentStepIndex: 0,
-      createdAt: new Date().toISOString(),
+      createdAt,
       ...paths,
       validationStatus: 'Dry-run en curso',
       warnings: [
         'Dry-run funcional: no se ejecuta generacion pesada desde esta pantalla.',
-        'Los paths bajo .codex-temp son el contrato esperado para una futura escritura por bridge.',
+        'Los artefactos del run se persisten por IPC seguro bajo .codex-temp.',
       ],
       logs: [
         'Run creado desde la home minimalista.',
-        'Brief guardado en estado local del renderer.',
+        'Persistencia solicitada al bridge seguro.',
         `${COMMERCIAL_RUN_STEP_LABELS[0]}: completado en dry-run controlado.`,
       ],
     }
@@ -15671,16 +15817,127 @@ No usar credenciales.`
       source: 'orquestador',
       title: 'Dry-run comercial iniciado',
       content:
-        'La interfaz minimalista creo un run controlado sin ejecutar integraciones reales ni materializar archivos.',
+        'La interfaz minimalista creo un run controlado y solicito persistencia segura sin ejecutar integraciones reales.',
       raw: formatStructuredContent({
         runId,
         runType: 'dry-run',
         projectName,
         expectedRunPath: paths.expectedRunPath,
-        expectedArtifacts: ['run.json', 'brief.md', 'status.json', 'logs/', 'reports/'],
+        expectedArtifacts,
       }),
       status: 'info',
     })
+
+    const bridge = window.jefeRunBridge
+
+    if (!bridge?.createDryRun) {
+      setCommercialUiRun((currentRun) => {
+        if (!currentRun || currentRun.id !== runId) return currentRun
+
+        return {
+          ...currentRun,
+          persistenceStatus: 'unavailable',
+          persistenceMessage: 'Bridge de persistencia no disponible en este entorno.',
+          warnings: [
+            ...currentRun.warnings,
+            'La UI sigue en dry-run visual porque el bridge IPC no esta disponible.',
+          ],
+          logs: [
+            ...currentRun.logs,
+            'Persistencia omitida: window.jefeRunBridge no esta disponible.',
+          ],
+        }
+      })
+      return
+    }
+
+    void bridge
+      .createDryRun({
+        runId,
+        title: projectName,
+        brief: normalizedBrief,
+        runType: 'dry-run',
+        createdAt,
+        status: 'running',
+        currentStep: COMMERCIAL_RUN_STEP_LABELS[0],
+        validation: 'Dry-run en curso',
+        steps: initialSteps,
+        expectedArtifacts,
+        warnings: nextRun.warnings,
+      })
+      .then((response) => {
+        if (!response?.ok) {
+          const errorMessage = response?.error || 'No se pudo persistir el run controlado.'
+          setCommercialUiRun((currentRun) => {
+            if (!currentRun || currentRun.id !== runId) return currentRun
+
+            return {
+              ...currentRun,
+              persistenceStatus: 'error',
+              persistenceMessage: errorMessage,
+              warnings: [
+                ...currentRun.warnings,
+                'La persistencia fallo; el dry-run visual sigue disponible.',
+              ],
+              logs: [...currentRun.logs, `Persistencia fallida: ${errorMessage}`],
+            }
+          })
+          addFlowMessage({
+            source: 'orquestador',
+            title: 'Persistencia de run fallida',
+            content:
+              'JEFE mantuvo el dry-run visual, pero no marco el run como guardado fisicamente.',
+            status: 'warning',
+          })
+          return
+        }
+
+        setCommercialUiRun((currentRun) => {
+          if (!currentRun || currentRun.id !== runId) return currentRun
+
+          return {
+            ...currentRun,
+            persistenceStatus: 'persisted',
+            persistenceMessage: 'Run persistido por IPC seguro.',
+            expectedRunPath: response.path || currentRun.expectedRunPath,
+            persistedArtifacts: response.artifacts || currentRun.persistedArtifacts,
+            logs: [
+              ...currentRun.logs,
+              'Run persistido fisicamente por IPC seguro.',
+              `Artefactos creados en ${response.path || currentRun.expectedRunPath}.`,
+            ],
+          }
+        })
+        addFlowMessage({
+          source: 'orquestador',
+          title: 'Run persistido',
+          content:
+            'JEFE creo los artefactos del dry-run en .codex-temp sin ejecutar generacion pesada.',
+          raw: formatStructuredContent({
+            runId,
+            path: response.path,
+            artifacts: response.artifacts,
+          }),
+          status: 'success',
+        })
+      })
+      .catch((error: unknown) => {
+        const errorMessage = error instanceof Error ? error.message : 'Error inesperado de persistencia.'
+        setCommercialUiRun((currentRun) => {
+          if (!currentRun || currentRun.id !== runId) return currentRun
+
+          return {
+            ...currentRun,
+            persistenceStatus: 'error',
+            persistenceMessage: errorMessage,
+            warnings: [
+              ...currentRun.warnings,
+              'La persistencia lanzo un error; el dry-run visual sigue disponible.',
+            ],
+            logs: [...currentRun.logs, `Persistencia con error: ${errorMessage}`],
+          }
+        })
+      })
   }
   const resetCommercialDryRun = () => {
     setCommercialUiRun(null)
@@ -21779,6 +22036,9 @@ No usar credenciales.`
         outputPath: commercialUiRun.expectedOutputPath,
         reportsPath: commercialUiRun.expectedReportsPath,
         screenshotsPath: commercialUiRun.expectedScreenshotsPath,
+        persistenceStatus: commercialUiRun.persistenceStatus,
+        persistenceMessage: commercialUiRun.persistenceMessage,
+        persistedArtifacts: commercialUiRun.persistedArtifacts || {},
         hasResult: commercialUiRun.status === 'completed',
         warnings: commercialUiRun.warnings,
         logs: commercialUiRun.logs,

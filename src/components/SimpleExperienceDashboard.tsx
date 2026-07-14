@@ -18,6 +18,9 @@ type CommercialRunSummary = {
   outputPath: string
   reportsPath: string
   screenshotsPath: string
+  persistenceStatus: 'pending' | 'persisted' | 'unavailable' | 'error'
+  persistenceMessage: string
+  persistedArtifacts?: Record<string, string>
   hasResult: boolean
   warnings: string[]
   logs: string[]
@@ -310,6 +313,22 @@ export function SimpleExperienceDashboard({
                 <dd>{runSummary.runPath}</dd>
               </div>
               <div>
+                <dt>Persistencia</dt>
+                <dd>
+                  {runSummary.persistenceStatus === 'persisted'
+                    ? 'Run persistido: si'
+                    : runSummary.persistenceStatus === 'pending'
+                      ? 'Run persistido: pendiente'
+                      : runSummary.persistenceStatus === 'unavailable'
+                        ? 'Run persistido: no disponible'
+                        : 'Run persistido: error'}
+                </dd>
+              </div>
+              <div>
+                <dt>Estado IPC</dt>
+                <dd>{runSummary.persistenceMessage}</dd>
+              </div>
+              <div>
                 <dt>Reportes</dt>
                 <dd>{runSummary.reportsPath}</dd>
               </div>
@@ -318,6 +337,17 @@ export function SimpleExperienceDashboard({
                 <dd>{runSummary.validationStatus}</dd>
               </div>
             </dl>
+            {runSummary.persistedArtifacts && Object.keys(runSummary.persistedArtifacts).length > 0 ? (
+              <div className="jefe-commercial-artifact-list">
+                <span>Artefactos creados</span>
+                {Object.entries(runSummary.persistedArtifacts).map(([key, value]) => (
+                  <p key={key}>
+                    <strong>{key}</strong>
+                    <code>{value}</code>
+                  </p>
+                ))}
+              </div>
+            ) : null}
             {runSummary.warnings.length > 0 ? (
               <ul>
                 {runSummary.warnings.map((warning) => (
@@ -431,8 +461,12 @@ export function SimpleExperienceDashboard({
                     <strong>{runSummary.validationStatus}</strong>
                   </div>
                   <div>
-                    <span>Output</span>
-                    <strong>{runSummary.outputPath}</strong>
+                    <span>Entrega</span>
+                    <strong>
+                      {runSummary.persistenceStatus === 'persisted'
+                        ? 'Disponible en detalles'
+                        : 'Dry-run sin archivos'}
+                    </strong>
                   </div>
                 </div>
               ) : null}
