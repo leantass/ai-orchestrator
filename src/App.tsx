@@ -1538,8 +1538,7 @@ const DEFAULT_SESSION_EVENTS = [
   'El planificador cargó el objetivo inicial',
   'Se abrió el punto de aprobación',
 ]
-const DEFAULT_GOAL_INPUT =
-  'Preparar una mejora del flujo de trabajo entre planificador y ejecutor'
+const DEFAULT_GOAL_INPUT = ''
 const LEGACY_DEFAULT_WORKSPACE_PATH =
   'C:\\Users\\letas\\Desktop\\Proyectos\\Desarrollo\\orquestadoria\\ai-orchestrator'
 const DEFAULT_WORKSPACE_PATH =
@@ -11348,6 +11347,7 @@ function App() {
   )
   const [activeWizardStep, setActiveWizardStep] =
     useState<WizardStepKey>('goal')
+  const [commercialGenerationStarted, setCommercialGenerationStarted] = useState(false)
 
   useEffect(() => {
     executionRunSummariesRef.current = executionRunSummaries
@@ -21533,18 +21533,123 @@ No usar credenciales.`
         : simpleResultKind === 'deferred'
           ? 'Plan guardado sin cambios en el workspace.'
           : 'Sin archivos creados.'
+  const commercialGenerationActive =
+    commercialGenerationStarted ||
+    isPlanning ||
+    isExecutingTask ||
+    decisionPending ||
+    hasWizardPlan
+  const commercialGenerationSteps = [
+    {
+      label: 'Leyendo brief',
+      status: commercialGenerationActive ? ('completed' as const) : ('pending' as const),
+    },
+    {
+      label: 'Detectando dominio',
+      status: hasWizardPlan || isExecutingTask || decisionPending || simpleShouldShowMaterializedResult
+        ? ('completed' as const)
+        : commercialGenerationActive
+          ? ('in-progress' as const)
+          : ('pending' as const),
+    },
+    {
+      label: 'Definiendo modulos',
+      status: hasWizardPlan || isExecutingTask || decisionPending || simpleShouldShowMaterializedResult
+        ? ('completed' as const)
+        : ('pending' as const),
+    },
+    {
+      label: 'Generando proyecto',
+      status: isExecutingTask
+        ? ('in-progress' as const)
+        : simpleShouldShowMaterializedResult
+          ? ('completed' as const)
+          : ('pending' as const),
+    },
+    {
+      label: 'Validando',
+      status: simpleShouldShowMaterializedResult ? ('completed' as const) : ('pending' as const),
+    },
+    {
+      label: 'Preparando entrega',
+      status: simpleShouldShowMaterializedResult
+        ? ('completed' as const)
+        : ('pending' as const),
+    },
+  ]
+  const commercialQuickExamples = [
+    {
+      label: 'Sistema de viandas para empresas',
+      value:
+        'Un sistema de viandas para empresas con portal empleado, cocina, reportes, etiquetas y panel proveedor.',
+    },
+    {
+      label: 'Plataforma de oportunidades comerciales',
+      value:
+        'Una plataforma de oportunidades comerciales que convierta reportes de analisis en pipeline, campanas y entregables revisables.',
+    },
+    {
+      label: 'Sistema de turnos y reportes',
+      value:
+        'Un sistema de turnos y reportes con clientes, agenda, estados, panel administrativo y validaciones locales.',
+    },
+  ]
 
   const simpleShell = (
     <SimpleExperienceDashboard
-      title={simpleHeroTitle}
-      description={simpleHeroDescription}
+      title="¿Qué querés construir?"
+      description="Describí el sistema que necesitás. JEFE lo interpreta, lo genera, lo valida y te entrega un proyecto funcional."
       modeSwitcher={experienceModeSwitcher}
       themeSwitcher={themeModeSwitcher}
       navItems={simpleShellNavItems}
       statusLabel={`Cerebro: ${activeContextHubStatus?.available ? 'Conectado' : 'Local'}`}
       statusDetail={`Modo: ${runtimePlatformLabel} + ${runtimeOnlineLabel}`}
       statusBadge={plannerBadge}
+      generationActive={commercialGenerationActive}
+      generationSteps={commercialGenerationSteps}
+      onOpenTechnicalDetails={() => setFlowConsoleVisibility({ open: true, pinned: true })}
       requestPanel={
+        <>
+          <article className="jefe-commercial-request">
+            <label htmlFor="simple-goal-input-commercial">También podés pegar un brief completo.</label>
+            <textarea
+              id="simple-goal-input-commercial"
+              value={goalInput}
+              onChange={(event) => setGoalInput(event.target.value)}
+              rows={7}
+              className="jefe-commercial-textarea"
+              placeholder="Ej: Un sistema de viandas para empresas con portal empleado, cocina, reportes, etiquetas y panel proveedor."
+            />
+            <div className="jefe-commercial-request-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  setCommercialGenerationStarted(true)
+                  setActiveWizardStep('plan')
+                  handleWizardGeneratePlan()
+                }}
+                disabled={isPlanning || !goalInput.trim()}
+                className="jefe-commercial-primary-cta"
+              >
+                {isPlanning ? 'Creando sistema...' : 'Crear sistema'}
+              </button>
+            </div>
+            <div className="jefe-commercial-examples" aria-label="Ejemplos rapidos">
+              {commercialQuickExamples.map((example) => (
+                <button
+                  key={example.label}
+                  type="button"
+                  onClick={() => {
+                    setGoalInput(example.value)
+                    setCommercialGenerationStarted(false)
+                  }}
+                >
+                  {example.label}
+                </button>
+              ))}
+            </div>
+          </article>
+          <div className="hidden" aria-hidden="true">
         <article className="jefe-surface rounded-[28px] p-5 sm:p-6">
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
             <div>
@@ -21630,6 +21735,8 @@ No usar credenciales.`
             </ResultSectionCard>
           </div>
         </article>
+          </div>
+        </>
       }
       understoodPanel={
         <ResultSectionCard
@@ -26121,4 +26228,3 @@ No usar credenciales.`
 }
 
 export default App
-
