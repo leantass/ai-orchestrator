@@ -79,6 +79,11 @@ const {
   readDryRun: readJefeDryRun,
   listDryRuns: listJefeDryRuns,
 } = require('./jefe-run-persistence.cjs')
+const {
+  startGenerationFromRun: startJefeGenerationFromRun,
+  getGenerationStatus: getJefeGenerationStatus,
+  readGenerationResult: readJefeGenerationResult,
+} = require('./jefe-real-generation.cjs')
 
 function isElectronExecutablePath(executablePath) {
   if (typeof executablePath !== 'string' || !executablePath.trim()) {
@@ -60072,6 +60077,18 @@ ipcMain.handle('jefe-runs:read-dry-run', async (_event, payload) =>
 )
 
 ipcMain.handle('jefe-runs:list-dry-runs', async () => listJefeDryRuns())
+
+ipcMain.handle('jefe-generation:start-from-run', async (_event, payload) =>
+  startJefeGenerationFromRun(payload?.runId),
+)
+
+ipcMain.handle('jefe-generation:get-status', async (_event, payload) =>
+  getJefeGenerationStatus(payload?.runId),
+)
+
+ipcMain.handle('jefe-generation:read-result', async (_event, payload) =>
+  readJefeGenerationResult(payload?.runId),
+)
 
 ipcMain.handle('ai-orchestrator:list-reusable-artifacts', async (_event, payload) => {
   return {

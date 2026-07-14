@@ -66,6 +66,27 @@ type PersistedRunDetail = {
   artifacts?: Record<string, string>
 }
 
+type RealGenerationResult = {
+  runId: string
+  path?: string
+  outputPath?: string
+  summary?: string
+  logs?: Record<string, string>
+  artifacts?: Record<string, string>
+  status?: {
+    runId?: string
+    status?: string
+    currentStep?: string
+    steps?: Array<{ label: string; status: string }>
+    startedAt?: string
+    completedAt?: string
+    outputPath?: string
+    validation?: Array<{ name: string; status: string; reason?: string; exitCode?: number }>
+    warnings?: string[]
+    errors?: string[]
+  }
+}
+
 type CommercialView = 'home' | 'projects' | 'history' | 'run-detail' | 'placeholder'
 type RunDetailTab = 'summary' | 'brief' | 'status' | 'artifacts' | 'logs' | 'report'
 
@@ -322,6 +343,9 @@ export function SimpleExperienceDashboard({
   runSummary,
   persistedRuns = [],
   selectedPersistedRun,
+  realGenerationResult,
+  realGenerationLoading = false,
+  realGenerationError = '',
   runHistoryLoading = false,
   runHistoryError = '',
   onOpenTechnicalDetails,
@@ -330,6 +354,7 @@ export function SimpleExperienceDashboard({
   onOpenRunHistory,
   onOpenPersistedRun,
   onBackToRunHistory,
+  onStartRealGeneration,
   onCreateNewSystem,
 }: {
   title: string
@@ -354,6 +379,9 @@ export function SimpleExperienceDashboard({
   runSummary?: CommercialRunSummary | null
   persistedRuns?: PersistedRunListItem[]
   selectedPersistedRun?: PersistedRunDetail | null
+  realGenerationResult?: RealGenerationResult | null
+  realGenerationLoading?: boolean
+  realGenerationError?: string
   runHistoryLoading?: boolean
   runHistoryError?: string
   onOpenTechnicalDetails?: () => void
@@ -362,6 +390,7 @@ export function SimpleExperienceDashboard({
   onOpenRunHistory?: () => void
   onOpenPersistedRun?: (runId: string) => void
   onBackToRunHistory?: () => void
+  onStartRealGeneration?: (runId: string) => void
   onCreateNewSystem?: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -370,6 +399,7 @@ export function SimpleExperienceDashboard({
   const [activeView, setActiveView] = useState<CommercialView>('home')
   const [placeholderLabel, setPlaceholderLabel] = useState('Plantillas')
   const [runDetailTab, setRunDetailTab] = useState<RunDetailTab>('summary')
+  const [generationConfirmOpen, setGenerationConfirmOpen] = useState(false)
 
   const handleOpenTechnicalDetails = useCallback(() => {
     onOpenTechnicalDetails?.()
@@ -423,6 +453,25 @@ export function SimpleExperienceDashboard({
     ...(selectedPersistedRun?.run.warnings || []),
     ...(selectedPersistedRun?.status.warnings || []),
   ]
+  const generationStatus = realGenerationResult?.status?.status || ''
+  const generationCompleted = generationStatus === 'completed'
+  const generationFailed = generationStatus === 'failed'
+  const generationOutputPath =
+    realGenerationResult?.outputPath || realGenerationResult?.status?.outputPath || ''
+  const generationValidation = realGenerationResult?.status?.validation || []
+  const generationLogs = realGenerationResult?.logs || {}
+  const generationLogLines = summarizeLogLines(
+    Object.entries(generationLogs)
+      .filter(([, value]) => Boolean(value))
+      .map(([key, value]) => `## ${key}\n${value}`)
+      .join('\n\n'),
+  )
+  const canStartRealGeneration = Boolean(
+    selectedPersistedRun?.runId &&
+      selectedPersistedRun?.brief &&
+      !generationCompleted &&
+      !realGenerationLoading,
+  )
 
   const handleOpenRun = (runId: string) => {
     setRunDetailTab('summary')
@@ -433,6 +482,7 @@ export function SimpleExperienceDashboard({
   const handleBackToHistory = () => {
     setActiveView('history')
     setRunDetailTab('summary')
+    setGenerationConfirmOpen(false)
     onBackToRunHistory?.()
     onOpenRunHistory?.()
   }
@@ -440,7 +490,15 @@ export function SimpleExperienceDashboard({
   const handleCreateNewSystem = () => {
     setActiveView('home')
     setRunDetailTab('summary')
+    setGenerationConfirmOpen(false)
     onCreateNewSystem?.()
+  }
+
+  const handleConfirmRealGeneration = () => {
+    if (!selectedPersistedRun?.runId) return
+
+    setGenerationConfirmOpen(false)
+    onStartRealGeneration?.(selectedPersistedRun.runId)
   }
 
   const technicalDrawerContent = (
@@ -764,6 +822,16 @@ export function SimpleExperienceDashboard({
                   Copiar runId
                 </button>
               ) : null}
+              {selectedPersistedRun ? (
+                <button
+                  type="button"
+                  className="jefe-commercial-primary-action"
+                  onClick={() => setGenerationConfirmOpen(true)}
+                  disabled={!canStartRealGeneration}
+                >
+                  {realGenerationLoading ? 'Generando...' : generationCompleted ? 'Proyecto generado' : 'Generar proyecto real'}
+                </button>
+              ) : null}
             </div>
             {runHistoryError ? (
               <div className="jefe-commercial-inline-alert">
@@ -777,6 +845,40 @@ export function SimpleExperienceDashboard({
             ) : null}
             {!runHistoryLoading && selectedPersistedRun ? (
               <div className="jefe-commercial-run-detail">
+                <div className="jefe-commercial-generation-card">
+                  <div>
+                    <span>Generacion real controlada</span>
+                    <strong>
+                      {realGenerationLoading
+                        ? 'En ejecucion'
+                        : generationCompleted
+                          ? 'Completada'
+                          : generationFailed
+                            ? 'Fallida'
+                            : 'Pendiente de aprobacion'}
+                    </strong>
+                    <p>
+                      Solo se ejecuta desde este detalle y escribe en .codex-temp. No corre Codex real ni servicios externos.
+                    </p>
+                  </div>
+                  {generationOutputPath ? (
+                    <code>{generationOutputPath}</code>
+                  ) : (
+                    <code>Sin output generado todavia</code>
+                  )}
+                  {realGenerationError ? (
+                    <p className="jefe-commercial-error-text">{realGenerationError}</p>
+                  ) : null}
+                  {generationValidation.length > 0 ? (
+                    <div className="jefe-commercial-validation-strip">
+                      {generationValidation.map((entry) => (
+                        <span key={`${entry.name}-${entry.status}`}>
+                          {entry.name}: {entry.status}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
                 <div className="jefe-commercial-run-detail-summary">
                   <div>
                     <span>Estado</span>
@@ -852,6 +954,17 @@ export function SimpleExperienceDashboard({
                       {(selectedPersistedRun.status.steps || []).length === 0 ? (
                         <p>Sin pasos guardados.</p>
                       ) : null}
+                      {(realGenerationResult?.status?.steps || []).length > 0 ? (
+                        <>
+                          <h3>Generacion real</h3>
+                          {(realGenerationResult?.status?.steps || []).map((step) => (
+                            <div key={`generation-${step.label}-${step.status}`}>
+                              <strong>{step.label}</strong>
+                              <span>{formatRunStatus(step.status)}</span>
+                            </div>
+                          ))}
+                        </>
+                      ) : null}
                     </div>
                   ) : null}
                   {runDetailTab === 'artifacts' ? (
@@ -864,6 +977,12 @@ export function SimpleExperienceDashboard({
                           </p>
                         ),
                       )}
+                      {Object.entries(realGenerationResult?.artifacts || {}).map(([key, value]) => (
+                        <p key={`generation-${key}`}>
+                          <strong>generation.{key}</strong>
+                          <code>{value}</code>
+                        </p>
+                      ))}
                     </div>
                   ) : null}
                   {runDetailTab === 'logs' ? (
@@ -873,10 +992,18 @@ export function SimpleExperienceDashboard({
                       ) : (
                         <p>Sin logs guardados.</p>
                       )}
+                      {generationLogLines.length > 0 ? (
+                        <>
+                          <h3>Generacion real</h3>
+                          {generationLogLines.map((line) => <p key={`generation-${line}`}>{line}</p>)}
+                        </>
+                      ) : null}
                     </div>
                   ) : null}
                   {runDetailTab === 'report' ? (
-                    <pre className="jefe-commercial-readable-block">{selectedPersistedRun.summary || 'Sin reporte guardado.'}</pre>
+                    <pre className="jefe-commercial-readable-block">
+                      {realGenerationResult?.summary || selectedPersistedRun.summary || 'Sin reporte guardado.'}
+                    </pre>
                   ) : null}
                 </div>
               </div>
@@ -895,6 +1022,32 @@ export function SimpleExperienceDashboard({
           </section>
         ) : null}
       </main>
+
+      {generationConfirmOpen ? (
+        <div className="jefe-commercial-modal-backdrop" role="presentation">
+          <section className="jefe-commercial-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="real-generation-title">
+            <div className="jefe-commercial-kicker">Aprobacion requerida</div>
+            <h2 id="real-generation-title">Generar proyecto real</h2>
+            <p>
+              JEFE va a materializar este sistema desde el brief guardado. El output quedara en .codex-temp y no se tocaran proyectos externos ni servicios reales.
+            </p>
+            <div className="jefe-commercial-confirm-summary">
+              <span>Run</span>
+              <strong>{selectedPersistedRun?.runId}</strong>
+              <span>Destino</span>
+              <strong>.codex-temp/jefe-real-generation/runs/{selectedPersistedRun?.runId}/output</strong>
+            </div>
+            <div className="jefe-commercial-modal-actions">
+              <button type="button" onClick={() => setGenerationConfirmOpen(false)}>
+                Cancelar
+              </button>
+              <button type="button" className="jefe-commercial-primary-action" onClick={handleConfirmRealGeneration}>
+                Generar proyecto real
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       <aside className={joinClasses('jefe-commercial-drawer', menuOpen && 'is-open')} aria-hidden={!menuOpen}>
         <div className="jefe-commercial-drawer-header">

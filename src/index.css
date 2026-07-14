@@ -1213,6 +1213,71 @@ html[data-theme="dark"] .jefe-tone-badge-violet {
   padding: 16px;
 }
 
+.jefe-commercial-generation-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--jefe-line);
+  border-radius: 8px;
+  background: var(--jefe-elevated);
+}
+
+.jefe-commercial-generation-card span {
+  color: var(--jefe-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.jefe-commercial-generation-card strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 18px;
+}
+
+.jefe-commercial-generation-card p {
+  margin: 8px 0 0;
+  color: var(--jefe-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.jefe-commercial-generation-card code {
+  display: block;
+  max-width: 100%;
+  border: 1px solid var(--jefe-line);
+  border-radius: 8px;
+  background: var(--jefe-panel-muted);
+  color: var(--jefe-text-strong);
+  padding: 10px 12px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.jefe-commercial-validation-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.jefe-commercial-validation-strip span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border: 1px solid var(--jefe-line);
+  border-radius: 999px;
+  background: var(--jefe-panel-muted);
+  color: var(--jefe-text-strong);
+  padding: 5px 9px;
+  font-size: 12px;
+  text-transform: none;
+}
+
+.jefe-commercial-error-text {
+  color: var(--jefe-danger) !important;
+}
+
 .jefe-commercial-run-detail-summary,
 .jefe-commercial-detail-grid {
   display: grid;
@@ -1261,6 +1326,91 @@ html[data-theme="dark"] .jefe-tone-badge-violet {
 
 .jefe-commercial-tab-panel {
   min-height: 260px;
+}
+
+.jefe-commercial-primary-action {
+  border-color: var(--jefe-primary) !important;
+  background: var(--jefe-primary) !important;
+  color: #fff !important;
+}
+
+.jefe-commercial-primary-action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.jefe-commercial-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.38);
+}
+
+.jefe-commercial-confirm-modal {
+  width: min(520px, 100%);
+  border: 1px solid var(--jefe-line);
+  border-radius: 8px;
+  background: var(--jefe-elevated);
+  box-shadow: var(--jefe-shadow-strong);
+  padding: 24px;
+}
+
+.jefe-commercial-confirm-modal h2 {
+  margin: 8px 0 10px;
+  color: var(--jefe-text-strong);
+  font-size: 26px;
+}
+
+.jefe-commercial-confirm-modal p {
+  margin: 0;
+  color: var(--jefe-muted);
+  line-height: 1.55;
+}
+
+.jefe-commercial-confirm-summary {
+  display: grid;
+  grid-template-columns: minmax(92px, auto) minmax(0, 1fr);
+  gap: 8px 12px;
+  margin-top: 18px;
+  border: 1px solid var(--jefe-line);
+  border-radius: 8px;
+  background: var(--jefe-panel-muted);
+  padding: 14px;
+}
+
+.jefe-commercial-confirm-summary span {
+  color: var(--jefe-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.jefe-commercial-confirm-summary strong {
+  min-width: 0;
+  color: var(--jefe-text-strong);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.jefe-commercial-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.jefe-commercial-modal-actions button {
+  min-height: 40px;
+  border: 1px solid var(--jefe-line);
+  border-radius: 8px;
+  background: var(--jefe-elevated);
+  color: var(--jefe-text-strong);
+  padding: 9px 14px;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 .jefe-commercial-readable-block {
@@ -1432,10 +1582,9 @@ html[data-theme="dark"] .jefe-commercial-backdrop {
 }
 
 .jefe-commercial-footer {
-  position: fixed;
-  right: 24px;
-  bottom: 16px;
-  left: 24px;
+  position: static;
+  margin: 0 auto 16px;
+  padding: 0 24px;
   color: var(--jefe-subtle);
   font-size: 12px;
   text-align: center;
@@ -1557,6 +1706,26 @@ html[data-theme="dark"] .jefe-commercial-backdrop {
   .jefe-commercial-run-detail-summary,
   .jefe-commercial-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .jefe-commercial-generation-card {
+    padding: 14px;
+  }
+
+  .jefe-commercial-confirm-modal {
+    padding: 18px;
+  }
+
+  .jefe-commercial-confirm-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .jefe-commercial-modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .jefe-commercial-modal-actions button {
+    width: 100%;
   }
 
   .jefe-commercial-step-list > div,

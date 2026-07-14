@@ -272,3 +272,12 @@ contextBridge.exposeInMainWorld('jefeRunBridge', {
   readDryRun: (runId) => ipcRenderer.invoke('jefe-runs:read-dry-run', { runId }),
   listDryRuns: () => ipcRenderer.invoke('jefe-runs:list-dry-runs'),
 })
+
+contextBridge.exposeInMainWorld('jefeGenerationBridge', {
+  startGenerationFromRun: (runId) =>
+    ipcRenderer.invoke('jefe-generation:start-from-run', { runId }),
+  getGenerationStatus: (runId) =>
+    ipcRenderer.invoke('jefe-generation:get-status', { runId }),
+  readGenerationResult: (runId) =>
+    ipcRenderer.invoke('jefe-generation:read-result', { runId }),
+})

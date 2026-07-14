@@ -184,6 +184,39 @@ type PersistedRunDetail = {
   artifacts?: Record<string, string>
 }
 
+type RealGenerationStep = {
+  label: string
+  status: string
+}
+
+type RealGenerationValidation = {
+  name: string
+  status: string
+  reason?: string
+  exitCode?: number
+}
+
+type RealGenerationResult = {
+  runId: string
+  path?: string
+  outputPath?: string
+  summary?: string
+  logs?: Record<string, string>
+  artifacts?: Record<string, string>
+  status?: {
+    runId?: string
+    status?: string
+    currentStep?: string
+    steps?: RealGenerationStep[]
+    startedAt?: string
+    completedAt?: string
+    outputPath?: string
+    validation?: RealGenerationValidation[]
+    warnings?: string[]
+    errors?: string[]
+  }
+}
+
 const COMMERCIAL_RUN_STEP_LABELS = [
   'Leyendo brief',
   'Detectando tipo de sistema',
@@ -1557,6 +1590,37 @@ declare global {
       listDryRuns?: () => Promise<{
         ok: boolean
         runs?: PersistedRunListItem[]
+        error?: string
+      }>
+    }
+    jefeGenerationBridge?: {
+      startGenerationFromRun?: (runId: string) => Promise<{
+        ok: boolean
+        runId?: string
+        path?: string
+        outputPath?: string
+        status?: RealGenerationResult['status']
+        artifacts?: Record<string, string>
+        error?: string
+      }>
+      getGenerationStatus?: (runId: string) => Promise<{
+        ok: boolean
+        runId?: string
+        path?: string
+        outputPath?: string
+        status?: RealGenerationResult['status']
+        logs?: Record<string, string>
+        error?: string
+      }>
+      readGenerationResult?: (runId: string) => Promise<{
+        ok: boolean
+        runId?: string
+        path?: string
+        outputPath?: string
+        status?: RealGenerationResult['status']
+        summary?: string
+        logs?: Record<string, string>
+        artifacts?: Record<string, string>
         error?: string
       }>
     }
@@ -11526,6 +11590,10 @@ function App() {
   const [runHistoryError, setRunHistoryError] = useState('')
   const [selectedPersistedRun, setSelectedPersistedRun] =
     useState<PersistedRunDetail | null>(null)
+  const [realGenerationResult, setRealGenerationResult] =
+    useState<RealGenerationResult | null>(null)
+  const [realGenerationLoading, setRealGenerationLoading] = useState(false)
+  const [realGenerationError, setRealGenerationError] = useState('')
 
   useEffect(() => {
     executionRunSummariesRef.current = executionRunSummaries
@@ -15844,6 +15912,36 @@ No usar credenciales.`
     }
   }
 
+  const loadRealGenerationResult = async (runId: string) => {
+    const bridge = window.jefeGenerationBridge
+
+    if (!bridge?.readGenerationResult) {
+      setRealGenerationResult(null)
+      return
+    }
+
+    try {
+      const response = await bridge.readGenerationResult(runId)
+
+      if (!response?.ok) {
+        setRealGenerationResult(null)
+        return
+      }
+
+      setRealGenerationResult({
+        runId: response.runId || runId,
+        path: response.path || '',
+        outputPath: response.outputPath || '',
+        status: response.status || {},
+        summary: response.summary || '',
+        logs: response.logs || {},
+        artifacts: response.artifacts || {},
+      })
+    } catch {
+      setRealGenerationResult(null)
+    }
+  }
+
   const openPersistedRun = async (runId: string) => {
     const bridge = window.jefeRunBridge
 
@@ -15874,9 +15972,12 @@ No usar credenciales.`
         summary: response.summary || '',
         artifacts: response.artifacts || {},
       })
+      setRealGenerationError('')
+      void loadRealGenerationResult(response.runId || runId)
     } catch {
       setRunHistoryError('No pude leer este run. Revisa los detalles tecnicos.')
       setSelectedPersistedRun(null)
+      setRealGenerationResult(null)
     } finally {
       setIsRunHistoryLoading(false)
     }
@@ -15884,11 +15985,50 @@ No usar credenciales.`
 
   const showPersistedRunHistory = () => {
     setSelectedPersistedRun(null)
+    setRealGenerationResult(null)
+    setRealGenerationError('')
     void loadPersistedRunHistory()
   }
 
   const showPersistedRunDetail = (runId: string) => {
     void openPersistedRun(runId)
+  }
+
+  const startRealGenerationFromRun = async (runId: string) => {
+    const bridge = window.jefeGenerationBridge
+
+    if (!bridge?.startGenerationFromRun) {
+      setRealGenerationError('La generacion real controlada no esta disponible en este entorno.')
+      return
+    }
+
+    setRealGenerationLoading(true)
+    setRealGenerationError('')
+
+    try {
+      const response = await bridge.startGenerationFromRun(runId)
+      const nextResult: RealGenerationResult = {
+        runId: response?.runId || runId,
+        path: response?.path || '',
+        outputPath: response?.outputPath || response?.status?.outputPath || '',
+        status: response?.status || {},
+        artifacts: response?.artifacts || {},
+      }
+
+      if (!response?.ok) {
+        setRealGenerationError(response?.error || 'La generacion real controlada fallo.')
+      }
+
+      setRealGenerationResult(nextResult)
+
+      if (bridge.readGenerationResult) {
+        await loadRealGenerationResult(runId)
+      }
+    } catch {
+      setRealGenerationError('La generacion real controlada fallo.')
+    } finally {
+      setRealGenerationLoading(false)
+    }
   }
 
   const startCommercialDryRun = () => {
@@ -22206,6 +22346,9 @@ No usar credenciales.`
       runSummary={commercialRunSummary}
       persistedRuns={persistedRuns}
       selectedPersistedRun={selectedPersistedRun}
+      realGenerationResult={realGenerationResult}
+      realGenerationLoading={realGenerationLoading}
+      realGenerationError={realGenerationError}
       runHistoryLoading={isRunHistoryLoading}
       runHistoryError={runHistoryError}
       onOpenTechnicalDetails={() => setFlowConsoleVisibility({ open: true, pinned: true })}
@@ -22213,10 +22356,17 @@ No usar credenciales.`
       onOpenDelivery={() => setFlowConsoleVisibility({ open: true, pinned: true })}
       onOpenRunHistory={showPersistedRunHistory}
       onOpenPersistedRun={showPersistedRunDetail}
-      onBackToRunHistory={() => setSelectedPersistedRun(null)}
+      onStartRealGeneration={startRealGenerationFromRun}
+      onBackToRunHistory={() => {
+        setSelectedPersistedRun(null)
+        setRealGenerationResult(null)
+        setRealGenerationError('')
+      }}
       onCreateNewSystem={() => {
         setCommercialUiRun(null)
         setCommercialGenerationStarted(false)
+        setRealGenerationResult(null)
+        setRealGenerationError('')
       }}
       requestPanel={
         <>
