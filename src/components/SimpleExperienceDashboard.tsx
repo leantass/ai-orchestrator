@@ -26,13 +26,56 @@ type CommercialRunSummary = {
   logs: string[]
 }
 
+type PersistedRunListItem = {
+  runId: string
+  title: string
+  status: string
+  runType: string
+  createdAt?: string
+  updatedAt: string
+  validation?: string
+  persisted?: boolean
+  path: string
+}
+
+type PersistedRunDetail = {
+  runId: string
+  path: string
+  run: {
+    title?: string
+    runType?: string
+    createdAt?: string
+    updatedAt?: string
+    status?: string
+    paths?: Record<string, string>
+    warnings?: string[]
+    expectedArtifacts?: string[]
+  }
+  status: {
+    status?: string
+    currentStep?: string
+    steps?: Array<{ label: string; status: string }>
+    completedAt?: string
+    validation?: string
+    warnings?: string[]
+    errors?: string[]
+  }
+  brief?: string
+  eventsLog?: string
+  summary?: string
+  artifacts?: Record<string, string>
+}
+
+type CommercialView = 'home' | 'projects' | 'history' | 'run-detail' | 'placeholder'
+type RunDetailTab = 'summary' | 'brief' | 'status' | 'artifacts' | 'logs' | 'report'
+
 type MenuOption = {
   key: string
   label: string
   description: string
   icon: AppIconName
   action?: () => void
-  view?: 'home' | 'projects' | 'placeholder'
+  view?: CommercialView
 }
 
 type RecentProject = {
@@ -106,18 +149,23 @@ function findNavItem(navItems: AppShellNavItem[], matchers: string[]) {
 function buildMenuOptions({
   navItems,
   onOpenTechnicalDetails,
+  onOpenRunHistory,
+  onBackToRunHistory,
+  onCreateNewSystem,
   setActiveView,
   setPlaceholderLabel,
   setMenuOpen,
 }: {
   navItems: AppShellNavItem[]
   onOpenTechnicalDetails?: () => void
-  setActiveView: (value: 'home' | 'projects' | 'placeholder') => void
+  onOpenRunHistory?: () => void
+  onBackToRunHistory?: () => void
+  onCreateNewSystem?: () => void
+  setActiveView: (value: CommercialView) => void
   setPlaceholderLabel: (value: string) => void
   setMenuOpen: (value: boolean) => void
 }): MenuOption[] {
   const newSystemNav = findNavItem(navItems, ['request', 'guided', 'nueva'])
-  const historyNav = findNavItem(navItems, ['history', 'actividad', 'corrida'])
   const reportsNav = findNavItem(navItems, ['report'])
   const integrationsNav = findNavItem(navItems, ['connector', 'integracion'])
   const settingsNav = findNavItem(navItems, ['setting', 'ajuste', 'auditoria'])
@@ -153,6 +201,7 @@ function buildMenuOptions({
           'guided',
           () => {
             setActiveView('home')
+            onCreateNewSystem?.()
             newSystemNav?.onClick?.()
           },
           'home',
@@ -164,11 +213,22 @@ function buildMenuOptions({
           'projects',
           () => {
             setActiveView('projects')
+            onOpenRunHistory?.()
           },
           'projects',
         )
       case 'Historial':
-        return makeOption(label, 'Revisar corridas y actividad reciente.', 'history', historyNav?.onClick)
+        return makeOption(
+          label,
+          'Revisar corridas y actividad reciente.',
+          'history',
+          () => {
+            setActiveView('history')
+            onBackToRunHistory?.()
+            onOpenRunHistory?.()
+          },
+          'history',
+        )
       case 'Reportes':
         return makeOption(label, 'Abrir reportes y entregas ejecutivas.', 'reports', reportsNav?.onClick)
       case 'Logs':
@@ -202,6 +262,43 @@ function statusClassName(status: GenerationStepStatus) {
   return 'jefe-commercial-step--pending'
 }
 
+function formatRunDate(value?: string) {
+  if (!value) return 'Sin fecha'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+
+  return date.toLocaleString('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function formatRunStatus(value?: string) {
+  if (value === 'completed') return 'Completado'
+  if (value === 'running') return 'En progreso'
+  if (value === 'error') return 'Error'
+  if (value === 'unreadable') return 'No legible'
+  return value || 'Sin estado'
+}
+
+function summarizeLogLines(value?: string) {
+  if (!value) return []
+
+  return value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(-12)
+}
+
+function getRunTitle(run?: PersistedRunDetail | null) {
+  return run?.run.title || run?.runId || 'Run guardado'
+}
+
 export function SimpleExperienceDashboard({
   title,
   description,
@@ -223,9 +320,17 @@ export function SimpleExperienceDashboard({
   generationActive = false,
   generationSteps = defaultGenerationSteps,
   runSummary,
+  persistedRuns = [],
+  selectedPersistedRun,
+  runHistoryLoading = false,
+  runHistoryError = '',
   onOpenTechnicalDetails,
   onBackFromProgress,
   onOpenDelivery,
+  onOpenRunHistory,
+  onOpenPersistedRun,
+  onBackToRunHistory,
+  onCreateNewSystem,
 }: {
   title: string
   description: string
@@ -247,31 +352,52 @@ export function SimpleExperienceDashboard({
   generationActive?: boolean
   generationSteps?: Array<{ label: string; status: GenerationStepStatus }>
   runSummary?: CommercialRunSummary | null
+  persistedRuns?: PersistedRunListItem[]
+  selectedPersistedRun?: PersistedRunDetail | null
+  runHistoryLoading?: boolean
+  runHistoryError?: string
   onOpenTechnicalDetails?: () => void
   onBackFromProgress?: () => void
   onOpenDelivery?: () => void
+  onOpenRunHistory?: () => void
+  onOpenPersistedRun?: (runId: string) => void
+  onBackToRunHistory?: () => void
+  onCreateNewSystem?: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [technicalOpen, setTechnicalOpen] = useState(false)
   const [menuSearch, setMenuSearch] = useState('')
-  const [activeView, setActiveView] = useState<'home' | 'projects' | 'placeholder'>('home')
+  const [activeView, setActiveView] = useState<CommercialView>('home')
   const [placeholderLabel, setPlaceholderLabel] = useState('Plantillas')
+  const [runDetailTab, setRunDetailTab] = useState<RunDetailTab>('summary')
 
   const handleOpenTechnicalDetails = useCallback(() => {
     onOpenTechnicalDetails?.()
     setTechnicalOpen(true)
-  }, [onOpenTechnicalDetails])
+  }, [onOpenTechnicalDetails, setTechnicalOpen])
 
   const menuOptions = useMemo(
     () =>
       buildMenuOptions({
         navItems,
         onOpenTechnicalDetails: handleOpenTechnicalDetails,
+        onOpenRunHistory,
+        onBackToRunHistory,
+        onCreateNewSystem,
         setActiveView,
         setPlaceholderLabel,
         setMenuOpen,
       }),
-    [handleOpenTechnicalDetails, navItems],
+    [
+      handleOpenTechnicalDetails,
+      navItems,
+      onBackToRunHistory,
+      onCreateNewSystem,
+      onOpenRunHistory,
+      setActiveView,
+      setMenuOpen,
+      setPlaceholderLabel,
+    ],
   )
 
   const filteredMenuOptions = useMemo(() => {
@@ -283,6 +409,39 @@ export function SimpleExperienceDashboard({
   }, [menuOptions, menuSearch])
 
   const visibleMainView = generationActive ? 'progress' : activeView
+  const recentPersistedRuns = persistedRuns.slice(0, 3)
+  const runDetailTabs: Array<{ key: RunDetailTab; label: string }> = [
+    { key: 'summary', label: 'Resumen' },
+    { key: 'brief', label: 'Brief' },
+    { key: 'status', label: 'Estado' },
+    { key: 'artifacts', label: 'Artefactos' },
+    { key: 'logs', label: 'Logs' },
+    { key: 'report', label: 'Reporte' },
+  ]
+  const selectedRunLogLines = summarizeLogLines(selectedPersistedRun?.eventsLog)
+  const selectedRunWarnings = [
+    ...(selectedPersistedRun?.run.warnings || []),
+    ...(selectedPersistedRun?.status.warnings || []),
+  ]
+
+  const handleOpenRun = (runId: string) => {
+    setRunDetailTab('summary')
+    setActiveView('run-detail')
+    onOpenPersistedRun?.(runId)
+  }
+
+  const handleBackToHistory = () => {
+    setActiveView('history')
+    setRunDetailTab('summary')
+    onBackToRunHistory?.()
+    onOpenRunHistory?.()
+  }
+
+  const handleCreateNewSystem = () => {
+    setActiveView('home')
+    setRunDetailTab('summary')
+    onCreateNewSystem?.()
+  }
 
   const technicalDrawerContent = (
     <div className="space-y-4">
@@ -479,7 +638,31 @@ export function SimpleExperienceDashboard({
             <div>
               <div className="jefe-commercial-kicker">Proyectos</div>
               <h1>Entregables recientes</h1>
-              <p>Una vista corta para abrir lo importante sin convertir la home en un tablero tecnico.</p>
+              <p>Una vista corta para abrir demos conocidos y los ultimos runs guardados por JEFE.</p>
+            </div>
+            {recentPersistedRuns.length > 0 ? (
+              <>
+                <div className="jefe-commercial-section-heading">
+                  <span>Runs persistidos</span>
+                  <button type="button" onClick={handleBackToHistory}>Ver historial</button>
+                </div>
+                <div className="jefe-commercial-project-grid">
+                  {recentPersistedRuns.map((run) => (
+                    <article key={run.runId} className="jefe-commercial-project-card">
+                      <div>
+                        <strong>{run.title}</strong>
+                        <span>{formatRunStatus(run.status)} - Dry-run</span>
+                      </div>
+                      <small>{run.validation || 'Validacion pendiente'}</small>
+                      <p>{formatRunDate(run.updatedAt || run.createdAt)}</p>
+                      <button type="button" onClick={() => handleOpenRun(run.runId)}>Abrir</button>
+                    </article>
+                  ))}
+                </div>
+              </>
+            ) : null}
+            <div className="jefe-commercial-section-heading">
+              <span>Demos conocidos</span>
             </div>
             <div className="jefe-commercial-project-grid">
               {recentProjects.map((project) => (
@@ -494,6 +677,210 @@ export function SimpleExperienceDashboard({
                 </article>
               ))}
             </div>
+          </section>
+        ) : null}
+
+        {visibleMainView === 'history' ? (
+          <section className="jefe-commercial-projects" aria-label="Historial de sistemas">
+            <div>
+              <div className="jefe-commercial-kicker">Historial</div>
+              <h1>Historial de sistemas</h1>
+              <p>Runs guardados por JEFE. Aca podes revisar pedidos, estado, validaciones y entrega.</p>
+            </div>
+            {runHistoryError ? (
+              <div className="jefe-commercial-inline-alert">
+                <strong>No pude leer este run.</strong>
+                <span>{runHistoryError}</span>
+                <button type="button" onClick={handleOpenTechnicalDetails}>Ver detalles tecnicos</button>
+              </div>
+            ) : null}
+            {runHistoryLoading ? (
+              <div className="jefe-commercial-empty-state">Cargando runs guardados...</div>
+            ) : null}
+            {!runHistoryLoading && persistedRuns.length === 0 ? (
+              <div className="jefe-commercial-empty-state">
+                <strong>No hay runs guardados todavia.</strong>
+                <button type="button" onClick={handleCreateNewSystem}>Crear nuevo sistema</button>
+              </div>
+            ) : null}
+            {persistedRuns.length > 0 ? (
+              <div className="jefe-commercial-run-list">
+                {persistedRuns.map((run) => (
+                  <article key={run.runId} className="jefe-commercial-run-card">
+                    <div>
+                      <strong>{run.title}</strong>
+                      <span>{run.runId}</span>
+                    </div>
+                    <dl>
+                      <div>
+                        <dt>Tipo</dt>
+                        <dd>{run.runType || 'dry-run'}</dd>
+                      </div>
+                      <div>
+                        <dt>Estado</dt>
+                        <dd>{formatRunStatus(run.status)}</dd>
+                      </div>
+                      <div>
+                        <dt>Fecha</dt>
+                        <dd>{formatRunDate(run.updatedAt || run.createdAt)}</dd>
+                      </div>
+                      <div>
+                        <dt>Validacion</dt>
+                        <dd>{run.validation || 'Pendiente'}</dd>
+                      </div>
+                      <div>
+                        <dt>Persistido</dt>
+                        <dd>{run.persisted === false ? 'No' : 'Si'}</dd>
+                      </div>
+                      <div>
+                        <dt>Ruta</dt>
+                        <dd>{run.path}</dd>
+                      </div>
+                    </dl>
+                    <button type="button" onClick={() => handleOpenRun(run.runId)}>Abrir</button>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        {visibleMainView === 'run-detail' ? (
+          <section className="jefe-commercial-projects" aria-label="Detalle de run">
+            <div>
+              <div className="jefe-commercial-kicker">Run guardado</div>
+              <h1>{selectedPersistedRun ? getRunTitle(selectedPersistedRun) : 'Run guardado'}</h1>
+              <p>Detalle ordenado del pedido, estado, artefactos y reporte del dry-run.</p>
+            </div>
+            <div className="jefe-commercial-detail-actions">
+              <button type="button" onClick={handleBackToHistory}>Volver al historial</button>
+              {selectedPersistedRun ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(selectedPersistedRun.runId)
+                  }}
+                >
+                  Copiar runId
+                </button>
+              ) : null}
+            </div>
+            {runHistoryError ? (
+              <div className="jefe-commercial-inline-alert">
+                <strong>No pude leer este run.</strong>
+                <span>{runHistoryError}</span>
+                <button type="button" onClick={handleOpenTechnicalDetails}>Ver detalles tecnicos</button>
+              </div>
+            ) : null}
+            {runHistoryLoading ? (
+              <div className="jefe-commercial-empty-state">Abriendo run...</div>
+            ) : null}
+            {!runHistoryLoading && selectedPersistedRun ? (
+              <div className="jefe-commercial-run-detail">
+                <div className="jefe-commercial-run-detail-summary">
+                  <div>
+                    <span>Estado</span>
+                    <strong>{formatRunStatus(selectedPersistedRun.status.status || selectedPersistedRun.run.status)}</strong>
+                  </div>
+                  <div>
+                    <span>Fecha</span>
+                    <strong>{formatRunDate(selectedPersistedRun.run.updatedAt || selectedPersistedRun.run.createdAt)}</strong>
+                  </div>
+                  <div>
+                    <span>Tipo</span>
+                    <strong>{selectedPersistedRun.run.runType || 'dry-run'}</strong>
+                  </div>
+                  <div>
+                    <span>Validacion</span>
+                    <strong>{selectedPersistedRun.status.validation || 'Pendiente'}</strong>
+                  </div>
+                </div>
+                <div className="jefe-commercial-tabs" role="tablist" aria-label="Detalle del run">
+                  {runDetailTabs.map((tab) => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={runDetailTab === tab.key}
+                      data-active={runDetailTab === tab.key}
+                      onClick={() => setRunDetailTab(tab.key)}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="jefe-commercial-tab-panel">
+                  {runDetailTab === 'summary' ? (
+                    <div className="jefe-commercial-detail-grid">
+                      <div>
+                        <span>Run</span>
+                        <strong>{selectedPersistedRun.runId}</strong>
+                      </div>
+                      <div>
+                        <span>Ruta</span>
+                        <strong>{selectedPersistedRun.path}</strong>
+                      </div>
+                      <div>
+                        <span>Paso actual</span>
+                        <strong>{selectedPersistedRun.status.currentStep || 'Sin paso actual'}</strong>
+                      </div>
+                      <div>
+                        <span>Persistencia</span>
+                        <strong>Run persistido</strong>
+                      </div>
+                      {selectedRunWarnings.length > 0 ? (
+                        <div className="jefe-commercial-detail-wide">
+                          <span>Warnings</span>
+                          {selectedRunWarnings.map((warning) => (
+                            <p key={warning}>{warning}</p>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {runDetailTab === 'brief' ? (
+                    <pre className="jefe-commercial-readable-block">{selectedPersistedRun.brief || 'Sin brief guardado.'}</pre>
+                  ) : null}
+                  {runDetailTab === 'status' ? (
+                    <div className="jefe-commercial-step-list">
+                      {(selectedPersistedRun.status.steps || []).map((step) => (
+                        <div key={`${step.label}-${step.status}`}>
+                          <strong>{step.label}</strong>
+                          <span>{formatRunStatus(step.status)}</span>
+                        </div>
+                      ))}
+                      {(selectedPersistedRun.status.steps || []).length === 0 ? (
+                        <p>Sin pasos guardados.</p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {runDetailTab === 'artifacts' ? (
+                    <div className="jefe-commercial-artifact-list">
+                      {Object.entries(selectedPersistedRun.artifacts || selectedPersistedRun.run.paths || {}).map(
+                        ([key, value]) => (
+                          <p key={key}>
+                            <strong>{key}</strong>
+                            <code>{value}</code>
+                          </p>
+                        ),
+                      )}
+                    </div>
+                  ) : null}
+                  {runDetailTab === 'logs' ? (
+                    <div className="jefe-commercial-log-list">
+                      {selectedRunLogLines.length > 0 ? (
+                        selectedRunLogLines.map((line) => <p key={line}>{line}</p>)
+                      ) : (
+                        <p>Sin logs guardados.</p>
+                      )}
+                    </div>
+                  ) : null}
+                  {runDetailTab === 'report' ? (
+                    <pre className="jefe-commercial-readable-block">{selectedPersistedRun.summary || 'Sin reporte guardado.'}</pre>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
           </section>
         ) : null}
 

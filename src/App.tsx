@@ -135,6 +135,55 @@ type CommercialUiRun = {
   logs: string[]
 }
 
+type PersistedRunListItem = {
+  runId: string
+  title: string
+  status: string
+  runType: string
+  createdAt?: string
+  updatedAt: string
+  validation?: string
+  persisted?: boolean
+  path: string
+}
+
+type PersistedRunStep = {
+  label: string
+  status: string
+}
+
+type PersistedRunDetail = {
+  runId: string
+  path: string
+  run: {
+    runId?: string
+    title?: string
+    runType?: string
+    createdAt?: string
+    updatedAt?: string
+    status?: string
+    source?: string
+    briefPreview?: string
+    expectedArtifacts?: string[]
+    paths?: Record<string, string>
+    warnings?: string[]
+  }
+  status: {
+    runId?: string
+    status?: string
+    currentStep?: string
+    steps?: PersistedRunStep[]
+    completedAt?: string
+    validation?: string
+    warnings?: string[]
+    errors?: string[]
+  }
+  brief?: string
+  eventsLog?: string
+  summary?: string
+  artifacts?: Record<string, string>
+}
+
 const COMMERCIAL_RUN_STEP_LABELS = [
   'Leyendo brief',
   'Detectando tipo de sistema',
@@ -1495,21 +1544,19 @@ declare global {
       }>
       readDryRun?: (runId: string) => Promise<{
         ok: boolean
-        run?: unknown
-        status?: unknown
+        runId?: string
+        path?: string
+        run?: PersistedRunDetail['run']
+        status?: PersistedRunDetail['status']
+        brief?: string
+        eventsLog?: string
         summary?: string
+        artifacts?: Record<string, string>
         error?: string
       }>
       listDryRuns?: () => Promise<{
         ok: boolean
-        runs?: Array<{
-          runId: string
-          title: string
-          status: string
-          runType: string
-          updatedAt: string
-          path: string
-        }>
+        runs?: PersistedRunListItem[]
         error?: string
       }>
     }
@@ -11474,6 +11521,11 @@ function App() {
   const [commercialGenerationStarted, setCommercialGenerationStarted] = useState(false)
   const [commercialUiRun, setCommercialUiRun] = useState<CommercialUiRun | null>(null)
   const commercialRunPersistenceSnapshotRef = useRef('')
+  const [persistedRuns, setPersistedRuns] = useState<PersistedRunListItem[]>([])
+  const [isRunHistoryLoading, setIsRunHistoryLoading] = useState(false)
+  const [runHistoryError, setRunHistoryError] = useState('')
+  const [selectedPersistedRun, setSelectedPersistedRun] =
+    useState<PersistedRunDetail | null>(null)
 
   useEffect(() => {
     executionRunSummariesRef.current = executionRunSummaries
@@ -15762,6 +15814,83 @@ No usar credenciales.`
       ...(raw ? { raw } : {}),
     })
   }
+  const loadPersistedRunHistory = async () => {
+    const bridge = window.jefeRunBridge
+
+    if (!bridge?.listDryRuns) {
+      setRunHistoryError('El historial de runs no esta disponible en este entorno.')
+      setPersistedRuns([])
+      return
+    }
+
+    setIsRunHistoryLoading(true)
+    setRunHistoryError('')
+
+    try {
+      const response = await bridge.listDryRuns()
+
+      if (!response?.ok) {
+        setRunHistoryError(response?.error || 'No pude leer el historial de runs.')
+        setPersistedRuns([])
+        return
+      }
+
+      setPersistedRuns(response.runs || [])
+    } catch {
+      setRunHistoryError('No pude leer el historial de runs.')
+      setPersistedRuns([])
+    } finally {
+      setIsRunHistoryLoading(false)
+    }
+  }
+
+  const openPersistedRun = async (runId: string) => {
+    const bridge = window.jefeRunBridge
+
+    if (!bridge?.readDryRun) {
+      setRunHistoryError('No pude abrir este run porque el bridge no esta disponible.')
+      return
+    }
+
+    setIsRunHistoryLoading(true)
+    setRunHistoryError('')
+
+    try {
+      const response = await bridge.readDryRun(runId)
+
+      if (!response?.ok) {
+        setRunHistoryError(response?.error || 'No pude leer este run. Revisa los detalles tecnicos.')
+        setSelectedPersistedRun(null)
+        return
+      }
+
+      setSelectedPersistedRun({
+        runId: response.runId || runId,
+        path: response.path || '',
+        run: response.run || {},
+        status: response.status || {},
+        brief: response.brief || '',
+        eventsLog: response.eventsLog || '',
+        summary: response.summary || '',
+        artifacts: response.artifacts || {},
+      })
+    } catch {
+      setRunHistoryError('No pude leer este run. Revisa los detalles tecnicos.')
+      setSelectedPersistedRun(null)
+    } finally {
+      setIsRunHistoryLoading(false)
+    }
+  }
+
+  const showPersistedRunHistory = () => {
+    setSelectedPersistedRun(null)
+    void loadPersistedRunHistory()
+  }
+
+  const showPersistedRunDetail = (runId: string) => {
+    void openPersistedRun(runId)
+  }
+
   const startCommercialDryRun = () => {
     const normalizedBrief = goalInput.trim()
     if (!normalizedBrief) return
@@ -22075,9 +22204,20 @@ No usar credenciales.`
       generationActive={commercialGenerationActive}
       generationSteps={commercialGenerationSteps}
       runSummary={commercialRunSummary}
+      persistedRuns={persistedRuns}
+      selectedPersistedRun={selectedPersistedRun}
+      runHistoryLoading={isRunHistoryLoading}
+      runHistoryError={runHistoryError}
       onOpenTechnicalDetails={() => setFlowConsoleVisibility({ open: true, pinned: true })}
       onBackFromProgress={resetCommercialDryRun}
       onOpenDelivery={() => setFlowConsoleVisibility({ open: true, pinned: true })}
+      onOpenRunHistory={showPersistedRunHistory}
+      onOpenPersistedRun={showPersistedRunDetail}
+      onBackToRunHistory={() => setSelectedPersistedRun(null)}
+      onCreateNewSystem={() => {
+        setCommercialUiRun(null)
+        setCommercialGenerationStarted(false)
+      }}
       requestPanel={
         <>
           <article className="jefe-commercial-request">

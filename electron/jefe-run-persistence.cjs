@@ -380,6 +380,8 @@ async function readDryRun(runId, options = {}) {
     const paths = resolveRunPaths(runId, options)
     const run = await readJsonIfExists(paths.runJsonPath)
     const status = await readJsonIfExists(paths.statusPath)
+    const brief = await fs.promises.readFile(paths.briefPath, 'utf8')
+    const eventsLog = await fs.promises.readFile(paths.eventsPath, 'utf8')
     const summary = await fs.promises.readFile(paths.summaryPath, 'utf8')
 
     return {
@@ -387,8 +389,17 @@ async function readDryRun(runId, options = {}) {
       runId: paths.runId,
       run,
       status,
+      brief,
+      eventsLog,
       summary,
       path: toRelativeRepoPath(paths.runPath, options),
+      artifacts: {
+        runJson: toRelativeRepoPath(paths.runJsonPath, options),
+        brief: toRelativeRepoPath(paths.briefPath, options),
+        status: toRelativeRepoPath(paths.statusPath, options),
+        eventsLog: toRelativeRepoPath(paths.eventsPath, options),
+        summary: toRelativeRepoPath(paths.summaryPath, options),
+      },
     }
   } catch (error) {
     return buildFailure(error)
@@ -416,7 +427,10 @@ async function listDryRuns(options = {}) {
           title: run.title || entry.name,
           status: status.status || run.status || 'unknown',
           runType: run.runType || 'dry-run',
+          createdAt: run.createdAt || '',
           updatedAt: run.updatedAt || run.createdAt || '',
+          validation: status.validation || '',
+          persisted: true,
           path: toRelativeRepoPath(paths.runPath, options),
         })
       } catch {
@@ -425,7 +439,10 @@ async function listDryRuns(options = {}) {
           title: entry.name,
           status: 'unreadable',
           runType: 'dry-run',
+          createdAt: '',
           updatedAt: '',
+          validation: '',
+          persisted: false,
           path: toRelativeRepoPath(paths.runPath, options),
         })
       }

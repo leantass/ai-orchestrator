@@ -1082,6 +1082,218 @@ html[data-theme="dark"] .jefe-tone-badge-violet {
   font-weight: 700;
 }
 
+.jefe-commercial-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+  color: var(--jefe-muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.jefe-commercial-section-heading button,
+.jefe-commercial-detail-actions button,
+.jefe-commercial-inline-alert button,
+.jefe-commercial-empty-state button {
+  min-height: 36px;
+  border: 1px solid var(--jefe-line);
+  border-radius: 8px;
+  background: var(--jefe-elevated);
+  color: var(--jefe-text-strong);
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.jefe-commercial-run-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.jefe-commercial-run-card,
+.jefe-commercial-run-detail,
+.jefe-commercial-inline-alert,
+.jefe-commercial-empty-state {
+  border: 1px solid var(--jefe-line);
+  border-radius: 8px;
+  background: var(--jefe-elevated);
+}
+
+.jefe-commercial-run-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 2.2fr) max-content;
+  gap: 16px;
+  align-items: center;
+  padding: 14px;
+}
+
+.jefe-commercial-run-card > div:first-child {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.jefe-commercial-run-card strong,
+.jefe-commercial-run-detail strong,
+.jefe-commercial-empty-state strong,
+.jefe-commercial-inline-alert strong {
+  color: var(--jefe-text-strong);
+}
+
+.jefe-commercial-run-card span,
+.jefe-commercial-run-card dt,
+.jefe-commercial-run-card dd,
+.jefe-commercial-run-detail span,
+.jefe-commercial-run-detail p,
+.jefe-commercial-empty-state,
+.jefe-commercial-inline-alert span {
+  color: var(--jefe-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.jefe-commercial-run-card dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.jefe-commercial-run-card dt {
+  margin-bottom: 2px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.jefe-commercial-run-card dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--jefe-text-strong);
+}
+
+.jefe-commercial-run-card button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--jefe-primary);
+  color: #fff;
+  padding: 0 16px;
+  font-weight: 800;
+}
+
+.jefe-commercial-empty-state,
+.jefe-commercial-inline-alert {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  margin-top: 24px;
+  padding: 18px;
+}
+
+.jefe-commercial-inline-alert {
+  border-color: color-mix(in srgb, var(--jefe-danger) 28%, var(--jefe-line));
+}
+
+.jefe-commercial-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.jefe-commercial-run-detail {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+  padding: 16px;
+}
+
+.jefe-commercial-run-detail-summary,
+.jefe-commercial-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.jefe-commercial-run-detail-summary > div,
+.jefe-commercial-detail-grid > div {
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--jefe-line);
+  border-radius: 8px;
+  background: var(--jefe-panel-muted);
+  padding: 12px;
+}
+
+.jefe-commercial-detail-wide {
+  grid-column: 1 / -1;
+}
+
+.jefe-commercial-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid var(--jefe-line);
+  padding-bottom: 10px;
+}
+
+.jefe-commercial-tabs button {
+  min-height: 34px;
+  border: 1px solid var(--jefe-line);
+  border-radius: 8px;
+  background: var(--jefe-panel-muted);
+  color: var(--jefe-text);
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.jefe-commercial-tabs button[data-active="true"] {
+  border-color: var(--jefe-primary);
+  background: var(--jefe-primary-soft);
+  color: var(--jefe-text-strong);
+}
+
+.jefe-commercial-tab-panel {
+  min-height: 260px;
+}
+
+.jefe-commercial-readable-block {
+  max-height: 430px;
+  overflow: auto;
+  border: 1px solid var(--jefe-line);
+  border-radius: 8px;
+  background: var(--jefe-panel-muted);
+  color: var(--jefe-text-strong);
+  padding: 14px;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.jefe-commercial-step-list {
+  display: grid;
+  gap: 8px;
+}
+
+.jefe-commercial-step-list > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--jefe-line);
+  border-radius: 8px;
+  background: var(--jefe-panel-muted);
+  padding: 12px;
+}
+
 .jefe-commercial-drawer {
   position: fixed;
   top: 0;
@@ -1335,6 +1547,27 @@ html[data-theme="dark"] .jefe-commercial-backdrop {
 
   .jefe-commercial-result-summary {
     grid-template-columns: 1fr;
+  }
+
+  .jefe-commercial-run-card {
+    grid-template-columns: 1fr;
+  }
+
+  .jefe-commercial-run-card dl,
+  .jefe-commercial-run-detail-summary,
+  .jefe-commercial-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .jefe-commercial-step-list > div,
+  .jefe-commercial-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .jefe-commercial-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .jefe-commercial-drawer {
