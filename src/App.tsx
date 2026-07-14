@@ -115,6 +115,70 @@ type FlowMessage = {
   successCriteria?: string[]
 }
 
+type CommercialUiRun = {
+  id: string
+  brief: string
+  projectName: string
+  status: 'running' | 'completed' | 'error'
+  runType: 'dry-run'
+  currentStepIndex: number
+  createdAt: string
+  expectedRunPath: string
+  expectedOutputPath: string
+  expectedReportsPath: string
+  expectedScreenshotsPath: string
+  validationStatus: string
+  warnings: string[]
+  logs: string[]
+}
+
+const COMMERCIAL_RUN_STEP_LABELS = [
+  'Leyendo brief',
+  'Detectando tipo de sistema',
+  'Definiendo modulos',
+  'Generando proyecto',
+  'Validando',
+  'Preparando entrega',
+] as const
+
+function buildCommercialRunId() {
+  const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
+  const suffix = Math.random().toString(36).slice(2, 7)
+  return `jefe-ui-dry-run-${timestamp}-${suffix}`
+}
+
+function inferCommercialProjectName(brief: string) {
+  const normalizedBrief = brief.toLocaleLowerCase()
+
+  if (normalizedBrief.includes('vianda')) return 'Sistema de viandas'
+  if (normalizedBrief.includes('revenue') || normalizedBrief.includes('oportunidad')) {
+    return 'Plataforma de oportunidades comerciales'
+  }
+  if (normalizedBrief.includes('turno')) return 'Sistema de turnos'
+  if (normalizedBrief.includes('lavander')) return 'Sistema de lavanderia B2B'
+
+  const firstWords = brief
+    .trim()
+    .split(/\s+/)
+    .slice(0, 5)
+    .join(' ')
+    .replace(/[^\p{L}\p{N}\s-]/gu, '')
+    .trim()
+
+  return firstWords || 'Nuevo sistema'
+}
+
+function buildCommercialRunPaths(runId: string) {
+  const basePath = `.codex-temp/jefe-ui-real-flow/runs/${runId}`
+
+  return {
+    expectedRunPath: basePath,
+    expectedOutputPath: `${basePath}/output`,
+    expectedReportsPath: `${basePath}/reports`,
+    expectedScreenshotsPath: `${basePath}/screenshots`,
+  }
+}
+
 type QuestionPolicyContract = {
   mode?: 'ask-only-if-blocking' | 'brain-decides-missing' | 'user-will-contribute' | string
   blockingQuestions?: string[]
@@ -11348,10 +11412,62 @@ function App() {
   const [activeWizardStep, setActiveWizardStep] =
     useState<WizardStepKey>('goal')
   const [commercialGenerationStarted, setCommercialGenerationStarted] = useState(false)
+  const [commercialUiRun, setCommercialUiRun] = useState<CommercialUiRun | null>(null)
 
   useEffect(() => {
     executionRunSummariesRef.current = executionRunSummaries
   }, [executionRunSummaries])
+
+  useEffect(() => {
+    if (!commercialUiRun || commercialUiRun.status !== 'running') {
+      return undefined
+    }
+
+    if (commercialUiRun.currentStepIndex >= COMMERCIAL_RUN_STEP_LABELS.length - 1) {
+      const completionTimer = window.setTimeout(() => {
+        setCommercialUiRun((currentRun) => {
+          if (!currentRun || currentRun.id !== commercialUiRun.id) return currentRun
+
+          return {
+            ...currentRun,
+            status: 'completed',
+            validationStatus: 'Dry-run PASS',
+            logs: [
+              ...currentRun.logs,
+              'Dry-run finalizado: no se materializaron archivos desde la UI.',
+              `Resultado preparado para revisar en ${currentRun.expectedRunPath}.`,
+            ],
+          }
+        })
+      }, 650)
+
+      return () => window.clearTimeout(completionTimer)
+    }
+
+    const stepTimer = window.setTimeout(() => {
+      setCommercialUiRun((currentRun) => {
+        if (!currentRun || currentRun.id !== commercialUiRun.id || currentRun.status !== 'running') {
+          return currentRun
+        }
+
+        const nextStepIndex = Math.min(
+          currentRun.currentStepIndex + 1,
+          COMMERCIAL_RUN_STEP_LABELS.length - 1,
+        )
+
+        return {
+          ...currentRun,
+          currentStepIndex: nextStepIndex,
+          logs: [
+            ...currentRun.logs,
+            `${COMMERCIAL_RUN_STEP_LABELS[nextStepIndex]}: completado en dry-run controlado.`,
+          ],
+        }
+      })
+    }, 850)
+
+    return () => window.clearTimeout(stepTimer)
+  }, [commercialUiRun])
 
   useEffect(() => {
     const rootElement = appRootRef.current
@@ -15513,6 +15629,63 @@ No usar credenciales.`
       status,
       ...(raw ? { raw } : {}),
     })
+  }
+  const startCommercialDryRun = () => {
+    const normalizedBrief = goalInput.trim()
+    if (!normalizedBrief) return
+
+    const runId = buildCommercialRunId()
+    const paths = buildCommercialRunPaths(runId)
+    const projectName = inferCommercialProjectName(normalizedBrief)
+    const nextRun: CommercialUiRun = {
+      id: runId,
+      brief: normalizedBrief,
+      projectName,
+      status: 'running',
+      runType: 'dry-run',
+      currentStepIndex: 0,
+      createdAt: new Date().toISOString(),
+      ...paths,
+      validationStatus: 'Dry-run en curso',
+      warnings: [
+        'Dry-run funcional: no se ejecuta generacion pesada desde esta pantalla.',
+        'Los paths bajo .codex-temp son el contrato esperado para una futura escritura por bridge.',
+      ],
+      logs: [
+        'Run creado desde la home minimalista.',
+        'Brief guardado en estado local del renderer.',
+        `${COMMERCIAL_RUN_STEP_LABELS[0]}: completado en dry-run controlado.`,
+      ],
+    }
+
+    setCommercialUiRun(nextRun)
+    setCommercialGenerationStarted(true)
+    setActiveWizardStep('execution')
+    setSessionStatus('Dry-run comercial iniciado')
+    setCurrentStep('JEFE esta interpretando el sistema en modo dry-run')
+    setSessionEvents((currentEvents) => [
+      ...currentEvents,
+      'Se inicio un dry-run controlado desde la interfaz comercial',
+    ])
+    addFlowMessage({
+      source: 'orquestador',
+      title: 'Dry-run comercial iniciado',
+      content:
+        'La interfaz minimalista creo un run controlado sin ejecutar integraciones reales ni materializar archivos.',
+      raw: formatStructuredContent({
+        runId,
+        runType: 'dry-run',
+        projectName,
+        expectedRunPath: paths.expectedRunPath,
+        expectedArtifacts: ['run.json', 'brief.md', 'status.json', 'logs/', 'reports/'],
+      }),
+      status: 'info',
+    })
+  }
+  const resetCommercialDryRun = () => {
+    setCommercialUiRun(null)
+    setCommercialGenerationStarted(false)
+    setActiveWizardStep('goal')
   }
   const debugRendererLog = (label: string, details?: unknown) => {
     if (details === undefined) {
@@ -21534,49 +21707,83 @@ No usar credenciales.`
           ? 'Plan guardado sin cambios en el workspace.'
           : 'Sin archivos creados.'
   const commercialGenerationActive =
+    commercialUiRun !== null ||
     commercialGenerationStarted ||
     isPlanning ||
     isExecutingTask ||
     decisionPending ||
     hasWizardPlan
-  const commercialGenerationSteps = [
-    {
-      label: 'Leyendo brief',
-      status: commercialGenerationActive ? ('completed' as const) : ('pending' as const),
-    },
-    {
-      label: 'Detectando dominio',
-      status: hasWizardPlan || isExecutingTask || decisionPending || simpleShouldShowMaterializedResult
-        ? ('completed' as const)
-        : commercialGenerationActive
-          ? ('in-progress' as const)
-          : ('pending' as const),
-    },
-    {
-      label: 'Definiendo modulos',
-      status: hasWizardPlan || isExecutingTask || decisionPending || simpleShouldShowMaterializedResult
-        ? ('completed' as const)
-        : ('pending' as const),
-    },
-    {
-      label: 'Generando proyecto',
-      status: isExecutingTask
-        ? ('in-progress' as const)
-        : simpleShouldShowMaterializedResult
-          ? ('completed' as const)
-          : ('pending' as const),
-    },
-    {
-      label: 'Validando',
-      status: simpleShouldShowMaterializedResult ? ('completed' as const) : ('pending' as const),
-    },
-    {
-      label: 'Preparando entrega',
-      status: simpleShouldShowMaterializedResult
-        ? ('completed' as const)
-        : ('pending' as const),
-    },
-  ]
+  const commercialGenerationSteps = commercialUiRun
+    ? COMMERCIAL_RUN_STEP_LABELS.map((label, index) => ({
+        label,
+        status:
+          commercialUiRun.status === 'error' && index === commercialUiRun.currentStepIndex
+            ? ('error' as const)
+            : commercialUiRun.status === 'completed' || index < commercialUiRun.currentStepIndex
+              ? ('completed' as const)
+              : index === commercialUiRun.currentStepIndex
+                ? ('in-progress' as const)
+                : ('pending' as const),
+      }))
+    : [
+        {
+          label: 'Leyendo brief',
+          status: commercialGenerationActive ? ('completed' as const) : ('pending' as const),
+        },
+        {
+          label: 'Detectando tipo de sistema',
+          status: hasWizardPlan || isExecutingTask || decisionPending || simpleShouldShowMaterializedResult
+            ? ('completed' as const)
+            : commercialGenerationActive
+              ? ('in-progress' as const)
+              : ('pending' as const),
+        },
+        {
+          label: 'Definiendo modulos',
+          status: hasWizardPlan || isExecutingTask || decisionPending || simpleShouldShowMaterializedResult
+            ? ('completed' as const)
+            : ('pending' as const),
+        },
+        {
+          label: 'Generando proyecto',
+          status: isExecutingTask
+            ? ('in-progress' as const)
+            : simpleShouldShowMaterializedResult
+              ? ('completed' as const)
+              : ('pending' as const),
+        },
+        {
+          label: 'Validando',
+          status: simpleShouldShowMaterializedResult ? ('completed' as const) : ('pending' as const),
+        },
+        {
+          label: 'Preparando entrega',
+          status: simpleShouldShowMaterializedResult
+            ? ('completed' as const)
+            : ('pending' as const),
+        },
+      ]
+  const commercialRunSummary = commercialUiRun
+    ? {
+        id: commercialUiRun.id,
+        runType: 'dry-run funcional',
+        statusLabel:
+          commercialUiRun.status === 'completed'
+            ? 'Completado'
+            : commercialUiRun.status === 'error'
+              ? 'Error'
+              : 'En progreso',
+        projectName: commercialUiRun.projectName,
+        validationStatus: commercialUiRun.validationStatus,
+        runPath: commercialUiRun.expectedRunPath,
+        outputPath: commercialUiRun.expectedOutputPath,
+        reportsPath: commercialUiRun.expectedReportsPath,
+        screenshotsPath: commercialUiRun.expectedScreenshotsPath,
+        hasResult: commercialUiRun.status === 'completed',
+        warnings: commercialUiRun.warnings,
+        logs: commercialUiRun.logs,
+      }
+    : null
   const commercialQuickExamples = [
     {
       label: 'Sistema de viandas para empresas',
@@ -21607,7 +21814,10 @@ No usar credenciales.`
       statusBadge={plannerBadge}
       generationActive={commercialGenerationActive}
       generationSteps={commercialGenerationSteps}
+      runSummary={commercialRunSummary}
       onOpenTechnicalDetails={() => setFlowConsoleVisibility({ open: true, pinned: true })}
+      onBackFromProgress={resetCommercialDryRun}
+      onOpenDelivery={() => setFlowConsoleVisibility({ open: true, pinned: true })}
       requestPanel={
         <>
           <article className="jefe-commercial-request">
@@ -21624,14 +21834,12 @@ No usar credenciales.`
               <button
                 type="button"
                 onClick={() => {
-                  setCommercialGenerationStarted(true)
-                  setActiveWizardStep('plan')
-                  handleWizardGeneratePlan()
+                  startCommercialDryRun()
                 }}
-                disabled={isPlanning || !goalInput.trim()}
+                disabled={isPlanning || commercialUiRun?.status === 'running' || !goalInput.trim()}
                 className="jefe-commercial-primary-cta"
               >
-                {isPlanning ? 'Creando sistema...' : 'Crear sistema'}
+                {commercialUiRun?.status === 'running' || isPlanning ? 'Creando sistema...' : 'Crear sistema'}
               </button>
             </div>
             <div className="jefe-commercial-examples" aria-label="Ejemplos rapidos">
@@ -21641,6 +21849,7 @@ No usar credenciales.`
                   type="button"
                   onClick={() => {
                     setGoalInput(example.value)
+                    setCommercialUiRun(null)
                     setCommercialGenerationStarted(false)
                   }}
                 >

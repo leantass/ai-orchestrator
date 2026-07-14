@@ -908,6 +908,104 @@ html[data-theme="dark"] .jefe-tone-badge-violet {
   color: #fff;
 }
 
+.jefe-commercial-progress-card > .jefe-commercial-secondary-cta,
+.jefe-commercial-progress-card > .jefe-commercial-primary-cta {
+  margin-right: 8px;
+  margin-bottom: 8px;
+}
+
+.jefe-commercial-result-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.jefe-commercial-result-summary div,
+.jefe-commercial-run-details {
+  border: 1px solid var(--jefe-line);
+  border-radius: 8px;
+  background: var(--jefe-panel-muted);
+}
+
+.jefe-commercial-result-summary div {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.jefe-commercial-result-summary span {
+  color: var(--jefe-muted);
+  font-size: 12px;
+}
+
+.jefe-commercial-result-summary strong {
+  overflow-wrap: anywhere;
+  color: var(--jefe-text-strong);
+  font-size: 13px;
+}
+
+.jefe-commercial-run-details {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.jefe-commercial-run-details > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.jefe-commercial-run-details strong {
+  color: var(--jefe-text-strong);
+}
+
+.jefe-commercial-run-details span,
+.jefe-commercial-run-details dt,
+.jefe-commercial-run-details li,
+.jefe-commercial-log-list p {
+  color: var(--jefe-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.jefe-commercial-run-details dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.jefe-commercial-run-details dt {
+  margin-bottom: 2px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.jefe-commercial-run-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--jefe-text-strong);
+  font-size: 13px;
+}
+
+.jefe-commercial-run-details ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.jefe-commercial-log-list {
+  display: grid;
+  gap: 6px;
+  border-top: 1px solid var(--jefe-line);
+  padding-top: 12px;
+}
+
+.jefe-commercial-log-list p {
+  margin: 0;
+}
+
 .jefe-commercial-project-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -926,6 +1024,7 @@ html[data-theme="dark"] .jefe-tone-badge-violet {
 
 .jefe-commercial-project-card strong,
 .jefe-commercial-project-card span,
+.jefe-commercial-project-card small,
 .jefe-commercial-project-card p {
   display: block;
   margin: 0;
@@ -937,6 +1036,7 @@ html[data-theme="dark"] .jefe-tone-badge-violet {
 }
 
 .jefe-commercial-project-card span,
+.jefe-commercial-project-card small,
 .jefe-commercial-project-card p {
   color: var(--jefe-muted);
   font-size: 13px;
@@ -1196,6 +1296,10 @@ html[data-theme="dark"] .jefe-tone-badge-violet {
 
   .jefe-commercial-progress .jefe-commercial-step em {
     grid-column: auto;
+  }
+
+  .jefe-commercial-result-summary {
+    grid-template-columns: 1fr;
   }
 
   .jefe-commercial-drawer {

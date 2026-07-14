@@ -8,6 +8,21 @@ const joinClasses = (...tokens: Array<string | false | null | undefined>) =>
 
 type GenerationStepStatus = 'pending' | 'in-progress' | 'completed' | 'error'
 
+type CommercialRunSummary = {
+  id: string
+  runType: string
+  statusLabel: string
+  projectName: string
+  validationStatus: string
+  runPath: string
+  outputPath: string
+  reportsPath: string
+  screenshotsPath: string
+  hasResult: boolean
+  warnings: string[]
+  logs: string[]
+}
+
 type MenuOption = {
   key: string
   label: string
@@ -21,6 +36,7 @@ type RecentProject = {
   name: string
   status: string
   validation: string
+  type?: string
 }
 
 const commercialMenuLabels = [
@@ -43,18 +59,21 @@ const commercialMenuLabels = [
 const recentProjects: RecentProject[] = [
   {
     name: 'TuVianda',
-    status: 'Entregable local',
+    status: 'Generado por JEFE',
     validation: 'Validacion completa',
+    type: 'Proyecto separado',
   },
   {
     name: 'Lavanderia B2B',
-    status: 'Demo generada',
+    status: 'Generado por JEFE',
     validation: 'Smokes locales',
+    type: 'Demo local',
   },
   {
     name: 'Revenue Platform',
-    status: 'Sandbox mock',
+    status: 'Generado por JEFE',
     validation: 'AISO y Scarlett mock',
+    type: 'Sandbox mock',
   },
 ]
 
@@ -200,7 +219,10 @@ export function SimpleExperienceDashboard({
   footer,
   generationActive = false,
   generationSteps = defaultGenerationSteps,
+  runSummary,
   onOpenTechnicalDetails,
+  onBackFromProgress,
+  onOpenDelivery,
 }: {
   title: string
   description: string
@@ -221,7 +243,10 @@ export function SimpleExperienceDashboard({
   footer?: ReactNode
   generationActive?: boolean
   generationSteps?: Array<{ label: string; status: GenerationStepStatus }>
+  runSummary?: CommercialRunSummary | null
   onOpenTechnicalDetails?: () => void
+  onBackFromProgress?: () => void
+  onOpenDelivery?: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [technicalOpen, setTechnicalOpen] = useState(false)
@@ -269,6 +294,46 @@ export function SimpleExperienceDashboard({
         </button>
       </div>
       <div className="space-y-4">
+        {runSummary ? (
+          <section className="jefe-commercial-run-details" aria-label="Resumen tecnico del run">
+            <div>
+              <strong>{runSummary.projectName}</strong>
+              <span>{runSummary.statusLabel} - {runSummary.runType}</span>
+            </div>
+            <dl>
+              <div>
+                <dt>Run</dt>
+                <dd>{runSummary.id}</dd>
+              </div>
+              <div>
+                <dt>Ruta prevista</dt>
+                <dd>{runSummary.runPath}</dd>
+              </div>
+              <div>
+                <dt>Reportes</dt>
+                <dd>{runSummary.reportsPath}</dd>
+              </div>
+              <div>
+                <dt>Validacion</dt>
+                <dd>{runSummary.validationStatus}</dd>
+              </div>
+            </dl>
+            {runSummary.warnings.length > 0 ? (
+              <ul>
+                {runSummary.warnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            ) : null}
+            {runSummary.logs.length > 0 ? (
+              <div className="jefe-commercial-log-list">
+                {runSummary.logs.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
         {technicalPanel}
         {understoodPanel}
         {planPanel}
@@ -334,6 +399,43 @@ export function SimpleExperienceDashboard({
               <button type="button" className="jefe-commercial-secondary-cta" onClick={handleOpenTechnicalDetails}>
                 Ver detalles tecnicos
               </button>
+              {onBackFromProgress ? (
+                <button type="button" className="jefe-commercial-secondary-cta" onClick={onBackFromProgress}>
+                  Volver
+                </button>
+              ) : null}
+              {runSummary?.hasResult && onOpenDelivery ? (
+                <button
+                  type="button"
+                  className="jefe-commercial-primary-cta"
+                  onClick={() => {
+                    onOpenDelivery()
+                    handleOpenTechnicalDetails()
+                  }}
+                >
+                  Abrir entrega
+                </button>
+              ) : null}
+              {runSummary?.hasResult ? (
+                <div className="jefe-commercial-result-summary" aria-label="Resultado del run">
+                  <div>
+                    <span>Proyecto</span>
+                    <strong>{runSummary.projectName}</strong>
+                  </div>
+                  <div>
+                    <span>Estado</span>
+                    <strong>{runSummary.statusLabel}</strong>
+                  </div>
+                  <div>
+                    <span>Validaciones</span>
+                    <strong>{runSummary.validationStatus}</strong>
+                  </div>
+                  <div>
+                    <span>Output</span>
+                    <strong>{runSummary.outputPath}</strong>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </section>
         ) : null}
@@ -352,6 +454,7 @@ export function SimpleExperienceDashboard({
                     <strong>{project.name}</strong>
                     <span>{project.status}</span>
                   </div>
+                  {project.type ? <small>{project.type}</small> : null}
                   <p>{project.validation}</p>
                   <button type="button" onClick={handleOpenTechnicalDetails}>Abrir</button>
                 </article>
