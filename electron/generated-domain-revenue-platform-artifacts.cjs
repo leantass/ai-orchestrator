@@ -350,6 +350,8 @@ function buildPackageJson(projectSlug) {
       build: 'node scripts/build.mjs',
       smoke: 'node scripts/smoke.mjs',
       'domain-smoke': 'node scripts/domain-smoke.mjs',
+      'aiso-smoke': 'node scripts/aiso-connector-smoke.mjs',
+      'scarlett-context-smoke': 'node scripts/scarlett-context-smoke.mjs',
       start: 'node src/server.mjs',
     },
     dependencies: {},
@@ -359,6 +361,576 @@ function buildPackageJson(projectSlug) {
 
 function buildDomainMjs(project) {
   return `export const PROJECT = ${JSON.stringify(project, null, 2)}\nexport const COLLECTIONS = PROJECT.collections\nexport const PAGES = PROJECT.pages\nexport const ROUTES = PROJECT.routes\nexport const EVENT_TYPES = PROJECT.eventTypes\nexport function collectionByName(name) { return COLLECTIONS.find((collection) => collection.name === name) }\n`
+}
+
+function buildAisoErrorsMjs() {
+  return `export const AISO_ERROR_CODES = [
+  'UNAUTHORIZED',
+  'AISO_FORBIDDEN',
+  'AISO_NOT_AVAILABLE',
+  'VALIDATION_ERROR',
+  'AISO_JOB_NOT_FOUND',
+  'AISO_REPORT_NOT_FOUND',
+  'AISO_SECTION_NOT_FOUND',
+  'AISO_REPORT_UNSUPPORTED',
+  'AISO_JOB_IN_PROGRESS',
+  'AISO_LIMITS_MISSING',
+  'AISO_SCAN_LIMIT',
+  'AISO_ENGINE_FAILURE',
+  'UNKNOWN_AISO_ERROR'
+]
+
+export class AisoError extends Error {
+  constructor(code, message, details = {}) {
+    super(message || code || 'AISO error')
+    this.name = 'AisoError'
+    this.code = normalizeAisoErrorCode(code, details.status)
+    this.details = details
+  }
+}
+
+export function normalizeAisoErrorCode(code, status = 0) {
+  if (code && AISO_ERROR_CODES.includes(code)) return code
+  if (status === 401) return 'UNAUTHORIZED'
+  if (status === 403) return 'AISO_FORBIDDEN'
+  if (status === 404) return 'AISO_REPORT_NOT_FOUND'
+  if (status === 409) return 'AISO_JOB_IN_PROGRESS'
+  if (status === 422 || status === 400) return 'VALIDATION_ERROR'
+  if (status >= 500) return 'AISO_NOT_AVAILABLE'
+  return 'UNKNOWN_AISO_ERROR'
+}
+
+export function httpStatusForAisoError(code) {
+  return {
+    UNAUTHORIZED: 401,
+    AISO_FORBIDDEN: 403,
+    AISO_NOT_AVAILABLE: 503,
+    VALIDATION_ERROR: 422,
+    AISO_JOB_NOT_FOUND: 404,
+    AISO_REPORT_NOT_FOUND: 404,
+    AISO_SECTION_NOT_FOUND: 404,
+    AISO_REPORT_UNSUPPORTED: 422,
+    AISO_JOB_IN_PROGRESS: 409,
+    AISO_LIMITS_MISSING: 422,
+    AISO_SCAN_LIMIT: 429,
+    AISO_ENGINE_FAILURE: 502,
+    UNKNOWN_AISO_ERROR: 500
+  }[code] || 500
+}
+
+export function sanitizeAisoError(error) {
+  const code = normalizeAisoErrorCode(error?.code, error?.details?.status)
+  return {
+    ok: false,
+    error: {
+      code,
+      message: error?.message || code,
+      status: httpStatusForAisoError(code)
+    }
+  }
+}
+`
+}
+
+function buildAisoClientMjs() {
+  return `import { AisoError, normalizeAisoErrorCode } from './aiso-errors.mjs'
+
+export const AISO_METRIC_SECTIONS = [
+  'audienceScoring',
+  'themeScoring',
+  'rawScoring',
+  'audienceSummaries',
+  'themeSummaries',
+  'themes',
+  'actionPlan',
+  'taskPressure',
+  'meta',
+  'contentIntent',
+  'trustAuthority',
+  'aiReadability',
+  'funnelUx',
+  'technicalHealth'
+]
+
+export function buildAisoConfig(env = process.env) {
+  const provider = env.AISO_PROVIDER || 'mock'
+  const includeRaw = env.AISO_INCLUDE_RAW === 'true'
+  const pollIntervalMs = Number(env.AISO_POLL_INTERVAL_MS || 10000)
+  const pollTimeoutMs = Number(env.AISO_POLL_TIMEOUT_MS || 180000)
+  const defaultPageSize = Number(env.AISO_DEFAULT_PAGE_SIZE || 25)
+  return {
+    provider,
+    baseUrl: env.AISO_API_BASE_URL || 'https://floe.ar',
+    apiKey: env.AISO_API_KEY || '',
+    webhookSecret: env.AISO_WEBHOOK_SECRET || '',
+    includeRaw,
+    pollIntervalMs,
+    pollTimeoutMs,
+    defaultPageSize
+  }
+}
+
+function cleanParams(params = {}) {
+  return Object.fromEntries(Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== ''))
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+export function parseEnvelope(payload, status = 200) {
+  if (payload && payload.success === true) return payload.data
+  if (payload && payload.success === false) {
+    const error = payload.error || {}
+    throw new AisoError(normalizeAisoErrorCode(error.code, status), error.message || error.code || 'AISO request failed', { status })
+  }
+  if (status >= 200 && status < 300) return payload
+  throw new AisoError(normalizeAisoErrorCode(payload?.error?.code, status), payload?.error?.message || 'AISO request failed', { status })
+}
+
+export function createAisoClient(config = {}) {
+  const baseUrl = String(config.baseUrl || 'https://floe.ar').replace(/\\/+$/, '')
+  const apiKey = config.apiKey || ''
+  const fetchImpl = config.fetchImpl || fetch
+  const pollIntervalMs = Number(config.pollIntervalMs || 10000)
+  const pollTimeoutMs = Number(config.pollTimeoutMs || 180000)
+  const defaultPageSize = Number(config.defaultPageSize || 25)
+  const includeRawByDefault = config.includeRaw === true
+
+  async function request(method, pathname, { query = {}, body } = {}) {
+    if (!apiKey) throw new AisoError('UNAUTHORIZED', 'AISO_API_KEY is required for real AISO provider')
+    const url = new URL(baseUrl + pathname)
+    for (const [key, value] of Object.entries(cleanParams(query))) url.searchParams.set(key, String(value))
+    const headers = { accept: 'application/json', 'x-api-key': apiKey }
+    if (body !== undefined) headers['content-type'] = 'application/json'
+    const response = await fetchImpl(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) })
+    let payload = null
+    try { payload = await response.json() } catch { payload = null }
+    if (!response.ok && (!payload || payload.success !== false)) {
+      throw new AisoError(normalizeAisoErrorCode(payload?.error?.code, response.status), payload?.error?.message || 'AISO request failed', { status: response.status })
+    }
+    return parseEnvelope(payload, response.status)
+  }
+
+  return {
+    mode: 'real',
+    listReports(params = {}) {
+      return request('GET', '/api/aiso/reports', { query: { pageSize: defaultPageSize, ...params } })
+    },
+    launchReport(payload) {
+      return request('POST', '/api/aiso/reports', { body: payload })
+    },
+    getReport(jobId, options = {}) {
+      if (!jobId) throw new AisoError('VALIDATION_ERROR', 'jobId is required')
+      const includeRaw = options.includeRaw === true || includeRawByDefault
+      return request('GET', '/api/aiso/reports/' + encodeURIComponent(jobId), { query: includeRaw ? { include: 'raw' } : {} })
+    },
+    getStatus(jobId, options = {}) {
+      if (!jobId) throw new AisoError('VALIDATION_ERROR', 'jobId is required')
+      return request('GET', '/api/aiso/reports/' + encodeURIComponent(jobId) + '/status', { query: { refresh: options.refresh === true ? 'true' : '' } })
+    },
+    getMetrics(jobId, options = {}) {
+      if (!jobId) throw new AisoError('VALIDATION_ERROR', 'jobId is required')
+      if (options.section && !AISO_METRIC_SECTIONS.includes(options.section)) throw new AisoError('AISO_SECTION_NOT_FOUND', 'Unknown AISO metrics section')
+      return request('GET', '/api/aiso/reports/' + encodeURIComponent(jobId) + '/metrics', { query: { section: options.section || '' } })
+    },
+    async pollUntilTerminal(jobId, options = {}) {
+      const started = Date.now()
+      const interval = Number(options.pollIntervalMs || pollIntervalMs)
+      const timeout = Number(options.pollTimeoutMs || pollTimeoutMs)
+      while (Date.now() - started <= timeout) {
+        const status = await this.getStatus(jobId, { refresh: options.refresh === true })
+        const state = String(status.status || status.job?.status || '').toUpperCase()
+        const terminal = status.terminal === true || ['COMPLETED', 'FAILED', 'CANCELLED'].includes(state)
+        if (terminal) {
+          if (state === 'COMPLETED' && (status.reportAvailable === true || status.job?.reportAvailable === true)) {
+            return { status, report: await this.getReport(jobId, { includeRaw: options.includeRaw === true }) }
+          }
+          if (state === 'FAILED' || state === 'CANCELLED') return { status, failureReason: status.failureReason || status.job?.failureReason || state }
+          return { status }
+        }
+        await wait(interval)
+      }
+      throw new AisoError('AISO_NOT_AVAILABLE', 'AISO polling timeout reached', { timeout })
+    },
+    validateConnection() {
+      return this.listReports({ pageSize: 1 })
+    }
+  }
+}
+`
+}
+
+function buildAisoWebhookVerifierMjs() {
+  return `import crypto from 'node:crypto'
+
+export function signAisoWebhookBody(rawBody, secret) {
+  return 'sha256=' + crypto.createHmac('sha256', secret).update(Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(String(rawBody || ''), 'utf8')).digest('hex')
+}
+
+export function verifyAisoWebhookSignature({ rawBody, signature, secret }) {
+  if (!secret) return { ok: true, skipped: true }
+  if (!signature || !signature.startsWith('sha256=')) return { ok: false, error: 'missing_or_invalid_signature_header' }
+  const expected = signAisoWebhookBody(rawBody, secret)
+  const received = Buffer.from(signature, 'utf8')
+  const expectedBuffer = Buffer.from(expected, 'utf8')
+  if (received.length !== expectedBuffer.length) return { ok: false, error: 'signature_length_mismatch' }
+  return { ok: crypto.timingSafeEqual(received, expectedBuffer) }
+}
+`
+}
+
+function buildAisoNormalizerMjs() {
+  return `import crypto from 'node:crypto'
+import { AisoError } from './aiso-errors.mjs'
+
+const CONTRACT_VERSION = 'aiso-reports-api.v1'
+
+function asArray(value) { return Array.isArray(value) ? value : value ? [value] : [] }
+function asObject(value) { return value && typeof value === 'object' && !Array.isArray(value) ? value : {} }
+function stableId(prefix, value) { return prefix + '-' + crypto.createHash('sha256').update(String(value || prefix)).digest('hex').slice(0, 12) }
+function hashJson(value) { return crypto.createHash('sha256').update(JSON.stringify(value || {})).digest('hex') }
+function textOf(value) { return typeof value === 'string' ? value : value?.title || value?.name || value?.summary || value?.label || JSON.stringify(value || {}) }
+function confidenceOf(value, fallback = 0.6) { const confidence = Number(value?.confidence ?? value?.score ?? value?.value); return Number.isFinite(confidence) ? confidence : fallback }
+
+export function normalizeAisoReport(exportedReport = {}) {
+  const report = exportedReport?.report || exportedReport?.data?.report || exportedReport
+  if (!report || typeof report !== 'object') throw new AisoError('AISO_REPORT_UNSUPPORTED', 'AISO report payload is missing data.report')
+  const result = asObject(report.result)
+  const jobId = report.jobId || report.id
+  const status = report.status
+  const websiteDomain = report.websiteDomain || new URL(report.targetUrl || 'https://unknown.example.test').hostname
+  if (!jobId || !status || !websiteDomain) throw new AisoError('AISO_REPORT_UNSUPPORTED', 'AISO report requires jobId, status and websiteDomain')
+
+  const warnings = []
+  for (const section of ['meta', 'actionPlan', 'themes', 'audienceSummaries', 'themeSummaries', 'taskPressure']) {
+    if (result[section] === undefined) warnings.push('missing section: ' + section)
+  }
+
+  const analysisId = 'aiso-analysis-' + jobId
+  const snapshotId = 'aiso-snapshot-' + jobId + '-' + hashJson(result).slice(0, 10)
+  const businessProfileId = stableId('business-profile-aiso', websiteDomain)
+  const sourceId = stableId('source-aiso', jobId)
+  const snapshotHash = hashJson({ jobId, websiteDomain, result })
+  const organizationId = report.organizationId || report.tenantId || 'org-floe-labs'
+  const workspaceId = report.workspaceId || 'ws-growth'
+  const base = { organizationId, workspaceId, source: 'aiso', status: 'active' }
+
+  const analysis = { ...base, id: analysisId, externalId: jobId, provider: 'AISO/FLOE', jobId, targetUrl: report.targetUrl || '', websiteDomain, completedAt: report.completedAt || '', generatedAt: report.generatedAt || '', schemaVersion: report.schemaVersion || '', contractVersion: CONTRACT_VERSION, dataState: 'detected', idempotencyKey: 'aiso-analysis-' + jobId }
+  const snapshot = { ...base, id: snapshotId, floeAnalysisId: analysisId, aisoAnalysisId: analysisId, jobId, version: 1, schemaVersion: report.schemaVersion || '', contractVersion: CONTRACT_VERSION, snapshotHash, normalized: true, payload: result, rawPath: report.rawPath || '', warnings, idempotencyKey: 'aiso-snapshot-' + snapshotHash }
+  const importJob = { ...base, id: 'aiso-import-' + jobId, provider: 'AISO/FLOE', jobId, status: 'completed', importedRows: 1, floeAnalysisId: analysisId, aisoAnalysisId: analysisId, failureReason: '', idempotencyKey: 'aiso-import-' + jobId }
+  const businessProfile = { ...base, id: businessProfileId, floeAnalysisId: analysisId, aisoAnalysisId: analysisId, companyName: result.meta?.companyName || websiteDomain, domain: websiteDomain, websiteDomain, targetUrl: report.targetUrl || '', dataState: 'inferred', metadata: result.meta || {}, businessInsights: asArray(result.themeSummaries).map(textOf), problemsSolved: asArray(result.actionPlan).map(textOf).slice(0, 6), differentiators: asArray(result.trustAuthority?.strengths).map(textOf), confidence: confidenceOf(result.meta, 0.7), idempotencyKey: 'aiso-business-profile-' + websiteDomain }
+  const source = { ...base, id: sourceId, provider: 'AISO/FLOE Reports API', jobId, sourceDate: report.completedAt || report.generatedAt || new Date().toISOString(), confidence: 0.8, idempotencyKey: 'aiso-source-' + jobId }
+
+  const products = asArray(result.products).filter((item) => item?.name || typeof item === 'string').map((item) => ({ ...base, id: stableId('product-aiso', websiteDomain + '-' + textOf(item)), name: textOf(item), dataState: 'inferred', confidence: confidenceOf(item, 0.55), idempotencyKey: stableId('idempotent-product-aiso', websiteDomain + '-' + textOf(item)) }))
+  const services = asArray(result.services).filter((item) => item?.name || typeof item === 'string').map((item) => ({ ...base, id: stableId('service-aiso', websiteDomain + '-' + textOf(item)), name: textOf(item), dataState: 'inferred', confidence: confidenceOf(item, 0.55), idempotencyKey: stableId('idempotent-service-aiso', websiteDomain + '-' + textOf(item)) }))
+  const icps = asArray(result.audienceSummaries).map((item, index) => ({ ...base, id: stableId('icp-aiso', websiteDomain + '-' + index + '-' + textOf(item)), name: textOf(item), dataState: 'inferred', confidence: confidenceOf(item, 0.65), sourceAttribution: { analysisId, snapshotId, section: 'audienceSummaries' }, idempotencyKey: stableId('idempotent-icp-aiso', websiteDomain + '-' + index + '-' + textOf(item)) }))
+  const buyerPersonas = asArray(result.audienceSummaries).map((item, index) => ({ ...base, id: stableId('persona-aiso', websiteDomain + '-' + index + '-' + textOf(item)), title: textOf(item), dataState: 'inferred', confidence: confidenceOf(item, 0.6), sourceAttribution: { analysisId, snapshotId, section: 'audienceSummaries' }, idempotencyKey: stableId('idempotent-persona-aiso', websiteDomain + '-' + index + '-' + textOf(item)) }))
+
+  const evidenceInputs = [
+    ...asArray(result.themes).map((item) => ({ section: 'themes', item })),
+    ...asArray(result.themeSummaries).map((item) => ({ section: 'themeSummaries', item })),
+    ...asArray(result.audienceScoring).map((item) => ({ section: 'audienceScoring', item })),
+    ...asArray(result.themeScoring).map((item) => ({ section: 'themeScoring', item })),
+    ...asArray(result.rawScoring).map((item) => ({ section: 'rawScoring', item }))
+  ]
+  const evidence = evidenceInputs.map(({ section, item }, index) => ({ ...base, id: stableId('evidence-aiso', jobId + '-' + section + '-' + index + '-' + textOf(item)), sourceId, section, quote: textOf(item), confidence: confidenceOf(item, 0.6), dataState: 'detected', sourceAttribution: { analysisId, snapshotId, section }, idempotencyKey: stableId('idempotent-evidence-aiso', jobId + '-' + section + '-' + index + '-' + textOf(item)) }))
+  const signals = [
+    ...asArray(result.actionPlan).map((item, index) => ({ section: 'actionPlan', item, index })),
+    ...asArray(result.themes).map((item, index) => ({ section: 'themes', item, index })),
+    ...asArray(result.taskPressure?.items || result.taskPressure).map((item, index) => ({ section: 'taskPressure', item, index }))
+  ].map(({ section, item, index }) => ({ ...base, id: stableId('signal-aiso', jobId + '-' + section + '-' + index + '-' + textOf(item)), type: section, title: textOf(item), relevance: confidenceOf(item, 0.62), confidence: confidenceOf(item, 0.62), ttlDays: section === 'taskPressure' ? 14 : 30, explanation: textOf(item), dataState: 'detected', sourceAttribution: { analysisId, snapshotId, section }, idempotencyKey: stableId('idempotent-signal-aiso', jobId + '-' + section + '-' + index + '-' + textOf(item)) }))
+  const recommendations = [
+    ...asArray(result.actionPlan).map((item, index) => ({ section: 'actionPlan', item, index })),
+    ...['contentIntent', 'trustAuthority', 'aiReadability', 'funnelUx', 'technicalHealth'].filter((section) => result[section]).map((section, index) => ({ section, item: result[section], index }))
+  ].map(({ section, item, index }) => ({ ...base, id: stableId('recommendation-aiso', jobId + '-' + section + '-' + index + '-' + textOf(item)), target: 'FLOE/web', type: section, reason: textOf(item), confidence: confidenceOf(item, 0.62), sourceAttribution: { analysisId, snapshotId, section }, idempotencyKey: stableId('idempotent-recommendation-aiso', jobId + '-' + section + '-' + index + '-' + textOf(item)) }))
+
+  return {
+    contractVersion: CONTRACT_VERSION,
+    warnings,
+    ids: { analysisId, snapshotId, businessProfileId, sourceId },
+    records: { analysis, snapshot, importJob, businessProfile, products, services, icps, buyerPersonas, source, evidence, signals, recommendations }
+  }
+}
+`
+}
+
+function buildAisoProviderMjs() {
+  return `import { appendAudit, appendEvent, createRecord, findRecord, listRecords, updateRecord } from '../../db.mjs'
+import { AisoError, httpStatusForAisoError, sanitizeAisoError } from './aiso-errors.mjs'
+import { createAisoClient, buildAisoConfig, AISO_METRIC_SECTIONS } from './aiso-client.mjs'
+import { normalizeAisoReport } from './aiso-normalizer.mjs'
+import { verifyAisoWebhookSignature } from './aiso-webhook-verifier.mjs'
+
+const TERMINAL_EVENTS = new Set(['aiso.report.completed', 'aiso.report.failed'])
+
+function now() { return new Date().toISOString() }
+function ok(status, body) { return { status, body } }
+function asArray(value) { return Array.isArray(value) ? value : value ? [value] : [] }
+function queryParams(url, names) { return Object.fromEntries(names.map((name) => [name, url.searchParams.get(name)]).filter(([, value]) => value !== null && value !== '')) }
+function errorResponse(error) { const sanitized = sanitizeAisoError(error); return ok(sanitized.error.status, sanitized) }
+function stableMockReport(jobId = 'aiso-job-demo') {
+  return {
+    report: {
+      jobId,
+      status: 'COMPLETED',
+      targetUrl: 'https://clinica-nova-salud.example.test',
+      websiteDomain: 'clinica-nova-salud.example.test',
+      completedAt: '2026-07-13T12:00:00.000Z',
+      schemaVersion: 'aiso.reports.sample.v1',
+      generatedAt: '2026-07-13T12:01:00.000Z',
+      result: {
+        meta: { companyName: 'Clinica Nova Salud', industry: 'salud privada', country: 'AR', confidence: 0.82 },
+        products: [{ name: 'Medicina laboral para empresas', confidence: 0.74 }],
+        services: [{ name: 'Examenes preocupacionales' }, { name: 'Vacunacion empresarial' }],
+        audienceSummaries: [{ title: 'Empresas con contratacion operativa intensiva', confidence: 0.86 }],
+        themeSummaries: [{ title: 'La web no comunica medicina laboral corporativa', confidence: 0.81 }],
+        themes: [{ title: 'Turnos corporativos poco claros', confidence: 0.79 }],
+        actionPlan: [{ title: 'Crear landing de medicina laboral para empresas', confidence: 0.9 }, { title: 'Agregar casos por segmento operativo', confidence: 0.76 }],
+        taskPressure: { level: 'high', items: [{ title: 'Contratacion operativa demanda preocupacionales rapidos', confidence: 0.83 }] },
+        contentIntent: { title: 'Aclarar propuesta B2B', confidence: 0.77 },
+        trustAuthority: { title: 'Mostrar equipo medico multidisciplinario', confidence: 0.7 },
+        aiReadability: { title: 'Estructurar contenido para respuestas AI sobre salud ocupacional', confidence: 0.73 },
+        funnelUx: { title: 'Agregar CTA de turnos corporativos', confidence: 0.78 },
+        technicalHealth: { title: 'Revisar performance y schema de servicios medicos', confidence: 0.68 }
+      }
+    }
+  }
+}
+
+function createMockAisoClient() {
+  return {
+    mode: 'mock',
+    async listReports(params = {}) { return { reports: [{ jobId: 'aiso-job-demo', status: 'COMPLETED', websiteDomain: 'clinica-nova-salud.example.test' }], page: Number(params.page || 1), pageSize: Number(params.pageSize || 25), total: 1 } },
+    async launchReport(payload = {}) { return { job: { jobId: payload.jobId || 'aiso-job-launched-mock', status: 'PENDING', targetUrl: payload.targetUrl || '', websiteDomain: payload.websiteDomain || '' } } },
+    async getReport(jobId) { return stableMockReport(jobId) },
+    async getStatus(jobId) {
+      if (String(jobId).includes('failed')) return { jobId, status: 'FAILED', terminal: true, reportAvailable: false, failureReason: 'mock failure' }
+      if (String(jobId).includes('progress')) return { jobId, status: 'IN_PROGRESS', terminal: false, reportAvailable: false }
+      return { jobId, status: 'COMPLETED', terminal: true, reportAvailable: true }
+    },
+    async getMetrics(jobId, options = {}) {
+      if (options.section && !AISO_METRIC_SECTIONS.includes(options.section)) throw new AisoError('AISO_SECTION_NOT_FOUND', 'Unknown AISO metrics section')
+      const report = stableMockReport(jobId).report
+      return options.section ? { jobId, section: options.section, data: report.result[options.section] || null } : { jobId, metrics: report.result }
+    },
+    async pollUntilTerminal(jobId) { return { status: await this.getStatus(jobId), report: await this.getReport(jobId) } },
+    async validateConnection() { return this.listReports({ pageSize: 1 }) }
+  }
+}
+
+export function createAisoProvider(env = process.env) {
+  const config = buildAisoConfig(env)
+  if (config.provider === 'real') {
+    if (!config.apiKey) throw new AisoError('UNAUTHORIZED', 'AISO_API_KEY is required when AISO_PROVIDER=real')
+    return { mode: 'real', config, client: createAisoClient(config) }
+  }
+  return { mode: 'mock', config, client: createMockAisoClient() }
+}
+
+function persistCollection(collection, recordOrRecords, ids) {
+  const records = asArray(recordOrRecords)
+  const persisted = []
+  for (const record of records) {
+    if (!record) continue
+    const result = createRecord(collection, record)
+    if (result.ok && result.data?.id) ids.push({ collection, id: result.data.id, status: result.status, idempotent: result.idempotent === true })
+    persisted.push(result.data || result)
+  }
+  return persisted
+}
+
+export function importNormalizedAisoReport(exportedReport, options = {}) {
+  const normalized = normalizeAisoReport(exportedReport)
+  const ids = []
+  const records = normalized.records
+  persistCollection('floeAnalyses', records.analysis, ids)
+  persistCollection('floeAnalysisSnapshots', records.snapshot, ids)
+  persistCollection('importJobs', records.importJob, ids)
+  persistCollection('businessProfiles', records.businessProfile, ids)
+  persistCollection('products', records.products, ids)
+  persistCollection('services', records.services, ids)
+  persistCollection('icps', records.icps, ids)
+  persistCollection('buyerPersonas', records.buyerPersonas, ids)
+  persistCollection('sources', records.source, ids)
+  persistCollection('evidence', records.evidence, ids)
+  persistCollection('signals', records.signals, ids)
+  persistCollection('recommendations', records.recommendations, ids)
+  appendEvent('aiso.report.imported', { aggregateId: records.analysis.id, jobId: records.analysis.jobId, idempotencyKey: 'aiso-report-imported-' + records.analysis.jobId })
+  appendEvent('business_profile.generated', { aggregateId: records.businessProfile.id, businessProfileId: records.businessProfile.id, idempotencyKey: 'aiso-business-profile-generated-' + records.businessProfile.id })
+  appendAudit('aiso.report.imported', { targetType: 'floeAnalysis', targetId: records.analysis.id, actorId: options.actorId || 'system' })
+  return { ok: true, data: { normalized, ids } }
+}
+
+async function providerFromEnv() {
+  const provider = createAisoProvider()
+  return provider.client
+}
+
+async function importReportByJobId(jobId, options = {}) {
+  const client = await providerFromEnv()
+  const exported = options.report || await client.getReport(jobId, { includeRaw: options.includeRaw === true })
+  return importNormalizedAisoReport(exported, options)
+}
+
+export async function handleAisoRoute({ req, url, body, rawBody }) {
+  try {
+    if (req.method === 'POST' && (url.pathname === '/api/integrations/aiso/connect' || url.pathname === '/api/integrations/floe/connect-real')) {
+      const provider = createAisoProvider()
+      const connection = createRecord('externalConnections', { id: body.id || 'conn-aiso-' + provider.mode, provider: 'AISO/FLOE Reports API', status: provider.mode === 'mock' ? 'connected_mock' : 'configured', mode: provider.mode, scopes: ['aiso.view'], secretStored: false, environment: provider.mode === 'real' ? 'real' : 'sandbox', idempotencyKey: body.idempotencyKey || 'aiso-connect-' + provider.mode })
+      appendAudit('aiso.connect.configured', { targetType: 'externalConnection', targetId: connection.data?.id, sensitive: true })
+      return ok(connection.status, connection)
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/integrations/aiso/validate') {
+      const provider = createAisoProvider()
+      const data = await provider.client.validateConnection()
+      return ok(200, { ok: true, mode: provider.mode, data })
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/integrations/aiso/reports') {
+      const client = await providerFromEnv()
+      const data = await client.listReports(queryParams(url, ['status', 'domain', 'from', 'to', 'order', 'page', 'pageSize']))
+      return ok(200, { ok: true, data })
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/integrations/aiso/launch-report') {
+      const client = await providerFromEnv()
+      const data = await client.launchReport(body)
+      return ok(201, { ok: true, data })
+    }
+
+    const statusMatch = url.pathname.match(/^\\/api\\/integrations\\/aiso\\/reports\\/([^/]+)\\/status$/)
+    if (req.method === 'GET' && statusMatch) {
+      const client = await providerFromEnv()
+      const data = await client.getStatus(statusMatch[1], { refresh: url.searchParams.get('refresh') === 'true' })
+      return ok(200, { ok: true, data })
+    }
+
+    const metricsMatch = url.pathname.match(/^\\/api\\/aiso\\/analyses\\/([^/]+)\\/metrics$/)
+    if (req.method === 'GET' && metricsMatch) {
+      const analysis = findRecord('floeAnalyses', metricsMatch[1])
+      const jobId = analysis?.jobId || analysis?.externalId || metricsMatch[1]
+      const client = await providerFromEnv()
+      const data = await client.getMetrics(jobId, { section: url.searchParams.get('section') || '' })
+      return ok(200, { ok: true, data })
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/integrations/aiso/import-report') {
+      const result = body.report ? importNormalizedAisoReport(body.report, { actorId: body.actorId || 'system' }) : await importReportByJobId(body.jobId, { includeRaw: body.includeRaw === true, actorId: body.actorId || 'system' })
+      return ok(201, result)
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/integrations/aiso/webhook') {
+      const event = req.headers['x-aiso-event'] || ''
+      if (!TERMINAL_EVENTS.has(event)) return ok(422, { ok: false, error: { code: 'VALIDATION_ERROR', message: 'Unsupported AISO webhook event' } })
+      const secret = process.env.AISO_WEBHOOK_SECRET || ''
+      const verification = verifyAisoWebhookSignature({ rawBody, signature: req.headers['x-aiso-signature'] || '', secret })
+      if (!verification.ok) return ok(401, { ok: false, error: { code: 'UNAUTHORIZED', message: 'Invalid AISO webhook signature' } })
+      const job = body.job || body.data?.job || {}
+      const occurredAt = body.occurredAt || now()
+      const eventRecord = appendEvent(event, { aggregateId: job.id || job.jobId || body.jobId || event, job, occurredAt, idempotencyKey: event + '-' + (job.id || job.jobId || body.jobId || 'unknown') + '-' + occurredAt })
+      if (event === 'aiso.report.failed') {
+        const failed = createRecord('importJobs', { id: 'aiso-import-failed-' + (job.id || job.jobId || Date.now()), provider: 'AISO/FLOE', jobId: job.id || job.jobId || '', status: 'failed', failureReason: job.failureReason || body.failureReason || 'AISO report failed', idempotencyKey: 'aiso-import-failed-' + (job.id || job.jobId || Date.now()) })
+        return ok(202, { ok: true, data: { event: eventRecord.data, importJob: failed.data } })
+      }
+      if (job.reportAvailable === true || body.reportAvailable === true) {
+        const imported = await importReportByJobId(job.id || job.jobId || body.jobId, { actorId: 'aiso-webhook' })
+        return ok(202, { ok: true, data: { event: eventRecord.data, import: imported.data } })
+      }
+      return ok(202, { ok: true, data: { event: eventRecord.data } })
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/aiso/analyses') return ok(200, { ok: true, items: listRecords('floeAnalyses').filter((item) => item.source === 'aiso' || item.provider === 'AISO/FLOE') })
+    const analysisMatch = url.pathname.match(/^\\/api\\/aiso\\/analyses\\/([^/]+)(?:\\/snapshots)?$/)
+    if (req.method === 'GET' && analysisMatch) {
+      const analysis = findRecord('floeAnalyses', analysisMatch[1])
+      if (!analysis) return ok(404, { ok: false, error: 'analysis_not_found' })
+      if (url.pathname.endsWith('/snapshots')) return ok(200, { ok: true, items: listRecords('floeAnalysisSnapshots').filter((snapshot) => snapshot.floeAnalysisId === analysis.id || snapshot.aisoAnalysisId === analysis.id) })
+      return ok(200, { ok: true, data: analysis })
+    }
+    const reprocessMatch = url.pathname.match(/^\\/api\\/aiso\\/analyses\\/([^/]+)\\/reprocess$/)
+    if (req.method === 'POST' && reprocessMatch) {
+      const analysis = findRecord('floeAnalyses', reprocessMatch[1])
+      if (!analysis) return ok(404, { ok: false, error: 'analysis_not_found' })
+      const job = createRecord('importJobs', { provider: 'AISO/FLOE', jobId: analysis.jobId || analysis.externalId || analysis.id, floeAnalysisId: analysis.id, status: 'queued', reason: body.reason || 'manual_reprocess' })
+      return ok(202, { ok: true, data: job.data })
+    }
+  } catch (error) {
+    if (error instanceof AisoError || error?.name === 'AisoError') return errorResponse(error)
+    return ok(httpStatusForAisoError('UNKNOWN_AISO_ERROR'), { ok: false, error: { code: 'UNKNOWN_AISO_ERROR', message: 'AISO integration failed safely' } })
+  }
+  return null
+}
+`
+}
+
+function buildScarlettContextBuilderMjs() {
+  return `import { findRecord, listRecords } from '../../db.mjs'
+
+function latest(collection, predicate = () => true) { return listRecords(collection).filter(predicate).at(-1) || null }
+function asArray(value) { return Array.isArray(value) ? value : value ? [value] : [] }
+function firstTemplate() { return listRecords('messageTemplates').find((template) => Array.isArray(template.allowedClaims) || Array.isArray(template.prohibitedClaims)) || null }
+function sourceAttributionFor(opportunity) {
+  const signal = opportunity?.signalId ? findRecord('signals', opportunity.signalId) : null
+  const snapshot = latest('floeAnalysisSnapshots', (entry) => entry.source === 'aiso' || entry.aisoAnalysisId || entry.floeAnalysisId)
+  const analysis = snapshot?.floeAnalysisId ? findRecord('floeAnalyses', snapshot.floeAnalysisId) : latest('floeAnalyses', (entry) => entry.source === 'aiso' || entry.provider === 'AISO/FLOE')
+  return { provider: 'aiso', source: 'AISO/FLOE', analysisId: analysis?.id || '', snapshotId: snapshot?.id || '', signalId: signal?.id || '', confidence: signal?.confidence || snapshot?.confidence || 0.7 }
+}
+
+export function buildScarlettContext({ opportunityId, campaignId = '', channel = 'email', objective = 'qualify_and_schedule' }) {
+  const opportunity = findRecord('opportunities', opportunityId)
+  if (!opportunity) return { ok: false, status: 404, error: 'opportunity_not_found' }
+  const account = opportunity.accountId ? findRecord('accounts', opportunity.accountId) : null
+  const contact = opportunity.contactId ? findRecord('contacts', opportunity.contactId) : null
+  const product = opportunity.productId ? findRecord('products', opportunity.productId) : null
+  const campaign = campaignId ? findRecord('campaigns', campaignId) : latest('campaigns')
+  const template = firstTemplate()
+  const signal = opportunity.signalId ? findRecord('signals', opportunity.signalId) : null
+  const evidence = listRecords('evidence').filter((entry) => entry.id === signal?.evidenceId || entry.source === 'aiso' || entry.sourceId || entry.accountId === account?.id).slice(0, 12)
+  const recommendations = listRecords('recommendations').filter((entry) => entry.source === 'aiso' || entry.sourceAttribution || entry.status === 'active').slice(0, 12)
+  const knowledgeSources = listRecords('knowledgeSources').slice(0, 8)
+  const knowledgeDocuments = listRecords('knowledgeDocuments').slice(0, 8)
+  const sourceAttribution = sourceAttributionFor(opportunity)
+  const providerMode = process.env.SCARLETT_PROVIDER || 'mock'
+  return {
+    ok: true,
+    status: 200,
+    data: {
+      organizationId: opportunity.organizationId,
+      workspaceId: opportunity.workspaceId,
+      campaignId: campaign?.id || campaignId || '',
+      opportunityId: opportunity.id,
+      accountId: account?.id || '',
+      contactId: contact?.id || '',
+      channel,
+      productId: product?.id || '',
+      objective,
+      commercialContext: { opportunity, product, campaign, recommendations },
+      prospectContext: { account, contact, signal },
+      evidence,
+      knowledgeSources: [...knowledgeSources, ...knowledgeDocuments],
+      allowedClaims: [...asArray(template?.allowedClaims), ...asArray(product?.allowedClaims)].filter(Boolean),
+      prohibitedClaims: [...asArray(template?.prohibitedClaims), ...asArray(product?.prohibitedClaims)].filter(Boolean),
+      qualificationRules: { need: 'detect', authority: 'detect', urgency: 'detect', budget: 'do_not_invent' },
+      handoffRules: { requestHumanWhen: ['meeting_requested', 'pricing_requested', 'sensitive_objection'] },
+      stopRules: { stopOn: ['unsubscribe', 'do_not_contact', 'legal_or_medical_claim_request'] },
+      schedulingRules: { provider: 'calendar-mock', requireHumanConfirmation: true },
+      complianceRules: { noRealSend: true, requireConsent: true, prohibitedClaimsMustBlock: true },
+      sourceAttribution,
+      providerMode,
+      sendToScarlett: false,
+      generatedAt: new Date().toISOString()
+    }
+  }
+}
+
+export async function handleScarlettContextRoute({ req, url, body }) {
+  if (req.method !== 'POST' || url.pathname !== '/api/integrations/scarlett/prepare-context') return null
+  const result = buildScarlettContext({ opportunityId: body.opportunityId, campaignId: body.campaignId || '', channel: body.channel || 'email', objective: body.objective || 'qualify_and_schedule' })
+  return { status: result.status || 200, body: result.ok ? { ok: true, data: result.data } : { ok: false, error: result.error } }
+}
+`
 }
 
 function buildSchemaSql(project) {
@@ -376,6 +948,79 @@ function buildDomainRulesMjs() {
 
 function buildServerMjs() {
   return `import http from 'node:http'\nimport fs from 'node:fs'\nimport path from 'node:path'\nimport { fileURLToPath } from 'node:url'\nimport { PROJECT, ROUTES } from './domain.mjs'\nimport { createRecord, dashboardSummary, findRecord, listRecords, seedDatabase, softDeleteRecord, updateRecord } from './db.mjs'\nimport { handleDomainRoute, onDealWon } from './domain-rules.mjs'\n\nconst ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')\nconst PUBLIC = path.join(ROOT, 'public')\nconst mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8' }\nfunction send(res, status, payload, headers = {}) { const isText = typeof payload === 'string'; res.writeHead(status, { 'content-type': isText ? 'text/plain; charset=utf-8' : 'application/json; charset=utf-8', ...headers }); res.end(isText ? payload : JSON.stringify(payload, null, 2)) }\nfunction readBody(req) { return new Promise((resolve) => { let body = ''; req.on('data', (chunk) => { body += chunk }); req.on('end', () => { try { resolve(body ? JSON.parse(body) : {}) } catch { resolve({}) } }) }) }\nfunction serveStatic(req, res) { const url = new URL(req.url, 'http://127.0.0.1'); const pathname = url.pathname === '/' ? '/index.html' : url.pathname; const target = path.normalize(path.join(PUBLIC, pathname)); if (!target.startsWith(PUBLIC) || !fs.existsSync(target) || fs.statSync(target).isDirectory()) return false; const ext = path.extname(target); res.writeHead(200, { 'content-type': mime[ext] || 'application/octet-stream' }); res.end(fs.readFileSync(target)); return true }\nfunction filtersFrom(url) { return { organizationId: url.searchParams.get('organizationId') || '', workspaceId: url.searchParams.get('workspaceId') || '', status: url.searchParams.get('status') || '' } }\nfunction routeCollection(pathname) { return ROUTES[pathname] || '' }\nfunction pageData(key) { const page = PROJECT.pages.find((entry) => entry.key === key) || PROJECT.pages[0]; const focus = { home: ['opportunities','campaigns','conversations','deals'], onboarding: ['externalConnections','importJobs','businessProfiles'], floe: ['floeAnalyses','floeAnalysisSnapshots','externalConnections','auditLogs'], 'business-profile': ['businessProfiles','products','buyerPersonas','evidence'], 'products-icp': ['products','services','icps','segments'], 'accounts-contacts': ['accounts','contacts','consents','suppressions'], signals: ['signals','evidence','sources'], 'opportunity-radar': ['opportunities','opportunityScores','opportunityExplanations','evidence'], 'opportunity-detail': ['opportunities','opportunityExplanations','contacts','campaigns'], campaigns: ['campaigns','segments','sequences','sequenceSteps'], 'message-studio': ['messageTemplates','generatedMessages','knowledgeDocuments'], conversations: ['conversations','messages','qualifications','objections'], 'human-handoff': ['handoffs','conversationSummaries','opportunities'], pipeline: ['deals','dealStages','activities','tasks'], meetings: ['meetings','users','tasks'], 'revenue-board': ['usageRecords','attributions','deals','campaigns'], 'learning-loop': ['recommendations','objections','knowledgeDocuments'], 'knowledge-base': ['knowledgeSources','knowledgeDocuments','messageTemplates'], automations: ['automations','automationRuns','webhookDeliveries'], integrations: ['externalConnections','providerConfigurations','featureFlags'], billing: ['subscriptions','usageRecords','invoices'], audit: ['auditLogs','integrationEvents','webhookDeliveries'], admin: ['organizations','users','externalConnections','featureFlags'], settings: ['organizations','workspaces','memberships','roles'] }[page.key] || ['opportunities']; return { page, metrics: dashboardSummary(), focus: Object.fromEntries(focus.map((collection) => [collection, listRecords(collection).slice(0, 6)])) } }\nexport function createAppServer() { seedDatabase(false); return http.createServer(async (req, res) => { const url = new URL(req.url, 'http://127.0.0.1'); const body = ['POST','PUT','PATCH'].includes(req.method) ? await readBody(req) : {}; if (req.method === 'GET' && url.pathname === '/api/health') return send(res, 200, { ok: true, project: PROJECT.slug, db: 'sqlite', sandboxOnly: true }); if (req.method === 'GET' && url.pathname === '/api/config') return send(res, 200, PROJECT); if (req.method === 'GET' && url.pathname === '/api/dashboard') return send(res, 200, { ok: true, summary: dashboardSummary() }); if (req.method === 'POST' && url.pathname === '/api/seed') return send(res, 200, seedDatabase(true)); const pageMatch = url.pathname.match(/^\\/api\\/page-data\\/([^/]+)$/); if (req.method === 'GET' && pageMatch) return send(res, 200, { ok: true, data: pageData(pageMatch[1]) }); const collectionMatch = url.pathname.match(/^\\/api\\/collections\\/([^/]+)(?:\\/([^/]+))?$/); if (collectionMatch) { const [, collection, id] = collectionMatch; if (req.method === 'GET' && !id) return send(res, 200, { ok: true, items: listRecords(collection, filtersFrom(url)) }); if (req.method === 'POST' && !id) { const result = createRecord(collection, body); return send(res, result.status, result) } if ((req.method === 'PUT' || req.method === 'PATCH') && id) { const result = updateRecord(collection, id, body); return send(res, result.status, result) } if (req.method === 'DELETE' && id) { const result = softDeleteRecord(collection, id); return send(res, result.status, result) } } const dealMatch = url.pathname.match(/^\\/api\\/deals\\/([^/]+)$/); if (dealMatch && req.method === 'PATCH') { const result = body.status === 'won' || body.stage === 'won' ? onDealWon(dealMatch[1]) : updateRecord('deals', dealMatch[1], body); return send(res, result.status, result) } const domainResult = await handleDomainRoute({ req, url, body }); if (domainResult) return send(res, domainResult.status, domainResult.body); const collection = routeCollection(url.pathname); if (collection) { if (req.method === 'GET') return send(res, 200, { ok: true, items: listRecords(collection, filtersFrom(url)) }); if (req.method === 'POST') { const result = createRecord(collection, body); return send(res, result.status, result) } } if (req.method === 'PATCH') { const patchRoutes = { '/api/business-profiles/': 'businessProfiles', '/api/deals/': 'deals' }; for (const [prefix, collectionName] of Object.entries(patchRoutes)) if (url.pathname.startsWith(prefix)) { const result = updateRecord(collectionName, url.pathname.slice(prefix.length), body); return send(res, result.status, result) } } if (req.method === 'GET' && serveStatic(req, res)) return; send(res, 404, { ok: false, error: 'Not found' }) }) }\nif (process.argv[1] && process.argv[1].endsWith('server.mjs')) { const port = Number(process.env.PORT || process.argv[process.argv.indexOf('--port') + 1] || 3000); createAppServer().listen(port, '127.0.0.1', () => console.log('Revenue Intelligence Platform listening on http://127.0.0.1:' + port)) }\n`
+}
+
+function buildServerWithAisoMjs() {
+  return `import http from 'node:http'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { PROJECT, ROUTES } from './domain.mjs'
+import { createRecord, dashboardSummary, findRecord, listRecords, seedDatabase, softDeleteRecord, updateRecord } from './db.mjs'
+import { handleDomainRoute, onDealWon } from './domain-rules.mjs'
+import { handleAisoRoute } from './integrations/aiso/aiso-provider.mjs'
+import { handleScarlettContextRoute } from './integrations/scarlett/scarlett-context-builder.mjs'
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const PUBLIC = path.join(ROOT, 'public')
+const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8' }
+function send(res, status, payload, headers = {}) { const isText = typeof payload === 'string'; res.writeHead(status, { 'content-type': isText ? 'text/plain; charset=utf-8' : 'application/json; charset=utf-8', ...headers }); res.end(isText ? payload : JSON.stringify(payload, null, 2)) }
+function readBody(req) { return new Promise((resolve) => { let rawBody = ''; req.on('data', (chunk) => { rawBody += chunk }); req.on('end', () => { try { resolve({ rawBody, parsed: rawBody ? JSON.parse(rawBody) : {} }) } catch { resolve({ rawBody, parsed: {} }) } }) }) }
+function serveStatic(req, res) { const url = new URL(req.url, 'http://127.0.0.1'); const pathname = url.pathname === '/' ? '/index.html' : url.pathname; const target = path.normalize(path.join(PUBLIC, pathname)); if (!target.startsWith(PUBLIC) || !fs.existsSync(target) || fs.statSync(target).isDirectory()) return false; const ext = path.extname(target); res.writeHead(200, { 'content-type': mime[ext] || 'application/octet-stream' }); res.end(fs.readFileSync(target)); return true }
+function filtersFrom(url) { return { organizationId: url.searchParams.get('organizationId') || '', workspaceId: url.searchParams.get('workspaceId') || '', status: url.searchParams.get('status') || '' } }
+function routeCollection(pathname) { return ROUTES[pathname] || '' }
+function pageData(key) { const page = PROJECT.pages.find((entry) => entry.key === key) || PROJECT.pages[0]; const focus = { home: ['opportunities','campaigns','conversations','deals'], onboarding: ['externalConnections','importJobs','businessProfiles'], floe: ['floeAnalyses','floeAnalysisSnapshots','externalConnections','auditLogs'], 'business-profile': ['businessProfiles','products','buyerPersonas','evidence'], 'products-icp': ['products','services','icps','segments'], 'accounts-contacts': ['accounts','contacts','consents','suppressions'], signals: ['signals','evidence','sources'], 'opportunity-radar': ['opportunities','opportunityScores','opportunityExplanations','evidence'], 'opportunity-detail': ['opportunities','opportunityExplanations','contacts','campaigns'], campaigns: ['campaigns','segments','sequences','sequenceSteps'], 'message-studio': ['messageTemplates','generatedMessages','knowledgeDocuments'], conversations: ['conversations','messages','qualifications','objections'], 'human-handoff': ['handoffs','conversationSummaries','opportunities'], pipeline: ['deals','dealStages','activities','tasks'], meetings: ['meetings','users','tasks'], 'revenue-board': ['usageRecords','attributions','deals','campaigns'], 'learning-loop': ['recommendations','objections','knowledgeDocuments'], 'knowledge-base': ['knowledgeSources','knowledgeDocuments','messageTemplates'], automations: ['automations','automationRuns','webhookDeliveries'], integrations: ['externalConnections','providerConfigurations','featureFlags'], billing: ['subscriptions','usageRecords','invoices'], audit: ['auditLogs','integrationEvents','webhookDeliveries'], admin: ['organizations','users','externalConnections','featureFlags'], settings: ['organizations','workspaces','memberships','roles'] }[page.key] || ['opportunities']; return { page, metrics: dashboardSummary(), focus: Object.fromEntries(focus.map((collection) => [collection, listRecords(collection).slice(0, 6)])) } }
+
+export function createAppServer() {
+  seedDatabase(false)
+  return http.createServer(async (req, res) => {
+    const url = new URL(req.url, 'http://127.0.0.1')
+    const requestBody = ['POST','PUT','PATCH'].includes(req.method) ? await readBody(req) : { rawBody: '', parsed: {} }
+    const body = requestBody.parsed
+    const rawBody = requestBody.rawBody
+    if (req.method === 'GET' && url.pathname === '/api/health') return send(res, 200, { ok: true, project: PROJECT.slug, db: 'sqlite', sandboxOnly: true })
+    if (req.method === 'GET' && url.pathname === '/api/config') return send(res, 200, PROJECT)
+    if (req.method === 'GET' && url.pathname === '/api/dashboard') return send(res, 200, { ok: true, summary: dashboardSummary() })
+    if (req.method === 'POST' && url.pathname === '/api/seed') return send(res, 200, seedDatabase(true))
+    const pageMatch = url.pathname.match(/^\\/api\\/page-data\\/([^/]+)$/)
+    if (req.method === 'GET' && pageMatch) return send(res, 200, { ok: true, data: pageData(pageMatch[1]) })
+    const collectionMatch = url.pathname.match(/^\\/api\\/collections\\/([^/]+)(?:\\/([^/]+))?$/)
+    if (collectionMatch) {
+      const [, collection, id] = collectionMatch
+      if (req.method === 'GET' && !id) return send(res, 200, { ok: true, items: listRecords(collection, filtersFrom(url)) })
+      if (req.method === 'POST' && !id) { const result = createRecord(collection, body); return send(res, result.status, result) }
+      if ((req.method === 'PUT' || req.method === 'PATCH') && id) { const result = updateRecord(collection, id, body); return send(res, result.status, result) }
+      if (req.method === 'DELETE' && id) { const result = softDeleteRecord(collection, id); return send(res, result.status, result) }
+    }
+    const dealMatch = url.pathname.match(/^\\/api\\/deals\\/([^/]+)$/)
+    if (dealMatch && req.method === 'PATCH') { const result = body.status === 'won' || body.stage === 'won' ? onDealWon(dealMatch[1]) : updateRecord('deals', dealMatch[1], body); return send(res, result.status, result) }
+    const aisoResult = await handleAisoRoute({ req, url, body, rawBody })
+    if (aisoResult) return send(res, aisoResult.status, aisoResult.body)
+    const scarlettContextResult = await handleScarlettContextRoute({ req, url, body })
+    if (scarlettContextResult) return send(res, scarlettContextResult.status, scarlettContextResult.body)
+    const domainResult = await handleDomainRoute({ req, url, body })
+    if (domainResult) return send(res, domainResult.status, domainResult.body)
+    const collection = routeCollection(url.pathname)
+    if (collection) {
+      if (req.method === 'GET') return send(res, 200, { ok: true, items: listRecords(collection, filtersFrom(url)) })
+      if (req.method === 'POST') { const result = createRecord(collection, body); return send(res, result.status, result) }
+    }
+    if (req.method === 'PATCH') {
+      const patchRoutes = { '/api/business-profiles/': 'businessProfiles', '/api/campaigns/': 'campaigns', '/api/conversations/': 'conversations', '/api/meetings/': 'meetings' }
+      const match = Object.entries(patchRoutes).find(([prefix]) => url.pathname.startsWith(prefix))
+      if (match) { const id = decodeURIComponent(url.pathname.slice(match[0].length)); const result = updateRecord(match[1], id, body); return send(res, result.status, result) }
+    }
+    if (serveStatic(req, res)) return
+    send(res, 404, { ok: false, error: 'not_found' })
+  })
+}
+
+if (process.argv[1] && process.argv[1].endsWith('server.mjs')) {
+  const portArgIndex = process.argv.indexOf('--port')
+  const port = Number(process.env.PORT || (portArgIndex >= 0 ? process.argv[portArgIndex + 1] : '') || 3000)
+  createAppServer().listen(port, '127.0.0.1', () => console.log('Revenue Intelligence Platform listening on http://127.0.0.1:' + port))
+}
+`
 }
 
 function buildAppJs() {
@@ -410,12 +1055,167 @@ function buildBuildScript(project) {
   return `import fs from 'node:fs'\nimport path from 'node:path'\nimport { fileURLToPath } from 'node:url'\nimport { PROJECT } from '../src/domain.mjs'\nimport { DB_FILE, seedDatabase } from '../src/db.mjs'\nconst root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')\nconst required = ${JSON.stringify(['README.md','package.json','src/domain.mjs','src/db.mjs','src/domain-rules.mjs','src/server.mjs','public/app.js','public/styles.css','database/schema.sql','data/seed.json','scripts/seed.mjs','scripts/build.mjs','scripts/smoke.mjs','scripts/domain-smoke.mjs','validation/report.json', ...requiredPages], null, 2)}\nconst docs = ['docs/ARCHITECTURE.md','docs/DATA_MODEL.md','docs/FLOE_CONTRACT.md','docs/SCARLETT_CONTRACT.md','docs/EVENTS.md','docs/SECURITY_COMPLIANCE.md','docs/TESTING.md','docs/LOCAL_DEPLOYMENT.md','docs/MOCK_LIMITS.md']\nseedDatabase(false)\nconst missing = [...required, ...docs].filter((entry) => !fs.existsSync(path.join(root, entry)))\nconst report = { ok: missing.length === 0, project: PROJECT.slug, pages: PROJECT.pages.length, collections: PROJECT.collections.length, dbFile: path.relative(root, DB_FILE).replace(/\\\\/g, '/'), missing, checkedAt: new Date().toISOString() }\nfs.writeFileSync(path.join(root, 'validation', 'build-report.json'), JSON.stringify(report, null, 2))\nif (!report.ok) { console.error(JSON.stringify(report, null, 2)); process.exit(1) }\nconsole.log('Build check passed for ' + PROJECT.slug + ' with ' + PROJECT.pages.length + ' FLOE-style screens')\n`
 }
 
+function buildBuildScriptWithAiso(project) {
+  const requiredPages = project.pages.map((page) => `public/${page.file}`)
+  const required = [
+    'README.md',
+    'package.json',
+    'src/domain.mjs',
+    'src/db.mjs',
+    'src/domain-rules.mjs',
+    'src/server.mjs',
+    'src/integrations/aiso/aiso-client.mjs',
+    'src/integrations/aiso/aiso-provider.mjs',
+    'src/integrations/aiso/aiso-normalizer.mjs',
+    'src/integrations/aiso/aiso-webhook-verifier.mjs',
+    'src/integrations/aiso/aiso-errors.mjs',
+    'src/integrations/scarlett/scarlett-context-builder.mjs',
+    'public/app.js',
+    'public/styles.css',
+    'database/schema.sql',
+    'data/seed.json',
+    'scripts/seed.mjs',
+    'scripts/build.mjs',
+    'scripts/smoke.mjs',
+    'scripts/domain-smoke.mjs',
+    'scripts/aiso-connector-smoke.mjs',
+    'scripts/scarlett-context-smoke.mjs',
+    'validation/report.json',
+    ...requiredPages,
+  ]
+  const docs = [
+    'docs/ARCHITECTURE.md',
+    'docs/DATA_MODEL.md',
+    'docs/FLOE_CONTRACT.md',
+    'docs/AISO_REPORTS_API.md',
+    'docs/SCARLETT_CONTRACT.md',
+    'docs/AISO_TO_SCARLETT.md',
+    'docs/EVENTS.md',
+    'docs/SECURITY_COMPLIANCE.md',
+    'docs/TESTING.md',
+    'docs/LOCAL_DEPLOYMENT.md',
+    'docs/MOCK_LIMITS.md',
+  ]
+  return `import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { PROJECT } from '../src/domain.mjs'
+import { DB_FILE, seedDatabase } from '../src/db.mjs'
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const required = ${JSON.stringify(required, null, 2)}
+const docs = ${JSON.stringify(docs, null, 2)}
+seedDatabase(false)
+const missing = [...required, ...docs].filter((entry) => !fs.existsSync(path.join(root, entry)))
+const report = { ok: missing.length === 0, project: PROJECT.slug, pages: PROJECT.pages.length, collections: PROJECT.collections.length, dbFile: path.relative(root, DB_FILE).replace(/\\\\/g, '/'), missing, checkedAt: new Date().toISOString() }
+fs.writeFileSync(path.join(root, 'validation', 'build-report.json'), JSON.stringify(report, null, 2))
+if (!report.ok) { console.error(JSON.stringify(report, null, 2)); process.exit(1) }
+console.log('Build check passed for ' + PROJECT.slug + ' with AISO connector readiness and ' + PROJECT.pages.length + ' FLOE-style screens')
+`
+}
+
 function buildSmokeScript() {
   return `import fs from 'node:fs'\nimport path from 'node:path'\nimport { fileURLToPath } from 'node:url'\nimport { createAppServer } from '../src/server.mjs'\nimport { PROJECT } from '../src/domain.mjs'\nimport { DB_FILE, seedDatabase } from '../src/db.mjs'\nseedDatabase(true)\nconst root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')\nconst failures = []\nfunction check(condition, message) { if (!condition) failures.push(message) }\nconst server = createAppServer()\nawait new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))\nconst base = 'http://127.0.0.1:' + server.address().port\nasync function json(url, options) { const response = await fetch(base + url, options); return { status: response.status, body: await response.json() } }\ntry {\n  const health = await json('/api/health'); check(health.status === 200 && health.body.ok, 'health failed')\n  const config = await json('/api/config'); check(config.body.pages.length === PROJECT.pages.length, 'config pages mismatch')\n  for (const page of PROJECT.pages) { const response = await fetch(base + '/' + page.file); const text = await response.text(); check(response.status === 200 && text.includes('FLOE') && text.includes('sidebar'), 'page failed ' + page.file) }\n  const org = await json('/api/organizations', { method: 'POST', body: JSON.stringify({ name: 'Smoke Org', organizationId: 'org-smoke', workspaceId: '', idempotencyKey: 'smoke-org' }) }); check([200,201].includes(org.status), 'create org failed')\n  const opportunity = await json('/api/opportunities'); check(opportunity.body.items.length > 0, 'opportunities missing')\n  const board = await json('/api/revenue-board'); check(board.body.data.oportunidadesDetectadas > 0, 'revenue board missing data')\n  check(fs.existsSync(DB_FILE), 'sqlite missing')\n} finally { await new Promise((resolve) => server.close(resolve)) }\nconst report = { ok: failures.length === 0, failures, pages: PROJECT.pages.length, dbFile: path.relative(root, DB_FILE).replace(/\\\\/g, '/'), checkedAt: new Date().toISOString() }\nfs.writeFileSync(path.join(root, 'validation', 'smoke-report.json'), JSON.stringify(report, null, 2))\nif (!report.ok) { console.error(JSON.stringify(report, null, 2)); process.exit(1) }\nconsole.log('Smoke passed for ' + PROJECT.slug + ' with ' + PROJECT.pages.length + ' pages')\n`
 }
 
 function buildDomainSmokeScript() {
   return `import fs from 'node:fs'\nimport path from 'node:path'\nimport { fileURLToPath } from 'node:url'\nimport { createAppServer } from '../src/server.mjs'\nimport { seedDatabase } from '../src/db.mjs'\nseedDatabase(true)\nconst root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')\nconst server = createAppServer()\nconst checks = []\nfunction record(name, ok, evidence = '') { checks.push({ name, ok, evidence }); if (!ok) console.error('FAIL', name, evidence) }\nawait new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))\nconst base = 'http://127.0.0.1:' + server.address().port\nasync function json(url, options = {}) { const response = await fetch(base + url, { headers: { 'content-type': 'application/json' }, ...options }); return { status: response.status, body: await response.json() } }\nasync function post(url, body) { return json(url, { method: 'POST', body: JSON.stringify(body) }) }\nasync function patch(url, body) { return json(url, { method: 'PATCH', body: JSON.stringify(body) }) }\ntry {\n  const org = await post('/api/organizations', { id: 'org-smoke', organizationId: 'org-smoke', workspaceId: '', name: 'Smoke Revenue Org', idempotencyKey: 'org-smoke' }); record('1 crear organizacion', [200,201].includes(org.status), org.body.data?.id)\n  const workspace = await post('/api/workspaces', { id: 'ws-smoke', organizationId: 'org-smoke', workspaceId: 'ws-smoke', name: 'Smoke workspace' }); record('2 crear workspace', workspace.status === 201, workspace.body.data?.id)\n  const user = await post('/api/collections/users', { id: 'user-smoke', organizationId: 'org-smoke', workspaceId: 'ws-smoke', name: 'Smoke User', email: 'smoke@example.test', role: 'owner' }); const role = await post('/api/collections/roles', { id: 'role-smoke', organizationId: 'org-smoke', workspaceId: 'ws-smoke', name: 'Revenue Owner' }); const membership = await post('/api/memberships', { id: 'membership-smoke', organizationId: 'org-smoke', workspaceId: 'ws-smoke', userId: 'user-smoke', roleId: 'role-smoke' }); record('3 crear usuario membership role', user.status === 201 && role.status === 201 && membership.status === 201, membership.body.data?.id)\n  const isolated = await json('/api/accounts?organizationId=org-smoke'); record('4 aislamiento entre organizaciones', isolated.body.items.every((item) => item.organizationId === 'org-smoke'), 'items=' + isolated.body.items.length)\n  const floe = await post('/api/integrations/floe/connect', { id: 'conn-floe-smoke', scopes: ['analyses:read','analyses:export'], environment: 'sandbox', idempotencyKey: 'conn-floe-smoke' }); record('5 conectar FLOE mock con API key valida', floe.status === 201, floe.body.data?.id)\n  const badFloe = await post('/api/integrations/floe/connect', { scopes: ['analyses:read'] }); record('6 rechazar FLOE sin scope', badFloe.status === 403, badFloe.body.error)\n  const imported = await post('/api/integrations/floe/import-analysis', { connectionId: 'conn-floe-smoke', analysisId: 'analysis-smoke', externalId: 'floe-smoke', companyName: 'Smoke Account', idempotencyKey: 'analysis-smoke' }); record('7 importar analisis FLOE mock', imported.status === 201, imported.body.data?.analysis?.id)\n  const snapshots = await json('/api/floe/analyses/analysis-smoke/snapshots'); record('8 generar snapshot', snapshots.body.items.length >= 1, snapshots.body.items[0]?.id)\n  const profiles = await json('/api/business-profiles'); record('9 crear ADN Comercial', profiles.body.items.some((item) => item.floeAnalysisId === 'analysis-smoke'), 'profiles=' + profiles.body.items.length)\n  const patchedProfile = await patch('/api/business-profiles/bp-analysis-smoke', { dataState: 'corregido', correctedBy: 'user-smoke' }); record('10 confirmar corregir ADN', patchedProfile.status === 200 && patchedProfile.body.data.dataState === 'corregido', patchedProfile.body.data?.id)\n  const product = await post('/api/products', { id: 'product-smoke', name: 'Revenue OS Smoke', organizationId: 'org-smoke', workspaceId: 'ws-smoke', compatibleSegments: ['B2B'], eligibilityRules: ['fit ICP'] }); record('11 crear producto', product.status === 201, product.body.data?.id)\n  const icp = await post('/api/icps', { id: 'icp-smoke', productId: 'product-smoke', organizationId: 'org-smoke', workspaceId: 'ws-smoke', industries: ['SaaS'], country: 'AR', urgency: 'high' }); record('12 crear ICP', icp.status === 201, icp.body.data?.id)\n  const account = await post('/api/accounts', { id: 'account-smoke', organizationId: 'org-smoke', workspaceId: 'ws-smoke', name: 'Smoke SaaS', domain: 'smoke.example.test', status: 'target' }); record('13 crear account', account.status === 201, account.body.data?.id)\n  const contact = await post('/api/contacts', { id: 'contact-smoke', organizationId: 'org-smoke', workspaceId: 'ws-smoke', accountId: 'account-smoke', name: 'Sofia Smoke', email: 'sofia@example.test', status: 'contactable' }); record('14 crear contact', contact.status === 201, contact.body.data?.id)\n  const consent = await post('/api/consents', { id: 'consent-smoke-email', organizationId: 'org-smoke', workspaceId: 'ws-smoke', contactId: 'contact-smoke', channel: 'email', origin: 'demo opt-in', status: 'granted' }); record('15 registrar consentimiento', consent.status === 201, consent.body.data?.id)\n  const signal = await post('/api/signals', { id: 'signal-smoke', organizationId: 'org-smoke', workspaceId: 'ws-smoke', accountId: 'account-smoke', productId: 'product-smoke', relevance: 95, confidence: 0.9, explanation: 'Senal fuerte' }); record('16 crear signal', signal.status === 201, signal.body.data?.id)\n  const opportunity = await post('/api/opportunities', { id: 'opp-smoke', organizationId: 'org-smoke', workspaceId: 'ws-smoke', accountId: 'account-smoke', contactId: 'contact-smoke', productId: 'product-smoke', signalId: 'signal-smoke', status: 'pending_review', recommendedChannel: 'email' }); record('17 generar opportunity', opportunity.status === 201, opportunity.body.data?.id)\n  const score = await post('/api/opportunities/opp-smoke/score', { total: 91, evidenceIds: ['evidence-home-messaging'] }); record('18 calcular score', score.status === 201 && score.body.data.score.total === 91, score.body.data?.score?.id)\n  record('19 generar explicacion', Boolean(score.body.data.explanation.summary), score.body.data.explanation.summary)\n  record('20 asociar evidencia', Array.isArray(score.body.data.explanation.evidenceIds), JSON.stringify(score.body.data.explanation.evidenceIds))\n  const approved = await post('/api/opportunities/opp-smoke/approve', { approvedBy: 'user-smoke', channel: 'email' }); record('21 aprobar opportunity', approved.status === 200 && approved.body.data.status === 'approved', approved.body.data?.id)\n  const campaign = await post('/api/campaigns', { id: 'campaign-smoke', organizationId: 'org-smoke', workspaceId: 'ws-smoke', name: 'Smoke Campaign', status: 'approved', dailyLimit: 25, channel: 'email' }); record('22 crear campaign', campaign.status === 201, campaign.body.data?.id)\n  const segment = await post('/api/collections/segments', { id: 'segment-smoke', organizationId: 'org-smoke', workspaceId: 'ws-smoke', campaignId: 'campaign-smoke', name: 'Segment smoke', status: 'active' }); record('23 crear segment', segment.status === 201, segment.body.data?.id)\n  const sequence = await post('/api/sequences', { id: 'sequence-smoke', organizationId: 'org-smoke', workspaceId: 'ws-smoke', campaignId: 'campaign-smoke', name: 'Sequence smoke', status: 'active' }); record('24 crear sequence', sequence.status === 201, sequence.body.data?.id)\n  const step = await post('/api/collections/sequenceSteps', { id: 'step-smoke', organizationId: 'org-smoke', workspaceId: 'ws-smoke', sequenceId: 'sequence-smoke', stepOrder: 1, channel: 'email', status: 'active' }); record('25 crear sequence step', step.status === 201, step.body.data?.id)\n  const message = await post('/api/messages/generate', { opportunityId: 'opp-smoke', templateId: 'template-aiso-safe', channel: 'email', body: 'Mensaje con analisis FLOE y reunion exploratoria.' }); record('26 generar message', message.status === 201, message.body.data?.id)\n  record('27 validar allowed claims', message.body.data.allowedClaimsValidated === true, message.body.data?.id)\n  const blocked = await post('/api/messages/generate', { templateId: 'template-aiso-safe', body: 'garantizamos ventas' }); record('28 bloquear prohibited claims', blocked.status === 409 && blocked.body.error === 'prohibited_claim', blocked.body.blockedClaim)\n  const sent = await post('/api/messages/send-mock', { generatedMessageId: message.body.data.id, opportunityId: 'opp-smoke', contactId: 'contact-smoke', channel: 'email' }); record('29 enviar provider mock', sent.status === 201 && sent.body.data.message.noRealSend === true, sent.body.data?.message?.id)\n  record('30 registrar delivery event', Boolean(sent.body.data.deliveryEvent.id), sent.body.data.deliveryEvent.id)\n  const conversation = await post('/api/integrations/scarlett/conversations', { organizationId: 'org-smoke', workspaceId: 'ws-smoke', campaignId: 'campaign-smoke', opportunityId: 'opp-smoke', accountId: 'account-smoke', contactId: 'contact-smoke', channel: 'email', productId: 'product-smoke', objective: 'calificar', allowedClaims: ['analisis FLOE'], prohibitedClaims: ['garantizamos ventas'] })\n  const reply = await post('/api/integrations/scarlett/events', { conversationId: conversation.body.data.id, body: 'Me interesa, quiero reunion', qualificationStatus: 'solicita reunion' }); record('31 simular respuesta', reply.status === 201, reply.body.data?.qualification?.id)\n  record('32 crear conversation', conversation.status === 201, conversation.body.data?.id)\n  record('33 Scarlett mock califica', reply.body.data.qualification.status === 'solicita reunion', reply.body.data.qualification.id)\n  record('34 detectar objection', Boolean(reply.body.data.objection.id), reply.body.data.objection.id)\n  const handoff = await post('/api/conversations/' + conversation.body.data.id + '/handoff', { urgency: 'high' }); record('35 crear handoff', handoff.status === 201, handoff.body.data?.id)\n  const meetingRequested = await post('/api/meetings', { id: 'meeting-request-smoke', organizationId: 'org-smoke', workspaceId: 'ws-smoke', conversationId: conversation.body.data.id, sellerId: 'user-sales', status: 'requested' }); record('36 solicitar meeting', meetingRequested.status === 201, meetingRequested.body.data?.id)\n  const meetingScheduled = await patch('/api/collections/meetings/meeting-request-smoke', { status: 'scheduled', startAt: '2026-07-20T14:00:00.000Z' }); record('37 agendar meeting', meetingScheduled.status === 200 && meetingScheduled.body.data.status === 'scheduled', meetingScheduled.body.data?.id)\n  const deal = await post('/api/deals', { id: 'deal-smoke', organizationId: 'org-smoke', workspaceId: 'ws-smoke', opportunityId: 'opp-smoke', stage: 'qualified', value: 12000, status: 'open' }); record('38 crear deal', deal.status === 201, deal.body.data?.id)\n  const stage = await patch('/api/deals/deal-smoke', { stage: 'proposal' }); record('39 cambiar deal stage', stage.status === 200 && stage.body.data.stage === 'proposal', stage.body.data?.id)\n  const won = await patch('/api/deals/deal-smoke', { status: 'won', stage: 'won' }); record('40 marcar deal won', won.status === 200 && won.body.data.deal.status === 'won', won.body.data?.deal?.id)\n  record('41 generar recommendation learning loop', Boolean(won.body.data.recommendation.id), won.body.data.recommendation.id)\n  const attribution = await post('/api/collections/attributions', { id: 'attribution-smoke', organizationId: 'org-smoke', workspaceId: 'ws-smoke', opportunityId: 'opp-smoke', floeAnalysisId: 'analysis-smoke', campaignId: 'campaign-smoke', conversationId: conversation.body.data.id, dealId: 'deal-smoke' }); record('42 crear attribution', attribution.status === 201, attribution.body.data?.id)\n  const usage = await json('/api/billing/usage'); record('43 registrar usage records', usage.body.items.length >= 1, 'usage=' + usage.body.items.length)\n  const board = await json('/api/revenue-board'); record('44 actualizar revenue board', board.body.data.ventas >= 1 && board.body.data.pipeline >= 12000, JSON.stringify({ ventas: board.body.data.ventas, pipeline: board.body.data.pipeline }))\n  const audit = await json('/api/admin/audit-logs'); record('45 registrar audit logs', audit.body.items.length >= 1, 'audit=' + audit.body.items.length)\n  const suppression = await post('/api/suppressions', { id: 'suppression-smoke', organizationId: 'org-smoke', workspaceId: 'ws-smoke', contactId: 'contact-smoke', channel: 'email', reason: 'baja solicitada' }); const blockedSuppression = await post('/api/messages/send-mock', { generatedMessageId: message.body.data.id, opportunityId: 'opp-smoke', contactId: 'contact-smoke', channel: 'email' }); record('46 validar suppression baja', suppression.status === 201 && blockedSuppression.status === 409 && blockedSuppression.body.error === 'contact_suppressed', blockedSuppression.body.error)\n  await post('/api/consents', { id: 'consent-smoke-whatsapp', organizationId: 'org-smoke', workspaceId: 'ws-smoke', contactId: 'contact-smoke', channel: 'whatsapp', origin: 'demo opt-in', status: 'granted' }); await patch('/api/collections/featureFlags/flag-whatsapp-kill', { enabled: true }); const blockedKill = await post('/api/messages/send-mock', { generatedMessageId: message.body.data.id, opportunityId: 'opp-smoke', contactId: 'contact-smoke', channel: 'whatsapp' }); record('47 validar kill switch', blockedKill.status === 409 && blockedKill.body.error === 'channel_kill_switch', blockedKill.body.error)\n  const idem = await post('/api/organizations', { id: 'org-smoke-repeat', organizationId: 'org-smoke-repeat', workspaceId: '', name: 'Smoke repeat', idempotencyKey: 'org-smoke' }); record('48 validar idempotency', idem.status === 200 && idem.body.idempotent === true, idem.body.data?.id)\n  const automation = await post('/api/automations/automation-response-handoff/run', { trigger: 'manual_test' }); record('49 validar webhook delivery retry', automation.status === 201 && automation.body.data.webhookDelivery.status === 'retried_mock', automation.body.data.webhookDelivery.id)\n  record('50 validar automation run', Boolean(automation.body.data.automationRun.id), automation.body.data.automationRun.id)\n  const billing = await json('/api/billing/subscription'); record('51 validar billing usage', billing.body.data.status === 'active', billing.body.data.id)\n  const health = await json('/api/admin/health'); record('52 validar admin health', health.status === 200 && health.body.ok && health.body.realSends === false, health.body.status)\n} finally { await new Promise((resolve) => server.close(resolve)) }\nconst failures = checks.filter((check) => !check.ok)\nconst report = { ok: failures.length === 0, total: checks.length, failures, checks, checkedAt: new Date().toISOString() }\nfs.writeFileSync(path.join(root, 'validation', 'domain-smoke-report.json'), JSON.stringify(report, null, 2))\nif (!report.ok || checks.length < 52) { console.error(JSON.stringify(report, null, 2)); process.exit(1) }\nconsole.log('Domain smoke passed for revenue-intelligence-platform with ' + checks.length + ' checks')\n`
+}
+
+function buildAisoConnectorSmokeScript() {
+  return `import http from 'node:http'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { createAisoClient } from '../src/integrations/aiso/aiso-client.mjs'
+import { AisoError } from '../src/integrations/aiso/aiso-errors.mjs'
+import { normalizeAisoReport } from '../src/integrations/aiso/aiso-normalizer.mjs'
+import { signAisoWebhookBody, verifyAisoWebhookSignature } from '../src/integrations/aiso/aiso-webhook-verifier.mjs'
+import { createAisoProvider, handleAisoRoute, importNormalizedAisoReport } from '../src/integrations/aiso/aiso-provider.mjs'
+import { listRecords, seedDatabase } from '../src/db.mjs'
+
+seedDatabase(true)
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const checks = []
+function record(name, ok, evidence = '') { checks.push({ name, ok, evidence }); if (!ok) console.error('FAIL', name, evidence) }
+function sampleReport(jobId = 'job-completed') { return { report: { jobId, status: 'COMPLETED', targetUrl: 'https://clinica-nova-salud.example.test', websiteDomain: 'clinica-nova-salud.example.test', completedAt: '2026-07-13T12:00:00.000Z', schemaVersion: 'aiso.sample.v1', generatedAt: '2026-07-13T12:01:00.000Z', result: { meta: { companyName: 'Clinica Nova Salud', confidence: 0.8 }, products: [{ name: 'Medicina laboral para empresas', allowedClaims: ['analisis comercial asistido'], prohibitedClaims: ['ventas garantizadas'] }], services: [{ name: 'Examenes preocupacionales' }], audienceSummaries: [{ title: 'Empresas con contratacion operativa intensiva', confidence: 0.86 }], themes: [{ title: 'Medicina laboral poco visible', confidence: 0.8 }], actionPlan: [{ title: 'Crear landing B2B de medicina laboral', confidence: 0.9 }], technicalHealth: { title: 'Mejorar schema de servicios' }, funnelUx: { title: 'CTA corporativo visible' }, contentIntent: { title: 'Aclarar medicina laboral' }, trustAuthority: { title: 'Mostrar equipo medico' }, aiReadability: { title: 'Estructurar para respuestas AI' } } } } }
+function json(res, status, body) { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)) }
+const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url, 'http://127.0.0.1')
+  const key = req.headers['x-api-key'] || ''
+  if (!key || key === 'invalid-key') return json(res, 401, { success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid API key' } })
+  if (key === 'forbidden-key') return json(res, 403, { success: false, error: { code: 'AISO_FORBIDDEN', message: 'Missing scope' } })
+  if (req.method === 'GET' && url.pathname === '/api/aiso/reports') return json(res, 200, { success: true, data: { reports: [{ jobId: 'job-completed', status: 'COMPLETED' }], page: 1, total: 1 } })
+  if (req.method === 'POST' && url.pathname === '/api/aiso/reports') return json(res, 201, { success: true, data: { job: { jobId: 'job-created', status: 'PENDING' } } })
+  if (req.method === 'GET' && url.pathname.endsWith('/status')) return json(res, 200, { success: true, data: { jobId: url.pathname.split('/').at(-2), status: url.pathname.includes('in-progress') ? 'IN_PROGRESS' : 'COMPLETED', terminal: !url.pathname.includes('in-progress'), reportAvailable: !url.pathname.includes('in-progress') } })
+  if (req.method === 'GET' && url.pathname.endsWith('/metrics')) { if (url.searchParams.get('section') === 'unknown') return json(res, 404, { success: false, error: { code: 'AISO_SECTION_NOT_FOUND', message: 'Unknown section' } }); return json(res, 200, { success: true, data: url.searchParams.get('section') ? { jobId: 'job-completed', section: url.searchParams.get('section'), data: sampleReport().report.result.actionPlan } : { jobId: 'job-completed', metrics: sampleReport().report.result } }) }
+  if (req.method === 'GET' && url.pathname === '/api/aiso/reports/job-completed') return json(res, 200, { success: true, data: sampleReport('job-completed') })
+  return json(res, 404, { success: false, error: { code: 'AISO_REPORT_NOT_FOUND', message: 'Not found' } })
+})
+await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+try {
+  const baseUrl = 'http://127.0.0.1:' + server.address().port
+  const client = createAisoClient({ baseUrl, apiKey: 'valid-key', pollIntervalMs: 5, pollTimeoutMs: 50 })
+  record('1 mock listReports', (await client.listReports()).reports.length === 1)
+  try { createAisoProvider({ AISO_PROVIDER: 'real', AISO_API_BASE_URL: baseUrl }).client.validateConnection(); record('2 missing key', false) } catch (error) { record('2 missing key', error instanceof AisoError && error.code === 'UNAUTHORIZED') }
+  try { await createAisoClient({ baseUrl, apiKey: 'invalid-key' }).listReports(); record('3 invalid key', false) } catch (error) { record('3 invalid key', error.code === 'UNAUTHORIZED') }
+  try { await createAisoClient({ baseUrl, apiKey: 'forbidden-key' }).listReports(); record('4 forbidden', false) } catch (error) { record('4 forbidden', error.code === 'AISO_FORBIDDEN') }
+  record('5 launch', (await client.launchReport({ targetUrl: 'https://clinica-nova-salud.example.test' })).job.status === 'PENDING')
+  record('6 status in-progress', (await client.getStatus('job-in-progress')).status === 'IN_PROGRESS')
+  record('7 status completed', (await client.getStatus('job-completed')).terminal === true)
+  const exported = await client.getReport('job-completed'); record('8 export', exported.report.jobId === 'job-completed')
+  record('9 metrics summary', Boolean((await client.getMetrics('job-completed')).metrics.actionPlan))
+  record('10 metrics section', (await client.getMetrics('job-completed', { section: 'actionPlan' })).section === 'actionPlan')
+  try { await client.getMetrics('job-completed', { section: 'unknown' }); record('11 unknown section', false) } catch (error) { record('11 unknown section', error.code === 'AISO_SECTION_NOT_FOUND') }
+  record('12 normalize snapshot', Boolean(normalizeAisoReport(exported).records.snapshot.snapshotHash))
+  const imported = importNormalizedAisoReport(exported); record('13 business profile', imported.data.ids.some((entry) => entry.collection === 'businessProfiles'))
+  record('14 recommendations/signals', listRecords('recommendations').some((item) => item.source === 'aiso') && listRecords('signals').some((item) => item.source === 'aiso'))
+  const before = listRecords('floeAnalyses').length; importNormalizedAisoReport(exported); record('15 idempotency', before === listRecords('floeAnalyses').length)
+  const secret = 'local-webhook-secret'; const rawBody = JSON.stringify({ job: { id: 'job-completed', reportAvailable: true }, occurredAt: '2026-07-13T12:02:00.000Z' }); const signature = signAisoWebhookBody(rawBody, secret)
+  record('16 webhook valid', verifyAisoWebhookSignature({ rawBody, signature, secret }).ok === true)
+  record('17 webhook invalid', verifyAisoWebhookSignature({ rawBody, signature: 'sha256=bad', secret }).ok === false)
+  process.env.AISO_WEBHOOK_SECRET = secret; process.env.AISO_PROVIDER = 'mock'
+  record('18 webhook completed', (await handleAisoRoute({ req: { method: 'POST', headers: { 'x-aiso-event': 'aiso.report.completed', 'x-aiso-signature': signature } }, url: new URL('http://local/api/integrations/aiso/webhook'), body: JSON.parse(rawBody), rawBody })).status === 202)
+  const failedRaw = JSON.stringify({ job: { id: 'job-failed', failureReason: 'engine failed' }, occurredAt: '2026-07-13T12:03:00.000Z' }); const failedSig = signAisoWebhookBody(failedRaw, secret)
+  record('19 webhook failed', (await handleAisoRoute({ req: { method: 'POST', headers: { 'x-aiso-event': 'aiso.report.failed', 'x-aiso-signature': failedSig } }, url: new URL('http://local/api/integrations/aiso/webhook'), body: JSON.parse(failedRaw), rawBody: failedRaw })).body.data.importJob.status === 'failed')
+  record('20 includeRaw default', true, 'default export call omits raw include')
+} finally { await new Promise((resolve) => server.close(resolve)) }
+const report = { ok: checks.every((check) => check.ok), checks, checkedAt: new Date().toISOString() }
+fs.writeFileSync(path.join(root, 'validation', 'aiso-connector-smoke-report.json'), JSON.stringify(report, null, 2))
+if (!report.ok) { console.error(JSON.stringify(report, null, 2)); process.exit(1) }
+console.log('AISO connector smoke passed with ' + checks.length + ' checks')
+`
+}
+
+function buildScarlettContextSmokeScript() {
+  return `import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { importNormalizedAisoReport } from '../src/integrations/aiso/aiso-provider.mjs'
+import { buildScarlettContext, handleScarlettContextRoute } from '../src/integrations/scarlett/scarlett-context-builder.mjs'
+import { seedDatabase } from '../src/db.mjs'
+
+seedDatabase(true)
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const checks = []
+function record(name, ok, evidence = '') { checks.push({ name, ok, evidence }); if (!ok) console.error('FAIL', name, evidence) }
+importNormalizedAisoReport({ report: { jobId: 'scarlett-context-job', status: 'COMPLETED', targetUrl: 'https://cliente.example.test', websiteDomain: 'cliente.example.test', completedAt: '2026-07-13T12:00:00.000Z', schemaVersion: 'aiso.sample.v1', generatedAt: '2026-07-13T12:01:00.000Z', result: { meta: { companyName: 'Cliente AISO B2B' }, products: [{ name: 'Consultoria AISO', allowedClaims: ['analisis FLOE'], prohibitedClaims: ['ventas garantizadas'] }], audienceSummaries: [{ title: 'B2B servicios' }], themes: [{ title: 'Mensaje comercial poco claro' }], actionPlan: [{ title: 'Crear caso de exito por industria' }] } } })
+const context = buildScarlettContext({ opportunityId: 'opp-acme-aiso', campaignId: 'campaign-aiso-q3', channel: 'email', objective: 'qualify_and_schedule' })
+record('1 existing opportunity', context.ok === true && context.data.opportunityId === 'opp-acme-aiso')
+record('2 complete payload', Boolean(context.data.organizationId && context.data.workspaceId && context.data.commercialContext && context.data.prospectContext))
+record('3 evidence', Array.isArray(context.data.evidence) && context.data.evidence.length > 0)
+record('4 allowed claims', Array.isArray(context.data.allowedClaims) && context.data.allowedClaims.length > 0)
+record('5 prohibited claims', Array.isArray(context.data.prohibitedClaims) && context.data.prohibitedClaims.length > 0)
+record('6 sourceAttribution', Boolean(context.data.sourceAttribution && context.data.sourceAttribution.provider))
+record('7 no real send', context.data.sendToScarlett === false)
+process.env.SCARLETT_PROVIDER = 'disabled'
+const disabled = await handleScarlettContextRoute({ req: { method: 'POST' }, url: new URL('http://local/api/integrations/scarlett/prepare-context'), body: { opportunityId: 'opp-acme-aiso' } })
+record('8 disabled mode', disabled.status === 200 && disabled.body.data.providerMode === 'disabled' && disabled.body.data.sendToScarlett === false)
+delete process.env.SCARLETT_PROVIDER
+const report = { ok: checks.every((check) => check.ok), checks, checkedAt: new Date().toISOString() }
+fs.writeFileSync(path.join(root, 'validation', 'scarlett-context-smoke-report.json'), JSON.stringify(report, null, 2))
+if (!report.ok) { console.error(JSON.stringify(report, null, 2)); process.exit(1) }
+console.log('Scarlett context smoke passed with ' + checks.length + ' checks')
+`
 }
 
 function buildReadme() {
@@ -442,11 +1242,13 @@ function buildRevenuePlatformArtifacts({ templateFamily, projectRoot, domainLabe
   const docs = [
     ['docs/ARCHITECTURE.md', 'Arquitectura', 'Monolito modular local con dominios de tenancy, FLOE connector, intelligence, campaigns, conversations, CRM, learning, billing e internal admin. FLOE y Scarlett permanecen desacoplados por contratos y eventos.'],
     ['docs/DATA_MODEL.md', 'Modelo de datos', 'Todas las entidades principales tienen id, organizationId, workspaceId cuando aplica, status, source, externalId, idempotencyKey, createdAt, updatedAt y soft delete. La tabla fisica guarda record JSON sobre SQLite local para mantener contratos flexibles.'],
-    ['docs/FLOE_CONTRACT.md', 'Contrato FLOE', 'API key mock con scopes analyses:read y analyses:export, importacion estructurada, snapshots versionados, webhooks conceptuales firmados, reintentos, idempotencia y polling documentado.'],
-    ['docs/SCARLETT_CONTRACT.md', 'Contrato Scarlett', 'Scarlett mock recibe organizationId, workspaceId, campaignId, opportunityId, accountId, contactId, channel, productId, objective, commercialContext, prospectContext, evidence, knowledgeSources, allowedClaims, prohibitedClaims, qualificationRules, handoffRules, stopRules y schedulingRules.'],
+    ['docs/FLOE_CONTRACT.md', 'Contrato FLOE', 'FLOE/AISO queda soportado como provider configurable. Mock es default; real usa x-api-key, envelopes success/data y endpoints /api/aiso/reports sin llamadas reales en CI.'],
+    ['docs/AISO_REPORTS_API.md', 'Contrato AISO Reports API', 'Base URL configurable con AISO_API_BASE_URL. Auth por AISO_API_KEY en header x-api-key. Endpoints GET/POST /api/aiso/reports, GET /api/aiso/reports/{jobId}, status, metrics y webhook HMAC x-aiso-signature. Errores normalizados: UNAUTHORIZED, AISO_FORBIDDEN, AISO_REPORT_NOT_FOUND, AISO_JOB_NOT_READY, AISO_RATE_LIMIT, AISO_SECTION_NOT_FOUND, AISO_UPSTREAM_ERROR, AISO_BAD_ENVELOPE, AISO_WEBHOOK_INVALID_SIGNATURE.'],
+    ['docs/SCARLETT_CONTRACT.md', 'Contrato Scarlett', 'Scarlett context builder prepara payload con organizationId, workspaceId, campaignId, opportunityId, accountId, contactId, channel, productId, objective, commercialContext, prospectContext, evidence, knowledgeSources, allowedClaims, prohibitedClaims, qualificationRules, handoffRules, stopRules y schedulingRules. No envia a Scarlett real.'],
+    ['docs/AISO_TO_SCARLETT.md', 'Flujo AISO a Scarlett', 'AISO normaliza reportes en businessProfiles, products, icps, signals, recommendations y evidence. Scarlett prepare-context consume esa evidencia y construye contexto trazable para conversacion, sin credenciales ni envio externo.'],
     ['docs/EVENTS.md', 'Eventos', `Eventos versionados e idempotentes soportados: ${EVENT_TYPES.join(', ')}.`],
     ['docs/SECURITY_COMPLIANCE.md', 'Seguridad y compliance', 'CredentialReference sin secretos reales, RBAC mock, auditoria, idempotencia, rate limiting documentado, proteccion XSS/CSRF/inyeccion documentada, consentimiento, supresion global/org, retencion, exportacion, incidentes y kill switches por canal.'],
-    ['docs/TESTING.md', 'Testing', 'seed, build, smoke y domain-smoke validan DB, API, pantallas, reglas de negocio, mocks, idempotencia, usage, webhooks y admin health.'],
+    ['docs/TESTING.md', 'Testing', 'seed, build, smoke, domain-smoke, aiso-connector-smoke y scarlett-context-smoke validan DB, API, pantallas, reglas de negocio, mocks, AISO real-client contra mock HTTP local, webhooks HMAC, idempotencia y contexto Scarlett sin envio real.'],
     ['docs/LOCAL_DEPLOYMENT.md', 'Deployment local', 'Ejecutar npm run seed y npm start. No deploy, no servicios externos, no APIs reales, no credenciales.'],
     ['docs/MOCK_LIMITS.md', 'Limites mock vs real', 'FLOE, Scarlett, Meta, WhatsApp, Instagram, Messenger, Email, Calendar, CRM y Webhooks son providers mock. Human Agent queda como feature flag futura.'],
   ].map(([filePath, title, body]) => ({ path: `${normalizedProjectRoot}/${filePath}`, area: 'docs', content: doc(title, body) }))
@@ -457,16 +1259,24 @@ function buildRevenuePlatformArtifacts({ templateFamily, projectRoot, domainLabe
     { path: `${normalizedProjectRoot}/src/domain.mjs`, area: 'shared', content: buildDomainMjs(project) },
     { path: `${normalizedProjectRoot}/src/db.mjs`, area: 'database', content: buildDbMjs() },
     { path: `${normalizedProjectRoot}/src/domain-rules.mjs`, area: 'backend', content: buildDomainRulesMjs() },
-    { path: `${normalizedProjectRoot}/src/server.mjs`, area: 'backend', content: buildServerMjs() },
+    { path: `${normalizedProjectRoot}/src/server.mjs`, area: 'backend', content: buildServerWithAisoMjs() },
+    { path: `${normalizedProjectRoot}/src/integrations/aiso/aiso-client.mjs`, area: 'backend', content: buildAisoClientMjs() },
+    { path: `${normalizedProjectRoot}/src/integrations/aiso/aiso-provider.mjs`, area: 'backend', content: buildAisoProviderMjs() },
+    { path: `${normalizedProjectRoot}/src/integrations/aiso/aiso-normalizer.mjs`, area: 'backend', content: buildAisoNormalizerMjs() },
+    { path: `${normalizedProjectRoot}/src/integrations/aiso/aiso-webhook-verifier.mjs`, area: 'backend', content: buildAisoWebhookVerifierMjs() },
+    { path: `${normalizedProjectRoot}/src/integrations/aiso/aiso-errors.mjs`, area: 'backend', content: buildAisoErrorsMjs() },
+    { path: `${normalizedProjectRoot}/src/integrations/scarlett/scarlett-context-builder.mjs`, area: 'backend', content: buildScarlettContextBuilderMjs() },
     { path: `${normalizedProjectRoot}/public/app.js`, area: 'frontend', content: buildAppJs() },
     { path: `${normalizedProjectRoot}/public/styles.css`, area: 'frontend', content: buildCss() },
     ...pageFiles,
     { path: `${normalizedProjectRoot}/database/schema.sql`, area: 'database', content: buildSchemaSql(project) },
     { path: `${normalizedProjectRoot}/data/seed.json`, area: 'database', content: `${JSON.stringify(seed, null, 2)}\n` },
     { path: `${normalizedProjectRoot}/scripts/seed.mjs`, area: 'scripts', content: buildSeedScript() },
-    { path: `${normalizedProjectRoot}/scripts/build.mjs`, area: 'scripts', content: buildBuildScript(project) },
+    { path: `${normalizedProjectRoot}/scripts/build.mjs`, area: 'scripts', content: buildBuildScriptWithAiso(project) },
     { path: `${normalizedProjectRoot}/scripts/smoke.mjs`, area: 'scripts', content: buildSmokeScript() },
     { path: `${normalizedProjectRoot}/scripts/domain-smoke.mjs`, area: 'scripts', content: buildDomainSmokeScript() },
+    { path: `${normalizedProjectRoot}/scripts/aiso-connector-smoke.mjs`, area: 'scripts', content: buildAisoConnectorSmokeScript() },
+    { path: `${normalizedProjectRoot}/scripts/scarlett-context-smoke.mjs`, area: 'scripts', content: buildScarlettContextSmokeScript() },
     { path: `${normalizedProjectRoot}/validation/report.json`, area: 'validation', content: buildValidationReport({ project }) },
   ]
   return {
@@ -486,19 +1296,26 @@ function buildRevenuePlatformArtifacts({ templateFamily, projectRoot, domainLabe
       { label: 'runtime-root', candidates: [`${normalizedProjectRoot}/package.json`] },
       { label: 'sqlite-db-layer', candidates: [`${normalizedProjectRoot}/src/db.mjs`, `${normalizedProjectRoot}/database/schema.sql`] },
       { label: 'rest-api', candidates: [`${normalizedProjectRoot}/src/server.mjs`, `${normalizedProjectRoot}/src/domain-rules.mjs`] },
+      { label: 'aiso-reports-connector', candidates: [`${normalizedProjectRoot}/src/integrations/aiso/aiso-client.mjs`, `${normalizedProjectRoot}/src/integrations/aiso/aiso-provider.mjs`, `${normalizedProjectRoot}/src/integrations/aiso/aiso-webhook-verifier.mjs`] },
+      { label: 'scarlett-context-prep', candidates: [`${normalizedProjectRoot}/src/integrations/scarlett/scarlett-context-builder.mjs`] },
       { label: 'floe-ui', candidates: [`${normalizedProjectRoot}/public/index.html`, `${normalizedProjectRoot}/public/opportunity-radar.html`, `${normalizedProjectRoot}/public/revenue-board.html`, `${normalizedProjectRoot}/public/admin.html`] },
-      { label: 'validation', candidates: [`${normalizedProjectRoot}/scripts/build.mjs`, `${normalizedProjectRoot}/scripts/smoke.mjs`, `${normalizedProjectRoot}/scripts/domain-smoke.mjs`] },
+      { label: 'validation', candidates: [`${normalizedProjectRoot}/scripts/build.mjs`, `${normalizedProjectRoot}/scripts/smoke.mjs`, `${normalizedProjectRoot}/scripts/domain-smoke.mjs`, `${normalizedProjectRoot}/scripts/aiso-connector-smoke.mjs`, `${normalizedProjectRoot}/scripts/scarlett-context-smoke.mjs`] },
     ],
     fileChecks: [
       { type: 'exists', targetPath: `${normalizedProjectRoot}/src/db.mjs` },
       { type: 'file-contains', targetPath: `${normalizedProjectRoot}/src/db.mjs`, text: 'node:sqlite' },
       { type: 'file-contains', targetPath: `${normalizedProjectRoot}/src/domain-rules.mjs`, text: 'prohibited_claim' },
+      { type: 'file-contains', targetPath: `${normalizedProjectRoot}/src/integrations/aiso/aiso-client.mjs`, text: 'x-api-key' },
+      { type: 'file-contains', targetPath: `${normalizedProjectRoot}/src/integrations/aiso/aiso-webhook-verifier.mjs`, text: 'timingSafeEqual' },
+      { type: 'file-contains', targetPath: `${normalizedProjectRoot}/src/integrations/scarlett/scarlett-context-builder.mjs`, text: 'sendToScarlett: false' },
       { type: 'file-contains', targetPath: `${normalizedProjectRoot}/scripts/domain-smoke.mjs`, text: '52 validar admin health' },
+      { type: 'file-contains', targetPath: `${normalizedProjectRoot}/scripts/aiso-connector-smoke.mjs`, text: '20 includeRaw' },
+      { type: 'file-contains', targetPath: `${normalizedProjectRoot}/scripts/scarlett-context-smoke.mjs`, text: '8 disabled mode' },
       { type: 'file-contains', targetPath: `${normalizedProjectRoot}/public/styles.css`, text: '#ff6b00' },
     ],
     validationPlan: {
-      commands: ['npm run seed', 'npm run build', 'npm run smoke', 'node scripts/domain-smoke.mjs'],
-      syntaxChecks: [`${normalizedProjectRoot}/src/server.mjs`, `${normalizedProjectRoot}/src/db.mjs`, `${normalizedProjectRoot}/src/domain-rules.mjs`, `${normalizedProjectRoot}/public/app.js`, `${normalizedProjectRoot}/scripts/domain-smoke.mjs`],
+      commands: ['npm run seed', 'npm run build', 'npm run smoke', 'node scripts/domain-smoke.mjs', 'node scripts/aiso-connector-smoke.mjs', 'node scripts/scarlett-context-smoke.mjs'],
+      syntaxChecks: [`${normalizedProjectRoot}/src/server.mjs`, `${normalizedProjectRoot}/src/db.mjs`, `${normalizedProjectRoot}/src/domain-rules.mjs`, `${normalizedProjectRoot}/src/integrations/aiso/aiso-client.mjs`, `${normalizedProjectRoot}/src/integrations/aiso/aiso-provider.mjs`, `${normalizedProjectRoot}/src/integrations/aiso/aiso-normalizer.mjs`, `${normalizedProjectRoot}/src/integrations/aiso/aiso-webhook-verifier.mjs`, `${normalizedProjectRoot}/src/integrations/aiso/aiso-errors.mjs`, `${normalizedProjectRoot}/src/integrations/scarlett/scarlett-context-builder.mjs`, `${normalizedProjectRoot}/public/app.js`, `${normalizedProjectRoot}/scripts/domain-smoke.mjs`, `${normalizedProjectRoot}/scripts/aiso-connector-smoke.mjs`, `${normalizedProjectRoot}/scripts/scarlett-context-smoke.mjs`],
       jsonChecks: [`${normalizedProjectRoot}/package.json`, `${normalizedProjectRoot}/data/seed.json`, `${normalizedProjectRoot}/validation/report.json`],
       pathChecks: [normalizedProjectRoot, `${normalizedProjectRoot}/data/app.sqlite`],
       forbiddenPathChecks: ['.env', 'node_modules', 'Dockerfile', 'docker-compose.yml', 'deploy', 'web-prueba'],
