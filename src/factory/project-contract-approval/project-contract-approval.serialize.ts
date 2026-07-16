@@ -1,0 +1,5 @@
+import type { FactoryProjectContractApprovalResult, FactoryProjectContractApprovalSummary } from './project-contract-approval.types.ts'
+
+export function serializeFactoryProjectContractApprovalResult(result: FactoryProjectContractApprovalResult): string { return JSON.stringify(result, null, 2) }
+export function parseFactoryProjectContractApprovalResult(json: string): FactoryProjectContractApprovalResult { return JSON.parse(json) as FactoryProjectContractApprovalResult }
+export function summarizeFactoryProjectContractApprovalResult(result: FactoryProjectContractApprovalResult): FactoryProjectContractApprovalSummary { return { approvalId: result.approvalId, compatibilityId: result.compatibilityId, candidateId: result.candidateId, decision: result.decision, status: result.status, receiptPresent: Boolean(result.approvalReceipt), envelopePresent: Boolean(result.approvedContractEnvelope), persistenceStatus: result.approvedContractEnvelope?.persistenceStatus, codexStatus: result.approvedContractEnvelope?.codexStatus, recommendedNextStep: result.recommendedNextStep.slice(0, 280) } }

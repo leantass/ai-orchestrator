@@ -1,0 +1,7 @@
+import type { FactoryProjectContractPersistencePolicy } from './project-contract-persistence.types.ts'
+
+export const FACTORY_PROJECT_CONTRACT_PERSISTENCE_KIND = 'factory-project-contract-persistence' as const
+export const FACTORY_PROJECT_CONTRACT_PERSISTENCE_VERSION = '1.0' as const
+export const FACTORY_PROJECT_CONTRACT_PERSISTENCE_STATUSES = ['ready_for_runtime_persistence', 'blocked'] as const
+export const DEFAULT_FACTORY_PROJECT_CONTRACT_PERSISTENCE_POLICY: Readonly<FactoryProjectContractPersistencePolicy> = { requireApprovedContractEnvelope: true, requireApprovalReceipt: true, requireContractValidationOk: true, requirePersistenceStatusNotPersisted: true, requireRuntimeNotExecutable: true, requireCodexNotAllowed: true, requireRepositoryNotCreated: true, requireDeployNotAllowed: true, requireCanonicalPayload: true, requireFingerprint: true, requireIdempotencyKey: true, requireAtomicWritePlan: true, requireRollbackPlan: true, requireRelativePersistenceTarget: true, forbidAbsolutePaths: true, forbidPathTraversal: true, forbidCodexExecution: true, forbidProjectCreation: true, forbidRepositoryCreation: true, forbidDeploy: true, forbidFilesystemWriteInThisGate: true }
+export function createFactoryProjectContractPersistencePolicy(overrides: Partial<FactoryProjectContractPersistencePolicy> = {}): FactoryProjectContractPersistencePolicy { return structuredClone({ ...DEFAULT_FACTORY_PROJECT_CONTRACT_PERSISTENCE_POLICY, ...overrides, ...DEFAULT_FACTORY_PROJECT_CONTRACT_PERSISTENCE_POLICY }) }

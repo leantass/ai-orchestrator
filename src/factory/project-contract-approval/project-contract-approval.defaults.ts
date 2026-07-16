@@ -1,0 +1,8 @@
+import type { FactoryProjectContractApprovalPolicy } from './project-contract-approval.types.ts'
+
+export const FACTORY_PROJECT_CONTRACT_APPROVAL_KIND = 'factory-project-contract-approval' as const
+export const FACTORY_PROJECT_CONTRACT_APPROVAL_VERSION = '1.0' as const
+export const FACTORY_PROJECT_CONTRACT_APPROVAL_DECISIONS = ['reject_contract_draft', 'request_contract_changes', 'human_review_required', 'approve_contract_for_final_review', 'approve_contract_for_persistence_candidate', 'blocked'] as const
+export const FACTORY_PROJECT_CONTRACT_APPROVAL_STATUSES = ['approved_candidate', 'requires_changes', 'requires_human_review', 'rejected', 'blocked'] as const
+export const DEFAULT_FACTORY_PROJECT_CONTRACT_APPROVAL_POLICY: Readonly<FactoryProjectContractApprovalPolicy> = { requireCompatibleResult: true, requireContractDraft: true, requireContractValidationOk: true, requireHumanApproval: true, requireReviewerIdentity: true, requireNoBlockers: true, requireNoCriticalWarnings: true, requireRuntimeIndependence: true, requireOwnRepository: true, requireOwnRoot: true, forbidJefeRuntimeDependency: true, forbidJefeModuleImports: true, requireEnvironmentVariablesWithoutValues: true, forbidCodexExecution: true, forbidProjectCreation: true, forbidRepositoryCreation: true, forbidDeploy: true, allowPersistenceCandidateOnly: true }
+export function createFactoryProjectContractApprovalPolicy(overrides: Partial<FactoryProjectContractApprovalPolicy> = {}): FactoryProjectContractApprovalPolicy { return structuredClone({ ...DEFAULT_FACTORY_PROJECT_CONTRACT_APPROVAL_POLICY, ...overrides, ...DEFAULT_FACTORY_PROJECT_CONTRACT_APPROVAL_POLICY }) }

@@ -1,0 +1,6 @@
+import type { FactoryProjectContractCompatibilityPolicy } from './project-contract-compatibility.types.ts'
+
+export const FACTORY_PROJECT_CONTRACT_COMPATIBILITY_KIND = 'factory-project-contract-compatibility' as const
+export const FACTORY_PROJECT_CONTRACT_COMPATIBILITY_VERSION = '1.0' as const
+export const DEFAULT_FACTORY_PROJECT_CONTRACT_COMPATIBILITY_POLICY: Readonly<FactoryProjectContractCompatibilityPolicy> = { requireCandidateReadyForContractDraft: true, requireHumanApproval: true, requireOwnRepository: true, requireOwnRoot: true, requireRuntimeIndependence: true, forbidJefeRuntimeDependency: true, forbidJefeModuleImports: true, requireEnvironmentVariablesWithoutValues: true, requireQualityProfile: true, requireSecurityProfile: true, requireEvidenceRequirements: true, requireFactoryProjectContractValidation: true, forbidCodexExecution: true, forbidProjectCreation: true, forbidRepositoryCreation: true, forbidDeploy: true }
+export function createFactoryProjectContractCompatibilityPolicy(overrides: Partial<FactoryProjectContractCompatibilityPolicy> = {}): FactoryProjectContractCompatibilityPolicy { return structuredClone({ ...DEFAULT_FACTORY_PROJECT_CONTRACT_COMPATIBILITY_POLICY, ...overrides, ...DEFAULT_FACTORY_PROJECT_CONTRACT_COMPATIBILITY_POLICY }) }

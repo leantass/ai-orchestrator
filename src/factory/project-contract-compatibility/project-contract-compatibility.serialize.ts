@@ -1,0 +1,5 @@
+import type { FactoryProjectContractCompatibilityResult, FactoryProjectContractCompatibilitySummary } from './project-contract-compatibility.types.ts'
+
+export function serializeFactoryProjectContractCompatibilityResult(result: FactoryProjectContractCompatibilityResult): string { return JSON.stringify(result, null, 2) }
+export function parseFactoryProjectContractCompatibilityResult(json: string): FactoryProjectContractCompatibilityResult { return JSON.parse(json) as FactoryProjectContractCompatibilityResult }
+export function summarizeFactoryProjectContractCompatibilityResult(result: FactoryProjectContractCompatibilityResult): FactoryProjectContractCompatibilitySummary { return { compatibilityId: result.compatibilityId, candidateId: result.candidateId, slug: result.contractDraft?.project.slug ?? '', status: result.status, canCreateFactoryProjectContract: result.canCreateFactoryProjectContract, contractValidationOk: result.contractValidation?.ok === true, blockersCount: result.blockers.length, warningsCount: result.warnings.length, recommendedNextStep: result.recommendedNextStep.slice(0, 260) } }
