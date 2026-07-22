@@ -1,0 +1,5 @@
+import type { FactoryHermesResearchRuntimePlanningResult, FactoryHermesResearchRuntimePlanningSummary } from './hermes-research-runtime-planning.types.ts'
+
+export function serializeFactoryHermesResearchRuntimePlanningResult(result: FactoryHermesResearchRuntimePlanningResult): string { return JSON.stringify(result, null, 2) }
+export function parseFactoryHermesResearchRuntimePlanningResult(json: string): FactoryHermesResearchRuntimePlanningResult { return JSON.parse(json) as FactoryHermesResearchRuntimePlanningResult }
+export function summarizeFactoryHermesResearchRuntimePlanningResult(result: FactoryHermesResearchRuntimePlanningResult): FactoryHermesResearchRuntimePlanningSummary { return { planningId: result.planningId, toolId: 'hermes_agent', auditedHead: result.auditedHead, interfaceStatus: result.interfaceStatus, interfaceCandidatesCount: result.interfaceCandidates.length, decision: result.decision, status: result.status, canProceedToResearchRuntimeBoundary: result.canProceedToResearchRuntimeBoundary, canExecuteHermes: false, approvedNextGate: result.researchRuntimePlanningReceipt?.approvedNextGate, nextStep: result.recommendedNextStep } }

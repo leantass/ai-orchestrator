@@ -1,0 +1,9 @@
+import type { FactoryHermesToolsetDisableVerificationPlanningKind, FactoryHermesToolsetDisableVerificationPlanningPolicy, FactoryHermesToolsetDisableVerificationPlanningVersion } from './hermes-toolset-disable-verification-planning.types.ts'
+
+export const FACTORY_HERMES_TOOLSET_DISABLE_VERIFICATION_PLANNING_KIND: FactoryHermesToolsetDisableVerificationPlanningKind = 'factory-hermes-toolset-disable-verification-planning'
+export const FACTORY_HERMES_TOOLSET_DISABLE_VERIFICATION_PLANNING_VERSION: FactoryHermesToolsetDisableVerificationPlanningVersion = '1.0'
+export const TOOLSET_DISABLE_VERIFICATION_PLANNING_NEXT_STEP = 'Proceed to Factory Hermes Toolset Disable Verification Approval Gate v1; no Hermes execution is authorized.'
+export const TOOLSET_DISABLE_VERIFICATION_NOT_AUTHORIZED_ACTIONS = ['execute_hermes_now', 'execute_oneshot_now', 'pass_prompt_now', 'run_research_now', 'validate_toolsets_by_execution_now', 'call_models_now', 'use_network_now', 'access_credentials_now', 'read_env_secrets_now', 'enable_toolsets_now', 'mutate_filesystem_now', 'create_runtime_run_root_now', 'approve_runtime_adapter_now', 'ingest_real_output_now', 'promote_findings_now', 'execute_uv_now', 'execute_python_now', 'execute_pip_now', 'execute_setup_py_now', 'deploy_now']
+export const DEFAULT_FACTORY_HERMES_TOOLSET_DISABLE_VERIFICATION_PLANNING_POLICY: FactoryHermesToolsetDisableVerificationPlanningPolicy = {
+  requireAdapterApprovalBlockedByToolset: true, requireSourceInspection: true, requireStaticMap: true, requireNoToolModeProofForRetry: true, requireBlockIfNoToolModeUnproven: true, requireNoExecutionInThisGate: true, requireNoPromptPassingInThisGate: true, requireNoNetworkInThisGate: true, requireNoCredentialUseInThisGate: true, requireNoModelCallsInThisGate: true, requireNoToolsetEnablementInThisGate: true, forbidHermesExecutionInThisGate: true, forbidResearchExecutionInThisGate: true, forbidUsingFindingsInThisGate: true, forbidDeployInThisGate: true,
+}

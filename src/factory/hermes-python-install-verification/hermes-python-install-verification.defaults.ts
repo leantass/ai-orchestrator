@@ -1,0 +1,9 @@
+import type { FactoryHermesPythonInstallVerificationKind, FactoryHermesPythonInstallVerificationPolicy, FactoryHermesPythonInstallVerificationVersion } from './hermes-python-install-verification.types.ts'
+
+export const FACTORY_HERMES_PYTHON_INSTALL_VERIFICATION_KIND: FactoryHermesPythonInstallVerificationKind = 'factory-hermes-python-install-verification'
+export const FACTORY_HERMES_PYTHON_INSTALL_VERIFICATION_VERSION: FactoryHermesPythonInstallVerificationVersion = '1.0'
+export const FACTORY_HERMES_PYTHON_INSTALL_VERIFICATION_NEXT_STEP = 'Proceed to Factory Hermes Python Install JEFE Review Gate v1; Hermes execution remains forbidden.'
+
+export const DEFAULT_FACTORY_HERMES_PYTHON_INSTALL_VERIFICATION_POLICY: FactoryHermesPythonInstallVerificationPolicy = {
+  requirePythonInstallManifest: true, requirePythonInstallResult: true, requireUvVerificationResult: true, requirePythonEnvRootUnderCodexTemp: true, requireInstallRootUnderCodexTemp: true, requireSourceRootUnderInstallRoot: true, requirePythonEnvPresent: true, requirePyvenvCfg: true, requirePythonExecutablePresent: true, requireSitePackagesPresent: true, requirePythonInstallSuccess: true, requireVerifiedUvUsed: true, requireNoHermesExecution: true, requireNoHermesScripts: true, requireNoPipExecution: true, requireNoPythonDirectExecution: true, requireNoSetupPyExecution: true, forbidUvRun: true, forbidUvPip: true, forbidPipExecution: true, forbidPythonDirectExecution: true, forbidSetupPyExecution: true, forbidHermesExecution: true, forbidHermesScripts: true, forbidShell: true, forbidCmd: true, forbidPowerShell: true, forbidDownloadInThisGate: true, forbidExtractionInThisGate: true, forbidPackageFileMutation: true, forbidCredentials: true, forbidModelCalls: true, forbidDeploy: true, requireJefeReviewNext: true, requireResearchRuntimePlanningFuture: true,
+}

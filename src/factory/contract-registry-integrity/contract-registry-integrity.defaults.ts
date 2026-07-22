@@ -1,0 +1,7 @@
+import type { FactoryContractRegistryIntegrityPolicy } from './contract-registry-integrity.types.ts'
+export const FACTORY_CONTRACT_REGISTRY_INTEGRITY_KIND = 'factory-contract-registry-integrity' as const
+export const FACTORY_CONTRACT_REGISTRY_INTEGRITY_VERSION = '1.0' as const
+export const FACTORY_CONTRACT_REGISTRY_INTEGRITY_STATUSES = ['clean', 'warning', 'blocked'] as const
+export const FACTORY_CONTRACT_REGISTRY_INTEGRITY_SEVERITIES = ['info', 'warning', 'error', 'critical'] as const
+export const DEFAULT_FACTORY_CONTRACT_REGISTRY_INTEGRITY_POLICY: Readonly<FactoryContractRegistryIntegrityPolicy> = { requireStorageRootInsideCodexTemp: true, requireContractFile: true, requireMetadataFile: true, requireFingerprintMatch: true, requireIdempotencyKeyMatch: true, requireFlagsSafe: true, requirePathContainment: true, requireNoDuplicateCriticalConflicts: true, requireNoMissingContract: true, requireNoMissingMetadata: true, requireNoTamperingSignals: true, forbidCodexExecution: true, forbidProjectCreation: true, forbidRepositoryCreation: true, forbidDeploy: true, allowMemoryUseOnlyIfClean: true, allowCodexTaskUse: false }
+export function createFactoryContractRegistryIntegrityPolicy(overrides: Partial<FactoryContractRegistryIntegrityPolicy> = {}): FactoryContractRegistryIntegrityPolicy { return structuredClone({ ...DEFAULT_FACTORY_CONTRACT_REGISTRY_INTEGRITY_POLICY, ...overrides, ...DEFAULT_FACTORY_CONTRACT_REGISTRY_INTEGRITY_POLICY }) }

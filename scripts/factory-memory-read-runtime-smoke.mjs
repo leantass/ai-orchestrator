@@ -1,0 +1,54 @@
+import assert from 'node:assert/strict'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { parseFactoryMemoryReadRuntimeResult, serializeFactoryMemoryReadRuntimeResult, summarizeFactoryMemoryReadRuntimeResult, validateFactoryMemoryReadRuntimeInput, validateFactoryMemoryReadRuntimeReadItem, validateFactoryMemoryReadRuntimeResult } from '../src/factory/memory-read-runtime/index.ts'
+const require = createRequire(import.meta.url); const runtime = require('../electron/factory/memory-read-runtime/index.cjs'); const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'); const storageRoot = path.join(repoRoot, '.codex-temp', 'factory-memory-read-runtime-v1', 'smoke'); await rm(storageRoot, { recursive: true, force: true })
+const at = '2026-07-18T18:00:00.000Z'; const logicalTarget = 'factory-memory/projects/read-runtime/records/factory-project-contract/memory-record-read-runtime.v1.json'; const metadataLogicalTarget = 'factory-memory/projects/read-runtime/records/factory-project-contract/memory-record-read-runtime.v1.meta.json'; const indexLogicalTarget = 'factory-memory/projects/read-runtime/index.v1.json'; const targetPath = path.join(storageRoot, ...logicalTarget.split('/')); const metadataPath = path.join(storageRoot, ...metadataLogicalTarget.split('/')); const indexPath = path.join(storageRoot, ...indexLogicalTarget.split('/')); await mkdir(path.dirname(targetPath), { recursive: true })
+const record = { memoryRecordId: 'memory-record-read-runtime', memoryRecordKind: 'factory_project_contract', memoryRecordVersion: '1.0', namespace: 'factory/projects/read-runtime/contracts', projectNamespace: 'factory/projects/read-runtime', scope: 'project', status: 'draft', title: 'Read runtime record', summary: 'Safe project memory.', canonicalFacts: { integrityStatus: 'clean', notExecutable: true, codexAllowed: false }, references: [{ targetPath: 'logical-contract.json', metadataPath: 'logical-contract.meta.json' }], lineage: { contractProjectId: 'read-runtime' }, tags: ['safe'], retentionPolicy: 'retain_until_governed_removal', promotionPolicy: { globalRequiresHumanReview: true, globalPromotionAllowed: false }, stalePolicy: { markStaleBeforeReplacement: true }, containsSecrets: false, containsRawEvidence: false }
+const metadata = { metadataKind: 'factory-memory-record-persistence-metadata', metadataVersion: '1.0', memoryRecordId: record.memoryRecordId, memoryRecordKind: record.memoryRecordKind, namespace: record.namespace, projectNamespace: record.projectNamespace, fingerprint: 'abcddcba', idempotencyKey: 'factory-memory-11223344', logicalTarget, writtenAt: at, writtenBy: 'smoke', notExecutable: true, embeddingsCreated: false, codexTaskCreated: false, globalPromotionAllowed: false, projectCreated: false, repositoryCreated: false, deployed: false }
+const index = { indexKind: 'factory-project-memory-index', indexVersion: '1.0', projectNamespace: record.projectNamespace, generatedAt: at, generatedBy: 'smoke', records: [{ memoryRecordId: record.memoryRecordId, memoryRecordKind: record.memoryRecordKind, logicalTarget, fingerprint: metadata.fingerprint, idempotencyKey: metadata.idempotencyKey, metadataPath: metadataLogicalTarget }], count: 1, embeddingsCreated: false, codexTaskCreated: false, deployed: false }; await writeFile(targetPath, JSON.stringify(record, null, 2)); await writeFile(metadataPath, JSON.stringify(metadata, null, 2)); await writeFile(indexPath, JSON.stringify(index, null, 2)) // 1
+const candidate = { readCandidateId: 'read-candidate-runtime', memoryRecordId: record.memoryRecordId, memoryRecordKind: record.memoryRecordKind, memoryRecordVersion: record.memoryRecordVersion, namespace: record.namespace, projectNamespace: record.projectNamespace, logicalTarget, metadataLogicalTarget, fingerprint: metadata.fingerprint, idempotencyKey: metadata.idempotencyKey, sourceIntegrityReportRef: 'integrity:1', sourceRegistryEntryId: 'registry:1', readPurpose: 'jefe_review_context', readScope: 'project', status: 'read_candidate', allowedUse: ['governed_memory_read_candidate'], deniedUse: [], safeReferences: [{ logicalTarget, metadataLogicalTarget }], minimalFacts: {}, lineage: { sourceIntegrityReportRef: 'integrity:1', sourceRegistryEntryId: 'registry:1' }, freshness: { integrityCheckedAt: at, freshnessStatus: 'current' }, retention: { readOnly: true, noMutation: true }, warnings: [], blockers: [], containsFullMemoryRecord: false, containsCanonicalPayload: false, containsRawEvidence: false, containsSecrets: false, canReadMemoryRuntime: false, canAssembleContext: false, canCreateCodexTask: false, canExecuteCodex: false, canCreateEmbeddings: false, canCreateProject: false, canCreateRepository: false, canDeploy: false, recommendedNextStep: 'runtime' }
+const admission = { admissionId: 'memory-read-admission-runtime', admissionKind: 'factory-memory-read-admission', admissionVersion: '1.0', requestedAt: at, requestedBy: 'JEFE', readPurpose: 'jefe_review_context', sourceIntegrityReportRef: 'integrity:1', decision: 'approve_memory_read_candidates', status: 'read_candidates_ready', candidates: [candidate], rejectedEntries: [], blockedEntries: [], checks: [], findings: [], blockers: [], warnings: [], summary: { admissionId: 'memory-read-admission-runtime', readPurpose: 'jefe_review_context', decision: 'approve_memory_read_candidates', status: 'read_candidates_ready', candidatesCount: 1, rejectedCount: 0, blockedCount: 0, namespaces: [record.namespace], canReadMemoryRuntime: false, canAssembleContext: false, canCreateCodexTask: false, recommendedNextStep: 'runtime' }, canReadMemoryRuntime: false, canAssembleContext: false, canCreateCodexTask: false, canExecuteCodex: false, canCreateEmbeddings: false, canCreateProject: false, canCreateRepository: false, canDeploy: false, recommendedNextStep: 'runtime' }
+const input = { memoryReadAdmissionResult: admission, storageRoot, executedAt: at, executedBy: 'smoke' }; assert.equal(validateFactoryMemoryReadRuntimeInput(input).ok, true) // 2
+const beforeRecord = await readFile(targetPath, 'utf8'); const beforeMetadata = await readFile(metadataPath, 'utf8'); const beforeIndex = await readFile(indexPath, 'utf8'); const result = await runtime.executeFactoryMemoryReadRuntime(input); const item = result.readItems[0]
+assert.equal(result.status, 'success') // 3
+assert.equal(result.status, 'success') // 4
+assert.ok(result.recordsRead > 0) // 5
+assert.ok(item.safeMemoryRecord) // 6
+assert.equal(JSON.stringify(item.safeMemoryRecord).includes('rawEvidence'), false) // 7
+assert.equal(item.containsSecrets, false) // 8
+assert.equal(item.containsCanonicalPayload, false) // 9
+assert.ok(item.metadataReadback) // 10
+assert.equal(item.metadataReadback.fingerprint, candidate.fingerprint) // 11
+assert.equal(item.metadataReadback.idempotencyKey, candidate.idempotencyKey) // 12
+assert.equal(item.namespace, record.namespace) // 13
+assert.equal(item.projectNamespace, record.projectNamespace) // 14
+await rm(targetPath); const missingRecord = await runtime.executeFactoryMemoryReadRuntime(input); assert.equal(missingRecord.readItems[0].readStatus, 'missing'); await writeFile(targetPath, beforeRecord) // 15
+await rm(metadataPath); const missingMetadata = await runtime.executeFactoryMemoryReadRuntime(input); assert.equal(missingMetadata.readItems[0].readStatus, 'missing'); await writeFile(metadataPath, beforeMetadata) // 16
+await writeFile(metadataPath, JSON.stringify({ ...metadata, fingerprint: 'bad' })); const badFingerprint = await runtime.executeFactoryMemoryReadRuntime(input); assert.equal(badFingerprint.readItems[0].readStatus, 'blocked'); await writeFile(metadataPath, beforeMetadata) // 17
+await writeFile(metadataPath, JSON.stringify({ ...metadata, idempotencyKey: 'bad' })); const badIdempotency = await runtime.executeFactoryMemoryReadRuntime(input); assert.equal(badIdempotency.readItems[0].readStatus, 'blocked'); await writeFile(metadataPath, beforeMetadata) // 18
+await writeFile(metadataPath, JSON.stringify({ ...metadata, embeddingsCreated: true })); const unsafeFlags = await runtime.executeFactoryMemoryReadRuntime(input); assert.equal(unsafeFlags.readItems[0].readStatus, 'blocked'); await writeFile(metadataPath, beforeMetadata) // 19
+await assert.rejects(async () => runtime.assertFactoryMemoryReadRuntimeRootAllowed(path.join(repoRoot, 'outside'))) // 20
+assert.equal((await runtime.executeFactoryMemoryReadRuntime({ ...input, memoryReadAdmissionResult: { ...admission, candidates: [{ ...candidate, logicalTarget: path.resolve(targetPath) }] } })).readItems[0].readStatus, 'blocked') // 21
+assert.equal((await runtime.executeFactoryMemoryReadRuntime({ ...input, memoryReadAdmissionResult: { ...admission, candidates: [{ ...candidate, logicalTarget: '../escape.json' }] } })).readItems[0].readStatus, 'blocked') // 22
+assert.equal((await runtime.executeFactoryMemoryReadRuntime({ ...input, memoryReadAdmissionResult: { ...admission, candidates: [{ ...candidate, logicalTarget: 'other/file.json' }] } })).readItems[0].readStatus, 'blocked') // 23
+assert.equal(result.canAssembleContext, false) // 24
+assert.equal(result.canCreateCodexTask, false) // 25
+assert.equal(result.canExecuteCodex, false) // 26
+assert.equal(result.canCreateEmbeddings, false) // 27
+assert.equal(result.canCreateProject, false) // 28
+assert.equal(result.canCreateRepository, false) // 29
+assert.equal(result.canDeploy, false) // 30
+assert.equal(parseFactoryMemoryReadRuntimeResult(serializeFactoryMemoryReadRuntimeResult(result)).runtimeReadId, result.runtimeReadId) // 31
+assert.equal(JSON.stringify(summarizeFactoryMemoryReadRuntimeResult(result)).includes('safeMemoryRecord'), false) // 32
+assert.equal(await readFile(targetPath, 'utf8'), beforeRecord) // 33
+assert.equal(await readFile(metadataPath, 'utf8'), beforeMetadata) // 34
+assert.equal(await readFile(indexPath, 'utf8'), beforeIndex) // 35
+assert.ok([targetPath, metadataPath, indexPath].every((value) => path.resolve(value).startsWith(path.resolve(storageRoot) + path.sep))) // 36
+assert.equal(Object.keys(result).includes('database'), false) // 37
+assert.equal(result.canCreateEmbeddings, false) // 38
+assert.ok(/Memory Context Assembly Gate/u.test(result.recommendedNextStep) && !/execute Codex directly/iu.test(result.recommendedNextStep)) // 39
+assert.equal(validateFactoryMemoryReadRuntimeReadItem(item).ok, true); assert.equal(validateFactoryMemoryReadRuntimeResult(result).ok, true)
+console.log(JSON.stringify({ ok: true, checks: 39, runtimeKind: result.runtimeReadKind, status: result.status, recordsRead: result.recordsRead, missingStatus: missingRecord.status, mismatchStatus: badFingerprint.status, containsFullMemoryRecord: item.containsFullMemoryRecord, canAssembleContext: result.canAssembleContext, canCreateCodexTask: result.canCreateCodexTask }, null, 2))

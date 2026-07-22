@@ -1,0 +1,10 @@
+import type { FactoryHermesResearchRuntimeAdapterApprovalKind, FactoryHermesResearchRuntimeAdapterApprovalPolicy, FactoryHermesResearchRuntimeAdapterApprovalVersion } from './hermes-research-runtime-adapter-approval.types.ts'
+
+export const FACTORY_HERMES_RESEARCH_RUNTIME_ADAPTER_APPROVAL_KIND: FactoryHermesResearchRuntimeAdapterApprovalKind = 'factory-hermes-research-runtime-adapter-approval'
+export const FACTORY_HERMES_RESEARCH_RUNTIME_ADAPTER_APPROVAL_VERSION: FactoryHermesResearchRuntimeAdapterApprovalVersion = '1.0'
+export const FACTORY_HERMES_RESEARCH_RUNTIME_ADAPTER_APPROVAL_NEXT_STEP_GRANTED = 'Proceed to Factory Hermes Research Runtime Adapter v1; execution still happens only in that future runtime.'
+export const FACTORY_HERMES_RESEARCH_RUNTIME_ADAPTER_APPROVAL_NEXT_STEP_BLOCKED = 'Proceed to Factory Hermes Toolset Disable Verification Planning Gate v1 before adapter approval.'
+export const ADAPTER_APPROVAL_NOT_AUTHORIZED_ACTIONS = ['execute_oneshot_now', 'pass_prompt_now', 'run_research_now', 'execute_hermes_now', 'call_models_now', 'use_network_now', 'access_credentials_now', 'read_env_secrets_now', 'enable_toolsets_now', 'mutate_filesystem_now', 'create_runtime_run_root_now', 'ingest_real_output_now', 'promote_findings_now', 'execute_uv_now', 'execute_python_now', 'execute_pip_now', 'execute_setup_py_now', 'deploy_now']
+export const DEFAULT_FACTORY_HERMES_RESEARCH_RUNTIME_ADAPTER_APPROVAL_POLICY: FactoryHermesResearchRuntimeAdapterApprovalPolicy = {
+  requireFinalExecutionApproval: true, requireRuntimeSelectionDecision: true, requireApprovedRuntimeSelectionSnapshot: true, requireExactCommandEnvelope: true, requireExactProviderModelCredentialHost: true, requireToolsetDisableSupportOrBlock: true, requireRuntimeRunRootUnderCodexTemp: true, requireNoExecutionInThisGate: true, requireNoCredentialReadInThisGate: true, requireNoNetworkInThisGate: true, requireNoModelCallsInThisGate: true, requireNoPromptPassingInThisGate: true, forbidHermesExecutionInThisGate: true, forbidResearchExecutionInThisGate: true, forbidUsingFindingsInThisGate: true, forbidDeployInThisGate: true,
+}

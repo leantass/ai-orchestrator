@@ -1,0 +1,57 @@
+import { DEFAULT_FACTORY_HERMES_RESULT_INGESTION_CONTRACT_PLANNING_POLICY, FACTORY_HERMES_RESULT_INGESTION_CONTRACT_PLANNING_KIND, FACTORY_HERMES_RESULT_INGESTION_CONTRACT_PLANNING_NEXT_STEP, FACTORY_HERMES_RESULT_INGESTION_CONTRACT_PLANNING_VERSION, RESULT_INGESTION_NOT_AUTHORIZED_ACTIONS, RESULT_INGESTION_REQUIRED_NEXT_POLICIES } from './hermes-result-ingestion-contract-planning.defaults.ts'
+import type { FactoryHermesFindingCandidateRule, FactoryHermesIngestionSurfaceRule, FactoryHermesResultIngestionContractPlanningInput, FactoryHermesResultIngestionContractPlanningResult, FactoryHermesResultIngestionRecordShape } from './hermes-result-ingestion-contract-planning.types.ts'
+
+function surfaceRules(): FactoryHermesIngestionSurfaceRule[] {
+  return [
+    { ruleId: 'stdout_plain_text_raw_candidate', sourceSurface: 'stdout', status: 'ingestible_as_raw_candidate_evidence', usableAsFindingsImmediately: false, requiresJefeReview: true, requiresClassification: true },
+    { ruleId: 'stderr_operational', sourceSurface: 'stderr', status: 'operational_only', usableAsFindingsImmediately: false, allowedClassifications: ['runtime_error', 'warning', 'diagnostics', 'sanitized_logs'] },
+    { ruleId: 'usage_file_metadata', sourceSurface: 'usage_file', status: 'operational_metadata_only', usableAsFindingsImmediately: false, allowedFields: ['tokens', 'cost', 'model', 'provider', 'api_calls', 'duration'] },
+    { ruleId: 'runtime_status', sourceSurface: 'command_result', status: 'operational_metadata', usableAsFindingsImmediately: false, fields: ['exitCode', 'timedOut', 'killed', 'signal', 'durationMs', 'outputTruncated'] },
+    { ruleId: 'tool_output', sourceSurface: 'toolsets', status: 'not_ingestable_until_toolsets_policy_and_runtime_evidence', usableAsFindingsImmediately: false },
+    { ruleId: 'help_output', sourceSurface: 'help_probe', status: 'operational_only', usableAsFindingsImmediately: false },
+    { ruleId: 'logs_debug_trace', sourceSurface: 'logs', status: 'operational_only', usableAsFindingsImmediately: false },
+  ]
+}
+
+function findingRules(): FactoryHermesFindingCandidateRule[] {
+  return [
+    { ruleId: 'no_automatic_findings', ruleName: 'No automatic findings', requirements: ['Raw stdout cannot become findings automatically.', 'Model output is candidate evidence only.'] },
+    { ruleId: 'required_classification', ruleName: 'Required classification', requirements: ['Classify as research_output_candidate, controlled_failure, runtime_error, policy_violation, empty_output, timeout, provider_error, credential_error, network_error, toolset_violation or no_findings.'] },
+    { ruleId: 'evidence_metadata_required', ruleName: 'Evidence metadata required', requirements: ['Records include promptHash, provider, model, toolsets, networkStatus, credentialsStatus, modelCallStatus, outputSha256, previews, usageFileRef and executionResultRef.'] },
+    { ruleId: 'confidence_review_boundary', ruleName: 'Confidence review boundary', requirements: ['Default confidence is unknown/unreviewed.', 'Only JEFE Review sets final confidence.'] },
+    { ruleId: 'safety_and_secrecy', ruleName: 'Safety and secrecy', requirements: ['No secrets in records.', 'Sanitizer required.', 'Secret patterns classify as policy_violation or sanitized_secret_detected.'] },
+    { ruleId: 'promotion_boundary', ruleName: 'Promotion boundary', requirements: ['findingsUsableNow false.', 'Findings usable only after Research Execution JEFE Review.', 'No direct stdout to memory, brief or context.'] },
+    { ruleId: 'failure_handling', ruleName: 'Failure handling', requirements: ['Failures are operational records.', 'Failed output cannot be findings.'] },
+  ]
+}
+
+function recordShape(): FactoryHermesResultIngestionRecordShape {
+  return {
+    requiredFields: ['recordId', 'runId', 'toolId', 'commandName', 'commandShape', 'promptHash', 'provider', 'model', 'credentialRefNames', 'networkStatus', 'toolsetsRequested', 'toolsetsApproved', 'toolsetsUsed', 'exitCode', 'timedOut', 'killed', 'signal', 'stdoutPreviewSanitized', 'stderrPreviewSanitized', 'stdoutTruncated', 'stderrTruncated', 'outputSizeBytes', 'outputSha256', 'usageFileRef', 'usageMetadata', 'classification', 'normalizedOutcome', 'rawCandidateEvidenceRef', 'findingCandidates', 'findingUseAllowed', 'requiresJefeReview', 'ingestionWarnings', 'policyViolations', 'createdAt'],
+    forbiddenFields: ['credentialValues', 'fullEnv', 'rawFullOutputWithoutApprovedArtifactRef', 'hiddenChainOfThought', 'secretValues'],
+    findingUseAllowed: false,
+    requiresJefeReview: true,
+  }
+}
+
+function base(input: FactoryHermesResultIngestionContractPlanningInput): FactoryHermesResultIngestionContractPlanningResult {
+  return { planningId: `hermes-result-ingestion-contract-planning:75b300f:${input.plannedAt}`, planningKind: FACTORY_HERMES_RESULT_INGESTION_CONTRACT_PLANNING_KIND, planningVersion: FACTORY_HERMES_RESULT_INGESTION_CONTRACT_PLANNING_VERSION, plannedAt: input.plannedAt, plannedBy: input.plannedBy, toolId: 'hermes_agent', commandShapeUnderConsideration: 'oneshot_real_with_provider_model', futureCommandShape: 'hermes.exe --oneshot "<PROMPT>" --provider <PROVIDER> --model <MODEL> --toolsets <TOOLSETS>', ingestionSurfaceRules: [], findingCandidateRules: [], checks: [], blockers: [], warnings: [], status: 'blocked', decision: 'blocked_missing_output_contract_policy_planning', canProceedToTimeoutKillSwitchPolicyPlanning: false, canProceedToResearchExecutionApproval: false, canRunResearchNow: false, canExecuteHermesNow: false, canPassPromptNow: false, canUseNetworkNow: false, canUseCredentialsNow: false, canReadEnvSecretsNow: false, canCallModelsNow: false, canEnableToolsetsNow: false, canUseFindings: false, recommendedNextStep: FACTORY_HERMES_RESULT_INGESTION_CONTRACT_PLANNING_NEXT_STEP }
+}
+
+export function evaluateFactoryHermesResultIngestionContractPlanning(input: FactoryHermesResultIngestionContractPlanningInput): FactoryHermesResultIngestionContractPlanningResult {
+  const policy = { ...DEFAULT_FACTORY_HERMES_RESULT_INGESTION_CONTRACT_PLANNING_POLICY, ...(input.policy || {}) }
+  const out = base(input)
+  const output = input.outputContractPolicyPlanningResult
+  if (policy.requireOutputContractPolicyPlanning && !output) return { ...out, blockers: [{ blockerId: 'blocked_missing_output_contract_policy_planning', message: 'Output contract policy planning result is required.' }] }
+  const outputPlan = output?.hermesOutputContractPolicyPlanCandidate
+  if (output?.status !== 'output_contract_policy_plan_created' || output?.decision !== 'hermes_output_contract_policy_plan_created' || output?.canProceedToResultIngestionContractPlanning !== true || output?.canProceedToResearchExecutionApproval !== false || output?.canRunResearchNow !== false || output?.canExecuteHermesNow !== false || output?.canPassPromptNow !== false || output?.canUseNetworkNow !== false || output?.canUseCredentialsNow !== false || output?.canReadEnvSecretsNow !== false || output?.canCallModelsNow !== false || output?.canEnableToolsetsNow !== false || output?.canUseFindings !== false || outputPlan?.outputAllowedNow !== false || outputPlan?.findingsAllowedNow !== false || outputPlan?.rawOutputPromotableNow !== false || outputPlan?.stdoutPolicy?.usableAsFindingsBeforeIngestion !== false || outputPlan?.usageFilePolicy?.metadataOnly !== true || outputPlan?.resultPromotionPolicy?.requiresResultIngestion !== true || outputPlan?.resultPromotionPolicy?.requiresJefeReview !== true) return { ...out, decision: 'blocked_output_contract_policy_not_ready_for_result_ingestion_contract', blockers: [{ blockerId: 'blocked_output_contract_policy_not_ready_for_result_ingestion_contract', message: 'Output contract policy planning is not ready.' }] }
+  if (policy.requireToolsetsPolicyPlanning && (!input.toolsetsPolicyPlanningResult || input.toolsetsPolicyPlanningResult.status !== 'toolsets_policy_plan_created' || input.toolsetsPolicyPlanningResult.canEnableToolsetsNow !== false)) return { ...out, decision: 'blocked_toolsets_policy_not_ready_for_result_ingestion_contract', blockers: [{ blockerId: 'blocked_toolsets_policy_not_ready_for_result_ingestion_contract', message: 'Toolsets policy planning is not ready.' }] }
+  if (!input.networkPolicyPlanningResult || input.networkPolicyPlanningResult.status !== 'network_policy_plan_created' || input.networkPolicyPlanningResult.canUseNetworkNow !== false) return { ...out, decision: 'blocked_network_policy_not_ready_for_result_ingestion_contract', blockers: [{ blockerId: 'blocked_network_policy_not_ready_for_result_ingestion_contract', message: 'Network policy planning is not ready.' }] }
+  if (!input.credentialsPolicyPlanningResult || input.credentialsPolicyPlanningResult.status !== 'credentials_policy_plan_created' || input.credentialsPolicyPlanningResult.canUseCredentialsNow !== false || input.credentialsPolicyPlanningResult.canReadEnvSecretsNow !== false) return { ...out, decision: 'blocked_credentials_policy_not_ready_for_result_ingestion_contract', blockers: [{ blockerId: 'blocked_credentials_policy_not_ready_for_result_ingestion_contract', message: 'Credentials policy planning is not ready.' }] }
+  const ingestionSurfaceRules = surfaceRules()
+  const findingCandidateRules = findingRules()
+  const ingestionRecordShape = recordShape()
+  const receipt = { receiptId: `${out.planningId}:receipt`, planningId: out.planningId, toolId: 'hermes_agent' as const, plannedBy: input.plannedBy, plannedAt: input.plannedAt, decision: 'hermes_result_ingestion_contract_plan_created' as const, scope: 'hermes_result_ingestion_contract_planning_only' as const, approvedNextGate: 'Factory Hermes Timeout Kill Switch Policy Planning Gate v1' as const, limitations: ['No real output ingestion is authorized.', 'No output can be promoted to findings.', 'JEFE Review is mandatory before findings use.'], notAuthorizedActions: RESULT_INGESTION_NOT_AUTHORIZED_ACTIONS }
+  const plan = { planCandidateId: `${out.planningId}:result-ingestion-contract-plan-candidate`, toolId: 'hermes_agent' as const, commandShapeUnderConsideration: 'oneshot_real_with_provider_model' as const, futureCommandShape: { executable: 'hermes.exe' as const, argsTemplate: ['--oneshot', '<PROMPT>', '--provider', '<PROVIDER>', '--model', '<MODEL>', '--toolsets', '<TOOLSETS>'] as ['--oneshot', '<PROMPT>', '--provider', '<PROVIDER>', '--model', '<MODEL>', '--toolsets', '<TOOLSETS>'], shell: false as const }, ingestionSurfaceRules, findingCandidateRules, ingestionRecordShape, ingestionAllowedNow: false as const, findingsAllowedNow: false as const, promotionAllowedNow: false as const, rawOutputDirectUseForbidden: true as const, requiresJefeReviewForFindings: true as const, failureRecordsSupported: true as const, sanitizationRequiredBeforeIngestion: true as const, secretDetectionRequired: true as const, memoryWriteAllowedNow: false as const, briefWriteAllowedNow: false as const, contextUseAllowedNow: false as const, requiredNextPolicies: RESULT_INGESTION_REQUIRED_NEXT_POLICIES, canProceedToTimeoutKillSwitchPolicyPlanning: true as const, canProceedToResearchExecutionApproval: false as const, canUseFindings: false as const }
+  return { ...out, ingestionSurfaceRules, findingCandidateRules, ingestionRecordShape, resultIngestionContractPlanningReceipt: receipt, hermesResultIngestionContractPlanCandidate: plan, status: 'result_ingestion_contract_plan_created', decision: 'hermes_result_ingestion_contract_plan_created', canProceedToTimeoutKillSwitchPolicyPlanning: true }
+}

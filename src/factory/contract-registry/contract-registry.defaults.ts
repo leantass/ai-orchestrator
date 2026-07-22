@@ -1,0 +1,6 @@
+import type { FactoryContractRegistryPolicy } from './contract-registry.types.ts'
+export const FACTORY_CONTRACT_REGISTRY_KIND = 'factory-contract-registry' as const
+export const FACTORY_CONTRACT_REGISTRY_VERSION = '1.0' as const
+export const FACTORY_CONTRACT_REGISTRY_ENTRY_STATUSES = ['valid', 'invalid', 'blocked'] as const
+export const DEFAULT_FACTORY_CONTRACT_REGISTRY_POLICY: Readonly<FactoryContractRegistryPolicy> = { requireStorageRootInsideCodexTemp: true, requireMetadataForEntry: true, requireContractReadback: true, requireFingerprint: true, requireIdempotencyKey: true, requireNotExecutable: true, requireCodexNotAllowed: true, requireProjectNotCreated: true, requireRepositoryNotCreated: true, requireDeployNotAllowed: true, detectDuplicateFingerprints: true, detectDuplicateIdempotencyKeys: true, detectConflictingProjectIds: true, forbidPathTraversal: true, forbidAbsoluteContractPaths: true, allowIndexWrite: true, indexWriteUnderStorageRootOnly: true, forbidCodexExecution: true, forbidProjectCreation: true, forbidRepositoryCreation: true, forbidDeploy: true }
+export function createFactoryContractRegistryPolicy(overrides: Partial<FactoryContractRegistryPolicy> = {}): FactoryContractRegistryPolicy { return structuredClone({ ...DEFAULT_FACTORY_CONTRACT_REGISTRY_POLICY, ...overrides, ...DEFAULT_FACTORY_CONTRACT_REGISTRY_POLICY }) }

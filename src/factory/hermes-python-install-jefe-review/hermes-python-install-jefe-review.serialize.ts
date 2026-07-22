@@ -1,0 +1,5 @@
+import type { FactoryHermesPythonInstallJefeReviewResult, FactoryHermesPythonInstallJefeReviewSummary } from './hermes-python-install-jefe-review.types.ts'
+
+export function serializeFactoryHermesPythonInstallJefeReviewResult(result: FactoryHermesPythonInstallJefeReviewResult): string { return JSON.stringify(result, null, 2) }
+export function parseFactoryHermesPythonInstallJefeReviewResult(json: string): FactoryHermesPythonInstallJefeReviewResult { return JSON.parse(json) as FactoryHermesPythonInstallJefeReviewResult }
+export function summarizeFactoryHermesPythonInstallJefeReviewResult(result: FactoryHermesPythonInstallJefeReviewResult): FactoryHermesPythonInstallJefeReviewSummary { return { jefeReviewId: result.jefeReviewId, toolId: 'hermes_agent', auditedHead: result.auditedHead, verificationStatus: result.verificationStatus, decision: result.decision, status: result.status, canProceedToResearchRuntimePlanning: result.canProceedToResearchRuntimePlanning, canExecuteHermes: false, approvedNextGate: result.approvedHermesPythonInstallReadinessEnvelope?.approvedNextGate, nextStep: result.recommendedNextStep } }

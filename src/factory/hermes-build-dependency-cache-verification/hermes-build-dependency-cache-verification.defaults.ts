@@ -1,0 +1,5 @@
+import type { FactoryHermesBuildDependencyCacheVerificationKind, FactoryHermesBuildDependencyCacheVerificationVersion } from './hermes-build-dependency-cache-verification.types.ts'
+export const FACTORY_HERMES_BUILD_DEPENDENCY_CACHE_VERIFICATION_KIND: FactoryHermesBuildDependencyCacheVerificationKind = 'factory-hermes-build-dependency-cache-verification'
+export const FACTORY_HERMES_BUILD_DEPENDENCY_CACHE_VERIFICATION_VERSION: FactoryHermesBuildDependencyCacheVerificationVersion = '1.0'
+export const FACTORY_HERMES_BUILD_DEPENDENCY_CACHE_VERIFICATION_NEXT_STEP = 'Proceed to Factory Hermes Entrypoint Materialization Runtime Retry Gate v1; retry is not authorized in this verification gate.'
+export const FACTORY_HERMES_BUILD_DEPENDENCY_CACHE_VERIFICATION_NOT_AUTHORIZED_ACTIONS = ['retry_materialization_now', 'execute_uv_now', 'execute_uv_sync_now', 'execute_python_now', 'execute_pip_now', 'execute_setup_py_now', 'execute_hermes_now', 'use_network_now', 'call_models_now', 'access_credentials_now', 'mutate_project_files_now', 'deploy_now']

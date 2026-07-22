@@ -1,0 +1,7 @@
+import type { FactoryMemoryAdmissionPolicy } from './memory-admission.types.ts'
+
+export const FACTORY_MEMORY_ADMISSION_KIND = 'factory-memory-admission' as const
+export const FACTORY_MEMORY_ADMISSION_VERSION = '1.0' as const
+export const FACTORY_MEMORY_RECORD_STATUSES = ['draft', 'blocked', 'rejected', 'replacement_candidate'] as const
+export const DEFAULT_FACTORY_MEMORY_ADMISSION_POLICY: Readonly<FactoryMemoryAdmissionPolicy> = { requireIntegrityReport: true, requireCleanIntegrityEntry: true, requireCanUseForMemory: true, rejectCriticalFindings: true, rejectUnsafeFlags: true, rejectMissingFingerprint: true, rejectMissingIdempotencyKey: true, requireProjectNamespace: true, requireLineage: true, requireNoSecrets: true, requireNoRawEvidence: true, allowProjectScopedMemory: true, requireHumanReviewForGlobalPromotion: true, globalPromotionAllowedByDefault: false, allowContradictionWithoutResolution: false, markStaleBeforeReplacement: true, codexTaskAllowedByAdmission: false, memoryWriteAllowedByAdmission: false, forbidCodexExecution: true, forbidProjectCreation: true, forbidRepositoryCreation: true, forbidDeploy: true }
+export function createFactoryMemoryAdmissionPolicy(overrides: Partial<FactoryMemoryAdmissionPolicy> = {}): FactoryMemoryAdmissionPolicy { return structuredClone({ ...DEFAULT_FACTORY_MEMORY_ADMISSION_POLICY, ...overrides, ...DEFAULT_FACTORY_MEMORY_ADMISSION_POLICY }) }

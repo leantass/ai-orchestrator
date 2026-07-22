@@ -1,0 +1,34 @@
+import { DEFAULT_FACTORY_HERMES_TOOLSET_DISABLE_VERIFICATION_PLANNING_POLICY, FACTORY_HERMES_TOOLSET_DISABLE_VERIFICATION_PLANNING_KIND, FACTORY_HERMES_TOOLSET_DISABLE_VERIFICATION_PLANNING_VERSION, TOOLSET_DISABLE_VERIFICATION_NOT_AUTHORIZED_ACTIONS, TOOLSET_DISABLE_VERIFICATION_PLANNING_NEXT_STEP } from './hermes-toolset-disable-verification-planning.defaults.ts'
+import type { FactoryHermesToolsetDisableVerificationPlanningInput, FactoryHermesToolsetDisableVerificationPlanningResult } from './hermes-toolset-disable-verification-planning.types.ts'
+
+function validAdapterBlock(r: any): boolean {
+  return r?.status === 'research_runtime_adapter_approval_blocked' && r?.decision === 'hermes_research_runtime_adapter_approval_blocked_toolset_mode_unverified' && r?.runtimeAdapterApprovalStatus === 'blocked' && r?.canProceedToToolsetDisableVerificationPlanning === true && r?.canProceedToResearchRuntimeAdapter === false && r?.canRunResearchNow === false && r?.canExecuteHermesNow === false
+}
+
+function staticMap(source: any) {
+  return {
+    cliToolsetsArg: { exists: !!source?.hasToolsetsArg, rawEvidenceRefs: ['hermes_cli/main.py --toolsets', 'hermes_cli/oneshot.py toolsets param'], acceptedShape: 'comma-separated string or iterable normalized to list', defaultBehavior: 'omitted means use config toolsets for cli' },
+    validationPath: { refs: ['hermes_cli/oneshot.py _validate_explicit_toolsets', 'toolsets.validate_toolset'], validatesKnownToolsetNames: true, rejectsUnknownToolsets: true, allowsEmptyList: false },
+    defaultToolsetsPath: { usesCliDefaultsWhenOmitted: true, usesConfigYaml: true, hiddenDefaultsRisk: true },
+    noMcpSentinel: { exists: !!source?.hasNoMcp, disablesMcpOnly: true, disablesAllTools: false },
+    agentConstruction: { AIAgentReceivesToolsOrToolsets: true, canReceiveEmptyTools: 'unknown' },
+  }
+}
+
+export function evaluateFactoryHermesToolsetDisableVerificationPlanning(input: FactoryHermesToolsetDisableVerificationPlanningInput): FactoryHermesToolsetDisableVerificationPlanningResult {
+  const policy = { ...DEFAULT_FACTORY_HERMES_TOOLSET_DISABLE_VERIFICATION_PLANNING_POLICY, ...(input.policy || {}) }
+  const planningId = `hermes-toolset-disable-verification-planning:75b300f:${input.plannedAt}`
+  const base = { planningId, planningKind: FACTORY_HERMES_TOOLSET_DISABLE_VERIFICATION_PLANNING_KIND, planningVersion: FACTORY_HERMES_TOOLSET_DISABLE_VERIFICATION_PLANNING_VERSION, plannedAt: input.plannedAt, plannedBy: input.plannedBy, toolId: 'hermes_agent' as const, adapterApprovalDecisionRef: input.researchRuntimeAdapterApprovalResult?.adapterApprovalId, selectedToolsetMode: 'no_toolsets_text_only' as const, toolsetDisableVerificationCandidates: [], checks: [], blockers: [], warnings: [], status: 'toolset_disable_verification_plan_created' as const, decision: 'hermes_toolset_disable_verification_plan_created_runtime_probe_or_selection_revision_required' as const, staticVerificationStatus: 'inconclusive_or_not_supported' as const, canProceedToToolsetDisableVerificationApproval: true, canProceedToResearchRuntimeAdapterApprovalRetry: false, canProceedToRuntimeSelectionRevisionPlanning: false, canProceedToResearchRuntimeAdapter: false as const, canRunResearchNow: false as const, canExecuteHermesNow: false as const, canPassPromptNow: false as const, canUseNetworkNow: false as const, canUseCredentialsNow: false as const, canReadEnvSecretsNow: false as const, canCallModelsNow: false as const, canEnableToolsetsNow: false as const, canMutateFilesystemNow: false as const, canUseFindings: false as const, recommendedNextStep: TOOLSET_DISABLE_VERIFICATION_PLANNING_NEXT_STEP }
+  if (policy.requireAdapterApprovalBlockedByToolset && !validAdapterBlock(input.researchRuntimeAdapterApprovalResult)) return { ...base, status: 'blocked', decision: 'blocked_invalid_adapter_approval', canProceedToToolsetDisableVerificationApproval: false, blockers: [{ blockerId: 'invalid_adapter_approval', message: 'Adapter approval result is not blocked by unverified toolset mode.' }] }
+  const map = staticMap(input.sourceInspection || {})
+  const evidence = { noToolModeProven: false, noToolModeSyntax: null, proofLevel: 'not_supported' as const, evidenceItems: ['--toolsets exists and validates real names.', 'Unknown entries are ignored and all-invalid explicit toolsets fail.', 'Omitting --toolsets uses configured cli toolsets.', 'no_mcp disables MCP servers only, not all tools.'], contradictions: ['no_toolsets_text_only is a policy label, not a validated Hermes toolset name.', 'Source does not prove empty toolsets accepted for oneshot.'], risks: ['Hidden defaults may activate if --toolsets is omitted.', 'Invalid no-tools syntax could fail before a useful runtime.', 'Assuming no-tools could allow unexpected tools.'] }
+  const candidates = [
+    { candidateId: 'static_source_verification', status: 'completed_not_supported', allowedNow: false as const, requiresApprovalGate: false },
+    { candidateId: 'controlled_cli_validation_probe', status: 'future_approval_required', objective: 'Probe toolset validation without prompt/model/network if a safe command exists.', allowedNow: false as const, requiresApprovalGate: true },
+    { candidateId: 'adapter_with_no_tool_mode', status: 'blocked_until_verified', allowedNow: false as const, requiresApprovalGate: true },
+    { candidateId: 'selection_revision', status: 'candidate_if_no_tool_mode_not_supported', options: ['implement wrapper/policy layer to force empty tools if technically possible', 'choose known minimal safe toolset only if acceptable', 'keep Hermes research blocked'], allowedNow: false as const, requiresApprovalGate: true },
+  ]
+  const receipt = { receiptId: `${planningId}:receipt`, planningId, toolId: 'hermes_agent' as const, plannedBy: input.plannedBy, plannedAt: input.plannedAt, decision: base.decision, scope: 'hermes_toolset_disable_verification_planning_only' as const, approvedNextGate: 'Factory Hermes Toolset Disable Verification Approval Gate v1', limitations: ['No Hermes execution or CLI validation by execution is authorized.', 'No prompt, model, network, credentials, toolsets, runtime adapter, output ingestion, or findings are authorized.'], notAuthorizedActions: TOOLSET_DISABLE_VERIFICATION_NOT_AUTHORIZED_ACTIONS }
+  const recommendation = { recommendationId: `${planningId}:recommendation`, recommendedNextGate: 'Factory Hermes Toolset Disable Verification Approval Gate v1', rationale: 'Static source review does not prove a complete no-tools mode; a controlled future approval is required before any probe.', noExecutionAuthorized: true as const }
+  return { ...base, toolsetLoadingStaticMap: map, toolsetDisableEvidence: evidence, toolsetDisableVerificationCandidates: candidates, toolsetDisableVerificationPlanningReceipt: receipt, toolsetDisableVerificationRecommendation: recommendation }
+}

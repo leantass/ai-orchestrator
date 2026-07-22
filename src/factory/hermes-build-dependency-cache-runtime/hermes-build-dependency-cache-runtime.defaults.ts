@@ -1,0 +1,5 @@
+import type { FactoryHermesBuildDependencyCacheRuntimeKind, FactoryHermesBuildDependencyCacheRuntimeVersion } from './hermes-build-dependency-cache-runtime.types.ts'
+export const FACTORY_HERMES_BUILD_DEPENDENCY_CACHE_RUNTIME_KIND: FactoryHermesBuildDependencyCacheRuntimeKind = 'factory-hermes-build-dependency-cache-runtime'
+export const FACTORY_HERMES_BUILD_DEPENDENCY_CACHE_RUNTIME_VERSION: FactoryHermesBuildDependencyCacheRuntimeVersion = '1.0'
+export const FACTORY_HERMES_BUILD_DEPENDENCY_CACHE_RUNTIME_NEXT_SUCCESS = 'Proceed to Factory Hermes Build Dependency Cache Verification Gate v1; do not retry materialization until cache verification passes.'
+export const FACTORY_HERMES_BUILD_DEPENDENCY_CACHE_RUNTIME_NEXT_FAILURE = 'Review Factory Hermes Build Dependency Cache Runtime result before repair; do not retry materialization or execute Hermes.'

@@ -1,0 +1,5 @@
+import type { FactoryHermesPythonInstallRuntimeRetryResult, FactoryHermesPythonInstallRuntimeRetrySummary } from './hermes-python-install-runtime-retry.types.ts'
+
+export function serializeFactoryHermesPythonInstallRuntimeRetryResult(result: FactoryHermesPythonInstallRuntimeRetryResult): string { return JSON.stringify(result, null, 2) }
+export function parseFactoryHermesPythonInstallRuntimeRetryResult(json: string): FactoryHermesPythonInstallRuntimeRetryResult { return JSON.parse(json) as FactoryHermesPythonInstallRuntimeRetryResult }
+export function summarizeFactoryHermesPythonInstallRuntimeRetryResult(result: FactoryHermesPythonInstallRuntimeRetryResult): FactoryHermesPythonInstallRuntimeRetrySummary { return { retryId: result.retryId, status: result.status, decision: result.decision, auditedHead: result.auditedHead, pythonEnvRootRef: result.pythonEnvRootRef, uvExecutableRef: result.uvExecutableRef, pythonInstallStatus: result.pythonInstallStatus, venvStatus: result.venvStatus, uvStatus: result.uvStatus, canProceedToPythonInstallVerification: result.canProceedToPythonInstallVerification, canExecuteHermes: false, nextStep: result.recommendedNextStep } }
