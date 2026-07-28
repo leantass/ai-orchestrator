@@ -38,6 +38,11 @@ import { GuidedSidebarActions } from './components/GuidedSidebarActions'
 import { HomeDashboardPanel } from './components/HomeDashboardPanel'
 import { DetectedProjectBanner } from './components/DetectedProjectBanner'
 import { ImplementationRoadmapCard } from './components/ImplementationRoadmapCard'
+import {
+  InputAssetsPanel,
+  type JefeInputAsset,
+  type JefeInputAssetBlocked,
+} from './components/jefe/InputAssetsPanel'
 import { LocalProjectManifestCard } from './components/LocalProjectManifestCard'
 import { NextActionPlanCard } from './components/NextActionPlanCard'
 import { PlanOverviewPanel } from './components/PlanOverviewPanel'
@@ -1551,6 +1556,11 @@ declare global {
         steps: Array<{ label: string; status: string }>
         expectedArtifacts: string[]
         warnings: string[]
+        inputAssets?: {
+          assets: JefeInputAsset[]
+          brandColors: string
+          visualNotes: string
+        }
       }) => Promise<{
         ok: boolean
         runId?: string
@@ -11594,6 +11604,11 @@ function App() {
     useState<RealGenerationResult | null>(null)
   const [realGenerationLoading, setRealGenerationLoading] = useState(false)
   const [realGenerationError, setRealGenerationError] = useState('')
+  const [jefeInputAssets, setJefeInputAssets] = useState<JefeInputAsset[]>([])
+  const [jefeInputAssetsBlocked, setJefeInputAssetsBlocked] = useState<JefeInputAssetBlocked[]>([])
+  const [jefeBrandColors, setJefeBrandColors] = useState('')
+  const [jefeVisualNotes, setJefeVisualNotes] = useState('')
+  const [jefeInputAssetsMessage, setJefeInputAssetsMessage] = useState('')
 
   useEffect(() => {
     executionRunSummariesRef.current = executionRunSummaries
@@ -16048,6 +16063,9 @@ No usar credenciales.`
       'brief.md',
       'status.json',
       'logs/events.log',
+      ...(jefeInputAssets.length > 0 || jefeBrandColors.trim() || jefeVisualNotes.trim()
+        ? ['inputs/input-assets.json', 'inputs/assets/']
+        : []),
       'reports/RUN_SUMMARY.md',
     ]
     const nextRun: CommercialUiRun = {
@@ -16133,6 +16151,14 @@ No usar credenciales.`
         steps: initialSteps,
         expectedArtifacts,
         warnings: nextRun.warnings,
+        inputAssets:
+          jefeInputAssets.length > 0 || jefeBrandColors.trim() || jefeVisualNotes.trim()
+            ? {
+                assets: jefeInputAssets,
+                brandColors: jefeBrandColors,
+                visualNotes: jefeVisualNotes,
+              }
+            : undefined,
       })
       .then((response) => {
         if (!response?.ok) {
@@ -22379,6 +22405,18 @@ No usar credenciales.`
               rows={7}
               className="jefe-commercial-textarea"
               placeholder="Ej: Un sistema de viandas para empresas con portal empleado, cocina, reportes, etiquetas y panel proveedor."
+            />
+            <InputAssetsPanel
+              assets={jefeInputAssets}
+              blockedAssets={jefeInputAssetsBlocked}
+              brandColors={jefeBrandColors}
+              visualNotes={jefeVisualNotes}
+              message={jefeInputAssetsMessage}
+              onAssetsChange={setJefeInputAssets}
+              onBlockedAssetsChange={setJefeInputAssetsBlocked}
+              onBrandColorsChange={setJefeBrandColors}
+              onVisualNotesChange={setJefeVisualNotes}
+              onMessageChange={setJefeInputAssetsMessage}
             />
             <div className="jefe-commercial-request-actions">
               <button
