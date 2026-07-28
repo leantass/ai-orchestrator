@@ -2,6 +2,11 @@ const fs = require('fs')
 const path = require('path')
 const { spawn } = require('child_process')
 const { resolveRunPaths: resolveDryRunPaths } = require('./jefe-run-persistence.cjs')
+const { readInputAssetsManifest } = require('./jefe-input-assets.cjs')
+const {
+  buildInputAssetsReportLines,
+  projectInputAssetsSummary,
+} = require('./jefe-input-assets-output.cjs')
 
 const RUN_ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/
 const GENERATION_RELATIVE_ROOT = path.join('.codex-temp', 'jefe-real-generation', 'runs')
@@ -24,6 +29,13 @@ const GENERATION_STEPS = [
   'Validando estructura',
   'Corriendo smoke basico',
   'Preparando entrega',
+]
+const INPUT_ASSETS_TRACEABILITY_REPORTS = [
+  'PROJECT_INTAKE.md',
+  'PROJECT_CONTRACT.md',
+  'ARCHITECTURE_PLAN.md',
+  'QA_CHECKLIST.md',
+  'RUN_SUMMARY.md',
 ]
 
 function getRepoRoot(options = {}) {
@@ -159,6 +171,38 @@ function buildSafeEnv(baseEnv = process.env) {
   safeEnv.NODE_ENV = safeEnv.NODE_ENV || 'test'
 
   return safeEnv
+}
+
+function buildInputAssetsTraceabilitySection(inputAssets) {
+  if (!inputAssets) return ''
+
+  return [
+    '',
+    '## Materiales de entrada',
+    '',
+    ...buildInputAssetsReportLines(inputAssets).map((line) => `- ${line}`),
+    '- Limites: copia local solamente; sin red; sin OCR; sin analisis automatico de PDF; sin ejecucion de archivos.',
+    '',
+  ].join('\n')
+}
+
+async function appendInputAssetsTraceability({ reportsPath, inputAssets }) {
+  const section = buildInputAssetsTraceabilitySection(inputAssets)
+  if (!section) return []
+
+  const updatedReports = []
+  for (const reportName of INPUT_ASSETS_TRACEABILITY_REPORTS) {
+    const reportPath = path.join(reportsPath, reportName)
+    if (!fs.existsSync(reportPath)) continue
+
+    const current = await fs.promises.readFile(reportPath, 'utf8')
+    if (/^## Materiales de entrada\b/imu.test(current)) continue
+
+    await fs.promises.writeFile(reportPath, `${current.trimEnd()}\n${section}`, 'utf8')
+    updatedReports.push(reportName)
+  }
+
+  return updatedReports
 }
 
 function commandToText(command, args) {
@@ -427,6 +471,7 @@ async function startGenerationFromRun(runId, options = {}) {
     if (!fs.existsSync(paths.generatorScriptPath)) {
       throw new Error('entrypoint oficial no encontrado.')
     }
+    const inputAssets = await readInputAssetsManifest(dryRunPaths.runPath)
 
     await writeStatus(paths, {
       runId: paths.runId,
@@ -466,6 +511,10 @@ async function startGenerationFromRun(runId, options = {}) {
     if (generation.status !== 0) {
       throw new Error(sanitizeText(generation.stderr || generation.stdout || 'Generacion fallida.'))
     }
+    const inputAssetsTraceabilityReports = await appendInputAssetsTraceability({
+      reportsPath: paths.reportsPath,
+      inputAssets,
+    })
 
     await writeStatus(paths, {
       runId: paths.runId,
@@ -540,6 +589,7 @@ async function startGenerationFromRun(runId, options = {}) {
       completedAt,
       outputPath: toRelativeRepoPath(paths.outputPath, options),
       validation: validations,
+      inputAssets: projectInputAssetsSummary(inputAssets),
       warnings: ['Generacion real controlada: no se ejecuto Codex real ni servicios externos.'],
       errors: failedValidation ? [`Fallo validacion: ${failedValidation.name}`] : [],
     }
@@ -562,6 +612,9 @@ async function startGenerationFromRun(runId, options = {}) {
         summary: toRelativeRepoPath(paths.summaryPath, options),
         generationLog: toRelativeRepoPath(paths.generationLogPath, options),
         output: toRelativeRepoPath(paths.outputPath, options),
+        ...(inputAssetsTraceabilityReports.length > 0
+          ? { inputAssetsTraceability: inputAssetsTraceabilityReports.join(', ') }
+          : {}),
       },
       error: failedValidation ? `Fallo validacion: ${failedValidation.name}` : undefined,
     }
