@@ -281,3 +281,7 @@ contextBridge.exposeInMainWorld('jefeGenerationBridge', {
   readGenerationResult: (runId) =>
     ipcRenderer.invoke('jefe-generation:read-result', { runId }),
 })
+
+contextBridge.exposeInMainWorld('jefeInputAssetsBridge', {
+  selectInputAssets: () => ipcRenderer.invoke('jefe-input-assets:select'),
+})

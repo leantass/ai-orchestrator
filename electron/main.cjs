@@ -84,6 +84,9 @@ const {
   getGenerationStatus: getJefeGenerationStatus,
   readGenerationResult: readJefeGenerationResult,
 } = require('./jefe-real-generation.cjs')
+const {
+  validateAssetSelection: validateJefeAssetSelection,
+} = require('./jefe-input-assets.cjs')
 
 function isElectronExecutablePath(executablePath) {
   if (typeof executablePath !== 'string' || !executablePath.trim()) {
@@ -60089,6 +60092,29 @@ ipcMain.handle('jefe-generation:get-status', async (_event, payload) =>
 ipcMain.handle('jefe-generation:read-result', async (_event, payload) =>
   readJefeGenerationResult(payload?.runId),
 )
+
+ipcMain.handle('jefe-input-assets:select', async () => {
+  const result = await dialog.showOpenDialog({
+    title: 'Agregar materiales opcionales',
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      {
+        name: 'Materiales compatibles',
+        extensions: ['png', 'jpg', 'jpeg', 'webp', 'svg', 'pdf', 'txt', 'md'],
+      },
+    ],
+  })
+
+  if (result.canceled) {
+    return { ok: true, canceled: true, assets: [], blocked: [], totalFiles: 0, totalBytes: 0 }
+  }
+
+  const files = (result.filePaths || []).map((filePath) => ({
+    path: filePath,
+    size: fs.statSync(filePath).size,
+  }))
+  return { canceled: false, ...validateJefeAssetSelection(files) }
+})
 
 ipcMain.handle('ai-orchestrator:list-reusable-artifacts', async (_event, payload) => {
   return {

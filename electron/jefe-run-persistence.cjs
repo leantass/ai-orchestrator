@@ -1,5 +1,6 @@
 const fs = require('fs')
 const path = require('path')
+const { copyAssetsToRun } = require('./jefe-input-assets.cjs')
 
 const RUN_ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/
 const MAX_BRIEF_LENGTH = 20000
@@ -108,6 +109,8 @@ function resolveRunPaths(runId, options = {}) {
     statusPath: path.join(runPath, 'status.json'),
     eventsPath: path.join(runPath, 'logs', 'events.log'),
     summaryPath: path.join(runPath, 'reports', 'RUN_SUMMARY.md'),
+    inputAssetsPath: path.join(runPath, 'inputs', 'input-assets.json'),
+    inputAssetsFolderPath: path.join(runPath, 'inputs', 'assets'),
   }
 }
 
@@ -256,8 +259,31 @@ async function createDryRun(payload, options = {}) {
   try {
     const paths = resolveRunPaths(payload?.runId, options)
     const { brief, run, statusRecord } = buildRunRecord(payload, paths, options)
+    const inputAssetsPayload = payload?.inputAssets && typeof payload.inputAssets === 'object'
+      ? payload.inputAssets
+      : null
 
     await ensureRunDirectories(paths)
+    let inputAssetsResult = null
+    if (inputAssetsPayload) {
+      inputAssetsResult = await copyAssetsToRun({
+        runId: paths.runId,
+        runPath: paths.runPath,
+        projectName: run.title,
+        assets: inputAssetsPayload.assets || [],
+        brandColors: inputAssetsPayload.brandColors || '',
+        visualNotes: inputAssetsPayload.visualNotes || '',
+      })
+      run.inputAssets = {
+        manifest: toRelativeRepoPath(paths.inputAssetsPath, options),
+        totalFiles: inputAssetsResult.manifest.totalFiles,
+        totalBytes: inputAssetsResult.manifest.totalBytes,
+        logoCandidate: inputAssetsResult.manifest.logoCandidate?.safeName || '',
+      }
+      run.paths.inputAssets = toRelativeRepoPath(paths.inputAssetsPath, options)
+      run.paths.inputAssetsFolder = toRelativeRepoPath(paths.inputAssetsFolderPath, options)
+      statusRecord.inputAssets = run.inputAssets
+    }
     await writeJsonFile(paths.runJsonPath, run)
     await fs.promises.writeFile(paths.briefPath, buildBriefMarkdown({ brief, createdAt: run.createdAt }), 'utf8')
     await writeJsonFile(paths.statusPath, statusRecord)
@@ -290,6 +316,7 @@ async function createDryRun(payload, options = {}) {
         status: toRelativeRepoPath(paths.statusPath, options),
         eventsLog: toRelativeRepoPath(paths.eventsPath, options),
         summary: toRelativeRepoPath(paths.summaryPath, options),
+        ...(inputAssetsResult ? { inputAssets: toRelativeRepoPath(paths.inputAssetsPath, options) } : {}),
       },
     }
   } catch (error) {
