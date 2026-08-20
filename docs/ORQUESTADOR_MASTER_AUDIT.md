@@ -1,0 +1,33 @@
+# Auditoría maestra integral del Orquestador / JEFE
+
+Versión incorporada al worktree canónico candidato: 2026-08-20.
+Fuente auditada: `feature/jefe-factory-core` y `feature/jefe-real-project-delivery-v1`, ambos desde `81ba810313610e3e3f678bea5a70b29650b471c0`.
+
+## Estado vigente de auditoría
+
+El Orquestador posee arquitectura, contratos, UI y smokes parciales, pero no una escalera integral demostrada. Los bloqueos principales son: verdad de integración, Context Hub externo, investigación real/Hermes bloqueado, ejecución Codex no demostrada, QA visual inexistente, bucles de corrección no integrados y entrega no verificada.
+
+La evidencia no permite declarar “release candidate”, “deuda crítica cero”, preview validado, investigación remota, Codex operativo, entrega comercial o prueba integral. Capturas blancas no cuentan como evidencia visual.
+
+## Escalones vigentes
+
+| Escalón | Estado |
+|---|---|
+| Verdad del repositorio | En reconciliación. |
+| Context Hub / MEMORIA | Parcial; externo y no demostrado extremo a extremo. |
+| Entrada e investigación | Assets parciales; investigación real no demostrada. |
+| JEFE comercial | WIP sin validación visual real. |
+| Planner / contratos | Parcial y mayormente oculto. |
+| Codex / ejecución | Mock/bridge presentes; Codex real no demostrado. |
+| QA / seguridad | Smokes/políticas presentes; QA integral ausente. |
+| Corrección automática | Preparada en partes, no integrada. |
+| Preview / aprobación | Sin evidencia visual válida. |
+| Git / CI / entrega | Configurado en parte, sin entrega comprobada. |
+| Observabilidad / aprendizaje | Eventos locales, sin analítica/aprendizaje cerrado. |
+| Prueba integral | Ausente. |
+
+Este documento es una auditoría fechada; `ORQUESTADOR_INTEGRATION_STATUS.md` registra el bloque de integración actualmente aplicado.
+
+## Deuda heredada de lint: QA / Factory-Hermes
+
+El lint global del baseline mantiene 306 errores y 0 warnings en 73 archivos bajo `src/factory/hermes-*`: 304 de `@typescript-eslint/no-explicit-any` y 2 de `@typescript-eslint/no-empty-object-type`. No afecta al contrato, registro ni smoke fundacionales, que pasan lint focalizado. La deuda permanece abierta y corresponde al escalón futuro de QA / Factory-Hermes; no se relajan reglas ni se modifica la clasificación vigente de los demás escalones.
