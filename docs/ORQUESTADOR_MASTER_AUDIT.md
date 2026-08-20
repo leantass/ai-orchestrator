@@ -35,3 +35,7 @@ El lint global del baseline mantiene 306 errores y 0 warnings en 73 archivos baj
 ## Escalón 1C: alcance de creación canónica
 
 La creación de primera versión se reconcilia con contrato único, perfiles `factory_typed` y `commercial_site`, materialización atómica local y manifest reabrible. La validación es estructural y de archivos/DOM; no constituye QA visual, preview, entrega comercial ni ejecución externa. Los flujos de generación heredados con runners, UI, IPC y Hermes siguen fuera del alcance y requieren su escalón propio.
+
+## Escalón 1D: estado de persistencia
+
+Persistencia JSON atómica e IPC allowlisted quedan disponibles para una UI futura. No constituyen una UI, preview o restauración real; la entrega sólo se declara disponible con evidencia física.

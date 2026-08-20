@@ -202,4 +202,6 @@ async function readMaterializedManifest(manifestPath, { deserializeProjectContra
   return { manifest: parsed, project: deserializeProjectContract(JSON.stringify(parsed.contract), { allowedRoots }) }
 }
 
-module.exports = { MaterializationError, materializeProject, readMaterializedManifest }
+// Alias transitorios: preservan callers históricos sin iniciar runners ni saltar el contrato.
+function unavailableLegacyGeneration() { return { ok: false, status: 'not_available', error: 'La generación heredada fue reemplazada por creación canónica materializada.' } }
+module.exports = { MaterializationError, materializeProject, readMaterializedManifest, startGenerationFromRun: unavailableLegacyGeneration, getGenerationStatus: unavailableLegacyGeneration, readGenerationResult: unavailableLegacyGeneration }

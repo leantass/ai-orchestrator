@@ -26,4 +26,6 @@ El Escalón 1 sigue abierto hasta que los archivos solapados, persistencia, IPC 
 
 ## Avance de reconciliación 1C
 
-Se resolvieron manualmente los tres archivos solapados de creación/materialización: `electron/jefe-project-creation.cjs`, `electron/jefe-real-generation.cjs` y `scripts/jefe-project-creation-smoke.mjs`. No se copió un motor completo: se conservaron la tipificación/capacidades Factory y la marca/Input Assets/direcciones estructurales Comercial bajo el contrato canónico. Permanecen sin integrar `src/App.tsx`, `src/index.css`, `electron/main.cjs`, preload, IPC, workspace, preview y Hermes completo.
+Se resolvieron manualmente los tres archivos solapados de creación/materialización: `electron/jefe-project-creation.cjs`, `electron/jefe-real-generation.cjs` y `scripts/jefe-project-creation-smoke.mjs`. No se copió un motor completo: se conservaron la tipificación/capacidades Factory y la marca/Input Assets/direcciones estructurales Comercial bajo el contrato canónico. Permanecen sin integrar `src/App.tsx`, `src/index.css`, workspace, preview, restauración y Hermes completo.
+
+La reconciliación 1D incorpora persistencia/IPC canónicos sin conectar UI; `src/App.tsx` e `src/index.css` siguen excluidos.

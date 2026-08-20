@@ -285,3 +285,17 @@ contextBridge.exposeInMainWorld('jefeGenerationBridge', {
 contextBridge.exposeInMainWorld('jefeInputAssetsBridge', {
   selectInputAssets: () => ipcRenderer.invoke('jefe-input-assets:select'),
 })
+
+// API canónica mínima para la futura UI. No acepta canales ni paths libres.
+contextBridge.exposeInMainWorld('jefeProjectBridge', {
+  createFirstVersion: (request) => ipcRenderer.invoke('jefe-projects:create-first-version', request),
+  listProjects: () => ipcRenderer.invoke('jefe-projects:list'),
+  getProject: (projectId) => ipcRenderer.invoke('jefe-projects:get', { projectId }),
+  listVersions: (projectId) => ipcRenderer.invoke('jefe-projects:list-versions', { projectId }),
+  getWorkspaceSnapshot: (projectId) => ipcRenderer.invoke('jefe-projects:workspace-snapshot', { projectId }),
+  openPreview: (projectId) => ipcRenderer.invoke('jefe-projects:open', { projectId, target: 'preview' }),
+  openDelivery: (projectId) => ipcRenderer.invoke('jefe-projects:open', { projectId, target: 'delivery' }),
+  copyPreviewLocation: (projectId) => ipcRenderer.invoke('jefe-projects:copy-location', { projectId, target: 'preview' }),
+  capabilities: () => ipcRenderer.invoke('jefe-projects:capabilities'),
+  selectInputAssets: () => ipcRenderer.invoke('jefe-input-assets:select'),
+})

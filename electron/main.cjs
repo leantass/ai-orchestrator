@@ -87,6 +87,7 @@ const {
 const {
   validateAssetSelection: validateJefeAssetSelection,
 } = require('./jefe-input-assets.cjs')
+const { registerCanonicalProjectIpc } = require('./jefe-project-ipc.cjs')
 
 function isElectronExecutablePath(executablePath) {
   if (typeof executablePath !== 'string' || !executablePath.trim()) {
@@ -60114,6 +60115,13 @@ ipcMain.handle('jefe-input-assets:select', async () => {
     size: fs.statSync(filePath).size,
   }))
   return { canceled: false, ...validateJefeAssetSelection(files) }
+})
+
+registerCanonicalProjectIpc({
+  ipcMain,
+  root: path.join(app.getPath('userData'), 'jefe-canonical-projects'),
+  shell,
+  clipboard: electronModule.clipboard,
 })
 
 ipcMain.handle('ai-orchestrator:list-reusable-artifacts', async (_event, payload) => {

@@ -81,3 +81,7 @@ Perfiles soportados:
 El smoke `scripts/jefe-project-creation-smoke.mjs` usa únicamente un directorio temporal y cubre Factory, Comercial, identidad, manifest/reapertura, compatibilidad de perfil/tipo/plataforma, traversal, roots externos, colisiones, fallo parcial, Input Assets/URL como referencia, las tres direcciones y su diferenciación estructural por DOM. No valida belleza visual ni crea un proyecto comercial real.
 
 Fuentes sintetizadas manualmente: Factory aportó registro/capacidades, mock y documentación local; Comercial aportó marca, Input Assets y composición estructural por dirección. Siguen fuera de este escalón los flujos heredados `startGenerationFromRun`, UI, `electron/main.cjs`, preload, IPC, workspace, preview, restauración y Hermes masivo.
+
+## Escalón 1D: persistencia e IPC seguro
+
+La fuente de verdad pasa a ser el manifest físico por versión dentro de un root autorizado; `.jefe-project-index.json` es atómico, determinista y reconstruible desde manifests válidos. `jefeProjectBridge` expone sólo crear/listar/consultar/snapshot/open/copy/capacidades/Input Assets mediante canales semánticos, sin paths, shell, filesystem ni canales libres. Abrir/copiar resuelve identidad en main y los smokes usan shell/clipboard inyectados. UI sigue sin conectar; el lint global Hermes continúa abierto.
