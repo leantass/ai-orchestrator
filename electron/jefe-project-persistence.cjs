@@ -35,7 +35,7 @@ function createProjectPersistence({ root }) {
     const project = deserializeProjectContract(JSON.stringify(raw.contract), { allowedRoots: [allowedRoot] })
     const expected = path.join(allowedRoot, project.projectId, project.activeVersionId, 'manifest.json')
     if (path.resolve(expected) !== target) fail('IDENTITY_INCONSISTENT', 'La identidad del manifest no coincide con su ubicación.', { manifestPath: target })
-    return { project, manifestPath: target, artifactPaths: Array.isArray(raw.artifactPaths) ? raw.artifactPaths : [] }
+    return { project, manifestPath: target, artifactPaths: Array.isArray(raw.artifactPaths) ? raw.artifactPaths : [], raw }
   }
   async function scan() {
     const records = []
@@ -77,7 +77,11 @@ function createProjectPersistence({ root }) {
   async function getProject(projectId) { if (!safeId(projectId)) fail('INVALID_ID', 'projectId inválido.'); return (await listProjects()).find((project) => project.projectId === projectId) || null }
   async function listVersions(projectId) { const records = (await scan()).filter((record) => !record.invalid && record.project.projectId === projectId); return records.map((record) => record.project.versions.find((version) => version.versionId === record.project.activeVersionId)).filter(Boolean).sort((a, b) => a.versionId.localeCompare(b.versionId)) }
   async function getVersion(projectId, versionId) { return (await listVersions(projectId)).find((version) => version.versionId === versionId) || null }
+  async function getVersionRecord(projectId, versionId) {
+    if (!safeId(projectId) || !safeId(versionId)) fail('INVALID_ID', 'La identidad de versión es inválida.')
+    return (await scan()).find((record) => !record.invalid && record.project.projectId === projectId && record.project.activeVersionId === versionId) || null
+  }
   async function workspaceSnapshot(projectId) { const project = await getProject(projectId); if (!project) return null; const versions = await listVersions(projectId); const rootPath = project.physicalPaths.projectRoot; const previewPath = rootPath ? path.join(rootPath, 'app', 'index.html') : null; return { projectId: project.projectId, state: project.delivery.status, generationProfile: project.generationProfile, projectType: project.projectType, platform: project.platform, creativeDirection: project.visualDirection, materials: { totalFiles: project.inputAssets.totalFiles, references: project.inputAssets.urlReferences.length }, lastActivity: project.timestamps.updatedAt, versionCount: versions.length, activeVersionId: project.activeVersionId, previewAvailable: Boolean(previewPath && fs.existsSync(previewPath)), deliveryAvailable: project.delivery.status === 'delivered_local' && Boolean(project.delivery.localPath && fs.existsSync(project.delivery.localPath)), nextStep: project.delivery.status === 'not_ready' ? 'review_local_artifacts' : 'review_delivery', blockers: project.delivery.status === 'not_ready' ? ['delivery_not_registered'] : [] } }
-  return { root: allowedRoot, registerManifest, rebuildIndex, listProjects, getProject, listVersions, getVersion, workspaceSnapshot, readManifest }
+  return { root: allowedRoot, registerManifest, rebuildIndex, listProjects, getProject, listVersions, getVersion, getVersionRecord, workspaceSnapshot, readManifest, writeAtomic }
 }
 module.exports = { ProjectPersistenceError, createProjectPersistence }

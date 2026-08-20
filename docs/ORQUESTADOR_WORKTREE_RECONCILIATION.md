@@ -31,3 +31,5 @@ Se resolvieron manualmente los tres archivos solapados de creación/materializac
 La reconciliación 1D incorpora persistencia/IPC canónicos sin conectar UI; `src/App.tsx` e `src/index.css` siguen excluidos.
 
 La reconciliación 1E conecta `App.tsx` e `index.css` exclusivamente al bridge canónico: el hub no incorpora fixtures ni proyectos demo, y la UI técnica heredada queda preservada detrás de `#advanced`. No se integra todavía el workspace 1F.
+
+La reconciliación 1F completa el workspace comercial sobre las mismas autoridades canónicas: manifests por versión, persistencia existente, ledger físico por proyecto y bridge allowlisted. Se añadieron lifecycle, resolver de preview, smokes y UI comercial; no se integró Hermes masivo ni se tocaron los worktrees fuente. El preview integrado queda diferido por no ampliar `electron/main.cjs` con un protocolo dedicado; sólo se abre un recurso validado por main.

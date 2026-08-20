@@ -1834,3 +1834,15 @@ html[data-theme="dark"] .jefe-commercial-backdrop {
     padding: 16px;
   }
 }
+
+.workspace-shell { max-width: 1180px; }
+.workspace-header, .workspace-grid { display: grid; gap: 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.workspace-header { align-items: start; margin: 20px 0; padding: 22px; border: 1px solid var(--jefe-line, #d8d8df); border-radius: 14px; }
+.workspace-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0; }
+.workspace-tabs button[aria-current="page"] { background: var(--jefe-primary, #6d28d9); color: #fff; }
+.workspace-grid article { min-width: 0; padding: 20px; border: 1px solid var(--jefe-line, #d8d8df); border-radius: 14px; background: var(--jefe-panel, #fff); }
+.workspace-grid li { margin: 10px 0; }
+.workspace-grid button { margin: 8px 8px 8px 0; }
+.workspace-grid label { display: grid; gap: 6px; margin: 12px 0; }
+.workspace-grid textarea { min-height: 110px; resize: vertical; }
+@media (max-width: 640px) { .workspace-header, .workspace-grid { grid-template-columns: 1fr; } .workspace-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .workspace-tabs button { min-height: 48px; } }

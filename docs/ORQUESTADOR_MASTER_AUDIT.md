@@ -43,3 +43,7 @@ Persistencia JSON atómica e IPC allowlisted quedan disponibles para una UI futu
 ## Escalón 1E: hub comercial guiado
 
 La portada comercial consume proyectos físicos mediante `jefeProjectBridge`, con hub, borrador local no canónico y wizard de cinco pasos. El modo técnico permanece fuera del recorrido principal mediante `#advanced`, compatible con Vite y `file://`. Responsive y accesibilidad se implementaron por código; no hubo validación visual. Workspace completo, comparación, restauración y entrega avanzada quedan para 1F.
+
+## Escalón 1F: ciclo local y workspace
+
+El ciclo local de versiones, ledger y entrega inmutable están cubiertos por smokes físicos. El workspace comercial no convierte esa evidencia en claims de IA, Codex real, deploy, publicación o QA visual. Preview conserva una frontera de recurso declarado y MIME allowlisted, pero no hay protocolo dedicado registrado ni evidencia de iframe vivo. La aprobación local no es validación técnica. La deuda global Hermes permanece: 306 errores y 0 warnings en 73 archivos `src/factory/hermes-*`, sin relajar reglas.
