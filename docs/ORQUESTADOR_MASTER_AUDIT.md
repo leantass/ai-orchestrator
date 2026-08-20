@@ -39,3 +39,7 @@ La creación de primera versión se reconcilia con contrato único, perfiles `fa
 ## Escalón 1D: estado de persistencia
 
 Persistencia JSON atómica e IPC allowlisted quedan disponibles para una UI futura. No constituyen una UI, preview o restauración real; la entrega sólo se declara disponible con evidencia física.
+
+## Escalón 1E: hub comercial guiado
+
+La portada comercial consume proyectos físicos mediante `jefeProjectBridge`, con hub, borrador local no canónico y wizard de cinco pasos. El modo técnico permanece fuera del recorrido principal mediante `#advanced`, compatible con Vite y `file://`. Responsive y accesibilidad se implementaron por código; no hubo validación visual. Workspace completo, comparación, restauración y entrega avanzada quedan para 1F.

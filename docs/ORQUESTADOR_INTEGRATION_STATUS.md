@@ -85,3 +85,9 @@ Fuentes sintetizadas manualmente: Factory aportó registro/capacidades, mock y d
 ## Escalón 1D: persistencia e IPC seguro
 
 La fuente de verdad pasa a ser el manifest físico por versión dentro de un root autorizado; `.jefe-project-index.json` es atómico, determinista y reconstruible desde manifests válidos. `jefeProjectBridge` expone sólo crear/listar/consultar/snapshot/open/copy/capacidades/Input Assets mediante canales semánticos, sin paths, shell, filesystem ni canales libres. Abrir/copiar resuelve identidad en main y los smokes usan shell/clipboard inyectados. UI sigue sin conectar; el lint global Hermes continúa abierto.
+
+## Escalón 1E: estado parcial por límite de turno
+
+`STATUS=PARTIAL_BY_TURN_TIME_LIMIT`. Checkpoints 1 a 4 están en curso: se añadieron `src/commercial/hubModel.ts` y `src/commercial/CommercialApp.tsx`, se conectó la portada comercial por defecto desde `App.tsx` y se agregaron reglas responsive/accesibles focales en `src/index.css`. El hub usa exclusivamente `jefeProjectBridge`, no crea fixtures y conserva `/advanced` como ruta explícita para el código técnico existente. `npm run typecheck` pasó. Falta completar el smoke hub/wizard, documentación 1E completa, ESLint focalizado, build, auditoría Git y commit `feat: connect commercial project hub and guided intake`.
+
+Actualización de cierre: smoke del hub/wizard y regresiones canónicas PASS; ESLint focalizado, typecheck y build PASS. El modo técnico usa ahora `#advanced` (no `/advanced`) para funcionar también bajo `file://`. El hub mantiene borradores sólo en `localStorage`, usa snapshots físicos para proyectos y deja 1F —workspace, comparación, restauración y entrega avanzada— pendiente. Responsive y accesibilidad fueron revisados por reglas/código, sin afirmar validación visual.

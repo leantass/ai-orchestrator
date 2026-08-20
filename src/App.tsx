@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import { flushSync } from 'react-dom'
+import { CommercialApp } from './commercial/CommercialApp'
 import {
   ActionTile,
   DisclosurePanel,
@@ -11425,7 +11426,7 @@ const sanitizeSimpleExperienceText = ({
   return replacement || fallback
 }
 
-function App() {
+function AdvancedApp() {
   const persistedFlowMessages = getStoredFlowMessages()
   const skipProjectPolicyPersistenceRef = useRef(false)
   const skipSessionEventsPersistenceRef = useRef(false)
@@ -27022,6 +27023,10 @@ No usar credenciales.`
       </div>
     </main>
   )
+}
+
+function App() {
+  return window.location.hash === '#advanced' ? <AdvancedApp /> : <CommercialApp />
 }
 
 export default App

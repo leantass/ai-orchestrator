@@ -29,3 +29,5 @@ El Escalón 1 sigue abierto hasta que los archivos solapados, persistencia, IPC 
 Se resolvieron manualmente los tres archivos solapados de creación/materialización: `electron/jefe-project-creation.cjs`, `electron/jefe-real-generation.cjs` y `scripts/jefe-project-creation-smoke.mjs`. No se copió un motor completo: se conservaron la tipificación/capacidades Factory y la marca/Input Assets/direcciones estructurales Comercial bajo el contrato canónico. Permanecen sin integrar `src/App.tsx`, `src/index.css`, workspace, preview, restauración y Hermes completo.
 
 La reconciliación 1D incorpora persistencia/IPC canónicos sin conectar UI; `src/App.tsx` e `src/index.css` siguen excluidos.
+
+La reconciliación 1E conecta `App.tsx` e `index.css` exclusivamente al bridge canónico: el hub no incorpora fixtures ni proyectos demo, y la UI técnica heredada queda preservada detrás de `#advanced`. No se integra todavía el workspace 1F.
