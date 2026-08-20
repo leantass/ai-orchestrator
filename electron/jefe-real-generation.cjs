@@ -1,656 +1,205 @@
 const fs = require('fs')
 const path = require('path')
-const { spawn } = require('child_process')
-const { resolveRunPaths: resolveDryRunPaths } = require('./jefe-run-persistence.cjs')
-const { readInputAssetsManifest } = require('./jefe-input-assets.cjs')
-const {
-  buildInputAssetsReportLines,
-  projectInputAssetsSummary,
-} = require('./jefe-input-assets-output.cjs')
 
-const RUN_ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/
-const GENERATION_RELATIVE_ROOT = path.join('.codex-temp', 'jefe-real-generation', 'runs')
-const GENERATOR_SCRIPT_RELATIVE_PATH = path.join('scripts', 'generated-domain-real-project-from-brief.mjs')
-const MAX_LOG_LENGTH = 6000
-const CONTROL_CHARS_PATTERN = /[\x00-\x08\x0B\x0C\x0E-\x1F]/
-const SECRET_ENV_PATTERNS = [
-  /KEY/iu,
-  /TOKEN/iu,
-  /SECRET/iu,
-  /PASSWORD/iu,
-  /CREDENTIAL/iu,
-  /AUTH/iu,
-]
-
-const GENERATION_STEPS = [
-  'Preparando brief',
-  'Ejecutando generador',
-  'Creando proyecto',
-  'Validando estructura',
-  'Corriendo smoke basico',
-  'Preparando entrega',
-]
-const INPUT_ASSETS_TRACEABILITY_REPORTS = [
-  'PROJECT_INTAKE.md',
-  'PROJECT_CONTRACT.md',
-  'ARCHITECTURE_PLAN.md',
-  'QA_CHECKLIST.md',
-  'RUN_SUMMARY.md',
-]
-
-function getRepoRoot(options = {}) {
-  return path.resolve(options.repoRoot || path.join(__dirname, '..'))
-}
-
-function validateRunId(runId) {
-  const normalizedRunId = typeof runId === 'string' ? runId.trim() : ''
-
-  if (!RUN_ID_PATTERN.test(normalizedRunId)) {
-    throw new Error('runId invalido. Solo se permiten letras, numeros, guion y guion bajo.')
-  }
-
-  return normalizedRunId
-}
-
-function toRelativeRepoPath(absolutePath, options = {}) {
-  return path.relative(getRepoRoot(options), absolutePath).replace(/\\/g, '/')
-}
-
-function ensureInsidePath(targetPath, rootPath, label = 'path') {
-  const resolvedTarget = path.resolve(targetPath)
-  const resolvedRoot = path.resolve(rootPath)
-
-  if (resolvedTarget !== resolvedRoot && !resolvedTarget.startsWith(resolvedRoot + path.sep)) {
-    throw new Error(`${label} fuera del root permitido.`)
-  }
-
-  return resolvedTarget
-}
-
-function getGenerationRoot(options = {}) {
-  const repoRoot = getRepoRoot(options)
-  const codexTempRoot = path.resolve(repoRoot, '.codex-temp')
-  const generationRoot = path.resolve(repoRoot, GENERATION_RELATIVE_ROOT)
-
-  ensureInsidePath(generationRoot, codexTempRoot, 'generation root')
-
-  return generationRoot
-}
-
-function resolveGenerationPaths(runId, options = {}) {
-  const safeRunId = validateRunId(runId)
-  const repoRoot = getRepoRoot(options)
-  const generationRoot = getGenerationRoot(options)
-  const runPath = ensureInsidePath(path.join(generationRoot, safeRunId), generationRoot, 'generation run')
-  const outputPath = ensureInsidePath(path.join(runPath, 'output'), runPath, 'generation output')
-  const logsPath = path.join(runPath, 'logs')
-  const reportsPath = path.join(runPath, 'reports')
-
-  return {
-    runId: safeRunId,
-    repoRoot,
-    generationRoot,
-    runPath,
-    outputPath,
-    logsPath,
-    reportsPath,
-    statusPath: path.join(runPath, 'status.json'),
-    summaryPath: path.join(reportsPath, 'GENERATION_SUMMARY.md'),
-    generationLogPath: path.join(logsPath, 'generation.log'),
-    seedLogPath: path.join(logsPath, 'seed.log'),
-    buildLogPath: path.join(logsPath, 'build.log'),
-    smokeLogPath: path.join(logsPath, 'smoke.log'),
-    domainSmokeLogPath: path.join(logsPath, 'domain-smoke.log'),
-    generatorScriptPath: path.join(repoRoot, GENERATOR_SCRIPT_RELATIVE_PATH),
+class MaterializationError extends Error {
+  constructor(code, message, details = {}) {
+    super(message)
+    this.name = 'MaterializationError'
+    this.code = code
+    this.details = details
   }
 }
 
-function sanitizeText(value, maxLength = MAX_LOG_LENGTH) {
-  const text = typeof value === 'string' ? value : String(value || '')
-  const normalized = text
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
-    .replace(CONTROL_CHARS_PATTERN, '')
-    .trim()
-
-  return normalized.slice(0, maxLength)
+function fail(code, message, details) {
+  throw new MaterializationError(code, message, details)
 }
 
-function sanitizeError(error) {
-  const message = error instanceof Error ? error.message : String(error || '')
-
-  if (/runId/iu.test(message)) return message
-  if (/brief/iu.test(message)) return 'No pude leer el brief guardado para este run.'
-  if (/fuera|path|traversal|root/iu.test(message)) return 'La ruta de generacion no es segura.'
-  if (/soportado|mapper minimo/iu.test(message)) return 'El brief no esta soportado por el generador real controlado actual.'
-
-  return 'No se pudo ejecutar la generacion real controlada.'
+function isInside(root, candidate) {
+  const relative = path.relative(root, candidate)
+  return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative))
 }
 
-function buildFailure(error) {
-  return {
-    ok: false,
-    error: sanitizeError(error),
+function resolveInside(root, relativePath, field) {
+  if (typeof relativePath !== 'string' || !relativePath || path.isAbsolute(relativePath) || relativePath.split(/[\\/]/u).includes('..')) {
+    fail('UNSAFE_RELATIVE_PATH', `${field} debe ser una ruta relativa segura.`, { field, relativePath })
   }
+  const resolved = path.resolve(root, relativePath)
+  if (!isInside(root, resolved)) fail('PATH_OUTSIDE_ROOT', `${field} queda fuera del root autorizado.`, { field, relativePath })
+  return resolved
 }
 
-async function ensureGenerationDirectories(paths) {
-  await fs.promises.mkdir(paths.logsPath, { recursive: true })
-  await fs.promises.mkdir(paths.reportsPath, { recursive: true })
+function safeFileName(value) {
+  return typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,179}$/u.test(value) && !value.includes('..')
 }
 
-async function writeJsonFile(filePath, value) {
-  await fs.promises.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8')
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/gu, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]))
 }
 
-function buildSteps(currentStep, failed = false) {
-  const currentIndex = Math.max(0, GENERATION_STEPS.indexOf(currentStep))
-
-  return GENERATION_STEPS.map((label, index) => {
-    if (failed && index === currentIndex) return { label, status: 'error' }
-    if (index < currentIndex) return { label, status: 'completed' }
-    if (index === currentIndex) return { label, status: 'in-progress' }
-    return { label, status: 'pending' }
-  })
+function artifact(relativePath, content, encoding = 'utf8') {
+  return { relativePath, content, encoding }
 }
 
-function buildCompletedSteps() {
-  return GENERATION_STEPS.map((label) => ({ label, status: 'completed' }))
-}
-
-function buildSafeEnv(baseEnv = process.env) {
-  const safeEnv = {}
-
-  for (const [key, value] of Object.entries(baseEnv)) {
-    if (SECRET_ENV_PATTERNS.some((pattern) => pattern.test(key))) continue
-    safeEnv[key] = value
+function factoryArtifacts(project, capabilities) {
+  const label = project.projectType.replace(/_/gu, ' ')
+  const data = {
+    project: {
+      projectId: project.projectId,
+      runId: project.runId,
+      versionId: project.activeVersionId,
+      projectType: project.projectType,
+      platform: project.platform,
+      generationProfile: project.generationProfile,
+      capabilityMatrix: capabilities,
+      deliveryLevel: 'local_mock_only',
+    },
   }
-
-  safeEnv.AISO_PROVIDER = 'disabled'
-  safeEnv.SCARLETT_PROVIDER = 'disabled'
-  safeEnv.NODE_ENV = safeEnv.NODE_ENV || 'test'
-
-  return safeEnv
-}
-
-function buildInputAssetsTraceabilitySection(inputAssets) {
-  if (!inputAssets) return ''
-
+  const title = escapeHtml(project.brandSpec.name || project.projectId)
   return [
-    '',
-    '## Materiales de entrada',
-    '',
-    ...buildInputAssetsReportLines(inputAssets).map((line) => `- ${line}`),
-    '- Limites: copia local solamente; sin red; sin OCR; sin analisis automatico de PDF; sin ejecucion de archivos.',
-    '',
-  ].join('\n')
+    artifact('README.md', `# ${project.brandSpec.name || project.projectId}\n\nPrimera versión Factory tipada. Este artefacto es un mock local; no declara backend, pagos, autenticación, despliegue ni integración externa.\n`),
+    artifact('docs/DELIVERY.md', '# Entrega\n\nEstado: `not_ready`. Materialización local de una primera versión tipada; no es una entrega comercial.\n'),
+    artifact('docs/CAPABILITIES.md', `${JSON.stringify(capabilities, null, 2)}\n`),
+    artifact('data/mock-data.json', `${JSON.stringify(data, null, 2)}\n`),
+    artifact('app/index.html', `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><link rel="stylesheet" href="./styles.css"></head><body><main class="factory-shell" data-profile="factory_typed"><header><p>Mock tipado</p><h1>${title}</h1></header><section id="resumen"><h2>${escapeHtml(label)}</h2><p>Primera versión local con capacidades declaradas y datos mock.</p></section><section id="capabilities"><h2>Capacidades</h2><pre id="capability-output"></pre></section></main><script src="./app.js"></script></body></html>`),
+    artifact('app/styles.css', 'body{font-family:system-ui;margin:0;background:#f4f6f8;color:#16202a}.factory-shell{max-width:820px;margin:auto;padding:48px}header{border-bottom:4px solid #2b6cb0}pre{background:#fff;padding:18px;overflow:auto}\n'),
+    artifact('app/app.js', `const MOCK_DATA=${JSON.stringify(data)};document.querySelector('#capability-output').textContent=JSON.stringify(MOCK_DATA.project.capabilityMatrix,null,2);\n`),
+  ]
 }
 
-async function appendInputAssetsTraceability({ reportsPath, inputAssets }) {
-  const section = buildInputAssetsTraceabilitySection(inputAssets)
-  if (!section) return []
-
-  const updatedReports = []
-  for (const reportName of INPUT_ASSETS_TRACEABILITY_REPORTS) {
-    const reportPath = path.join(reportsPath, reportName)
-    if (!fs.existsSync(reportPath)) continue
-
-    const current = await fs.promises.readFile(reportPath, 'utf8')
-    if (/^## Materiales de entrada\b/imu.test(current)) continue
-
-    await fs.promises.writeFile(reportPath, `${current.trimEnd()}\n${section}`, 'utf8')
-    updatedReports.push(reportName)
+function commercialLayout(direction, brandName, action, logoAppPath = null) {
+  const identity = logoAppPath
+    ? `<span class="brand-identity"><img src="${escapeHtml(logoAppPath)}" alt="${brandName}"><strong>${brandName}</strong></span>`
+    : `<strong>${brandName}</strong>`
+  if (direction === 'expresiva') {
+    return `<aside class="expressive-rail">${identity}<a href="#obras">Obras</a><a href="#contacto">Contacto</a></aside><main><section id="inicio" class="expressive-hero"><p>Dirección expresiva</p><h1>Una presencia que toma posición.</h1><div class="poster-grid"><b>Identidad</b><b>Ritmo</b><b>Campaña</b></div></section><section id="obras" class="expressive-gallery"><article>Exploración 01</article><article>Exploración 02</article><article>Exploración 03</article></section><section id="contacto" class="expressive-contact"><h2>${action}</h2><a href="mailto:hola@example.local">Abrir conversación</a></section></main>`
   }
-
-  return updatedReports
-}
-
-function commandToText(command, args) {
-  return [command, ...args].join(' ')
-}
-
-function resolveSpawnCommand(command, args) {
-  if (process.platform === 'win32' && command.endsWith('.cmd')) {
-    return {
-      command: 'cmd.exe',
-      args: ['/d', '/s', '/c', command, ...args],
-      displayCommand: commandToText(command, args),
-    }
+  if (direction === 'comercial') {
+    return `<header class="commercial-nav">${identity}<nav><a href="#beneficios">Beneficios</a><a href="#conversion">Contacto</a></nav></header><main><section id="inicio" class="commercial-hero"><div><p>Dirección comercial</p><h1>Una propuesta clara para decidir más rápido.</h1><a class="cta" href="#conversion">${action}</a></div><aside><strong>Propuesta</strong><p>Valor, prioridad y próximo paso.</p></aside></section><section id="beneficios" class="benefit-grid"><article>Mensaje directo</article><article>Oferta ordenada</article><article>Conversión local</article></section><section id="conversion" class="conversion-panel"><h2>${action}</h2><form><label>Nombre <input name="name"></label><label>Email <input name="email"></label><button type="button">Solicitar contacto</button></form></section></main><footer>Contacto local, sin envío remoto.</footer>`
   }
+  return `<header class="editorial-nav">${identity}<nav><a href="#relato">Relato</a><a href="#servicios">Servicios</a><a href="#contacto">Contacto</a></nav></header><main><section id="inicio" class="editorial-hero"><p>Dirección editorial</p><h1>Una historia de marca con ritmo y criterio.</h1></section><section id="relato" class="editorial-story"><article><h2>Contexto</h2><p>La marca ordena su voz, sus piezas y su próximo capítulo.</p></article><aside>01 / Nota de dirección</aside></section><section id="servicios" class="editorial-services"><article>Estrategia</article><article>Identidad</article><article>Sitio</article></section><section id="contacto" class="editorial-contact"><h2>${action}</h2><a href="mailto:hola@example.local">Escribir</a></section></main><footer>Edición local de primera versión.</footer>`
+}
 
-  return {
-    command,
-    args,
-    displayCommand: commandToText(command, args),
+function commercialArtifacts(project, profileContext = {}) {
+  const brandName = escapeHtml(project.brandSpec.name || project.projectId)
+  const direction = project.visualDirection
+  const action = 'Solicitar una conversación'
+  const structure = commercialLayout(direction, brandName, action, profileContext.logoAppPath)
+  const data = {
+    projectId: project.projectId,
+    runId: project.runId,
+    versionId: project.activeVersionId,
+    direction,
+    businessType: profileContext.businessType || 'negocio local',
+    audience: profileContext.audience || 'audiencia declarada en el brief',
+    proposition: profileContext.proposition || 'propuesta local inicial',
+    urlReferences: project.inputAssets.urlReferences || [],
   }
-}
-
-function runSpawnCommand({ command, args, cwd, logPath, env, timeoutMs = 180000 }) {
-  return new Promise((resolve) => {
-    const startedAt = new Date().toISOString()
-    let stdout = ''
-    let stderr = ''
-    let settled = false
-    const resolvedCommand = resolveSpawnCommand(command, args)
-    const child = spawn(resolvedCommand.command, resolvedCommand.args, {
-      cwd,
-      env,
-      shell: false,
-      windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
-    const timeoutId = setTimeout(() => {
-      if (settled) return
-      child.kill()
-      settled = true
-      resolve({
-        command: resolvedCommand.displayCommand,
-        status: 124,
-        stdout,
-        stderr: `${stderr}\nTimeout despues de ${timeoutMs}ms`,
-        startedAt,
-        finishedAt: new Date().toISOString(),
-      })
-    }, timeoutMs)
-
-    child.stdout.on('data', (chunk) => {
-      stdout += chunk.toString()
-    })
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk.toString()
-    })
-    child.on('error', (error) => {
-      if (settled) return
-      clearTimeout(timeoutId)
-      settled = true
-      resolve({
-        command: resolvedCommand.displayCommand,
-        status: 1,
-        stdout,
-        stderr: error instanceof Error ? error.message : String(error),
-        startedAt,
-        finishedAt: new Date().toISOString(),
-      })
-    })
-    child.on('close', (status) => {
-      if (settled) return
-      clearTimeout(timeoutId)
-      settled = true
-      resolve({
-        command: resolvedCommand.displayCommand,
-        status: status ?? 1,
-        stdout,
-        stderr,
-        startedAt,
-        finishedAt: new Date().toISOString(),
-      })
-    })
-  }).then(async (result) => {
-    const log = [
-      `$ ${result.command}`,
-      `cwd=${toRelativeRepoPath(cwd, { repoRoot: cwd === getRepoRoot({ repoRoot: cwd }) ? cwd : undefined })}`,
-      `exit=${result.status}`,
-      sanitizeText(result.stdout, 20000),
-      sanitizeText(result.stderr, 20000),
-    ].filter(Boolean).join('\n')
-
-    await fs.promises.writeFile(logPath, `${log}\n`, 'utf8')
-
-    return result
-  })
-}
-
-function readPackageScripts(packageJsonPath) {
-  try {
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'))
-    return packageJson && typeof packageJson.scripts === 'object' && packageJson.scripts
-      ? packageJson.scripts
-      : {}
-  } catch {
-    return {}
-  }
-}
-
-async function writeStatus(paths, status) {
-  await writeJsonFile(paths.statusPath, {
-    ...status,
-    updatedAt: new Date().toISOString(),
-  })
-}
-
-function buildSummaryMarkdown({ paths, status, commands }) {
-  const validations = Array.isArray(status.validation) ? status.validation : []
-  const errors = Array.isArray(status.errors) ? status.errors : []
-  const warnings = Array.isArray(status.warnings) ? status.warnings : []
-
   return [
-    '# GENERATION SUMMARY',
-    '',
-    `Run: ${paths.runId}`,
-    `Estado: ${status.status}`,
-    `Tipo: real generation controlada`,
-    `Output: ${toRelativeRepoPath(paths.outputPath, { repoRoot: paths.repoRoot })}`,
-    '',
-    '## Comandos permitidos',
-    '',
-    ...commands.map((entry) => `- \`${entry.command}\`: ${entry.status === 0 ? 'PASS' : entry.status === 'skipped' ? 'SKIPPED' : 'FAILED'}`),
-    '',
-    '## Validaciones',
-    '',
-    ...(validations.length > 0
-      ? validations.map((entry) => `- ${entry.name}: ${entry.status}`)
-      : ['- Sin validaciones ejecutadas.']),
-    '',
-    '## Warnings',
-    '',
-    ...(warnings.length > 0 ? warnings.map((warning) => `- ${warning}`) : ['- Sin warnings.']),
-    '',
-    '## Errores',
-    '',
-    ...(errors.length > 0 ? errors.map((error) => `- ${error}`) : ['- Sin errores.']),
-    '',
-    '## Alcance',
-    '',
-    'No se ejecuto Codex real, no se llamaron servicios externos, no se leyo `.env`, no se tocaron proyectos externos y no hubo deploy.',
-    '',
-  ].join('\n')
+    artifact('README.md', `# ${project.brandSpec.name || project.projectId}\n\nPrimera versión local de sitio comercial (${direction}). No analiza URLs remotas ni ejecuta archivos aportados.\n`),
+    artifact('docs/DELIVERY.md', '# Entrega\n\nEstado: `not_ready`. Los archivos son locales y no constituyen una entrega ni un despliegue.\n'),
+    artifact('docs/BRAND.md', `# Marca\n\n- Nombre: ${project.brandSpec.name || project.projectId}\n- Dirección: ${direction}\n- Notas: ${project.brandSpec.visualNotes || 'sin notas'}\n`),
+    artifact('data/mock-data.json', `${JSON.stringify(data, null, 2)}\n`),
+    artifact('app/index.html', `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${brandName}</title>${profileContext.logoAppPath ? `<link rel="icon" href="./favicon${path.extname(profileContext.logoAppPath)}">` : ''}<link rel="stylesheet" href="./styles.css"></head><body data-profile="commercial_site" data-creative-direction="${direction}">${structure}<script src="./app.js"></script></body></html>`),
+    artifact('app/styles.css', `:root{--primary:${project.brandSpec.primaryColor || '#1A202C'};--accent:${project.brandSpec.accentColor || '#D53F8C'}}*{box-sizing:border-box}body{margin:0;font-family:Georgia,serif;color:var(--primary)}header,.expressive-rail{padding:20px;display:flex;justify-content:space-between;gap:18px}.brand-identity{display:flex;align-items:center;gap:9px}.brand-identity img{max-height:32px;max-width:96px}nav{display:flex;gap:14px}main{max-width:1080px;margin:auto}.editorial-hero,.commercial-hero,.expressive-hero{min-height:45vh;padding:72px 36px}.editorial-story,.commercial-hero,.expressive-gallery{display:grid;grid-template-columns:2fr 1fr;gap:24px;padding:36px}.editorial-services,.benefit-grid,.poster-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:36px}.editorial-services article,.benefit-grid article,.expressive-gallery article,.poster-grid b{padding:28px;background:#f1f3f5}.conversion-panel,.editorial-contact,.expressive-contact{padding:48px;background:var(--primary);color:white}.cta,button{background:var(--accent);color:white;padding:12px 18px;display:inline-block}.expressive-rail{position:fixed;flex-direction:column;height:100vh;background:var(--primary);color:white}.expressive-rail+main{margin-left:180px}.expressive-hero{background:var(--accent);color:white}.expressive-gallery{grid-template-columns:repeat(3,1fr)}footer{padding:24px;text-align:center}@media(max-width:640px){.expressive-rail{position:static;height:auto}.expressive-rail+main{margin-left:0}.editorial-story,.commercial-hero,.expressive-gallery{grid-template-columns:1fr}.editorial-services,.benefit-grid,.poster-grid{grid-template-columns:1fr}}\n`),
+    artifact('app/app.js', `const PROJECT=${JSON.stringify(data)};document.body.dataset.projectId=PROJECT.projectId;\n`),
+  ]
 }
 
-async function readGenerationStatus(runId, options = {}) {
-  try {
-    const paths = resolveGenerationPaths(runId, options)
-    const status = JSON.parse(await fs.promises.readFile(paths.statusPath, 'utf8'))
-
-    return {
-      ok: true,
-      runId: paths.runId,
-      status,
-      path: toRelativeRepoPath(paths.runPath, options),
-      outputPath: toRelativeRepoPath(paths.outputPath, options),
-      logs: await readLogs(paths),
-    }
-  } catch (error) {
-    return buildFailure(error)
-  }
+function stable(value) {
+  if (Array.isArray(value)) return value.map(stable)
+  if (!value || typeof value !== 'object') return value
+  return Object.keys(value).sort().reduce((result, key) => { result[key] = stable(value[key]); return result }, {})
 }
 
-async function readLogs(paths) {
-  const logs = {}
-  for (const [key, filePath] of Object.entries({
-    generation: paths.generationLogPath,
-    seed: paths.seedLogPath,
-    build: paths.buildLogPath,
-    smoke: paths.smokeLogPath,
-    domainSmoke: paths.domainSmokeLogPath,
-  })) {
-    try {
-      logs[key] = sanitizeText(await fs.promises.readFile(filePath, 'utf8'))
-    } catch {
-      logs[key] = ''
-    }
-  }
-  return logs
+async function writeArtifact(root, entry) {
+  const target = resolveInside(root, entry.relativePath, 'artifact.relativePath')
+  await fs.promises.mkdir(path.dirname(target), { recursive: true })
+  await fs.promises.writeFile(target, entry.content, entry.encoding)
 }
 
-async function readGenerationResult(runId, options = {}) {
-  try {
-    const paths = resolveGenerationPaths(runId, options)
-    const status = JSON.parse(await fs.promises.readFile(paths.statusPath, 'utf8'))
-    const summary = await fs.promises.readFile(paths.summaryPath, 'utf8')
-    const logs = await readLogs(paths)
+async function materializeProject({ project, destinationRoot, capabilities, profileContext = {}, providedAssets = [], failureInjection = null }) {
+  if (!project || typeof project !== 'object') fail('INVALID_PROJECT', 'Se requiere un proyecto normalizado.')
+  if (typeof destinationRoot !== 'string' || !path.isAbsolute(destinationRoot)) fail('INVALID_DESTINATION_ROOT', 'destinationRoot debe ser absoluto.')
+  const root = path.resolve(destinationRoot)
+  const versionId = project.activeVersionId
+  const projectRoot = resolveInside(root, path.join(project.projectId, versionId), 'project root')
+  const manifestPath = resolveInside(projectRoot, 'manifest.json', 'manifest path')
+  if (fs.existsSync(projectRoot)) fail('VERSION_COLLISION', 'La versión ya tiene un directorio materializado.', { projectId: project.projectId, versionId, projectRoot })
+  const stagingRoot = resolveInside(root, path.join('.jefe-staging', `${project.projectId}-${versionId}`), 'staging root')
+  if (fs.existsSync(stagingRoot)) fail('STAGING_COLLISION', 'Existe un staging pendiente para esta versión.', { stagingRoot })
 
-    return {
-      ok: true,
-      runId: paths.runId,
-      status,
-      outputPath: toRelativeRepoPath(paths.outputPath, options),
-      path: toRelativeRepoPath(paths.runPath, options),
-      summary: sanitizeText(summary, 12000),
-      logs,
-      artifacts: {
-        status: toRelativeRepoPath(paths.statusPath, options),
-        summary: toRelativeRepoPath(paths.summaryPath, options),
-        generationLog: toRelativeRepoPath(paths.generationLogPath, options),
-        output: toRelativeRepoPath(paths.outputPath, options),
-      },
-    }
-  } catch (error) {
-    return buildFailure(error)
+  const assetMetadata = project.inputAssets.files.map((file) => ({ ...file, preservedAsReference: true }))
+  const sourceByName = new Map()
+  for (const supplied of providedAssets) {
+    if (!supplied || !safeFileName(supplied.safeName)) fail('INVALID_INPUT_ASSET', 'El archivo de entrada tiene un nombre inválido.', { safeName: supplied && supplied.safeName })
+    if (!Object.hasOwn(supplied, 'content')) fail('INVALID_INPUT_ASSET', 'El archivo de entrada debe aportar contenido explícito; no se ejecutan paths.', { safeName: supplied.safeName })
+    if (sourceByName.has(supplied.safeName)) fail('DUPLICATE_INPUT_ASSET', 'No puede repetirse un Input Asset.', { safeName: supplied.safeName })
+    sourceByName.set(supplied.safeName, supplied.content)
   }
-}
-
-async function runValidationIfAvailable({ name, scriptName, command, args, cwd, logPath, env, commands }) {
-  if (scriptName) {
-    const scripts = readPackageScripts(path.join(cwd, 'package.json'))
-    if (!scripts[scriptName]) {
-      const skipped = { name, status: 'skipped', reason: `script ${scriptName} no disponible` }
-      commands.push({ command: `npm run ${scriptName}`, status: 'skipped' })
-      await fs.promises.writeFile(logPath, `${skipped.reason}\n`, 'utf8')
-      return skipped
-    }
+  for (const suppliedName of sourceByName.keys()) {
+    if (!project.inputAssets.files.some((file) => file.safeName === suppliedName)) fail('UNKNOWN_INPUT_ASSET', 'El contenido aportado no existe en el contrato.', { safeName: suppliedName })
   }
-
-  const result = await runSpawnCommand({ command, args, cwd, logPath, env, timeoutMs: 180000 })
-  commands.push({ command: result.command, status: result.status })
-
-  return {
-    name,
-    status: result.status === 0 ? 'PASS' : 'FAILED',
-    exitCode: result.status,
-  }
-}
-
-async function startGenerationFromRun(runId, options = {}) {
-  let paths
-  const commands = []
+  const logo = project.inputAssets.files.find((file) => /logo/iu.test(file.kind) && sourceByName.has(file.safeName))
+  const logoExtension = logo ? path.extname(logo.safeName).toLowerCase() : ''
+  if (logo && !['.png', '.svg', '.jpg', '.jpeg', '.webp'].includes(logoExtension)) fail('INVALID_LOGO_ASSET', 'Un logo materializable debe usar una extensión de imagen local.', { safeName: logo.safeName })
+  const effectiveProfileContext = logo
+    ? { ...profileContext, logoAppPath: `./assets/logo${logoExtension}` }
+    : profileContext
+  const artifacts = project.generationProfile === 'commercial_site'
+    ? commercialArtifacts(project, effectiveProfileContext)
+    : factoryArtifacts(project, capabilities)
+  artifacts.push(artifact('assets/input/input-assets.json', `${JSON.stringify({ files: assetMetadata, urlReferences: project.inputAssets.urlReferences || [] }, null, 2)}\n`))
 
   try {
-    paths = resolveGenerationPaths(runId, options)
-    const dryRunPaths = resolveDryRunPaths(paths.runId, options)
-    const safeEnv = buildSafeEnv(options.env || process.env)
-
-    ensureInsidePath(dryRunPaths.briefPath, dryRunPaths.runPath, 'brief path')
-    await ensureGenerationDirectories(paths)
-
-    const now = new Date().toISOString()
-    await writeStatus(paths, {
-      runId: paths.runId,
-      status: 'running',
-      currentStep: GENERATION_STEPS[0],
-      steps: buildSteps(GENERATION_STEPS[0]),
-      startedAt: now,
-      outputPath: toRelativeRepoPath(paths.outputPath, options),
-      validation: [],
-      warnings: ['Generacion real controlada: no se ejecuta Codex real ni servicios externos.'],
-      errors: [],
+    await fs.promises.mkdir(path.dirname(stagingRoot), { recursive: true })
+    await fs.promises.mkdir(stagingRoot, { recursive: false })
+    let writes = 0
+    for (const entry of artifacts) {
+      await writeArtifact(stagingRoot, entry)
+      writes += 1
+      if (failureInjection && writes === failureInjection.afterWrites) fail('INJECTED_MATERIALIZATION_FAILURE', 'Fallo parcial inyectado para smoke.', { writes })
+    }
+    for (const [safeName, content] of sourceByName.entries()) {
+      await writeArtifact(stagingRoot, artifact(path.join('assets', 'input', safeName), content, Buffer.isBuffer(content) ? undefined : 'utf8'))
+    }
+    const copiedAssetPaths = [...sourceByName.keys()].map((name) => `assets/input/${name}`)
+    if (logo) {
+      const logoContent = sourceByName.get(logo.safeName)
+      await writeArtifact(stagingRoot, artifact(`app/assets/logo${logoExtension}`, logoContent, Buffer.isBuffer(logoContent) ? undefined : 'utf8'))
+      await writeArtifact(stagingRoot, artifact(`app/favicon${logoExtension}`, logoContent, Buffer.isBuffer(logoContent) ? undefined : 'utf8'))
+      copiedAssetPaths.push(`app/assets/logo${logoExtension}`, `app/favicon${logoExtension}`)
+    }
+    const portableArtifacts = artifacts.map((entry) => entry.relativePath.replace(/\\/gu, '/')).sort()
+    const manifest = stable({
+      schemaVersion: 'jefe-project-manifest/v1',
+      contract: project,
+      profileContext: effectiveProfileContext,
+      artifactPaths: portableArtifacts.concat(copiedAssetPaths).sort(),
+      physicalPaths: { projectRoot: '.', manifestPath: 'manifest.json' },
+      materialization: { status: 'materialized_local', generatedAt: project.timestamps.updatedAt },
     })
-
-    if (!fs.existsSync(dryRunPaths.briefPath)) {
-      throw new Error('brief persistido no encontrado.')
-    }
-    if (!fs.existsSync(paths.generatorScriptPath)) {
-      throw new Error('entrypoint oficial no encontrado.')
-    }
-    const inputAssets = await readInputAssetsManifest(dryRunPaths.runPath)
-
-    await writeStatus(paths, {
-      runId: paths.runId,
-      status: 'running',
-      currentStep: GENERATION_STEPS[1],
-      steps: buildSteps(GENERATION_STEPS[1]),
-      startedAt: now,
-      outputPath: toRelativeRepoPath(paths.outputPath, options),
-      validation: [],
-      warnings: ['Generacion real controlada: no se ejecuta Codex real ni servicios externos.'],
-      errors: [],
-    })
-
-    const generatorArgs = [
-      GENERATOR_SCRIPT_RELATIVE_PATH.replace(/\\/g, '/'),
-      '--brief',
-      toRelativeRepoPath(dryRunPaths.briefPath, options),
-      '--output',
-      toRelativeRepoPath(paths.outputPath, options),
-      '--mode',
-      'real-project',
-      '--reports-dir',
-      toRelativeRepoPath(paths.reportsPath, options),
-      '--logs-dir',
-      toRelativeRepoPath(paths.logsPath, options),
-    ]
-    const generation = await runSpawnCommand({
-      command: process.execPath,
-      args: generatorArgs,
-      cwd: paths.repoRoot,
-      logPath: paths.generationLogPath,
-      env: safeEnv,
-      timeoutMs: 180000,
-    })
-    commands.push({ command: generation.command, status: generation.status })
-
-    if (generation.status !== 0) {
-      throw new Error(sanitizeText(generation.stderr || generation.stdout || 'Generacion fallida.'))
-    }
-    const inputAssetsTraceabilityReports = await appendInputAssetsTraceability({
-      reportsPath: paths.reportsPath,
-      inputAssets,
-    })
-
-    await writeStatus(paths, {
-      runId: paths.runId,
-      status: 'running',
-      currentStep: GENERATION_STEPS[3],
-      steps: buildSteps(GENERATION_STEPS[3]),
-      startedAt: now,
-      outputPath: toRelativeRepoPath(paths.outputPath, options),
-      validation: [{ name: 'structure', status: fs.existsSync(path.join(paths.outputPath, 'package.json')) ? 'PASS' : 'FAILED' }],
-      warnings: ['Generacion real controlada: no se ejecuta Codex real ni servicios externos.'],
-      errors: [],
-    })
-
-    const validations = []
-    const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
-    validations.push(await runValidationIfAvailable({
-      name: 'seed',
-      scriptName: 'seed',
-      command: npmCommand,
-      args: ['run', 'seed'],
-      cwd: paths.outputPath,
-      logPath: paths.seedLogPath,
-      env: safeEnv,
-      commands,
-    }))
-    validations.push(await runValidationIfAvailable({
-      name: 'build',
-      scriptName: 'build',
-      command: npmCommand,
-      args: ['run', 'build'],
-      cwd: paths.outputPath,
-      logPath: paths.buildLogPath,
-      env: safeEnv,
-      commands,
-    }))
-    validations.push(await runValidationIfAvailable({
-      name: 'smoke',
-      scriptName: 'smoke',
-      command: npmCommand,
-      args: ['run', 'smoke'],
-      cwd: paths.outputPath,
-      logPath: paths.smokeLogPath,
-      env: safeEnv,
-      commands,
-    }))
-
-    const domainSmokePath = path.join(paths.outputPath, 'scripts', 'domain-smoke.mjs')
-    if (fs.existsSync(domainSmokePath)) {
-      validations.push(await runValidationIfAvailable({
-        name: 'domain-smoke',
-        command: process.execPath,
-        args: ['scripts/domain-smoke.mjs'],
-        cwd: paths.outputPath,
-        logPath: paths.domainSmokeLogPath,
-        env: safeEnv,
-        commands,
-      }))
-    } else {
-      validations.push({ name: 'domain-smoke', status: 'skipped', reason: 'script no disponible' })
-      commands.push({ command: 'node scripts/domain-smoke.mjs', status: 'skipped' })
-      await fs.promises.writeFile(paths.domainSmokeLogPath, 'script no disponible\n', 'utf8')
-    }
-
-    const failedValidation = validations.find((entry) => entry.status === 'FAILED')
-    const completedAt = new Date().toISOString()
-    const finalStatus = {
-      runId: paths.runId,
-      status: failedValidation ? 'failed' : 'completed',
-      currentStep: failedValidation ? GENERATION_STEPS[4] : GENERATION_STEPS[5],
-      steps: failedValidation ? buildSteps(GENERATION_STEPS[4], true) : buildCompletedSteps(),
-      startedAt: now,
-      completedAt,
-      outputPath: toRelativeRepoPath(paths.outputPath, options),
-      validation: validations,
-      inputAssets: projectInputAssetsSummary(inputAssets),
-      warnings: ['Generacion real controlada: no se ejecuto Codex real ni servicios externos.'],
-      errors: failedValidation ? [`Fallo validacion: ${failedValidation.name}`] : [],
-    }
-
-    await writeStatus(paths, finalStatus)
-    await fs.promises.writeFile(
-      paths.summaryPath,
-      buildSummaryMarkdown({ paths, status: finalStatus, commands }),
-      'utf8',
-    )
-
-    return {
-      ok: !failedValidation,
-      runId: paths.runId,
-      status: finalStatus,
-      outputPath: toRelativeRepoPath(paths.outputPath, options),
-      path: toRelativeRepoPath(paths.runPath, options),
-      artifacts: {
-        status: toRelativeRepoPath(paths.statusPath, options),
-        summary: toRelativeRepoPath(paths.summaryPath, options),
-        generationLog: toRelativeRepoPath(paths.generationLogPath, options),
-        output: toRelativeRepoPath(paths.outputPath, options),
-        ...(inputAssetsTraceabilityReports.length > 0
-          ? { inputAssetsTraceability: inputAssetsTraceabilityReports.join(', ') }
-          : {}),
-      },
-      error: failedValidation ? `Fallo validacion: ${failedValidation.name}` : undefined,
-    }
+    await writeArtifact(stagingRoot, artifact('manifest.json', `${JSON.stringify(manifest, null, 2)}\n`))
+    await fs.promises.mkdir(path.dirname(projectRoot), { recursive: true })
+    await fs.promises.rename(stagingRoot, projectRoot)
+    return { projectRoot, manifestPath, artifactPaths: manifest.artifactPaths }
   } catch (error) {
-    if (paths) {
-      const failedStatus = {
-        runId: paths.runId,
-        status: 'failed',
-        currentStep: GENERATION_STEPS[1],
-        steps: buildSteps(GENERATION_STEPS[1], true),
-        completedAt: new Date().toISOString(),
-        outputPath: toRelativeRepoPath(paths.outputPath, options),
-        validation: [],
-        warnings: ['Generacion real controlada fallida sin tocar proyectos externos.'],
-        errors: [sanitizeError(error)],
-      }
-
-      await ensureGenerationDirectories(paths)
-      await writeStatus(paths, failedStatus)
-      await fs.promises.writeFile(
-        paths.summaryPath,
-        buildSummaryMarkdown({ paths, status: failedStatus, commands }),
-        'utf8',
-      )
-    }
-
-    return buildFailure(error)
+    await fs.promises.rm(stagingRoot, { recursive: true, force: true }).catch(() => {})
+    if (error instanceof MaterializationError) throw error
+    fail('MATERIALIZATION_FAILED', error instanceof Error ? error.message : String(error))
   }
 }
 
-module.exports = {
-  GENERATION_RELATIVE_ROOT,
-  GENERATION_STEPS,
-  resolveGenerationPaths,
-  startGenerationFromRun,
-  getGenerationStatus: readGenerationStatus,
-  readGenerationResult,
-  sanitizeError,
+async function readMaterializedManifest(manifestPath, { deserializeProjectContract, allowedRoots }) {
+  if (typeof manifestPath !== 'string' || !path.isAbsolute(manifestPath)) fail('INVALID_MANIFEST_PATH', 'manifestPath debe ser absoluto.')
+  let parsed
+  try {
+    parsed = JSON.parse(await fs.promises.readFile(manifestPath, 'utf8'))
+  } catch (error) {
+    fail('INVALID_MANIFEST', 'No se pudo leer un manifest JSON válido.', { message: error instanceof Error ? error.message : String(error) })
+  }
+  if (!parsed || typeof parsed !== 'object' || !parsed.contract || !Array.isArray(parsed.artifactPaths)) fail('INVALID_MANIFEST', 'El manifest no contiene contrato ni artefactos válidos.')
+  if (parsed.artifactPaths.some((entry) => typeof entry !== 'string' || path.isAbsolute(entry) || entry.split('/').includes('..'))) fail('INVALID_MANIFEST_PATHS', 'El manifest contiene rutas no portables.')
+  return { manifest: parsed, project: deserializeProjectContract(JSON.stringify(parsed.contract), { allowedRoots }) }
 }
+
+module.exports = { MaterializationError, materializeProject, readMaterializedManifest }

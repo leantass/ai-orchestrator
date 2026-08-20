@@ -23,3 +23,7 @@ Rama: `integration/orquestador-canonical-v1`.
 Ruta: `C:\Users\letas\Desktop\Proyectos\Desarrollo\orquestadoria\ai-orchestrator-canonical-integration-81ba810`.
 
 El Escalón 1 sigue abierto hasta que los archivos solapados, persistencia, IPC y documentación se reconcilien y validen en este worktree.
+
+## Avance de reconciliación 1C
+
+Se resolvieron manualmente los tres archivos solapados de creación/materialización: `electron/jefe-project-creation.cjs`, `electron/jefe-real-generation.cjs` y `scripts/jefe-project-creation-smoke.mjs`. No se copió un motor completo: se conservaron la tipificación/capacidades Factory y la marca/Input Assets/direcciones estructurales Comercial bajo el contrato canónico. Permanecen sin integrar `src/App.tsx`, `src/index.css`, `electron/main.cjs`, preload, IPC, workspace, preview y Hermes completo.

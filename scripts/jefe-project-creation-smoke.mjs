@@ -1,115 +1,133 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { createRequire } from 'node:module'
-import { fileURLToPath } from 'node:url'
 
-const currentFilePath = fileURLToPath(import.meta.url)
-const repoRoot = path.resolve(path.dirname(currentFilePath), '..')
 const require = createRequire(import.meta.url)
-const { createDryRun } = require(path.join(repoRoot, 'electron', 'jefe-run-persistence.cjs'))
-const { validateAssetSelection, extractManualBrandColors } = require(path.join(repoRoot, 'electron', 'jefe-input-assets.cjs'))
-const { createFirstVersionFromRun } = require(path.join(repoRoot, 'electron', 'jefe-project-creation.cjs'))
+const { createFirstVersionFromRun, reopenFirstVersion } = require('../electron/jefe-project-creation.cjs')
 
-const smokeRoot = path.join(repoRoot, '.codex-temp', 'jefe-project-creation-smoke', `run-${Date.now()}`)
-const fixturesRoot = path.join(smokeRoot, 'fixtures')
-const targetRoot = path.join(smokeRoot, 'projects')
-const runId = `project-assets-${Date.now()}`
+const tempRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'jefe-canonical-creation-'))
+const allowedRoot = path.join(tempRoot, 'allowed')
+const outsideRoot = path.join(tempRoot, 'outside')
 
-async function writeFixture(name, content) {
-  const filePath = path.join(fixturesRoot, name)
-  await fs.promises.mkdir(path.dirname(filePath), { recursive: true })
-  await fs.promises.writeFile(filePath, content)
-  return filePath
+function request(overrides = {}) {
+  return {
+    destinationRoot: allowedRoot,
+    allowedRoots: [allowedRoot],
+    projectId: 'factory-project',
+    runId: 'factory-run',
+    versionId: 'factory-version',
+    projectType: 'dashboard_internal',
+    platform: 'web',
+    generationProfile: 'factory_typed',
+    projectName: 'Panel de operaciones',
+    brandSpec: { name: 'Panel de operaciones', primaryColor: '#1A202C', accentColor: '#D53F8C', visualNotes: 'Sobrio y claro' },
+    inputAssets: { manifestId: 'factory-assets', files: [{ safeName: 'brief.txt', kind: 'brief', sizeBytes: 12 }], detectedHexColors: ['#1A202C'] },
+    providedAssets: [{ safeName: 'brief.txt', content: 'globalThis.__input_asset_executed = true' }],
+    ...overrides,
+  }
 }
 
-function read(projectPath, relativePath) {
-  const filePath = path.join(projectPath, relativePath)
-  assert.equal(fs.existsSync(filePath), true, `${relativePath} existe`)
-  return fs.readFileSync(filePath, 'utf8')
+function assertRejected(result, code) {
+  assert.equal(result.ok, false, `se esperaba rechazo ${code}`)
+  assert.equal(result.error.code, code, `${result.error.code}: ${result.error.message}`)
 }
 
-const logoPath = await writeFixture('logo-demo-universal.png', Buffer.from('png-fixture'))
-const pdfPath = await writeFixture('brand-reference.pdf', Buffer.from('%PDF-1.4 fixture'))
-const selection = validateAssetSelection([
-  { path: logoPath, size: fs.statSync(logoPath).size },
-  { path: pdfPath, size: fs.statSync(pdfPath).size },
-])
-const colors = extractManualBrandColors('primary: #111827\nsecondary: #f97316')
+try {
+  await fs.promises.mkdir(allowedRoot, { recursive: true })
 
-const dryRun = await createDryRun({
-  runId,
-  title: 'Proyecto Demo Universal',
-  brief: 'Mock local universal con logo, PDF, colores y nota visual.',
-  runType: 'dry-run',
-  createdAt: new Date().toISOString(),
-  status: 'completed',
-  currentStep: 'Preparando entrega',
-  validation: 'Input Assets listo',
-  steps: [{ label: 'Preparando entrega', status: 'completed' }],
-  expectedArtifacts: ['inputs/input-assets.json'],
-  warnings: ['Smoke local sin servicios externos.'],
-  inputAssets: {
-    assets: selection.assets,
-    brandColors: colors.source,
-    visualNotes: 'Nota visual neutral para el proyecto mock.',
-  },
-}, { repoRoot })
-assert.equal(dryRun.ok, true, dryRun.error)
+  const factory = await createFirstVersionFromRun(request())
+  assert.equal(factory.ok, true, JSON.stringify(factory.error))
+  assert.equal(factory.project.projectId, 'factory-project')
+  assert.equal(factory.project.runId, 'factory-run')
+  assert.equal(factory.project.activeVersionId, 'factory-version')
+  assert.equal(factory.project.generationProfile, 'factory_typed')
+  assert.equal(factory.project.delivery.status, 'not_ready')
+  assert.equal(fs.existsSync(factory.artifacts.manifestPath), true)
+  assert.equal(fs.existsSync(path.join(factory.artifacts.projectRoot, 'app', 'index.html')), true)
+  assert.equal(fs.existsSync(path.join(factory.artifacts.projectRoot, 'assets', 'input', 'brief.txt')), true)
+  assert.equal(globalThis.__input_asset_executed, undefined, 'un Input Asset no debe ejecutarse')
 
-const created = await createFirstVersionFromRun(runId, { repoRoot, targetRoot })
-assert.equal(created.ok, true, created.error)
-assert.equal(created.path.startsWith(targetRoot), true, 'proyecto bajo targetRoot')
+  const reopenedFactory = await reopenFirstVersion(factory.artifacts.manifestPath, { allowedRoots: [allowedRoot] })
+  assert.equal(reopenedFactory.ok, true, JSON.stringify(reopenedFactory.error))
+  assert.deepEqual(reopenedFactory.project, factory.project, 'el manifest debe reabrir el contrato sin pérdida')
+  assert.equal(reopenedFactory.manifest.artifactPaths.every((entry) => !path.isAbsolute(entry) && !entry.split('/').includes('..')), true)
+  assert.equal(reopenedFactory.manifest.artifactPaths.every((entry) => fs.existsSync(path.join(factory.artifacts.projectRoot, entry))), true)
 
-const projectPath = created.path
-const manifest = read(projectPath, 'assets/input/input-assets.json')
-const inputAssetsDoc = read(projectPath, 'docs/input-assets/INPUT_ASSETS.md')
-const indexHtml = read(projectPath, 'app/index.html')
-const stylesCss = read(projectPath, 'app/styles.css')
+  const duplicate = await createFirstVersionFromRun(request())
+  assertRejected(duplicate, 'VERSION_COLLISION')
 
-assert.equal(fs.existsSync(path.join(projectPath, 'assets/input/logo-demo-universal.png')), true, 'logo en assets/input')
-assert.equal(fs.existsSync(path.join(projectPath, 'assets/input/brand-reference.pdf')), true, 'pdf en assets/input')
-assert.equal(fs.existsSync(path.join(projectPath, 'app/assets/logo.png')), true, 'logo en app/assets')
-assert.match(inputAssetsDoc, /logo-demo-universal|brand-reference|#111827|Nota visual neutral/iu)
-assert.match(indexHtml, /\.\/assets\/logo\.png/iu, 'logo relativo en html')
-assert.match(stylesCss, /--brand-primary:\s*#111827|--brand-secondary:\s*#f97316/iu, 'variables de marca')
-assert.equal(/C:\\|https?:\/\//iu.test(`${manifest}\n${inputAssetsDoc}\n${indexHtml}\n${stylesCss}`), false, 'sin rutas absolutas o externas')
-assert.equal(/\.\.\//u.test(`${manifest}\n${inputAssetsDoc}\n${indexHtml}\n${stylesCss}`), false, 'sin traversal')
+  const invalidProfile = await createFirstVersionFromRun(request({ projectId: 'invalid-profile-project', runId: 'invalid-profile-run', versionId: 'invalid-profile-version', generationProfile: 'invalid' }))
+  assertRejected(invalidProfile, 'INVALID_GENERATION_PROFILE')
+  const incompatibleType = await createFirstVersionFromRun(request({ projectId: 'type-project', runId: 'type-run', versionId: 'type-version', projectType: 'mobile_app_mock', platform: 'web' }))
+  assertRejected(incompatibleType, 'TYPE_PLATFORM_MISMATCH')
+  const traversal = await createFirstVersionFromRun(request({ projectId: 'traversal-project', runId: 'traversal-run', versionId: 'traversal-version', destinationRoot: path.join(allowedRoot, '..', 'outside') }))
+  assertRejected(traversal, 'PATH_OUTSIDE_ROOT')
+  const outside = await createFirstVersionFromRun(request({ projectId: 'outside-project', runId: 'outside-run', versionId: 'outside-version', destinationRoot: outsideRoot }))
+  assertRejected(outside, 'PATH_OUTSIDE_ROOT')
+  const invalidAsset = await createFirstVersionFromRun(request({ projectId: 'asset-project', runId: 'asset-run', versionId: 'asset-version', inputAssets: { files: [{ safeName: '../evil.js', kind: 'script', sizeBytes: 1 }] } }))
+  assertRejected(invalidAsset, 'INVALID_ASSET')
 
-const unsafeRunId = `project-assets-unsafe-${Date.now()}`
-const unsafeRun = await createDryRun({
-  runId: unsafeRunId,
-  title: 'Proyecto Inseguro',
-  brief: 'Debe rechazar traversal.',
-  runType: 'dry-run',
-  createdAt: new Date().toISOString(),
-  status: 'completed',
-  currentStep: 'Preparando entrega',
-  validation: 'Input Assets listo',
-  steps: [{ label: 'Preparando entrega', status: 'completed' }],
-  expectedArtifacts: ['inputs/input-assets.json'],
-  warnings: [],
-  inputAssets: {
-    assets: selection.assets.slice(0, 1),
-    brandColors: colors.source,
-    visualNotes: 'ok',
-  },
-}, { repoRoot })
-assert.equal(unsafeRun.ok, true, unsafeRun.error)
-const unsafeRunPath = path.join(repoRoot, '.codex-temp', 'jefe-ui-real-flow', 'runs', unsafeRunId, 'inputs', 'input-assets.json')
-const unsafeManifest = JSON.parse(fs.readFileSync(unsafeRunPath, 'utf8'))
-unsafeManifest.assets[0].runRelativePath = '../escape.png'
-await fs.promises.writeFile(unsafeRunPath, `${JSON.stringify(unsafeManifest, null, 2)}\n`, 'utf8')
-const unsafeCreated = await createFirstVersionFromRun(unsafeRunId, {
-  repoRoot,
-  targetRoot: path.join(smokeRoot, 'unsafe-projects'),
-})
-assert.equal(unsafeCreated.ok, false, 'rechaza traversal en manifest')
-assert.match(unsafeCreated.error || '', /runRelativePath inseguro|fuera del root permitido/iu)
+  const partial = await createFirstVersionFromRun(request({ projectId: 'partial-project', runId: 'partial-run', versionId: 'partial-version', testFailureInjection: { afterWrites: 2 } }))
+  assertRejected(partial, 'INJECTED_MATERIALIZATION_FAILURE')
+  assert.equal(fs.existsSync(path.join(allowedRoot, 'partial-project', 'partial-version')), false, 'un fallo parcial no puede presentar versión válida')
+  assert.equal(fs.existsSync(path.join(allowedRoot, '.jefe-staging', 'partial-project-partial-version')), false, 'el staging parcial debe limpiarse')
 
-console.log(JSON.stringify({
-  ok: true,
-  projectPath: path.relative(repoRoot, projectPath).replace(/\\/g, '/'),
-  copiedAssets: created.inputAssets.copiedAssets,
-  logoAppPath: created.inputAssets.logoAppPath,
-}, null, 2))
+  const directions = ['editorial', 'comercial', 'expresiva']
+  const htmlByDirection = new Map()
+  for (const direction of directions) {
+    const commercial = await createFirstVersionFromRun(request({
+      projectId: `commercial-${direction}`,
+      runId: `commercial-run-${direction}`,
+      versionId: `commercial-version-${direction}`,
+      projectType: 'agency_site',
+      platform: 'web',
+      generationProfile: 'commercial_site',
+      creativeDirection: direction,
+      projectName: `Estudio ${direction}`,
+      businessType: 'Estudio de diseño',
+      audience: 'equipos que necesitan una identidad clara',
+      proposition: 'Estrategia, identidad y sitio local',
+      inputAssets: {
+        manifestId: `assets-${direction}`,
+        files: [{ safeName: 'logo.svg', kind: 'logo', sizeBytes: 116 }],
+        detectedHexColors: ['#112233', '#D53F8C'],
+        visualNotes: `Notas ${direction}`,
+        urlReferences: ['https://example.org/referencia'],
+      },
+      providedAssets: [{ safeName: 'logo.svg', content: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="#112233"/></svg>' }],
+    }))
+    assert.equal(commercial.ok, true, JSON.stringify(commercial.error))
+    assert.equal(commercial.project.generationProfile, 'commercial_site')
+    assert.equal(commercial.project.visualDirection, direction)
+    assert.equal(commercial.project.inputAssets.urlReferences[0], 'https://example.org/referencia')
+    assert.equal(commercial.project.delivery.status, 'not_ready')
+    const html = await fs.promises.readFile(path.join(commercial.artifacts.projectRoot, 'app', 'index.html'), 'utf8')
+    htmlByDirection.set(direction, html)
+    const manifest = JSON.parse(await fs.promises.readFile(commercial.artifacts.manifestPath, 'utf8'))
+    assert.equal(manifest.artifactPaths.every((entry) => !path.isAbsolute(entry) && !entry.includes('..')), true)
+    assert.equal(manifest.contract.inputAssets.urlReferences[0], 'https://example.org/referencia', 'URL sólo como referencia')
+    assert.equal(fs.existsSync(path.join(commercial.artifacts.projectRoot, 'app', 'assets', 'logo.svg')), true, 'logo real materializado')
+    assert.equal(fs.existsSync(path.join(commercial.artifacts.projectRoot, 'app', 'favicon.svg')), true, 'favicon local desde logo real')
+    assert.match(html, /assets\/logo\.svg/u, 'HTML referencia el logo local')
+  }
+  assert.match(htmlByDirection.get('editorial'), /editorial-hero/u)
+  assert.match(htmlByDirection.get('comercial'), /commercial-hero/u)
+  assert.match(htmlByDirection.get('expresiva'), /expressive-rail/u)
+  assert.notEqual(htmlByDirection.get('editorial'), htmlByDirection.get('comercial'))
+  assert.notEqual(htmlByDirection.get('comercial'), htmlByDirection.get('expresiva'))
+  assert.notEqual(htmlByDirection.get('editorial'), htmlByDirection.get('expresiva'))
+
+  const firstVersion = await createFirstVersionFromRun(request({ projectId: 'multi-project', runId: 'multi-run-one', versionId: 'multi-version-one' }))
+  const secondVersion = await createFirstVersionFromRun(request({ projectId: 'multi-project', runId: 'multi-run-two', versionId: 'multi-version-two' }))
+  assert.equal(firstVersion.ok, true, JSON.stringify(firstVersion.error))
+  assert.equal(secondVersion.ok, true, JSON.stringify(secondVersion.error))
+  assert.notEqual(firstVersion.artifacts.projectRoot, secondVersion.artifacts.projectRoot)
+  assert.equal(fs.existsSync(path.join(firstVersion.artifacts.projectRoot, 'app', 'index.html')), true)
+  assert.equal(fs.existsSync(path.join(secondVersion.artifacts.projectRoot, 'app', 'index.html')), true)
+
+  console.log('PASS jefe-project-creation-smoke')
+} finally {
+  await fs.promises.rm(tempRoot, { recursive: true, force: true })
+}

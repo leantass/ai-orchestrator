@@ -1,188 +1,178 @@
-const fs = require('fs')
 const path = require('path')
-const { resolveRunPaths } = require('./jefe-run-persistence.cjs')
-const { readInputAssetsManifest } = require('./jefe-input-assets.cjs')
-const {
-  buildInputAssetsCssVariables,
-  copyInputAssetsToProject,
-} = require('./jefe-input-assets-output.cjs')
+const registry = require('./jefe-project-registry.cjs')
+const contract = require('./jefe-project-contract.cjs')
+const generation = require('./jefe-real-generation.cjs')
 
-const RUN_ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/
-const DEFAULT_PROJECTS_ROOT = path.join('.codex-temp', 'jefe-projects')
-
-function validateRunId(runId) {
-  const normalizedRunId = typeof runId === 'string' ? runId.trim() : ''
-  if (!RUN_ID_PATTERN.test(normalizedRunId)) {
-    throw new Error('runId invalido. Solo se permiten letras, numeros, guion y guion bajo.')
+class ProjectCreationError extends Error {
+  constructor(code, message, details = {}) {
+    super(message)
+    this.name = 'ProjectCreationError'
+    this.code = code
+    this.details = details
   }
-  return normalizedRunId
 }
 
-function ensureInsidePath(targetPath, rootPath, label = 'path') {
-  const resolvedTarget = path.resolve(targetPath)
-  const resolvedRoot = path.resolve(rootPath)
-  if (resolvedTarget !== resolvedRoot && !resolvedTarget.startsWith(resolvedRoot + path.sep)) {
-    throw new Error(`${label} fuera del root permitido.`)
+function fail(code, message, details) {
+  throw new ProjectCreationError(code, message, details)
+}
+
+function optionalText(value, field, maxLength = 800) {
+  if (value === undefined || value === null || value === '') return null
+  if (typeof value !== 'string') fail('INVALID_CREATE_INPUT', `${field} debe ser texto.`, { field })
+  const normalized = value.trim().replace(/\s+/gu, ' ')
+  if (!normalized || normalized.length > maxLength) fail('INVALID_CREATE_INPUT', `${field} es vacío o supera el máximo.`, { field, maxLength })
+  return normalized
+}
+
+function isInside(root, candidate) {
+  const relative = path.relative(root, candidate)
+  return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative))
+}
+
+function normalizeRoots(destinationRoot, value) {
+  const roots = Array.isArray(value) && value.length > 0 ? value : [destinationRoot]
+  const normalized = roots.map((root) => {
+    if (typeof root !== 'string' || !path.isAbsolute(root)) fail('INVALID_ALLOWED_ROOT', 'allowedRoots debe contener rutas absolutas.', { root })
+    return path.resolve(root)
+  })
+  if (!normalized.some((root) => isInside(root, destinationRoot))) fail('PATH_OUTSIDE_ROOT', 'destinationRoot queda fuera de allowedRoots.', { destinationRoot, allowedRoots: normalized })
+  return normalized
+}
+
+function adaptLegacyRun(runId, options) {
+  if (typeof runId !== 'string') return null
+  return {
+    ...options,
+    runId,
+    projectId: options.projectId || `project-${runId}`,
+    versionId: options.versionId || `version-${runId}`,
+    projectType: options.projectType || registry.detectProjectType(options.brief || options.projectName || ''),
+    generationProfile: options.generationProfile || 'factory_typed',
+    compatibility: 'legacy_run_argument',
   }
-  return resolvedTarget
 }
 
-function sanitizeFolderName(value) {
-  const cleaned = String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, ' ')
-    .replace(/\.\.+/g, ' ')
-    .replace(/[^\p{L}\p{N} _-]+/gu, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-  return cleaned.slice(0, 80).trim() || 'Proyecto JEFE'
+function normalizeRequest(input, options) {
+  const legacy = adaptLegacyRun(input, options)
+  const source = legacy || input
+  if (!source || typeof source !== 'object' || Array.isArray(source)) fail('INVALID_CREATE_INPUT', 'La creación requiere un objeto de solicitud o un runId compatible.')
+  const destinationCandidate = source.destinationRoot || source.targetRoot || options.destinationRoot || options.targetRoot
+  if (typeof destinationCandidate !== 'string' || !path.isAbsolute(destinationCandidate)) fail('INVALID_DESTINATION_ROOT', 'destinationRoot o targetRoot debe ser absoluto.')
+  const destinationRoot = path.resolve(destinationCandidate)
+  const allowedRoots = normalizeRoots(destinationRoot, source.allowedRoots || options.allowedRoots)
+  const profile = source.generationProfile || 'factory_typed'
+  const projectType = source.projectType || registry.detectProjectType(source.brief || source.projectName || '')
+  const definition = registry.getProjectTypeDefinition(projectType)
+  if (!registry.isKnownProjectType(projectType)) fail('INVALID_PROJECT_TYPE', 'El tipo de proyecto no está registrado.', { projectType })
+  const platform = source.platform || definition.targetPlatform
+  if (platform !== definition.targetPlatform) fail('TYPE_PLATFORM_MISMATCH', 'La plataforma no coincide con el tipo de proyecto.', { projectType, platform, expected: definition.targetPlatform })
+  if (!registry.GENERATION_PROFILE_IDS.includes(profile)) fail('INVALID_GENERATION_PROFILE', 'El perfil no está soportado.', { profile })
+  if (profile === 'commercial_site' && platform !== 'web') fail('PROFILE_PLATFORM_MISMATCH', 'commercial_site sólo admite plataforma web.', { platform })
+  const direction = source.creativeDirection || source.visualDirection || null
+  if (profile === 'commercial_site' && !direction) fail('MISSING_VISUAL_DIRECTION', 'commercial_site requiere dirección visual explícita.')
+  const now = new Date().toISOString()
+  const versionId = source.versionId
+  const projectId = source.projectId
+  const runId = source.runId
+  const projectRoot = path.resolve(destinationRoot, String(projectId || ''), String(versionId || ''))
+  if (!isInside(destinationRoot, projectRoot) || !allowedRoots.some((root) => isInside(root, projectRoot))) {
+    fail('PATH_OUTSIDE_ROOT', 'El destino de la versión queda fuera del root permitido.', { destinationRoot, projectId, versionId })
+  }
+  return {
+    destinationRoot,
+    allowedRoots,
+    compatibility: source.compatibility || null,
+    profileContext: {
+      projectName: optionalText(source.projectName, 'projectName', 120),
+      businessType: optionalText(source.businessType, 'businessType', 160),
+      audience: optionalText(source.audience, 'audience', 240),
+      proposition: optionalText(source.proposition, 'proposition', 500),
+      brief: optionalText(source.brief, 'brief', 4000),
+    },
+    providedAssets: Array.isArray(source.providedAssets) ? source.providedAssets : [],
+    failureInjection: source.testFailureInjection || null,
+    draft: {
+      projectId,
+      runId,
+      projectType,
+      platform,
+      generationProfile: profile,
+      visualDirection: direction,
+      brandSpec: source.brandSpec || { name: source.projectName || null },
+      inputAssets: source.inputAssets || {},
+      manifest: { manifestId: source.manifestId || `manifest-${versionId}` },
+      physicalPaths: { projectRoot, manifestPath: path.join(projectRoot, 'manifest.json'), deliveryPath: null },
+      timestamps: { createdAt: source.createdAt || now, updatedAt: now },
+      changeOrigin: source.changeOrigin || { kind: 'integration', reference: 'canonical-project-creation' },
+      delivery: { status: 'not_ready' },
+      versions: [{
+        versionId,
+        runId,
+        createdAt: source.createdAt || now,
+        changeOrigin: source.changeOrigin || { kind: 'integration', reference: 'canonical-project-creation' },
+        deliveryPath: null,
+        summary: optionalText(source.summary, 'summary', 500),
+      }],
+      activeVersionId: versionId,
+    },
+  }
 }
 
-async function readJsonIfExists(filePath) {
+function structuredError(error) {
+  if (error instanceof ProjectCreationError || error instanceof contract.ProjectContractError || error instanceof generation.MaterializationError) {
+    return { code: error.code, message: error.message, details: error.details }
+  }
+  return { code: 'CREATION_FAILED', message: error instanceof Error ? error.message : String(error), details: {} }
+}
+
+/**
+ * Única entrada pública de creación. Acepta la solicitud canónica y, de forma
+ * transitoria, un runId con opciones; ambos caminos se normalizan inmediatamente.
+ */
+async function createFirstVersionFromRun(input, options = {}) {
   try {
-    return JSON.parse(await fs.promises.readFile(filePath, 'utf8'))
-  } catch {
-    return null
-  }
-}
-
-async function writeFile(filePath, content) {
-  await fs.promises.mkdir(path.dirname(filePath), { recursive: true })
-  await fs.promises.writeFile(filePath, content, 'utf8')
-}
-
-function buildStylesCss(inputAssets) {
-  const cssVariables = buildInputAssetsCssVariables(inputAssets)
-  return `:root {
-  color-scheme: light;
-  --brand-primary: ${cssVariables['--brand-primary'] || '#176b5b'};
-  --brand-secondary: ${cssVariables['--brand-secondary'] || '#dce5df'};
-  --brand-accent: ${cssVariables['--brand-accent'] || '#85d7c6'};
-  --brand-background: ${cssVariables['--brand-background'] || '#f4f7f5'};
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-}
-body { margin: 0; min-height: 100vh; background: var(--brand-background); color: #18231f; }
-main { max-width: 960px; margin: 0 auto; padding: 32px; display: grid; gap: 16px; }
-.panel { background: white; border: 1px solid #d9e4de; border-radius: 8px; padding: 20px; }
-.brand-logo { width: 80px; max-height: 80px; object-fit: contain; border-radius: 8px; }
-.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
-.swatch { width: 42px; height: 42px; border-radius: 8px; border: 1px solid #cbd8d2; }
-`
-}
-
-function buildIndexHtml({ projectName, inputAssets, logoAppPath }) {
-  const colors = inputAssets?.detectedHexColors || []
-  const notes = inputAssets?.visualNotes || 'Sin notas visuales.'
-  return `<!doctype html>
-<html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${projectName}</title>
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
-  <body>
-    <main>
-      <section class="panel">
-        ${logoAppPath ? `<img class="brand-logo" src="${logoAppPath}" alt="Logo de ${projectName}" />` : ''}
-        <h1>${projectName}</h1>
-        <p>Mock local generado con materiales de entrada copiados localmente.</p>
-      </section>
-      <section class="panel">
-        <h2>Colores</h2>
-        <div class="swatches">
-          ${colors.map((color) => `<span class="swatch" style="background:${color}"></span>`).join('')}
-        </div>
-      </section>
-      <section class="panel">
-        <h2>Notas visuales</h2>
-        <p>${notes}</p>
-      </section>
-    </main>
-  </body>
-</html>
-`
-}
-
-async function createFirstVersionFromRun(runId, options = {}) {
-  try {
-    const safeRunId = validateRunId(runId)
-    const repoRoot = path.resolve(options.repoRoot || path.join(__dirname, '..'))
-    const runPaths = resolveRunPaths(safeRunId, { repoRoot })
-    const runRecord = await readJsonIfExists(runPaths.runJsonPath)
-    const inputAssets = await readInputAssetsManifest(runPaths.runPath)
-    const projectName = runRecord?.title || inputAssets?.projectName || 'Proyecto JEFE'
-    const projectsRoot = ensureInsidePath(
-      path.resolve(repoRoot, options.targetRoot || DEFAULT_PROJECTS_ROOT),
-      repoRoot,
-      'projects root',
-    )
-    const safeFolderName = sanitizeFolderName(projectName)
-    const targetPath = ensureInsidePath(path.join(projectsRoot, safeFolderName), projectsRoot, 'project target')
-
-    if (fs.existsSync(targetPath)) {
-      return {
-        ok: false,
-        status: 'project_already_exists',
-        error: 'La carpeta destino ya existe. No se sobrescribio nada.',
-        projectName,
-        safeFolderName,
-        path: targetPath,
-      }
-    }
-
-    await fs.promises.mkdir(targetPath, { recursive: true })
-    const copied = await copyInputAssetsToProject({
-      inputAssets,
-      sourceRunPath: runPaths.runPath,
-      targetPath,
+    const request = normalizeRequest(input, options)
+    const project = contract.normalizeProjectContract(request.draft, { allowedRoots: request.allowedRoots })
+    const materialized = await generation.materializeProject({
+      project,
+      destinationRoot: request.destinationRoot,
+      capabilities: registry.CAPABILITY_MATRIX,
+      profileContext: request.profileContext,
+      providedAssets: request.providedAssets,
+      failureInjection: request.failureInjection,
     })
-
-    await writeFile(path.join(targetPath, 'README.md'), `# ${projectName}\n\nMock local con Input Assets V1.\n`)
-    await writeFile(path.join(targetPath, 'app', 'styles.css'), buildStylesCss(inputAssets))
-    await writeFile(path.join(targetPath, 'app', 'index.html'), buildIndexHtml({
-      projectName,
-      inputAssets,
-      logoAppPath: copied.logoAppPath,
-    }))
-
     return {
       ok: true,
       status: 'created',
-      runId: safeRunId,
-      projectName,
-      safeFolderName,
-      path: targetPath,
-      projectPath: targetPath,
-      appEntryPath: path.join(targetPath, 'app', 'index.html'),
-      inputAssets: {
-        copiedAssets: copied.copiedAssets.length,
-        logoAppPath: copied.logoAppPath,
+      compatibility: request.compatibility,
+      project,
+      artifacts: {
+        projectRoot: materialized.projectRoot,
+        manifestPath: materialized.manifestPath,
+        artifactPaths: materialized.artifactPaths,
+        deliveryStatus: project.delivery.status,
       },
-      createdFiles: [
-        'README.md',
-        'docs/input-assets/INPUT_ASSETS.md',
-        'assets/input/input-assets.json',
-        'app/assets/',
-        'app/index.html',
-        'app/styles.css',
-      ],
-      warnings: [
-        'Mock local: sin red, sin OCR, sin analisis automatico de PDF y sin ejecucion de archivos.',
-      ],
     }
   } catch (error) {
-    return {
-      ok: false,
-      status: 'error',
-      error: error instanceof Error ? error.message : String(error),
-    }
+    return { ok: false, status: 'rejected', error: structuredError(error) }
+  }
+}
+
+async function reopenFirstVersion(manifestPath, options = {}) {
+  try {
+    if (!Array.isArray(options.allowedRoots) || options.allowedRoots.length === 0) fail('MISSING_ALLOWED_ROOTS', 'La reapertura requiere allowedRoots explícitos.')
+    const reopened = await generation.readMaterializedManifest(manifestPath, {
+      deserializeProjectContract: contract.deserializeProjectContract,
+      allowedRoots: options.allowedRoots,
+    })
+    return { ok: true, ...reopened }
+  } catch (error) {
+    return { ok: false, error: structuredError(error) }
   }
 }
 
 module.exports = {
-  DEFAULT_PROJECTS_ROOT,
   createFirstVersionFromRun,
-  sanitizeFolderName,
+  reopenFirstVersion,
+  COMPATIBILITY_NOTE: 'Un argumento runId se adapta transitoriamente a la solicitud canónica; no crea un segundo modelo interno.',
 }

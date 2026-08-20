@@ -87,11 +87,21 @@ function normalizeInputAssets(value) {
     .map((color, index) => normalizeColor(color, `inputAssets.detectedHexColors[${index}]`))
     .filter(Boolean)
     .sort()
+  const urlReferences = (Array.isArray(source.urlReferences) ? source.urlReferences : [])
+    .map((entry, index) => {
+      if (typeof entry !== 'string' || entry.length > 2048) fail('INVALID_URL_REFERENCE', 'Cada URL de referencia debe ser texto acotado.', { index })
+      let parsed
+      try { parsed = new URL(entry) } catch { fail('INVALID_URL_REFERENCE', 'La referencia debe usar una URL absoluta válida.', { index }) }
+      if (!['http:', 'https:'].includes(parsed.protocol)) fail('INVALID_URL_REFERENCE', 'La referencia debe usar http o https.', { index })
+      return parsed.toString()
+    })
+    .sort()
   return {
     manifestId: normalizeId(source.manifestId, 'inputAssets.manifestId'),
     files,
     totalFiles: files.length,
     detectedHexColors: [...new Set(colors)],
+    urlReferences: [...new Set(urlReferences)],
     visualNotes: optionalText(source.visualNotes, 'inputAssets.visualNotes', 1200),
   }
 }

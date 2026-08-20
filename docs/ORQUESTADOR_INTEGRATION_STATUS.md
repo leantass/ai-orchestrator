@@ -66,3 +66,18 @@ La instalación se realizó únicamente en este worktree. `npm ci --offline --no
 Los SHA-256 de `package.json` y `package-lock.json` permanecieron idénticos antes y después de la instalación. `node_modules` y `dist` están ignorados por `.gitignore`. La deuda de lint se clasifica como heredada del baseline: no hay diff en `src/factory/**`, archivos Hermes, `eslint.config.js`, `package.json` ni `package-lock.json`; el lint focalizado de los tres archivos fundacionales pasa. Los documentos Markdown no requieren lint de código.
 
 El quality gate global continúa abierto y su cierre corresponde al escalón futuro de QA / Factory-Hermes. Esta integración no ocultó, excluyó ni corrigió artificialmente la deuda: no añadió `eslint-disable`, excepciones, exclusiones, cambios de reglas, scripts, configuración ni dependencias. Por esa clasificación explícita, el bloque fundacional puede recibir su commit local sin declarar PASS global.
+
+## Escalón 1C: creación y materialización canónica
+
+Estado: **en integración; Escalón 1 todavía no cerrado**. La única entrada pública de creación es `createFirstVersionFromRun(...)` en `electron/jefe-project-creation.cjs`. Acepta una solicitud canónica y conserva, sólo como adaptador transitorio, la firma histórica con `runId`; ambos caminos se normalizan inmediatamente mediante `jefe-project-contract.cjs`.
+
+Perfiles soportados:
+
+- `factory_typed`: tipo y plataforma del registro, matriz de capacidades y artefactos mock locales honestos; no declara backend, pagos, autenticación, despliegue ni producto comercial completo.
+- `commercial_site`: sólo plataforma `web`, nombre/tipo de negocio, audiencia, propuesta, marca, Input Assets y referencias URL sin analizarlas ni ejecutarlas. Cuando existe un logo local aportado, se preserva también como logo/favicon local. Requiere dirección `editorial`, `comercial` o `expresiva`.
+
+`jefe-real-generation.cjs` es ahora el materializador local interno. Escribe primero en `.jefe-staging` dentro del root permitido, valida rutas/IDs/nombres de Input Assets, genera `manifest.json` con contrato reabrible y rutas relativas de artefactos, y sólo renombra la versión al completar. Las colisiones de `projectId`/`versionId` se rechazan estructuradamente; no hay sobrescritura silenciosa ni mezcla de versiones. Un fallo parcial limpia el staging y no presenta una versión válida.
+
+El smoke `scripts/jefe-project-creation-smoke.mjs` usa únicamente un directorio temporal y cubre Factory, Comercial, identidad, manifest/reapertura, compatibilidad de perfil/tipo/plataforma, traversal, roots externos, colisiones, fallo parcial, Input Assets/URL como referencia, las tres direcciones y su diferenciación estructural por DOM. No valida belleza visual ni crea un proyecto comercial real.
+
+Fuentes sintetizadas manualmente: Factory aportó registro/capacidades, mock y documentación local; Comercial aportó marca, Input Assets y composición estructural por dirección. Siguen fuera de este escalón los flujos heredados `startGenerationFromRun`, UI, `electron/main.cjs`, preload, IPC, workspace, preview, restauración y Hermes masivo.

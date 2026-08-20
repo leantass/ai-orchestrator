@@ -31,3 +31,7 @@ Este documento es una auditoría fechada; `ORQUESTADOR_INTEGRATION_STATUS.md` re
 ## Deuda heredada de lint: QA / Factory-Hermes
 
 El lint global del baseline mantiene 306 errores y 0 warnings en 73 archivos bajo `src/factory/hermes-*`: 304 de `@typescript-eslint/no-explicit-any` y 2 de `@typescript-eslint/no-empty-object-type`. No afecta al contrato, registro ni smoke fundacionales, que pasan lint focalizado. La deuda permanece abierta y corresponde al escalón futuro de QA / Factory-Hermes; no se relajan reglas ni se modifica la clasificación vigente de los demás escalones.
+
+## Escalón 1C: alcance de creación canónica
+
+La creación de primera versión se reconcilia con contrato único, perfiles `factory_typed` y `commercial_site`, materialización atómica local y manifest reabrible. La validación es estructural y de archivos/DOM; no constituye QA visual, preview, entrega comercial ni ejecución externa. Los flujos de generación heredados con runners, UI, IPC y Hermes siguen fuera del alcance y requieren su escalón propio.
