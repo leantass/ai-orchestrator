@@ -1,5 +1,7 @@
 # JEFE / AI Orchestrator - V1 Runbook
 
+> **Histórico / no canónico.** Para capacidades y límites vigentes consultar [ORQUESTADOR_CURRENT_STATUS.md](ORQUESTADOR_CURRENT_STATUS.md).
+
 ## Objetivo
 
 Este runbook explica como operar la V1 local de JEFE de forma segura, demostrable y sin ejecutar herramientas externas reales.

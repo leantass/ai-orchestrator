@@ -1,5 +1,7 @@
 # Auditoría maestra integral del Orquestador / JEFE
 
+> Estado canónico: consultar [ORQUESTADOR_CURRENT_STATUS.md](ORQUESTADOR_CURRENT_STATUS.md). Esta auditoría conserva historia; desde el cierre 1G no declara release-ready, QA visual ni Codex real.
+
 Versión incorporada al worktree canónico candidato: 2026-08-20.
 Fuente auditada: `feature/jefe-factory-core` y `feature/jefe-real-project-delivery-v1`, ambos desde `81ba810313610e3e3f678bea5a70b29650b471c0`.
 
@@ -47,3 +49,9 @@ La portada comercial consume proyectos físicos mediante `jefeProjectBridge`, co
 ## Escalón 1F: ciclo local y workspace
 
 El ciclo local de versiones, ledger y entrega inmutable están cubiertos por smokes físicos. El workspace comercial no convierte esa evidencia en claims de IA, Codex real, deploy, publicación o QA visual. Preview conserva una frontera de recurso declarado y MIME allowlisted, pero no hay protocolo dedicado registrado ni evidencia de iframe vivo. La aprobación local no es validación técnica. La deuda global Hermes permanece: 306 errores y 0 warnings en 73 archivos `src/factory/hermes-*`, sin relajar reglas.
+
+## Cierre 1G: auditoría de reconciliación
+
+`ESCALON_1_STATUS=CLOSED` para la integración de repositorio. La autoridad de contrato, creación, persistencia, IPC, apertura/copia y preview está descrita en `ORQUESTADOR_CANONICAL_ARCHITECTURE.md`; no se halló una autoridad paralela activa en el recorrido canónico. Los aliases de generación heredada son compatibilidad segura porque devuelven `not_available`.
+
+La matriz completa y agrupada de los WIP Factory/Comercial se consolida en `ORQUESTADOR_WORKTREE_RECONCILIATION.md`: registro/profiles e Input Assets se integraron o reemplazaron; Hermes/Radar, memoria, planner, executor, QA, corrección, preview visual, entrega remota y observabilidad quedaron asignados a escalones futuros. Cerrar 1 no equivale a cerrar producto, release ni deuda Hermes.

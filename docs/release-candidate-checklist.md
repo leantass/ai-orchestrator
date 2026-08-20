@@ -1,5 +1,7 @@
 # Release Candidate Checklist
 
+> **Histórico / no canónico.** No describe el estado actual ni autoriza release. Consultar [ORQUESTADOR_CURRENT_STATUS.md](ORQUESTADOR_CURRENT_STATUS.md).
+
 ## Objetivo
 
 Esta guía sirve para validar JEFE como plataforma local segura y operable. El criterio de salida no es solo “genero archivos”, sino que el operador pueda entender el flujo, abrir la entrega local, continuar por fases seguras y distinguir con claridad que esta listo, que sigue mockeado y que requiere aprobacion futura.

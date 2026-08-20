@@ -1,5 +1,7 @@
 # Estado de integración canónica del Orquestador
 
+> Historial de integración. Para estado prevalente consultar [ORQUESTADOR_CURRENT_STATUS.md](ORQUESTADOR_CURRENT_STATUS.md).
+
 Fecha: 2026-08-20
 Rama candidata: `integration/orquestador-canonical-v1`
 Worktree: `C:\Users\letas\Desktop\Proyectos\Desarrollo\orquestadoria\ai-orchestrator-canonical-integration-81ba810`
@@ -99,3 +101,7 @@ El ciclo canónico crea versiones locales desde un pedido de cambio con IDs gene
 La aprobación es local, explícita y distinta de la validación técnica o visual. La comparación A/B usa manifests y hashes de artefactos declarados, sin contenido, diff visual ni evaluación estética. Restaurar crea una versión nueva por staging/rename. La entrega exige aprobación y genera un snapshot inmutable con manifest; no hay deploy, publicación ni red.
 
 El bridge añade acciones allowlisted de versiones, historial, comparación, restauración, entrega y preview. El resolver acepta sólo proyecto/versión/recurso declarados y MIME permitidos. No se registró un protocolo Electron nuevo: la UI ofrece “Abrir preview validado” y no simula iframe ni usa `file://` arbitrario. El workspace persiste sólo preferencias locales de proyecto/área y presenta Resumen, Construcción y supervisión, Materiales y contexto, y Versiones y entrega desde el snapshot físico. Responsive y accesibilidad fueron implementados por código, sin declarar validación visual real.
+
+## Escalón 1G: cierre de baseline
+
+Se cerró la reconciliación documental y de autoridades del Escalón 1. La corrección mínima de esta ronda restauró el wizard comercial de cinco pasos, Input Assets y borrador local después de detectar que el workspace 1F había reducido ese flujo. La secuencia de commits canónicos es revisable y el cierre no afirma release-ready ni cierra los escalones 2–12.
