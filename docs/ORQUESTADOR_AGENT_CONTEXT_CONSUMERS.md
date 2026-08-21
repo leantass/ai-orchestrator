@@ -1,5 +1,7 @@
 # Adaptadores canónicos de consumo de contexto
 
+Actualizacion 2C-C2: los resultados de consumidores internos pueden ingresar solamente como eventos de MEMORIA `agent_inference`; esa ingesta no otorga ejecucion, red, filesystem ni autoridad humana.
+
 ## Alcance 2C-B
 
 `jefe-agent-context-service.cjs` recibe por inyección un lector semántico de MEMORIA, el builder 2C-A y un registro interno. No tiene IPC, preload, red, shell, procesos, paths, roots, credenciales ni configuración enviada desde renderer. El registro por defecto está vacío: el resultado honesto es `consumerStatus=not_connected`.
@@ -20,6 +22,4 @@ Los paquetes `blocked` no invocan consumidor. En `restricted`, Radar/Hermes/Scou
 
 El smoke `jefe-agent-context-consumers-smoke.mjs` cubre 28 casos: adapters, integridad, aislamiento A/B, disposiciones, límites de autoridad, inmutabilidad, referencias, no-prompt, resultado no persistido, error sanitizado y registro vacío. No hay consumidor externo real.
 
-Pendiente 2C-C: handoff al runtime canónico, ingesta validada, correlación paquete/ejecución/resultado, escritura contextual con autoridad correcta, reintentos/fallos y cierre de 2C.
-
-2C-C1 ya agrega persistencia durable de intentos/resultados no ingeridos; 2C-C2 conserva la ingesta y reconciliación.
+2C-C ya está cerrado: C1 agrega persistencia durable de intentos/resultados no ingeridos y C2 completa ingesta/reconciliación idempotente y no autoritativa. 2D queda pendiente para recuperación, conflictos y cierre humano.

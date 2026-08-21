@@ -1,0 +1,9 @@
+# Ingesta canonica de resultados de agente (2C-C2)
+
+2C-C1 termina al persistir un resultado sanitizado, no confiable y no autoritativo en `completed_uningested`. 2C-C2 es la unica frontera que lo transforma en eventos de MEMORIA: revalida `packageId`/`handoffId`/`attemptId`/`resultId`, fuerza actor al agente objetivo, autoridad `agent_inference` y procedencia `agent_result_ingestion`. Nunca concede autoridad humana ni convierte texto de agente en aprobacion, deploy o ejecucion.
+
+Los estados son `completed_uningested`, `ingestion_pending`, `ingested` e `ingestion_failed`. Cada `entryId` se deriva deterministamente de `resultId`, indice y tipo mediante la funcion productiva compartida. Un append parcial conserva eventos ya escritos; retry y reconciliacion reconocen compatibles y agregan solo faltantes. La reconciliacion procesa pendientes en orden determinista con limite 1-50, sin cursor ni offset publico.
+
+Una colision incompatible conserva la entrada original y deja `ENTRY_ID_COLLISION` permanente; no se fusiona ni se resuelve automaticamente. Un record corrupto se aisla y expone solo `CORRUPT_ATTEMPT`, sin JSON, stack, path ni payload. URLs HTTPS seguras son datos inertes: no hay DNS, fetch ni red. Se rechazan paths, traversal, `file://`, credenciales URL, localhost/loopback, controles, claves desconocidas, payloads fuera de limite y claves opcionales presentes con `undefined`.
+
+La ingesta solo toca persistencia de intentos y MEMORIA. No crea versiones, modifica lifecycle/manifests/ledger, abre procesos, ejecuta agentes, llama adapters, aprueba, entrega ni elige proximo agente. `nextResponsible=lean` es una pregunta contextual pendiente. El smoke cubre 36 casos. 2D conserva resolucion humana de conflictos, cierre de recuperacion y compactacion/retencion; no hay agentes reales, UI de MEMORIA, QA visual, deploy, red ni aprendizaje vectorial.

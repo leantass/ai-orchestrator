@@ -70,10 +70,14 @@ La frontera IPC/preload es semántica y cerrada: no hay append genérico, filesy
 
 ## Escalón 2C-A: frontera de paquetes
 
-`ESCALON_2C_STATUS=IN_PROGRESS`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=COMPLETED`; `ESCALON_2C_C_STATUS=NOT_STARTED`. Los paquetes son vistas deterministas, limitadas y puras de snapshots válidos: no constituyen una segunda memoria ni ejecutan agentes. El presupuesto registra omisiones, decisiones humanas/conflictos/lineage se preservan y una fuente pending, failed o corrupta no puede producir falso `ready`.
+`ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=COMPLETED`; `ESCALON_2C_C1_STATUS=COMPLETED`; `ESCALON_2C_C2_STATUS=COMPLETED`. Los paquetes son vistas deterministas, limitadas y puras de snapshots válidos: no constituyen una segunda memoria ni ejecutan agentes. El presupuesto registra omisiones, decisiones humanas/conflictos/lineage se preservan y una fuente pending, failed o corrupta no puede producir falso `ready`.
 
 La auditoría de Factory/Comercial mantuvo sus módulos Context Hub, Hermes, Radar y planner como referencias desconectadas. Se excluyeron de la integración para evitar autoridad paralela, filesystem libre, red o ejecución. Permanecen abiertos consumo real, UI, aprendizaje/vector database, QA visual, deploy y resolución humana de conflictos.
 
 Los adapters 2C-B revalidan los paquetes y entregan handoffs inmutables sólo a consumidores internos inyectados; con registro vacío devuelven `not_connected`. No hay runtime real ni escritura de resultados: 2C-C conserva esa responsabilidad.
 
 2C-C1 añade intento durable y resultado estructurado no ingerido. La persistencia por proyecto es atómica, reconstruible y aislada; no agrega autoridad ni consume referencias URL. Factory/Hermes permanece histórico/pospuesto por sus runners y fronteras de ejecución.
+
+## Cierre 2C-C2
+
+`CHECKS=36/36`. El servicio canonico ingiere solo resultados C1 revalidados como eventos `agent_inference`; la recuperacion parcial es idempotente, A/B queda aislado, la corrupcion se reporta sin contenido crudo y `ENTRY_ID_COLLISION` es permanente. El proximo trabajo es 2D: resolucion humana de conflictos y cierre, no ejecucion automatica.

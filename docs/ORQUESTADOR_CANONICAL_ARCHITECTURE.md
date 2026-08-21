@@ -18,6 +18,10 @@
 
 Los aliases de generación heredada permanecen sólo para no romper callers y rechazan ejecución. Los scripts de fixtures y mocks viven en pruebas/smokes, no se cargan en el recorrido comercial runtime. No existe una segunda persistencia o bridge de paths libre dentro del flujo canónico.
 
+## Resultados de agente (Escalón 2C-C2)
+
+`electron/jefe-agent-result-ingestion.cjs` es la autoridad unica de ingesta desde intentos C1 hacia MEMORIA. Revalida resultado e identidad, deriva IDs deterministas y escribe eventos no autoritativos. Retry/reconciliacion son acotados e idempotentes; colisiones incompatibles quedan `ingestion_failed` y no se resuelven. El modulo no tiene lifecycle, IPC, UI, red, runners ni capacidad de ejecutar otro agente.
+
 ## Preview
 
 La resolución segura está implementada. Un protocolo Electron dedicado no fue registrado en este escalón; por tanto no hay iframe integrado completo, evidencia visual, comparación visual ni aprobación visual automatizada.
@@ -28,7 +32,7 @@ Los productores canónicos son creación, versión/cambio, aprobación local, re
 
 La outbox por proyecto soporta `synced`, `pending` y `failed`, con reapertura y reconciliación idempotentes. Las colisiones incompatibles no se fusionan. Snapshot y timeline son de sólo lectura; timeline limita 1–50 entradas, ordena determinísticamente y usa cursor opaco ligado al proyecto. IPC/preload permiten sólo operaciones semánticas allowlisted, sin append genérico, paths, roots, filesystem ni `ipcRenderer` expuesto.
 
-`ESCALON_2_STATUS=IN_PROGRESS`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=IN_PROGRESS`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=COMPLETED`; `ESCALON_2C_C_STATUS=NOT_STARTED`; `ESCALON_2D_STATUS=NOT_STARTED`. No hay UI de MEMORIA, consumo real para agentes, aprendizaje, búsqueda vectorial, resolución humana de conflictos, compactación/retención final, QA visual ni deploy.
+`ESCALON_2_STATUS=IN_PROGRESS`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=COMPLETED`; `ESCALON_2C_C_STATUS=COMPLETED`; `ESCALON_2C_C1_STATUS=COMPLETED`; `ESCALON_2C_C2_STATUS=COMPLETED`; `ESCALON_2D_STATUS=NOT_STARTED`. No hay UI de MEMORIA, agentes reales, aprendizaje, búsqueda vectorial, resolución humana de conflictos, compactación/retención final, QA visual ni deploy.
 
 ## Paquetes de contexto (Escalón 2C-A)
 

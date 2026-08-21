@@ -134,6 +134,10 @@ La auditoría excluyó Context Hub/Hermes históricos de Factory/Comercial: perm
 
 Los adapters revalidan packageId/checksum, target, purpose, identidad, disposición y usos antes de producir el handoff determinista e inmutable. El registro productivo queda vacío y responde `not_connected`; los consumidores falsos del smoke son inyectados, sin red, procesos ni persistencia. Sus resultados no son autoridad ni evidencia y 2C-C queda responsable de handoff real e ingesta validada.
 
+## Cierre 2C-C2: ingesta canonica de resultados
+
+`ESCALON_2C_C2_STATUS=COMPLETED`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2_STATUS=IN_PROGRESS`; `NEXT=ESCALON_2D_CONTEXT_RECOVERY_CONFLICTS_AND_CLOSURE`. La ingesta valida correlacion, conserva autoridad no humana, recupera append parcial y pendientes de modo idempotente, aisla proyectos y deja colisiones incompatibles como `ENTRY_ID_COLLISION` permanentes. No hay ejecucion automatica, agentes reales, UI, red, QA visual ni deploy.
+
 ## Escalón 2C-C1: handoff durable y resultado no ingerido
 
-`ESCALON_2C_C_STATUS=IN_PROGRESS`; `ESCALON_2C_C1_STATUS=COMPLETED`; `ESCALON_2C_C2_STATUS=NOT_STARTED`. Los intentos correlacionan `packageId`, `handoffId`, `attemptId` y `resultId`, con persistencia atómica/reabrible y resultados `untrusted`, `not_authoritative`, `not_ingested`. El registro por defecto sigue desconectado; los consumidores son falsos sólo en smoke. No hay MEMORIA, IPC, UI, red, lifecycle ni agentes reales.
+`ESCALON_2C_C_STATUS=COMPLETED`; `ESCALON_2C_C1_STATUS=COMPLETED`; `ESCALON_2C_C2_STATUS=COMPLETED`. Los intentos correlacionan `packageId`, `handoffId`, `attemptId` y `resultId`, con persistencia atómica/reabrible y resultados `untrusted`, `not_authoritative`, `not_ingested`. La ingesta C2 crea sólo eventos no autoritativos de MEMORIA; no hay IPC, UI, red, lifecycle ni agentes reales.

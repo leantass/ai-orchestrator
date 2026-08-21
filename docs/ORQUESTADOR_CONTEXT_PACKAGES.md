@@ -1,8 +1,10 @@
 # Paquetes canónicos de contexto (2C-A)
 
-`ESCALON_2_STATUS=IN_PROGRESS`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=IN_PROGRESS`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=COMPLETED`; `ESCALON_2C_C_STATUS=NOT_STARTED`; `ESCALON_2D_STATUS=NOT_STARTED`.
+`ESCALON_2_STATUS=IN_PROGRESS`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=COMPLETED`; `ESCALON_2C_C1_STATUS=COMPLETED`; `ESCALON_2C_C2_STATUS=COMPLETED`; `ESCALON_2D_STATUS=NOT_STARTED`.
 
 Los paquetes son una frontera pura de consumo: transforman snapshot/timeline ya sincronizados en una vista determinista por agente. No escriben MEMORIA, outbox, manifests, ledger, índices ni archivos; no usan IPC, red, filesystem libre ni invocan agentes.
+
+Actualizacion 2C-C2: el resultado correlacionado del handoff se revalida antes de crear eventos no autoritativos; no habilita aprobacion, deploy, ejecucion ni resolucion humana.
 
 ## Contrato
 
