@@ -126,6 +126,10 @@ Validación de cierre: sintaxis, ESLint focal, smokes de MEMORIA, nueve regresio
 
 ## Escalón 2C-A: paquetes canónicos de contexto
 
-`ESCALON_2C_STATUS=IN_PROGRESS`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=NOT_STARTED`. El contrato y builder puros construyen paquetes deterministas desde snapshots sincronizados para Cerebro, JEFE, Radar, Hermes, Scout, Planner, Codex y QA. Validan combinación agente/propósito, identidad, presupuesto y disposiciones `ready`/`restricted`/`blocked`; preservan actor, autoridad, procedencia y lineage sin escribir ninguna fuente física.
+`ESCALON_2C_STATUS=IN_PROGRESS`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=COMPLETED`; `ESCALON_2C_C_STATUS=NOT_STARTED`. El contrato y builder puros construyen paquetes deterministas desde snapshots sincronizados para Cerebro, JEFE, Radar, Hermes, Scout, Planner, Codex y QA. Validan combinación agente/propósito, identidad, presupuesto y disposiciones `ready`/`restricted`/`blocked`; preservan actor, autoridad, procedencia y lineage sin escribir ninguna fuente física.
 
 La auditoría excluyó Context Hub/Hermes históricos de Factory/Comercial: permanecen desconectados y con riesgo de segunda autoridad o ejecución externa. No hay IPC, UI, runner, red ni consumidor real en 2C-A. El smoke cubre 24 casos de determinismo, seguridad, presupuesto, autoridad y aislamiento.
+
+## Escalón 2C-B: adapters de consumo seguro
+
+Los adapters revalidan packageId/checksum, target, purpose, identidad, disposición y usos antes de producir el handoff determinista e inmutable. El registro productivo queda vacío y responde `not_connected`; los consumidores falsos del smoke son inyectados, sin red, procesos ni persistencia. Sus resultados no son autoridad ni evidencia y 2C-C queda responsable de handoff real e ingesta validada.

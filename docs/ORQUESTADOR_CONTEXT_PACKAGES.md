@@ -1,6 +1,6 @@
 # Paquetes canónicos de contexto (2C-A)
 
-`ESCALON_2_STATUS=IN_PROGRESS`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=IN_PROGRESS`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=NOT_STARTED`; `ESCALON_2D_STATUS=NOT_STARTED`.
+`ESCALON_2_STATUS=IN_PROGRESS`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=IN_PROGRESS`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=COMPLETED`; `ESCALON_2C_C_STATUS=NOT_STARTED`; `ESCALON_2D_STATUS=NOT_STARTED`.
 
 Los paquetes son una frontera pura de consumo: transforman snapshot/timeline ya sincronizados en una vista determinista por agente. No escriben MEMORIA, outbox, manifests, ledger, índices ni archivos; no usan IPC, red, filesystem libre ni invocan agentes.
 
@@ -31,3 +31,7 @@ Las secciones permitidas preservan `entryId`, timestamp, scope, identidad, actor
 ## Evidencia
 
 `jefe-context-package-smoke.mjs` cubre 24 casos: matriz de agentes, determinismo, presupuesto, disposiciones, autoridad humana, lineage, seguridad, aislamiento A/B y ausencia de mutaciones. Los paquetes están construibles, pero todavía no tienen consumidores reales, UI, aprendizaje/vector database, ejecución automática ni validación visual. JEFE no es release-ready.
+
+## Adaptadores 2C-B
+
+2C-B consume estos paquetes sólo mediante `jefe-agent-context-adapters.cjs` y el servicio interno inyectable. Cada adapter vuelve a validar la integridad y genera un handoff inmutable con frontera de política fija; no hay IPC, UI, runner, red, filesystem ni consumidor real. Véase [ORQUESTADOR_AGENT_CONTEXT_CONSUMERS.md](ORQUESTADOR_AGENT_CONTEXT_CONSUMERS.md). La corrección mínima de `cleanReference` preserva únicamente URLs `https` seguras como datos, sin consultarlas.

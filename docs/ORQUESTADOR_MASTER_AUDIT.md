@@ -70,6 +70,8 @@ La frontera IPC/preload es semántica y cerrada: no hay append genérico, filesy
 
 ## Escalón 2C-A: frontera de paquetes
 
-`ESCALON_2C_STATUS=IN_PROGRESS`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=NOT_STARTED`. Los paquetes son vistas deterministas, limitadas y puras de snapshots válidos: no constituyen una segunda memoria ni ejecutan agentes. El presupuesto registra omisiones, decisiones humanas/conflictos/lineage se preservan y una fuente pending, failed o corrupta no puede producir falso `ready`.
+`ESCALON_2C_STATUS=IN_PROGRESS`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=COMPLETED`; `ESCALON_2C_C_STATUS=NOT_STARTED`. Los paquetes son vistas deterministas, limitadas y puras de snapshots válidos: no constituyen una segunda memoria ni ejecutan agentes. El presupuesto registra omisiones, decisiones humanas/conflictos/lineage se preservan y una fuente pending, failed o corrupta no puede producir falso `ready`.
 
 La auditoría de Factory/Comercial mantuvo sus módulos Context Hub, Hermes, Radar y planner como referencias desconectadas. Se excluyeron de la integración para evitar autoridad paralela, filesystem libre, red o ejecución. Permanecen abiertos consumo real, UI, aprendizaje/vector database, QA visual, deploy y resolución humana de conflictos.
+
+Los adapters 2C-B revalidan los paquetes y entregan handoffs inmutables sólo a consumidores internos inyectados; con registro vacío devuelven `not_connected`. No hay runtime real ni escritura de resultados: 2C-C conserva esa responsabilidad.

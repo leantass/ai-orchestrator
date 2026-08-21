@@ -14,8 +14,9 @@ const SOURCE_SECTIONS = Object.freeze({ objective: 'objective', requirements: 'r
 const PRIORITY = Object.freeze({ conflicts: 0, decisions: 1, objective: 2, constraints: 3, requirements: 4, failures: 5, corrections: 5, risks: 6, questions: 6, evidence: 7, validations: 7, outcomes: 8, preferences: 8, assumptions: 8 })
 function matches(entry, identity) { return entry && entry.identity && entry.identity.projectId === identity.projectId && (!identity.runId || entry.identity.runId === identity.runId || entry.scope === 'project') && (!identity.versionId || entry.identity.versionId === identity.versionId || entry.scope === 'project') }
 function cleanReference(reference) {
-  if (!reference || typeof reference !== 'object' || typeof reference.kind !== 'string' || reference.kind.length > 40 || !safeText(reference.value) || /^file:/iu.test(reference.value) || reference.value.split(/[\\/]/u).includes('..')) return null
-  if (reference.kind === 'url' && !/^https:\/\//iu.test(reference.value)) return null
+  if (!reference || typeof reference !== 'object' || typeof reference.kind !== 'string' || reference.kind.length > 40 || typeof reference.value !== 'string' || reference.value.length > 4000 || /^file:/iu.test(reference.value) || reference.value.split(/[\\/]/u).includes('..')) return null
+  if (reference.kind === 'url') { if (!/^https:\/\/[^\s]+$/iu.test(reference.value) || /password|access.?token|refresh.?token|api.?key|secret|cookie|authorization|bearer/iu.test(reference.value)) return null; return { kind: reference.kind, value: reference.value } }
+  if (!safeText(reference.value)) return null
   return { kind: reference.kind, value: reference.value }
 }
 function cleanEntry(entry) {

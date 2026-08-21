@@ -4,7 +4,7 @@ Fecha de cierre documental: 2026-08-21. Rama: `integration/orquestador-canonical
 
 `ESCALON_1_STATUS=VERIFIED_CLOSED`: se cerraron y verificaron la reconciliación de repositorio y la autoridad canónica, no el producto ni el release.
 
-`ESCALON_2_STATUS=IN_PROGRESS`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=IN_PROGRESS`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=NOT_STARTED`; `ESCALON_2D_STATUS=NOT_STARTED`.
+`ESCALON_2_STATUS=IN_PROGRESS`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=IN_PROGRESS`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=COMPLETED`; `ESCALON_2C_C_STATUS=NOT_STARTED`; `ESCALON_2D_STATUS=NOT_STARTED`.
 
 2B conecta MEMORIA al lifecycle canónico mediante productores posteriores a manifests/ledger, outbox durable, reapertura/reintento, reconciliación idempotente, aislamiento A/B y canales contextuales semánticos. El smoke integrado pasa `CHECKS=42/42` y `CASOS_PASS=1-42`.
 
@@ -18,7 +18,7 @@ Fecha de cierre documental: 2026-08-21. Rama: `integration/orquestador-canonical
 - Resolver seguro de preview para proyecto/versión/recurso declarado y MIME permitido.
 - La creación/materialización canónica es la única vía real; el flujo heredado permanece deshabilitado y su smoke sólo verifica el rechazo honesto `not_available`.
 - MEMORIA recibe creación, versiones, cambios, aprobaciones, restauraciones, entrega local y fallos sanitizados desde fuentes físicas; snapshot/timeline son lecturas puras y timeline está limitado/paginado.
-- Paquetes canónicos de contexto son deterministas, presupuestados y específicos por agente; aún no conectan consumidores, runners ni UI.
+- Paquetes canónicos de contexto son deterministas, presupuestados y específicos por agente; los adapters 2C-B producen sólo handoffs inmutables para consumidores internos inyectables y el runtime por defecto responde `not_connected`.
 
 ## Límites abiertos
 
@@ -28,4 +28,4 @@ El preview no está demostrado como iframe ni validado visualmente; sólo puede 
 
 ## Deuda y próximo paso
 
-`npm run lint` global continúa FAIL heredado: 306 errores, 0 warnings, 73 archivos bajo `src/factory/hermes-*`. El quality gate global permanece abierto y no se alteraron reglas. El siguiente escalón exacto es **Escalón 2C-B: adaptadores consumidores de agentes**. JEFE no está release-ready; no hay ejecución automática, UI de MEMORIA, QA visual, deploy ni proyecto comercial real.
+`npm run lint` global continúa FAIL heredado: 306 errores, 0 warnings, 73 archivos bajo `src/factory/hermes-*`. El quality gate global permanece abierto y no se alteraron reglas. El siguiente escalón exacto es **Escalón 2C-C: handoff al runtime e ingesta de resultados**. JEFE no está release-ready; no hay ejecución automática, UI de MEMORIA, QA visual, deploy ni proyecto comercial real.
