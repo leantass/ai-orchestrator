@@ -59,3 +59,11 @@ La matriz completa y agrupada de los WIP Factory/Comercial se consolida en `ORQU
 ## Escalón 2A: memoria local canónica
 
 MEMORIA incorpora contrato, persistencia inmutable y proyección determinista, sin afirmar integración externa ni recuperación semántica. La decisión humana no puede ser sustituida por una inferencia; las relaciones explícitas preservan historia y conflictos. Persisten como pendientes UI, IPC, productores, consumo por agentes, aprendizaje, vector database y los escalones 2B–2D.
+
+## Escalón 2B: cierre de integración contextual
+
+`ESCALON_2B_STATUS=COMPLETED` dentro de `ESCALON_2_STATUS=IN_PROGRESS`. La auditoría verificó que manifests/ledger son fuente de verdad y que MEMORIA se deriva después del éxito físico para creación, versiones/cambios, aprobación local, restauración, entrega local y fallos sanitizados. La identidad por versión permanece `projectId/runId/versionId`; la autoridad humana procede sólo de una aprobación física local.
+
+La outbox durable representa `synced`, `pending` y `failed`; reconciliación/reapertura recuperan eventos técnicos faltantes de forma idempotente, mientras una colisión incompatible conserva historia y queda `failed`. Locks y cola se liberan, y un fallo contextual de A no bloquea ni contamina B. Snapshot, timeline limitado/paginado, preview y comparación no producen efectos físicos.
+
+La frontera IPC/preload es semántica y cerrada: no hay append genérico, filesystem, paths, roots ni `ipcRenderer` para renderer. El smoke de 2B pasa 42/42. Esto no declara release-ready, QA visual, deploy, publicación, consumo por agentes, búsqueda vectorial, resolución humana de conflictos ni aprendizaje entre proyectos. La deuda Hermes global continúa en 306 errores, 0 warnings y 73 archivos.

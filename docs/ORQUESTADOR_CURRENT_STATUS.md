@@ -1,10 +1,12 @@
 # Estado actual canónico del Orquestador
 
-Fecha de cierre documental: 2026-08-20. Commit canónico: `28988435dbf0fd7156c63d8ad69a6a01d2f08e3e` más el cierre documental de esta ronda. Rama: `integration/orquestador-canonical-v1`.
+Fecha de cierre documental: 2026-08-21. Rama: `integration/orquestador-canonical-v1`.
 
 `ESCALON_1_STATUS=VERIFIED_CLOSED`: se cerraron y verificaron la reconciliación de repositorio y la autoridad canónica, no el producto ni el release.
 
-`ESCALON_2_STATUS=IN_PROGRESS` y `ESCALON_2A_STATUS=COMPLETED`: MEMORIA ya tiene contrato, eventos locales inmutables y snapshot reconstruible, sin UI, IPC ni productores conectados.
+`ESCALON_2_STATUS=IN_PROGRESS`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=NOT_STARTED`; `ESCALON_2D_STATUS=NOT_STARTED`.
+
+2B conecta MEMORIA al lifecycle canónico mediante productores posteriores a manifests/ledger, outbox durable, reapertura/reintento, reconciliación idempotente, aislamiento A/B y canales contextuales semánticos. El smoke integrado pasa `CHECKS=42/42` y `CASOS_PASS=1-42`.
 
 ## Integrado y validado focalmente
 
@@ -15,13 +17,14 @@ Fecha de cierre documental: 2026-08-20. Commit canónico: `28988435dbf0fd7156c63
 - Workspace de cuatro áreas, ciclo de versiones, ledger, aprobación local, comparación de manifests/hashes, restauración como nueva versión y entrega local inmutable.
 - Resolver seguro de preview para proyecto/versión/recurso declarado y MIME permitido.
 - La creación/materialización canónica es la única vía real; el flujo heredado permanece deshabilitado y su smoke sólo verifica el rechazo honesto `not_available`.
+- MEMORIA recibe creación, versiones, cambios, aprobaciones, restauraciones, entrega local y fallos sanitizados desde fuentes físicas; snapshot/timeline son lecturas puras y timeline está limitado/paginado.
 
 ## Límites abiertos
 
-Los escalones 2 a 12 siguen abiertos: Context Hub/MEMORIA, investigación Radar/Hermes/Scout, planner comercial, Codex/executor real, QA y seguridad globales, corrección, preview embebido/QA visual, Git/CI/entrega remota, observabilidad y prueba integral.
+Los escalones 2C, 2D y 3 a 12 siguen abiertos: UI de MEMORIA, paquetes para agentes, consumo por agentes, aprendizaje entre proyectos, búsqueda semántica/vectorial, resolución humana de conflictos, compactación/retención, investigación Radar/Hermes/Scout, planner comercial, Codex/executor real, QA y seguridad globales, preview embebido/QA visual, Git/CI/entrega remota, observabilidad y prueba integral.
 
 El preview no está demostrado como iframe ni validado visualmente; sólo puede abrirse un recurso local previamente validado. Aprobación local no equivale a validación técnica o visual. No hay deploy, publicación, red ni proyecto comercial real.
 
 ## Deuda y próximo paso
 
-`npm run lint` global continúa FAIL heredado: 306 errores, 0 warnings, 73 archivos bajo `src/factory/hermes-*`. El quality gate global permanece abierto y no se alteraron reglas. El siguiente escalón exacto es **Escalón 2: Context Hub/MEMORIA**, empezando por contrato y límites de admisión, no por integración externa automática.
+`npm run lint` global continúa FAIL heredado: 306 errores, 0 warnings, 73 archivos bajo `src/factory/hermes-*`. El quality gate global permanece abierto y no se alteraron reglas. El siguiente escalón exacto es **Escalón 2C: paquetes de contexto y consumo por agentes**. JEFE no está release-ready; no hay QA visual, deploy ni proyecto comercial real.

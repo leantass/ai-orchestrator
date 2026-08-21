@@ -113,3 +113,13 @@ Se cerró la reconciliación documental y de autoridades del Escalón 1. La corr
 ## Escalón 2A: fundación MEMORIA
 
 `ESCALON_2_STATUS=IN_PROGRESS`; `ESCALON_2A_STATUS=COMPLETED`. El registro canónico local es append-only, valida identidad/autoridad/relaciones y proyecta snapshots sólo desde eventos válidos. No conecta renderer, IPC, JEFE ni agentes: 2B cubre productores y lifecycle, 2C consultas/paquetes de contexto y 2D recuperación/conflictos/corrección integral.
+
+## Escalón 2B: integración de MEMORIA con lifecycle
+
+`ESCALON_1_STATUS=VERIFIED_CLOSED`; `ESCALON_2_STATUS=IN_PROGRESS`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=NOT_STARTED`; `ESCALON_2D_STATUS=NOT_STARTED`.
+
+`jefe-context-integration.cjs` consume únicamente manifests y ledger físicos después de que el lifecycle materializa creación, versión/cambio, aprobación local, restauración, entrega local o fallo relevante. Conserva identidad `projectId/runId/versionId`, evita sobrescribir historia y sólo proyecta autoridad humana desde la aprobación física local. La outbox durable mantiene `synced`, `pending` o `failed`; reintento/reapertura recuperan trabajo técnico faltante y una colisión incompatible queda `failed` sin resolución automática.
+
+`jefe-project-ipc.cjs` y `jefeProjectBridge` exponen snapshot, timeline limitado con cursor opaco, estado y reconciliación semánticos. No habilitan append genérico, paths, roots, filesystem ni autoridad enviada por renderer. Snapshot, timeline, preview y comparación son lecturas puras; el estado y la outbox están aislados por proyecto.
+
+Validación de cierre: sintaxis, ESLint focal, smokes de MEMORIA, nueve regresiones canónicas, typecheck y build PASS; el smoke 2B completa `42/42`. El build conserva un warning de chunk mayor a 500 kB. La deuda global Hermes continúa en 306 errores, 0 warnings y 73 archivos, sin cambios de reglas ni archivos Hermes.

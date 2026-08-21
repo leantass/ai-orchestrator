@@ -1,4 +1,4 @@
-# MEMORIA / Context Hub canónico (2A)
+# MEMORIA / Context Hub canónico (2A–2B)
 
 `ESCALON_2A_STATUS=COMPLETED`. MEMORIA es un registro local append-only de entradas validadas, no un chat, un archivo libre ni una base vectorial. La fuente de verdad son los eventos; el snapshot se reconstruye desde ellos y no es editable como autoridad.
 
@@ -14,6 +14,20 @@ Cada entrada se valida, serializa de modo determinista y se escribe atómicament
 
 Se rechazan paths externos, traversal, campos sensibles evidentes y metadata/textos fuera de límite. Esta protección no detecta secretos ocultos en lenguaje natural. No hay embeddings, búsqueda semántica, UI, IPC ni integración con agentes en 2A.
 
+## Escalón 2B: productores, reconciliación y frontera semántica
+
+`ESCALON_2_STATUS=IN_PROGRESS`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=NOT_STARTED`; `ESCALON_2D_STATUS=NOT_STARTED`.
+
+Los manifests por versión y el ledger físico siguen siendo la fuente de verdad. Tras una creación, cambio, aprobación local, restauración, entrega local o fallo relevante, `jefe-context-integration.cjs` deriva entradas técnicas sólo después del resultado físico. La identidad de una versión conserva exactamente `projectId`, `runId` y `versionId`. Restauración crea una versión física nueva; entrega sólo declara preparación local aprobada, nunca deploy, publicación, hosting, URL pública ni CI.
+
+La autoridad humana sólo procede del evento físico de aprobación local. Las demás entradas derivadas usan actor/procedencia técnica; el renderer no puede forjar actor, autoridad, procedencia, origen, IDs físicos ni paths. No se fabrican QA visual, validación técnica, aceptación comercial o conformidad de entrega.
+
+La outbox durable distingue `synced`, `pending` y `failed`. Una interrupción posterior a la materialización puede reabrirse y reconciliarse de modo idempotente desde manifests/ledger; una colisión incompatible conserva la historia y permanece `failed` con código estructurado. Locks y cola se liberan, y el estado se calcula por proyecto para aislar A/B.
+
+Snapshot, timeline limitado/paginado, preview y comparación son lecturas puras. Timeline usa límite entero 1–50, orden determinista y cursor opaco ligado al proyecto. IPC/preload exponen únicamente snapshot, timeline, estado y reconciliación contextuales semánticos; no hay append genérico, filesystem, roots, paths libres ni `ipcRenderer` expuesto.
+
+El smoke `jefe-context-lifecycle-ipc-smoke.mjs` cubre 42/42 casos de 2B junto con recuperación, colisiones y aislamiento.
+
 ## Pendientes
 
-2B integra productores, proyectos, versiones, lifecycle e IPC. 2C añade consultas y paquetes de contexto para agentes. 2D cubre recuperación integral, conflictos, corrección y cierre. Radar, Hermes, Scout, Planner, Codex, QA, aprendizaje entre proyectos y cualquier vector database siguen fuera de alcance.
+2C añade paquetes de contexto y consumo por agentes. 2D cubre resolución humana de conflictos, corrección integral y política final de compactación/retención. Siguen fuera de alcance UI de MEMORIA, aprendizaje entre proyectos, búsqueda semántica/vectorial, QA visual y deploy. Radar, Hermes, Scout, Planner, Codex y QA todavía no consumen MEMORIA canónica.

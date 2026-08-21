@@ -305,5 +305,9 @@ contextBridge.exposeInMainWorld('jefeProjectBridge', {
   copyPreviewLocation: (projectId) => ipcRenderer.invoke('jefe-projects:copy-location', { projectId, target: 'preview' }),
   copyDeliveryLocation: (projectId, versionId) => ipcRenderer.invoke('jefe-projects:copy-location', { projectId, versionId, target: 'delivery' }),
   capabilities: () => ipcRenderer.invoke('jefe-projects:capabilities'),
+  getContextSnapshot: (projectId) => ipcRenderer.invoke('jefe-context:snapshot', { projectId }),
+  getContextTimeline: (projectId, limit = 20, cursor = null) => ipcRenderer.invoke('jefe-context:timeline', { projectId, limit, ...(cursor ? { cursor } : {}) }),
+  getContextSyncStatus: (projectId) => ipcRenderer.invoke('jefe-context:status', { projectId }),
+  reconcileContext: (projectId) => ipcRenderer.invoke('jefe-context:reconcile', { projectId }),
   selectInputAssets: () => ipcRenderer.invoke('jefe-input-assets:select'),
 })

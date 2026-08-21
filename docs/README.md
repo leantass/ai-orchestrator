@@ -9,4 +9,6 @@ Prevalencia: [ORQUESTADOR_CURRENT_STATUS.md](ORQUESTADOR_CURRENT_STATUS.md) defi
 - [Reconciliación y matriz de fuentes](ORQUESTADOR_WORKTREE_RECONCILIATION.md)
 - [MEMORIA / Context Hub canónico](ORQUESTADOR_CONTEXT_HUB.md)
 
+Estado prevalente: `ESCALON_1_STATUS=VERIFIED_CLOSED`, `ESCALON_2_STATUS=IN_PROGRESS`, `ESCALON_2A_STATUS=COMPLETED`, `ESCALON_2B_STATUS=COMPLETED`, `ESCALON_2C_STATUS=NOT_STARTED`, `ESCALON_2D_STATUS=NOT_STARTED`. MEMORIA está integrada al lifecycle físico con smoke 2B `42/42`; no hay UI de MEMORIA, consumo por agentes, QA visual ni deploy.
+
 Los documentos `V1_*`, `release-candidate-checklist.md`, `operator-demo-flow.md`, `INVESTOR_DEMO_GUIDE.md`, `jefe-readiness-scoreboard.md` y planes de Factory/Hermes son históricos o prospectivos. No describen capacidad canónica ni reemplazan este índice.
