@@ -28,4 +28,8 @@ Los productores canónicos son creación, versión/cambio, aprobación local, re
 
 La outbox por proyecto soporta `synced`, `pending` y `failed`, con reapertura y reconciliación idempotentes. Las colisiones incompatibles no se fusionan. Snapshot y timeline son de sólo lectura; timeline limita 1–50 entradas, ordena determinísticamente y usa cursor opaco ligado al proyecto. IPC/preload permiten sólo operaciones semánticas allowlisted, sin append genérico, paths, roots, filesystem ni `ipcRenderer` expuesto.
 
-`ESCALON_2_STATUS=IN_PROGRESS`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=NOT_STARTED`; `ESCALON_2D_STATUS=NOT_STARTED`. No hay UI de MEMORIA, paquetes/consumo para agentes, aprendizaje, búsqueda vectorial, resolución humana de conflictos, compactación/retención final, QA visual ni deploy.
+`ESCALON_2_STATUS=IN_PROGRESS`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=IN_PROGRESS`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=NOT_STARTED`; `ESCALON_2D_STATUS=NOT_STARTED`. No hay UI de MEMORIA, consumo para agentes, aprendizaje, búsqueda vectorial, resolución humana de conflictos, compactación/retención final, QA visual ni deploy.
+
+## Paquetes de contexto (Escalón 2C-A)
+
+`jefe-context-package-contract.cjs` y `jefe-context-package-builder.cjs` consumen sólo snapshots validados y estado de sincronización. Producen paquetes por agente/propósito allowlisted con identidad física, disposición, presupuesto, omisiones e integridad deterministas. No persisten paquetes, no usan IPC ni crean permisos; 2C-B será el único bloque habilitado para conectar consumidores.

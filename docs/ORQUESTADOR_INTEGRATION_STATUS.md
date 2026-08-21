@@ -123,3 +123,9 @@ Se cerró la reconciliación documental y de autoridades del Escalón 1. La corr
 `jefe-project-ipc.cjs` y `jefeProjectBridge` exponen snapshot, timeline limitado con cursor opaco, estado y reconciliación semánticos. No habilitan append genérico, paths, roots, filesystem ni autoridad enviada por renderer. Snapshot, timeline, preview y comparación son lecturas puras; el estado y la outbox están aislados por proyecto.
 
 Validación de cierre: sintaxis, ESLint focal, smokes de MEMORIA, nueve regresiones canónicas, typecheck y build PASS; el smoke 2B completa `42/42`. El build conserva un warning de chunk mayor a 500 kB. La deuda global Hermes continúa en 306 errores, 0 warnings y 73 archivos, sin cambios de reglas ni archivos Hermes.
+
+## Escalón 2C-A: paquetes canónicos de contexto
+
+`ESCALON_2C_STATUS=IN_PROGRESS`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=NOT_STARTED`. El contrato y builder puros construyen paquetes deterministas desde snapshots sincronizados para Cerebro, JEFE, Radar, Hermes, Scout, Planner, Codex y QA. Validan combinación agente/propósito, identidad, presupuesto y disposiciones `ready`/`restricted`/`blocked`; preservan actor, autoridad, procedencia y lineage sin escribir ninguna fuente física.
+
+La auditoría excluyó Context Hub/Hermes históricos de Factory/Comercial: permanecen desconectados y con riesgo de segunda autoridad o ejecución externa. No hay IPC, UI, runner, red ni consumidor real en 2C-A. El smoke cubre 24 casos de determinismo, seguridad, presupuesto, autoridad y aislamiento.

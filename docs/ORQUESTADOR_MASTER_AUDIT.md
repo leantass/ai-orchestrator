@@ -67,3 +67,9 @@ MEMORIA incorpora contrato, persistencia inmutable y proyección determinista, s
 La outbox durable representa `synced`, `pending` y `failed`; reconciliación/reapertura recuperan eventos técnicos faltantes de forma idempotente, mientras una colisión incompatible conserva historia y queda `failed`. Locks y cola se liberan, y un fallo contextual de A no bloquea ni contamina B. Snapshot, timeline limitado/paginado, preview y comparación no producen efectos físicos.
 
 La frontera IPC/preload es semántica y cerrada: no hay append genérico, filesystem, paths, roots ni `ipcRenderer` para renderer. El smoke de 2B pasa 42/42. Esto no declara release-ready, QA visual, deploy, publicación, consumo por agentes, búsqueda vectorial, resolución humana de conflictos ni aprendizaje entre proyectos. La deuda Hermes global continúa en 306 errores, 0 warnings y 73 archivos.
+
+## Escalón 2C-A: frontera de paquetes
+
+`ESCALON_2C_STATUS=IN_PROGRESS`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=NOT_STARTED`. Los paquetes son vistas deterministas, limitadas y puras de snapshots válidos: no constituyen una segunda memoria ni ejecutan agentes. El presupuesto registra omisiones, decisiones humanas/conflictos/lineage se preservan y una fuente pending, failed o corrupta no puede producir falso `ready`.
+
+La auditoría de Factory/Comercial mantuvo sus módulos Context Hub, Hermes, Radar y planner como referencias desconectadas. Se excluyeron de la integración para evitar autoridad paralela, filesystem libre, red o ejecución. Permanecen abiertos consumo real, UI, aprendizaje/vector database, QA visual, deploy y resolución humana de conflictos.

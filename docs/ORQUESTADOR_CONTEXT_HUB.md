@@ -30,4 +30,4 @@ El smoke `jefe-context-lifecycle-ipc-smoke.mjs` cubre 42/42 casos de 2B junto co
 
 ## Pendientes
 
-2C añade paquetes de contexto y consumo por agentes. 2D cubre resolución humana de conflictos, corrección integral y política final de compactación/retención. Siguen fuera de alcance UI de MEMORIA, aprendizaje entre proyectos, búsqueda semántica/vectorial, QA visual y deploy. Radar, Hermes, Scout, Planner, Codex y QA todavía no consumen MEMORIA canónica.
+2C-A completa paquetes canónicos puros por agente; 2C-B añade sus consumidores. `ESCALON_2C_STATUS=IN_PROGRESS`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=NOT_STARTED`. 2D cubre resolución humana de conflictos, corrección integral y política final de compactación/retención. Siguen fuera de alcance UI de MEMORIA, aprendizaje entre proyectos, búsqueda semántica/vectorial, QA visual y deploy. Radar, Hermes, Scout, Planner, Codex y QA todavía no consumen MEMORIA canónica.
