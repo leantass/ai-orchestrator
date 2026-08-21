@@ -2,7 +2,7 @@
 
 Fecha de cierre documental: 2026-08-20. Commit canónico: `28988435dbf0fd7156c63d8ad69a6a01d2f08e3e` más el cierre documental de esta ronda. Rama: `integration/orquestador-canonical-v1`.
 
-`ESCALON_1_STATUS=CLOSED`: se cerró la reconciliación de repositorio y autoridad canónica, no el producto ni el release.
+`ESCALON_1_STATUS=VERIFIED_CLOSED`: se cerraron y verificaron la reconciliación de repositorio y la autoridad canónica, no el producto ni el release.
 
 ## Integrado y validado focalmente
 
@@ -12,6 +12,7 @@ Fecha de cierre documental: 2026-08-20. Commit canónico: `28988435dbf0fd7156c63
 - Hub comercial, wizard de cinco pasos, Input Assets como referencia y tres direcciones visuales.
 - Workspace de cuatro áreas, ciclo de versiones, ledger, aprobación local, comparación de manifests/hashes, restauración como nueva versión y entrega local inmutable.
 - Resolver seguro de preview para proyecto/versión/recurso declarado y MIME permitido.
+- La creación/materialización canónica es la única vía real; el flujo heredado permanece deshabilitado y su smoke sólo verifica el rechazo honesto `not_available`.
 
 ## Límites abiertos
 

@@ -105,3 +105,7 @@ El bridge añade acciones allowlisted de versiones, historial, comparación, res
 ## Escalón 1G: cierre de baseline
 
 Se cerró la reconciliación documental y de autoridades del Escalón 1. La corrección mínima de esta ronda restauró el wizard comercial de cinco pasos, Input Assets y borrador local después de detectar que el workspace 1F había reducido ese flujo. La secuencia de commits canónicos es revisable y el cierre no afirma release-ready ni cierra los escalones 2–12.
+
+## Escalón 1H: verificación de frontera heredada
+
+`ESCALON_1_STATUS=VERIFIED_CLOSED`. `createFirstVersionFromRun(...)` y `materializeProject(...)` siguen siendo la única vía real de creación/materialización. `scripts/jefe-real-generation-smoke.mjs` ya no pretende ejecutar un runner histórico: verifica que el alias heredado responde `not_available`, no crea proyecto, versión, entrega, preview ni deploy, y no abre una segunda autoridad. Los escalones 2–12 permanecen abiertos; JEFE no está terminado ni release-ready y la deuda Hermes continúa en 306 errores, 0 warnings y 73 archivos heredados.
