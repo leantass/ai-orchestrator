@@ -7,5 +7,6 @@ Prevalencia: [ORQUESTADOR_CURRENT_STATUS.md](ORQUESTADOR_CURRENT_STATUS.md) defi
 - [Auditoría maestra](ORQUESTADOR_MASTER_AUDIT.md)
 - [Integración](ORQUESTADOR_INTEGRATION_STATUS.md)
 - [Reconciliación y matriz de fuentes](ORQUESTADOR_WORKTREE_RECONCILIATION.md)
+- [MEMORIA / Context Hub canónico](ORQUESTADOR_CONTEXT_HUB.md)
 
 Los documentos `V1_*`, `release-candidate-checklist.md`, `operator-demo-flow.md`, `INVESTOR_DEMO_GUIDE.md`, `jefe-readiness-scoreboard.md` y planes de Factory/Hermes son históricos o prospectivos. No describen capacidad canónica ni reemplazan este índice.

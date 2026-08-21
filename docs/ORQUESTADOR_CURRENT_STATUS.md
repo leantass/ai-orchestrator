@@ -4,6 +4,8 @@ Fecha de cierre documental: 2026-08-20. Commit canónico: `28988435dbf0fd7156c63
 
 `ESCALON_1_STATUS=VERIFIED_CLOSED`: se cerraron y verificaron la reconciliación de repositorio y la autoridad canónica, no el producto ni el release.
 
+`ESCALON_2_STATUS=IN_PROGRESS` y `ESCALON_2A_STATUS=COMPLETED`: MEMORIA ya tiene contrato, eventos locales inmutables y snapshot reconstruible, sin UI, IPC ni productores conectados.
+
 ## Integrado y validado focalmente
 
 - Contrato único de proyecto, run y versión.

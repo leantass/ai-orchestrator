@@ -109,3 +109,7 @@ Se cerró la reconciliación documental y de autoridades del Escalón 1. La corr
 ## Escalón 1H: verificación de frontera heredada
 
 `ESCALON_1_STATUS=VERIFIED_CLOSED`. `createFirstVersionFromRun(...)` y `materializeProject(...)` siguen siendo la única vía real de creación/materialización. `scripts/jefe-real-generation-smoke.mjs` ya no pretende ejecutar un runner histórico: verifica que el alias heredado responde `not_available`, no crea proyecto, versión, entrega, preview ni deploy, y no abre una segunda autoridad. Los escalones 2–12 permanecen abiertos; JEFE no está terminado ni release-ready y la deuda Hermes continúa en 306 errores, 0 warnings y 73 archivos heredados.
+
+## Escalón 2A: fundación MEMORIA
+
+`ESCALON_2_STATUS=IN_PROGRESS`; `ESCALON_2A_STATUS=COMPLETED`. El registro canónico local es append-only, valida identidad/autoridad/relaciones y proyecta snapshots sólo desde eventos válidos. No conecta renderer, IPC, JEFE ni agentes: 2B cubre productores y lifecycle, 2C consultas/paquetes de contexto y 2D recuperación/conflictos/corrección integral.

@@ -12,6 +12,7 @@
 | IPC/preload | `electron/jefe-project-ipc.cjs` y `electron/preload.cjs` | Canales semánticos allowlisted; renderer no entrega paths ni canales. |
 | Preview | `electron/jefe-project-preview.cjs` | Recurso declarado + MIME allowlist; sin `file://` arbitrario. |
 | UI | `src/commercial/*` | Consume bridge y snapshots físicos; `localStorage` sólo guarda preferencias/borrador. |
+| MEMORIA | `electron/jefe-context-contract.cjs` y `electron/jefe-context-persistence.cjs` | Eventos locales validados e inmutables; snapshot reconstruible, sin IPC/UI/agentes en 2A. |
 
 ## Compatibilidad y exclusiones
 

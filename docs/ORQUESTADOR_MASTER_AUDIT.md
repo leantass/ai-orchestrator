@@ -55,3 +55,7 @@ El ciclo local de versiones, ledger y entrega inmutable están cubiertos por smo
 `ESCALON_1_STATUS=VERIFIED_CLOSED` para la integración de repositorio. La autoridad de contrato, creación, persistencia, IPC, apertura/copia y preview está descrita en `ORQUESTADOR_CANONICAL_ARCHITECTURE.md`; no se halló una autoridad paralela activa en el recorrido canónico. La única vía real de creación/materialización es canónica; el smoke de generación heredada verifica que sus aliases de compatibilidad devuelven `not_available`, sin iniciar runner ni crear artefactos.
 
 La matriz completa y agrupada de los WIP Factory/Comercial se consolida en `ORQUESTADOR_WORKTREE_RECONCILIATION.md`: registro/profiles e Input Assets se integraron o reemplazaron; Hermes/Radar, memoria, planner, executor, QA, corrección, preview visual, entrega remota y observabilidad quedaron asignados a escalones futuros. Cerrar 1 no equivale a cerrar producto, release ni deuda Hermes.
+
+## Escalón 2A: memoria local canónica
+
+MEMORIA incorpora contrato, persistencia inmutable y proyección determinista, sin afirmar integración externa ni recuperación semántica. La decisión humana no puede ser sustituida por una inferencia; las relaciones explícitas preservan historia y conflictos. Persisten como pendientes UI, IPC, productores, consumo por agentes, aprendizaje, vector database y los escalones 2B–2D.
