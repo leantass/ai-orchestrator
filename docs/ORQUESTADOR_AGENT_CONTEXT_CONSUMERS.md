@@ -21,3 +21,5 @@ Los paquetes `blocked` no invocan consumidor. En `restricted`, Radar/Hermes/Scou
 El smoke `jefe-agent-context-consumers-smoke.mjs` cubre 28 casos: adapters, integridad, aislamiento A/B, disposiciones, límites de autoridad, inmutabilidad, referencias, no-prompt, resultado no persistido, error sanitizado y registro vacío. No hay consumidor externo real.
 
 Pendiente 2C-C: handoff al runtime canónico, ingesta validada, correlación paquete/ejecución/resultado, escritura contextual con autoridad correcta, reintentos/fallos y cierre de 2C.
+
+2C-C1 ya agrega persistencia durable de intentos/resultados no ingeridos; 2C-C2 conserva la ingesta y reconciliación.

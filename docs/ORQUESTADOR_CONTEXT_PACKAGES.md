@@ -35,3 +35,5 @@ Las secciones permitidas preservan `entryId`, timestamp, scope, identidad, actor
 ## Adaptadores 2C-B
 
 2C-B consume estos paquetes sólo mediante `jefe-agent-context-adapters.cjs` y el servicio interno inyectable. Cada adapter vuelve a validar la integridad y genera un handoff inmutable con frontera de política fija; no hay IPC, UI, runner, red, filesystem ni consumidor real. Véase [ORQUESTADOR_AGENT_CONTEXT_CONSUMERS.md](ORQUESTADOR_AGENT_CONTEXT_CONSUMERS.md). La corrección mínima de `cleanReference` preserva únicamente URLs `https` seguras como datos, sin consultarlas.
+
+2C-C1 correlaciona ese handoff con un intento durable y resultado no ingerido; la corrección mínima permite a QA validar sin exigir un objetivo ausente de su vista.

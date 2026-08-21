@@ -15,7 +15,7 @@ const PRIORITY = Object.freeze({ conflicts: 0, decisions: 1, objective: 2, const
 function matches(entry, identity) { return entry && entry.identity && entry.identity.projectId === identity.projectId && (!identity.runId || entry.identity.runId === identity.runId || entry.scope === 'project') && (!identity.versionId || entry.identity.versionId === identity.versionId || entry.scope === 'project') }
 function cleanReference(reference) {
   if (!reference || typeof reference !== 'object' || typeof reference.kind !== 'string' || reference.kind.length > 40 || typeof reference.value !== 'string' || reference.value.length > 4000 || /^file:/iu.test(reference.value) || reference.value.split(/[\\/]/u).includes('..')) return null
-  if (reference.kind === 'url') { if (!/^https:\/\/[^\s]+$/iu.test(reference.value) || /password|access.?token|refresh.?token|api.?key|secret|cookie|authorization|bearer/iu.test(reference.value)) return null; return { kind: reference.kind, value: reference.value } }
+  if (reference.kind === 'url') { let url; try { url = new URL(reference.value) } catch { return null }; if (url.protocol !== 'https:' || url.username || url.password || ['localhost', '127.0.0.1', '::1'].includes(url.hostname) || /password|access.?token|refresh.?token|api.?key|secret|cookie|authorization|bearer/iu.test(reference.value)) return null; return { kind: reference.kind, value: reference.value } }
   if (!safeText(reference.value)) return null
   return { kind: reference.kind, value: reference.value }
 }
@@ -67,7 +67,7 @@ function buildContextPackage(input) {
   if (!objective && request.purpose !== 'validation') blockers.push('objective_missing')
   if (['planning', 'execution', 'validation'].includes(request.purpose) && !requirements) blockers.push('requirements_missing')
   const restricted = !blockers.length && (rawContext.conflicts.length || rawContext.humanPending || (rawContext.questions || []).length)
-  const coreMissing = ['objective', 'constraints', 'requirements'].some((section) => (section === 'objective' ? !objective : (rawContext[section] || []).length && !(budgeted.context[section] || []).length))
+  const coreMissing = ['objective', 'constraints', 'requirements'].some((section) => (section === 'objective' ? request.purpose !== 'validation' && !objective : (rawContext[section] || []).length && !(budgeted.context[section] || []).length))
   if (coreMissing) blockers.push('budget_excludes_core')
   const disposition = blockers.length ? 'blocked' : restricted ? 'restricted' : 'ready'
   const allowedUse = disposition === 'ready' ? ['read_context', 'prepare_draft'] : disposition === 'restricted' ? ['read_context', 'clarify', 'research', 'prepare_draft'] : []

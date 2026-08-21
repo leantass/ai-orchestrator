@@ -33,3 +33,5 @@ La outbox por proyecto soporta `synced`, `pending` y `failed`, con reapertura y 
 ## Paquetes de contexto (Escalón 2C-A)
 
 `jefe-context-package-contract.cjs` y `jefe-context-package-builder.cjs` consumen sólo snapshots validados y estado de sincronización. Producen paquetes por agente/propósito allowlisted con identidad física, disposición, presupuesto, omisiones e integridad deterministas. Los adapters 2C-B revalidan y congelan el handoff con política fija; no persisten paquetes, no usan IPC ni crean permisos y su registro productivo responde `not_connected`.
+
+2C-C1 persiste intentos y resultados no ingeridos bajo root inyectado, con correlación determinista y sin exponer paths. `completed_uningested` no escribe MEMORIA ni eleva autoridad; C2 reserva ingesta/reconciliación.

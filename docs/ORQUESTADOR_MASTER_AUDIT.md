@@ -75,3 +75,5 @@ La frontera IPC/preload es semántica y cerrada: no hay append genérico, filesy
 La auditoría de Factory/Comercial mantuvo sus módulos Context Hub, Hermes, Radar y planner como referencias desconectadas. Se excluyeron de la integración para evitar autoridad paralela, filesystem libre, red o ejecución. Permanecen abiertos consumo real, UI, aprendizaje/vector database, QA visual, deploy y resolución humana de conflictos.
 
 Los adapters 2C-B revalidan los paquetes y entregan handoffs inmutables sólo a consumidores internos inyectados; con registro vacío devuelven `not_connected`. No hay runtime real ni escritura de resultados: 2C-C conserva esa responsabilidad.
+
+2C-C1 añade intento durable y resultado estructurado no ingerido. La persistencia por proyecto es atómica, reconstruible y aislada; no agrega autoridad ni consume referencias URL. Factory/Hermes permanece histórico/pospuesto por sus runners y fronteras de ejecución.

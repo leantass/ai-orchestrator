@@ -133,3 +133,7 @@ La auditoría excluyó Context Hub/Hermes históricos de Factory/Comercial: perm
 ## Escalón 2C-B: adapters de consumo seguro
 
 Los adapters revalidan packageId/checksum, target, purpose, identidad, disposición y usos antes de producir el handoff determinista e inmutable. El registro productivo queda vacío y responde `not_connected`; los consumidores falsos del smoke son inyectados, sin red, procesos ni persistencia. Sus resultados no son autoridad ni evidencia y 2C-C queda responsable de handoff real e ingesta validada.
+
+## Escalón 2C-C1: handoff durable y resultado no ingerido
+
+`ESCALON_2C_C_STATUS=IN_PROGRESS`; `ESCALON_2C_C1_STATUS=COMPLETED`; `ESCALON_2C_C2_STATUS=NOT_STARTED`. Los intentos correlacionan `packageId`, `handoffId`, `attemptId` y `resultId`, con persistencia atómica/reabrible y resultados `untrusted`, `not_authoritative`, `not_ingested`. El registro por defecto sigue desconectado; los consumidores son falsos sólo en smoke. No hay MEMORIA, IPC, UI, red, lifecycle ni agentes reales.
