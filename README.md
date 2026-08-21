@@ -21,6 +21,7 @@ El recorrido comercial predeterminado permite crear proyectos locales, revisar v
 - [Arquitectura canónica](docs/ORQUESTADOR_CANONICAL_ARCHITECTURE.md)
 - [Auditoría maestra](docs/ORQUESTADOR_MASTER_AUDIT.md)
 - [Historial de integración](docs/ORQUESTADOR_INTEGRATION_STATUS.md)
+- [Recuperación y conflictos de MEMORIA](docs/ORQUESTADOR_CONTEXT_RECOVERY_AND_CONFLICTS.md)
 - [Reconciliación de worktrees](docs/ORQUESTADOR_WORKTREE_RECONCILIATION.md)
 - [Índice documental](docs/README.md)
 

@@ -81,3 +81,7 @@ Los adapters 2C-B revalidan los paquetes y entregan handoffs inmutables sólo a 
 ## Cierre 2C-C2
 
 `CHECKS=36/36`. El servicio canonico ingiere solo resultados C1 revalidados como eventos `agent_inference`; la recuperacion parcial es idempotente, A/B queda aislado, la corrupcion se reporta sin contenido crudo y `ENTRY_ID_COLLISION` es permanente. El proximo trabajo es 2D: resolucion humana de conflictos y cierre, no ejecucion automatica.
+
+## Cierre 2D
+
+`CHECKS=54/54`; `ESCALON_2_STATUS=VERIFIED_CLOSED`. Recuperacion, conflictos y salud operan dentro de la autoridad contextual canonica. No reconstruyen fuentes fisicas/canonicas corruptas, no borran historia y no ejecutan lifecycle, agentes, red ni deploy. La retencion es conservadora y la interfaz/autenticacion humana quedan fuera de alcance.

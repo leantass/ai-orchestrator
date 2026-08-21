@@ -22,6 +22,10 @@ Los aliases de generación heredada permanecen sólo para no romper callers y re
 
 `electron/jefe-agent-result-ingestion.cjs` es la autoridad unica de ingesta desde intentos C1 hacia MEMORIA. Revalida resultado e identidad, deriva IDs deterministas y escribe eventos no autoritativos. Retry/reconciliacion son acotados e idempotentes; colisiones incompatibles quedan `ingestion_failed` y no se resuelven. El modulo no tiene lifecycle, IPC, UI, red, runners ni capacidad de ejecutar otro agente.
 
+## Recuperacion y conflictos (Escalón 2D)
+
+`electron/jefe-context-recovery.cjs` diagnostica y recupera solo proyecciones o trabajo compatible mediante planes cerrados. `electron/jefe-context-conflict-resolution.cjs` agrega resoluciones humanas append-only sin sobrescribir entradas ni alterar lifecycle. No hay autenticacion de operador ni UI: la autoridad semantica esta preparada internamente, no verificada end-to-end. `RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`.
+
 ## Preview
 
 La resolución segura está implementada. Un protocolo Electron dedicado no fue registrado en este escalón; por tanto no hay iframe integrado completo, evidencia visual, comparación visual ni aprobación visual automatizada.

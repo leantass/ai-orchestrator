@@ -134,6 +134,10 @@ La auditoría excluyó Context Hub/Hermes históricos de Factory/Comercial: perm
 
 Los adapters revalidan packageId/checksum, target, purpose, identidad, disposición y usos antes de producir el handoff determinista e inmutable. El registro productivo queda vacío y responde `not_connected`; los consumidores falsos del smoke son inyectados, sin red, procesos ni persistencia. Sus resultados no son autoridad ni evidencia y 2C-C queda responsable de handoff real e ingesta validada.
 
+## Cierre 2D: recuperacion, conflictos y retencion
+
+`ESCALON_2D_STATUS=COMPLETED`; `ESCALON_2_STATUS=VERIFIED_CLOSED`; `RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`. El nucleo interno diagnostica sin mutar, prepara planes deterministas, recupera solo derivados o trabajo compatible y conserva fuentes corruptas/bloqueadas. Resoluciones humanas son append-only e internas; autenticacion/UI siguen pendientes. El smoke 2D pasa 54/54.
+
 ## Cierre 2C-C2: ingesta canonica de resultados
 
 `ESCALON_2C_C2_STATUS=COMPLETED`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2_STATUS=IN_PROGRESS`; `NEXT=ESCALON_2D_CONTEXT_RECOVERY_CONFLICTS_AND_CLOSURE`. La ingesta valida correlacion, conserva autoridad no humana, recupera append parcial y pendientes de modo idempotente, aisla proyectos y deja colisiones incompatibles como `ENTRY_ID_COLLISION` permanentes. No hay ejecucion automatica, agentes reales, UI, red, QA visual ni deploy.

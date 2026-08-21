@@ -2,11 +2,11 @@
 
 Fecha de cierre documental: 2026-08-21. Rama: `integration/orquestador-canonical-v1`.
 
-Estado prevalente de cierre: `ESCALON_1_STATUS=VERIFIED_CLOSED`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=COMPLETED`; `ESCALON_2C_C1_STATUS=COMPLETED`; `ESCALON_2C_C2_STATUS=COMPLETED`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2_STATUS=IN_PROGRESS`; `NEXT=ESCALON_2D_CONTEXT_RECOVERY_CONFLICTS_AND_CLOSURE`.
+Estado prevalente de cierre: `ESCALON_1_STATUS=VERIFIED_CLOSED`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2D_STATUS=COMPLETED`; `ESCALON_2_STATUS=VERIFIED_CLOSED`; `RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`.
 
 `ESCALON_1_STATUS=VERIFIED_CLOSED`: se cerraron y verificaron la reconciliación de repositorio y la autoridad canónica, no el producto ni el release.
 
-`ESCALON_2_STATUS=IN_PROGRESS`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=COMPLETED`; `ESCALON_2C_C_STATUS=COMPLETED`; `ESCALON_2C_C1_STATUS=COMPLETED`; `ESCALON_2C_C2_STATUS=COMPLETED`; `ESCALON_2D_STATUS=NOT_STARTED`.
+`ESCALON_2_STATUS=VERIFIED_CLOSED`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=COMPLETED`; `ESCALON_2C_C_STATUS=COMPLETED`; `ESCALON_2C_C1_STATUS=COMPLETED`; `ESCALON_2C_C2_STATUS=COMPLETED`; `ESCALON_2D_STATUS=COMPLETED`.
 
 2B conecta MEMORIA al lifecycle canónico mediante productores posteriores a manifests/ledger, outbox durable, reapertura/reintento, reconciliación idempotente, aislamiento A/B y canales contextuales semánticos. El smoke integrado pasa `CHECKS=42/42` y `CASOS_PASS=1-42`.
 
@@ -24,10 +24,10 @@ Estado prevalente de cierre: `ESCALON_1_STATUS=VERIFIED_CLOSED`; `ESCALON_2A_STA
 
 ## Límites abiertos
 
-Los escalones 2D y 3 a 12 siguen abiertos: UI de MEMORIA, agentes reales, aprendizaje entre proyectos, búsqueda semántica/vectorial, resolución humana de conflictos, compactación/retención, investigación Radar/Hermes/Scout, planner comercial, Codex/executor real, QA y seguridad globales, preview embebido/QA visual, Git/CI/entrega remota, observabilidad y prueba integral.
+Los escalones 3 a 12 siguen abiertos: UI de MEMORIA, autenticación humana end-to-end, agentes reales, aprendizaje entre proyectos, búsqueda semántica/vectorial, investigación Radar/Hermes/Scout, planner comercial, Codex/executor real, QA y seguridad globales, preview embebido/QA visual, Git/CI/entrega remota, observabilidad y prueba integral.
 
 El preview no está demostrado como iframe ni validado visualmente; sólo puede abrirse un recurso local previamente validado. Aprobación local no equivale a validación técnica o visual. No hay deploy, publicación, red ni proyecto comercial real.
 
 ## Deuda y próximo paso
 
-`npm run lint` global continúa FAIL heredado: 306 errores, 0 warnings, 73 archivos bajo `src/factory/hermes-*`. El quality gate global permanece abierto y no se alteraron reglas. El siguiente escalón exacto es **Escalón 2C-C: handoff al runtime e ingesta de resultados**. JEFE no está release-ready; no hay ejecución automática, UI de MEMORIA, QA visual, deploy ni proyecto comercial real.
+`npm run lint` global continúa FAIL heredado: 306 errores, 0 warnings, 73 archivos bajo `src/factory/hermes-*`. El quality gate global permanece abierto y no se alteraron reglas. El roadmap canónico vigente no define todavía un nombre único para el siguiente escalón. JEFE no está release-ready; no hay ejecución automática, UI de MEMORIA, autenticación humana end-to-end, QA visual, deploy ni proyecto comercial real.

@@ -16,7 +16,7 @@ Se rechazan paths externos, traversal, campos sensibles evidentes y metadata/tex
 
 ## Escalón 2B: productores, reconciliación y frontera semántica
 
-`ESCALON_2_STATUS=IN_PROGRESS`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2C_C1_STATUS=COMPLETED`; `ESCALON_2C_C2_STATUS=COMPLETED`; `ESCALON_2D_STATUS=NOT_STARTED`.
+`ESCALON_2_STATUS=VERIFIED_CLOSED`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2C_C1_STATUS=COMPLETED`; `ESCALON_2C_C2_STATUS=COMPLETED`; `ESCALON_2D_STATUS=COMPLETED`; `RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`.
 
 Los manifests por versión y el ledger físico siguen siendo la fuente de verdad. Tras una creación, cambio, aprobación local, restauración, entrega local o fallo relevante, `jefe-context-integration.cjs` deriva entradas técnicas sólo después del resultado físico. La identidad de una versión conserva exactamente `projectId`, `runId` y `versionId`. Restauración crea una versión física nueva; entrega sólo declara preparación local aprobada, nunca deploy, publicación, hosting, URL pública ni CI.
 
@@ -28,8 +28,8 @@ Snapshot, timeline limitado/paginado, preview y comparación son lecturas puras.
 
 El smoke `jefe-context-lifecycle-ipc-smoke.mjs` cubre 42/42 casos de 2B junto con recuperación, colisiones y aislamiento.
 
-Estado prevalente: `ESCALON_2_STATUS=IN_PROGRESS`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=COMPLETED`; `ESCALON_2C_C1_STATUS=COMPLETED`; `ESCALON_2C_C2_STATUS=COMPLETED`; `NEXT=ESCALON_2D_CONTEXT_RECOVERY_CONFLICTS_AND_CLOSURE`.
+Estado prevalente: `ESCALON_2_STATUS=VERIFIED_CLOSED`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2D_STATUS=COMPLETED`; `RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`. El roadmap canónico no define todavía un nombre único para el siguiente escalón.
 
 ## Pendientes
 
-2C completa paquetes, adapters, handoff durable e ingesta canónica de resultados. `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=COMPLETED`; `ESCALON_2C_C1_STATUS=COMPLETED`; `ESCALON_2C_C2_STATUS=COMPLETED`. 2D cubre resolución humana de conflictos, corrección integral y política final de compactación/retención. Siguen fuera de alcance UI de MEMORIA, aprendizaje entre proyectos, búsqueda semántica/vectorial, QA visual, deploy y agentes reales.
+2C completa paquetes, adapters, handoff durable e ingesta canónica de resultados. 2D completa diagnóstico, recuperación compatible, conflictos internos y política de retención conservadora. Siguen fuera de alcance UI de MEMORIA, autenticación humana end-to-end, aprendizaje entre proyectos, búsqueda semántica/vectorial, QA visual, deploy y agentes reales.
