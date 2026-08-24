@@ -42,5 +42,15 @@ try {
   assert.throws(() => validateContextEntry(entry('sensitive', { password: 'forbidden', metadata: { apiKey: 'forbidden' } })), (error) => error.code === 'SENSITIVE_FIELD')
   assert.throws(() => validateContextEntry(entry('too-large', { detail: 'x'.repeat(4001) })), (error) => error.code === 'INVALID_TEXT')
   assert.equal(JSON.stringify(projectContextSnapshot((await memory.readEvents()).entries).history), JSON.stringify((await memory.getSnapshot()).history))
+  const concurrentRoot = path.join(root, 'concurrent-stage'); const fixedNow = Date.now; Date.now = () => 1700000000000
+  try {
+    const left = createContextMemory({ root: concurrentRoot, allowedRoots: [root], clock }); const right = createContextMemory({ root: concurrentRoot, allowedRoots: [root], clock })
+    await Promise.all([left.append(entry('concurrent-left')), right.append(entry('concurrent-right'))])
+    const concurrentSnapshot = await createContextMemory({ root: concurrentRoot, allowedRoots: [root], clock }).getSnapshot()
+    assert.deepEqual(concurrentSnapshot.history.map((item) => item.entryId).sort(), ['concurrent-left', 'concurrent-right'])
+    assert.equal((await fs.promises.readdir(concurrentRoot, { recursive: true })).some((name) => name.endsWith('.stage')), false)
+    assert.equal((await left.append(entry('concurrent-left'))).idempotent, true); assert.equal(left.isLocked(`project:${JSON.stringify({ projectId: 'project-alpha' })}`), false)
+    await right.append(entry('concurrent-third')); assert.equal((await left.getSnapshot()).history.length, 3)
+  } finally { Date.now = fixedNow }
   console.log('PASS jefe-context-hub-smoke: 35 contractual, persistence, projection and safety cases')
 } finally { await fs.promises.rm(root, { recursive: true, force: true }) }
