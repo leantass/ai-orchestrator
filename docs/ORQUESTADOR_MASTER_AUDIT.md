@@ -93,3 +93,7 @@ La auditoría clasificó runtime canónico de MEMORIA/lifecycle como conectado l
 ## Escalón 3A
 
 `CHECKS=40/40`. Intake humano durable y paquetes no conectados son fundación local; no hay descubrimiento externo, proveedor, evidencia verificada ni ejecución.
+
+## Escalón 3B — investigación supervisada
+
+ESCALON_3B_STATUS=COMPLETED; registro no equivale a conexión, receipt no equivale a evidencia y evidencia aceptada no equivale a verdad absoluta. La red sigue deshabilitada y los proveedores reales no están conectados. Las sesiones de investigación son durables, con receipts inmutables, replay, recuperación de evidence_pending y corrupción aislada. El contenido externo permanece no confiable; la defensa SSRF es offline hasta 3C. El fallo C2 anterior no volvió a reproducirse; se corrigió una carrera real de staging de MEMORIA mediante secuencia monotónica local y regresión determinista.

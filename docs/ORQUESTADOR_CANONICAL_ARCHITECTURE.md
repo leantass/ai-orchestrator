@@ -51,3 +51,7 @@ La outbox por proyecto soporta `synced`, `pending` y `failed`, con reapertura y 
 `jefe-context-package-contract.cjs` y `jefe-context-package-builder.cjs` consumen sólo snapshots validados y estado de sincronización. Producen paquetes por agente/propósito allowlisted con identidad física, disposición, presupuesto, omisiones e integridad deterministas. Los adapters 2C-B revalidan y congelan el handoff con política fija; no persisten paquetes, no usan IPC ni crean permisos y su registro productivo responde `not_connected`.
 
 2C-C1 persiste intentos y resultados no ingeridos bajo root inyectado, con correlación determinista y sin exponer paths. `completed_uningested` no escribe MEMORIA ni eleva autoridad; C2 reserva ingesta/reconciliación.
+
+## Escalón 3B — investigación supervisada
+
+ESCALON_3B_STATUS=COMPLETED; registro no equivale a conexión, receipt no equivale a evidencia y evidencia aceptada no equivale a verdad absoluta. La red sigue deshabilitada y los proveedores reales no están conectados. Las sesiones de investigación son durables, con receipts inmutables, replay, recuperación de evidence_pending y corrupción aislada. El contenido externo permanece no confiable; la defensa SSRF es offline hasta 3C. El fallo C2 anterior no volvió a reproducirse; se corrigió una carrera real de staging de MEMORIA mediante secuencia monotónica local y regresión determinista.

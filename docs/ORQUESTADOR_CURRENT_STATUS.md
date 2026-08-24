@@ -35,3 +35,7 @@ El preview no está demostrado como iframe ni validado visualmente; sólo puede 
 ## Deuda y próximo paso
 
 `npm run lint` global continúa FAIL heredado: 306 errores, 0 warnings, 73 archivos bajo `src/factory/hermes-*`. El quality gate global permanece abierto y no se alteraron reglas. El roadmap canónico vigente no define todavía un nombre único para el siguiente escalón. JEFE no está release-ready; no hay ejecución automática, UI de MEMORIA, autenticación humana end-to-end, QA visual, deploy ni proyecto comercial real.
+
+## Escalón 3B — investigación supervisada
+
+ESCALON_3B_STATUS=COMPLETED; registro no equivale a conexión, receipt no equivale a evidencia y evidencia aceptada no equivale a verdad absoluta. La red sigue deshabilitada y los proveedores reales no están conectados. Las sesiones de investigación son durables, con receipts inmutables, replay, recuperación de evidence_pending y corrupción aislada. El contenido externo permanece no confiable; la defensa SSRF es offline hasta 3C. El fallo C2 anterior no volvió a reproducirse; se corrigió una carrera real de staging de MEMORIA mediante secuencia monotónica local y regresión determinista.

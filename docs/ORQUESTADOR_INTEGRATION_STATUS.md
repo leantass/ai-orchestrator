@@ -153,3 +153,7 @@ Los adapters revalidan packageId/checksum, target, purpose, identidad, disposici
 ## Escalón 2C-C1: handoff durable y resultado no ingerido
 
 `ESCALON_2C_C_STATUS=COMPLETED`; `ESCALON_2C_C1_STATUS=COMPLETED`; `ESCALON_2C_C2_STATUS=COMPLETED`. Los intentos correlacionan `packageId`, `handoffId`, `attemptId` y `resultId`, con persistencia atómica/reabrible y resultados `untrusted`, `not_authoritative`, `not_ingested`. La ingesta C2 crea sólo eventos no autoritativos de MEMORIA; no hay IPC, UI, red, lifecycle ni agentes reales.
+
+## Escalón 3B — investigación supervisada
+
+ESCALON_3B_STATUS=COMPLETED; registro no equivale a conexión, receipt no equivale a evidencia y evidencia aceptada no equivale a verdad absoluta. La red sigue deshabilitada y los proveedores reales no están conectados. Las sesiones de investigación son durables, con receipts inmutables, replay, recuperación de evidence_pending y corrupción aislada. El contenido externo permanece no confiable; la defensa SSRF es offline hasta 3C. El fallo C2 anterior no volvió a reproducirse; se corrigió una carrera real de staging de MEMORIA mediante secuencia monotónica local y regresión determinista.
