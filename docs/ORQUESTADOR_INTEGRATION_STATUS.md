@@ -138,6 +138,10 @@ Los adapters revalidan packageId/checksum, target, purpose, identidad, disposici
 
 `ESCALON_2D_STATUS=COMPLETED`; `ESCALON_2_STATUS=VERIFIED_CLOSED`; `RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`. El nucleo interno diagnostica sin mutar, prepara planes deterministas, recupera solo derivados o trabajo compatible y conserva fuentes corruptas/bloqueadas. Resoluciones humanas son append-only e internas; autenticacion/UI siguen pendientes. El smoke 2D pasa 54/54.
 
+## Roadmap posterior
+
+`ESCALON_3_STATUS=NOT_STARTED` hasta que se implemente 3A. La fuente de verdad de Escalones 3-12 es `ORQUESTADOR_CANONICAL_ROADMAP.md`; no hay agentes, proveedores ni herramientas de terceros conectados por este cierre documental.
+
 ## Cierre 2C-C2: ingesta canonica de resultados
 
 `ESCALON_2C_C2_STATUS=COMPLETED`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2_STATUS=IN_PROGRESS`; `NEXT=ESCALON_2D_CONTEXT_RECOVERY_CONFLICTS_AND_CLOSURE`. La ingesta valida correlacion, conserva autoridad no humana, recupera append parcial y pendientes de modo idempotente, aisla proyectos y deja colisiones incompatibles como `ENTRY_ID_COLLISION` permanentes. No hay ejecucion automatica, agentes reales, UI, red, QA visual ni deploy.

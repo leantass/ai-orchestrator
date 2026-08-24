@@ -23,6 +23,7 @@ El recorrido comercial predeterminado permite crear proyectos locales, revisar v
 - [Historial de integración](docs/ORQUESTADOR_INTEGRATION_STATUS.md)
 - [Recuperación y conflictos de MEMORIA](docs/ORQUESTADOR_CONTEXT_RECOVERY_AND_CONFLICTS.md)
 - [Reconciliación de worktrees](docs/ORQUESTADOR_WORKTREE_RECONCILIATION.md)
+- [Roadmap canónico](docs/ORQUESTADOR_CANONICAL_ROADMAP.md)
 - [Índice documental](docs/README.md)
 
 Los documentos `V1_*`, guías de demo y checklist de release son históricos; no prevalecen sobre el estado actual.

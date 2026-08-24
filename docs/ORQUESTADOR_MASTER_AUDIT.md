@@ -85,3 +85,7 @@ Los adapters 2C-B revalidan los paquetes y entregan handoffs inmutables sólo a 
 ## Cierre 2D
 
 `CHECKS=54/54`; `ESCALON_2_STATUS=VERIFIED_CLOSED`. Recuperacion, conflictos y salud operan dentro de la autoridad contextual canonica. No reconstruyen fuentes fisicas/canonicas corruptas, no borran historia y no ejecutan lifecycle, agentes, red ni deploy. La retencion es conservadora y la interfaz/autenticacion humana quedan fuera de alcance.
+
+## Roadmap 3-12
+
+La auditoría clasificó runtime canónico de MEMORIA/lifecycle como conectado local; Factory/Hermes/Radar/Planner como histórico o referencia; Comercial como base parcial de UX. El roadmap canónico fija Escalón 3 para discovery supervisado y prohíbe inferir integraciones reales desde smokes, adapters o documentación.

@@ -26,6 +26,10 @@ Los aliases de generación heredada permanecen sólo para no romper callers y re
 
 `electron/jefe-context-recovery.cjs` diagnostica y recupera solo proyecciones o trabajo compatible mediante planes cerrados. `electron/jefe-context-conflict-resolution.cjs` agrega resoluciones humanas append-only sin sobrescribir entradas ni alterar lifecycle. No hay autenticacion de operador ni UI: la autoridad semantica esta preparada internamente, no verificada end-to-end. `RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`.
 
+## Roadmap posterior
+
+La arquitectura posterior está definida exclusivamente en `ORQUESTADOR_CANONICAL_ROADMAP.md`. Escalón 3 inicia intake supervisado sin proveedores; Planner, ejecución, QA, preview, entrega, observabilidad, centro comercial, integración y governance son escalones dependientes, no capacidades ya conectadas.
+
 ## Preview
 
 La resolución segura está implementada. Un protocolo Electron dedicado no fue registrado en este escalón; por tanto no hay iframe integrado completo, evidencia visual, comparación visual ni aprobación visual automatizada.

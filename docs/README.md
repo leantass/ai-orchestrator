@@ -5,6 +5,7 @@ Prevalencia: [ORQUESTADOR_CURRENT_STATUS.md](ORQUESTADOR_CURRENT_STATUS.md) defi
 - [Estado actual](ORQUESTADOR_CURRENT_STATUS.md)
 - [Ingesta canónica de resultados de agente](ORQUESTADOR_AGENT_RESULT_INGESTION.md)
 - [Recuperación y conflictos de MEMORIA](ORQUESTADOR_CONTEXT_RECOVERY_AND_CONFLICTS.md)
+- [Roadmap canónico](ORQUESTADOR_CANONICAL_ROADMAP.md)
 
 Estado de cierre Escalón 2: `ESCALON_2_STATUS=VERIFIED_CLOSED`, `ESCALON_2D_STATUS=COMPLETED`, `RECOVERY_SMOKE=54/54_PASS`, `RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`. No declara release-ready, agentes reales, autenticación humana end-to-end, UI de conflictos, QA visual, deploy ni red.
 - [Arquitectura canónica](ORQUESTADOR_CANONICAL_ARCHITECTURE.md)
