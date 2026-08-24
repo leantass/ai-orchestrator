@@ -89,3 +89,7 @@ Los adapters 2C-B revalidan los paquetes y entregan handoffs inmutables sólo a 
 ## Roadmap 3-12
 
 La auditoría clasificó runtime canónico de MEMORIA/lifecycle como conectado local; Factory/Hermes/Radar/Planner como histórico o referencia; Comercial como base parcial de UX. El roadmap canónico fija Escalón 3 para discovery supervisado y prohíbe inferir integraciones reales desde smokes, adapters o documentación.
+
+## Escalón 3A
+
+`CHECKS=40/40`. Intake humano durable y paquetes no conectados son fundación local; no hay descubrimiento externo, proveedor, evidencia verificada ni ejecución.

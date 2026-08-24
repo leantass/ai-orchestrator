@@ -43,4 +43,4 @@ Nada está integrado por este documento. Sin evidencia local o verificación ext
 
 MEMORIA, paquetes 2C, handoff/resultados y recuperación 2D son `FUNCTIONAL_CONNECTED` en smokes locales. Lifecycle, persistencia, preview seguro y workspace comercial son fundaciones locales conectadas; preview visual, UI de conflictos, autenticación humana, agentes reales, investigación, Codex, QA global, CI, entrega remota y observabilidad son `ABSENT` o `FOUNDATION_ONLY`. Factory/Hermes/Radar/Planner histórico es `HISTORICAL_WIP`/`REFERENCE_ONLY`; Comercial es `PARTIAL_EXISTING_FOUNDATION` para Escalón 10. Ningún fixture, adapter inyectable o documento acredita proveedor real.
 
-El siguiente bloque canónico es `ESCALON_3A=SUPERVISED_DISCOVERY_AND_INTAKE`: contrato, registro durable, coordinación sin ejecución y smoke local.
+`ESCALON_3_STATUS=IN_PROGRESS`; `ESCALON_3A_STATUS=COMPLETED`. 3A entrega contrato, registro durable, coordinación sin ejecución y smoke local. El siguiente bloque canónico es `ESCALON_3B=SUPERVISED_RESEARCH_PROVIDER_POLICY_AND_EVIDENCE_GATE`: no conecta proveedores hasta disponer de política, evidencia y aprobación explícita.

@@ -30,6 +30,10 @@ Los aliases de generación heredada permanecen sólo para no romper callers y re
 
 La arquitectura posterior está definida exclusivamente en `ORQUESTADOR_CANONICAL_ROADMAP.md`. Escalón 3 inicia intake supervisado sin proveedores; Planner, ejecución, QA, preview, entrega, observabilidad, centro comercial, integración y governance son escalones dependientes, no capacidades ya conectadas.
 
+## Intake supervisado (Escalón 3A)
+
+`jefe-discovery-contract`, `jefe-discovery-persistence` y `jefe-discovery-orchestrator` son la única fundación de intake. Reutilizan MEMORIA y paquetes 2C, mantienen actores no conectados y no crean memoria, handoff ni outbox paralelos.
+
 ## Preview
 
 La resolución segura está implementada. Un protocolo Electron dedicado no fue registrado en este escalón; por tanto no hay iframe integrado completo, evidencia visual, comparación visual ni aprobación visual automatizada.
