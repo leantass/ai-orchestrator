@@ -48,3 +48,13 @@ MEMORIA, paquetes 2C, handoff/resultados y recuperación 2D son `FUNCTIONAL_CONN
 ## Escalón 3B — investigación supervisada
 
 ESCALON_3B_STATUS=COMPLETED; registro no equivale a conexión, receipt no equivale a evidencia y evidencia aceptada no equivale a verdad absoluta. La red sigue deshabilitada y los proveedores reales no están conectados. Las sesiones de investigación son durables, con receipts inmutables, replay, recuperación de evidence_pending y corrupción aislada. El contenido externo permanece no confiable; la defensa SSRF es offline hasta 3C. El fallo C2 anterior no volvió a reproducirse; se corrigió una carrera real de staging de MEMORIA mediante secuencia monotónica local y regresión determinista.
+## Avance canónico a 3C
+
+`ESCALON_3_STATUS=IN_PROGRESS`; `ESCALON_3A_STATUS=COMPLETED`; `ESCALON_3B_STATUS=COMPLETED`; `ESCALON_3C_STATUS=NOT_STARTED`.
+
+`NEXT=ESCALON_3C_SUPERVISED_RESEARCH_CONNECTORS_AND_EXECUTION`.
+
+- `ESCALON_3C_A=SAFE_CONNECTOR_RUNTIME_FOUNDATION`
+- `ESCALON_3C_B=REAL_FREE_OR_SELF_HOSTED_CONNECTORS`
+- `ESCALON_3C_C=SUPERVISED_EXECUTION_AND_EVIDENCE_FLOW`
+- `ESCALON_3C_D=RECOVERY_AND_ESCALON_3_CLOSURE`
