@@ -4,9 +4,9 @@ Fecha de cierre documental: 2026-08-25. Rama: `integration/orquestador-canonical
 
 Estado prevalente de cierre: `ESCALON_1_STATUS=VERIFIED_CLOSED`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2D_STATUS=COMPLETED`; `ESCALON_2_STATUS=VERIFIED_CLOSED`; `RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`.
 
-Estado actual: `STATUS=ESCALON_3_VERIFIED_CLOSED`; `ESCALON_3_STATUS=VERIFIED_CLOSED`; `ESCALON_3A_STATUS=COMPLETED`; `ESCALON_3B_STATUS=COMPLETED`; `ESCALON_3B_R1_STATUS=COMPLETED`; `ESCALON_3C_STATUS=VERIFIED_CLOSED`; `ESCALON_3C_A_STATUS=COMPLETED`; `ESCALON_3C_B_STATUS=COMPLETED`; `ESCALON_3C_C_STATUS=COMPLETED`; `ESCALON_3C_D_STATUS=COMPLETED`. Los escalones 4–9 y 11–12 siguen `NOT_STARTED`; Escalón 10 conserva `PARTIAL_EXISTING_FOUNDATION`. La autoridad es [ORQUESTADOR_CANONICAL_ROADMAP.md](ORQUESTADOR_CANONICAL_ROADMAP.md).
+Estado actual: `STATUS=ESCALON_4A_COMPLETED`; `ESCALON_3_STATUS=VERIFIED_CLOSED`; `ESCALON_3A_STATUS=COMPLETED`; `ESCALON_3B_STATUS=COMPLETED`; `ESCALON_3B_R1_STATUS=COMPLETED`; `ESCALON_3C_STATUS=VERIFIED_CLOSED`; `ESCALON_3C_A_STATUS=COMPLETED`; `ESCALON_3C_B_STATUS=COMPLETED`; `ESCALON_3C_C_STATUS=COMPLETED`; `ESCALON_3C_D_STATUS=COMPLETED`; `ESCALON_4_STATUS=IN_PROGRESS`; `ESCALON_4A_STATUS=COMPLETED`. Los escalones 5–9 y 11–12 siguen `NOT_STARTED`; Escalón 10 conserva `PARTIAL_EXISTING_FOUNDATION`. La autoridad es [ORQUESTADOR_CANONICAL_ROADMAP.md](ORQUESTADOR_CANONICAL_ROADMAP.md).
 
-`NETWORK=DISABLED`; `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`; `PUSH=NO`; `NEXT=ESCALON_4A_PLANNER_AND_EXECUTABLE_CONTRACTS`.
+`NETWORK=DISABLED`; `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`; `PUSH=NO`; `NEXT=ESCALON_4B_PLANNER_PERSISTENCE_AND_ORCHESTRATION`.
 
 Evidencia de cierre: `CORRELATION_SMOKE=PASS`; `SMOKE_3B=84/84_PASS`; `CONNECTOR_RUNTIME_SMOKE=54/54_PASS`; `ESCALON_3C_B_SMOKE=24/24_PASS`; `SUPERVISED_EXECUTION_SMOKE=38/38`; `ESCALON_3C_C_DELIVERY_SMOKE=26/26_PASS`; `ESCALON_3C_D_HEALTH_SMOKE=34/34_PASS`; `SUPERVISED_RECOVERY_SMOKE=67/67`; `C2_REGRESSION=36/36_PASS`.
 
@@ -65,4 +65,10 @@ La matriz cruzada reexpuso una flake C2 entre instancias de MEMORIA sobre el mis
 
 3C-B integra solamente el conector local `structured_analysis`, con input y candidate deterministas y sin red. 3C-C hace durable el flujo de preparación, ejecución explícita y entrega previa al gate de evidencia; el adapter no se repite al reanudar una entrega o sincronización. 3C-D incorpora diagnóstico, plan y recuperación local por root físico, reconstrucción de índices/salud y aislamiento conservador de corrupción. Ningún bloque ejecuta proveedores reales, DNS, fetch, shell, navegador, Electron, proyecto comercial, UI, preview, publicación o deploy.
 
-La evidencia focal es `24/24` para 3C-B, `38/38` y `26/26` para 3C-C, y `34/34` y `67/67` para 3C-D. El siguiente bloque es `ESCALON_4A_PLANNER_AND_EXECUTABLE_CONTRACTS`; no fue iniciado por este cierre.
+La evidencia focal es `24/24` para 3C-B, `38/38` y `26/26` para 3C-C, y `34/34` y `67/67` para 3C-D. Ese cierre dejó como siguiente bloque `ESCALON_4A_PLANNER_AND_EXECUTABLE_CONTRACTS`, iniciado posteriormente bajo la autoridad vigente.
+
+## Escalón 4A — contrato canónico de planner
+
+`ESCALON_4_STATUS=IN_PROGRESS`; `ESCALON_4A_STATUS=COMPLETED`. La solicitud durablemente identificable correlaciona identity, discovery, investigación, caso de evidencia, flujo 3C y paquete de contexto para Planner. El plan local valida alcance, dependencias, riesgos y restricciones con límites y sanitización; no acepta paths, secretos, credenciales ni comandos. El gate es `closed` sólo para evidencia `accepted_for_context` y paquete `ready`; el resto retorna explícitamente a discovery. No existe permiso de ejecución, autoridad humana, IPC, UI, Codex, red, preview o deploy.
+
+`jefe-planner-contract-smoke.mjs` pasa `20/20` casos conductuales reales. El siguiente bloque es 4B; no fue iniciado por 4A.

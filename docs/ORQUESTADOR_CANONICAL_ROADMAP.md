@@ -1,6 +1,6 @@
 # Roadmap canónico de finalización del Orquestador
 
-Esta es la única autoridad posterior a Escalón 2. Estados: `ESCALON_1_STATUS=VERIFIED_CLOSED`, `ESCALON_2_STATUS=VERIFIED_CLOSED`, `ESCALON_3_STATUS=VERIFIED_CLOSED`, `ESCALON_4_STATUS=NOT_STARTED`, `ESCALON_5_STATUS=NOT_STARTED`, `ESCALON_6_STATUS=NOT_STARTED`, `ESCALON_7_STATUS=NOT_STARTED`, `ESCALON_8_STATUS=NOT_STARTED`, `ESCALON_9_STATUS=NOT_STARTED`, `ESCALON_10_STATUS=PARTIAL_EXISTING_FOUNDATION`, `ESCALON_11_STATUS=NOT_STARTED`, `ESCALON_12_STATUS=NOT_STARTED`.
+Esta es la única autoridad posterior a Escalón 2. Estados: `ESCALON_1_STATUS=VERIFIED_CLOSED`, `ESCALON_2_STATUS=VERIFIED_CLOSED`, `ESCALON_3_STATUS=VERIFIED_CLOSED`, `ESCALON_4_STATUS=IN_PROGRESS`, `ESCALON_5_STATUS=NOT_STARTED`, `ESCALON_6_STATUS=NOT_STARTED`, `ESCALON_7_STATUS=NOT_STARTED`, `ESCALON_8_STATUS=NOT_STARTED`, `ESCALON_9_STATUS=NOT_STARTED`, `ESCALON_10_STATUS=PARTIAL_EXISTING_FOUNDATION`, `ESCALON_11_STATUS=NOT_STARTED`, `ESCALON_12_STATUS=NOT_STARTED`.
 
 ## Flujo y retorno
 
@@ -85,3 +85,13 @@ Los smokes `jefe-research-connector-health-rebuild-smoke.mjs` y `jefe-supervised
 UI, autenticación humana end-to-end, QA visual y deploy permanecen pendientes. JEFE no está release-ready. La deuda Hermes heredada continúa intacta: 306 errores, 0 warnings y 73 archivos afectados. `PUSH=NO`.
 
 `NEXT=ESCALON_4A_PLANNER_AND_EXECUTABLE_CONTRACTS`.
+
+## Escalón 4A — contrato canónico de planner
+
+`ESCALON_4_STATUS=IN_PROGRESS`; `ESCALON_4A_STATUS=COMPLETED`; `ESCALON_4B_STATUS=NOT_STARTED`; `ESCALON_4C_STATUS=NOT_STARTED`; `ESCALON_4D_STATUS=NOT_STARTED`.
+
+`jefe-planner-contract.cjs` es la autoridad de la solicitud y del plan local. Correlaciona identidad física, intake, plan de investigación, caso de evidencia, flujo supervisado y paquete de contexto específico de Planner. El contrato normaliza alcance, dependencias, riesgos y restricciones sin paths, secretos, credenciales ni comandos; produce pasos deterministas de planificación y un gate explícito. Sólo evidencia `accepted_for_context` con paquete `ready` cierra el contrato para el gate siguiente; toda evidencia insuficiente, humana pendiente o paquete restringido vuelve a discovery. Ningún plan habilita ejecución: `executionPermitted=false` hasta el Escalón 5.
+
+El smoke `jefe-planner-contract-smoke.mjs` pasa `20/20` casos conductuales locales sobre determinismo, correlación, límites, sanitización, gate, inmutabilidad y matriz negativa. No hay UI, IPC, red, proveedores, navegador, Electron, Codex, ejecución, aprobación humana, proyecto comercial, preview, publicación o deploy.
+
+`NEXT=ESCALON_4B_PLANNER_PERSISTENCE_AND_ORCHESTRATION`.
