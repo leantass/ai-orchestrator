@@ -69,7 +69,7 @@ La evidencia focal es `24/24` para 3C-B, `38/38` y `26/26` para 3C-C, y `34/34` 
 
 ## Escalón 4A — contrato canónico de planner
 
-`ESCALON_4_STATUS=IN_PROGRESS`; `ESCALON_4A_STATUS=COMPLETED`. La solicitud durablemente identificable correlaciona identity, discovery, investigación, caso de evidencia, flujo 3C y paquete de contexto para Planner. El plan local valida alcance, dependencias, riesgos y restricciones con límites y sanitización; no acepta paths, secretos, credenciales ni comandos. El gate es `closed` sólo para evidencia `accepted_for_context` y paquete `ready`; el resto retorna explícitamente a discovery. No existe permiso de ejecución, autoridad humana, IPC, UI, Codex, red, preview o deploy.
+`ESCALON_4A_STATUS=COMPLETED`. La solicitud durablemente identificable correlaciona identity, discovery, investigación, caso de evidencia, flujo 3C y paquete de contexto para Planner. El plan local valida alcance, dependencias, riesgos y restricciones con límites y sanitización; no acepta paths, secretos, credenciales ni comandos. El gate es `closed` sólo para evidencia `accepted_for_context` y paquete `ready`; el resto retorna explícitamente a discovery. No existe permiso de ejecución, autoridad humana, IPC, UI, Codex, red, preview o deploy.
 
 `jefe-planner-contract-smoke.mjs` pasa `20/20` casos conductuales reales. 4B fue iniciado posteriormente desde este contrato cerrado.
 

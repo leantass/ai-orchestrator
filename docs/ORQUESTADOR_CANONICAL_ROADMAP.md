@@ -84,7 +84,7 @@ Los smokes `jefe-research-connector-health-rebuild-smoke.mjs` y `jefe-supervised
 
 UI, autenticación humana end-to-end, QA visual y deploy permanecen pendientes. JEFE no está release-ready. La deuda Hermes heredada continúa intacta: 306 errores, 0 warnings y 73 archivos afectados. `PUSH=NO`.
 
-`NEXT=ESCALON_4A_PLANNER_AND_EXECUTABLE_CONTRACTS`.
+Al cierre del Escalón 3, el siguiente bloque era `ESCALON_4A_PLANNER_AND_EXECUTABLE_CONTRACTS`; quedó completado posteriormente.
 
 ## Escalón 4A — contrato canónico de planner
 
@@ -94,7 +94,7 @@ UI, autenticación humana end-to-end, QA visual y deploy permanecen pendientes. 
 
 El smoke `jefe-planner-contract-smoke.mjs` pasa `20/20` casos conductuales locales sobre determinismo, correlación, límites, sanitización, gate, inmutabilidad y matriz negativa. No hay UI, IPC, red, proveedores, navegador, Electron, Codex, ejecución, aprobación humana, proyecto comercial, preview, publicación o deploy.
 
-`NEXT=ESCALON_4B_PLANNER_PERSISTENCE_AND_ORCHESTRATION`.
+4B continuó posteriormente desde este contrato cerrado.
 
 ## Escalón 4B — persistencia y orquestación de Planner
 
@@ -102,13 +102,13 @@ El smoke `jefe-planner-contract-smoke.mjs` pasa `20/20` casos conductuales local
 
 `jefe-planner-orchestrator.cjs` consume exclusivamente puertos de lectura de discovery, casos de evidencia y flujos 3C, más un paquete 2C validado para el agente Planner. Revalida identidad y correlación completa antes de crear los registros. Fuente ausente, identidad cruzada o referencias incongruentes rechazan la preparación; evidencia insuficiente genera el retorno explícito a discovery. No hay adapter, shell, red, IPC, Codex ni ejecución de plan.
 
-El smoke `jefe-planner-persistence-smoke.mjs` pasa `20/20` casos conductuales locales de persistencia, reapertura, concurrencia, corrupción, rollback atómico, aislamiento y seguridad de fuentes. `NEXT=ESCALON_4C_PLANNER_EVIDENCE_AND_CONTRACT_GATE`.
+El smoke `jefe-planner-persistence-smoke.mjs` pasa `20/20` casos conductuales locales de persistencia, reapertura, concurrencia, corrupción, rollback atómico, aislamiento y seguridad de fuentes. 4C continuó posteriormente desde esta persistencia.
 
 ## Escalón 4C — evidencia y gate de contrato
 
 `ESCALON_4C_STATUS=COMPLETED`. `jefe-planner-gate.cjs` deriva y persiste un gate inmutable de cada revisión de plan. Si el contrato está cerrado, el resultado queda preparado sólo para el gate del Escalón 5; si no, retorna a discovery. En ambos casos el permiso de ejecución es explícitamente `not_available_until_escalon_5`: el módulo no registra aprobación humana, no inicia Codex y no autoriza ninguna operación externa.
 
-El gate es atómico, reabrible, idempotente, aislado por proyecto y con índice reconstruible; su read model no muta. El smoke `jefe-planner-gate-smoke.mjs` pasa `16/16` casos conductuales locales. `NEXT=ESCALON_4D_PLANNER_RECOVERY_AND_DOCUMENTATION`.
+El gate es atómico, reabrible, idempotente, aislado por proyecto y con índice reconstruible; su read model no muta. El smoke `jefe-planner-gate-smoke.mjs` pasa `16/16` casos conductuales locales. 4D continuó posteriormente desde este gate.
 
 ## Escalón 4D — recuperación y cierre de Planner
 
