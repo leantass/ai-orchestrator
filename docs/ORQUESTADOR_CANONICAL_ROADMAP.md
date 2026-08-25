@@ -1,6 +1,6 @@
 # Roadmap canónico de finalización del Orquestador
 
-Esta es la única autoridad posterior a Escalón 2. Estados: `ESCALON_1_STATUS=VERIFIED_CLOSED`, `ESCALON_2_STATUS=VERIFIED_CLOSED`, `ESCALON_3_STATUS=IN_PROGRESS`, `ESCALON_4_STATUS=NOT_STARTED`, `ESCALON_5_STATUS=NOT_STARTED`, `ESCALON_6_STATUS=NOT_STARTED`, `ESCALON_7_STATUS=NOT_STARTED`, `ESCALON_8_STATUS=NOT_STARTED`, `ESCALON_9_STATUS=NOT_STARTED`, `ESCALON_10_STATUS=PARTIAL_EXISTING_FOUNDATION`, `ESCALON_11_STATUS=NOT_STARTED`, `ESCALON_12_STATUS=NOT_STARTED`.
+Esta es la única autoridad posterior a Escalón 2. Estados: `ESCALON_1_STATUS=VERIFIED_CLOSED`, `ESCALON_2_STATUS=VERIFIED_CLOSED`, `ESCALON_3_STATUS=VERIFIED_CLOSED`, `ESCALON_4_STATUS=NOT_STARTED`, `ESCALON_5_STATUS=NOT_STARTED`, `ESCALON_6_STATUS=NOT_STARTED`, `ESCALON_7_STATUS=NOT_STARTED`, `ESCALON_8_STATUS=NOT_STARTED`, `ESCALON_9_STATUS=NOT_STARTED`, `ESCALON_10_STATUS=PARTIAL_EXISTING_FOUNDATION`, `ESCALON_11_STATUS=NOT_STARTED`, `ESCALON_12_STATUS=NOT_STARTED`.
 
 ## Flujo y retorno
 
@@ -41,9 +41,9 @@ Nada está integrado por este documento. Sin evidencia local o verificación ext
 
 ## Inventario honesto
 
-MEMORIA, paquetes 2C, handoff/resultados y recuperación 2D son `FUNCTIONAL_CONNECTED` en smokes locales. Lifecycle, persistencia, preview seguro y workspace comercial son fundaciones locales conectadas. El intake 3A, el gate 3B reparado por R1 y la fundación de runtime 3C-A son locales y supervisados; no acreditan investigación remota. Preview visual, UI de conflictos, autenticación humana end-to-end, agentes y proveedores reales, Codex, QA global, CI, entrega remota y observabilidad son `ABSENT` o `FOUNDATION_ONLY`. Factory/Hermes/Radar/Planner histórico es `HISTORICAL_WIP`/`REFERENCE_ONLY`; Comercial es `PARTIAL_EXISTING_FOUNDATION` para Escalón 10. Ningún fixture, adapter inyectable, smoke o documento acredita proveedor real.
+MEMORIA, paquetes 2C, handoff/resultados y recuperación 2D son `FUNCTIONAL_CONNECTED` en smokes locales. Lifecycle, persistencia, preview seguro y workspace comercial son fundaciones locales conectadas. El intake 3A, el gate 3B reparado por R1 y el flujo local supervisado 3C-A a 3C-D son locales; no acreditan investigación remota. Preview visual, UI de conflictos, autenticación humana end-to-end, agentes y proveedores reales, Codex, QA global, CI, entrega remota y observabilidad son `ABSENT` o `FOUNDATION_ONLY`. Factory/Hermes/Radar/Planner histórico es `HISTORICAL_WIP`/`REFERENCE_ONLY`; Comercial es `PARTIAL_EXISTING_FOUNDATION` para Escalón 10. Ningún fixture, adapter inyectable, smoke o documento acredita proveedor real.
 
-`ESCALON_3_STATUS=IN_PROGRESS`; `ESCALON_3A_STATUS=COMPLETED`; `ESCALON_3B_STATUS=COMPLETED`; `ESCALON_3B_R1_STATUS=COMPLETED`; `ESCALON_3C_STATUS=IN_PROGRESS`; `ESCALON_3C_A_STATUS=COMPLETED`.
+`ESCALON_3_STATUS=VERIFIED_CLOSED`; `ESCALON_3A_STATUS=COMPLETED`; `ESCALON_3B_STATUS=COMPLETED`; `ESCALON_3B_R1_STATUS=COMPLETED`; `ESCALON_3C_STATUS=VERIFIED_CLOSED`; `ESCALON_3C_A_STATUS=COMPLETED`; `ESCALON_3C_B_STATUS=COMPLETED`; `ESCALON_3C_C_STATUS=COMPLETED`; `ESCALON_3C_D_STATUS=COMPLETED`.
 
 ## Escalón 3B — investigación supervisada
 
@@ -55,15 +55,33 @@ MEMORIA, paquetes 2C, handoff/resultados y recuperación 2D son `FUNCTIONAL_CONN
 
 ## Escalón 3C-A — fundación segura de runtime de conectores
 
-`STATUS=ESCALON_3C_A_COMPLETED`; `ESCALON_3_STATUS=IN_PROGRESS`; `ESCALON_3C_STATUS=IN_PROGRESS`; `ESCALON_3C_A_STATUS=COMPLETED`. El runtime prepara intentos durables, reserva presupuesto desde política confiable, limita concurrencia, aplica timeout de adapter/cancelación linealizada, retry con lineage, circuit breaker persistido y reconciliación acotada. El candidato validado sólo entra a 3B mediante `receiveContribution`; el runtime no decide corroboración, aceptación, autoridad ni escritura a MEMORIA. Coordinación y locks son locales al proceso; 3C-A no acredita ejecución distribuida.
+`STATUS=ESCALON_3C_A_COMPLETED`; `ESCALON_3C_A_STATUS=COMPLETED`. El runtime prepara intentos durables, reserva presupuesto desde política confiable, limita concurrencia, aplica timeout de adapter/cancelación linealizada, retry con lineage, circuit breaker persistido y reconciliación acotada. El candidato validado sólo entra a 3B mediante `receiveContribution`; el runtime no decide corroboración, aceptación, autoridad ni escritura a MEMORIA. Coordinación y locks son locales al proceso; 3C-A no acredita ejecución distribuida.
 
-El smoke `jefe-research-connector-runtime-smoke.mjs` acredita `SMOKE_STRUCTURE=52/52`, `BEHAVIORAL_CASES_COMPLETE=52/52`, `BEHAVIORAL_CASES_REAL=1-52` y `CONNECTOR_RUNTIME_SMOKE=52/52_PASS_X5`. `NETWORK=DISABLED`; `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`. `manual_reference` es una referencia local inerte y los adapters inyectados son fixtures de smoke, no evidencia externa. No hubo DNS, fetch, shell, navegador, Electron, provider real, generación, preview, publicación ni deploy.
+El cierre original de 3C-A acreditó `52/52` casos en cinco ejecuciones. La regresión actual de `jefe-research-connector-runtime-smoke.mjs` pasa `SMOKE_STRUCTURE=54/54`, `BEHAVIORAL_CASES_COMPLETE=54/54`, `BEHAVIORAL_CASES_REAL=1-54` y `CONNECTOR_RUNTIME_SMOKE=54/54_PASS`. `NETWORK=DISABLED`; `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`. `manual_reference` es una referencia local inerte y los adapters inyectados son fixtures de smoke, no evidencia externa. No hubo DNS, fetch, shell, navegador, Electron, provider real, generación, preview, publicación ni deploy.
 
 - `ESCALON_3C_A=SAFE_CONNECTOR_RUNTIME_FOUNDATION` — `COMPLETED`
-- `ESCALON_3C_B=REAL_FREE_OR_SELF_HOSTED_CONNECTORS` — `NOT_STARTED`
-- `ESCALON_3C_C=SUPERVISED_EXECUTION_AND_EVIDENCE_FLOW` — `NOT_STARTED`
-- `ESCALON_3C_D=RECOVERY_AND_ESCALON_3_CLOSURE` — `NOT_STARTED`
+- `ESCALON_3C_B=DETERMINISTIC_LOCAL_STRUCTURED_ANALYSIS_CONNECTOR` — `COMPLETED`
+- `ESCALON_3C_C=SUPERVISED_EXECUTION_AND_EVIDENCE_FLOW` — `COMPLETED`
+- `ESCALON_3C_D=RECOVERY_AND_ESCALON_3_CLOSURE` — `COMPLETED`
+
+## Escalón 3C-B — conector local de análisis estructurado
+
+`STATUS=ESCALON_3C_B_COMPLETED`. El único conector ejecutable incorporado es `structured_analysis`, una transformación local, determinista y sin red de un paquete de contexto autorizado. Su catálogo separa los siete tipos registrados, el conector productivo, `manual_reference` inerte y fixtures inyectadas. El runtime vuelve a validar descriptor, input, hash, presupuesto y recibo antes de que una contribución pueda entrar en 3B; ningún resultado se declara proveedor externo ni evidencia comercial.
+
+El smoke `jefe-research-structured-analysis-connector-smoke.mjs` pasa `24/24` casos conductuales reales. `NETWORK=DISABLED`; no hubo DNS, fetch, shell, navegador, Electron, proveedor real, proyecto comercial, preview, publicación ni deploy.
+
+## Escalón 3C-C — ejecución supervisada y entrega de evidencia
+
+`STATUS=ESCALON_3C_C_COMPLETED`. El flujo durable correlaciona intake, paquetes por rol, plan, caso de evidencia, requests, intentos y entregas. La ejecución es explícita: prepara sin ejecutar, usa sólo el conector local autorizado, persiste una entrega cerrada antes de `receiveContribution` y reanuda delivery o sincronización sin repetir el adapter. Los terminales, replay, concurrencia, cancelación, fallo parcial y aislamiento A/B se conservan sin fabricar receipts, autoridad humana ni append adicional a MEMORIA.
+
+Los smokes `jefe-supervised-research-execution-smoke.mjs` y `jefe-research-connector-delivery-smoke.mjs` pasan respectivamente `38/38` y `26/26` casos conductuales reales. No hay agentes, proveedores reales, red, UI, autenticación humana end-to-end ni ejecución distribuida.
+
+## Escalón 3C-D — recuperación y cierre del Escalón 3
+
+`STATUS=ESCALON_3C_D_COMPLETED`; `ESCALON_3_STATUS=VERIFIED_CLOSED`; `RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`. La recuperación es local, explícita y por plan: toma snapshots estables, diagnostica sin mutar, produce un plan determinista ligado a sus revisiones y ejecuta sólo operaciones allowlisted con locks por root físico. Puede reconstruir índices derivados y salud de conectores, reconciliar estado durable compatible y sincronizar un append pendiente de MEMORIA; no ejecuta adapters, red ni reintentos de provider. La corrupción se preserva y aísla, las fronteras de entrega/preparación/humana permanecen explícitas, y cada fallo vuelve al checkpoint durable correspondiente.
+
+Los smokes `jefe-research-connector-health-rebuild-smoke.mjs` y `jefe-supervised-research-recovery-smoke.mjs` pasan respectivamente `34/34` y `67/67` casos conductuales reales. Esto cierra el flujo local supervisado del Escalón 3, no acredita investigación remota, proveedores reales, autenticación humana, UI, QA visual, proyecto comercial, CI, publicación o deploy.
 
 UI, autenticación humana end-to-end, QA visual y deploy permanecen pendientes. JEFE no está release-ready. La deuda Hermes heredada continúa intacta: 306 errores, 0 warnings y 73 archivos afectados. `PUSH=NO`.
 
-`NEXT=ESCALON_3C_SUPERVISED_RESEARCH_CONNECTORS_AND_EXECUTION`.
+`NEXT=ESCALON_4A_PLANNER_AND_EXECUTABLE_CONTRACTS`.

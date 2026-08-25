@@ -1,8 +1,8 @@
-const path = require('path')
+const { physicalRootKey } = require('./jefe-physical-root.cjs')
 
 const scopes = new Map()
 const deferred = () => { let resolve; const promise = new Promise((done) => { resolve = done }); return { promise, resolve } }
-const keyFor = (root, connectorId) => `${path.resolve(root)}:${connectorId}`
+const keyFor = (root, connectorId) => `${physicalRootKey(root)}:${connectorId}`
 
 function getScope(root, connectorId, maxConcurrency) {
   const key = keyFor(root, connectorId)

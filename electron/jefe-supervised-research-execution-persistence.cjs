@@ -1,5 +1,6 @@
 const fs = require('fs')
 const path = require('path')
+const { physicalRootKey, resolvePhysicalRoot } = require('./jefe-physical-root.cjs')
 const { canonical } = require('./jefe-context-package-contract.cjs')
 const {
   FLOW_ID,
@@ -9,7 +10,7 @@ const {
   transitionExecutionFlow,
 } = require('./jefe-supervised-research-execution-contract.cjs')
 
-const PROJECT_ID = /^[a-z][a-z0-9_-]{2,80}$/u
+const PROJECT_ID = /^[a-z][a-z0-9-]{2,80}$/u
 const locks = new Map()
 let stageSequence = 0
 
@@ -37,11 +38,6 @@ function deepFreeze(value) {
 
 function plainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value) && [Object.prototype, null].includes(Object.getPrototypeOf(value))
-}
-
-function normalizedRoot(value) {
-  const resolved = path.resolve(value)
-  return process.platform === 'win32' ? resolved.toLocaleLowerCase('en-US') : resolved
 }
 
 function locked(key, work) {
@@ -73,8 +69,8 @@ function validateProjectId(value) {
 
 function createSupervisedResearchExecutionPersistence({ root } = {}) {
   if (typeof root !== 'string' || !path.isAbsolute(root)) fail('INVALID_ROOT', 'Root de ejecucion invalido.')
-  const authorityRoot = path.resolve(root)
-  const rootLockKey = normalizedRoot(authorityRoot)
+  const authorityRoot = resolvePhysicalRoot(root)
+  const rootLockKey = physicalRootKey(authorityRoot)
   const flowFile = (executionFlowId) => path.join(authorityRoot, `${executionFlowId}.json`)
   const indexFile = path.join(authorityRoot, 'research-execution-index.json')
   const isFlowFile = (name) => /^research-execution-[a-f0-9]{32}\.json$/u.test(name)

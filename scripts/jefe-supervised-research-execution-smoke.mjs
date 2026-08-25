@@ -74,6 +74,8 @@ const names = [
   'reconcile recupera y proyecta human sin ejecutar adapter',
   'crash post receipt reanuda delivery sin repetir provider',
   'matriz negativa no usa red shell browser ni autoridad humana falsa',
+  'batch targeted rechaza preparacion y prepareFlow la reanuda',
+  'snapshot stale aborta y write fallido no bloquea candidato posterior',
 ]
 const checks = new Map()
 let clockTick = 0
@@ -326,6 +328,7 @@ checks.set(2, async () => {
   assert.deepEqual(record.identity, identity('identity'))
   assert.equal(Object.isFrozen(record.identity), true)
   throwsCode(() => validateExecutionFlow({ ...record, identity: { projectId: record.identity.projectId, runId: record.identity.runId } }), 'INVALID_EXECUTION_IDENTITY')
+  throwsCode(() => createExecutionFlow({ identity: { ...record.identity, projectId: 'project_bad' }, intakeId: record.intakeId, routingFingerprint: routeHash }, clock()), 'INVALID_EXECUTION_IDENTITY')
   throwsCode(() => transitionExecutionFlow(record, 'prepare_research', { identity: identity('forged') }, clock()), 'INVALID_EXECUTION_TRANSITION')
 })
 
@@ -400,6 +403,11 @@ checks.set(11, async () => {
   const next = await store.compareAndSet(record.executionFlowId, spec)
   assert.equal(next.record.revision, 1)
   await rejectsCode(() => store.compareAndSet(record.executionFlowId, spec), 'STALE_EXECUTION_FLOW')
+  const beforeRegression = await fs.promises.readFile(path.join(store.authorityRoot, `${record.executionFlowId}.json`), 'utf8')
+  const regressedAt = new Date(Date.parse(next.record.updatedAt) - 1).toISOString()
+  await rejectsCode(() => store.compareAndSet(record.executionFlowId, { expectedStates: ['prepare_research'], expectedRevision: 1, nextState: 'blocked', patch: { pendingOperations: [], lastErrorCode: 'CANCELLED' }, updatedAt: regressedAt }), 'INVALID_EXECUTION_TIMESTAMP')
+  assert.equal(await fs.promises.readFile(path.join(store.authorityRoot, `${record.executionFlowId}.json`), 'utf8'), beforeRegression)
+  assert.equal((await store.read(record.executionFlowId)).revision, 1)
 })
 
 checks.set(12, async () => {
@@ -642,7 +650,7 @@ checks.set(34, async () => {
   const flow = await interrupted.execution.prepareFlow({ intakeId: interruptedEnvironment.intake.intakeId })
   const flowRecord = await interrupted.flowPersistence.read(flow.executionFlowId)
   const attempt = await interrupted.connectorPersistence.read(flowRecord.attemptRefs.at(-1).connectorAttemptId)
-  await interrupted.connectorPersistence.transitionAttempt(attempt.connectorAttemptId, { expectedStates: ['prepared'], expectedRevision: attempt.revision, nextState: 'running', patch: { updatedAt: clock() } })
+  await interrupted.connectorPersistence.claimExecution(attempt.connectorAttemptId, { expectedRevision: attempt.revision, now: clock(), maxTransientFailures: Number.MAX_SAFE_INTEGER, circuitCooldownMs: 60000 })
   await interrupted.flowPersistence.compareAndSet(flow.executionFlowId, { expectedStates: ['ready_for_execution'], expectedRevision: flowRecord.revision, nextState: 'explicit_execution', patch: { pendingOperations: ['explicit_execution'], lastErrorCode: null }, updatedAt: clock() })
   const reconciled = await interrupted.execution.reconcileFlows({ projectId: interruptedEnvironment.physicalIdentity.projectId, limit: 10 })
   assert.equal(reconciled.adaptersExecuted, 0)
@@ -660,6 +668,120 @@ checks.set(34, async () => {
   const humanResult = await projected.reconcileFlows({ projectId: humanEnvironment.physicalIdentity.projectId, limit: 10 })
   assert.equal(humanResult.items[0].state, 'requires_human')
   assert.equal(humanEnvironment.counters.adapters, 0)
+
+  const boundaryEnvironment = await createEnvironment('reconcile-boundary-batch')
+  const boundaryPersistence = createSupervisedResearchExecutionPersistence({ root: boundaryEnvironment.flowRoot })
+  const persistBatchRecord = async (seed, finalState) => {
+    const requests = researchRefs(seed)
+    let record = (await boundaryPersistence.create(createExecutionFlow({ identity: boundaryEnvironment.physicalIdentity, intakeId: intakeId(seed), routingFingerprint: routeHash }, clock()))).record
+    const advance = async (nextState, patch) => {
+      record = (await boundaryPersistence.compareAndSet(record.executionFlowId, {
+        expectedStates: [record.state],
+        expectedRevision: record.revision,
+        nextState,
+        patch,
+        updatedAt: clock(),
+      })).record
+    }
+    await advance('prepare_research', { packageRefs: packageRefs(seed), pendingOperations: ['prepare_research'] })
+    await advance('prepare_attempts', {
+      researchPlanId: durableId('research-plan', seed),
+      evidenceCaseId: durableId('evidence-case', seed),
+      requestRefs: requests,
+      pendingOperations: ['prepare_attempts'],
+    })
+    await advance('ready_for_execution', { attemptRefs: [attemptRef(requests, seed)], pendingOperations: [] })
+    await advance('explicit_execution', { pendingOperations: ['explicit_execution'], lastErrorCode: null })
+    await advance(finalState, finalState === 'resume_delivery'
+      ? { pendingOperations: ['resume_delivery'], lastErrorCode: 'DELIVERY_PENDING' }
+      : { pendingOperations: ['sync_state'], lastErrorCode: null })
+    return record
+  }
+  const deliveryBoundaries = await Promise.all(Array.from({ length: 51 }, (_, index) => persistBatchRecord(`reconcile-boundary-${String(index + 1).padStart(3, '0')}`, 'resume_delivery')))
+  const syncRecord = await persistBatchRecord('reconcile-boundary-sync', 'sync_state')
+
+  const deliveryStatuses = new Map(deliveryBoundaries.map((record) => [record.attemptRefs.at(-1).connectorAttemptId, { state: 'prepared', deliveryState: 'pending' }]))
+  let adapterExecutions = 0
+  let attemptStatusReads = 0
+  let connectorReconciles = 0
+  const boundaryRuntime = {
+    async prepareConnectorAttempt() { throw new Error('prepare no permitido en reconcile') },
+    async executePreparedAttempt() { adapterExecutions += 1; throw new Error('adapter no permitido en reconcile') },
+    async cancelAttempt() { throw new Error('cancel no permitido en reconcile') },
+    async retryAttempt() { throw new Error('retry no permitido en reconcile') },
+    async reconcileAttempts() { connectorReconciles += 1; return { items: [], remaining: 0 } },
+    async getAttemptStatus(connectorAttemptId) {
+      attemptStatusReads += 1
+      return deliveryStatuses.get(connectorAttemptId) || null
+    },
+    async withExactAttemptSnapshots(projectId, snapshots, work) {
+      assert.equal(projectId, boundaryEnvironment.physicalIdentity.projectId)
+      return work(snapshots.map((snapshot) => ({ connectorAttemptId: snapshot.connectorAttemptId, status: null })))
+    },
+    getConnectorHealth() { return { connectorId: 'structured-analysis-local', state: 'ready', networkEnabled: false } },
+  }
+  let syncRetries = 0
+  const boundaryResearch = {
+    async plan() { throw new Error('plan no permitido en reconcile') },
+    getContributionContext() { throw new Error('contexto no permitido en reconcile') },
+    async reopenEvidenceCase() { throw new Error('reopen no esperado en reconcile') },
+    async retryEvidenceCase(evidenceCaseId) {
+      syncRetries += 1
+      assert.equal(evidenceCaseId, syncRecord.evidenceCaseId)
+      return {
+        researchPlanId: syncRecord.researchPlanId,
+        evidenceCaseId,
+        identity: structuredClone(boundaryEnvironment.physicalIdentity),
+        projectId: boundaryEnvironment.physicalIdentity.projectId,
+        state: 'requires_human',
+      }
+    },
+    async withExactEvidenceCaseSnapshots(projectId, snapshots, work) {
+      assert.equal(projectId, boundaryEnvironment.physicalIdentity.projectId)
+      return work(snapshots.map((snapshot) => ({ evidenceCaseId: snapshot.evidenceCaseId, view: null })))
+    },
+  }
+  const boundaryExecution = createSupervisedResearchExecution({
+    persistence: boundaryPersistence,
+    discovery: boundaryEnvironment.discovery,
+    research: boundaryResearch,
+    connectorRuntime: boundaryRuntime,
+    trustedRouting: routeInput,
+    clock,
+  })
+  const empty = await boundaryExecution.reconcileFlows({ projectId: boundaryEnvironment.physicalIdentity.projectId, limit: 50, candidates: [] })
+  assert.deepEqual(empty.items, [])
+  assert.equal(empty.remaining, 0)
+  assert.equal(attemptStatusReads, 0)
+  assert.equal(connectorReconciles, 0)
+  const syncCandidate = {
+    executionFlowId: syncRecord.executionFlowId,
+    revision: syncRecord.revision,
+    state: syncRecord.state,
+    fingerprint: crypto.createHash('sha256').update(canonical(syncRecord)).digest('hex'),
+    evidenceCaseSnapshot: { evidenceCaseId: syncRecord.evidenceCaseId, revision: 0, state: 'requires_human', fingerprint: 'a'.repeat(64) },
+    connectorAttemptSnapshot: { connectorAttemptId: syncRecord.attemptRefs.at(-1).connectorAttemptId, revision: 0, state: 'succeeded', deliveryId: null, deliveryState: null, fingerprint: 'b'.repeat(64) },
+  }
+  await rejectsCode(() => boundaryExecution.reconcileFlows({ projectId: boundaryEnvironment.physicalIdentity.projectId, limit: 50, candidates: [{ ...syncCandidate, revision: syncCandidate.revision + 1 }] }), 'STALE_RECONCILE_CANDIDATE')
+  assert.equal(syncRetries, 0)
+  const bounded = await boundaryExecution.reconcileFlows({ projectId: boundaryEnvironment.physicalIdentity.projectId, limit: 50 })
+  assert.deepEqual(bounded.items.map((item) => item.executionFlowId), [syncRecord.executionFlowId])
+  assert.equal(bounded.items[0].state, 'requires_human')
+  assert.equal(bounded.remaining, 0)
+  assert.equal(bounded.adaptersExecuted, 0)
+  assert.equal(syncRetries, 1)
+  assert.equal(connectorReconciles, 1)
+  assert.equal(attemptStatusReads, deliveryBoundaries.length)
+  assert.equal(adapterExecutions, 0)
+  assert.equal(boundaryEnvironment.counters.adapters, 0)
+  const preservedBoundaries = await Promise.all(deliveryBoundaries.map((record) => boundaryPersistence.read(record.executionFlowId)))
+  assert.equal(preservedBoundaries.every((record) => record.state === 'resume_delivery' && record.pendingOperations[0] === 'resume_delivery'), true)
+  const replay = await boundaryExecution.reconcileFlows({ projectId: boundaryEnvironment.physicalIdentity.projectId, limit: 50 })
+  assert.deepEqual(replay.items, [])
+  assert.equal(replay.remaining, 0)
+  assert.equal(replay.adaptersExecuted, 0)
+  assert.equal(syncRetries, 1)
+  assert.equal(adapterExecutions, 0)
 })
 
 checks.set(35, async () => {
@@ -737,9 +859,247 @@ checks.set(36, async () => {
   }
 })
 
+checks.set(37, async () => {
+  const environment = await createEnvironment('targeted-mixed-locks')
+  const services = createServices(environment)
+  const prepared = await services.execution.prepareFlow({ intakeId: environment.intake.intakeId })
+  let syncFlow = await services.flowPersistence.read(prepared.executionFlowId)
+  syncFlow = (await services.flowPersistence.compareAndSet(syncFlow.executionFlowId, { expectedStates: ['ready_for_execution'], expectedRevision: syncFlow.revision, nextState: 'explicit_execution', patch: { pendingOperations: ['explicit_execution'], lastErrorCode: null }, updatedAt: clock() })).record
+  syncFlow = (await services.flowPersistence.compareAndSet(syncFlow.executionFlowId, { expectedStates: ['explicit_execution'], expectedRevision: syncFlow.revision, nextState: 'sync_state', patch: { pendingOperations: ['sync_state'], lastErrorCode: null }, updatedAt: clock() })).record
+  const caseRecord = await services.evidencePersistence.read(syncFlow.evidenceCaseId)
+  const attemptRecord = await services.connectorPersistence.read(syncFlow.attemptRefs.at(-1).connectorAttemptId)
+
+  const second = await environment.discovery.createIntake({
+    objective: 'Preparar segundo flujo local sin deadlock',
+    expectedOutcome: 'Segundo flujo listo para ejecucion explicita',
+    audience: 'Equipo tecnico',
+    problem: 'Validar particion de locks exactos',
+    scope: 'Investigacion supervisada',
+    constraints: ['Sin red'],
+    questions: ['Puede prepararse fuera del lock del caso ajeno'],
+    assumptions: ['La preparacion es deterministica'],
+    risks: ['Deadlock por lock root-wide'],
+    priority: 'normal',
+    responsible: 'lean',
+    projectType: 'commercial_site',
+    platform: 'web',
+    identity: environment.physicalIdentity,
+  })
+  const preparing = createExecutionFlow({ identity: environment.physicalIdentity, intakeId: second.intake.intakeId, routingFingerprint: routeHash }, clock())
+  await services.flowPersistence.create(preparing)
+  const flowCandidate = (record, evidenceCaseSnapshot, connectorAttemptSnapshot) => ({
+    executionFlowId: record.executionFlowId,
+    revision: record.revision,
+    state: record.state,
+    fingerprint: crypto.createHash('sha256').update(canonical(record)).digest('hex'),
+    evidenceCaseSnapshot,
+    connectorAttemptSnapshot,
+  })
+  const candidates = [
+    flowCandidate(syncFlow, { evidenceCaseId: caseRecord.evidenceCaseId, revision: caseRecord.revision, state: caseRecord.state, fingerprint: crypto.createHash('sha256').update(canonical(caseRecord)).digest('hex') }, { connectorAttemptId: attemptRecord.connectorAttemptId, revision: attemptRecord.revision, state: attemptRecord.state, deliveryId: attemptRecord.delivery?.deliveryId || null, deliveryState: attemptRecord.delivery?.state || null, fingerprint: crypto.createHash('sha256').update(canonical(attemptRecord)).digest('hex') }),
+    flowCandidate(preparing, null, null),
+  ]
+  const syncBytes = await fs.promises.readFile(path.join(environment.flowRoot, `${syncFlow.executionFlowId}.json`), 'utf8')
+  const preparingBytes = await fs.promises.readFile(path.join(environment.flowRoot, `${preparing.executionFlowId}.json`), 'utf8')
+  await rejectsCode(() => services.execution.reconcileFlows({ projectId: environment.physicalIdentity.projectId, limit: 2, candidates }), 'INVALID_RECONCILE_CANDIDATES')
+  assert.equal(await fs.promises.readFile(path.join(environment.flowRoot, `${syncFlow.executionFlowId}.json`), 'utf8'), syncBytes)
+  assert.equal(await fs.promises.readFile(path.join(environment.flowRoot, `${preparing.executionFlowId}.json`), 'utf8'), preparingBytes)
+  const resumed = await services.execution.prepareFlow({ intakeId: second.intake.intakeId })
+  assert.equal(resumed.state, 'ready_for_execution')
+  assert.equal((await services.execution.prepareFlow({ intakeId: second.intake.intakeId })).state, 'ready_for_execution')
+
+  const crashAt = async (targetState) => {
+    const created = await environment.discovery.createIntake({
+      objective: `Reanudar boundary real ${targetState}`,
+      expectedOutcome: `Flow ${targetState} listo sin duplicados`,
+      audience: 'Equipo tecnico',
+      problem: 'Validar restart por etapa durable',
+      scope: 'Investigacion supervisada',
+      constraints: ['Sin red'],
+      questions: [`Puede reanudarse ${targetState}`],
+      assumptions: ['Los IDs son deterministas'],
+      risks: ['Duplicacion por replay'],
+      priority: 'normal',
+      responsible: 'lean',
+      projectType: 'commercial_site',
+      platform: 'web',
+      identity: environment.physicalIdentity,
+    })
+    let record = createExecutionFlow({ identity: environment.physicalIdentity, intakeId: created.intake.intakeId, routingFingerprint: routeHash }, clock())
+    await services.flowPersistence.create(record)
+    if (targetState === 'prepare_context') return { intake: created.intake, record }
+    const context = await environment.discovery.prepareResearchContext(created.intake.intakeId)
+    const packageRefs = Object.fromEntries(context.packages.map((item) => [item.agent, { packageId: item.packageId, handoffId: item.handoffId, consumerStatus: item.consumerStatus }]))
+    record = (await services.flowPersistence.compareAndSet(record.executionFlowId, { expectedStates: ['prepare_context'], expectedRevision: record.revision, nextState: 'prepare_research', patch: { packageRefs, pendingOperations: ['prepare_research'], lastErrorCode: null }, updatedAt: clock() })).record
+    if (targetState === 'prepare_research') return { intake: created.intake, record }
+    const planned = await services.research.plan({ intake: context.intake, packages: context.packages, providerType: route.providerType, budget: route.budget, references: [] })
+    const requestRefs = ['radar', 'scout', 'hermes'].map((role) => ({ role, researchRequestId: planned[role].researchRequestId }))
+    record = (await services.flowPersistence.compareAndSet(record.executionFlowId, { expectedStates: ['prepare_research'], expectedRevision: record.revision, nextState: 'prepare_attempts', patch: { researchPlanId: planned.researchPlanId, evidenceCaseId: planned.evidenceCaseId, requestRefs, pendingOperations: ['prepare_attempts'], lastErrorCode: null }, updatedAt: clock() })).record
+    return { intake: created.intake, record }
+  }
+  for (const targetState of ['prepare_context', 'prepare_research', 'prepare_attempts']) {
+    const crashed = await crashAt(targetState)
+    assert.equal(crashed.record.state, targetState)
+    const attemptsBefore = (await services.connectorPersistence.listAllAttempts(environment.physicalIdentity.projectId)).length
+    const resumedCrash = await services.execution.prepareFlow({ intakeId: crashed.intake.intakeId })
+    const attemptsAfter = await services.connectorPersistence.listAllAttempts(environment.physicalIdentity.projectId)
+    const casesAfter = await services.evidencePersistence.listAll(environment.physicalIdentity.projectId)
+    const replay = await services.execution.prepareFlow({ intakeId: crashed.intake.intakeId })
+    assert.equal(resumedCrash.state, 'ready_for_execution')
+    assert.equal(replay.executionFlowId, resumedCrash.executionFlowId)
+    assert.equal(replay.state, 'ready_for_execution')
+    assert.equal(attemptsAfter.length, attemptsBefore + 1)
+    assert.equal((await services.connectorPersistence.listAllAttempts(environment.physicalIdentity.projectId)).length, attemptsAfter.length)
+    assert.equal((await services.evidencePersistence.listAll(environment.physicalIdentity.projectId)).length, casesAfter.length)
+    const durable = await services.flowPersistence.read(resumedCrash.executionFlowId)
+    assert.equal(durable.attemptRefs.length, 1)
+    assert.equal(new Set(durable.attemptRefs.map((item) => item.connectorAttemptId)).size, 1)
+  }
+  assert.equal(environment.counters.adapters, 0)
+})
+
+checks.set(38, async () => {
+  const environment = await createEnvironment('targeted-attempt-stale')
+  const services = createServices(environment)
+  const prepared = await services.execution.prepareFlow({ intakeId: environment.intake.intakeId })
+  let flow = await services.flowPersistence.read(prepared.executionFlowId)
+  flow = (await services.flowPersistence.compareAndSet(flow.executionFlowId, { expectedStates: ['ready_for_execution'], expectedRevision: flow.revision, nextState: 'explicit_execution', patch: { pendingOperations: ['explicit_execution'], lastErrorCode: null }, updatedAt: clock() })).record
+  const caseRecord = await services.evidencePersistence.read(flow.evidenceCaseId)
+  const attemptRecord = await services.connectorPersistence.read(flow.attemptRefs.at(-1).connectorAttemptId)
+  const before = await fs.promises.readFile(path.join(environment.flowRoot, `${flow.executionFlowId}.json`), 'utf8')
+  const candidate = {
+    executionFlowId: flow.executionFlowId,
+    revision: flow.revision,
+    state: flow.state,
+    fingerprint: crypto.createHash('sha256').update(canonical(flow)).digest('hex'),
+    evidenceCaseSnapshot: { evidenceCaseId: caseRecord.evidenceCaseId, revision: caseRecord.revision, state: caseRecord.state, fingerprint: crypto.createHash('sha256').update(canonical(caseRecord)).digest('hex') },
+    connectorAttemptSnapshot: { connectorAttemptId: attemptRecord.connectorAttemptId, revision: attemptRecord.revision, state: attemptRecord.state, deliveryId: attemptRecord.delivery?.deliveryId || null, deliveryState: attemptRecord.delivery?.state || null, fingerprint: crypto.createHash('sha256').update(canonical(attemptRecord)).digest('hex') },
+  }
+  assert.equal((await services.connectorRuntime.cancelAttempt(attemptRecord.connectorAttemptId)).state, 'cancelled')
+  await rejectsCode(() => services.execution.reconcileFlows({ projectId: environment.physicalIdentity.projectId, limit: 1, candidates: [candidate] }), 'STALE_RECONCILE_CANDIDATE')
+  assert.equal(await fs.promises.readFile(path.join(environment.flowRoot, `${flow.executionFlowId}.json`), 'utf8'), before)
+  assert.equal(environment.counters.adapters, 0)
+
+  const fairnessRoot = path.join(root, 'targeted-write-fairness')
+  const fairnessPersistence = createSupervisedResearchExecutionPersistence({ root: fairnessRoot })
+  const fairnessIdentity = identity('targeted-write-fairness')
+  const createExplicitFlow = async (seed) => {
+    const packages = packageRefs(seed)
+    const requests = researchRefs(seed)
+    let record = createExecutionFlow({ identity: fairnessIdentity, intakeId: intakeId(seed), routingFingerprint: routeHash }, clock())
+    await fairnessPersistence.create(record)
+    record = (await fairnessPersistence.compareAndSet(record.executionFlowId, { expectedStates: ['prepare_context'], expectedRevision: record.revision, nextState: 'prepare_research', patch: { packageRefs: packages, pendingOperations: ['prepare_research'], lastErrorCode: null }, updatedAt: clock() })).record
+    record = (await fairnessPersistence.compareAndSet(record.executionFlowId, { expectedStates: ['prepare_research'], expectedRevision: record.revision, nextState: 'prepare_attempts', patch: { researchPlanId: durableId('research-plan', seed), evidenceCaseId: durableId('evidence-case', seed), requestRefs: requests, pendingOperations: ['prepare_attempts'], lastErrorCode: null }, updatedAt: clock() })).record
+    record = (await fairnessPersistence.compareAndSet(record.executionFlowId, { expectedStates: ['prepare_attempts'], expectedRevision: record.revision, nextState: 'ready_for_execution', patch: { attemptRefs: [attemptRef(requests, seed)], pendingOperations: [], lastErrorCode: null }, updatedAt: clock() })).record
+    return (await fairnessPersistence.compareAndSet(record.executionFlowId, { expectedStates: ['ready_for_execution'], expectedRevision: record.revision, nextState: 'explicit_execution', patch: { pendingOperations: ['explicit_execution'], lastErrorCode: null }, updatedAt: clock() })).record
+  }
+  const fairnessFlows = [await createExplicitFlow('targeted-write-fairness-a'), await createExplicitFlow('targeted-write-fairness-b')].sort((left, right) => left.executionFlowId.localeCompare(right.executionFlowId))
+  const fairnessCases = new Map(fairnessFlows.map((item) => [item.evidenceCaseId, { evidenceCaseId: item.evidenceCaseId, revision: 0, state: 'ready', fingerprint: hex(`${item.evidenceCaseId}:snapshot`, 64) }]))
+  const fairnessAttempts = new Map(fairnessFlows.map((item) => {
+    const connectorAttemptId = item.attemptRefs.at(-1).connectorAttemptId
+    return [connectorAttemptId, { connectorAttemptId, revision: 0, state: 'prepared', deliveryId: null, deliveryState: null, fingerprint: hex(`${connectorAttemptId}:snapshot`, 64) }]
+  }))
+  let casesPreflighted = false
+  let attemptsPreflighted = false
+  const fairnessResearch = {
+    async plan() { throw new Error('plan no permitido en reconcile targeted') },
+    getContributionContext() { throw new Error('contexto no permitido en reconcile targeted') },
+    async reopenEvidenceCase() { throw new Error('reopen no permitido en reconcile targeted') },
+    async retryEvidenceCase() { throw new Error('retry no permitido en reconcile targeted') },
+    async withExactEvidenceCaseSnapshots(projectId, snapshots, work) {
+      assert.equal(projectId, fairnessIdentity.projectId)
+      assert.deepEqual(snapshots.map((item) => item.evidenceCaseId).sort(), [...fairnessCases.keys()].sort())
+      casesPreflighted = true
+      return work(snapshots.map((snapshot) => ({ evidenceCaseId: snapshot.evidenceCaseId, view: null })))
+    },
+  }
+  const fairnessRuntime = {
+    async prepareConnectorAttempt() { throw new Error('prepare no permitido en reconcile targeted') },
+    async executePreparedAttempt() { throw new Error('execute no permitido en reconcile targeted') },
+    async cancelAttempt() { throw new Error('cancel no permitido en reconcile targeted') },
+    async retryAttempt() { throw new Error('retry no permitido en reconcile targeted') },
+    async reconcileAttempts() { throw new Error('reconcile connector no permitido en reconcile targeted') },
+    async getAttemptStatus() { throw new Error('status directo no permitido en reconcile targeted') },
+    async withExactAttemptSnapshots(projectId, snapshots, work) {
+      assert.equal(projectId, fairnessIdentity.projectId)
+      assert.equal(casesPreflighted, true)
+      assert.deepEqual(snapshots.map((item) => item.connectorAttemptId).sort(), [...fairnessAttempts.keys()].sort())
+      attemptsPreflighted = true
+      return work(snapshots.map((snapshot) => ({ connectorAttemptId: snapshot.connectorAttemptId, status: { state: 'prepared', deliveryState: null } })))
+    },
+    getConnectorHealth() { return { state: 'ready', networkEnabled: false, connectorId: 'structured-analysis-local' } },
+  }
+  const fairnessExecutionFor = (persistence) => createSupervisedResearchExecution({
+    persistence,
+    discovery: { async reopen() { throw new Error('discovery no permitido') }, async prepareResearchContext() { throw new Error('discovery no permitido') } },
+    research: fairnessResearch,
+    connectorRuntime: fairnessRuntime,
+    trustedRouting: routeInput,
+    clock,
+  })
+  const fairnessExecution = fairnessExecutionFor(fairnessPersistence)
+  const fairnessCandidates = fairnessFlows.map((item) => ({
+    executionFlowId: item.executionFlowId,
+    revision: item.revision,
+    state: item.state,
+    fingerprint: crypto.createHash('sha256').update(canonical(item)).digest('hex'),
+    evidenceCaseSnapshot: fairnessCases.get(item.evidenceCaseId),
+    connectorAttemptSnapshot: fairnessAttempts.get(item.attemptRefs.at(-1).connectorAttemptId),
+  }))
+  const failedTarget = path.resolve(fairnessRoot, `${fairnessFlows[0].executionFlowId}.json`)
+  const failedBytes = await fs.promises.readFile(failedTarget, 'utf8')
+  const laterTarget = path.resolve(fairnessRoot, `${fairnessFlows[1].executionFlowId}.json`)
+  const laterBytes = await fs.promises.readFile(laterTarget, 'utf8')
+  const staleWrites = []
+  const stalePersistence = {
+    ...fairnessPersistence,
+    async compareAndSet(executionFlowId, spec) {
+      staleWrites.push(executionFlowId)
+      if (executionFlowId === fairnessFlows[0].executionFlowId) {
+        const error = new Error('controlled stale CAS')
+        error.code = 'STALE_EXECUTION_FLOW'
+        throw error
+      }
+      return fairnessPersistence.compareAndSet(executionFlowId, spec)
+    },
+  }
+  await rejectsCode(() => fairnessExecutionFor(stalePersistence).reconcileFlows({ projectId: fairnessIdentity.projectId, limit: 2, candidates: fairnessCandidates }), 'STALE_EXECUTION_FLOW')
+  assert.deepEqual(staleWrites, [fairnessFlows[0].executionFlowId])
+  assert.equal(await fs.promises.readFile(failedTarget, 'utf8'), failedBytes)
+  assert.equal(await fs.promises.readFile(laterTarget, 'utf8'), laterBytes)
+  const originalRename = fs.promises.rename
+  let rejectedWrites = 0
+  try {
+    fs.promises.rename = async function rejectFirstFlow(source, target) {
+      if (path.resolve(target) === failedTarget) {
+        assert.equal(casesPreflighted, true)
+        assert.equal(attemptsPreflighted, true)
+        rejectedWrites += 1
+        const error = new Error('controlled persistent flow write failure')
+        error.code = 'INJECTED_FLOW_WRITE_FAILURE'
+        throw error
+      }
+      return Reflect.apply(originalRename, this, [source, target])
+    }
+    const result = await fairnessExecution.reconcileFlows({ projectId: fairnessIdentity.projectId, limit: 2, candidates: fairnessCandidates })
+    assert.deepEqual(result.items.map((item) => item.executionFlowId), [fairnessFlows[1].executionFlowId])
+    assert.equal(result.items[0].state, 'ready_for_execution')
+    assert.equal(result.remaining, 1)
+    assert.equal(result.corruptionCount, 0)
+    assert.equal(result.adaptersExecuted, 0)
+  } finally {
+    fs.promises.rename = originalRename
+  }
+  assert.equal(rejectedWrites, 1)
+  assert.equal(await fs.promises.readFile(failedTarget, 'utf8'), failedBytes)
+  assert.equal((await fairnessPersistence.read(fairnessFlows[0].executionFlowId)).state, 'explicit_execution')
+  assert.equal((await fairnessPersistence.read(fairnessFlows[1].executionFlowId)).state, 'ready_for_execution')
+  assert.equal((await fs.promises.readdir(fairnessRoot)).some((name) => name.endsWith('.stage')), false)
+})
+
 try {
-  assert.equal(names.length, 36)
-  assert.equal(checks.size, 36)
+  assert.equal(names.length, 38)
+  assert.equal(checks.size, 38)
   const executed = []
   const total = checks.size
   for (const [number, check] of checks) {
@@ -748,7 +1108,7 @@ try {
     executed.push(number)
     console.log(`PASS ${number}/${total} ${names[number - 1]}`)
   }
-  assert.deepEqual(executed, Array.from({ length: 36 }, (_, index) => index + 1))
+  assert.deepEqual(executed, Array.from({ length: 38 }, (_, index) => index + 1))
   const executedRange = `${executed[0]}-${executed.at(-1)}`
   console.log(`PASS jefe-supervised-research-execution-smoke: casos ${executedRange}`)
   console.log(`SMOKE_STRUCTURE=${checks.size}/${names.length}`)

@@ -522,8 +522,31 @@ checks.set(24, async () => {
   assert.equal(result.state, 'partial')
   assert.equal(evidenceCase.receipts[0].method, 'injected_controlled_adapter')
   assert.notEqual(evidenceCase.receipts[0].method, 'controlled_adapter')
-  assert.equal(counters.inputs, 0)
+  assert.equal(counters.inputs, 1)
   assert.equal(counters.receives, 1)
+  assert.deepEqual((await persistence.read(prepared.record.connectorAttemptId)).delivery.budget, input.budget)
+
+  const mutationEnvironment = await createEnvironment('controlled-input-mutation')
+  const mutationRequest = mutationEnvironment.planned.scout
+  const mutationCounters = { contexts: 0, inputs: 0, receives: 0 }
+  const mutationPersistence = createConnectorPersistence({ root: mutationEnvironment.connectorRoot })
+  const mutatingAdapter = Object.freeze({
+    kind: 'controlled_local',
+    execute({ input: mutableInput }) {
+      mutableInput.questions.push('pregunta inyectada')
+      return { candidate: structuredAnalysisCandidate(mutableInput) }
+    },
+  })
+  const mutationRuntime = createConnectorRuntime({ persistence: mutationPersistence, clock: () => now, trustedAdapters: { 'structured-analysis-local': mutatingAdapter }, trustedResearch: bridgeFor(mutationEnvironment.research, mutationCounters) })
+  const mutationPrepared = await mutationRuntime.prepareConnectorAttempt(await connectorAttemptInput(mutationEnvironment.research, mutationRequest))
+  assert.equal((await mutationRuntime.executePreparedAttempt(mutationPrepared.record.connectorAttemptId)).state, 'failed_transient')
+  const mutationSaved = await mutationPersistence.read(mutationPrepared.record.connectorAttemptId)
+  assert.equal(mutationSaved.errorCode, 'ADAPTER_FAILURE')
+  assert.equal(Object.hasOwn(mutationSaved, 'delivery'), false)
+  assert.equal(Object.hasOwn(mutationSaved, 'receipt'), false)
+  assert.equal(Object.hasOwn(mutationSaved, 'research'), false)
+  assert.deepEqual(mutationCounters, { contexts: 1, inputs: 1, receives: 0 })
+  assert.equal((await mutationEnvironment.research.getConnectorInput(mutationRequest.researchRequestId)).questions.length, 1)
 })
 
 const completed = []

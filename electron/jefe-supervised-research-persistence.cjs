@@ -1,6 +1,7 @@
 const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
+const { physicalRootKey, resolvePhysicalRoot } = require('./jefe-physical-root.cjs')
 const { canonical } = require('./jefe-context-package-contract.cjs')
 const { receipt: providerReceipt, safeResearchText } = require('./jefe-research-contract.cjs')
 const { LIMITS, budget: researchBudget, safeUrl } = require('./jefe-research-provider-policy.cjs')
@@ -226,11 +227,6 @@ function validTimestamp(value) {
   return typeof value === 'string' && !Number.isNaN(Date.parse(value))
 }
 
-function normalizedRootKey(value) {
-  const resolved = path.normalize(path.resolve(value))
-  return process.platform === 'win32' ? resolved.toLocaleLowerCase('en-US') : resolved
-}
-
 function locked(key, work) {
   const previous = locks.get(key) || Promise.resolve()
   let release
@@ -365,23 +361,31 @@ function validateSessionRecord(value) {
   return JSON.parse(canonical({ ...value, budget: cleanBudget, receipts, evidenceDecisions }))
 }
 
-function assertCompatible(prior, next) {
+function sessionWriteCompatibility(prior, next) {
+  if (!plainObject(prior) || !plainObject(next) || !Array.isArray(prior.receipts) || !Array.isArray(next.receipts) || !validTimestamp(prior.updatedAt) || !validTimestamp(next.updatedAt)) return 'incompatible'
   const priorIdentity = Object.fromEntries(IMMUTABLE_FIELDS.map((key) => [key, prior[key] ?? null]))
   const nextIdentity = Object.fromEntries(IMMUTABLE_FIELDS.map((key) => [key, next[key] ?? null]))
-  if (canonical(priorIdentity) !== canonical(nextIdentity)) fail('INCOMPATIBLE_REPLAY', 'Sesion durable incompatible.')
-  if (Date.parse(next.updatedAt) < Date.parse(prior.updatedAt) || !STATE_TRANSITIONS[prior.status]?.has(next.status)) fail('STALE_SESSION', 'Sesion durable obsoleta.')
+  if (canonical(priorIdentity) !== canonical(nextIdentity)) return 'incompatible'
+  if (Date.parse(next.updatedAt) < Date.parse(prior.updatedAt) || !STATE_TRANSITIONS[prior.status]?.has(next.status)) return 'stale'
   const nextReceipts = new Map(next.receipts.map((item) => [item.receiptId, item]))
   for (const item of prior.receipts) {
     const replay = nextReceipts.get(item.receiptId)
-    if (!replay || canonical(replay) !== canonical(item)) fail('INCOMPATIBLE_REPLAY', 'Receipt durable incompatible.')
+    if (!replay || canonical(replay) !== canonical(item)) return 'incompatible'
   }
+  return 'compatible'
+}
+
+function assertCompatible(prior, next) {
+  const compatibility = sessionWriteCompatibility(prior, next)
+  if (compatibility === 'incompatible') fail('INCOMPATIBLE_REPLAY', 'Sesion durable incompatible.')
+  if (compatibility === 'stale') fail('STALE_SESSION', 'Sesion durable obsoleta.')
 }
 
 function createSupervisedResearchPersistence({ root, failureInjection = null } = {}) {
   if (typeof root !== 'string' || !path.isAbsolute(root)) fail('INVALID_ROOT', 'Registro de investigacion invalido.')
   if (failureInjection !== null && failureInjection !== 'before_rename') fail('INVALID_FAILURE_INJECTION', 'Registro de investigacion invalido.')
-  const authorityRoot = path.resolve(root)
-  const rootKey = normalizedRootKey(authorityRoot)
+  const authorityRoot = resolvePhysicalRoot(root)
+  const rootKey = physicalRootKey(authorityRoot)
   const sessionFile = (id) => path.join(authorityRoot, `${id}.json`)
   const indexFile = path.join(authorityRoot, 'research-session-index.json')
   const isSessionFile = (name) => /^research-session-[a-f0-9]{32}\.json$/u.test(name)
@@ -487,4 +491,4 @@ function createSupervisedResearchPersistence({ root, failureInjection = null } =
   return { authorityRoot, read, write, listDetailed, list, listAll, rebuildIndex }
 }
 
-module.exports = { SupervisedResearchPersistenceError, createSupervisedResearchPersistence }
+module.exports = { SupervisedResearchPersistenceError, createSupervisedResearchPersistence, sessionWriteCompatibility }

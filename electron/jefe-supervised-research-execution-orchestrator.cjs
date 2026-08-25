@@ -1,4 +1,5 @@
 const crypto = require('crypto')
+const { physicalRootKey } = require('./jefe-physical-root.cjs')
 const { canonical } = require('./jefe-context-package-contract.cjs')
 const { budget: validateBudget } = require('./jefe-research-provider-policy.cjs')
 const {
@@ -12,15 +13,17 @@ const {
 
 const INTAKE_ID = /^intake-[a-f0-9]{32}$/u
 const FLOW_ID = /^research-execution-[a-f0-9]{32}$/u
-const SAFE_ID = /^[a-z][a-z0-9_-]{2,80}$/u
+const SAFE_ID = /^[a-z][a-z0-9-]{2,80}$/u
 const PACKAGE_ID = /^context-package-[a-f0-9]{32}$/u
 const HANDOFF_ID = /^agent-handoff-[a-f0-9]{32}$/u
 const RESEARCH_PLAN_ID = /^research-plan-[a-f0-9]{32}$/u
 const EVIDENCE_CASE_ID = /^evidence-case-[a-f0-9]{32}$/u
 const RESEARCH_REQUEST_ID = /^research-[a-f0-9]{32}$/u
 const ATTEMPT_ID = /^connector-attempt-[a-f0-9]{32}$/u
+const RECOVERY_FINGERPRINT = /^[a-f0-9]{64}$/u
 const EXECUTION_ROLE = 'scout'
 const CONSUMER_STATUSES = new Set(['not_connected', 'registered_internal'])
+const TARGETED_RECOVERY_STATES = new Set(['explicit_execution', 'resume_delivery', 'sync_state'])
 const flowLocks = new Map()
 
 class SupervisedResearchExecutionError extends Error {
@@ -67,6 +70,11 @@ function exclusive(key, work) {
     release()
     if (flowLocks.get(key) === tail) flowLocks.delete(key)
   })
+}
+
+function exclusiveMany(keys, work, index = 0) {
+  if (index >= keys.length) return work()
+  return exclusive(keys[index], () => exclusiveMany(keys, work, index + 1))
 }
 
 function validateIdentity(value) {
@@ -129,8 +137,8 @@ function createSupervisedResearchExecution(options = {}) {
   const { persistence, discovery, research, connectorRuntime, trustedRouting, clock } = options
   const persistenceMethods = ['create', 'read', 'compareAndSet', 'listDetailed', 'listAll']
   const discoveryMethods = ['reopen', 'prepareResearchContext']
-  const researchMethods = ['plan', 'getContributionContext', 'reopenEvidenceCase', 'retryEvidenceCase']
-  const runtimeMethods = ['prepareConnectorAttempt', 'executePreparedAttempt', 'cancelAttempt', 'retryAttempt', 'reconcileAttempts', 'getAttemptStatus', 'getConnectorHealth']
+  const researchMethods = ['plan', 'getContributionContext', 'reopenEvidenceCase', 'retryEvidenceCase', 'withExactEvidenceCaseSnapshots']
+  const runtimeMethods = ['prepareConnectorAttempt', 'executePreparedAttempt', 'cancelAttempt', 'retryAttempt', 'reconcileAttempts', 'getAttemptStatus', 'withExactAttemptSnapshots', 'getConnectorHealth']
   if (!persistence || typeof persistence.authorityRoot !== 'string' || persistenceMethods.some((key) => typeof persistence[key] !== 'function')) fail('INVALID_DEPENDENCY', 'Persistencia de flow invalida.')
   if (!discovery || discoveryMethods.some((key) => typeof discovery[key] !== 'function')) fail('INVALID_DEPENDENCY', 'Discovery invalido.')
   if (!research || researchMethods.some((key) => typeof research[key] !== 'function')) fail('INVALID_DEPENDENCY', 'Investigacion invalida.')
@@ -142,7 +150,63 @@ function createSupervisedResearchExecution(options = {}) {
   if (!plainObject(health) || health.state !== 'ready' || health.networkEnabled !== false || health.connectorId !== 'structured-analysis-local') fail('INVALID_TRUSTED_ROUTING', 'El connector local no esta listo de forma segura.')
   const terminal = new Set(TERMINAL_STATES)
   const knownFlowErrors = new Set(ERROR_CODES)
-  const lockKey = (executionFlowId) => `${persistence.authorityRoot}:${executionFlowId}`
+  const operationAuthorityRoot = physicalRootKey(persistence.authorityRoot)
+  const lockKey = (executionFlowId) => `${operationAuthorityRoot}:${executionFlowId}`
+
+  function flowRecoverySnapshot(flow) {
+    if (!plainObject(flow) || !FLOW_ID.test(flow.executionFlowId) || !Number.isSafeInteger(flow.revision) || flow.revision < 0 || typeof flow.state !== 'string') fail('INVALID_EXECUTION_FLOW', 'Flow invalido para recovery.')
+    return {
+      executionFlowId: flow.executionFlowId,
+      revision: flow.revision,
+      state: flow.state,
+      fingerprint: digest(flow),
+    }
+  }
+
+  function evidenceCaseSnapshot(value) {
+    if (!plainObject(value)) fail('INVALID_RECONCILE_CANDIDATES', 'Snapshot de caso de evidencia invalido.')
+    exactInput(value, ['evidenceCaseId', 'revision', 'state', 'fingerprint'], 'INVALID_RECONCILE_CANDIDATES')
+    if (!EVIDENCE_CASE_ID.test(value.evidenceCaseId)) fail('INVALID_RECONCILE_CANDIDATES', 'Snapshot de caso de evidencia invalido.')
+    const missing = value.revision === null && value.state === null && value.fingerprint === null
+    const present = Number.isSafeInteger(value.revision) && value.revision >= 0 && typeof value.state === 'string' && RECOVERY_FINGERPRINT.test(value.fingerprint)
+    if (!missing && !present) fail('INVALID_RECONCILE_CANDIDATES', 'Snapshot de caso de evidencia invalido.')
+    return clone(value)
+  }
+
+  function connectorAttemptSnapshot(value) {
+    if (!plainObject(value)) fail('INVALID_RECONCILE_CANDIDATES', 'Snapshot de connector attempt invalido.')
+    exactInput(value, ['connectorAttemptId', 'revision', 'state', 'deliveryId', 'deliveryState', 'fingerprint'], 'INVALID_RECONCILE_CANDIDATES')
+    if (!ATTEMPT_ID.test(value.connectorAttemptId)) fail('INVALID_RECONCILE_CANDIDATES', 'Snapshot de connector attempt invalido.')
+    const missing = value.revision === null && value.state === null && value.deliveryId === null && value.deliveryState === null && value.fingerprint === null
+    const present = Number.isSafeInteger(value.revision) && value.revision >= 0 && typeof value.state === 'string' && (value.deliveryId === null || /^connector-delivery-[a-f0-9]{32}$/u.test(value.deliveryId)) && (value.deliveryState === null || ['pending', 'delivered'].includes(value.deliveryState)) && RECOVERY_FINGERPRINT.test(value.fingerprint)
+    if (!missing && !present) fail('INVALID_RECONCILE_CANDIDATES', 'Snapshot de connector attempt invalido.')
+    return clone(value)
+  }
+
+  function recoveryCandidates(value, limit) {
+    if (!Array.isArray(value) || value.length > limit || value.length > 50) fail('INVALID_RECONCILE_CANDIDATES', 'Candidatos de reconciliacion invalidos.')
+    const identifiers = new Set()
+    return value.map((candidateRecord) => {
+      exactInput(candidateRecord, ['executionFlowId', 'revision', 'state', 'fingerprint', 'evidenceCaseSnapshot', 'connectorAttemptSnapshot'], 'INVALID_RECONCILE_CANDIDATES')
+      if (!FLOW_ID.test(candidateRecord.executionFlowId) || !Number.isSafeInteger(candidateRecord.revision) || candidateRecord.revision < 0 || !TARGETED_RECOVERY_STATES.has(candidateRecord.state) || !RECOVERY_FINGERPRINT.test(candidateRecord.fingerprint) || identifiers.has(candidateRecord.executionFlowId) || (candidateRecord.evidenceCaseSnapshot !== null && !plainObject(candidateRecord.evidenceCaseSnapshot)) || (candidateRecord.connectorAttemptSnapshot !== null && !plainObject(candidateRecord.connectorAttemptSnapshot))) fail('INVALID_RECONCILE_CANDIDATES', 'Candidatos de reconciliacion invalidos.')
+      identifiers.add(candidateRecord.executionFlowId)
+      return {
+        ...clone(candidateRecord),
+        evidenceCaseSnapshot: candidateRecord.evidenceCaseSnapshot === null ? null : evidenceCaseSnapshot(candidateRecord.evidenceCaseSnapshot),
+        connectorAttemptSnapshot: candidateRecord.connectorAttemptSnapshot === null ? null : connectorAttemptSnapshot(candidateRecord.connectorAttemptSnapshot),
+      }
+    }).sort((left, right) => left.executionFlowId.localeCompare(right.executionFlowId))
+  }
+
+  async function requireRecoveryCandidate(candidateRecord, projectId) {
+    const current = await persistence.read(candidateRecord.executionFlowId)
+    const { evidenceCaseSnapshot: expectedCase, connectorAttemptSnapshot: expectedAttempt, ...expectedFlow } = candidateRecord
+    if (!current || current.identity?.projectId !== projectId || canonical(flowRecoverySnapshot(current)) !== canonical(expectedFlow)) fail('STALE_RECONCILE_CANDIDATE', 'El candidato de flow ya no coincide con el snapshot.')
+    if ((current.evidenceCaseId === null) !== (expectedCase === null) || (current.evidenceCaseId !== null && current.evidenceCaseId !== expectedCase.evidenceCaseId)) fail('STALE_RECONCILE_CANDIDATE', 'La dependencia de evidencia del flow ya no coincide con el snapshot.')
+    const attemptId = current.attemptRefs.at(-1)?.connectorAttemptId || null
+    if ((attemptId === null) !== (expectedAttempt === null) || (attemptId !== null && attemptId !== expectedAttempt.connectorAttemptId)) fail('STALE_RECONCILE_CANDIDATE', 'La dependencia de connector del flow ya no coincide con el snapshot.')
+    return current
+  }
 
   function time() {
     const value = clock()
@@ -170,11 +234,11 @@ function createSupervisedResearchExecution(options = {}) {
     })).record
   }
 
-  async function blocked(record, code) {
+  async function blocked(record, code, strict = false) {
     if (terminal.has(record.state)) return record
     const safeCode = knownFlowErrors.has(code) ? code : 'CORRUPT_DEPENDENCY'
     try { return await cas(record, 'blocked', { pendingOperations: [], lastErrorCode: safeCode }) } catch (error) {
-      if (error.code !== 'STALE_EXECUTION_FLOW') throw error
+      if (error.code !== 'STALE_EXECUTION_FLOW' || strict) throw error
       return requireFlow(record.executionFlowId)
     }
   }
@@ -204,12 +268,12 @@ function createSupervisedResearchExecution(options = {}) {
     return { researchPlanId: value.researchPlanId, evidenceCaseId: value.evidenceCaseId, requestRefs: refs }
   }
 
-  async function prepareContext(flow) {
+  async function prepareContext(flow, strict = false) {
     let result
     try { result = await discovery.prepareResearchContext(flow.intakeId) } catch { fail('CONTEXT_PREPARATION_FAILED', 'No se pudo preparar contexto de discovery.') }
     let prepared
     try { prepared = validateDiscoveryContext(result, flow) } catch {
-      return blocked(flow, 'CORRUPT_DEPENDENCY')
+      return blocked(flow, 'CORRUPT_DEPENDENCY', strict)
     }
     return cas(flow, 'prepare_research', {
       packageRefs: prepared.packageRefs,
@@ -218,7 +282,7 @@ function createSupervisedResearchExecution(options = {}) {
     })
   }
 
-  async function prepareResearch(flow) {
+  async function prepareResearch(flow, strict = false) {
     const intake = await reopenIntake(flow)
     let result
     try {
@@ -232,7 +296,7 @@ function createSupervisedResearchExecution(options = {}) {
     } catch { fail('RESEARCH_PREPARATION_FAILED', 'No se pudo preparar investigacion.') }
     let plan
     try { plan = validateResearchPlan(result, flow) } catch {
-      return blocked(flow, 'CORRUPT_DEPENDENCY')
+      return blocked(flow, 'CORRUPT_DEPENDENCY', strict)
     }
     return cas(flow, 'prepare_attempts', {
       researchPlanId: plan.researchPlanId,
@@ -283,14 +347,14 @@ function createSupervisedResearchExecution(options = {}) {
     }
   }
 
-  async function prepareAttempts(flow) {
+  async function prepareAttempts(flow, strict = false) {
     const result = flow.attemptRefs.length ? await prepareRetryAttempt(flow) : await prepareInitialAttempt(flow)
-    if (result.blocked) return blocked(flow, result.blocked)
+    if (result.blocked) return blocked(flow, result.blocked, strict)
     const record = result.record
-    if (!plainObject(record) || typeof record.connectorAttemptId !== 'string' || !ATTEMPT_ID.test(record.connectorAttemptId) || record.projectId !== flow.identity.projectId || record.providerType !== routing.providerType || record.operation !== routing.operation) return blocked(flow, 'CORRUPT_DEPENDENCY')
-    if (record.state === 'not_connected') return blocked(flow, 'CONNECTOR_NOT_CONNECTED')
-    if (record.state === 'policy_blocked') return blocked(flow, record.errorCode === 'BUDGET_EXHAUSTED' || record.errorCode === 'CIRCUIT_OPEN' ? record.errorCode : 'CONNECTOR_POLICY_BLOCKED')
-    if (record.state !== 'prepared') return blocked(flow, 'CORRUPT_DEPENDENCY')
+    if (!plainObject(record) || typeof record.connectorAttemptId !== 'string' || !ATTEMPT_ID.test(record.connectorAttemptId) || record.projectId !== flow.identity.projectId || record.providerType !== routing.providerType || record.operation !== routing.operation) return blocked(flow, 'CORRUPT_DEPENDENCY', strict)
+    if (record.state === 'not_connected') return blocked(flow, 'CONNECTOR_NOT_CONNECTED', strict)
+    if (record.state === 'policy_blocked') return blocked(flow, record.errorCode === 'BUDGET_EXHAUSTED' || record.errorCode === 'CIRCUIT_OPEN' ? record.errorCode : 'CONNECTOR_POLICY_BLOCKED', strict)
+    if (record.state !== 'prepared') return blocked(flow, 'CORRUPT_DEPENDENCY', strict)
     const attemptRefs = flow.attemptRefs.some((item) => item.connectorAttemptId === record.connectorAttemptId)
       ? flow.attemptRefs
       : [...flow.attemptRefs, { researchRequestId: requestForRole(flow, EXECUTION_ROLE).researchRequestId, connectorAttemptId: record.connectorAttemptId }]
@@ -301,16 +365,16 @@ function createSupervisedResearchExecution(options = {}) {
     })
   }
 
-  async function resumePreparation(executionFlowId) {
+  async function resumePreparation(executionFlowId, strict = false, initialFlow = null) {
     for (let step = 0; step < 8; step += 1) {
-      const flow = await requireFlow(executionFlowId)
+      const flow = step === 0 && initialFlow ? initialFlow : await requireFlow(executionFlowId)
       try {
-        if (flow.state === 'prepare_context') await prepareContext(flow)
-        else if (flow.state === 'prepare_research') await prepareResearch(flow)
-        else if (flow.state === 'prepare_attempts') await prepareAttempts(flow)
+        if (flow.state === 'prepare_context') await prepareContext(flow, strict)
+        else if (flow.state === 'prepare_research') await prepareResearch(flow, strict)
+        else if (flow.state === 'prepare_attempts') await prepareAttempts(flow, strict)
         else return flow
       } catch (error) {
-        if (error.code !== 'STALE_EXECUTION_FLOW') throw error
+        if (error.code !== 'STALE_EXECUTION_FLOW' || strict) throw error
       }
     }
     fail('STALE_EXECUTION_FLOW', 'El flow no pudo converger.')
@@ -343,35 +407,38 @@ function createSupervisedResearchExecution(options = {}) {
     return knownFlowErrors.has(result?.errorCode) ? result.errorCode : fallback
   }
 
-  async function synchronize(flow, retryLocal = false) {
+  async function synchronize(flow, retryLocal = false, exactCaseView = undefined, strict = false) {
     let current = flow
     if (current.state !== 'sync_state') return current
     let caseView
-    try {
-      caseView = retryLocal ? await research.retryEvidenceCase(current.evidenceCaseId) : await research.reopenEvidenceCase(current.evidenceCaseId)
-    } catch { fail('SYNC_FAILED', 'No se pudo sincronizar el caso de evidencia.') }
-    if (!plainObject(caseView) || caseView.researchPlanId !== current.researchPlanId || caseView.evidenceCaseId !== current.evidenceCaseId || caseView.projectId !== current.identity.projectId || canonical(caseView.identity) !== canonical(current.identity)) return blocked(current, 'CORRUPT_DEPENDENCY')
+    if (arguments.length >= 3) caseView = exactCaseView
+    else {
+      try {
+        caseView = retryLocal ? await research.retryEvidenceCase(current.evidenceCaseId) : await research.reopenEvidenceCase(current.evidenceCaseId)
+      } catch { fail('SYNC_FAILED', 'No se pudo sincronizar el caso de evidencia.') }
+    }
+    if (!plainObject(caseView) || caseView.researchPlanId !== current.researchPlanId || caseView.evidenceCaseId !== current.evidenceCaseId || caseView.projectId !== current.identity.projectId || canonical(caseView.identity) !== canonical(current.identity)) return blocked(current, 'CORRUPT_DEPENDENCY', strict)
     if (caseView.state === 'requires_human') return cas(current, 'requires_human', { pendingOperations: [], lastErrorCode: null })
     if (caseView.state === 'needs_corroboration') return cas(current, 'needs_corroboration', { pendingOperations: [], lastErrorCode: null })
     if (caseView.state === 'completed_with_evidence' || (caseView.state === 'accepted_for_context' && caseView.memory?.status === 'appended' && (!Array.isArray(caseView.pendingOperations) || caseView.pendingOperations.length === 0))) return cas(current, 'completed_with_evidence', { pendingOperations: [], lastErrorCode: null })
     if (caseView.state === 'accepted_for_context') return current
-    return blocked(current, 'CORRUPT_DEPENDENCY')
+    return blocked(current, 'CORRUPT_DEPENDENCY', strict)
   }
 
-  async function settleExecution(flow, result) {
-    if (!plainObject(result) || typeof result.state !== 'string') return blocked(flow, 'CORRUPT_DEPENDENCY')
+  async function settleExecution(flow, result, strict = false, exactCaseView = undefined) {
+    if (!plainObject(result) || typeof result.state !== 'string') return blocked(flow, 'CORRUPT_DEPENDENCY', strict)
     if (['succeeded', 'partial'].includes(result.state)) {
       const syncing = await cas(flow, 'sync_state', { pendingOperations: ['sync_state'], lastErrorCode: null })
-      return synchronize(syncing, false)
+      return strict ? synchronize(syncing, false, exactCaseView, true) : synchronize(syncing, false)
     }
     if (result.state === 'failed_transient' && result.deliveryState === 'pending') return cas(flow, 'resume_delivery', { pendingOperations: ['resume_delivery'], lastErrorCode: 'DELIVERY_PENDING' })
     if (result.state === 'failed_transient') return cas(flow, 'ready_for_execution', { pendingOperations: [], lastErrorCode: executionError(result, 'ADAPTER_FAILURE') })
-    if (result.state === 'policy_blocked') return blocked(flow, executionError(result, 'CONNECTOR_POLICY_BLOCKED'))
-    if (result.state === 'not_connected') return blocked(flow, 'CONNECTOR_NOT_CONNECTED')
-    if (result.state === 'timed_out') return blocked(flow, 'EXECUTION_TIMEOUT')
-    if (result.state === 'cancelled') return blocked(flow, 'CANCELLED')
-    if (result.state === 'failed_permanent') return blocked(flow, executionError(result, 'ADAPTER_PERMANENT_FAILURE'))
-    return blocked(flow, 'EXECUTION_FAILED')
+    if (result.state === 'policy_blocked') return blocked(flow, executionError(result, 'CONNECTOR_POLICY_BLOCKED'), strict)
+    if (result.state === 'not_connected') return blocked(flow, 'CONNECTOR_NOT_CONNECTED', strict)
+    if (result.state === 'timed_out') return blocked(flow, 'EXECUTION_TIMEOUT', strict)
+    if (result.state === 'cancelled') return blocked(flow, 'CANCELLED', strict)
+    if (result.state === 'failed_permanent') return blocked(flow, executionError(result, 'ADAPTER_PERMANENT_FAILURE'), strict)
+    return blocked(flow, 'EXECUTION_FAILED', strict)
   }
 
   async function executeNext(input) {
@@ -445,39 +512,107 @@ function createSupervisedResearchExecution(options = {}) {
     return flowResult(await requireFlow(input.executionFlowId), { idempotent: true })
   }
 
-  async function reconcileOne(flow) {
+  async function reconcileOne(flow, exactCaseView = undefined, exactAttemptStatus = undefined, targeted = false) {
     if (terminal.has(flow.state) || flow.state === 'ready_for_execution') return flow
-    if (['prepare_context', 'prepare_research', 'prepare_attempts'].includes(flow.state)) return resumePreparation(flow.executionFlowId)
-    if (flow.state === 'sync_state') return synchronize(flow, true)
+    if (['prepare_context', 'prepare_research', 'prepare_attempts'].includes(flow.state)) return targeted ? resumePreparation(flow.executionFlowId, true, flow) : resumePreparation(flow.executionFlowId)
+    if (flow.state === 'sync_state') return targeted ? synchronize(flow, false, exactCaseView, true) : synchronize(flow, true)
     if (!['explicit_execution', 'resume_delivery'].includes(flow.state)) return flow
     const attempt = lastAttempt(flow)
-    const status = await connectorRuntime.getAttemptStatus(attempt.connectorAttemptId)
-    if (!status) return blocked(flow, 'CORRUPT_DEPENDENCY')
+    const status = targeted ? exactAttemptStatus : await connectorRuntime.getAttemptStatus(attempt.connectorAttemptId)
+    if (!status) return blocked(flow, 'CORRUPT_DEPENDENCY', targeted)
     if (status.state === 'prepared' && flow.state === 'resume_delivery' && status.deliveryState === 'pending') return flow
     if (status.state === 'prepared') return cas(flow, 'ready_for_execution', { pendingOperations: [], lastErrorCode: 'INTERRUPTED' })
     if (['succeeded', 'partial'].includes(status.state)) {
       const syncing = await cas(flow, 'sync_state', { pendingOperations: ['sync_state'], lastErrorCode: null })
-      return synchronize(syncing, true)
+      return targeted ? synchronize(syncing, false, exactCaseView, true) : synchronize(syncing, true)
     }
     if (status.state === 'failed_transient' && status.deliveryState === 'pending') return flow.state === 'resume_delivery' ? flow : cas(flow, 'resume_delivery', { pendingOperations: ['resume_delivery'], lastErrorCode: 'DELIVERY_PENDING' })
     if (status.state === 'failed_transient') return cas(flow, 'ready_for_execution', { pendingOperations: [], lastErrorCode: 'INTERRUPTED' })
     if (['running', 'contributing'].includes(status.state)) return flow
-    return settleExecution(flow, status)
+    return settleExecution(flow, status, targeted, exactCaseView)
+  }
+
+  async function isReconcileActionable(flow) {
+    if (['prepare_context', 'prepare_research', 'prepare_attempts', 'sync_state'].includes(flow.state)) return true
+    if (!['explicit_execution', 'resume_delivery'].includes(flow.state)) return false
+    const attempt = lastAttempt(flow)
+    const status = await connectorRuntime.getAttemptStatus(attempt.connectorAttemptId)
+    if (!status) return true
+    if (['running', 'contributing'].includes(status.state)) return false
+    if (flow.state === 'resume_delivery' && status.deliveryState === 'pending' && ['prepared', 'failed_transient'].includes(status.state)) return false
+    return true
   }
 
   async function reconcileFlows(input) {
-    exactInput(input, ['projectId', 'limit'])
+    const hasCandidates = plainObject(input) && Object.hasOwn(input, 'candidates')
+    exactInput(input, hasCandidates ? ['projectId', 'limit', 'candidates'] : ['projectId', 'limit'])
     if (typeof input.projectId !== 'string' || !SAFE_ID.test(input.projectId) || !Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 50) fail('INVALID_RECONCILE_REQUEST', 'Reconciliacion invalida.')
+    if (hasCandidates) {
+      const exactCandidates = recoveryCandidates(input.candidates, input.limit)
+      if (exactCandidates.length === 0) return deepFreeze({ items: [], remaining: 0, corruptionCount: 0, adaptersExecuted: 0 })
+      const keys = exactCandidates.map((item) => lockKey(item.executionFlowId))
+      return exclusiveMany(keys, async () => {
+        const flows = []
+        for (const item of exactCandidates) flows.push(await requireRecoveryCandidate(item, input.projectId))
+        const lockedIndexes = flows.map((_, index) => index)
+        const snapshotsById = new Map()
+        for (const index of lockedIndexes) {
+          const item = exactCandidates[index]
+          if (!item.evidenceCaseSnapshot) continue
+          const prior = snapshotsById.get(item.evidenceCaseSnapshot.evidenceCaseId)
+          if (prior && canonical(prior) !== canonical(item.evidenceCaseSnapshot)) fail('INVALID_RECONCILE_CANDIDATES', 'Snapshots de evidencia incompatibles.')
+          snapshotsById.set(item.evidenceCaseSnapshot.evidenceCaseId, item.evidenceCaseSnapshot)
+        }
+        const attemptSnapshotsById = new Map()
+        for (const index of lockedIndexes) {
+          const item = exactCandidates[index]
+          if (!item.connectorAttemptSnapshot) continue
+          const prior = attemptSnapshotsById.get(item.connectorAttemptSnapshot.connectorAttemptId)
+          if (prior && canonical(prior) !== canonical(item.connectorAttemptSnapshot)) fail('INVALID_RECONCILE_CANDIDATES', 'Snapshots de connector incompatibles.')
+          attemptSnapshotsById.set(item.connectorAttemptSnapshot.connectorAttemptId, item.connectorAttemptSnapshot)
+        }
+        const items = []
+        let failures = 0
+        if (lockedIndexes.length > 0) await research.withExactEvidenceCaseSnapshots(input.projectId, [...snapshotsById.values()], async (captured) => {
+          const views = new Map(captured.map((item) => [item.evidenceCaseId, item.view]))
+          return connectorRuntime.withExactAttemptSnapshots(input.projectId, [...attemptSnapshotsById.values()], async (capturedAttempts) => {
+            const statuses = new Map(capturedAttempts.map((item) => [item.connectorAttemptId, item.status]))
+            for (const index of lockedIndexes) {
+              const caseSnapshot = exactCandidates[index].evidenceCaseSnapshot
+              const attemptSnapshot = exactCandidates[index].connectorAttemptSnapshot
+              const caseView = caseSnapshot ? views.get(caseSnapshot.evidenceCaseId) : null
+              const attemptStatus = attemptSnapshot ? statuses.get(attemptSnapshot.connectorAttemptId) : null
+              try {
+                items.push(executionFlowView(await reconcileOne(flows[index], caseView, attemptStatus, true)))
+              } catch (error) {
+                if (typeof error?.code === 'string' && error.code.startsWith('STALE_')) throw error
+                failures += 1
+              }
+            }
+          })
+        })
+        return deepFreeze({ items, remaining: failures, corruptionCount: 0, adaptersExecuted: 0 })
+      })
+    }
     await connectorRuntime.reconcileAttempts({ projectId: input.projectId, limit: input.limit })
     const detail = await persistence.listDetailed(input.projectId)
-    const candidates = detail.records.filter((item) => !terminal.has(item.state)).sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.executionFlowId.localeCompare(right.executionFlowId))
+    const ordered = [...detail.records].sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.executionFlowId.localeCompare(right.executionFlowId))
+    const candidates = []
+    for (const item of ordered) if (await isReconcileActionable(item)) candidates.push(item)
     const selected = candidates.slice(0, input.limit)
-    const items = []
-    for (const item of selected) {
-      const result = await exclusive(lockKey(item.executionFlowId), async () => reconcileOne(await requireFlow(item.executionFlowId)))
-      items.push(executionFlowView(result))
-    }
-    return deepFreeze({ items, remaining: Math.max(0, candidates.length - selected.length), corruptionCount: detail.corruptions.length, adaptersExecuted: 0 })
+    if (selected.length === 0) return deepFreeze({ items: [], remaining: 0, corruptionCount: detail.corruptions.length, adaptersExecuted: 0 })
+    const keys = selected.map((item) => lockKey(item.executionFlowId))
+    const exact = await exclusiveMany(keys, async () => {
+      const flows = []
+      for (const item of selected) {
+        const current = await persistence.read(item.executionFlowId)
+        if (current && canonical(flowRecoverySnapshot(current)) === canonical(flowRecoverySnapshot(item))) flows.push(current)
+      }
+      const items = []
+      for (const flow of flows) items.push(executionFlowView(await reconcileOne(flow)))
+      return { items, adaptersExecuted: 0 }
+    })
+    return deepFreeze({ ...exact, remaining: Math.max(0, candidates.length - selected.length), corruptionCount: detail.corruptions.length })
   }
 
   return deepFreeze({

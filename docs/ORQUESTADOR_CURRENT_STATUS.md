@@ -4,11 +4,11 @@ Fecha de cierre documental: 2026-08-25. Rama: `integration/orquestador-canonical
 
 Estado prevalente de cierre: `ESCALON_1_STATUS=VERIFIED_CLOSED`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2D_STATUS=COMPLETED`; `ESCALON_2_STATUS=VERIFIED_CLOSED`; `RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`.
 
-Estado actual: `STATUS=ESCALON_3C_A_COMPLETED`; `ESCALON_3_STATUS=IN_PROGRESS`; `ESCALON_3A_STATUS=COMPLETED`; `ESCALON_3B_STATUS=COMPLETED`; `ESCALON_3B_R1_STATUS=COMPLETED`; `ESCALON_3C_STATUS=IN_PROGRESS`; `ESCALON_3C_A_STATUS=COMPLETED`. Los escalones 4–9 y 11–12 siguen `NOT_STARTED`; Escalón 10 conserva `PARTIAL_EXISTING_FOUNDATION`. La autoridad es [ORQUESTADOR_CANONICAL_ROADMAP.md](ORQUESTADOR_CANONICAL_ROADMAP.md).
+Estado actual: `STATUS=ESCALON_3_VERIFIED_CLOSED`; `ESCALON_3_STATUS=VERIFIED_CLOSED`; `ESCALON_3A_STATUS=COMPLETED`; `ESCALON_3B_STATUS=COMPLETED`; `ESCALON_3B_R1_STATUS=COMPLETED`; `ESCALON_3C_STATUS=VERIFIED_CLOSED`; `ESCALON_3C_A_STATUS=COMPLETED`; `ESCALON_3C_B_STATUS=COMPLETED`; `ESCALON_3C_C_STATUS=COMPLETED`; `ESCALON_3C_D_STATUS=COMPLETED`. Los escalones 4–9 y 11–12 siguen `NOT_STARTED`; Escalón 10 conserva `PARTIAL_EXISTING_FOUNDATION`. La autoridad es [ORQUESTADOR_CANONICAL_ROADMAP.md](ORQUESTADOR_CANONICAL_ROADMAP.md).
 
-`NETWORK=DISABLED`; `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`; `PUSH=NO`; `NEXT=ESCALON_3C_SUPERVISED_RESEARCH_CONNECTORS_AND_EXECUTION`.
+`NETWORK=DISABLED`; `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`; `PUSH=NO`; `NEXT=ESCALON_4A_PLANNER_AND_EXECUTABLE_CONTRACTS`.
 
-Evidencia de cierre: `CORRELATION_SMOKE=PASS`; `SMOKE_3B=84/84_PASS`; `SMOKE_STRUCTURE=52/52`; `BEHAVIORAL_CASES_COMPLETE=52/52`; `CONNECTOR_RUNTIME_SMOKE=52/52_PASS_X5`; `C2_REGRESSION=36/36_PASS`.
+Evidencia de cierre: `CORRELATION_SMOKE=PASS`; `SMOKE_3B=84/84_PASS`; `CONNECTOR_RUNTIME_SMOKE=54/54_PASS`; `ESCALON_3C_B_SMOKE=24/24_PASS`; `SUPERVISED_EXECUTION_SMOKE=38/38`; `ESCALON_3C_C_DELIVERY_SMOKE=26/26_PASS`; `ESCALON_3C_D_HEALTH_SMOKE=34/34_PASS`; `SUPERVISED_RECOVERY_SMOKE=67/67`; `C2_REGRESSION=36/36_PASS`.
 
 `ESCALON_1_STATUS=VERIFIED_CLOSED`: se cerraron y verificaron la reconciliación de repositorio y la autoridad canónica, no el producto ni el release.
 
@@ -29,16 +29,19 @@ Evidencia de cierre: `CORRELATION_SMOKE=PASS`; `SMOKE_3B=84/84_PASS`; `SMOKE_STR
 - Paquetes canónicos de contexto son deterministas, presupuestados y específicos por agente; los adapters 2C-B producen sólo handoffs inmutables para consumidores internos inyectables y el runtime por defecto responde `not_connected`.
 - 3A conserva intake humano durable; 3B-R1 agrega requests independientes en casos de evidencia deterministas y limita MEMORIA a un append del orquestador después de aceptación.
 - 3C-A aporta contrato, persistencia, coordinación y runtime local seguro para intentos de connector, con presupuesto confiable, concurrencia, timeout de adapter, cancelación linealizada, retry, circuit breaker y reconciliación acotada.
+- 3C-B añade exclusivamente `structured_analysis`: un conector local, determinista y sin red para paquetes autorizados; `manual_reference` sigue siendo inerte y los fixtures no acreditan proveedores ni evidencia externa.
+- 3C-C conecta el flujo supervisado durable desde intake hasta entrega previa a `receiveContribution`, con replay, concurrencia, cancelación, fallo parcial y reanudación sin repetir el adapter ni fabricar autoridad.
+- 3C-D diagnostica y recupera localmente mediante planes explícitos y allowlisted, reconstruye derivados y salud, conserva corrupción y sincroniza sólo trabajo durable compatible; no ejecuta adapters, reintentos de proveedor ni red.
 
 ## Límites abiertos
 
-Escalón 3 continúa abierto después de completar 3C-A; 3C-B, 3C-C y 3C-D no comenzaron. Permanecen pendientes UI de MEMORIA y conectores, autenticación humana end-to-end, agentes y proveedores reales, aprendizaje entre proyectos, búsqueda semántica/vectorial, investigación remota, planner comercial, Codex/executor real, QA y seguridad globales, preview embebido/QA visual, Git/CI/entrega remota, observabilidad y prueba integral.
+El Escalón 3 queda cerrado sólo como flujo local supervisado. Permanecen pendientes UI de MEMORIA y conectores, autenticación humana end-to-end, agentes y proveedores reales, aprendizaje entre proyectos, búsqueda semántica/vectorial, investigación remota, planner comercial, Codex/executor real, QA y seguridad globales, preview embebido/QA visual, Git/CI/entrega remota, observabilidad y prueba integral.
 
 El preview no está demostrado como iframe ni validado visualmente; sólo puede abrirse un recurso local previamente validado. Aprobación local no equivale a validación técnica o visual. No hay deploy, publicación, red ni proyecto comercial real.
 
 ## Deuda y próximo paso
 
-`npm run lint` global continúa FAIL heredado: 306 errores, 0 warnings, 73 archivos afectados bajo `src/factory/hermes-*`. La deuda Hermes permanece intacta, el quality gate global sigue abierto y no se alteraron reglas. JEFE no está release-ready; UI, autenticación humana end-to-end, QA visual, deploy y proyecto comercial real siguen pendientes. El runtime 3C-A no autoriza ejecución remota ni cambia el `NEXT` canónico.
+`npm run lint` global continúa FAIL heredado: 306 errores, 0 warnings, 73 archivos afectados bajo `src/factory/hermes-*`. La deuda Hermes permanece intacta, el quality gate global sigue abierto y no se alteraron reglas. JEFE no está release-ready; UI, autenticación humana end-to-end, QA visual, deploy y proyecto comercial real siguen pendientes. Los cierres 3C-B, 3C-C y 3C-D no autorizan ejecución remota ni cambian los límites de red; el próximo bloque canónico es 4A, sin iniciar su implementación.
 
 ## Escalón 3B — investigación supervisada
 
@@ -50,8 +53,16 @@ El preview no está demostrado como iframe ni validado visualmente; sólo puede 
 
 ## Escalón 3C-A — runtime seguro de conectores
 
-`STATUS=ESCALON_3C_A_COMPLETED`; `CONNECTOR_RUNTIME_SMOKE=52/52_PASS_X5`. Los intentos son cerrados, durables e idempotentes; el caller no controla adapter, provider, presupuesto, timeout, circuit breaker, IDs ni autoridad. Los adapters inyectados sólo pueden devolver candidatos no confiables, que el runtime valida bajo un contrato cerrado. La única vía hacia la evidencia 3B es `receiveContribution`, que vuelve a validar correlación y receipt; el runtime no decide `accepted_for_context` ni escribe MEMORIA por su cuenta.
+`STATUS=ESCALON_3C_A_COMPLETED`; el cierre original obtuvo `CONNECTOR_RUNTIME_SMOKE=52/52_PASS_X5` y la regresión actual pasa `54/54`. Los intentos son cerrados, durables e idempotentes; el caller no controla adapter, provider, presupuesto, timeout, circuit breaker, IDs ni autoridad. Los adapters inyectados sólo pueden devolver candidatos no confiables, que el runtime valida bajo un contrato cerrado. La única vía hacia la evidencia 3B es `receiveContribution`, que vuelve a validar correlación y receipt; el runtime no decide `accepted_for_context` ni escribe MEMORIA por su cuenta.
 
-El smoke 3C-A completó `SMOKE_STRUCTURE=52/52`, `BEHAVIORAL_CASES_COMPLETE=52/52` y `BEHAVIORAL_CASES_REAL=1-52` en cinco ejecuciones, además de las regresiones cruzadas. Esto acredita comportamiento local con fixtures inyectadas, no red, DNS, fetch, shell, navegador, Electron, providers reales, generación, preview, publicación o deploy.
+El cierre original de 3C-A completó `52/52` en cinco ejecuciones; la regresión actual completa `SMOKE_STRUCTURE=54/54`, `BEHAVIORAL_CASES_COMPLETE=54/54` y `BEHAVIORAL_CASES_REAL=1-54`. Esto acredita comportamiento local con fixtures inyectadas, no red, DNS, fetch, shell, navegador, Electron, providers reales, generación, preview, publicación o deploy.
 
 La matriz cruzada reexpuso una flake C2 entre instancias de MEMORIA sobre el mismo root. La persistencia ahora serializa append/rebuild por root dentro del proceso y usa staging globalmente único; C2 pasó 36/36 en diez ejecuciones consecutivas. No existe locking multiproceso.
+
+## Cierre 3C-B, 3C-C y 3C-D
+
+`ESCALON_3_STATUS=VERIFIED_CLOSED`; `ESCALON_3C_STATUS=VERIFIED_CLOSED`; `ESCALON_3C_B_STATUS=COMPLETED`; `ESCALON_3C_C_STATUS=COMPLETED`; `ESCALON_3C_D_STATUS=COMPLETED`; `RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`.
+
+3C-B integra solamente el conector local `structured_analysis`, con input y candidate deterministas y sin red. 3C-C hace durable el flujo de preparación, ejecución explícita y entrega previa al gate de evidencia; el adapter no se repite al reanudar una entrega o sincronización. 3C-D incorpora diagnóstico, plan y recuperación local por root físico, reconstrucción de índices/salud y aislamiento conservador de corrupción. Ningún bloque ejecuta proveedores reales, DNS, fetch, shell, navegador, Electron, proyecto comercial, UI, preview, publicación o deploy.
+
+La evidencia focal es `24/24` para 3C-B, `38/38` y `26/26` para 3C-C, y `34/34` y `67/67` para 3C-D. El siguiente bloque es `ESCALON_4A_PLANNER_AND_EXECUTABLE_CONTRACTS`; no fue iniciado por este cierre.

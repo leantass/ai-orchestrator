@@ -63,6 +63,8 @@ const names = [
   'concurrencia y aislamiento A B',
   'compatibilidad manual fixture y externos',
   'traps de capacidades en recovery',
+  'preflight causal y contexto bloquea delivery adulterada',
+  'payload durable controlled queda ligado al input autoritativo',
 ]
 const checks = new Map()
 
@@ -72,6 +74,19 @@ function digest(value) {
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value))
+}
+
+async function treeSnapshot(base) {
+  const output = {}
+  async function visit(current) {
+    for (const entry of await fs.promises.readdir(current, { withFileTypes: true }).catch(() => [])) {
+      const target = path.join(current, entry.name)
+      if (entry.isDirectory()) await visit(target)
+      else output[path.relative(base, target)] = await fs.promises.readFile(target, 'utf8')
+    }
+  }
+  await visit(base)
+  return output
 }
 
 function throwsCode(run, code) {
@@ -136,19 +151,32 @@ function environment(name, options = {}) {
       const receipt = providerReceipt(value.rawReceipt, { researchRequestId, providerType, budget: connectorBudget }, now)
       let result = committed.get(receipt.receiptId)
       if (!result) {
+        const evidence = {
+          evidenceId: `evidence-${digest(canonical({ request: researchRequestId, receipt: receipt.receiptId, claim: value.claim })).slice(0, 32)}`,
+          state: 'needs_corroboration',
+          nextResponsible: 'scout',
+          claim: value.claim,
+          classification: 'UNTRUSTED_EXTERNAL_CONTENT',
+          corroborationCount: 0,
+          contradictionCount: 0,
+        }
         result = {
           receipt,
           state: 'needs_corroboration',
           researchPlanId: context.researchPlanId,
           evidenceCaseId: context.evidenceCaseId,
-          evidence: null,
+          evidence,
           memory: { status: 'not_applicable', entryId: null },
         }
         committed.set(receipt.receiptId, result)
         counters.commits += 1
       }
       if (behavior.throwAfterCommit && counters.receives === 1) throw new Error('controlled post-commit crash')
-      return clone(result)
+      const output = clone(result)
+      if (behavior.nullEvidence) output.evidence = null
+      if (behavior.forgedEvidence) output.evidence = { ...output.evidence, evidenceId: `evidence-${'f'.repeat(32)}`, claim: `${output.evidence.claim} adulterado` }
+      if (behavior.futureReceipt) output.receipt.receivedAt = '2099-08-25T03:00:00.000Z'
+      return output
     },
   })
   const attemptInput = {
@@ -209,9 +237,9 @@ function directDelivery(env) {
 async function persistPending(env) {
   const runtime = runtimeFor(env)
   const prepared = await runtime.prepareConnectorAttempt(env.attemptInput)
-  const running = (await env.persistence.transitionAttempt(prepared.record.connectorAttemptId, (prior) => ({ ...prior, state: 'running', updatedAt: now }))).record
+  const running = (await env.persistence.claimExecution(prepared.record.connectorAttemptId, { expectedRevision: prepared.record.revision, now, maxTransientFailures: Number.MAX_SAFE_INTEGER, circuitCooldownMs: 60000 })).record
   const outbox = delivery({ record: running, context: env.context, rawReceipt: rawReceiptFor(env), claim: env.input.objective, budget: env.input.budget, now })
-  return (await env.persistence.transitionAttempt(running.connectorAttemptId, (prior) => ({ ...prior, state: 'contributing', delivery: outbox, updatedAt: now }))).record
+  return (await env.persistence.completeCircuitObservation(running.connectorAttemptId, { expectedStates: ['running'], expectedRevision: running.revision, nextState: 'contributing', patch: { delivery: outbox, updatedAt: now }, outcome: 'success', now, maxTransientFailures: Number.MAX_SAFE_INTEGER, circuitCooldownMs: 60000 })).record
 }
 
 let transientPromise
@@ -258,12 +286,7 @@ async function crashScenario() {
     let crashTerminal = true
     const base = env.persistence
     const crashingPersistence = {
-      authorityRoot: base.authorityRoot,
-      createReservedAttempt: (...args) => base.createReservedAttempt(...args),
-      updateHealth: (...args) => base.updateHealth(...args),
-      readHealth: (...args) => base.readHealth(...args),
-      read: (...args) => base.read(...args),
-      listAllAttempts: (...args) => base.listAllAttempts(...args),
+      ...base,
       transitionAttempt(id, spec) {
         if (crashTerminal && spec && ['succeeded', 'partial'].includes(spec.nextState)) {
           crashTerminal = false
@@ -547,7 +570,8 @@ checks.set(23, async () => {
   const fixturePrepared = await fixtureRuntime.prepareConnectorAttempt(fixtureEnv.attemptInput)
   assert.equal((await fixtureRuntime.executePreparedAttempt(fixturePrepared.record.connectorAttemptId)).state, 'partial')
   assert.equal(fixtureEnv.counters.lastPayload.rawReceipt.method, 'injected_controlled_adapter')
-  assert.equal(fixtureEnv.counters.inputs, 0)
+  assert.equal(fixtureEnv.counters.inputs, 1)
+  assert.deepEqual((await fixtureEnv.persistence.read(fixturePrepared.record.connectorAttemptId)).delivery.budget, fixtureEnv.input.budget)
 
   let externalCalls = 0
   const externalRuntime = createConnectorRuntime({ persistence: createConnectorPersistence({ root: path.join(root, 'external') }), clock: () => now, trustedAdapters: { 'metasearch-not-connected': () => { externalCalls += 1; return { state: 'not_executed' } } } })
@@ -590,6 +614,140 @@ checks.set(24, async () => {
     assert.deepEqual(calls, [])
   } finally {
     for (const restore of restores.reverse()) restore()
+  }
+})
+
+checks.set(25, async () => {
+  const lineageBehavior = { onReceive() { throw new Error('controlled delivery rejection') } }
+  const lineage = environment('delivery-lineage-preflight', { behavior: lineageBehavior })
+  const lineageAdapter = { calls: 0 }
+  const lineageRuntime = runtimeFor(lineage, { adapters: { 'structured-analysis-local': countedProduct(lineageAdapter) }, policy: { maxAttempts: 3 } })
+  const rootAttempt = await lineageRuntime.prepareConnectorAttempt(lineage.attemptInput)
+  assert.equal((await lineageRuntime.executePreparedAttempt(rootAttempt.record.connectorAttemptId)).state, 'failed_transient')
+  const child = await lineageRuntime.retryAttempt(rootAttempt.record.connectorAttemptId)
+  const undefinedBirth = await lineage.persistence.read(child.attempt)
+  undefinedBirth.delivery.rawReceipt.extra = undefined
+  await rejectsCode(() => lineage.persistence.createReservedAttempt(undefinedBirth, { maxReservationsPerProject: 8, reservationCost: 0 }), 'INVALID_ATTEMPT')
+  assert.equal((await lineageRuntime.executePreparedAttempt(child.attempt)).state, 'failed_transient')
+  const grandchild = await lineageRuntime.retryAttempt(child.attempt)
+  const rootFile = path.join(lineage.storeRoot, `${rootAttempt.record.connectorAttemptId}.json`)
+  await fs.promises.rm(rootFile)
+  const lineageBefore = await treeSnapshot(lineage.storeRoot)
+  const receivesBefore = lineage.counters.receives
+  const adapterCallsBefore = lineageAdapter.calls
+  await rejectsCode(() => lineageRuntime.retryAttempt(child.attempt), 'HEALTH_SOURCE_INCOMPLETE')
+  await rejectsCode(() => lineageRuntime.executePreparedAttempt(grandchild.attempt), 'HEALTH_SOURCE_INCOMPLETE')
+  assert.equal(lineage.counters.receives, receivesBefore)
+  assert.equal(lineageAdapter.calls, adapterCallsBefore)
+  assert.deepEqual(await treeSnapshot(lineage.storeRoot), lineageBefore)
+  assert.equal((await lineage.persistence.listAllAttempts(lineage.context.projectId)).length, 2)
+
+  const contextBehavior = { onReceive() { throw new Error('controlled delivery rejection') } }
+  const context = environment('delivery-context-preflight', { behavior: contextBehavior })
+  const contextAdapter = { calls: 0 }
+  const initialRuntime = runtimeFor(context, { adapters: { 'structured-analysis-local': countedProduct(contextAdapter) } })
+  const initial = await initialRuntime.prepareConnectorAttempt(context.attemptInput)
+  assert.equal((await initialRuntime.executePreparedAttempt(initial.record.connectorAttemptId)).state, 'failed_transient')
+  const retry = await initialRuntime.retryAttempt(initial.record.connectorAttemptId)
+  const crossCounters = { contexts: 0, inputs: 0, receives: 0 }
+  const crossBridge = Object.freeze({
+    getContributionContext(researchRequestId) {
+      crossCounters.contexts += 1
+      assert.equal(researchRequestId, context.context.researchRequestId)
+      return { ...clone(context.context), evidenceCaseId: `evidence-case-${digest('cross-evidence-case').slice(0, 32)}` }
+    },
+    getConnectorInput(researchRequestId) {
+      crossCounters.inputs += 1
+      assert.equal(researchRequestId, context.context.researchRequestId)
+      return clone(context.input)
+    },
+    async receiveContribution() {
+      crossCounters.receives += 1
+      throw new Error('forbidden receive')
+    },
+  })
+  const adapterTrap = { calls: 0 }
+  const crossRuntime = runtimeFor(context, { persistence: createConnectorPersistence({ root: context.storeRoot }), bridge: crossBridge, adapters: { 'structured-analysis-local': countedProduct(adapterTrap) } })
+  const contextBefore = await treeSnapshot(context.storeRoot)
+  await rejectsCode(() => crossRuntime.executePreparedAttempt(retry.attempt), 'INVALID_RESEARCH_CORRELATION')
+  assert.deepEqual(crossCounters, { contexts: 1, inputs: 0, receives: 0 })
+  assert.equal(adapterTrap.calls, 0)
+  assert.deepEqual(await treeSnapshot(context.storeRoot), contextBefore)
+})
+
+checks.set(26, async () => {
+  const behavior = { rejectBeforeCommit: true }
+  const env = environment('controlled-durable-payload-binding', { behavior })
+  const physicalAdapter = { calls: 0 }
+  const firstRuntime = runtimeFor(env, { adapters: { 'structured-analysis-local': countedProduct(physicalAdapter) } })
+  const prepared = await firstRuntime.prepareConnectorAttempt(env.attemptInput)
+  assert.equal((await firstRuntime.executePreparedAttempt(prepared.record.connectorAttemptId)).state, 'failed_transient')
+  behavior.rejectBeforeCommit = false
+  const retry = await firstRuntime.retryAttempt(prepared.record.connectorAttemptId)
+  const parent = await env.persistence.read(prepared.record.connectorAttemptId)
+  const child = await env.persistence.read(retry.attempt)
+
+  const forgedExcerpt = canonical({ evidenceStatus: 'independent_evidence_required', forged: true, questionCount: env.input.questions.length })
+  const forgedBytes = Buffer.byteLength(forgedExcerpt, 'utf8')
+  const forgedRawReceipt = {
+    ...rawReceiptFor(env),
+    bytes: forgedBytes,
+    contentHash: digest(forgedExcerpt),
+    excerpt: forgedExcerpt,
+    consumed: { ...rawReceiptFor(env).consumed, bytes: forgedBytes },
+  }
+  const forgedClaim = `${env.input.objective} adulterado`
+  const forgedDelivery = delivery({ record: child, context: env.context, rawReceipt: forgedRawReceipt, claim: forgedClaim, budget: env.input.budget, now: child.delivery.createdAt })
+  assert.notEqual(forgedDelivery.deliveryId, child.delivery.deliveryId)
+  assert.notEqual(forgedDelivery.expectedReceiptId, child.delivery.expectedReceiptId)
+  assert.equal(forgedDelivery.rawReceipt.method, 'controlled_adapter')
+  assert.deepEqual(validateDelivery(forgedDelivery, parent), forgedDelivery)
+  assert.deepEqual(validateDelivery(forgedDelivery, child), forgedDelivery)
+
+  for (const record of [parent, child]) {
+    const target = path.join(env.storeRoot, `${record.connectorAttemptId}.json`)
+    await fs.promises.writeFile(target, `${canonical({ ...record, delivery: forgedDelivery })}\n`, 'utf8')
+  }
+  assert.equal((await env.persistence.diagnoseDerivedHealth('structured-analysis-local', { maxTransientFailures: Number.MAX_SAFE_INTEGER, circuitCooldownMs: 60000 })).sourceIntegrity, 'complete')
+
+  const before = await treeSnapshot(env.storeRoot)
+  const receivesBefore = env.counters.receives
+  const adapterTrap = { calls: 0 }
+  const runtime = runtimeFor(env, { persistence: createConnectorPersistence({ root: env.storeRoot }), adapters: { 'structured-analysis-local': countedProduct(adapterTrap) } })
+  await rejectsCode(() => runtime.retryAttempt(parent.connectorAttemptId), 'INVALID_RESEARCH_CORRELATION')
+  await rejectsCode(() => runtime.executePreparedAttempt(child.connectorAttemptId), 'INVALID_RESEARCH_CORRELATION')
+  assert.equal(env.counters.receives, receivesBefore)
+  assert.equal(adapterTrap.calls, 0)
+  assert.equal(physicalAdapter.calls, 1)
+  assert.deepEqual(await treeSnapshot(env.storeRoot), before)
+
+  const methodSwapped = delivery({ record: child, context: env.context, rawReceipt: { ...forgedRawReceipt, method: 'injected_controlled_adapter' }, claim: forgedClaim, budget: env.input.budget, now: child.delivery.createdAt })
+  assert.equal(methodSwapped.rawReceipt.method, 'injected_controlled_adapter')
+  for (const record of [parent, child]) {
+    const target = path.join(env.storeRoot, `${record.connectorAttemptId}.json`)
+    await fs.promises.writeFile(target, `${canonical({ ...record, delivery: methodSwapped })}\n`, 'utf8')
+  }
+  const swappedBefore = await treeSnapshot(env.storeRoot)
+  await rejectsCode(() => runtime.retryAttempt(parent.connectorAttemptId), 'INVALID_RESEARCH_CORRELATION')
+  await rejectsCode(() => runtime.executePreparedAttempt(child.connectorAttemptId), 'INVALID_RESEARCH_CORRELATION')
+  assert.equal(env.counters.receives, receivesBefore)
+  assert.equal(adapterTrap.calls, 0)
+  assert.deepEqual(await treeSnapshot(env.storeRoot), swappedBefore)
+
+  for (const [suffix, behaviorPatch] of [['null-evidence', { nullEvidence: true }], ['forged-evidence', { forgedEvidence: true }], ['future-receipt', { futureReceipt: true }]]) {
+    const malformed = environment(`controlled-receive-${suffix}`, { behavior: behaviorPatch })
+    const malformedAdapter = { calls: 0 }
+    const malformedRuntime = runtimeFor(malformed, { adapters: { 'structured-analysis-local': countedProduct(malformedAdapter) } })
+    const malformedPrepared = await malformedRuntime.prepareConnectorAttempt(malformed.attemptInput)
+    const malformedResult = await malformedRuntime.executePreparedAttempt(malformedPrepared.record.connectorAttemptId)
+    const malformedSaved = await malformed.persistence.read(malformedPrepared.record.connectorAttemptId)
+    assert.equal(malformedResult.state, 'failed_transient')
+    assert.equal(malformedSaved.errorCode, 'RESEARCH_RECEIVE_REJECTED')
+    assert.equal(malformedSaved.delivery.state, 'pending')
+    assert.equal(Object.hasOwn(malformedSaved, 'receipt'), false)
+    assert.equal(Object.hasOwn(malformedSaved, 'research'), false)
+    assert.equal(malformed.counters.receives, 1)
+    assert.equal(malformedAdapter.calls, 1)
   }
 })
 

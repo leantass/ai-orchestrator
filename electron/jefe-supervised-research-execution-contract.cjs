@@ -5,7 +5,7 @@ const SCHEMA_VERSION = 'jefe-supervised-research-execution-flow/v1'
 const FLOW_ID = /^research-execution-[a-f0-9]{32}$/u
 const INTAKE_ID = /^intake-[a-f0-9]{32}$/u
 const ROUTING_FINGERPRINT = /^[a-f0-9]{64}$/u
-const SAFE_ID = /^[a-z][a-z0-9_-]{2,80}$/u
+const SAFE_ID = /^[a-z][a-z0-9-]{2,80}$/u
 const PACKAGE_ID = /^context-package-[a-f0-9]{32}$/u
 const HANDOFF_ID = /^agent-handoff-[a-f0-9]{32}$/u
 const RESEARCH_PLAN_ID = /^research-plan-[a-f0-9]{32}$/u
@@ -342,7 +342,9 @@ function transitionExecutionFlow(record, nextState, patch, now) {
   const prior = validateExecutionFlow(record)
   if (!FLOW_STATES.includes(nextState) || !TRANSITIONS[prior.state].includes(nextState)) fail('INVALID_EXECUTION_TRANSITION', 'Transicion de flujo no permitida.')
   if (!plainObject(patch) || Object.keys(patch).some((key) => !TRANSITION_PATCH_FIELDS.includes(key))) fail('INVALID_EXECUTION_TRANSITION', 'Patch de flujo no permitido.')
-  const proposed = validateExecutionFlow({ ...clone(prior), ...clone(patch), state: nextState, updatedAt: timestamp(now) })
+  const updatedAt = timestamp(now)
+  if (Date.parse(updatedAt) < Date.parse(prior.updatedAt)) fail('INVALID_EXECUTION_TIMESTAMP', 'Timestamp de ejecucion invalido.')
+  const proposed = validateExecutionFlow({ ...clone(prior), ...clone(patch), state: nextState, updatedAt })
   if (canonical(immutableSeed(prior)) !== canonical(immutableSeed(proposed))) fail('IMMUTABLE_EXECUTION_IDENTITY', 'La identidad del flujo no puede cambiar.')
   if (Object.keys(prior.packageRefs).length > 0 && canonical(prior.packageRefs) !== canonical(proposed.packageRefs)) fail('IMMUTABLE_PACKAGE_REFS', 'Los paquetes del flujo no pueden cambiar.')
   if (prior.researchPlanId !== null && (proposed.researchPlanId !== prior.researchPlanId || proposed.evidenceCaseId !== prior.evidenceCaseId)) fail('IMMUTABLE_RESEARCH_REFS', 'Plan y caso no pueden cambiar.')

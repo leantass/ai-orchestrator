@@ -1,8 +1,10 @@
 const crypto = require('crypto')
+const { physicalRootKey } = require('./jefe-physical-root.cjs')
 const { request, receipt, safeResearchText } = require('./jefe-research-contract.cjs')
 const { candidate } = require('./jefe-research-evidence-contract.cjs')
 const { evaluate, publicView } = require('./jefe-research-evidence-gate.cjs')
 const { canonical } = require('./jefe-context-package-contract.cjs')
+const { sessionWriteCompatibility } = require('./jefe-supervised-research-persistence.cjs')
 
 const operationLocks = new Map()
 let memoryStoreSequence = 0
@@ -13,6 +15,7 @@ const HANDOFF_ID = /^agent-handoff-[a-f0-9]{32}$/u
 const RESEARCH_REQUEST_ID = /^research-[a-f0-9]{32}$/u
 const RESEARCH_PLAN_ID = /^research-plan-[a-f0-9]{32}$/u
 const EVIDENCE_CASE_ID = /^evidence-case-[a-f0-9]{32}$/u
+const RECOVERY_FINGERPRINT = /^[a-f0-9]{64}$/u
 const PHYSICAL_IDENTITY_FIELDS = Object.freeze(['projectId', 'runId', 'versionId'])
 const PACKAGE_REFERENCE_FIELDS = Object.freeze(['agent', 'packageId', 'handoffId', 'consumerStatus'])
 const STORED_REQUEST_FIELDS = Object.freeze([
@@ -137,6 +140,11 @@ function exclusive(key, work) {
   })
 }
 
+function exclusiveMany(keys, work, index = 0) {
+  if (index >= keys.length) return work()
+  return exclusive(keys[index], () => exclusiveMany(keys, work, index + 1))
+}
+
 function correlationSeed(value) {
   if (!value || typeof value !== 'object') fail('INVALID_RESEARCH_PLAN', 'Plan de investigacion invalido.')
   const identity = physicalIdentity(value.identity, 'INVALID_RESEARCH_PLAN')
@@ -204,7 +212,19 @@ function createMemoryCasePersistence() {
   const list = async (projectId) => [...values.values()].filter((item) => !projectId || item.projectId === projectId).sort((a, b) => a.evidenceCaseId.localeCompare(b.evidenceCaseId)).map(clone)
   const findByRequestId = async (id) => clone([...values.values()].find((item) => item.requests.some((requestRecord) => requestRecord.researchRequestId === id)) || null)
   const rebuildIndex = async () => ({ index: { evidenceCaseIds: [...values.keys()].sort() }, idempotent: true })
-  return { authorityRoot, read, write, create: write, update, list, findByRequestId, rebuildIndex }
+  const withExactSnapshots = async (projectId, snapshots, work) => {
+    const captured = []
+    for (const snapshot of snapshots) {
+      const record = values.get(snapshot.evidenceCaseId) || null
+      if (snapshot.revision === null) {
+        if (record) fail('STALE_RECONCILE_CANDIDATE', 'El caso ausente ya no coincide con el snapshot.')
+      } else if (!record || record.projectId !== projectId || canonical(recoveryCandidateForMemory(record)) !== canonical(snapshot)) fail('STALE_RECONCILE_CANDIDATE', 'El caso ya no coincide con el snapshot.')
+      captured.push({ evidenceCaseId: snapshot.evidenceCaseId, record: record ? clone(record) : null })
+    }
+    return work(captured)
+  }
+  const recoveryCandidateForMemory = (record) => ({ evidenceCaseId: record.evidenceCaseId, revision: record.revision, state: record.state, fingerprint: digest(record) })
+  return { authorityRoot, read, write, create: write, update, list, listAll: list, findByRequestId, withExactSnapshots, rebuildIndex }
 }
 
 function normalizedClaim(value) {
@@ -243,12 +263,21 @@ function caseIdentity(caseRecord) {
 
 function createSupervisedResearch({ memory = null, persistence = null, evidenceCasePersistence = null, clock = () => new Date().toISOString(), trusted = {} } = {}) {
   const caseStore = evidenceCasePersistence || createMemoryCasePersistence()
-  if (!caseStore || typeof caseStore.read !== 'function' || typeof caseStore.write !== 'function' || typeof caseStore.update !== 'function' || typeof caseStore.findByRequestId !== 'function') fail('INVALID_EVIDENCE_CASE_PERSISTENCE', 'Persistencia de casos invalida.')
+  if (!caseStore || typeof caseStore.read !== 'function' || typeof caseStore.write !== 'function' || typeof caseStore.update !== 'function' || typeof caseStore.findByRequestId !== 'function' || typeof caseStore.list !== 'function' || typeof caseStore.withExactSnapshots !== 'function' || typeof caseStore.rebuildIndex !== 'function') fail('INVALID_EVIDENCE_CASE_PERSISTENCE', 'Persistencia de casos invalida.')
   const records = new Map()
   const requestCases = new Map()
   const requests = {}
-  const operationKey = (evidenceCaseId) => `${caseStore.authorityRoot || 'evidence-case-store'}:${evidenceCaseId}`
+  const rawAuthorityRoot = caseStore.authorityRoot || 'evidence-case-store'
+  const operationAuthorityRoot = physicalRootKey(rawAuthorityRoot)
+  const operationKey = (evidenceCaseId) => `${operationAuthorityRoot}:${evidenceCaseId}`
   const sessionId = (researchRequestId) => `research-session-${digest(researchRequestId).slice(0, 32)}`
+  const caseTimestamp = (prior, advance = false) => {
+    const observed = clock()
+    const observedTime = Date.parse(observed)
+    const priorTime = Date.parse(prior)
+    if (Number.isNaN(observedTime) || Number.isNaN(priorTime)) return observed
+    return new Date(Math.max(observedTime, priorTime + Number(advance))).toISOString()
+  }
 
   function registerCase(caseRecord) {
     caseIdentity(caseRecord)
@@ -268,6 +297,60 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
         researchPlanId: caseRecord.researchPlanId,
       })
     }
+  }
+
+  function recoveryCandidate(caseRecord) {
+    caseIdentity(caseRecord)
+    if (!Number.isSafeInteger(caseRecord.revision) || caseRecord.revision < 0 || typeof caseRecord.state !== 'string') fail('INVALID_EVIDENCE_CASE_IDENTITY', 'Caso de evidencia invalido para recovery.')
+    return {
+      evidenceCaseId: caseRecord.evidenceCaseId,
+      revision: caseRecord.revision,
+      state: caseRecord.state,
+      fingerprint: digest(caseRecord),
+    }
+  }
+
+  function recoveryCandidates(value, limit) {
+    if (!Array.isArray(value) || value.length > limit || value.length > 50) fail('INVALID_RECONCILE_CANDIDATES', 'Candidatos de reconciliacion invalidos.')
+    const identifiers = new Set()
+    return value.map((candidateRecord) => {
+      if (!hasExactFields(candidateRecord, ['evidenceCaseId', 'revision', 'state', 'fingerprint']) || !EVIDENCE_CASE_ID.test(candidateRecord.evidenceCaseId) || !Number.isSafeInteger(candidateRecord.revision) || candidateRecord.revision < 0 || typeof candidateRecord.state !== 'string' || !RECOVERY_FINGERPRINT.test(candidateRecord.fingerprint) || identifiers.has(candidateRecord.evidenceCaseId)) fail('INVALID_RECONCILE_CANDIDATES', 'Candidatos de reconciliacion invalidos.')
+      identifiers.add(candidateRecord.evidenceCaseId)
+      return clone(candidateRecord)
+    }).sort((left, right) => left.evidenceCaseId.localeCompare(right.evidenceCaseId))
+  }
+
+  function exactEvidenceCaseSnapshots(value) {
+    if (!Array.isArray(value) || value.length > 50) fail('INVALID_RECONCILE_CANDIDATES', 'Snapshots de casos de evidencia invalidos.')
+    const identifiers = new Set()
+    return value.map((snapshot) => {
+      if (!hasExactFields(snapshot, ['evidenceCaseId', 'revision', 'state', 'fingerprint']) || !EVIDENCE_CASE_ID.test(snapshot.evidenceCaseId) || identifiers.has(snapshot.evidenceCaseId)) fail('INVALID_RECONCILE_CANDIDATES', 'Snapshots de casos de evidencia invalidos.')
+      const missing = snapshot.revision === null && snapshot.state === null && snapshot.fingerprint === null
+      const present = Number.isSafeInteger(snapshot.revision) && snapshot.revision >= 0 && typeof snapshot.state === 'string' && RECOVERY_FINGERPRINT.test(snapshot.fingerprint)
+      if (!missing && !present) fail('INVALID_RECONCILE_CANDIDATES', 'Snapshots de casos de evidencia invalidos.')
+      identifiers.add(snapshot.evidenceCaseId)
+      return clone(snapshot)
+    }).sort((left, right) => left.evidenceCaseId.localeCompare(right.evidenceCaseId))
+  }
+
+  async function withExactEvidenceCaseSnapshots(projectId, snapshots, work) {
+    if (typeof projectId !== 'string' || !CORRELATION_ID.test(projectId) || typeof work !== 'function') fail('INVALID_RECONCILE_CANDIDATES', 'Coordinacion exacta de casos invalida.')
+    const exactSnapshots = exactEvidenceCaseSnapshots(snapshots)
+    if (exactSnapshots.length === 0) return work(deepFreeze([]))
+    const keys = exactSnapshots.map((item) => operationKey(item.evidenceCaseId))
+    return exclusiveMany(keys, async () => {
+      try {
+        return await caseStore.withExactSnapshots(projectId, exactSnapshots, (captured) => work(deepFreeze(captured.map((item) => deepFreeze({ evidenceCaseId: item.evidenceCaseId, view: item.record ? evidenceCaseView(item.record) : null })))))
+      } catch (error) {
+        if (error?.code === 'STALE_EVIDENCE_CASE_SNAPSHOT') fail('STALE_RECONCILE_CANDIDATE', 'El caso de evidencia ya no coincide con el snapshot.')
+        throw error
+      }
+    })
+  }
+
+  function requireRecoveryCandidate(current, expected, projectId) {
+    if (!current || current.projectId !== projectId || canonical(recoveryCandidate(current)) !== canonical(expected)) fail('STALE_RECONCILE_CANDIDATE', 'El candidato de investigacion ya no coincide con el snapshot.')
+    return current
   }
 
   function sessionState(caseRecord, requestRecord) {
@@ -315,52 +398,111 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
     for (const requestRecord of caseRecord.requests) await persistSession(caseRecord, requestRecord)
   }
 
-  async function markCaseFailure(evidenceCaseId, error, pendingOperation) {
+  async function sessionProjectionState(caseRecord) {
+    if (!persistence) return 'synchronized'
+    if (typeof persistence.read !== 'function') return 'writable'
+    let writable = false
+    for (const requestRecord of caseRecord.requests) {
+      const stored = await persistence.read(sessionId(requestRecord.researchRequestId))
+      const projected = sessionRecord(caseRecord, requestRecord)
+      if (!stored) {
+        writable = true
+        continue
+      }
+      if (canonical(stored) === canonical(projected)) continue
+      if (sessionWriteCompatibility(stored, projected) !== 'compatible') return 'conflict'
+      writable = true
+    }
+    return writable ? 'writable' : 'synchronized'
+  }
+
+  function withoutPendingOperation(caseRecord, pendingOperation) {
+    const pendingOperations = caseRecord.pendingOperations.filter((item) => item !== pendingOperation)
+    const projected = { ...caseRecord, pendingOperations }
+    if (pendingOperations.length === 0) delete projected.lastErrorCode
+    return projected
+  }
+
+  async function requireWritableSessionProjection(caseRecord) {
+    const projected = withoutPendingOperation(caseRecord, 'sync_request_sessions')
+    const projectionState = await sessionProjectionState(projected)
+    if (projectionState === 'conflict') fail('RESEARCH_SESSION_PROJECTION_CONFLICT', 'La proyeccion durable de la sesion es incompatible.')
+    return { projected, projectionState }
+  }
+
+  async function markCaseFailure(evidenceCaseId, error, pendingOperation, advanceFailure = false) {
     try {
       return (await caseStore.update(evidenceCaseId, (current) => {
         const pendingOperations = [...new Set([...current.pendingOperations, pendingOperation])].sort()
-        return { ...current, pendingOperations, lastErrorCode: persistableErrorCode(error, 'RESEARCH_PERSISTENCE_FAILED'), updatedAt: clock() }
+        return { ...current, pendingOperations, lastErrorCode: persistableErrorCode(error, 'RESEARCH_PERSISTENCE_FAILED'), updatedAt: caseTimestamp(current.updatedAt, advanceFailure) }
       })).record
     } catch {
       return caseStore.read(evidenceCaseId)
     }
   }
 
-  async function completePreparation(evidenceCaseId) {
+  async function completePreparation(evidenceCaseId, advanceFailure = false) {
     let current = await caseStore.read(evidenceCaseId)
     if (!current) fail('EVIDENCE_CASE_NOT_FOUND', 'Caso de evidencia inexistente.')
     caseIdentity(current)
-    if (current.state !== 'preparing') {
+    if (current.state !== 'preparing' && !current.pendingOperations.includes('complete_plan')) {
       registerCase(current)
       return current
     }
+    await requireWritableSessionProjection(current)
     try {
-      for (const requestRecord of current.requests) {
-        if (!current.preparedRequestIds.includes(requestRecord.researchRequestId)) {
-          await persistSession(current, requestRecord)
-          current = (await caseStore.update(evidenceCaseId, (draft) => ({
-            ...draft,
-            preparedRequestIds: [...new Set([...draft.preparedRequestIds, requestRecord.researchRequestId])].sort(),
-            updatedAt: clock(),
-          }))).record
+      if (current.state === 'preparing') {
+        for (const requestRecord of current.requests) {
+          if (!current.preparedRequestIds.includes(requestRecord.researchRequestId)) {
+            await persistSession(current, requestRecord)
+            current = (await caseStore.update(evidenceCaseId, (draft) => ({
+              ...draft,
+              preparedRequestIds: [...new Set([...draft.preparedRequestIds, requestRecord.researchRequestId])].sort(),
+              updatedAt: caseTimestamp(draft.updatedAt),
+            }))).record
+          }
         }
-      }
-      current = (await caseStore.update(evidenceCaseId, (draft) => {
-        const next = {
+        current = (await caseStore.update(evidenceCaseId, (draft) => ({
           ...draft,
           state: 'ready',
-          pendingOperations: draft.pendingOperations.filter((item) => item !== 'complete_plan'),
+          pendingOperations: [...new Set([...draft.pendingOperations, 'complete_plan'])].sort(),
           nextResponsible: 'jefe',
-          updatedAt: clock(),
-        }
-        delete next.lastErrorCode
-        return next
-      })).record
-      await persistAllSessions(current)
+          updatedAt: caseTimestamp(draft.updatedAt),
+        }))).record
+      }
+      const synchronized = withoutPendingOperation(current, 'complete_plan')
+      await persistAllSessions(synchronized)
+      current = (await caseStore.update(evidenceCaseId, (draft) => withoutPendingOperation(draft, 'complete_plan'))).record
       registerCase(current)
       return current
     } catch (error) {
-      const failed = await markCaseFailure(evidenceCaseId, error, 'complete_plan')
+      const failed = await markCaseFailure(evidenceCaseId, error, 'complete_plan', advanceFailure)
+      if (failed) registerCase(failed)
+      throw error
+    }
+  }
+
+  async function synchronizeCaseSessions(caseRecord, advanceFailure = false) {
+    const { projected: initialSynchronized, projectionState } = await requireWritableSessionProjection(caseRecord)
+    try {
+      let journaled = caseRecord
+      let synchronized = initialSynchronized
+      if (projectionState === 'synchronized') {
+        if (!journaled.pendingOperations.includes('sync_request_sessions')) return journaled
+        return (await caseStore.update(caseRecord.evidenceCaseId, (draft) => withoutPendingOperation(draft, 'sync_request_sessions'))).record
+      }
+      if (!journaled.pendingOperations.includes('sync_request_sessions')) {
+        journaled = (await caseStore.update(caseRecord.evidenceCaseId, (draft) => ({
+          ...draft,
+          pendingOperations: [...new Set([...draft.pendingOperations, 'sync_request_sessions'])].sort(),
+          updatedAt: caseTimestamp(draft.updatedAt),
+        }))).record
+        synchronized = withoutPendingOperation(journaled, 'sync_request_sessions')
+      }
+      await persistAllSessions(synchronized)
+      return (await caseStore.update(caseRecord.evidenceCaseId, (draft) => withoutPendingOperation(draft, 'sync_request_sessions'))).record
+    } catch (error) {
+      const failed = await markCaseFailure(caseRecord.evidenceCaseId, error, 'sync_request_sessions', advanceFailure)
       if (failed) registerCase(failed)
       throw error
     }
@@ -455,7 +597,8 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
       }
       registerCase(current)
       if (current.state === 'preparing') current = await completePreparation(evidenceCaseId)
-      else await persistAllSessions(current)
+      else if (current.pendingOperations.includes('complete_plan')) current = await completePreparation(evidenceCaseId)
+      else current = await synchronizeCaseSessions(current)
       registerCase(current)
       return planResult(current)
     })
@@ -499,16 +642,17 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
     return next
   }
 
-  async function appendAcceptedMemory(caseRecord) {
+  async function appendAcceptedMemory(caseRecord, advanceFailure = false) {
     const identity = caseIdentity(caseRecord)
     if (caseRecord.state !== 'accepted_for_context' || !caseRecord.pendingOperations.includes('memory_append')) return caseRecord
+    await requireWritableSessionProjection(caseRecord)
     const decision = caseRecord.evidenceDecisions[0]
     const entryId = `research-evidence-${digest(caseRecord.evidenceCaseId).slice(0, 24)}`
     if (!memory || typeof memory.append !== 'function') {
       return (await caseStore.update(caseRecord.evidenceCaseId, (draft) => {
         const pendingOperations = [...new Set([...draft.pendingOperations, 'memory_append'])].sort()
-        if (draft.memory?.status === 'pending' && draft.memory.entryId === entryId && draft.lastErrorCode === 'MEMORY_NOT_CONFIGURED' && canonical(draft.pendingOperations) === canonical(pendingOperations)) return draft
-        return { ...draft, memory: { status: 'pending', entryId }, pendingOperations, lastErrorCode: 'MEMORY_NOT_CONFIGURED', updatedAt: clock() }
+        if (!advanceFailure && draft.memory?.status === 'pending' && draft.memory.entryId === entryId && draft.lastErrorCode === 'MEMORY_NOT_CONFIGURED' && canonical(draft.pendingOperations) === canonical(pendingOperations)) return draft
+        return { ...draft, memory: { status: 'pending', entryId }, pendingOperations, lastErrorCode: 'MEMORY_NOT_CONFIGURED', updatedAt: caseTimestamp(draft.updatedAt, advanceFailure) }
       })).record
     }
     const receiptIds = caseRecord.contributions.map((item) => item.receiptId).sort()
@@ -537,12 +681,13 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
         },
       })
       return (await caseStore.update(caseRecord.evidenceCaseId, (draft) => {
-        const next = { ...draft, memory: { status: 'appended', entryId }, pendingOperations: draft.pendingOperations.filter((item) => item !== 'memory_append'), updatedAt: clock() }
+        const pendingOperations = [...new Set([...draft.pendingOperations.filter((item) => item !== 'memory_append'), 'sync_request_sessions'])].sort()
+        const next = { ...draft, memory: { status: 'appended', entryId }, pendingOperations, updatedAt: caseTimestamp(draft.updatedAt) }
         delete next.lastErrorCode
         return next
       })).record
     } catch (error) {
-      return (await caseStore.update(caseRecord.evidenceCaseId, (draft) => ({ ...draft, memory: { status: 'pending', entryId }, pendingOperations: [...new Set([...draft.pendingOperations, 'memory_append'])].sort(), lastErrorCode: persistableErrorCode(error, 'MEMORY_APPEND_FAILED'), updatedAt: clock() }))).record
+      return (await caseStore.update(caseRecord.evidenceCaseId, (draft) => ({ ...draft, memory: { status: 'pending', entryId }, pendingOperations: [...new Set([...draft.pendingOperations, 'memory_append'])].sort(), lastErrorCode: persistableErrorCode(error, 'MEMORY_APPEND_FAILED'), updatedAt: caseTimestamp(draft.updatedAt, advanceFailure) }))).record
     }
   }
 
@@ -562,6 +707,7 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
       if (!current) fail('EVIDENCE_CASE_NOT_FOUND', 'Caso de evidencia inexistente.')
       caseIdentity(current)
       if (current.state === 'preparing') fail('EVIDENCE_CASE_NOT_READY', 'Caso de evidencia no preparado.')
+      await requireWritableSessionProjection(current)
       const requestRecord = current.requests.find((item) => item.researchRequestId === input.researchRequestId)
       if (!requestRecord) fail('REQUEST_NOT_IN_EVIDENCE_CASE', 'Solicitud no asociada al caso.')
       let got = receipt(input.rawReceipt, requestRecord, clock())
@@ -580,30 +726,34 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
             ...draft,
             receipts: [...draft.receipts, got].sort((a, b) => a.receiptId.localeCompare(b.receiptId)),
             contributions: [...draft.contributions, { researchRequestId: input.researchRequestId, receiptId: got.receiptId, claim: input.claim }].sort((a, b) => a.receiptId.localeCompare(b.receiptId)),
-            updatedAt: clock(),
+            updatedAt: caseTimestamp(draft.updatedAt),
           }
           const aggregated = aggregate(next)
+          aggregated.pendingOperations = [...new Set([...aggregated.pendingOperations, 'sync_request_sessions'])].sort()
           delete aggregated.lastErrorCode
           return aggregated
         })).record
       }
       current = await appendAcceptedMemory(await caseStore.read(current.evidenceCaseId))
-      try {
-        await persistAllSessions(current)
-      } catch (error) {
-        current = await markCaseFailure(current.evidenceCaseId, error, 'sync_request_sessions')
-        registerCase(current)
-        throw error
-      }
+      current = await synchronizeCaseSessions(current)
       registerCase(current)
       const decision = current.evidenceDecisions[0] || null
+      const ownContribution = current.contributions.find((item) => item.researchRequestId === input.researchRequestId && item.receiptId === got.receiptId)
+      const ownEvidence = ownContribution ? evidenceFromContribution(current, ownContribution) : null
+      const contributionDecision = ownEvidence && decision ? {
+        ...ownEvidence,
+        state: decision.state,
+        nextResponsible: decision.nextResponsible,
+        corroborations: [...(decision.corroborations || [])],
+        contradictions: [...(decision.contradictions || [])],
+      } : null
       return {
         state: current.state,
         researchPlanId: current.researchPlanId,
         evidenceCaseId: current.evidenceCaseId,
         identity: clone(caseIdentity(current)),
         receipt: got,
-        evidence: decision ? publicView(decision) : null,
+        evidence: contributionDecision ? publicView(contributionDecision) : null,
         memory: current.memory,
         pendingOperations: [...current.pendingOperations],
         lastErrorCode: current.lastErrorCode || null,
@@ -663,24 +813,24 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
     }
   }
 
+  async function retryEvidenceCaseUnlocked(evidenceCaseId, expected = null, projectId = null, advanceFailure = false) {
+    let current = await caseStore.read(evidenceCaseId)
+    if (!current) {
+      if (expected) fail('STALE_RECONCILE_CANDIDATE', 'El candidato de investigacion ya no existe.')
+      fail('EVIDENCE_CASE_NOT_FOUND', 'Caso de evidencia inexistente.')
+    }
+    caseIdentity(current)
+    if (expected) current = requireRecoveryCandidate(current, expected, projectId)
+    await requireWritableSessionProjection(current)
+    if (current.state === 'preparing' || current.pendingOperations.includes('complete_plan')) current = await completePreparation(evidenceCaseId, advanceFailure)
+    current = await appendAcceptedMemory(current, advanceFailure)
+    current = await synchronizeCaseSessions(current, advanceFailure)
+    registerCase(current)
+    return evidenceCaseView(current)
+  }
+
   async function retryEvidenceCase(evidenceCaseId) {
-    return exclusive(operationKey(evidenceCaseId), async () => {
-      let current = await caseStore.read(evidenceCaseId)
-      if (!current) fail('EVIDENCE_CASE_NOT_FOUND', 'Caso de evidencia inexistente.')
-      caseIdentity(current)
-      if (current.state === 'preparing') current = await completePreparation(evidenceCaseId)
-      current = await appendAcceptedMemory(current)
-      if (current.pendingOperations.includes('sync_request_sessions')) {
-        await persistAllSessions(current)
-        current = (await caseStore.update(evidenceCaseId, (draft) => {
-          const next = { ...draft, pendingOperations: draft.pendingOperations.filter((item) => item !== 'sync_request_sessions'), updatedAt: clock() }
-          delete next.lastErrorCode
-          return next
-        })).record
-      } else await persistAllSessions(current)
-      registerCase(current)
-      return evidenceCaseView(current)
-    })
+    return exclusive(operationKey(evidenceCaseId), () => retryEvidenceCaseUnlocked(evidenceCaseId))
   }
 
   async function retryPendingResearch(researchRequestId) {
@@ -688,15 +838,34 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
     return retryEvidenceCase(current.evidenceCaseId)
   }
 
-  async function reconcilePendingResearch(projectId) {
+  async function reconcilePendingResearch(projectId, limit = 50, candidates = undefined) {
     if (typeof projectId !== 'string' || !CORRELATION_ID.test(projectId)) fail('INVALID_PROJECT_ID', 'Proyecto invalido.')
-    const cases = await caseStore.list(projectId)
-    const results = []
-    for (const current of cases.sort((a, b) => a.evidenceCaseId.localeCompare(b.evidenceCaseId))) {
-      caseIdentity(current)
-      if (current.state === 'preparing' || current.pendingOperations.length > 0) results.push(await retryEvidenceCase(current.evidenceCaseId))
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) fail('INVALID_RECONCILE_LIMIT', 'Limite de reconciliacion invalido.')
+    if (candidates !== undefined) {
+      const exactCandidates = recoveryCandidates(candidates, limit)
+      if (exactCandidates.length === 0) return []
+      const keys = exactCandidates.map((item) => operationKey(item.evidenceCaseId))
+      return exclusiveMany(keys, async () => {
+        for (const item of exactCandidates) requireRecoveryCandidate(await caseStore.read(item.evidenceCaseId), item, projectId)
+        const results = []
+        for (const item of exactCandidates) {
+          try {
+            results.push(await retryEvidenceCaseUnlocked(item.evidenceCaseId, item, projectId, true))
+          } catch (error) {
+            if (typeof error?.code === 'string' && error.code.startsWith('STALE_')) throw error
+            const durable = await caseStore.read(item.evidenceCaseId)
+            const persistedErrorCodes = new Set([persistableErrorCode(error, 'RESEARCH_PERSISTENCE_FAILED'), persistableErrorCode(error, 'MEMORY_APPEND_FAILED')])
+            const advanced = durable && durable.revision > item.revision
+            if (!durable || durable.projectId !== projectId || !advanced || durable.pendingOperations.length === 0 || !persistedErrorCodes.has(durable.lastErrorCode)) throw error
+            results.push(evidenceCaseView(durable))
+          }
+        }
+        return results
+      })
     }
-    return results
+    const cases = typeof caseStore.listAll === 'function' ? await caseStore.listAll(projectId) : await caseStore.list(projectId, 1000)
+    const pending = cases.filter((current) => current.state === 'preparing' || current.pendingOperations.length > 0).sort((a, b) => Number(Boolean(a.lastErrorCode)) - Number(Boolean(b.lastErrorCode)) || (a.lastErrorCode && b.lastErrorCode ? a.revision - b.revision : 0) || a.evidenceCaseId.localeCompare(b.evidenceCaseId)).slice(0, limit)
+    return reconcilePendingResearch(projectId, limit, pending.map(recoveryCandidate))
   }
 
   async function reopen(researchRequestId) {
@@ -783,6 +952,7 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
     retryPendingResearch,
     retryEvidenceCase,
     reconcilePendingResearch,
+    withExactEvidenceCaseSnapshots,
     getResearchView,
     reopen,
     reopenEvidenceCase,

@@ -6,6 +6,7 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
+const { canonical } = require('../electron/jefe-context-package-contract.cjs')
 const {
   createSupervisedResearch,
   deriveEvidenceCaseId,
@@ -278,6 +279,47 @@ test('fallo parcial de preparación deja preparing durable y recuperable', () =>
   assert.equal(partial.record.pendingOperations.includes('complete_plan'), true)
   assert.equal(partial.record.preparedRequestIds.length, 0)
   assert.equal(partial.record.lastErrorCode, 'INJECTED_FAILURE')
+
+  const input = planInput(`${environment.token}-ready-sync-crash`)
+  const durableSessions = environment.requestStore()
+  let sessionWrites = 0
+  const failFinalSessionSync = {
+    async write(record) {
+      sessionWrites += 1
+      if (sessionWrites === 4) {
+        const error = new Error('Fallo final de sesiones inyectado.')
+        error.code = 'INJECTED_FAILURE'
+        throw error
+      }
+      return durableSessions.write(record)
+    },
+  }
+  const interrupted = environment.service({ persistence: failFinalSessionSync })
+  await rejectsCode(() => interrupted.plan(input), 'INJECTED_FAILURE')
+  const topic = {
+    identity: input.intake.identity,
+    projectId: input.intake.identity.projectId,
+    discoveryId: `discovery-${input.intake.intakeId.slice(7)}`,
+    intakeId: input.intake.intakeId,
+    objective: input.intake.objective,
+    questions: input.intake.questions,
+  }
+  const researchPlanId = deriveResearchPlanId(topic)
+  const evidenceCaseId = deriveEvidenceCaseId({ researchPlanId })
+  const readyPending = await environment.evidenceCaseStore().read(evidenceCaseId)
+  assert.equal(readyPending.state, 'ready')
+  assert.deepEqual(readyPending.pendingOperations, ['complete_plan'])
+  assert.equal(readyPending.preparedRequestIds.length, 3)
+  assert.equal(readyPending.lastErrorCode, 'INJECTED_FAILURE')
+
+  const fresh = environment.service()
+  const recovered = await fresh.retryEvidenceCase(evidenceCaseId)
+  assert.equal(recovered.state, 'ready')
+  assert.deepEqual(recovered.pendingOperations, [])
+  assert.deepEqual(await fresh.reconcilePendingResearch(input.intake.identity.projectId), [])
+  const synchronizedSessions = await environment.requestStore().listAll(input.intake.identity.projectId)
+  assert.equal(synchronizedSessions.length, 3)
+  assert.equal(synchronizedSessions.every((record) => record.pendingOperations.length === 0), true)
 }))
 
 test('un caso preparing rechaza contribuciones antes de quedar ready', () => withEnvironment(async (environment) => {
@@ -470,11 +512,19 @@ test('replay con otro timestamp conserva el receipt original byte a byte', () =>
   const { planned, service } = await prepare(environment, 'timestamp-replay')
   const input = contribution(planned.radar, { seed: 'timestamp', host: 'timestamp' })
   const first = await service.receiveContribution(input)
+  const caseFile = path.join(environment.evidenceCaseRoot, `${planned.evidenceCaseId}.json`)
+  const beforeCase = await fs.promises.readFile(caseFile, 'utf8')
+  const beforeSessions = await Promise.all((await fs.promises.readdir(environment.requestRoot)).sort().map(async (name) => [name, await fs.promises.readFile(path.join(environment.requestRoot, name), 'utf8')]))
+  const beforeRevision = (await environment.evidenceCaseStore().read(planned.evidenceCaseId)).revision
   environment.time.value = '2026-08-25T04:00:00.000Z'
   const replay = await service.receiveContribution(input)
   assert.equal(replay.idempotent, true)
   assert.equal(replay.receipt.receivedAt, first.receipt.receivedAt)
-  assert.equal((await environment.evidenceCaseStore().read(planned.evidenceCaseId)).receipts.length, 1)
+  const after = await environment.evidenceCaseStore().read(planned.evidenceCaseId)
+  assert.equal(after.receipts.length, 1)
+  assert.equal(after.revision, beforeRevision)
+  assert.equal(await fs.promises.readFile(caseFile, 'utf8'), beforeCase)
+  assert.deepEqual(await Promise.all((await fs.promises.readdir(environment.requestRoot)).sort().map(async (name) => [name, await fs.promises.readFile(path.join(environment.requestRoot, name), 'utf8')])), beforeSessions)
 }))
 
 test('replay de receipt alterado se rechaza y preserva bytes durables', () => withEnvironment(async (environment) => {
@@ -510,6 +560,27 @@ test('fallo de MEMORIA deja append pendiente y evidencia durable aceptada', () =
   assert.equal((await environment.memoryStore.readEvents()).entries.length, 0)
 }))
 
+test('proyeccion futura bloquea retry y nueva contribucion antes de efectos', () => withEnvironment(async (environment) => {
+  environment.memory.failuresRemaining = 1
+  const accepted = await acceptCase(environment, 'projection-preflight')
+  const sessions = await environment.requestStore().listAll(accepted.input.intake.identity.projectId)
+  const session = sessions.find((item) => item.researchRequestId === accepted.planned.radar.researchRequestId)
+  assert.ok(session)
+  const sessionFile = path.join(environment.requestRoot, `${session.researchSessionId}.json`)
+  await fs.promises.writeFile(sessionFile, `${canonical({ ...session, updatedAt: '2099-08-25T00:00:00.000Z' })}\n`, 'utf8')
+  const caseFile = path.join(environment.evidenceCaseRoot, `${accepted.planned.evidenceCaseId}.json`)
+  const caseBefore = await fs.promises.readFile(caseFile, 'utf8')
+  const recordBefore = await environment.evidenceCaseStore().read(accepted.planned.evidenceCaseId)
+  const memoryCallsBefore = environment.memory.calls.length
+  await rejectsCode(() => accepted.service.retryEvidenceCase(accepted.planned.evidenceCaseId), 'RESEARCH_SESSION_PROJECTION_CONFLICT')
+  await rejectsCode(() => accepted.service.receiveContribution(contribution(accepted.planned.hermes, { seed: 'projection-preflight-three', host: 'projection-preflight-three' })), 'RESEARCH_SESSION_PROJECTION_CONFLICT')
+  const recordAfter = await environment.evidenceCaseStore().read(accepted.planned.evidenceCaseId)
+  assert.equal(environment.memory.calls.length, memoryCallsBefore)
+  assert.equal(await fs.promises.readFile(caseFile, 'utf8'), caseBefore)
+  assert.equal(recordAfter.revision, recordBefore.revision)
+  assert.equal(recordAfter.receipts.length, recordBefore.receipts.length)
+}))
+
 test('reapertura reanuda sólo el append pendiente y converge idempotentemente', () => withEnvironment(async (environment) => {
   environment.memory.failuresRemaining = 1
   const accepted = await acceptCase(environment, 'memory-retry')
@@ -519,6 +590,94 @@ test('reapertura reanuda sólo el append pendiente y converge idempotentemente',
   assert.deepEqual(retried.pendingOperations, [])
   assert.equal(again.memory.status, 'appended')
   assert.equal(environment.memory.calls.length, 2)
+  assert.equal((await environment.memoryStore.readEvents()).entries.length, 1)
+
+  const durableSessions = environment.requestStore()
+  let failSessionSync = false
+  const controlledSessions = {
+    async write(record) {
+      if (failSessionSync) {
+        const error = new Error('Fallo de sync de sesiones inyectado.')
+        error.code = 'INJECTED_FAILURE'
+        throw error
+      }
+      return durableSessions.write(record)
+    },
+  }
+  const callsBeforeWindow = environment.memory.calls.length
+  environment.memory.failuresRemaining = 1
+  const window = await prepare(environment, 'memory-session-window', environment.service({ persistence: controlledSessions }))
+  await window.service.receiveContribution(contribution(window.planned.radar, { seed: 'memory-session-window-one', host: 'memory-session-window-one' }))
+  await window.service.receiveContribution(contribution(window.planned.scout, { seed: 'memory-session-window-two', host: 'memory-session-window-two' }))
+  const memoryPending = await environment.evidenceCaseStore().read(window.planned.evidenceCaseId)
+  assert.equal(memoryPending.memory.status, 'pending')
+  assert.deepEqual(memoryPending.pendingOperations, ['memory_append'])
+
+  failSessionSync = true
+  await rejectsCode(() => window.service.retryEvidenceCase(window.planned.evidenceCaseId), 'INJECTED_FAILURE')
+  const sessionsPending = await environment.evidenceCaseStore().read(window.planned.evidenceCaseId)
+  assert.equal(sessionsPending.memory.status, 'appended')
+  assert.deepEqual(sessionsPending.pendingOperations, ['sync_request_sessions'])
+  assert.equal(sessionsPending.lastErrorCode, 'INJECTED_FAILURE')
+
+  failSessionSync = false
+  const fresh = environment.service()
+  const reconciled = await fresh.reconcilePendingResearch(window.input.intake.identity.projectId)
+  assert.equal(reconciled.length, 1)
+  assert.equal(reconciled[0].memory.status, 'appended')
+  assert.deepEqual(reconciled[0].pendingOperations, [])
+  assert.deepEqual(await fresh.reconcilePendingResearch(window.input.intake.identity.projectId), [])
+  const synchronizedSessions = await durableSessions.listAll(window.input.intake.identity.projectId)
+  assert.equal(synchronizedSessions.length, 3)
+  assert.equal(synchronizedSessions.every((record) => record.status === 'completed_with_evidence' && record.pendingOperations.length === 0), true)
+  assert.equal(environment.memory.calls.length - callsBeforeWindow, 2)
+  assert.equal((await environment.memoryStore.readEvents()).entries.length, 2)
+}))
+
+test('journal sync es durable antes de MEMORIA y de cada escritura de sesion', () => withEnvironment(async (environment) => {
+  const durableSessions = environment.requestStore()
+  const observed = { memory: 0, sessions: 0 }
+  let inspectWrites = false
+  let failSessionWrite = false
+  const controlledSessions = {
+    read: (researchSessionId) => durableSessions.read(researchSessionId),
+    async write(record) {
+      if (inspectWrites) {
+        const durableCase = await environment.evidenceCaseStore().read(record.evidenceCaseId)
+        assert.equal(durableCase.pendingOperations.includes('sync_request_sessions'), true)
+        observed.sessions += 1
+        if (failSessionWrite) {
+          const error = new Error('Fallo despues del journal durable.')
+          error.code = 'INJECTED_FAILURE'
+          throw error
+        }
+      }
+      return durableSessions.write(record)
+    },
+  }
+  const controlledMemory = {
+    async append(value) {
+      const durableCase = await environment.evidenceCaseStore().read(value.metadata.evidenceCaseId)
+      assert.equal(durableCase.pendingOperations.includes('sync_request_sessions'), true)
+      observed.memory += 1
+      return environment.memory.append(value)
+    },
+  }
+  const prepared = await prepare(environment, 'write-ahead-sync', environment.service({ persistence: controlledSessions, memory: controlledMemory }))
+  inspectWrites = true
+  await prepared.service.receiveContribution(contribution(prepared.planned.radar, { seed: 'write-ahead-radar', host: 'write-ahead-radar' }))
+  failSessionWrite = true
+  await rejectsCode(() => prepared.service.receiveContribution(contribution(prepared.planned.scout, { seed: 'write-ahead-scout', host: 'write-ahead-scout' })), 'INJECTED_FAILURE')
+  const interrupted = await environment.evidenceCaseStore().read(prepared.planned.evidenceCaseId)
+  assert.equal(observed.memory, 1)
+  assert.equal(observed.sessions > 0, true)
+  assert.equal(interrupted.memory.status, 'appended')
+  assert.deepEqual(interrupted.pendingOperations, ['sync_request_sessions'])
+  assert.equal(interrupted.lastErrorCode, 'INJECTED_FAILURE')
+  failSessionWrite = false
+  const healed = await environment.service().retryEvidenceCase(prepared.planned.evidenceCaseId)
+  assert.deepEqual(healed.pendingOperations, [])
+  assert.equal(observed.memory, 1)
   assert.equal((await environment.memoryStore.readEvents()).entries.length, 1)
 }))
 
@@ -536,8 +695,19 @@ test('reconcile desde instancia nueva conecta MEMORIA ausente y completa el pend
   assert.deepEqual(pending.pendingOperations, ['memory_append'])
   assert.equal(pending.lastErrorCode, 'MEMORY_NOT_CONFIGURED')
   assert.equal(environment.memory.calls.length, 0)
+  assert.deepEqual(await disconnected.reconcilePendingResearch(accepted.input.intake.identity.projectId, 50, []), [])
+  assert.equal((await environment.evidenceCaseStore().read(accepted.planned.evidenceCaseId)).memory.status, 'pending')
+  const candidate = { evidenceCaseId: pending.evidenceCaseId, revision: pending.revision, state: pending.state, fingerprint: digest(canonical(pending)) }
+  const failed = await disconnected.reconcilePendingResearch(accepted.input.intake.identity.projectId, 50, [candidate])
+  const advanced = await environment.evidenceCaseStore().read(accepted.planned.evidenceCaseId)
+  assert.equal(failed.length, 1)
+  assert.equal(failed[0].memory.status, 'pending')
+  assert.equal(advanced.revision > pending.revision, true)
+  assert.equal(Date.parse(advanced.updatedAt) > Date.parse(pending.updatedAt), true)
   const fresh = environment.service()
-  const first = await fresh.reconcilePendingResearch(accepted.input.intake.identity.projectId)
+  await rejectsCode(() => fresh.reconcilePendingResearch(accepted.input.intake.identity.projectId, 50, [candidate]), 'STALE_RECONCILE_CANDIDATE')
+  const healedCandidate = { evidenceCaseId: advanced.evidenceCaseId, revision: advanced.revision, state: advanced.state, fingerprint: digest(canonical(advanced)) }
+  const first = await fresh.reconcilePendingResearch(accepted.input.intake.identity.projectId, 50, [healedCandidate])
   const second = await fresh.reconcilePendingResearch(accepted.input.intake.identity.projectId)
   assert.equal(first.length, 1)
   assert.equal(first[0].memory.status, 'appended')
@@ -545,6 +715,59 @@ test('reconcile desde instancia nueva conecta MEMORIA ausente y completa el pend
   assert.equal(environment.memory.calls.length, 1)
   assert.deepEqual(environment.memory.calls[0].identity, accepted.input.intake.identity)
   assert.equal((await environment.memoryStore.readEvents()).entries.length, 1)
+}))
+
+test('reconcile por lote continua tras error durable y no posterga el caso siguiente', () => withEnvironment(async (environment) => {
+  const durableSessions = environment.requestStore()
+  let blockedCaseId = null
+  let failBlockedCase = false
+  const selectiveSessions = {
+    async write(record) {
+      if (failBlockedCase && record.evidenceCaseId === blockedCaseId) {
+        const error = new Error('Fallo persistente y controlado de una sola case.')
+        error.code = 'INJECTED_FAILURE'
+        throw error
+      }
+      return durableSessions.write(record)
+    },
+  }
+  const service = environment.service({ persistence: selectiveSessions })
+  const leftInput = planInput(`${environment.token}-batch-left`)
+  const rightInput = planInput(`${environment.token}-batch-right`)
+  rightInput.intake.identity.projectId = leftInput.intake.identity.projectId
+  const left = await service.plan(leftInput)
+  const right = await service.plan(rightInput)
+  for (const planned of [left, right]) {
+    environment.memory.failuresRemaining = 1
+    await service.receiveContribution(contribution(planned.radar, { seed: `${planned.evidenceCaseId}-radar`, host: 'batch-radar' }))
+    await service.receiveContribution(contribution(planned.scout, { seed: `${planned.evidenceCaseId}-scout`, host: 'batch-scout' }))
+    assert.deepEqual((await environment.evidenceCaseStore().read(planned.evidenceCaseId)).pendingOperations, ['memory_append'])
+  }
+  const [blocked, following] = [left, right].sort((a, b) => a.evidenceCaseId.localeCompare(b.evidenceCaseId))
+  blockedCaseId = blocked.evidenceCaseId
+  failBlockedCase = true
+  await rejectsCode(() => service.retryEvidenceCase(blocked.evidenceCaseId), 'INJECTED_FAILURE')
+  const blockedBeforeReconcile = await environment.evidenceCaseStore().read(blocked.evidenceCaseId)
+  assert.deepEqual(blockedBeforeReconcile.pendingOperations, ['sync_request_sessions'])
+
+  const failingProgress = environment.service({
+    persistence: selectiveSessions,
+    evidenceCasePersistence: environment.evidenceCaseStore({ failureInjection: 'before_rename' }),
+  })
+  const blockedCandidate = { evidenceCaseId: blockedBeforeReconcile.evidenceCaseId, revision: blockedBeforeReconcile.revision, state: blockedBeforeReconcile.state, fingerprint: digest(canonical(blockedBeforeReconcile)) }
+  await rejectsCode(() => failingProgress.reconcilePendingResearch(leftInput.intake.identity.projectId, 50, [blockedCandidate]), 'INJECTED_FAILURE')
+  assert.deepEqual(await environment.evidenceCaseStore().read(blocked.evidenceCaseId), blockedBeforeReconcile)
+
+  const fresh = environment.service({ persistence: selectiveSessions })
+  const reconciled = await fresh.reconcilePendingResearch(leftInput.intake.identity.projectId)
+  const blockedAfter = await environment.evidenceCaseStore().read(blocked.evidenceCaseId)
+  const followingAfter = await environment.evidenceCaseStore().read(following.evidenceCaseId)
+  assert.equal(reconciled.length, 2)
+  assert.deepEqual(blockedAfter.pendingOperations, ['sync_request_sessions'])
+  assert.equal(blockedAfter.lastErrorCode, 'INJECTED_FAILURE')
+  assert.equal(blockedAfter.revision > blockedBeforeReconcile.revision, true)
+  assert.equal(followingAfter.memory.status, 'appended')
+  assert.deepEqual(followingAfter.pendingOperations, [])
 }))
 
 test('reopen por request reconstruye estado aceptado desde persistencia', () => withEnvironment(async (environment) => {
@@ -556,8 +779,10 @@ test('reopen por request reconstruye estado aceptado desde persistencia', () => 
   assert.equal(reopened.researchPlanId, accepted.planned.researchPlanId)
   assert.equal(reopened.evidenceCaseId, accepted.planned.evidenceCaseId)
   assert.deepEqual(reopened.identity, accepted.input.intake.identity)
-  await environment.evidenceCaseStore().update(accepted.planned.evidenceCaseId, (record) => ({ ...record, identity: { ...record.identity, versionId: 'version-tampered' } }))
-  await rejectsCode(() => fresh.reopen(accepted.planned.radar.researchRequestId), 'INVALID_EVIDENCE_CASE_IDENTITY')
+  const before = await environment.evidenceCaseStore().read(accepted.planned.evidenceCaseId)
+  await rejectsCode(() => environment.evidenceCaseStore().update(accepted.planned.evidenceCaseId, (record) => ({ ...record, identity: { ...record.identity, versionId: 'version-tampered' } })), 'INCOMPATIBLE_EVIDENCE_CASE')
+  assert.deepEqual((await environment.evidenceCaseStore().read(accepted.planned.evidenceCaseId)).identity, before.identity)
+  assert.deepEqual((await fresh.reopen(accepted.planned.radar.researchRequestId)).identity, accepted.input.intake.identity)
 }))
 
 test('contribuciones concurrentes independientes no pierden receipts', () => withEnvironment(async (environment) => {
@@ -625,7 +850,8 @@ test('fallo atómico antes de rename conserva revisión y limpia staging', () =>
   const file = path.join(environment.evidenceCaseRoot, `${planned.evidenceCaseId}.json`)
   const before = await fs.promises.readFile(file, 'utf8')
   const failing = environment.evidenceCaseStore({ failureInjection: 'before_rename' })
-  await rejectsCode(() => failing.update(planned.evidenceCaseId, (record) => ({ ...record, nextResponsible: 'scout' })), 'INJECTED_FAILURE')
+  environment.time.value = '2026-08-25T05:00:00.000Z'
+  await rejectsCode(() => failing.update(planned.evidenceCaseId, (record) => ({ ...record, updatedAt: environment.time.value })), 'INJECTED_FAILURE')
   assert.equal(await fs.promises.readFile(file, 'utf8'), before)
   assert.equal((await fs.promises.readdir(environment.evidenceCaseRoot)).some((name) => name.endsWith('.stage')), false)
 }))
