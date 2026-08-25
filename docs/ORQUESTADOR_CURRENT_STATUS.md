@@ -39,3 +39,7 @@ El preview no está demostrado como iframe ni validado visualmente; sólo puede 
 ## Escalón 3B — investigación supervisada
 
 ESCALON_3B_STATUS=COMPLETED; registro no equivale a conexión, receipt no equivale a evidencia y evidencia aceptada no equivale a verdad absoluta. La red sigue deshabilitada y los proveedores reales no están conectados. Las sesiones de investigación son durables, con receipts inmutables, replay, recuperación de evidence_pending y corrupción aislada. El contenido externo permanece no confiable; la defensa SSRF es offline hasta 3C. El fallo C2 anterior no volvió a reproducirse; se corrigió una carrera real de staging de MEMORIA mediante secuencia monotónica local y regresión determinista.
+
+### Reparación estructural 3B-R1
+
+`ESCALON_3B_R1_STATUS=COMPLETED`; `CORRELATION_SMOKE=PASS` con 41 casos conductuales reales y el smoke histórico 3B en 84/84. El agregado durable correlaciona las tres requests de cada plan, reconstruye corroboraciones sólo desde receipts persistidos, conserva contradicciones para Lean y limita MEMORIA a un único append del orquestador tras `accepted_for_context`. No habilita red, providers reales, UI, autenticación humana, preview ni deploy.

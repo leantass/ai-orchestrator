@@ -58,3 +58,7 @@ ESCALON_3B_STATUS=COMPLETED; registro no equivale a conexión, receipt no equiva
 - `ESCALON_3C_B=REAL_FREE_OR_SELF_HOSTED_CONNECTORS`
 - `ESCALON_3C_C=SUPERVISED_EXECUTION_AND_EVIDENCE_FLOW`
 - `ESCALON_3C_D=RECOVERY_AND_ESCALON_3_CLOSURE`
+
+## Reparación estructural 3B-R1
+
+`ESCALON_3B_R1_STATUS=COMPLETED`; `CORRELATION_SMOKE=PASS`. El modelo durable por request se conserva y queda subordinado a un `researchPlanId` compartido y un `evidenceCaseId` determinista. Los casos agregan únicamente receipts persistidos y correlacionados; una sola fuente queda `needs_corroboration`, fuentes con provider, host y hash independientes pueden quedar `accepted_for_context`, y claims contradictorios permanecen `requires_human` sin ganador automático. Replay, reapertura, retry, reconcile, concurrencia e índice reconstruible son idempotentes. MEMORIA recibe como máximo un append canónico desde el orquestador y sólo después de aceptación. La red continúa deshabilitada y ningún proveedor real queda conectado por R1.
