@@ -88,7 +88,7 @@ UI, autenticación humana end-to-end, QA visual y deploy permanecen pendientes. 
 
 ## Escalón 4A — contrato canónico de planner
 
-`ESCALON_4_STATUS=IN_PROGRESS`; `ESCALON_4A_STATUS=COMPLETED`; `ESCALON_4B_STATUS=COMPLETED`; `ESCALON_4C_STATUS=NOT_STARTED`; `ESCALON_4D_STATUS=NOT_STARTED`.
+`ESCALON_4_STATUS=IN_PROGRESS`; `ESCALON_4A_STATUS=COMPLETED`; `ESCALON_4B_STATUS=COMPLETED`; `ESCALON_4C_STATUS=COMPLETED`; `ESCALON_4D_STATUS=NOT_STARTED`.
 
 `jefe-planner-contract.cjs` es la autoridad de la solicitud y del plan local. Correlaciona identidad física, intake, plan de investigación, caso de evidencia, flujo supervisado y paquete de contexto específico de Planner. El contrato normaliza alcance, dependencias, riesgos y restricciones sin paths, secretos, credenciales ni comandos; produce pasos deterministas de planificación y un gate explícito. Sólo evidencia `accepted_for_context` con paquete `ready` cierra el contrato para el gate siguiente; toda evidencia insuficiente, humana pendiente o paquete restringido vuelve a discovery. Ningún plan habilita ejecución: `executionPermitted=false` hasta el Escalón 5.
 
@@ -103,3 +103,9 @@ El smoke `jefe-planner-contract-smoke.mjs` pasa `20/20` casos conductuales local
 `jefe-planner-orchestrator.cjs` consume exclusivamente puertos de lectura de discovery, casos de evidencia y flujos 3C, más un paquete 2C validado para el agente Planner. Revalida identidad y correlación completa antes de crear los registros. Fuente ausente, identidad cruzada o referencias incongruentes rechazan la preparación; evidencia insuficiente genera el retorno explícito a discovery. No hay adapter, shell, red, IPC, Codex ni ejecución de plan.
 
 El smoke `jefe-planner-persistence-smoke.mjs` pasa `20/20` casos conductuales locales de persistencia, reapertura, concurrencia, corrupción, rollback atómico, aislamiento y seguridad de fuentes. `NEXT=ESCALON_4C_PLANNER_EVIDENCE_AND_CONTRACT_GATE`.
+
+## Escalón 4C — evidencia y gate de contrato
+
+`ESCALON_4C_STATUS=COMPLETED`. `jefe-planner-gate.cjs` deriva y persiste un gate inmutable de cada revisión de plan. Si el contrato está cerrado, el resultado queda preparado sólo para el gate del Escalón 5; si no, retorna a discovery. En ambos casos el permiso de ejecución es explícitamente `not_available_until_escalon_5`: el módulo no registra aprobación humana, no inicia Codex y no autoriza ninguna operación externa.
+
+El gate es atómico, reabrible, idempotente, aislado por proyecto y con índice reconstruible; su read model no muta. El smoke `jefe-planner-gate-smoke.mjs` pasa `16/16` casos conductuales locales. `NEXT=ESCALON_4D_PLANNER_RECOVERY_AND_DOCUMENTATION`.
