@@ -1,6 +1,6 @@
 # Roadmap canónico de finalización del Orquestador
 
-Esta es la única autoridad posterior a Escalón 2. Estados: `ESCALON_1_STATUS=VERIFIED_CLOSED`, `ESCALON_2_STATUS=VERIFIED_CLOSED`, `ESCALON_3_STATUS=VERIFIED_CLOSED`, `ESCALON_4_STATUS=IN_PROGRESS`, `ESCALON_5_STATUS=NOT_STARTED`, `ESCALON_6_STATUS=NOT_STARTED`, `ESCALON_7_STATUS=NOT_STARTED`, `ESCALON_8_STATUS=NOT_STARTED`, `ESCALON_9_STATUS=NOT_STARTED`, `ESCALON_10_STATUS=PARTIAL_EXISTING_FOUNDATION`, `ESCALON_11_STATUS=NOT_STARTED`, `ESCALON_12_STATUS=NOT_STARTED`.
+Esta es la única autoridad posterior a Escalón 2. Estados: `ESCALON_1_STATUS=VERIFIED_CLOSED`, `ESCALON_2_STATUS=VERIFIED_CLOSED`, `ESCALON_3_STATUS=VERIFIED_CLOSED`, `ESCALON_4_STATUS=VERIFIED_CLOSED`, `ESCALON_5_STATUS=NOT_STARTED`, `ESCALON_6_STATUS=NOT_STARTED`, `ESCALON_7_STATUS=NOT_STARTED`, `ESCALON_8_STATUS=NOT_STARTED`, `ESCALON_9_STATUS=NOT_STARTED`, `ESCALON_10_STATUS=PARTIAL_EXISTING_FOUNDATION`, `ESCALON_11_STATUS=NOT_STARTED`, `ESCALON_12_STATUS=NOT_STARTED`.
 
 ## Flujo y retorno
 
@@ -88,7 +88,7 @@ UI, autenticación humana end-to-end, QA visual y deploy permanecen pendientes. 
 
 ## Escalón 4A — contrato canónico de planner
 
-`ESCALON_4_STATUS=IN_PROGRESS`; `ESCALON_4A_STATUS=COMPLETED`; `ESCALON_4B_STATUS=COMPLETED`; `ESCALON_4C_STATUS=COMPLETED`; `ESCALON_4D_STATUS=NOT_STARTED`.
+`ESCALON_4_STATUS=VERIFIED_CLOSED`; `ESCALON_4A_STATUS=COMPLETED`; `ESCALON_4B_STATUS=COMPLETED`; `ESCALON_4C_STATUS=COMPLETED`; `ESCALON_4D_STATUS=COMPLETED`.
 
 `jefe-planner-contract.cjs` es la autoridad de la solicitud y del plan local. Correlaciona identidad física, intake, plan de investigación, caso de evidencia, flujo supervisado y paquete de contexto específico de Planner. El contrato normaliza alcance, dependencias, riesgos y restricciones sin paths, secretos, credenciales ni comandos; produce pasos deterministas de planificación y un gate explícito. Sólo evidencia `accepted_for_context` con paquete `ready` cierra el contrato para el gate siguiente; toda evidencia insuficiente, humana pendiente o paquete restringido vuelve a discovery. Ningún plan habilita ejecución: `executionPermitted=false` hasta el Escalón 5.
 
@@ -109,3 +109,11 @@ El smoke `jefe-planner-persistence-smoke.mjs` pasa `20/20` casos conductuales lo
 `ESCALON_4C_STATUS=COMPLETED`. `jefe-planner-gate.cjs` deriva y persiste un gate inmutable de cada revisión de plan. Si el contrato está cerrado, el resultado queda preparado sólo para el gate del Escalón 5; si no, retorna a discovery. En ambos casos el permiso de ejecución es explícitamente `not_available_until_escalon_5`: el módulo no registra aprobación humana, no inicia Codex y no autoriza ninguna operación externa.
 
 El gate es atómico, reabrible, idempotente, aislado por proyecto y con índice reconstruible; su read model no muta. El smoke `jefe-planner-gate-smoke.mjs` pasa `16/16` casos conductuales locales. `NEXT=ESCALON_4D_PLANNER_RECOVERY_AND_DOCUMENTATION`.
+
+## Escalón 4D — recuperación y cierre de Planner
+
+`ESCALON_4D_STATUS=COMPLETED`; `ESCALON_4_STATUS=VERIFIED_CLOSED`; `RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`. `jefe-planner-recovery.cjs` diagnostica los stores de plan y gate sin escribir, deriva un plan determinista y reconstruye exclusivamente sus índices derivados por una invocación explícita. No reabre ni ejecuta planes, adapters o proveedores, no borra registros y no altera decisiones humanas.
+
+El smoke `jefe-planner-recovery-smoke.mjs` pasa `11/11` casos conductuales locales. La matriz del Escalón 4 comprende contratos `20/20`, persistencia/orquestación `20/20`, gates `16/16` y recovery `11/11`. Esto cierra solamente Planner y contratos ejecutables locales; no inicia Codex, worktrees, ejecución, QA, preview, aprobación humana, Git/CI, red, publicación ni deploy.
+
+`NEXT=ESCALON_5A_SAFE_CODEX_EXECUTION`.

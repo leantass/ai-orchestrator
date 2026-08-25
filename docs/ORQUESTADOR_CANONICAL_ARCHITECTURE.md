@@ -31,7 +31,7 @@ Los aliases de generación heredada permanecen sólo para no romper callers y re
 
 ## Roadmap posterior
 
-La arquitectura posterior está definida exclusivamente en `ORQUESTADOR_CANONICAL_ROADMAP.md`. `ESCALON_3_STATUS=IN_PROGRESS`: 3A, 3B con R1 y 3C-A están completos como fundaciones locales supervisadas. Planner, ejecución externa, QA, preview, entrega, observabilidad, centro comercial, integración y governance son escalones dependientes, no capacidades ya conectadas.
+La arquitectura posterior está definida exclusivamente en `ORQUESTADOR_CANONICAL_ROADMAP.md`. `ESCALON_4_STATUS=VERIFIED_CLOSED`: 3A–3C y 4A–4D están completos únicamente como fundaciones locales supervisadas y de contratos. `jefe-planner-recovery.cjs` sólo recupera índices derivados de Planner mediante un plan explícito. Ejecución externa, Codex/worktrees, QA, preview, entrega, observabilidad, centro comercial, integración y governance siguen siendo escalones dependientes, no capacidades ya conectadas.
 
 ## Intake supervisado (Escalón 3A)
 

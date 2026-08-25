@@ -4,9 +4,9 @@ Fecha de cierre documental: 2026-08-25. Rama: `integration/orquestador-canonical
 
 Estado prevalente de cierre: `ESCALON_1_STATUS=VERIFIED_CLOSED`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2D_STATUS=COMPLETED`; `ESCALON_2_STATUS=VERIFIED_CLOSED`; `RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`.
 
-Estado actual: `STATUS=ESCALON_4C_COMPLETED`; `ESCALON_3_STATUS=VERIFIED_CLOSED`; `ESCALON_3A_STATUS=COMPLETED`; `ESCALON_3B_STATUS=COMPLETED`; `ESCALON_3B_R1_STATUS=COMPLETED`; `ESCALON_3C_STATUS=VERIFIED_CLOSED`; `ESCALON_3C_A_STATUS=COMPLETED`; `ESCALON_3C_B_STATUS=COMPLETED`; `ESCALON_3C_C_STATUS=COMPLETED`; `ESCALON_3C_D_STATUS=COMPLETED`; `ESCALON_4_STATUS=IN_PROGRESS`; `ESCALON_4A_STATUS=COMPLETED`; `ESCALON_4B_STATUS=COMPLETED`; `ESCALON_4C_STATUS=COMPLETED`. Los escalones 5–9 y 11–12 siguen `NOT_STARTED`; Escalón 10 conserva `PARTIAL_EXISTING_FOUNDATION`. La autoridad es [ORQUESTADOR_CANONICAL_ROADMAP.md](ORQUESTADOR_CANONICAL_ROADMAP.md).
+Estado actual: `STATUS=ESCALON_4_VERIFIED_CLOSED`; `ESCALON_3_STATUS=VERIFIED_CLOSED`; `ESCALON_3A_STATUS=COMPLETED`; `ESCALON_3B_STATUS=COMPLETED`; `ESCALON_3B_R1_STATUS=COMPLETED`; `ESCALON_3C_STATUS=VERIFIED_CLOSED`; `ESCALON_3C_A_STATUS=COMPLETED`; `ESCALON_3C_B_STATUS=COMPLETED`; `ESCALON_3C_C_STATUS=COMPLETED`; `ESCALON_3C_D_STATUS=COMPLETED`; `ESCALON_4_STATUS=VERIFIED_CLOSED`; `ESCALON_4A_STATUS=COMPLETED`; `ESCALON_4B_STATUS=COMPLETED`; `ESCALON_4C_STATUS=COMPLETED`; `ESCALON_4D_STATUS=COMPLETED`. Los escalones 5–9 y 11–12 siguen `NOT_STARTED`; Escalón 10 conserva `PARTIAL_EXISTING_FOUNDATION`. La autoridad es [ORQUESTADOR_CANONICAL_ROADMAP.md](ORQUESTADOR_CANONICAL_ROADMAP.md).
 
-`NETWORK=DISABLED`; `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`; `PUSH=NO`; `NEXT=ESCALON_4D_PLANNER_RECOVERY_AND_DOCUMENTATION`.
+`NETWORK=DISABLED`; `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`; `PUSH=NO`; `NEXT=ESCALON_5A_SAFE_CODEX_EXECUTION`.
 
 Evidencia de cierre: `CORRELATION_SMOKE=PASS`; `SMOKE_3B=84/84_PASS`; `CONNECTOR_RUNTIME_SMOKE=54/54_PASS`; `ESCALON_3C_B_SMOKE=24/24_PASS`; `SUPERVISED_EXECUTION_SMOKE=38/38`; `ESCALON_3C_C_DELIVERY_SMOKE=26/26_PASS`; `ESCALON_3C_D_HEALTH_SMOKE=34/34_PASS`; `SUPERVISED_RECOVERY_SMOKE=67/67`; `C2_REGRESSION=36/36_PASS`.
 
@@ -83,4 +83,10 @@ La evidencia focal es `24/24` para 3C-B, `38/38` y `26/26` para 3C-C, y `34/34` 
 
 `ESCALON_4C_STATUS=COMPLETED`. El gate durable deriva del plan y sólo puede cerrar contrato o devolver a discovery; no puede registrar una decisión humana ni emitir un permiso de ejecución. Aun con contrato cerrado, `executionPermit=not_available_until_escalon_5`. Su persistencia es atómica, idempotente, reabrible y reconstruible.
 
-`jefe-planner-gate-smoke.mjs` pasa `16/16` casos. El siguiente bloque es 4D; no fue iniciado por 4C.
+`jefe-planner-gate-smoke.mjs` pasa `16/16` casos. 4D fue iniciado posteriormente desde el gate canónico.
+
+## Escalón 4D — recuperación y cierre de Planner
+
+`ESCALON_4_STATUS=VERIFIED_CLOSED`; `ESCALON_4D_STATUS=COMPLETED`. Recovery diagnostica sin mutar, deriva un plan reproducible y reconstruye sólo índices derivados por una acción explícita. Nunca ejecuta planes, adapters, proveedores o Codex; tampoco borra historia, resuelve decisiones humanas ni habilita Escalón 5.
+
+La matriz local completa pasa: contrato `20/20`, persistencia/orquestación `20/20`, gate `16/16` y recovery `11/11`. Planner queda cerrado sólo como contrato/persistencia/gate local. El siguiente escalón canónico es 5A y no fue iniciado.

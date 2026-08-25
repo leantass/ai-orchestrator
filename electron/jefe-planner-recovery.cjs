@@ -1,0 +1,18 @@
+const crypto = require('crypto')
+const { canonical } = require('./jefe-context-package-contract.cjs')
+const RECOVERY_SCHEMA = 'jefe-planner-recovery-plan/v1'
+const PLAN_ID = /^planner-recovery-[a-f0-9]{32}$/u
+class PlannerRecoveryError extends Error { constructor(code, message) { super(message); this.name = 'PlannerRecoveryError'; this.code = code } }
+function fail(code, message) { throw new PlannerRecoveryError(code, message) }
+function digest(value) { return crypto.createHash('sha256').update(canonical(value)).digest('hex') }
+function freeze(value) { if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value; for (const child of Object.values(value)) freeze(child); return Object.freeze(value) }
+function plain(value) { return Boolean(value) && typeof value === 'object' && !Array.isArray(value) && [Object.prototype, null].includes(Object.getPrototypeOf(value)) }
+function validProject(value) { if (value !== undefined && (typeof value !== 'string' || !/^[a-z][a-z0-9-]{2,80}$/u.test(value))) fail('INVALID_PROJECT_ID', 'Proyecto inválido.'); return value }
+function createPlannerRecovery({ plannerPersistence, gatePersistence } = {}) {
+  if (!plannerPersistence || typeof plannerPersistence.listDetailed !== 'function' || typeof plannerPersistence.rebuildIndex !== 'function' || !gatePersistence || typeof gatePersistence.listDetailed !== 'function' || typeof gatePersistence.rebuildIndex !== 'function') fail('INVALID_RECOVERY_DEPENDENCY', 'Dependencias de recovery inválidas.')
+  async function diagnose(projectId) { validProject(projectId); const [planner, gates] = await Promise.all([plannerPersistence.listDetailed(projectId), gatePersistence.listDetailed(projectId)]); return freeze({ schemaVersion: 'jefe-planner-recovery-diagnosis/v1', projectId: projectId || null, plannerRecords: planner.records.length, plannerCorruptions: planner.corruptions.length, gateRecords: gates.records.length, gateCorruptions: gates.corruptions.length, recoveryRequired: planner.corruptions.length > 0 || gates.corruptions.length > 0 }) }
+  function createPlan(diagnosis) { if (!plain(diagnosis) || diagnosis.schemaVersion !== 'jefe-planner-recovery-diagnosis/v1' || !Number.isSafeInteger(diagnosis.plannerRecords) || !Number.isSafeInteger(diagnosis.plannerCorruptions) || !Number.isSafeInteger(diagnosis.gateRecords) || !Number.isSafeInteger(diagnosis.gateCorruptions)) fail('INVALID_RECOVERY_DIAGNOSIS', 'Diagnóstico inválido.'); const operations = ['rebuild_planner_index', 'rebuild_planner_gate_index']; const planId = `planner-recovery-${digest({ diagnosis, operations }).slice(0, 32)}`; return freeze({ schemaVersion: RECOVERY_SCHEMA, recoveryPlanId: planId, projectId: diagnosis.projectId, operations, retentionMode: 'conservative_no_automatic_deletion', executionPolicy: 'derived_indexes_only' }) }
+  async function execute(plan) { if (!plain(plan) || plan.schemaVersion !== RECOVERY_SCHEMA || !PLAN_ID.test(plan.recoveryPlanId) || canonical(plan.operations) !== canonical(['rebuild_planner_index', 'rebuild_planner_gate_index']) || plan.retentionMode !== 'conservative_no_automatic_deletion' || plan.executionPolicy !== 'derived_indexes_only') fail('INVALID_RECOVERY_PLAN', 'Plan de recovery inválido.'); const planner = await plannerPersistence.rebuildIndex(); const gates = await gatePersistence.rebuildIndex(); return freeze({ recoveryPlanId: plan.recoveryPlanId, planner, gates, executedAdapters: false, executedPlans: false, deletedRecords: 0 }) }
+  return Object.freeze({ diagnose, createPlan, execute })
+}
+module.exports = { RECOVERY_SCHEMA, PlannerRecoveryError, createPlannerRecovery }
