@@ -574,6 +574,28 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
     })
   }
 
+  function connectorInputView(researchRequestId, record) {
+    return deepFreeze({
+      schemaVersion: 'jefe-research-connector-input/v1',
+      researchRequestId,
+      providerType: record.request.providerType,
+      objective: record.request.objective,
+      questions: [...record.request.questions],
+      budget: { ...record.request.budget },
+      needsCorroboration: record.request.needsCorroboration,
+    })
+  }
+
+  function getConnectorInput(researchRequestId) {
+    const record = records.get(researchRequestId)
+    if (record) return connectorInputView(researchRequestId, record)
+    return resolveCase(researchRequestId).then(() => {
+      const hydrated = records.get(researchRequestId)
+      if (!hydrated) fail('REQUEST_NOT_FOUND', 'Solicitud inexistente.')
+      return connectorInputView(researchRequestId, hydrated)
+    })
+  }
+
   async function rebuildEvidenceCaseIndex() {
     return caseStore.rebuildIndex()
   }
@@ -593,6 +615,7 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
     reopenEvidenceCase,
     rebuildEvidenceCaseIndex,
     getContributionContext,
+    getConnectorInput,
     requests,
   }
 }

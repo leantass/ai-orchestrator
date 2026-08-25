@@ -2,12 +2,14 @@ const crypto = require('crypto')
 const { CONNECTORS, attempt, connector, view } = require('./jefe-research-connector-contract.cjs')
 const { execute: coordinate, cancel: cancelCoordinated, isExecuting: isCoordinated } = require('./jefe-research-connector-coordinator.cjs')
 const { canonical } = require('./jefe-context-package-contract.cjs')
+const { structuredAnalysisCandidate } = require('./jefe-research-structured-analysis-connector.cjs')
 
 const defaultScheduler = Object.freeze({ setTimeout: global.setTimeout, clearTimeout: global.clearTimeout })
 const POLICY_FIELDS = Object.freeze(['maxReservationsPerProject', 'reservationCost', 'maxConcurrency', 'executionTimeoutMs', 'maxTransientFailures', 'circuitCooldownMs', 'maxAttempts'])
 const CANDIDATE_FIELDS = Object.freeze(['status', 'url', 'mimeType', 'bytes', 'contentHash', 'excerpt', 'redirects', 'codes', 'consumed', 'claim'])
 const CONTEXT_FIELDS = Object.freeze(['researchSessionId', 'researchRequestId', 'researchPlanId', 'evidenceCaseId', 'discoveryId', 'projectId', 'providerType'])
-const RESEARCH_BRIDGE_FIELDS = Object.freeze(['getContributionContext', 'receiveContribution'])
+const CONNECTOR_INPUT_FIELDS = Object.freeze(['schemaVersion', 'researchRequestId', 'providerType', 'objective', 'questions', 'budget', 'needsCorroboration'])
+const RESEARCH_BRIDGE_FIELDS = Object.freeze(['getContributionContext', 'getConnectorInput', 'receiveContribution'])
 
 class ConnectorRuntimeError extends Error {
   constructor(code, message) {
@@ -34,6 +36,11 @@ function inactive(record) {
   }
 }
 
+function trustedAdapter(value) {
+  if (typeof value === 'function') return true
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value) && [Object.prototype, null].includes(Object.getPrototypeOf(value)) && Object.keys(value).length === 2 && value.kind === 'controlled_local' && Object.hasOwn(value, 'execute') && typeof value.execute === 'function')
+}
+
 function createConnectorRuntime(options = {}) {
   const optionFields = ['persistence', 'clock', 'trustedAdapters', 'trustedPolicy', 'trustedScheduler', 'trustedResearch']
   if (!options || typeof options !== 'object' || Array.isArray(options) || Object.keys(options).some((key) => !optionFields.includes(key))) fail('INVALID_RUNTIME_OPTIONS', 'Runtime invalido.')
@@ -42,7 +49,7 @@ function createConnectorRuntime(options = {}) {
   if (!persistence || persistenceMethods.some((key) => typeof persistence[key] !== 'function') || typeof persistence.authorityRoot !== 'string') fail('INVALID_DEPENDENCY', 'Persistencia invalida.')
   if (!trustedPolicy || typeof trustedPolicy !== 'object' || Array.isArray(trustedPolicy) || Object.keys(trustedPolicy).some((key) => !POLICY_FIELDS.includes(key))) fail('INVALID_POLICY', 'Politica invalida.')
   const knownAdapterIds = new Set(Object.values(CONNECTORS).map((item) => item.connectorId))
-  if (!trustedAdapters || typeof trustedAdapters !== 'object' || Array.isArray(trustedAdapters) || Object.entries(trustedAdapters).some(([key, item]) => !knownAdapterIds.has(key) || typeof item !== 'function')) fail('INVALID_ADAPTERS', 'Adapters invalidos.')
+  if (!trustedAdapters || typeof trustedAdapters !== 'object' || Array.isArray(trustedAdapters) || Object.entries(trustedAdapters).some(([key, item]) => !knownAdapterIds.has(key) || !trustedAdapter(item) || (typeof item === 'object' && key !== 'structured-analysis-local'))) fail('INVALID_ADAPTERS', 'Adapters invalidos.')
   if (!trustedScheduler || typeof trustedScheduler.setTimeout !== 'function' || typeof trustedScheduler.clearTimeout !== 'function') fail('INVALID_SCHEDULER', 'Scheduler invalido.')
   if (trustedResearch !== null && (!trustedResearch || typeof trustedResearch !== 'object' || Array.isArray(trustedResearch) || ![Object.prototype, null].includes(Object.getPrototypeOf(trustedResearch)) || Object.keys(trustedResearch).length !== RESEARCH_BRIDGE_FIELDS.length || Object.keys(trustedResearch).some((key) => !RESEARCH_BRIDGE_FIELDS.includes(key)) || RESEARCH_BRIDGE_FIELDS.some((key) => !Object.hasOwn(trustedResearch, key) || typeof trustedResearch[key] !== 'function'))) fail('INVALID_RESEARCH_BRIDGE', 'Integracion de investigacion invalida.')
   const policy = {
@@ -61,7 +68,7 @@ function createConnectorRuntime(options = {}) {
   const halfOpenAt = () => new Date(new Date(timeOf(clock)).getTime() + policy.circuitCooldownMs).toISOString()
 
   function researchAvailable() {
-    return trustedResearch && typeof trustedResearch.receiveContribution === 'function' && typeof trustedResearch.getContributionContext === 'function'
+    return trustedResearch && RESEARCH_BRIDGE_FIELDS.every((key) => typeof trustedResearch[key] === 'function')
   }
 
   async function contributionContext(researchRequestId) {
@@ -76,7 +83,16 @@ function createConnectorRuntime(options = {}) {
     for (const key of ['researchSessionId', 'researchRequestId', 'discoveryId', 'projectId', 'providerType']) if (input[key] !== context[key]) fail('INVALID_RESEARCH_CORRELATION', 'Correlacion de investigacion invalida.')
   }
 
-  async function adaptCandidate(record, candidateValue) {
+  async function connectorInput(record) {
+    if (!researchAvailable()) fail('RESEARCH_INTEGRATION_UNAVAILABLE', 'Integracion de investigacion no disponible.')
+    let input
+    try { input = await trustedResearch.getConnectorInput(record.researchRequestId) } catch { fail('INVALID_RESEARCH_CORRELATION', 'Correlacion de investigacion invalida.') }
+    if (!input || typeof input !== 'object' || Array.isArray(input) || ![Object.prototype, null].includes(Object.getPrototypeOf(input)) || Object.keys(input).length !== CONNECTOR_INPUT_FIELDS.length || Object.keys(input).some((key) => !CONNECTOR_INPUT_FIELDS.includes(key)) || CONNECTOR_INPUT_FIELDS.some((key) => !Object.hasOwn(input, key))) fail('INVALID_RESEARCH_CORRELATION', 'Correlacion de investigacion invalida.')
+    if (input.schemaVersion !== 'jefe-research-connector-input/v1' || input.researchRequestId !== record.researchRequestId || input.providerType !== record.providerType || typeof input.objective !== 'string' || !Array.isArray(input.questions) || !input.budget || typeof input.budget !== 'object' || Array.isArray(input.budget) || typeof input.needsCorroboration !== 'boolean') fail('INVALID_RESEARCH_CORRELATION', 'Correlacion de investigacion invalida.')
+    return JSON.parse(canonical(input))
+  }
+
+  async function adaptCandidate(record, candidateValue, adapterKind) {
     if (!candidateValue || typeof candidateValue !== 'object' || Array.isArray(candidateValue) || ![Object.prototype, null].includes(Object.getPrototypeOf(candidateValue)) || Object.keys(candidateValue).some((key) => !CANDIDATE_FIELDS.includes(key) || candidateValue[key] === undefined)) fail('INVALID_CONNECTOR_CANDIDATE', 'Candidate invalido.')
     if (!Object.hasOwn(candidateValue, 'status') || !Object.hasOwn(candidateValue, 'claim') || !['received', 'partial'].includes(candidateValue.status) || typeof candidateValue.claim !== 'string') fail('INVALID_CONNECTOR_CANDIDATE', 'Candidate invalido.')
     const snapshot = {}
@@ -92,6 +108,7 @@ function createConnectorRuntime(options = {}) {
       providerType: context.providerType,
       operation: record.operation,
       status: snapshot.status,
+      method: adapterKind === 'controlled_local' ? 'controlled_adapter' : 'injected_controlled_adapter',
     }
     for (const key of ['url', 'mimeType', 'bytes', 'contentHash', 'excerpt', 'redirects', 'codes', 'consumed']) if (snapshot[key] !== undefined) rawReceipt[key] = snapshot[key]
     return { context, rawReceipt, claim: snapshot.claim }
@@ -213,7 +230,21 @@ function createConnectorRuntime(options = {}) {
           try { return inactive((await conditional(running, 'failed_transient', { errorCode: 'CIRCUIT_OPEN', updatedAt: timeOf(clock) })).record) } catch (error) { if (error.code === 'STALE_TRANSITION') return terminalFromStale(id); throw error }
         }
         const adapter = trustedAdapters[running.connectorId]
-        const adapterPromise = Promise.resolve().then(() => adapter ? adapter({ connectorAttemptId: running.connectorAttemptId, connectorId: running.connectorId }) : { state: 'not_executed' })
+        const adapterKind = adapter && typeof adapter === 'object' ? adapter.kind : 'injected_fixture'
+        let adapterInput = Object.freeze({ connectorAttemptId: running.connectorAttemptId, connectorId: running.connectorId })
+        if (adapterKind === 'controlled_local') {
+          let input
+          try { input = await connectorInput(running) } catch { return failRunning(running, 'INVALID_RESEARCH_CORRELATION') }
+          adapterInput = Object.freeze({
+            connectorAttemptId: running.connectorAttemptId,
+            connectorId: running.connectorId,
+            researchRequestId: running.researchRequestId,
+            providerType: running.providerType,
+            operation: running.operation,
+            input,
+          })
+        }
+        const adapterPromise = Promise.resolve().then(() => adapter ? (adapterKind === 'controlled_local' ? adapter.execute(adapterInput) : adapter(adapterInput)) : { state: 'not_executed' })
         adapterPromise.catch(() => {})
         let timer
         const timeout = new Promise((resolve) => { timer = trustedScheduler.setTimeout(() => resolve({ kind: 'timeout' }), policy.executionTimeoutMs) })
@@ -239,12 +270,17 @@ function createConnectorRuntime(options = {}) {
           }
         }
         if (resultKeys.length !== 1 || !Object.hasOwn(adapterResult, 'candidate')) return failRunning(running, 'UNTRUSTED_ADAPTER_OUTPUT')
+        if (adapterKind === 'controlled_local') {
+          let expected
+          try { expected = structuredAnalysisCandidate(adapterInput.input) } catch { return failRunning(running, 'INVALID_CONNECTOR_CANDIDATE') }
+          if (canonical(adapterResult.candidate) !== canonical(expected)) return failRunning(running, 'INVALID_CONNECTOR_CANDIDATE')
+        }
 
         let adapted
         let researchResult
         let contributionRecord = running
         try {
-          adapted = await adaptCandidate(running, adapterResult.candidate)
+          adapted = await adaptCandidate(running, adapterResult.candidate, adapterKind)
           contributionRecord = (await conditional(running, 'contributing', { updatedAt: timeOf(clock) })).record
           researchResult = await trustedResearch.receiveContribution({ researchRequestId: adapted.context.researchRequestId, rawReceipt: adapted.rawReceipt, claim: adapted.claim })
         } catch (error) {
@@ -270,10 +306,11 @@ function createConnectorRuntime(options = {}) {
           researchPlanId: researchResult.researchPlanId,
         }
         try {
-          const saved = await conditional(contributionRecord, 'succeeded', { receipt: connectorReceipt, research, budgetReservation: { ...contributionRecord.budgetReservation, consumed: contributionRecord.budgetReservation.reserved }, updatedAt: timeOf(clock) })
+          const terminalState = connectorReceipt.status === 'partial' ? 'partial' : 'succeeded'
+          const saved = await conditional(contributionRecord, terminalState, { receipt: connectorReceipt, research, budgetReservation: { ...contributionRecord.budgetReservation, consumed: contributionRecord.budgetReservation.reserved }, updatedAt: timeOf(clock) })
           await recordSuccess(contributionRecord)
           return {
-            state: 'succeeded',
+            state: terminalState,
             classification: connectorReceipt.classification,
             referenceOnly: false,
             attempt: saved.record.connectorAttemptId,
