@@ -88,10 +88,18 @@ UI, autenticación humana end-to-end, QA visual y deploy permanecen pendientes. 
 
 ## Escalón 4A — contrato canónico de planner
 
-`ESCALON_4_STATUS=IN_PROGRESS`; `ESCALON_4A_STATUS=COMPLETED`; `ESCALON_4B_STATUS=NOT_STARTED`; `ESCALON_4C_STATUS=NOT_STARTED`; `ESCALON_4D_STATUS=NOT_STARTED`.
+`ESCALON_4_STATUS=IN_PROGRESS`; `ESCALON_4A_STATUS=COMPLETED`; `ESCALON_4B_STATUS=COMPLETED`; `ESCALON_4C_STATUS=NOT_STARTED`; `ESCALON_4D_STATUS=NOT_STARTED`.
 
 `jefe-planner-contract.cjs` es la autoridad de la solicitud y del plan local. Correlaciona identidad física, intake, plan de investigación, caso de evidencia, flujo supervisado y paquete de contexto específico de Planner. El contrato normaliza alcance, dependencias, riesgos y restricciones sin paths, secretos, credenciales ni comandos; produce pasos deterministas de planificación y un gate explícito. Sólo evidencia `accepted_for_context` con paquete `ready` cierra el contrato para el gate siguiente; toda evidencia insuficiente, humana pendiente o paquete restringido vuelve a discovery. Ningún plan habilita ejecución: `executionPermitted=false` hasta el Escalón 5.
 
 El smoke `jefe-planner-contract-smoke.mjs` pasa `20/20` casos conductuales locales sobre determinismo, correlación, límites, sanitización, gate, inmutabilidad y matriz negativa. No hay UI, IPC, red, proveedores, navegador, Electron, Codex, ejecución, aprobación humana, proyecto comercial, preview, publicación o deploy.
 
 `NEXT=ESCALON_4B_PLANNER_PERSISTENCE_AND_ORCHESTRATION`.
+
+## Escalón 4B — persistencia y orquestación de Planner
+
+`ESCALON_4B_STATUS=COMPLETED`. `jefe-planner-persistence.cjs` persiste la solicitud y su plan correlacionado mediante staging/rename, locks por root físico, reapertura, idempotencia, índice reconstruible y aislamiento por proyecto. Los registros son inmutables: una solicitud o plan forjado se rechaza antes de escribir y una corrupción permanece visible en el read model.
+
+`jefe-planner-orchestrator.cjs` consume exclusivamente puertos de lectura de discovery, casos de evidencia y flujos 3C, más un paquete 2C validado para el agente Planner. Revalida identidad y correlación completa antes de crear los registros. Fuente ausente, identidad cruzada o referencias incongruentes rechazan la preparación; evidencia insuficiente genera el retorno explícito a discovery. No hay adapter, shell, red, IPC, Codex ni ejecución de plan.
+
+El smoke `jefe-planner-persistence-smoke.mjs` pasa `20/20` casos conductuales locales de persistencia, reapertura, concurrencia, corrupción, rollback atómico, aislamiento y seguridad de fuentes. `NEXT=ESCALON_4C_PLANNER_EVIDENCE_AND_CONTRACT_GATE`.

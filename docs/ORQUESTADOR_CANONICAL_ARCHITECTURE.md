@@ -15,7 +15,7 @@
 | MEMORIA | `electron/jefe-context-contract.cjs`, `electron/jefe-context-persistence.cjs` y `electron/jefe-context-integration.cjs` | Eventos locales validados e inmutables, derivados después de manifests/ledger; outbox durable e IPC semántico, sin UI ni agentes. |
 | Investigación supervisada | `electron/jefe-supervised-research-orchestrator.cjs` y persistencias de sesión/caso | Correlaciona requests y receipts; sólo el orquestador promueve evidencia aceptada a MEMORIA. |
 | Runtime de conectores | `electron/jefe-research-connector-contract.cjs`, persistencia, coordinador y runtime | Intenta adapters confiables locales bajo política fija; no habilita red, providers reales ni autoridad del caller. |
-| Planner (4A) | `electron/jefe-planner-contract.cjs` | Cierra solicitud/plan local desde referencias correlacionadas de 3C y paquete de Planner; no ejecuta, no decide autoridad humana y retorna a discovery cuando evidencia o contexto no cierran. |
+| Planner (4A–4B) | `electron/jefe-planner-contract.cjs`, `jefe-planner-persistence.cjs` y `jefe-planner-orchestrator.cjs` | Cierra y persiste solicitud/plan local desde puertos correlacionados de 3C y paquete de Planner; no ejecuta, no decide autoridad humana y retorna a discovery cuando evidencia o contexto no cierran. |
 
 ## Compatibilidad y exclusiones
 
