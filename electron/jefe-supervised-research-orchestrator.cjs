@@ -1,11 +1,77 @@
 const crypto = require('crypto')
-const { request, receipt } = require('./jefe-research-contract.cjs')
+const { request, receipt, safeResearchText } = require('./jefe-research-contract.cjs')
 const { candidate } = require('./jefe-research-evidence-contract.cjs')
 const { evaluate, publicView } = require('./jefe-research-evidence-gate.cjs')
 const { canonical } = require('./jefe-context-package-contract.cjs')
 
 const operationLocks = new Map()
 let memoryStoreSequence = 0
+
+const CORRELATION_ID = /^[a-z][a-z0-9-]{2,80}$/u
+const PACKAGE_ID = /^context-package-[a-f0-9]{32}$/u
+const HANDOFF_ID = /^agent-handoff-[a-f0-9]{32}$/u
+const RESEARCH_REQUEST_ID = /^research-[a-f0-9]{32}$/u
+const RESEARCH_PLAN_ID = /^research-plan-[a-f0-9]{32}$/u
+const EVIDENCE_CASE_ID = /^evidence-case-[a-f0-9]{32}$/u
+const PHYSICAL_IDENTITY_FIELDS = Object.freeze(['projectId', 'runId', 'versionId'])
+const PACKAGE_REFERENCE_FIELDS = Object.freeze(['agent', 'packageId', 'handoffId', 'consumerStatus'])
+const STORED_REQUEST_FIELDS = Object.freeze([
+  'schemaVersion',
+  'discoveryId',
+  'intakeId',
+  'projectId',
+  'packageId',
+  'handoffId',
+  'role',
+  'objective',
+  'questions',
+  'providerType',
+  'purpose',
+  'budget',
+  'references',
+  'needsCorroboration',
+  'state',
+  'provenance',
+  'actor',
+  'authority',
+  'createdAt',
+  'researchRequestId',
+  'identity',
+  'researchPlanId',
+  'evidenceCaseId',
+])
+const RESEARCH_ROLES = Object.freeze(['radar', 'scout', 'hermes'])
+const CONSUMER_STATUSES = new Set(['not_connected', 'registered_internal'])
+const PERSISTABLE_ERROR_CODES = new Set([
+  'RESEARCH_PERSISTENCE_FAILED',
+  'MEMORY_APPEND_FAILED',
+  'MEMORY_NOT_CONFIGURED',
+  'INJECTED_MEMORY_FAILURE',
+  'INJECTED_FAILURE',
+  'CORRUPT_SESSION',
+  'INCOMPATIBLE_REPLAY',
+  'SESSION_LOCKED',
+  'INVALID_ENTRY',
+  'INVALID_ID',
+  'INVALID_IDENTITY',
+  'INVALID_REFERENCE',
+  'INVALID_REFERENCES',
+  'INVALID_ACTOR',
+  'INVALID_AUTHORITY',
+  'INVALID_SCOPE',
+  'INVALID_STATE',
+  'INVALID_TEXT',
+  'INVALID_TIMESTAMP',
+  'INVALID_TYPE',
+  'INVALID_URL_REFERENCE',
+  'METADATA_DEPTH',
+  'METADATA_SIZE',
+  'SENSITIVE_FIELD',
+  'LOCKED',
+  'ENTRY_ID_COLLISION',
+  'UNKNOWN_RELATION_TARGET',
+  'HUMAN_DECISION_PROTECTED',
+])
 
 class SupervisedResearchError extends Error {
   constructor(code, message) {
@@ -32,6 +98,34 @@ function deepFreeze(value) {
   return Object.freeze(value)
 }
 
+function plainObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) && [Object.prototype, null].includes(Object.getPrototypeOf(value))
+}
+
+function hasExactFields(value, fields) {
+  return plainObject(value) && Object.keys(value).length === fields.length && fields.every((field) => Object.hasOwn(value, field))
+}
+
+function physicalIdentity(value, code = 'INVALID_RESEARCH_IDENTITY') {
+  if (!hasExactFields(value, PHYSICAL_IDENTITY_FIELDS) || PHYSICAL_IDENTITY_FIELDS.some((field) => typeof value[field] !== 'string' || !CORRELATION_ID.test(value[field]))) fail(code, 'Identidad fisica de investigacion invalida.')
+  return Object.fromEntries(PHYSICAL_IDENTITY_FIELDS.map((field) => [field, value[field]]))
+}
+
+function contextPackages(value) {
+  if (!Array.isArray(value) || value.length !== RESEARCH_ROLES.length) fail('MISSING_CONTEXT_PACKAGE', 'Faltan paquetes de contexto.')
+  const byAgent = new Map()
+  for (const item of value) {
+    if (!hasExactFields(item, PACKAGE_REFERENCE_FIELDS) || !RESEARCH_ROLES.includes(item.agent) || !PACKAGE_ID.test(item.packageId) || !HANDOFF_ID.test(item.handoffId) || !CONSUMER_STATUSES.has(item.consumerStatus) || byAgent.has(item.agent)) fail('INVALID_CONTEXT_PACKAGE', 'Paquete de contexto invalido.')
+    byAgent.set(item.agent, clone(item))
+  }
+  if (RESEARCH_ROLES.some((role) => !byAgent.has(role)) || new Set(value.map((item) => item.packageId)).size !== value.length || new Set(value.map((item) => item.handoffId)).size !== value.length) fail('INVALID_CONTEXT_PACKAGE', 'Paquete de contexto invalido.')
+  return byAgent
+}
+
+function persistableErrorCode(error, fallback) {
+  return PERSISTABLE_ERROR_CODES.has(error?.code) ? error.code : fallback
+}
+
 function exclusive(key, work) {
   const previous = operationLocks.get(key) || Promise.resolve()
   let release
@@ -45,14 +139,16 @@ function exclusive(key, work) {
 
 function correlationSeed(value) {
   if (!value || typeof value !== 'object') fail('INVALID_RESEARCH_PLAN', 'Plan de investigacion invalido.')
+  const identity = physicalIdentity(value.identity, 'INVALID_RESEARCH_PLAN')
   const seed = {
+    identity,
     projectId: value.projectId,
     discoveryId: value.discoveryId,
     intakeId: value.intakeId,
     objective: value.objective,
     questions: value.questions,
   }
-  if (Object.values(seed).slice(0, 4).some((item) => typeof item !== 'string' || !item) || !Array.isArray(seed.questions) || seed.questions.length < 1) fail('INVALID_RESEARCH_PLAN', 'Plan de investigacion invalido.')
+  if (identity.projectId !== seed.projectId || [seed.projectId, seed.discoveryId, seed.intakeId, seed.objective].some((item) => typeof item !== 'string' || !item) || !Array.isArray(seed.questions) || seed.questions.length < 1) fail('INVALID_RESEARCH_PLAN', 'Plan de investigacion invalido.')
   return seed
 }
 
@@ -62,7 +158,7 @@ function deriveResearchPlanId(value) {
 
 function deriveEvidenceCaseId(value) {
   const researchPlanId = typeof value?.researchPlanId === 'string' ? value.researchPlanId : deriveResearchPlanId(value)
-  if (!/^research-plan-[a-f0-9]{32}$/u.test(researchPlanId)) fail('INVALID_EVIDENCE_CASE', 'Caso de evidencia invalido.')
+  if (!RESEARCH_PLAN_ID.test(researchPlanId)) fail('INVALID_EVIDENCE_CASE', 'Caso de evidencia invalido.')
   return `evidence-case-${digest({ researchPlanId, slot: 'primary_evidence' }).slice(0, 32)}`
 }
 
@@ -115,6 +211,36 @@ function normalizedClaim(value) {
   return value.normalize('NFKC').replace(/\s+/gu, ' ').trim().toLocaleLowerCase('es')
 }
 
+function caseIdentity(caseRecord) {
+  if (!plainObject(caseRecord) || !RESEARCH_PLAN_ID.test(caseRecord.researchPlanId) || !EVIDENCE_CASE_ID.test(caseRecord.evidenceCaseId)) fail('INVALID_EVIDENCE_CASE_IDENTITY', 'Correlacion del caso de evidencia invalida.')
+  const identity = physicalIdentity(caseRecord.identity, 'INVALID_EVIDENCE_CASE_IDENTITY')
+  const expectedPlanId = deriveResearchPlanId({
+    identity,
+    projectId: caseRecord.projectId,
+    discoveryId: caseRecord.discoveryId,
+    intakeId: caseRecord.intakeId,
+    objective: caseRecord.objective,
+    questions: caseRecord.questions,
+  })
+  if (identity.projectId !== caseRecord.projectId || caseRecord.researchPlanId !== expectedPlanId || caseRecord.evidenceCaseId !== deriveEvidenceCaseId({ researchPlanId: expectedPlanId }) || !Array.isArray(caseRecord.requests) || caseRecord.requests.length !== RESEARCH_ROLES.length) fail('INVALID_EVIDENCE_CASE_IDENTITY', 'Correlacion del caso de evidencia invalida.')
+  const roles = new Set()
+  const packageIds = new Set()
+  const handoffIds = new Set()
+  for (const requestRecord of caseRecord.requests) {
+    if (!hasExactFields(requestRecord, STORED_REQUEST_FIELDS) || requestRecord.schemaVersion !== 'jefe-research-request/v1' || !RESEARCH_REQUEST_ID.test(requestRecord.researchRequestId)) fail('INVALID_EVIDENCE_CASE_IDENTITY', 'Correlacion del caso de evidencia invalida.')
+    const requestIdentity = physicalIdentity(requestRecord?.identity, 'INVALID_EVIDENCE_CASE_IDENTITY')
+    if (!RESEARCH_ROLES.includes(requestRecord.role) || roles.has(requestRecord.role) || !PACKAGE_ID.test(requestRecord.packageId) || packageIds.has(requestRecord.packageId) || !HANDOFF_ID.test(requestRecord.handoffId) || handoffIds.has(requestRecord.handoffId) || canonical(requestIdentity) !== canonical(identity)) fail('INVALID_EVIDENCE_CASE_IDENTITY', 'Correlacion del caso de evidencia invalida.')
+    if (requestRecord.researchPlanId !== caseRecord.researchPlanId || requestRecord.evidenceCaseId !== caseRecord.evidenceCaseId || requestRecord.projectId !== caseRecord.projectId || requestRecord.discoveryId !== caseRecord.discoveryId || requestRecord.intakeId !== caseRecord.intakeId) fail('INVALID_EVIDENCE_CASE_IDENTITY', 'Correlacion del caso de evidencia invalida.')
+    const requestSeed = Object.fromEntries(STORED_REQUEST_FIELDS.filter((field) => !['researchRequestId', 'researchPlanId', 'evidenceCaseId'].includes(field)).map((field) => [field, requestRecord[field]]))
+    if (requestRecord.researchRequestId !== `research-${digest(requestSeed).slice(0, 32)}`) fail('INVALID_EVIDENCE_CASE_IDENTITY', 'Correlacion del caso de evidencia invalida.')
+    roles.add(requestRecord.role)
+    packageIds.add(requestRecord.packageId)
+    handoffIds.add(requestRecord.handoffId)
+  }
+  if (RESEARCH_ROLES.some((role) => !roles.has(role))) fail('INVALID_EVIDENCE_CASE_IDENTITY', 'Correlacion del caso de evidencia invalida.')
+  return identity
+}
+
 function createSupervisedResearch({ memory = null, persistence = null, evidenceCasePersistence = null, clock = () => new Date().toISOString(), trusted = {} } = {}) {
   const caseStore = evidenceCasePersistence || createMemoryCasePersistence()
   if (!caseStore || typeof caseStore.read !== 'function' || typeof caseStore.write !== 'function' || typeof caseStore.update !== 'function' || typeof caseStore.findByRequestId !== 'function') fail('INVALID_EVIDENCE_CASE_PERSISTENCE', 'Persistencia de casos invalida.')
@@ -125,6 +251,7 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
   const sessionId = (researchRequestId) => `research-session-${digest(researchRequestId).slice(0, 32)}`
 
   function registerCase(caseRecord) {
+    caseIdentity(caseRecord)
     for (const storedRequest of caseRecord.requests) {
       const requestRecord = deepFreeze(clone(storedRequest))
       requests[requestRecord.researchRequestId] = requestRecord
@@ -157,6 +284,7 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
       researchRequestId: requestRecord.researchRequestId,
       researchPlanId: caseRecord.researchPlanId,
       evidenceCaseId: caseRecord.evidenceCaseId,
+      identity: caseIdentity(caseRecord),
       discoveryId: requestRecord.discoveryId,
       intakeId: requestRecord.intakeId,
       projectId: requestRecord.projectId,
@@ -191,7 +319,7 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
     try {
       return (await caseStore.update(evidenceCaseId, (current) => {
         const pendingOperations = [...new Set([...current.pendingOperations, pendingOperation])].sort()
-        return { ...current, pendingOperations, lastErrorCode: error.code || 'RESEARCH_PERSISTENCE_FAILED', updatedAt: clock() }
+        return { ...current, pendingOperations, lastErrorCode: persistableErrorCode(error, 'RESEARCH_PERSISTENCE_FAILED'), updatedAt: clock() }
       })).record
     } catch {
       return caseStore.read(evidenceCaseId)
@@ -201,6 +329,7 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
   async function completePreparation(evidenceCaseId) {
     let current = await caseStore.read(evidenceCaseId)
     if (!current) fail('EVIDENCE_CASE_NOT_FOUND', 'Caso de evidencia inexistente.')
+    caseIdentity(current)
     if (current.state !== 'preparing') {
       registerCase(current)
       return current
@@ -238,6 +367,7 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
   }
 
   function planResult(caseRecord) {
+    const identity = caseIdentity(caseRecord)
     const byRole = Object.fromEntries(caseRecord.requests.map((item) => [item.role, requests[item.researchRequestId] || item]))
     const scout = byRole.scout
     return {
@@ -245,6 +375,7 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
       caseState: caseRecord.state,
       researchPlanId: caseRecord.researchPlanId,
       evidenceCaseId: caseRecord.evidenceCaseId,
+      identity: deepFreeze(clone(identity)),
       radar: byRole.radar,
       scout,
       hermes: byRole.hermes,
@@ -253,15 +384,17 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
   }
 
   async function plan({ intake, packages, providerType = 'metasearch', budget, references = [] }) {
-    if (!intake || intake.state !== 'ready_for_discovery' || !intake.identity?.versionId || !Array.isArray(packages)) fail('INVALID_INTAKE', 'Intake no apto para investigacion.')
-    const byAgent = new Map(packages.map((item) => [item.agent, item]))
-    if (!byAgent.has('radar') || !byAgent.has('scout') || !byAgent.has('hermes')) fail('MISSING_CONTEXT_PACKAGE', 'Faltan paquetes de contexto.')
+    if (!intake || intake.state !== 'ready_for_discovery' || typeof intake.intakeId !== 'string' || !CORRELATION_ID.test(intake.intakeId) || typeof intake.objective !== 'string' || !Array.isArray(intake.questions)) fail('INVALID_INTAKE', 'Intake no apto para investigacion.')
+    const identity = physicalIdentity(intake.identity, 'INVALID_INTAKE')
+    const byAgent = contextPackages(packages)
+    const questions = (intake.questions.length ? intake.questions : [intake.expectedOutcome]).map((item) => safeResearchText(item))
     const topic = {
+      identity,
       discoveryId: `discovery-${intake.intakeId.slice(7)}`,
       intakeId: intake.intakeId,
-      projectId: intake.identity.projectId,
-      objective: intake.objective,
-      questions: intake.questions.length ? intake.questions : [intake.expectedOutcome],
+      projectId: identity.projectId,
+      objective: safeResearchText(intake.objective),
+      questions,
     }
     const researchPlanId = deriveResearchPlanId(topic)
     const evidenceCaseId = deriveEvidenceCaseId({ researchPlanId })
@@ -269,9 +402,11 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
       let current = await caseStore.read(evidenceCaseId)
       const createdAt = current?.createdAt || clock()
       const common = {
-        ...topic,
-        packageId: byAgent.get('scout').packageId,
-        handoffId: `handoff-${byAgent.get('scout').packageId.slice(-24)}`,
+        discoveryId: topic.discoveryId,
+        intakeId: topic.intakeId,
+        projectId: topic.projectId,
+        objective: topic.objective,
+        questions: topic.questions,
         providerType,
         purpose: 'research',
         budget,
@@ -279,15 +414,21 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
         needsCorroboration: true,
       }
       const plannedRequests = [
-        request({ ...common, role: 'radar', purpose: 'discovery', providerType: 'manual_reference' }, createdAt, trusted),
-        request({ ...common, role: 'scout' }, createdAt, trusted),
-        request({ ...common, role: 'hermes', packageId: byAgent.get('hermes').packageId, handoffId: `handoff-${byAgent.get('hermes').packageId.slice(-24)}` }, createdAt, trusted),
-      ].map((requestRecord) => ({ ...requestRecord, researchPlanId, evidenceCaseId }))
+        request({ ...common, packageId: byAgent.get('radar').packageId, handoffId: byAgent.get('radar').handoffId, role: 'radar', purpose: 'discovery', providerType: 'manual_reference' }, createdAt, trusted),
+        request({ ...common, packageId: byAgent.get('scout').packageId, handoffId: byAgent.get('scout').handoffId, role: 'scout' }, createdAt, trusted),
+        request({ ...common, packageId: byAgent.get('hermes').packageId, handoffId: byAgent.get('hermes').handoffId, role: 'hermes' }, createdAt, trusted),
+      ].map((requestRecord) => {
+        const correlated = { ...requestRecord, identity: clone(identity) }
+        delete correlated.researchRequestId
+        correlated.researchRequestId = `research-${digest(correlated).slice(0, 32)}`
+        return { ...correlated, researchPlanId, evidenceCaseId }
+      })
       if (!current) {
         current = (await caseStore.write({
           schemaVersion: 'jefe-supervised-research-evidence-case/v1',
           evidenceCaseId,
           researchPlanId,
+          identity: clone(identity),
           projectId: topic.projectId,
           discoveryId: topic.discoveryId,
           intakeId: topic.intakeId,
@@ -307,9 +448,10 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
           updatedAt: createdAt,
         })).record
       } else {
+        caseIdentity(current)
         const existingIds = current.requests.map((item) => item.researchRequestId).sort()
         const plannedIds = plannedRequests.map((item) => item.researchRequestId).sort()
-        if (canonical(existingIds) !== canonical(plannedIds) || current.researchPlanId !== researchPlanId) fail('INCOMPATIBLE_RESEARCH_PLAN', 'Plan de investigacion incompatible.')
+        if (canonical(existingIds) !== canonical(plannedIds) || current.researchPlanId !== researchPlanId || canonical(current.identity) !== canonical(identity)) fail('INCOMPATIBLE_RESEARCH_PLAN', 'Plan de investigacion incompatible.')
       }
       registerCase(current)
       if (current.state === 'preparing') current = await completePreparation(evidenceCaseId)
@@ -358,19 +500,24 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
   }
 
   async function appendAcceptedMemory(caseRecord) {
+    const identity = caseIdentity(caseRecord)
     if (caseRecord.state !== 'accepted_for_context' || !caseRecord.pendingOperations.includes('memory_append')) return caseRecord
-    if (!memory || typeof memory.append !== 'function') {
-      return (await caseStore.update(caseRecord.evidenceCaseId, (draft) => ({ ...draft, memory: { status: 'not_configured', entryId: null }, pendingOperations: draft.pendingOperations.filter((item) => item !== 'memory_append'), updatedAt: clock() }))).record
-    }
     const decision = caseRecord.evidenceDecisions[0]
     const entryId = `research-evidence-${digest(caseRecord.evidenceCaseId).slice(0, 24)}`
+    if (!memory || typeof memory.append !== 'function') {
+      return (await caseStore.update(caseRecord.evidenceCaseId, (draft) => {
+        const pendingOperations = [...new Set([...draft.pendingOperations, 'memory_append'])].sort()
+        if (draft.memory?.status === 'pending' && draft.memory.entryId === entryId && draft.lastErrorCode === 'MEMORY_NOT_CONFIGURED' && canonical(draft.pendingOperations) === canonical(pendingOperations)) return draft
+        return { ...draft, memory: { status: 'pending', entryId }, pendingOperations, lastErrorCode: 'MEMORY_NOT_CONFIGURED', updatedAt: clock() }
+      })).record
+    }
     const receiptIds = caseRecord.contributions.map((item) => item.receiptId).sort()
     const references = [...new Set(caseRecord.receipts.map((item) => item.url).filter(Boolean))].sort().map((value) => ({ kind: 'url', value }))
     try {
       await memory.append({
         entryId,
         scope: 'version',
-        identity: { projectId: caseRecord.projectId, runId: caseRecord.discoveryId, versionId: caseRecord.intakeId },
+        identity: clone(identity),
         type: 'evidence',
         summary: decision.claim,
         actor: decision.actor,
@@ -395,7 +542,7 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
         return next
       })).record
     } catch (error) {
-      return (await caseStore.update(caseRecord.evidenceCaseId, (draft) => ({ ...draft, memory: { status: 'pending', entryId }, pendingOperations: [...new Set([...draft.pendingOperations, 'memory_append'])].sort(), lastErrorCode: error.code || 'MEMORY_APPEND_FAILED', updatedAt: clock() }))).record
+      return (await caseStore.update(caseRecord.evidenceCaseId, (draft) => ({ ...draft, memory: { status: 'pending', entryId }, pendingOperations: [...new Set([...draft.pendingOperations, 'memory_append'])].sort(), lastErrorCode: persistableErrorCode(error, 'MEMORY_APPEND_FAILED'), updatedAt: clock() }))).record
     }
   }
 
@@ -413,6 +560,7 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
     return exclusive(operationKey(located.evidenceCaseId), async () => {
       let current = await caseStore.read(located.evidenceCaseId)
       if (!current) fail('EVIDENCE_CASE_NOT_FOUND', 'Caso de evidencia inexistente.')
+      caseIdentity(current)
       if (current.state === 'preparing') fail('EVIDENCE_CASE_NOT_READY', 'Caso de evidencia no preparado.')
       const requestRecord = current.requests.find((item) => item.researchRequestId === input.researchRequestId)
       if (!requestRecord) fail('REQUEST_NOT_IN_EVIDENCE_CASE', 'Solicitud no asociada al caso.')
@@ -453,9 +601,12 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
         state: current.state,
         researchPlanId: current.researchPlanId,
         evidenceCaseId: current.evidenceCaseId,
+        identity: clone(caseIdentity(current)),
         receipt: got,
         evidence: decision ? publicView(decision) : null,
         memory: current.memory,
+        pendingOperations: [...current.pendingOperations],
+        lastErrorCode: current.lastErrorCode || null,
         idempotent,
       }
     })
@@ -470,15 +621,19 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
   async function reopenEvidenceCase(evidenceCaseId) {
     const current = await caseStore.read(evidenceCaseId)
     if (!current) fail('EVIDENCE_CASE_NOT_FOUND', 'Caso de evidencia inexistente.')
+    caseIdentity(current)
+    if (current.state === 'preparing' || current.pendingOperations.length > 0) return retryEvidenceCase(evidenceCaseId)
     registerCase(current)
     return evidenceCaseView(current)
   }
 
   function evidenceCaseView(current) {
+    const identity = caseIdentity(current)
     const decision = current.evidenceDecisions[0] || null
     return {
       researchPlanId: current.researchPlanId,
       evidenceCaseId: current.evidenceCaseId,
+      identity: clone(identity),
       projectId: current.projectId,
       state: current.state,
       requestIds: current.requests.map((item) => item.researchRequestId).sort(),
@@ -486,6 +641,7 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
       evidence: decision ? publicView(decision) : null,
       contradictionStatus: current.contradictionStatus || null,
       pendingOperations: current.pendingOperations,
+      lastErrorCode: current.lastErrorCode || null,
       memory: current.memory,
       nextResponsible: current.nextResponsible,
       revision: current.revision,
@@ -495,13 +651,23 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
   async function getResearchStatus(researchRequestId) {
     const current = await resolveCase(researchRequestId)
     const requestRecord = current.requests.find((item) => item.researchRequestId === researchRequestId)
-    return { state: sessionState(current, requestRecord), researchRequestId, researchPlanId: current.researchPlanId, evidenceCaseId: current.evidenceCaseId }
+    return {
+      state: sessionState(current, requestRecord),
+      researchRequestId,
+      researchPlanId: current.researchPlanId,
+      evidenceCaseId: current.evidenceCaseId,
+      identity: clone(caseIdentity(current)),
+      pendingOperations: [...current.pendingOperations],
+      lastErrorCode: current.lastErrorCode || null,
+      memory: clone(current.memory),
+    }
   }
 
   async function retryEvidenceCase(evidenceCaseId) {
     return exclusive(operationKey(evidenceCaseId), async () => {
       let current = await caseStore.read(evidenceCaseId)
       if (!current) fail('EVIDENCE_CASE_NOT_FOUND', 'Caso de evidencia inexistente.')
+      caseIdentity(current)
       if (current.state === 'preparing') current = await completePreparation(evidenceCaseId)
       current = await appendAcceptedMemory(current)
       if (current.pendingOperations.includes('sync_request_sessions')) {
@@ -523,19 +689,25 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
   }
 
   async function reconcilePendingResearch(projectId) {
+    if (typeof projectId !== 'string' || !CORRELATION_ID.test(projectId)) fail('INVALID_PROJECT_ID', 'Proyecto invalido.')
     const cases = await caseStore.list(projectId)
     const results = []
     for (const current of cases.sort((a, b) => a.evidenceCaseId.localeCompare(b.evidenceCaseId))) {
+      caseIdentity(current)
       if (current.state === 'preparing' || current.pendingOperations.length > 0) results.push(await retryEvidenceCase(current.evidenceCaseId))
     }
     return results
   }
 
   async function reopen(researchRequestId) {
-    const current = await resolveCase(researchRequestId)
+    let current = await resolveCase(researchRequestId)
+    if (current.state === 'preparing' || current.pendingOperations.length > 0) {
+      await retryEvidenceCase(current.evidenceCaseId)
+      current = await resolveCase(researchRequestId)
+    }
     const requestRecord = current.requests.find((item) => item.researchRequestId === researchRequestId)
     const decision = current.evidenceDecisions[0] || null
-    return { request: requestRecord, state: sessionState(current, requestRecord), evidence: decision ? publicView(decision) : null, researchPlanId: current.researchPlanId, evidenceCaseId: current.evidenceCaseId }
+    return { request: requestRecord, state: sessionState(current, requestRecord), evidence: decision ? publicView(decision) : null, researchPlanId: current.researchPlanId, evidenceCaseId: current.evidenceCaseId, identity: clone(caseIdentity(current)) }
   }
 
   function getResearchView(researchRequestId) {
@@ -549,6 +721,7 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
       nextStep: record.pending ? 'Reintentar persistencia de investigacion.' : 'Esperar proveedor o corroboracion.',
       researchPlanId: record.researchPlanId,
       evidenceCaseId: record.evidenceCaseId,
+      identity: clone(record.request.identity),
     }
   }
 

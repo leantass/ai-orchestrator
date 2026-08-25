@@ -1,8 +1,9 @@
 const crypto = require('crypto')
-const { CONNECTORS, attempt, connector, view } = require('./jefe-research-connector-contract.cjs')
+const { CONNECTORS, attempt, connector, delivery: createDelivery, completeDelivery, view } = require('./jefe-research-connector-contract.cjs')
 const { execute: coordinate, cancel: cancelCoordinated, isExecuting: isCoordinated } = require('./jefe-research-connector-coordinator.cjs')
 const { canonical } = require('./jefe-context-package-contract.cjs')
 const { structuredAnalysisCandidate } = require('./jefe-research-structured-analysis-connector.cjs')
+const { budget: providerBudget } = require('./jefe-research-provider-policy.cjs')
 
 const defaultScheduler = Object.freeze({ setTimeout: global.setTimeout, clearTimeout: global.clearTimeout })
 const POLICY_FIELDS = Object.freeze(['maxReservationsPerProject', 'reservationCost', 'maxConcurrency', 'executionTimeoutMs', 'maxTransientFailures', 'circuitCooldownMs', 'maxAttempts'])
@@ -92,7 +93,7 @@ function createConnectorRuntime(options = {}) {
     return JSON.parse(canonical(input))
   }
 
-  async function adaptCandidate(record, candidateValue, adapterKind) {
+  async function adaptCandidate(record, candidateValue, adapterKind, trustedInput = null) {
     if (!candidateValue || typeof candidateValue !== 'object' || Array.isArray(candidateValue) || ![Object.prototype, null].includes(Object.getPrototypeOf(candidateValue)) || Object.keys(candidateValue).some((key) => !CANDIDATE_FIELDS.includes(key) || candidateValue[key] === undefined)) fail('INVALID_CONNECTOR_CANDIDATE', 'Candidate invalido.')
     if (!Object.hasOwn(candidateValue, 'status') || !Object.hasOwn(candidateValue, 'claim') || !['received', 'partial'].includes(candidateValue.status) || typeof candidateValue.claim !== 'string') fail('INVALID_CONNECTOR_CANDIDATE', 'Candidate invalido.')
     const snapshot = {}
@@ -103,6 +104,7 @@ function createConnectorRuntime(options = {}) {
     }
     const context = await contributionContext(record.researchRequestId)
     assertContext(record, context)
+    const deliveryBudget = trustedInput?.budget || providerBudget()
     const rawReceipt = {
       researchRequestId: context.researchRequestId,
       providerType: context.providerType,
@@ -111,7 +113,8 @@ function createConnectorRuntime(options = {}) {
       method: adapterKind === 'controlled_local' ? 'controlled_adapter' : 'injected_controlled_adapter',
     }
     for (const key of ['url', 'mimeType', 'bytes', 'contentHash', 'excerpt', 'redirects', 'codes', 'consumed']) if (snapshot[key] !== undefined) rawReceipt[key] = snapshot[key]
-    return { context, rawReceipt, claim: snapshot.claim }
+    const delivery = createDelivery({ record, context, rawReceipt, claim: snapshot.claim, budget: deliveryBudget, now: timeOf(clock) })
+    return { context, rawReceipt: delivery.rawReceipt, claim: delivery.claim, delivery }
   }
 
   async function recordFailure(record, countFailure = true) {
@@ -158,14 +161,14 @@ function createConnectorRuntime(options = {}) {
     return current ? inactive(current) : { state: 'not_found' }
   }
 
-  async function failRunning(record, errorCode, transient = false) {
+  async function failRunning(record, errorCode, transient = false, countFailure = transient) {
     try {
       const saved = await conditional(record, transient ? 'failed_transient' : 'failed_permanent', {
         errorCode,
         budgetReservation: { ...record.budgetReservation, consumed: record.budgetReservation.reserved },
         updatedAt: timeOf(clock),
       })
-      await recordFailure(record, transient)
+      await recordFailure(record, countFailure)
       return inactive(saved.record)
     } catch (error) {
       if (error.code === 'STALE_TRANSITION') return terminalFromStale(record.connectorAttemptId)
@@ -220,83 +223,93 @@ function createConnectorRuntime(options = {}) {
         if (!current || current.state !== 'prepared') return current ? inactive(current) : { state: 'not_found' }
         let running
         try { running = (await conditional(current, 'running', { updatedAt: timeOf(clock) })).record } catch (error) { if (error.code === 'STALE_TRANSITION') return terminalFromStale(id); throw error }
-        const probeAllowed = await claimCircuitProbe(running)
-        const claimed = await persistence.read(id)
-        if (!claimed || claimed.state !== 'running' || claimed.revision !== running.revision) {
-          if (probeAllowed) await recordFailure(running, false)
-          return claimed ? inactive(claimed) : { state: 'not_found' }
-        }
-        if (!probeAllowed) {
-          try { return inactive((await conditional(running, 'failed_transient', { errorCode: 'CIRCUIT_OPEN', updatedAt: timeOf(clock) })).record) } catch (error) { if (error.code === 'STALE_TRANSITION') return terminalFromStale(id); throw error }
-        }
-        const adapter = trustedAdapters[running.connectorId]
-        const adapterKind = adapter && typeof adapter === 'object' ? adapter.kind : 'injected_fixture'
-        let adapterInput = Object.freeze({ connectorAttemptId: running.connectorAttemptId, connectorId: running.connectorId })
-        if (adapterKind === 'controlled_local') {
-          let input
-          try { input = await connectorInput(running) } catch { return failRunning(running, 'INVALID_RESEARCH_CORRELATION') }
-          adapterInput = Object.freeze({
-            connectorAttemptId: running.connectorAttemptId,
-            connectorId: running.connectorId,
-            researchRequestId: running.researchRequestId,
-            providerType: running.providerType,
-            operation: running.operation,
-            input,
-          })
-        }
-        const adapterPromise = Promise.resolve().then(() => adapter ? (adapterKind === 'controlled_local' ? adapter.execute(adapterInput) : adapter(adapterInput)) : { state: 'not_executed' })
-        adapterPromise.catch(() => {})
-        let timer
-        const timeout = new Promise((resolve) => { timer = trustedScheduler.setTimeout(() => resolve({ kind: 'timeout' }), policy.executionTimeoutMs) })
-        const outcome = await Promise.race([adapterPromise.then((value) => ({ kind: 'result', value }), () => ({ kind: 'failure' })), cancelled, timeout])
-        trustedScheduler.clearTimeout(timer)
-        if (outcome.kind === 'cancelled') return terminalFromStale(id)
-        if (outcome.kind === 'timeout') return timeoutRunning(running)
-        if (outcome.kind === 'failure') return failRunning(running, 'ADAPTER_FAILURE', true)
+        let contributionRecord = running
+        if (!running.delivery) {
+          const probeAllowed = await claimCircuitProbe(running)
+          const claimed = await persistence.read(id)
+          if (!claimed || claimed.state !== 'running' || claimed.revision !== running.revision) {
+            if (probeAllowed) await recordFailure(running, false)
+            return claimed ? inactive(claimed) : { state: 'not_found' }
+          }
+          if (!probeAllowed) {
+            try { return inactive((await conditional(running, 'failed_transient', { errorCode: 'CIRCUIT_OPEN', updatedAt: timeOf(clock) })).record) } catch (error) { if (error.code === 'STALE_TRANSITION') return terminalFromStale(id); throw error }
+          }
+          const adapter = trustedAdapters[running.connectorId]
+          const adapterKind = adapter && typeof adapter === 'object' ? adapter.kind : 'injected_fixture'
+          let adapterInput = Object.freeze({ connectorAttemptId: running.connectorAttemptId, connectorId: running.connectorId })
+          if (adapterKind === 'controlled_local') {
+            let input
+            try { input = await connectorInput(running) } catch { return failRunning(running, 'INVALID_RESEARCH_CORRELATION') }
+            adapterInput = Object.freeze({
+              connectorAttemptId: running.connectorAttemptId,
+              connectorId: running.connectorId,
+              researchRequestId: running.researchRequestId,
+              providerType: running.providerType,
+              operation: running.operation,
+              input,
+            })
+          }
+          const adapterPromise = Promise.resolve().then(() => adapter ? (adapterKind === 'controlled_local' ? adapter.execute(adapterInput) : adapter(adapterInput)) : { state: 'not_executed' })
+          adapterPromise.catch(() => {})
+          let timer
+          const timeout = new Promise((resolve) => { timer = trustedScheduler.setTimeout(() => resolve({ kind: 'timeout' }), policy.executionTimeoutMs) })
+          const outcome = await Promise.race([adapterPromise.then((value) => ({ kind: 'result', value }), () => ({ kind: 'failure' })), cancelled, timeout])
+          trustedScheduler.clearTimeout(timer)
+          if (outcome.kind === 'cancelled') return terminalFromStale(id)
+          if (outcome.kind === 'timeout') return timeoutRunning(running)
+          if (outcome.kind === 'failure') return failRunning(running, 'ADAPTER_FAILURE', true)
 
-        const adapterResult = outcome.value
-        if (!adapterResult || typeof adapterResult !== 'object' || Array.isArray(adapterResult)) return failRunning(running, 'UNTRUSTED_ADAPTER_OUTPUT')
-        const resultKeys = Object.keys(adapterResult)
-        if (resultKeys.length === 1 && adapterResult.state === 'failed_permanent') return failRunning(running, 'ADAPTER_PERMANENT_FAILURE')
-        if (resultKeys.length === 1 && adapterResult.state === 'not_executed') {
-          const connectorReceipt = { status: 'not_executed', classification: 'UNTRUSTED_EXTERNAL_CONTENT' }
+          const adapterResult = outcome.value
+          if (!adapterResult || typeof adapterResult !== 'object' || Array.isArray(adapterResult)) return failRunning(running, 'UNTRUSTED_ADAPTER_OUTPUT')
+          const resultKeys = Object.keys(adapterResult)
+          if (resultKeys.length === 1 && adapterResult.state === 'failed_permanent') return failRunning(running, 'ADAPTER_PERMANENT_FAILURE')
+          if (resultKeys.length === 1 && adapterResult.state === 'not_executed') {
+            const connectorReceipt = { status: 'not_executed', classification: 'UNTRUSTED_EXTERNAL_CONTENT' }
+            try {
+              const saved = await conditional(running, 'succeeded', { receipt: connectorReceipt, budgetReservation: { ...running.budgetReservation, consumed: running.budgetReservation.reserved }, updatedAt: timeOf(clock) })
+              await recordSuccess(running)
+              return { state: 'not_executed', classification: connectorReceipt.classification, referenceOnly: true, attempt: saved.record.connectorAttemptId }
+            } catch (error) {
+              if (error.code === 'STALE_TRANSITION') return terminalFromStale(id)
+              throw error
+            }
+          }
+          if (resultKeys.length !== 1 || !Object.hasOwn(adapterResult, 'candidate')) return failRunning(running, 'UNTRUSTED_ADAPTER_OUTPUT')
+          if (adapterKind === 'controlled_local') {
+            let expected
+            try { expected = structuredAnalysisCandidate(adapterInput.input) } catch { return failRunning(running, 'INVALID_CONNECTOR_CANDIDATE') }
+            if (canonical(adapterResult.candidate) !== canonical(expected)) return failRunning(running, 'INVALID_CONNECTOR_CANDIDATE')
+          }
+
+          let adapted
           try {
-            const saved = await conditional(running, 'succeeded', { receipt: connectorReceipt, budgetReservation: { ...running.budgetReservation, consumed: running.budgetReservation.reserved }, updatedAt: timeOf(clock) })
-            await recordSuccess(running)
-            return { state: 'not_executed', classification: connectorReceipt.classification, referenceOnly: true, attempt: saved.record.connectorAttemptId }
+            adapted = await adaptCandidate(running, adapterResult.candidate, adapterKind, adapterInput.input || null)
+            contributionRecord = (await conditional(running, 'contributing', { delivery: adapted.delivery, updatedAt: timeOf(clock) })).record
           } catch (error) {
             if (error.code === 'STALE_TRANSITION') return terminalFromStale(id)
-            throw error
+            if (error.code === 'INVALID_RESEARCH_CORRELATION' || error.code === 'RESEARCH_INTEGRATION_UNAVAILABLE') return failRunning(running, 'INVALID_RESEARCH_CORRELATION')
+            return failRunning(running, 'INVALID_CONNECTOR_CANDIDATE')
           }
-        }
-        if (resultKeys.length !== 1 || !Object.hasOwn(adapterResult, 'candidate')) return failRunning(running, 'UNTRUSTED_ADAPTER_OUTPUT')
-        if (adapterKind === 'controlled_local') {
-          let expected
-          try { expected = structuredAnalysisCandidate(adapterInput.input) } catch { return failRunning(running, 'INVALID_CONNECTOR_CANDIDATE') }
-          if (canonical(adapterResult.candidate) !== canonical(expected)) return failRunning(running, 'INVALID_CONNECTOR_CANDIDATE')
+        } else {
+          try { contributionRecord = (await conditional(running, 'contributing', { updatedAt: timeOf(clock) })).record } catch (error) { if (error.code === 'STALE_TRANSITION') return terminalFromStale(id); throw error }
         }
 
-        let adapted
+        const durableDelivery = contributionRecord.delivery
         let researchResult
-        let contributionRecord = running
         try {
-          adapted = await adaptCandidate(running, adapterResult.candidate, adapterKind)
-          contributionRecord = (await conditional(running, 'contributing', { updatedAt: timeOf(clock) })).record
-          researchResult = await trustedResearch.receiveContribution({ researchRequestId: adapted.context.researchRequestId, rawReceipt: adapted.rawReceipt, claim: adapted.claim })
+          researchResult = await trustedResearch.receiveContribution({ researchRequestId: durableDelivery.researchRequestId, rawReceipt: durableDelivery.rawReceipt, claim: durableDelivery.claim })
         } catch (error) {
-          if (error.code === 'STALE_TRANSITION') return terminalFromStale(id)
-          const candidateCodes = new Set(['INVALID_CONNECTOR_CANDIDATE', 'INVALID_CONTRIBUTION', 'INVALID_RECEIPT', 'INVALID_RECEIPT_CORRELATION', 'INVALID_TEXT', 'INVALID_URL', 'INVALID_EVIDENCE', 'INVALID_EVIDENCE_CORRELATION', 'INCOMPATIBLE_RECEIPT_REPLAY', 'INCOMPATIBLE_CONTRIBUTION_REPLAY', 'BUDGET_EXHAUSTED'])
-          if (error.code === 'INVALID_RESEARCH_CORRELATION' || error.code === 'RESEARCH_INTEGRATION_UNAVAILABLE') return failRunning(contributionRecord, 'INVALID_RESEARCH_CORRELATION')
-          if (candidateCodes.has(error.code)) return failRunning(contributionRecord, error.code === 'INVALID_CONNECTOR_CANDIDATE' || error.code === 'INVALID_CONTRIBUTION' || error.code === 'INVALID_TEXT' || error.code === 'INVALID_EVIDENCE' ? 'INVALID_CONNECTOR_CANDIDATE' : 'INVALID_PROVIDER_RECEIPT')
-          return failRunning(contributionRecord, 'RESEARCH_RECEIVE_REJECTED', true)
+          const candidateCodes = new Set(['INVALID_CONTRIBUTION', 'INVALID_RECEIPT', 'INVALID_RECEIPT_CORRELATION', 'INVALID_TEXT', 'INVALID_URL', 'INVALID_EVIDENCE', 'INVALID_EVIDENCE_CORRELATION', 'INCOMPATIBLE_RECEIPT_REPLAY', 'INCOMPATIBLE_CONTRIBUTION_REPLAY', 'BUDGET_EXHAUSTED'])
+          if (candidateCodes.has(error.code)) return failRunning(contributionRecord, error.code === 'INVALID_CONTRIBUTION' || error.code === 'INVALID_TEXT' || error.code === 'INVALID_EVIDENCE' ? 'INVALID_CONNECTOR_CANDIDATE' : 'INVALID_PROVIDER_RECEIPT', false, false)
+          return failRunning(contributionRecord, 'RESEARCH_RECEIVE_REJECTED', true, false)
         }
 
         const canonicalReceipt = researchResult?.receipt
-        const connectorReceipt = canonicalReceipt && canonicalReceipt.researchRequestId === adapted.context.researchRequestId && canonicalReceipt.providerType === adapted.context.providerType && canonicalReceipt.operation === running.operation && ['received', 'partial'].includes(canonicalReceipt.status) && canonicalReceipt.classification === 'UNTRUSTED_EXTERNAL_CONTENT' && /^receipt-[a-f0-9]{32}$/u.test(canonicalReceipt.receiptId)
+        const connectorReceipt = canonicalReceipt && canonicalReceipt.receiptId === durableDelivery.expectedReceiptId && canonicalReceipt.researchRequestId === durableDelivery.researchRequestId && canonicalReceipt.providerType === durableDelivery.providerType && canonicalReceipt.operation === durableDelivery.operation && canonicalReceipt.status === durableDelivery.rawReceipt.status && canonicalReceipt.classification === 'UNTRUSTED_EXTERNAL_CONTENT'
           ? { status: canonicalReceipt.status, classification: canonicalReceipt.classification, receiptId: canonicalReceipt.receiptId }
           : null
         const evidenceId = researchResult?.evidence?.evidenceId || null
-        if (!connectorReceipt || researchResult?.evidenceCaseId !== adapted.context.evidenceCaseId || researchResult?.researchPlanId !== adapted.context.researchPlanId || !['evidence_pending', 'needs_corroboration', 'accepted_for_context', 'requires_human', 'completed_with_evidence'].includes(researchResult?.state) || (evidenceId !== null && !/^evidence-[a-f0-9]{32}$/u.test(evidenceId))) return failRunning(contributionRecord, 'RESEARCH_RECEIVE_REJECTED', true)
+        if (!connectorReceipt || researchResult?.evidenceCaseId !== durableDelivery.evidenceCaseId || researchResult?.researchPlanId !== durableDelivery.researchPlanId || !['evidence_pending', 'needs_corroboration', 'accepted_for_context', 'requires_human', 'completed_with_evidence'].includes(researchResult?.state) || (evidenceId !== null && !/^evidence-[a-f0-9]{32}$/u.test(evidenceId))) return failRunning(contributionRecord, 'RESEARCH_RECEIVE_REJECTED', true, false)
         const research = {
           researchRequestId: running.researchRequestId,
           receiptId: connectorReceipt.receiptId,
@@ -307,8 +320,9 @@ function createConnectorRuntime(options = {}) {
         }
         try {
           const terminalState = connectorReceipt.status === 'partial' ? 'partial' : 'succeeded'
-          const saved = await conditional(contributionRecord, terminalState, { receipt: connectorReceipt, research, budgetReservation: { ...contributionRecord.budgetReservation, consumed: contributionRecord.budgetReservation.reserved }, updatedAt: timeOf(clock) })
-          await recordSuccess(contributionRecord)
+          const delivered = completeDelivery(durableDelivery, connectorReceipt.receiptId, timeOf(clock))
+          const saved = await conditional(contributionRecord, terminalState, { delivery: delivered, receipt: connectorReceipt, research, budgetReservation: { ...contributionRecord.budgetReservation, consumed: contributionRecord.budgetReservation.reserved }, updatedAt: timeOf(clock) })
+          await recordSuccess(saved.record)
           return {
             state: terminalState,
             classification: connectorReceipt.classification,
@@ -351,7 +365,7 @@ function createConnectorRuntime(options = {}) {
     const circuitBlocked = record.state === 'policy_blocked' && record.errorCode === 'CIRCUIT_OPEN'
     if (record.state !== 'failed_transient' && !circuitBlocked) return inactive(record)
     const health = await persistence.readHealth(record.connectorId)
-    if (health.state === 'half_open' || (health.state === 'open' && timeOf(clock) < health.halfOpenEligibleAt)) return { ...inactive(record), errorCode: 'CIRCUIT_OPEN' }
+    if (!record.delivery && (health.state === 'half_open' || (health.state === 'open' && timeOf(clock) < health.halfOpenEligibleAt))) return { ...inactive(record), errorCode: 'CIRCUIT_OPEN' }
     if ((record.attemptNumber || 1) >= policy.maxAttempts) fail('RETRY_LIMIT_REACHED', 'Limite de reintentos alcanzado.')
     const existing = await persistence.listAllAttempts(record.projectId)
     const descendant = existing.find((item) => item.retryOfAttemptId === id)
@@ -365,7 +379,7 @@ function createConnectorRuntime(options = {}) {
     delete next.receipt
     delete next.research
     delete next.updatedAt
-    const saved = await persistence.createReservedAttempt(next, { maxReservationsPerProject: policy.maxReservationsPerProject, reservationCost: policy.reservationCost })
+    const saved = await persistence.createReservedAttempt(next, { maxReservationsPerProject: policy.maxReservationsPerProject, reservationCost: record.delivery ? 0 : policy.reservationCost })
     return { state: saved.record.state, retried: true, attempt: saved.record.connectorAttemptId, idempotent: saved.idempotent }
   }
 
@@ -385,7 +399,7 @@ function createConnectorRuntime(options = {}) {
     for (const record of selected) {
       try {
         const saved = (await conditional(record, 'failed_transient', { errorCode: 'INTERRUPTED', budgetReservation: { ...record.budgetReservation, consumed: record.budgetReservation.reserved }, updatedAt: timeOf(clock) })).record
-        await recordFailure(saved)
+        await recordFailure(saved, !saved.delivery)
         items.push(view(saved))
       } catch (error) { if (error.code !== 'STALE_TRANSITION') throw error }
     }
@@ -394,7 +408,7 @@ function createConnectorRuntime(options = {}) {
 
   async function getAttemptStatus(id) {
     const record = await persistence.read(id)
-    return record ? view(record) : null
+    return record ? { ...view(record), deliveryState: record.delivery?.state || null } : null
   }
 
   function getConnectorHealth(providerType) {

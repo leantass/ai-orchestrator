@@ -26,6 +26,15 @@ function digest(value) {
   return crypto.createHash('sha256').update(value).digest('hex')
 }
 
+function packageReference(agent, token) {
+  return {
+    agent,
+    packageId: `context-package-${digest(`package:${agent}:${token}`).slice(0, 32)}`,
+    handoffId: `agent-handoff-${digest(`handoff:${agent}:${token}`).slice(0, 32)}`,
+    consumerStatus: 'not_connected',
+  }
+}
+
 function copy(value) {
   return JSON.parse(JSON.stringify(value))
 }
@@ -41,16 +50,16 @@ function planInput(token) {
   return {
     intake: {
       state: 'ready_for_discovery',
-      identity: { versionId: `version-${token}`, projectId: `project-${token}` },
+      identity: { projectId: `project-${token}`, runId: `run-${token}`, versionId: `version-${token}` },
       intakeId: `intake-${token}`,
       objective: `Investigar evidencia controlada ${token}`,
       questions: [`Que evidencia responde ${token}`],
       expectedOutcome: `Resultado controlado ${token}`,
     },
     packages: [
-      { agent: 'radar', packageId: `context-package-radar-${token}` },
-      { agent: 'scout', packageId: `context-package-scout-${token}` },
-      { agent: 'hermes', packageId: `context-package-hermes-${token}` },
+      packageReference('radar', token),
+      packageReference('scout', token),
+      packageReference('hermes', token),
     ],
     providerType: 'metasearch',
     budget: { maxQueries: 2, maxSources: 4 },
@@ -176,6 +185,7 @@ async function leavePreparing(environment, suffix = 'preparing') {
   const service = environment.service({ persistence: environment.requestStore({ failureInjection: 'before_rename' }) })
   await rejectsCode(() => service.plan(input), 'INJECTED_FAILURE')
   const topic = {
+    identity: input.intake.identity,
     projectId: input.intake.identity.projectId,
     discoveryId: `discovery-${input.intake.intakeId.slice(7)}`,
     intakeId: input.intake.intakeId,
@@ -189,14 +199,15 @@ async function leavePreparing(environment, suffix = 'preparing') {
 }
 
 test('researchPlanId es determinista ante distinto orden de claves', async () => {
-  const one = { projectId: 'project-alpha', discoveryId: 'discovery-alpha', intakeId: 'intake-alpha', objective: 'Objetivo', questions: ['Pregunta'] }
-  const two = { questions: ['Pregunta'], objective: 'Objetivo', intakeId: 'intake-alpha', discoveryId: 'discovery-alpha', projectId: 'project-alpha' }
+  const one = { identity: { projectId: 'project-alpha', runId: 'run-alpha', versionId: 'version-alpha' }, projectId: 'project-alpha', discoveryId: 'discovery-alpha', intakeId: 'intake-alpha', objective: 'Objetivo', questions: ['Pregunta'] }
+  const two = { questions: ['Pregunta'], objective: 'Objetivo', intakeId: 'intake-alpha', discoveryId: 'discovery-alpha', projectId: 'project-alpha', identity: { versionId: 'version-alpha', runId: 'run-alpha', projectId: 'project-alpha' } }
   assert.equal(deriveResearchPlanId(one), deriveResearchPlanId(two))
   assert.match(deriveResearchPlanId(one), /^research-plan-[a-f0-9]{32}$/u)
+  assert.notEqual(deriveResearchPlanId(one), deriveResearchPlanId({ ...one, identity: { ...one.identity, runId: 'run-other' } }))
 })
 
 test('evidenceCaseId es determinista y deriva del plan compartido', async () => {
-  const researchPlanId = deriveResearchPlanId({ projectId: 'project-beta', discoveryId: 'discovery-beta', intakeId: 'intake-beta', objective: 'Objetivo', questions: ['Pregunta'] })
+  const researchPlanId = deriveResearchPlanId({ identity: { projectId: 'project-beta', runId: 'run-beta', versionId: 'version-beta' }, projectId: 'project-beta', discoveryId: 'discovery-beta', intakeId: 'intake-beta', objective: 'Objetivo', questions: ['Pregunta'] })
   const one = deriveEvidenceCaseId({ researchPlanId })
   const two = deriveEvidenceCaseId({ researchPlanId })
   assert.equal(one, two)
@@ -204,11 +215,25 @@ test('evidenceCaseId es determinista y deriva del plan compartido', async () => 
 })
 
 test('plan materializa el caso durable de preparing a ready', () => withEnvironment(async (environment) => {
-  const { planned } = await prepare(environment)
+  const { input, planned } = await prepare(environment)
   const record = await environment.evidenceCaseStore().read(planned.evidenceCaseId)
   assert.equal(planned.caseState, 'ready')
   assert.equal(record.state, 'ready')
   assert.deepEqual(record.pendingOperations, [])
+  assert.deepEqual(planned.identity, input.intake.identity)
+  assert.deepEqual(record.identity, input.intake.identity)
+  const packages = new Map(input.packages.map((item) => [item.agent, item]))
+  for (const role of ['radar', 'scout', 'hermes']) {
+    assert.deepEqual(planned[role].identity, input.intake.identity)
+    assert.equal(planned[role].packageId, packages.get(role).packageId)
+    assert.equal(planned[role].handoffId, packages.get(role).handoffId)
+  }
+  const missingRun = copy(input)
+  delete missingRun.intake.identity.runId
+  await rejectsCode(() => environment.service().plan(missingRun), 'INVALID_INTAKE')
+  const crossedHandoff = copy(input)
+  crossedHandoff.packages[0].handoffId = crossedHandoff.packages[1].handoffId
+  await rejectsCode(() => environment.service().plan(crossedHandoff), 'INVALID_CONTEXT_PACKAGE')
 }))
 
 test('replay de plan desde una instancia nueva conserva IDs y requests', () => withEnvironment(async (environment) => {
@@ -227,6 +252,14 @@ test('las tres sesiones por request comparten researchPlanId y evidenceCaseId', 
   assert.equal(sessions.length, 3)
   assert.equal(sessions.every((item) => item.researchPlanId === planned.researchPlanId), true)
   assert.equal(sessions.every((item) => item.evidenceCaseId === planned.evidenceCaseId), true)
+  assert.equal(sessions.every((item) => JSON.stringify(item.identity) === JSON.stringify(input.intake.identity)), true)
+  const packages = new Map(input.packages.map((item) => [item.agent, item]))
+  for (const session of sessions) {
+    assert.deepEqual(session.request.identity, input.intake.identity)
+    assert.equal(session.packageId, packages.get(session.request.role).packageId)
+    assert.equal(session.handoffId, packages.get(session.request.role).handoffId)
+  }
+  await rejectsCode(() => environment.requestStore().write({ ...sessions[0], identity: { ...sessions[0].identity, runId: 'run-tampered' } }), 'INVALID_SESSION')
 }))
 
 test('el caso asocia y localiza las tres requests independientes', () => withEnvironment(async (environment) => {
@@ -374,6 +407,10 @@ test('aceptación realiza exactamente un append canónico con trazabilidad del c
   assert.equal(loaded.entries[0].metadata.evidenceCaseId, accepted.planned.evidenceCaseId)
   assert.equal(loaded.entries[0].metadata.receiptIds.length, 2)
   assert.equal(loaded.entries[0].provenance, 'supervised_research_evidence_case_gate')
+  assert.deepEqual(loaded.entries[0].identity, accepted.input.intake.identity)
+  assert.deepEqual(environment.memory.calls[0].identity, accepted.input.intake.identity)
+  assert.notEqual(environment.memory.calls[0].identity.runId, accepted.planned.radar.discoveryId)
+  assert.notEqual(environment.memory.calls[0].identity.versionId, accepted.planned.radar.intakeId)
 }))
 
 test('replay de contribución aceptada es idempotente y no repite append', () => withEnvironment(async (environment) => {
@@ -473,10 +510,10 @@ test('fallo de MEMORIA deja append pendiente y evidencia durable aceptada', () =
   assert.equal((await environment.memoryStore.readEvents()).entries.length, 0)
 }))
 
-test('retry reanuda sólo el append pendiente y converge idempotentemente', () => withEnvironment(async (environment) => {
+test('reapertura reanuda sólo el append pendiente y converge idempotentemente', () => withEnvironment(async (environment) => {
   environment.memory.failuresRemaining = 1
   const accepted = await acceptCase(environment, 'memory-retry')
-  const retried = await accepted.service.retryPendingResearch(accepted.planned.radar.researchRequestId)
+  const retried = await accepted.service.reopenEvidenceCase(accepted.planned.evidenceCaseId)
   const again = await accepted.service.retryPendingResearch(accepted.planned.radar.researchRequestId)
   assert.equal(retried.memory.status, 'appended')
   assert.deepEqual(retried.pendingOperations, [])
@@ -485,16 +522,28 @@ test('retry reanuda sólo el append pendiente y converge idempotentemente', () =
   assert.equal((await environment.memoryStore.readEvents()).entries.length, 1)
 }))
 
-test('reconcile desde instancia nueva recupera pendiente una sola vez', () => withEnvironment(async (environment) => {
-  environment.memory.failuresRemaining = 1
-  const accepted = await acceptCase(environment, 'memory-reconcile')
+test('reconcile desde instancia nueva conecta MEMORIA ausente y completa el pendiente una sola vez', () => withEnvironment(async (environment) => {
+  const disconnected = environment.service({ memory: null })
+  const accepted = await prepare(environment, 'memory-reconcile', disconnected)
+  await disconnected.receiveContribution(contribution(accepted.planned.radar, { seed: 'memory-reconcile-one', host: 'memory-reconcile-one' }))
+  const result = await disconnected.receiveContribution(contribution(accepted.planned.scout, { seed: 'memory-reconcile-two', host: 'memory-reconcile-two' }))
+  const pending = await environment.evidenceCaseStore().read(accepted.planned.evidenceCaseId)
+  assert.equal(result.state, 'accepted_for_context')
+  assert.deepEqual(result.pendingOperations, ['memory_append'])
+  assert.equal(result.lastErrorCode, 'MEMORY_NOT_CONFIGURED')
+  assert.equal(pending.memory.status, 'pending')
+  assert.match(pending.memory.entryId, /^research-evidence-[a-f0-9]{24}$/u)
+  assert.deepEqual(pending.pendingOperations, ['memory_append'])
+  assert.equal(pending.lastErrorCode, 'MEMORY_NOT_CONFIGURED')
+  assert.equal(environment.memory.calls.length, 0)
   const fresh = environment.service()
   const first = await fresh.reconcilePendingResearch(accepted.input.intake.identity.projectId)
   const second = await fresh.reconcilePendingResearch(accepted.input.intake.identity.projectId)
   assert.equal(first.length, 1)
   assert.equal(first[0].memory.status, 'appended')
   assert.deepEqual(second, [])
-  assert.equal(environment.memory.calls.length, 2)
+  assert.equal(environment.memory.calls.length, 1)
+  assert.deepEqual(environment.memory.calls[0].identity, accepted.input.intake.identity)
   assert.equal((await environment.memoryStore.readEvents()).entries.length, 1)
 }))
 
@@ -506,6 +555,9 @@ test('reopen por request reconstruye estado aceptado desde persistencia', () => 
   assert.equal(reopened.evidence.state, 'accepted_for_context')
   assert.equal(reopened.researchPlanId, accepted.planned.researchPlanId)
   assert.equal(reopened.evidenceCaseId, accepted.planned.evidenceCaseId)
+  assert.deepEqual(reopened.identity, accepted.input.intake.identity)
+  await environment.evidenceCaseStore().update(accepted.planned.evidenceCaseId, (record) => ({ ...record, identity: { ...record.identity, versionId: 'version-tampered' } }))
+  await rejectsCode(() => fresh.reopen(accepted.planned.radar.researchRequestId), 'INVALID_EVIDENCE_CASE_IDENTITY')
 }))
 
 test('contribuciones concurrentes independientes no pierden receipts', () => withEnvironment(async (environment) => {

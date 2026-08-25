@@ -1,7 +1,7 @@
 const fs = require('fs')
 const path = require('path')
 const { canonical } = require('./jefe-context-package-contract.cjs')
-const { ATTEMPT_ID, ATTEMPT_STATES, CONNECTOR_ID, CONNECTORS, TRANSITIONS, connector, transition } = require('./jefe-research-connector-contract.cjs')
+const { ATTEMPT_ID, ATTEMPT_STATES, CONNECTOR_ID, CONNECTORS, TRANSITIONS, connector, transition, validateDelivery } = require('./jefe-research-connector-contract.cjs')
 
 const locks = new Map()
 let stageSequence = 0
@@ -70,7 +70,7 @@ function validateResearch(value) {
 }
 
 function validateAttemptRecord(value) {
-  const allowed = ['schemaVersion', 'researchSessionId', 'researchRequestId', 'discoveryId', 'projectId', 'providerType', 'operation', 'connectorId', 'state', 'createdAt', 'connectorAttemptId', 'revision', 'budgetReservation', 'updatedAt', 'errorCode', 'receipt', 'research', 'rootAttemptId', 'retryOfAttemptId', 'attemptNumber']
+  const allowed = ['schemaVersion', 'researchSessionId', 'researchRequestId', 'discoveryId', 'projectId', 'providerType', 'operation', 'connectorId', 'state', 'createdAt', 'connectorAttemptId', 'revision', 'budgetReservation', 'updatedAt', 'errorCode', 'receipt', 'research', 'delivery', 'rootAttemptId', 'retryOfAttemptId', 'attemptNumber']
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some((key) => !allowed.includes(key))) fail('INVALID_ATTEMPT', 'Intento invalido.')
   if (value.schemaVersion !== 'jefe-research-connector-attempt/v1' || !ATTEMPT_ID.test(value.connectorAttemptId) || !ATTEMPT_STATES.includes(value.state) || !Number.isSafeInteger(value.revision) || value.revision < 0) fail('INVALID_ATTEMPT', 'Intento invalido.')
   for (const key of ['researchSessionId', 'researchRequestId', 'discoveryId', 'projectId']) if (typeof value[key] !== 'string' || !/^[a-z][a-z0-9-]{2,80}$/u.test(value[key])) fail('INVALID_ATTEMPT', 'Intento invalido.')
@@ -83,6 +83,11 @@ function validateAttemptRecord(value) {
   if (value.errorCode !== undefined && !ERROR_CODES.has(value.errorCode)) fail('INVALID_ATTEMPT', 'Intento invalido.')
   if (value.receipt !== undefined) validateReceipt(value.receipt)
   if (value.research !== undefined) validateResearch(value.research)
+  if (value.delivery !== undefined) {
+    let cleanDelivery
+    try { cleanDelivery = validateDelivery(value.delivery, value) } catch { fail('INVALID_ATTEMPT', 'Intento invalido.') }
+    value = { ...value, delivery: cleanDelivery }
+  }
   if (['prepared', 'running', 'contributing'].includes(value.state) && (value.errorCode !== undefined || value.receipt !== undefined || value.research !== undefined)) fail('INVALID_ATTEMPT', 'Intento invalido.')
   if (['policy_blocked', 'not_connected', 'failed_transient', 'failed_permanent', 'timed_out', 'cancelled'].includes(value.state) && (value.receipt !== undefined || value.research !== undefined)) fail('INVALID_ATTEMPT', 'Intento invalido.')
   if (['succeeded', 'partial'].includes(value.state) && (value.receipt === undefined || value.errorCode !== undefined)) fail('INVALID_ATTEMPT', 'Intento invalido.')
@@ -92,6 +97,12 @@ function validateAttemptRecord(value) {
   if (value.research && (value.research.researchRequestId !== value.researchRequestId || value.research.receiptId !== value.receipt?.receiptId)) fail('INVALID_ATTEMPT', 'Intento invalido.')
   for (const key of ['rootAttemptId', 'retryOfAttemptId']) if (value[key] !== undefined && !ATTEMPT_ID.test(value[key])) fail('INVALID_ATTEMPT', 'Intento invalido.')
   if (value.attemptNumber !== undefined && (!Number.isSafeInteger(value.attemptNumber) || value.attemptNumber < 2)) fail('INVALID_ATTEMPT', 'Intento invalido.')
+  if (value.state === 'contributing' && value.delivery?.state !== 'pending') fail('INVALID_ATTEMPT', 'Intento invalido.')
+  if (value.delivery?.state === 'pending' && !['prepared', 'running', 'contributing', 'failed_transient', 'failed_permanent', 'cancelled'].includes(value.state)) fail('INVALID_ATTEMPT', 'Intento invalido.')
+  if (value.delivery?.state === 'delivered' && !['succeeded', 'partial'].includes(value.state)) fail('INVALID_ATTEMPT', 'Intento invalido.')
+  if (value.delivery && ['prepared', 'running'].includes(value.state) && (!value.retryOfAttemptId || !value.rootAttemptId)) fail('INVALID_ATTEMPT', 'Intento invalido.')
+  if (['received', 'partial'].includes(value.receipt?.status) && (value.delivery?.state !== 'delivered' || value.delivery.receiptId !== value.receipt.receiptId)) fail('INVALID_ATTEMPT', 'Intento invalido.')
+  if (value.receipt?.status === 'not_executed' && value.delivery !== undefined) fail('INVALID_ATTEMPT', 'Intento invalido.')
   return JSON.parse(canonical(value))
 }
 
@@ -120,6 +131,15 @@ function attemptIdentity(value, fields = ATTEMPT_REPLAY_FIELDS) {
 function assertTransitionIntegrity(prior, proposed) {
   if (canonical(attemptIdentity(prior, ATTEMPT_IMMUTABLE_FIELDS)) !== canonical(attemptIdentity(proposed, ATTEMPT_IMMUTABLE_FIELDS))) fail('INVALID_TRANSITION_REQUEST', 'Transicion invalida.')
   if (proposed.budgetReservation?.reserved !== prior.budgetReservation.reserved || !Number.isSafeInteger(proposed.budgetReservation?.consumed) || proposed.budgetReservation.consumed < prior.budgetReservation.consumed) fail('INVALID_TRANSITION_REQUEST', 'Transicion invalida.')
+  if (!prior.delivery && proposed.delivery && (prior.state !== 'running' || proposed.state !== 'contributing' || proposed.delivery.state !== 'pending')) fail('INVALID_TRANSITION_REQUEST', 'Transicion invalida.')
+  if (prior.delivery) {
+    if (!proposed.delivery) fail('INVALID_TRANSITION_REQUEST', 'Transicion invalida.')
+    const immutable = (value) => Object.fromEntries(Object.entries(value).filter(([key]) => !['state', 'deliveredAt', 'receiptId'].includes(key)))
+    if (canonical(immutable(prior.delivery)) !== canonical(immutable(proposed.delivery))) fail('INVALID_TRANSITION_REQUEST', 'Transicion invalida.')
+    if (prior.delivery.state === 'delivered' && canonical(prior.delivery) !== canonical(proposed.delivery)) fail('INVALID_TRANSITION_REQUEST', 'Transicion invalida.')
+    if (prior.delivery.state === 'pending' && !['pending', 'delivered'].includes(proposed.delivery.state)) fail('INVALID_TRANSITION_REQUEST', 'Transicion invalida.')
+    if (prior.delivery.state === 'pending' && proposed.delivery.state === 'delivered' && !['succeeded', 'partial'].includes(proposed.state)) fail('INVALID_TRANSITION_REQUEST', 'Transicion invalida.')
+  }
 }
 
 function createConnectorPersistence({ root } = {}) {
