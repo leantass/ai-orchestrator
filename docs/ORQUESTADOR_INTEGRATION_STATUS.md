@@ -157,3 +157,19 @@ Los adapters revalidan packageId/checksum, target, purpose, identidad, disposici
 ## Escalón 3B — investigación supervisada
 
 ESCALON_3B_STATUS=COMPLETED; registro no equivale a conexión, receipt no equivale a evidencia y evidencia aceptada no equivale a verdad absoluta. La red sigue deshabilitada y los proveedores reales no están conectados. Las sesiones de investigación son durables, con receipts inmutables, replay, recuperación de evidence_pending y corrupción aislada. El contenido externo permanece no confiable; la defensa SSRF es offline hasta 3C. El fallo C2 anterior no volvió a reproducirse; se corrigió una carrera real de staging de MEMORIA mediante secuencia monotónica local y regresión determinista.
+
+## Cierre 3B-R1: casos de evidencia entre requests
+
+`ESCALON_3B_R1_STATUS=COMPLETED`; `CORRELATION_SMOKE=PASS`. La reparación conserva las sesiones por request y agrega una autoridad durable por `researchPlanId`/`evidenceCaseId`. Las contribuciones ingresan por `receiveContribution`, que valida el receipt contra su request/provider y reconstruye corroboraciones sólo desde receipts persistidos. Una sola fuente permanece `needs_corroboration`; fuentes independientes pueden llegar a `accepted_for_context`; contradicciones quedan `requires_human`. El orquestador es la única vía de append a MEMORIA y lo hace como máximo una vez después de aceptación. El smoke R1 pasa 41 casos reales y el smoke histórico 3B conserva 84/84.
+
+## Cierre 3C-A: fundación segura del runtime de conectores
+
+Fecha: 2026-08-25. `STATUS=ESCALON_3C_A_COMPLETED`; `ESCALON_3_STATUS=IN_PROGRESS`; `ESCALON_3A_STATUS=COMPLETED`; `ESCALON_3B_STATUS=COMPLETED`; `ESCALON_3B_R1_STATUS=COMPLETED`; `ESCALON_3C_A_STATUS=COMPLETED`.
+
+El contrato registra conectores con estados honestos y deriva identidad del intento. Persistencia y coordinador conservan intentos, reservas, concurrencia, cancelación linealizada, retry, circuit breaker y recuperación sin aceptar capacidades del caller. El timeout demostrado termina la fase del adapter; `contributing` protege la entrega local no abortable a 3B. El runtime valida el candidato y lo entrega únicamente a `receiveContribution`; no suministra corroboración, provider, autoridad, aceptación ni orden de append.
+
+El smoke 3C-A pasa `52/52` casos conductuales reales en cinco ejecuciones, además de regresiones cruzadas con 3B, 2B, C2 y 2D. `NETWORK=DISABLED`; `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`. `manual_reference` permanece referencia local inerte y los adapters de smoke son fixtures inyectadas, no providers ni evidencia externa. No se ejecutaron DNS, fetch, shell, navegador, Electron, provider real, generación, preview, publicación o deploy.
+
+El orden cruzado final volvió a exponer la flake C2 de dos instancias de MEMORIA sobre el mismo root. La corrección responsable serializa append/rebuild por root dentro del proceso y usa staging globalmente único; C2 quedó verde en diez ejecuciones consecutivas antes de repetir la matriz cruzada. Esto no añade locking multiproceso.
+
+UI, autenticación humana end-to-end, QA visual y deploy continúan pendientes. JEFE no está release-ready. La deuda Hermes heredada permanece intacta en 306 errores, 0 warnings y 73 archivos afectados. `PUSH=NO`; `NEXT=ESCALON_3C_SUPERVISED_RESEARCH_CONNECTORS_AND_EXECUTION`.

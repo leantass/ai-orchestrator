@@ -13,6 +13,8 @@
 | Preview | `electron/jefe-project-preview.cjs` | Recurso declarado + MIME allowlist; sin `file://` arbitrario. |
 | UI | `src/commercial/*` | Consume bridge y snapshots físicos; `localStorage` sólo guarda preferencias/borrador. |
 | MEMORIA | `electron/jefe-context-contract.cjs`, `electron/jefe-context-persistence.cjs` y `electron/jefe-context-integration.cjs` | Eventos locales validados e inmutables, derivados después de manifests/ledger; outbox durable e IPC semántico, sin UI ni agentes. |
+| Investigación supervisada | `electron/jefe-supervised-research-orchestrator.cjs` y persistencias de sesión/caso | Correlaciona requests y receipts; sólo el orquestador promueve evidencia aceptada a MEMORIA. |
+| Runtime de conectores | `electron/jefe-research-connector-contract.cjs`, persistencia, coordinador y runtime | Intenta adapters confiables locales bajo política fija; no habilita red, providers reales ni autoridad del caller. |
 
 ## Compatibilidad y exclusiones
 
@@ -28,7 +30,7 @@ Los aliases de generación heredada permanecen sólo para no romper callers y re
 
 ## Roadmap posterior
 
-La arquitectura posterior está definida exclusivamente en `ORQUESTADOR_CANONICAL_ROADMAP.md`. Escalón 3 inicia intake supervisado sin proveedores; Planner, ejecución, QA, preview, entrega, observabilidad, centro comercial, integración y governance son escalones dependientes, no capacidades ya conectadas.
+La arquitectura posterior está definida exclusivamente en `ORQUESTADOR_CANONICAL_ROADMAP.md`. `ESCALON_3_STATUS=IN_PROGRESS`: 3A, 3B con R1 y 3C-A están completos como fundaciones locales supervisadas. Planner, ejecución externa, QA, preview, entrega, observabilidad, centro comercial, integración y governance son escalones dependientes, no capacidades ya conectadas.
 
 ## Intake supervisado (Escalón 3A)
 
@@ -44,7 +46,7 @@ Los productores canónicos son creación, versión/cambio, aprobación local, re
 
 La outbox por proyecto soporta `synced`, `pending` y `failed`, con reapertura y reconciliación idempotentes. Las colisiones incompatibles no se fusionan. Snapshot y timeline son de sólo lectura; timeline limita 1–50 entradas, ordena determinísticamente y usa cursor opaco ligado al proyecto. IPC/preload permiten sólo operaciones semánticas allowlisted, sin append genérico, paths, roots, filesystem ni `ipcRenderer` expuesto.
 
-`ESCALON_2_STATUS=IN_PROGRESS`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=COMPLETED`; `ESCALON_2C_C_STATUS=COMPLETED`; `ESCALON_2C_C1_STATUS=COMPLETED`; `ESCALON_2C_C2_STATUS=COMPLETED`; `ESCALON_2D_STATUS=NOT_STARTED`. No hay UI de MEMORIA, agentes reales, aprendizaje, búsqueda vectorial, resolución humana de conflictos, compactación/retención final, QA visual ni deploy.
+`ESCALON_2_STATUS=VERIFIED_CLOSED`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2C_A_STATUS=COMPLETED`; `ESCALON_2C_B_STATUS=COMPLETED`; `ESCALON_2C_C_STATUS=COMPLETED`; `ESCALON_2C_C1_STATUS=COMPLETED`; `ESCALON_2C_C2_STATUS=COMPLETED`; `ESCALON_2D_STATUS=COMPLETED`. No hay UI de MEMORIA, agentes reales, aprendizaje, búsqueda vectorial, autenticación humana end-to-end, QA visual ni deploy.
 
 ## Paquetes de contexto (Escalón 2C-A)
 
@@ -54,4 +56,10 @@ La outbox por proyecto soporta `synced`, `pending` y `failed`, con reapertura y 
 
 ## Escalón 3B — investigación supervisada
 
-ESCALON_3B_STATUS=COMPLETED; registro no equivale a conexión, receipt no equivale a evidencia y evidencia aceptada no equivale a verdad absoluta. La red sigue deshabilitada y los proveedores reales no están conectados. Las sesiones de investigación son durables, con receipts inmutables, replay, recuperación de evidence_pending y corrupción aislada. El contenido externo permanece no confiable; la defensa SSRF es offline hasta 3C. El fallo C2 anterior no volvió a reproducirse; se corrigió una carrera real de staging de MEMORIA mediante secuencia monotónica local y regresión determinista.
+`ESCALON_3B_STATUS=COMPLETED`; `ESCALON_3B_R1_STATUS=COMPLETED`. Registro no equivale a conexión, receipt no equivale a evidencia y evidencia aceptada no equivale a verdad absoluta. El modelo por request queda subordinado al caso agregado determinista. `receiveContribution` valida el receipt contra su request/provider y reconstruye corroboración sólo desde receipts persistidos; contradicciones permanecen `requires_human`. MEMORIA recibe un único append determinista desde el orquestador después de `accepted_for_context`.
+
+## Escalón 3C-A — runtime seguro de conectores
+
+`STATUS=ESCALON_3C_A_COMPLETED`; `ESCALON_3_STATUS=IN_PROGRESS`; `ESCALON_3C_A_STATUS=COMPLETED`. El contrato cierra identidad, provider y operación. La persistencia atómica conserva intentos, reservas, lineage de retry y estado durable de circuit breaker; el coordinador limita concurrencia y cancelación; el runtime aplica política confiable, timeout de adapter y reconciliación determinista. Coordinación y locks son locales al proceso en esta fundación sin providers reales.
+
+Un adapter inyectado sólo produce un candidato no confiable. Después de sanitizarlo, el runtime llama exclusivamente `receiveContribution`; no puede forjar provider, aceptación, autoridad humana, IDs o escritura a MEMORIA. El smoke acredita 52/52 casos conductuales reales en cinco ejecuciones. `NETWORK=DISABLED`; `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`. No hay DNS, fetch, shell, navegador, Electron, provider real, generación, preview, publicación ni deploy. UI, autenticación humana end-to-end y QA visual siguen pendientes; JEFE no está release-ready y `PUSH=NO`.

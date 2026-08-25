@@ -73,6 +73,18 @@ function contributionInput(value) {
   return { researchRequestId: value.researchRequestId, rawReceipt: value.rawReceipt, claim: value.claim.trim() }
 }
 
+const AGGREGATE_LIMITS = Object.freeze({ queries: 'maxQueries', sources: 'maxSources', bytes: 'maxTotalBytes', durationMs: 'maxDurationMs', redirects: 'maxRedirects', attempts: 'maxAttempts' })
+
+function assertAggregateBudget(caseRecord, requestRecord, nextReceipt) {
+  const receipts = caseRecord.receipts.filter((item) => item.researchRequestId === requestRecord.researchRequestId)
+  for (const [field, budgetField] of Object.entries(AGGREGATE_LIMITS)) {
+    const total = [...receipts, nextReceipt].reduce((sum, item) => sum + (item.consumed?.[field] || 0), 0)
+    if (total > requestRecord.budget[budgetField]) fail('BUDGET_EXHAUSTED', 'Presupuesto de investigacion agotado.')
+  }
+  const totalBytes = [...receipts, nextReceipt].reduce((sum, item) => sum + (item.bytes || 0), 0)
+  if (totalBytes > requestRecord.budget.maxTotalBytes || receipts.length + 1 > requestRecord.budget.maxAttempts) fail('BUDGET_EXHAUSTED', 'Presupuesto de investigacion agotado.')
+}
+
 function createMemoryCasePersistence() {
   const values = new Map()
   const authorityRoot = `memory-evidence-cases-${++memoryStoreSequence}`
@@ -414,6 +426,7 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
         if (!existingContribution || existingContribution.researchRequestId !== input.researchRequestId || existingContribution.claim !== input.claim) fail('INCOMPATIBLE_CONTRIBUTION_REPLAY', 'Contribucion incompatible.')
         idempotent = true
       } else {
+        assertAggregateBudget(current, requestRecord, got)
         current = (await caseStore.update(current.evidenceCaseId, (draft) => {
           const next = {
             ...draft,
@@ -539,9 +552,7 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
     }
   }
 
-  function getContributionContext(researchRequestId) {
-    const record = records.get(researchRequestId)
-    if (!record) fail('REQUEST_NOT_FOUND', 'Solicitud inexistente.')
+  function contributionContextView(researchRequestId, record) {
     return deepFreeze({
       researchSessionId: sessionId(researchRequestId),
       researchRequestId,
@@ -550,6 +561,16 @@ function createSupervisedResearch({ memory = null, persistence = null, evidenceC
       discoveryId: record.request.discoveryId,
       projectId: record.request.projectId,
       providerType: record.request.providerType,
+    })
+  }
+
+  function getContributionContext(researchRequestId) {
+    const record = records.get(researchRequestId)
+    if (record) return contributionContextView(researchRequestId, record)
+    return resolveCase(researchRequestId).then(() => {
+      const hydrated = records.get(researchRequestId)
+      if (!hydrated) fail('REQUEST_NOT_FOUND', 'Solicitud inexistente.')
+      return contributionContextView(researchRequestId, hydrated)
     })
   }
 

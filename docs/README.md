@@ -7,6 +7,8 @@ Prevalencia: [ORQUESTADOR_CURRENT_STATUS.md](ORQUESTADOR_CURRENT_STATUS.md) defi
 - [Recuperación y conflictos de MEMORIA](ORQUESTADOR_CONTEXT_RECOVERY_AND_CONFLICTS.md)
 - [Roadmap canónico](ORQUESTADOR_CANONICAL_ROADMAP.md)
 - [Intake y descubrimiento supervisado](ORQUESTADOR_SUPERVISED_DISCOVERY.md)
+- [Investigación supervisada y gate de evidencia](ORQUESTADOR_SUPERVISED_RESEARCH.md)
+- [Runtime seguro de conectores de investigación](ORQUESTADOR_RESEARCH_CONNECTORS.md)
 
 Estado de cierre Escalón 2: `ESCALON_2_STATUS=VERIFIED_CLOSED`, `ESCALON_2D_STATUS=COMPLETED`, `RECOVERY_SMOKE=54/54_PASS`, `RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`. No declara release-ready, agentes reales, autenticación humana end-to-end, UI de conflictos, QA visual, deploy ni red.
 - [Arquitectura canónica](ORQUESTADOR_CANONICAL_ARCHITECTURE.md)
@@ -23,4 +25,10 @@ Los documentos `V1_*`, `release-candidate-checklist.md`, `operator-demo-flow.md`
 
 ## Escalón 3B — investigación supervisada
 
-ESCALON_3B_STATUS=COMPLETED; registro no equivale a conexión, receipt no equivale a evidencia y evidencia aceptada no equivale a verdad absoluta. La red sigue deshabilitada y los proveedores reales no están conectados. Las sesiones de investigación son durables, con receipts inmutables, replay, recuperación de evidence_pending y corrupción aislada. El contenido externo permanece no confiable; la defensa SSRF es offline hasta 3C. El fallo C2 anterior no volvió a reproducirse; se corrigió una carrera real de staging de MEMORIA mediante secuencia monotónica local y regresión determinista.
+`ESCALON_3A_STATUS=COMPLETED`; `ESCALON_3B_STATUS=COMPLETED`; `ESCALON_3B_R1_STATUS=COMPLETED`; `CORRELATION_SMOKE=PASS`. Registro no equivale a conexión, receipt no equivale a evidencia y evidencia aceptada no equivale a verdad absoluta. Las sesiones por request quedan subordinadas a casos agregados deterministas; sólo el orquestador puede añadir una evidencia aceptada a MEMORIA.
+
+## Escalón 3C-A — runtime seguro de conectores
+
+`STATUS=ESCALON_3C_A_COMPLETED`; `ESCALON_3_STATUS=IN_PROGRESS`; `ESCALON_3C_A_STATUS=COMPLETED`; `CONNECTOR_RUNTIME_SMOKE=52/52_PASS_X5`. El runtime local durable entrega candidatos sanitizados exclusivamente a `receiveContribution`; no decide evidencia, autoridad ni aceptación.
+
+`NETWORK=DISABLED`; `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`; `PUSH=NO`; `NEXT=ESCALON_3C_SUPERVISED_RESEARCH_CONNECTORS_AND_EXECUTION`. UI, autenticación humana end-to-end, QA visual y deploy siguen pendientes; JEFE no está release-ready. La deuda Hermes permanece intacta: 306 errores, 0 warnings y 73 archivos afectados.

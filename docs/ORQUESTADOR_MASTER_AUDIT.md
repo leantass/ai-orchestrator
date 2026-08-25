@@ -97,3 +97,15 @@ La auditoría clasificó runtime canónico de MEMORIA/lifecycle como conectado l
 ## Escalón 3B — investigación supervisada
 
 ESCALON_3B_STATUS=COMPLETED; registro no equivale a conexión, receipt no equivale a evidencia y evidencia aceptada no equivale a verdad absoluta. La red sigue deshabilitada y los proveedores reales no están conectados. Las sesiones de investigación son durables, con receipts inmutables, replay, recuperación de evidence_pending y corrupción aislada. El contenido externo permanece no confiable; la defensa SSRF es offline hasta 3C. El fallo C2 anterior no volvió a reproducirse; se corrigió una carrera real de staging de MEMORIA mediante secuencia monotónica local y regresión determinista.
+
+## Auditoría de cierre 3B-R1 y 3C-A — 2026-08-25
+
+Esta entrada amplía la historia sin reemplazar las conclusiones fechadas anteriores. El estado prevalente queda en `ORQUESTADOR_CURRENT_STATUS.md` y el orden en `ORQUESTADOR_CANONICAL_ROADMAP.md`.
+
+`ESCALON_3A_STATUS=COMPLETED`; `ESCALON_3B_STATUS=COMPLETED`; `ESCALON_3B_R1_STATUS=COMPLETED`; `STATUS=ESCALON_3C_A_COMPLETED`; `ESCALON_3_STATUS=IN_PROGRESS`. R1 cerró la correlación entre requests mediante casos de evidencia deterministas, receipts persistidos y un único append del orquestador después de `accepted_for_context`. Su smoke completa 41 casos y conserva la regresión 3B en 84/84.
+
+3C-A añade una fundación local de connector runtime con contrato cerrado, persistencia atómica, presupuesto confiable, concurrencia limitada, timeout de adapter, cancelación linealizada, retry con lineage, circuit breaker durable y reconcile acotado. El candidato validado sólo alcanza 3B por `receiveContribution`; ni caller ni adapter pueden elevar provider, IDs, presupuesto, autoridad, aceptación, deploy o paths. Coordinación y locks son locales al proceso y no acreditan ejecución distribuida. El smoke completa 52/52 casos conductuales reales en cinco ejecuciones y mantiene verdes los órdenes cruzados con 3B, 2B, C2 y 2D.
+
+Durante ese cierre, el orden cruzado reprodujo nuevamente una carrera C2 entre instancias de MEMORIA que compartían root. Se corrigió en la persistencia canónica con exclusión por root a nivel de proceso y staging globalmente único; la regresión C2 pasó 36/36 diez veces consecutivas antes de repetir los órdenes. No se afirma coordinación entre procesos.
+
+La evidencia sigue siendo local y de smoke. `NETWORK=DISABLED`; `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`; no hay DNS, fetch, shell, browser, Electron, provider real, generación, preview, publicación ni deploy. UI, autenticación humana end-to-end y QA visual continúan pendientes; JEFE no está release-ready. La deuda Hermes permanece intacta en 306 errores, 0 warnings y 73 archivos afectados. `PUSH=NO`; `NEXT=ESCALON_3C_SUPERVISED_RESEARCH_CONNECTORS_AND_EXECUTION`.

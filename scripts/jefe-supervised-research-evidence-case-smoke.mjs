@@ -62,7 +62,7 @@ function rawReceipt(requestRecord, {
   seed = 'receipt-one',
   host = 'source-one',
   status = 'received',
-  operation = 'reference',
+  operation = requestRecord.providerType === 'manual_reference' ? 'reference' : 'search',
   excerpt = 'Observacion controlada',
 } = {}) {
   const raw = {

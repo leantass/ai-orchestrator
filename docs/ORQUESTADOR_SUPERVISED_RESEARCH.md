@@ -21,3 +21,15 @@ El caso es la autoridad agregada reabrible. Replay con otro timestamp, reapertur
 Sólo el orquestador puede añadir evidencia a MEMORIA, mediante un `entryId` determinista y únicamente después de `accepted_for_context`. Un fallo de append conserva `memory_append` pendiente; retry/reconcile repiten sólo esa operación y no vuelven a evaluar con datos del caller. `receive` continúa como wrapper compatible, pero ignora cualquier corroboración suministrada externamente.
 
 `jefe-supervised-research-evidence-case-smoke.mjs` acredita 41 casos conductuales reales y emite `CORRELATION_SMOKE=PASS`; `jefe-supervised-research-evidence-smoke.mjs` conserva 84/84. Ambos son smokes locales con contenido inyectado: no constituyen evidencia externa ni conectan red o providers reales.
+
+## Escalón 3C-A: entrega segura de contribuciones
+
+`STATUS=ESCALON_3C_A_COMPLETED`; `ESCALON_3_STATUS=IN_PROGRESS`; `ESCALON_3A_STATUS=COMPLETED`; `ESCALON_3B_STATUS=COMPLETED`; `ESCALON_3B_R1_STATUS=COMPLETED`; `ESCALON_3C_A_STATUS=COMPLETED`.
+
+El runtime 3C-A no reemplaza la autoridad de 3B. Prepara intentos persistidos bajo configuración confiable, aplica reserva de presupuesto, concurrencia, timeout de adapter, cancelación linealizada, retry, circuit breaker y reconciliación limitada. Un adapter sólo puede devolver un candidato; contrato y runtime rechazan campos forjados y marcadores sensibles explícitos, y derivan identidad/provider desde el intento durable. La contribución validada cruza la frontera exclusivamente mediante `receiveContribution({ researchRequestId, rawReceipt, claim })`.
+
+`receiveContribution` vuelve a validar request, provider, receipt y caso. El runtime no suministra corroboraciones, no decide `accepted_for_context`, no inventa autoridad humana y no llama MEMORIA. La aceptación y el único append canónico continúan perteneciendo al orquestador de investigación. Replay, respuesta tardía, cancelación, retry y reconcile no vuelven a ejecutar una contribución ya persistida.
+
+El smoke `jefe-research-connector-runtime-smoke.mjs` cerró `SMOKE_STRUCTURE=52/52`, `BEHAVIORAL_CASES_COMPLETE=52/52` y `BEHAVIORAL_CASES_REAL=1-52` en cinco ejecuciones completas, además de órdenes cruzados con 3B, 2B, C2 y 2D. Son fixtures locales supervisadas: `NETWORK=DISABLED`; `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`. No hay DNS, fetch, shell, browser, Electron, provider real, generación, preview, publicación o deploy.
+
+UI, autenticación humana end-to-end y QA visual siguen pendientes. JEFE no está release-ready; la deuda Hermes heredada permanece en 306 errores, 0 warnings y 73 archivos afectados; `PUSH=NO`; `NEXT=ESCALON_3C_SUPERVISED_RESEARCH_CONNECTORS_AND_EXECUTION`.
