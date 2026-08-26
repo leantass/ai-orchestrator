@@ -13,6 +13,7 @@ const CHANNELS = Object.freeze({
   corrections: 'jefe-qa-security:corrections',
   correction: 'jefe-qa-security:open-correction',
   recovery: 'jefe-qa-security:recovery',
+  runs: 'jefe-qa-security:runs',
 })
 
 const ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+){0,15}$/u
@@ -85,6 +86,13 @@ function registerQaSecurityIpc({ ipcMain, projectRoot, qaRoot = path.join(projec
   }
   handle(CHANNELS.gates, async (payload) => { const { projectId, run } = await readRunForProject(payload); return { ok: true, projectId, gates: await persistence.gates(run.qaRunId) } })
   handle(CHANNELS.recovery, async (payload) => { const { projectId, run } = await readRunForProject(payload); return { ok: true, projectId, recovery: await recovery.diagnose(run.qaRunId) } })
+  handle(CHANNELS.runs, async (payload) => {
+    const projectId = safeId(payload.projectId, 'projectId')
+    await assertProject(projectId)
+    const detail = await persistence.scanDetailed()
+    const runs = detail.runs.filter((run) => run.projectId === projectId).sort((left, right) => String(right.updatedAt || '').localeCompare(String(left.updatedAt || '')))
+    return { ok: true, projectId, runs }
+  })
   handle(CHANNELS.correction, async (payload) => {
     noArbitraryPaths(payload)
     const { projectId, run } = await readRunForProject(payload)

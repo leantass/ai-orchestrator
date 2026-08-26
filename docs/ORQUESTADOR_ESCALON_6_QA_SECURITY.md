@@ -223,7 +223,7 @@ La corrupcion de un receipt o indice se aisla, se reporta y no produce PASS. A/B
 | 6D-01 | correction loop vuelve al target correcto | smoke de retorno y lineage | PASS |
 | 6D-02 | recovery conserva corrupcion e historia | diagnostico, rebuild y reapertura | PASS |
 | 6D-03 | documentacion y limites honestos | docs canonicamente sincronizados | PASS |
-| 6-CLOSE | todos los checks obligatorios trusted, gates pasados, sin bloqueantes, recovery probado y deuda clasificada | matriz completa repetida en limpio | BLOCKED: gate humano/workspace físico |
+| 6-CLOSE | todos los checks obligatorios trusted, gates pasados, sin bloqueantes, recovery probado y deuda clasificada | matriz completa repetida en limpio | PARTIAL: gate humano y workspace visual real pendientes |
 
 ## 10. Casos manuales y capacidades fuera de alcance
 
@@ -243,7 +243,7 @@ Permanecen fuera: red, proveedores, Codex CLI, Electron, navegador, deploy, CI r
 6. se documenten por separado los casos manuales, la deuda Hermes y cada capacidad fuera de alcance;
 7. el commit de cierre contenga la implementacion, smokes, validaciones y documentacion, sin iniciar Escalon 7.
 
-Estado de implementación al 2026-08-26: 6A, 6B y 6D pasan sus criterios automatizables; 6C pasa los checks estáticos y conserva `6C-03=PARTIAL` por revisión humana. El smoke QA Security pasa `24/24` y el smoke adicional de integración IPC también pasa. El estado canónico es `ESCALON_6_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`; `ESCALON_7_STATUS=NOT_STARTED`, `NETWORK=DISABLED`, `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`, `PUSH=NO`.
+Estado de implementación al 2026-08-26: 6A, 6B y 6D pasan sus criterios automatizables; 6C pasa los checks estáticos y conserva `6C-03=PARTIAL` por revisión humana. Existe workspace físico QA `factory-qa-electron`, perfil `factory_typed`, y run real `qa-run-9acde2282f0d64880cce6444f4fc160b`; su snapshot permanece `not_ready`, con próximo paso `review_and_approve` y bloqueo `approval_required`. El smoke QA Security pasa `24/24`; el smoke IPC se amplió para verificar el canal semántico `runs`. La vista visual del workspace real queda pendiente porque Electron termina al iniciarse en este entorno y Chrome/Vite no dispone del preload físico: `Workspace visual real pendiente por limitación de integración Bridge/Electron`. El estado canónico es `ESCALON_6_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`; `ESCALON_7_STATUS=NOT_STARTED`, `NETWORK=DISABLED`, `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`, `PUSH=NO`.
 
 La superficie productiva QA/IPC está integrada en `electron/jefe-qa-security-ipc.cjs`, registrada desde `electron/main.cjs` y expuesta mediante `jefeQaSecurityBridge` en `electron/preload.cjs`. Solo ofrece canales semánticos allowlisted: no expone `ipcRenderer`, filesystem, roots, shell ni comandos. Las lecturas componen snapshots desde registros persistidos y cada operación valida la pertenencia del `qaRunId` al `projectId`.
 
@@ -259,4 +259,4 @@ El 2026-08-26 se capturó la aplicación React real servida por Vite local media
 | `04-materiales-referencias-desktop.png` | 1280×820 | `7d074c308d1b5364abde0684fa5112dccfff8adcf29d18016532353248c18ef3` | real, no uniforme, overflow horizontal 0 |
 | `05-materiales-referencias-mobile.png` | 390×844 | `e193088f9a8c3bcd61aba5bb72d178b68bc1b680da5c73e70628747baa60ec4c` | real, no uniforme, overflow horizontal 0 |
 
-Hallazgo corregido: `Wizard.next()` no exponía el error de campos obligatorios; ahora lo presenta en el estado `aria-live` y la captura 03 lo demuestra. El análisis DOM de la vista mobile registró 3 controles, 0 sin label, 1 región `aria-live`, 0 solapamientos entre bloques principales, 0 overflow horizontal y foco alcanzable por Tab (`TEXTAREA`). Queda pendiente la vista de workspace persistido real por ausencia de proyectos físicos, además de la revisión humana de foco real, lector de pantalla, tactilidad, contraste perceptual y compatibilidad de navegador. La evidencia visual no se promueve automáticamente a aprobación humana ni cierra `6-CLOSE`.
+Hallazgo corregido: `Wizard.next()` no exponía el error de campos obligatorios; ahora lo presenta en el estado `aria-live`. El análisis DOM de las vistas registró controles etiquetados, 0 overflow horizontal y foco alcanzable por Tab. La evidencia Chrome v3 contiene hub, wizard, validación, materiales desktop/mobile, foco y viewport angosto; todas las imágenes son no uniformes. No se declara allí el workspace físico: `Workspace visual real pendiente por limitación de integración Bridge/Electron`. La evidencia visual no se promueve automáticamente a aprobación humana ni cierra `6-CLOSE`.

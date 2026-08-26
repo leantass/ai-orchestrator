@@ -321,5 +321,6 @@ contextBridge.exposeInMainWorld('jefeQaSecurityBridge', {
   gates: (projectId, qaRunId) => ipcRenderer.invoke('jefe-qa-security:gates', { projectId, qaRunId }),
   corrections: (projectId, qaRunId) => ipcRenderer.invoke('jefe-qa-security:corrections', { projectId, qaRunId }),
   recovery: (projectId, qaRunId) => ipcRenderer.invoke('jefe-qa-security:recovery', { projectId, qaRunId }),
+  listRuns: (projectId) => ipcRenderer.invoke('jefe-qa-security:runs', { projectId }),
   openCorrection: (projectId, qaRunId, findingIds, returnTarget, reasonCode) => ipcRenderer.invoke('jefe-qa-security:open-correction', { projectId, qaRunId, findingIds, returnTarget, reasonCode }),
 })
