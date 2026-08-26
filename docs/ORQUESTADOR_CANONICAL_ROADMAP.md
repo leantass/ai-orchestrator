@@ -1,6 +1,10 @@
 # Roadmap canónico de finalización del Orquestador
 
-Esta es la única autoridad posterior a Escalón 2. Estados: `ESCALON_1_STATUS=VERIFIED_CLOSED`, `ESCALON_2_STATUS=VERIFIED_CLOSED`, `ESCALON_3_STATUS=VERIFIED_CLOSED`, `ESCALON_4_STATUS=VERIFIED_CLOSED`, `ESCALON_5_STATUS=VERIFIED_CLOSED`, `ESCALON_6_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`, `ESCALON_7_STATUS=NOT_STARTED`, `ESCALON_8_STATUS=NOT_STARTED`, `ESCALON_9_STATUS=NOT_STARTED`, `ESCALON_10_STATUS=PARTIAL_EXISTING_FOUNDATION`, `ESCALON_11_STATUS=NOT_STARTED`, `ESCALON_12_STATUS=NOT_STARTED`.
+Esta es la única autoridad posterior a Escalón 2. Estados: `ESCALON_1_STATUS=VERIFIED_CLOSED`, `ESCALON_2_STATUS=VERIFIED_CLOSED`, `ESCALON_3_STATUS=VERIFIED_CLOSED`, `ESCALON_4_STATUS=VERIFIED_CLOSED`, `ESCALON_5_STATUS=VERIFIED_CLOSED`, `ESCALON_6_STATUS=VERIFIED_CLOSED`, `ESCALON_7_STATUS=NOT_STARTED`, `ESCALON_8_STATUS=NOT_STARTED`, `ESCALON_9_STATUS=NOT_STARTED`, `ESCALON_10_STATUS=PARTIAL_EXISTING_FOUNDATION`, `ESCALON_11_STATUS=NOT_STARTED`, `ESCALON_12_STATUS=NOT_STARTED`.
+
+## Estado vigente de cierre documental
+
+`ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`. Cierre basado en `orquestador-visual-evidence-2026-08-26-v4-final.zip`, SHA-256 `899D1B33318D4652062488447A1AE666882E13EFBF4E16C4C3D47BEC85E1F9C2`, aprobado externamente sobre el workspace interno `factory-qa-electron` (`factory_typed`).
 
 ## Flujo y retorno
 
@@ -119,7 +123,7 @@ El smoke `jefe-planner-recovery-smoke.mjs` pasa `11/11` casos conductuales local
 `ESCALON_5_STATUS=VERIFIED_CLOSED`; `ESCALON_5_BLOCKS=5A_CONTRACT_POLICY,5B_DURABLE_STATE,5C_CONTROLLED_EXECUTION_MEMORY,5D_RECOVERY_DOCUMENTATION`.
 `NEXT=ESCALON_6_QA_SECURITY`.
 
-`ESCALON_6_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`; `ESCALON_6A_STATUS=COMPLETED`; `ESCALON_6B_STATUS=COMPLETED`; `ESCALON_6C_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`; `ESCALON_6D_STATUS=COMPLETED`; `ESCALON_6_BLOCKS=6A_CONTRACT_POLICY,6B_DURABLE_ORCHESTRATION,6C_EVIDENCE_GATES,6D_RECOVERY_CORRECTION_DOCUMENTATION`. El alcance normativo, modelos, estados, límites, matriz de aceptación y exclusiones están definidos en [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md). La implementación actual pasa el smoke local 6 `24/24` y el smoke IPC semántico; la evidencia v4 incluye el workspace físico Electron real. 6-CLOSE sigue pendiente de revisión/aprobación humana y `ESCALON_7_STATUS=NOT_STARTED`.
+`ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_6A_STATUS=COMPLETED`; `ESCALON_6B_STATUS=COMPLETED`; `ESCALON_6C_STATUS=COMPLETED`; `ESCALON_6D_STATUS=COMPLETED`; `ESCALON_6_BLOCKS=6A_CONTRACT_POLICY,6B_DURABLE_ORCHESTRATION,6C_EVIDENCE_GATES,6D_RECOVERY_CORRECTION_DOCUMENTATION`. El cierre usa la evidencia v4-final aprobada externamente sobre el workspace físico interno `factory-qa-electron` (`factory_typed`); `ESCALON_7_STATUS=NOT_STARTED`.
 
 ## Auditoria de cierre del Escalon 5 — 2026-08-26
 
@@ -129,4 +133,7 @@ La correccion de auditoria en 5B restringe los patches de transicion a `adapter`
 
 Evidencia ejecutada: 5A `12/12`, 5B `11/11`, 5C `5/5`, 5D `5/5`; Planner contrato/persistencia/gate/recovery `20/20`, `20/20`, `16/16`, `11/11`; Research, MEMORIA, recovery y regresiones relacionadas PASS. Syntax, ESLint focal, typecheck, build y `git diff --check` PASS. El lint global queda FAIL con `316 errores, 0 warnings`, concentrados en la deuda heredada `src/factory/hermes-*`; el build conserva el warning literal de chunk mayor a 500 kB.
 
-El alcance operativo detallado de `ESCALON_6_QA_SECURITY` está definido en su especificación canónica enlazada. La implementación local permanece en progreso: el smoke focal pasa `24/24` y existe manifiesto de cinco capturas reales Chrome/CDP (`.codex-temp/orchestrator-canonical-visual-evidence-20260826/`), mientras el workspace persistido no está disponible, el cierre integral/manual y la deuda Hermes siguen documentados sin iniciar Escalón 7.
+El alcance operativo detallado de `ESCALON_6_QA_SECURITY` está definido en su especificación canónica enlazada. El bloque 6 queda cerrado documentalmente: smoke focal `24/24`, batería completa, workspace físico `factory-qa-electron` y evidencia v4-final aprobada externamente. La deuda Hermes sigue documentada y `ESCALON_7_STATUS=NOT_STARTED`.
+## Errata de estado vigente 2026-08-26
+
+Las referencias históricas de Escalón 6 como pendiente o en progreso quedan superseded por el estado prevalente: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`. El cierre documental usa la evidencia v4-final aprobada externamente sobre `factory-qa-electron` (`factory_typed`).

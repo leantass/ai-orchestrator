@@ -7,11 +7,15 @@ Fuente auditada: `feature/jefe-factory-core` y `feature/jefe-real-project-delive
 
 ## Addendum Escalon 5
 
+## Addendum vigente: cierre documental Escalon 6
+
+`ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`. La evidencia visual v4-final fue aprobada externamente: `orquestador-visual-evidence-2026-08-26-v4-final.zip`, SHA-256 `899D1B33318D4652062488447A1AE666882E13EFBF4E16C4C3D47BEC85E1F9C2`, sobre el workspace interno `factory-qa-electron` (`factory_typed`). No acredita proveedores reales, red, deploy ni publicaciÃ³n. La deuda Hermes global y el warning de chunk mayor a 500 kB permanecen vigentes; el video no fue necesario.
+
 La auditoria cierra 5A contrato/politica, 5B persistencia/estados, 5C ejecucion controlada/MEMORIA y 5D diagnostico/recovery. La evidencia ejecutable esta en los cuatro smokes `orchestrator-canonical-execution-5[abcd]-smoke.mjs`. El adaptador Codex externo sigue desconectado y no se simula exito. El proximo escalon es 6 y no fue iniciado.
 
 ## Formalizacion del Escalon 6
 
-La especificacion canonica está en [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md). Define 6A–6D, contratos de QA/security/findings/correction, correlación, estados, gates, evidencia, políticas locales, recovery, límites y criterios de cierre. 6A–6D tienen implementación local y el smoke 6 pasa `24/24`; la batería integral posterior a las correcciones también pasa. Se capturaron cinco vistas reales de la aplicación mediante Chrome/CDP local, con manifiesto y hashes; no se declara aprobación humana, workspace persistido inexistente, ejecución SAST externa ni cierre del Escalón 6.
+La especificacion canonica está en [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md). Define 6A–6D, contratos de QA/security/findings/correction, correlación, estados, gates, evidencia, políticas locales, recovery, límites y criterios de cierre. 6A–6D tienen implementación local y el smoke 6 pasa `24/24`; la batería integral posterior a las correcciones también pasa. La evidencia v4-final contiene diez vistas reales, incluyendo workspace Electron físico, y fue aprobada externamente. No se declara ejecución SAST externa, proveedor real, red, deploy ni publicación; el cierre del Escalón 6 es documental y `ESCALON_7_STATUS=NOT_STARTED`.
 
 La validación actual del 2026-08-26 reportó 316 errores y 0 warnings en la deuda heredada `src/factory/hermes-*`. Las menciones históricas a 306 errores en este documento no representan el conteo actual; no se modificó esa deuda ni se alteró la configuración de lint.
 
@@ -119,3 +123,6 @@ Esta entrada amplía la historia sin reemplazar las conclusiones fechadas anteri
 Durante ese cierre, el orden cruzado reprodujo nuevamente una carrera C2 entre instancias de MEMORIA que compartían root. Se corrigió en la persistencia canónica con exclusión por root a nivel de proceso y staging globalmente único; la regresión C2 pasó 36/36 diez veces consecutivas antes de repetir los órdenes. No se afirma coordinación entre procesos.
 
 La evidencia sigue siendo local y de smoke. `NETWORK=DISABLED`; `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`; no hay DNS, fetch, shell, browser, Electron, provider real, generación, preview, publicación ni deploy. UI, autenticación humana end-to-end y QA visual continúan pendientes; JEFE no está release-ready. La deuda Hermes permanece intacta en 306 errores, 0 warnings y 73 archivos afectados. `PUSH=NO`; `NEXT=ESCALON_3C_SUPERVISED_RESEARCH_CONNECTORS_AND_EXECUTION`.
+## Errata de estado vigente 2026-08-26
+
+Las afirmaciones históricas de QA visual inexistente o Escalón 6 no cerrado quedan superseded por el addendum de cierre: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`, con evidencia v4-final aprobada externamente. El alcance sigue sin incluir proveedores reales, red, deploy ni publicación.

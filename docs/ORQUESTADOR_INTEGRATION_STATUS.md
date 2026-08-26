@@ -4,11 +4,15 @@
 
 Fecha: 2026-08-20
 
+## Estado vigente de cierre documental
+
+`ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`. La evidencia visual v4-final fue aprobada externamente: `orquestador-visual-evidence-2026-08-26-v4-final.zip`, SHA-256 `899D1B33318D4652062488447A1AE666882E13EFBF4E16C4C3D47BEC85E1F9C2`, sobre el workspace interno `factory-qa-electron` (`factory_typed`). No hubo proveedores reales, red, deploy ni publicaciÃ³n; la deuda Hermes y el warning de chunk mayor a 500 kB continÃºan vigentes.
+
 ## Cierre del Escalon 5
 
 `ESCALON_5_STATUS=VERIFIED_CLOSED`. 5A-5D estan implementados y cubiertos por smokes focales. La integracion externa permanece honestamente `not_connected`; no se declara ejecucion real, aprobacion, QA, deploy ni publicacion.
 
-La especificación y el estado vigente del siguiente bloque están en [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md). El bloque 6 está en progreso: 6A–6D implementados localmente, smoke `24/24` y cinco capturas reales Chrome/CDP con manifiesto; `ESCALON_7_STATUS=NOT_STARTED` no cambia.
+La especificación y el estado vigente del siguiente bloque están en [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md). El bloque 6 está cerrado documentalmente: 6A–6D implementados, smoke `24/24`, batería completa y evidencia v4-final aprobada externamente sobre `factory-qa-electron` (`factory_typed`); `ESCALON_7_STATUS=NOT_STARTED` no cambia.
 Rama candidata: `integration/orquestador-canonical-v1`
 Worktree: `C:\Users\letas\Desktop\Proyectos\Desarrollo\orquestadoria\ai-orchestrator-canonical-integration-81ba810`
 Base: `81ba810313610e3e3f678bea5a70b29650b471c0`
@@ -179,3 +183,6 @@ El smoke 3C-A pasa `52/52` casos conductuales reales en cinco ejecuciones, adem�
 El orden cruzado final volvió a exponer la flake C2 de dos instancias de MEMORIA sobre el mismo root. La corrección responsable serializa append/rebuild por root dentro del proceso y usa staging globalmente único; C2 quedó verde en diez ejecuciones consecutivas antes de repetir la matriz cruzada. Esto no añade locking multiproceso.
 
 UI, autenticación humana end-to-end, QA visual y deploy continúan pendientes. JEFE no está release-ready. La deuda Hermes heredada permanece intacta en 306 errores, 0 warnings y 73 archivos afectados. `PUSH=NO`; `NEXT=ESCALON_3C_SUPERVISED_RESEARCH_CONNECTORS_AND_EXECUTION`.
+## Errata de estado vigente 2026-08-26
+
+Las referencias históricas de Escalón 6 como “en progreso” o “no cerrado” quedan superseded por el cierre documental vigente: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`. La aprobación externa corresponde al ZIP v4-final indicado arriba y no extiende el alcance a proveedores, red, deploy, publicación ni proyecto comercial.

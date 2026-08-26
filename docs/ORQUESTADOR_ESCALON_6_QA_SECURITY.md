@@ -1,8 +1,12 @@
 # Escalon 6: QA, seguridad y correction loop canonicos
 
-Estado normativo actual: `ESCALON_6_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`; `ESCALON_6A_STATUS=COMPLETED`; `ESCALON_6B_STATUS=COMPLETED`; `ESCALON_6C_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`; `ESCALON_6D_STATUS=COMPLETED`.
+Estado normativo actual: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_6A_STATUS=COMPLETED`; `ESCALON_6B_STATUS=COMPLETED`; `ESCALON_6C_STATUS=COMPLETED`; `ESCALON_6D_STATUS=COMPLETED`.
 
-Este documento define el alcance canónico y registra su implementación incremental. La implementación actual no declara cierre: 6-CLOSE permanece pendiente y no modifica el estado de ningún escalón anterior ni inicia el Escalón 7.
+Este documento define el alcance canónico y registra su implementación y cierre documental. 6-CLOSE queda verificado sobre evidencia externa aprobada y no modifica el estado de ningún escalón anterior ni inicia el Escalón 7.
+
+## Registro de cierre documental 2026-08-26
+
+`ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`. La matriz fue completada con PASS y la evidencia visual v4-final fue aprobada externamente: `orquestador-visual-evidence-2026-08-26-v4-final.zip`, SHA-256 `899D1B33318D4652062488447A1AE666882E13EFBF4E16C4C3D47BEC85E1F9C2`. La evidencia usa el workspace interno `factory-qa-electron`, perfil `factory_typed`; no es proyecto comercial y no acredita proveedores reales, red, deploy ni publicaciÃ³n. La deuda Hermes global, el warning de chunk mayor a 500 kB y las capacidades fuera de alcance permanecen vigentes. El video no fue necesario.
 
 ## 1. Proposito y limites
 
@@ -218,12 +222,12 @@ La corrupcion de un receipt o indice se aisla, se reporta y no produce PASS. A/B
 | 6B-03 | timeout, cancelacion, retry y stale completion | smoke de estados y limites | PASS |
 | 6C-01 | technical/security/accessibility gates independientes | receipts y gate derivado/persistido | PASS |
 | 6C-02 | SAST/secret/path/command/artifact checks locales | runner local sin shell/red | PASS |
-| 6C-03 | QA tecnico y responsive/accessibility estaticos sin claim visual | checks estaticos + evidencia visual real separada; revision humana pendiente | PARTIAL |
+| 6C-03 | QA tecnico y responsive/accessibility estaticos sin claim visual | checks estaticos + evidencia visual real v4-final aprobada externamente | PASS |
 | 6C-04 | findings sanitizados y no forjables | validator + corrupcion/secret cases | PASS |
 | 6D-01 | correction loop vuelve al target correcto | smoke de retorno y lineage | PASS |
 | 6D-02 | recovery conserva corrupcion e historia | diagnostico, rebuild y reapertura | PASS |
 | 6D-03 | documentacion y limites honestos | docs canonicamente sincronizados | PASS |
-| 6-CLOSE | todos los checks obligatorios trusted, gates pasados, sin bloqueantes, recovery probado y deuda clasificada | matriz completa repetida en limpio | PARTIAL: gate humano y workspace visual real pendientes |
+| 6-CLOSE | todos los checks obligatorios trusted, gates pasados, sin bloqueantes, recovery probado y deuda clasificada | matriz completa repetida en limpio + aprobacion externa de v4-final | PASS |
 
 ## 10. Casos manuales y capacidades fuera de alcance
 
@@ -243,13 +247,13 @@ Permanecen fuera: red, proveedores, Codex CLI, Electron, navegador, deploy, CI r
 6. se documenten por separado los casos manuales, la deuda Hermes y cada capacidad fuera de alcance;
 7. el commit de cierre contenga la implementacion, smokes, validaciones y documentacion, sin iniciar Escalon 7.
 
-Estado de implementación al 2026-08-26: 6A, 6B y 6D pasan sus criterios automatizables; 6C conserva `6C-03=PARTIAL` por revisión humana. Existe workspace físico QA `factory-qa-electron`, perfil `factory_typed`, y run real `qa-run-9acde2282f0d64880cce6444f4fc160b`; su snapshot visual permanece `not_ready`, con próximo paso `review_and_approve` y bloqueo `approval_required`. La evidencia v4 fue capturada desde el ejecutable Electron directo en segundo plano mediante CDP, con preload real: hub, workspace desktop 1280x820, workspace mobile 390x844, foco y estados QA. El wrapper `run-electron-runtime.mjs` sigue terminando inmediatamente en este entorno; no se presenta como runtime estable. El smoke QA Security pasa `24/24`; el smoke IPC verifica el canal semántico `runs`. El estado canónico es `ESCALON_6_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`; `ESCALON_7_STATUS=NOT_STARTED`, `NETWORK=DISABLED`, `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`, `PUSH=NO`.
+Estado de implementación al 2026-08-26: 6A–6D pasan sus criterios automatizables y 6C-03 queda aceptado con la aprobación externa del ZIP v4-final. Existe workspace físico QA `factory-qa-electron`, perfil `factory_typed`, y run real `qa-run-9acde2282f0d64880cce6444f4fc160b`; su snapshot visual permanece `not_ready`, con próximo paso `review_and_approve` y bloqueo `approval_required`. La evidencia v4 fue capturada desde el ejecutable Electron directo en segundo plano mediante CDP, con preload real: hub, workspace desktop 1280x820, workspace mobile 390x844, foco y estados QA. El smoke QA Security pasa `24/24`; el smoke IPC verifica el canal semántico `runs`. El estado canónico es `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`, `NETWORK=DISABLED`, `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`, `PUSH=NO`.
 
 La superficie productiva QA/IPC está integrada en `electron/jefe-qa-security-ipc.cjs`, registrada desde `electron/main.cjs` y expuesta mediante `jefeQaSecurityBridge` en `electron/preload.cjs`. Solo ofrece canales semánticos allowlisted: no expone `ipcRenderer`, filesystem, roots, shell ni comandos. Las lecturas componen snapshots desde registros persistidos y cada operación valida la pertenencia del `qaRunId` al `projectId`.
 
-## 12. Evidencia visual real separada del gate
+## 12. Evidencia visual histórica y evidencia final del gate
 
-El 2026-08-26 se capturó la aplicación React real servida por Vite local mediante Chrome aislado y CDP directo, sin Playwright/Puppeteer, Electron, Edge, fixtures ni imágenes generadas. El manifiesto queda en `.codex-temp/orchestrator-canonical-visual-evidence-20260826/manifest.json`.
+El siguiente cuadro conserva el registro histórico de las primeras cinco capturas React/Vite. No es la base del cierre vigente. La base del cierre es el ZIP `orquestador-visual-evidence-2026-08-26-v4-final.zip`, aprobado externamente, capturado desde el renderer Electron real mediante CDP sobre el workspace físico interno `factory-qa-electron` (`factory_typed`), con diez PNG coherentes, overflow horizontal 0 y sin imágenes blancas, transparentes o uniformes.
 
 | Vista | Dimensiones | SHA-256 | Resultado |
 | --- | ---: | --- | --- |
@@ -259,4 +263,4 @@ El 2026-08-26 se capturó la aplicación React real servida por Vite local media
 | `04-materiales-referencias-desktop.png` | 1280×820 | `7d074c308d1b5364abde0684fa5112dccfff8adcf29d18016532353248c18ef3` | real, no uniforme, overflow horizontal 0 |
 | `05-materiales-referencias-mobile.png` | 390×844 | `e193088f9a8c3bcd61aba5bb72d178b68bc1b680da5c73e70628747baa60ec4c` | real, no uniforme, overflow horizontal 0 |
 
-Hallazgo corregido: `Wizard.next()` no exponía el error de campos obligatorios; ahora lo presenta en el estado `aria-live`. El análisis DOM de las vistas registró controles etiquetados, 0 overflow horizontal y foco alcanzable por Tab. La evidencia v4 contiene hub con el proyecto físico, wizard, validación, materiales desktop/mobile, workspace físico desktop/mobile, foco y viewport angosto; todas las imágenes son no uniformes. La evidencia visual no se promueve automáticamente a aprobación humana ni cierra `6-CLOSE`.
+Hallazgo corregido: `Wizard.next()` no exponía el error de campos obligatorios; ahora lo presenta en el estado `aria-live`. El análisis DOM de las vistas registró controles etiquetados, 0 overflow horizontal y foco alcanzable por Tab. La evidencia final v4 contiene hub con el proyecto físico, wizard, validación, materiales desktop/mobile, workspace físico desktop/mobile, foco y viewport angosto; todas las imágenes son no uniformes. Con la aprobación externa registrada arriba, esta evidencia sí satisface el criterio documental `6C-03` y contribuye al cierre `6-CLOSE`; no acredita proveedores reales, red, deploy ni publicación.
