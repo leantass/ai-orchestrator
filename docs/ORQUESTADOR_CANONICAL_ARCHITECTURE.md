@@ -47,9 +47,9 @@ El alcance normativo de QA, seguridad y correction loop está documentado en [OR
 
 `jefe-discovery-contract`, `jefe-discovery-persistence` y `jefe-discovery-orchestrator` son la única fundación de intake. Reutilizan MEMORIA y paquetes 2C, mantienen actores no conectados y no crean memoria, handoff ni outbox paralelos.
 
-## Preview
+## Preview y aprobación humana (Escalón 7)
 
-La resolución segura está implementada. Se capturó evidencia visual real separada mediante Chrome/CDP local, pero no existe un protocolo Electron dedicado ni gate visual integrado: no hay iframe completo, comparación visual ni aprobación visual automatizada.
+La resolución parcial existente está implementada como `external_only` y la aprobación local se registra en lifecycle. El protocolo canónico de Escalón 7, sus contratos, estados, autoridad/autenticación, persistencia específica, política de origen/recursos, recovery y criterios visuales quedan formalizados en [ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md](ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md). `ESCALON_7_STATUS=NOT_STARTED` porque la implementación aún no comenzó; no se inicia Escalón 8.
 
 ## MEMORIA integrada (Escalón 2B)
 

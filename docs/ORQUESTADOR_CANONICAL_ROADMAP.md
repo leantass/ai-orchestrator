@@ -16,7 +16,7 @@ Lean → CEREBRO → Radar → Hermes/Scout → JEFE → MEMORIA → Planner →
 | 4 | Planner y contratos ejecutables | intake/contexto válido → alcance, dependencias, riesgos y plan; gate: contrato cerrado | sin ejecución; invalidez vuelve a discovery |
 | 5 | Ejecución segura: Codex/worktrees | plan aprobado → cambio aislado recuperable; gate: locks/límites | sin entrega; fallo vuelve a Codex/Planner |
 | 6 | QA, seguridad y correction loop | cambio aislado → evidencia de pruebas; gate: QA/SAST/accesibilidad; bloques 6A contrato/política, 6B persistencia/orquestación, 6C evidencia/gates, 6D recovery/corrección | sin aprobación visual; fallo vuelve a responsable; especificación en `ORQUESTADOR_ESCALON_6_QA_SECURITY.md` |
-| 7 | Preview y aprobación humana | evidencia local real → decisión explícita; gate: operador | sin autenticación ficticia/deploy; rechazo vuelve al plan |
+| 7 | Preview y aprobación humana | evidencia local real → decisión explícita; gate: operador; especificación pendiente en `ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md` | sin autenticación ficticia/deploy; rechazo vuelve al plan |
 | 8 | Git, CI y entrega | aprobación/evidencia → commit, CI y entrega honesta | sin push/deploy implícito; fallo vuelve a QA/Codex |
 | 9 | Observabilidad y operación | eventos reales → salud/incidentes/recuperación | sin alertas inventadas; incidente vuelve a JEFE/MEMORIA |
 | 10 | Centro de control comercial | capacidades conectadas → UX visual guiada y accesible | UI sin backend es bloqueada; mantiene base comercial existente |
@@ -121,9 +121,15 @@ El gate es atómico, reabrible, idempotente, aislado por proyecto y con índice 
 El smoke `jefe-planner-recovery-smoke.mjs` pasa `11/11` casos conductuales locales. La matriz del Escalón 4 comprende contratos `20/20`, persistencia/orquestación `20/20`, gates `16/16` y recovery `11/11`. Esto cierra solamente Planner y contratos ejecutables locales; no inicia Codex, worktrees, ejecución, QA, preview, aprobación humana, Git/CI, red, publicación ni deploy.
 
 `ESCALON_5_STATUS=VERIFIED_CLOSED`; `ESCALON_5_BLOCKS=5A_CONTRACT_POLICY,5B_DURABLE_STATE,5C_CONTROLLED_EXECUTION_MEMORY,5D_RECOVERY_DOCUMENTATION`.
-`NEXT=ESCALON_6_QA_SECURITY`.
+`NEXT=ESCALON_7_PREVIEW_APPROVAL_SPECIFICATION`.
 
 `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_6A_STATUS=COMPLETED`; `ESCALON_6B_STATUS=COMPLETED`; `ESCALON_6C_STATUS=COMPLETED`; `ESCALON_6D_STATUS=COMPLETED`; `ESCALON_6_BLOCKS=6A_CONTRACT_POLICY,6B_DURABLE_ORCHESTRATION,6C_EVIDENCE_GATES,6D_RECOVERY_CORRECTION_DOCUMENTATION`. El cierre usa la evidencia v4-final aprobada externamente sobre el workspace físico interno `factory-qa-electron` (`factory_typed`); `ESCALON_7_STATUS=NOT_STARTED`.
+
+## Escalón 7 — auditoría de alcance 2026-08-26
+
+`ESCALON_7_STATUS=NOT_STARTED`; `ESCALON_7_SPEC_STATUS=READY_FOR_IMPLEMENTATION`. El contrato canónico, los estados, la persistencia, la autoridad del aprobador, la política de recursos/origen, la superficie IPC, el recovery, el correction loop y la matriz de aceptación están definidos en [ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md](ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md). La implementación aún no comenzó.
+
+La fundación parcial existente de preview/aprobación no se promueve automáticamente a cierre: el preview actual es `external_only` y la aprobación local no acredita autenticación humana end-to-end. La implementación deberá satisfacer el contrato documentado; no se inicia Escalón 8.
 
 ## Auditoria de cierre del Escalon 5 — 2026-08-26
 

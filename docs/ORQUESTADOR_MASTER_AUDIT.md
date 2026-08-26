@@ -21,7 +21,7 @@ La validación actual del 2026-08-26 reportó 316 errores y 0 warnings en la deu
 
 ## Estado vigente de auditoría
 
-El Orquestador posee arquitectura, contratos, UI y smokes parciales, pero no una escalera integral demostrada. Los bloqueos principales son: verdad de integración, Context Hub externo, investigación real/Hermes bloqueado, ejecución Codex no demostrada, QA visual inexistente, bucles de corrección no integrados y entrega no verificada.
+El Orquestador posee arquitectura, contratos, UI y smokes parciales, pero no una escalera integral demostrada. Escalón 6 queda cerrado documentalmente con evidencia v4-final aprobada. Escalón 7 permanece `NOT_STARTED`, aunque su contrato canónico ya fue formalizado en [ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md](ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md); todavía faltan implementación y evidencia de sus criterios. Continúan fuera de alcance la verdad de integración externa, Context Hub externo, investigación real/Hermes, ejecución Codex no demostrada, proveedores, red, deploy y publicación.
 
 La evidencia no permite declarar “release candidate”, “deuda crítica cero”, preview validado, investigación remota, Codex operativo, entrega comercial o prueba integral. Capturas blancas no cuentan como evidencia visual.
 

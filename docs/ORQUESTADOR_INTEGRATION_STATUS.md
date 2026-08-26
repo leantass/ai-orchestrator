@@ -12,7 +12,7 @@ Fecha: 2026-08-20
 
 `ESCALON_5_STATUS=VERIFIED_CLOSED`. 5A-5D estan implementados y cubiertos por smokes focales. La integracion externa permanece honestamente `not_connected`; no se declara ejecucion real, aprobacion, QA, deploy ni publicacion.
 
-La especificación y el estado vigente del siguiente bloque están en [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md). El bloque 6 está cerrado documentalmente: 6A–6D implementados, smoke `24/24`, batería completa y evidencia v4-final aprobada externamente sobre `factory-qa-electron` (`factory_typed`); `ESCALON_7_STATUS=NOT_STARTED` no cambia.
+La especificación y el estado vigente del bloque 6 están en [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md). El bloque 6 está cerrado documentalmente: 6A–6D implementados, smoke `24/24`, batería completa y evidencia v4-final aprobada externamente sobre `factory-qa-electron` (`factory_typed`). Escalón 7 permanece `NOT_STARTED`, con contrato listo para implementación en [ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md](ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md).
 Rama candidata: `integration/orquestador-canonical-v1`
 Worktree: `C:\Users\letas\Desktop\Proyectos\Desarrollo\orquestadoria\ai-orchestrator-canonical-integration-81ba810`
 Base: `81ba810313610e3e3f678bea5a70b29650b471c0`

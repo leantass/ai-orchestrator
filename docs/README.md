@@ -3,7 +3,7 @@
 Prevalencia: [ORQUESTADOR_CURRENT_STATUS.md](ORQUESTADOR_CURRENT_STATUS.md) define el estado actual; [ORQUESTADOR_CANONICAL_ARCHITECTURE.md](ORQUESTADOR_CANONICAL_ARCHITECTURE.md) define autoridades; la auditoría y reconciliación explican evidencia e historia.
 
 - [Estado actual](ORQUESTADOR_CURRENT_STATUS.md)
-Estado vigente: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`. El cierre usa evidencia visual v4-final aprobada externamente sobre el workspace interno `factory-qa-electron` (`factory_typed`); no habilita proveedores reales, red, deploy ni publicaciÃ³n.
+Estado vigente: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`; `ESCALON_7_SPEC_STATUS=READY_FOR_IMPLEMENTATION`. El cierre del 6 usa evidencia visual v4-final aprobada externamente sobre el workspace interno `factory-qa-electron` (`factory_typed`); el contrato de 7 está en [ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md](ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md).
 - [Ingesta canónica de resultados de agente](ORQUESTADOR_AGENT_RESULT_INGESTION.md)
 - [Recuperación y conflictos de MEMORIA](ORQUESTADOR_CONTEXT_RECOVERY_AND_CONFLICTS.md)
 - [Roadmap canónico](ORQUESTADOR_CANONICAL_ROADMAP.md)

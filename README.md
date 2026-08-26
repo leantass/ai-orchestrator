@@ -1,6 +1,6 @@
 # JEFE / Orquestador
 
-Estado canÃ³nico actual: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`. Cierre documental basado en `orquestador-visual-evidence-2026-08-26-v4-final.zip`, SHA-256 `899D1B33318D4652062488447A1AE666882E13EFBF4E16C4C3D47BEC85E1F9C2`, aprobado externamente sobre el workspace interno `factory-qa-electron` (`factory_typed`). No es proyecto comercial ni habilita proveedores reales, red, deploy o publicaciÃ³n; deuda Hermes y warning de chunk mayor a 500 kB permanecen vigentes.
+Estado canónico actual: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`; `ESCALON_7_SPEC_STATUS=READY_FOR_IMPLEMENTATION`. Cierre documental basado en `orquestador-visual-evidence-2026-08-26-v4-final.zip`, SHA-256 `899D1B33318D4652062488447A1AE666882E13EFBF4E16C4C3D47BEC85E1F9C2`, aprobado externamente sobre el workspace interno `factory-qa-electron` (`factory_typed`). El contrato de Escalón 7 está en [ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md](docs/ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md); no es proyecto comercial ni habilita proveedores reales, red, deploy o publicación.
 
 JEFE es una aplicación local para crear y administrar versiones físicas de proyectos con controles explícitos de revisión y entrega local. No es release-ready: no demuestra Context Hub/MEMORIA conectado, investigación remota, Codex/executor real, QA visual, deploy ni entrega remota.
 
