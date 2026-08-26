@@ -311,3 +311,15 @@ contextBridge.exposeInMainWorld('jefeProjectBridge', {
   reconcileContext: (projectId) => ipcRenderer.invoke('jefe-context:reconcile', { projectId }),
   selectInputAssets: () => ipcRenderer.invoke('jefe-input-assets:select'),
 })
+
+// Bridge QA semántico: no expone canales, roots, comandos ni filesystem al renderer.
+contextBridge.exposeInMainWorld('jefeQaSecurityBridge', {
+  capabilities: () => ipcRenderer.invoke('jefe-qa-security:capabilities'),
+  request: (input) => ipcRenderer.invoke('jefe-qa-security:request', { input }),
+  snapshot: (projectId, qaRunId) => ipcRenderer.invoke('jefe-qa-security:snapshot', { projectId, qaRunId }),
+  findings: (projectId, qaRunId) => ipcRenderer.invoke('jefe-qa-security:findings', { projectId, qaRunId }),
+  gates: (projectId, qaRunId) => ipcRenderer.invoke('jefe-qa-security:gates', { projectId, qaRunId }),
+  corrections: (projectId, qaRunId) => ipcRenderer.invoke('jefe-qa-security:corrections', { projectId, qaRunId }),
+  recovery: (projectId, qaRunId) => ipcRenderer.invoke('jefe-qa-security:recovery', { projectId, qaRunId }),
+  openCorrection: (projectId, qaRunId, findingIds, returnTarget, reasonCode) => ipcRenderer.invoke('jefe-qa-security:open-correction', { projectId, qaRunId, findingIds, returnTarget, reasonCode }),
+})

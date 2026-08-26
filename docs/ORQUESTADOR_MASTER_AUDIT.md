@@ -11,7 +11,7 @@ La auditoria cierra 5A contrato/politica, 5B persistencia/estados, 5C ejecucion 
 
 ## Formalizacion del Escalon 6
 
-La especificacion canonica está en [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md). Define 6A–6D, contratos de QA/security/findings/correction, correlación, estados, gates, evidencia, políticas locales, recovery, límites y criterios de cierre. Esta documentación clasifica la capacidad como `prepared`; no declara implementación, ejecución SAST externa, QA visual, aprobación humana ni cierre del Escalón 6.
+La especificacion canonica está en [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md). Define 6A–6D, contratos de QA/security/findings/correction, correlación, estados, gates, evidencia, políticas locales, recovery, límites y criterios de cierre. 6A–6D tienen implementación local y el smoke 6 pasa `24/24`; la batería integral posterior a las correcciones también pasa. Se capturaron cinco vistas reales de la aplicación mediante Chrome/CDP local, con manifiesto y hashes; no se declara aprobación humana, workspace persistido inexistente, ejecución SAST externa ni cierre del Escalón 6.
 
 La validación actual del 2026-08-26 reportó 316 errores y 0 warnings en la deuda heredada `src/factory/hermes-*`. Las menciones históricas a 306 errores en este documento no representan el conteo actual; no se modificó esa deuda ni se alteró la configuración de lint.
 

@@ -2,15 +2,17 @@
 
 Fecha de cierre documental: 2026-08-25. Rama: `integration/orquestador-canonical-v1`.
 
+Actualización 2026-08-26: la implementación automatizada de Escalón 6 queda en `ESCALON_6_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`; la línea histórica de estado `IN_PROGRESS` se conserva como referencia del WIP previo. QA/IPC semántico integrado y smoke específico PASS; permanecen pendientes únicamente el workspace físico real y la validación humana.
+
 Estado prevalente de cierre: `ESCALON_1_STATUS=VERIFIED_CLOSED`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2D_STATUS=COMPLETED`; `ESCALON_2_STATUS=VERIFIED_CLOSED`; `RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`.
 
-Estado actual: `STATUS=ESCALON_4_VERIFIED_CLOSED`; `ESCALON_3_STATUS=VERIFIED_CLOSED`; `ESCALON_3A_STATUS=COMPLETED`; `ESCALON_3B_STATUS=COMPLETED`; `ESCALON_3B_R1_STATUS=COMPLETED`; `ESCALON_3C_STATUS=VERIFIED_CLOSED`; `ESCALON_3C_A_STATUS=COMPLETED`; `ESCALON_3C_B_STATUS=COMPLETED`; `ESCALON_3C_C_STATUS=COMPLETED`; `ESCALON_3C_D_STATUS=COMPLETED`; `ESCALON_4_STATUS=VERIFIED_CLOSED`; `ESCALON_4A_STATUS=COMPLETED`; `ESCALON_4B_STATUS=COMPLETED`; `ESCALON_4C_STATUS=COMPLETED`; `ESCALON_4D_STATUS=COMPLETED`. Los escalones 5–9 y 11–12 siguen `NOT_STARTED`; Escalón 10 conserva `PARTIAL_EXISTING_FOUNDATION`. La autoridad es [ORQUESTADOR_CANONICAL_ROADMAP.md](ORQUESTADOR_CANONICAL_ROADMAP.md).
+Estado actual: `STATUS=ESCALON_6_IN_PROGRESS`; `ESCALON_3_STATUS=VERIFIED_CLOSED`; `ESCALON_3A_STATUS=COMPLETED`; `ESCALON_3B_STATUS=COMPLETED`; `ESCALON_3B_R1_STATUS=COMPLETED`; `ESCALON_3C_STATUS=VERIFIED_CLOSED`; `ESCALON_3C_A_STATUS=COMPLETED`; `ESCALON_3C_B_STATUS=COMPLETED`; `ESCALON_3C_C_STATUS=COMPLETED`; `ESCALON_3C_D_STATUS=COMPLETED`; `ESCALON_4_STATUS=VERIFIED_CLOSED`; `ESCALON_4A_STATUS=COMPLETED`; `ESCALON_4B_STATUS=COMPLETED`; `ESCALON_4C_STATUS=COMPLETED`; `ESCALON_4D_STATUS=COMPLETED`; `ESCALON_5_STATUS=VERIFIED_CLOSED`; `ESCALON_6_STATUS=IN_PROGRESS`; `ESCALON_7_STATUS=NOT_STARTED`. Escalones 8–9 y 11–12 siguen `NOT_STARTED`; Escalón 10 conserva `PARTIAL_EXISTING_FOUNDATION`. La autoridad es [ORQUESTADOR_CANONICAL_ROADMAP.md](ORQUESTADOR_CANONICAL_ROADMAP.md).
 
 `NETWORK=DISABLED`; `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`; `PUSH=NO`; `ESCALON_5_STATUS=VERIFIED_CLOSED`; `ESCALON_5A_STATUS=VERIFIED_CLOSED`; `ESCALON_5B_STATUS=VERIFIED_CLOSED`; `ESCALON_5C_STATUS=VERIFIED_CLOSED`; `ESCALON_5D_STATUS=VERIFIED_CLOSED`; `NEXT=ESCALON_6_QA_SECURITY`.
 
-Auditoria 2026-08-26: Escalon 5 queda verificado tras corregir la allowlist de patches de transicion en persistencia 5B. Escalon 6 sigue `NOT_STARTED`: el roadmap canonico no contiene un alcance operativo detallado para `ESCALON_6_QA_SECURITY`.
+Auditoria 2026-08-26: Escalon 5 queda verificado tras corregir la allowlist de patches de transicion en persistencia 5B. Escalon 6 está en progreso con contrato, persistencia, evidencia, gates, recovery y correction loop locales; el cierre normativo sigue pendiente.
 
-Formalizacion 2026-08-26: [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md) define 6A contrato/politica, 6B persistencia/orquestacion, 6C evidencia/gates y 6D recovery/correction. La especificacion es `prepared`, no implementacion; los checks de QA/security/accessibility, findings y correction loop siguen `pending`. Escalon 7 permanece `NOT_STARTED`.
+Implementacion 2026-08-26: [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md) define y ya implementa 6A contrato/politica, 6B persistencia/orquestacion, 6C evidencia/gates y 6D recovery/correction loop. El smoke `orchestrator-canonical-qa-security-6-smoke.mjs` pasa `24/24`; la bateria completa posterior a las correcciones tambien pasa. Se capturaron cinco vistas reales de la aplicación mediante Chrome/CDP local, con manifiesto en `.codex-temp/orchestrator-canonical-visual-evidence-20260826/`; se corrigió el feedback visual del wizard. 6-CLOSE sigue pendiente por lint global heredado, workspace persistido no disponible y revision manual fuera de alcance; Escalon 7 permanece `NOT_STARTED`.
 
 Evidencia de cierre: `CORRELATION_SMOKE=PASS`; `SMOKE_3B=84/84_PASS`; `CONNECTOR_RUNTIME_SMOKE=54/54_PASS`; `ESCALON_3C_B_SMOKE=24/24_PASS`; `SUPERVISED_EXECUTION_SMOKE=38/38`; `ESCALON_3C_C_DELIVERY_SMOKE=26/26_PASS`; `ESCALON_3C_D_HEALTH_SMOKE=34/34_PASS`; `SUPERVISED_RECOVERY_SMOKE=67/67`; `C2_REGRESSION=36/36_PASS`.
 
@@ -45,7 +47,7 @@ El preview no está demostrado como iframe ni validado visualmente; sólo puede 
 
 ## Deuda y próximo paso
 
-`npm run lint` global continúa FAIL heredado: la ejecución de auditoría del 2026-08-26 reportó 316 errores y 0 warnings en archivos `src/factory/hermes-*`; la cifra histórica de 306 queda sólo como antecedente fechado. La deuda Hermes permanece intacta, el quality gate global sigue abierto y no se alteraron reglas. JEFE no está release-ready; QA visual, deploy y proyecto comercial real siguen pendientes. El siguiente bloque canónico es `ESCALON_6_QA_SECURITY`, formalizado pero aún no implementado.
+`npm run lint` global continúa FAIL heredado: la ejecución de auditoría del 2026-08-26 reportó 316 errores y 0 warnings en archivos `src/factory/hermes-*`; la cifra histórica de 306 queda sólo como antecedente fechado. La deuda Hermes permanece intacta, el quality gate global sigue abierto y no se alteraron reglas. JEFE no está release-ready; QA visual, deploy y proyecto comercial real siguen pendientes. `ESCALON_6_QA_SECURITY` está implementándose localmente y aún no está cerrado.
 
 ## Escalón 3B — investigación supervisada
 

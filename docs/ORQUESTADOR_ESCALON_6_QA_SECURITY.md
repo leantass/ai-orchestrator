@@ -1,8 +1,8 @@
 # Escalon 6: QA, seguridad y correction loop canonicos
 
-Estado normativo: `ESCALON_6_STATUS=NOT_STARTED`.
+Estado normativo actual: `ESCALON_6_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`; `ESCALON_6A_STATUS=COMPLETED`; `ESCALON_6B_STATUS=COMPLETED`; `ESCALON_6C_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`; `ESCALON_6D_STATUS=COMPLETED`.
 
-Este documento formaliza el alcance que debe implementarse despues del cierre del Escalon 5. No implementa contratos, runners, persistencia, gates ni herramientas. La especificacion es vinculante para una futura implementacion y no modifica el estado de ningun escalon.
+Este documento define el alcance canónico y registra su implementación incremental. La implementación actual no declara cierre: 6-CLOSE permanece pendiente y no modifica el estado de ningún escalón anterior ni inicia el Escalón 7.
 
 ## 1. Proposito y limites
 
@@ -210,20 +210,20 @@ La corrupcion de un receipt o indice se aisla, se reporta y no produce PASS. A/B
 
 | ID | Requisito verificable | Evidencia requerida | Clasificacion actual |
 | --- | --- | --- | --- |
-| 6A-01 | contrato exacto, IDs y correlacion completa | validator + casos negativos | pendiente |
-| 6A-02 | catalogo cerrado, scope y politica sin shell/red/secretos | validator + matriz de paths/comandos | pendiente |
-| 6A-03 | diferencia trusted/untrusted/pending/rejected | tipos, derivacion y casos | pendiente |
-| 6B-01 | persistencia atomica, CAS, locks e idempotencia | smoke fisico con readback | pendiente |
-| 6B-02 | concurrencia e aislamiento A/B | smoke concurrente y roots separados | pendiente |
-| 6B-03 | timeout, cancelacion, retry y stale completion | smoke de estados y limites | pendiente |
-| 6C-01 | technical/security/accessibility gates independientes | receipts y gate derivado | pendiente |
-| 6C-02 | SAST/secret/path/command/artifact checks locales | ejecucion local real o `not_connected` explicito | pendiente |
-| 6C-03 | QA tecnico y responsive/accessibility estaticos sin claim visual | receipts focales + matriz manual | pendiente |
-| 6C-04 | findings sanitizados y no forjables | validator + corrupcion/secret cases | pendiente |
-| 6D-01 | correction loop vuelve al target correcto | smoke de retorno y lineage | pendiente |
-| 6D-02 | recovery conserva corrupcion e historia | diagnostico, rebuild y reapertura | pendiente |
-| 6D-03 | documentacion y limites honestos | docs canonicamente sincronizados | preparado |
-| 6-CLOSE | todos los checks obligatorios trusted, gates pasados, sin bloqueantes, recovery probado y deuda clasificada | matriz completa repetida en limpio | pendiente |
+| 6A-01 | contrato exacto, IDs y correlacion completa | validator + casos negativos del smoke 6 | PASS |
+| 6A-02 | catalogo cerrado, scope y politica sin shell/red/secretos | validator + matriz de paths/comandos del smoke 6 | PASS |
+| 6A-03 | diferencia trusted/untrusted/pending/rejected | token interno + casos de receipt del smoke 6 | PASS |
+| 6B-01 | persistencia atomica, CAS, locks e idempotencia | smoke fisico con readback | PASS |
+| 6B-02 | concurrencia e aislamiento A/B | smoke concurrente y roots separados + IPC A/B | PASS |
+| 6B-03 | timeout, cancelacion, retry y stale completion | smoke de estados y limites | PASS |
+| 6C-01 | technical/security/accessibility gates independientes | receipts y gate derivado/persistido | PASS |
+| 6C-02 | SAST/secret/path/command/artifact checks locales | runner local sin shell/red | PASS |
+| 6C-03 | QA tecnico y responsive/accessibility estaticos sin claim visual | checks estaticos + evidencia visual real separada; revision humana pendiente | PARTIAL |
+| 6C-04 | findings sanitizados y no forjables | validator + corrupcion/secret cases | PASS |
+| 6D-01 | correction loop vuelve al target correcto | smoke de retorno y lineage | PASS |
+| 6D-02 | recovery conserva corrupcion e historia | diagnostico, rebuild y reapertura | PASS |
+| 6D-03 | documentacion y limites honestos | docs canonicamente sincronizados | PASS |
+| 6-CLOSE | todos los checks obligatorios trusted, gates pasados, sin bloqueantes, recovery probado y deuda clasificada | matriz completa repetida en limpio | BLOCKED: gate humano/workspace físico |
 
 ## 10. Casos manuales y capacidades fuera de alcance
 
@@ -243,4 +243,20 @@ Permanecen fuera: red, proveedores, Codex CLI, Electron, navegador, deploy, CI r
 6. se documenten por separado los casos manuales, la deuda Hermes y cada capacidad fuera de alcance;
 7. el commit de cierre contenga la implementacion, smokes, validaciones y documentacion, sin iniciar Escalon 7.
 
-Hasta entonces: `ESCALON_6_STATUS=NOT_STARTED`, `ESCALON_7_STATUS=NOT_STARTED`, `NETWORK=DISABLED`, `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`, `PUSH=NO`.
+Estado de implementación al 2026-08-26: 6A, 6B y 6D pasan sus criterios automatizables; 6C pasa los checks estáticos y conserva `6C-03=PARTIAL` por revisión humana. El smoke QA Security pasa `24/24` y el smoke adicional de integración IPC también pasa. El estado canónico es `ESCALON_6_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`; `ESCALON_7_STATUS=NOT_STARTED`, `NETWORK=DISABLED`, `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`, `PUSH=NO`.
+
+La superficie productiva QA/IPC está integrada en `electron/jefe-qa-security-ipc.cjs`, registrada desde `electron/main.cjs` y expuesta mediante `jefeQaSecurityBridge` en `electron/preload.cjs`. Solo ofrece canales semánticos allowlisted: no expone `ipcRenderer`, filesystem, roots, shell ni comandos. Las lecturas componen snapshots desde registros persistidos y cada operación valida la pertenencia del `qaRunId` al `projectId`.
+
+## 12. Evidencia visual real separada del gate
+
+El 2026-08-26 se capturó la aplicación React real servida por Vite local mediante Chrome aislado y CDP directo, sin Playwright/Puppeteer, Electron, Edge, fixtures ni imágenes generadas. El manifiesto queda en `.codex-temp/orchestrator-canonical-visual-evidence-20260826/manifest.json`.
+
+| Vista | Dimensiones | SHA-256 | Resultado |
+| --- | ---: | --- | --- |
+| `01-hub-desktop.png` | 1280×820 | `957c201128acf4e3f47614e544954ab83e6017b177dd0dc540c4a9a866c7066b` | real, no uniforme, overflow horizontal 0 |
+| `02-wizard-step-1-desktop.png` | 1280×820 | `c2bf84a2cdd29a3900969d89ec2c75375afe3eb2b8b80176852c283e64289b6b` | real, no uniforme, overflow horizontal 0 |
+| `03-wizard-feedback-error.png` | 1280×820 | `e6d51ce0a8a54cb2d2b1ce7c9fabc48bc04566e725750be22af2654c9342521b` | feedback visible, no uniforme, overflow horizontal 0 |
+| `04-materiales-referencias-desktop.png` | 1280×820 | `7d074c308d1b5364abde0684fa5112dccfff8adcf29d18016532353248c18ef3` | real, no uniforme, overflow horizontal 0 |
+| `05-materiales-referencias-mobile.png` | 390×844 | `e193088f9a8c3bcd61aba5bb72d178b68bc1b680da5c73e70628747baa60ec4c` | real, no uniforme, overflow horizontal 0 |
+
+Hallazgo corregido: `Wizard.next()` no exponía el error de campos obligatorios; ahora lo presenta en el estado `aria-live` y la captura 03 lo demuestra. El análisis DOM de la vista mobile registró 3 controles, 0 sin label, 1 región `aria-live`, 0 solapamientos entre bloques principales, 0 overflow horizontal y foco alcanzable por Tab (`TEXTAREA`). Queda pendiente la vista de workspace persistido real por ausencia de proyectos físicos, además de la revisión humana de foco real, lector de pantalla, tactilidad, contraste perceptual y compatibilidad de navegador. La evidencia visual no se promueve automáticamente a aprobación humana ni cierra `6-CLOSE`.
