@@ -7,6 +7,8 @@ Fecha: 2026-08-20
 ## Cierre del Escalon 5
 
 `ESCALON_5_STATUS=VERIFIED_CLOSED`. 5A-5D estan implementados y cubiertos por smokes focales. La integracion externa permanece honestamente `not_connected`; no se declara ejecucion real, aprobacion, QA, deploy ni publicacion.
+
+La especificación del siguiente bloque está en [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md). Es un contrato documental preparado; `ESCALON_6_STATUS=NOT_STARTED` y `ESCALON_7_STATUS=NOT_STARTED` no cambian.
 Rama candidata: `integration/orquestador-canonical-v1`
 Worktree: `C:\Users\letas\Desktop\Proyectos\Desarrollo\orquestadoria\ai-orchestrator-canonical-integration-81ba810`
 Base: `81ba810313610e3e3f678bea5a70b29650b471c0`

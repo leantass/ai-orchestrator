@@ -24,6 +24,7 @@ El recorrido comercial predeterminado permite crear proyectos locales, revisar v
 - [Recuperación y conflictos de MEMORIA](docs/ORQUESTADOR_CONTEXT_RECOVERY_AND_CONFLICTS.md)
 - [Reconciliación de worktrees](docs/ORQUESTADOR_WORKTREE_RECONCILIATION.md)
 - [Roadmap canónico](docs/ORQUESTADOR_CANONICAL_ROADMAP.md)
+- [Especificación Escalón 6 QA/Security](docs/ORQUESTADOR_ESCALON_6_QA_SECURITY.md)
 - [Intake y descubrimiento supervisado](docs/ORQUESTADOR_SUPERVISED_DISCOVERY.md)
 - [Índice documental](docs/README.md)
 

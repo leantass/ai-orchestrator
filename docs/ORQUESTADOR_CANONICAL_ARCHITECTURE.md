@@ -35,7 +35,9 @@ Los aliases de generación heredada permanecen sólo para no romper callers y re
 
 ## Roadmap posterior
 
-La arquitectura posterior está definida exclusivamente en `ORQUESTADOR_CANONICAL_ROADMAP.md`. `ESCALON_4_STATUS=VERIFIED_CLOSED`: 3A–3C y 4A–4D están completos únicamente como fundaciones locales supervisadas y de contratos. `jefe-planner-recovery.cjs` sólo recupera índices derivados de Planner mediante un plan explícito. Ejecución externa, Codex/worktrees, QA, preview, entrega, observabilidad, centro comercial, integración y governance siguen siendo escalones dependientes, no capacidades ya conectadas.
+La arquitectura posterior está definida exclusivamente en `ORQUESTADOR_CANONICAL_ROADMAP.md`. `ESCALON_5_STATUS=VERIFIED_CLOSED`: 3A–3C, 4A–4D y 5A–5D están completos únicamente como fundaciones locales supervisadas, contratos y ejecución segura sin proveedor conectado. `jefe-planner-recovery.cjs` sólo recupera índices derivados de Planner mediante un plan explícito. QA/security del Escalón 6 está formalizado pero no implementado; preview, entrega, observabilidad, centro comercial, integración y governance siguen siendo escalones dependientes, no capacidades ya conectadas.
+
+El alcance normativo de QA, seguridad y correction loop está documentado en [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md). Su contrato futuro consume la salida aislada del Escalón 5 y sólo puede producir evidencia local clasificada, findings sanitizados, gates derivados y retornos explícitos; no conecta herramientas externas ni inicia Escalón 7. `ESCALON_6_STATUS=NOT_STARTED`.
 
 ## Intake supervisado (Escalón 3A)
 

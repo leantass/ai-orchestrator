@@ -9,6 +9,12 @@ Fuente auditada: `feature/jefe-factory-core` y `feature/jefe-real-project-delive
 
 La auditoria cierra 5A contrato/politica, 5B persistencia/estados, 5C ejecucion controlada/MEMORIA y 5D diagnostico/recovery. La evidencia ejecutable esta en los cuatro smokes `orchestrator-canonical-execution-5[abcd]-smoke.mjs`. El adaptador Codex externo sigue desconectado y no se simula exito. El proximo escalon es 6 y no fue iniciado.
 
+## Formalizacion del Escalon 6
+
+La especificacion canonica está en [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md). Define 6A–6D, contratos de QA/security/findings/correction, correlación, estados, gates, evidencia, políticas locales, recovery, límites y criterios de cierre. Esta documentación clasifica la capacidad como `prepared`; no declara implementación, ejecución SAST externa, QA visual, aprobación humana ni cierre del Escalón 6.
+
+La validación actual del 2026-08-26 reportó 316 errores y 0 warnings en la deuda heredada `src/factory/hermes-*`. Las menciones históricas a 306 errores en este documento no representan el conteo actual; no se modificó esa deuda ni se alteró la configuración de lint.
+
 ## Estado vigente de auditoría
 
 El Orquestador posee arquitectura, contratos, UI y smokes parciales, pero no una escalera integral demostrada. Los bloqueos principales son: verdad de integración, Context Hub externo, investigación real/Hermes bloqueado, ejecución Codex no demostrada, QA visual inexistente, bucles de corrección no integrados y entrega no verificada.

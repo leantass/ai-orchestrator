@@ -1,6 +1,6 @@
 # Roadmap canónico de finalización del Orquestador
 
-Esta es la única autoridad posterior a Escalón 2. Estados: `ESCALON_1_STATUS=VERIFIED_CLOSED`, `ESCALON_2_STATUS=VERIFIED_CLOSED`, `ESCALON_3_STATUS=VERIFIED_CLOSED`, `ESCALON_4_STATUS=VERIFIED_CLOSED`, `ESCALON_5_STATUS=NOT_STARTED`, `ESCALON_6_STATUS=NOT_STARTED`, `ESCALON_7_STATUS=NOT_STARTED`, `ESCALON_8_STATUS=NOT_STARTED`, `ESCALON_9_STATUS=NOT_STARTED`, `ESCALON_10_STATUS=PARTIAL_EXISTING_FOUNDATION`, `ESCALON_11_STATUS=NOT_STARTED`, `ESCALON_12_STATUS=NOT_STARTED`.
+Esta es la única autoridad posterior a Escalón 2. Estados: `ESCALON_1_STATUS=VERIFIED_CLOSED`, `ESCALON_2_STATUS=VERIFIED_CLOSED`, `ESCALON_3_STATUS=VERIFIED_CLOSED`, `ESCALON_4_STATUS=VERIFIED_CLOSED`, `ESCALON_5_STATUS=VERIFIED_CLOSED`, `ESCALON_6_STATUS=NOT_STARTED`, `ESCALON_7_STATUS=NOT_STARTED`, `ESCALON_8_STATUS=NOT_STARTED`, `ESCALON_9_STATUS=NOT_STARTED`, `ESCALON_10_STATUS=PARTIAL_EXISTING_FOUNDATION`, `ESCALON_11_STATUS=NOT_STARTED`, `ESCALON_12_STATUS=NOT_STARTED`.
 
 ## Flujo y retorno
 
@@ -11,7 +11,7 @@ Lean → CEREBRO → Radar → Hermes/Scout → JEFE → MEMORIA → Planner →
 | 3 | Descubrimiento e investigación supervisados: CEREBRO/Radar/Hermes/Scout/JEFE | necesidad humana → intake, plan, receipts correlacionados y runtime local supervisado; gate: identidad, política y evidencia | sin red ni proveedores reales; falta crítica vuelve a Lean/CEREBRO |
 | 4 | Planner y contratos ejecutables | intake/contexto válido → alcance, dependencias, riesgos y plan; gate: contrato cerrado | sin ejecución; invalidez vuelve a discovery |
 | 5 | Ejecución segura: Codex/worktrees | plan aprobado → cambio aislado recuperable; gate: locks/límites | sin entrega; fallo vuelve a Codex/Planner |
-| 6 | QA, seguridad y correction loop | cambio aislado → evidencia de pruebas; gate: QA/SAST/accesibilidad | sin aprobación visual; fallo vuelve a responsable |
+| 6 | QA, seguridad y correction loop | cambio aislado → evidencia de pruebas; gate: QA/SAST/accesibilidad; bloques 6A contrato/política, 6B persistencia/orquestación, 6C evidencia/gates, 6D recovery/corrección | sin aprobación visual; fallo vuelve a responsable; especificación en `ORQUESTADOR_ESCALON_6_QA_SECURITY.md` |
 | 7 | Preview y aprobación humana | evidencia local real → decisión explícita; gate: operador | sin autenticación ficticia/deploy; rechazo vuelve al plan |
 | 8 | Git, CI y entrega | aprobación/evidencia → commit, CI y entrega honesta | sin push/deploy implícito; fallo vuelve a QA/Codex |
 | 9 | Observabilidad y operación | eventos reales → salud/incidentes/recuperación | sin alertas inventadas; incidente vuelve a JEFE/MEMORIA |
@@ -118,6 +118,8 @@ El smoke `jefe-planner-recovery-smoke.mjs` pasa `11/11` casos conductuales local
 
 `ESCALON_5_STATUS=VERIFIED_CLOSED`; `ESCALON_5_BLOCKS=5A_CONTRACT_POLICY,5B_DURABLE_STATE,5C_CONTROLLED_EXECUTION_MEMORY,5D_RECOVERY_DOCUMENTATION`.
 `NEXT=ESCALON_6_QA_SECURITY`.
+
+`ESCALON_6_STATUS=NOT_STARTED`; `ESCALON_6_BLOCKS=6A_CONTRACT_POLICY,6B_DURABLE_ORCHESTRATION,6C_EVIDENCE_GATES,6D_RECOVERY_CORRECTION_DOCUMENTATION`. El alcance normativo, modelos, estados, límites, matriz de aceptación y exclusiones están definidos en [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md). Esta formalización no inicia implementación ni altera `ESCALON_7_STATUS=NOT_STARTED`.
 
 ## Auditoria de cierre del Escalon 5 — 2026-08-26
 

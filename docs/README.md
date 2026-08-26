@@ -6,6 +6,7 @@ Prevalencia: [ORQUESTADOR_CURRENT_STATUS.md](ORQUESTADOR_CURRENT_STATUS.md) defi
 - [Ingesta canónica de resultados de agente](ORQUESTADOR_AGENT_RESULT_INGESTION.md)
 - [Recuperación y conflictos de MEMORIA](ORQUESTADOR_CONTEXT_RECOVERY_AND_CONFLICTS.md)
 - [Roadmap canónico](ORQUESTADOR_CANONICAL_ROADMAP.md)
+- [Especificación Escalón 6 QA/Security](ORQUESTADOR_ESCALON_6_QA_SECURITY.md)
 - [Intake y descubrimiento supervisado](ORQUESTADOR_SUPERVISED_DISCOVERY.md)
 - [Investigación supervisada y gate de evidencia](ORQUESTADOR_SUPERVISED_RESEARCH.md)
 - [Runtime seguro de conectores de investigación](ORQUESTADOR_RESEARCH_CONNECTORS.md)
