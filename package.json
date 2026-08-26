@@ -19,6 +19,10 @@
     "ai-quality": "node scripts/ai-quality.mjs",
     "quality:ci": "node scripts/ai-quality.mjs",
     "ai-planner-smoke": "node scripts/ai-planner-smoke.mjs",
+    "orchestrator-execution-5a-smoke": "node scripts/orchestrator-canonical-execution-5a-smoke.mjs",
+    "orchestrator-execution-5b-smoke": "node scripts/orchestrator-canonical-execution-5b-smoke.mjs",
+    "orchestrator-execution-5c-smoke": "node scripts/orchestrator-canonical-execution-5c-smoke.mjs",
+    "orchestrator-execution-5d-smoke": "node scripts/orchestrator-canonical-execution-5d-smoke.mjs",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit",
     "preview": "vite preview --config vite.config.ts --configLoader native"
