@@ -118,3 +118,13 @@ El smoke `jefe-planner-recovery-smoke.mjs` pasa `11/11` casos conductuales local
 
 `ESCALON_5_STATUS=VERIFIED_CLOSED`; `ESCALON_5_BLOCKS=5A_CONTRACT_POLICY,5B_DURABLE_STATE,5C_CONTROLLED_EXECUTION_MEMORY,5D_RECOVERY_DOCUMENTATION`.
 `NEXT=ESCALON_6_QA_SECURITY`.
+
+## Auditoria de cierre del Escalon 5 — 2026-08-26
+
+La auditoria confirmo rama `integration/orquestador-canonical-v1`, HEAD `f2cb4f83edeaa57a270057c4c156b474bcd5b943`, arbol e indice limpios, y ancestry lineal de 5A, 5B, 5C, 5D y la correccion de retry lineage. `package.json` cambio intencionalmente en 5A para agregar los cuatro comandos smoke de 5A–5D; su SHA-256 actual es `43c4d2a4e3188682e42fbfb8b91032010f22f938f0a68522010a925f6ee4c272`, frente a `660bfe94e2c1ac11abdaa04ac36190503b4638217932c8c0d2bfe5f5cd0259ff` en `ad78a08^`. `package-lock.json` no cambio y conserva SHA-256 `6a202a2a9d202936dfee777591fe2e01cffc0ab588c6775faf20849990280303`.
+
+La correccion de auditoria en 5B restringe los patches de transicion a `adapter` y `technicalResult`; impide alterar identidad, repositorio, baseline, permisos o lineage desde una transicion durable. El smoke 5B agrega evidencia adversarial de rechazo y preservacion.
+
+Evidencia ejecutada: 5A `12/12`, 5B `11/11`, 5C `5/5`, 5D `5/5`; Planner contrato/persistencia/gate/recovery `20/20`, `20/20`, `16/16`, `11/11`; Research, MEMORIA, recovery y regresiones relacionadas PASS. Syntax, ESLint focal, typecheck, build y `git diff --check` PASS. El lint global queda FAIL con `316 errores, 0 warnings`, concentrados en la deuda heredada `src/factory/hermes-*`; el build conserva el warning literal de chunk mayor a 500 kB.
+
+El alcance operativo detallado de `ESCALON_6_QA_SECURITY` no esta definido en este roadmap: solo existe la fila de proposito general y no hay bloques, contratos, criterios de aceptacion ni evidencia requerida. Para respetar la autoridad canonica y no inventar QA/SAST, proveedores, ejecucion externa, UI/IPC o aprobacion humana, Escalon 6 permanece `NOT_STARTED` y no se inicia en este cierre.

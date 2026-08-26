@@ -20,5 +20,7 @@ const root = await fs.mkdtemp(path.join(os.tmpdir(), 'canonical-execution-5b-'))
   const cancelled = await store.transition(record.executionId, 2, 'cancel_requested'); assert.equal(cancelled.state, 'cancel_requested') // 7 cancellation
   assert.equal((await store.rebuildIndex()).index.executionIds.length, 1) // 8 rebuildable index
   const interrupted = await store.transition(record.executionId, 3, 'interrupted'); const failed = await store.transition(record.executionId, interrupted.revision, 'failed_transient'); const retried = await store.retry(record.executionId, failed.revision); assert.equal(retried.state, 'requested'); assert.equal(retried.attemptNumber, 2); assert.equal(retried.attemptHistory.length, 1) // 9 retry lineage
-  console.log('PASS orchestrator-canonical-execution-5b-smoke: casos 1-9')
+  await assert.rejects(() => store.transition(record.executionId, retried.revision, 'prepared', { repository: { clean: false } }), (error) => error.code === 'INVALID_TRANSITION_PATCH') // 10 patch no puede alterar identidad/politica
+  assert.deepEqual((await store.read(record.executionId)).repository, repository) // 11 identidad durable preservada
+  console.log('PASS orchestrator-canonical-execution-5b-smoke: casos 1-11')
 } finally { await fs.rm(root, { recursive: true, force: true }) }

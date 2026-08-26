@@ -23,4 +23,8 @@ El adaptador `codex-cli` queda `not_connected`: no hay ejecucion real de Codex C
 
 La maquina durable cubre `requested`, `policy_blocked`, `prepared`, `waiting_for_authority`, `running`, `cancel_requested`, `cancelled`, `timed_out`, `interrupted`, `failed_transient`, `failed_permanent`, `completed_unverified`, `recovery_required`, `recovered` y `not_connected`. Retry conserva el registro original y se modela como nuevo intento correlacionado en la siguiente revision del contrato; ninguna lectura elimina corrupciones.
 
-No se agrega UI ni IPC: el roadmap vigente de Escalon 5 define ejecucion segura y no una superficie visible. El Escalon 6 queda fuera de alcance.
+No se agrega UI ni IPC: el roadmap vigente de Escalon 5 define ejecucion segura y no una superficie visible. Escalon 6 permanece sin iniciar porque el roadmap solo enuncia su proposito QA/seguridad y no define bloques ni criterios operables.
+
+## Correccion de auditoria 2026-08-26
+
+Persistencia 5B ahora rechaza patches de transicion fuera de la allowlist `adapter`/`technicalResult`, evitando que una transicion altere identidad, repositorio, baseline, permisos o lineage. El smoke 5B cubre esta frontera con un caso adversarial y confirma que la identidad durable permanece intacta.
