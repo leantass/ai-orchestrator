@@ -2,6 +2,10 @@
 
 ## Autoridades únicas
 
+## Escalon 5 implementado
+
+La via canonica de ejecucion vive en `electron/orchestrator-canonical-execution-contract.cjs`, `electron/orchestrator-canonical-execution-persistence.cjs` y `electron/orchestrator-canonical-execution-service.cjs`. Planner entrega el plan cerrado; el executor deriva permisos desde el registro confiable, valida baseline/worktree y persiste antes del append tecnico a MEMORIA. No existe shell generico ni IPC de ejecucion.
+
 | Área | Autoridad canónica | Límite |
 |---|---|---|
 | Identidad/contrato | `electron/jefe-project-contract.cjs` | IDs y paths se normalizan dentro de roots explícitos. |

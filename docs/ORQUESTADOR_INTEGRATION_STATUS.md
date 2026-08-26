@@ -3,6 +3,10 @@
 > Historial de integración. Para estado prevalente consultar [ORQUESTADOR_CURRENT_STATUS.md](ORQUESTADOR_CURRENT_STATUS.md).
 
 Fecha: 2026-08-20
+
+## Cierre del Escalon 5
+
+`ESCALON_5_STATUS=VERIFIED_CLOSED`. 5A-5D estan implementados y cubiertos por smokes focales. La integracion externa permanece honestamente `not_connected`; no se declara ejecucion real, aprobacion, QA, deploy ni publicacion.
 Rama candidata: `integration/orquestador-canonical-v1`
 Worktree: `C:\Users\letas\Desktop\Proyectos\Desarrollo\orquestadoria\ai-orchestrator-canonical-integration-81ba810`
 Base: `81ba810313610e3e3f678bea5a70b29650b471c0`

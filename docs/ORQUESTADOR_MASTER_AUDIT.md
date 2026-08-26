@@ -5,6 +5,10 @@
 Versión incorporada al worktree canónico candidato: 2026-08-20.
 Fuente auditada: `feature/jefe-factory-core` y `feature/jefe-real-project-delivery-v1`, ambos desde `81ba810313610e3e3f678bea5a70b29650b471c0`.
 
+## Addendum Escalon 5
+
+La auditoria cierra 5A contrato/politica, 5B persistencia/estados, 5C ejecucion controlada/MEMORIA y 5D diagnostico/recovery. La evidencia ejecutable esta en los cuatro smokes `orchestrator-canonical-execution-5[abcd]-smoke.mjs`. El adaptador Codex externo sigue desconectado y no se simula exito. El proximo escalon es 6 y no fue iniciado.
+
 ## Estado vigente de auditoría
 
 El Orquestador posee arquitectura, contratos, UI y smokes parciales, pero no una escalera integral demostrada. Los bloqueos principales son: verdad de integración, Context Hub externo, investigación real/Hermes bloqueado, ejecución Codex no demostrada, QA visual inexistente, bucles de corrección no integrados y entrega no verificada.

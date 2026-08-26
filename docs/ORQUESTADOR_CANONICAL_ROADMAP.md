@@ -116,4 +116,5 @@ El gate es atómico, reabrible, idempotente, aislado por proyecto y con índice 
 
 El smoke `jefe-planner-recovery-smoke.mjs` pasa `11/11` casos conductuales locales. La matriz del Escalón 4 comprende contratos `20/20`, persistencia/orquestación `20/20`, gates `16/16` y recovery `11/11`. Esto cierra solamente Planner y contratos ejecutables locales; no inicia Codex, worktrees, ejecución, QA, preview, aprobación humana, Git/CI, red, publicación ni deploy.
 
-`NEXT=ESCALON_5A_SAFE_CODEX_EXECUTION`.
+`ESCALON_5_STATUS=VERIFIED_CLOSED`; `ESCALON_5_BLOCKS=5A_CONTRACT_POLICY,5B_DURABLE_STATE,5C_CONTROLLED_EXECUTION_MEMORY,5D_RECOVERY_DOCUMENTATION`.
+`NEXT=ESCALON_6_QA_SECURITY`.
