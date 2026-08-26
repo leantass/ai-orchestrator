@@ -19,5 +19,6 @@ const root = await fs.mkdtemp(path.join(os.tmpdir(), 'canonical-execution-5b-'))
   await assert.rejects(() => store.transition(record.executionId, 1, 'running'), (error) => error.code === 'STALE_COMPLETION') // 6 stale preserved
   const cancelled = await store.transition(record.executionId, 2, 'cancel_requested'); assert.equal(cancelled.state, 'cancel_requested') // 7 cancellation
   assert.equal((await store.rebuildIndex()).index.executionIds.length, 1) // 8 rebuildable index
-  console.log('PASS orchestrator-canonical-execution-5b-smoke: casos 1-8')
+  const interrupted = await store.transition(record.executionId, 3, 'interrupted'); const failed = await store.transition(record.executionId, interrupted.revision, 'failed_transient'); const retried = await store.retry(record.executionId, failed.revision); assert.equal(retried.state, 'requested'); assert.equal(retried.attemptNumber, 2); assert.equal(retried.attemptHistory.length, 1) // 9 retry lineage
+  console.log('PASS orchestrator-canonical-execution-5b-smoke: casos 1-9')
 } finally { await fs.rm(root, { recursive: true, force: true }) }
