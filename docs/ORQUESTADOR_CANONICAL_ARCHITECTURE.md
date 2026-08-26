@@ -4,7 +4,7 @@
 
 ## Estado vigente de cierre documental
 
-`ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`. El cierre se basa en evidencia visual v4-final aprobada externamente, sobre `factory-qa-electron` (`factory_typed`); no habilita proyecto comercial, proveedores reales, red, deploy ni publicaciÃ³n.
+Registro histórico previo a la implementación local de 7: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`. El estado vigente es `ESCALON_7_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`; no habilita proyecto comercial, proveedores reales, red, deploy ni publicación.
 
 ## Escalon 5 implementado
 
@@ -41,7 +41,7 @@ Los aliases de generación heredada permanecen sólo para no romper callers y re
 
 La arquitectura posterior está definida exclusivamente en `ORQUESTADOR_CANONICAL_ROADMAP.md`. `ESCALON_5_STATUS=VERIFIED_CLOSED`: 3A–3C, 4A–4D y 5A–5D están completos únicamente como fundaciones locales supervisadas, contratos y ejecución segura sin proveedor conectado. `jefe-planner-recovery.cjs` sólo recupera índices derivados de Planner mediante un plan explícito. QA/security del Escalón 6 está implementado y cerrado documentalmente con evidencia v4-final aprobada; preview, entrega, observabilidad, centro comercial, integración y governance siguen siendo escalones dependientes, no capacidades ya conectadas.
 
-El alcance normativo de QA, seguridad y correction loop está documentado en [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md). La implementación automatizada consume la salida aislada del Escalón 5 y produce evidencia local clasificada, findings sanitizados, gates persistidos, retornos explícitos y una superficie QA/IPC semántica; el cierre documental queda en `ESCALON_6_STATUS=VERIFIED_CLOSED` y no inicia Escalón 7.
+El alcance normativo de QA, seguridad y correction loop está documentado en [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md). La implementación automatizada consume la salida aislada del Escalón 5 y produce evidencia local clasificada, findings sanitizados, gates persistidos, retornos explícitos y una superficie QA/IPC semántica; el cierre documental queda en `ESCALON_6_STATUS=VERIFIED_CLOSED`. El Escalón 7 ya tiene implementación local pendiente de gate humano y visual.
 
 ## Intake supervisado (Escalón 3A)
 
@@ -49,7 +49,7 @@ El alcance normativo de QA, seguridad y correction loop está documentado en [OR
 
 ## Preview y aprobación humana (Escalón 7)
 
-La resolución parcial existente está implementada como `external_only` y la aprobación local se registra en lifecycle. El protocolo canónico de Escalón 7, sus contratos, estados, autoridad/autenticación, persistencia específica, política de origen/recursos, recovery y criterios visuales quedan formalizados en [ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md](ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md). `ESCALON_7_STATUS=NOT_STARTED` porque la implementación aún no comenzó; no se inicia Escalón 8.
+La resolución local del Escalón 7 implementa preview semántico `preview_ready`, snapshot hasheado, revisión y aprobación durable con persistencia atómica, recovery, IPC/preload allowlisted y superficie UI. La autenticación humana real y evidencia visual runtime no están conectadas; por eso `ESCALON_7_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`. El contrato completo está en [ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md](ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md) y no se inicia Escalón 8.
 
 ## MEMORIA integrada (Escalón 2B)
 
@@ -76,4 +76,4 @@ La outbox por proyecto soporta `synced`, `pending` y `failed`, con reapertura y 
 Un adapter inyectado sólo produce un candidato no confiable. Después de sanitizarlo, el runtime llama exclusivamente `receiveContribution`; no puede forjar provider, aceptación, autoridad humana, IDs o escritura a MEMORIA. El smoke acredita 52/52 casos conductuales reales en cinco ejecuciones. `NETWORK=DISABLED`; `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`. No hay DNS, fetch, shell, navegador, Electron, provider real, generación, preview, publicación ni deploy. UI, autenticación humana end-to-end y QA visual siguen pendientes; JEFE no está release-ready y `PUSH=NO`.
 ## Errata de estado vigente 2026-08-26
 
-Las referencias históricas de Escalón 6 como formalizado pero no implementado quedan superseded por el cierre vigente: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`, con evidencia v4-final aprobada externamente sobre `factory-qa-electron` (`factory_typed`).
+Las referencias históricas de Escalón 6 como formalizado pero no implementado quedan superseded por el cierre vigente: `ESCALON_6_STATUS=VERIFIED_CLOSED`, con evidencia v4-final aprobada externamente sobre `factory-qa-electron` (`factory_typed`). La referencia a Escalón 7 `NOT_STARTED` es histórica; su estado vigente es `IMPLEMENTED_PENDING_HUMAN_GATE`.

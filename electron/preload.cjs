@@ -324,3 +324,14 @@ contextBridge.exposeInMainWorld('jefeQaSecurityBridge', {
   listRuns: (projectId) => ipcRenderer.invoke('jefe-qa-security:runs', { projectId }),
   openCorrection: (projectId, qaRunId, findingIds, returnTarget, reasonCode) => ipcRenderer.invoke('jefe-qa-security:open-correction', { projectId, qaRunId, findingIds, returnTarget, reasonCode }),
 })
+
+// Preview/aprobación del Escalón 7: sólo operaciones semánticas allowlisted.
+contextBridge.exposeInMainWorld('jefePreviewApprovalBridge', {
+  request: (payload) => ipcRenderer.invoke('jefe-preview:request', payload),
+  read: (projectId, previewRequestId) => ipcRenderer.invoke('jefe-preview:read', { projectId, previewRequestId }),
+  review: (payload) => ipcRenderer.invoke('jefe-preview:review', payload),
+  approval: (payload) => ipcRenderer.invoke('jefe-preview:approval', payload),
+  readApproval: (projectId, previewRequestId) => ipcRenderer.invoke('jefe-preview:approval-read', { projectId, previewRequestId }),
+  recovery: (projectId) => ipcRenderer.invoke('jefe-preview:recovery', { projectId }),
+  transition: (payload) => ipcRenderer.invoke('jefe-preview:transition', payload),
+})

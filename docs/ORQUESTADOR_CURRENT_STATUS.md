@@ -2,19 +2,19 @@
 
 Fecha de cierre documental: 2026-08-26. Rama: `integration/orquestador-canonical-v1`.
 
-Estado vigente posterior a la aprobaciÃ³n externa: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`. La evidencia es `orquestador-visual-evidence-2026-08-26-v4-final.zip`, SHA-256 `899D1B33318D4652062488447A1AE666882E13EFBF4E16C4C3D47BEC85E1F9C2`, sobre `factory-qa-electron` (`factory_typed`). Las menciones posteriores de estados anteriores son histÃ³ricas.
+Estado vigente posterior a la aprobación externa: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`; `ESCALON_8_STATUS=NOT_STARTED`. La evidencia del 6 es `orquestador-visual-evidence-2026-08-26-v4-final.zip`; el 7 tiene implementación local, smoke de 25 casos y evidencia visual parcial en `orquestador-visual-evidence-escalon-7-final11.zip`, pero requiere gate humano y evidencia runtime del Bridge/workspace Electron.
 
-Actualización 2026-08-26: la evidencia v4-final fue revisada y aprobada externamente. Escalón 6 queda en `ESCALON_6_STATUS=VERIFIED_CLOSED`; Escalón 7 permanece `ESCALON_7_STATUS=NOT_STARTED`.
+Registro histórico previo a la implementación local de 7: la evidencia v4-final fue revisada y aprobada externamente. El estado vigente de 7 es `IMPLEMENTED_PENDING_HUMAN_GATE`, como se declara arriba.
 
 Estado prevalente de cierre: `ESCALON_1_STATUS=VERIFIED_CLOSED`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2D_STATUS=COMPLETED`; `ESCALON_2_STATUS=VERIFIED_CLOSED`; `RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`.
 
-Estado actual: `STATUS=ESCALON_6_VERIFIED_CLOSED`; `ESCALON_3_STATUS=VERIFIED_CLOSED`; `ESCALON_4_STATUS=VERIFIED_CLOSED`; `ESCALON_5_STATUS=VERIFIED_CLOSED`; `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`. Escalones 8–9 y 11–12 siguen `NOT_STARTED`; Escalón 10 conserva `PARTIAL_EXISTING_FOUNDATION`. La autoridad es [ORQUESTADOR_CANONICAL_ROADMAP.md](ORQUESTADOR_CANONICAL_ROADMAP.md).
+Estado actual: `STATUS=ESCALON_7_IMPLEMENTED_PENDING_HUMAN_GATE`; `ESCALON_3_STATUS=VERIFIED_CLOSED`; `ESCALON_4_STATUS=VERIFIED_CLOSED`; `ESCALON_5_STATUS=VERIFIED_CLOSED`; `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`; `ESCALON_8_STATUS=NOT_STARTED`. Escalones 9 y 11–12 siguen `NOT_STARTED`; Escalón 10 conserva `PARTIAL_EXISTING_FOUNDATION`. La autoridad es [ORQUESTADOR_CANONICAL_ROADMAP.md](ORQUESTADOR_CANONICAL_ROADMAP.md).
 
-`NETWORK=DISABLED`; `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`; `PUSH=NO`; `ESCALON_5_STATUS=VERIFIED_CLOSED`; `ESCALON_5A_STATUS=VERIFIED_CLOSED`; `ESCALON_5B_STATUS=VERIFIED_CLOSED`; `ESCALON_5C_STATUS=VERIFIED_CLOSED`; `ESCALON_5D_STATUS=VERIFIED_CLOSED`; `NEXT=ESCALON_7_PREVIEW_APPROVAL_SPECIFICATION`.
+`NETWORK=DISABLED`; `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`; `PUSH=NO`; `ESCALON_5_STATUS=VERIFIED_CLOSED`; `ESCALON_5A_STATUS=VERIFIED_CLOSED`; `ESCALON_5B_STATUS=VERIFIED_CLOSED`; `ESCALON_5C_STATUS=VERIFIED_CLOSED`; `ESCALON_5D_STATUS=VERIFIED_CLOSED`; `NEXT=ESCALON_7_HUMAN_GATE_AND_VISUAL_EVIDENCE`.
 
-Auditoría histórica 2026-08-26: Escalón 5 quedó verificado tras corregir la allowlist de patches de transición en persistencia 5B. La referencia original a Escalón 6 en progreso queda supersedida por el cierre documental aprobado registrado arriba; Escalón 7 permanece `NOT_STARTED` por especificación canónica insuficiente.
+Auditoría histórica 2026-08-26: Escalón 5 quedó verificado tras corregir la allowlist de patches de transición en persistencia 5B. La referencia original a Escalón 6 en progreso queda supersedida por el cierre documental aprobado registrado arriba. Escalón 7 está implementado localmente y pendiente del gate humano/evidencia visual runtime.
 
-Implementación 2026-08-26: [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md) define e implementa 6A–6D. El smoke QA pasa `24/24`, la batería completa pasa y la evidencia `orquestador-visual-evidence-2026-08-26-v4-final.zip` fue aprobada externamente sobre `factory-qa-electron` (`factory_typed`). 6-CLOSE queda cerrado documentalmente. Escalón 7 permanece `NOT_STARTED`; su contrato canónico ya está formalizado en [ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md](ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md), pero la implementación aún no comenzó.
+Implementación 2026-08-26: [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md) define e implementa 6A–6D. El smoke QA pasa `24/24`, la batería completa pasa y la evidencia v4-final fue aprobada externamente. Escalón 7 implementa preview/aprobación local, persistencia, recovery, IPC/preload y UI; su smoke pasa `25` casos e incluye pending_review, reviewed, supersession, CAS concurrente y corrupción read-only. Existe evidencia visual parcial del renderer web; queda `IMPLEMENTED_PENDING_HUMAN_GATE` por autenticación humana no conectada y evidencia runtime del Bridge/workspace Electron no obtenida.
 
 Evidencia de cierre: `CORRELATION_SMOKE=PASS`; `SMOKE_3B=84/84_PASS`; `CONNECTOR_RUNTIME_SMOKE=54/54_PASS`; `ESCALON_3C_B_SMOKE=24/24_PASS`; `SUPERVISED_EXECUTION_SMOKE=38/38`; `ESCALON_3C_C_DELIVERY_SMOKE=26/26_PASS`; `ESCALON_3C_D_HEALTH_SMOKE=34/34_PASS`; `SUPERVISED_RECOVERY_SMOKE=67/67`; `C2_REGRESSION=36/36_PASS`.
 
@@ -100,4 +100,4 @@ La evidencia focal es `24/24` para 3C-B, `38/38` y `26/26` para 3C-C, y `34/34` 
 La matriz local completa pasa: contrato `20/20`, persistencia/orquestación `20/20`, gate `16/16` y recovery `11/11`. Planner queda cerrado sólo como contrato/persistencia/gate local. El siguiente escalón canónico es 5A y no fue iniciado.
 ## Errata de estado vigente 2026-08-26
 
-Las referencias históricas posteriores que mencionan `IN_PROGRESS` o `IMPLEMENTED_PENDING_HUMAN_GATE` describen el WIP anterior. El estado prevalente es `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`, conforme al cierre externo del ZIP v4-final.
+Las referencias históricas posteriores que mencionan `IN_PROGRESS` o `ESCALON_7_STATUS=NOT_STARTED` preceden a la implementación local actual. El estado prevalente es `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`, conforme al gate humano y la evidencia visual runtime aún pendientes.

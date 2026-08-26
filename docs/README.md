@@ -3,7 +3,7 @@
 Prevalencia: [ORQUESTADOR_CURRENT_STATUS.md](ORQUESTADOR_CURRENT_STATUS.md) define el estado actual; [ORQUESTADOR_CANONICAL_ARCHITECTURE.md](ORQUESTADOR_CANONICAL_ARCHITECTURE.md) define autoridades; la auditoría y reconciliación explican evidencia e historia.
 
 - [Estado actual](ORQUESTADOR_CURRENT_STATUS.md)
-Estado vigente: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`; `ESCALON_7_SPEC_STATUS=READY_FOR_IMPLEMENTATION`. El cierre del 6 usa evidencia visual v4-final aprobada externamente sobre el workspace interno `factory-qa-electron` (`factory_typed`); el contrato de 7 está en [ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md](ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md).
+Estado vigente: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`; `ESCALON_8_STATUS=NOT_STARTED`. El cierre del 6 usa evidencia visual v4-final aprobada externamente; el contrato y la implementación local de 7 están en [ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md](ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md), pendientes de gate humano y evidencia visual runtime.
 - [Ingesta canónica de resultados de agente](ORQUESTADOR_AGENT_RESULT_INGESTION.md)
 - [Recuperación y conflictos de MEMORIA](ORQUESTADOR_CONTEXT_RECOVERY_AND_CONFLICTS.md)
 - [Roadmap canónico](ORQUESTADOR_CANONICAL_ROADMAP.md)
@@ -34,4 +34,4 @@ Los documentos `V1_*`, `release-candidate-checklist.md`, `operator-demo-flow.md`
 `STATUS=ESCALON_3C_A_COMPLETED`; `ESCALON_3_STATUS=IN_PROGRESS`; `ESCALON_3C_A_STATUS=COMPLETED`; `CONNECTOR_RUNTIME_SMOKE=52/52_PASS_X5`. El runtime local durable entrega candidatos sanitizados exclusivamente a `receiveContribution`; no decide evidencia, autoridad ni aceptación.
 
 `NETWORK=DISABLED`; `REAL_NETWORK_CONNECTORS=NOT_CONNECTED`; `PUSH=NO`; `NEXT=ESCALON_3C_SUPERVISED_RESEARCH_CONNECTORS_AND_EXECUTION`. UI, autenticación humana end-to-end, QA visual y deploy siguen pendientes; JEFE no está release-ready. La deuda Hermes permanece intacta: 306 errores, 0 warnings y 73 archivos afectados.
-Estado prevalente posterior al cierre documental: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`. La evidencia v4-final fue aprobada externamente sobre el workspace interno `factory-qa-electron` (`factory_typed`); no es un proyecto comercial ni habilita proveedores, red, deploy o publicación.
+Registro histórico previo a la implementación local de 7: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`. El estado vigente de 7 es `IMPLEMENTED_PENDING_HUMAN_GATE`, con gate humano y evidencia visual runtime pendientes.

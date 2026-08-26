@@ -12,7 +12,7 @@ Fecha: 2026-08-20
 
 `ESCALON_5_STATUS=VERIFIED_CLOSED`. 5A-5D estan implementados y cubiertos por smokes focales. La integracion externa permanece honestamente `not_connected`; no se declara ejecucion real, aprobacion, QA, deploy ni publicacion.
 
-La especificación y el estado vigente del bloque 6 están en [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md). El bloque 6 está cerrado documentalmente: 6A–6D implementados, smoke `24/24`, batería completa y evidencia v4-final aprobada externamente sobre `factory-qa-electron` (`factory_typed`). Escalón 7 permanece `NOT_STARTED`, con contrato listo para implementación en [ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md](ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md).
+La especificación y el estado vigente del bloque 6 están en [ORQUESTADOR_ESCALON_6_QA_SECURITY.md](ORQUESTADOR_ESCALON_6_QA_SECURITY.md). El bloque 6 está cerrado documentalmente: 6A–6D implementados, smoke `24/24`, batería completa y evidencia v4-final aprobada externamente. Escalón 7 está `IMPLEMENTED_PENDING_HUMAN_GATE`: preview/aprobación local, persistencia, recovery, IPC/preload y UI implementados; faltan gate humano y evidencia visual runtime. Contrato en [ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md](ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md).
 Rama candidata: `integration/orquestador-canonical-v1`
 Worktree: `C:\Users\letas\Desktop\Proyectos\Desarrollo\orquestadoria\ai-orchestrator-canonical-integration-81ba810`
 Base: `81ba810313610e3e3f678bea5a70b29650b471c0`
@@ -185,4 +185,4 @@ El orden cruzado final volvió a exponer la flake C2 de dos instancias de MEMORI
 UI, autenticación humana end-to-end, QA visual y deploy continúan pendientes. JEFE no está release-ready. La deuda Hermes heredada permanece intacta en 306 errores, 0 warnings y 73 archivos afectados. `PUSH=NO`; `NEXT=ESCALON_3C_SUPERVISED_RESEARCH_CONNECTORS_AND_EXECUTION`.
 ## Errata de estado vigente 2026-08-26
 
-Las referencias históricas de Escalón 6 como “en progreso” o “no cerrado” quedan superseded por el cierre documental vigente: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`. La aprobación externa corresponde al ZIP v4-final indicado arriba y no extiende el alcance a proveedores, red, deploy, publicación ni proyecto comercial.
+Las referencias históricas de Escalón 6 como “en progreso” o “no cerrado” quedan superseded por el cierre documental vigente: `ESCALON_6_STATUS=VERIFIED_CLOSED`. La referencia histórica a `ESCALON_7_STATUS=NOT_STARTED` precede a su implementación local actual; el estado vigente es `IMPLEMENTED_PENDING_HUMAN_GATE`. La aprobación externa corresponde al ZIP v4-final indicado arriba y no extiende el alcance a proveedores, red, deploy, publicación ni proyecto comercial.

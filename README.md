@@ -1,6 +1,6 @@
 # JEFE / Orquestador
 
-Estado canónico actual: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`; `ESCALON_7_SPEC_STATUS=READY_FOR_IMPLEMENTATION`. Cierre documental basado en `orquestador-visual-evidence-2026-08-26-v4-final.zip`, SHA-256 `899D1B33318D4652062488447A1AE666882E13EFBF4E16C4C3D47BEC85E1F9C2`, aprobado externamente sobre el workspace interno `factory-qa-electron` (`factory_typed`). El contrato de Escalón 7 está en [ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md](docs/ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md); no es proyecto comercial ni habilita proveedores reales, red, deploy o publicación.
+Estado canónico actual: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`; `ESCALON_8_STATUS=NOT_STARTED`. El contrato e implementación local del Escalón 7 están en [ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md](docs/ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md); existe evidencia visual parcial del renderer web, pero falta autenticación humana real y evidencia runtime del Bridge/workspace físico.
 
 JEFE es una aplicación local para crear y administrar versiones físicas de proyectos con controles explícitos de revisión y entrega local. No es release-ready: no demuestra Context Hub/MEMORIA conectado, investigación remota, Codex/executor real, QA visual, deploy ni entrega remota.
 
@@ -31,4 +31,4 @@ El recorrido comercial predeterminado permite crear proyectos locales, revisar v
 - [Índice documental](docs/README.md)
 
 Los documentos `V1_*`, guías de demo y checklist de release son históricos; no prevalecen sobre el estado actual.
-Estado prevalente posterior al cierre documental: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`. La evidencia v4-final fue aprobada externamente sobre el workspace interno `factory-qa-electron` (`factory_typed`); no es un proyecto comercial ni habilita proveedores, red, deploy o publicación.
+Registro histórico previo a la implementación local de 7: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`. El estado vigente de 7 es `IMPLEMENTED_PENDING_HUMAN_GATE`, con gate humano y evidencia visual runtime pendientes.

@@ -1,10 +1,10 @@
 # Roadmap canónico de finalización del Orquestador
 
-Esta es la única autoridad posterior a Escalón 2. Estados: `ESCALON_1_STATUS=VERIFIED_CLOSED`, `ESCALON_2_STATUS=VERIFIED_CLOSED`, `ESCALON_3_STATUS=VERIFIED_CLOSED`, `ESCALON_4_STATUS=VERIFIED_CLOSED`, `ESCALON_5_STATUS=VERIFIED_CLOSED`, `ESCALON_6_STATUS=VERIFIED_CLOSED`, `ESCALON_7_STATUS=NOT_STARTED`, `ESCALON_8_STATUS=NOT_STARTED`, `ESCALON_9_STATUS=NOT_STARTED`, `ESCALON_10_STATUS=PARTIAL_EXISTING_FOUNDATION`, `ESCALON_11_STATUS=NOT_STARTED`, `ESCALON_12_STATUS=NOT_STARTED`.
+Esta es la única autoridad posterior a Escalón 2. Estados: `ESCALON_1_STATUS=VERIFIED_CLOSED`, `ESCALON_2_STATUS=VERIFIED_CLOSED`, `ESCALON_3_STATUS=VERIFIED_CLOSED`, `ESCALON_4_STATUS=VERIFIED_CLOSED`, `ESCALON_5_STATUS=VERIFIED_CLOSED`, `ESCALON_6_STATUS=VERIFIED_CLOSED`, `ESCALON_7_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`, `ESCALON_8_STATUS=NOT_STARTED`, `ESCALON_9_STATUS=NOT_STARTED`, `ESCALON_10_STATUS=PARTIAL_EXISTING_FOUNDATION`, `ESCALON_11_STATUS=NOT_STARTED`, `ESCALON_12_STATUS=NOT_STARTED`.
 
 ## Estado vigente de cierre documental
 
-`ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`. Cierre basado en `orquestador-visual-evidence-2026-08-26-v4-final.zip`, SHA-256 `899D1B33318D4652062488447A1AE666882E13EFBF4E16C4C3D47BEC85E1F9C2`, aprobado externamente sobre el workspace interno `factory-qa-electron` (`factory_typed`).
+Registro histórico previo a la implementación local de 7. El estado vigente de 7 está declarado en la línea canónica superior y en su sección específica.
 
 ## Flujo y retorno
 
@@ -123,13 +123,13 @@ El smoke `jefe-planner-recovery-smoke.mjs` pasa `11/11` casos conductuales local
 `ESCALON_5_STATUS=VERIFIED_CLOSED`; `ESCALON_5_BLOCKS=5A_CONTRACT_POLICY,5B_DURABLE_STATE,5C_CONTROLLED_EXECUTION_MEMORY,5D_RECOVERY_DOCUMENTATION`.
 `NEXT=ESCALON_7_PREVIEW_APPROVAL_SPECIFICATION`.
 
-`ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_6A_STATUS=COMPLETED`; `ESCALON_6B_STATUS=COMPLETED`; `ESCALON_6C_STATUS=COMPLETED`; `ESCALON_6D_STATUS=COMPLETED`; `ESCALON_6_BLOCKS=6A_CONTRACT_POLICY,6B_DURABLE_ORCHESTRATION,6C_EVIDENCE_GATES,6D_RECOVERY_CORRECTION_DOCUMENTATION`. El cierre usa la evidencia v4-final aprobada externamente sobre el workspace físico interno `factory-qa-electron` (`factory_typed`); `ESCALON_7_STATUS=NOT_STARTED`.
+`ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_6A_STATUS=COMPLETED`; `ESCALON_6B_STATUS=COMPLETED`; `ESCALON_6C_STATUS=COMPLETED`; `ESCALON_6D_STATUS=COMPLETED`; `ESCALON_6_BLOCKS=6A_CONTRACT_POLICY,6B_DURABLE_ORCHESTRATION,6C_EVIDENCE_GATES,6D_RECOVERY_CORRECTION_DOCUMENTATION`. El cierre usa la evidencia v4-final aprobada externamente sobre el workspace físico interno `factory-qa-electron` (`factory_typed`). El estado vigente de 7 es `IMPLEMENTED_PENDING_HUMAN_GATE`.
 
 ## Escalón 7 — auditoría de alcance 2026-08-26
 
-`ESCALON_7_STATUS=NOT_STARTED`; `ESCALON_7_SPEC_STATUS=READY_FOR_IMPLEMENTATION`. El contrato canónico, los estados, la persistencia, la autoridad del aprobador, la política de recursos/origen, la superficie IPC, el recovery, el correction loop y la matriz de aceptación están definidos en [ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md](ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md). La implementación aún no comenzó.
+`ESCALON_7_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`; `ESCALON_7_SPEC_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`. El contrato canónico, los estados, la persistencia, la autoridad del aprobador, la política de recursos/origen, la superficie IPC, el recovery, el correction loop y la matriz de aceptación están definidos en [ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md](ORQUESTADOR_ESCALON_7_PREVIEW_APPROVAL.md). La implementación local está parcial y espera gate humano/evidencia visual.
 
-La fundación parcial existente de preview/aprobación no se promueve automáticamente a cierre: el preview actual es `external_only` y la aprobación local no acredita autenticación humana end-to-end. La implementación deberá satisfacer el contrato documentado; no se inicia Escalón 8.
+La implementación local añade preview/aprobación semánticos, persistencia y UI conectada, pero no se promueve automáticamente a cierre: autenticación humana real y evidencia visual runtime siguen pendientes. No se inicia Escalón 8.
 
 ## Auditoria de cierre del Escalon 5 — 2026-08-26
 
@@ -139,7 +139,7 @@ La correccion de auditoria en 5B restringe los patches de transicion a `adapter`
 
 Evidencia ejecutada: 5A `12/12`, 5B `11/11`, 5C `5/5`, 5D `5/5`; Planner contrato/persistencia/gate/recovery `20/20`, `20/20`, `16/16`, `11/11`; Research, MEMORIA, recovery y regresiones relacionadas PASS. Syntax, ESLint focal, typecheck, build y `git diff --check` PASS. El lint global queda FAIL con `316 errores, 0 warnings`, concentrados en la deuda heredada `src/factory/hermes-*`; el build conserva el warning literal de chunk mayor a 500 kB.
 
-El alcance operativo detallado de `ESCALON_6_QA_SECURITY` está definido en su especificación canónica enlazada. El bloque 6 queda cerrado documentalmente: smoke focal `24/24`, batería completa, workspace físico `factory-qa-electron` y evidencia v4-final aprobada externamente. La deuda Hermes sigue documentada y `ESCALON_7_STATUS=NOT_STARTED`.
+El alcance operativo detallado de `ESCALON_6_QA_SECURITY` está definido en su especificación canónica enlazada. El bloque 6 queda cerrado documentalmente: smoke focal `24/24`, batería completa, workspace físico `factory-qa-electron` y evidencia v4-final aprobada externamente. La deuda Hermes sigue documentada; el estado vigente de 7 es `IMPLEMENTED_PENDING_HUMAN_GATE`.
 ## Errata de estado vigente 2026-08-26
 
-Las referencias históricas de Escalón 6 como pendiente o en progreso quedan superseded por el estado prevalente: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=NOT_STARTED`. El cierre documental usa la evidencia v4-final aprobada externamente sobre `factory-qa-electron` (`factory_typed`).
+Las referencias históricas de Escalón 6 como pendiente o en progreso quedan superseded por el estado prevalente: `ESCALON_6_STATUS=VERIFIED_CLOSED`; el estado vigente de 7 es `IMPLEMENTED_PENDING_HUMAN_GATE`. El cierre documental usa la evidencia v4-final aprobada externamente sobre `factory-qa-electron` (`factory_typed`).
