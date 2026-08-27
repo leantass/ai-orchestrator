@@ -334,4 +334,5 @@ contextBridge.exposeInMainWorld('jefePreviewApprovalBridge', {
   readApproval: (projectId, previewRequestId) => ipcRenderer.invoke('jefe-preview:approval-read', { projectId, previewRequestId }),
   recovery: (projectId) => ipcRenderer.invoke('jefe-preview:recovery', { projectId }),
   transition: (payload) => ipcRenderer.invoke('jefe-preview:transition', payload),
+  open: (projectId, previewRequestId) => ipcRenderer.invoke('jefe-preview:open', { projectId, previewRequestId }),
 })

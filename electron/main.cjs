@@ -60127,7 +60127,18 @@ registerCanonicalProjectIpc({
   clipboard: electronModule.clipboard,
 })
 registerQaSecurityIpc({ ipcMain, projectRoot: canonicalProjectRoot })
-registerPreviewApprovalIpc({ ipcMain, root: canonicalProjectRoot })
+const previewApprovalRegistration = registerPreviewApprovalIpc({ ipcMain, root: canonicalProjectRoot })
+ipcMain.handle('jefe-preview:open', async (_event, payload = {}) => {
+  try {
+    if (!payload || typeof payload !== 'object' || Object.keys(payload).some((key) => !['projectId', 'previewRequestId'].includes(key))) return { ok: false, error: { code: 'INVALID_PAYLOAD', message: 'El payload de apertura no es semántico.' } }
+    const resolved = await previewApprovalRegistration.service.resolveArtifact(payload)
+    const previewWindow = new BrowserWindow({ width: 1280, height: 820, minWidth: 390, minHeight: 640, title: `Preview real · ${resolved.preview.versionId}`, webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true } })
+    previewWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    previewWindow.webContents.on('will-navigate', (event, url) => { if (!url.startsWith('file://')) event.preventDefault() })
+    await previewWindow.loadFile(resolved.artifactPath)
+    return { ok: true, preview: { projectId: resolved.preview.projectId, runId: resolved.preview.runId, versionId: resolved.preview.versionId, resourceId: resolved.preview.resourceId, previewRequestId: resolved.preview.previewRequestId, snapshotSha256: resolved.preview.versionSnapshot.snapshotSha256 } }
+  } catch (error) { return { ok: false, error: { code: error?.code || 'PREVIEW_OPEN_FAILED', message: error instanceof Error ? error.message : 'No se pudo abrir el preview real.' } } }
+})
 
 ipcMain.handle('ai-orchestrator:list-reusable-artifacts', async (_event, payload) => {
   return {
