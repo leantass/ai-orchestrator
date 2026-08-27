@@ -1846,3 +1846,75 @@ html[data-theme="dark"] .jefe-commercial-backdrop {
 .workspace-grid label { display: grid; gap: 6px; margin: 12px 0; }
 .workspace-grid textarea { min-height: 110px; resize: vertical; }
 @media (max-width: 640px) { .workspace-header, .workspace-grid { grid-template-columns: 1fr; } .workspace-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .workspace-tabs button { min-height: 48px; } }
+
+/* Editorial commercial surface. Existing semantic controls remain the source
+   of truth; this is a visual layer only. */
+.commercial-shell {
+  width: min(1440px, 100%);
+  max-width: none;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 28px clamp(18px, 3vw, 48px) 48px 220px;
+  position: relative;
+  background: radial-gradient(circle at 75% 8%, var(--jefe-primary-soft), transparent 25rem), var(--jefe-app-bg);
+}
+.commercial-shell::before {
+  content: "JEFE\A\A Inicio\A Proyectos\A Orquestador\A Versiones\A Entregas\A Ajustes";
+  white-space: pre;
+  position: fixed;
+  inset: 24px auto 24px 24px;
+  width: 164px;
+  padding: 18px 16px;
+  border: 1px solid var(--jefe-line);
+  border-radius: 24px;
+  background: var(--jefe-sidebar-bg);
+  box-shadow: var(--jefe-shadow-soft);
+  color: var(--jefe-muted);
+  font-size: 12px;
+  line-height: 2.6;
+  letter-spacing: .03em;
+  pointer-events: none;
+  z-index: 0;
+}
+.commercial-shell > * { position: relative; z-index: 1; }
+.commercial-shell header { align-items: flex-start; padding: 12px 4px 22px; border-bottom: 1px solid var(--jefe-line); }
+.commercial-shell header > div:first-child p:first-child { color: var(--jefe-primary); font-size: 11px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+.commercial-shell h1 { max-width: 800px; color: var(--jefe-text-strong); font-family: Georgia, 'Times New Roman', serif; font-size: clamp(2.8rem, 5vw, 5.4rem); font-weight: 500; letter-spacing: -.055em; line-height: .98; }
+.commercial-shell h2 { color: var(--jefe-text-strong); font-family: Georgia, 'Times New Roman', serif; font-weight: 500; letter-spacing: -.02em; }
+.commercial-shell header > button, .commercial-shell button.selected { min-height: 48px; border-color: var(--jefe-primary); border-radius: 999px; background: var(--jefe-primary); box-shadow: 0 10px 22px var(--jefe-primary-soft); font-weight: 750; }
+.commercial-shell button { border-radius: 999px; transition: transform 160ms ease, border-color 160ms ease, background 160ms ease; }
+.commercial-shell button:hover { transform: translateY(-1px); border-color: var(--jefe-primary-line); }
+.hub-controls { grid-template-columns: minmax(0, 1fr) 190px; align-items: end; margin: 28px 0 8px; }
+.commercial-shell input, .commercial-shell textarea, .commercial-shell select { border-color: var(--jefe-line); border-radius: 14px; background: var(--jefe-elevated); }
+.commercial-shell textarea { min-height: 156px; }
+.project-grid { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); margin-top: 16px; }
+.project-card { min-height: 142px; border: 1px solid var(--jefe-line); border-radius: 22px; background: var(--jefe-elevated); box-shadow: var(--jefe-shadow-soft); padding: 22px; }
+.project-card strong { font-family: Georgia, 'Times New Roman', serif; font-size: 22px; font-weight: 500; }
+.project-card span { color: var(--jefe-muted); font-size: 13px; }
+.workspace-shell { padding-top: 22px; }
+.workspace-shell > header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, .35fr); gap: 28px; }
+.workspace-shell > header h1 { font-size: clamp(2.4rem, 4vw, 4.4rem); }
+.workspace-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--jefe-line); padding: 18px 0 10px; }
+.workspace-tabs button { border: 0; border-radius: 999px; background: transparent; color: var(--jefe-muted); font-size: 13px; }
+.workspace-tabs button[aria-selected="true"], .workspace-tabs button[aria-current="page"] { background: var(--jefe-primary-soft); color: var(--jefe-text-strong); }
+.workspace-grid { grid-template-columns: minmax(0, 1.45fr) minmax(280px, .8fr); gap: 18px; }
+.workspace-grid > article { min-width: 0; border: 1px solid var(--jefe-line); border-radius: 24px; background: var(--jefe-elevated); box-shadow: var(--jefe-shadow-soft); padding: clamp(18px, 2vw, 28px); }
+.workspace-grid > article:first-child { background: linear-gradient(145deg, var(--jefe-elevated), var(--jefe-panel-muted)); }
+.workspace-grid p, .workspace-grid li { color: var(--jefe-muted); line-height: 1.6; }
+.workspace-grid article > button:first-of-type { border-color: var(--jefe-primary); background: var(--jefe-primary); color: #fff; font-weight: 750; }
+.workspace-grid article label { margin-top: 14px; }
+@media (max-width: 980px) {
+  .commercial-shell { padding-left: 192px; }
+  .commercial-shell::before { width: 140px; }
+  .workspace-shell > header, .workspace-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 680px) {
+  .commercial-shell { padding: 18px 14px 32px; }
+  .commercial-shell::before { content: "JEFE  ·  Menú"; position: static; display: block; width: auto; min-height: auto; margin-bottom: 14px; padding: 12px 14px; line-height: 1; border-radius: 16px; }
+  .commercial-shell header { display: grid; grid-template-columns: 1fr; gap: 14px; }
+  .commercial-shell h1, .workspace-shell > header h1 { font-size: 3rem; }
+  .hub-controls { grid-template-columns: 1fr; }
+  .workspace-tabs { overflow-x: auto; flex-wrap: nowrap; }
+  .workspace-tabs button { flex: 0 0 auto; }
+  .project-grid { grid-template-columns: 1fr; }
+}
