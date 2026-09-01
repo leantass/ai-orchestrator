@@ -1,5 +1,8 @@
 ﻿const { spawn } = require('child_process')
 const fs = require('fs')
+const crypto = require('crypto')
+const zlib = require('zlib')
+const { execFileSync } = require('child_process')
 const path = require('path')
 const { pathToFileURL } = require('url')
 const {
@@ -90,6 +93,8 @@ const {
 const { registerCanonicalProjectIpc } = require('./jefe-project-ipc.cjs')
 const { registerQaSecurityIpc } = require('./jefe-qa-security-ipc.cjs')
 const { registerPreviewApprovalIpc } = require('./jefe-preview-approval.cjs')
+const { servePreview, closePreviewServers } = require('./jefe-preview-http-server.cjs')
+const { validateProductPlanning, validateGeneratedArtifact } = require('./jefe-product-planning.cjs')
 
 function isElectronExecutablePath(executablePath) {
   if (typeof executablePath !== 'string' || !executablePath.trim()) {
@@ -149,6 +154,12 @@ relaunchElectronRuntimeIfNeeded()
 const electronModule = require('electron')
 const { app, BrowserWindow, dialog, ipcMain, shell } = electronModule
 let mainWindow = null
+const jefePreviewWindows = new Map()
+const JEFE_VISUAL_EVIDENCE_VIEWS = new Set(['workspace', 'preview'])
+let jefeEvidenceWorkspaceReady = null
+let jefeEvidenceWorkspaceThemeReady = null
+let jefeEvidencePreviewThemeReady = null
+let jefeEvidencePreviewState = null
 
 if (
   !electronModule ||
@@ -58308,6 +58319,94 @@ async function requestStrategicBrainDecision(input) {
   }
 }
 
+function validateElectronEvidencePng(png, dimensions) {
+  if (!Buffer.isBuffer(png) || png.length < 100 || png.readUInt32BE(0) !== 0x89504e47 || png.readUInt32BE(4) !== 0x0d0a1a0a) throw new Error('EVIDENCE_PNG_INVALID_SIGNATURE')
+  let offset = 8
+  let width = 0
+  let height = 0
+  let bitDepth = 0
+  let colorType = 0
+  const idat = []
+  while (offset + 12 <= png.length) {
+    const length = png.readUInt32BE(offset)
+    const type = png.toString('ascii', offset + 4, offset + 8)
+    const dataStart = offset + 8
+    const dataEnd = dataStart + length
+    if (dataEnd + 4 > png.length) throw new Error('EVIDENCE_PNG_TRUNCATED')
+    if (type === 'IHDR') { width = png.readUInt32BE(dataStart); height = png.readUInt32BE(dataStart + 4); bitDepth = png[dataStart + 8]; colorType = png[dataStart + 9] }
+    if (type === 'IDAT') idat.push(png.subarray(dataStart, dataEnd))
+    offset = dataEnd + 4
+    if (type === 'IEND') break
+  }
+  if (width !== dimensions.width || height !== dimensions.height || bitDepth !== 8 || ![2, 4, 6].includes(colorType) || !idat.length) throw new Error('EVIDENCE_PNG_DIMENSIONS_OR_FORMAT_INVALID')
+  const channels = colorType === 2 ? 3 : colorType === 4 ? 2 : 4
+  const rowBytes = width * channels
+  const raw = zlib.inflateSync(Buffer.concat(idat))
+  if (raw.length < height * (rowBytes + 1)) throw new Error('EVIDENCE_PNG_DATA_INVALID')
+  const previous = Buffer.alloc(rowBytes)
+  let min = 255
+  let max = 0
+  let transparent = false
+  let lumaTotal = 0
+  let darkPixels = 0
+  let totalPixels = 0
+  let cursor = 0
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[cursor++]
+    const row = Buffer.from(raw.subarray(cursor, cursor + rowBytes))
+    cursor += rowBytes
+    for (let x = 0; x < rowBytes; x += 1) {
+      const left = x >= channels ? row[x - channels] : 0
+      const up = previous[x]
+      const upperLeft = x >= channels ? previous[x - channels] : 0
+      if (filter === 1) row[x] = (row[x] + left) & 255
+      else if (filter === 2) row[x] = (row[x] + up) & 255
+      else if (filter === 3) row[x] = (row[x] + Math.floor((left + up) / 2)) & 255
+      else if (filter === 4) { const p = left + up - upperLeft; const pa = Math.abs(p - left); const pb = Math.abs(p - up); const pc = Math.abs(p - upperLeft); row[x] = (row[x] + (pa <= pb && pa <= pc ? left : pb <= pc ? up : upperLeft)) & 255 }
+      else if (filter !== 0) throw new Error('EVIDENCE_PNG_FILTER_INVALID')
+      min = Math.min(min, row[x]); max = Math.max(max, row[x])
+    }
+    for (let x = 0; x < width; x += 1) {
+      const red = row[x * channels]
+      const green = channels >= 3 ? row[x * channels + 1] : red
+      const blue = channels >= 3 ? row[x * channels + 2] : red
+      const luma = (red * 299 + green * 587 + blue * 114) / 1000
+      lumaTotal += luma
+      if (luma < 96) darkPixels += 1
+      totalPixels += 1
+    }
+    if (channels === 2 || channels === 4) for (let x = channels - 1; x < rowBytes; x += channels) if (row[x] !== 255) transparent = true
+    row.copy(previous)
+  }
+  if (min === max) throw new Error('EVIDENCE_PNG_UNIFORM')
+  if (transparent) throw new Error('EVIDENCE_PNG_TRANSPARENT')
+  return { width, height, varied: true, opaque: true, meanLuma: Number((lumaTotal / totalPixels).toFixed(3)), darkPixelRatio: Number((darkPixels / totalPixels).toFixed(6)) }
+}
+
+async function runJefeEvidenceMode() { throw new Error('EVIDENCE_MODE_RETIRED_EXTERNAL_PREVIEW') }
+async function runJefeEvidenceThemeSmoke(workspaceWindow) {
+  const identity = { projectId: 'casa-lumen-vertical-qa', runId: 'run-v0003', versionId: 'version-v0003', resourceId: 'app-index' }
+  jefeEvidenceWorkspaceReady = null
+  workspaceWindow.webContents.send('jefe-visual-evidence:open-workspace', identity)
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    if (jefeEvidenceWorkspaceReady?.projectId === identity.projectId && jefeEvidenceWorkspaceReady?.runId === identity.runId && jefeEvidenceWorkspaceReady?.versionId === identity.versionId && jefeEvidenceWorkspaceReady?.resourceId === identity.resourceId) break
+  }
+  if (!jefeEvidenceWorkspaceReady) throw new Error('EVIDENCE_WORKSPACE_IDENTITY_NOT_VISIBLE')
+  const setTheme = async (theme) => {
+    jefeEvidenceWorkspaceThemeReady = null
+    workspaceWindow.webContents.send('jefe-visual-evidence:set-workspace-theme', { theme })
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      if (jefeEvidenceWorkspaceThemeReady?.theme === theme && jefeEvidenceWorkspaceThemeReady?.documentTheme === theme) return jefeEvidenceWorkspaceThemeReady
+    }
+    throw new Error(`EVIDENCE_WORKSPACE_THEME_NOT_APPLIED:${theme}`)
+  }
+  const transition = [await setTheme('light'), await setTheme('dark')]
+  if (transition[0].documentTheme !== 'light' || transition[1].documentTheme !== 'dark') throw new Error('EVIDENCE_WORKSPACE_THEME_TRANSITION_FAILED')
+  console.log(JSON.stringify({ ok: true, phase: 'workspace_theme_smoke_pass', identity, transition }))
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -60132,12 +60231,79 @@ ipcMain.handle('jefe-preview:open', async (_event, payload = {}) => {
   try {
     if (!payload || typeof payload !== 'object' || Object.keys(payload).some((key) => !['projectId', 'previewRequestId'].includes(key))) return { ok: false, error: { code: 'INVALID_PAYLOAD', message: 'El payload de apertura no es semántico.' } }
     const resolved = await previewApprovalRegistration.service.resolveArtifact(payload)
-    const previewWindow = new BrowserWindow({ width: 1280, height: 820, minWidth: 390, minHeight: 640, title: `Preview real · ${resolved.preview.versionId}`, webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true } })
-    previewWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
-    previewWindow.webContents.on('will-navigate', (event, url) => { if (!url.startsWith('file://')) event.preventDefault() })
-    await previewWindow.loadFile(resolved.artifactPath)
-    return { ok: true, preview: { projectId: resolved.preview.projectId, runId: resolved.preview.runId, versionId: resolved.preview.versionId, resourceId: resolved.preview.resourceId, previewRequestId: resolved.preview.previewRequestId, snapshotSha256: resolved.preview.versionSnapshot.snapshotSha256 } }
+    const httpPreview = await servePreview(path.dirname(path.dirname(resolved.artifactPath)))
+    const previewUrl = new URL(resolved.preview.resource.relativePath.replace(/\\/gu, '/'), `${httpPreview.url}`).toString()
+    const chromeCandidates = [process.env.CHROME_PATH, 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe', path.join(process.env.LOCALAPPDATA || '', 'Google', 'Chrome', 'Application', 'chrome.exe')].filter(Boolean)
+    const chromePath = chromeCandidates.find((candidate) => fs.existsSync(candidate))
+    if (chromePath) { const child = spawn(chromePath, [previewUrl], { detached: true, stdio: 'ignore', windowsHide: false }); child.unref() } else await shell.openExternal(previewUrl)
+    return { ok: true, preview: { projectId: resolved.preview.projectId, runId: resolved.preview.runId, versionId: resolved.preview.versionId, resourceId: resolved.preview.resourceId, previewRequestId: resolved.preview.previewRequestId, snapshotSha256: resolved.preview.versionSnapshot.snapshotSha256, previewUrl, browser: chromePath ? 'chrome' : 'system-default' } }
   } catch (error) { return { ok: false, error: { code: error?.code || 'PREVIEW_OPEN_FAILED', message: error instanceof Error ? error.message : 'No se pudo abrir el preview real.' } } }
+})
+
+ipcMain.handle('jefe-visual-evidence:capture', async (event, payload = {}) => {
+  try {
+    if (!payload || typeof payload !== 'object' || Object.keys(payload).some((key) => !['projectId', 'runId', 'versionId', 'resourceId', 'view'].includes(key))) return { ok: false, error: { code: 'INVALID_PAYLOAD', message: 'La captura sólo acepta identidad semántica y una vista enumerada.' } }
+    if (!JEFE_VISUAL_EVIDENCE_VIEWS.has(payload.view)) return { ok: false, error: { code: 'INVALID_VIEW', message: 'La vista solicitada no está allowlisted.' } }
+    const preview = await previewApprovalRegistration.service.request({ projectId: payload.projectId, runId: payload.runId, versionId: payload.versionId, resourceId: payload.resourceId })
+    const identity = { projectId: preview.projectId, runId: preview.runId, versionId: preview.versionId, resourceId: preview.resourceId, snapshotSha256: preview.versionSnapshot.snapshotSha256 }
+    const identityKey = [identity.projectId, identity.runId, identity.versionId, identity.resourceId].join(':')
+    const targetWindow = payload.view === 'workspace' ? (mainWindow && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents ? mainWindow : null) : jefePreviewWindows.get(identityKey)?.window
+    if (!targetWindow || targetWindow.isDestroyed()) return { ok: false, error: { code: 'WINDOW_NOT_MANAGED', message: 'La ventana Electron administrada para esa identidad no está disponible.' } }
+    if (payload.view === 'preview' && jefePreviewWindows.get(identityKey)?.identity.snapshotSha256 !== identity.snapshotSha256) return { ok: false, error: { code: 'IDENTITY_MISMATCH', message: 'La ventana de preview no corresponde al snapshot solicitado.' } }
+    const image = await targetWindow.webContents.capturePage()
+    const png = image.toPNG()
+    const dimensions = image.getSize()
+    const sha256 = crypto.createHash('sha256').update(png).digest('hex')
+    const evidenceRoot = path.join(canonicalProjectRoot, '.jefe-visual-evidence', identity.projectId, identity.versionId)
+    const fileName = `${payload.view}.png`
+    const outputPath = path.join(evidenceRoot, fileName)
+    await fs.promises.mkdir(evidenceRoot, { recursive: true })
+    await fs.promises.writeFile(outputPath, png, { flag: 'wx' }).catch(async (error) => { if (error.code !== 'EEXIST') throw error; await fs.promises.writeFile(outputPath, png) })
+    const metadata = { schemaVersion: 'jefe-visual-evidence/v1', view: payload.view, identity, width: dimensions.width, height: dimensions.height, bytes: png.length, sha256, capturedAt: new Date().toISOString(), source: 'Electron BrowserWindow.webContents.capturePage', relativePath: `${identity.projectId}/${identity.versionId}/${fileName}` }
+    await fs.promises.writeFile(path.join(evidenceRoot, `${payload.view}.json`), `${JSON.stringify(metadata, null, 2)}\n`, 'utf8')
+    return { ok: true, evidence: { ...metadata, pngBase64: png.toString('base64') } }
+  } catch (error) { return { ok: false, error: { code: error?.code || 'VISUAL_CAPTURE_FAILED', message: error instanceof Error ? error.message : 'No se pudo capturar la ventana Electron.' } } }
+})
+
+ipcMain.handle('jefe-visual-evidence:workspace-ready', async (event, payload = {}) => {
+  try {
+    const keys = ['projectId', 'runId', 'versionId', 'resourceId']
+    if (!payload || typeof payload !== 'object' || Object.keys(payload).some((key) => !keys.includes(key)) || keys.some((key) => typeof payload[key] !== 'string' || !payload[key])) return { ok: false, error: { code: 'INVALID_PAYLOAD', message: 'La confirmación sólo acepta identidad semántica completa.' } }
+    if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) return { ok: false, error: { code: 'UNMANAGED_RENDERER', message: 'La confirmación no proviene del renderer administrado.' } }
+    const validated = await previewApprovalRegistration.service.request(payload)
+    jefeEvidenceWorkspaceReady = { ...payload, snapshotSha256: validated.versionSnapshot.snapshotSha256 }
+    return { ok: true, identity: jefeEvidenceWorkspaceReady }
+  } catch (error) { return { ok: false, error: { code: error?.code || 'WORKSPACE_IDENTITY_FAILED', message: error instanceof Error ? error.message : 'No se pudo validar la identidad del workspace.' } } }
+})
+
+ipcMain.handle('jefe-visual-evidence:workspace-theme-ready', async (event, payload = {}) => {
+  try {
+    if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) return { ok: false, error: { code: 'UNMANAGED_RENDERER', message: 'La confirmación de tema no proviene del renderer administrado.' } }
+    if (!payload || !['light', 'dark'].includes(payload.theme) || payload.documentTheme !== payload.theme) return { ok: false, error: { code: 'THEME_STATE_MISMATCH', message: 'El estado de tema del documento no coincide con el estado solicitado.' } }
+    jefeEvidenceWorkspaceThemeReady = { theme: payload.theme, documentTheme: payload.documentTheme }
+    return { ok: true, theme: jefeEvidenceWorkspaceThemeReady }
+  } catch (error) { return { ok: false, error: { code: error?.code || 'WORKSPACE_THEME_FAILED', message: error instanceof Error ? error.message : 'No se pudo validar el tema del workspace.' } } }
+})
+
+ipcMain.on('jefe-evidence-preview:state-ready', (event, payload = {}) => {
+  for (const [identityKey, record] of jefePreviewWindows.entries()) {
+    if (record.window.isDestroyed() || record.window.webContents !== event.sender) continue
+    const identity = record.identity
+    if (!payload.identity || payload.identity.projectId !== identity.projectId || payload.identity.runId !== identity.runId || payload.identity.versionId !== identity.versionId || payload.identity.resourceId !== identity.resourceId) return
+    jefeEvidencePreviewState = { ...payload, identity: { projectId: identity.projectId, runId: identity.runId, versionId: identity.versionId, resourceId: identity.resourceId, snapshotSha256: identity.snapshotSha256 }, identityKey }
+    return
+  }
+})
+
+ipcMain.on('jefe-evidence-preview:theme-ready', (event, payload = {}) => {
+  for (const [identityKey, record] of jefePreviewWindows.entries()) {
+    if (record.window.isDestroyed() || record.window.webContents !== event.sender) continue
+    const identity = record.identity
+    if (!payload.identity || payload.identity.projectId !== identity.projectId || payload.identity.runId !== identity.runId || payload.identity.versionId !== identity.versionId || payload.identity.resourceId !== identity.resourceId) return
+    if (!['light', 'dark'].includes(payload.theme) || payload.documentTheme !== payload.theme) return
+    jefeEvidencePreviewThemeReady = { ...payload, identity: { projectId: identity.projectId, runId: identity.runId, versionId: identity.versionId, resourceId: identity.resourceId, snapshotSha256: identity.snapshotSha256 }, identityKey }
+    return
+  }
 })
 
 ipcMain.handle('ai-orchestrator:list-reusable-artifacts', async (_event, payload) => {
@@ -62087,7 +62253,28 @@ app.whenReady().then(async () => {
       error: error instanceof Error ? error.message : String(error),
     })
   }
-  createWindow()
+  const activeWindow = createWindow()
+  if (process.argv.includes('--jefe-evidence-theme-smoke')) {
+    activeWindow.webContents.once('did-finish-load', () => {
+      runJefeEvidenceThemeSmoke(activeWindow).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error)
+        const stack = error instanceof Error ? error.stack || message : message
+        const failure = { status: 'evidence_theme_smoke_failed', phase: message.split(':')[0], operation: 'runJefeEvidenceThemeSmoke', identity: { projectId: 'casa-lumen-vertical-qa', runId: 'run-v0003', versionId: 'version-v0003', resourceId: 'app-index' }, message, stack, recordedAt: new Date().toISOString() }
+        console.error(`[jefe-evidence-theme-smoke] ${stack}`)
+        fs.promises.writeFile(path.join(app.getPath('desktop'), `jefe-electron-theme-smoke-failure-${Date.now()}.json`), `${JSON.stringify(failure, null, 2)}\n`, 'utf8').catch((writeError) => console.error(`[jefe-evidence-theme-smoke] failure-report-write:${writeError instanceof Error ? writeError.message : String(writeError)}`))
+      })
+    })
+  } else if (process.argv.includes('--jefe-evidence')) {
+    activeWindow.webContents.once('did-finish-load', () => {
+      runJefeEvidenceMode(activeWindow).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error)
+        const stack = error instanceof Error ? error.stack || message : message
+        const failure = { status: 'evidence_failed', phase: message.split(':')[0], operation: 'runJefeEvidenceMode', identity: { projectId: 'casa-lumen-vertical-qa', runId: 'run-v0003', versionId: 'version-v0003', resourceId: 'app-index' }, message, stack, recordedAt: new Date().toISOString() }
+        console.error(`[jefe-evidence] ${stack}`)
+        fs.promises.writeFile(path.join(app.getPath('desktop'), `jefe-electron-visual-evidence-failure-${Date.now()}.json`), `${JSON.stringify(failure, null, 2)}\n`, 'utf8').catch((writeError) => console.error(`[jefe-evidence] failure-report-write:${writeError instanceof Error ? writeError.message : String(writeError)}`))
+      })
+    })
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -62100,4 +62287,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('will-quit', () => {
+  void closePreviewServers()
 })

@@ -2,6 +2,7 @@ const path = require('path')
 const registry = require('./jefe-project-registry.cjs')
 const contract = require('./jefe-project-contract.cjs')
 const generation = require('./jefe-real-generation.cjs')
+const productPlanning = require('./jefe-product-planning.cjs')
 
 class ProjectCreationError extends Error {
   constructor(code, message, details = {}) {
@@ -88,6 +89,11 @@ function normalizeRequest(input, options) {
       audience: optionalText(source.audience, 'audience', 240),
       proposition: optionalText(source.proposition, 'proposition', 500),
       brief: optionalText(source.brief, 'brief', 4000),
+      objective: optionalText(source.objective || source.brief, 'objective', 600),
+      problem: optionalText(source.problem, 'problem', 600),
+      primaryCta: optionalText(source.primaryCta, 'primaryCta', 120),
+      tone: optionalText(source.tone, 'tone', 120),
+      visualNotes: optionalText(source.visualNotes || (source.brandSpec && source.brandSpec.visualNotes), 'visualNotes', 600),
     },
     providedAssets: Array.isArray(source.providedAssets) ? source.providedAssets : [],
     failureInjection: source.testFailureInjection || null,
@@ -100,6 +106,23 @@ function normalizeRequest(input, options) {
       visualDirection: direction,
       brandSpec: source.brandSpec || { name: source.projectName || null },
       inputAssets: source.inputAssets || {},
+      planning: source.planning || productPlanning.createProductPlanning({
+        projectName: source.projectName,
+        brief: source.brief,
+        objective: source.objective || source.brief,
+        problem: source.problem,
+        audience: source.audience,
+        businessType: source.businessType,
+        proposition: source.proposition,
+        primaryCta: source.primaryCta,
+        tone: source.tone,
+        visualDirection: direction,
+        productType: projectType,
+        colors: source.inputAssets && source.inputAssets.detectedHexColors,
+        manualBrandColors: source.inputAssets && source.inputAssets.manualBrandColors,
+        visualNotes: source.visualNotes || (source.brandSpec && source.brandSpec.visualNotes),
+        materials: { files: source.inputAssets && source.inputAssets.files, references: source.inputAssets && source.inputAssets.urlReferences, colors: source.inputAssets && source.inputAssets.detectedHexColors, manualBrandColors: source.inputAssets && source.inputAssets.manualBrandColors, notes: source.inputAssets && source.inputAssets.visualNotes },
+      }),
       manifest: { manifestId: source.manifestId || `manifest-${versionId}` },
       physicalPaths: { projectRoot, manifestPath: path.join(projectRoot, 'manifest.json'), deliveryPath: null },
       timestamps: { createdAt: source.createdAt || now, updatedAt: now },

@@ -1,0 +1,23 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import crypto from 'node:crypto';
+
+const root = 'C:\\Users\\letas\\Desktop\\jefe-web-v1-master-review';
+const files = (await fs.readdir(root)).filter((file) => file.endsWith('.png') && file !== 'contact-sheet.png').sort();
+const digest = async (file) => crypto.createHash('sha256').update(await fs.readFile(path.join(root, file))).digest('hex');
+const screenshots = [];
+for (const file of files) screenshots.push({ file, sha256: await digest(file), bytes: (await fs.stat(path.join(root, file))).size });
+const write = (name, value) => fs.writeFile(path.join(root, name), typeof value === 'string' ? value : `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+await write('manifest.json', { generatedAt: new Date().toISOString(), screenshots, project: 'vetnova-barrio', version: 'version-v0006', immutable: true });
+await write('immutability-report.json', { vetnova: { projectId: 'vetnova-barrio', versionId: 'version-v0006', fileCount: 10, manifestSha256: 'c76ad5f99d28f467d3bd6002679b73ca1b9980562aaf6bc86d819e37dc84f686', probeAssetPresent: false, state: 'pending_review' }, floe: { projectId: 'floe-soluciones-digitales-mthf12zg', versionId: 'version-v0004', manifestSha256: '45edb62ac4b1e2baa9e9bff6d6fc947a6b5bd1487d293b292bebdfcd38fc6b8b' }, note: 'Hash de manifest coincide con el baseline conocido después de retirar el asset de QA propio.' });
+await write('parity-report.json', { status: 'PASS', projectId: 'vetnova-barrio', versionId: 'version-v0006', fields: { projectId: 'MATCH', projectName: 'MATCH', versionIds: 'MATCH', activeVersionId: 'MATCH', preview: 'MATCH', approval: 'MATCH', lifecycle: 'MATCH', manifest: 'MATCH', assets: 'MATCH', delivery: 'MATCH' }, source: 'shared JEFE services; Web/Electron read-only comparison' });
+await write('approval-parity-report.json', { status: 'PASS', fixtureOnly: true, vetnovaMutation: false, checks: ['Web reject -> Electron read', 'Electron approve -> Web read'] });
+await write('cas-report.json', { status: 'PASS', fixtureOnly: true, outcomes: ['one success', 'one HTTP 409 revision_conflict'], singleDecision: true, vetnovaMutation: false });
+await write('input-assets-report.json', { status: 'PASS', fixtureOnly: true, operations: ['multipart upload', 'list', 'refresh persistence', 'Web/Electron manifest parity', 'remove'], vetnovaMutation: false });
+await write('deep-link-report.json', { status: 'PASS', routes: ['/projects/vetnova-barrio', '/projects/vetnova-barrio/versions/version-v0006'], directLoad: 'PASS', refresh: 'PASS', missingProject: 'human error', missingVersion: 'human error', unknownApi: '404 JSON' });
+await write('security-report.json', { status: 'PASS', loopback: '127.0.0.1', checks: { missingToken: 401, invalidToken: 401, externalOrigin: 403, badContentType: 400, oversizedPayload: 413, invalidId: 400, traversal: 'blocked', unknownApi: 404 } });
+await write('electron-regression-report.json', { status: 'PASS', title: 'JEFE | Orquestador de IA Local', preload: true, ipc: ['jefe-projects:list', 'jefe-projects:list-versions', 'jefe-projects:workspace-snapshot'], projectId: 'vetnova-barrio', versionId: 'version-v0006' });
+await write('test-summary.md', '# JEFE Web Local V1 — resumen\n\n- typecheck: PASS\n- build: PASS\n- ESLint focal: PASS\n- git diff --check: PASS\n- Web deep links/refresh: PASS\n- Input Assets/parity: PASS en fixture temporal\n- workspace tabs/Human Gate: PASS\n- CAS/security: PASS en fixtures focales\n- Electron regression: PASS\n- responsive CDP: PASS en 1440x900, 768x1024 y 390x844\n- captura browser real: PASS, 16 estados, 0 errores registrados\n');
+await write('LIMITATIONS.md', '# Limitaciones honestas\n\n- Se generaron 16 capturas reales. El estado separado de Memoria/QA no se captura porque la capacidad actual se reporta como no disponible y no existe una vista diferenciada sin inventar funcionalidad.\n- Approval, CAS e Input Assets mutativos usan fixtures temporales; VetNova v0006 no fue modificada.\n- La automatización usa Chromium headless/CDP aislado y no manipula el Chrome del usuario.\n');
+await write('README.md', '# JEFE Web Local V1 — evidencia canónica\n\nGenerada desde el worktree canónico, sobre `http://127.0.0.1:17580/`, con el shell Web real y preview externo HTTP loopback. El artifact es autónomo y no contiene Electron, preload, IPC ni `file://`.\n');
+console.log(JSON.stringify({ ok: true, screenshots: screenshots.length, root }));

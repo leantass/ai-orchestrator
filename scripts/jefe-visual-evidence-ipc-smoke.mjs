@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict'
+import fs from 'node:fs/promises'
+
+const main = await fs.readFile(new URL('../electron/main.cjs', import.meta.url), 'utf8')
+const preload = await fs.readFile(new URL('../electron/preload.cjs', import.meta.url), 'utf8')
+const previewPreload = await fs.readFile(new URL('../electron/jefe-evidence-preview-preload.cjs', import.meta.url), 'utf8')
+assert.match(main, /registerCanonicalProjectIpc/u)
+assert.match(main, /registerPreviewApprovalIpc/u)
+assert.match(main, /EVIDENCE_MODE_RETIRED_EXTERNAL_PREVIEW/u)
+assert.match(main, /jefe-visual-evidence:open-workspace/u)
+assert.match(main, /event\.sender === mainWindow\.webContents/u)
+assert.doesNotMatch(main, /new BrowserWindow\([^)]*preview/iu)
+assert.doesNotMatch(main, /webContents\.executeJavaScript/u)
+assert.match(preload, /exposeInMainWorld\('jefeProjectBridge'/u)
+assert.match(preload, /jefe-preview:request/u)
+assert.match(preload, /jefe-preview:approval-read/u)
+assert.doesNotMatch(preload, /exposeInMainWorld\('(filesystem|ipcRenderer)'/u)
+assert.match(previewPreload, /jefe-evidence-preview:read-state/u)
+assert.match(previewPreload, /document\.documentElement\.dataset\.theme/u)
+assert.match(previewPreload, /window\.innerWidth/u)
+console.log('PASS jefe-visual-evidence-ipc-smoke: shell Electron con preload/IPC semánticos y preview externo')

@@ -1859,7 +1859,7 @@ html[data-theme="dark"] .jefe-commercial-backdrop {
   background: radial-gradient(circle at 75% 8%, var(--jefe-primary-soft), transparent 25rem), var(--jefe-app-bg);
 }
 .commercial-shell::before {
-  content: "JEFE\A\A Inicio\A Proyectos\A Orquestador\A Versiones\A Entregas\A Ajustes";
+  content: "JEFE\A\A Inicio\A Proyectos\A Construir\A Versiones\A Entregas\A Ajustes";
   white-space: pre;
   position: fixed;
   inset: 24px auto 24px 24px;
@@ -1980,7 +1980,535 @@ html[data-theme="dark"] .jefe-commercial-backdrop {
 .jefe-wizard-progress .is-active, .jefe-wizard-progress .is-done { color: var(--jefe-text-strong); }.jefe-wizard-progress .is-active i { border-color: var(--jefe-primary); background: var(--jefe-primary); color: #fff; }
 .jefe-wizard-content { width: min(720px, 100%); margin: 0 auto; }.jefe-wizard-content h1 { font-size: clamp(2.7rem, 6vw, 5rem); }
 .jefe-form-grid { display: grid; gap: 16px; margin-top: 40px; }.jefe-form-grid input, .jefe-form-grid textarea, .jefe-decision-actions input { border: 1px solid var(--jefe-line); border-radius: 14px; background: var(--jefe-elevated); color: var(--jefe-text-strong); padding: 13px; font: inherit; }.jefe-form-grid textarea { min-height: 130px; resize: vertical; }
-.jefe-upload-card { display: grid; gap: 6px; justify-items: start; border: 1px dashed var(--jefe-line-strong); border-radius: 16px; background: transparent; color: var(--jefe-primary); padding: 22px; text-align: left; }.jefe-upload-card small, .jefe-form-note { color: var(--jefe-muted); font-size: 12px; }.jefe-direction-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 40px; }.jefe-direction-grid button { display: grid; gap: 10px; min-height: 170px; border: 1px solid var(--jefe-line); border-radius: 20px; background: var(--jefe-elevated); color: var(--jefe-text-strong); padding: 18px; text-align: left; }.jefe-direction-grid button span { color: var(--jefe-primary); font-family: Georgia, serif; font-size: 28px; }.jefe-direction-grid button small { color: var(--jefe-muted); }.jefe-direction-grid button.is-selected { border-color: var(--jefe-primary); box-shadow: 0 0 0 3px var(--jefe-primary-soft); }.jefe-review-card { margin-top: 40px; border: 1px solid var(--jefe-line); border-radius: 20px; background: var(--jefe-elevated); padding: 24px; }.jefe-review-card h2 { font-family: Georgia, serif; font-weight: 500; }.jefe-wizard-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 36px; }
+.jefe-upload-card { display: grid; gap: 6px; justify-items: start; border: 1px dashed var(--jefe-line-strong); border-radius: 16px; background: transparent; color: var(--jefe-primary); padding: 22px; text-align: left; }.jefe-upload-card small, .jefe-form-note { color: var(--jefe-muted); font-size: 12px; }.jefe-form-note--error { color: var(--jefe-danger); }.jefe-direction-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 40px; }.jefe-direction-grid button { display: grid; gap: 10px; min-height: 170px; border: 1px solid var(--jefe-line); border-radius: 20px; background: var(--jefe-elevated); color: var(--jefe-text-strong); padding: 18px; text-align: left; }.jefe-direction-grid button span { color: var(--jefe-primary); font-family: Georgia, serif; font-size: 28px; }.jefe-direction-grid button small { color: var(--jefe-muted); }.jefe-direction-grid button.is-selected { border-color: var(--jefe-primary); box-shadow: 0 0 0 3px var(--jefe-primary-soft); }.jefe-review-card { margin-top: 40px; border: 1px solid var(--jefe-line); border-radius: 20px; background: var(--jefe-elevated); padding: 24px; }.jefe-review-card h2 { font-family: Georgia, serif; font-weight: 500; }.jefe-wizard-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 36px; }
 .jefe-workspace-header h1 { font-size: clamp(2.8rem, 5vw, 5rem); }.jefe-back-link { display: block; border: 0; background: transparent; color: var(--jefe-muted); padding: 0; }.jefe-workspace-next { display: grid; align-content: start; gap: 6px; border-left: 2px solid var(--jefe-primary); padding-left: 16px; }.jefe-workspace-next span, .jefe-workspace-next small { color: var(--jefe-muted); font-size: 12px; }.jefe-workspace-next strong { color: var(--jefe-text-strong); font-size: 15px; }.jefe-workspace-tabs { display: flex; gap: 8px; margin: 36px 0 20px; border-bottom: 1px solid var(--jefe-line); padding-bottom: 10px; overflow-x: auto; }.jefe-workspace-tabs button { border: 0; border-radius: 999px; background: transparent; color: var(--jefe-muted); padding: 9px 14px; white-space: nowrap; }.jefe-workspace-tabs button[aria-selected="true"] { background: var(--jefe-primary-soft); color: var(--jefe-text-strong); }.jefe-workspace-layout, .jefe-workspace-columns { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(280px, .75fr); gap: 18px; }.jefe-workspace-columns { margin-top: 18px; }.jefe-preview-panel, .jefe-review-panel, .jefe-surface-card { min-width: 0; border: 1px solid var(--jefe-line); border-radius: 22px; background: var(--jefe-elevated); box-shadow: var(--jefe-shadow-soft); padding: 22px; }.jefe-preview-panel { background: linear-gradient(145deg, var(--jefe-elevated), var(--jefe-panel-muted)); }.jefe-panel-heading { display: flex; justify-content: space-between; gap: 14px; align-items: start; }.jefe-status-pill { display: inline-flex; border: 1px solid var(--jefe-primary-line); border-radius: 999px; background: var(--jefe-primary-soft); color: var(--jefe-primary); padding: 7px 10px; font-size: 11px; }.jefe-preview-stage { min-height: 350px; display: grid; place-items: center; margin-top: 18px; overflow: hidden; border: 1px solid var(--jefe-line); border-radius: 16px; background: var(--jefe-bg); }.jefe-preview-browser { position: absolute; align-self: start; display: flex; width: calc(100% - 44px); gap: 6px; border-bottom: 1px solid var(--jefe-line); padding: 12px; }.jefe-preview-browser span { width: 7px; height: 7px; border-radius: 50%; background: var(--jefe-line-strong); }.jefe-preview-browser b { margin-left: 10px; color: var(--jefe-subtle); font-size: 10px; font-weight: 500; }.jefe-preview-empty { display: grid; justify-items: center; gap: 10px; padding: 60px 24px 24px; text-align: center; }.jefe-preview-symbol { color: var(--jefe-accent-violet); font-size: 28px; }.jefe-preview-empty strong { color: var(--jefe-text-strong); font-family: Georgia, serif; font-size: 20px; font-weight: 500; }.jefe-preview-empty p { max-width: 350px; margin: 0; color: var(--jefe-muted); font-size: 13px; line-height: 1.5; }.jefe-preview-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }.jefe-preview-meta span { display: grid; gap: 4px; color: var(--jefe-muted); font-size: 10px; text-transform: uppercase; }.jefe-preview-meta strong { overflow-wrap: anywhere; color: var(--jefe-text-strong); font-size: 11px; text-transform: none; }.jefe-context-note { margin-bottom: 0; }.jefe-review-panel { align-self: start; }.jefe-review-panel h2 { font-size: 30px; }.jefe-review-panel > p { margin-bottom: 22px; }.jefe-decision-actions { display: grid; gap: 12px; margin-top: 18px; }.jefe-danger-button { min-height: 42px; border: 1px solid var(--jefe-danger); border-radius: 999px; background: var(--jefe-danger-soft); color: var(--jefe-danger); font-weight: 750; }.jefe-review-result { border-top: 1px solid var(--jefe-line); padding-top: 14px; }.jefe-progress-list, .jefe-activity-list { display: grid; gap: 10px; margin: 18px 0 0; padding: 0; list-style: none; }.jefe-progress-list li { display: flex; align-items: center; gap: 10px; color: var(--jefe-muted); font-size: 13px; }.jefe-progress-list i { display: grid; width: 22px; height: 22px; place-items: center; border: 1px solid var(--jefe-line); border-radius: 50%; font-style: normal; }.jefe-progress-list i.is-done { border-color: var(--jefe-success); color: var(--jefe-success); }.jefe-activity-list li { display: grid; gap: 3px; border-bottom: 1px solid var(--jefe-line); padding-bottom: 9px; color: var(--jefe-text); font-size: 13px; }.jefe-activity-list small { color: var(--jefe-muted); font-size: 10px; }.jefe-surface-card li { margin: 9px 0; color: var(--jefe-muted); font-size: 13px; }.jefe-surface-card li button { margin-left: 10px; border: 0; background: transparent; color: var(--jefe-primary); }
+.jefe-human-status { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 14px; color: var(--jefe-muted); font-size: 12px; }.jefe-human-status strong { color: var(--jefe-text-strong); font-weight: 700; }
+.jefe-preview-fallback { color: var(--jefe-primary); font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
 @media (max-width: 900px) { .jefe-product-shell { grid-template-columns: 1fr; }.jefe-nav { position: static; height: auto; display: flex; flex-direction: row; align-items: center; gap: 18px; border-right: 0; border-bottom: 1px solid var(--jefe-line); padding: 14px 18px; }.jefe-nav nav { display: none; }.jefe-nav-footer { display: flex; margin-left: auto; }.jefe-home-page, .jefe-wizard-page, .jefe-workspace-page { width: min(100% - 32px, 740px); }.jefe-home-hero { margin-top: 9vh; }.jefe-workspace-layout, .jefe-workspace-columns { grid-template-columns: 1fr; }.jefe-workspace-next { border-left: 0; border-top: 1px solid var(--jefe-line); padding: 14px 0 0; } }
 @media (max-width: 560px) { .jefe-home-hero h1 { font-size: 3.5rem; }.jefe-type-picker > div, .jefe-project-list, .jefe-direction-grid { grid-template-columns: 1fr 1fr; }.jefe-type-picker button { min-height: 74px; }.jefe-type-picker button:last-child { grid-column: span 2; }.jefe-idea-actions { flex-wrap: wrap; }.jefe-idea-actions span { width: 100%; order: 3; }.jefe-idea-actions .jefe-primary { margin-left: auto; }.jefe-section-heading { align-items: start; flex-direction: column; }.jefe-preview-meta { grid-template-columns: 1fr; }.jefe-wizard-header { align-items: center; }.jefe-wizard-header button:last-child { font-size: 0; }.jefe-wizard-header button:last-child::after { content: 'Guardar'; font-size: 12px; } }
+
+@media (max-width: 560px) {
+  .jefe-product-shell, .jefe-home-page, .jefe-wizard-page, .jefe-workspace-page { min-width: 0; max-width: 100%; overflow-x: hidden; }
+  .jefe-wizard-progress { display: block; width: 100%; min-height: 28px; margin: 26px 0 42px; overflow: hidden; white-space: normal; }
+  .jefe-wizard-progress span { display: none; }
+  .jefe-wizard-progress span.is-active { display: flex; width: 100%; white-space: normal; }
+  .jefe-wizard-progress span.is-active i { flex: 0 0 25px; }
+  .jefe-direction-grid { grid-template-columns: 1fr; gap: 10px; margin-top: 26px; }
+  .jefe-direction-grid button { min-height: 112px; }
+  .jefe-type-picker > div { grid-template-columns: 1fr 1fr; }
+  .jefe-project-list { grid-template-columns: 1fr; }
+  .jefe-form-grid, .jefe-idea-box, .jefe-preview-panel, .jefe-review-panel, .jefe-surface-card { min-width: 0; }
+  .jefe-wizard-actions { flex-wrap: wrap; }
+  .jefe-wizard-actions .jefe-primary { margin-left: auto; }
+  .jefe-review-grid { grid-template-columns: 1fr; }
+  .jefe-review-item--wide { grid-column: auto; }
+}
+
+/* Final responsive corrections for the real preview and workspace tabs. */
+.jefe-preview-stage { position: relative; }
+.jefe-preview-browser { top: 0; left: 0; width: 100%; }
+.jefe-workspace-next strong, .jefe-workspace-next small { overflow-wrap: anywhere; }
+@media (max-width: 560px) {
+  .jefe-workspace-page, .jefe-workspace-layout, .jefe-workspace-columns { min-width: 0; max-width: 100%; overflow-x: hidden; }
+  .jefe-workspace-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; }
+  .jefe-workspace-tabs button { min-width: 0; white-space: normal; }
+}
+
+/* Keyboard focus is intentionally limited to actionable controls. */
+.jefe-product-shell, .jefe-product-shell * { box-sizing: border-box; }
+.jefe-product-shell :where(button, input, textarea, select):focus-visible {
+  outline: 3px solid var(--jefe-primary);
+  outline-offset: 3px;
+}
+
+/* Commercial home: compact two-zone start surface for desktop viewports. */
+@media (min-width: 901px) {
+  .jefe-product-shell:has(.jefe-home-page:has(#jefe-idea)) {
+    min-height: 100dvh;
+    height: 100dvh;
+  }
+
+  .jefe-home-page:has(#jefe-idea) {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 12px;
+    min-width: 0;
+    min-height: 0;
+    height: 100dvh;
+    padding: 20px 0 16px;
+  }
+
+  .jefe-home-page:has(#jefe-idea) .jefe-home-hero {
+    display: grid;
+    grid-template-columns: minmax(250px, .76fr) minmax(500px, 1.24fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0 clamp(24px, 4vw, 68px);
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    text-align: left;
+  }
+
+  .jefe-home-page:has(#jefe-idea) .jefe-home-hero > .jefe-eyebrow { grid-column: 1; grid-row: 1; }
+  .jefe-home-page:has(#jefe-idea) .jefe-home-hero > h1 { grid-column: 1; grid-row: 2; margin: 6px 0; font-size: clamp(3rem, 5.2vw, 5.2rem); }
+  .jefe-home-page:has(#jefe-idea) .jefe-home-hero > p { grid-column: 1; grid-row: 3; align-self: start; max-width: 410px; margin: 12px 0 0; font-size: 14px; line-height: 1.5; }
+  .jefe-home-page:has(#jefe-idea) .jefe-idea-box { grid-column: 2; grid-row: 1 / span 3; align-self: stretch; min-width: 0; }
+  .jefe-home-page:has(#jefe-idea) .jefe-idea-box textarea { min-height: clamp(112px, 16vh, 168px); }
+  .jefe-home-page:has(#jefe-idea) .jefe-type-picker { grid-column: 2; grid-row: 4; align-self: end; min-width: 0; margin-top: 14px; }
+  .jefe-home-page:has(#jefe-idea) .jefe-type-picker > div { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .jefe-home-page:has(#jefe-idea) .jefe-type-picker button { min-width: 0; min-height: 72px; padding: 10px; }
+  .jefe-home-page:has(#jefe-idea) .jefe-type-picker button strong { white-space: nowrap; }
+  .jefe-home-page:has(#jefe-idea) .jefe-recent-section { display: flex; align-items: center; justify-content: flex-end; min-width: 0; min-height: 34px; margin: 0; }
+  .jefe-home-page:has(#jefe-idea) .jefe-recent-section .jefe-section-heading { width: 100%; min-height: 34px; align-items: center; padding: 8px 0 0; border-bottom: 0; }
+  .jefe-home-page:has(#jefe-idea) .jefe-recent-section .jefe-section-heading > div:first-child { display: none; }
+  .jefe-home-page:has(#jefe-idea) .jefe-recent-section .jefe-project-list,
+  .jefe-home-page:has(#jefe-idea) .jefe-recent-section .jefe-empty-state,
+  .jefe-home-page:has(#jefe-idea) .jefe-recent-section .jefe-notice { display: none; }
+  .jefe-home-page:has(#jefe-idea) .jefe-recent-section .jefe-section-heading > div:last-child { display: flex; justify-content: flex-end; gap: 12px; width: 100%; }
+}
+
+@media (max-width: 900px) {
+  .jefe-product-shell:has(.jefe-home-page:has(#jefe-idea)) { min-height: 100dvh; height: auto; }
+  .jefe-home-page:has(#jefe-idea) { display: block; height: auto; min-height: calc(100dvh - 64px); padding: 18px 0 32px; }
+  .jefe-home-page:has(#jefe-idea) .jefe-home-hero { display: block; width: min(740px, 100%); margin: 9vh auto 0; text-align: center; }
+  .jefe-home-page:has(#jefe-idea) .jefe-home-hero > h1 { margin: 14px 0; font-size: clamp(3rem, 12vw, 4.8rem); }
+  .jefe-home-page:has(#jefe-idea) .jefe-home-hero > p { max-width: 520px; margin: 22px auto 32px; font-size: 16px; line-height: 1.65; }
+  .jefe-home-page:has(#jefe-idea) .jefe-idea-box, .jefe-home-page:has(#jefe-idea) .jefe-type-picker { margin-top: 28px; }
+  .jefe-home-page:has(#jefe-idea) .jefe-recent-section { display: block; min-height: 0; margin-top: 14vh; }
+  .jefe-home-page:has(#jefe-idea) .jefe-recent-section .jefe-section-heading > div:first-child { display: block; }
+  .jefe-home-page:has(#jefe-idea) .jefe-recent-section .jefe-project-list,
+  .jefe-home-page:has(#jefe-idea) .jefe-recent-section .jefe-empty-state,
+  .jefe-home-page:has(#jefe-idea) .jefe-recent-section .jefe-notice { display: block; }
+}
+
+/* Final desktop refinement: keep the right creation flow at natural height. */
+@media (min-width: 901px) {
+  .jefe-home-page:has(#jefe-idea) .jefe-home-hero {
+    grid-template-rows: auto auto auto auto;
+    align-content: start;
+    padding-top: 8px;
+    row-gap: 14px;
+  }
+
+  .jefe-home-page:has(#jefe-idea) .jefe-idea-box {
+    align-self: start;
+    height: auto;
+    min-height: 0;
+  }
+
+  .jefe-home-page:has(#jefe-idea) .jefe-idea-box textarea {
+    min-height: 112px;
+    max-height: 168px;
+  }
+
+  .jefe-home-page:has(#jefe-idea) .jefe-type-picker {
+    align-self: start;
+    margin-top: 0;
+    padding-bottom: 12px;
+  }
+
+  .jefe-home-page:has(#jefe-idea) .jefe-idea-actions > button:not(.jefe-primary):not(.jefe-attach) {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    border: 1px solid var(--jefe-line);
+    border-radius: 999px;
+    padding: 0 12px;
+    min-height: 36px;
+    color: var(--jefe-text-strong);
+    background: var(--jefe-panel);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .jefe-home-page:has(#jefe-idea) .jefe-idea-actions > button.jefe-primary {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+}
+.jefe-product-shell :where(button, input, textarea, select):disabled { cursor: not-allowed; opacity: .62; }
+
+/* Commercial wizard viewport contract: desktop steps fit without vertical scroll. */
+@media (min-width: 901px) {
+  .jefe-product-shell:has(.jefe-wizard-page) {
+    height: 100vh;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .jefe-wizard-page {
+    display: flex;
+    min-height: 0;
+    height: 100vh;
+    flex-direction: column;
+    overflow: visible;
+    padding: 18px 0 18px;
+  }
+
+  .jefe-wizard-header {
+    flex: 0 0 auto;
+    align-items: center;
+  }
+
+  .jefe-wizard-progress {
+    flex: 0 0 auto;
+    gap: 12px;
+    margin: 14px 0 18px;
+    padding-bottom: 10px;
+  }
+
+  .jefe-wizard-progress span {
+    gap: 6px;
+    font-size: 11px;
+  }
+
+  .jefe-wizard-progress i {
+    width: 22px;
+    height: 22px;
+  }
+
+  .jefe-wizard-content {
+    display: flex;
+    width: min(820px, 100%);
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+  }
+
+  .jefe-wizard-content h1 {
+    margin: 8px 0;
+    font-size: clamp(2.25rem, 4vw, 4rem);
+  }
+
+  .jefe-form-grid {
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .jefe-form-grid label {
+    gap: 6px;
+  }
+
+  .jefe-form-grid input,
+  .jefe-form-grid textarea {
+    padding: 10px 12px;
+  }
+
+  .jefe-form-grid textarea {
+    min-height: 84px;
+  }
+
+  /* Step 1: identity and need share one row. */
+  .jefe-wizard-content > .jefe-form-grid:not(:has(> button.jefe-upload-card)):has(> label:nth-child(2)):not(:has(> label:nth-child(3))) {
+    grid-template-columns: minmax(190px, .72fr) minmax(0, 1.28fr);
+  }
+
+  /* Step 2: two short fields, then the proposition at full width. */
+  .jefe-wizard-content > .jefe-form-grid:has(> label:nth-child(3)):not(:has(> button.jefe-upload-card)) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .jefe-wizard-content > .jefe-form-grid:has(> label:nth-child(3)):not(:has(> button.jefe-upload-card)) > label:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+
+  .jefe-wizard-content > .jefe-form-grid:has(> label:nth-child(3)):not(:has(> button.jefe-upload-card)) textarea {
+    min-height: 76px;
+  }
+
+  /* Step 3: the upload affordance spans the row; the remaining material fields stay balanced. */
+  .jefe-wizard-content > .jefe-form-grid:has(> button.jefe-upload-card) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .jefe-wizard-content > .jefe-form-grid > .jefe-upload-card {
+    grid-column: 1 / -1;
+    min-height: 58px;
+    padding: 13px 16px;
+  }
+
+  .jefe-wizard-content > .jefe-form-grid:has(> button.jefe-upload-card) > label:nth-of-type(2) {
+    grid-column: 1 / -1;
+  }
+
+  .jefe-wizard-content > .jefe-form-grid:has(> button.jefe-upload-card) textarea {
+    min-height: 72px;
+  }
+
+  .jefe-wizard-content > .jefe-form-grid:has(> button.jefe-upload-card) .jefe-form-note {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+
+  .jefe-direction-grid {
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .jefe-direction-grid button {
+    min-height: 136px;
+    gap: 7px;
+    padding: 15px;
+  }
+
+  .jefe-review-card {
+    margin-top: 16px;
+    padding: 18px;
+  }
+
+  .jefe-review-card h2 {
+    margin: 0 0 8px;
+  }
+
+  .jefe-review-card p {
+    margin: 8px 0;
+  }
+
+  .jefe-wizard-actions {
+    flex: 0 0 auto;
+    margin-top: auto;
+    padding-top: 14px;
+  }
+}
+
+/* On narrow screens content remains complete and only vertical scrolling is allowed. */
+@media (max-width: 900px) {
+  .jefe-product-shell:has(.jefe-wizard-page) {
+    min-height: 100vh;
+    height: auto;
+    overflow-x: hidden;
+  }
+
+  .jefe-wizard-page {
+    min-width: 0;
+    min-height: calc(100vh - 64px);
+    height: auto;
+    overflow-x: hidden;
+    overflow-y: visible;
+    padding: 18px 0 32px;
+  }
+
+  .jefe-wizard-content {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .jefe-wizard-content h1 {
+    font-size: clamp(2.25rem, 11vw, 3.6rem);
+  }
+
+  .jefe-form-grid input,
+  .jefe-form-grid textarea {
+    max-width: 100%;
+  }
+}
+
+/* Premium wizard composition: one deliberate reading column on desktop. */
+@media (min-width: 901px) {
+  .jefe-product-shell:has(.jefe-wizard-page) {
+    overflow: visible;
+  }
+
+  .jefe-wizard-page {
+    padding-top: 10px;
+    padding-bottom: 26px;
+    overflow: visible;
+  }
+
+  .jefe-wizard-progress {
+    margin-top: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+  }
+
+  .jefe-wizard-content {
+    width: min(940px, calc(100% - 48px));
+    justify-content: flex-start;
+  }
+
+  .jefe-wizard-content h1 {
+    max-width: 940px;
+    margin: 6px 0 12px;
+    font-size: clamp(2.2rem, 4.2vw, 4.1rem);
+  }
+
+  .jefe-wizard-content > .jefe-form-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .jefe-wizard-content > .jefe-form-grid > * {
+    grid-column: auto !important;
+    width: 100%;
+  }
+
+  .jefe-wizard-content > .jefe-form-grid input,
+  .jefe-wizard-content > .jefe-form-grid textarea {
+    width: 100%;
+    min-width: 0;
+    padding: 12px 14px;
+    line-height: 1.5;
+  }
+
+  /* The brief gets enough editorial height to read normally without an inner scrollbar. */
+  .jefe-wizard-content > .jefe-form-grid:not(:has(> button.jefe-upload-card)):has(> label:nth-child(2)):not(:has(> label:nth-child(3))) > label:nth-child(2) textarea {
+    min-height: 176px;
+  }
+
+  .jefe-wizard-content > .jefe-form-grid:has(> label:nth-child(3)):not(:has(> button.jefe-upload-card)) > label:nth-child(3) textarea {
+    min-height: 108px;
+  }
+
+  .jefe-wizard-content > .jefe-form-grid:has(> button.jefe-upload-card) > .jefe-upload-card {
+    min-height: 72px;
+    padding: 15px 18px;
+  }
+
+  .jefe-wizard-content > .jefe-form-grid:has(> button.jefe-upload-card) textarea {
+    min-height: 72px;
+  }
+
+  .jefe-wizard-content > .jefe-form-grid:has(> button.jefe-upload-card) {
+    gap: 7px;
+    margin-top: 10px;
+  }
+
+  .jefe-wizard-content > .jefe-form-grid:has(> button.jefe-upload-card) > .jefe-upload-card {
+    min-height: 56px;
+    padding: 10px 16px;
+  }
+
+  .jefe-wizard-actions {
+    margin-top: 10px;
+    padding: 8px 0 6px;
+    border-top: 1px solid var(--jefe-line);
+    background: linear-gradient(180deg, transparent, var(--jefe-app-bg) 30%);
+  }
+
+  .jefe-wizard-actions button {
+    min-height: 44px;
+  }
+
+  .jefe-review-card {
+    margin-top: 6px;
+    padding: 10px 14px;
+  }
+
+  .jefe-review-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px 16px;
+  }
+
+  .jefe-review-item {
+    display: grid;
+    min-width: 0;
+    gap: 2px;
+  }
+
+  .jefe-review-item--wide {
+    grid-column: 1 / -1;
+  }
+
+  .jefe-review-item[data-review-field="materials"],
+  .jefe-review-item[data-review-field="urls"] {
+    grid-column: auto;
+  }
+
+  .jefe-review-item > span {
+    color: var(--jefe-muted);
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .jefe-review-item > strong,
+  .jefe-review-item > p {
+    margin: 0;
+    color: var(--jefe-text-strong);
+    font-size: 13px;
+    line-height: 1.22;
+    overflow-wrap: anywhere;
+  }
+
+  .jefe-review-guidance {
+    margin: 6px 0 0;
+    border-top: 1px solid var(--jefe-line);
+    padding-top: 5px;
+    color: var(--jefe-muted);
+    font-size: 11px;
+    line-height: 1.35;
+  }
+}
+
+/* Quiet, accessible focus treatment for the commercial surface. */
+.jefe-product-shell :where(button, input, textarea, select):focus-visible {
+  outline: 2px solid var(--jefe-primary-line);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px var(--jefe-primary-soft);
+}
+
+/* Review step: keep the complete decision surface in the real Electron viewport. */
+@media (min-width: 901px) {
+  .jefe-wizard-content--review h1 {
+    margin: 2px 0 6px;
+    font-size: clamp(1.85rem, 3.2vw, 3rem);
+    line-height: 1;
+  }
+
+  .jefe-wizard-content--review .jefe-review-card {
+    margin-top: 2px;
+    padding: 9px 13px;
+  }
+
+  .jefe-wizard-content--review .jefe-review-grid {
+    gap: 4px 14px;
+  }
+
+  .jefe-wizard-content--review .jefe-review-item {
+    gap: 1px;
+  }
+
+  .jefe-wizard-content--review .jefe-review-item > span {
+    font-size: 9px;
+    line-height: 1.1;
+  }
+
+  .jefe-wizard-content--review .jefe-review-item > strong,
+  .jefe-wizard-content--review .jefe-review-item > p {
+    font-size: 12px;
+    line-height: 1.16;
+  }
+
+  .jefe-wizard-content--review .jefe-review-item details {
+    margin-top: 2px;
+  }
+
+  .jefe-wizard-content--review .jefe-review-item details summary {
+    width: max-content;
+    cursor: pointer;
+    color: var(--jefe-primary);
+    font-size: 10px;
+    font-weight: 750;
+  }
+
+  .jefe-wizard-content--review .jefe-review-item details p {
+    margin-top: 3px;
+  }
+
+  .jefe-wizard-content--review .jefe-review-guidance {
+    margin-top: 4px;
+    padding-top: 4px;
+    font-size: 10px;
+    line-height: 1.2;
+  }
+
+  .jefe-wizard-content--review .jefe-wizard-actions {
+    margin-top: auto;
+    padding-top: 9px;
+    padding-bottom: 0;
+  }
+}

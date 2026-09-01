@@ -3,6 +3,7 @@ const fs = require('fs')
 const path = require('path')
 const contract = require('./jefe-project-contract.cjs')
 const { createFirstVersionFromRun } = require('./jefe-project-creation.cjs')
+const productPlanning = require('./jefe-product-planning.cjs')
 
 const LEDGER_SCHEMA = 'jefe-project-events/v1'
 const ID_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+){0,15}$/u
@@ -25,7 +26,20 @@ function createProjectLifecycle({ root, persistence }) {
   async function ensureCreated(project) { const ledger = await readLedger(project.projectId); if (ledger.events.some((event) => event.type === 'project_created')) return ledger; const event = { eventId: 'event-000001', sequence: 1, type: 'project_created', occurredAt: project.timestamps.createdAt || new Date().toISOString(), versionId: project.activeVersionId, source: 'physical_manifest' }; ledger.events.push(event); await persistence.writeAtomic(ledgerPath(project.projectId), ledger); return ledger }
   async function identity(projectId) { const versions = await persistence.listVersions(projectId); let number = versions.length + 1; while (true) { const suffix = String(number).padStart(4, '0'); const versionId = `version-v${suffix}`; const existing = await persistence.getVersionRecord(projectId, versionId); if (!existing) return { versionId, runId: `run-v${suffix}` }; number += 1 } }
   async function baseRecord(projectId, versionId = null) { const project = await persistence.getProject(safeId(projectId, 'projectId')); if (!project) fail('PROJECT_NOT_FOUND', 'El proyecto no existe.'); const selected = versionId || project.activeVersionId; const record = await persistence.getVersionRecord(projectId, safeId(selected, 'versionId')); if (!record) fail('VERSION_NOT_FOUND', 'La versión no existe.'); return { project, record } }
-  function sourceContext(project, changeRequest) { return { projectName: project.brandSpec.name || project.projectId, brief: changeRequest, businessType: null, audience: null, proposition: null } }
+  function sourceContext(project, changeRequest, requestedDirection = null) {
+    const prior = project.planning && project.planning.brief ? productPlanning.migrateLegacyPlanning(project.planning) : null
+    const next = productPlanning.evolveProductPlanning(prior, changeRequest, {
+      projectName: project.brandSpec.name || project.projectId,
+      brief: prior && prior.brief.objective,
+      businessType: prior && prior.content && prior.content.contextual && prior.content.contextual.businessType,
+      audience: prior && prior.brief.audience,
+      proposition: prior && prior.brief.valueProposition,
+      visualDirection: requestedDirection || project.visualDirection,
+      colors: prior && prior.brief.visualPreferences && prior.brief.visualPreferences.colors,
+      manualBrandColors: project.inputAssets && project.inputAssets.manualBrandColors,
+    })
+    return { projectName: project.brandSpec.name || project.projectId, brief: changeRequest, businessType: next.content.contextual.businessType, audience: next.brief.audience, proposition: next.brief.valueProposition, planning: next }
+  }
   async function createVersion({ projectId, changeRequest, options = {} }) {
     projectId = safeId(projectId, 'projectId'); changeRequest = text(changeRequest, 'changeRequest', 1200, true)
     if (locks.has(projectId)) fail('VERSION_LOCKED', 'Ya hay una nueva versión en proceso para este proyecto.')
@@ -37,7 +51,7 @@ function createProjectLifecycle({ root, persistence }) {
       const ids = await identity(projectId)
       const visualDirection = options && Object.hasOwn(options, 'visualDirection') ? options.visualDirection : project.visualDirection
       if (visualDirection && !contract.VISUAL_DIRECTIONS.includes(visualDirection)) fail('INVALID_VISUAL_DIRECTION', 'La dirección visual no es válida.')
-      const result = await createFirstVersionFromRun({ destinationRoot: allowedRoot, allowedRoots: [allowedRoot], projectId, ...ids, projectType: project.projectType, platform: project.platform, generationProfile: project.generationProfile, creativeDirection: visualDirection, brandSpec: project.brandSpec, inputAssets: project.inputAssets, ...sourceContext(project, changeRequest), changeOrigin: { kind: 'commercial', reference: changeRequest }, summary: changeRequest })
+      const result = await createFirstVersionFromRun({ destinationRoot: allowedRoot, allowedRoots: [allowedRoot], projectId, ...ids, projectType: project.projectType, platform: project.platform, generationProfile: project.generationProfile, creativeDirection: visualDirection, brandSpec: project.brandSpec, inputAssets: project.inputAssets, ...sourceContext(project, changeRequest, visualDirection), changeOrigin: { kind: 'commercial', reference: changeRequest }, summary: changeRequest })
       if (!result.ok) { await appendEvent(projectId, 'version_creation_failed', { versionId: project.activeVersionId, requestEventId: requested.eventId, errorCode: result.error && result.error.code ? result.error.code : 'CREATION_FAILED' }); return result }
       await persistence.registerManifest(result.artifacts.manifestPath)
       const created = await appendEvent(projectId, 'version_created', { versionId: ids.versionId, runId: ids.runId, originVersionId: project.activeVersionId, changeRequest })

@@ -21,7 +21,7 @@ try {
   const secondRecord = await persistence.getVersionRecord('cycle-project', second.versionId)
   assert.equal(secondRecord.project.visualDirection, 'editorial', 'hereda dirección')
   const changed = await lifecycle.createVersion({ projectId: 'cycle-project', changeRequest: 'Nueva campaña.', options: { visualDirection: 'expresiva' } })
-  assert.equal(changed.ok, true); assert.equal((await persistence.getVersionRecord('cycle-project', changed.versionId)).project.visualDirection, 'expresiva')
+  assert.equal(changed.ok, true, JSON.stringify(changed.error)); assert.equal((await persistence.getVersionRecord('cycle-project', changed.versionId)).project.visualDirection, 'expresiva')
   await assert.rejects(() => lifecycle.createVersion({ projectId: 'cycle-project', changeRequest: 'fallo', options: { visualDirection: 'invalida' } }), { code: 'INVALID_VISUAL_DIRECTION' })
   const afterFailure = await lifecycle.createVersion({ projectId: 'cycle-project', changeRequest: 'El lock se liberó.' }); assert.equal(afterFailure.ok, true)
   const record = await persistence.getVersionRecord('cycle-project', second.versionId); const raw = JSON.parse(await fs.promises.readFile(record.manifestPath, 'utf8')); raw.artifactPaths.push('app/new.txt'); await fs.promises.writeFile(path.join(path.dirname(record.manifestPath), 'app/new.txt'), 'nuevo', 'utf8'); await fs.promises.writeFile(path.join(path.dirname(record.manifestPath), 'README.md'), 'modificado', 'utf8'); await fs.promises.rm(path.join(path.dirname(record.manifestPath), 'docs', 'BRAND.md')); await fs.promises.writeFile(record.manifestPath, `${JSON.stringify(raw, null, 2)}\n`, 'utf8')

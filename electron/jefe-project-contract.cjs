@@ -1,5 +1,6 @@
 const path = require('path')
 const registry = require('./jefe-project-registry.cjs')
+const planning = require('./jefe-product-planning.cjs')
 
 const CONTRACT_VERSION = 'jefe-project-contract/v1'
 const ID_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+){0,15}$/u
@@ -101,6 +102,7 @@ function normalizeInputAssets(value) {
     files,
     totalFiles: files.length,
     detectedHexColors: [...new Set(colors)],
+    manualBrandColors: optionalText(source.manualBrandColors, 'inputAssets.manualBrandColors', 500),
     urlReferences: [...new Set(urlReferences)],
     visualNotes: optionalText(source.visualNotes, 'inputAssets.visualNotes', 1200),
   }
@@ -253,6 +255,14 @@ function normalizeProjectContract(value, options = {}) {
       updatedAt: normalizeTimestamp(value.timestamps && value.timestamps.updatedAt, 'timestamps.updatedAt'),
     },
     changeOrigin: normalizeChangeOrigin(value.changeOrigin),
+    planning: planning.validateProductPlanning(value.planning || planning.createProductPlanning({
+      projectName: value.brandSpec && value.brandSpec.name,
+      brief: value.planningBrief || value.brandSpec && value.brandSpec.visualNotes,
+      productType: projectType,
+      visualDirection: visualDirection || 'comercial',
+      colors: value.inputAssets && value.inputAssets.detectedHexColors,
+      visualNotes: value.brandSpec && value.brandSpec.visualNotes,
+    })),
     delivery,
     versions,
     activeVersionId,
@@ -274,11 +284,21 @@ function serializeProjectContract(value, options = {}) {
 
 function deserializeProjectContract(serialized, options = {}) {
   if (typeof serialized !== 'string') fail('INVALID_SERIALIZED_CONTRACT', 'El contrato serializado debe ser texto JSON.', {})
+  let parsed
   try {
-    return normalizeProjectContract(JSON.parse(serialized), options)
+    parsed = JSON.parse(serialized)
   } catch (error) {
-    if (error instanceof ProjectContractError) throw error
     fail('INVALID_SERIALIZED_CONTRACT', 'El contrato serializado no contiene JSON válido.', {})
+  }
+  try {
+    return normalizeProjectContract(parsed, options)
+  } catch (error) {
+    if (['PLANNING_BRIEF_ID_DRIFT', 'INVALID_UTF8_TEXT'].includes(error?.code) && parsed && typeof parsed === 'object') {
+      return normalizeProjectContract({ ...parsed, planning: planning.migrateLegacyPlanning(parsed.planning) }, options)
+    }
+    if (error instanceof ProjectContractError) throw error
+    if (error?.code) fail(error.code, error.message || 'El contrato contiene datos inválidos.', error.details || {})
+    throw error
   }
 }
 

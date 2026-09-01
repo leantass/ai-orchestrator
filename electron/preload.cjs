@@ -336,3 +336,21 @@ contextBridge.exposeInMainWorld('jefePreviewApprovalBridge', {
   transition: (payload) => ipcRenderer.invoke('jefe-preview:transition', payload),
   open: (projectId, previewRequestId) => ipcRenderer.invoke('jefe-preview:open', { projectId, previewRequestId }),
 })
+
+contextBridge.exposeInMainWorld('jefeVisualEvidenceBridge', {
+  capture: (payload) => ipcRenderer.invoke('jefe-visual-evidence:capture', payload),
+  onOpenWorkspace: (listener) => {
+    if (typeof listener !== 'function') return () => {}
+    const handler = (_event, payload) => listener(payload)
+    ipcRenderer.on('jefe-visual-evidence:open-workspace', handler)
+    return () => ipcRenderer.removeListener('jefe-visual-evidence:open-workspace', handler)
+  },
+  onSetWorkspaceTheme: (listener) => {
+    if (typeof listener !== 'function') return () => {}
+    const handler = (_event, payload) => listener(payload)
+    ipcRenderer.on('jefe-visual-evidence:set-workspace-theme', handler)
+    return () => ipcRenderer.removeListener('jefe-visual-evidence:set-workspace-theme', handler)
+  },
+  confirmWorkspace: (payload) => ipcRenderer.invoke('jefe-visual-evidence:workspace-ready', payload),
+  confirmWorkspaceTheme: (payload) => ipcRenderer.invoke('jefe-visual-evidence:workspace-theme-ready', payload),
+})
