@@ -23,7 +23,7 @@ function list(value) {
   })
 }
 
-function buildHumanFeedback({ approval, projectBrief, businessUnderstanding, qualityReports = {} } = {}) {
+function buildHumanFeedback({ approval, preview, projectBrief, businessUnderstanding, qualityReports = {} } = {}) {
   if (!approval || approval.state !== 'rejected' || approval.decision !== 'rejected') throw new Error('A rejected human approval is required.')
   const rejectionReason = text(approval.reason, 'rejectionReason')
   if (!rejectionReason) throw new Error('A rejected approval requires rejectionReason.')
@@ -34,7 +34,11 @@ function buildHumanFeedback({ approval, projectBrief, businessUnderstanding, qua
     reviewer: approval.actor?.identity || approval.reviewer || null,
     authenticationStatus: approval.authenticationStatus || 'not_connected',
     timestamp: approval.updatedAt || approval.timestamp || null,
-    snapshot: { projectId: approval.projectId, versionId: approval.versionId, previewRequestId: approval.previewRequestId, snapshotSha256: approval.snapshotSha256 || null },
+    snapshot: { projectId: approval.projectId, versionId: approval.versionId, previewRequestId: approval.previewRequestId, snapshotSha256: approval.snapshotSha256 || preview?.versionSnapshot?.snapshotSha256 || null },
+    artifactSha256: approval.artifactSha256 || preview?.versionSnapshot?.artifactSha256 || null,
+    correctionId: approval.correctionId || null,
+    returnTarget: approval.returnTarget || 'execution',
+    provenance: { source: 'human_gate', authority: approval.authority || 'human_decision', actorType: approval.actor?.type || 'human', authenticationStatus: approval.authenticationStatus || 'not_connected' },
     projectBrief: projectBrief || null,
     businessUnderstanding: businessUnderstanding || null,
     qualityReports: qualityReports || {},
