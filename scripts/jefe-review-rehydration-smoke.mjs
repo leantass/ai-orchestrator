@@ -77,6 +77,6 @@ try {
   try { if (socket) socket.send(JSON.stringify({ id: 999999, method: 'Browser.close' })) } catch {}
   await wait(300); try { socket?.close() } catch {}; try { browser?.kill() } catch {}
   if (webRuntime) await Promise.race([webRuntime.close().catch(() => {}), wait(500)])
-  await fs.rm(root, { recursive: true, force: true })
+  await fs.rm(root, { recursive: true, force: true }).catch(() => {})
   if (passed) process.exit(0)
 }
