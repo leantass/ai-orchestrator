@@ -2,6 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const { validateProductPlanning, validateGeneratedArtifact } = require('./jefe-product-planning.cjs')
 const { assertArtifactQuality, assertContentQuality } = require('./jefe-generator-quality.cjs')
+const { adaptSemanticGenerationSpec } = require('./jefe-semantic-generation-adapter.cjs')
 
 class MaterializationError extends Error {
   constructor(code, message, details = {}) { super(message); this.name = 'MaterializationError'; this.code = code; this.details = details }
@@ -86,7 +87,7 @@ function premiumScript() {
 function commercialArtifacts(project, profileContext = {}) {
   const brandName = project.brandSpec.name || project.projectId
   const direction = project.visualDirection
-  const planning = project.planning || null
+  const planning = profileContext.normalizedGenerationPlan?.planning || project.planning || null
   const action = planning?.content?.ctas?.[0] || 'Solicitar una conversación'
   const structure = commercialLayoutV2(direction, brandName, action, profileContext.logoAppPath, planning)
   const data = { projectId: project.projectId, runId: project.runId, versionId: project.activeVersionId, direction, businessType: profileContext.businessType || planning?.content?.contextual?.businessType || 'producto', audience: profileContext.audience || planning?.brief?.audience || '', proposition: profileContext.proposition || planning?.strategy?.primaryMessage || '', brief: profileContext.brief || planning?.brief?.objective || '', planning, manualBrandColors: project.inputAssets.manualBrandColors || planning?.brief?.visualPreferences?.manualBrandColors || '', urlReferences: project.inputAssets.urlReferences || [] }
@@ -111,6 +112,7 @@ async function materializeProject({ project, destinationRoot, capabilities, prof
   if (!project || typeof project !== 'object') fail('INVALID_PROJECT', 'Se requiere un proyecto normalizado.')
   if (typeof destinationRoot !== 'string' || !path.isAbsolute(destinationRoot)) fail('INVALID_DESTINATION_ROOT', 'destinationRoot debe ser absoluto.')
   const root = path.resolve(destinationRoot); const versionId = project.activeVersionId
+  const normalizedProfileContext = profileContext.generationMode === 'semantic_correction' ? { ...profileContext, normalizedGenerationPlan: adaptSemanticGenerationSpec(profileContext.semanticGenerationSpec) } : profileContext
   const projectRoot = resolveInside(root, path.join(project.projectId, versionId), 'project root'); const manifestPath = resolveInside(projectRoot, 'manifest.json', 'manifest path')
   if (fs.existsSync(projectRoot)) fail('VERSION_COLLISION', 'La versión ya tiene un directorio materializado.', { projectId: project.projectId, versionId, projectRoot })
   const stagingRoot = resolveInside(root, path.join('.jefe-staging', `${project.projectId}-${versionId}`), 'staging root')
@@ -125,7 +127,7 @@ async function materializeProject({ project, destinationRoot, capabilities, prof
   for (const suppliedName of sourceByName.keys()) if (!project.inputAssets.files.some((file) => file.safeName === suppliedName)) fail('UNKNOWN_INPUT_ASSET', 'El contenido aportado no existe en el contrato.', { safeName: suppliedName })
   const logo = project.inputAssets.files.find((file) => /logo/iu.test(file.kind) && sourceByName.has(file.safeName)); const logoExtension = logo ? path.extname(logo.safeName).toLowerCase() : ''
   if (logo && !['.png', '.svg', '.jpg', '.jpeg', '.webp'].includes(logoExtension)) fail('INVALID_LOGO_ASSET', 'Un logo materializable debe usar una extensión de imagen local.', { safeName: logo.safeName })
-  const effectiveProfileContext = logo ? { ...profileContext, logoAppPath: `./assets/logo${logoExtension}` } : profileContext
+  const effectiveProfileContext = logo ? { ...normalizedProfileContext, logoAppPath: `./assets/logo${logoExtension}` } : normalizedProfileContext
   const artifacts = project.generationProfile === 'commercial_site' ? commercialArtifacts(project, effectiveProfileContext) : factoryArtifacts(project, capabilities)
   let qualityReport = null
   let contentQualityReport = null
