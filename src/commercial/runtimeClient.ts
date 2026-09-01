@@ -59,11 +59,14 @@ export function isJefeWebRuntime() {
 export function createJefePreviewClient() {
   const bridge = previewElectron()
   if (bridge) return bridge
+  let preparedPreview: { key: string; url: string } | null = null
+  const resolvePreview = (projectId: string, previewRequestId: string) => request(`/api/projects/${encodeURIComponent(projectId)}/previews/${encodeURIComponent(previewRequestId)}/open`, { method: 'POST' }).then((result: any) => { const url = result.url || null; if (result.ok && url) preparedPreview = { key: `${projectId}:${previewRequestId}`, url }; return result })
   return {
     request: (payload: any) => request('/api/previews', { method: 'POST', body: JSON.stringify(payload) }).then((result: any) => result.ok && result.preview ? { ...result, preview: { ...result.preview, stateCode: result.preview.state, state: humanStateLabel(result.preview.state), stateLabel: humanStateLabel(result.preview.state) } } : result),
     readApproval: (projectId: string, previewRequestId: string) => request(`/api/projects/${encodeURIComponent(projectId)}/previews/${encodeURIComponent(previewRequestId)}/approval`).then((result: any) => result.ok && result.approval ? { ...result, approval: { ...result.approval, stateLabel: humanStateLabel(result.approval.state) } } : result),
     review: (payload: any) => request(`/api/previews/${encodeURIComponent(payload.previewRequestId)}/review`, { method: 'POST', body: JSON.stringify(payload) }),
     approval: (payload: any) => request(`/api/previews/${encodeURIComponent(payload.previewRequestId)}/approval`, { method: 'POST', body: JSON.stringify(payload) }),
-    open: (projectId: string, previewRequestId: string) => { const popup = window.open('about:blank', '_blank', 'noopener,noreferrer'); return request(`/api/projects/${encodeURIComponent(projectId)}/previews/${encodeURIComponent(previewRequestId)}/open`, { method: 'POST' }).then((result: any) => { if (result.ok && result.url && popup) popup.location.href = result.url; return { ...result, openedExternally: Boolean(result.ok && result.url && popup), previewUrl: result.url || null } }) },
+    prepare: (projectId: string, previewRequestId: string) => resolvePreview(projectId, previewRequestId),
+    open: (projectId: string, previewRequestId: string) => { const key = `${projectId}:${previewRequestId}`; const prepared = preparedPreview?.key === key ? preparedPreview.url : null; if (prepared) { const popup = window.open(prepared, '_blank', 'noopener,noreferrer'); return Promise.resolve({ ok: true, url: prepared, openedExternally: Boolean(popup), previewUrl: prepared }) } return resolvePreview(projectId, previewRequestId).then((result: any) => { const previewUrl = result.url || null; const popup = result.ok && previewUrl ? window.open(previewUrl, '_blank', 'noopener,noreferrer') : null; return { ...result, openedExternally: Boolean(result.ok && previewUrl && popup), previewUrl } }) },
   }
 }
