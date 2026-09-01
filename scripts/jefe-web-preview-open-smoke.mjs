@@ -1,19 +1,20 @@
 import assert from 'node:assert/strict'
-import fs from 'node:fs/promises'
-import os from 'node:os'
 import path from 'node:path'
-import { spawn } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+import { connectCdp, createJefeWebSmokeHarness, launchIsolatedChrome, wait } from './helpers/jefe-web-smoke-harness.mjs'
 
-const chrome = process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-const profile = await fs.mkdtemp(path.join(os.tmpdir(), 'jefe-preview-open-'))
-const port = 17682; const base = 'http://127.0.0.1:17580'; const workspace = `${base}/projects/vetnova-barrio/versions/version-v0006`; const child = spawn(chrome, ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-popup-blocking', `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, workspace], { stdio: 'ignore', windowsHide: true })
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)); const pages = async () => fetch(`http://127.0.0.1:${port}/json/list`).then((response) => response.json()); const pageFor = async (predicate) => { for (let i = 0; i < 60; i += 1) { try { const page = (await pages()).find(predicate); if (page) return page } catch {} await wait(200) } throw new Error('CDP page unavailable') }
-const connect = async (page) => { const socket = new WebSocket(page.webSocketDebuggerUrl); await new Promise((resolve, reject) => { socket.addEventListener('open', resolve, { once: true }); socket.addEventListener('error', reject, { once: true }) }); let id = 0; const pending = new Map(); socket.addEventListener('message', (event) => { const message = JSON.parse(event.data); const resolve = pending.get(message.id); if (resolve) { pending.delete(message.id); resolve(message.result) } }); const command = (method, params = {}) => new Promise((resolve) => { const requestId = ++id; pending.set(requestId, resolve); socket.send(JSON.stringify({ id: requestId, method, params })) }); const evaluate = async (expression) => (await command('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })).result.value; return { socket, command, evaluate } }
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const harness = await createJefeWebSmokeHarness({ distRoot: path.join(repoRoot, 'dist') })
+const browser = await launchIsolatedChrome(harness.workspaceUrl, 'preview-open')
+let cdp
 try {
-  const mainPage = await pageFor((item) => item.type === 'page' && item.url.includes('/projects/vetnova-barrio/versions/version-v0006')); const main = await connect(mainPage); await main.command('Network.enable'); await main.command('Runtime.enable'); await wait(1800)
-  const before = await main.evaluate(`(() => ({ title: document.title, text: document.body.innerText, tabs: [...document.querySelectorAll('button')].filter((item) => item.innerText.includes('Abrir preview real')).length }))()`); assert.equal(before.title, 'JEFE | Orquestador de IA Local'); assert.match(before.text, /VetNova/u); assert.equal(before.tabs, 1)
-  const opened = await main.evaluate(`(async () => { const calls = []; const original = window.open; window.open = (url) => { calls.push(String(url)); return {}; }; const button = [...document.querySelectorAll('button')].find((item) => item.innerText.includes('Abrir preview real')); button?.click(); await new Promise((resolve) => setTimeout(resolve, 1800)); window.open = original; const approve = [...document.querySelectorAll('button')].some((item) => item.innerText.includes('Aprobar preview')); const reject = [...document.querySelectorAll('button')].some((item) => item.innerText.includes('Rechazar preview')); return { calls, fallback: Boolean(document.querySelector('.jefe-preview-fallback')), approve, reject }; })()`); assert.equal(opened.calls.length, 1); assert.match(opened.calls[0], /^http:\/\/127\.0\.0\.1:/u); assert.match(opened.calls[0], /\/app\/index\.html$/u); assert.equal(opened.fallback, false); assert.equal(opened.approve, true); assert.equal(opened.reject, true); const previewResponse = await fetch(opened.calls[0]); assert.equal(previewResponse.status, 200); const previewHtml = await previewResponse.text(); assert.match(previewHtml, /VetNova/u)
-  console.log(JSON.stringify({ ok: true, click: true, api: 'POST /api/projects/vetnova-barrio/previews/:id/open', blankTabCreated: false, tabsOpened: 1, previewUrl: opened.calls[0], previewHttp: 'PASS', humanGateAfterInspection: 'PASS', consoleErrors: 0, failedRequests: 0, state: 'pending_review', mode: 'window.open adapter instrumentation; headless popup navigation unavailable' }))
-  try { preview.socket.send(JSON.stringify({ id: 999999, method: 'Browser.close' })) } catch {}
-  try { main.socket.send(JSON.stringify({ id: 999998, method: 'Browser.close' })) } catch {}
-} finally { await wait(500); child.kill(); await fs.rm(profile, { recursive: true, force: true }).catch(() => {}) }
+  const page = await browser.pageFor((item) => item.type === 'page' && item.url.includes(`/projects/${harness.projectId}/versions/${harness.versionId}`))
+  cdp = await connectCdp(page)
+  for (let attempt = 0; attempt < 40; attempt += 1) { if (await cdp.evaluate("document.title === 'JEFE | Orquestador de IA Local' && document.body.innerText.includes('Proyecto Smoke Web')")) break; await wait(150) }
+  const before = await cdp.evaluate(`(() => ({ title: document.title, text: document.body.innerText, tabs: [...document.querySelectorAll('button')].filter((item) => item.innerText.includes('Abrir preview real')).length }))()`)
+  assert.equal(before.title, 'JEFE | Orquestador de IA Local'); assert.match(before.text, /Proyecto Smoke Web/u); assert.equal(before.tabs, 1)
+  const opened = await cdp.evaluate(`(async () => { const calls = []; const original = window.open; window.open = (url) => { calls.push(String(url)); return {}; }; const button = [...document.querySelectorAll('button')].find((item) => item.innerText.includes('Abrir preview real')); button?.click(); await new Promise((resolve) => setTimeout(resolve, 1200)); window.open = original; return { calls, fallback: Boolean(document.querySelector('.jefe-preview-fallback')), approval: document.body.innerText.includes('Aprobar preview') }; })()`)
+  assert.equal(opened.calls.length, 1); assert.match(opened.calls[0], /^http:\/\/127\.0\.0\.1:\d+\/app\/index\.html$/u); assert.doesNotMatch(opened.calls[0], /about:blank|file:/u); assert.equal(opened.fallback, false); assert.equal(opened.approval, true)
+  const previewResponse = await fetch(opened.calls[0]); assert.equal(previewResponse.status, 200); const previewHtml = await previewResponse.text(); assert.match(previewHtml, /Proyecto Smoke Web/u)
+  console.log(JSON.stringify({ ok: true, isolated: true, syntheticProject: harness.projectId, previewHttp: 'PASS', popupUrl: opened.calls[0], blankTabCreated: false, noFileUrl: true, noClientProjectDependency: true }))
+} finally { cdp?.close(); await browser.close(); await harness.close() }

@@ -294,6 +294,7 @@ contextBridge.exposeInMainWorld('jefeProjectBridge', {
   listVersions: (projectId) => ipcRenderer.invoke('jefe-projects:list-versions', { projectId }),
   getWorkspaceSnapshot: (projectId) => ipcRenderer.invoke('jefe-projects:workspace-snapshot', { projectId }),
   createVersion: (projectId, changeRequest, options = {}) => ipcRenderer.invoke('jefe-projects:create-version', { projectId, changeRequest, options }),
+  requestSemanticCorrection: (projectId, sourceVersionId, idempotencyKey = null) => ipcRenderer.invoke('jefe-projects:semantic-correction', { projectId, sourceVersionId, ...(idempotencyKey ? { idempotencyKey } : {}) }),
   approveVersion: (projectId, versionId, approved, observation = null) => ipcRenderer.invoke('jefe-projects:approve-version', { projectId, versionId, approved, observation }),
   history: (projectId) => ipcRenderer.invoke('jefe-projects:history', { projectId }),
   compareVersions: (projectId, leftVersionId, rightVersionId) => ipcRenderer.invoke('jefe-projects:compare', { projectId, leftVersionId, rightVersionId }),

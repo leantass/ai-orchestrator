@@ -25,6 +25,7 @@ function webClient() {
     listVersions: (projectId: string) => call(`/api/projects/${encodeURIComponent(projectId)}/versions`),
     createFirstVersion: (payload: unknown) => call('/api/projects', { method: 'POST', body: JSON.stringify(payload) }),
     createVersion: (projectId: string, changeRequest: string, options = {}) => call(`/api/projects/${encodeURIComponent(projectId)}/versions`, { method: 'POST', body: JSON.stringify({ changeRequest, options }) }),
+    requestSemanticCorrection: (projectId: string, sourceVersionId: string, idempotencyKey?: string) => call(`/api/projects/${encodeURIComponent(projectId)}/semantic-corrections`, { method: 'POST', body: JSON.stringify({ sourceVersionId, ...(idempotencyKey ? { idempotencyKey } : {}) }) }),
     compareVersions: (projectId: string, leftVersionId: string, rightVersionId: string) => call(`/api/projects/${encodeURIComponent(projectId)}/compare`, { method: 'POST', body: JSON.stringify({ leftVersionId, rightVersionId }) }),
     restoreVersion: (projectId: string, sourceVersionId: string) => call(`/api/projects/${encodeURIComponent(projectId)}/restore`, { method: 'POST', body: JSON.stringify({ sourceVersionId }) }),
     prepareLocalDelivery: (projectId: string, versionId: string) => call(`/api/projects/${encodeURIComponent(projectId)}/delivery`, { method: 'POST', body: JSON.stringify({ versionId }) }),
