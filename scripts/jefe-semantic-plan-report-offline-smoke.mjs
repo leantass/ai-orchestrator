@@ -1,0 +1,8 @@
+import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
+const require = createRequire(import.meta.url)
+const { validateRealSemanticPlanRunReport } = require('../electron/jefe-semantic-plan-verification.cjs')
+const report = { providerModel: 'gpt-5', executionMode: 'background', semanticGenerationCalls: 3, maxCalls: 6, retries: 0, providerBudgetExceeded: false, abortTimeoutObserved: false, backgroundDeadlineExceeded: false, syntheticFallbackUsedInRealMode: false, plans: { BusinessUnderstanding: { source: 'REAL_PROVIDER', status: 'completed', structuredOutput: true, provenanceGeneratedByJEFE: true, provenanceGeneratedByModel: false, schemaVersion: 'business-understanding-v2' }, ContentPlan: { source: 'REAL_PROVIDER', status: 'completed', structuredOutput: true, provenanceGeneratedByJEFE: true, provenanceGeneratedByModel: false, schemaVersion: 'content-plan-v2' }, ExperiencePlan: { source: 'REAL_PROVIDER', status: 'completed', structuredOutput: true, provenanceGeneratedByJEFE: true, provenanceGeneratedByModel: false, schemaVersion: 'experience-plan-v2' } } }
+assert.equal(validateRealSemanticPlanRunReport(report), report)
+for (const mutation of [{ ...report, semanticGenerationCalls: 4 }, { ...report, plans: { ...report.plans, ContentPlan: { ...report.plans.ContentPlan, schemaVersion: 'wrong' } } }, { ...report, plans: { ...report.plans, ExperiencePlan: { ...report.plans.ExperiencePlan, source: 'LOCAL' } } }]) assert.throws(() => validateRealSemanticPlanRunReport(mutation), { code: 'INVALID_SEMANTIC_PLAN_REPORT' })
+console.log('PASS jefe-semantic-plan-report-offline-smoke: exact schema IDs, provider source, provenance, mode, accounting, no-fallback and invalid negatives')

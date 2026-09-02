@@ -20,6 +20,8 @@ Output budgets are operation-specific and leave headroom for reasoning plus visi
 
 Productive semantic plans request Background Mode explicitly from the provider. The provider uses `background=true` and `store=false`, polls only bounded `queued`/`in_progress` responses, classifies deadline/cancellation separately, and reports generation calls independently from poll and cancel HTTP requests. Probes remain foreground. Background live validation is opt-in and is not run by normal offline smokes.
 
+The real-plan verification report validator accepts only the exact BU, ContentPlan and ExperiencePlan schema versions, provider source, completion state, provenance flags and generation accounting. Prior live evidence remains metadata-only; content and experience quality gates are `NOT_REPLAYABLE_FROM_CURRENT_SAFE_EVIDENCE` unless safe structured payloads are explicitly retained.
+
 Provider enablement is unchanged. The isolated bootstrap smokes inject only a synthetic decision dependency and perform zero provider calls. Normal runtime configuration does not accept arbitrary plans or test candidates.
 
 Validation status: Semantic Runtime Adapter PASS; Semantic Runtime Bootstrap PASS; Interactive Human Review NOT_YET_VALIDATED. Full interactive browser QA and Human Gate parity remain outside this checkpoint.

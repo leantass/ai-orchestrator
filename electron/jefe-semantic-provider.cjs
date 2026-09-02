@@ -4,14 +4,15 @@ const crypto = require('node:crypto')
 const OUTPUT_BUDGET_POLICY = Object.freeze({
   minimal_probe: Object.freeze({ initialOutputBudget: 128, retryOutputBudget: 256, maxRetries: 1 }),
   structured_probe: Object.freeze({ initialOutputBudget: 256, retryOutputBudget: 512, maxRetries: 1 }),
-  business_understanding: Object.freeze({ initialOutputBudget: 1200, retryOutputBudget: 2400, maxRetries: 1 }),
-  correction_plan: Object.freeze({ initialOutputBudget: 1800, retryOutputBudget: 3600, maxRetries: 1 }),
-  content_plan: Object.freeze({ initialOutputBudget: 2400, retryOutputBudget: 4800, maxRetries: 1 }),
-  experience_plan: Object.freeze({ initialOutputBudget: 1800, retryOutputBudget: 3600, maxRetries: 1 }),
+  business_understanding: Object.freeze({ initialOutputBudget: 16384, retryOutputBudget: 32768, maxRetries: 1 }),
+  correction_plan: Object.freeze({ initialOutputBudget: 16384, retryOutputBudget: 32768, maxRetries: 1 }),
+  content_plan: Object.freeze({ initialOutputBudget: 24576, retryOutputBudget: 49152, maxRetries: 1 }),
+  experience_plan: Object.freeze({ initialOutputBudget: 16384, retryOutputBudget: 32768, maxRetries: 1 }),
 })
 const OUTPUT_BUDGETS = Object.freeze(Object.fromEntries(Object.entries(OUTPUT_BUDGET_POLICY).map(([key, value]) => [key, value.initialOutputBudget])))
 function outputBudgetPolicy(operation) { return OUTPUT_BUDGET_POLICY[operation] || OUTPUT_BUDGET_POLICY.business_understanding }
 const BACKGROUND_DEFAULTS = Object.freeze({ deadlineMs: 300000, initialDelayMs: 2000, intervalMs: 2500, maxPollRequests: 80, pollRetryMax: 2 })
+const MAX_MODEL_OUTPUT_TOKENS = 65536
 
 class ProviderCallBudget {
   constructor(maxCalls = 3, runId = null) { this.runId = runId; this.maxCalls = maxCalls; this.callsUsed = 0; this.reservations = []; this.operationCounts = {}; this.queue = Promise.resolve() }
@@ -64,9 +65,11 @@ function extractResponseText(payload) {
   return ''
 }
 function parseProviderPayload(text) { try { return JSON.parse(text) } catch { return null } }
+function safeUsage(usage) { if (!usage || typeof usage !== 'object') return null; return Object.fromEntries(['input_tokens', 'output_tokens', 'reasoning_tokens', 'total_tokens'].filter((key) => Number.isFinite(usage[key])).map((key) => [key, usage[key]])) }
 
 function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, now = Date.now, sleepImpl = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), callBudget = null } = {}) {
   const config = providerConfig({ env })
+  if (Object.values(OUTPUT_BUDGET_POLICY).some((policy) => policy.retryOutputBudget > MAX_MODEL_OUTPUT_TOKENS || policy.initialOutputBudget >= policy.retryOutputBudget)) throw new Error('INVALID_OUTPUT_BUDGET_POLICY')
   const transportStats = { generationRequests: 0, pollRequests: 0, cancelRequests: 0, totalHttpRequests: 0 }
   const transport = (kind) => { transportStats[`${kind}Requests`] += 1; transportStats.totalHttpRequests += 1 }
   return Object.freeze({
@@ -90,7 +93,7 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
           response = await fetchImpl(config.baseUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` }, body: JSON.stringify(requestBody), signal: controller.signal })
           firstResponseAt = now(); responseText = await response.text(); completedAt = now()
           const requestId = response.headers?.get?.('x-request-id') || response.headers?.get?.('request-id') || null
-          const telemetry = safeRequestSummary({ requestStartedAt, firstResponseAt, completedAt, status: response.status, requestId, attempts: attempt + 1 })
+          const telemetry = { ...safeRequestSummary({ requestStartedAt, firstResponseAt, completedAt, status: response.status, requestId, attempts: attempt + 1 }), maxOutputTokens: currentMaxOutputTokens }
           if (!response.ok) {
             let providerError = null
             try { providerError = JSON.parse(responseText)?.error || null } catch {}
@@ -107,7 +110,7 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
             return { ok: false, status, incompleteReason, errorCategory: incompleteReason === 'max_output_tokens' ? 'OUTPUT_BUDGET_EXHAUSTED' : 'SCHEMA_ERROR', telemetry: { ...telemetry, budgets } }
           }
           if (status === 'failed' || status === 'cancelled' || payload?.incomplete_details) return { ok: false, status, errorCategory: 'MODEL_ERROR', telemetry }
-          return { ok: true, status, text: extractResponseText(payload), payload, telemetry: { ...telemetry, budgets } }
+          return { ok: true, status, text: extractResponseText(payload), payload, telemetry: { ...telemetry, budgets, usage: safeUsage(payload.usage) } }
         } catch (error) {
           completedAt = now(); const timedOut = error?.name === 'AbortError'; const category = classifyError(error, { timedOut }); const telemetry = safeRequestSummary({ requestStartedAt, firstResponseAt, completedAt, errorCategory: category, attempts: attempt + 1 })
           if ((category === 'ABORT_TIMEOUT' || category === 'NETWORK_ERROR') && attempt < retries) { attempt += 1; continue }
@@ -139,7 +142,7 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
           pollRequests += 1; transport('poll')
           try { const polled = await fetchImpl(`${config.baseUrl}/${encodeURIComponent(responseId)}`, { method: 'GET', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` } }); if (!polled.ok) throw Object.assign(new Error('poll http'), { status: polled.status }); completed = parseProviderPayload(await polled.text()) || {}; status = completed.status || 'failed' } catch (error) { lastPollError = classifyError(error, { status: error.status || 0 }); if (pollRequests >= config.backgroundMaxPollRequests) return { ok: false, status, errorCategory: 'BACKGROUND_POLL_FAILED', responseId, telemetry: { executionMode: 'background', durationMs: now() - startedAt, pollRequests, transportStats, lastPollError } } }
         }
-        const telemetry = { executionMode: 'background', durationMs: now() - startedAt, responseId, pollRequests, transportStats: { ...transportStats } }
+        const telemetry = { executionMode: 'background', durationMs: now() - startedAt, responseId, pollRequests, maxOutputTokens: currentMaxOutputTokens, usage: safeUsage(completed.usage), transportStats: { ...transportStats } }
         if (status === 'incomplete' && completed.incomplete_details?.reason === 'max_output_tokens' && outputBudgetRetry < outputBudgetRetryMax) { outputBudgetRetry += 1; currentMaxOutputTokens = retryOutputBudget || currentMaxOutputTokens * 2; continue }
         if (status === 'incomplete') return { ok: false, status, incompleteReason: completed.incomplete_details?.reason || null, errorCategory: completed.incomplete_details?.reason === 'max_output_tokens' ? 'OUTPUT_BUDGET_EXHAUSTED' : 'SCHEMA_ERROR', responseId, telemetry }
         if (status === 'failed' || status === 'cancelled') return { ok: false, status, errorCategory: 'MODEL_ERROR', responseId, telemetry }

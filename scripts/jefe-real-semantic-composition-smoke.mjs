@@ -28,7 +28,7 @@ try {
     validateSemanticEnvelope(envelope, { input: undefined, provider: composition.semanticProvider, sourceRefs: ['synthetic-brief:composition'] })
     assert.equal(envelope.provenance.provider, 'openai-semantic')
     assert.ok(envelope.provenance.responseId)
-    assert.match(envelope.decision.schemaVersion, /^(business|content|experience)-plan-v2$/u)
+    assert.ok(['business-understanding-v2', 'content-plan-v2', 'experience-plan-v2'].includes(envelope.decision.schemaVersion))
     console.log(`${name}=REAL_PROVIDER`)
   }
   assert.ok(plans.providerBudget.callsUsed >= 3 && plans.providerBudget.callsUsed <= 6)
