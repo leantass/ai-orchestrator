@@ -91,6 +91,7 @@ const {
   validateAssetSelection: validateJefeAssetSelection,
 } = require('./jefe-input-assets.cjs')
 const { registerCanonicalProjectIpc } = require('./jefe-project-ipc.cjs')
+const { createSemanticRuntimeComposition } = require('./jefe-semantic-runtime-composition.cjs')
 const { registerQaSecurityIpc } = require('./jefe-qa-security-ipc.cjs')
 const { registerPreviewApprovalIpc } = require('./jefe-preview-approval.cjs')
 const { servePreview, closePreviewServers } = require('./jefe-preview-http-server.cjs')
@@ -60219,11 +60220,13 @@ ipcMain.handle('jefe-input-assets:select', async () => {
 })
 
 const canonicalProjectRoot = path.join(app.getPath('userData'), 'jefe-canonical-projects')
+const semanticRuntimeComposition = createSemanticRuntimeComposition({ root: canonicalProjectRoot })
 registerCanonicalProjectIpc({
   ipcMain,
   root: path.join(app.getPath('userData'), 'jefe-canonical-projects'),
   shell,
   clipboard: electronModule.clipboard,
+  semanticRuntimeAdapter: semanticRuntimeComposition.adapter,
 })
 registerQaSecurityIpc({ ipcMain, projectRoot: canonicalProjectRoot })
 const previewApprovalRegistration = registerPreviewApprovalIpc({ ipcMain, root: canonicalProjectRoot })
