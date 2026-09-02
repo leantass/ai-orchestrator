@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict'
+import fs from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
+import { createRequire } from 'node:module'
+const require = createRequire(import.meta.url)
+const { serveArtifact, runBrowserQuality, loopbackUrl } = require('../electron/jefe-browser-quality.cjs')
+
+const fixture = `<!doctype html><meta charset="utf-8"><style>body{margin:0;padding:20px} .wide{width:1200px} :focus{outline:2px solid blue}</style><button id="theme" aria-label="theme">Tema</button><button id="faq" aria-expanded="false">FAQ</button><div id="answer" hidden>Respuesta concreta</div><form id="form"><label for="name">Nombre</label><input id="name" required><button id="submit">Enviar</button></form><button id="popup">Popup</button><output id="status"></output><script>theme.onclick=()=>document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark';faq.onclick=()=>{faq.setAttribute('aria-expanded',faq.getAttribute('aria-expanded')!=='true');answer.hidden=!answer.hidden};form.onsubmit=e=>{e.preventDefault();status.textContent='Enviado'};popup.onclick=()=>window.open('/popup','_blank');window.__jefeFixtureReady=true</script>`
+async function makeRoot(extra = '') { const root = await fs.mkdtemp(path.join(os.tmpdir(), 'jefe-browser-quality-')); await fs.mkdir(path.join(root, 'app')); await fs.writeFile(path.join(root, 'app', 'index.html'), fixture + extra); await fs.writeFile(path.join(root, 'app', 'styles.css'), 'body{font-family:sans-serif}'); await fs.writeFile(path.join(root, 'app', 'app.js'), ''); await fs.writeFile(path.join(root, 'popup'), '<!doctype html><meta charset="utf-8"><title>Popup</title>'); return root }
+async function run(root, config = {}) { const server = await serveArtifact(root); try { return await runBrowserQuality({ url: server.url, candidateHash: `hash-${path.basename(root)}`, viewports: [{ width: 800, height: 600 }, { width: 390, height: 844 }], interactions: { theme: { selector: '#theme' }, faq: { selector: '#faq' }, form: { selector: '#name', value: 'Prueba sintética ñáéíóú 123' }, popup: { selector: '#popup' } }, ...config }) } finally { await new Promise((resolve) => server.server.close(resolve)); await fs.rm(root, { recursive: true, force: true }) } }
+const roots = []
+try { const happyRoot = await makeRoot(); roots.push(happyRoot); const happy = await run(happyRoot); assert.equal(happy.status, 'PASS', JSON.stringify(happy)); assert.equal(happy.interactions.theme, 'PASS'); assert.equal(happy.interactions.faq, 'PASS'); assert.equal(happy.interactions.form, 'PASS'); assert.equal(happy.popupFindings[0]?.status, 'PASS');
+  const cases = [{ name: 'console-error', extra: '<script>console.error("synthetic browser quality error")</script>' }, { name: 'page-error', extra: '<script>setTimeout(()=>{throw new Error("synthetic page error")},50)</script>' }, { name: 'required-404', extra: '<script src="/missing-required-script.js"></script>' }, { name: 'mobile-overflow', extra: '<div class="wide">overflow</div>' }]
+  const negatives = []
+  for (const test of cases) { const root = await makeRoot(test.extra); roots.push(root); const result = await run(root, { requiredResources: test.name === 'required-404' ? ['missing-required-script.js'] : [] }); assert.equal(result.status, 'NEEDS_CORRECTION', `${test.name} unexpectedly passed`); negatives.push({ name: test.name, status: result.status }) }
+  console.log(JSON.stringify({ ok: true, BrowserQualityContract: 'PASS', BrowserQualityHappy: 'PASS', BrowserQualityNegatives: 'PASS', interactions: happy.interactions, popup: 'PASS', negatives }))
+} finally { for (const root of roots) await fs.rm(root, { recursive: true, force: true }).catch(() => {}) }

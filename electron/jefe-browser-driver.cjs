@@ -60,6 +60,29 @@ async function connect(target) {
   })
   const evaluate = async (expression) => (await command('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })).result?.value
   const on = (name, handler) => { const current = listeners.get(name) || []; current.push(handler); listeners.set(name, current) }
+  const focus = async (selector) => {
+    const result = await evaluate(`(() => { const element=document.querySelector(${JSON.stringify(selector)}); if(!element) return { found:false }; element.focus(); const style=getComputedStyle(element); const rect=element.getBoundingClientRect(); return { found:true, active:document.activeElement===element, focusable:typeof element.focus==='function', visible:rect.width>0&&rect.height>0, outline:style.outlineStyle, shadow:style.boxShadow } })()`)
+    if (!result?.found) throw new Error('ELEMENT_NOT_FOUND')
+    if (!result.active) throw new Error('FOCUS_NOT_OBSERVED')
+    if (!result.visible || (result.outline === 'none' && result.shadow === 'none')) throw new Error('FOCUS_NOT_VISIBLE')
+    return result
+  }
+  const press = async (key, modifiers = []) => {
+    const modifierNames = new Set(modifiers)
+    const modifierBit = (modifierNames.has('Alt') ? 1 : 0) | (modifierNames.has('Control') ? 2 : 0) | (modifierNames.has('Meta') ? 4 : 0) | (modifierNames.has('Shift') ? 8 : 0)
+    const code = key.length === 1 ? `Key${key.toUpperCase()}` : key
+    const virtualKeyCodes = { Tab: 9, Enter: 13, Escape: 27, Space: 32 }
+    await command('Input.dispatchKeyEvent', { type: 'keyDown', key, code, text: key === 'Enter' ? '\\r' : (key.length === 1 ? key : undefined), unmodifiedText: key === 'Enter' ? '\\r' : (key.length === 1 ? key : undefined), modifiers: modifierBit, windowsVirtualKeyCode: virtualKeyCodes[key] || (key.length === 1 ? key.toUpperCase().charCodeAt(0) : undefined), nativeVirtualKeyCode: virtualKeyCodes[key] })
+    await command('Input.dispatchKeyEvent', { type: 'keyUp', key, code, modifiers: modifierBit })
+  }
+  const type = async (selector, value) => { await focus(selector); await command('Input.insertText', { text: String(value) }); const observed = await evaluate(`document.querySelector(${JSON.stringify(selector)})?.value`); if (observed !== String(value)) throw new Error('TYPE_EFFECT_NOT_OBSERVED'); return observed }
+  const waitForSelector = async (selector, timeout = 5000) => waitForFunction(`!!document.querySelector(${JSON.stringify(selector)})`, timeout)
+  const measureOverflow = () => evaluate('({document:{scrollWidth:document.documentElement.scrollWidth,clientWidth:document.documentElement.clientWidth},body:{scrollWidth:document.body?.scrollWidth||0,clientWidth:document.body?.clientWidth||0},overflow:Math.max(0,document.documentElement.scrollWidth-document.documentElement.clientWidth,document.body?.scrollWidth-document.body?.clientWidth||0)})')
+  const events = { consoleErrors: [], consoleWarnings: [], pageErrors: [], failedRequests: [], badResponses: [] }
+  on('Runtime.consoleAPICalled', ({ type, args = [] }) => { const message = args.map((arg) => arg.value ?? arg.description ?? '').join(' '); if (type === 'error') events.consoleErrors.push(message); else if (type === 'warning' || type === 'warn') events.consoleWarnings.push(message) })
+  on('Runtime.exceptionThrown', ({ exceptionDetails }) => { events.pageErrors.push(exceptionDetails?.exception?.description || exceptionDetails?.text || 'PAGE_ERROR') })
+  on('Network.loadingFailed', (event) => { if (!event.canceled) events.failedRequests.push({ url: event.requestId, errorText: event.errorText, canceled: false }) })
+  on('Network.responseReceived', (event) => { if (event.response?.status >= 400 && !/\/favicon\.ico$/iu.test(event.response.url)) events.badResponses.push({ url: event.response.url, status: event.response.status }) })
   const setViewport = async ({ width, height, deviceScaleFactor = 1, mobile = false }) => {
     if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) throw new Error('INVALID_VIEWPORT')
     await command('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor, mobile, screenWidth: width, screenHeight: height })
@@ -106,11 +129,8 @@ async function connect(target) {
   }
 
   return {
-    url: target.url, command, evaluate, on, setViewport, getViewportMetrics, assertUsableViewport, goto, click,
-    focus: (selector) => evaluate(`document.querySelector(${JSON.stringify(selector)})?.focus()`),
-    type: (selector, value) => evaluate(`(() => { const e=document.querySelector(${JSON.stringify(selector)}); e.focus(); e.value=${JSON.stringify(value)}; e.dispatchEvent(new Event('input',{bubbles:true})); return e.value })()`),
-    press: async (key) => { await command('Input.dispatchKeyEvent', { type: 'keyDown', key, code: key }); await command('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key }) },
-    waitForFunction, close: () => socket.close()
+    url: target.url, command, evaluate, on, events, setViewport, getViewportMetrics, assertUsableViewport, goto, click,
+    focus, type, press, waitForFunction, waitForSelector, measureOverflow, close: () => socket.close()
   }
 }
 
@@ -119,7 +139,7 @@ async function launch({ url, headless = true, timeout = 10000 } = {}) {
   if (!exe) throw Object.assign(new Error('BROWSER_EXECUTABLE_NOT_FOUND'), { code: 'BROWSER_EXECUTABLE_NOT_FOUND' })
   const debugPort = await freePort()
   const profile = await fsp.mkdtemp(path.join(os.tmpdir(), 'jefe-browser-driver-'))
-  const child = spawn(exe, [`--headless=${headless ? 'new' : 'false'}`, '--window-size=800,600', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-extensions', `--user-data-dir=${profile}`, `--remote-debugging-port=${debugPort}`, ...(url ? [url] : [])], { stdio: 'ignore', windowsHide: true })
+  const child = spawn(exe, [`--headless=${headless ? 'new' : 'false'}`, '--window-size=800,600', '--disable-gpu', '--disable-popup-blocking', '--no-first-run', '--no-default-browser-check', '--disable-extensions', `--user-data-dir=${profile}`, `--remote-debugging-port=${debugPort}`, ...(url ? [url] : [])], { stdio: 'ignore', windowsHide: true })
   let target
   for (let i = 0; i < timeout / 100 && !target; i += 1) {
     try { target = (await fetch(`http://127.0.0.1:${debugPort}/json/list`).then((response) => response.json())).find((item) => item.type === 'page' && (!url || item.url === url)) } catch {}
@@ -129,7 +149,9 @@ async function launch({ url, headless = true, timeout = 10000 } = {}) {
   const contexts = []
   return {
     executable: path.basename(exe), headless,
-    async page() { const page = await connect(target); await page.command('Page.enable'); await page.command('Runtime.enable'); await page.command('DOM.enable'); contexts.push(page); return page },
+    async targets() { return fetch(`http://127.0.0.1:${debugPort}/json/list`).then((response) => response.json()) },
+    async waitForTarget(predicate, waitTimeout = 5000) { for (let elapsed = 0; elapsed < waitTimeout; elapsed += 100) { const found = (await this.targets()).find(predicate); if (found) return found; await delay(100) } throw new Error('POPUP_TIMEOUT') },
+    async page() { const page = await connect(target); await page.command('Page.enable'); await page.command('Runtime.enable'); await page.command('DOM.enable'); await page.command('Network.enable'); contexts.push(page); return page },
     async close() { contexts.forEach((page) => page.close()); child.kill(); await delay(200); await fsp.rm(profile, { recursive: true, force: true }).catch(() => {}) }
   }
 }
