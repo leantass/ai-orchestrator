@@ -6,7 +6,7 @@ const generation = require('./jefe-real-generation.cjs')
 const { createProjectPersistence } = require('./jefe-project-persistence.cjs')
 const { createPreviewApprovalService } = require('./jefe-preview-approval.cjs')
 const intelligence = require('./jefe-semantic-intelligence.cjs')
-const { createOpenAISemanticProvider, providerHealth } = require('./jefe-semantic-provider.cjs')
+const { createOpenAISemanticProvider, providerHealth, SEMANTIC_SCHEMA, CONTENT_PLAN_SCHEMA, EXPERIENCE_PLAN_SCHEMA, ProviderRunBudget } = require('./jefe-semantic-provider.cjs')
 const { buildSemanticGenerationSpec, buildExecutionPackage } = require('./jefe-semantic-correction-lifecycle.cjs')
 const { createSemanticProductionPromotion } = require('./jefe-semantic-production-promotion.cjs')
 const { createSemanticRuntimeAdapter } = require('./jefe-semantic-runtime-adapter.cjs')
@@ -17,7 +17,8 @@ function createSemanticRuntimeComposition({ root, feedbackProvider = null, decis
   const preview = createPreviewApprovalService({ root })
   const promotion = createSemanticProductionPromotion({ root })
   const productive = mode === 'productive'
-  const provider = semanticProvider || (productive ? createOpenAISemanticProvider({ env, callBudget }) : null)
+  const runBudget = callBudget || (productive ? new ProviderRunBudget({ runId: `semantic-composition-${Date.now()}`, maxCalls: 4 }) : null)
+  const provider = semanticProvider || (productive ? createOpenAISemanticProvider({ env, callBudget: runBudget }) : null)
   const brain = semanticBrainAdapter || (provider ? intelligence.createSemanticBrainAdapter({ provider }) : null)
   const health = provider ? providerHealth(provider, { readyForRealSemanticWork: provider.enabled && provider.credentialAvailable && Boolean(brain) }) : { configured: false, enabled: false, credentialAvailable: false, model: null, readyForRealSemanticWork: false }
   function requireProductiveProvider() {
@@ -35,10 +36,12 @@ function createSemanticRuntimeComposition({ root, feedbackProvider = null, decis
     const source = await persistence.getVersionRecord(projectId, sourceVersionId)
     if (!source) throw Object.assign(new Error('La versión fuente no existe.'), { code: 'VERSION_NOT_FOUND' })
     const feedback = await resolveFeedback({ project: source.project, sourceVersionId, sourceRecord: source })
-    const understanding = intelligence.buildBusinessUnderstandingV2({ brief: { audience: source.project.planning?.audience || 'usuarios del servicio', objective: source.project.planning?.objective || 'presentar una propuesta clara', services: source.project.planning?.services || ['servicio principal'], customerNeeds: source.project.planning?.customerNeeds || ['decidir con claridad'], trustDrivers: source.project.planning?.trustDrivers || ['acompañamiento'], conversionActions: source.project.planning?.conversionActions || ['conversar'] }, feedback })
+    const brief = { audience: source.project.planning?.audience || 'usuarios del servicio', objective: source.project.planning?.objective || 'presentar una propuesta clara', services: source.project.planning?.services || ['servicio principal'], customerNeeds: source.project.planning?.customerNeeds || ['decidir con claridad'], trustDrivers: source.project.planning?.trustDrivers || ['acompañamiento'], conversionActions: source.project.planning?.conversionActions || ['conversar'] }
+    const realPlans = productive ? await runSemanticPlans({ brief, feedback, sourceRefs: [`semantic-source:${projectId}:${sourceVersionId}`] }) : null
+    const understanding = realPlans ? realPlans.businessUnderstanding.decision : intelligence.buildBusinessUnderstandingV2({ brief, feedback })
     const correctionPlan = intelligence.createCorrectionPlan({ feedback, businessUnderstanding: understanding })
-    const contentPlan = intelligence.buildContentPlanV2(understanding)
-    const experiencePlan = intelligence.buildExperiencePlanV2(understanding)
+    const contentPlan = realPlans ? realPlans.contentPlan.decision : intelligence.buildContentPlanV2(understanding)
+    const experiencePlan = realPlans ? realPlans.experiencePlan.decision : intelligence.buildExperiencePlanV2(understanding)
     const decision = await resolveDecision({ project: source.project, sourceVersionId, feedback, understanding, contentPlan, experiencePlan })
     const generationSpec = { ...buildSemanticGenerationSpec({ contentPlan, experiencePlan, creativeDirection: source.project.visualDirection, preservedQualities: decision.preservedQualities, prohibitedChanges: decision.prohibitedChanges }), planning: source.project.planning, sectionOrder: ['relato', 'servicios', 'confianza', 'faq', 'contacto'], heroVariant: 'focused', treatments: ['semantic-correction'], contentDensity: 'balanced', ctaStrategy: 'consultation' }
     const packageValue = buildExecutionPackage({ correctionPlan, businessUnderstanding: understanding, contentPlan, experiencePlan, semanticGates: decision.semanticGates, provenance: { source: 'JEFE', generatedBy: 'JEFE' }, generationSpec, humanFeedbackRef: `human-feedback:${feedback.correctionId || sourceVersionId}`, sourceProjectId: projectId, sourceVersionId, sourceSnapshotSha256: feedback.snapshot.snapshotSha256, correctionId: feedback.correctionId || `correction-${sourceVersionId}` })
@@ -53,7 +56,15 @@ function createSemanticRuntimeComposition({ root, feedbackProvider = null, decis
     if (!brain || typeof brain.decide !== 'function') throw Object.assign(new Error('El adapter semántico no está configurado.'), { code: 'SEMANTIC_PROVIDER_NOT_READY' })
     return brain.decide(input)
   }
-  return { persistence, preview, promotion, semanticProvider: provider, semanticBrainAdapter: brain, providerHealth: health, decideSemantic, adapter: createSemanticRuntimeAdapter({ service: promotion, resolveExecution }) }
+  async function runSemanticPlans({ brief, correctionPlan = null, feedback = null, preservedQualities = [], sourceRefs = ['synthetic-brief:composition'] } = {}) {
+    requireProductiveProvider()
+    const input = [{ role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ brief, correctionPlan, feedback, preservedQualities }) }] }]
+    const bu = await decideSemantic({ operation: 'business_understanding', input, schema: SEMANTIC_SCHEMA, sourceRefs, outputBudgetRetryMax: 1 })
+    const content = await decideSemantic({ operation: 'content_plan', input: [{ role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ brief, businessUnderstanding: bu.decision, correctionPlan, preservedQualities }) }] }], schema: CONTENT_PLAN_SCHEMA, sourceRefs, outputBudgetRetryMax: 0 })
+    const experience = await decideSemantic({ operation: 'experience_plan', input: [{ role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ brief, businessUnderstanding: bu.decision, contentPlan: content.decision, correctionPlan, preservedQualities }) }] }], schema: EXPERIENCE_PLAN_SCHEMA, sourceRefs, outputBudgetRetryMax: 0 })
+    return { businessUnderstanding: bu, contentPlan: content, experiencePlan: experience, providerBudget: runBudget?.snapshot?.() || null }
+  }
+  return { persistence, preview, promotion, semanticProvider: provider, semanticBrainAdapter: brain, providerHealth: health, providerRunBudget: runBudget, decideSemantic, runSemanticPlans, adapter: createSemanticRuntimeAdapter({ service: promotion, resolveExecution }) }
 }
 
 module.exports = { createSemanticRuntimeComposition }

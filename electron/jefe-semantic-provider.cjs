@@ -1,18 +1,31 @@
 const DEFAULT_FOREGROUND_TIMEOUT_MS = 30000
 const DEFAULT_RETRY_MAX = 1
 const crypto = require('node:crypto')
-const OUTPUT_BUDGETS = Object.freeze({ minimal_probe: 128, structured_probe: 256, business_understanding: 800, correction_plan: 1200, content_plan: 1600, experience_plan: 1200 })
+const OUTPUT_BUDGET_POLICY = Object.freeze({
+  minimal_probe: Object.freeze({ initialOutputBudget: 128, retryOutputBudget: 256, maxRetries: 1 }),
+  structured_probe: Object.freeze({ initialOutputBudget: 256, retryOutputBudget: 512, maxRetries: 1 }),
+  business_understanding: Object.freeze({ initialOutputBudget: 1200, retryOutputBudget: 2400, maxRetries: 1 }),
+  correction_plan: Object.freeze({ initialOutputBudget: 1800, retryOutputBudget: 3600, maxRetries: 1 }),
+  content_plan: Object.freeze({ initialOutputBudget: 2400, retryOutputBudget: 4800, maxRetries: 1 }),
+  experience_plan: Object.freeze({ initialOutputBudget: 1800, retryOutputBudget: 3600, maxRetries: 1 }),
+})
+const OUTPUT_BUDGETS = Object.freeze(Object.fromEntries(Object.entries(OUTPUT_BUDGET_POLICY).map(([key, value]) => [key, value.initialOutputBudget])))
+function outputBudgetPolicy(operation) { return OUTPUT_BUDGET_POLICY[operation] || OUTPUT_BUDGET_POLICY.business_understanding }
 
 class ProviderCallBudget {
-  constructor(maxCalls = 3) { this.maxCalls = maxCalls; this.callsUsed = 0; this.queue = Promise.resolve() }
-  async reserve() {
+  constructor(maxCalls = 3, runId = null) { this.runId = runId; this.maxCalls = maxCalls; this.callsUsed = 0; this.reservations = []; this.operationCounts = {}; this.queue = Promise.resolve() }
+  get callsRemaining() { return Math.max(0, this.maxCalls - this.callsUsed) }
+  get exhausted() { return this.callsUsed >= this.maxCalls }
+  snapshot() { return { runId: this.runId, maxCalls: this.maxCalls, callsUsed: this.callsUsed, callsRemaining: this.callsRemaining, reservations: [...this.reservations], operationCounts: { ...this.operationCounts }, exhausted: this.exhausted } }
+  async reserve(operation = 'semantic') {
     let allowed = false
     const previous = this.queue
-    this.queue = previous.then(() => { if (this.callsUsed < this.maxCalls) { this.callsUsed += 1; allowed = true } })
+    this.queue = previous.then(() => { if (this.callsUsed < this.maxCalls) { this.callsUsed += 1; this.operationCounts[operation] = (this.operationCounts[operation] || 0) + 1; this.reservations.push({ operation, callNumber: this.callsUsed }); allowed = true } })
     await this.queue
     return allowed
   }
 }
+class ProviderRunBudget extends ProviderCallBudget { constructor({ runId, maxCalls = 3 } = {}) { super(maxCalls, runId || `semantic-run-${Date.now()}`) } }
 
 function providerConfig({ env = process.env } = {}) {
   return {
@@ -52,11 +65,11 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
     model: config.model,
     enabled: env.AI_ORCHESTRATOR_SEMANTIC_BRAIN_ENABLED === 'true' || env.AI_ORCHESTRATOR_BRAIN_PROVIDER?.trim() === 'openai',
     credentialAvailable: Boolean(config.apiKey),
-    async request({ input, schema = null, maxOutputTokens = 600, reasoningEffort = config.reasoningEffort, timeoutMs = config.foregroundTimeoutMs, retries = config.retryMax, outputBudgetRetryMax = 0 } = {}) {
+    async request({ input, schema = null, maxOutputTokens = 600, reasoningEffort = config.reasoningEffort, timeoutMs = config.foregroundTimeoutMs, retries = config.retryMax, outputBudgetRetryMax = 0, operation = 'semantic', retryOutputBudget = null } = {}) {
       if (!config.apiKey) throw Object.assign(new Error('OPENAI_CREDENTIAL_MISSING'), { category: 'MODEL_ERROR' })
       let attempt = 0; let outputBudgetRetry = 0; let currentMaxOutputTokens = maxOutputTokens; const budgets = []
       while (true) {
-        if (callBudget && !(await callBudget.reserve())) return { ok: false, status: 0, errorCategory: 'PROVIDER_CALL_BUDGET_EXHAUSTED', telemetry: { attempts: attempt, budgets } }
+        if (callBudget && !(await callBudget.reserve(operation))) return { ok: false, status: 0, errorCategory: 'PROVIDER_CALL_BUDGET_EXHAUSTED', telemetry: { attempts: attempt, budgets, providerBudget: callBudget.snapshot?.() || null } }
         budgets.push(currentMaxOutputTokens)
         const requestBody = { model: config.model, input, max_output_tokens: currentMaxOutputTokens, store: false, reasoning: { effort: reasoningEffort } }
         if (schema) requestBody.text = { format: { type: 'json_schema', name: schema.name, strict: true, schema: schema.schema } }
@@ -79,7 +92,7 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
           const status = payload?.status || 'completed'
           if (status === 'incomplete') {
             const incompleteReason = payload?.incomplete_details?.reason || null
-            if (incompleteReason === 'max_output_tokens' && outputBudgetRetry < outputBudgetRetryMax) { outputBudgetRetry += 1; currentMaxOutputTokens *= 2; continue }
+            if (incompleteReason === 'max_output_tokens' && outputBudgetRetry < outputBudgetRetryMax) { outputBudgetRetry += 1; currentMaxOutputTokens = retryOutputBudget || currentMaxOutputTokens * 2; continue }
             return { ok: false, status, incompleteReason, errorCategory: incompleteReason === 'max_output_tokens' ? 'OUTPUT_BUDGET_EXHAUSTED' : 'SCHEMA_ERROR', telemetry: { ...telemetry, budgets } }
           }
           if (status === 'failed' || status === 'cancelled' || payload?.incomplete_details) return { ok: false, status, errorCategory: 'MODEL_ERROR', telemetry }
@@ -92,7 +105,8 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
       }
     },
     async decide({ operation = 'business_understanding', input, schema = SEMANTIC_SCHEMA, sourceRefs = [], outputBudgetRetryMax = 1 } = {}) {
-      const result = await this.request({ input, schema, maxOutputTokens: OUTPUT_BUDGETS[operation] || OUTPUT_BUDGETS.business_understanding, reasoningEffort: config.reasoningEffort, outputBudgetRetryMax })
+      const policy = outputBudgetPolicy(operation)
+      const result = await this.request({ input, schema, maxOutputTokens: policy.initialOutputBudget, reasoningEffort: config.reasoningEffort, outputBudgetRetryMax, operation, retryOutputBudget: policy.retryOutputBudget })
       if (!result.ok) throw Object.assign(new Error(result.errorCategory || 'SEMANTIC_PROVIDER_FAILED'), { code: result.errorCategory || 'SEMANTIC_PROVIDER_FAILED', telemetry: result.telemetry })
       let decision
       try { decision = JSON.parse(result.text) } catch { throw Object.assign(new Error('SEMANTIC_STRUCTURED_OUTPUT_INVALID'), { code: 'SEMANTIC_STRUCTURED_OUTPUT_INVALID' }) }
@@ -103,6 +117,8 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
 
 const MINIMAL_SCHEMA = Object.freeze({ name: 'semantic_minimal', schema: { type: 'object', additionalProperties: false, properties: { ok: { type: 'boolean' }, label: { type: 'string' } }, required: ['ok', 'label'] } })
 const SEMANTIC_SCHEMA = Object.freeze({ name: 'business_understanding_v2_probe', schema: { type: 'object', additionalProperties: false, properties: { schemaVersion: { type: 'string', enum: ['business-understanding-v2'] }, businessType: { type: 'string' }, businessModel: { type: 'string' }, audience: { type: 'string' }, primaryGoal: { type: 'string' }, customerNeeds: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 3 }, customerQuestions: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 3 }, trustDrivers: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 3 }, conversionActions: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 2 }, serviceModel: { type: 'string' }, domainVocabulary: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 6 }, tone: { type: 'string' } }, required: ['schemaVersion', 'businessType', 'businessModel', 'audience', 'primaryGoal', 'customerNeeds', 'customerQuestions', 'trustDrivers', 'conversionActions', 'serviceModel', 'domainVocabulary', 'tone'] } })
+const CONTENT_PLAN_SCHEMA = Object.freeze({ name: 'content_plan_v2', schema: { type: 'object', additionalProperties: false, properties: { schemaVersion: { type: 'string', enum: ['content-plan-v2'] }, hero: { type: 'string' }, presentation: { type: 'string' }, services: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 8 }, trust: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 6 }, faq: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 8 }, contact: { type: 'string' }, contentPriorities: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 8 } }, required: ['schemaVersion', 'hero', 'presentation', 'services', 'trust', 'faq', 'contact', 'contentPriorities'] } })
+const EXPERIENCE_PLAN_SCHEMA = Object.freeze({ name: 'experience_plan_v2', schema: { type: 'object', additionalProperties: false, properties: { schemaVersion: { type: 'string', enum: ['experience-plan-v2'] }, archetype: { type: 'string' }, sectionOrder: { type: 'array', items: { type: 'string' }, minItems: 3, maxItems: 8 }, heroVariant: { type: 'string' }, sectionTreatments: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 8 }, contentDensity: { type: 'string' }, ctaPositions: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 5 }, servicesTreatment: { type: 'string' }, trustTreatment: { type: 'string' }, faqTreatment: { type: 'string' }, conversionStrategy: { type: 'string' } }, required: ['schemaVersion', 'archetype', 'sectionOrder', 'heroVariant', 'sectionTreatments', 'contentDensity', 'ctaPositions', 'servicesTreatment', 'trustTreatment', 'faqTreatment', 'conversionStrategy'] } })
 
 async function probeMinimal(provider) { return provider.request({ input: [{ role: 'user', content: [{ type: 'input_text', text: 'Respondé únicamente OK.' }] }], maxOutputTokens: OUTPUT_BUDGETS.minimal_probe, reasoningEffort: 'low' }) }
 async function probeStructured(provider) { return provider.request({ input: [{ role: 'user', content: [{ type: 'input_text', text: 'Devolvé ok=true y label="ready".' }] }], schema: MINIMAL_SCHEMA, maxOutputTokens: OUTPUT_BUDGETS.structured_probe, reasoningEffort: 'low' }) }
@@ -118,7 +134,7 @@ function validateSemanticEnvelope(envelope, { input, provider, sourceRefs } = {}
   const p = envelope?.provenance
   if (!envelope?.decision || !p) throw new TypeError('Invalid SemanticDecisionEnvelope')
   if (!p.operation || !p.provider || !p.model || !p.schemaId || !p.schemaVersion || !p.adapterVersion || !p.requestHash || !p.inputHash || !p.createdAt || Number.isNaN(Date.parse(p.createdAt))) throw new TypeError('Invalid provenance fields')
-  if (!Array.isArray(p.sourceRefs) || !p.sourceRefs.every((ref) => typeof ref === 'string' && ref.startsWith('synthetic-brief:'))) throw new TypeError('Invalid sourceRefs')
+  if (!Array.isArray(p.sourceRefs) || !p.sourceRefs.every((ref) => typeof ref === 'string' && /^(?:synthetic-brief|semantic-source):/u.test(ref))) throw new TypeError('Invalid sourceRefs')
   if (p.responseId !== null && typeof p.responseId !== 'string') throw new TypeError('Invalid responseId')
   if (provider && (p.provider !== provider.providerId || p.model !== provider.model)) throw new TypeError('Provider provenance mismatch')
   if (input !== undefined && p.inputHash !== hash(input)) throw new TypeError('Invalid inputHash')
@@ -127,4 +143,4 @@ function validateSemanticEnvelope(envelope, { input, provider, sourceRefs } = {}
 }
 function providerHealth(provider, probes = {}) { return { configured: true, credentialAvailable: provider.credentialAvailable, enabled: provider.enabled, model: provider.model, transport: probes.transport || 'not_probed', lastProbeStatus: probes.lastProbeStatus || 'not_run', lastProbeDurationMs: probes.lastProbeDurationMs ?? null, structuredOutputs: probes.structuredOutputs || 'not_run', backgroundSupported: false, readyForRealSemanticWork: probes.readyForRealSemanticWork === true } }
 
-module.exports = { DEFAULT_FOREGROUND_TIMEOUT_MS, OUTPUT_BUDGETS, ProviderCallBudget, providerConfig, classifyError, createOpenAISemanticProvider, probeMinimal, probeStructured, probeSemantic, providerHealth, wrapSemanticDecision, validateSemanticEnvelope, MINIMAL_SCHEMA, SEMANTIC_SCHEMA }
+module.exports = { DEFAULT_FOREGROUND_TIMEOUT_MS, OUTPUT_BUDGETS, OUTPUT_BUDGET_POLICY, outputBudgetPolicy, ProviderCallBudget, ProviderRunBudget, providerConfig, classifyError, createOpenAISemanticProvider, probeMinimal, probeStructured, probeSemantic, providerHealth, wrapSemanticDecision, validateSemanticEnvelope, MINIMAL_SCHEMA, SEMANTIC_SCHEMA, CONTENT_PLAN_SCHEMA, EXPERIENCE_PLAN_SCHEMA }

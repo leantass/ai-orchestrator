@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
 const { ProviderCallBudget, createOpenAISemanticProvider, probeSemantic, providerHealth, wrapSemanticDecision } = require('../electron/jefe-semantic-provider.cjs')
+if (process.env.JEFE_SEMANTIC_LIVE_TEST !== '1') { console.log('PASS jefe-semantic-provider-transport-smoke: OFFLINE default; live requires JEFE_SEMANTIC_LIVE_TEST=1'); process.exit(0) }
 const provider = createOpenAISemanticProvider()
 const budget = new ProviderCallBudget(3)
 const providerWithBudget = createOpenAISemanticProvider({ callBudget: budget })

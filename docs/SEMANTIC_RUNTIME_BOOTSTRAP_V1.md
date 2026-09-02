@@ -12,7 +12,11 @@ The bootstraps only wire dependencies. Runtime requests accept semantic IDs and 
 
 Productive semantic mode is explicit and fail-closed: it constructs the existing OpenAI provider and SemanticBrainAdapter, requires provider readiness, structured output and JEFE-owned provenance, and never falls back to local semantic decisions. Synthetic decisions remain available only through internal dependency injection for offline tests.
 
-Foundation status: `REAL_SEMANTIC_PROVIDER_COMPOSITION_V1=PARTIAL`. BusinessUnderstanding real is connected; ContentPlan and ExperiencePlan real provider operations are `NOT_YET_CONNECTED`. The prior wiring task requested three provider calls and consumed four because an output-budget retry and a repeated live smoke were run; this checkpoint makes no provider calls. A run-level provider budget remains required for the next execution.
+Foundation status: `COMPLETE_REAL_SEMANTIC_PLAN_WIRING_V1=IMPLEMENTED_PENDING_LIVE_VALIDATION`. Productive composition coordinates BusinessUnderstandingV2, ContentPlanV2 and ExperiencePlanV2 through the same SemanticBrainAdapter/provider boundary; deterministic code only validates and maps the resulting plans. The prior wiring task requested three provider calls and consumed four because an output-budget retry and a repeated live smoke were run; this block adds a shared run-level budget and makes no live calls by default.
+
+All provider-capable smokes default to offline. A live smoke requires the explicit process flag `JEFE_SEMANTIC_LIVE_TEST=1`; credential presence alone never enables network calls. `ProviderRunBudget` is shared by the composition and its provider instances, so retries, concurrent reservations and new adapters consume the same hard ceiling.
+
+Output budgets are operation-specific and leave headroom for reasoning plus visible JSON: the normal BU + ContentPlan + ExperiencePlan path expects three calls, while one output retry per operation has a six-call theoretical worst case. This output budget is separate from the run-level provider ceiling.
 
 Provider enablement is unchanged. The isolated bootstrap smokes inject only a synthetic decision dependency and perform zero provider calls. Normal runtime configuration does not accept arbitrary plans or test candidates.
 
