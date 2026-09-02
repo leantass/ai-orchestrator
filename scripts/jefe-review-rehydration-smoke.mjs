@@ -38,10 +38,11 @@ async function openAndInspect(url) {
   const evaluate = async (expression) => (await run('Runtime.evaluate', { expression, returnByValue: true })).result.value
   for (let attempt = 0; attempt < 40; attempt += 1) { if (await evaluate("document.body.innerText.includes('Preview rehydration')")) break; await wait(250) }
   const inspect = () => evaluate(`(() => ({ title: document.title, controls: [...document.querySelectorAll('button')].map((button) => button.innerText.trim()), text: document.body.innerText, path: location.pathname }))()`)
+  const waitForWorkspace = async () => { for (let attempt = 0; attempt < 40; attempt += 1) { const state = await inspect(); if (state.text.includes('Preview rehydration') && state.text.includes('Aprobar preview')) return state; await wait(100) } throw new Error('WORKSPACE_REHYDRATION_TIMEOUT') }
   check((await inspect()).text.includes('Aprobar preview'), 'la decisión durable aparece al entrar al workspace')
-  await run('Page.navigate', { url: `${webRuntime.url}/projects` }); await wait(400); await run('Page.navigate', { url }); await wait(700)
+  await run('Page.navigate', { url: `${webRuntime.url}/projects` }); await wait(400); await run('Page.navigate', { url }); await waitForWorkspace()
   check((await inspect()).text.includes('Aprobar preview'), 'la decisión se rehidrata al volver desde Proyectos')
-  await run('Page.reload'); await wait(700)
+  await run('Page.reload'); await waitForWorkspace()
   const afterRefresh = await inspect(); check(afterRefresh.text.includes('Aprobar preview'), 'la decisión se rehidrata después de refresh')
   check(afterRefresh.path.includes('/projects/rehydration-project/versions/rehydration-version'), 'deep-link permanece en el proyecto y versión')
 }

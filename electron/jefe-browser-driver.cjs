@@ -48,6 +48,7 @@ async function connect(target) {
     }
     if (message.method) for (const listener of listeners.get(message.method) || []) listener(message.params || {})
   })
+  socket.addEventListener('close', () => { for (const [id, request] of pending) { clearTimeout(request.timer); pending.delete(id); request.reject(Object.assign(new Error('CDP connection closed'), { code: 'CDP_CONNECTION_CLOSED', commandId: id })) } })
 
   const command = (method, params = {}, timeout = 5000) => new Promise((resolve, reject) => {
     const id = ++sequence
@@ -64,8 +65,7 @@ async function connect(target) {
     const result = await evaluate(`(() => { const element=document.querySelector(${JSON.stringify(selector)}); if(!element) return { found:false }; element.focus(); const style=getComputedStyle(element); const rect=element.getBoundingClientRect(); return { found:true, active:document.activeElement===element, focusable:typeof element.focus==='function', visible:rect.width>0&&rect.height>0, outline:style.outlineStyle, shadow:style.boxShadow } })()`)
     if (!result?.found) throw new Error('ELEMENT_NOT_FOUND')
     if (!result.active) throw new Error('FOCUS_NOT_OBSERVED')
-    if (!result.visible || (result.outline === 'none' && result.shadow === 'none')) throw new Error('FOCUS_NOT_VISIBLE')
-    return result
+    return { ...result, focusVisible: result.visible && (result.outline !== 'none' || result.shadow !== 'none') }
   }
   const press = async (key, modifiers = []) => {
     const modifierNames = new Set(modifiers)
@@ -129,7 +129,7 @@ async function connect(target) {
   }
 
   return {
-    url: target.url, command, evaluate, on, events, setViewport, getViewportMetrics, assertUsableViewport, goto, click,
+    targetId: target.id || target.targetId, url: target.url, command, evaluate, on, events, setViewport, getViewportMetrics, assertUsableViewport, goto, click,
     focus, type, press, waitForFunction, waitForSelector, measureOverflow, close: () => socket.close()
   }
 }
@@ -151,6 +151,8 @@ async function launch({ url, headless = true, timeout = 10000 } = {}) {
     executable: path.basename(exe), headless,
     async targets() { return fetch(`http://127.0.0.1:${debugPort}/json/list`).then((response) => response.json()) },
     async waitForTarget(predicate, waitTimeout = 5000) { for (let elapsed = 0; elapsed < waitTimeout; elapsed += 100) { const found = (await this.targets()).find(predicate); if (found) return found; await delay(100) } throw new Error('POPUP_TIMEOUT') },
+    async waitForPopup(predicate = (item) => item.type === 'page' && item.url.startsWith('http'), waitTimeout = 5000) { const before = new Set((await this.targets()).map((item) => item.id || item.targetId)); return this.waitForTarget((item) => !before.has(item.id || item.targetId) && predicate(item), waitTimeout) },
+    async closeTarget(targetId) { const response = await fetch(`http://127.0.0.1:${debugPort}/json/close/${encodeURIComponent(targetId)}`); if (!response.ok) throw new Error('CDP_TARGET_CLOSE_FAILED'); return true },
     async page() { const page = await connect(target); await page.command('Page.enable'); await page.command('Runtime.enable'); await page.command('DOM.enable'); await page.command('Network.enable'); contexts.push(page); return page },
     async close() { contexts.forEach((page) => page.close()); child.kill(); await delay(200); await fsp.rm(profile, { recursive: true, force: true }).catch(() => {}) }
   }
