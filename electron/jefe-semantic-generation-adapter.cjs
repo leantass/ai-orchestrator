@@ -21,10 +21,11 @@ function question(value) {
   const clean = String(value || '').trim().replace(/^[¿?\s]+|[¿?\s]+$/gu, '')
   return `¿${clean.charAt(0).toLocaleUpperCase('es-AR') + clean.slice(1)}?`
 }
-function semanticFaq(value) {
+function semanticFaq(value, businessUnderstanding, index) {
+  const context = businessUnderstanding.customerNeeds[index % businessUnderstanding.customerNeeds.length]
   return String(value || '').trim().endsWith('?')
-    ? { question: question(value), answer: `${sentence(value, 'La respuesta se define con el contexto disponible')} Para orientar el próximo paso.`, source: 'businessUnderstanding.customerQuestions' }
-    : { question: question(value), answer: sentence(value, 'La respuesta se define con el contexto disponible'), source: 'businessUnderstanding.customerQuestions' }
+    ? { question: question(value), answer: `${sentence(value, 'La respuesta se define con el contexto disponible')} ${sentence(context, 'Para orientar el próximo paso')}`, source: 'businessUnderstanding.customerQuestions' }
+    : { question: question(value), answer: `${sentence(value, 'La respuesta se define con el contexto disponible')} ${sentence(context, 'Para orientar el próximo paso')}`, source: 'businessUnderstanding.customerQuestions' }
 }
 function semanticServices(values) {
   return values.map((value) => {
@@ -33,8 +34,8 @@ function semanticServices(values) {
     return { title, description, source: 'brief.services' }
   })
 }
-function semanticTrust(values) {
-  return values.map((value, index) => ({ title: ['Criterio claro', 'Alcance visible', 'Acompañamiento profesional', 'Revisión explícita'][index] || 'Confianza', description: sentence(value, 'Criterio explicado para avanzar'), source: 'businessUnderstanding.trustDrivers' }))
+function semanticTrust(values, businessUnderstanding) {
+  return values.map((value, index) => ({ title: ['Criterio claro', 'Alcance visible', 'Acompañamiento profesional', 'Revisión explícita'][index] || 'Confianza', description: `${sentence(value, 'Criterio explicado para avanzar')} ${sentence(businessUnderstanding.trustDrivers[index % businessUnderstanding.trustDrivers.length], 'Criterio explicado para avanzar')}`, source: 'businessUnderstanding.trustDrivers' }))
 }
 function buildSectionContracts(sections) {
   return sections.map((section) => ({ id: section, component: section === 'inicio' ? 'hero' : section === 'contacto' ? 'conversion-form' : section, source: `ExperiencePlan.sections.${section}`, qaCriteria: 'section exists exactly once and is customer-facing' }))
@@ -48,8 +49,8 @@ function adaptSemanticPlansToPlanning({ sourcePlanning, businessUnderstanding, c
   if (!sections.length || new Set(sections).size !== sections.length) fail('ExperiencePlanV2 sectionOrder is invalid.')
   const services = semanticServices(content.services)
   const trust = content.trust.map((item) => sentence(item, 'Criterio explicado para avanzar'))
-  const trustItems = semanticTrust(content.trust)
-  const faq = content.faq.map(semanticFaq)
+  const trustItems = semanticTrust(content.trust, bu)
+  const faq = content.faq.map((item, index) => semanticFaq(item, bu, index))
   if (!content.hero || !content.presentation || !services.length || !trust.length || faq.length < 4 || !content.contact) fail('ContentPlanV2 customer-facing content is incomplete.')
   const nextBrief = { ...sourcePlanning.brief, audience: bu.audience || sourcePlanning.brief.audience, objective: bu.primaryGoal || sourcePlanning.brief.objective }
   const nextStrategy = { ...sourcePlanning.strategy, audience: bu.audience || sourcePlanning.strategy.audience, primaryMessage: sentence(content.hero, sourcePlanning.strategy.primaryMessage) }

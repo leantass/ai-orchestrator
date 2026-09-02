@@ -35,6 +35,7 @@ const htmlB = await fs.readFile(path.join(candidateB.projectRoot, 'app', 'index.
 assert.notEqual(htmlA, htmlB)
 assert.match(htmlA, /Hero semántico A/u); assert.match(htmlA, /Servicio A/u); assert.match(htmlA, /Consultar A/u)
 assert.match(htmlB, /Hero semántico B/u); assert.match(htmlB, /Servicio C/u); assert.match(htmlB, /Consultar B/u)
+assert.match(htmlA, /comparar opciones/u); assert.match(htmlA, /Método visible/u)
 assert.ok(htmlA.indexOf('id="servicios"') < htmlA.indexOf('id="confianza"'))
 assert.ok(htmlB.indexOf('id="confianza"') < htmlB.indexOf('id="servicios"'))
 assert.doesNotMatch(htmlA, /Hero legacy/u); assert.doesNotMatch(htmlB, /Hero legacy/u)
