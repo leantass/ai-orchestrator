@@ -11,6 +11,7 @@ const OUTPUT_BUDGET_POLICY = Object.freeze({
 })
 const OUTPUT_BUDGETS = Object.freeze(Object.fromEntries(Object.entries(OUTPUT_BUDGET_POLICY).map(([key, value]) => [key, value.initialOutputBudget])))
 function outputBudgetPolicy(operation) { return OUTPUT_BUDGET_POLICY[operation] || OUTPUT_BUDGET_POLICY.business_understanding }
+const BACKGROUND_DEFAULTS = Object.freeze({ deadlineMs: 300000, initialDelayMs: 2000, intervalMs: 2500, maxPollRequests: 80, pollRetryMax: 2 })
 
 class ProviderCallBudget {
   constructor(maxCalls = 3, runId = null) { this.runId = runId; this.maxCalls = maxCalls; this.callsUsed = 0; this.reservations = []; this.operationCounts = {}; this.queue = Promise.resolve() }
@@ -35,6 +36,11 @@ function providerConfig({ env = process.env } = {}) {
     reasoningEffort: env.AI_ORCHESTRATOR_SEMANTIC_REASONING?.trim() || 'low',
     foregroundTimeoutMs: Math.max(5000, Number.parseInt(env.AI_ORCHESTRATOR_SEMANTIC_FOREGROUND_TIMEOUT_MS || String(DEFAULT_FOREGROUND_TIMEOUT_MS), 10) || DEFAULT_FOREGROUND_TIMEOUT_MS),
     retryMax: Math.min(DEFAULT_RETRY_MAX, Math.max(0, Number.parseInt(env.AI_ORCHESTRATOR_SEMANTIC_RETRY_MAX || String(DEFAULT_RETRY_MAX), 10) || DEFAULT_RETRY_MAX)),
+    backgroundDeadlineMs: Math.max(1000, Number.parseInt(env.AI_ORCHESTRATOR_SEMANTIC_BACKGROUND_DEADLINE_MS || String(BACKGROUND_DEFAULTS.deadlineMs), 10) || BACKGROUND_DEFAULTS.deadlineMs),
+    backgroundInitialDelayMs: Math.max(0, Number.parseInt(env.AI_ORCHESTRATOR_SEMANTIC_BACKGROUND_INITIAL_DELAY_MS || String(BACKGROUND_DEFAULTS.initialDelayMs), 10) || 0),
+    backgroundIntervalMs: Math.min(5000, Math.max(0, Number.parseInt(env.AI_ORCHESTRATOR_SEMANTIC_BACKGROUND_INTERVAL_MS || String(BACKGROUND_DEFAULTS.intervalMs), 10) || 0)),
+    backgroundMaxPollRequests: Math.max(1, Number.parseInt(env.AI_ORCHESTRATOR_SEMANTIC_BACKGROUND_MAX_POLLS || String(BACKGROUND_DEFAULTS.maxPollRequests), 10) || BACKGROUND_DEFAULTS.maxPollRequests),
+    backgroundPollRetryMax: Math.max(0, Number.parseInt(env.AI_ORCHESTRATOR_SEMANTIC_BACKGROUND_POLL_RETRY_MAX || String(BACKGROUND_DEFAULTS.pollRetryMax), 10) || 0),
     outputBudgets: OUTPUT_BUDGETS,
   }
 }
@@ -57,16 +63,21 @@ function extractResponseText(payload) {
   for (const item of Array.isArray(payload?.output) ? payload.output : []) for (const part of Array.isArray(item?.content) ? item.content : []) if (typeof part?.text === 'string') return part.text
   return ''
 }
+function parseProviderPayload(text) { try { return JSON.parse(text) } catch { return null } }
 
-function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, now = Date.now, callBudget = null } = {}) {
+function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, now = Date.now, sleepImpl = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), callBudget = null } = {}) {
   const config = providerConfig({ env })
+  const transportStats = { generationRequests: 0, pollRequests: 0, cancelRequests: 0, totalHttpRequests: 0 }
+  const transport = (kind) => { transportStats[`${kind}Requests`] += 1; transportStats.totalHttpRequests += 1 }
   return Object.freeze({
     providerId: 'openai-semantic',
     model: config.model,
     enabled: env.AI_ORCHESTRATOR_SEMANTIC_BRAIN_ENABLED === 'true' || env.AI_ORCHESTRATOR_BRAIN_PROVIDER?.trim() === 'openai',
     credentialAvailable: Boolean(config.apiKey),
-    async request({ input, schema = null, maxOutputTokens = 600, reasoningEffort = config.reasoningEffort, timeoutMs = config.foregroundTimeoutMs, retries = config.retryMax, outputBudgetRetryMax = 0, operation = 'semantic', retryOutputBudget = null } = {}) {
+    transportStats,
+    async request({ input, schema = null, maxOutputTokens = 600, reasoningEffort = config.reasoningEffort, timeoutMs = config.foregroundTimeoutMs, retries = config.retryMax, outputBudgetRetryMax = 0, operation = 'semantic', retryOutputBudget = null, executionMode = 'foreground' } = {}) {
       if (!config.apiKey) throw Object.assign(new Error('OPENAI_CREDENTIAL_MISSING'), { category: 'MODEL_ERROR' })
+      if (executionMode === 'background') return this.requestBackground({ input, schema, maxOutputTokens, reasoningEffort, outputBudgetRetryMax, operation, retryOutputBudget })
       let attempt = 0; let outputBudgetRetry = 0; let currentMaxOutputTokens = maxOutputTokens; const budgets = []
       while (true) {
         if (callBudget && !(await callBudget.reserve(operation))) return { ok: false, status: 0, errorCategory: 'PROVIDER_CALL_BUDGET_EXHAUSTED', telemetry: { attempts: attempt, budgets, providerBudget: callBudget.snapshot?.() || null } }
@@ -104,9 +115,40 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
         } finally { clearTimeout(timer) }
       }
     },
-    async decide({ operation = 'business_understanding', input, schema = SEMANTIC_SCHEMA, sourceRefs = [], outputBudgetRetryMax = 1 } = {}) {
+    async requestBackground({ input, schema = null, maxOutputTokens = 600, reasoningEffort = config.reasoningEffort, outputBudgetRetryMax = 0, operation = 'semantic', retryOutputBudget = null } = {}) {
+      let outputBudgetRetry = 0; let currentMaxOutputTokens = maxOutputTokens
+      while (true) {
+        if (callBudget && !(await callBudget.reserve(operation))) return { ok: false, status: 0, errorCategory: 'PROVIDER_CALL_BUDGET_EXHAUSTED', telemetry: { executionMode: 'background', providerBudget: callBudget.snapshot?.() || null, transportStats } }
+        const startedAt = now(); const requestBody = { model: config.model, input, max_output_tokens: currentMaxOutputTokens, background: true, store: false, reasoning: { effort: reasoningEffort } }
+        if (schema) requestBody.text = { format: { type: 'json_schema', name: schema.name, strict: true, schema: schema.schema } }
+        transport('generation')
+        let response
+        try { response = await fetchImpl(config.baseUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` }, body: JSON.stringify(requestBody) }) } catch (error) { return { ok: false, status: 0, errorCategory: classifyError(error), telemetry: { executionMode: 'background', durationMs: now() - startedAt, transportStats } } }
+        const payload = parseProviderPayload(await response.text())
+        if (!response.ok) return { ok: false, status: response.status, errorCategory: classifyError(null, { status: response.status }), telemetry: { executionMode: 'background', durationMs: now() - startedAt, transportStats } }
+        const responseId = payload?.id
+        if (!responseId) return { ok: false, status: response.status, errorCategory: 'SCHEMA_ERROR', telemetry: { executionMode: 'background', durationMs: now() - startedAt, transportStats } }
+        let status = payload.status || 'queued'; let completed = payload; let pollRequests = 0; let lastPollError = null
+        while (['queued', 'in_progress'].includes(status)) {
+          if (now() - startedAt >= config.backgroundDeadlineMs || pollRequests >= config.backgroundMaxPollRequests) {
+            let cancelStatus = 'not_attempted'; transport('cancel')
+            try { const cancel = await fetchImpl(`${config.baseUrl}/${encodeURIComponent(responseId)}/cancel`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` } }); cancelStatus = cancel.ok ? 'accepted' : `http_${cancel.status}` } catch { cancelStatus = 'failed' }
+            return { ok: false, status, errorCategory: 'BACKGROUND_DEADLINE_EXCEEDED', responseId, telemetry: { executionMode: 'background', durationMs: now() - startedAt, pollRequests, cancelAttempted: true, cancelStatus, transportStats, lastPollError } }
+          }
+          await sleepImpl(pollRequests === 0 ? config.backgroundInitialDelayMs : config.backgroundIntervalMs)
+          pollRequests += 1; transport('poll')
+          try { const polled = await fetchImpl(`${config.baseUrl}/${encodeURIComponent(responseId)}`, { method: 'GET', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` } }); if (!polled.ok) throw Object.assign(new Error('poll http'), { status: polled.status }); completed = parseProviderPayload(await polled.text()) || {}; status = completed.status || 'failed' } catch (error) { lastPollError = classifyError(error, { status: error.status || 0 }); if (pollRequests >= config.backgroundMaxPollRequests) return { ok: false, status, errorCategory: 'BACKGROUND_POLL_FAILED', responseId, telemetry: { executionMode: 'background', durationMs: now() - startedAt, pollRequests, transportStats, lastPollError } } }
+        }
+        const telemetry = { executionMode: 'background', durationMs: now() - startedAt, responseId, pollRequests, transportStats: { ...transportStats } }
+        if (status === 'incomplete' && completed.incomplete_details?.reason === 'max_output_tokens' && outputBudgetRetry < outputBudgetRetryMax) { outputBudgetRetry += 1; currentMaxOutputTokens = retryOutputBudget || currentMaxOutputTokens * 2; continue }
+        if (status === 'incomplete') return { ok: false, status, incompleteReason: completed.incomplete_details?.reason || null, errorCategory: completed.incomplete_details?.reason === 'max_output_tokens' ? 'OUTPUT_BUDGET_EXHAUSTED' : 'SCHEMA_ERROR', responseId, telemetry }
+        if (status === 'failed' || status === 'cancelled') return { ok: false, status, errorCategory: 'MODEL_ERROR', responseId, telemetry }
+        return { ok: true, status, text: extractResponseText(completed), payload: completed, responseId, telemetry }
+      }
+    },
+    async decide({ operation = 'business_understanding', input, schema = SEMANTIC_SCHEMA, sourceRefs = [], outputBudgetRetryMax = 1, executionMode = 'foreground' } = {}) {
       const policy = outputBudgetPolicy(operation)
-      const result = await this.request({ input, schema, maxOutputTokens: policy.initialOutputBudget, reasoningEffort: config.reasoningEffort, outputBudgetRetryMax, operation, retryOutputBudget: policy.retryOutputBudget })
+      const result = await this.request({ input, schema, maxOutputTokens: policy.initialOutputBudget, reasoningEffort: config.reasoningEffort, outputBudgetRetryMax, operation, retryOutputBudget: policy.retryOutputBudget, executionMode })
       if (!result.ok) throw Object.assign(new Error(result.errorCategory || 'SEMANTIC_PROVIDER_FAILED'), { code: result.errorCategory || 'SEMANTIC_PROVIDER_FAILED', telemetry: result.telemetry })
       let decision
       try { decision = JSON.parse(result.text) } catch { throw Object.assign(new Error('SEMANTIC_STRUCTURED_OUTPUT_INVALID'), { code: 'SEMANTIC_STRUCTURED_OUTPUT_INVALID' }) }
@@ -143,4 +185,4 @@ function validateSemanticEnvelope(envelope, { input, provider, sourceRefs } = {}
 }
 function providerHealth(provider, probes = {}) { return { configured: true, credentialAvailable: provider.credentialAvailable, enabled: provider.enabled, model: provider.model, transport: probes.transport || 'not_probed', lastProbeStatus: probes.lastProbeStatus || 'not_run', lastProbeDurationMs: probes.lastProbeDurationMs ?? null, structuredOutputs: probes.structuredOutputs || 'not_run', backgroundSupported: false, readyForRealSemanticWork: probes.readyForRealSemanticWork === true } }
 
-module.exports = { DEFAULT_FOREGROUND_TIMEOUT_MS, OUTPUT_BUDGETS, OUTPUT_BUDGET_POLICY, outputBudgetPolicy, ProviderCallBudget, ProviderRunBudget, providerConfig, classifyError, createOpenAISemanticProvider, probeMinimal, probeStructured, probeSemantic, providerHealth, wrapSemanticDecision, validateSemanticEnvelope, MINIMAL_SCHEMA, SEMANTIC_SCHEMA, CONTENT_PLAN_SCHEMA, EXPERIENCE_PLAN_SCHEMA }
+module.exports = { DEFAULT_FOREGROUND_TIMEOUT_MS, OUTPUT_BUDGETS, OUTPUT_BUDGET_POLICY, BACKGROUND_DEFAULTS, outputBudgetPolicy, ProviderCallBudget, ProviderRunBudget, providerConfig, classifyError, createOpenAISemanticProvider, probeMinimal, probeStructured, probeSemantic, providerHealth, wrapSemanticDecision, validateSemanticEnvelope, MINIMAL_SCHEMA, SEMANTIC_SCHEMA, CONTENT_PLAN_SCHEMA, EXPERIENCE_PLAN_SCHEMA }

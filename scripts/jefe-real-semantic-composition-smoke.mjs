@@ -17,7 +17,7 @@ try {
   const disabled = createSemanticRuntimeComposition({ root, mode: 'productive', env: { ...process.env, AI_ORCHESTRATOR_BRAIN_PROVIDER: '', AI_ORCHESTRATOR_SEMANTIC_BRAIN_ENABLED: 'false', OPENAI_API_KEY: '' } })
   await assert.rejects(() => disabled.decideSemantic({ operation: 'business_understanding', input: [], schema: SEMANTIC_SCHEMA, sourceRefs: ['synthetic-brief:bicycle-service'] }), (error) => error.code === 'SEMANTIC_PROVIDER_NOT_READY')
 
-  const callBudget = new ProviderRunBudget({ runId: 'live-composition-smoke', maxCalls: 4 })
+  const callBudget = new ProviderRunBudget({ runId: 'live-plan-wiring-smoke', maxCalls: 6 })
   const env = { ...process.env, AI_ORCHESTRATOR_BRAIN_PROVIDER: 'openai', AI_ORCHESTRATOR_SEMANTIC_BRAIN_ENABLED: 'true', AI_ORCHESTRATOR_SEMANTIC_REASONING: 'low' }
   const composition = createSemanticRuntimeComposition({ root, mode: 'productive', env, callBudget })
   assert.equal(composition.providerHealth.enabled, true)
@@ -31,7 +31,7 @@ try {
     assert.match(envelope.decision.schemaVersion, /^(business|content|experience)-plan-v2$/u)
     console.log(`${name}=REAL_PROVIDER`)
   }
-  assert.equal(plans.providerBudget.callsUsed, 3)
+  assert.ok(plans.providerBudget.callsUsed >= 3 && plans.providerBudget.callsUsed <= 6)
   assert.equal(plans.providerBudget.exhausted, false)
   console.log(`PASS jefe-real-semantic-composition-smoke: provider=${composition.providerHealth.model}, calls=${plans.providerBudget.callsUsed}/4, structured-output, provenance, no-local-fallback, disabled-fail-closed`)
 } finally {

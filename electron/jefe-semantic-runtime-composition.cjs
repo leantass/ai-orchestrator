@@ -59,9 +59,9 @@ function createSemanticRuntimeComposition({ root, feedbackProvider = null, decis
   async function runSemanticPlans({ brief, correctionPlan = null, feedback = null, preservedQualities = [], sourceRefs = ['synthetic-brief:composition'] } = {}) {
     requireProductiveProvider()
     const input = [{ role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ brief, correctionPlan, feedback, preservedQualities }) }] }]
-    const bu = await decideSemantic({ operation: 'business_understanding', input, schema: SEMANTIC_SCHEMA, sourceRefs, outputBudgetRetryMax: 1 })
-    const content = await decideSemantic({ operation: 'content_plan', input: [{ role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ brief, businessUnderstanding: bu.decision, correctionPlan, preservedQualities }) }] }], schema: CONTENT_PLAN_SCHEMA, sourceRefs, outputBudgetRetryMax: 0 })
-    const experience = await decideSemantic({ operation: 'experience_plan', input: [{ role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ brief, businessUnderstanding: bu.decision, contentPlan: content.decision, correctionPlan, preservedQualities }) }] }], schema: EXPERIENCE_PLAN_SCHEMA, sourceRefs, outputBudgetRetryMax: 0 })
+    const bu = await decideSemantic({ operation: 'business_understanding', input, schema: SEMANTIC_SCHEMA, sourceRefs, outputBudgetRetryMax: 1, executionMode: 'background' })
+    const content = await decideSemantic({ operation: 'content_plan', input: [{ role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ brief, businessUnderstanding: bu.decision, correctionPlan, preservedQualities }) }] }], schema: CONTENT_PLAN_SCHEMA, sourceRefs, outputBudgetRetryMax: 1, executionMode: 'background' })
+    const experience = await decideSemantic({ operation: 'experience_plan', input: [{ role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ brief, businessUnderstanding: bu.decision, contentPlan: content.decision, correctionPlan, preservedQualities }) }] }], schema: EXPERIENCE_PLAN_SCHEMA, sourceRefs, outputBudgetRetryMax: 1, executionMode: 'background' })
     return { businessUnderstanding: bu, contentPlan: content, experiencePlan: experience, providerBudget: runBudget?.snapshot?.() || null }
   }
   return { persistence, preview, promotion, semanticProvider: provider, semanticBrainAdapter: brain, providerHealth: health, providerRunBudget: runBudget, decideSemantic, runSemanticPlans, adapter: createSemanticRuntimeAdapter({ service: promotion, resolveExecution }) }

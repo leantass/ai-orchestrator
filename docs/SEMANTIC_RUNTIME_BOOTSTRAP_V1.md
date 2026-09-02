@@ -18,6 +18,8 @@ All provider-capable smokes default to offline. A live smoke requires the explic
 
 Output budgets are operation-specific and leave headroom for reasoning plus visible JSON: the normal BU + ContentPlan + ExperiencePlan path expects three calls, while one output retry per operation has a six-call theoretical worst case. This output budget is separate from the run-level provider ceiling.
 
+Productive semantic plans request Background Mode explicitly from the provider. The provider uses `background=true` and `store=false`, polls only bounded `queued`/`in_progress` responses, classifies deadline/cancellation separately, and reports generation calls independently from poll and cancel HTTP requests. Probes remain foreground. Background live validation is opt-in and is not run by normal offline smokes.
+
 Provider enablement is unchanged. The isolated bootstrap smokes inject only a synthetic decision dependency and perform zero provider calls. Normal runtime configuration does not accept arbitrary plans or test candidates.
 
 Validation status: Semantic Runtime Adapter PASS; Semantic Runtime Bootstrap PASS; Interactive Human Review NOT_YET_VALIDATED. Full interactive browser QA and Human Gate parity remain outside this checkpoint.
