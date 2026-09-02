@@ -6,15 +6,24 @@ const generation = require('./jefe-real-generation.cjs')
 const { createProjectPersistence } = require('./jefe-project-persistence.cjs')
 const { createPreviewApprovalService } = require('./jefe-preview-approval.cjs')
 const intelligence = require('./jefe-semantic-intelligence.cjs')
+const { createOpenAISemanticProvider, providerHealth } = require('./jefe-semantic-provider.cjs')
 const { buildSemanticGenerationSpec, buildExecutionPackage } = require('./jefe-semantic-correction-lifecycle.cjs')
 const { createSemanticProductionPromotion } = require('./jefe-semantic-production-promotion.cjs')
 const { createSemanticRuntimeAdapter } = require('./jefe-semantic-runtime-adapter.cjs')
 
-function createSemanticRuntimeComposition({ root, feedbackProvider = null, decisionProvider = null } = {}) {
+function createSemanticRuntimeComposition({ root, feedbackProvider = null, decisionProvider = null, semanticProvider = null, semanticBrainAdapter = null, mode = 'synthetic', env = process.env, callBudget = null } = {}) {
   if (typeof root !== 'string' || !path.isAbsolute(root)) throw Object.assign(new Error('A semantic runtime root is required.'), { code: 'INVALID_ROOT' })
   const persistence = createProjectPersistence({ root })
   const preview = createPreviewApprovalService({ root })
   const promotion = createSemanticProductionPromotion({ root })
+  const productive = mode === 'productive'
+  const provider = semanticProvider || (productive ? createOpenAISemanticProvider({ env, callBudget }) : null)
+  const brain = semanticBrainAdapter || (provider ? intelligence.createSemanticBrainAdapter({ provider }) : null)
+  const health = provider ? providerHealth(provider, { readyForRealSemanticWork: provider.enabled && provider.credentialAvailable && Boolean(brain) }) : { configured: false, enabled: false, credentialAvailable: false, model: null, readyForRealSemanticWork: false }
+  function requireProductiveProvider() {
+    if (!productive) return
+    if (!provider || !brain || !health.enabled || !health.credentialAvailable || !health.readyForRealSemanticWork) throw Object.assign(new Error('El provider semántico no está listo.'), { code: 'SEMANTIC_PROVIDER_NOT_READY', details: { configured: Boolean(provider), enabled: Boolean(health.enabled), credentialAvailable: Boolean(health.credentialAvailable), ready: Boolean(health.readyForRealSemanticWork) } })
+  }
   const resolveFeedback = feedbackProvider || (async ({ project, sourceVersionId }) => {
     const approval = await preview.findRejectedApproval(project.projectId, sourceVersionId)
     if (!approval) throw Object.assign(new Error('No rejected human feedback exists for the source version.'), { code: 'HUMAN_FEEDBACK_REQUIRED' })
@@ -22,6 +31,7 @@ function createSemanticRuntimeComposition({ root, feedbackProvider = null, decis
   })
   const resolveDecision = decisionProvider || (async () => ({ semanticGates: 'PASS', preservedQualities: ['business-intent', 'responsive'], prohibitedChanges: ['source-version-immutable'] }))
   const resolveExecution = async ({ projectId, sourceVersionId }) => {
+    requireProductiveProvider()
     const source = await persistence.getVersionRecord(projectId, sourceVersionId)
     if (!source) throw Object.assign(new Error('La versión fuente no existe.'), { code: 'VERSION_NOT_FOUND' })
     const feedback = await resolveFeedback({ project: source.project, sourceVersionId, sourceRecord: source })
@@ -38,7 +48,12 @@ function createSemanticRuntimeComposition({ root, feedbackProvider = null, decis
     await generation.materializeProject({ project: target, destinationRoot: path.join(path.resolve(root), '.jefe-semantic-candidates'), capabilities: registry.CAPABILITY_MATRIX, profileContext: { generationMode: 'semantic_correction', semanticGenerationSpec: generationSpec, projectName: source.project.projectName, businessType: source.project.planning?.businessType, audience: source.project.planning?.audience, brief: source.project.planning?.objective }, providedAssets: [] })
     return { executionPackage: packageValue, sourceManifestPath: source.manifestPath, candidateRoot }
   }
-  return { persistence, preview, promotion, adapter: createSemanticRuntimeAdapter({ service: promotion, resolveExecution }) }
+  async function decideSemantic(input) {
+    requireProductiveProvider()
+    if (!brain || typeof brain.decide !== 'function') throw Object.assign(new Error('El adapter semántico no está configurado.'), { code: 'SEMANTIC_PROVIDER_NOT_READY' })
+    return brain.decide(input)
+  }
+  return { persistence, preview, promotion, semanticProvider: provider, semanticBrainAdapter: brain, providerHealth: health, decideSemantic, adapter: createSemanticRuntimeAdapter({ service: promotion, resolveExecution }) }
 }
 
 module.exports = { createSemanticRuntimeComposition }

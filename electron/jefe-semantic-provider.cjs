@@ -50,7 +50,7 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
   return Object.freeze({
     providerId: 'openai-semantic',
     model: config.model,
-    enabled: env.AI_ORCHESTRATOR_SEMANTIC_BRAIN_ENABLED === 'true',
+    enabled: env.AI_ORCHESTRATOR_SEMANTIC_BRAIN_ENABLED === 'true' || env.AI_ORCHESTRATOR_BRAIN_PROVIDER?.trim() === 'openai',
     credentialAvailable: Boolean(config.apiKey),
     async request({ input, schema = null, maxOutputTokens = 600, reasoningEffort = config.reasoningEffort, timeoutMs = config.foregroundTimeoutMs, retries = config.retryMax, outputBudgetRetryMax = 0 } = {}) {
       if (!config.apiKey) throw Object.assign(new Error('OPENAI_CREDENTIAL_MISSING'), { category: 'MODEL_ERROR' })
@@ -90,6 +90,13 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
           return { ok: false, status: 0, errorCategory: category, telemetry }
         } finally { clearTimeout(timer) }
       }
+    },
+    async decide({ operation = 'business_understanding', input, schema = SEMANTIC_SCHEMA, sourceRefs = [], outputBudgetRetryMax = 1 } = {}) {
+      const result = await this.request({ input, schema, maxOutputTokens: OUTPUT_BUDGETS[operation] || OUTPUT_BUDGETS.business_understanding, reasoningEffort: config.reasoningEffort, outputBudgetRetryMax })
+      if (!result.ok) throw Object.assign(new Error(result.errorCategory || 'SEMANTIC_PROVIDER_FAILED'), { code: result.errorCategory || 'SEMANTIC_PROVIDER_FAILED', telemetry: result.telemetry })
+      let decision
+      try { decision = JSON.parse(result.text) } catch { throw Object.assign(new Error('SEMANTIC_STRUCTURED_OUTPUT_INVALID'), { code: 'SEMANTIC_STRUCTURED_OUTPUT_INVALID' }) }
+      return wrapSemanticDecision({ decision, operation, provider: { ...this, responseId: result.payload?.id || null }, input, sourceRefs })
     },
   })
 }
