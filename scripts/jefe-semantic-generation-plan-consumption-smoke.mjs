@@ -40,6 +40,11 @@ assert.ok(htmlB.indexOf('id="confianza"') < htmlB.indexOf('id="servicios"'))
 assert.doesNotMatch(htmlA, /Hero legacy/u); assert.doesNotMatch(htmlB, /Hero legacy/u)
 assert.throws(() => adaptSemanticPlansToPlanning({ sourcePlanning: source.project.planning, businessUnderstanding: bu, contentPlan: null, experiencePlan: baseExperience }), /ContentPlanV2/u)
 assert.throws(() => adaptSemanticPlansToPlanning({ sourcePlanning: source.project.planning, businessUnderstanding: bu, contentPlan: contentA, experiencePlan: null }), /ExperiencePlanV2/u)
+const genericExperience = { ...baseExperience, sectionOrder: ['inicio', 'presentacion', 'servicios', 'confianza', 'faq', 'contacto'] }
+const genericSpec = specFor(contentA, genericExperience)
+assert.deepEqual(adaptSemanticGenerationSpec(genericSpec).sectionOrder, ['presentacion', 'servicios', 'confianza', 'faq', 'contacto'])
+const labelledExperience = { ...baseExperience, sectionOrder: ['inicio', 'Servicios profesionales', 'Confianza y método', 'Preguntas frecuentes', 'Contacto'] }
+assert.deepEqual(adaptSemanticGenerationSpec(specFor(contentA, labelledExperience)).sectionOrder, ['servicios-profesionales', 'confianza-y-metodo', 'preguntas-frecuentes', 'contacto'])
 assert.equal(adaptSemanticGenerationSpec({ ...specA }).schemaVersion, 'normalized-generation-plan-v1')
 await fs.rm(root, { recursive: true, force: true })
 console.log('PASS jefe-semantic-generation-plan-consumption-smoke: pre-fix conflict reproduced, ContentPlanV2/ExperiencePlanV2 authority, legacy planning excluded, missing plans fail closed, A/B artifacts differ, standard adapter contract preserved')

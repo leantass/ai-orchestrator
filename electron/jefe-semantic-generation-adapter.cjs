@@ -3,6 +3,12 @@ const { validateProductPlanning } = require('./jefe-product-planning.cjs')
 
 function hash(value) { return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex') }
 function fail(message) { throw Object.assign(new Error(message), { code: 'INVALID_SEMANTIC_GENERATION_SPEC' }) }
+function normalizeSectionId(value) {
+  if (typeof value !== 'string' || !value.trim()) fail('sectionOrder contains an invalid section.')
+  const normalized = value.trim().toLocaleLowerCase('es-AR').normalize('NFD').replace(/[\u0300-\u036f]/gu, '').replace(/[^a-z0-9]+/gu, '-').replace(/^-+|-+$/gu, '')
+  if (!/^[a-z][a-z0-9-]{0,31}$/u.test(normalized)) fail('sectionOrder contains an invalid section.')
+  return normalized
+}
 function requiredPlan(value, field, schemaVersion) {
   if (!value || typeof value !== 'object' || value.schemaVersion !== schemaVersion) fail(`${field} with ${schemaVersion} is required.`)
   return value
@@ -38,8 +44,8 @@ function adaptSemanticPlansToPlanning({ sourcePlanning, businessUnderstanding, c
   const bu = requiredPlan(businessUnderstanding, 'BusinessUnderstandingV2', 'business-understanding-v2')
   const content = requiredPlan(contentPlan, 'ContentPlanV2', 'content-plan-v2')
   const experience = requiredPlan(experiencePlan, 'ExperiencePlanV2', 'experience-plan-v2')
-  const sections = [...experience.sectionOrder]
-  if (!sections.length || new Set(sections).size !== sections.length || sections.some((item) => !['inicio', 'relato', 'servicios', 'confianza', 'faq', 'contacto'].includes(item))) fail('ExperiencePlanV2 sectionOrder is invalid.')
+  const sections = experience.sectionOrder.map(normalizeSectionId)
+  if (!sections.length || new Set(sections).size !== sections.length) fail('ExperiencePlanV2 sectionOrder is invalid.')
   const services = semanticServices(content.services)
   const trust = content.trust.map((item) => sentence(item, 'Criterio explicado para avanzar'))
   const trustItems = semanticTrust(content.trust)
@@ -59,10 +65,11 @@ function adaptSemanticGenerationSpec(spec) {
   if (!spec.planning || typeof spec.planning !== 'object') fail('SemanticGenerationSpec must contain structured planning.')
   validateProductPlanning(spec.planning)
   if (!Array.isArray(spec.sectionOrder) || spec.sectionOrder.length === 0) fail('sectionOrder is required.')
-  if (spec.sectionOrder.some((id) => !['relato', 'servicios', 'confianza', 'faq', 'contacto'].includes(id))) fail('sectionOrder contains an unknown section.')
+  const sectionOrder = spec.sectionOrder.map(normalizeSectionId)
+  if (new Set(sectionOrder).size !== sectionOrder.length) fail('sectionOrder contains an invalid section.')
   if (!spec.heroVariant || typeof spec.heroVariant !== 'string' || spec.heroVariant.includes('<')) fail('heroVariant is invalid.')
   if (spec.treatments && (!Array.isArray(spec.treatments) || spec.treatments.some((value) => typeof value !== 'string'))) fail('treatments are invalid.')
   if (spec.assets && (!Array.isArray(spec.assets) || spec.assets.some((value) => typeof value !== 'string' || value.includes('..') || value.startsWith('/')))) fail('assets must be safe relative references.')
-  return { schemaVersion: 'normalized-generation-plan-v1', planning: spec.planning, sectionOrder: [...spec.sectionOrder], heroVariant: spec.heroVariant, treatments: [...(spec.treatments || [])], creativeDirection: spec.creativeDirection || null, contentDensity: spec.contentDensity || 'balanced', ctaStrategy: spec.ctaStrategy || null, preservedQualities: [...(spec.preservedQualities || [])], prohibitedChanges: [...(spec.prohibitedChanges || [])], semanticGenerationSpecHash: hash(spec) }
+  return { schemaVersion: 'normalized-generation-plan-v1', planning: spec.planning, sectionOrder, heroVariant: spec.heroVariant, treatments: [...(spec.treatments || [])], creativeDirection: spec.creativeDirection || null, contentDensity: spec.contentDensity || 'balanced', ctaStrategy: spec.ctaStrategy || null, preservedQualities: [...(spec.preservedQualities || [])], prohibitedChanges: [...(spec.prohibitedChanges || [])], semanticGenerationSpecHash: hash(spec) }
 }
 module.exports = { adaptSemanticGenerationSpec, adaptSemanticPlansToPlanning }
