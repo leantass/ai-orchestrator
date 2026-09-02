@@ -113,6 +113,8 @@ async function materializeProject({ project, destinationRoot, capabilities, prof
   if (typeof destinationRoot !== 'string' || !path.isAbsolute(destinationRoot)) fail('INVALID_DESTINATION_ROOT', 'destinationRoot debe ser absoluto.')
   const root = path.resolve(destinationRoot); const versionId = project.activeVersionId
   const normalizedProfileContext = profileContext.generationMode === 'semantic_correction' ? { ...profileContext, normalizedGenerationPlan: adaptSemanticGenerationSpec(profileContext.semanticGenerationSpec) } : profileContext
+  const effectivePlanning = normalizedProfileContext.normalizedGenerationPlan?.planning || project.planning
+  const materializedProject = effectivePlanning === project.planning ? project : { ...project, planning: effectivePlanning }
   const projectRoot = resolveInside(root, path.join(project.projectId, versionId), 'project root'); const manifestPath = resolveInside(projectRoot, 'manifest.json', 'manifest path')
   if (fs.existsSync(projectRoot)) fail('VERSION_COLLISION', 'La versión ya tiene un directorio materializado.', { projectId: project.projectId, versionId, projectRoot })
   const stagingRoot = resolveInside(root, path.join('.jefe-staging', `${project.projectId}-${versionId}`), 'staging root')
@@ -132,10 +134,10 @@ async function materializeProject({ project, destinationRoot, capabilities, prof
   let qualityReport = null
   let contentQualityReport = null
   if (project.generationProfile === 'commercial_site') {
-    validateProductPlanning(project.planning)
-    contentQualityReport = assertContentQuality(project.planning)
+    validateProductPlanning(effectivePlanning)
+    contentQualityReport = assertContentQuality(effectivePlanning)
     const stylesheet = artifacts.find((entry) => entry.relativePath === 'app/styles.css'); const script = artifacts.find((entry) => entry.relativePath === 'app/app.js'); const html = artifacts.find((entry) => entry.relativePath === 'app/index.html')
-    validateGeneratedArtifact(project.planning, { html: html?.content, css: stylesheet?.content, js: script?.content })
+    validateGeneratedArtifact(effectivePlanning, { html: html?.content, css: stylesheet?.content, js: script?.content })
     qualityReport = assertArtifactQuality({ html: html?.content, css: stylesheet?.content, js: script?.content })
   }
   artifacts.push(artifact('assets/input/input-assets.json', `${JSON.stringify({ files: assetMetadata, urlReferences: project.inputAssets.urlReferences || [] }, null, 2)}\n`))
@@ -146,7 +148,7 @@ async function materializeProject({ project, destinationRoot, capabilities, prof
     const copiedAssetPaths = [...sourceByName.keys()].map((name) => `assets/input/${name}`)
     if (logo) { const logoContent = sourceByName.get(logo.safeName); await writeArtifact(stagingRoot, artifact(`app/assets/logo${logoExtension}`, logoContent, Buffer.isBuffer(logoContent) ? undefined : 'utf8')); await writeArtifact(stagingRoot, artifact(`app/favicon${logoExtension}`, logoContent, Buffer.isBuffer(logoContent) ? undefined : 'utf8')); copiedAssetPaths.push(`app/assets/logo${logoExtension}`, `app/favicon${logoExtension}`) }
     const portableArtifacts = artifacts.map((entry) => entry.relativePath.replace(/\\/gu, '/')).sort()
-    const manifest = stable({ schemaVersion: 'jefe-project-manifest/v1', contract: project, profileContext: effectiveProfileContext, artifactPaths: portableArtifacts.concat(copiedAssetPaths).sort(), physicalPaths: { projectRoot: '.', manifestPath: 'manifest.json' }, materialization: { status: 'materialized_local', generatedAt: project.timestamps.updatedAt, ...(qualityReport ? { visualQuality: qualityReport } : {}), ...(contentQualityReport ? { contentQuality: contentQualityReport } : {}) } })
+    const manifest = stable({ schemaVersion: 'jefe-project-manifest/v1', contract: materializedProject, profileContext: effectiveProfileContext, artifactPaths: portableArtifacts.concat(copiedAssetPaths).sort(), physicalPaths: { projectRoot: '.', manifestPath: 'manifest.json' }, materialization: { status: 'materialized_local', generatedAt: project.timestamps.updatedAt, ...(qualityReport ? { visualQuality: qualityReport } : {}), ...(contentQualityReport ? { contentQuality: contentQualityReport } : {}) } })
     await writeArtifact(stagingRoot, artifact('manifest.json', `${JSON.stringify(manifest, null, 2)}\n`))
     if (project.generationProfile === 'commercial_site') {
       const persistedPlanning = JSON.parse(await fs.promises.readFile(resolveInside(stagingRoot, 'data/planning.json', 'planning artifact'), 'utf8')); const persistedManifest = JSON.parse(await fs.promises.readFile(resolveInside(stagingRoot, 'manifest.json', 'manifest artifact'), 'utf8'))

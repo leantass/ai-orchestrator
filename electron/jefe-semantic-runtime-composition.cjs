@@ -8,6 +8,7 @@ const { createPreviewApprovalService } = require('./jefe-preview-approval.cjs')
 const intelligence = require('./jefe-semantic-intelligence.cjs')
 const { createOpenAISemanticProvider, providerHealth, SEMANTIC_SCHEMA, CONTENT_PLAN_SCHEMA, EXPERIENCE_PLAN_SCHEMA, ProviderRunBudget } = require('./jefe-semantic-provider.cjs')
 const { buildSemanticGenerationSpec, buildExecutionPackage } = require('./jefe-semantic-correction-lifecycle.cjs')
+const { adaptSemanticPlansToPlanning } = require('./jefe-semantic-generation-adapter.cjs')
 const { createSemanticProductionPromotion } = require('./jefe-semantic-production-promotion.cjs')
 const { createSemanticRuntimeAdapter } = require('./jefe-semantic-runtime-adapter.cjs')
 
@@ -43,7 +44,8 @@ function createSemanticRuntimeComposition({ root, feedbackProvider = null, decis
     const contentPlan = realPlans ? realPlans.contentPlan.decision : intelligence.buildContentPlanV2(understanding)
     const experiencePlan = realPlans ? realPlans.experiencePlan.decision : intelligence.buildExperiencePlanV2(understanding)
     const decision = await resolveDecision({ project: source.project, sourceVersionId, feedback, understanding, contentPlan, experiencePlan })
-    const generationSpec = { ...buildSemanticGenerationSpec({ contentPlan, experiencePlan, creativeDirection: source.project.visualDirection, preservedQualities: decision.preservedQualities, prohibitedChanges: decision.prohibitedChanges }), planning: source.project.planning, sectionOrder: ['relato', 'servicios', 'confianza', 'faq', 'contacto'], heroVariant: 'focused', treatments: ['semantic-correction'], contentDensity: 'balanced', ctaStrategy: 'consultation' }
+    const semanticPlanning = adaptSemanticPlansToPlanning({ sourcePlanning: source.project.planning, businessUnderstanding: understanding, contentPlan, experiencePlan })
+    const generationSpec = { ...buildSemanticGenerationSpec({ contentPlan, experiencePlan, creativeDirection: source.project.visualDirection, preservedQualities: decision.preservedQualities, prohibitedChanges: decision.prohibitedChanges }), planning: semanticPlanning, sectionOrder: experiencePlan.sectionOrder.filter((item) => item !== 'inicio'), heroVariant: experiencePlan.heroVariant, treatments: experiencePlan.sectionTreatments, contentDensity: experiencePlan.contentDensity, ctaStrategy: experiencePlan.conversionStrategy, semanticRefs: { businessUnderstanding: 'BusinessUnderstandingV2', contentPlan: 'ContentPlanV2', experiencePlan: 'ExperiencePlanV2' }, provenance: { source: 'JEFE', generatedBy: 'JEFE', generatedByModel: false } }
     const packageValue = buildExecutionPackage({ correctionPlan, businessUnderstanding: understanding, contentPlan, experiencePlan, semanticGates: decision.semanticGates, provenance: { source: 'JEFE', generatedBy: 'JEFE' }, generationSpec, humanFeedbackRef: `human-feedback:${feedback.correctionId || sourceVersionId}`, sourceProjectId: projectId, sourceVersionId, sourceSnapshotSha256: feedback.snapshot.snapshotSha256, correctionId: feedback.correctionId || `correction-${sourceVersionId}` })
     const candidateRoot = path.join(path.resolve(root), '.jefe-semantic-candidates', projectId, 'version-candidate')
     await fs.rm(candidateRoot, { recursive: true, force: true })
