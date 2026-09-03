@@ -2,6 +2,7 @@ const fs = require('node:fs/promises')
 const path = require('node:path')
 const crypto = require('node:crypto')
 const { assessArtifact, assessContentQuality } = require('./jefe-generator-quality.cjs')
+const { compareGeneratedContent } = require('./jefe-product-planning.cjs')
 
 function planFidelity({ html, spec }) {
   const source = String(html || '')
@@ -9,8 +10,10 @@ function planFidelity({ html, spec }) {
   const expected = Array.isArray(spec?.sectionOrder) ? spec.sectionOrder : []
   const missing = expected.filter((id) => !source.includes(`id="${id}"`) && !source.includes(`id='${id}'`))
   const actualExpectedOrder = order.filter((id) => expected.includes(id))
-  const pass = missing.length === 0 && (actualExpectedOrder.length === 0 || expected.every((id, index) => actualExpectedOrder[index] === id))
-  return { pass, status: pass ? 'PASS' : 'NEEDS_CORRECTION', expectedOrder: expected, actualOrder: order, comparedOrder: actualExpectedOrder, missing }
+  const orderPass = missing.length === 0 && (actualExpectedOrder.length === 0 || expected.every((id, index) => actualExpectedOrder[index] === id))
+  const content = compareGeneratedContent(spec?.planning, source)
+  const pass = orderPass && content.pass
+  return { pass, status: pass ? 'PASS' : 'NEEDS_CORRECTION', expectedOrder: expected, actualOrder: order, comparedOrder: actualExpectedOrder, missing, content }
 }
 function independence({ html, css, js }) { const source = `${html}\n${css}\n${js}`; const findings = []; if (/\b(?:electron|preload|ipc)\b|file:\/\//iu.test(source)) findings.push('runtime dependency detected'); if (/(?:src|href)=["'](?:[a-z]:|\/|https?:)/iu.test(html)) findings.push('unsafe asset path'); return { pass: findings.length === 0, findings } }
 function aggregate(reports) { const required = ['semanticPreGate', 'semanticPlanFidelity', 'artifactIndependence', 'visualQuality', 'contentQuality']; const pass = required.every((key) => reports[key]?.pass === true); return { ...reports, overallStatus: pass ? 'PASS' : 'NEEDS_CORRECTION', eligibleForPromotion: pass } }

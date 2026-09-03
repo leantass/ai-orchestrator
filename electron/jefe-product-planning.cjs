@@ -84,6 +84,25 @@ function color(value) {
   const clean = text(value, 'color', 20).toUpperCase()
   return /^#[0-9A-F]{6}$/u.test(clean) ? clean : null
 }
+function decodeHtmlEntities(value) { return String(value || '').replace(/&amp;/gu, '&').replace(/&lt;/gu, '<').replace(/&gt;/gu, '>').replace(/&quot;/gu, '"').replace(/&#39;/gu, "'").replace(/&#x27;/giu, "'").replace(/&#(\d+);/gu, (_match, code) => String.fromCodePoint(Number(code))) }
+function visibleArtifactText(html) { return decodeHtmlEntities(String(html || '').replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/giu, ' ').replace(/<[^>]+>/gu, ' ')).replace(/\s+/gu, ' ').trim().normalize('NFC').toLocaleLowerCase('es-AR') }
+function normalizeVisibleSlot(value) { return decodeHtmlEntities(String(value || '')).replace(/\s+/gu, ' ').trim().normalize('NFC').toLocaleLowerCase('es-AR') }
+function plannedContentSlots(planning) {
+  const content = planning?.content || {}
+  return [
+    ['hero.title', content.hero?.title || content.title], ['hero.subtitle', content.hero?.description || content.subtitle],
+    ...((content.services || content.benefits || []).flatMap((item, index) => { const service = typeof item === 'string' ? { title: item, description: item } : item; return [['services[' + index + '].title', service.title], ['services[' + index + '].description', service.description]] })),
+    ...((content.trustItems || content.trust || []).map((item, index) => ['trust[' + index + ']', typeof item === 'string' ? item : item.description])),
+    ...((content.faq || []).flatMap((item, index) => [['faq[' + index + '].question', item.question], ['faq[' + index + '].answer', item.answer]])),
+    ['cta.label', content.ctas?.[0]],
+  ].filter(([, value]) => value)
+}
+function compareGeneratedContent(planning, html) {
+  const artifactVisibleText = visibleArtifactText(html)
+  const contentSlots = plannedContentSlots(planning).map(([slot, value]) => ({ slot, plannedValue: String(value), plannedNormalized: normalizeVisibleSlot(value) }))
+  const driftSlots = contentSlots.filter((item) => !artifactVisibleText.includes(item.plannedNormalized))
+  return { pass: driftSlots.length === 0, driftSlots, driftType: driftSlots.length ? 'CONTENT_MAPPING_OR_SEMANTIC_DRIFT' : null }
+}
 function digest(value) { return crypto.createHash('sha256').update(JSON.stringify(stable(value))).digest('hex').slice(0, 24) }
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable)
@@ -359,7 +378,7 @@ function validateGeneratedArtifact(planning, artifacts) {
   if (INTERNAL_TERMS.some((term) => term.test(html + '\n' + js))) fail('GENERATED_ARTIFACT_INTERNAL_LEAK', 'El artefacto filtra información interna.')
   const actualSections = [...html.matchAll(/<section[^>]+id=["']([a-z0-9-]+)["']/giu)].map((match) => match[1]); const plannedSections = planning.experience.sections
   if (actualSections.length !== plannedSections.length || new Set(actualSections).size !== actualSections.length || actualSections.some((item) => !plannedSections.includes(item))) fail('GENERATED_ARTIFACT_SECTION_DRIFT', 'Las secciones del artefacto no coinciden exactamente con ExperiencePlan.', { plannedSections, actualSections })
-  if (!html.includes(planning.content.title) || !html.includes(planning.content.ctas[0])) fail('GENERATED_ARTIFACT_CONTENT_DRIFT', 'El artefacto no deriva del contenido planificado.')
+  const contentFidelity = compareGeneratedContent(planning, html); if (!contentFidelity.pass) fail('GENERATED_ARTIFACT_CONTENT_DRIFT', 'El artefacto no deriva del contenido planificado.', contentFidelity)
   const styleChecks = { links: /a\s*\{[^}]*text-decoration\s*:\s*none/iu.test(css), input: /input\s*\{[^}]*border\s*:/iu.test(css), button: /button\s*\{[^}]*appearance\s*:/iu.test(css), focus: /:focus-visible/iu.test(css), dark: /\[data-theme=["']dark["']\]/iu.test(css), responsive: /@media\s*\(/iu.test(css) }
   if (!Object.values(styleChecks).every(Boolean)) fail('GENERATED_ARTIFACT_DEFAULT_STYLE', 'El sistema visual no cubre estilos premium, foco, tema oscuro y responsive: ' + JSON.stringify(styleChecks), styleChecks)
   for (const token of Object.values(planning.visual.palette)) if (typeof token === 'string' && /^#/u.test(token) && !css.toUpperCase().includes(token.toUpperCase())) fail('GENERATED_ARTIFACT_TOKEN_DRIFT', 'Falta token visual ' + token + ' en CSS.')
@@ -383,4 +402,4 @@ function validateGeneratedArtifact(planning, artifacts) {
   return { ok: true, sections: planning.experience.sections.length, traceability: planning.build.traceability.length }
 }
 
-module.exports = { SCHEMA_VERSION, DIRECTIONS, PRODUCT_TYPES, ProductPlanningError, createProductPlanning, evolveProductPlanning, migrateLegacyPlanning, validateProductPlanning, validateGeneratedArtifact }
+module.exports = { SCHEMA_VERSION, DIRECTIONS, PRODUCT_TYPES, ProductPlanningError, createProductPlanning, evolveProductPlanning, migrateLegacyPlanning, validateProductPlanning, validateGeneratedArtifact, compareGeneratedContent }
