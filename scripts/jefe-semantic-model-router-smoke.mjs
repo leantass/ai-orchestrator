@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+const { createSemanticModelRouter } = require('../electron/jefe-semantic-model-router.cjs')
+const { ProviderRunBudget } = require('../electron/jefe-semantic-provider.cjs')
+const budget = new ProviderRunBudget({ runId: 'router-offline', maxCalls: 2 })
+const router = createSemanticModelRouter({ env: { AI_ORCHESTRATOR_SEMANTIC_MODEL: 'terra-real', AI_ORCHESTRATOR_SEMANTIC_FAST_MODEL: 'luna-real', AI_ORCHESTRATOR_SEMANTIC_BALANCED_MODEL: 'luna-real' }, callBudget: budget })
+const deterministic = router.route({ operation: 'validation', complexity: 'architectural', risk: 'critical' })
+assert.equal(deterministic.llmRequired, false); assert.equal(deterministic.executionMode, 'local'); assert.equal(deterministic.selectedModel, null)
+const simple = router.route({ operation: 'localized_correction', complexity: 'simple', risk: 'low' })
+assert.deepEqual({ model: simple.selectedModel, effort: simple.reasoningEffort, mode: simple.executionMode }, { model: 'luna-real', effort: 'low', mode: 'background' })
+const complex = router.route({ operation: 'experience_plan', complexity: 'complex', risk: 'high', qualityNeed: 'strict' })
+assert.equal(complex.selectedModel, 'terra-real'); assert.equal(complex.reasoningEffort, 'high'); assert.equal(complex.budgetAvailable, true)
+assert.equal((await budget.reserve('test')).valueOf(), true)
+const escalated = router.route({ operation: 'content_plan', complexity: 'medium', escalation: { fromModel: 'luna-real', reason: 'quality contract failed' } })
+assert.equal(escalated.selectedModel, 'terra-real'); assert.equal(escalated.escalatedFrom, 'luna-real'); assert.equal(escalated.escalationReason, 'quality contract failed')
+await budget.reserve('test-2')
+const exhausted = router.route({ operation: 'content_plan', complexity: 'complex' })
+assert.equal(exhausted.budgetAvailable, false); assert.equal(router.canCall(), false)
+console.log('PASS jefe-semantic-model-router-smoke: deterministic no-LLM, capability routing, reasoning/mode selection, explicit escalation, shared budget and exhausted-call prevention')

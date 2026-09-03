@@ -11,6 +11,7 @@ const { buildSemanticGenerationSpec, buildExecutionPackage } = require('./jefe-s
 const { adaptSemanticPlansToPlanning, buildContentSectionCatalog, contentSectionCatalogHash } = require('./jefe-semantic-generation-adapter.cjs')
 const { createSemanticProductionPromotion } = require('./jefe-semantic-production-promotion.cjs')
 const { createSemanticRuntimeAdapter } = require('./jefe-semantic-runtime-adapter.cjs')
+const { createSemanticModelRouter } = require('./jefe-semantic-model-router.cjs')
 
 function createSemanticRuntimeComposition({ root, feedbackProvider = null, decisionProvider = null, semanticProvider = null, semanticBrainAdapter = null, mode = 'synthetic', env = process.env, callBudget = null } = {}) {
   if (typeof root !== 'string' || !path.isAbsolute(root)) throw Object.assign(new Error('A semantic runtime root is required.'), { code: 'INVALID_ROOT' })
@@ -19,6 +20,7 @@ function createSemanticRuntimeComposition({ root, feedbackProvider = null, decis
   const promotion = createSemanticProductionPromotion({ root })
   const productive = mode === 'productive'
   const runBudget = callBudget || (productive ? new ProviderRunBudget({ runId: `semantic-composition-${Date.now()}`, maxCalls: 4 }) : null)
+  const modelRouter = createSemanticModelRouter({ env, callBudget: runBudget })
   const provider = semanticProvider || (productive ? createOpenAISemanticProvider({ env, callBudget: runBudget }) : null)
   const brain = semanticBrainAdapter || (provider ? intelligence.createSemanticBrainAdapter({ provider }) : null)
   const health = provider ? providerHealth(provider, { readyForRealSemanticWork: provider.enabled && provider.credentialAvailable && Boolean(brain) }) : { configured: false, enabled: false, credentialAvailable: false, model: null, readyForRealSemanticWork: false }
@@ -58,7 +60,11 @@ function createSemanticRuntimeComposition({ root, feedbackProvider = null, decis
   async function decideSemantic(input) {
     requireProductiveProvider()
     if (!brain || typeof brain.decide !== 'function') throw Object.assign(new Error('El adapter semántico no está configurado.'), { code: 'SEMANTIC_PROVIDER_NOT_READY' })
-    return brain.decide(input)
+    const complexity = input.operation === 'business_understanding' || input.operation === 'content_plan' || input.operation === 'experience_plan' ? 'complex' : 'medium'
+    const routing = modelRouter.route({ operation: input.operation, complexity, risk: productive ? 'high' : 'medium', qualityNeed: productive ? 'strict' : 'standard' })
+    if (!routing.llmRequired) throw Object.assign(new Error('DETERMINISTIC_OPERATION_DOES_NOT_USE_PROVIDER'), { code: 'DETERMINISTIC_OPERATION_DOES_NOT_USE_PROVIDER', routing })
+    if (!routing.budgetAvailable) throw Object.assign(new Error('PROVIDER_CALL_BUDGET_EXHAUSTED'), { code: 'PROVIDER_CALL_BUDGET_EXHAUSTED', routing })
+    return brain.decide({ ...input, model: routing.selectedModel, reasoningEffort: routing.reasoningEffort, executionMode: routing.executionMode, routing })
   }
   async function runSemanticPlans({ brief, correctionPlan = null, feedback = null, preservedQualities = [], sourceRefs = ['synthetic-brief:composition'] } = {}) {
     requireProductiveProvider()
@@ -70,7 +76,7 @@ function createSemanticRuntimeComposition({ root, feedbackProvider = null, decis
     const experience = await decideSemantic({ operation: 'experience_plan', input: [{ role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ brief, businessUnderstanding: bu.decision, contentPlan: content.decision, contentSectionCatalog, contentSectionCatalogHash: catalogHash, correctionPlan, preservedQualities }) }] }], schema: experiencePlanSchemaForCatalog(contentSectionCatalog, catalogHash), sourceRefs, contentPlanRef: 'ContentPlanV2', contentSectionCatalogHash: catalogHash, outputBudgetRetryMax: 1, executionMode: 'background' })
     return { businessUnderstanding: bu, contentPlan: content, experiencePlan: experience, providerBudget: runBudget?.snapshot?.() || null }
   }
-  return { persistence, preview, promotion, semanticProvider: provider, semanticBrainAdapter: brain, providerHealth: health, providerRunBudget: runBudget, decideSemantic, runSemanticPlans, adapter: createSemanticRuntimeAdapter({ service: promotion, resolveExecution }) }
+  return { persistence, preview, promotion, semanticProvider: provider, semanticBrainAdapter: brain, modelRouter, providerHealth: health, providerRunBudget: runBudget, decideSemantic, runSemanticPlans, adapter: createSemanticRuntimeAdapter({ service: promotion, resolveExecution }) }
 }
 
 module.exports = { createSemanticRuntimeComposition }

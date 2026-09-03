@@ -90,14 +90,14 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
     enabled: env.AI_ORCHESTRATOR_SEMANTIC_BRAIN_ENABLED === 'true' || env.AI_ORCHESTRATOR_BRAIN_PROVIDER?.trim() === 'openai',
     credentialAvailable: Boolean(config.apiKey),
     transportStats,
-    async request({ input, schema = null, maxOutputTokens = 600, reasoningEffort = config.reasoningEffort, timeoutMs = config.foregroundTimeoutMs, retries = config.retryMax, outputBudgetRetryMax = 0, operation = 'semantic', retryOutputBudget = null, executionMode = 'foreground' } = {}) {
+    async request({ input, schema = null, model = config.model, maxOutputTokens = 600, reasoningEffort = config.reasoningEffort, timeoutMs = config.foregroundTimeoutMs, retries = config.retryMax, outputBudgetRetryMax = 0, operation = 'semantic', retryOutputBudget = null, executionMode = 'foreground' } = {}) {
       if (!config.apiKey) throw Object.assign(new Error('OPENAI_CREDENTIAL_MISSING'), { category: 'MODEL_ERROR' })
-      if (executionMode === 'background') return this.requestBackground({ input, schema, maxOutputTokens, reasoningEffort, outputBudgetRetryMax, operation, retryOutputBudget })
+      if (executionMode === 'background') return this.requestBackground({ input, schema, model, maxOutputTokens, reasoningEffort, outputBudgetRetryMax, operation, retryOutputBudget })
       let attempt = 0; let outputBudgetRetry = 0; let currentMaxOutputTokens = maxOutputTokens; const budgets = []
       while (true) {
         if (callBudget && !(await callBudget.reserve(operation))) return { ok: false, status: 0, errorCategory: 'PROVIDER_CALL_BUDGET_EXHAUSTED', telemetry: { attempts: attempt, budgets, providerBudget: callBudget.snapshot?.() || null } }
         budgets.push(currentMaxOutputTokens)
-        const requestBody = { model: config.model, input, max_output_tokens: currentMaxOutputTokens, store: false, reasoning: { effort: reasoningEffort } }
+        const requestBody = { model, input, max_output_tokens: currentMaxOutputTokens, store: false, reasoning: { effort: reasoningEffort } }
         if (schema) requestBody.text = { format: { type: 'json_schema', name: schema.name, strict: true, schema: schema.schema } }
         const requestStartedAt = now(); let firstResponseAt = null; let completedAt = null; let response; let responseText = ''
         const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeoutMs)
@@ -111,7 +111,7 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
             try { providerError = JSON.parse(responseText)?.error || null } catch {}
             const retryable = response.status === 429 || response.status >= 500
             if (retryable && attempt < retries) { attempt += 1; continue }
-            const errorEnvelope = providerErrorEnvelope({ category: 'HTTP_ERROR', operation, executionMode: 'foreground', model: config.model, upstreamCode: providerError?.code || null, upstreamMessage: providerError?.message || null, httpStatus: response.status, retryable, generationCallNumber: callBudget?.snapshot?.().callsUsed || null })
+            const errorEnvelope = providerErrorEnvelope({ category: 'HTTP_ERROR', operation, executionMode: 'foreground', model, upstreamCode: providerError?.code || null, upstreamMessage: providerError?.message || null, httpStatus: response.status, retryable, generationCallNumber: callBudget?.snapshot?.().callsUsed || null })
             return { ok: false, status: response.status, errorCategory: 'HTTP_ERROR', errorCode: providerError?.code || null, errorType: providerError?.type || null, errorParam: providerError?.param || null, errorEnvelope, telemetry }
           }
           let payload
@@ -122,27 +122,27 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
             if (incompleteReason === 'max_output_tokens' && outputBudgetRetry < outputBudgetRetryMax) { outputBudgetRetry += 1; currentMaxOutputTokens = retryOutputBudget || currentMaxOutputTokens * 2; continue }
             return { ok: false, status, incompleteReason, errorCategory: incompleteReason === 'max_output_tokens' ? 'OUTPUT_BUDGET_EXHAUSTED' : 'SCHEMA_ERROR', telemetry: { ...telemetry, budgets } }
           }
-          if (status === 'failed' || status === 'cancelled') { const errorEnvelope = responseFailure({ payload, operation, executionMode: 'foreground', model: config.model, generationCallNumber: callBudget?.snapshot?.().callsUsed || null }); return { ok: false, status, errorCategory: 'MODEL_ERROR', errorEnvelope, telemetry } }
-          if (payload?.incomplete_details) return { ok: false, status, errorCategory: 'OUTPUT_BUDGET_EXHAUSTED', errorEnvelope: providerErrorEnvelope({ category: 'OUTPUT_BUDGET_EXHAUSTED', operation, executionMode: 'foreground', model: config.model, responseId: payload?.id || null, responseStatus: status, incompleteReason: payload.incomplete_details.reason || null, generationCallNumber: callBudget?.snapshot?.().callsUsed || null }), telemetry }
+          if (status === 'failed' || status === 'cancelled') { const errorEnvelope = responseFailure({ payload, operation, executionMode: 'foreground', model, generationCallNumber: callBudget?.snapshot?.().callsUsed || null }); return { ok: false, status, errorCategory: 'MODEL_ERROR', errorEnvelope, telemetry } }
+          if (payload?.incomplete_details) return { ok: false, status, errorCategory: 'OUTPUT_BUDGET_EXHAUSTED', errorEnvelope: providerErrorEnvelope({ category: 'OUTPUT_BUDGET_EXHAUSTED', operation, executionMode: 'foreground', model, responseId: payload?.id || null, responseStatus: status, incompleteReason: payload.incomplete_details.reason || null, generationCallNumber: callBudget?.snapshot?.().callsUsed || null }), telemetry }
           return { ok: true, status, text: extractResponseText(payload), payload, telemetry: { ...telemetry, budgets, usage: safeUsage(payload.usage) } }
         } catch (error) {
           completedAt = now(); const timedOut = error?.name === 'AbortError'; const category = classifyError(error, { timedOut }); const telemetry = safeRequestSummary({ requestStartedAt, firstResponseAt, completedAt, errorCategory: category, attempts: attempt + 1 })
           if ((category === 'ABORT_TIMEOUT' || category === 'NETWORK_ERROR') && attempt < retries) { attempt += 1; continue }
-          return { ok: false, status: 0, errorCategory: category, errorEnvelope: providerErrorEnvelope({ category: category === 'FOREGROUND_TIMEOUT' ? 'FOREGROUND_TIMEOUT' : category === 'NETWORK_ERROR' ? 'NETWORK_ERROR' : 'UNKNOWN_PROVIDER_ERROR', operation, executionMode: 'foreground', model: config.model, retryable: category === 'NETWORK_ERROR', generationCallNumber: callBudget?.snapshot?.().callsUsed || null }), telemetry }
+          return { ok: false, status: 0, errorCategory: category, errorEnvelope: providerErrorEnvelope({ category: category === 'ABORT_TIMEOUT' ? 'FOREGROUND_TIMEOUT' : category === 'NETWORK_ERROR' ? 'NETWORK_ERROR' : 'UNKNOWN_PROVIDER_ERROR', operation, executionMode: 'foreground', model, retryable: category === 'NETWORK_ERROR', generationCallNumber: callBudget?.snapshot?.().callsUsed || null }), telemetry }
         } finally { clearTimeout(timer) }
       }
     },
-    async requestBackground({ input, schema = null, maxOutputTokens = 600, reasoningEffort = config.reasoningEffort, outputBudgetRetryMax = 0, operation = 'semantic', retryOutputBudget = null } = {}) {
+    async requestBackground({ input, schema = null, model = config.model, maxOutputTokens = 600, reasoningEffort = config.reasoningEffort, outputBudgetRetryMax = 0, operation = 'semantic', retryOutputBudget = null } = {}) {
       let outputBudgetRetry = 0; let currentMaxOutputTokens = maxOutputTokens
       while (true) {
         if (callBudget && !(await callBudget.reserve(operation))) return { ok: false, status: 0, errorCategory: 'PROVIDER_CALL_BUDGET_EXHAUSTED', telemetry: { executionMode: 'background', providerBudget: callBudget.snapshot?.() || null, transportStats } }
-        const startedAt = now(); const requestBody = { model: config.model, input, max_output_tokens: currentMaxOutputTokens, background: true, store: false, reasoning: { effort: reasoningEffort } }
+        const startedAt = now(); const requestBody = { model, input, max_output_tokens: currentMaxOutputTokens, background: true, store: false, reasoning: { effort: reasoningEffort } }
         if (schema) requestBody.text = { format: { type: 'json_schema', name: schema.name, strict: true, schema: schema.schema } }
         transport('generation')
         let response
-        try { response = await fetchImpl(config.baseUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` }, body: JSON.stringify(requestBody) }) } catch (error) { const category = classifyError(error); return { ok: false, status: 0, errorCategory: category, errorEnvelope: providerErrorEnvelope({ category: category === 'NETWORK_ERROR' ? 'NETWORK_ERROR' : 'UNKNOWN_PROVIDER_ERROR', operation, executionMode: 'background', model: config.model, retryable: category === 'NETWORK_ERROR', generationCallNumber: callBudget?.snapshot?.().callsUsed || null }), telemetry: { executionMode: 'background', durationMs: now() - startedAt, transportStats } } }
+        try { response = await fetchImpl(config.baseUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` }, body: JSON.stringify(requestBody) }) } catch (error) { const category = classifyError(error); return { ok: false, status: 0, errorCategory: category, errorEnvelope: providerErrorEnvelope({ category: category === 'NETWORK_ERROR' ? 'NETWORK_ERROR' : 'UNKNOWN_PROVIDER_ERROR', operation, executionMode: 'background', model, retryable: category === 'NETWORK_ERROR', generationCallNumber: callBudget?.snapshot?.().callsUsed || null }), telemetry: { executionMode: 'background', durationMs: now() - startedAt, transportStats } } }
         const payload = parseProviderPayload(await response.text())
-        if (!response.ok) return { ok: false, status: response.status, errorCategory: 'HTTP_ERROR', errorEnvelope: providerErrorEnvelope({ category: 'HTTP_ERROR', operation, executionMode: 'background', model: config.model, upstreamCode: payload?.error?.code || null, upstreamMessage: payload?.error?.message || null, httpStatus: response.status, retryable: response.status === 429 || response.status >= 500, generationCallNumber: callBudget?.snapshot?.().callsUsed || null }), telemetry: { executionMode: 'background', durationMs: now() - startedAt, transportStats } }
+        if (!response.ok) return { ok: false, status: response.status, errorCategory: 'HTTP_ERROR', errorEnvelope: providerErrorEnvelope({ category: 'HTTP_ERROR', operation, executionMode: 'background', model, upstreamCode: payload?.error?.code || null, upstreamMessage: payload?.error?.message || null, httpStatus: response.status, retryable: response.status === 429 || response.status >= 500, generationCallNumber: callBudget?.snapshot?.().callsUsed || null }), telemetry: { executionMode: 'background', durationMs: now() - startedAt, transportStats } }
         const responseId = payload?.id
         if (!responseId) return { ok: false, status: response.status, errorCategory: 'SCHEMA_ERROR', telemetry: { executionMode: 'background', durationMs: now() - startedAt, transportStats } }
         let status = payload.status || 'queued'; let completed = payload; let pollRequests = 0; let lastPollError = null
@@ -150,7 +150,7 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
           if (now() - startedAt >= config.backgroundDeadlineMs || pollRequests >= config.backgroundMaxPollRequests) {
             let cancelStatus = 'not_attempted'; transport('cancel')
             try { const cancel = await fetchImpl(`${config.baseUrl}/${encodeURIComponent(responseId)}/cancel`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` } }); cancelStatus = cancel.ok ? 'accepted' : `http_${cancel.status}` } catch { cancelStatus = 'failed' }
-            return { ok: false, status, errorCategory: 'BACKGROUND_DEADLINE_EXCEEDED', errorEnvelope: providerErrorEnvelope({ category: 'BACKGROUND_DEADLINE_EXCEEDED', operation, executionMode: 'background', model: config.model, responseId, responseStatus: status, generationCallNumber: callBudget?.snapshot?.().callsUsed || null, pollCount: pollRequests }), responseId, telemetry: { executionMode: 'background', durationMs: now() - startedAt, pollRequests, cancelAttempted: true, cancelStatus, transportStats, lastPollError } }
+            return { ok: false, status, errorCategory: 'BACKGROUND_DEADLINE_EXCEEDED', errorEnvelope: providerErrorEnvelope({ category: 'BACKGROUND_DEADLINE_EXCEEDED', operation, executionMode: 'background', model, responseId, responseStatus: status, generationCallNumber: callBudget?.snapshot?.().callsUsed || null, pollCount: pollRequests }), responseId, telemetry: { executionMode: 'background', durationMs: now() - startedAt, pollRequests, cancelAttempted: true, cancelStatus, transportStats, lastPollError } }
           }
           await sleepImpl(pollRequests === 0 ? config.backgroundInitialDelayMs : config.backgroundIntervalMs)
           pollRequests += 1; transport('poll')
@@ -158,18 +158,18 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
         }
         const telemetry = { executionMode: 'background', durationMs: now() - startedAt, responseId, pollRequests, maxOutputTokens: currentMaxOutputTokens, usage: safeUsage(completed.usage), transportStats: { ...transportStats } }
         if (status === 'incomplete' && completed.incomplete_details?.reason === 'max_output_tokens' && outputBudgetRetry < outputBudgetRetryMax) { outputBudgetRetry += 1; currentMaxOutputTokens = retryOutputBudget || currentMaxOutputTokens * 2; continue }
-        if (status === 'incomplete') return { ok: false, status, incompleteReason: completed.incomplete_details?.reason || null, errorCategory: completed.incomplete_details?.reason === 'max_output_tokens' ? 'OUTPUT_BUDGET_EXHAUSTED' : 'SCHEMA_ERROR', errorEnvelope: providerErrorEnvelope({ category: completed.incomplete_details?.reason === 'max_output_tokens' ? 'OUTPUT_BUDGET_EXHAUSTED' : 'SEMANTIC_SCHEMA_INVALID', operation, executionMode: 'background', model: config.model, responseId, responseStatus: status, incompleteReason: completed.incomplete_details?.reason || null, generationCallNumber: callBudget?.snapshot?.().callsUsed || null, pollCount: pollRequests }), responseId, telemetry }
-        if (status === 'failed' || status === 'cancelled') { const errorEnvelope = responseFailure({ payload: completed, operation, executionMode: 'background', model: config.model, generationCallNumber: callBudget?.snapshot?.().callsUsed || null, pollCount: pollRequests }); return { ok: false, status, errorCategory: 'MODEL_ERROR', errorEnvelope, responseId, telemetry } }
+        if (status === 'incomplete') return { ok: false, status, incompleteReason: completed.incomplete_details?.reason || null, errorCategory: completed.incomplete_details?.reason === 'max_output_tokens' ? 'OUTPUT_BUDGET_EXHAUSTED' : 'SCHEMA_ERROR', errorEnvelope: providerErrorEnvelope({ category: completed.incomplete_details?.reason === 'max_output_tokens' ? 'OUTPUT_BUDGET_EXHAUSTED' : 'SEMANTIC_SCHEMA_INVALID', operation, executionMode: 'background', model, responseId, responseStatus: status, incompleteReason: completed.incomplete_details?.reason || null, generationCallNumber: callBudget?.snapshot?.().callsUsed || null, pollCount: pollRequests }), responseId, telemetry }
+        if (status === 'failed' || status === 'cancelled') { const errorEnvelope = responseFailure({ payload: completed, operation, executionMode: 'background', model, generationCallNumber: callBudget?.snapshot?.().callsUsed || null, pollCount: pollRequests }); return { ok: false, status, errorCategory: 'MODEL_ERROR', errorEnvelope, responseId, telemetry } }
         return { ok: true, status, text: extractResponseText(completed), payload: completed, responseId, telemetry }
       }
     },
-    async decide({ operation = 'business_understanding', input, schema = SEMANTIC_SCHEMA, sourceRefs = [], contentPlanRef = null, contentSectionCatalogHash = null, outputBudgetRetryMax = 1, executionMode = 'foreground' } = {}) {
+    async decide({ operation = 'business_understanding', input, schema = SEMANTIC_SCHEMA, model = config.model, reasoningEffort = config.reasoningEffort, routing = null, sourceRefs = [], contentPlanRef = null, contentSectionCatalogHash = null, outputBudgetRetryMax = 1, executionMode = 'foreground' } = {}) {
       const policy = outputBudgetPolicy(operation)
-      const result = await this.request({ input, schema, maxOutputTokens: policy.initialOutputBudget, reasoningEffort: config.reasoningEffort, outputBudgetRetryMax, operation, retryOutputBudget: policy.retryOutputBudget, executionMode })
+      const result = await this.request({ input, schema, model, maxOutputTokens: policy.initialOutputBudget, reasoningEffort, outputBudgetRetryMax, operation, retryOutputBudget: policy.retryOutputBudget, executionMode })
       if (!result.ok) throw Object.assign(new Error(result.errorCategory || 'SEMANTIC_PROVIDER_FAILED'), { code: result.errorCategory || 'SEMANTIC_PROVIDER_FAILED', telemetry: result.telemetry, errorEnvelope: result.errorEnvelope || null })
       let decision
-      try { decision = JSON.parse(result.text) } catch { throw Object.assign(new Error('SEMANTIC_STRUCTURED_OUTPUT_INVALID'), { code: 'SEMANTIC_STRUCTURED_OUTPUT_INVALID', errorEnvelope: providerErrorEnvelope({ category: 'STRUCTURED_OUTPUT_INVALID', operation, executionMode, model: this.model, responseId: result.responseId || null, responseStatus: result.status || 'completed', generationCallNumber: result.telemetry?.providerBudget?.callsUsed || null }) }) }
-      return wrapSemanticDecision({ decision, operation, provider: { ...this, responseId: result.payload?.id || null }, input, sourceRefs, contentPlanRef, contentSectionCatalogHash })
+      try { decision = JSON.parse(result.text) } catch { throw Object.assign(new Error('SEMANTIC_STRUCTURED_OUTPUT_INVALID'), { code: 'SEMANTIC_STRUCTURED_OUTPUT_INVALID', errorEnvelope: providerErrorEnvelope({ category: 'STRUCTURED_OUTPUT_INVALID', operation, executionMode, model, responseId: result.responseId || null, responseStatus: result.status || 'completed', generationCallNumber: result.telemetry?.providerBudget?.callsUsed || null }) }) }
+      return wrapSemanticDecision({ decision, operation, provider: { ...this, model, responseId: result.payload?.id || null }, input, routing, sourceRefs, contentPlanRef, contentSectionCatalogHash })
     },
   })
 }
@@ -183,11 +183,12 @@ async function probeMinimal(provider) { return provider.request({ input: [{ role
 async function probeStructured(provider) { return provider.request({ input: [{ role: 'user', content: [{ type: 'input_text', text: 'Devolvé ok=true y label="ready".' }] }], schema: MINIMAL_SCHEMA, maxOutputTokens: OUTPUT_BUDGETS.structured_probe, reasoningEffort: 'low' }) }
 async function probeSemantic(provider) { return provider.request({ input: [{ role: 'system', content: [{ type: 'input_text', text: 'Generá sólo el objeto semántico solicitado. No incluy provenance, provider, modelo, timestamps, hashes ni metadatos de ejecución.' }] }, { role: 'user', content: [{ type: 'input_text', text: 'Brief ficticio: estudio que ofrece clases particulares de idiomas por turnos.' }] }], schema: SEMANTIC_SCHEMA, maxOutputTokens: OUTPUT_BUDGETS.business_understanding, outputBudgetRetryMax: 1, reasoningEffort: 'low' }) }
 function hash(value) { return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex') }
-function wrapSemanticDecision({ decision, operation = 'business-understanding', provider, input, schemaId = SEMANTIC_SCHEMA.name, sourceRefs = [], contentPlanRef = null, contentSectionCatalogHash = null, createdAt = new Date().toISOString(), adapterVersion = 'semantic-adapter-v1' } = {}) {
+function wrapSemanticDecision({ decision, operation = 'business-understanding', provider, input, schemaId = SEMANTIC_SCHEMA.name, routing = null, sourceRefs = [], contentPlanRef = null, contentSectionCatalogHash = null, createdAt = new Date().toISOString(), adapterVersion = 'semantic-adapter-v1' } = {}) {
   if (!decision || typeof decision !== 'object' || !provider?.providerId) throw new TypeError('semantic decision and provider are required')
   const provenance = { operation, provider: provider.providerId, model: provider.model, responseId: provider.responseId || null, requestHash: hash({ operation, input }), inputHash: hash(input), schemaId, schemaVersion: decision.schemaVersion || null, adapterVersion, createdAt, sourceRefs }
   if (contentPlanRef) provenance.contentPlanRef = contentPlanRef
   if (contentSectionCatalogHash) provenance.contentSectionCatalogHash = contentSectionCatalogHash
+  if (routing) provenance.routing = routing
   const envelope = { decision, provenance }
   validateSemanticEnvelope(envelope, { input, provider, sourceRefs })
   return envelope
