@@ -3,6 +3,24 @@ const { validateProductPlanning } = require('./jefe-product-planning.cjs')
 
 function hash(value) { return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex') }
 function fail(message) { throw Object.assign(new Error(message), { code: 'INVALID_SEMANTIC_GENERATION_SPEC' }) }
+function buildContentSectionCatalog(contentPlan) {
+  if (Array.isArray(contentPlan?.sections) && contentPlan.sections.length > 0) {
+    return contentPlan.sections.map((item) => ({ id: item.id, role: item.role || item.id, label: item.label || item.id, kind: item.kind || item.id, required: item.required === true, contentRef: item.contentRef || item.id, ...(Array.isArray(item.aliases) ? { aliases: item.aliases } : {}) }))
+  }
+  const fields = [
+    ['inicio', 'hero', 'hero', 'hero', 'hero'],
+    ['relato', 'presentation', 'presentation', 'narrative', 'presentation'],
+    ['servicios', 'services', 'services', 'service-catalog', 'services'],
+    ['confianza', 'trust', 'trust', 'proof', 'trust'],
+    ['faq', 'faq', 'faq', 'faq', 'faq'],
+    ['contacto', 'contact', 'contact', 'conversion-form', 'contact'],
+  ]
+  return fields.filter(([, contentRef]) => {
+    const value = contentPlan?.[contentRef]
+    return Array.isArray(value) ? value.length > 0 : Boolean(value)
+  }).map(([id, role, label, kind, contentRef]) => ({ id, role, label, kind, required: ['inicio', 'servicios', 'contacto'].includes(id), contentRef }))
+}
+function contentSectionCatalogHash(catalog) { return hash(catalog) }
 function normalizeComparableLabel(value) {
   return String(value || '').trim().toLocaleLowerCase('es-AR').normalize('NFD').replace(/[\u0300-\u036f]/gu, '').replace(/[^a-z0-9]+/gu, ' ').replace(/\s+/gu, ' ').trim()
 }
@@ -10,7 +28,8 @@ function canonicalId(value) {
   if (typeof value !== 'string' || !/^[a-z][a-z0-9-]{0,31}$/u.test(value.trim())) return null
   return value.trim()
 }
-function sectionIdentityCatalog(planning) {
+function sectionIdentityCatalog(planning, catalog = null) {
+  if (Array.isArray(catalog)) return catalog.map((item) => ({ id: item.id, labels: [item.role, item.label, ...(Array.isArray(item.aliases) ? item.aliases : [])].map(normalizeComparableLabel).filter(Boolean) }))
   const sections = Array.isArray(planning?.experience?.sections) ? planning.experience.sections : []
   const contracts = Array.isArray(planning?.build?.sectionContracts) ? planning.build.sectionContracts : []
   const navigation = Array.isArray(planning?.content?.navigation) ? planning.content.navigation : []
@@ -20,21 +39,21 @@ function sectionIdentityCatalog(planning) {
     return { id, labels: labels.map(normalizeComparableLabel).filter(Boolean) }
   })
 }
-function resolveSectionReference(value, planning, field = 'section reference') {
+function resolveSectionReference(value, planning, field = 'section reference', catalog = null) {
   if (typeof value !== 'string' || !value.trim()) fail(`${field} is invalid.`)
   const raw = value.trim()
   const direct = canonicalId(raw)
-  const catalog = sectionIdentityCatalog(planning)
-  if (direct && catalog.some((item) => item.id === direct)) return direct
+  const identities = sectionIdentityCatalog(planning, catalog)
+  if (direct && identities.some((item) => item.id === direct)) return direct
   const comparable = normalizeComparableLabel(raw)
-  const matches = catalog.filter((item) => item.labels.includes(comparable))
+  const matches = identities.filter((item) => item.labels.includes(comparable))
   if (matches.length === 1) return matches[0].id
   if (matches.length > 1) fail(`AMBIGUOUS_SEMANTIC_SECTION: ${field}.`)
   fail(`UNKNOWN_SEMANTIC_SECTION: ${field}.`)
 }
-function resolveSectionOrder(values, planning, field = 'sectionOrder') {
+function resolveSectionOrder(values, planning, field = 'sectionOrder', catalog = null) {
   if (!Array.isArray(values) || values.length === 0) fail(`${field} is required.`)
-  const resolved = values.map((value) => resolveSectionReference(value, planning, field))
+  const resolved = values.map((value) => resolveSectionReference(value, planning, field, catalog))
   if (new Set(resolved).size !== resolved.length) fail(`${field} contains duplicate sections.`)
   return resolved
 }
@@ -69,12 +88,16 @@ function semanticTrust(values, businessUnderstanding) {
 function buildSectionContracts(sections) {
   return sections.map((section) => ({ id: section, component: section === 'inicio' ? 'hero' : section === 'contacto' ? 'conversion-form' : section, source: `ExperiencePlan.sections.${section}`, qaCriteria: 'section exists exactly once and is customer-facing' }))
 }
-function adaptSemanticPlansToPlanning({ sourcePlanning, businessUnderstanding, contentPlan, experiencePlan } = {}) {
+function adaptSemanticPlansToPlanning({ sourcePlanning, businessUnderstanding, contentPlan, experiencePlan, requireCatalogHash = false } = {}) {
   if (!sourcePlanning || typeof sourcePlanning !== 'object') fail('source planning is required.')
   const bu = requiredPlan(businessUnderstanding, 'BusinessUnderstandingV2', 'business-understanding-v2')
   const content = requiredPlan(contentPlan, 'ContentPlanV2', 'content-plan-v2')
   const experience = requiredPlan(experiencePlan, 'ExperiencePlanV2', 'experience-plan-v2')
-  const sections = resolveSectionOrder(experience.sectionOrder, sourcePlanning, 'ExperiencePlanV2 sectionOrder')
+  const catalog = buildContentSectionCatalog(content)
+  const catalogSha256 = contentSectionCatalogHash(catalog)
+  if (requireCatalogHash && experience.contentSectionCatalogHash !== catalogSha256) fail('EXPERIENCE_PLAN_CONTENT_CATALOG_STALE')
+  const sections = resolveSectionOrder(experience.sectionOrder, sourcePlanning, 'ExperiencePlanV2 sectionOrder', catalog)
+  if (catalog.some((item) => item.required && !sections.includes(item.id))) fail('ExperiencePlanV2 omits a required content section.')
   const services = semanticServices(content.services)
   const trust = content.trust.map((item) => sentence(item, 'Criterio explicado para avanzar'))
   const trustItems = semanticTrust(content.trust, bu)
@@ -83,12 +106,12 @@ function adaptSemanticPlansToPlanning({ sourcePlanning, businessUnderstanding, c
   const nextBrief = { ...sourcePlanning.brief, audience: bu.audience || sourcePlanning.brief.audience, objective: bu.primaryGoal || sourcePlanning.brief.objective }
   const nextStrategy = { ...sourcePlanning.strategy, audience: bu.audience || sourcePlanning.strategy.audience, primaryMessage: sentence(content.hero, sourcePlanning.strategy.primaryMessage) }
   const nextContent = { ...sourcePlanning.content, title: sentence(content.hero, sourcePlanning.content.title), subtitle: sentence(content.presentation, sourcePlanning.content.subtitle), benefits: services.map((item) => item.description), services, trust, trustItems, faq, ctas: [sentence(content.contact, sourcePlanning.content.ctas[0])], contact: { ...sourcePlanning.content.contact, title: sentence(content.contact, sourcePlanning.content.contact.title), description: sentence(content.contact, sourcePlanning.content.contact.description), primaryAction: sentence(content.contact, sourcePlanning.content.ctas[0]), source: 'ContentPlanV2.contact' }, hero: { ...sourcePlanning.content.hero, title: sentence(content.hero, sourcePlanning.content.title), description: sentence(content.presentation, sourcePlanning.content.subtitle), primaryCTA: sentence(content.contact, sourcePlanning.content.ctas[0]), source: 'ContentPlanV2.hero' }, businessUnderstanding: { ...bu, schemaVersion: 'business-understanding-v2' } }
-  const ctaPositions = resolveSectionOrder(experience.ctaPositions, sourcePlanning, 'ExperiencePlanV2 ctaPositions')
+  const ctaPositions = resolveSectionOrder(experience.ctaPositions, sourcePlanning, 'ExperiencePlanV2 ctaPositions', catalog)
   const nextExperience = { ...sourcePlanning.experience, sections, navigation: sections.filter((item) => item !== 'inicio'), forms: [{ fields: ['name', 'email'], submitAction: sentence(content.contact, sourcePlanning.content.ctas[0]), persistence: 'local_only' }], responsive: true, archetype: experience.archetype, heroVariant: experience.heroVariant, sectionTreatments: experience.sectionTreatments, contentDensity: experience.contentDensity, ctaPositions, servicesTreatment: experience.servicesTreatment, trustTreatment: experience.trustTreatment, faqTreatment: experience.faqTreatment, conversionStrategy: experience.conversionStrategy }
   const nextBuild = { ...sourcePlanning.build, sectionContracts: buildSectionContracts(sections), traceability: [...sourcePlanning.build.traceability, { source: 'ContentPlanV2', decision: 'customer-facing copy', component: 'artifact content', qaCriteria: 'content is derived from semantic plan' }, { source: 'ExperiencePlanV2', decision: 'section order and treatments', component: 'artifact structure', qaCriteria: 'structure is derived from semantic plan' }] }
   const result = { ...sourcePlanning, brief: nextBrief, strategy: nextStrategy, experience: nextExperience, content: nextContent, build: nextBuild, semanticRefs: { businessUnderstanding: 'BusinessUnderstandingV2', contentPlan: 'ContentPlanV2', experiencePlan: 'ExperiencePlanV2' } }
   validateProductPlanning(result)
-  return result
+  return { ...result, semanticRefs: { ...result.semanticRefs, contentSectionCatalogHash: catalogSha256 }, sectionCatalog: catalog }
 }
 function adaptSemanticGenerationSpec(spec) {
   if (!spec || spec.schemaVersion !== 'semantic-generation-spec-v1') fail('SemanticGenerationSpec schema is required.')
@@ -102,4 +125,4 @@ function adaptSemanticGenerationSpec(spec) {
   const ctaPositions = spec.ctaPositions === undefined ? undefined : resolveSectionOrder(spec.ctaPositions, spec.planning, 'ctaPositions')
   return { schemaVersion: 'normalized-generation-plan-v1', planning: spec.planning, sectionOrder, heroVariant: spec.heroVariant, treatments: [...(spec.treatments || [])], ...(ctaPositions ? { ctaPositions } : {}), creativeDirection: spec.creativeDirection || null, contentDensity: spec.contentDensity || 'balanced', ctaStrategy: spec.ctaStrategy || null, preservedQualities: [...(spec.preservedQualities || [])], prohibitedChanges: [...(spec.prohibitedChanges || [])], semanticGenerationSpecHash: hash(spec) }
 }
-module.exports = { adaptSemanticGenerationSpec, adaptSemanticPlansToPlanning }
+module.exports = { adaptSemanticGenerationSpec, adaptSemanticPlansToPlanning, buildContentSectionCatalog, contentSectionCatalogHash }
