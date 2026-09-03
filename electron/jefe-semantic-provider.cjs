@@ -1,6 +1,8 @@
 const DEFAULT_FOREGROUND_TIMEOUT_MS = 30000
 const DEFAULT_RETRY_MAX = 1
 const crypto = require('node:crypto')
+const PROVIDER_ERROR_CATEGORIES = Object.freeze(['HTTP_ERROR', 'NETWORK_ERROR', 'FOREGROUND_TIMEOUT', 'BACKGROUND_DEADLINE_EXCEEDED', 'BACKGROUND_RESPONSE_FAILED', 'OUTPUT_BUDGET_EXHAUSTED', 'STRUCTURED_OUTPUT_INVALID', 'SEMANTIC_SCHEMA_INVALID', 'SEMANTIC_CONTRACT_INVALID', 'PROVIDER_CALL_BUDGET_EXHAUSTED', 'UNKNOWN_PROVIDER_ERROR'])
+const TRANSIENT_UPSTREAM_CODES = new Set(['server_error'])
 const OUTPUT_BUDGET_POLICY = Object.freeze({
   minimal_probe: Object.freeze({ initialOutputBudget: 128, retryOutputBudget: 256, maxRetries: 1 }),
   structured_probe: Object.freeze({ initialOutputBudget: 256, retryOutputBudget: 512, maxRetries: 1 }),
@@ -49,10 +51,20 @@ function providerConfig({ env = process.env } = {}) {
 function classifyError(error, { status = 0, timedOut = false } = {}) {
   if (timedOut) return 'ABORT_TIMEOUT'
   if (status === 429) return 'RATE_LIMIT'
-  if (status >= 500) return 'HTTP_ERROR'
-  if (status >= 400) return 'MODEL_ERROR'
+  if (status >= 400) return 'HTTP_ERROR'
   if (error?.name === 'TypeError') return 'NETWORK_ERROR'
   return 'UNKNOWN'
+}
+function sanitizeProviderMessage(value) {
+  return String(value || '').replace(/authorization\s*:\s*bearer\s+[^\s]+/giu, 'authorization: [redacted]').replace(/(?:api[_-]?key|token|secret)\s*[:=]\s*[^\s,;]+/giu, '$1=[redacted]').slice(0, 600)
+}
+function providerErrorEnvelope({ category = 'UNKNOWN_PROVIDER_ERROR', operation = 'semantic', executionMode = 'foreground', provider = 'openai-semantic', model = null, responseId = null, responseStatus = null, upstreamCode = null, upstreamMessage = null, httpStatus = null, incompleteReason = null, retryable = false, generationCallNumber = null, pollCount = 0 } = {}) {
+  const safeCategory = PROVIDER_ERROR_CATEGORIES.includes(category) ? category : 'UNKNOWN_PROVIDER_ERROR'
+  return Object.freeze({ category: safeCategory, operation, executionMode, provider, model, responseId, responseStatus, upstreamCode, upstreamMessage: sanitizeProviderMessage(upstreamMessage), httpStatus, incompleteReason, retryable: Boolean(retryable), generationCallNumber, pollCount, createdAt: new Date().toISOString() })
+}
+function responseFailure({ payload, operation, executionMode, model, generationCallNumber, pollCount = 0 } = {}) {
+  const code = payload?.error?.code || null
+  return providerErrorEnvelope({ category: executionMode === 'background' ? 'BACKGROUND_RESPONSE_FAILED' : 'UNKNOWN_PROVIDER_ERROR', operation, executionMode, model, responseId: payload?.id || null, responseStatus: payload?.status || 'failed', upstreamCode: code, upstreamMessage: payload?.error?.message || null, retryable: TRANSIENT_UPSTREAM_CODES.has(code), generationCallNumber, pollCount })
 }
 
 function safeRequestSummary({ requestStartedAt, firstResponseAt, completedAt, status = 0, requestId = null, errorCategory = null, attempts = 0 }) {
@@ -99,7 +111,8 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
             try { providerError = JSON.parse(responseText)?.error || null } catch {}
             const retryable = response.status === 429 || response.status >= 500
             if (retryable && attempt < retries) { attempt += 1; continue }
-            return { ok: false, status: response.status, errorCategory: classifyError(null, { status: response.status }), errorCode: providerError?.code || null, errorType: providerError?.type || null, errorParam: providerError?.param || null, telemetry }
+            const errorEnvelope = providerErrorEnvelope({ category: 'HTTP_ERROR', operation, executionMode: 'foreground', model: config.model, upstreamCode: providerError?.code || null, upstreamMessage: providerError?.message || null, httpStatus: response.status, retryable, generationCallNumber: callBudget?.snapshot?.().callsUsed || null })
+            return { ok: false, status: response.status, errorCategory: 'HTTP_ERROR', errorCode: providerError?.code || null, errorType: providerError?.type || null, errorParam: providerError?.param || null, errorEnvelope, telemetry }
           }
           let payload
           try { payload = JSON.parse(responseText) } catch { return { ok: false, status: response.status, errorCategory: 'SCHEMA_ERROR', telemetry } }
@@ -109,12 +122,13 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
             if (incompleteReason === 'max_output_tokens' && outputBudgetRetry < outputBudgetRetryMax) { outputBudgetRetry += 1; currentMaxOutputTokens = retryOutputBudget || currentMaxOutputTokens * 2; continue }
             return { ok: false, status, incompleteReason, errorCategory: incompleteReason === 'max_output_tokens' ? 'OUTPUT_BUDGET_EXHAUSTED' : 'SCHEMA_ERROR', telemetry: { ...telemetry, budgets } }
           }
-          if (status === 'failed' || status === 'cancelled' || payload?.incomplete_details) return { ok: false, status, errorCategory: 'MODEL_ERROR', telemetry }
+          if (status === 'failed' || status === 'cancelled') { const errorEnvelope = responseFailure({ payload, operation, executionMode: 'foreground', model: config.model, generationCallNumber: callBudget?.snapshot?.().callsUsed || null }); return { ok: false, status, errorCategory: 'MODEL_ERROR', errorEnvelope, telemetry } }
+          if (payload?.incomplete_details) return { ok: false, status, errorCategory: 'OUTPUT_BUDGET_EXHAUSTED', errorEnvelope: providerErrorEnvelope({ category: 'OUTPUT_BUDGET_EXHAUSTED', operation, executionMode: 'foreground', model: config.model, responseId: payload?.id || null, responseStatus: status, incompleteReason: payload.incomplete_details.reason || null, generationCallNumber: callBudget?.snapshot?.().callsUsed || null }), telemetry }
           return { ok: true, status, text: extractResponseText(payload), payload, telemetry: { ...telemetry, budgets, usage: safeUsage(payload.usage) } }
         } catch (error) {
           completedAt = now(); const timedOut = error?.name === 'AbortError'; const category = classifyError(error, { timedOut }); const telemetry = safeRequestSummary({ requestStartedAt, firstResponseAt, completedAt, errorCategory: category, attempts: attempt + 1 })
           if ((category === 'ABORT_TIMEOUT' || category === 'NETWORK_ERROR') && attempt < retries) { attempt += 1; continue }
-          return { ok: false, status: 0, errorCategory: category, telemetry }
+          return { ok: false, status: 0, errorCategory: category, errorEnvelope: providerErrorEnvelope({ category: category === 'FOREGROUND_TIMEOUT' ? 'FOREGROUND_TIMEOUT' : category === 'NETWORK_ERROR' ? 'NETWORK_ERROR' : 'UNKNOWN_PROVIDER_ERROR', operation, executionMode: 'foreground', model: config.model, retryable: category === 'NETWORK_ERROR', generationCallNumber: callBudget?.snapshot?.().callsUsed || null }), telemetry }
         } finally { clearTimeout(timer) }
       }
     },
@@ -126,9 +140,9 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
         if (schema) requestBody.text = { format: { type: 'json_schema', name: schema.name, strict: true, schema: schema.schema } }
         transport('generation')
         let response
-        try { response = await fetchImpl(config.baseUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` }, body: JSON.stringify(requestBody) }) } catch (error) { return { ok: false, status: 0, errorCategory: classifyError(error), telemetry: { executionMode: 'background', durationMs: now() - startedAt, transportStats } } }
+        try { response = await fetchImpl(config.baseUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` }, body: JSON.stringify(requestBody) }) } catch (error) { const category = classifyError(error); return { ok: false, status: 0, errorCategory: category, errorEnvelope: providerErrorEnvelope({ category: category === 'NETWORK_ERROR' ? 'NETWORK_ERROR' : 'UNKNOWN_PROVIDER_ERROR', operation, executionMode: 'background', model: config.model, retryable: category === 'NETWORK_ERROR', generationCallNumber: callBudget?.snapshot?.().callsUsed || null }), telemetry: { executionMode: 'background', durationMs: now() - startedAt, transportStats } } }
         const payload = parseProviderPayload(await response.text())
-        if (!response.ok) return { ok: false, status: response.status, errorCategory: classifyError(null, { status: response.status }), telemetry: { executionMode: 'background', durationMs: now() - startedAt, transportStats } }
+        if (!response.ok) return { ok: false, status: response.status, errorCategory: 'HTTP_ERROR', errorEnvelope: providerErrorEnvelope({ category: 'HTTP_ERROR', operation, executionMode: 'background', model: config.model, upstreamCode: payload?.error?.code || null, upstreamMessage: payload?.error?.message || null, httpStatus: response.status, retryable: response.status === 429 || response.status >= 500, generationCallNumber: callBudget?.snapshot?.().callsUsed || null }), telemetry: { executionMode: 'background', durationMs: now() - startedAt, transportStats } }
         const responseId = payload?.id
         if (!responseId) return { ok: false, status: response.status, errorCategory: 'SCHEMA_ERROR', telemetry: { executionMode: 'background', durationMs: now() - startedAt, transportStats } }
         let status = payload.status || 'queued'; let completed = payload; let pollRequests = 0; let lastPollError = null
@@ -136,7 +150,7 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
           if (now() - startedAt >= config.backgroundDeadlineMs || pollRequests >= config.backgroundMaxPollRequests) {
             let cancelStatus = 'not_attempted'; transport('cancel')
             try { const cancel = await fetchImpl(`${config.baseUrl}/${encodeURIComponent(responseId)}/cancel`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` } }); cancelStatus = cancel.ok ? 'accepted' : `http_${cancel.status}` } catch { cancelStatus = 'failed' }
-            return { ok: false, status, errorCategory: 'BACKGROUND_DEADLINE_EXCEEDED', responseId, telemetry: { executionMode: 'background', durationMs: now() - startedAt, pollRequests, cancelAttempted: true, cancelStatus, transportStats, lastPollError } }
+            return { ok: false, status, errorCategory: 'BACKGROUND_DEADLINE_EXCEEDED', errorEnvelope: providerErrorEnvelope({ category: 'BACKGROUND_DEADLINE_EXCEEDED', operation, executionMode: 'background', model: config.model, responseId, responseStatus: status, generationCallNumber: callBudget?.snapshot?.().callsUsed || null, pollCount: pollRequests }), responseId, telemetry: { executionMode: 'background', durationMs: now() - startedAt, pollRequests, cancelAttempted: true, cancelStatus, transportStats, lastPollError } }
           }
           await sleepImpl(pollRequests === 0 ? config.backgroundInitialDelayMs : config.backgroundIntervalMs)
           pollRequests += 1; transport('poll')
@@ -144,17 +158,17 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
         }
         const telemetry = { executionMode: 'background', durationMs: now() - startedAt, responseId, pollRequests, maxOutputTokens: currentMaxOutputTokens, usage: safeUsage(completed.usage), transportStats: { ...transportStats } }
         if (status === 'incomplete' && completed.incomplete_details?.reason === 'max_output_tokens' && outputBudgetRetry < outputBudgetRetryMax) { outputBudgetRetry += 1; currentMaxOutputTokens = retryOutputBudget || currentMaxOutputTokens * 2; continue }
-        if (status === 'incomplete') return { ok: false, status, incompleteReason: completed.incomplete_details?.reason || null, errorCategory: completed.incomplete_details?.reason === 'max_output_tokens' ? 'OUTPUT_BUDGET_EXHAUSTED' : 'SCHEMA_ERROR', responseId, telemetry }
-        if (status === 'failed' || status === 'cancelled') return { ok: false, status, errorCategory: 'MODEL_ERROR', responseId, telemetry }
+        if (status === 'incomplete') return { ok: false, status, incompleteReason: completed.incomplete_details?.reason || null, errorCategory: completed.incomplete_details?.reason === 'max_output_tokens' ? 'OUTPUT_BUDGET_EXHAUSTED' : 'SCHEMA_ERROR', errorEnvelope: providerErrorEnvelope({ category: completed.incomplete_details?.reason === 'max_output_tokens' ? 'OUTPUT_BUDGET_EXHAUSTED' : 'SEMANTIC_SCHEMA_INVALID', operation, executionMode: 'background', model: config.model, responseId, responseStatus: status, incompleteReason: completed.incomplete_details?.reason || null, generationCallNumber: callBudget?.snapshot?.().callsUsed || null, pollCount: pollRequests }), responseId, telemetry }
+        if (status === 'failed' || status === 'cancelled') { const errorEnvelope = responseFailure({ payload: completed, operation, executionMode: 'background', model: config.model, generationCallNumber: callBudget?.snapshot?.().callsUsed || null, pollCount: pollRequests }); return { ok: false, status, errorCategory: 'MODEL_ERROR', errorEnvelope, responseId, telemetry } }
         return { ok: true, status, text: extractResponseText(completed), payload: completed, responseId, telemetry }
       }
     },
     async decide({ operation = 'business_understanding', input, schema = SEMANTIC_SCHEMA, sourceRefs = [], contentPlanRef = null, contentSectionCatalogHash = null, outputBudgetRetryMax = 1, executionMode = 'foreground' } = {}) {
       const policy = outputBudgetPolicy(operation)
       const result = await this.request({ input, schema, maxOutputTokens: policy.initialOutputBudget, reasoningEffort: config.reasoningEffort, outputBudgetRetryMax, operation, retryOutputBudget: policy.retryOutputBudget, executionMode })
-      if (!result.ok) throw Object.assign(new Error(result.errorCategory || 'SEMANTIC_PROVIDER_FAILED'), { code: result.errorCategory || 'SEMANTIC_PROVIDER_FAILED', telemetry: result.telemetry })
+      if (!result.ok) throw Object.assign(new Error(result.errorCategory || 'SEMANTIC_PROVIDER_FAILED'), { code: result.errorCategory || 'SEMANTIC_PROVIDER_FAILED', telemetry: result.telemetry, errorEnvelope: result.errorEnvelope || null })
       let decision
-      try { decision = JSON.parse(result.text) } catch { throw Object.assign(new Error('SEMANTIC_STRUCTURED_OUTPUT_INVALID'), { code: 'SEMANTIC_STRUCTURED_OUTPUT_INVALID' }) }
+      try { decision = JSON.parse(result.text) } catch { throw Object.assign(new Error('SEMANTIC_STRUCTURED_OUTPUT_INVALID'), { code: 'SEMANTIC_STRUCTURED_OUTPUT_INVALID', errorEnvelope: providerErrorEnvelope({ category: 'STRUCTURED_OUTPUT_INVALID', operation, executionMode, model: this.model, responseId: result.responseId || null, responseStatus: result.status || 'completed', generationCallNumber: result.telemetry?.providerBudget?.callsUsed || null }) }) }
       return wrapSemanticDecision({ decision, operation, provider: { ...this, responseId: result.payload?.id || null }, input, sourceRefs, contentPlanRef, contentSectionCatalogHash })
     },
   })
@@ -196,4 +210,4 @@ function experiencePlanSchemaForCatalog(catalog, catalogHash) {
   if (!ids.length || !catalogHash) throw new TypeError('ContentSectionCatalog is required.')
   return Object.freeze({ name: 'experience_plan_v2_dynamic', schema: { type: 'object', additionalProperties: false, properties: { schemaVersion: { type: 'string', enum: ['experience-plan-v2'] }, contentSectionCatalogHash: { type: 'string', enum: [catalogHash] }, archetype: { type: 'string' }, sectionOrder: { type: 'array', items: { type: 'string', enum: ids }, minItems: 3, maxItems: ids.length }, heroVariant: { type: 'string' }, sectionTreatments: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 8 }, contentDensity: { type: 'string' }, ctaPositions: { type: 'array', items: { type: 'string', enum: ids }, minItems: 1, maxItems: 5 }, servicesTreatment: { type: 'string' }, trustTreatment: { type: 'string' }, faqTreatment: { type: 'string' }, conversionStrategy: { type: 'string' } }, required: ['schemaVersion', 'contentSectionCatalogHash', 'archetype', 'sectionOrder', 'heroVariant', 'sectionTreatments', 'contentDensity', 'ctaPositions', 'servicesTreatment', 'trustTreatment', 'faqTreatment', 'conversionStrategy'] } })
 }
-module.exports = { DEFAULT_FOREGROUND_TIMEOUT_MS, OUTPUT_BUDGETS, OUTPUT_BUDGET_POLICY, BACKGROUND_DEFAULTS, outputBudgetPolicy, ProviderCallBudget, ProviderRunBudget, providerConfig, classifyError, createOpenAISemanticProvider, probeMinimal, probeStructured, probeSemantic, providerHealth, wrapSemanticDecision, validateSemanticEnvelope, MINIMAL_SCHEMA, SEMANTIC_SCHEMA, CONTENT_PLAN_SCHEMA, EXPERIENCE_PLAN_SCHEMA, experiencePlanSchemaForCatalog }
+module.exports = { DEFAULT_FOREGROUND_TIMEOUT_MS, OUTPUT_BUDGETS, OUTPUT_BUDGET_POLICY, BACKGROUND_DEFAULTS, outputBudgetPolicy, ProviderCallBudget, ProviderRunBudget, providerConfig, classifyError, providerErrorEnvelope, createOpenAISemanticProvider, probeMinimal, probeStructured, probeSemantic, providerHealth, wrapSemanticDecision, validateSemanticEnvelope, MINIMAL_SCHEMA, SEMANTIC_SCHEMA, CONTENT_PLAN_SCHEMA, EXPERIENCE_PLAN_SCHEMA, experiencePlanSchemaForCatalog }
