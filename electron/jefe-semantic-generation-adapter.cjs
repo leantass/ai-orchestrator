@@ -3,11 +3,40 @@ const { validateProductPlanning } = require('./jefe-product-planning.cjs')
 
 function hash(value) { return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex') }
 function fail(message) { throw Object.assign(new Error(message), { code: 'INVALID_SEMANTIC_GENERATION_SPEC' }) }
-function normalizeSectionId(value) {
-  if (typeof value !== 'string' || !value.trim()) fail('sectionOrder contains an invalid section.')
-  const normalized = value.trim().toLocaleLowerCase('es-AR').normalize('NFD').replace(/[\u0300-\u036f]/gu, '').replace(/[^a-z0-9]+/gu, '-').replace(/^-+|-+$/gu, '')
-  if (!/^[a-z][a-z0-9-]{0,31}$/u.test(normalized)) fail('sectionOrder contains an invalid section.')
-  return normalized
+function normalizeComparableLabel(value) {
+  return String(value || '').trim().toLocaleLowerCase('es-AR').normalize('NFD').replace(/[\u0300-\u036f]/gu, '').replace(/[^a-z0-9]+/gu, ' ').replace(/\s+/gu, ' ').trim()
+}
+function canonicalId(value) {
+  if (typeof value !== 'string' || !/^[a-z][a-z0-9-]{0,31}$/u.test(value.trim())) return null
+  return value.trim()
+}
+function sectionIdentityCatalog(planning) {
+  const sections = Array.isArray(planning?.experience?.sections) ? planning.experience.sections : []
+  const contracts = Array.isArray(planning?.build?.sectionContracts) ? planning.build.sectionContracts : []
+  const navigation = Array.isArray(planning?.content?.navigation) ? planning.content.navigation : []
+  return sections.map((id, index) => {
+    const contract = contracts.find((item) => item?.id === id) || {}
+    const labels = [navigation[sections.filter((item) => item !== 'inicio').indexOf(id)], contract.label, contract.component === 'hero' ? 'hero' : null, contract.component === 'conversion-form' ? 'contact' : null, ...(Array.isArray(contract.aliases) ? contract.aliases : [])].filter(Boolean)
+    return { id, labels: labels.map(normalizeComparableLabel).filter(Boolean) }
+  })
+}
+function resolveSectionReference(value, planning, field = 'section reference') {
+  if (typeof value !== 'string' || !value.trim()) fail(`${field} is invalid.`)
+  const raw = value.trim()
+  const direct = canonicalId(raw)
+  const catalog = sectionIdentityCatalog(planning)
+  if (direct && catalog.some((item) => item.id === direct)) return direct
+  const comparable = normalizeComparableLabel(raw)
+  const matches = catalog.filter((item) => item.labels.includes(comparable))
+  if (matches.length === 1) return matches[0].id
+  if (matches.length > 1) fail(`AMBIGUOUS_SEMANTIC_SECTION: ${field}.`)
+  fail(`UNKNOWN_SEMANTIC_SECTION: ${field}.`)
+}
+function resolveSectionOrder(values, planning, field = 'sectionOrder') {
+  if (!Array.isArray(values) || values.length === 0) fail(`${field} is required.`)
+  const resolved = values.map((value) => resolveSectionReference(value, planning, field))
+  if (new Set(resolved).size !== resolved.length) fail(`${field} contains duplicate sections.`)
+  return resolved
 }
 function requiredPlan(value, field, schemaVersion) {
   if (!value || typeof value !== 'object' || value.schemaVersion !== schemaVersion) fail(`${field} with ${schemaVersion} is required.`)
@@ -45,8 +74,7 @@ function adaptSemanticPlansToPlanning({ sourcePlanning, businessUnderstanding, c
   const bu = requiredPlan(businessUnderstanding, 'BusinessUnderstandingV2', 'business-understanding-v2')
   const content = requiredPlan(contentPlan, 'ContentPlanV2', 'content-plan-v2')
   const experience = requiredPlan(experiencePlan, 'ExperiencePlanV2', 'experience-plan-v2')
-  const sections = experience.sectionOrder.map(normalizeSectionId)
-  if (!sections.length || new Set(sections).size !== sections.length) fail('ExperiencePlanV2 sectionOrder is invalid.')
+  const sections = resolveSectionOrder(experience.sectionOrder, sourcePlanning, 'ExperiencePlanV2 sectionOrder')
   const services = semanticServices(content.services)
   const trust = content.trust.map((item) => sentence(item, 'Criterio explicado para avanzar'))
   const trustItems = semanticTrust(content.trust, bu)
@@ -55,7 +83,8 @@ function adaptSemanticPlansToPlanning({ sourcePlanning, businessUnderstanding, c
   const nextBrief = { ...sourcePlanning.brief, audience: bu.audience || sourcePlanning.brief.audience, objective: bu.primaryGoal || sourcePlanning.brief.objective }
   const nextStrategy = { ...sourcePlanning.strategy, audience: bu.audience || sourcePlanning.strategy.audience, primaryMessage: sentence(content.hero, sourcePlanning.strategy.primaryMessage) }
   const nextContent = { ...sourcePlanning.content, title: sentence(content.hero, sourcePlanning.content.title), subtitle: sentence(content.presentation, sourcePlanning.content.subtitle), benefits: services.map((item) => item.description), services, trust, trustItems, faq, ctas: [sentence(content.contact, sourcePlanning.content.ctas[0])], contact: { ...sourcePlanning.content.contact, title: sentence(content.contact, sourcePlanning.content.contact.title), description: sentence(content.contact, sourcePlanning.content.contact.description), primaryAction: sentence(content.contact, sourcePlanning.content.ctas[0]), source: 'ContentPlanV2.contact' }, hero: { ...sourcePlanning.content.hero, title: sentence(content.hero, sourcePlanning.content.title), description: sentence(content.presentation, sourcePlanning.content.subtitle), primaryCTA: sentence(content.contact, sourcePlanning.content.ctas[0]), source: 'ContentPlanV2.hero' }, businessUnderstanding: { ...bu, schemaVersion: 'business-understanding-v2' } }
-  const nextExperience = { ...sourcePlanning.experience, sections, navigation: sections.filter((item) => item !== 'inicio'), forms: [{ fields: ['name', 'email'], submitAction: sentence(content.contact, sourcePlanning.content.ctas[0]), persistence: 'local_only' }], responsive: true, archetype: experience.archetype, heroVariant: experience.heroVariant, sectionTreatments: experience.sectionTreatments, contentDensity: experience.contentDensity, ctaPositions: experience.ctaPositions, servicesTreatment: experience.servicesTreatment, trustTreatment: experience.trustTreatment, faqTreatment: experience.faqTreatment, conversionStrategy: experience.conversionStrategy }
+  const ctaPositions = resolveSectionOrder(experience.ctaPositions, sourcePlanning, 'ExperiencePlanV2 ctaPositions')
+  const nextExperience = { ...sourcePlanning.experience, sections, navigation: sections.filter((item) => item !== 'inicio'), forms: [{ fields: ['name', 'email'], submitAction: sentence(content.contact, sourcePlanning.content.ctas[0]), persistence: 'local_only' }], responsive: true, archetype: experience.archetype, heroVariant: experience.heroVariant, sectionTreatments: experience.sectionTreatments, contentDensity: experience.contentDensity, ctaPositions, servicesTreatment: experience.servicesTreatment, trustTreatment: experience.trustTreatment, faqTreatment: experience.faqTreatment, conversionStrategy: experience.conversionStrategy }
   const nextBuild = { ...sourcePlanning.build, sectionContracts: buildSectionContracts(sections), traceability: [...sourcePlanning.build.traceability, { source: 'ContentPlanV2', decision: 'customer-facing copy', component: 'artifact content', qaCriteria: 'content is derived from semantic plan' }, { source: 'ExperiencePlanV2', decision: 'section order and treatments', component: 'artifact structure', qaCriteria: 'structure is derived from semantic plan' }] }
   const result = { ...sourcePlanning, brief: nextBrief, strategy: nextStrategy, experience: nextExperience, content: nextContent, build: nextBuild, semanticRefs: { businessUnderstanding: 'BusinessUnderstandingV2', contentPlan: 'ContentPlanV2', experiencePlan: 'ExperiencePlanV2' } }
   validateProductPlanning(result)
@@ -66,11 +95,11 @@ function adaptSemanticGenerationSpec(spec) {
   if (!spec.planning || typeof spec.planning !== 'object') fail('SemanticGenerationSpec must contain structured planning.')
   validateProductPlanning(spec.planning)
   if (!Array.isArray(spec.sectionOrder) || spec.sectionOrder.length === 0) fail('sectionOrder is required.')
-  const sectionOrder = spec.sectionOrder.map(normalizeSectionId)
-  if (new Set(sectionOrder).size !== sectionOrder.length) fail('sectionOrder contains an invalid section.')
+  const sectionOrder = resolveSectionOrder(spec.sectionOrder, spec.planning)
   if (!spec.heroVariant || typeof spec.heroVariant !== 'string' || spec.heroVariant.includes('<')) fail('heroVariant is invalid.')
   if (spec.treatments && (!Array.isArray(spec.treatments) || spec.treatments.some((value) => typeof value !== 'string'))) fail('treatments are invalid.')
   if (spec.assets && (!Array.isArray(spec.assets) || spec.assets.some((value) => typeof value !== 'string' || value.includes('..') || value.startsWith('/')))) fail('assets must be safe relative references.')
-  return { schemaVersion: 'normalized-generation-plan-v1', planning: spec.planning, sectionOrder, heroVariant: spec.heroVariant, treatments: [...(spec.treatments || [])], creativeDirection: spec.creativeDirection || null, contentDensity: spec.contentDensity || 'balanced', ctaStrategy: spec.ctaStrategy || null, preservedQualities: [...(spec.preservedQualities || [])], prohibitedChanges: [...(spec.prohibitedChanges || [])], semanticGenerationSpecHash: hash(spec) }
+  const ctaPositions = spec.ctaPositions === undefined ? undefined : resolveSectionOrder(spec.ctaPositions, spec.planning, 'ctaPositions')
+  return { schemaVersion: 'normalized-generation-plan-v1', planning: spec.planning, sectionOrder, heroVariant: spec.heroVariant, treatments: [...(spec.treatments || [])], ...(ctaPositions ? { ctaPositions } : {}), creativeDirection: spec.creativeDirection || null, contentDensity: spec.contentDensity || 'balanced', ctaStrategy: spec.ctaStrategy || null, preservedQualities: [...(spec.preservedQualities || [])], prohibitedChanges: [...(spec.prohibitedChanges || [])], semanticGenerationSpecHash: hash(spec) }
 }
 module.exports = { adaptSemanticGenerationSpec, adaptSemanticPlansToPlanning }

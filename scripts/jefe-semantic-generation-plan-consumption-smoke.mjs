@@ -41,11 +41,14 @@ assert.ok(htmlB.indexOf('id="confianza"') < htmlB.indexOf('id="servicios"'))
 assert.doesNotMatch(htmlA, /Hero legacy/u); assert.doesNotMatch(htmlB, /Hero legacy/u)
 assert.throws(() => adaptSemanticPlansToPlanning({ sourcePlanning: source.project.planning, businessUnderstanding: bu, contentPlan: null, experiencePlan: baseExperience }), /ContentPlanV2/u)
 assert.throws(() => adaptSemanticPlansToPlanning({ sourcePlanning: source.project.planning, businessUnderstanding: bu, contentPlan: contentA, experiencePlan: null }), /ExperiencePlanV2/u)
-const genericExperience = { ...baseExperience, sectionOrder: ['inicio', 'presentacion', 'servicios', 'confianza', 'faq', 'contacto'] }
-const genericSpec = specFor(contentA, genericExperience)
-assert.deepEqual(adaptSemanticGenerationSpec(genericSpec).sectionOrder, ['presentacion', 'servicios', 'confianza', 'faq', 'contacto'])
-const labelledExperience = { ...baseExperience, sectionOrder: ['inicio', 'Servicios profesionales', 'Confianza y método', 'Preguntas frecuentes', 'Contacto'] }
-assert.deepEqual(adaptSemanticGenerationSpec(specFor(contentA, labelledExperience)).sectionOrder, ['servicios-profesionales', 'confianza-y-metodo', 'preguntas-frecuentes', 'contacto'])
+/* Section identity is resolved against the canonical catalog; arbitrary labels fail closed. */
+assert.throws(() => specFor(contentA, { ...baseExperience, sectionOrder: ['inicio', 'presentacion', 'servicios', 'confianza', 'faq', 'contacto'] }), /UNKNOWN_SEMANTIC_SECTION/u)
+const labelledPlanning = { ...source.project.planning, build: { ...source.project.planning.build, sectionContracts: source.project.planning.build.sectionContracts.map((item) => item.id === 'servicios' ? { ...item, label: 'Servicios profesionales' } : item) } }
+const labelledSpec = { schemaVersion: 'semantic-generation-spec-v1', planning: adaptSemanticPlansToPlanning({ sourcePlanning: labelledPlanning, businessUnderstanding: bu, contentPlan: contentA, experiencePlan: { ...baseExperience, sectionOrder: ['inicio', 'Servicios profesionales', 'Confianza', 'FAQ', 'Contacto'], ctaPositions: ['inicio', 'Contacto'] } }), sectionOrder: ['servicios', 'confianza', 'faq', 'contacto'], heroVariant: 'focused', treatments: ['semantic'], preservedQualities: [], prohibitedChanges: [] }
+assert.deepEqual(adaptSemanticGenerationSpec(labelledSpec).sectionOrder, ['servicios', 'confianza', 'faq', 'contacto'])
+const ambiguousPlanning = { ...labelledPlanning, build: { ...labelledPlanning.build, sectionContracts: labelledPlanning.build.sectionContracts.map((item) => item.id === 'confianza' ? { ...item, label: 'Servicios profesionales' } : item) } }
+assert.throws(() => adaptSemanticPlansToPlanning({ sourcePlanning: ambiguousPlanning, businessUnderstanding: bu, contentPlan: contentA, experiencePlan: { ...baseExperience, sectionOrder: ['inicio', 'Servicios profesionales', 'faq', 'contacto'] } }), /AMBIGUOUS_SEMANTIC_SECTION/u)
+assert.throws(() => adaptSemanticPlansToPlanning({ sourcePlanning: source.project.planning, businessUnderstanding: bu, contentPlan: contentA, experiencePlan: { ...baseExperience, sectionOrder: ['inicio', 'No existe', 'faq', 'contacto'] } }), /UNKNOWN_SEMANTIC_SECTION/u)
 assert.equal(adaptSemanticGenerationSpec({ ...specA }).schemaVersion, 'normalized-generation-plan-v1')
 await fs.rm(root, { recursive: true, force: true })
 console.log('PASS jefe-semantic-generation-plan-consumption-smoke: pre-fix conflict reproduced, ContentPlanV2/ExperiencePlanV2 authority, legacy planning excluded, missing plans fail closed, A/B artifacts differ, standard adapter contract preserved')
