@@ -78,6 +78,31 @@ function extractResponseText(payload) {
 }
 function parseProviderPayload(text) { try { return JSON.parse(text) } catch { return null } }
 function safeUsage(usage) { if (!usage || typeof usage !== 'object') return null; return Object.fromEntries(['input_tokens', 'output_tokens', 'reasoning_tokens', 'total_tokens'].filter((key) => Number.isFinite(usage[key])).map((key) => [key, usage[key]])) }
+function invalidStructuredSchema(path, message) { throw Object.assign(new Error(`Invalid provider structured output schema at ${path}: ${message}`), { code: 'INVALID_PROVIDER_STRUCTURED_OUTPUT_SCHEMA', path }) }
+function validateSchemaNode(node, path = '$') {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) invalidStructuredSchema(path, 'schema node must be an object')
+  if (node.type === 'object') {
+    const properties = node.properties || {}
+    if (!properties || typeof properties !== 'object' || Array.isArray(properties)) invalidStructuredSchema(`${path}.properties`, 'properties must be an object')
+    const required = node.required
+    if (!Array.isArray(required)) invalidStructuredSchema(`${path}.required`, 'required must be an array')
+    const propertyNames = Object.keys(properties)
+    const requiredSet = new Set(required)
+    if (requiredSet.size !== required.length) invalidStructuredSchema(`${path}.required`, 'required contains duplicates')
+    for (const name of propertyNames) if (!requiredSet.has(name)) invalidStructuredSchema(`${path}.required`, `property ${name} is not required`)
+    for (const name of required) if (!Object.hasOwn(properties, name)) invalidStructuredSchema(`${path}.required`, `required property ${name} is not declared`)
+    for (const [name, child] of Object.entries(properties)) validateSchemaNode(child, `${path}.properties.${name}`)
+  } else if (node.type === 'array') {
+    if (!node.items) invalidStructuredSchema(`${path}.items`, 'array items are required')
+    validateSchemaNode(node.items, `${path}.items`)
+  }
+  return node
+}
+function validateStructuredOutputSchema(schema) {
+  if (!schema || typeof schema !== 'object' || typeof schema.name !== 'string' || !schema.schema) invalidStructuredSchema('$', 'name and schema are required')
+  validateSchemaNode(schema.schema)
+  return schema
+}
 
 function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, now = Date.now, sleepImpl = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), callBudget = null } = {}) {
   const config = providerConfig({ env })
@@ -92,6 +117,7 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
     transportStats,
     async request({ input, schema = null, model = config.model, maxOutputTokens = 600, reasoningEffort = config.reasoningEffort, timeoutMs = config.foregroundTimeoutMs, retries = config.retryMax, outputBudgetRetryMax = 0, operation = 'semantic', retryOutputBudget = null, executionMode = 'foreground' } = {}) {
       if (!config.apiKey) throw Object.assign(new Error('OPENAI_CREDENTIAL_MISSING'), { category: 'MODEL_ERROR' })
+      if (schema) validateStructuredOutputSchema(schema)
       if (executionMode === 'background') return this.requestBackground({ input, schema, model, maxOutputTokens, reasoningEffort, outputBudgetRetryMax, operation, retryOutputBudget })
       let attempt = 0; let outputBudgetRetry = 0; let currentMaxOutputTokens = maxOutputTokens; const budgets = []
       while (true) {
@@ -176,7 +202,7 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
 
 const MINIMAL_SCHEMA = Object.freeze({ name: 'semantic_minimal', schema: { type: 'object', additionalProperties: false, properties: { ok: { type: 'boolean' }, label: { type: 'string' } }, required: ['ok', 'label'] } })
 const SEMANTIC_SCHEMA = Object.freeze({ name: 'business_understanding_v2_probe', schema: { type: 'object', additionalProperties: false, properties: { schemaVersion: { type: 'string', enum: ['business-understanding-v2'] }, businessType: { type: 'string' }, businessModel: { type: 'string' }, audience: { type: 'string' }, primaryGoal: { type: 'string' }, customerNeeds: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 3 }, customerQuestions: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 3 }, trustDrivers: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 3 }, conversionActions: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 2 }, serviceModel: { type: 'string' }, domainVocabulary: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 6 }, tone: { type: 'string' } }, required: ['schemaVersion', 'businessType', 'businessModel', 'audience', 'primaryGoal', 'customerNeeds', 'customerQuestions', 'trustDrivers', 'conversionActions', 'serviceModel', 'domainVocabulary', 'tone'] } })
-const CONTENT_PLAN_SCHEMA = Object.freeze({ name: 'content_plan_v2', schema: { type: 'object', additionalProperties: false, properties: { schemaVersion: { type: 'string', enum: ['content-plan-v2'] }, hero: { type: 'string' }, presentation: { type: 'string' }, services: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 8 }, trust: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 6 }, faq: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 8 }, contact: { type: 'string' }, contentPriorities: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 8 }, sections: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { id: { type: 'string', pattern: '^[a-z][a-z0-9-]{0,31}$' }, role: { type: 'string' }, label: { type: 'string' }, kind: { type: 'string' }, required: { type: 'boolean' }, contentRef: { type: 'string' }, aliases: { type: 'array', items: { type: 'string' } } }, required: ['id', 'role', 'label', 'kind', 'required', 'contentRef'] }, minItems: 1, maxItems: 8 } }, required: ['schemaVersion', 'hero', 'presentation', 'services', 'trust', 'faq', 'contact', 'contentPriorities'] } })
+const CONTENT_PLAN_SCHEMA = Object.freeze({ name: 'content_plan_v2', schema: { type: 'object', additionalProperties: false, properties: { schemaVersion: { type: 'string', enum: ['content-plan-v2'] }, hero: { type: 'string' }, presentation: { type: 'string' }, services: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 8 }, trust: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 6 }, faq: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 8 }, contact: { type: 'string' }, contentPriorities: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 8 }, sections: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { id: { type: 'string', pattern: '^[a-z][a-z0-9-]{0,31}$' }, role: { type: 'string' }, label: { type: 'string' }, kind: { type: 'string' }, required: { type: 'boolean' }, contentRef: { type: 'string' }, aliases: { type: 'array', items: { type: 'string' } } }, required: ['id', 'role', 'label', 'kind', 'required', 'contentRef', 'aliases'] }, minItems: 1, maxItems: 8 } }, required: ['schemaVersion', 'hero', 'presentation', 'services', 'trust', 'faq', 'contact', 'contentPriorities', 'sections'] } })
 const EXPERIENCE_PLAN_SCHEMA = Object.freeze({ name: 'experience_plan_v2', schema: { type: 'object', additionalProperties: false, properties: { schemaVersion: { type: 'string', enum: ['experience-plan-v2'] }, archetype: { type: 'string' }, sectionOrder: { type: 'array', items: { type: 'string' }, minItems: 3, maxItems: 8 }, heroVariant: { type: 'string' }, sectionTreatments: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 8 }, contentDensity: { type: 'string' }, ctaPositions: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 5 }, servicesTreatment: { type: 'string' }, trustTreatment: { type: 'string' }, faqTreatment: { type: 'string' }, conversionStrategy: { type: 'string' } }, required: ['schemaVersion', 'archetype', 'sectionOrder', 'heroVariant', 'sectionTreatments', 'contentDensity', 'ctaPositions', 'servicesTreatment', 'trustTreatment', 'faqTreatment', 'conversionStrategy'] } })
 
 async function probeMinimal(provider) { return provider.request({ input: [{ role: 'user', content: [{ type: 'input_text', text: 'Respondé únicamente OK.' }] }], maxOutputTokens: OUTPUT_BUDGETS.minimal_probe, reasoningEffort: 'low' }) }
@@ -211,4 +237,4 @@ function experiencePlanSchemaForCatalog(catalog, catalogHash) {
   if (!ids.length || !catalogHash) throw new TypeError('ContentSectionCatalog is required.')
   return Object.freeze({ name: 'experience_plan_v2_dynamic', schema: { type: 'object', additionalProperties: false, properties: { schemaVersion: { type: 'string', enum: ['experience-plan-v2'] }, contentSectionCatalogHash: { type: 'string', enum: [catalogHash] }, archetype: { type: 'string' }, sectionOrder: { type: 'array', items: { type: 'string', enum: ids }, minItems: 3, maxItems: ids.length }, heroVariant: { type: 'string' }, sectionTreatments: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 8 }, contentDensity: { type: 'string' }, ctaPositions: { type: 'array', items: { type: 'string', enum: ids }, minItems: 1, maxItems: 5 }, servicesTreatment: { type: 'string' }, trustTreatment: { type: 'string' }, faqTreatment: { type: 'string' }, conversionStrategy: { type: 'string' } }, required: ['schemaVersion', 'contentSectionCatalogHash', 'archetype', 'sectionOrder', 'heroVariant', 'sectionTreatments', 'contentDensity', 'ctaPositions', 'servicesTreatment', 'trustTreatment', 'faqTreatment', 'conversionStrategy'] } })
 }
-module.exports = { DEFAULT_FOREGROUND_TIMEOUT_MS, OUTPUT_BUDGETS, OUTPUT_BUDGET_POLICY, BACKGROUND_DEFAULTS, outputBudgetPolicy, ProviderCallBudget, ProviderRunBudget, providerConfig, classifyError, providerErrorEnvelope, createOpenAISemanticProvider, probeMinimal, probeStructured, probeSemantic, providerHealth, wrapSemanticDecision, validateSemanticEnvelope, MINIMAL_SCHEMA, SEMANTIC_SCHEMA, CONTENT_PLAN_SCHEMA, EXPERIENCE_PLAN_SCHEMA, experiencePlanSchemaForCatalog }
+module.exports = { DEFAULT_FOREGROUND_TIMEOUT_MS, OUTPUT_BUDGETS, OUTPUT_BUDGET_POLICY, BACKGROUND_DEFAULTS, outputBudgetPolicy, ProviderCallBudget, ProviderRunBudget, providerConfig, classifyError, providerErrorEnvelope, validateStructuredOutputSchema, createOpenAISemanticProvider, probeMinimal, probeStructured, probeSemantic, providerHealth, wrapSemanticDecision, validateSemanticEnvelope, MINIMAL_SCHEMA, SEMANTIC_SCHEMA, CONTENT_PLAN_SCHEMA, EXPERIENCE_PLAN_SCHEMA, experiencePlanSchemaForCatalog }
