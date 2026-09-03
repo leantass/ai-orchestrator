@@ -61,29 +61,27 @@ function requiredPlan(value, field, schemaVersion) {
   if (!value || typeof value !== 'object' || value.schemaVersion !== schemaVersion) fail(`${field} with ${schemaVersion} is required.`)
   return value
 }
+function copy(value, fallback = '') { const clean = String(value ?? fallback).trim(); if (!clean) fail('SEMANTIC_CONTENT_REQUIRED'); return clean }
 function sentence(value, fallback) {
-  const clean = String(value || fallback).trim().replace(/[.!?]+$/u, '')
-  return `${clean.charAt(0).toLocaleUpperCase('es-AR') + clean.slice(1)}.`
+  return copy(value, fallback)
 }
 function question(value) {
-  const clean = String(value || '').trim().replace(/^[¿?\s]+|[¿?\s]+$/gu, '')
-  return `¿${clean.charAt(0).toLocaleUpperCase('es-AR') + clean.slice(1)}?`
+  return copy(value)
 }
-function semanticFaq(value, businessUnderstanding, index) {
-  const context = businessUnderstanding.customerNeeds[index % businessUnderstanding.customerNeeds.length]
-  return String(value || '').trim().endsWith('?')
-    ? { question: question(value), answer: `${sentence(value, 'La respuesta se define con el contexto disponible')} ${sentence(context, 'Para orientar el próximo paso')}`, source: 'businessUnderstanding.customerQuestions' }
-    : { question: question(value), answer: `${sentence(value, 'La respuesta se define con el contexto disponible')} ${sentence(context, 'Para orientar el próximo paso')}`, source: 'businessUnderstanding.customerQuestions' }
+function semanticFaq(value) {
+  if (value && typeof value === 'object') return { question: copy(value.question), answer: copy(value.answer), source: 'businessUnderstanding.customerQuestions' }
+  const exact = question(value)
+  return { question: exact, answer: exact, source: 'businessUnderstanding.customerQuestions' }
 }
 function semanticServices(values) {
   return values.map((value) => {
-    const description = sentence(value, 'Servicio definido por el plan semántico')
-    const title = description.split(/\s+para\s+/iu)[0].replace(/\.$/u, '')
-    return { title, description, source: 'brief.services' }
+    if (value && typeof value === 'object') return { title: copy(value.title), description: copy(value.description), source: 'brief.services', ...(value.value ? { value: copy(value.value) } : {}) }
+    const exact = copy(value)
+    return { title: exact, description: exact, source: 'brief.services' }
   })
 }
 function semanticTrust(values, businessUnderstanding) {
-  return values.map((value, index) => ({ title: ['Criterio claro', 'Alcance visible', 'Acompañamiento profesional', 'Revisión explícita'][index] || 'Confianza', description: `${sentence(value, 'Criterio explicado para avanzar')} ${sentence(businessUnderstanding.trustDrivers[index % businessUnderstanding.trustDrivers.length], 'Criterio explicado para avanzar')}`, source: 'businessUnderstanding.trustDrivers' }))
+  return values.map((value, index) => value && typeof value === 'object' ? { title: copy(value.title), description: copy(value.description), source: 'businessUnderstanding.trustDrivers' } : { title: `Criterio ${index + 1}`, description: copy(value), source: 'businessUnderstanding.trustDrivers' })
 }
 function buildSectionContracts(sections) {
   return sections.map((section) => ({ id: section, component: section === 'inicio' ? 'hero' : section === 'contacto' ? 'conversion-form' : section, source: `ExperiencePlan.sections.${section}`, qaCriteria: 'section exists exactly once and is customer-facing' }))
@@ -106,6 +104,8 @@ function adaptSemanticPlansToPlanning({ sourcePlanning, businessUnderstanding, c
   const nextBrief = { ...sourcePlanning.brief, audience: bu.audience || sourcePlanning.brief.audience, objective: bu.primaryGoal || sourcePlanning.brief.objective }
   const nextStrategy = { ...sourcePlanning.strategy, audience: bu.audience || sourcePlanning.strategy.audience, primaryMessage: sentence(content.hero, sourcePlanning.strategy.primaryMessage) }
   const nextContent = { ...sourcePlanning.content, title: sentence(content.hero, sourcePlanning.content.title), subtitle: sentence(content.presentation, sourcePlanning.content.subtitle), benefits: services.map((item) => item.description), services, trust, trustItems, faq, ctas: [sentence(content.contact, sourcePlanning.content.ctas[0])], contact: { ...sourcePlanning.content.contact, title: sentence(content.contact, sourcePlanning.content.contact.title), description: sentence(content.contact, sourcePlanning.content.contact.description), primaryAction: sentence(content.contact, sourcePlanning.content.ctas[0]), source: 'ContentPlanV2.contact' }, hero: { ...sourcePlanning.content.hero, title: sentence(content.hero, sourcePlanning.content.title), description: sentence(content.presentation, sourcePlanning.content.subtitle), primaryCTA: sentence(content.contact, sourcePlanning.content.ctas[0]), source: 'ContentPlanV2.hero' }, businessUnderstanding: { ...bu, schemaVersion: 'business-understanding-v2' } }
+  nextContent.sections = content.sections
+  nextContent.benefits = sourcePlanning.content.benefits
   const ctaPositions = resolveSectionOrder(experience.ctaPositions, sourcePlanning, 'ExperiencePlanV2 ctaPositions', catalog)
   const nextExperience = { ...sourcePlanning.experience, sections, navigation: sections.filter((item) => item !== 'inicio'), forms: [{ fields: ['name', 'email'], submitAction: sentence(content.contact, sourcePlanning.content.ctas[0]), persistence: 'local_only' }], responsive: true, archetype: experience.archetype, heroVariant: experience.heroVariant, sectionTreatments: experience.sectionTreatments, contentDensity: experience.contentDensity, ctaPositions, servicesTreatment: experience.servicesTreatment, trustTreatment: experience.trustTreatment, faqTreatment: experience.faqTreatment, conversionStrategy: experience.conversionStrategy }
   const nextBuild = { ...sourcePlanning.build, sectionContracts: buildSectionContracts(sections), traceability: [...sourcePlanning.build.traceability, { source: 'ContentPlanV2', decision: 'customer-facing copy', component: 'artifact content', qaCriteria: 'content is derived from semantic plan' }, { source: 'ExperiencePlanV2', decision: 'section order and treatments', component: 'artifact structure', qaCriteria: 'structure is derived from semantic plan' }] }

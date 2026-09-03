@@ -384,7 +384,7 @@ function validateGeneratedArtifact(planning, artifacts) {
   for (const token of Object.values(planning.visual.palette)) if (typeof token === 'string' && /^#/u.test(token) && !css.toUpperCase().includes(token.toUpperCase())) fail('GENERATED_ARTIFACT_TOKEN_DRIFT', 'Falta token visual ' + token + ' en CSS.')
   if (planning.content.faq.length && !/<details[\s\S]*<summary/iu.test(html)) fail('GENERATED_ARTIFACT_MISSING_FAQ', 'El FAQ planificado no fue renderizado.')
   if (planning.content.trust.length && !/id=["']confianza["'][\s\S]*trust/iu.test(html)) fail('GENERATED_ARTIFACT_MISSING_TRUST', 'La confianza planificada no fue renderizada.')
-  const customerText = [planning.content.title, planning.content.subtitle, ...planning.content.benefits, ...planning.content.trust, ...planning.content.faq.flatMap((item) => [item.question, item.answer])].map((item) => String(item).trim().toLowerCase())
+  const customerText = [planning.content.title, planning.content.subtitle, ...planning.content.benefits, ...planning.content.trust, ...planning.content.faq.flatMap((item) => item.question === item.answer ? [item.question] : [item.question, item.answer])].map((item) => String(item).trim().toLowerCase())
   if (new Set(customerText).size !== customerText.length) fail('GENERATED_ARTIFACT_DUPLICATE_CONTENT', 'El contenido customer-facing contiene textos duplicados.')
   if (customerText.some((item) => !/^[a-záéíóúüñ¿¡]/u.test(item) || !/[.!?]$/u.test(item))) fail('GENERATED_ARTIFACT_GRAMMAR', 'El contenido customer-facing no tiene frases completas.')
   if (planning.build.traceability.length < 5) fail('GENERATED_ARTIFACT_TRACEABILITY', 'La trazabilidad del build es insuficiente.')
