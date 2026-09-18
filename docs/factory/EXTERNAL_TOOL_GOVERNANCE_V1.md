@@ -1,5 +1,29 @@
 # External Tool Governance v1
 
+## Hermes Alternate Safe Runtime Implementation Planning Gate v1
+
+The Hermes alternate safe runtime implementation planning gate is planning-only. It creates a candidate architecture and future file allowlist for a Factory-owned no-tool provider-direct research adapter, mock-only runtime, and shared contracts while keeping Hermes CLI blocked. It authorizes no implementation, execution, prompt passing, credential access, network, model call, output ingestion, or findings use.
+
+## Hermes Alternate Safe Runtime Implementation Approval Gate v1
+
+The Hermes alternate safe runtime implementation approval gate can approve only the next code-only implementation gate. It authorizes no runtime execution, research execution, prompt passing, credential access, network, model call, output ingestion, findings use, Hermes execution, package mutation, or UI/preload/App mutation.
+
+## Hermes Alternate Safe Runtime Implementation Gate v1
+
+The Hermes alternate safe runtime implementation gate creates only pure code modules and verification-planning evidence. It does not execute runtime or research and does not use credentials, env, network, DNS, models, prompts, tools, output ingestion, findings, uv, pip, Python, setup.py, package files, or UI/preload/App.
+
+## Hermes Alternate Safe Runtime Verification Planning Gate v1
+
+The Hermes alternate safe runtime verification planning gate plans verification and regression compatibility only. It records obsolete post-implementation assertions and keeps verification execution, runtime, research, Hermes, prompts, credentials, env, network, models, output ingestion, and findings blocked.
+
+## Hermes Alternate Safe Runtime Verification Approval Gate v1
+
+The Hermes alternate safe runtime verification approval gate approves only the next verification gate. It does not execute verification or runtime, and stale regression assertions remain a compatibility issue that blocks runtime/release until handled.
+
+## Hermes Alternate Safe Runtime Verification Gate v1
+
+The Hermes alternate safe runtime verification gate executes only code-only/static verification with allowed smokes and read-only scans. It does not execute runtime, research, Hermes, providers, prompts, credentials, process env, network, output ingestion, or findings.
+
 ## Purpose
 
 External Tool Governance keeps external tools outside the factory core until each tool has a profile, lifecycle state, install plan, runtime boundary, adapter plan, result ingestion path, and JEFE review.
@@ -264,3 +288,175 @@ Wrapper No-Tool Mode Implementation may create inert wrapper modules and seriali
 Wrapper No-Tool Mode Verification Planning may only plan verification. It cannot execute verification, execute the wrapper, create live temp config, execute Hermes, pass prompts, use network, read credentials, call models, enable toolsets, create run roots, ingest findings, or approve a research runtime adapter.
 
 Wrapper No-Tool Mode Verification Approval may authorize only the following wrapper verification gate. It cannot perform verification itself, run the wrapper against Hermes, create live temp config, execute Hermes, use prompts, network, credentials, models, toolsets, or approve research runtime adapter retry.
+
+Wrapper No-Tool Mode Verification may run only code-only checks and pure in-memory wrapper functions. It cannot execute Hermes or a wrapper against Hermes, create live config files, send prompts, call models, use network, read credentials, enable toolsets, ingest output, promote findings, or approve research runtime adapter retry.
+
+Wrapper No-Tool Mode Verification Review may accept code-only verification only for Research Runtime Adapter Approval Retry. It cannot approve runtime execution.
+
+Research Runtime Adapter Approval Retry may approve only the next Research Runtime Adapter Gate with wrapper-boundary evidence. It cannot execute the adapter, wrapper, Hermes, `hermes.exe`, `--oneshot`, prompts, models, network, DNS, endpoints, credentials, `.env`, toolsets, run roots, research, ingestion, findings, uv, Python, pip, or setup.py.
+
+Research Runtime Adapter Gate may only prepare code-only adapter manifests and a non-executable command envelope. It cannot perform help probes, execute `hermes.exe`, run `--oneshot`, create live temp config, read credentials, use network, enable toolsets, execute research, or promote findings.
+
+Research Execution Approval Retry may only allow the final Research Execution Approval Gate. It cannot execute research, adapter, wrapper, Hermes, prompts, models, network, DNS, endpoints, credentials, `.env`, toolsets, run roots, ingestion, findings, uv, Python, pip, or setup.py.
+
+Research Execution Approval may only allow Controlled Research Runtime Planning. It cannot execute research or approve immediate runtime, adapter, wrapper, Hermes, prompts, models, network, credentials, toolsets, temp config, run root, ingestion, or findings use.
+
+Controlled Research Runtime Planning may plan future runtime controls only. It cannot create live temp config, create run roots, read credentials, send prompts, call models, use network, enable toolsets, execute Hermes, ingest output, or promote findings.
+
+Controlled Research Runtime Approval may approve only the next preparation gate after reviewing the plan. It is not runtime preparation and not runtime execution; it cannot create live temp config, create run roots, pass prompts, call models, use network, resolve DNS, test endpoints, read `.env`, read credential values, enable toolsets, execute Hermes, ingest output, or promote findings.
+
+Controlled Research Runtime Preparation may create only non-executable preparation artifacts for review. Virtual temp config candidates are not `config.yaml` files, run root validation is path-string only, credentials remain references only, prompt policy is not prompt approval, model/network allowlist is not network approval, and toolset proof requirements are not proof. Live runtime preparation, Hermes execution, network, credentials, output ingestion, and findings remain blocked.
+
+Controlled Research Runtime Preparation Review may accept non-executable artifacts only for Live Artifact Planning. Live artifact planning is not live artifact creation: it cannot create `config.yaml`, create run roots, read secrets, use network, execute Hermes, ingest output, or promote findings.
+
+Controlled Research Runtime Live Artifact Planning may define future creation boundaries only. It cannot create live temp config, create live run root, mutate project files, read secrets, use network, execute Hermes, ingest output, or promote findings.
+
+Controlled Research Runtime Live Artifact Approval may approve only the next creation gate. Approval is not creation and not runtime execution; temp config creation, run-root creation, prompts, models, network, credentials, toolsets, ingestion, findings, and Hermes execution remain blocked.
+
+Controlled Research Runtime Live Artifact Creation may write only approved `.codex-temp` artifacts for verification. It cannot execute Hermes, pass prompts, call models, use network, read credentials, enable toolsets, ingest output, or promote findings.
+
+Controlled Research Runtime Live Artifact Verification may read the created `.codex-temp` artifacts and prior gate receipts, perform read-only stat/lstat/readdir and text/JSON scans, and write only its ignored verification result. It cannot modify live artifacts, execute Hermes or wrappers, pass prompts, call models, use network, read `.env` or credential values, enable toolsets, ingest output, or promote findings.
+## Hermes Live Artifact Verification Review Governance
+
+Factory Hermes Controlled Research Runtime Live Artifact Verification Review Gate v1 may authorize controlled runtime execution planning only. It does not execute Hermes, `hermes.exe`, `--oneshot`, adapters, wrappers, prompts, models, network, DNS, endpoint tests, credential reads, `.env` reads, toolset enablement, output ingestion, or findings promotion.
+
+## Hermes Controlled Runtime Execution Planning Governance
+
+Factory Hermes Controlled Research Runtime Execution Planning Gate v1 may authorize only execution approval review. Its command envelope remains non-runnable and contains no command string, argv, env, prompt, or credential value.
+
+## Hermes Controlled Runtime Execution Approval Governance
+
+Factory Hermes Controlled Research Runtime Execution Approval Gate v1 may authorize only the final execution gate. It cannot execute Hermes, read credentials, pass prompts, use network, call models, enable toolsets, ingest output, or promote findings.
+
+## Hermes Controlled Runtime Execution Governance
+
+Factory Hermes Controlled Research Runtime Execution Gate v1 may execute only after final guards prove package integrity, artifact stability, prompt safety, credential redaction, safe wrapper command shape, timeout/kill switch readiness, bounded output, single-run behavior, and findings blocks. Without that proof it blocks before credential access and runtime execution.
+
+## Hermes Controlled Runtime Execution Review Governance
+
+Factory Hermes Controlled Research Runtime Execution Review Gate v1 reviews blocked-before-runtime evidence only. It cannot retry execution, read credentials, use network, ingest output, or promote findings.
+
+## Hermes Controlled Runtime Safe Command Shape Proof Planning Governance
+
+Factory Hermes Controlled Research Runtime Safe Command Shape Proof Planning Gate v1 creates planning artifacts only for source inspection, command candidates, static proof, no-defaults/no-toolsets proof, wrapper boundary proof, non-network dry-run proof, fail-closed command construction, risk registration, and future proof approval. It cannot execute proof, Hermes, wrapper, adapter, `hermes.exe`, `--oneshot`, prompts, models, network, DNS, endpoints, credentials, `.env`, toolsets, output ingestion, findings use, uv, pip, Python, setup.py, source/cache/package mutation, commit, or push.
+
+## Hermes Controlled Runtime Safe Command Shape Proof Approval Governance
+
+Factory Hermes Controlled Research Runtime Safe Command Shape Proof Approval Gate v1 may approve only the future proof gate. Approval is not proof and not execution; it cannot execute Hermes, wrapper, adapter, `hermes.exe`, `--oneshot`, prompts, models, network, DNS, endpoints, credentials, `.env`, toolsets, output ingestion, findings use, uv, pip, Python, setup.py, source/cache/package mutation, commit, or push.
+
+## Hermes Controlled Runtime Safe Command Shape Proof Governance
+
+Factory Hermes Controlled Research Runtime Safe Command Shape Proof Gate v1 may inspect source read-only and write an ignored proof artifact. It may execute a parse-only/dry-run command only after proving from source that no credentials, `.env`, prompts, models, network, DNS, toolsets, source/cache/python-env mutation, research output, or findings can occur. If that proof is unavailable, dry-run must be skipped and runtime remains blocked.
+
+## Hermes Controlled Runtime Safe Command Shape Proof Review Governance
+
+Factory Hermes Controlled Research Runtime Safe Command Shape Proof Review Gate v1 reviews blocked proof evidence only. It cannot retry proof or dry-run, execute Hermes, wrapper, adapter, research, prompts, models, network, DNS, endpoints, credentials, `.env`, toolsets, output ingestion, or findings. It may allow only resolution planning.
+
+## Hermes Controlled Runtime Safe Command Shape Resolution Planning Governance
+
+Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Planning Gate v1 may plan Factory-owned command rendering, fail-closed wrapper command building, source proof, internal API/schema assessment, and future parse-only probe assessment. It cannot implement, execute, retry proof, use network, read credentials, mutate Hermes source, enable toolsets, ingest output, or promote findings.
+
+## Hermes Controlled Runtime Safe Command Shape Resolution Approval Governance
+
+Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Approval Gate v1 may approve only implementation planning. It cannot implement renderer or wrapper builder, execute proof, retry dry-run, execute Hermes, use network, read credentials, enable toolsets, ingest output, or promote findings.
+
+## Hermes Controlled Runtime Safe Command Shape Resolution Implementation Planning Governance
+
+Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Implementation Planning Gate v1 may create only a future implementation plan and implementation approval envelope for the Factory-owned command renderer and fail-closed wrapper command builder. It cannot implement either component, execute proof or dry-run, execute Hermes, execute wrappers or adapters, pass prompts, call models, use network, read credentials, enable toolsets, ingest output, or promote findings.
+
+## Hermes Controlled Runtime Safe Command Shape Resolution Implementation Approval Governance
+
+Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Implementation Approval Gate v1 may approve only the next code-only implementation gate for non-executing renderer and builder components. It cannot implement those components itself, execute Hermes, execute wrapper or adapter code, execute proof or dry-run, pass prompts, call models, use network, read credentials, enable toolsets, ingest output, or promote findings.
+
+## Hermes Controlled Runtime Safe Command Shape Resolution Implementation Governance
+
+Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Implementation Gate v1 may implement only code-only, non-executing renderer and wrapper builder components. It cannot execute Hermes, execute wrapper or adapter code, execute proof or dry-run, pass prompts, call models, use network, read credentials, enable toolsets, ingest output, or promote findings. Verification planning is required next; safe command shape remains unproven.
+
+## Hermes Controlled Runtime Safe Command Shape Resolution Verification Planning Governance
+
+Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Verification Planning Gate v1 may create only a future verification plan and verification approval envelope for the code-only renderer and wrapper builder. It cannot execute verification, retry proof or dry-run, execute Hermes, execute wrapper or adapter code, execute research, pass prompts, call models, use network, read credentials, enable toolsets, ingest output, or promote findings.
+
+## Hermes Controlled Runtime Safe Command Shape Resolution Verification Approval Governance
+
+Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Verification Approval Gate v1 may approve only the next verification gate. It cannot execute formal verification, retry proof or dry-run, execute Hermes, execute wrapper or adapter code, execute research, pass prompts, call models, use network, read credentials, enable toolsets, ingest output, promote findings, mutate Hermes source, mutate packages, commit, push, or run `git add`.
+
+## Hermes Controlled Runtime Safe Command Shape Resolution Verification Governance
+
+Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Verification Gate v1 may execute only code-level smokes, static scans, typecheck, build, and diff check for the renderer, wrapper builder, and implementation result. It cannot execute Hermes, proof retry, dry-run retry, wrapper against Hermes, adapter, research, prompts, models, network, DNS, credentials, `.env`, toolsets, output ingestion, findings promotion, Hermes source mutation, package mutation, UI mutation, commit, push, or `git add`.
+
+## Hermes Controlled Runtime Safe Command Shape Proof Retry Planning Governance
+
+Factory Hermes Controlled Research Runtime Safe Command Shape Proof Retry Planning Gate v1 may create only a future proof retry plan and approval envelope using verified renderer and wrapper builder evidence. It cannot execute proof retry, dry-run retry, Hermes, wrapper against Hermes, adapter, research, prompts, models, network, DNS, credentials, `.env`, toolsets, output ingestion, findings promotion, Hermes source mutation, package mutation, UI mutation, commit, push, or `git add`.
+
+## Hermes Controlled Runtime Safe Command Shape Proof Retry Approval Governance
+
+Factory Hermes Controlled Research Runtime Safe Command Shape Proof Retry Approval Gate v1 may approve only the future proof retry gate. It cannot execute proof retry, dry-run retry, Hermes runtime, wrapper against Hermes, adapter, research, prompts, models, network, DNS, credentials, `.env`, toolsets, output ingestion, findings promotion, Hermes source mutation, package mutation, UI mutation, commit, push, or `git add`.
+## Hermes Safe Command Shape Proof Retry Gate v1
+
+- Proof retry was executed only as static/code proof.
+- Dry-run retry was skipped because source safety was not fully proven.
+- Runtime execution, research, adapter execution, credentials, `.env`, prompt passing, model calls, network, DNS, toolsets, output ingestion, and findings remain blocked.
+- Review is allowed only in the next proof retry review gate.
+## Hermes Safe Command Shape Proof Retry Review Gate v1
+
+- The blocked proof retry was reviewed and accepted as blocked.
+- No proof retry, dry-run, Hermes runtime, wrapper runtime, adapter, research, credentials, `.env`, prompts, models, network, DNS, toolsets, output ingestion, or findings were executed or enabled.
+- The only allowed next paths are keep-blocked decision or alternate safe runtime resolution planning.
+## Hermes Alternate Safe Runtime Resolution Planning Gate v1
+
+- Selected strategy: `factory_owned_no_tool_model_provider_direct_research_adapter`.
+- Hermes CLI remains blocked.
+- This gate is planning only and does not implement or execute runtime, research, models, network, credentials, prompts, toolsets, output ingestion, or findings.
+## Hermes Alternate Safe Runtime Resolution Approval Gate v1
+
+- Approved only implementation planning for `factory_owned_no_tool_model_provider_direct_research_adapter`.
+- Hermes CLI remains blocked.
+- No adapter/runtime/research/model/network/credential/output/findings action was enabled.
+## Mock E2E Planning Gate Governance
+
+Factory Hermes Controlled Research Runtime Mock E2E Planning Gate v1 is a planning-only governance gate. It may read ignored artifacts, build a mock-only plan candidate, write an ignored planning result, and prepare a future approval envelope. It may not execute Hermes, mock E2E, provider runtime, research, models, network, credentials, tools, output ingestion, or findings.
+## Mock E2E Approval Gate Governance
+
+Factory Hermes Controlled Research Runtime Mock E2E Approval Gate v1 is approval-only. It may read ignored planning and verification artifacts, write an ignored approval artifact, and create a next-gate envelope. It may not execute mock E2E, provider runtime, research, Hermes, models, network, credentials, tools, output ingestion, or findings.
+## Mock E2E Execution Gate Governance
+
+Factory Hermes Controlled Research Runtime Mock E2E Execution Gate v1 may execute only the verified local mock adapter and write ignored mock artifacts under `.codex-temp`. It may not execute provider runtime, real research, Hermes, models, network, credentials, external tools, output ingestion, or findings.
+## Mock E2E Review Gate Governance
+
+Factory Hermes Controlled Research Runtime Mock E2E Review Gate v1 is read-only against mock artifacts and may write only an ignored review result. It may allow provider runtime planning, not provider runtime execution.
+## Provider Runtime Planning Gate Governance
+
+Factory Hermes Controlled Research Runtime Provider Runtime Planning Gate v1 is planning-only. It may read ignored artifacts and write an ignored planning result. It may not execute provider runtime, call models, use network, resolve DNS, read credentials, read env, pass prompts to providers, ingest output, or promote findings.
+## Provider Runtime Approval Gate Governance
+
+Provider Runtime Approval Gate v1 is approval-only and may write only an ignored approval artifact. It may not execute provider runtime, call models, use network, read credentials, ingest output, or promote findings.
+## Provider Runtime Execution Planning Governance
+
+Provider Runtime Execution Planning is approved only to create a future execution plan candidate and approval envelope. It keeps Hermes CLI blocked and forbids provider execution, Hermes execution, credential reads, process.env reads, `.env` reads, network, DNS, model calls, provider prompts, tools/functions/tool_choice, output ingestion, findings promotion, package mutation, UI/preload/App mutation, dependency changes, uv, pip, Python and setup.py.
+## Provider Runtime Execution Approval Governance
+
+Provider Runtime Execution Approval is approval-only. It may create an envelope for the next execution gate, while still forbidding provider runtime execution, Hermes execution, credential reads, process.env reads, `.env` reads, network, DNS, model calls, provider prompts, toolsets, output ingestion, findings promotion, package mutation, UI/preload/App mutation, dependency changes, uv, pip, Python and setup.py.
+## Provider Runtime Execution Governance
+
+Provider Runtime Execution Gate v1 may read `process.env.OPENAI_API_KEY` once and make one provider-direct OpenAI request to `api.openai.com` using `gpt-4o-mini`. It remains forbidden to read `.env`, dump env, persist/log credentials, execute Hermes, enable tools/functions/tool_choice/MCP, retry, stream, ingest output, promote findings, modify package/UI/preload/App, run uv/pip/Python/setup.py, commit, push or use `git add`.
+## Provider Runtime Review Governance
+
+Provider Runtime Review is read-only over captured `.codex-temp` artifacts. It forbids second provider calls, network, DNS, process.env, credential reads, `.env`, tools/functions/tool_choice/MCP, output ingestion, findings promotion, Hermes execution and package/UI mutation.
+## Provider Runtime Retry Planning Governance
+
+Retry Planning is read-only over captured artifacts and writes only an ignored planning result. It forbids second provider calls, network, DNS, process.env, credentials, `.env`, tools/functions/tool_choice/MCP, output ingestion, findings promotion, Hermes execution and package/UI mutation.
+## Provider Runtime Retry Approval Governance
+
+Provider Runtime Retry Approval is approval-only. It may read ignored retry planning, review and failed execution artifacts and write only an ignored retry approval result/report. It may not make a second provider call, execute provider runtime, execute Hermes, send prompts, use network/DNS, read process.env, read credentials, read `.env`, enable tools/functions/tool_choice/MCP, ingest output, promote findings, mutate package/UI files, commit, push or use `git add`.
+## Provider Runtime Retry Execution Governance
+
+Provider Runtime Retry Execution may make exactly one second provider-direct request to `api.openai.com` using `gpt-4o-mini` and `process.env.OPENAI_API_KEY` inside the runtime gate. It remains forbidden to read `.env`, use dotenv, dump env, persist/log/write credentials, execute Hermes, enable tools/functions/tool_choice/MCP, retry automatically, stream, ingest output, promote findings, mutate package/UI files, commit, push or use `git add`.
+## Provider Runtime Retry Review Governance
+
+Provider Runtime Retry Review is read-only over retry execution artifacts and may write only an ignored retry review result/report. It may not execute provider runtime, make a third provider call, use network/DNS, read credentials, read env, pass prompts, enable tools/functions/tool_choice/MCP, ingest output, promote findings, execute Hermes, mutate package/UI files, commit, push or use `git add`.
+## Output Ingestion Planning Governance
+
+Output Ingestion Planning is planning-only. It may read reviewed retry artifacts and write an ignored planning result/report, but may not execute ingestion, create candidate output artifacts, use network, read credentials/env, execute providers or Hermes, promote findings, mutate package/UI files, commit, push or use `git add`.
+## Output Ingestion Approval Governance
+
+Output Ingestion Approval is approval-only. It may read planning/review artifacts and write an ignored approval result/report, but may not execute ingestion, create candidate output artifacts, use network, read credentials/env, execute providers or Hermes, promote findings, mutate package/UI files, commit, push or use `git add`.

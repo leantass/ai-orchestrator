@@ -40,3 +40,5 @@ Expected result:
 Factory Hermes Wrapper No-Tool Mode Verification Approval Gate v1.
 
 The approval gate can approve only wrapper verification. It cannot execute verification or approve Hermes research runtime adapter retry.
+
+The verification gate may execute only static/text scans and pure in-memory wrapper functions. It cannot execute Hermes or create live temp config.

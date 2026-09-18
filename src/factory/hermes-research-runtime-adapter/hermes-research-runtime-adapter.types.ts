@@ -1,11 +1,222 @@
 export type FactoryHermesResearchRuntimeAdapterVersion = '1.0'
 export type FactoryHermesResearchRuntimeAdapterKind = 'factory-hermes-research-runtime-adapter'
-export type FactoryHermesResearchRuntimeAdapterMode = 'help_probe_only'
-export type FactoryHermesResearchRuntimeAdapterStatus = 'completed' | 'blocked' | 'failed' | 'timed_out'
-export type FactoryHermesResearchRuntimeAdapterDecision = 'hermes_research_runtime_help_probe_completed' | 'blocked_missing_approval_envelope' | 'blocked_boundary_not_satisfied' | 'blocked_executable_missing' | 'blocked_mode_not_allowed' | 'failed_hermes_help_probe' | 'timed_out_hermes_help_probe' | 'killed_hermes_help_probe' | 'request_adapter_repair'
-export interface FactoryHermesResearchRuntimeAdapterInput { executedAt: string; executedBy: string; approvalResult?: unknown; boundaryResult?: unknown; mode?: FactoryHermesResearchRuntimeAdapterMode; policy?: Partial<FactoryHermesResearchRuntimeAdapterPolicy>; executionNotes?: string }
-export interface FactoryHermesResearchRuntimeAdapterPolicy { requireApprovalEnvelope: boolean; requireBoundaryContract: boolean; requireSelectedInterface: boolean; requireModeHelpProbeOnly: boolean; requireExecutableUnderPythonEnv: boolean; requireCwdSourceRoot: boolean; requireShellFalse: boolean; requireTimeout: boolean; requireKillSwitch: boolean; requireProcessTreeKillBestEffort: boolean; requireSanitizedLogs: boolean; requireBoundedOutputRoots: boolean; requireResultIngestionNext: boolean; forbidInteractiveNoArgs: boolean; forbidResearchPromptInV1: boolean; forbidNetwork: boolean; forbidCredentials: boolean; forbidModelCalls: boolean; forbidUvExecution: boolean; forbidPipExecution: boolean; forbidPythonDirectExecution: boolean; forbidSetupPyExecution: boolean; forbidHermesScripts: boolean; forbidProjectMutation: boolean; forbidDeploy: boolean }
-export interface FactoryHermesResearchRuntimeCommandResult { commandKind: 'hermes_help_probe'; executableRef: string; args: ['--help']; cwdRef: string; shell: false; timeoutMs: number; stdinStatus: 'closed'; stdoutPreview: string; stderrPreview: string; exitCode: number | null; timedOut: boolean; killed: boolean; started: boolean; completed: boolean }
-export interface FactoryHermesResearchRuntimeAdapterResult { adapterRunId: string; adapterKind: FactoryHermesResearchRuntimeAdapterKind; adapterVersion: FactoryHermesResearchRuntimeAdapterVersion; executedAt: string; executedBy: string; toolId: 'hermes_agent'; selectedCandidateId: string; commandName: 'hermes' | string; pythonEntrypoint: 'hermes_cli.main:main' | string; executableRef: string; cwdRef: string; outputRootRef: string; tempRootRef: string; mode: FactoryHermesResearchRuntimeAdapterMode; commandResults: FactoryHermesResearchRuntimeCommandResult[]; stdoutPreview: string; stderrPreview: string; exitCode: number | null; timedOut: boolean; killed: boolean; status: FactoryHermesResearchRuntimeAdapterStatus; decision: FactoryHermesResearchRuntimeAdapterDecision; blockers: string[]; warnings: string[]; networkStatus: 'not_allowed'; credentialsStatus: 'not_allowed'; modelCallStatus: 'not_allowed'; filesystemMutationStatus: 'bounded_artifacts_only'; hermesExecutionStatus: 'help_probe_only_completed' | 'help_probe_only_failed' | 'help_probe_only_timed_out' | 'not_executed'; scriptsStatus: 'not_executed'; pipStatus: 'not_executed'; pythonDirectStatus: 'not_executed'; setupPyStatus: 'not_executed'; uvStatus: 'not_executed'; canProceedToResultIngestion: boolean; canTreatAsResearchResult: false; canUseFindings: false; canCallModels: false; canUseCredentials: false; canUseNetwork: false; canDeploy: false; recommendedNextStep: string }
-export interface FactoryHermesResearchRuntimeAdapterValidationResult { ok: boolean; errors: string[]; warnings: string[] }
-export interface FactoryHermesResearchRuntimeAdapterSummary { adapterRunId: string; mode: FactoryHermesResearchRuntimeAdapterMode; commandName: string; exitCode: number | null; timedOut: boolean; status: FactoryHermesResearchRuntimeAdapterStatus; decision: FactoryHermesResearchRuntimeAdapterDecision; hermesExecutionStatus: FactoryHermesResearchRuntimeAdapterResult['hermesExecutionStatus']; canProceedToResultIngestion: boolean; canTreatAsResearchResult: false; networkStatus: 'not_allowed'; credentialsStatus: 'not_allowed'; modelCallStatus: 'not_allowed'; nextStep: string }
+export type FactoryHermesResearchRuntimeAdapterStatus = 'research_runtime_adapter_prepared' | 'research_runtime_adapter_blocked'
+export type FactoryHermesResearchRuntimeAdapterDecision = 'hermes_research_runtime_adapter_prepared_with_wrapper_boundary_for_execution_approval_retry' | 'hermes_research_runtime_adapter_blocked_executable_surface_detected' | 'hermes_research_runtime_adapter_blocked_input_evidence_invalid'
+
+export interface FactoryHermesResearchRuntimeAdapterInput {
+  adaptedAt: string
+  adaptedBy: string
+  adapterApprovalRetryResult?: any
+  wrapperVerificationReviewResult?: any
+  wrapperVerificationResult?: any
+  previousAdapterApprovalResult?: any
+  runtimeSelectionDecisionResult?: any
+  finalExecutionApprovalResult?: any
+  adapterSourceInspection?: FactoryHermesAdapterSourceInspection
+  policy?: Partial<FactoryHermesResearchRuntimeAdapterPolicy>
+}
+
+export interface FactoryHermesResearchRuntimeAdapterPolicy {
+  requireApprovalRetryGranted: boolean
+  requireWrapperVerificationReview: boolean
+  requireRuntimeSelectionDecision: boolean
+  requireWrapperBoundary: boolean
+  requireNonExecutableCommandEnvelope: boolean
+  requireSafetyManifest: boolean
+  requireResearchExecutionApprovalRetryEnvelope: boolean
+  forbidRuntimeAdapterExecution: boolean
+  forbidResearchExecution: boolean
+  forbidHermesExecution: boolean
+  forbidPromptPassing: boolean
+  forbidModelCalls: boolean
+  forbidNetwork: boolean
+  forbidCredentials: boolean
+  forbidToolsets: boolean
+  forbidFindingsUse: boolean
+}
+
+export interface FactoryHermesAdapterSourceInspection {
+  inspectionId: string
+  classification: 'case_a_not_found' | 'case_b_exists_without_wrapper_boundary' | 'case_c_exists_with_wrapper_boundary' | 'case_d_executable_surface_detected'
+  inspectedRefs: string[]
+  dangerousExecutableSurfaceDetected: boolean
+  controlledStringMatches: string[]
+  executableMatches: string[]
+}
+
+export interface FactoryHermesAdapterWrapperBoundaryIntegrationManifest {
+  integrationId: string
+  selectedWrapperStrategy: 'wrapper_temp_config_no_toolsets'
+  wrapperVerificationReviewRef: 'wrapper-no-tool-mode-verification-review-result.json'
+  wrapperVerificationRef: 'wrapper-no-tool-mode-verification-result.json'
+  adapterUsesWrapperBoundary: boolean
+  adapterDoesNotUseDirectHermesCliDefaults: boolean
+  directNoToolsetsTextOnlyRejected: boolean
+  hiddenDefaultsRiskCarriedForward: boolean
+  wrapperBoundaryType: 'code_only_no_runtime_execution'
+  realHermesRuntimeNotProven: boolean
+  noToolModeRuntimeNotClaimed: boolean
+  adapterMustNotExecuteNow: boolean
+  notes: string[]
+}
+
+export interface FactoryHermesAdapterNonExecutableCommandEnvelope {
+  envelopeId: string
+  toolId: 'hermes_agent'
+  provider: 'openai'
+  model: 'gpt-4o-mini'
+  credentialRef: 'OPENAI_API_KEY'
+  host: 'api.openai.com'
+  selectedWrapperStrategy: 'wrapper_temp_config_no_toolsets'
+  commandShape: 'non_executable_adapter_envelope_only'
+  commandString: null
+  argv: []
+  env: Record<string, never>
+  prompt: null
+  tempConfigPath: null
+  runRoot: null
+  executionAllowed: boolean
+  adapterExecutionAllowed: boolean
+  hermesExecutionAllowed: boolean
+  wrapperExecutionAllowed: boolean
+  researchExecutionAllowed: boolean
+  promptPassingAllowed: boolean
+  modelCallsAllowed: boolean
+  networkAllowed: boolean
+  credentialAccessAllowed: boolean
+  envSecretReadAllowed: boolean
+  toolsetEnablementAllowed: boolean
+  filesystemRuntimeMutationAllowed: boolean
+  findingsUseAllowed: boolean
+}
+
+export interface FactoryHermesAdapterRuntimeSafetyManifest {
+  manifestId: string
+  checks: Record<string, boolean>
+  packageFilesUnchanged: boolean
+  hermesSourceReadOnly: boolean
+}
+
+export interface FactoryHermesAdapterLimitationsCarryForward {
+  limitations: string[]
+  limitationsAcceptableForExecutionApprovalRetry: boolean
+  limitationsBlockImmediateRuntimeExecution: boolean
+  limitationsBlockImmediateResearchExecution: boolean
+  limitationsBlockFindingsUse: boolean
+}
+
+export interface FactoryHermesAdapterRiskDisposition {
+  riskId: string
+  severity: 'high' | 'critical'
+  disposition: 'accepted_for_execution_approval_retry_only'
+  mitigation: string
+  blocksExecutionApprovalRetry: boolean
+  blocksRuntimeExecution: boolean
+  blocksResearchExecution: boolean
+}
+
+export interface FactoryHermesAdapterRiskDispositionRegister {
+  registerId: string
+  dispositions: FactoryHermesAdapterRiskDisposition[]
+}
+
+export interface FactoryHermesResearchExecutionApprovalRetryEnvelope {
+  envelopeId: string
+  toolId: 'hermes_agent'
+  approvedFor: 'research_execution_approval_retry_only'
+  selectedWrapperStrategy: 'wrapper_temp_config_no_toolsets'
+  sourceAdapterRef: 'research-runtime-adapter-result.json'
+  targetNextGate: 'Factory Hermes Research Execution Approval Retry Gate v1'
+  purpose: string
+  allowedInNextGate: string[]
+  forbiddenEvenInNextGate: string[]
+  flags: Record<string, boolean>
+  recommendedNextGate: 'Factory Hermes Research Execution Approval Retry Gate v1'
+}
+
+export interface FactoryHermesResearchRuntimeAdapterReceipt {
+  receiptId: string
+  adapterId: string
+  toolId: 'hermes_agent'
+  adaptedBy: string
+  adaptedAt: string
+  decision: FactoryHermesResearchRuntimeAdapterDecision
+  adapterStatus: 'prepared_code_only_not_executed' | 'blocked'
+  scope: 'hermes_research_runtime_adapter_preparation_only'
+  approvedNextGate: string
+  limitations: string[]
+  notAuthorizedActions: string[]
+}
+
+export interface FactoryHermesResearchRuntimeAdapterResultRecord {
+  recordId: string
+  toolId: 'hermes_agent'
+  adapterStatus: 'prepared_code_only_not_executed' | 'blocked'
+  decision: FactoryHermesResearchRuntimeAdapterDecision
+  wrapperBoundaryIntegrated: boolean
+  adapterCommandEnvelopeBuilt: boolean
+  adapterSafetyManifestBuilt: boolean
+  runtimeAdapterExecutionAllowedNow: boolean
+  researchExecutionApproved: boolean
+  hermesExecutionApproved: boolean
+}
+
+export interface FactoryHermesResearchRuntimeAdapterCheck { checkId: string, passed: boolean, message: string }
+export interface FactoryHermesResearchRuntimeAdapterBlocker { blockerId: string, message: string }
+export interface FactoryHermesResearchRuntimeAdapterWarning { warningId: string, message: string }
+export interface FactoryHermesResearchRuntimeAdapterValidationResult { ok: boolean, errors: string[], warnings: string[] }
+export interface FactoryHermesResearchRuntimeAdapterSummary { adapterId: string, status: string, decision: string, canProceedToResearchExecutionApprovalRetry: boolean, canRunResearchNow: boolean }
+
+export interface FactoryHermesResearchRuntimeAdapterResult {
+  adapterId: string
+  adapterKind: FactoryHermesResearchRuntimeAdapterKind
+  adapterVersion: FactoryHermesResearchRuntimeAdapterVersion
+  adaptedAt: string
+  adaptedBy: string
+  toolId: 'hermes_agent'
+  adapterApprovalRetryRef?: string
+  wrapperVerificationReviewRef?: string
+  selectedWrapperStrategy: 'wrapper_temp_config_no_toolsets'
+  sourceInspection: FactoryHermesAdapterSourceInspection
+  adapterWrapperBoundaryIntegrationManifest: FactoryHermesAdapterWrapperBoundaryIntegrationManifest
+  adapterNonExecutableCommandEnvelope: FactoryHermesAdapterNonExecutableCommandEnvelope
+  adapterRuntimeSafetyManifest: FactoryHermesAdapterRuntimeSafetyManifest
+  adapterLimitationsCarryForward: FactoryHermesAdapterLimitationsCarryForward
+  adapterRiskDispositionRegister: FactoryHermesAdapterRiskDispositionRegister
+  researchExecutionApprovalRetryEnvelope: FactoryHermesResearchExecutionApprovalRetryEnvelope
+  researchRuntimeAdapterReceipt: FactoryHermesResearchRuntimeAdapterReceipt
+  hermesResearchRuntimeAdapterResultRecord: FactoryHermesResearchRuntimeAdapterResultRecord
+  checks: FactoryHermesResearchRuntimeAdapterCheck[]
+  blockers: FactoryHermesResearchRuntimeAdapterBlocker[]
+  warnings: FactoryHermesResearchRuntimeAdapterWarning[]
+  status: FactoryHermesResearchRuntimeAdapterStatus
+  decision: FactoryHermesResearchRuntimeAdapterDecision
+  adapterStatus: 'prepared_code_only_not_executed' | 'blocked'
+  wrapperBoundaryIntegrated: boolean
+  adapterCommandEnvelopeBuilt: boolean
+  adapterSafetyManifestBuilt: boolean
+  runtimeAdapterExecutionAllowedNow: boolean
+  researchExecutionApproved: boolean
+  hermesExecutionApproved: boolean
+  promptPassingApproved: boolean
+  modelCallsApproved: boolean
+  networkApproved: boolean
+  credentialAccessApproved: boolean
+  toolsetEnablementApproved: boolean
+  findingsUseApproved: boolean
+  canProceedToResearchExecutionApprovalRetry: boolean
+  canProceedToResearchExecutionApproval: boolean
+  canProceedToResearchRuntimeAdapterExecution: boolean
+  canProceedToKeepHermesResearchBlockedDecision: boolean
+  canRunResearchNow: boolean
+  canExecuteHermesNow: boolean
+  canPassPromptNow: boolean
+  canUseNetworkNow: boolean
+  canUseCredentialsNow: boolean
+  canReadEnvSecretsNow: boolean
+  canCallModelsNow: boolean
+  canEnableToolsetsNow: boolean
+  canMutateFilesystemNow: boolean
+  canUseFindings: boolean
+  recommendedNextStep: string
+}

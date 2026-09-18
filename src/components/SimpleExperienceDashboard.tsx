@@ -21,6 +21,11 @@ type CommercialRunSummary = {
   persistenceStatus: 'pending' | 'persisted' | 'unavailable' | 'error'
   persistenceMessage: string
   persistedArtifacts?: Record<string, string>
+  deliveryLabel?: string
+  resultLabel?: string
+  resultVisibleLabel?: string
+  reportArtifacts?: Array<{ name: string; path: string }>
+  persistenceLabel?: string
   hasResult: boolean
   warnings: string[]
   logs: string[]
@@ -87,6 +92,27 @@ type RealGenerationResult = {
   }
 }
 
+type FirstVersionCreationResult = {
+  ok: boolean
+  status?: string
+  projectName?: string
+  safeFolderName?: string
+  projectType?: string
+  projectTypeLabel?: string
+  targetPlatform?: string
+  capabilities?: Record<string, string>
+  path?: string
+  projectPath?: string
+  relativePath?: string
+  appPath?: string
+  appEntryPath?: string
+  reportsPath?: string
+  createdFiles?: string[]
+  copiedReports?: string[]
+  warnings?: string[]
+  error?: string
+}
+
 type CommercialView = 'home' | 'projects' | 'history' | 'run-detail' | 'placeholder'
 type RunDetailTab = 'summary' | 'brief' | 'status' | 'artifacts' | 'logs' | 'report'
 
@@ -148,7 +174,7 @@ const defaultGenerationSteps: Array<{ label: string; status: GenerationStepStatu
   { label: 'Leyendo brief', status: 'completed' },
   { label: 'Detectando dominio', status: 'in-progress' },
   { label: 'Definiendo modulos', status: 'pending' },
-  { label: 'Generando proyecto', status: 'pending' },
+  { label: 'Generando intake', status: 'pending' },
   { label: 'Validando', status: 'pending' },
   { label: 'Preparando entrega', status: 'pending' },
 ]
@@ -346,6 +372,9 @@ export function SimpleExperienceDashboard({
   realGenerationResult,
   realGenerationLoading = false,
   realGenerationError = '',
+  firstVersionCreationResult,
+  firstVersionCreationLoading = false,
+  firstVersionCreationError = '',
   runHistoryLoading = false,
   runHistoryError = '',
   onOpenTechnicalDetails,
@@ -355,6 +384,8 @@ export function SimpleExperienceDashboard({
   onOpenPersistedRun,
   onBackToRunHistory,
   onStartRealGeneration,
+  onCreateFirstVersion,
+  onFirstVersionDeliveryAction,
   onCreateNewSystem,
 }: {
   title: string
@@ -382,6 +413,9 @@ export function SimpleExperienceDashboard({
   realGenerationResult?: RealGenerationResult | null
   realGenerationLoading?: boolean
   realGenerationError?: string
+  firstVersionCreationResult?: FirstVersionCreationResult | null
+  firstVersionCreationLoading?: boolean
+  firstVersionCreationError?: string
   runHistoryLoading?: boolean
   runHistoryError?: string
   onOpenTechnicalDetails?: () => void
@@ -391,6 +425,10 @@ export function SimpleExperienceDashboard({
   onOpenPersistedRun?: (runId: string) => void
   onBackToRunHistory?: () => void
   onStartRealGeneration?: (runId: string) => void
+  onCreateFirstVersion?: (runId: string) => void
+  onFirstVersionDeliveryAction?: (
+    action: 'open-app' | 'open-folder' | 'copy-app' | 'copy-project',
+  ) => void
   onCreateNewSystem?: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -472,6 +510,26 @@ export function SimpleExperienceDashboard({
       !generationCompleted &&
       !realGenerationLoading,
   )
+  const canCreateFirstVersion = Boolean(
+    runSummary?.hasResult &&
+      runSummary.reportArtifacts &&
+      runSummary.reportArtifacts.length >= 10 &&
+      !firstVersionCreationLoading,
+  )
+  const firstVersionProjectPath =
+    firstVersionCreationResult?.projectPath ||
+    firstVersionCreationResult?.path ||
+    firstVersionCreationResult?.relativePath ||
+    ''
+  const firstVersionAppPath =
+    firstVersionCreationResult?.appEntryPath ||
+    firstVersionCreationResult?.appPath ||
+    ''
+  const firstVersionTypeLabel =
+    firstVersionCreationResult?.projectTypeLabel ||
+    firstVersionCreationResult?.projectType ||
+    'generic_web_app'
+  const firstVersionTargetPlatform = firstVersionCreationResult?.targetPlatform || 'local_mock'
 
   const handleOpenRun = (runId: string) => {
     setRunDetailTab('summary')
@@ -532,13 +590,14 @@ export function SimpleExperienceDashboard({
               <div>
                 <dt>Persistencia</dt>
                 <dd>
-                  {runSummary.persistenceStatus === 'persisted'
+                  {runSummary.persistenceLabel ||
+                  (runSummary.persistenceStatus === 'persisted'
                     ? 'Run persistido: si'
                     : runSummary.persistenceStatus === 'pending'
                       ? 'Run persistido: pendiente'
                       : runSummary.persistenceStatus === 'unavailable'
                         ? 'Run persistido: no disponible'
-                        : 'Run persistido: error'}
+                        : 'Run persistido: error')}
                 </dd>
               </div>
               <div>
@@ -557,6 +616,12 @@ export function SimpleExperienceDashboard({
             {runSummary.persistedArtifacts && Object.keys(runSummary.persistedArtifacts).length > 0 ? (
               <div className="jefe-commercial-artifact-list">
                 <span>Artefactos creados</span>
+                {runSummary.reportArtifacts?.map((artifact) => (
+                  <p key={artifact.name}>
+                    <strong>{artifact.name}</strong>
+                    <code>{artifact.path}</code>
+                  </p>
+                ))}
                 {Object.entries(runSummary.persistedArtifacts).map(([key, value]) => (
                   <p key={key}>
                     <strong>{key}</strong>
@@ -571,6 +636,33 @@ export function SimpleExperienceDashboard({
                   <li key={warning}>{warning}</li>
                 ))}
               </ul>
+            ) : null}
+            {firstVersionCreationResult?.ok ? (
+              <div className="jefe-commercial-artifact-list">
+                <span>Primera version creada</span>
+                <p>
+                  <strong>Ruta</strong>
+                  <code>{firstVersionProjectPath}</code>
+                </p>
+                <p>
+                  <strong>App demo</strong>
+                  <code>{firstVersionAppPath || 'app/index.html'}</code>
+                </p>
+                <p>
+                  <strong>Tipo detectado</strong>
+                  <code>{firstVersionCreationResult.projectType || 'generic_web_app'} - {firstVersionTypeLabel}</code>
+                </p>
+                <p>
+                  <strong>Plataforma objetivo</strong>
+                  <code>{firstVersionTargetPlatform}</code>
+                </p>
+                {(firstVersionCreationResult.createdFiles || []).map((filePath) => (
+                  <p key={filePath}>
+                    <strong>creado</strong>
+                    <code>{filePath}</code>
+                  </p>
+                ))}
+              </div>
             ) : null}
             {runSummary.logs.length > 0 ? (
               <div className="jefe-commercial-log-list">
@@ -663,6 +755,16 @@ export function SimpleExperienceDashboard({
                   Abrir entrega
                 </button>
               ) : null}
+              {canCreateFirstVersion && onCreateFirstVersion && runSummary ? (
+                <button
+                  type="button"
+                  className="jefe-commercial-primary-cta"
+                  onClick={() => onCreateFirstVersion(runSummary.id)}
+                  disabled={firstVersionCreationLoading}
+                >
+                  {firstVersionCreationLoading ? 'Creando primera version...' : 'Crear primera version'}
+                </button>
+              ) : null}
               {runSummary?.hasResult ? (
                 <div className="jefe-commercial-result-summary" aria-label="Resultado del run">
                   <div>
@@ -671,7 +773,7 @@ export function SimpleExperienceDashboard({
                   </div>
                   <div>
                     <span>Estado</span>
-                    <strong>{runSummary.statusLabel}</strong>
+                    <strong>{runSummary.resultLabel || runSummary.statusLabel}</strong>
                   </div>
                   <div>
                     <span>Validaciones</span>
@@ -679,12 +781,96 @@ export function SimpleExperienceDashboard({
                   </div>
                   <div>
                     <span>Entrega</span>
+                    <strong>{runSummary.deliveryLabel || 'Dry-run sin archivos'}</strong>
+                  </div>
+                  {runSummary.resultVisibleLabel ? (
+                    <div>
+                      <span>Resultado visible</span>
+                      <strong>{runSummary.resultVisibleLabel}</strong>
+                    </div>
+                  ) : null}
+                  {runSummary.reportArtifacts && runSummary.reportArtifacts.length > 0 ? (
+                    <div>
+                      <span>Archivos creados</span>
+                      <strong>{runSummary.reportArtifacts.map((artifact) => artifact.name).join(', ')}</strong>
+                    </div>
+                  ) : null}
+                  <div>
+                    <span>Donde quedo</span>
+                    <strong>{runSummary.runPath}</strong>
+                  </div>
+                  <div>
+                    <span>Arquitectura prevista</span>
                     <strong>
-                      {runSummary.persistenceStatus === 'persisted'
-                        ? 'Disponible en detalles'
-                        : 'Dry-run sin archivos'}
+                      Nivel actual: {firstVersionCreationResult?.ok ? 'L1 Local Mock First Version' : 'L0 Brief Intake'}.
+                      Proximo: {firstVersionCreationResult?.ok ? 'L2 Technical Scaffold' : 'L1 Local Mock First Version'}.
+                      QA futuro: Vitest, MSW, Playwright. Seguridad futura: Gitleaks, Semgrep, Trivy, axe,
+                      Lighthouse. IA futura: Promptfoo. Release futuro: staging/produccion. Feedback futuro:
+                      analitica, monetizacion y memoria.
                     </strong>
                   </div>
+                  <div>
+                    <span>Roadmap JEFE</span>
+                    <strong>
+                      Hoy: L0/L1. Proximo: input assets. Despues: continuar proyectos existentes,
+                      Codex build loop, QA completo, staging/produccion, analitica y memoria validada.
+                    </strong>
+                  </div>
+                  {firstVersionCreationResult?.ok ? (
+                    <>
+                      <div>
+                        <span>Estado</span>
+                        <strong>Primera version creada</strong>
+                      </div>
+                      <div>
+                        <span>Entrega</span>
+                        <strong>Proyecto creado en carpeta independiente</strong>
+                      </div>
+                      <div>
+                        <span>Ruta</span>
+                        <strong>{firstVersionProjectPath}</strong>
+                      </div>
+                      <div>
+                        <span>Tipo detectado</span>
+                        <strong>{firstVersionCreationResult.projectType || 'generic_web_app'} - {firstVersionTypeLabel}</strong>
+                      </div>
+                      <div>
+                        <span>Plataforma objetivo</span>
+                        <strong>{firstVersionTargetPlatform}</strong>
+                      </div>
+                      <div>
+                        <span>App demo</span>
+                        <strong>{firstVersionAppPath || 'app/index.html'}</strong>
+                      </div>
+                      <div>
+                        <span>Capacidades actuales</span>
+                        <strong>Demo local mock lista. Backend, deploy e integraciones reales pendientes.</strong>
+                      </div>
+                      <div>
+                        <span>Acciones</span>
+                        <strong className="jefe-commercial-inline-actions">
+                          <button type="button" onClick={() => onFirstVersionDeliveryAction?.('open-app')}>
+                            Abrir app demo
+                          </button>
+                          <button type="button" onClick={() => onFirstVersionDeliveryAction?.('open-folder')}>
+                            Abrir carpeta
+                          </button>
+                          <button type="button" onClick={() => onFirstVersionDeliveryAction?.('copy-app')}>
+                            Copiar ruta app
+                          </button>
+                          <button type="button" onClick={() => onFirstVersionDeliveryAction?.('copy-project')}>
+                            Copiar ruta proyecto
+                          </button>
+                        </strong>
+                      </div>
+                    </>
+                  ) : null}
+                  {firstVersionCreationError ? (
+                    <div>
+                      <span>Primera version</span>
+                      <strong>{firstVersionCreationError}</strong>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -829,7 +1015,7 @@ export function SimpleExperienceDashboard({
                   onClick={() => setGenerationConfirmOpen(true)}
                   disabled={!canStartRealGeneration}
                 >
-                  {realGenerationLoading ? 'Generando...' : generationCompleted ? 'Proyecto generado' : 'Generar proyecto real'}
+                  {realGenerationLoading ? 'Generando...' : generationCompleted ? 'Intake generado' : 'Generar intake'}
                 </button>
               ) : null}
             </div>
@@ -847,7 +1033,7 @@ export function SimpleExperienceDashboard({
               <div className="jefe-commercial-run-detail">
                 <div className="jefe-commercial-generation-card">
                   <div>
-                    <span>Generacion real controlada</span>
+                    <span>Intake dry-run controlado</span>
                     <strong>
                       {realGenerationLoading
                         ? 'En ejecucion'
@@ -858,13 +1044,13 @@ export function SimpleExperienceDashboard({
                             : 'Pendiente de aprobacion'}
                     </strong>
                     <p>
-                      Solo se ejecuta desde este detalle y escribe en .codex-temp. No corre Codex real ni servicios externos.
+                      Solo genera reports de intake en .codex-temp. No corre Codex real, OpenAI, providers ni red.
                     </p>
                   </div>
                   {generationOutputPath ? (
                     <code>{generationOutputPath}</code>
                   ) : (
-                    <code>Sin output generado todavia</code>
+                    <code>Sin entrega generada todavia</code>
                   )}
                   {realGenerationError ? (
                     <p className="jefe-commercial-error-text">{realGenerationError}</p>
@@ -956,7 +1142,7 @@ export function SimpleExperienceDashboard({
                       ) : null}
                       {(realGenerationResult?.status?.steps || []).length > 0 ? (
                         <>
-                          <h3>Generacion real</h3>
+                          <h3>Intake dry-run</h3>
                           {(realGenerationResult?.status?.steps || []).map((step) => (
                             <div key={`generation-${step.label}-${step.status}`}>
                               <strong>{step.label}</strong>
@@ -994,7 +1180,7 @@ export function SimpleExperienceDashboard({
                       )}
                       {generationLogLines.length > 0 ? (
                         <>
-                          <h3>Generacion real</h3>
+                          <h3>Intake dry-run</h3>
                           {generationLogLines.map((line) => <p key={`generation-${line}`}>{line}</p>)}
                         </>
                       ) : null}
@@ -1027,22 +1213,22 @@ export function SimpleExperienceDashboard({
         <div className="jefe-commercial-modal-backdrop" role="presentation">
           <section className="jefe-commercial-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="real-generation-title">
             <div className="jefe-commercial-kicker">Aprobacion requerida</div>
-            <h2 id="real-generation-title">Generar proyecto real</h2>
+            <h2 id="real-generation-title">Generar intake</h2>
             <p>
-              JEFE va a materializar este sistema desde el brief guardado. El output quedara en .codex-temp y no se tocaran proyectos externos ni servicios reales.
+              JEFE va a generar una entrega de intake desde el brief guardado. Los reports quedaran en .codex-temp y no se tocaran proyectos externos ni servicios reales.
             </p>
             <div className="jefe-commercial-confirm-summary">
               <span>Run</span>
               <strong>{selectedPersistedRun?.runId}</strong>
               <span>Destino</span>
-              <strong>.codex-temp/jefe-real-generation/runs/{selectedPersistedRun?.runId}/output</strong>
+              <strong>.codex-temp/jefe-ui-real-flow/runs/{selectedPersistedRun?.runId}/reports</strong>
             </div>
             <div className="jefe-commercial-modal-actions">
               <button type="button" onClick={() => setGenerationConfirmOpen(false)}>
                 Cancelar
               </button>
               <button type="button" className="jefe-commercial-primary-action" onClick={handleConfirmRealGeneration}>
-                Generar proyecto real
+                Generar intake
               </button>
             </div>
           </section>

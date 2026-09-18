@@ -1,0 +1,7 @@
+const path = require('node:path');
+function resolveFactoryHermesControlledResearchRuntimeAlternateSafeRuntimeImplementationPaths(root = process.cwd()) {
+  const installRoot = path.join(root, '.codex-temp', 'external-tools', 'hermes-agent', 'install', '75b300f');
+  return { repoRoot: root, installRoot, resultArtifact: path.join(installRoot, 'controlled-research-runtime-alternate-safe-runtime-implementation-result.json'), implementationApprovalResult: path.join(installRoot, 'controlled-research-runtime-alternate-safe-runtime-implementation-approval-result.json'), implementationPlanningResult: path.join(installRoot, 'controlled-research-runtime-alternate-safe-runtime-implementation-planning-result.json'), alternateResolutionApprovalResult: path.join(installRoot, 'controlled-research-runtime-alternate-safe-runtime-resolution-approval-result.json'), runtimeSelectionDecisionResult: path.join(installRoot, 'runtime-selection-decision-result.json') };
+}
+function assertControlledResearchRuntimeAlternateSafeRuntimeImplementationPathContained(target, root) { const relative = path.relative(path.resolve(root), path.resolve(target)); if (relative.startsWith('..') || path.isAbsolute(relative)) throw new Error(`Path escapes allowed root: ${target}`); }
+module.exports = { resolveFactoryHermesControlledResearchRuntimeAlternateSafeRuntimeImplementationPaths, assertControlledResearchRuntimeAlternateSafeRuntimeImplementationPathContained };

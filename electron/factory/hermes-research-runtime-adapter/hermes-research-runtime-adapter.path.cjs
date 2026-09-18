@@ -2,21 +2,18 @@ const path = require('node:path');
 
 function resolveFactoryHermesResearchRuntimeAdapterPaths(root = process.cwd()) {
   const installRoot = path.join(root, '.codex-temp', 'external-tools', 'hermes-agent', 'install', '75b300f');
-  const sourceRoot = path.join(installRoot, 'source');
-  const pythonEnvRoot = path.join(installRoot, 'python-env');
   return {
     root,
     installRoot,
-    sourceRoot,
-    pythonEnvRoot,
-    executableRef: path.join(pythonEnvRoot, 'Scripts', 'hermes.exe'),
-    outputRoot: path.join(installRoot, 'research-runtime-output'),
-    tempRoot: path.join(installRoot, 'research-runtime-temp'),
-    approvalResult: path.join(installRoot, 'research-runtime-approval-result.json'),
-    boundaryResult: path.join(installRoot, 'research-runtime-boundary-result.json'),
-    interfaceSelectionResult: path.join(installRoot, 'research-runtime-interface-selection-result.json'),
-    pythonInstallVerificationResult: path.join(installRoot, 'python-install-verification-result.json'),
+    adapterApprovalRetryResult: path.join(installRoot, 'research-runtime-adapter-approval-retry-result.json'),
+    wrapperVerificationReviewResult: path.join(installRoot, 'wrapper-no-tool-mode-verification-review-result.json'),
+    wrapperVerificationResult: path.join(installRoot, 'wrapper-no-tool-mode-verification-result.json'),
+    previousAdapterApprovalResult: path.join(installRoot, 'research-runtime-adapter-approval-result.json'),
+    runtimeSelectionDecisionResult: path.join(installRoot, 'runtime-selection-decision-result.json'),
+    finalExecutionApprovalResult: path.join(installRoot, 'final-execution-approval-result.json'),
     adapterResult: path.join(installRoot, 'research-runtime-adapter-result.json'),
+    adapterSourceRoot: path.join(root, 'src', 'factory', 'hermes-research-runtime-adapter'),
+    adapterElectronRoot: path.join(root, 'electron', 'factory', 'hermes-research-runtime-adapter'),
   };
 }
 

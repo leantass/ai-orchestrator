@@ -35,3 +35,7 @@ The next gate may inspect wrapper source and run pure in-memory serializer/valid
 ## Next Gate
 
 Factory Hermes Wrapper No-Tool Mode Verification Gate v1.
+
+The verification gate is still code-only and must route to Verification Review before any adapter retry can be considered.
+
+Research Runtime Adapter Approval Retry remains a separate gate after Verification Review and cannot be implied by this approval.

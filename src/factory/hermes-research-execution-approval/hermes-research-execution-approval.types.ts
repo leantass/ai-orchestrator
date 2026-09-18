@@ -1,55 +1,84 @@
 export type FactoryHermesResearchExecutionApprovalVersion = '1.0'
 export type FactoryHermesResearchExecutionApprovalKind = 'factory-hermes-research-execution-approval'
-export type FactoryHermesResearchExecutionApprovalStatus = 'research_execution_approval_blocked'
-export type FactoryHermesResearchExecutionApprovalDecision = 'hermes_research_execution_approval_blocked_missing_runtime_selections' | 'hermes_research_execution_approval_blocked_invalid_boundary'
-export type FactoryHermesResearchExecutionApprovalStatusValue = 'not_approved'
+export type FactoryHermesResearchExecutionApprovalStatus = 'research_execution_approval_granted' | 'research_execution_approval_blocked'
+export type FactoryHermesResearchExecutionApprovalDecision = 'hermes_research_execution_approval_granted_for_controlled_runtime_planning' | 'hermes_research_execution_approval_blocked_evidence_incomplete_or_unsafe'
 
+export interface FactoryHermesResearchExecutionApprovalPolicy { [key: string]: boolean }
 export interface FactoryHermesResearchExecutionApprovalInput {
   approvedAt: string
   approvedBy: string
-  humanApprovalRef?: string
-  researchExecutionBoundaryPlanningResult?: any
-  policyPlanningResults?: Record<string, any>
-  approvalPolicy?: Partial<FactoryHermesResearchExecutionApprovalPolicy>
-  approvalNotes?: string
+  researchExecutionApprovalRetryResult?: any
+  researchRuntimeAdapterResult?: any
+  adapterApprovalRetryResult?: any
+  wrapperVerificationReviewResult?: any
+  wrapperVerificationResult?: any
+  runtimeSelectionDecisionResult?: any
+  finalExecutionApprovalResult?: any
+  policy?: Partial<FactoryHermesResearchExecutionApprovalPolicy>
 }
 
-export interface FactoryHermesResearchExecutionApprovalPolicy {
-  requireBoundaryPlanning: boolean
-  requireAllPoliciesConsolidated: boolean
-  requireApprovalGateCanEvaluate: boolean
-  requireNoMissingRuntimeSelectionsForExecutionApproval: boolean
-  requireHumanFinalApprovalForExecution: boolean
-  requireRuntimeSelectionPlanningBeforeRuntimeAdapter: boolean
-  requireNotApprovedWhenSelectionsMissing: boolean
-  requireNoExecutionInThisGate: boolean
-  requireNoPromptPassingInThisGate: boolean
-  requireNoNetworkInThisGate: boolean
-  requireNoCredentialsInThisGate: boolean
-  requireNoModelCallsInThisGate: boolean
-  requireNoToolsetEnablementInThisGate: boolean
-  requireNoFilesystemMutationInThisGate: boolean
-  forbidExecutionApprovalWithMissingSelections: boolean
-  forbidRuntimeAdapterApprovalInThisGateWhenBlocked: boolean
-  forbidHermesExecutionInThisGate: boolean
-  forbidResearchExecutionInThisGate: boolean
-  forbidUsingFindingsInThisGate: boolean
-  forbidDeployInThisGate: boolean
+export interface FactoryHermesExecutionReadinessReview {
+  researchExecutionApprovalRetryGranted: boolean
+  researchRuntimeAdapterPrepared: boolean
+  adapterPreparedCodeOnly: boolean
+  wrapperBoundaryIntegrated: boolean
+  adapterCommandEnvelopeNonExecutable: boolean
+  adapterSafetyManifestPresent: boolean
+  wrapperVerificationReviewAccepted: boolean
+  runtimeSelectionKnown: boolean
+  provider: 'openai'
+  model: 'gpt-4o-mini'
+  credentialRef: 'OPENAI_API_KEY'
+  host: 'api.openai.com'
+  selectedWrapperStrategy: 'wrapper_temp_config_no_toolsets'
+  noLiveTempConfig: boolean
+  noRunRootCreated: boolean
+  noPromptAvailableForExecution: boolean
+  noCredentialValuesAvailable: boolean
+  noNetworkApproved: boolean
+  noModelCallsApproved: boolean
+  noToolsetsApproved: boolean
+  evidenceSupportsControlledRuntimePlanning: boolean
+  evidenceDoesNotApproveImmediateExecution: boolean
+  readinessSummary: string[]
 }
 
-export interface FactoryHermesResearchExecutionApprovalCheck { checkId: string; message: string }
-export interface FactoryHermesResearchExecutionApprovalBlocker { blockerId: string; message: string; sourceMissingSelectionId?: string }
-export interface FactoryHermesResearchExecutionApprovalWarning { warningId: string; message: string }
+export interface FactoryHermesExecutionApprovalLimitationsCarryForward {
+  limitations: string[]
+  limitationsAcceptableForControlledRuntimePlanning: boolean
+  limitationsBlockImmediateRuntimeExecution: boolean
+  limitationsBlockImmediateResearchExecution: boolean
+  limitationsBlockImmediateFindingsUse: boolean
+}
 
-export interface FactoryHermesRuntimeSelectionRequirement {
-  requirementId: string
-  sourceMissingSelectionId: string
-  requiredBefore: 'research_runtime_adapter'
-  requiredByGate: string
-  status: 'required_not_satisfied'
-  blocksExecutionNow: true
-  reason: string
-  expectedFutureEvidence: string[]
+export interface FactoryHermesExecutionApprovalRiskDisposition {
+  riskId: string
+  severity: 'high' | 'critical'
+  disposition: 'accepted_for_controlled_runtime_planning_only'
+  mitigation: string
+  blocksControlledRuntimePlanning: boolean
+  blocksImmediateRuntimeExecution: boolean
+  blocksResearchExecution: boolean
+}
+
+export interface FactoryHermesExecutionApprovalRiskDispositionRegister {
+  registerId: string
+  dispositions: FactoryHermesExecutionApprovalRiskDisposition[]
+}
+
+export interface FactoryHermesControlledResearchRuntimePlanningEnvelope {
+  envelopeId: string
+  toolId: 'hermes_agent'
+  approvedFor: 'controlled_research_runtime_planning_only'
+  selectedWrapperStrategy: 'wrapper_temp_config_no_toolsets'
+  sourceExecutionApprovalRef: 'research-execution-approval-result.json'
+  sourceAdapterRef: 'research-runtime-adapter-result.json'
+  targetNextGate: 'Factory Hermes Controlled Research Runtime Planning Gate v1'
+  purpose: string
+  allowedInNextGate: string[]
+  forbiddenEvenInNextGate: string[]
+  flags: Record<string, boolean>
+  recommendedNextGate: 'Factory Hermes Controlled Research Runtime Planning Gate v1'
 }
 
 export interface FactoryHermesResearchExecutionApprovalReceipt {
@@ -59,9 +88,9 @@ export interface FactoryHermesResearchExecutionApprovalReceipt {
   approvedBy: string
   approvedAt: string
   decision: FactoryHermesResearchExecutionApprovalDecision
-  approvalStatus: FactoryHermesResearchExecutionApprovalStatusValue
-  scope: 'hermes_research_execution_approval_evaluation_only'
-  approvedNextGate: 'Factory Hermes Runtime Selection Planning Gate v1'
+  executionApprovalStatus: 'approved_for_controlled_runtime_planning_only' | 'blocked'
+  scope: 'hermes_research_execution_approval_only'
+  approvedNextGate: string
   limitations: string[]
   notAuthorizedActions: string[]
 }
@@ -69,31 +98,42 @@ export interface FactoryHermesResearchExecutionApprovalReceipt {
 export interface FactoryHermesResearchExecutionApprovalDecisionRecord {
   decisionId: string
   toolId: 'hermes_agent'
-  approvalStatus: FactoryHermesResearchExecutionApprovalStatusValue
+  executionApprovalStatus: 'approved_for_controlled_runtime_planning_only' | 'blocked'
   decision: FactoryHermesResearchExecutionApprovalDecision
-  reason: 'missing_runtime_selections' | 'invalid_boundary'
-  boundaryValidated: boolean
-  policiesConsolidated: boolean
-  executionApproved: false
-  runtimeAdapterApproved: false
-  runtimeSelectionPlanningApproved: boolean
-  missingRuntimeSelectionCount: number
-  blockerCount: number
-  requiredNextGate: 'Factory Hermes Runtime Selection Planning Gate v1'
-  noExecutionAuthorizedActions: string[]
+  reason: string
+  researchExecutionApprovalRetryGranted: boolean
+  researchRuntimeAdapterPrepared: boolean
+  wrapperVerificationReviewAccepted: boolean
+  controlledResearchRuntimePlanningAllowed: boolean
+  researchExecutionApprovedNow: boolean
+  runtimeAdapterExecutionAllowedNow: boolean
+  hermesExecutionAllowedNow: boolean
+  promptPassingAllowedNow: boolean
+  modelCallsAllowedNow: boolean
+  networkAllowedNow: boolean
+  credentialAccessAllowedNow: boolean
+  toolsetEnablementAllowedNow: boolean
+  tempConfigCreationAllowedNow: boolean
+  runRootCreationAllowedNow: boolean
+  findingsUseAllowedNow: boolean
+  canProceedToControlledResearchRuntimePlanning: boolean
+  requiredNextGate: string
 }
 
 export interface FactoryHermesResearchExecutionApprovalBlockerPlan {
   blockerPlanId: string
   toolId: 'hermes_agent'
-  blockerType: 'missing_runtime_selections' | 'invalid_boundary'
-  blockers: FactoryHermesResearchExecutionApprovalBlocker[]
-  resolutionOrder: string[]
-  nextGateCandidate: 'Factory Hermes Runtime Selection Planning Gate v1'
-  canProceedToRuntimeSelectionPlanning: boolean
-  canProceedToResearchRuntimeAdapter: false
-  executionRemainsBlocked: true
+  blockerType: 'execution_approval_evidence_incomplete_or_unsafe'
+  blockers: string[]
+  resolutionOptions: string[]
+  recommendedConservativeNextGate: 'Factory Hermes Keep Hermes Research Blocked Decision Gate v1'
 }
+
+export interface FactoryHermesResearchExecutionApprovalCheck { checkId: string, passed: boolean, message: string }
+export interface FactoryHermesResearchExecutionApprovalBlocker { blockerId: string, message: string }
+export interface FactoryHermesResearchExecutionApprovalWarning { warningId: string, message: string }
+export interface FactoryHermesResearchExecutionApprovalValidationResult { ok: boolean, errors: string[] }
+export interface FactoryHermesResearchExecutionApprovalSummary { approvalId: string, status: string, decision: string, canProceedToControlledResearchRuntimePlanning: boolean, canRunResearchNow: boolean }
 
 export interface FactoryHermesResearchExecutionApprovalResult {
   approvalId: string
@@ -102,45 +142,47 @@ export interface FactoryHermesResearchExecutionApprovalResult {
   approvedAt: string
   approvedBy: string
   toolId: 'hermes_agent'
-  commandShapeUnderConsideration: 'oneshot_real_with_provider_model'
-  boundaryDecisionRef?: string
-  priorPolicySummary: string[]
-  approvalChecks: FactoryHermesResearchExecutionApprovalCheck[]
-  approvalBlockers: FactoryHermesResearchExecutionApprovalBlocker[]
-  approvalWarnings: FactoryHermesResearchExecutionApprovalWarning[]
-  runtimeSelectionRequirements: FactoryHermesRuntimeSelectionRequirement[]
+  executionApprovalRetryRef?: string
+  researchRuntimeAdapterRef?: string
+  wrapperVerificationReviewRef?: string
+  selectedWrapperStrategy: 'wrapper_temp_config_no_toolsets'
+  executionReadinessReview: FactoryHermesExecutionReadinessReview
+  executionApprovalLimitationsCarryForward: FactoryHermesExecutionApprovalLimitationsCarryForward
+  executionApprovalRiskDispositionRegister: FactoryHermesExecutionApprovalRiskDispositionRegister
+  controlledResearchRuntimePlanningEnvelope?: FactoryHermesControlledResearchRuntimePlanningEnvelope
   researchExecutionApprovalReceipt: FactoryHermesResearchExecutionApprovalReceipt
   hermesResearchExecutionApprovalDecision: FactoryHermesResearchExecutionApprovalDecisionRecord
-  researchExecutionApprovalBlockerPlan: FactoryHermesResearchExecutionApprovalBlockerPlan
+  approvalBlockerPlan?: FactoryHermesResearchExecutionApprovalBlockerPlan
+  checks: FactoryHermesResearchExecutionApprovalCheck[]
+  blockers: FactoryHermesResearchExecutionApprovalBlocker[]
+  warnings: FactoryHermesResearchExecutionApprovalWarning[]
   status: FactoryHermesResearchExecutionApprovalStatus
   decision: FactoryHermesResearchExecutionApprovalDecision
-  approvalStatus: FactoryHermesResearchExecutionApprovalStatusValue
-  canProceedToRuntimeSelectionPlanning: boolean
-  canProceedToResearchRuntimeAdapter: false
-  canProceedToResearchExecutionRuntime: false
-  canRunResearchNow: false
-  canExecuteHermesNow: false
-  canPassPromptNow: false
-  canUseNetworkNow: false
-  canUseCredentialsNow: false
-  canReadEnvSecretsNow: false
-  canCallModelsNow: false
-  canEnableToolsetsNow: false
-  canMutateFilesystemNow: false
-  canUseFindings: false
+  executionApprovalStatus: 'approved_for_controlled_runtime_planning_only' | 'blocked'
+  controlledResearchRuntimePlanningAllowed: boolean
+  researchExecutionApprovedNow: boolean
+  runtimeAdapterExecutionAllowedNow: boolean
+  hermesExecutionAllowedNow: boolean
+  promptPassingAllowedNow: boolean
+  modelCallsAllowedNow: boolean
+  networkAllowedNow: boolean
+  credentialAccessAllowedNow: boolean
+  toolsetEnablementAllowedNow: boolean
+  tempConfigCreationAllowedNow: boolean
+  runRootCreationAllowedNow: boolean
+  findingsUseAllowedNow: boolean
+  canProceedToControlledResearchRuntimePlanning: boolean
+  canProceedToResearchRuntimeAdapterExecution: boolean
+  canProceedToKeepHermesResearchBlockedDecision: boolean
+  canRunResearchNow: boolean
+  canExecuteHermesNow: boolean
+  canPassPromptNow: boolean
+  canUseNetworkNow: boolean
+  canUseCredentialsNow: boolean
+  canReadEnvSecretsNow: boolean
+  canCallModelsNow: boolean
+  canEnableToolsetsNow: boolean
+  canMutateFilesystemNow: boolean
+  canUseFindings: boolean
   recommendedNextStep: string
-}
-
-export interface FactoryHermesResearchExecutionApprovalValidationResult { ok: boolean; errors: string[]; warnings: string[] }
-export interface FactoryHermesResearchExecutionApprovalSummary {
-  approvalId: string
-  status: FactoryHermesResearchExecutionApprovalStatus
-  decision: FactoryHermesResearchExecutionApprovalDecision
-  approvalStatus: FactoryHermesResearchExecutionApprovalStatusValue
-  missingRuntimeSelectionCount: number
-  runtimeSelectionRequirementCount: number
-  canProceedToRuntimeSelectionPlanning: boolean
-  canProceedToResearchRuntimeAdapter: false
-  canRunResearchNow: false
-  nextStep: string
 }

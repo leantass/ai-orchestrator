@@ -223,14 +223,70 @@ type RealGenerationResult = {
   }
 }
 
+type FirstVersionCreationResult = {
+  ok: boolean
+  status?: 'created' | 'project_already_exists' | 'error' | string
+  runId?: string
+  projectName?: string
+  safeFolderName?: string
+  projectType?: string
+  projectTypeLabel?: string
+  targetPlatform?: string
+  capabilities?: Record<string, string>
+  path?: string
+  projectPath?: string
+  relativePath?: string
+  appPath?: string
+  appEntryPath?: string
+  reportsPath?: string
+  createdFiles?: string[]
+  copiedReports?: string[]
+  warnings?: string[]
+  error?: string
+}
+
 const COMMERCIAL_RUN_STEP_LABELS = [
   'Leyendo brief',
   'Detectando tipo de sistema',
   'Definiendo modulos',
-  'Generando proyecto',
+  'Generando intake',
   'Validando',
   'Preparando entrega',
 ] as const
+
+const INTAKE_REPORT_ARTIFACTS = [
+  'reports/PROJECT_INTAKE.md',
+  'reports/PROJECT_CONTRACT.md',
+  'reports/MVP_SCOPE.md',
+  'reports/ARCHITECTURE_PLAN.md',
+  'reports/DATA_MODEL.md',
+  'reports/BACKLOG.md',
+  'reports/RISK_REGISTER.md',
+  'reports/QA_CHECKLIST.md',
+  'reports/CODEX_FIRST_TASK.md',
+  'reports/RUN_SUMMARY.md',
+] as const
+
+const INTAKE_REPORT_NAMES = INTAKE_REPORT_ARTIFACTS.map((artifactPath) =>
+  artifactPath.replace(/^reports\//u, ''),
+)
+
+function getCommercialIntakeReportArtifacts(
+  artifacts?: Record<string, string>,
+): Array<{ name: string; path: string }> {
+  if (!artifacts) return []
+
+  return INTAKE_REPORT_NAMES.map((reportName) => {
+    const artifactKey = reportName.replace(/\.md$/u, '')
+    const artifactPath =
+      artifacts[artifactKey] ||
+      artifacts[reportName] ||
+      artifacts[`reports/${reportName}`] ||
+      ''
+
+    return artifactPath ? { name: reportName, path: artifactPath } : null
+  }).filter((entry): entry is { name: string; path: string } => Boolean(entry))
+}
 
 function buildCommercialRunId() {
   const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
@@ -238,9 +294,22 @@ function buildCommercialRunId() {
   return `jefe-ui-dry-run-${timestamp}-${suffix}`
 }
 
-function inferCommercialProjectName(brief: string) {
+function inferCommercialProjectNameLegacy(brief: string) {
   const normalizedBrief = brief.toLocaleLowerCase()
+  const namedMatch =
+    /(?:proyecto|sistema|plataforma|app|aplicaci[oó]n|herramienta)\s+(?:llamad[oa]|que\s+se\s+llame)\s+["“']([^"”'\n]{2,80})["”']/iu.exec(brief) ||
+    /(?:proyecto|sistema|plataforma|app|aplicaci[oó]n|herramienta)\s+(?:llamad[oa]|que\s+se\s+llame)\s+([A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ-]{1,40})/u.exec(brief) ||
+    /(?:nombre\s+del\s+proyecto|project\s+name|proyecto)\s*[:=-]\s*([A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ -]{1,80})/iu.exec(brief) ||
+    /(?:proyecto|sistema|plataforma|app|aplicaci[oó]n|herramienta)\s+["“']([^"”'\n]{2,80})["”']/iu.exec(brief)
 
+  if (namedMatch?.[1]) {
+    return namedMatch[1]
+      .replace(/[.:;,-]+$/u, '')
+      .split(/\s+(?:para|que|con|donde|y)\s+/iu)[0]
+      .trim()
+  }
+
+  if (normalizedBrief.includes('factos')) return 'Factos'
   if (normalizedBrief.includes('vianda')) return 'Sistema de viandas'
   if (normalizedBrief.includes('revenue') || normalizedBrief.includes('oportunidad')) {
     return 'Plataforma de oportunidades comerciales'
@@ -257,6 +326,33 @@ function inferCommercialProjectName(brief: string) {
     .trim()
 
   return firstWords || 'Nuevo sistema'
+}
+
+void inferCommercialProjectNameLegacy
+
+function inferCommercialProjectName(brief: string) {
+  const normalizedBrief = brief.toLocaleLowerCase()
+  const namedMatch =
+    /(?:llamad[oa]|que\s+se\s+llame|nombre)\s+["“']([^"”'\n]{2,80})["”']/iu.exec(brief) ||
+    /(?:llamad[oa]|que\s+se\s+llame|nombre)\s+([A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ _-]{1,80})/u.exec(brief) ||
+    /(?:nombre\s+del\s+proyecto|project\s+name|proyecto)\s*[:=-]\s*([A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ _-]{1,80})/iu.exec(brief)
+
+  if (namedMatch?.[1]) {
+    return namedMatch[1]
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[.:;,-]+$/u, '')
+      .split(/\s+(?:para|que|con|donde|tiene|debe|y)\s+/iu)[0]
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
+  if (normalizedBrief.includes('factos')) return 'Factos'
+  if (normalizedBrief.includes('vianda')) return 'Sistema de viandas'
+  if (normalizedBrief.includes('parking centro')) return 'Parking Centro'
+  if (normalizedBrief.includes('turno')) return 'Sistema de turnos'
+  if (normalizedBrief.includes('lavander')) return 'Sistema de lavanderia B2B'
+  return 'Nuevo sistema'
 }
 
 function buildCommercialRunPaths(runId: string) {
@@ -1632,6 +1728,26 @@ declare global {
         summary?: string
         logs?: Record<string, string>
         artifacts?: Record<string, string>
+        error?: string
+      }>
+    }
+    jefeProjectCreationBridge?: {
+      createFirstVersionFromRun?: (runId: string) => Promise<FirstVersionCreationResult>
+    }
+    jefeOpenBridge?: {
+      openProjectFolder?: (projectPath: string) => Promise<{ ok: boolean; path?: string; error?: string }>
+      openDemoApp?: (appPath: string) => Promise<{ ok: boolean; path?: string; error?: string }>
+      copyToClipboard?: (value: string) => Promise<{ ok: boolean; value?: string; error?: string }>
+    }
+    jefeInputAssetsBridge?: {
+      selectInputAssets?: () => Promise<{
+        ok: boolean
+        canceled?: boolean
+        assets?: JefeInputAsset[]
+        blocked?: JefeInputAssetBlocked[]
+        totalFiles?: number
+        totalBytes?: number
+        logoCandidate?: JefeInputAsset | null
         error?: string
       }>
     }
@@ -11605,6 +11721,10 @@ function AdvancedApp() {
     useState<RealGenerationResult | null>(null)
   const [realGenerationLoading, setRealGenerationLoading] = useState(false)
   const [realGenerationError, setRealGenerationError] = useState('')
+  const [firstVersionCreationResult, setFirstVersionCreationResult] =
+    useState<FirstVersionCreationResult | null>(null)
+  const [firstVersionCreationLoading, setFirstVersionCreationLoading] = useState(false)
+  const [firstVersionCreationError, setFirstVersionCreationError] = useState('')
   const [jefeInputAssets, setJefeInputAssets] = useState<JefeInputAsset[]>([])
   const [jefeInputAssetsBlocked, setJefeInputAssetsBlocked] = useState<JefeInputAssetBlocked[]>([])
   const [jefeBrandColors, setJefeBrandColors] = useState('')
@@ -11617,6 +11737,10 @@ function AdvancedApp() {
 
   useEffect(() => {
     if (!commercialUiRun || commercialUiRun.status !== 'running') {
+      return undefined
+    }
+
+    if (realGenerationLoading && commercialUiRun.currentStepIndex >= 3) {
       return undefined
     }
 
@@ -11666,7 +11790,7 @@ function AdvancedApp() {
     }, 850)
 
     return () => window.clearTimeout(stepTimer)
-  }, [commercialUiRun])
+  }, [commercialUiRun, realGenerationLoading])
 
   useEffect(() => {
     if (!commercialUiRun || commercialUiRun.persistenceStatus !== 'persisted') {
@@ -15380,9 +15504,52 @@ function AdvancedApp() {
     : normalizedGoalInput
       ? 'Proyecto actual'
       : 'Proyecto de prueba'
+  const simpleIsReputationIntakeBrief =
+    /\bfactos\b/iu.test(normalizedGoalInput) ||
+    (
+      /\breputaci[oó]n\b/iu.test(normalizedGoalInput) &&
+      /\b(noticias?|publicaciones?|monitoreo|fuentes?|riesgo|trypost)\b/iu.test(normalizedGoalInput)
+    )
+  const simpleDetectedProjectName = simpleIsReputationIntakeBrief
+    ? inferCommercialProjectName(normalizedGoalInput)
+    : ''
+  const simpleReputationModules =
+    'clientes, perfiles de monitoreo, palabras clave, busquedas programadas, hallazgos, clasificacion de riesgo, verificacion de fuentes, borradores de respuesta, aprobacion humana, handoff manual a TryPost'
+  const normalizedCommercialBriefText = normalizeSimpleExperienceSearchText(normalizedGoalInput)
+  const simpleCommercialBriefProfile = simpleIsReputationIntakeBrief
+    ? {
+        projectName: inferCommercialProjectName(normalizedGoalInput),
+        users: 'operadores de monitoreo, analistas de reputacion digital, responsables de comunicacion, aprobadores humanos',
+        modules: simpleReputationModules,
+        limits: 'sin proyecto real, sin repo, sin providers, sin OpenAI, sin red, sin publicacion automatica',
+      }
+    : /agencia|marketing|sitio institucional|portfolio|formulario/u.test(normalizedCommercialBriefText)
+      ? {
+          projectName: inferCommercialProjectName(normalizedGoalInput),
+          users: 'visitantes comerciales, potenciales clientes, equipo de marketing',
+          modules: 'hero, servicios, casos, equipo, testimonios, contacto, formulario, CTA',
+          limits: 'sin backend real, sin datos reales, sin envio real de formulario, sin integraciones reales',
+        }
+      : /ecommerce|tienda|catalogo|carrito|checkout|productos/u.test(normalizedCommercialBriefText)
+        ? {
+            projectName: inferCommercialProjectName(normalizedGoalInput),
+            users: 'compradores, administradores de catalogo, equipo comercial',
+            modules: 'catalogo, productos, categorias, carrito, checkout simulado, pedidos mock',
+            limits: 'sin pagos reales, sin stock real, sin datos reales, sin integraciones reales',
+          }
+        : /parking|estacionamiento|cochera|patente/u.test(normalizedCommercialBriefText)
+          ? {
+              projectName: inferCommercialProjectName(normalizedGoalInput),
+              users: 'conductores, operadores de playa, administradores de ocupacion',
+              modules: 'fecha, hora de entrada, hora de salida, patente, lugares disponibles, reserva simulada, ocupacion mock',
+              limits: 'sin reservas reales, sin patentes reales obligatorias, sin disponibilidad real, sin integraciones reales',
+            }
+          : null
   const simpleSummaryProjectValue =
     sanitizeSimpleExperienceText({
       value:
+        simpleCommercialBriefProfile?.projectName ||
+        simpleDetectedProjectName ||
         planOverviewGoalContextHints.domainLabel ||
         normalizeOptionalString(
           effectivePlannerExecutionMetadata.domainUnderstanding?.domainLabel,
@@ -15394,37 +15561,43 @@ function AdvancedApp() {
     }) || 'Todavía estoy armando el resumen.'
   const simpleSummaryUsersValue =
     sanitizeSimpleExperienceText({
-      value: collectUniqueSummaryValues(
-        effectivePlannerExecutionMetadata.domainUnderstanding?.roles,
-        activeProductArchitecture?.users,
-        activeProductArchitecture?.roles,
-      )
-        .slice(0, 4)
-        .join(', '),
+      value: simpleCommercialBriefProfile
+        ? simpleCommercialBriefProfile.users
+        : collectUniqueSummaryValues(
+            effectivePlannerExecutionMetadata.domainUnderstanding?.roles,
+            activeProductArchitecture?.users,
+            activeProductArchitecture?.roles,
+          )
+            .slice(0, 4)
+            .join(', '),
       fallback: 'Todavía estoy armando el resumen.',
       replacement: 'Plan conservado',
     }) || 'Todavía estoy armando el resumen.'
   const simpleSummaryFunctionsValue =
     sanitizeSimpleExperienceText({
-      value: collectUniqueSummaryValues(
-        effectivePlannerExecutionMetadata.domainUnderstanding?.primaryModules,
-        planOverviewGoalContextHints.moduleItems,
-        activeProductArchitecture?.coreModules,
-      )
-        .slice(0, 5)
-        .join(', '),
+      value: simpleCommercialBriefProfile
+        ? simpleCommercialBriefProfile.modules
+        : collectUniqueSummaryValues(
+            effectivePlannerExecutionMetadata.domainUnderstanding?.primaryModules,
+            planOverviewGoalContextHints.moduleItems,
+            activeProductArchitecture?.coreModules,
+          )
+            .slice(0, 5)
+            .join(', '),
       fallback: 'Todavía estoy armando el resumen.',
       replacement: 'Plan conservado',
     }) || 'Todavía estoy armando el resumen.'
   const simpleSummaryLimitsValue =
     sanitizeSimpleExperienceText({
-      value: collectUniqueSummaryValues(
-        effectivePlannerExecutionMetadata.domainUnderstanding?.explicitExclusions,
-        planOverviewGoalContextHints.exclusionItems,
-        activeProductArchitecture?.outOfScopeForFirstIteration,
-      )
-        .slice(0, 5)
-        .join(', '),
+      value: simpleCommercialBriefProfile
+        ? simpleCommercialBriefProfile.limits
+        : collectUniqueSummaryValues(
+            effectivePlannerExecutionMetadata.domainUnderstanding?.explicitExclusions,
+            planOverviewGoalContextHints.exclusionItems,
+            activeProductArchitecture?.outOfScopeForFirstIteration,
+          )
+            .slice(0, 5)
+            .join(', '),
       fallback: 'Todavía estoy armando el resumen.',
       replacement: 'Sin cambios aplicados',
     }) || 'Todavía estoy armando el resumen.'
@@ -16014,7 +16187,7 @@ No usar credenciales.`
     const bridge = window.jefeGenerationBridge
 
     if (!bridge?.startGenerationFromRun) {
-      setRealGenerationError('La generacion real controlada no esta disponible en este entorno.')
+      setRealGenerationError('El intake dry-run controlado no esta disponible en este entorno.')
       return
     }
 
@@ -16032,7 +16205,7 @@ No usar credenciales.`
       }
 
       if (!response?.ok) {
-        setRealGenerationError(response?.error || 'La generacion real controlada fallo.')
+        setRealGenerationError(response?.error || 'El intake dry-run controlado fallo.')
       }
 
       setRealGenerationResult(nextResult)
@@ -16041,10 +16214,125 @@ No usar credenciales.`
         await loadRealGenerationResult(runId)
       }
     } catch {
-      setRealGenerationError('La generacion real controlada fallo.')
+      setRealGenerationError('El intake dry-run controlado fallo.')
     } finally {
       setRealGenerationLoading(false)
     }
+  }
+
+  const createFirstVersionFromRun = async (runId: string) => {
+    const bridge = window.jefeProjectCreationBridge
+
+    if (!bridge?.createFirstVersionFromRun) {
+      setFirstVersionCreationError('La creacion de primera version no esta disponible en este entorno.')
+      return
+    }
+
+    setFirstVersionCreationLoading(true)
+    setFirstVersionCreationError('')
+
+    try {
+      const response = await bridge.createFirstVersionFromRun(runId)
+      setFirstVersionCreationResult(response)
+
+      if (!response?.ok) {
+        setFirstVersionCreationError(
+          response?.error || 'No se pudo crear la primera version.',
+        )
+        addFlowMessage({
+          source: 'orquestador',
+          title:
+            response?.status === 'project_already_exists'
+              ? 'Proyecto ya existente'
+              : 'Primera version no creada',
+          content:
+            response?.error ||
+            'JEFE no creo archivos porque la validacion segura no paso.',
+          status: 'warning',
+          raw: formatStructuredContent(response),
+        })
+        return
+      }
+
+      setCommercialUiRun((currentRun) => {
+        if (!currentRun || currentRun.id !== runId) return currentRun
+
+        return {
+          ...currentRun,
+          logs: [
+            ...currentRun.logs,
+            `Primera version creada en ${response.path || response.relativePath || 'ruta no disponible'}.`,
+            `Tipo detectado: ${response.projectType || 'generic_web_app'}.`,
+          ],
+        }
+      })
+      addFlowMessage({
+        source: 'orquestador',
+        title: 'Primera version creada',
+        content:
+          'JEFE creo una demo local mock en una carpeta independiente, sin dependencias ni integraciones reales.',
+        status: 'success',
+        raw: formatStructuredContent(response),
+      })
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'No se pudo crear la primera version.'
+      setFirstVersionCreationError(errorMessage)
+      setFirstVersionCreationResult({
+        ok: false,
+        status: 'error',
+        error: errorMessage,
+      })
+    } finally {
+      setFirstVersionCreationLoading(false)
+    }
+  }
+
+  const handleFirstVersionDeliveryAction = async (
+    action: 'open-app' | 'open-folder' | 'copy-app' | 'copy-project',
+  ) => {
+    const bridge = window.jefeOpenBridge
+    const projectPath =
+      firstVersionCreationResult?.projectPath ||
+      firstVersionCreationResult?.path ||
+      ''
+    const appPath =
+      firstVersionCreationResult?.appEntryPath ||
+      firstVersionCreationResult?.appPath ||
+      ''
+    const value = action === 'open-app' || action === 'copy-app' ? appPath : projectPath
+
+    if (!firstVersionCreationResult?.ok || !value) {
+      setFirstVersionCreationError('Todavia no hay una ruta de entrega disponible.')
+      return
+    }
+
+    if (!bridge) {
+      setFirstVersionCreationError('Las acciones de apertura no estan disponibles en este entorno.')
+      return
+    }
+
+    const response =
+      action === 'open-app'
+        ? await bridge.openDemoApp?.(appPath)
+        : action === 'open-folder'
+          ? await bridge.openProjectFolder?.(projectPath)
+          : await bridge.copyToClipboard?.(value)
+
+    if (!response?.ok) {
+      setFirstVersionCreationError(response?.error || 'No se pudo completar la accion.')
+      return
+    }
+
+    setFirstVersionCreationError(
+      action === 'copy-app'
+        ? 'Ruta de app copiada.'
+        : action === 'copy-project'
+          ? 'Ruta de proyecto copiada.'
+          : action === 'open-app'
+            ? 'App demo abierta.'
+            : 'Carpeta del proyecto abierta.',
+    )
   }
 
   const startCommercialDryRun = () => {
@@ -16067,7 +16355,7 @@ No usar credenciales.`
       ...(jefeInputAssets.length > 0 || jefeBrandColors.trim() || jefeVisualNotes.trim()
         ? ['inputs/input-assets.json', 'inputs/assets/']
         : []),
-      'reports/RUN_SUMMARY.md',
+      ...INTAKE_REPORT_ARTIFACTS,
     ]
     const nextRun: CommercialUiRun = {
       id: runId,
@@ -16082,7 +16370,7 @@ No usar credenciales.`
       ...paths,
       validationStatus: 'Dry-run en curso',
       warnings: [
-        'Dry-run funcional: no se ejecuta generacion pesada desde esta pantalla.',
+        'Dry-run funcional: no crea proyecto real ni ejecuta providers desde esta pantalla.',
         'Los artefactos del run se persisten por IPC seguro bajo .codex-temp.',
       ],
       logs: [
@@ -16093,6 +16381,8 @@ No usar credenciales.`
     }
 
     setCommercialUiRun(nextRun)
+    setFirstVersionCreationResult(null)
+    setFirstVersionCreationError('')
     setCommercialGenerationStarted(true)
     setActiveWizardStep('execution')
     setSessionStatus('Dry-run comercial iniciado')
@@ -16161,7 +16451,7 @@ No usar credenciales.`
               }
             : undefined,
       })
-      .then((response) => {
+      .then(async (response) => {
         if (!response?.ok) {
           const errorMessage = response?.error || 'No se pudo persistir el run controlado.'
           setCommercialUiRun((currentRun) => {
@@ -16208,7 +16498,7 @@ No usar credenciales.`
           source: 'orquestador',
           title: 'Run persistido',
           content:
-            'JEFE creo los artefactos del dry-run en .codex-temp sin ejecutar generacion pesada.',
+            'JEFE creo los artefactos del intake en .codex-temp sin crear proyecto real.',
           raw: formatStructuredContent({
             runId,
             path: response.path,
@@ -16216,6 +16506,128 @@ No usar credenciales.`
           }),
           status: 'success',
         })
+
+        const generationBridge = window.jefeGenerationBridge
+        if (!generationBridge?.startGenerationFromRun) {
+          const warning = 'El generador completo de intake no esta disponible en este entorno.'
+          setCommercialUiRun((currentRun) => {
+            if (!currentRun || currentRun.id !== runId) return currentRun
+
+            return {
+              ...currentRun,
+              persistenceMessage: warning,
+              warnings: [...currentRun.warnings, warning],
+              logs: [...currentRun.logs, warning],
+            }
+          })
+          return
+        }
+
+        setRealGenerationLoading(true)
+        setRealGenerationError('')
+        setCommercialUiRun((currentRun) => {
+          if (!currentRun || currentRun.id !== runId) return currentRun
+
+          return {
+            ...currentRun,
+            currentStepIndex: 3,
+            validationStatus: 'Generando reports de intake',
+            logs: [
+              ...currentRun.logs,
+              'Generador completo de intake iniciado desde el flujo real de la UI.',
+            ],
+          }
+        })
+
+        try {
+          const generationResponse = await generationBridge.startGenerationFromRun(runId)
+          const nextResult: RealGenerationResult = {
+            runId: generationResponse?.runId || runId,
+            path: generationResponse?.path || '',
+            outputPath:
+              generationResponse?.outputPath ||
+              generationResponse?.status?.outputPath ||
+              '',
+            status: generationResponse?.status || {},
+            artifacts: generationResponse?.artifacts || {},
+          }
+
+          setRealGenerationResult(nextResult)
+
+          if (!generationResponse?.ok) {
+            const errorMessage = generationResponse?.error || 'El intake dry-run controlado fallo.'
+            setRealGenerationError(errorMessage)
+            setCommercialUiRun((currentRun) => {
+              if (!currentRun || currentRun.id !== runId) return currentRun
+
+              return {
+                ...currentRun,
+                status: 'error',
+                currentStepIndex: 4,
+                validationStatus: 'Intake FAILED',
+                persistenceMessage: errorMessage,
+                warnings: [...currentRun.warnings, errorMessage],
+                logs: [...currentRun.logs, `Generacion de intake fallida: ${errorMessage}`],
+              }
+            })
+            return
+          }
+
+          if (generationBridge.readGenerationResult) {
+            await loadRealGenerationResult(runId)
+          }
+
+          setCommercialUiRun((currentRun) => {
+            if (!currentRun || currentRun.id !== runId) return currentRun
+
+            return {
+              ...currentRun,
+              status: 'completed',
+              currentStepIndex: COMMERCIAL_RUN_STEP_LABELS.length - 1,
+              validationStatus: 'Intake PASS',
+              expectedReportsPath:
+                generationResponse.outputPath || currentRun.expectedReportsPath,
+              persistedArtifacts: {
+                ...(currentRun.persistedArtifacts || {}),
+                ...(generationResponse.artifacts || {}),
+              },
+              logs: [
+                ...currentRun.logs,
+                'Generador completo de intake finalizado: 10 reports disponibles.',
+              ],
+            }
+          })
+          addFlowMessage({
+            source: 'orquestador',
+            title: 'Entrega de intake generada',
+            content:
+              'JEFE genero los 10 reports reales del intake desde el mismo run creado por la pantalla principal.',
+            raw: formatStructuredContent({
+              runId,
+              outputPath: generationResponse.outputPath,
+              artifacts: generationResponse.artifacts,
+            }),
+            status: 'success',
+          })
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'El intake dry-run controlado fallo.'
+          setRealGenerationError(errorMessage)
+          setCommercialUiRun((currentRun) => {
+            if (!currentRun || currentRun.id !== runId) return currentRun
+
+            return {
+              ...currentRun,
+              status: 'error',
+              currentStepIndex: 4,
+              validationStatus: 'Intake FAILED',
+              persistenceMessage: errorMessage,
+              warnings: [...currentRun.warnings, errorMessage],
+              logs: [...currentRun.logs, `Generacion de intake con error: ${errorMessage}`],
+            }
+          })
+        } finally {
+          setRealGenerationLoading(false)
+        }
       })
       .catch((error: unknown) => {
         const errorMessage = error instanceof Error ? error.message : 'Error inesperado de persistencia.'
@@ -16238,6 +16650,8 @@ No usar credenciales.`
   const resetCommercialDryRun = () => {
     setCommercialUiRun(null)
     setCommercialGenerationStarted(false)
+    setFirstVersionCreationResult(null)
+    setFirstVersionCreationError('')
     setActiveWizardStep('goal')
   }
   const debugRendererLog = (label: string, details?: unknown) => {
@@ -22208,8 +22622,31 @@ No usar credenciales.`
           ? 'No se crearon archivos. El plan queda disponible para retomarlo después.'
           : 'No se crearon archivos. Podés ajustar el pedido o volver a preparar el plan.'
       : simplePrimaryActionHelperText
+  const commercialIntakeReportArtifacts = getCommercialIntakeReportArtifacts(
+    commercialUiRun?.persistedArtifacts,
+  )
+  const commercialHasCompleteIntakeReports =
+    commercialIntakeReportArtifacts.length === INTAKE_REPORT_ARTIFACTS.length
+  const commercialRunPathWithReports =
+    commercialUiRun?.expectedRunPath ||
+    commercialUiRun?.expectedReportsPath.replace(/\/reports$/u, '') ||
+    ''
+  const commercialTechnicalWarnings =
+    commercialUiRun &&
+    commercialHasCompleteIntakeReports &&
+    commercialUiRun.persistenceStatus !== 'persisted'
+      ? [
+          `Advertencia tecnica IPC: ${commercialUiRun.persistenceMessage}`,
+          ...commercialUiRun.warnings,
+        ]
+      : commercialUiRun?.warnings || []
+  const firstVersionCreated = firstVersionCreationResult?.ok === true
   const simpleResultVisibleValue =
-    simpleShouldShowMaterializedResult
+    firstVersionCreated
+      ? 'Primera version creada'
+      : commercialHasCompleteIntakeReports
+      ? '10 reportes listos para revisar'
+      : simpleShouldShowMaterializedResult
       ? sanitizeSimpleExperienceText({
           value: resultMaterializationSummaryDescription,
           fallback: 'Proyecto actual',
@@ -22228,7 +22665,11 @@ No usar credenciales.`
               }) ||
               'Aún no hay resultado.'
   const simpleResultVisibleDetail =
-    simpleShouldShowMaterializedResult
+    firstVersionCreated
+      ? `Proyecto creado en carpeta independiente. Tipo detectado: ${firstVersionCreationResult?.projectType || 'generic_web_app'}. Plataforma objetivo: ${firstVersionCreationResult?.targetPlatform || 'local_mock'}.`
+      : commercialHasCompleteIntakeReports
+      ? 'Intake generado con PROJECT_INTAKE, PROJECT_CONTRACT, RUN_SUMMARY y el resto de reportes.'
+      : simpleShouldShowMaterializedResult
       ? sanitizeSimpleExperienceText({
           value: resultHumanText,
           fallback: 'La salida quedo lista para revisar.',
@@ -22246,19 +22687,38 @@ No usar credenciales.`
                 replacement: 'La planificacion sigue disponible para revisar.',
               })
   const simpleResultLocationValue =
-    simpleShouldShowMaterializedResult
+    firstVersionCreated
+      ? firstVersionCreationResult?.projectPath || firstVersionCreationResult?.path || firstVersionCreationResult?.relativePath || ''
+      : commercialHasCompleteIntakeReports
+      ? commercialRunPathWithReports
+      : simpleShouldShowMaterializedResult
       ? simplifyUserFacingText(
           resultMaterializationFolderLabel || 'Todavía no se creó una carpeta.',
         )
       : 'No se creó una carpeta.'
   const simpleResultLocationDetail =
-    simpleShouldShowMaterializedResult
+    firstVersionCreated
+      ? [
+          'README.md',
+          '.env.example',
+          '.gitignore',
+          'docs/',
+          'app/index.html',
+          'app/styles.css',
+          'app/app.js',
+          'data/mock-data.json',
+        ].join(', ')
+      : commercialHasCompleteIntakeReports
+      ? commercialIntakeReportArtifacts.map((artifact) => artifact.name).join(', ')
+      : simpleShouldShowMaterializedResult
       ? simplifyUserFacingText(resultMaterializationValidationsLabel)
       : simpleResultKind === 'blocked'
         ? 'Bloqueado antes de crear archivos.'
         : simpleResultKind === 'deferred'
           ? 'Plan guardado sin cambios en el workspace.'
           : 'Sin archivos creados.'
+  const simpleHasVisibleDelivery =
+    simpleShouldShowMaterializedResult || commercialHasCompleteIntakeReports || firstVersionCreated
   const commercialGenerationActive =
     commercialUiRun !== null ||
     commercialGenerationStarted ||
@@ -22298,7 +22758,7 @@ No usar credenciales.`
             : ('pending' as const),
         },
         {
-          label: 'Generando proyecto',
+          label: 'Generando intake',
           status: isExecutingTask
             ? ('in-progress' as const)
             : simpleShouldShowMaterializedResult
@@ -22333,10 +22793,35 @@ No usar credenciales.`
         reportsPath: commercialUiRun.expectedReportsPath,
         screenshotsPath: commercialUiRun.expectedScreenshotsPath,
         persistenceStatus: commercialUiRun.persistenceStatus,
-        persistenceMessage: commercialUiRun.persistenceMessage,
+        persistenceMessage: commercialHasCompleteIntakeReports
+          ? 'Run persistido por IPC seguro'
+          : commercialUiRun.persistenceMessage,
         persistedArtifacts: commercialUiRun.persistedArtifacts || {},
-        hasResult: commercialUiRun.status === 'completed',
-        warnings: commercialUiRun.warnings,
+        hasResult: commercialUiRun.status === 'completed' || commercialHasCompleteIntakeReports,
+        deliveryLabel: commercialHasCompleteIntakeReports
+          ? '10 reportes disponibles'
+          : 'Dry-run sin archivos',
+        resultLabel: commercialHasCompleteIntakeReports
+          ? 'Intake generado'
+          : commercialUiRun.status === 'completed'
+            ? 'Completado'
+            : commercialUiRun.status === 'error'
+              ? 'Error'
+              : 'En progreso',
+        resultVisibleLabel: commercialHasCompleteIntakeReports
+          ? '10 reportes listos para revisar'
+          : '',
+        reportArtifacts: commercialIntakeReportArtifacts,
+        persistenceLabel: commercialHasCompleteIntakeReports
+          ? 'Run persistido: sí'
+          : commercialUiRun.persistenceStatus === 'persisted'
+            ? 'Run persistido: si'
+            : commercialUiRun.persistenceStatus === 'pending'
+              ? 'Run persistido: pendiente'
+              : commercialUiRun.persistenceStatus === 'unavailable'
+                ? 'Run persistido: no disponible'
+                : 'Run persistido: error',
+        warnings: commercialTechnicalWarnings,
         logs: commercialUiRun.logs,
       }
     : null
@@ -22361,7 +22846,7 @@ No usar credenciales.`
   const simpleShell = (
     <SimpleExperienceDashboard
       title="¿Qué querés construir?"
-      description="Describí el sistema que necesitás. JEFE lo interpreta, lo genera, lo valida y te entrega un proyecto funcional."
+      description="Describí el sistema que necesitás. JEFE lo interpreta, genera un intake revisable, lo valida y deja la entrega bajo .codex-temp."
       modeSwitcher={experienceModeSwitcher}
       themeSwitcher={themeModeSwitcher}
       navItems={simpleShellNavItems}
@@ -22376,6 +22861,9 @@ No usar credenciales.`
       realGenerationResult={realGenerationResult}
       realGenerationLoading={realGenerationLoading}
       realGenerationError={realGenerationError}
+      firstVersionCreationResult={firstVersionCreationResult}
+      firstVersionCreationLoading={firstVersionCreationLoading}
+      firstVersionCreationError={firstVersionCreationError}
       runHistoryLoading={isRunHistoryLoading}
       runHistoryError={runHistoryError}
       onOpenTechnicalDetails={() => setFlowConsoleVisibility({ open: true, pinned: true })}
@@ -22384,16 +22872,22 @@ No usar credenciales.`
       onOpenRunHistory={showPersistedRunHistory}
       onOpenPersistedRun={showPersistedRunDetail}
       onStartRealGeneration={startRealGenerationFromRun}
+      onCreateFirstVersion={createFirstVersionFromRun}
+      onFirstVersionDeliveryAction={handleFirstVersionDeliveryAction}
       onBackToRunHistory={() => {
         setSelectedPersistedRun(null)
         setRealGenerationResult(null)
         setRealGenerationError('')
+        setFirstVersionCreationResult(null)
+        setFirstVersionCreationError('')
       }}
       onCreateNewSystem={() => {
         setCommercialUiRun(null)
         setCommercialGenerationStarted(false)
         setRealGenerationResult(null)
         setRealGenerationError('')
+        setFirstVersionCreationResult(null)
+        setFirstVersionCreationError('')
       }}
       requestPanel={
         <>
@@ -22784,7 +23278,11 @@ No usar credenciales.`
       rightResultPanel={
         <ResultSectionCard
           title={
-            simpleShouldShowMaterializedResult
+            firstVersionCreated
+              ? 'Primera version creada'
+              : commercialHasCompleteIntakeReports
+              ? 'Intake generado'
+              : simpleShouldShowMaterializedResult
               ? 'Primera versión creada correctamente'
               : simpleResultKind === 'rejected' || simpleResultKind === 'no-change'
                 ? 'Listo para empezar'
@@ -22795,7 +23293,11 @@ No usar credenciales.`
                     : 'Resultado'
           }
           description={
-            simpleShouldShowMaterializedResult
+            firstVersionCreated
+              ? 'El proyecto quedo creado en una carpeta independiente con app demo local mock.'
+              : commercialHasCompleteIntakeReports
+              ? 'Los 10 reportes quedaron disponibles en la carpeta del run bajo .codex-temp.'
+              : simpleShouldShowMaterializedResult
               ? 'Ya podés revisar qué se creó, dónde quedó y cuál es el próximo paso recomendado.'
               : simpleResultKind === 'rejected'
                 ? 'El plan queda listo para continuar cuando quieras.'
@@ -22807,7 +23309,7 @@ No usar credenciales.`
           }
           icon="result"
           badge={
-            simpleShouldShowMaterializedResult
+            simpleHasVisibleDelivery
               ? 'Listo'
               : simpleResultKind === 'rejected' || simpleResultKind === 'no-change'
                 ? 'Sin cambios'
@@ -22816,7 +23318,7 @@ No usar credenciales.`
                 : 'Revisado'
           }
           tone={
-            simpleShouldShowMaterializedResult
+            simpleHasVisibleDelivery
               ? 'emerald'
               : simpleResultKind === 'blocked'
                 ? 'rose'
@@ -22833,7 +23335,7 @@ No usar credenciales.`
               icon="result"
               emphasis="hero"
               tone={
-                simpleShouldShowMaterializedResult
+                simpleHasVisibleDelivery
                   ? 'emerald'
                   : simpleResultKind === 'blocked'
                     ? 'rose'

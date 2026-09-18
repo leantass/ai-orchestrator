@@ -54,3 +54,7 @@ Runtime Selection Revision Planning is the conservative blocked path when `no_to
 Wrapper No-Tool Mode Planning may produce a future wrapper approval candidate, but adapter approval remains blocked until the wrapper path is separately approved and bounded.
 
 Wrapper No-Tool Mode Approval still does not approve the research runtime adapter. It can only allow implementation planning for a governed wrapper path.
+
+Wrapper No-Tool Mode Verification Review can permit only a Research Runtime Adapter Approval Retry Gate. The retry may approve the next adapter gate using wrapper code-only evidence, but it still cannot execute Hermes, create live temp config, pass prompts, call models, use network, read credentials, enable toolsets, or run research.
+
+Research Runtime Adapter Gate v1 consumes that retry and prepares only non-executable adapter artifacts. It cannot perform the previous help probe or any Hermes execution.

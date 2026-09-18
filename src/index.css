@@ -947,6 +947,23 @@ html[data-theme="dark"] .jefe-tone-badge-violet {
   font-size: 13px;
 }
 
+.jefe-commercial-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.jefe-commercial-inline-actions button {
+  border: 1px solid var(--jefe-line);
+  border-radius: 8px;
+  background: var(--jefe-panel);
+  color: var(--jefe-text-strong);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 10px;
+}
+
 .jefe-input-assets-panel {
   display: grid;
   gap: 10px;

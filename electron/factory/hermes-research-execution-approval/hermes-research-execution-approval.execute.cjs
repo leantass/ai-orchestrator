@@ -11,33 +11,19 @@ async function readJson(file) {
 
 async function executeFactoryHermesResearchExecutionApproval(input = {}) {
   const paths = resolveFactoryHermesResearchExecutionApprovalPaths();
-  for (const target of [paths.boundaryPlanningResult, paths.policyChainPlanningResult, paths.promptPolicyPlanningResult, paths.modelProviderPolicyPlanningResult, paths.credentialsPolicyPlanningResult, paths.networkPolicyPlanningResult, paths.toolsetsPolicyPlanningResult, paths.outputContractPolicyPlanningResult, paths.resultIngestionContractPlanningResult, paths.timeoutKillSwitchPolicyPlanningResult, paths.filesystemMutationPolicyPlanningResult, paths.approvalResult]) assertResearchExecutionApprovalPathContained(target, paths.installRoot);
-  const { evaluateFactoryHermesResearchExecutionApproval } = await import(pathToFileURL(path.join(paths.repoRoot, 'src', 'factory', 'hermes-research-execution-approval', 'index.ts')).href);
-  const approvedAt = input.approvedAt || '2026-07-22T16:30:00.000Z';
-  const approvedBy = input.approvedBy || 'factory-hermes-research-execution-approval-smoke';
-  let result;
-  try {
-    result = evaluateFactoryHermesResearchExecutionApproval({
-      approvedAt,
-      approvedBy,
-      researchExecutionBoundaryPlanningResult: input.researchExecutionBoundaryPlanningResult || await readJson(paths.boundaryPlanningResult),
-      policyPlanningResults: input.policyPlanningResults || {
-        policyChainPlanning: await readJson(paths.policyChainPlanningResult),
-        promptPolicyPlanning: await readJson(paths.promptPolicyPlanningResult),
-        modelProviderPolicyPlanning: await readJson(paths.modelProviderPolicyPlanningResult),
-        credentialsPolicyPlanning: await readJson(paths.credentialsPolicyPlanningResult),
-        networkPolicyPlanning: await readJson(paths.networkPolicyPlanningResult),
-        toolsetsPolicyPlanning: await readJson(paths.toolsetsPolicyPlanningResult),
-        outputContractPolicyPlanning: await readJson(paths.outputContractPolicyPlanningResult),
-        resultIngestionContractPlanning: await readJson(paths.resultIngestionContractPlanningResult),
-        timeoutKillSwitchPolicyPlanning: await readJson(paths.timeoutKillSwitchPolicyPlanningResult),
-        filesystemMutationPolicyPlanning: await readJson(paths.filesystemMutationPolicyPlanningResult),
-      },
-    });
-  } catch (error) {
-    result = evaluateFactoryHermesResearchExecutionApproval({ approvedAt, approvedBy });
-    result = { ...result, approvalBlockers: [{ blockerId: 'runtime_read_failed', message: String(error.message || error) }] };
-  }
+  for (const target of [paths.researchExecutionApprovalRetryResult, paths.researchRuntimeAdapterResult, paths.adapterApprovalRetryResult, paths.wrapperVerificationReviewResult, paths.wrapperVerificationResult, paths.runtimeSelectionDecisionResult, paths.finalExecutionApprovalResult, paths.approvalResult]) assertResearchExecutionApprovalPathContained(target, paths.installRoot);
+  const gate = await import(pathToFileURL(path.join(paths.repoRoot, 'src', 'factory', 'hermes-research-execution-approval', 'index.ts')).href);
+  const result = gate.evaluateFactoryHermesResearchExecutionApproval({
+    approvedAt: input.approvedAt || '2026-07-23T13:00:00.000Z',
+    approvedBy: input.approvedBy || 'factory-hermes-research-execution-approval-smoke',
+    researchExecutionApprovalRetryResult: input.researchExecutionApprovalRetryResult || await readJson(paths.researchExecutionApprovalRetryResult),
+    researchRuntimeAdapterResult: input.researchRuntimeAdapterResult || await readJson(paths.researchRuntimeAdapterResult),
+    adapterApprovalRetryResult: input.adapterApprovalRetryResult || await readJson(paths.adapterApprovalRetryResult),
+    wrapperVerificationReviewResult: input.wrapperVerificationReviewResult || await readJson(paths.wrapperVerificationReviewResult),
+    wrapperVerificationResult: input.wrapperVerificationResult || await readJson(paths.wrapperVerificationResult),
+    runtimeSelectionDecisionResult: input.runtimeSelectionDecisionResult || await readJson(paths.runtimeSelectionDecisionResult),
+    finalExecutionApprovalResult: input.finalExecutionApprovalResult || await readJson(paths.finalExecutionApprovalResult),
+  });
   await fs.mkdir(path.dirname(paths.approvalResult), { recursive: true });
   await fs.writeFile(paths.approvalResult, `${JSON.stringify(result, null, 2)}\n`);
   return result;

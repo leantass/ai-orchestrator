@@ -2,37 +2,29 @@ import { FACTORY_HERMES_RESEARCH_RUNTIME_ADAPTER_KIND, FACTORY_HERMES_RESEARCH_R
 import type { FactoryHermesResearchRuntimeAdapterInput, FactoryHermesResearchRuntimeAdapterResult, FactoryHermesResearchRuntimeAdapterValidationResult } from './hermes-research-runtime-adapter.types.ts'
 
 const secretish = /password|secret|token|api[_-]?key|bearer|BEGIN [A-Z ]*PRIVATE KEY/iu
+
 export function validateFactoryHermesResearchRuntimeAdapterInput(input: FactoryHermesResearchRuntimeAdapterInput): FactoryHermesResearchRuntimeAdapterValidationResult {
   const errors: string[] = []
   const warnings: string[] = []
-  if (!input.executedAt) errors.push('executedAt is required.')
-  if (!input.executedBy) errors.push('executedBy is required.')
-  if ((input.mode || 'help_probe_only') !== 'help_probe_only') errors.push('mode must be help_probe_only.')
-  if (secretish.test(JSON.stringify({ executedBy: input.executedBy, executionNotes: input.executionNotes }))) errors.push('Input appears to contain a secret.')
+  if (!input?.adaptedAt) errors.push('adaptedAt is required.')
+  if (!input?.adaptedBy) errors.push('adaptedBy is required.')
+  if (secretish.test(JSON.stringify({ adaptedBy: input?.adaptedBy }))) errors.push('Input appears to contain a secret.')
   return { ok: errors.length === 0, errors, warnings }
 }
+
 export function validateFactoryHermesResearchRuntimeAdapterResult(result: FactoryHermesResearchRuntimeAdapterResult): FactoryHermesResearchRuntimeAdapterValidationResult {
   const errors: string[] = []
   const warnings: string[] = []
-  const command = result.commandResults[0]
   if (result.adapterKind !== FACTORY_HERMES_RESEARCH_RUNTIME_ADAPTER_KIND) errors.push('Invalid kind.')
   if (result.adapterVersion !== FACTORY_HERMES_RESEARCH_RUNTIME_ADAPTER_VERSION) errors.push('Invalid version.')
   if (result.toolId !== 'hermes_agent') errors.push('toolId must be hermes_agent.')
-  if (result.mode !== 'help_probe_only') errors.push('mode must be help_probe_only.')
-  if (result.commandName !== 'hermes') errors.push('commandName must be hermes.')
-  if (result.pythonEntrypoint !== 'hermes_cli.main:main') errors.push('pythonEntrypoint must be hermes_cli.main:main.')
-  if (!result.executableRef.endsWith('python-env/Scripts/hermes.exe')) errors.push('executableRef must point to python-env/Scripts/hermes.exe.')
-  if (!result.cwdRef.endsWith('75b300f/source')) errors.push('cwdRef must point to sourceRoot.')
-  if (result.commandResults.length !== 1) errors.push('Exactly one command result is required.')
-  if (command) {
-    if (command.commandKind !== 'hermes_help_probe') errors.push('Command kind must be hermes_help_probe.')
-    if (JSON.stringify(command.args) !== JSON.stringify(['--help'])) errors.push('Args must be exactly ["--help"].')
-    if (command.shell !== false) errors.push('shell must be false.')
-  }
-  if (result.commandResults.some((entry) => !['hermes_help_probe'].includes(entry.commandKind))) errors.push('Unexpected command kind.')
-  if (result.scriptsStatus !== 'not_executed' || result.pipStatus !== 'not_executed' || result.pythonDirectStatus !== 'not_executed' || result.setupPyStatus !== 'not_executed' || result.uvStatus !== 'not_executed') errors.push('Forbidden tool status must be not_executed.')
-  if (result.networkStatus !== 'not_allowed' || result.credentialsStatus !== 'not_allowed' || result.modelCallStatus !== 'not_allowed') errors.push('Network, credentials and models must be not_allowed.')
-  if (result.canTreatAsResearchResult !== false || result.canUseFindings !== false || result.canCallModels !== false || result.canUseCredentials !== false || result.canUseNetwork !== false || result.canDeploy !== false) errors.push('Research/model/network/deploy capabilities must be false.')
-  if (!result.recommendedNextStep) errors.push('recommendedNextStep is required.')
+  if (!['research_runtime_adapter_prepared', 'research_runtime_adapter_blocked'].includes(result.status)) errors.push('Invalid status.')
+  if (result.selectedWrapperStrategy !== 'wrapper_temp_config_no_toolsets') errors.push('Invalid wrapper strategy.')
+  if (result.runtimeAdapterExecutionAllowedNow !== false) errors.push('Runtime adapter execution must remain blocked.')
+  if (result.researchExecutionApproved !== false || result.hermesExecutionApproved !== false) errors.push('Research and Hermes execution must remain blocked.')
+  if (result.promptPassingApproved !== false || result.modelCallsApproved !== false || result.networkApproved !== false || result.credentialAccessApproved !== false || result.toolsetEnablementApproved !== false || result.findingsUseApproved !== false) errors.push('Prompt/model/network/credential/toolset/findings approvals must be false.')
+  if (result.canRunResearchNow !== false || result.canExecuteHermesNow !== false || result.canPassPromptNow !== false || result.canUseNetworkNow !== false || result.canUseCredentialsNow !== false || result.canReadEnvSecretsNow !== false || result.canCallModelsNow !== false || result.canEnableToolsetsNow !== false || result.canMutateFilesystemNow !== false || result.canUseFindings !== false) errors.push('Runtime capability flags must be false.')
+  if (result.status === 'research_runtime_adapter_prepared' && result.canProceedToResearchExecutionApprovalRetry !== true) errors.push('Prepared adapter must proceed only to execution approval retry.')
+  if (result.adapterNonExecutableCommandEnvelope.commandString !== null || result.adapterNonExecutableCommandEnvelope.argv.length !== 0 || Object.keys(result.adapterNonExecutableCommandEnvelope.env).length !== 0 || result.adapterNonExecutableCommandEnvelope.prompt !== null || result.adapterNonExecutableCommandEnvelope.tempConfigPath !== null || result.adapterNonExecutableCommandEnvelope.runRoot !== null) errors.push('Adapter command envelope must be non-executable.')
   return { ok: errors.length === 0, errors, warnings }
 }

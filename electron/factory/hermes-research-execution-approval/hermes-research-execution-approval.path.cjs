@@ -1,31 +1,24 @@
 const path = require('node:path');
 
-function resolveRepoRoot() { return path.resolve(__dirname, '..', '..', '..'); }
-
-function resolveFactoryHermesResearchExecutionApprovalPaths() {
-  const repoRoot = resolveRepoRoot();
-  const installRoot = path.join(repoRoot, '.codex-temp', 'external-tools', 'hermes-agent', 'install', '75b300f');
+function resolveFactoryHermesResearchExecutionApprovalPaths(root = process.cwd()) {
+  const installRoot = path.join(root, '.codex-temp', 'external-tools', 'hermes-agent', 'install', '75b300f');
   return {
-    repoRoot,
+    repoRoot: root,
     installRoot,
-    boundaryPlanningResult: path.join(installRoot, 'research-execution-boundary-planning-result.json'),
-    policyChainPlanningResult: path.join(installRoot, 'research-execution-policy-chain-planning-result.json'),
-    promptPolicyPlanningResult: path.join(installRoot, 'prompt-policy-planning-result.json'),
-    modelProviderPolicyPlanningResult: path.join(installRoot, 'model-provider-policy-planning-result.json'),
-    credentialsPolicyPlanningResult: path.join(installRoot, 'credentials-policy-planning-result.json'),
-    networkPolicyPlanningResult: path.join(installRoot, 'network-policy-planning-result.json'),
-    toolsetsPolicyPlanningResult: path.join(installRoot, 'toolsets-policy-planning-result.json'),
-    outputContractPolicyPlanningResult: path.join(installRoot, 'output-contract-policy-planning-result.json'),
-    resultIngestionContractPlanningResult: path.join(installRoot, 'result-ingestion-contract-planning-result.json'),
-    timeoutKillSwitchPolicyPlanningResult: path.join(installRoot, 'timeout-kill-switch-policy-planning-result.json'),
-    filesystemMutationPolicyPlanningResult: path.join(installRoot, 'filesystem-mutation-policy-planning-result.json'),
+    researchExecutionApprovalRetryResult: path.join(installRoot, 'research-execution-approval-retry-result.json'),
+    researchRuntimeAdapterResult: path.join(installRoot, 'research-runtime-adapter-result.json'),
+    adapterApprovalRetryResult: path.join(installRoot, 'research-runtime-adapter-approval-retry-result.json'),
+    wrapperVerificationReviewResult: path.join(installRoot, 'wrapper-no-tool-mode-verification-review-result.json'),
+    wrapperVerificationResult: path.join(installRoot, 'wrapper-no-tool-mode-verification-result.json'),
+    runtimeSelectionDecisionResult: path.join(installRoot, 'runtime-selection-decision-result.json'),
+    finalExecutionApprovalResult: path.join(installRoot, 'final-execution-approval-result.json'),
     approvalResult: path.join(installRoot, 'research-execution-approval-result.json'),
   };
 }
 
 function assertResearchExecutionApprovalPathContained(target, root) {
-  const rel = path.relative(root, target);
-  if (rel.startsWith('..') || path.isAbsolute(rel)) throw new Error(`path_outside_root: ${target}`);
+  const rel = path.relative(path.resolve(root), path.resolve(target));
+  if (rel.startsWith('..') || path.isAbsolute(rel)) throw new Error(`Path escapes allowed root: ${target}`);
 }
 
 module.exports = { resolveFactoryHermesResearchExecutionApprovalPaths, assertResearchExecutionApprovalPathContained };

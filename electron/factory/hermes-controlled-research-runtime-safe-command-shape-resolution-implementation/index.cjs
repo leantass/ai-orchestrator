@@ -1,0 +1,4 @@
+const { executeFactoryHermesControlledResearchRuntimeSafeCommandShapeResolutionImplementation } = require('./hermes-controlled-research-runtime-safe-command-shape-resolution-implementation.execute.cjs');
+const { resolveFactoryHermesControlledResearchRuntimeSafeCommandShapeResolutionImplementationPaths, assertControlledResearchRuntimeSafeCommandShapeResolutionImplementationPathContained } = require('./hermes-controlled-research-runtime-safe-command-shape-resolution-implementation.path.cjs');
+
+module.exports = { executeFactoryHermesControlledResearchRuntimeSafeCommandShapeResolutionImplementation, resolveFactoryHermesControlledResearchRuntimeSafeCommandShapeResolutionImplementationPaths, assertControlledResearchRuntimeSafeCommandShapeResolutionImplementationPathContained };

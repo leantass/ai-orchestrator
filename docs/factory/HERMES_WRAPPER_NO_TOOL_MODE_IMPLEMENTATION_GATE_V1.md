@@ -40,3 +40,5 @@ Factory Hermes Wrapper No-Tool Mode Verification Planning Gate v1.
 The next gate plans verification only. It must not execute verification, run the wrapper against Hermes, create live temp config, pass prompts, use network, read credentials, call models, enable toolsets, or approve the research runtime adapter.
 
 Verification Approval follows verification planning and can authorize only the wrapper verification gate, not adapter retry or Hermes execution.
+
+Wrapper verification remains code-only: static scan plus pure in-memory serializer, validator, virtual config, command envelope, and manifest checks.

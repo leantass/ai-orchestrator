@@ -1,11 +1,66 @@
-import type { FactoryHermesResearchExecutionApprovalRetryKind, FactoryHermesResearchExecutionApprovalRetryPolicy, FactoryHermesResearchExecutionApprovalRetryVersion } from './hermes-research-execution-approval-retry.types.ts'
+export const FACTORY_HERMES_RESEARCH_EXECUTION_APPROVAL_RETRY_KIND = 'factory-hermes-research-execution-approval-retry'
+export const FACTORY_HERMES_RESEARCH_EXECUTION_APPROVAL_RETRY_VERSION = '1.0'
 
-export const FACTORY_HERMES_RESEARCH_EXECUTION_APPROVAL_RETRY_KIND: FactoryHermesResearchExecutionApprovalRetryKind = 'factory-hermes-research-execution-approval-retry'
-export const FACTORY_HERMES_RESEARCH_EXECUTION_APPROVAL_RETRY_VERSION: FactoryHermesResearchExecutionApprovalRetryVersion = '1.0'
-export const FACTORY_HERMES_RESEARCH_EXECUTION_APPROVAL_RETRY_NEXT_STEP = 'Proceed to Factory Hermes Final Execution Approval Gate v1; runtime adapter and execution remain blocked.'
-export const APPROVAL_RETRY_NOT_AUTHORIZED_ACTIONS = ['approve_execution_now', 'approve_runtime_adapter_now', 'execute_oneshot_now', 'pass_prompt_now', 'run_research_now', 'execute_hermes_now', 'call_models_now', 'use_network_now', 'access_credentials_now', 'read_env_secrets_now', 'enable_toolsets_now', 'mutate_filesystem_now', 'create_runtime_run_root_now', 'ingest_real_output_now', 'promote_findings_now', 'execute_uv_now', 'execute_python_now', 'execute_pip_now', 'execute_setup_py_now', 'deploy_now']
-export const APPROVAL_RETRY_NO_EXECUTION_ACTIONS = ['execute_oneshot', 'run_research', 'execute_hermes', 'call_models', 'use_network', 'use_credentials', 'enable_toolsets', 'mutate_filesystem', 'pass_prompt']
+export const EXECUTION_APPROVAL_RETRY_LIMITATIONS = [
+  'no_real_hermes_execution_tested',
+  'no_model_network_or_provider_tested',
+  'config_schema_partially_unknown',
+  'empty_toolsets_support_unknown',
+  'hidden_defaults_may_still_exist_in_real_cli_runtime',
+  'wrapper_verified_only_as_code_boundary',
+  'adapter_prepared_only_as_non_executable_boundary',
+  'execution_approval_gate_must_not_auto_execute_runtime',
+  'execution_approval_gate_must_not_create_live_temp_config_without_future_approval',
+  'execution_approval_gate_must_not_read_credentials_without_future_approval',
+  'execution_approval_gate_must_not_pass_prompt_without_future_approval',
+  'execution_approval_gate_must_not_use_network_without_future_approval',
+  'execution_approval_gate_must_not_enable_toolsets_without_future_approval',
+]
 
-export const DEFAULT_FACTORY_HERMES_RESEARCH_EXECUTION_APPROVAL_RETRY_POLICY: FactoryHermesResearchExecutionApprovalRetryPolicy = {
-  requireRuntimeSelectionDecision: true, requireAllSelectionsResolvedForApprovalRetry: true, requireFinalExecutionApprovalSatisfiedForRuntimeAdapter: true, requireBlockWhenFinalApprovalMissing: true, requireNoExecutionInThisGate: true, requireNoPromptPassingInThisGate: true, requireNoNetworkInThisGate: true, requireNoCredentialUseInThisGate: true, requireNoModelCallsInThisGate: true, requireNoToolsetEnablementInThisGate: true, requireNoFilesystemMutationInThisGate: true, requireFinalExecutionApprovalGateNext: true, forbidRuntimeAdapterApprovalInThisGateWhenFinalApprovalMissing: true, forbidHermesExecutionInThisGate: true, forbidResearchExecutionInThisGate: true, forbidUsingFindingsInThisGate: true, forbidDeployInThisGate: true,
-}
+export const EXECUTION_APPROVAL_RETRY_NOT_AUTHORIZED_ACTIONS = [
+  'execute_research_now',
+  'execute_research_runtime_adapter_now',
+  'execute_wrapper_against_hermes_now',
+  'create_temp_config_now',
+  'modify_hermes_source_now',
+  'execute_hermes_now',
+  'execute_oneshot_now',
+  'pass_prompt_now',
+  'call_models_now',
+  'use_network_now',
+  'access_credentials_now',
+  'read_env_secrets_now',
+  'enable_toolsets_now',
+  'mutate_runtime_filesystem_now',
+  'create_runtime_run_root_now',
+  'ingest_real_output_now',
+  'promote_findings_now',
+  'execute_uv_now',
+  'execute_python_now',
+  'execute_pip_now',
+  'execute_setup_py_now',
+  'deploy_now',
+]
+
+export const DEFAULT_FACTORY_HERMES_RESEARCH_EXECUTION_APPROVAL_RETRY_POLICY = {
+  requireResearchRuntimeAdapterGate: true,
+  requireAdapterApprovalRetryGate: true,
+  requireWrapperVerificationReviewGate: true,
+  requireAdapterEvidenceReview: true,
+  requireLimitationsCarryForward: true,
+  requireRiskDispositionRegister: true,
+  requireExecutionApprovalGateEnvelopeIfAccepted: true,
+  requireNoRuntimeExecutionInThisGate: true,
+  requireNoResearchExecutionInThisGate: true,
+  requireNoHermesExecutionInThisGate: true,
+  requireNoPromptPassingInThisGate: true,
+  requireNoNetworkInThisGate: true,
+  requireNoCredentialUseInThisGate: true,
+  requireNoModelCallsInThisGate: true,
+  requireNoToolsetEnablementInThisGate: true,
+  forbidResearchExecutionApprovalFinalizationInThisGate: true,
+  forbidHermesExecutionInThisGate: true,
+  forbidResearchExecutionInThisGate: true,
+  forbidUsingFindingsInThisGate: true,
+  forbidDeployInThisGate: true,
+} as const

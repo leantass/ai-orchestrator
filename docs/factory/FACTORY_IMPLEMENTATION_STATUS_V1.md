@@ -42,6 +42,12 @@
 | Hermes Build Dependency Cache Planning Gate | done_local_uncommitted | Hermes Build Dependency Cache Planning Gate v1 | Hermes Agent, uv | Hermes Build Dependency Cache Approval Gate | No | Plans governed cache prefetch for `setuptools>=77,<83`; no cache, network, uv execution, materialization retry or Hermes execution. |
 | Hermes Build Dependency Cache Approval Gate | done_local_uncommitted | Hermes Build Dependency Cache Approval Gate v1 | Hermes Agent, uv | Hermes Build Dependency Cache Runtime Adapter | No | Approves future cache runtime envelope only; no cache, network now, uv execution, materialization retry or Hermes execution. |
 | Hermes Build Dependency Cache Runtime Adapter | done_local_uncommitted | Hermes Build Dependency Cache Runtime Adapter v1 | Hermes Agent, uv | Hermes Build Dependency Cache Verification Gate | uv sync temp env only | Executes approved cache prefetch only against temp env/cache scope; no materialization retry or Hermes execution. |
+| Hermes Controlled Research Runtime Alternate Safe Runtime Implementation Planning Gate | done_local_uncommitted | Alternate Safe Runtime Implementation Planning Gate v1 | Hermes Agent | Alternate Safe Runtime Implementation Approval Gate | No | Plans provider-direct no-tool adapter, mock runtime, and shared contracts only; no implementation, Hermes execution, prompt, network, credentials, model calls, output ingestion, or findings. |
+| Hermes Controlled Research Runtime Alternate Safe Runtime Implementation Approval Gate | done_local_uncommitted | Alternate Safe Runtime Implementation Approval Gate v1 | Hermes Agent | Alternate Safe Runtime Implementation Gate | No | Approves only the next code-only implementation gate; no adapter implementation in this gate, no runtime execution, no prompt, network, credentials, model calls, output ingestion, or findings. |
+| Hermes Controlled Research Runtime Alternate Safe Runtime Implementation Gate | done_local_uncommitted | Contracts, provider-direct adapter core, mock runtime core, implementation gate v1 | Hermes Agent | Alternate Safe Runtime Verification Planning Gate | No | Code-only/non-executing implementation; no runtime execution, research, Hermes, prompt, network, credentials, model calls, output ingestion, or findings. |
+| Hermes Controlled Research Runtime Alternate Safe Runtime Verification Planning Gate | done_local_uncommitted | Alternate Safe Runtime Verification Planning Gate v1 | Hermes Agent | Alternate Safe Runtime Verification Approval Gate | No | Plans verification and stale regression compatibility only; no verification execution, runtime, research, Hermes, prompt, network, credentials, model calls, output ingestion, or findings. |
+| Hermes Controlled Research Runtime Alternate Safe Runtime Verification Approval Gate | done_local_uncommitted | Alternate Safe Runtime Verification Approval Gate v1 | Hermes Agent | Alternate Safe Runtime Verification Gate | No | Approves only verification gate; stale regression assertions accepted as compatibility issue, no runtime, research, Hermes, prompt, network, credentials, model calls, output ingestion, or findings. |
+| Hermes Controlled Research Runtime Alternate Safe Runtime Verification Gate | done_local_uncommitted | Alternate Safe Runtime Verification Gate v1 | Hermes Agent | Mock E2E Planning Gate | No | Verifies code-only modules with allowed smokes/static scans; no runtime, research, Hermes, prompt, network, credentials, model calls, output ingestion, or findings. |
 | Codex Task Contract Approval | not_started | None | Codex | Approval gate | No | No executable task. |
 | Codex Prompt Assembly / Approval | not_started | None | Codex | Prompt gates | No | No final prompt. |
 | Codex Execution Adapter | not_started | None | Codex | Runtime adapter | No | Codex blocked. |
@@ -233,3 +239,420 @@ Verification planning creates static safety scan, serializer, command envelope, 
 Status: done_local_uncommitted.
 
 Verification approval grants only the next wrapper verification gate. It does not execute verification, wrapper code, Hermes, live temp config, prompts, network, credentials, model calls, toolsets, run roots, adapter retry, uv, Python, pip, or setup.py.
+## Hermes Wrapper No-Tool Mode Verification Gate v1
+
+Status: done_local_uncommitted.
+
+Verification runs code-only checks: static safety scan, pure in-memory serializer/validator calls, virtual config generation, non-executable command envelope construction, and no-Hermes-execution evidence. It does not execute Hermes, wrapper against Hermes, live temp config, prompts, network, credentials, model calls, toolsets, run roots, adapter retry, uv, Python, pip, or setup.py.
+## Hermes Wrapper No-Tool Mode Verification Review Gate v1
+
+Status: done_local_uncommitted.
+
+Verification review accepts wrapper evidence only for adapter approval retry. Runtime adapter execution, Hermes execution, wrapper-against-Hermes execution, temp config creation, prompts, models, network, credentials, toolsets, research, findings, uv, Python, pip, and setup.py remain blocked.
+## Hermes Research Runtime Adapter Approval Retry Gate v1
+
+Status: done_local_uncommitted if smoke and validation pass.
+
+Approval retry grants only Factory Hermes Research Runtime Adapter Gate v1 using wrapper code-only evidence. It writes an ignored retry result artifact and keeps adapter execution, Hermes execution, prompts, network, credentials, models, toolsets, run roots, research, findings, uv, Python, pip, and setup.py blocked.
+## Hermes Research Runtime Adapter Gate v1
+
+Status: done_local_uncommitted if smoke and validation pass.
+
+Adapter preparation creates wrapper-boundary integration, non-executable command envelope, safety manifest, limitations, risk register, and research execution approval retry envelope. It replaces the previous help-probe runtime surface and keeps all adapter execution, Hermes execution, prompts, network, credentials, models, toolsets, run roots, research, findings, uv, Python, pip, and setup.py blocked.
+## Hermes Research Execution Approval Retry Gate v1
+
+Status: done_local_uncommitted if smoke and validation pass.
+
+Execution approval retry accepts the prepared adapter only for the final Research Execution Approval Gate. Research execution, adapter execution, Hermes execution, prompts, models, network, credentials, toolsets, run roots, findings, uv, Python, pip, and setup.py remain blocked.
+## Hermes Research Execution Approval Gate v1
+
+Status: done_local_uncommitted if smoke and validation pass.
+
+Execution approval now grants only Controlled Research Runtime Planning. Immediate research execution, adapter execution, Hermes execution, prompts, models, network, credentials, toolsets, temp config creation, run-root creation, findings, uv, Python, pip, and setup.py remain blocked.
+## Hermes Controlled Research Runtime Planning Gate v1
+
+Status: done_local_uncommitted if smoke and validation pass.
+
+Controlled runtime planning creates a plan candidate plus boundary, temp config, run root, credential, prompt, model/network, toolset, timeout/kill switch, output ingestion, risk, and approval envelope artifacts. Runtime execution remains blocked.
+
+## Hermes Controlled Research Runtime Approval Gate v1
+
+Status: done_local_uncommitted if smoke and validation pass.
+
+Controlled runtime approval accepts the plan only for the next preparation gate. It writes the ignored approval result artifact and keeps runtime preparation, runtime execution, Hermes execution, prompts, network, credentials, model calls, toolsets, temp config creation, run-root creation, findings, uv, Python, pip, and setup.py blocked now.
+
+## Hermes Controlled Research Runtime Preparation Gate v1
+
+Status: done_local_uncommitted if smoke and validation pass.
+
+Controlled runtime preparation builds only non-executable manifests and policies for review. It writes the ignored preparation result artifact and keeps live runtime preparation, execution, adapter execution, Hermes execution, prompt passing, model calls, network, credentials, `.env`, toolsets, output ingestion, findings, uv, Python, pip, setup.py, package changes, and UI changes blocked.
+
+## Hermes Controlled Research Runtime Preparation Review Gate v1
+
+Status: done_local_uncommitted if smoke and validation pass.
+
+Controlled runtime preparation review accepts non-executable preparation artifacts only for Live Artifact Planning. Live artifact creation, live runtime preparation, execution, adapter execution, Hermes execution, prompts, models, network, DNS, credentials, `.env`, toolsets, output ingestion, findings, uv, Python, pip, setup.py, package changes, and UI changes remain blocked.
+
+## Hermes Controlled Research Runtime Live Artifact Planning Gate v1
+
+Status: done_local_uncommitted if smoke and validation pass.
+
+Live artifact planning creates only plans for future temp config/run-root creation, filesystem mutation allowlists, secret redaction, artifact safety checks, pre-runtime verification, risks, and approval. It does not create live artifacts, `config.yaml`, run roots, execute Hermes, use network, read credentials, enable toolsets, ingest output, or promote findings.
+
+## Hermes Controlled Research Runtime Live Artifact Approval Gate v1
+
+Status: done_local_uncommitted if smoke and validation pass.
+
+Live artifact approval grants only the next live artifact creation gate. It still does not create live artifacts, `config.yaml`, run roots, execute Hermes, use network, read credentials, enable toolsets, ingest output, or promote findings.
+
+## Hermes Controlled Research Runtime Live Artifact Creation Gate v1
+
+Status: done_local_uncommitted if smoke and validation pass.
+
+Live artifact creation writes only approved `.codex-temp` artifacts for verification: controlled temp config and run-root manifest. Runtime execution, adapter execution, Hermes execution, prompts, models, network, credentials, `.env`, toolsets, ingestion, and findings remain blocked.
+
+## Hermes Controlled Research Runtime Live Artifact Verification Gate v1
+
+Status: done_local_uncommitted if smoke and validation pass.
+
+Live artifact verification reads the created `.codex-temp` config and run-root manifest, validates prior planning/approval/creation receipts, checks path containment, symlink escape, secrets, env dumps, executable commands, runtime flags, and directory inventory, then writes only the ignored verification result artifact. Runtime execution, Hermes execution, prompts, models, network, credentials, `.env`, toolsets, ingestion, and findings remain blocked.
+## Factory Hermes Controlled Research Runtime Live Artifact Verification Review Gate v1
+
+Status: implemented as a pure review evaluator plus read-only CJS runtime and smoke.
+
+Decision target: `Factory Hermes Controlled Research Runtime Execution Planning Gate v1`.
+
+Runtime execution remains blocked.
+
+## Factory Hermes Controlled Research Runtime Execution Approval Gate v1
+
+Status: implemented as a pure approval-review evaluator plus read-only CJS runtime and smoke.
+
+Decision target: `Factory Hermes Controlled Research Runtime Execution Gate v1`.
+
+Runtime execution remains blocked until the final gate.
+
+## Factory Hermes Controlled Research Runtime Execution Gate v1
+
+Status: implemented as final preflight and fail-closed runtime boundary.
+
+Current decision: blocks before runtime when `safe_command_shape_not_proven`.
+
+Findings remain blocked pending execution review.
+
+## Factory Hermes Controlled Research Runtime Execution Review Gate v1
+
+Status: implemented as a pure review evaluator plus read-only CJS runtime and smoke.
+
+Decision target: `Factory Hermes Controlled Research Runtime Safe Command Shape Proof Planning Gate v1`.
+
+Runtime execution, output ingestion, and findings remain blocked.
+
+## Factory Hermes Controlled Research Runtime Safe Command Shape Proof Planning Gate v1
+
+Status: implemented as a pure planner plus read-only CJS runtime and smoke.
+
+Decision target: `Factory Hermes Controlled Research Runtime Safe Command Shape Proof Approval Gate v1`.
+
+Safe command shape proof, controlled runtime execution, Hermes execution, wrapper execution, adapter execution, prompt passing, model calls, network, DNS, credentials, `.env`, toolsets, output ingestion, findings, uv, pip, Python, setup.py, package mutation, and UI mutation remain blocked.
+
+## Factory Hermes Controlled Research Runtime Safe Command Shape Proof Approval Gate v1
+
+Status: implemented as a pure approval-review evaluator plus read-only CJS runtime and smoke.
+
+Decision target: `Factory Hermes Controlled Research Runtime Safe Command Shape Proof Gate v1`.
+
+This gate approves only the future proof gate. Proof execution, controlled runtime execution, Hermes execution, `hermes.exe`, `--oneshot`, wrapper execution, adapter execution, prompt passing, model calls, network, DNS, credentials, `.env`, toolsets, output ingestion, findings, uv, pip, Python, setup.py, package mutation, and UI mutation remain blocked now.
+
+## Factory Hermes Controlled Research Runtime Safe Command Shape Proof Gate v1
+
+Status: implemented as a conservative source-inspection proof evaluator plus read-only CJS runtime and smoke.
+
+Decision target: `Factory Hermes Controlled Research Runtime Safe Command Shape Proof Review Gate v1`.
+
+Current result is expected to block when hidden defaults, MCP/toolsets, validation order, wrapper command proof, or safe dry-run preconditions cannot be proven. Controlled runtime execution, Hermes execution, wrapper execution, adapter execution, prompts, models, network, DNS, credentials, `.env`, toolsets, output ingestion, findings, uv, pip, Python, setup.py, package mutation, and UI mutation remain blocked.
+
+## Factory Hermes Controlled Research Runtime Safe Command Shape Proof Review Gate v1
+
+Status: implemented as a pure review evaluator plus read-only CJS runtime and smoke.
+
+Decision target: `Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Planning Gate v1`.
+
+The review accepts the blocked proof as correct and allows only resolution planning. Proof retry, dry-run retry, controlled runtime execution, Hermes execution, wrapper execution, adapter execution, prompts, models, network, DNS, credentials, `.env`, toolsets, output ingestion, findings, uv, pip, Python, setup.py, package mutation, and UI mutation remain blocked.
+
+## Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Planning Gate v1
+
+Status: implemented as a pure planner plus read-only CJS runtime and smoke.
+
+Decision target: `Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Approval Gate v1`.
+
+The plan recommends `factory_owned_command_renderer_with_fail_closed_wrapper_builder` with `keep_hermes_research_blocked` as fallback. Renderer implementation, wrapper builder implementation, proof retry, dry-run retry, runtime execution, Hermes execution, prompts, models, network, DNS, credentials, `.env`, toolsets, output ingestion, findings, uv, pip, Python, setup.py, package mutation, and UI mutation remain blocked.
+
+## Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Approval Gate v1
+
+Status: implemented as a pure approval-review evaluator plus read-only CJS runtime and smoke.
+
+Decision target: `Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Implementation Planning Gate v1`.
+
+This gate approves only implementation planning. Renderer implementation, wrapper builder implementation, proof retry, dry-run retry, runtime execution, Hermes execution, prompts, models, network, DNS, credentials, `.env`, toolsets, output ingestion, findings, uv, pip, Python, setup.py, package mutation, and UI mutation remain blocked.
+
+## Factory Hermes Controlled Research Runtime Execution Planning Gate v1
+
+Status: implemented as a pure planner plus read-only CJS runtime and smoke.
+
+Decision target: `Factory Hermes Controlled Research Runtime Execution Approval Gate v1`.
+
+Runtime execution remains blocked.
+
+## Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Implementation Planning Gate v1
+
+Status: implemented as a pure planner plus read-only CJS runtime and smoke.
+
+Decision target: `Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Implementation Approval Gate v1`.
+
+Renderer implementation, wrapper builder implementation, proof retry, dry-run retry, runtime execution, Hermes execution, prompts, models, network, DNS, credentials, `.env`, toolsets, output ingestion, findings, uv, pip, Python, setup.py, package mutation, and UI mutation remain blocked.
+
+## Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Implementation Approval Gate v1
+
+Status: implemented as a pure approval-review evaluator plus read-only CJS runtime and smoke.
+
+Decision target: `Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Implementation Gate v1`.
+
+This gate approves only code-only implementation of non-executing renderer and builder components in the next gate. Proof retry, dry-run retry, runtime execution, Hermes execution, prompts, models, network, DNS, credentials, `.env`, toolsets, output ingestion, findings, uv, pip, Python, setup.py, package mutation, and UI mutation remain blocked.
+
+## Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Implementation Gate v1
+
+Status: implemented as code-only renderer/builder modules plus pure implementation certification gate and smokes.
+
+Decision target: `Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Verification Planning Gate v1`.
+
+Renderer and wrapper builder are implemented code-only. Safe command shape is still not proven. Proof retry, dry-run retry, runtime execution, Hermes execution, prompts, models, network, DNS, credentials, `.env`, toolsets, output ingestion, findings, uv, pip, Python, setup.py, package mutation, and UI mutation remain blocked.
+
+## Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Verification Planning Gate v1
+
+Status: implemented as a pure verification-planning evaluator plus read-only CJS runtime and smoke.
+
+Decision target: `Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Verification Approval Gate v1`.
+
+The gate creates only a plan candidate and approval envelope for future verification. Verification execution, proof retry, dry-run retry, runtime execution, Hermes execution, prompts, models, network, DNS, credentials, `.env`, toolsets, output ingestion, findings, uv, pip, Python, setup.py, package mutation, and UI mutation remain blocked.
+
+## Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Verification Approval Gate v1
+
+Status: implemented as a pure verification-approval evaluator plus read-only CJS runtime and smoke.
+
+Decision target: `Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Verification Gate v1`.
+
+The gate approves only the next verification gate. Formal verification, proof retry, dry-run retry, runtime execution, Hermes execution, prompts, models, network, DNS, credentials, `.env`, toolsets, output ingestion, findings, uv, pip, Python, setup.py, package mutation, UI mutation, commit, push, and `git add` remain blocked.
+
+## Factory Hermes Controlled Research Runtime Safe Command Shape Resolution Verification Gate v1
+
+Status: implemented as a code-only verification runtime, evaluator, smoke, and report writer.
+
+Decision target: `Factory Hermes Controlled Research Runtime Safe Command Shape Proof Retry Planning Gate v1`.
+
+The gate verifies renderer, wrapper builder, implementation result, model surfaces, fail-closed rules, integration, static safety scans, smokes, regressions, typecheck, build, and diff check. Safe command shape is still not proven for runtime. Proof retry, dry-run retry, runtime execution, Hermes execution, prompts, models, network, DNS, credentials, `.env`, toolsets, output ingestion, findings, uv, pip, Python, setup.py, package mutation, UI mutation, commit, push, and `git add` remain blocked.
+
+## Factory Hermes Controlled Research Runtime Safe Command Shape Proof Retry Planning Gate v1
+
+Status: implemented as a pure proof-retry planning evaluator plus read-only CJS runtime and smoke.
+
+Decision target: `Factory Hermes Controlled Research Runtime Safe Command Shape Proof Retry Approval Gate v1`.
+
+The gate plans only a future proof retry approval review. Proof retry, dry-run retry, runtime execution, Hermes execution, prompts, models, network, DNS, credentials, `.env`, toolsets, output ingestion, findings, uv, pip, Python, setup.py, package mutation, UI mutation, commit, push, and `git add` remain blocked.
+
+## Factory Hermes Controlled Research Runtime Safe Command Shape Proof Retry Approval Gate v1
+
+Status: implemented as a pure proof-retry approval evaluator plus read-only CJS runtime and smoke.
+
+Decision target: `Factory Hermes Controlled Research Runtime Safe Command Shape Proof Retry Gate v1`.
+
+The gate approves only the next proof retry gate. Proof retry, dry-run retry, runtime execution, Hermes runtime execution, prompts, models, network, DNS, credentials, `.env`, toolsets, output ingestion, findings, uv, pip, Python, setup.py, package mutation, UI mutation, commit, push, and `git add` remain blocked in this gate.
+## Factory Hermes Controlled Research Runtime Safe Command Shape Proof Retry Gate v1
+
+- Implemented: `src/factory/hermes-controlled-research-runtime-safe-command-shape-proof-retry/`.
+- Runtime bridge: `electron/factory/hermes-controlled-research-runtime-safe-command-shape-proof-retry/`.
+- Smoke: `scripts/factory-hermes-controlled-research-runtime-safe-command-shape-proof-retry-smoke.mjs`.
+- Result artifact: `.codex-temp/external-tools/hermes-agent/install/75b300f/controlled-research-runtime-safe-command-shape-proof-retry-result.json`.
+- Current status: `safe_command_shape_proof_retry_blocked`; safe command shape is not proven and runtime execution remains blocked.
+## Factory Hermes Controlled Research Runtime Safe Command Shape Proof Retry Review Gate v1
+
+- Implemented: `src/factory/hermes-controlled-research-runtime-safe-command-shape-proof-retry-review/`.
+- Runtime bridge: `electron/factory/hermes-controlled-research-runtime-safe-command-shape-proof-retry-review/`.
+- Smoke: `scripts/factory-hermes-controlled-research-runtime-safe-command-shape-proof-retry-review-smoke.mjs`.
+- Result artifact: `.codex-temp/external-tools/hermes-agent/install/75b300f/controlled-research-runtime-safe-command-shape-proof-retry-review-result.json`.
+- Current status: `safe_command_shape_proof_retry_review_completed`; blocked proof retry accepted for keep-blocked decision or alternate safe runtime resolution planning.
+## Factory Hermes Controlled Research Runtime Alternate Safe Runtime Resolution Planning Gate v1
+
+- Implemented: `src/factory/hermes-controlled-research-runtime-alternate-safe-runtime-resolution-planning/`.
+- Runtime bridge: `electron/factory/hermes-controlled-research-runtime-alternate-safe-runtime-resolution-planning/`.
+- Smoke: `scripts/factory-hermes-controlled-research-runtime-alternate-safe-runtime-resolution-planning-smoke.mjs`.
+- Result artifact: `.codex-temp/external-tools/hermes-agent/install/75b300f/controlled-research-runtime-alternate-safe-runtime-resolution-planning-result.json`.
+## Factory Hermes Controlled Research Runtime Alternate Safe Runtime Resolution Approval Gate v1
+
+- Implemented: `src/factory/hermes-controlled-research-runtime-alternate-safe-runtime-resolution-approval/`.
+- Runtime bridge: `electron/factory/hermes-controlled-research-runtime-alternate-safe-runtime-resolution-approval/`.
+- Smoke: `scripts/factory-hermes-controlled-research-runtime-alternate-safe-runtime-resolution-approval-smoke.mjs`.
+- Result artifact: `.codex-temp/external-tools/hermes-agent/install/75b300f/controlled-research-runtime-alternate-safe-runtime-resolution-approval-result.json`.
+## Factory Hermes Controlled Research Runtime Mock E2E Planning Gate v1
+
+- Status: implemented.
+- Decision on passing inputs: `factory_owned_mock_runtime_e2e_plan_created_for_approval`.
+- Output: `.codex-temp/external-tools/hermes-agent/install/75b300f/controlled-research-runtime-mock-e2e-planning-result.json`.
+- Scope: planning-only mock E2E candidate plus approval envelope.
+- Runtime, provider runtime, research, Hermes, network, credentials, output ingestion, and findings remain blocked.
+## Factory Hermes Controlled Research Runtime Mock E2E Approval Gate v1
+
+- Status: implemented.
+- Decision on passing inputs: `factory_owned_mock_runtime_e2e_approved_for_execution_gate`.
+- Output: `.codex-temp/external-tools/hermes-agent/install/75b300f/controlled-research-runtime-mock-e2e-approval-result.json`.
+- Scope: approval-only review of the mock E2E plan plus execution gate envelope.
+- Mock execution, provider runtime, research, Hermes, network, credentials, output ingestion, and findings remain blocked in this gate.
+## Factory Hermes Controlled Research Runtime Mock E2E Execution Gate v1
+
+- Status: implemented.
+- Decision on passing inputs: `factory_owned_mock_runtime_e2e_executed_for_review`.
+- Output: `.codex-temp/external-tools/hermes-agent/install/75b300f/controlled-research-runtime-mock-e2e-execution-result.json`.
+- Scope: mock-only local adapter execution and ignored mock artifacts under `.codex-temp`.
+- Provider runtime, real research, Hermes, network, credentials, output ingestion, and findings remain blocked.
+## Factory Hermes Controlled Research Runtime Mock E2E Review Gate v1
+
+- Status: implemented.
+- Decision on passing inputs: `factory_owned_mock_runtime_e2e_review_accepted_for_provider_runtime_planning`.
+- Output: `.codex-temp/external-tools/hermes-agent/install/75b300f/controlled-research-runtime-mock-e2e-review-result.json`.
+- Scope: review-only acceptance for provider runtime planning.
+- Provider runtime execution, real research, Hermes, network, credentials, output ingestion, and findings remain blocked.
+## Factory Hermes Controlled Research Runtime Provider Runtime Planning Gate v1
+
+- Status: implemented.
+- Decision on passing inputs: `factory_owned_provider_direct_runtime_plan_created_for_approval`.
+- Scope: provider runtime planning-only; no provider execution or credential access.
+- Next gate: Factory Hermes Controlled Research Runtime Provider Runtime Approval Gate v1.
+## Factory Hermes Controlled Research Runtime Provider Runtime Approval Gate v1
+
+- Status: implemented.
+- Decision on passing inputs: `factory_owned_provider_direct_runtime_approved_for_execution_planning`.
+- Scope: approval-only for Provider Runtime Execution Planning Gate v1.
+## Provider Runtime Execution Planning Gate v1
+
+Implemented: `Factory Hermes Controlled Research Runtime Provider Runtime Execution Planning Gate v1`.
+
+Result artifact: `.codex-temp/external-tools/hermes-agent/install/75b300f/controlled-research-runtime-provider-runtime-execution-planning-result.json`.
+
+Status: `controlled_research_runtime_provider_runtime_execution_plan_created`.
+
+Decision: `factory_owned_provider_direct_runtime_execution_plan_created_for_approval`.
+
+Next allowed gate: `Factory Hermes Controlled Research Runtime Provider Runtime Execution Approval Gate v1`.
+
+Provider runtime execution remains blocked now.
+## Provider Runtime Execution Approval Gate v1
+
+Implemented: `Factory Hermes Controlled Research Runtime Provider Runtime Execution Approval Gate v1`.
+
+Result artifact: `.codex-temp/external-tools/hermes-agent/install/75b300f/controlled-research-runtime-provider-runtime-execution-approval-result.json`.
+
+Status: `controlled_research_runtime_provider_runtime_execution_approval_granted`.
+
+Decision: `factory_owned_provider_direct_runtime_execution_approved_for_execution_gate`.
+
+Next allowed gate: `Factory Hermes Controlled Research Runtime Provider Runtime Execution Gate v1`.
+
+Provider runtime execution still did not run in this approval gate.
+## Provider Runtime Execution Gate v1
+
+Implemented: `Factory Hermes Controlled Research Runtime Provider Runtime Execution Gate v1`.
+
+Result artifact: `.codex-temp/external-tools/hermes-agent/install/75b300f/controlled-research-runtime-provider-runtime-execution-result.json`.
+
+Provider runtime artifacts: `.codex-temp/external-tools/hermes-agent/install/75b300f/provider-runtime/`.
+
+Next allowed gate: `Factory Hermes Controlled Research Runtime Provider Runtime Review Gate v1`.
+
+Hermes CLI remains blocked; output ingestion and findings remain blocked.
+## Provider Runtime Review Gate v1
+
+Implemented: `Factory Hermes Controlled Research Runtime Provider Runtime Review Gate v1`.
+
+Result artifact: `.codex-temp/external-tools/hermes-agent/install/75b300f/controlled-research-runtime-provider-runtime-review-result.json`.
+
+Status: `controlled_research_runtime_provider_runtime_review_completed`.
+
+Decision: `factory_owned_provider_direct_runtime_review_accepted_invalid_output_for_retry_planning`.
+
+Next allowed gate: `Factory Hermes Controlled Research Runtime Provider Runtime Retry Planning Gate v1`.
+## Provider Runtime Retry Planning Gate v1
+
+Implemented: `Factory Hermes Controlled Research Runtime Provider Runtime Retry Planning Gate v1`.
+
+Result artifact: `.codex-temp/external-tools/hermes-agent/install/75b300f/controlled-research-runtime-provider-runtime-retry-planning-result.json`.
+
+Status: `controlled_research_runtime_provider_runtime_retry_plan_created`.
+
+Decision: `factory_owned_provider_direct_runtime_retry_plan_created_for_approval`.
+
+Next allowed gate: `Factory Hermes Controlled Research Runtime Provider Runtime Retry Approval Gate v1`.
+## Provider Runtime Retry Approval Gate v1
+
+Implemented: `Factory Hermes Controlled Research Runtime Provider Runtime Retry Approval Gate v1`.
+
+Result artifact: `.codex-temp/external-tools/hermes-agent/install/75b300f/controlled-research-runtime-provider-runtime-retry-approval-result.json`.
+
+Status: `controlled_research_runtime_provider_runtime_retry_approval_granted`.
+
+Decision: `factory_owned_provider_direct_runtime_retry_approved_for_execution_gate`.
+
+Next allowed gate: `Factory Hermes Controlled Research Runtime Provider Runtime Retry Execution Gate v1`.
+
+No second provider call, provider runtime execution, real research, Hermes, prompt send, model call, network, DNS, credential/env read, tools, output ingestion or findings use occurred in this approval gate.
+## Provider Runtime Retry Execution Gate v1
+
+Implemented: `Factory Hermes Controlled Research Runtime Provider Runtime Retry Execution Gate v1`.
+
+Result artifact: `.codex-temp/external-tools/hermes-agent/install/75b300f/controlled-research-runtime-provider-runtime-retry-execution-result.json`.
+
+Status: `controlled_research_runtime_provider_runtime_retry_execution_completed`.
+
+Decision: `factory_owned_provider_direct_runtime_retry_executed_valid_for_review`.
+
+Next allowed gate: `Factory Hermes Controlled Research Runtime Provider Runtime Retry Review Gate v1`.
+
+The gate executed exactly one second provider-direct OpenAI request with `gpt-4o-mini`; retry output JSON was valid, no tools/functions/tool_choice/MCP were used, credentials were read only from `process.env` inside the gate, `.env` was not read, and output ingestion/findings remain blocked.
+## Provider Runtime Retry Review Gate v1
+
+Implemented: `Factory Hermes Controlled Research Runtime Provider Runtime Retry Review Gate v1`.
+
+Result artifact: `.codex-temp/external-tools/hermes-agent/install/75b300f/controlled-research-runtime-provider-runtime-retry-review-result.json`.
+
+Status: `controlled_research_runtime_provider_runtime_retry_review_completed`.
+
+Decision: `factory_owned_provider_direct_retry_review_accepted_valid_output_for_output_ingestion_planning`.
+
+Next allowed gate: `Factory Hermes Controlled Research Runtime Output Ingestion Planning Gate v1`.
+
+No third provider call, provider runtime execution, real research, Hermes, prompt send, model call, network, DNS, credential/env read, tools, output ingestion or findings promotion occurred in this review gate.
+## Output Ingestion Planning Gate v1
+
+Implemented: `Factory Hermes Controlled Research Runtime Output Ingestion Planning Gate v1`.
+
+Result artifact: `.codex-temp/external-tools/hermes-agent/install/75b300f/controlled-research-runtime-output-ingestion-planning-result.json`.
+
+Status: `controlled_research_runtime_output_ingestion_plan_created`.
+
+Decision: `factory_owned_output_ingestion_plan_created_for_approval`.
+
+Next allowed gate: `Factory Hermes Controlled Research Runtime Output Ingestion Approval Gate v1`.
+
+Planning-only: no output ingestion execution, candidate output artifact, provider runtime, third provider call, network, credentials, Hermes, tools or findings.
+## Output Ingestion Approval Gate v1
+
+Implemented: `Factory Hermes Controlled Research Runtime Output Ingestion Approval Gate v1`.
+
+Result artifact: `.codex-temp/external-tools/hermes-agent/install/75b300f/controlled-research-runtime-output-ingestion-approval-result.json`.
+
+Status: `controlled_research_runtime_output_ingestion_approval_granted`.
+
+Decision: `factory_owned_output_ingestion_approved_for_execution_gate`.
+
+Next allowed gate: `Factory Hermes Controlled Research Runtime Output Ingestion Execution Gate v1`.
+
+Approval-only: no ingestion execution, candidate output, provider runtime, network, credentials, Hermes, tools or findings.

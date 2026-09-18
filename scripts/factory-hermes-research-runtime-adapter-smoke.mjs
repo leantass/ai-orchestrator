@@ -9,88 +9,75 @@ const paths = resolveFactoryHermesResearchRuntimeAdapterPaths()
 const expectedPackageHash = '660BFE94E2C1AC11ABDAA04AC36190503B4638217932C8C0D2BFE5F5CD0259FF'
 const expectedLockHash = '6A202A2A9D202936DFEE777591FE2E01CFFC0AB588C6775FAF20849990280303'
 const sha256 = (file) => createHash('sha256').update(readFileSync(file)).digest('hex').toUpperCase()
+const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'))
 
-assert.equal(existsSync(paths.approvalResult), true) // 1
-const approval = JSON.parse(readFileSync(paths.approvalResult, 'utf8'))
-assert.ok(approval) // 2
-assert.equal(approval.status, 'approved_for_adapter_candidate') // 3
-assert.equal(approval.commandName, 'hermes') // 4
-assert.equal(approval.pythonEntrypoint, 'hermes_cli.main:main') // 5
-assert.equal(existsSync(paths.boundaryResult), true) // 6
-const boundary = JSON.parse(readFileSync(paths.boundaryResult, 'utf8'))
-assert.ok(boundary) // 7
-const executableExists = existsSync(paths.executableRef)
-assert.equal(typeof executableExists, 'boolean') // 8
-const input = { executedAt: '2026-07-21T20:00:00.000Z', executedBy: 'factory-hermes-research-runtime-adapter-smoke', mode: 'help_probe_only' }
-assert.equal(input.mode, 'help_probe_only') // 9
+assert.equal(existsSync(paths.adapterApprovalRetryResult), true) // 1
+const approvalRetry = readJson(paths.adapterApprovalRetryResult)
+assert.equal(approvalRetry.status, 'research_runtime_adapter_approval_retry_granted') // 2
+const input = { adaptedAt: '2026-07-23T11:00:00.000Z', adaptedBy: 'factory-hermes-research-runtime-adapter-smoke' }
+assert.equal(validateFactoryHermesResearchRuntimeAdapterInput(input).ok, true) // 49
 const result = await executeFactoryHermesResearchRuntimeAdapter(input)
-const command = result.commandResults[0]
-assert.equal(command.commandKind, 'hermes_help_probe') // 10
-assert.deepEqual(command.args, ['--help']) // 11
-assert.equal(command.shell, false) // 12
-assert.equal(command.cwdRef, '.codex-temp/external-tools/hermes-agent/install/75b300f/source') // 13
-assert.ok(command.timeoutMs > 0 && command.timeoutMs <= 60000) // 14
-assert.equal(command.stdinStatus, 'closed') // 15
-assert.equal(typeof command.stdoutPreview, 'string') // 16
-assert.equal(typeof command.stderrPreview, 'string') // 17
-assert.ok(['completed', 'failed', 'timed_out', 'blocked'].includes(result.status)) // 18
-if (result.status === 'completed') assert.equal(result.decision, 'hermes_research_runtime_help_probe_completed') // 19
-if (result.decision === 'blocked_executable_missing') assert.equal(command.started, false) // 19b
-assert.equal(result.canProceedToResultIngestion, true) // 20
-assert.equal(result.canTreatAsResearchResult, false) // 21
-assert.equal(result.canUseFindings, false) // 22
-assert.equal(result.networkStatus, 'not_allowed') // 23
-assert.equal(result.credentialsStatus, 'not_allowed') // 24
-assert.equal(result.modelCallStatus, 'not_allowed') // 25
-assert.equal(result.scriptsStatus, 'not_executed') // 26
-assert.equal(result.pipStatus, 'not_executed') // 27
-assert.equal(result.pythonDirectStatus, 'not_executed') // 28
-assert.equal(result.setupPyStatus, 'not_executed') // 29
-assert.equal(result.uvStatus, 'not_executed') // 30
-assert.notEqual(command.commandKind, 'uv') // 31
-assert.notEqual(command.commandKind, 'pip') // 32
-assert.notEqual(command.commandKind, 'python') // 33
-assert.notEqual(command.commandKind, 'setup_py') // 34
-assert.notEqual(command.commandKind, 'hermes_script') // 35
-assert.ok(result.outputRootRef.startsWith('.codex-temp/')) // 36
-assert.ok(result.tempRootRef.startsWith('.codex-temp/')) // 37
-assert.equal(existsSync(paths.adapterResult), true) // 38
-assert.equal(validateFactoryHermesResearchRuntimeAdapterInput(input).ok, true) // 39
-const validation = validateFactoryHermesResearchRuntimeAdapterResult(result)
-assert.equal(validation.ok, true, JSON.stringify(validation)) // 40
-assert.equal(parseFactoryHermesResearchRuntimeAdapterResult(serializeFactoryHermesResearchRuntimeAdapterResult(result)).adapterRunId, result.adapterRunId) // 41
-assert.equal(/BEGIN|password|secret|api[_-]?key|bearer|raw env|process\.env/iu.test(JSON.stringify(summarizeFactoryHermesResearchRuntimeAdapterResult(result))), false) // 42
-assert.equal(sha256('package.json'), expectedPackageHash) // 43
-assert.equal(sha256('package-lock.json'), expectedLockHash) // 44
-assert.ok(/Result Ingestion Gate/iu.test(result.recommendedNextStep)) // 45
-assert.equal(result.commandName, 'hermes') // 46
-assert.equal(result.pythonEntrypoint, 'hermes_cli.main:main') // 47
-assert.equal(result.canCallModels, false) // 48
-assert.equal(result.canUseCredentials, false) // 49
-assert.equal(result.canUseNetwork, false) // 50
-assert.equal(result.canDeploy, false) // 51
-assert.equal(result.executableRef.endsWith('python-env/Scripts/hermes.exe'), true) // 52
-assert.equal(approval.approvedHermesResearchRuntimeAdapterEnvelope.executionAuthorizationScope, 'future_runtime_adapter_only') // 53
-assert.equal(boundary.hermesResearchRuntimeBoundaryContract.commandBoundary.futureCommandCandidate.shell, false) // 54
-assert.equal(boundary.hermesResearchRuntimeBoundaryContract.commandBoundary.commandsAllowedNow.length, 0) // 55
 
-if (!['completed', 'failed', 'timed_out', 'blocked'].includes(result.status)) {
-  console.error(JSON.stringify({ status: result.status, decision: result.decision, blockers: result.blockers, noFallback: true, noUv: true, noPip: true, noPython: true, noSetupPy: true, noNetwork: true, noCredentials: true }, null, 2))
-  process.exit(1)
+assert.equal(existsSync(paths.adapterResult), true) // 3
+assert.equal(['research_runtime_adapter_prepared', 'research_runtime_adapter_blocked'].includes(result.status), true) // 4
+assert.equal(['hermes_research_runtime_adapter_prepared_with_wrapper_boundary_for_execution_approval_retry', 'hermes_research_runtime_adapter_blocked_executable_surface_detected', 'hermes_research_runtime_adapter_blocked_input_evidence_invalid'].includes(result.decision), true) // 5
+assert.equal(result.selectedWrapperStrategy, 'wrapper_temp_config_no_toolsets') // 6
+
+if (result.status === 'research_runtime_adapter_prepared') {
+  assert.ok(result.adapterWrapperBoundaryIntegrationManifest) // 7
+  assert.ok(result.adapterNonExecutableCommandEnvelope) // 8
+  assert.ok(result.adapterRuntimeSafetyManifest) // 9
+  assert.ok(result.adapterLimitationsCarryForward) // 10
+  assert.ok(result.adapterRiskDispositionRegister) // 11
+  assert.ok(result.researchExecutionApprovalRetryEnvelope) // 12
+  assert.equal(result.wrapperBoundaryIntegrated, true) // 13
+  assert.equal(result.adapterCommandEnvelopeBuilt, true) // 14
+  assert.equal(result.adapterSafetyManifestBuilt, true) // 15
 }
 
-console.log(JSON.stringify({
-  ok: true,
-  checks: 55,
-  executableExists,
-  status: result.status,
-  decision: result.decision,
-  mode: result.mode,
-  command: `${result.executableRef} --help`,
-  exitCode: result.exitCode,
-  timedOut: result.timedOut,
-  killed: result.killed,
-  canProceedToResultIngestion: result.canProceedToResultIngestion,
-  canTreatAsResearchResult: result.canTreatAsResearchResult,
-  hermesExecutionStatus: result.hermesExecutionStatus,
-}, null, 2))
+assert.equal(result.runtimeAdapterExecutionAllowedNow, false) // 16
+assert.equal(result.researchExecutionApproved, false) // 17
+assert.equal(result.hermesExecutionApproved, false) // 18
+assert.equal(result.promptPassingApproved, false) // 19
+assert.equal(result.modelCallsApproved, false) // 20
+assert.equal(result.networkApproved, false) // 21
+assert.equal(result.credentialAccessApproved, false) // 22
+assert.equal(result.toolsetEnablementApproved, false) // 23
+assert.equal(result.findingsUseApproved, false) // 24
+if (result.status === 'research_runtime_adapter_prepared') assert.equal(result.canProceedToResearchExecutionApprovalRetry, true) // 25
+assert.equal(result.canProceedToResearchExecutionApproval, false) // 26
+assert.equal(result.canProceedToResearchRuntimeAdapterExecution, false) // 27
+assert.equal(result.canRunResearchNow, false) // 28
+assert.equal(result.canExecuteHermesNow, false) // 29
+assert.equal(result.canPassPromptNow, false) // 30
+assert.equal(result.canUseNetworkNow, false) // 31
+assert.equal(result.canUseCredentialsNow, false) // 32
+assert.equal(result.canReadEnvSecretsNow, false) // 33
+assert.equal(result.canCallModelsNow, false) // 34
+assert.equal(result.canEnableToolsetsNow, false) // 35
+assert.equal(result.canMutateFilesystemNow, false) // 36
+assert.equal(result.canUseFindings, false) // 37
+assert.equal(result.adapterNonExecutableCommandEnvelope.commandString, null) // 38
+assert.deepEqual(result.adapterNonExecutableCommandEnvelope.argv, []) // 39
+assert.deepEqual(result.adapterNonExecutableCommandEnvelope.env, {}) // 40
+assert.equal(result.adapterNonExecutableCommandEnvelope.prompt, null) // 41
+assert.equal(result.adapterNonExecutableCommandEnvelope.tempConfigPath, null) // 42
+assert.equal(result.adapterNonExecutableCommandEnvelope.runRoot, null) // 43
+assert.equal(result.adapterLimitationsCarryForward.limitations.includes('no_real_hermes_execution_tested'), true) // 44
+assert.equal(result.adapterLimitationsCarryForward.limitations.includes('config_schema_partially_unknown'), true) // 45
+assert.equal(result.adapterLimitationsCarryForward.limitations.includes('empty_toolsets_support_unknown'), true) // 46
+assert.equal(result.adapterRiskDispositionRegister.dispositions.some((risk) => risk.riskId === 'hidden_defaults_not_detected_in_real_cli'), true) // 47
+assert.equal(result.adapterRiskDispositionRegister.dispositions.some((risk) => risk.riskId === 'research_execution_triggered_without_final_approval'), true) // 48
+assert.equal(validateFactoryHermesResearchRuntimeAdapterResult(result).ok, true, JSON.stringify(validateFactoryHermesResearchRuntimeAdapterResult(result))) // 50
+const parsed = parseFactoryHermesResearchRuntimeAdapterResult(serializeFactoryHermesResearchRuntimeAdapterResult(result))
+assert.equal(parsed.adapterId, result.adapterId) // 51
+const summary = summarizeFactoryHermesResearchRuntimeAdapterResult(result)
+assert.equal(JSON.stringify(summary).includes('sk-'), false) // 52
+assert.equal(JSON.stringify(summary).includes('process.env'), false)
+assert.equal(existsSync(paths.adapterResult), true) // 53
+assert.equal(sha256('package.json'), expectedPackageHash) // 54
+assert.equal(sha256('package-lock.json'), expectedLockHash) // 55
+for (const action of ['execute_research_runtime_adapter_now', 'execute_wrapper_against_hermes_now', 'create_temp_config_now', 'execute_hermes_now', 'execute_oneshot_now', 'pass_prompt_now', 'run_research_now', 'call_models_now', 'use_network_now', 'access_credentials_now', 'read_env_secrets_now', 'create_runtime_run_root_now', 'enable_toolsets_now', 'execute_uv_now', 'execute_python_now', 'execute_pip_now', 'execute_setup_py_now']) assert.equal(result.researchRuntimeAdapterReceipt.notAuthorizedActions.includes(action), true) // 56-72
+assert.equal(existsSync('docs/factory/HERMES_RESEARCH_RUNTIME_ADAPTER_GATE_V1.md'), true) // 73
+
+console.log('factory-hermes-research-runtime-adapter-smoke: PASS 73 checks')

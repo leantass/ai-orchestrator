@@ -1,13 +1,72 @@
-import type { FactoryHermesResearchExecutionApprovalKind, FactoryHermesResearchExecutionApprovalPolicy, FactoryHermesResearchExecutionApprovalVersion } from './hermes-research-execution-approval.types.ts'
+export const FACTORY_HERMES_RESEARCH_EXECUTION_APPROVAL_KIND = 'factory-hermes-research-execution-approval'
+export const FACTORY_HERMES_RESEARCH_EXECUTION_APPROVAL_VERSION = '1.0'
 
-export const FACTORY_HERMES_RESEARCH_EXECUTION_APPROVAL_KIND: FactoryHermesResearchExecutionApprovalKind = 'factory-hermes-research-execution-approval'
-export const FACTORY_HERMES_RESEARCH_EXECUTION_APPROVAL_VERSION: FactoryHermesResearchExecutionApprovalVersion = '1.0'
-export const FACTORY_HERMES_RESEARCH_EXECUTION_APPROVAL_NEXT_STEP = 'Proceed to Factory Hermes Runtime Selection Planning Gate v1; execution remains blocked.'
+export const EXECUTION_APPROVAL_LIMITATIONS = [
+  'no_real_hermes_execution_tested',
+  'no_model_network_or_provider_tested',
+  'config_schema_partially_unknown',
+  'empty_toolsets_support_unknown',
+  'hidden_defaults_may_still_exist_in_real_cli_runtime',
+  'wrapper_verified_only_as_code_boundary',
+  'adapter_prepared_only_as_non_executable_boundary',
+  'execution_approval_is_not_runtime_execution',
+  'controlled_runtime_planning_must_not_auto_execute',
+  'controlled_runtime_planning_must_define_temp_config_creation_policy',
+  'controlled_runtime_planning_must_define_run_root_policy',
+  'controlled_runtime_planning_must_define_credential_access_policy',
+  'controlled_runtime_planning_must_define_network_policy',
+  'controlled_runtime_planning_must_define_prompt_policy',
+  'controlled_runtime_planning_must_define_toolset_policy',
+  'findings_use_requires_real_ingestion_review',
+]
 
-export const DEFAULT_FACTORY_HERMES_RESEARCH_EXECUTION_APPROVAL_POLICY: FactoryHermesResearchExecutionApprovalPolicy = {
-  requireBoundaryPlanning: true, requireAllPoliciesConsolidated: true, requireApprovalGateCanEvaluate: true, requireNoMissingRuntimeSelectionsForExecutionApproval: true, requireHumanFinalApprovalForExecution: true, requireRuntimeSelectionPlanningBeforeRuntimeAdapter: true, requireNotApprovedWhenSelectionsMissing: true, requireNoExecutionInThisGate: true, requireNoPromptPassingInThisGate: true, requireNoNetworkInThisGate: true, requireNoCredentialsInThisGate: true, requireNoModelCallsInThisGate: true, requireNoToolsetEnablementInThisGate: true, requireNoFilesystemMutationInThisGate: true, forbidExecutionApprovalWithMissingSelections: true, forbidRuntimeAdapterApprovalInThisGateWhenBlocked: true, forbidHermesExecutionInThisGate: true, forbidResearchExecutionInThisGate: true, forbidUsingFindingsInThisGate: true, forbidDeployInThisGate: true,
-}
+export const EXECUTION_APPROVAL_NOT_AUTHORIZED_ACTIONS = [
+  'execute_research_now',
+  'execute_research_runtime_adapter_now',
+  'execute_wrapper_against_hermes_now',
+  'create_temp_config_now',
+  'create_run_root_now',
+  'modify_hermes_source_now',
+  'execute_hermes_now',
+  'execute_oneshot_now',
+  'pass_prompt_now',
+  'call_models_now',
+  'use_network_now',
+  'access_credentials_now',
+  'read_env_secrets_now',
+  'enable_toolsets_now',
+  'mutate_runtime_filesystem_now',
+  'ingest_real_output_now',
+  'promote_findings_now',
+  'execute_uv_now',
+  'execute_python_now',
+  'execute_pip_now',
+  'execute_setup_py_now',
+  'deploy_now',
+]
 
-export const RESEARCH_EXECUTION_APPROVAL_NOT_AUTHORIZED_ACTIONS = ['approve_execution_now', 'approve_runtime_adapter_now', 'execute_oneshot_now', 'pass_prompt_now', 'run_research_now', 'execute_hermes_now', 'call_models_now', 'use_network_now', 'access_credentials_now', 'enable_toolsets_now', 'mutate_filesystem_now', 'write_project_files_now', 'ingest_real_output_now', 'promote_findings_now', 'write_findings_to_memory_now', 'execute_uv_now', 'execute_python_now', 'execute_pip_now', 'execute_setup_py_now', 'deploy_now']
-
-export const NO_EXECUTION_AUTHORIZED_ACTIONS = ['execute_oneshot', 'run_research', 'execute_hermes', 'call_models', 'use_network', 'use_credentials', 'enable_toolsets', 'mutate_filesystem', 'use_findings']
+export const DEFAULT_FACTORY_HERMES_RESEARCH_EXECUTION_APPROVAL_POLICY = {
+  requireResearchExecutionApprovalRetryGate: true,
+  requireResearchRuntimeAdapterGate: true,
+  requireWrapperVerificationReviewGate: true,
+  requireRuntimeSelectionDecision: true,
+  requireExecutionReadinessReview: true,
+  requireLimitationsCarryForward: true,
+  requireRiskDispositionRegister: true,
+  requireControlledRuntimePlanningEnvelopeIfAccepted: true,
+  requireNoRuntimeExecutionInThisGate: true,
+  requireNoResearchExecutionInThisGate: true,
+  requireNoHermesExecutionInThisGate: true,
+  requireNoPromptPassingInThisGate: true,
+  requireNoNetworkInThisGate: true,
+  requireNoCredentialUseInThisGate: true,
+  requireNoModelCallsInThisGate: true,
+  requireNoToolsetEnablementInThisGate: true,
+  requireNoTempConfigCreationInThisGate: true,
+  requireNoRunRootCreationInThisGate: true,
+  forbidRuntimeExecutionInThisGate: true,
+  forbidHermesExecutionInThisGate: true,
+  forbidResearchExecutionInThisGate: true,
+  forbidUsingFindingsInThisGate: true,
+  forbidDeployInThisGate: true,
+} as const
