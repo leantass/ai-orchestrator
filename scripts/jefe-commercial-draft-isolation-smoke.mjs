@@ -22,6 +22,11 @@ async function waitFor(mainWindow, expression, message) {
   throw new Error(message)
 }
 
+async function reload(mainWindow) {
+  await mainWindow.reload()
+  await waitFor(mainWindow, 'document.querySelector("#jefe-idea") !== null', 'No se recuperó Inicio después de F5')
+}
+
 async function setControl(mainWindow, selector, value) {
   const expression = '(() => { const control = document.querySelector(' + JSON.stringify(selector) + '); if (!control) return false; const prototype = control instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype; const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set; setter?.call(control, ' + JSON.stringify(value) + '); control.dispatchEvent(new Event("input", { bubbles: true })); control.dispatchEvent(new Event("change", { bubbles: true })); return control.value === ' + JSON.stringify(value) + ' })()'
   const changed = await evaluate(mainWindow, expression)
@@ -76,6 +81,27 @@ export async function runElectronVisualE2E({ mainWindow, repoRoot }) {
   const homeAfterSave = await evaluate(mainWindow, 'document.body.innerText')
   assert.equal(homeAfterSave.includes('Estudio Horizonte'), false, 'El borrador A se mostró automáticamente en Inicio')
   assert.equal(homeAfterSave.includes('Continuar borrador'), true, 'No se ofreció recuperación explícita del borrador A')
+  assert.equal(homeAfterSave.includes('Borrador guardado localmente.'), true, 'No se mostró feedback claro al guardar')
+
+  await reload(mainWindow)
+  const homeAfterRefresh = await evaluate(mainWindow, 'document.body.innerText')
+  assert.equal(homeAfterRefresh.includes('Continuar borrador'), true, 'El borrador no sobrevivió F5')
+  assert.equal(await clickButton(mainWindow, 'Continuar borrador'), true, 'No se pudo continuar el borrador A')
+  await waitForStep(mainWindow, 5)
+  const restoredDraft = await readReview(mainWindow)
+  assert.equal(restoredDraft.fullValues.need.includes('Un sitio institucional para presentar servicios de arquitectura.'), true, 'No se restauró el brief del borrador A')
+  assert.equal(restoredDraft.fullValues['business-type'].includes('Estudio de arquitectura'), true, 'No se restauró el negocio del borrador A')
+  assert.equal(restoredDraft.fullValues.audience.includes('Personas que buscan diseño residencial.'), true, 'No se restauró la audiencia del borrador A')
+  assert.equal(restoredDraft.fullValues.proposition.includes('Diseñamos espacios habitables y duraderos.'), true, 'No se restauró la propuesta del borrador A')
+  assert.equal(restoredDraft.fullValues.colors.includes('ivory, naranja quemado'), true, 'No se restauraron los colores del borrador A')
+  assert.equal(restoredDraft.fullValues.direction.includes('Editorial'), true, 'No se restauró la dirección del borrador A')
+  assert.equal(await clickButton(mainWindow, 'Crear primera versión'), true, 'No se pudo crear la primera versión del borrador A')
+  await waitFor(mainWindow, 'document.body.innerText.includes("Proyecto")', 'No se abrió el workspace después de crear la primera versión')
+  const draftStorageAfterCreation = await evaluate(mainWindow, 'window.localStorage.getItem("jefe-commercial-draft-v1")')
+  assert.equal(draftStorageAfterCreation, null, 'El borrador no se eliminó después de crear la primera versión')
+  assert.equal(await clickButton(mainWindow, 'Proyectos'), true, 'No se pudo volver a Inicio después de crear la primera versión')
+  await waitFor(mainWindow, 'document.querySelector("#jefe-idea") !== null', 'No se recuperó Inicio después de crear la primera versión')
+  assert.equal((await evaluate(mainWindow, 'document.body.innerText')).includes('Continuar borrador'), false, 'El borrador siguió visible después de crear la primera versión')
 
   const floeBrief = 'Floe ayuda a empresas, organizaciones y profesionales con software, automatización y soporte confiable.'
   await setControl(mainWindow, '#jefe-idea', floeBrief)
