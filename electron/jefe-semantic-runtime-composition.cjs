@@ -6,12 +6,13 @@ const generation = require('./jefe-real-generation.cjs')
 const { createProjectPersistence } = require('./jefe-project-persistence.cjs')
 const { createPreviewApprovalService } = require('./jefe-preview-approval.cjs')
 const intelligence = require('./jefe-semantic-intelligence.cjs')
-const { createOpenAISemanticProvider, providerHealth, SEMANTIC_SCHEMA, CONTENT_PLAN_SCHEMA, EXPERIENCE_PLAN_SCHEMA, experiencePlanSchemaForCatalog, ProviderRunBudget } = require('./jefe-semantic-provider.cjs')
+const { createOpenAISemanticProvider, providerHealth, providerConfig, SEMANTIC_SCHEMA, CONTENT_PLAN_SCHEMA, EXPERIENCE_PLAN_SCHEMA, experiencePlanSchemaForCatalog, ProviderRunBudget } = require('./jefe-semantic-provider.cjs')
 const { buildSemanticGenerationSpec, buildExecutionPackage } = require('./jefe-semantic-correction-lifecycle.cjs')
 const { adaptSemanticPlansToPlanning, buildContentSectionCatalog, contentSectionCatalogHash } = require('./jefe-semantic-generation-adapter.cjs')
 const { createSemanticProductionPromotion } = require('./jefe-semantic-production-promotion.cjs')
 const { createSemanticRuntimeAdapter } = require('./jefe-semantic-runtime-adapter.cjs')
 const { createSemanticModelRouter } = require('./jefe-semantic-model-router.cjs')
+const { deriveSemanticRunTimeoutMs } = require('./jefe-semantic-timeout.cjs')
 
 function createSemanticRuntimeComposition({ root, feedbackProvider = null, decisionProvider = null, semanticProvider = null, semanticBrainAdapter = null, mode = 'synthetic', env = process.env, callBudget = null } = {}) {
   if (typeof root !== 'string' || !path.isAbsolute(root)) throw Object.assign(new Error('A semantic runtime root is required.'), { code: 'INVALID_ROOT' })
@@ -20,6 +21,8 @@ function createSemanticRuntimeComposition({ root, feedbackProvider = null, decis
   const promotion = createSemanticProductionPromotion({ root })
   const productive = mode === 'productive'
   const runBudget = callBudget || (productive ? new ProviderRunBudget({ runId: `semantic-composition-${Date.now()}`, maxCalls: 4 }) : null)
+  const semanticProviderConfig = productive ? providerConfig({ env }) : null
+  const runTimeoutMs = productive ? deriveSemanticRunTimeoutMs({ maxCalls: runBudget?.maxCalls, providerOperationTimeoutMs: semanticProviderConfig?.backgroundDeadlineMs }) : undefined
   const modelRouter = createSemanticModelRouter({ env, callBudget: runBudget })
   const provider = semanticProvider || (productive ? createOpenAISemanticProvider({ env, callBudget: runBudget }) : null)
   const brain = semanticBrainAdapter || (provider ? intelligence.createSemanticBrainAdapter({ provider }) : null)
@@ -98,7 +101,7 @@ function createSemanticRuntimeComposition({ root, feedbackProvider = null, decis
     await onPhase('EXPERIENCE_PLAN_READY', { semanticGenerationCalls: 3 })
     return { businessUnderstanding: bu, contentPlan: content, experiencePlan: experience, providerBudget: runBudget?.snapshot?.() || null }
   }
-  return { persistence, preview, promotion, semanticProvider: provider, semanticBrainAdapter: brain, modelRouter, providerHealth: health, providerRunBudget: runBudget, decideSemantic, runSemanticPlans, adapter: createSemanticRuntimeAdapter({ root, service: promotion, resolveExecution }) }
+  return { persistence, preview, promotion, semanticProvider: provider, semanticBrainAdapter: brain, modelRouter, providerHealth: health, providerRunBudget: runBudget, timeoutBudget: { runGlobalTimeoutMs: runTimeoutMs || null, providerOperationTimeoutMs: semanticProviderConfig?.backgroundDeadlineMs || null }, decideSemantic, runSemanticPlans, adapter: createSemanticRuntimeAdapter({ root, service: promotion, resolveExecution, timeoutMs: runTimeoutMs, providerOperationTimeoutMs: semanticProviderConfig?.backgroundDeadlineMs || null }) }
 }
 
 module.exports = { createSemanticRuntimeComposition }
