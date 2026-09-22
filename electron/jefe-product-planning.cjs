@@ -100,7 +100,7 @@ function plannedContentSlots(planning) {
 function compareGeneratedContent(planning, html) {
   const artifactVisibleText = visibleArtifactText(html)
   const contentSlots = plannedContentSlots(planning).map(([slot, value]) => ({ slot, plannedValue: String(value), plannedNormalized: normalizeVisibleSlot(value) }))
-  const driftSlots = contentSlots.filter((item) => !artifactVisibleText.includes(item.plannedNormalized))
+  const driftSlots = contentSlots.filter((item) => !artifactVisibleText.includes(item.plannedNormalized)).map((item) => ({ ...item, renderedPresent: false }))
   return { pass: driftSlots.length === 0, driftSlots, driftType: driftSlots.length ? 'CONTENT_MAPPING_OR_SEMANTIC_DRIFT' : null }
 }
 function digest(value) { return crypto.createHash('sha256').update(JSON.stringify(stable(value))).digest('hex').slice(0, 24) }

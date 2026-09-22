@@ -20,7 +20,7 @@ async function runCase(projectId, failureAt = null) {
   const adapter = createSemanticRuntimeAdapter({ root, timeoutMs: 1000, service, resolveExecution: async (_identity, { onPhase, onPhaseStart }) => {
     for (const phase of phasePlan) {
       onPhaseStart(phase)
-      if (failureAt === phase) throw Object.assign(new Error(`${phase} synthetic failure`), { code: `${phase}_FAILED` })
+      if (failureAt === phase) throw Object.assign(new Error(`${phase} synthetic failure`), { code: `${phase}_FAILED`, details: phase === 'CANDIDATE_READY' ? { driftType: 'CONTENT_MAPPING_OR_SEMANTIC_DRIFT', driftSlots: [{ slot: 'services[0].title', plannedValue: 'Contenido local de prueba', renderedPresent: false }] } : undefined })
       await onPhase(phase, { semanticGenerationCalls: phase === 'BUSINESS_UNDERSTANDING_READY' ? 1 : phase === 'CONTENT_PLAN_READY' ? 2 : phase === 'EXPERIENCE_PLAN_READY' ? 3 : 3, correctionRounds: 2, candidateId: phase === 'CANDIDATE_READY' ? `candidate-${projectId}` : undefined })
     }
     return { executionPackage: packageFor(projectId) }
@@ -38,7 +38,7 @@ async function runCase(projectId, failureAt = null) {
   assert.equal(typeof report.semanticGenerationCalls, 'number')
   assert.notEqual(report.safeFailureMessage, undefined)
   assert.equal(JSON.stringify(report).includes('sk-live'), false)
-  if (failureAt) { assert.equal(report.lastCompletedPhase, phases[phases.indexOf(failureAt) - 1]); const expectedCategory = failureAt === 'QUALITY_PASS' ? 'QUALITY_FAILURE' : failureAt === 'PROMOTED' ? 'PROMOTION_FAILURE' : failureAt === 'CANDIDATE_READY' ? 'CANDIDATE_GENERATION_FAILURE' : `${failureAt}_FAILURE`; assert.equal(report.failureCategory, expectedCategory); assert.equal(result.newVersionId, null) }
+  if (failureAt) { assert.equal(report.lastCompletedPhase, phases[phases.indexOf(failureAt) - 1]); const expectedCategory = failureAt === 'QUALITY_PASS' ? 'QUALITY_FAILURE' : failureAt === 'PROMOTED' ? 'PROMOTION_FAILURE' : failureAt === 'CANDIDATE_READY' ? 'CANDIDATE_GENERATION_FAILURE' : `${failureAt}_FAILURE`; assert.equal(report.failureCategory, expectedCategory); assert.equal(result.newVersionId, null); if (failureAt === 'CANDIDATE_READY') { assert.equal(report.candidateGenerationDetails.errorCode, 'CANDIDATE_READY_FAILED'); assert.equal(report.candidateGenerationDetails.driftSlotCount, 1); assert.equal(report.candidateGenerationDetails.driftSlots[0].plannedPreview, 'Contenido local de prueba'); assert.equal(report.candidateGenerationDetails.driftSlots[0].plannedValueHash.length, 64); assert.equal(report.candidateGenerationDetails.driftSlots[0].renderedPresent, false); assert.equal(JSON.stringify(report).includes('<html'), false) } }
   else { assert.equal(report.lastCompletedPhase, 'PROMOTED'); assert.equal(report.candidateId, `candidate-${projectId}`); assert.equal(report.newVersionId, 'version-v0002'); assert.equal(registerCalls, 1) }
   return { result, report }
 }
