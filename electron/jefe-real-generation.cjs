@@ -2,7 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const { validateProductPlanning, validateGeneratedArtifact } = require('./jefe-product-planning.cjs')
 const { assertArtifactQuality, assertContentQuality } = require('./jefe-generator-quality.cjs')
-const { adaptSemanticGenerationSpec } = require('./jefe-semantic-generation-adapter.cjs')
+const { adaptSemanticGenerationSpec, buildContentSectionCatalog } = require('./jefe-semantic-generation-adapter.cjs')
 
 class MaterializationError extends Error {
   constructor(code, message, details = {}) { super(message); this.name = 'MaterializationError'; this.code = code; this.details = details }
@@ -44,15 +44,30 @@ function factoryArtifacts(project, capabilities) {
 function commercialLayoutV2(direction, brandName, action, logoAppPath = null, planning = null) {
   const content = planning?.content || {}
   const sections = planning?.experience?.sections || []
+  const catalog = buildContentSectionCatalog(content)
+  const catalogById = new Map(catalog.map((item) => [item.id, item]))
+  const descriptorFor = (section) => catalogById.get(section) || { id: section, role: section, kind: section, contentRef: section, label: section }
+  const sectionType = (section) => {
+    const descriptor = descriptorFor(section)
+    const values = [descriptor.contentRef, descriptor.role, descriptor.kind].map((value) => String(value || '').toLowerCase())
+    if (values.some((value) => value === 'hero')) return 'hero'
+    if (values.some((value) => value === 'services' || value === 'service' || value.includes('service-catalog'))) return 'services'
+    if (values.some((value) => value === 'trust' || value === 'proof')) return 'trust'
+    if (values.some((value) => value === 'faq' || value.includes('question'))) return 'faq'
+    if (values.some((value) => value === 'contact' || value === 'conversion' || value.includes('conversion-form'))) return 'contact'
+    if (values.some((value) => value === 'presentation' || value === 'narrative')) return 'presentation'
+    return 'other'
+  }
   const anchor = (value) => value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/gu, '').replace(/[^a-z0-9]+/gu, '-')
-  const label = (value) => value === 'inicio' ? 'Inicio' : value === 'faq' ? 'FAQ' : value === 'conversion' || value === 'contacto' ? 'Contacto' : value.charAt(0).toUpperCase() + value.slice(1)
+  const label = (value) => { const descriptor = descriptorFor(value); return descriptor.label || value.charAt(0).toUpperCase() + value.slice(1) }
+  const contactSection = sections.find((section) => sectionType(section) === 'contact') || sections[sections.length - 1] || 'contacto'
   const identity = logoAppPath ? `<span class="brand-identity"><img src="${escapeHtml(logoAppPath)}" alt="${escapeHtml(brandName)}"><strong>${escapeHtml(brandName)}</strong></span>` : `<strong>${escapeHtml(brandName)}</strong>`
-  const nav = sections.filter((item) => item !== 'inicio').map((item) => `<a href="#${anchor(item)}">${escapeHtml(label(item))}</a>`).join('')
+  const nav = sections.filter((item) => sectionType(item) !== 'hero').map((item) => `<a href="#${anchor(item)}">${escapeHtml(label(item))}</a>`).join('')
   const benefits = (content.services || content.benefits || []).map((item) => { const service = typeof item === 'string' ? { title: item, description: item } : item; return `<article class="benefit-card"><h3>${escapeHtml(service.title)}</h3><p>${escapeHtml(service.description)}</p>${service.value ? `<small>${escapeHtml(service.value)}</small>` : ''}</article>` }).join('')
   const trust = (content.trustItems || content.trust || []).map((item) => { const trustItem = typeof item === 'string' ? { title: 'Confianza', description: item } : item; return `<article class="trust-card"><h3>${escapeHtml(trustItem.title)}</h3><p>${escapeHtml(trustItem.description)}</p></article>` }).join('')
   const faq = (content.faq || []).map((item) => `<details><summary>${escapeHtml(item.question)}</summary><p>${escapeHtml(item.answer)}</p></details>`).join('')
   const form = `<form id="primary-contact"><label for="name">Nombre<input id="name" name="name" autocomplete="name"></label><label for="email">Email<input id="email" name="email" type="email" autocomplete="email"></label><button type="button">${escapeHtml(action)}</button></form>`
-  const renderSection = (section) => {
+  const renderSectionLegacy = (section) => {
     if (section === 'inicio') return `<section id="inicio" class="site-hero hero-${direction} ${direction === 'comercial' ? 'commercial-hero' : `${direction}-hero`}"><div><p class="eyebrow">${escapeHtml(content.hero?.eyebrow || content.contextual?.businessType || 'Propuesta')}</p><h1>${escapeHtml(content.hero?.title || content.title)}</h1><p class="lede">${escapeHtml(content.hero?.description || content.subtitle)}</p><a class="cta" href="#${anchor(sections.includes('conversion') ? 'conversion' : 'contacto')}">${escapeHtml(content.hero?.primaryCTA || action)}</a></div>${content.hero?.supportingNote ? `<aside class="hero-note"><strong>${escapeHtml(content.hero.supportingNote)}</strong></aside>` : ''}</section>`
     if (section === 'confianza' || section === 'comunidad') return `<section id="${section}" class="trust-grid"><div class="section-heading"><p class="eyebrow">Confianza</p><h2>${escapeHtml(content.trustItems?.[0]?.title || 'Criterios para avanzar')}</h2></div>${trust}</section>`
     if (section === 'faq') return `<section id="faq" class="faq-panel"><div class="section-heading"><p class="eyebrow">Preguntas frecuentes</p><h2>${escapeHtml(content.businessUnderstanding?.customerQuestions?.[0] || 'Preguntas para decidir')}</h2></div>${faq}</section>`
@@ -61,6 +76,15 @@ function commercialLayoutV2(direction, brandName, action, logoAppPath = null, pl
     return `<section id="${section}" class="feature-panel"><div class="section-heading"><p class="eyebrow">${escapeHtml(label(section))}</p><h2>${escapeHtml(content.businessUnderstanding?.businessModel || content.title || 'Contexto para avanzar')}</h2></div><div class="feature-copy"><p>${escapeHtml(content.hero?.description || content.subtitle || '')}</p><p>${escapeHtml(content.businessUnderstanding?.customerNeeds?.[0] || content.benefits?.[0] || '')}</p></div></section>`
   }
   const railClass = direction === 'expresiva' ? ' expressive-rail' : ''
+  const renderSection = (section) => {
+    const type = sectionType(section)
+    if (type === 'hero') return `<section id="${anchor(section)}" class="site-hero hero-${direction} ${direction === 'comercial' ? 'commercial-hero' : `${direction}-hero`}"><div><p class="eyebrow">${escapeHtml(content.hero?.eyebrow || content.contextual?.businessType || 'Propuesta')}</p><h1>${escapeHtml(content.hero?.title || content.title)}</h1><p class="lede">${escapeHtml(content.hero?.description || content.subtitle)}</p><a class="cta" href="#${anchor(contactSection)}">${escapeHtml(content.hero?.primaryCTA || action)}</a></div>${content.hero?.supportingNote ? `<aside class="hero-note"><strong>${escapeHtml(content.hero.supportingNote)}</strong></aside>` : ''}</section>`
+    if (type === 'trust') return `<section id="${anchor(section)}" class="trust-grid"><div class="section-heading"><p class="eyebrow">Confianza</p><h2>${escapeHtml(content.trustItems?.[0]?.title || 'Criterios para avanzar')}</h2></div>${trust}</section>`
+    if (type === 'faq') return `<section id="${anchor(section)}" class="faq-panel"><div class="section-heading"><p class="eyebrow">Preguntas frecuentes</p><h2>${escapeHtml(content.businessUnderstanding?.customerQuestions?.[0] || 'Preguntas para decidir')}</h2></div>${faq}</section>`
+    if (type === 'contact') return `<section id="${anchor(section)}" class="conversion-panel"><p class="eyebrow">Proximo paso</p><h2>${escapeHtml(action)}</h2>${form}</section>`
+    if (type === 'services') return `<section id="${anchor(section)}" class="benefit-grid"><div class="section-heading"><p class="eyebrow">${escapeHtml(label(section))}</p><h2>${escapeHtml(content.businessUnderstanding?.primaryGoal || content.title || 'Propuesta y alcance')}</h2></div>${benefits}</section>`
+    return renderSectionLegacy(section)
+  }
   return `<header class="site-nav${railClass}">${identity}<nav>${nav}</nav><button class="theme-toggle" type="button" aria-pressed="false">Cambiar tema</button></header><main class="site-main">${sections.map(renderSection).join('')}</main><footer>Una experiencia local pensada para avanzar con claridad.</footer>`
 }
 
