@@ -28,6 +28,8 @@ const specA = specFor(contentA, baseExperience)
 const specB = specFor(contentB, experienceB)
 assert.equal(adaptSemanticGenerationSpec(specA).planning.content.title, 'Hero semántico A.')
 assert.equal(adaptSemanticGenerationSpec(specB).planning.content.title, 'Hero semántico B.')
+assert.deepEqual(specA.planning.content.benefits, contentA.services)
+assert.notDeepEqual(specA.planning.content.benefits, source.project.planning.content.benefits)
 assert.notDeepEqual(specA.planning, specB.planning)
 
 async function materialize(spec, versionId) {

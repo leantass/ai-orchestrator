@@ -103,6 +103,29 @@ function compareGeneratedContent(planning, html) {
   const driftSlots = contentSlots.filter((item) => !artifactVisibleText.includes(item.plannedNormalized)).map((item) => ({ ...item, renderedPresent: false }))
   return { pass: driftSlots.length === 0, driftSlots, driftType: driftSlots.length ? 'CONTENT_MAPPING_OR_SEMANTIC_DRIFT' : null }
 }
+function grammarEntries(planning) {
+  const content = planning?.content || {}
+  return [
+    ['title', content.title, 'heading'], ['subtitle', content.subtitle, 'body'],
+    ...(Array.isArray(content.benefits) ? content.benefits.map((value, index) => [`benefits[${index}]`, value, 'body']) : []),
+    ...(Array.isArray(content.trust) ? content.trust.map((value, index) => [`trust[${index}]`, value, 'body']) : []),
+    ...(Array.isArray(content.faq) ? content.faq.flatMap((item, index) => [[`faq[${index}].question`, item?.question, 'question'], [`faq[${index}].answer`, item?.answer, 'answer']]) : []),
+    ['cta.label', content.ctas?.[0], 'cta'],
+  ]
+}
+function inspectGeneratedArtifactGrammar(planning) {
+  const placeholder = /lorem ipsum|placeholder|\[\s*(?:texto|completar|todo)|\b(?:tbd|n\/a)\b/iu
+  const truncated = /\.{2,}|…/u
+  const findings = []
+  for (const [slot, rawValue, kind] of grammarEntries(planning)) {
+    const value = String(rawValue ?? '').trim()
+    const startsValid = /^[a-záéíóúüñ¿¡]/iu.test(value)
+    const validText = Boolean(value) && !placeholder.test(value) && !truncated.test(value)
+    const terminalPunctuationValid = kind === 'heading' || kind === 'cta' ? validText : kind === 'question' ? /\?$/u.test(value) : /[.!?]$/u.test(value)
+    if (!validText || !startsValid || !terminalPunctuationValid) findings.push({ slot, valuePreview: value.slice(0, 160), startsValid, terminalPunctuationValid, expected: kind === 'heading' ? 'texto válido sin placeholder ni truncamiento; el punto final es opcional' : kind === 'cta' ? 'texto válido sin placeholder ni truncamiento; el punto final es opcional' : kind === 'question' ? 'pregunta válida terminada en ?' : 'texto válido, completo y con puntuación final' })
+  }
+  return findings
+}
 function digest(value) { return crypto.createHash('sha256').update(JSON.stringify(stable(value))).digest('hex').slice(0, 24) }
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable)
@@ -387,7 +410,8 @@ function validateGeneratedArtifact(planning, artifacts) {
   if (planning.content.trust.length && !trustSectionIds.some((id) => actualSections.includes(id) && new RegExp(`<section[^>]+id=["']${String(id).replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}["'][^>]*class=["'][^"']*trust`, 'iu').test(html))) fail('GENERATED_ARTIFACT_MISSING_TRUST', 'La confianza planificada no fue renderizada.')
   const customerText = [planning.content.title, planning.content.subtitle, ...planning.content.benefits, ...planning.content.trust, ...planning.content.faq.flatMap((item) => item.question === item.answer ? [item.question] : [item.question, item.answer])].map((item) => String(item).trim().toLowerCase())
   if (new Set(customerText).size !== customerText.length) fail('GENERATED_ARTIFACT_DUPLICATE_CONTENT', 'El contenido customer-facing contiene textos duplicados.')
-  if (customerText.some((item) => !/^[a-záéíóúüñ¿¡]/u.test(item) || !/[.!?]$/u.test(item))) fail('GENERATED_ARTIFACT_GRAMMAR', 'El contenido customer-facing no tiene frases completas.')
+  const grammarFindings = inspectGeneratedArtifactGrammar(planning)
+  if (grammarFindings.length) fail('GENERATED_ARTIFACT_GRAMMAR', 'El contenido customer-facing no tiene frases completas.', { grammarFindingCount: grammarFindings.length, grammarFindings })
   if (planning.build.traceability.length < 5) fail('GENERATED_ARTIFACT_TRACEABILITY', 'La trazabilidad del build es insuficiente.')
   if (planning.content.faq.length < 4) fail('GENERATED_ARTIFACT_FAQ_INCOMPLETE', 'El FAQ debe contener al menos cuatro preguntas concretas.')
   const customerTextForQuality = [planning.content.title, planning.content.subtitle, ...planning.content.benefits, ...planning.content.trust, ...planning.content.faq.flatMap((item) => [item.question, item.answer])].map((item) => String(item).trim())
@@ -403,4 +427,4 @@ function validateGeneratedArtifact(planning, artifacts) {
   return { ok: true, sections: planning.experience.sections.length, traceability: planning.build.traceability.length }
 }
 
-module.exports = { SCHEMA_VERSION, DIRECTIONS, PRODUCT_TYPES, ProductPlanningError, createProductPlanning, evolveProductPlanning, migrateLegacyPlanning, validateProductPlanning, validateGeneratedArtifact, compareGeneratedContent }
+module.exports = { SCHEMA_VERSION, DIRECTIONS, PRODUCT_TYPES, ProductPlanningError, createProductPlanning, evolveProductPlanning, migrateLegacyPlanning, validateProductPlanning, validateGeneratedArtifact, compareGeneratedContent, inspectGeneratedArtifactGrammar }
