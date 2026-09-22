@@ -40,5 +40,32 @@ const changedCta = compareGeneratedContent(planning, render((value) => value ===
 assert.equal(changedCta.pass, false)
 assert.ok(changedCta.driftSlots.some((item) => item.slot === 'cta.label'))
 
+const catalog = [
+  { id: 'inicio-principal', role: 'hero', kind: 'hero', contentRef: 'hero', required: true },
+  { id: 'oferta-opcional', role: 'services', kind: 'service-catalog', contentRef: 'services', required: false },
+  { id: 'prueba-opcional', role: 'trust', kind: 'proof', contentRef: 'trust', required: false },
+  { id: 'dudas', role: 'faq', kind: 'faq', contentRef: 'faq', required: false },
+  { id: 'accion-final', role: 'contact', kind: 'conversion-form', contentRef: 'contact', required: true },
+]
+const selective = structuredClone(planning)
+selective.content.sections = catalog
+selective.experience.sections = ['inicio-principal', 'dudas', 'accion-final']
+const selectiveHtml = `<main><h1>${entity(planning.content.hero.title)}</h1><p>${entity(planning.content.hero.description)}</p><section id="dudas">${planning.content.faq.map((item) => `<details><summary>${entity(item.question)}</summary><p>${entity(item.answer)}</p></details>`).join('')}</section><section id="accion-final"><button>${entity(planning.content.ctas[0])}</button></section></main>`
+const omittedOptional = compareGeneratedContent(selective, selectiveHtml)
+assert.equal(omittedOptional.pass, true)
+assert.deepEqual(omittedOptional.activeContentRefs, ['hero', 'faq', 'contact'])
+assert.deepEqual(omittedOptional.requiredContentRefs, ['hero', 'contact'])
+assert.deepEqual(omittedOptional.omittedOptionalContentRefs, ['services', 'trust'])
+const includedTrust = structuredClone(selective)
+includedTrust.experience.sections = ['inicio-principal', 'prueba-opcional', 'dudas', 'accion-final']
+const trustDrift = compareGeneratedContent(includedTrust, selectiveHtml)
+assert.equal(trustDrift.pass, false)
+assert.ok(trustDrift.driftSlots.some((item) => item.slot === 'trust[0]' && item.renderedPresent === false))
+const includedServices = structuredClone(selective)
+includedServices.experience.sections = ['inicio-principal', 'oferta-opcional', 'dudas', 'accion-final']
+const servicesDrift = compareGeneratedContent(includedServices, selectiveHtml)
+assert.equal(servicesDrift.pass, false)
+assert.ok(servicesDrift.driftSlots.some((item) => item.slot === 'services[0].title' && item.renderedPresent === false))
+
 await fs.rm(root, { recursive: true, force: true })
 console.log('PASS jefe-generated-artifact-content-drift-smoke: HTML entities/whitespace normalized; hero, service, FAQ and CTA semantic drift reported by exact slot')

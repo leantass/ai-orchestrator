@@ -31,6 +31,7 @@ assert.equal(adaptSemanticGenerationSpec(specB).planning.content.title, 'Hero se
 assert.deepEqual(specA.planning.content.benefits, contentA.services)
 assert.notDeepEqual(specA.planning.content.benefits, source.project.planning.content.benefits)
 assert.notDeepEqual(specA.planning, specB.planning)
+assert.throws(() => specFor(contentA, { ...baseExperience, sectionOrder: ['inicio', 'confianza', 'faq', 'contacto'] }), /omits a required content section/u)
 
 async function materialize(spec, versionId) {
   return generation.materializeProject({ project: { ...source.project, activeVersionId: versionId, runId: `run-${versionId}`, physicalPaths: { projectRoot: path.join(root, 'semantic-consumption', versionId), manifestPath: path.join(root, 'semantic-consumption', versionId, 'manifest.json'), deliveryPath: null }, versions: [{ ...source.project.versions[0], versionId, runId: `run-${versionId}` }] }, destinationRoot: root, capabilities: {}, profileContext: { generationMode: 'semantic_correction', semanticGenerationSpec: spec }, providedAssets: [] })

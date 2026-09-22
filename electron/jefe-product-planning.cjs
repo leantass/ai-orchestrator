@@ -87,21 +87,38 @@ function color(value) {
 function decodeHtmlEntities(value) { return String(value || '').replace(/&amp;/gu, '&').replace(/&lt;/gu, '<').replace(/&gt;/gu, '>').replace(/&quot;/gu, '"').replace(/&#39;/gu, "'").replace(/&#x27;/giu, "'").replace(/&#(\d+);/gu, (_match, code) => String.fromCodePoint(Number(code))) }
 function visibleArtifactText(html) { return decodeHtmlEntities(String(html || '').replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/giu, ' ').replace(/<[^>]+>/gu, ' ')).replace(/\s+/gu, ' ').trim().normalize('NFC').toLocaleLowerCase('es-AR') }
 function normalizeVisibleSlot(value) { return decodeHtmlEntities(String(value || '')).replace(/\s+/gu, ' ').trim().normalize('NFC').toLocaleLowerCase('es-AR') }
+function sectionCatalogForPlanning(planning) {
+  if (Array.isArray(planning?.content?.sections) && planning.content.sections.length) return planning.content.sections.map((item) => ({ id: item.id, role: item.role || item.id, kind: item.kind || item.id, contentRef: item.contentRef || item.id, required: item.required === true }))
+  const contracts = Array.isArray(planning?.build?.sectionContracts) ? planning.build.sectionContracts : []
+  return (planning?.experience?.sections || []).map((id) => { const contract = contracts.find((item) => item?.id === id) || {}; const component = String(contract.component || id).toLowerCase(); const legacyRefs = { inicio: 'hero', relato: 'presentation', servicios: 'services', confianza: 'trust', faq: 'faq', contacto: 'contact' }; const contentRef = legacyRefs[component] || (component === 'hero' ? 'hero' : component === 'conversion-form' ? 'contact' : component); return { id, role: component, kind: component, contentRef, required: true } })
+}
+function sectionRefMatches(item, refs) {
+  return [item?.contentRef, item?.role, item?.kind].some((value) => refs.has(String(value || '').toLowerCase()))
+}
 function plannedContentSlots(planning) {
   const content = planning?.content || {}
+  const activeIds = new Set(planning?.experience?.sections || [])
+  const catalog = sectionCatalogForPlanning(planning)
+  const active = catalog.filter((item) => activeIds.has(item.id))
+  const hasRef = (...refs) => active.some((item) => sectionRefMatches(item, new Set(refs.map((value) => value.toLowerCase()))))
   return [
-    ['hero.title', content.hero?.title || content.title], ['hero.subtitle', content.hero?.description || content.subtitle],
-    ...((content.services || content.benefits || []).flatMap((item, index) => { const service = typeof item === 'string' ? { title: item, description: item } : item; return [['services[' + index + '].title', service.title], ['services[' + index + '].description', service.description]] })),
-    ...((content.trustItems || content.trust || []).map((item, index) => ['trust[' + index + ']', typeof item === 'string' ? item : item.description])),
-    ...((content.faq || []).flatMap((item, index) => [['faq[' + index + '].question', item.question], ['faq[' + index + '].answer', item.answer]])),
-    ['cta.label', content.ctas?.[0]],
+    ...(hasRef('hero', 'presentation', 'narrative') ? [['hero.title', content.hero?.title || content.title], ['hero.subtitle', content.hero?.description || content.subtitle]] : []),
+    ...(hasRef('services', 'service', 'service-catalog') ? (content.services || content.benefits || []).flatMap((item, index) => { const service = typeof item === 'string' ? { title: item, description: item } : item; return [['services[' + index + '].title', service.title], ['services[' + index + '].description', service.description]] }) : []),
+    ...(hasRef('trust', 'proof') ? (content.trustItems || content.trust || []).map((item, index) => ['trust[' + index + ']', typeof item === 'string' ? item : item.description]) : []),
+    ...(hasRef('faq', 'question') ? (content.faq || []).flatMap((item, index) => [['faq[' + index + '].question', item.question], ['faq[' + index + '].answer', item.answer]]) : []),
+    ...(hasRef('contact', 'conversion', 'conversion-form') ? [['cta.label', content.ctas?.[0]]] : []),
   ].filter(([, value]) => value)
 }
 function compareGeneratedContent(planning, html) {
   const artifactVisibleText = visibleArtifactText(html)
+  const catalog = sectionCatalogForPlanning(planning)
+  const activeIds = new Set(planning?.experience?.sections || [])
+  const activeContentRefs = [...new Set(catalog.filter((item) => activeIds.has(item.id)).map((item) => item.contentRef))]
+  const requiredContentRefs = [...new Set(catalog.filter((item) => item.required).map((item) => item.contentRef))]
+  const omittedOptionalContentRefs = [...new Set(catalog.filter((item) => !item.required && !activeIds.has(item.id)).map((item) => item.contentRef))]
   const contentSlots = plannedContentSlots(planning).map(([slot, value]) => ({ slot, plannedValue: String(value), plannedNormalized: normalizeVisibleSlot(value) }))
   const driftSlots = contentSlots.filter((item) => !artifactVisibleText.includes(item.plannedNormalized)).map((item) => ({ ...item, renderedPresent: false }))
-  return { pass: driftSlots.length === 0, driftSlots, driftType: driftSlots.length ? 'CONTENT_MAPPING_OR_SEMANTIC_DRIFT' : null }
+  return { pass: driftSlots.length === 0, activeContentRefs, requiredContentRefs, omittedOptionalContentRefs, driftSlots, driftType: driftSlots.length ? 'CONTENT_MAPPING_OR_SEMANTIC_DRIFT' : null }
 }
 function grammarEntries(planning) {
   const content = planning?.content || {}
