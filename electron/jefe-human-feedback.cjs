@@ -13,6 +13,7 @@ function list(value) {
   if (value == null) return []
   if (!Array.isArray(value) || value.length > MAX_FINDINGS) throw new TypeError('findings must be an array.')
   return value.map((finding) => {
+    if (typeof finding === 'string') return { id: null, title: null, detail: finding, severity: null }
     if (!finding || typeof finding !== 'object') throw new TypeError('Each finding must be structured.')
     return {
       id: text(finding.id, 'finding.id', 80),
