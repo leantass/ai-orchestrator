@@ -15,10 +15,48 @@ const duplicateServices = { content: { ...base, services: [{ title: 'A', descrip
 const irrelevantFaq = { content: { ...healthy.content, faq: [{ question: '¿Qué incluye una agencia de marketing?', answer: 'Campañas y anuncios para vender más.' }] } }
 const genericTrust = { content: { ...healthy.content, trustItems: [{ title: 'Confianza', description: 'Una experiencia excelente para todos.' }] } }
 const rawAudienceHero = { content: { ...healthy.content, hero: { supportingNote: 'equipos de producto' } } }
+const genericHeading = { content: { ...healthy.content, hero: { ...healthy.content.hero, title: 'Experiencia construida alrededor de tu objetivo' } } }
+const emptyFaq = { content: { ...healthy.content, faq: [{ question: '¿Qué?', answer: 'Sí.' }] } }
+const genericTrustPhrase = { content: { ...healthy.content, trustItems: [{ title: 'Confianza', description: 'Confianza y calidad.' }] } }
+const realSemanticContent = {
+  content: {
+    ...healthy.content,
+    businessUnderstanding: {
+      ...understanding,
+      domainVocabulary: ['servicios profesionales'],
+      customerNeeds: ['avanzar con claridad'],
+      trustDrivers: ['criterios verificables'],
+    },
+    faq: [{
+      question: '¿Qué necesito aportar como cliente?',
+      answer: 'Disponibilidad para 2–3 sesiones breves, materiales de marca, textos base y referencias. Si hay requisitos técnicos, coordinar contacto con la persona responsable.',
+      source: 'businessUnderstanding.customerQuestions',
+    }],
+    trustItems: [
+      { title: 'Entregables', description: 'Entregables claros, versionados y con acta de acuerdos.', source: 'businessUnderstanding.trustDrivers' },
+      { title: 'Comunicación', description: 'Comunicación ordenada: agenda, un canal y resúmenes de cada hito.', source: 'businessUnderstanding.trustDrivers' },
+      { title: 'Ajustes', description: 'Una ronda de ajustes por etapa para proteger tiempos y calidad.', source: 'businessUnderstanding.trustDrivers' },
+    ],
+  },
+}
+const replayWithoutProvenance = {
+  content: {
+    ...realSemanticContent.content,
+    faq: realSemanticContent.content.faq.map(({ source, ...item }) => item),
+    trustItems: realSemanticContent.content.trustItems.map(({ source, ...item }) => item),
+  },
+}
+const invalidProvenance = { content: { ...realSemanticContent.content, faq: realSemanticContent.content.faq.map((item) => ({ ...item, source: 'untrusted.fixture' })) } }
 
 assert.equal(assessContentQuality(healthy).overallContentStatus, 'PASS')
-for (const [name, fixture] of [['duplicate-services', duplicateServices], ['irrelevant-faq', irrelevantFaq], ['generic-trust', genericTrust], ['raw-audience-hero', rawAudienceHero]]) {
+assert.equal(assessContentQuality(realSemanticContent).overallContentStatus, 'PASS')
+const replayReport = assessContentQuality(replayWithoutProvenance)
+assert.equal(replayReport.overallContentStatus, 'NEEDS_CORRECTION')
+assert.equal(replayReport.findings.filter((item) => item.category === 'faqRelevance').length, 1)
+assert.equal(replayReport.findings.filter((item) => item.category === 'trustRelevance').length, 3)
+assert.equal(assessContentQuality(invalidProvenance).overallContentStatus, 'NEEDS_CORRECTION')
+for (const [name, fixture] of [['duplicate-services', duplicateServices], ['irrelevant-faq', irrelevantFaq], ['generic-trust', genericTrust], ['raw-audience-hero', rawAudienceHero], ['generic-heading', genericHeading], ['empty-faq', emptyFaq], ['generic-trust-phrase', genericTrustPhrase]]) {
   const report = assessContentQuality(fixture)
   assert.equal(report.overallContentStatus, 'NEEDS_CORRECTION', `${name}: ${JSON.stringify(report.findings)}`)
 }
-console.log(JSON.stringify({ ok: true, smoke: 'jefe-semantic-content-quality', negativeCases: 4, healthyCases: 1 }, null, 2))
+console.log(JSON.stringify({ ok: true, smoke: 'jefe-semantic-content-quality', negativeCases: 7, healthyCases: 2, replayFindings: replayReport.findings.length, providerCalls: 0 }, null, 2))

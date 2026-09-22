@@ -89,6 +89,18 @@ function assessArtifact({ css, html, js = '', viewports = ['1440x900', '1024x768
 
 function words(value) { return new Set(String(value || '').toLocaleLowerCase('es-AR').normalize('NFD').replace(/[\u0300-\u036f]/gu, '').split(/[^a-z0-9]+/u).filter((item) => item.length > 3)) }
 function lexicalSimilarity(left, right) { const a = words(left); const b = words(right); const union = new Set([...a, ...b]); return union.size ? [...a].filter((item) => b.has(item)).length / union.size : 0 }
+const SEMANTIC_FAQ_SOURCES = new Set(['businessUnderstanding.customerQuestions', 'ContentPlanV2.faq'])
+const SEMANTIC_TRUST_SOURCES = new Set(['businessUnderstanding.trustDrivers', 'ContentPlanV2.trust'])
+function provenanceSource(item) {
+  if (typeof item?.source === 'string') return item.source
+  if (item?.source && typeof item.source === 'object' && typeof item.source.path === 'string') return item.source.path
+  return null
+}
+function hasValidProvenance(item, allowedSources) { return allowedSources.has(provenanceSource(item)) }
+function normalizedCopy(value) { return String(value || '').trim().toLocaleLowerCase('es-AR').normalize('NFD').replace(/[\u0300-\u036f]/gu, '').replace(/\s+/gu, ' ') }
+function hasPlaceholder(value) { return /lorem ipsum|placeholder|\[\s*(?:texto| completar|todo)|\b(?:tbd|n\/a)\b/iu.test(String(value || '')) }
+function hasAdministrativeBoilerplate(value) { return /^(?:informacion|informaci[oó]n|detalles|aspectos generales|preguntas frecuentes)\s*(?:administrativ[oa]s?)?\.?$/iu.test(normalizedCopy(value)) }
+function hasGenericTrustCopy(value) { return /^(?:confianza(?: y calidad)?|excelente servicio|la mejor experiencia|calidad para todos|una experiencia excelente para todos|calidad)$/iu.test(normalizedCopy(value)) }
 function assessContentQuality(planning) {
   const content = planning?.content || {}
   const understanding = content.businessUnderstanding || {}
@@ -101,11 +113,35 @@ function assessContentQuality(planning) {
   if (audience && String(content.hero?.supportingNote || '').trim().toLocaleLowerCase('es-AR') === audience) findings.push({ severity: 'error', category: 'relevance', selector: '.hero-note', expected: 'nota derivada de necesidades', actual: 'audiencia copiada literalmente' })
   const headings = [content.hero?.title, ...services.map((item) => item.title), ...((content.trustItems || []).map((item) => item.title))].filter(Boolean)
   if (headings.some((item) => /experiencia construida alrededor de tu objetivo|propuesta concreta para decidir con contexto|recorrido que se entiende antes de avanzar/iu.test(item))) findings.push({ severity: 'error', category: 'relevance', selector: 'heading', expected: 'heading del dominio', actual: 'heading genérico de plantilla' })
-  const vocabulary = words([...(understanding.domainVocabulary || []), ...(understanding.customerNeeds || []), understanding.businessType].join(' '))
   const faq = Array.isArray(content.faq) ? content.faq : []
-  for (const item of faq) if (vocabulary.size && ![...words(`${item.question} ${item.answer}`)].some((word) => vocabulary.has(word))) findings.push({ severity: 'error', category: 'faqRelevance', selector: 'faq', expected: 'pregunta relacionada al dominio', actual: item.question })
+  const faqSeen = new Set()
+  const vocabulary = words([...(understanding.domainVocabulary || []), ...(understanding.customerNeeds || []), understanding.businessType].join(' '))
+  if (faq.length === 0) findings.push({ severity: 'error', category: 'faqRelevance', selector: 'faq', expected: 'al menos una FAQ concreta', actual: 'sin preguntas frecuentes' })
+  for (const item of faq) {
+    const question = String(item?.question || '').trim()
+    const answer = String(item?.answer || '').trim()
+    const key = normalizedCopy(`${question}|${answer}`)
+    if (!question || !answer || question.length < 12 || answer.length < 30) findings.push({ severity: 'error', category: 'faqRelevance', selector: 'faq', expected: 'pregunta y respuesta concretas', actual: question || answer || 'contenido vacío' })
+    else if (!/[?？]/u.test(question)) findings.push({ severity: 'error', category: 'faqRelevance', selector: 'faq', expected: 'pregunta bien formada', actual: question })
+    else if (faqSeen.has(key)) findings.push({ severity: 'error', category: 'faqRelevance', selector: 'faq', expected: 'FAQ no duplicada', actual: question })
+    else if (hasPlaceholder(`${question} ${answer}`) || hasAdministrativeBoilerplate(question)) findings.push({ severity: 'error', category: 'faqRelevance', selector: 'faq', expected: 'contenido útil para el cliente', actual: question })
+    faqSeen.add(key)
+    if (!hasValidProvenance(item, SEMANTIC_FAQ_SOURCES) && vocabulary.size && ![...words(`${question} ${answer}`)].some((word) => vocabulary.has(word))) findings.push({ severity: 'error', category: 'faqRelevance', selector: 'faq', expected: 'pregunta relacionada al dominio', actual: question })
+  }
   const trustWords = words((understanding.trustDrivers || []).join(' '))
-  for (const item of content.trustItems || []) if (trustWords.size && ![...words(item.description)].some((word) => trustWords.has(word))) findings.push({ severity: 'error', category: 'trustRelevance', selector: '.trust-card', expected: 'driver de confianza', actual: item.description })
+  const trustItems = Array.isArray(content.trustItems) ? content.trustItems : []
+  const trustSeen = new Set()
+  if (trustItems.length === 0) findings.push({ severity: 'error', category: 'trustRelevance', selector: '.trust-card', expected: 'al menos una señal de confianza concreta', actual: 'sin señales de confianza' })
+  for (const item of trustItems) {
+    const title = String(item?.title || '').trim()
+    const description = String(item?.description || '').trim()
+    const key = normalizedCopy(`${title}|${description}`)
+    if (!title || !description || description.length < 24) findings.push({ severity: 'error', category: 'trustRelevance', selector: '.trust-card', expected: 'señal de confianza concreta', actual: description || title || 'contenido vacío' })
+    else if (trustSeen.has(key)) findings.push({ severity: 'error', category: 'trustRelevance', selector: '.trust-card', expected: 'señales no duplicadas', actual: description })
+    else if (hasPlaceholder(`${title} ${description}`) || hasGenericTrustCopy(title) || hasGenericTrustCopy(description)) findings.push({ severity: 'error', category: 'trustRelevance', selector: '.trust-card', expected: 'razón concreta para confiar', actual: description })
+    trustSeen.add(key)
+    if (!hasValidProvenance(item, SEMANTIC_TRUST_SOURCES) && trustWords.size && ![...words(description)].some((word) => trustWords.has(word))) findings.push({ severity: 'error', category: 'trustRelevance', selector: '.trust-card', expected: 'driver de confianza', actual: description })
+  }
   const groups = { relevance: findings.filter((item) => item.category === 'relevance'), repetition: findings.filter((item) => item.category === 'serviceDifferentiation' || item.category === 'relevance' && item.actual === 'audiencia copiada literalmente'), serviceDifferentiation: findings.filter((item) => item.category === 'serviceDifferentiation'), faqRelevance: findings.filter((item) => item.category === 'faqRelevance'), trustRelevance: findings.filter((item) => item.category === 'trustRelevance') }
   const result = Object.fromEntries(Object.entries(groups).map(([key, value]) => [key, { pass: value.length === 0, findings: value }]))
   return { contentQuality: result, overallContentStatus: findings.length === 0 ? 'PASS' : 'NEEDS_CORRECTION', findings }
