@@ -95,12 +95,22 @@ function sectionCatalogForPlanning(planning) {
 function sectionRefMatches(item, refs) {
   return [item?.contentRef, item?.role, item?.kind].some((value) => refs.has(String(value || '').toLowerCase()))
 }
+function resolveArtifactContentSelection(planning) {
+  const catalog = sectionCatalogForPlanning(planning)
+  const activeSectionIds = [...new Set(planning?.experience?.sections || [])]
+  const activeIds = new Set(activeSectionIds)
+  const normalizeRef = (value) => String(value || '').trim().toLowerCase()
+  const activeContentRefs = [...new Set(catalog.filter((item) => activeIds.has(item.id)).map((item) => normalizeRef(item.contentRef)).filter(Boolean))]
+  const requiredContentRefs = [...new Set(catalog.filter((item) => item.required).map((item) => normalizeRef(item.contentRef)).filter(Boolean))]
+  const omittedOptionalContentRefs = [...new Set(catalog.filter((item) => !item.required && !activeIds.has(item.id)).map((item) => normalizeRef(item.contentRef)).filter(Boolean))]
+  const expected = new Set([...activeContentRefs, ...requiredContentRefs])
+  const sectionIdsFor = (contentRef) => catalog.filter((item) => normalizeRef(item.contentRef) === normalizeRef(contentRef) && (activeIds.has(item.id) || item.required)).map((item) => item.id)
+  return { catalog, activeSectionIds, activeContentRefs, requiredContentRefs, omittedOptionalContentRefs, isContentRefExpected: (contentRef) => expected.has(normalizeRef(contentRef)), sectionIdsFor }
+}
 function plannedContentSlots(planning) {
   const content = planning?.content || {}
-  const activeIds = new Set(planning?.experience?.sections || [])
-  const catalog = sectionCatalogForPlanning(planning)
-  const active = catalog.filter((item) => activeIds.has(item.id))
-  const hasRef = (...refs) => active.some((item) => sectionRefMatches(item, new Set(refs.map((value) => value.toLowerCase()))))
+  const selection = resolveArtifactContentSelection(planning)
+  const hasRef = (...refs) => refs.some((ref) => selection.isContentRefExpected(ref)) || selection.catalog.some((item) => (refs.includes(String(item.contentRef).toLowerCase()) || sectionRefMatches(item, new Set(refs.map((value) => value.toLowerCase())))) && (selection.activeSectionIds.includes(item.id) || item.required))
   return [
     ...(hasRef('hero', 'presentation', 'narrative') ? [['hero.title', content.hero?.title || content.title], ['hero.subtitle', content.hero?.description || content.subtitle]] : []),
     ...(hasRef('services', 'service', 'service-catalog') ? (content.services || content.benefits || []).flatMap((item, index) => { const service = typeof item === 'string' ? { title: item, description: item } : item; return [['services[' + index + '].title', service.title], ['services[' + index + '].description', service.description]] }) : []),
@@ -111,23 +121,21 @@ function plannedContentSlots(planning) {
 }
 function compareGeneratedContent(planning, html) {
   const artifactVisibleText = visibleArtifactText(html)
-  const catalog = sectionCatalogForPlanning(planning)
-  const activeIds = new Set(planning?.experience?.sections || [])
-  const activeContentRefs = [...new Set(catalog.filter((item) => activeIds.has(item.id)).map((item) => item.contentRef))]
-  const requiredContentRefs = [...new Set(catalog.filter((item) => item.required).map((item) => item.contentRef))]
-  const omittedOptionalContentRefs = [...new Set(catalog.filter((item) => !item.required && !activeIds.has(item.id)).map((item) => item.contentRef))]
+  const { activeContentRefs, requiredContentRefs, omittedOptionalContentRefs } = resolveArtifactContentSelection(planning)
   const contentSlots = plannedContentSlots(planning).map(([slot, value]) => ({ slot, plannedValue: String(value), plannedNormalized: normalizeVisibleSlot(value) }))
   const driftSlots = contentSlots.filter((item) => !artifactVisibleText.includes(item.plannedNormalized)).map((item) => ({ ...item, renderedPresent: false }))
   return { pass: driftSlots.length === 0, activeContentRefs, requiredContentRefs, omittedOptionalContentRefs, driftSlots, driftType: driftSlots.length ? 'CONTENT_MAPPING_OR_SEMANTIC_DRIFT' : null }
 }
 function grammarEntries(planning) {
   const content = planning?.content || {}
+  const selection = resolveArtifactContentSelection(planning)
+  const expected = (...refs) => refs.some((ref) => selection.isContentRefExpected(ref))
   return [
-    ['title', content.title, 'heading'], ['subtitle', content.subtitle, 'body'],
-    ...(Array.isArray(content.benefits) ? content.benefits.map((value, index) => [`benefits[${index}]`, value, 'body']) : []),
-    ...(Array.isArray(content.trust) ? content.trust.map((value, index) => [`trust[${index}]`, value, 'body']) : []),
-    ...(Array.isArray(content.faq) ? content.faq.flatMap((item, index) => [[`faq[${index}].question`, item?.question, 'question'], [`faq[${index}].answer`, item?.answer, 'answer']]) : []),
-    ['cta.label', content.ctas?.[0], 'cta'],
+    ...(expected('hero', 'presentation', 'narrative') ? [['title', content.title, 'heading'], ['subtitle', content.subtitle, 'body']] : []),
+    ...(expected('services', 'service', 'service-catalog') && Array.isArray(content.benefits) ? content.benefits.map((value, index) => [`benefits[${index}]`, value, 'body']) : []),
+    ...(expected('trust', 'proof') && Array.isArray(content.trust) ? content.trust.map((value, index) => [`trust[${index}]`, value, 'body']) : []),
+    ...(expected('faq', 'question') && Array.isArray(content.faq) ? content.faq.flatMap((item, index) => [[`faq[${index}].question`, item?.question, 'question'], [`faq[${index}].answer`, item?.answer, 'answer']]) : []),
+    ...(expected('contact', 'conversion', 'conversion-form') ? [['cta.label', content.ctas?.[0], 'cta']] : []),
   ]
 }
 function inspectGeneratedArtifactGrammar(planning) {
@@ -142,6 +150,21 @@ function inspectGeneratedArtifactGrammar(planning) {
     if (!validText || !startsValid || !terminalPunctuationValid) findings.push({ slot, valuePreview: value.slice(0, 160), startsValid, terminalPunctuationValid, expected: kind === 'heading' ? 'texto válido sin placeholder ni truncamiento; el punto final es opcional' : kind === 'cta' ? 'texto válido sin placeholder ni truncamiento; el punto final es opcional' : kind === 'question' ? 'pregunta válida terminada en ?' : 'texto válido, completo y con puntuación final' })
   }
   return findings
+}
+function expectedArtifactCustomerText(planning) {
+  const content = planning?.content || {}
+  const selection = resolveArtifactContentSelection(planning)
+  const expected = (...refs) => refs.some((ref) => selection.isContentRefExpected(ref))
+  return [
+    ...(expected('hero', 'presentation', 'narrative') ? [content.title, content.subtitle] : []),
+    ...(expected('services', 'service', 'service-catalog') ? (content.benefits || []) : []),
+    ...(expected('trust', 'proof') ? (content.trust || []) : []),
+    ...(expected('faq', 'question') ? (content.faq || []).flatMap((item) => item.question === item.answer ? [item.question] : [item.question, item.answer]) : []),
+    ...(expected('contact', 'conversion', 'conversion-form') ? [content.ctas?.[0]] : []),
+  ].filter(Boolean).map((item) => String(item).trim().toLowerCase())
+}
+function presenceDetails(selection, contentRef) {
+  return { expectedContentRef: contentRef, expectedSectionIds: selection.sectionIdsFor(contentRef), activeContentRefs: selection.activeContentRefs, requiredContentRefs: selection.requiredContentRefs, omittedOptionalContentRefs: selection.omittedOptionalContentRefs }
 }
 function digest(value) { return crypto.createHash('sha256').update(JSON.stringify(stable(value))).digest('hex').slice(0, 24) }
 function stable(value) {
@@ -417,21 +440,24 @@ function validateGeneratedArtifact(planning, artifacts) {
   if (INVALID_UTF8_TEXT.test(html + '\n' + js)) fail('GENERATED_ARTIFACT_UTF8', 'El artefacto contiene corrupción UTF-8.')
   if (INTERNAL_TERMS.some((term) => term.test(html + '\n' + js))) fail('GENERATED_ARTIFACT_INTERNAL_LEAK', 'El artefacto filtra información interna.')
   const actualSections = [...html.matchAll(/<section[^>]+id=["']([a-z0-9-]+)["']/giu)].map((match) => match[1]); const plannedSections = planning.experience.sections
+  const selection = resolveArtifactContentSelection(planning)
+  const sectionBlocks = [...html.matchAll(/<section\b([^>]*)>([\s\S]*?)<\/section>/giu)].map((match) => ({ attrs: match[1], body: match[2], id: match[1].match(/\bid=["']([^"']+)["']/iu)?.[1] || null }))
+  const faqSectionIds = selection.sectionIdsFor('faq')
+  if (selection.isContentRefExpected('faq') && !faqSectionIds.some((id) => sectionBlocks.some((section) => section.id === id && /<details\b[\s\S]*?<summary\b/iu.test(section.body)))) fail('GENERATED_ARTIFACT_MISSING_FAQ', 'El FAQ planificado no fue renderizado.', presenceDetails(selection, 'faq'))
+  const trustSectionIds = selection.sectionIdsFor('trust')
+  if (selection.isContentRefExpected('trust') && !trustSectionIds.some((id) => sectionBlocks.some((section) => section.id === id && /\bclass=["'][^"']*trust[^"']*["']/iu.test(section.attrs)))) fail('GENERATED_ARTIFACT_MISSING_TRUST', 'La confianza planificada no fue renderizada.', presenceDetails(selection, 'trust'))
   if (actualSections.length !== plannedSections.length || new Set(actualSections).size !== actualSections.length || actualSections.some((item) => !plannedSections.includes(item))) fail('GENERATED_ARTIFACT_SECTION_DRIFT', 'Las secciones del artefacto no coinciden exactamente con ExperiencePlan.', { plannedSections, actualSections })
   const contentFidelity = compareGeneratedContent(planning, html); if (!contentFidelity.pass) fail('GENERATED_ARTIFACT_CONTENT_DRIFT', 'El artefacto no deriva del contenido planificado.', contentFidelity)
   const styleChecks = { links: /a\s*\{[^}]*text-decoration\s*:\s*none/iu.test(css), input: /input\s*\{[^}]*border\s*:/iu.test(css), button: /button\s*\{[^}]*appearance\s*:/iu.test(css), focus: /:focus-visible/iu.test(css), dark: /\[data-theme=["']dark["']\]/iu.test(css), responsive: /@media\s*\(/iu.test(css) }
   if (!Object.values(styleChecks).every(Boolean)) fail('GENERATED_ARTIFACT_DEFAULT_STYLE', 'El sistema visual no cubre estilos premium, foco, tema oscuro y responsive: ' + JSON.stringify(styleChecks), styleChecks)
   for (const token of Object.values(planning.visual.palette)) if (typeof token === 'string' && /^#/u.test(token) && !css.toUpperCase().includes(token.toUpperCase())) fail('GENERATED_ARTIFACT_TOKEN_DRIFT', 'Falta token visual ' + token + ' en CSS.')
-  if (planning.content.faq.length && !/<details[\s\S]*<summary/iu.test(html)) fail('GENERATED_ARTIFACT_MISSING_FAQ', 'El FAQ planificado no fue renderizado.')
-  const trustSectionIds = Array.isArray(planning.content.sections) ? planning.content.sections.filter((item) => [item?.contentRef, item?.role, item?.kind].some((value) => ['trust', 'proof'].includes(String(value || '').toLowerCase()))).map((item) => item.id) : ['confianza']
-  if (planning.content.trust.length && !trustSectionIds.some((id) => actualSections.includes(id) && new RegExp(`<section[^>]+id=["']${String(id).replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}["'][^>]*class=["'][^"']*trust`, 'iu').test(html))) fail('GENERATED_ARTIFACT_MISSING_TRUST', 'La confianza planificada no fue renderizada.')
-  const customerText = [planning.content.title, planning.content.subtitle, ...planning.content.benefits, ...planning.content.trust, ...planning.content.faq.flatMap((item) => item.question === item.answer ? [item.question] : [item.question, item.answer])].map((item) => String(item).trim().toLowerCase())
+  const customerText = expectedArtifactCustomerText(planning)
   if (new Set(customerText).size !== customerText.length) fail('GENERATED_ARTIFACT_DUPLICATE_CONTENT', 'El contenido customer-facing contiene textos duplicados.')
   const grammarFindings = inspectGeneratedArtifactGrammar(planning)
   if (grammarFindings.length) fail('GENERATED_ARTIFACT_GRAMMAR', 'El contenido customer-facing no tiene frases completas.', { grammarFindingCount: grammarFindings.length, grammarFindings })
   if (planning.build.traceability.length < 5) fail('GENERATED_ARTIFACT_TRACEABILITY', 'La trazabilidad del build es insuficiente.')
-  if (planning.content.faq.length < 4) fail('GENERATED_ARTIFACT_FAQ_INCOMPLETE', 'El FAQ debe contener al menos cuatro preguntas concretas.')
-  const customerTextForQuality = [planning.content.title, planning.content.subtitle, ...planning.content.benefits, ...planning.content.trust, ...planning.content.faq.flatMap((item) => [item.question, item.answer])].map((item) => String(item).trim())
+  if (selection.isContentRefExpected('faq') && planning.content.faq.length < 4) fail('GENERATED_ARTIFACT_FAQ_INCOMPLETE', 'El FAQ debe contener al menos cuatro preguntas concretas.')
+  const customerTextForQuality = expectedArtifactCustomerText(planning)
   if (customerTextForQuality.some((item) => /\.{2,}|…/u.test(item))) fail('GENERATED_ARTIFACT_TRUNCATED_TEXT', 'El contenido customer-facing contiene truncamientos o puntuación incompleta.')
   const manualForQuality = String(planning.brief.visualPreferences.manualBrandColors || '').toLocaleLowerCase('es-AR')
   if (/azul/iu.test(manualForQuality) && /marfil/iu.test(manualForQuality) && /(?:menta|verde)/iu.test(manualForQuality)) {
@@ -444,4 +470,4 @@ function validateGeneratedArtifact(planning, artifacts) {
   return { ok: true, sections: planning.experience.sections.length, traceability: planning.build.traceability.length }
 }
 
-module.exports = { SCHEMA_VERSION, DIRECTIONS, PRODUCT_TYPES, ProductPlanningError, createProductPlanning, evolveProductPlanning, migrateLegacyPlanning, validateProductPlanning, validateGeneratedArtifact, compareGeneratedContent, inspectGeneratedArtifactGrammar }
+module.exports = { SCHEMA_VERSION, DIRECTIONS, PRODUCT_TYPES, ProductPlanningError, createProductPlanning, evolveProductPlanning, migrateLegacyPlanning, validateProductPlanning, validateGeneratedArtifact, compareGeneratedContent, inspectGeneratedArtifactGrammar, resolveArtifactContentSelection }
