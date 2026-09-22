@@ -62,6 +62,8 @@ function requiredPlan(value, field, schemaVersion) {
   return value
 }
 function copy(value, fallback = '') { const clean = String(value ?? fallback).trim(); if (!clean) fail('SEMANTIC_CONTENT_REQUIRED'); return clean }
+function faqQuestion(value) { const clean = copy(value).replace(/\s+/gu, ' '); return `${clean.startsWith('¿') ? '' : '¿'}${clean.replace(/[?¿]+$/u, '')}?` }
+function faqAnswer(value) { const clean = copy(value).replace(/\s+/gu, ' '); return /[.!?]$/u.test(clean) ? clean : `${clean}.` }
 function sentence(value, fallback) {
   return copy(value, fallback)
 }
@@ -69,9 +71,14 @@ function question(value) {
   return copy(value)
 }
 function semanticFaq(value) {
-  if (value && typeof value === 'object') return { question: copy(value.question), answer: copy(value.answer), source: 'businessUnderstanding.customerQuestions' }
-  const exact = question(value)
-  return { question: exact, answer: exact, source: 'businessUnderstanding.customerQuestions' }
+  if (value && typeof value === 'object') {
+    if (Array.isArray(value) || Object.keys(value).sort().join('|') !== 'answer|question') fail('SEMANTIC_FAQ_OBJECT_INVALID')
+    const normalizedQuestion = faqQuestion(value.question); const normalizedAnswer = faqAnswer(value.answer)
+    if (normalizedQuestion === normalizedAnswer || /lorem ipsum|placeholder|\[\s*(?:texto|completar|todo)|\b(?:tbd|n\/a)\b/iu.test(normalizedAnswer)) fail('SEMANTIC_FAQ_CONTENT_INVALID')
+    return { question: normalizedQuestion, answer: normalizedAnswer, source: 'businessUnderstanding.customerQuestions' }
+  }
+  const exact = copy(value)
+  return { question: faqQuestion(exact), answer: faqAnswer(exact), source: 'businessUnderstanding.customerQuestions', legacy: true }
 }
 function semanticServices(values) {
   return values.map((value) => {
