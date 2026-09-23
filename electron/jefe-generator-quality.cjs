@@ -89,6 +89,31 @@ function assessArtifact({ css, html, js = '', viewports = ['1440x900', '1024x768
 
 function words(value) { return new Set(String(value || '').toLocaleLowerCase('es-AR').normalize('NFD').replace(/[\u0300-\u036f]/gu, '').split(/[^a-z0-9]+/u).filter((item) => item.length > 3)) }
 function lexicalSimilarity(left, right) { const a = words(left); const b = words(right); const union = new Set([...a, ...b]); return union.size ? [...a].filter((item) => b.has(item)).length / union.size : 0 }
+function artifactSectionCopy(html) {
+  const decode = (value) => String(value || '').replace(/&amp;/gu, '&').replace(/&lt;/gu, '<').replace(/&gt;/gu, '>').replace(/&quot;/gu, '"').replace(/&#39;/gu, "'").replace(/<[^>]+>/gu, ' ').replace(/\s+/gu, ' ').trim()
+  return [...String(html || '').matchAll(/<section\b[^>]*\bid=["']([^"']+)["'][^>]*>([\s\S]*?)<\/section>/giu)].map((match) => {
+    const source = match[2]
+    const heading = decode(source.match(/<(?:h1|h2|h3)\b[^>]*>([\s\S]*?)<\/(?:h1|h2|h3)>/iu)?.[1] || '')
+    const body = [...source.matchAll(/<p\b([^>]*)>([\s\S]*?)<\/p>/giu)].filter((item) => !/\beyebrow\b/iu.test(item[1])).map((item) => decode(item[2])).filter(Boolean).join(' ')
+    return { sectionId: match[1], heading, body }
+  })
+}
+function repetitionNormalization(value) { return String(value || '').toLocaleLowerCase('es-AR').normalize('NFD').replace(/[\u0300-\u036f]/gu, '').replace(/\s+/gu, ' ').trim() }
+function assessCrossSectionRepetition({ html } = {}) {
+  const sections = artifactSectionCopy(html)
+  const findings = []
+  const add = (sectionA, sectionB, expected, actual, similarity) => findings.push({ category: 'crossSectionRepetition', sectionA, sectionB, expected, actual, similarity: Number(similarity.toFixed(3)) })
+  for (let index = 0; index < sections.length; index += 1) for (let other = index + 1; other < sections.length; other += 1) {
+    const left = sections[index]; const right = sections[other]
+    const headingEqual = left.heading && right.heading && repetitionNormalization(left.heading) === repetitionNormalization(right.heading)
+    const bodyEqual = left.body.length > 20 && right.body.length > 20 && repetitionNormalization(left.body) === repetitionNormalization(right.body)
+    const combined = lexicalSimilarity(`${left.heading} ${left.body}`, `${right.heading} ${right.body}`)
+    if (headingEqual) add(left.sectionId, right.sectionId, 'headings distintos entre secciones', left.heading, 1)
+    if (bodyEqual) add(left.sectionId, right.sectionId, 'cuerpos distintos entre secciones', left.body.slice(0, 300), 1)
+    if (!headingEqual && !bodyEqual && combined >= 0.88) add(left.sectionId, right.sectionId, 'contenido principal diferenciado', `${left.heading} ${left.body}`.slice(0, 300), combined)
+  }
+  return { schemaVersion: 'cross-section-repetition/v1', status: findings.length ? 'NEEDS_CORRECTION' : 'PASS', pass: findings.length === 0, findingCount: findings.length, findings, sections: sections.map((item) => ({ sectionId: item.sectionId, heading: item.heading.slice(0, 160), bodyPreview: item.body.slice(0, 160) })) }
+}
 const SEMANTIC_FAQ_SOURCES = new Set(['businessUnderstanding.customerQuestions', 'ContentPlanV2.faq'])
 const SEMANTIC_TRUST_SOURCES = new Set(['businessUnderstanding.trustDrivers', 'ContentPlanV2.trust'])
 function provenanceSource(item) {
@@ -162,4 +187,4 @@ function snapshotFiles(root, relativePaths) {
   return Object.fromEntries(relativePaths.map((relativePath) => [relativePath, fs.readFileSync(`${root}/${relativePath}`).toString('hex')]))
 }
 
-module.exports = { WCAG_THRESHOLDS, contrastRatio, parseTokens, assessTheme, assessArtifact, assertArtifactQuality, assessContentQuality, assertContentQuality, snapshotFiles }
+module.exports = { WCAG_THRESHOLDS, contrastRatio, parseTokens, assessTheme, assessArtifact, assessCrossSectionRepetition, artifactSectionCopy, assertArtifactQuality, assessContentQuality, assertContentQuality, snapshotFiles }

@@ -2,7 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const { validateProductPlanning, validateGeneratedArtifact } = require('./jefe-product-planning.cjs')
 const { assertArtifactQuality, assertContentQuality } = require('./jefe-generator-quality.cjs')
-const { adaptSemanticGenerationSpec, buildContentSectionCatalog } = require('./jefe-semantic-generation-adapter.cjs')
+const { adaptSemanticGenerationSpec, buildContentSectionCatalog, canonicalSemanticContentRef, validateSemanticContentCatalog } = require('./jefe-semantic-generation-adapter.cjs')
 
 class MaterializationError extends Error {
   constructor(code, message, details = {}) { super(message); this.name = 'MaterializationError'; this.code = code; this.details = details }
@@ -44,12 +44,14 @@ function factoryArtifacts(project, capabilities) {
 function commercialLayoutV2(direction, brandName, action, logoAppPath = null, planning = null) {
   const content = planning?.content || {}
   const sections = planning?.experience?.sections || []
-  const catalog = buildContentSectionCatalog(content)
+  const semanticMode = planning?.semanticRefs?.contentPlan === 'ContentPlanV2'
+  const catalog = buildContentSectionCatalog(content, { validate: semanticMode })
+  if (semanticMode) validateSemanticContentCatalog(catalog)
   const catalogById = new Map(catalog.map((item) => [item.id, item]))
   const descriptorFor = (section) => catalogById.get(section) || { id: section, role: section, kind: section, contentRef: section, label: section }
   const sectionType = (section) => {
     const descriptor = descriptorFor(section)
-    const values = [descriptor.contentRef, descriptor.role, descriptor.kind].map((value) => String(value || '').toLowerCase())
+    const values = [canonicalSemanticContentRef(descriptor.contentRef), canonicalSemanticContentRef(descriptor.role), canonicalSemanticContentRef(descriptor.kind), descriptor.contentRef, descriptor.role, descriptor.kind].map((value) => String(value || '').toLowerCase())
     if (values.some((value) => value === 'hero')) return 'hero'
     if (values.some((value) => value === 'services' || value === 'service' || value.includes('service-catalog'))) return 'services'
     if (values.some((value) => value === 'trust' || value === 'proof')) return 'trust'
@@ -82,7 +84,9 @@ function commercialLayoutV2(direction, brandName, action, logoAppPath = null, pl
     if (type === 'trust') return `<section id="${anchor(section)}" class="trust-grid"><div class="section-heading"><p class="eyebrow">Confianza</p><h2>${escapeHtml(content.trustItems?.[0]?.title || 'Criterios para avanzar')}</h2></div>${trust}</section>`
     if (type === 'faq') return `<section id="${anchor(section)}" class="faq-panel"><div class="section-heading"><p class="eyebrow">Preguntas frecuentes</p><h2>${escapeHtml(content.businessUnderstanding?.customerQuestions?.[0] || 'Preguntas para decidir')}</h2></div>${faq}</section>`
     if (type === 'contact') return `<section id="${anchor(section)}" class="conversion-panel"><p class="eyebrow">Proximo paso</p><h2>${escapeHtml(action)}</h2>${form}</section>`
+    if (type === 'presentation') return `<section id="${anchor(section)}" class="feature-panel"><div class="section-heading"><p class="eyebrow">${escapeHtml(label(section))}</p><h2>${escapeHtml(label(section) || 'Presentación')}</h2></div><div class="feature-copy"><p>${escapeHtml(content.presentation || content.subtitle || '')}</p></div></section>`
     if (type === 'services') return `<section id="${anchor(section)}" class="benefit-grid"><div class="section-heading"><p class="eyebrow">${escapeHtml(label(section))}</p><h2>${escapeHtml(content.businessUnderstanding?.primaryGoal || content.title || 'Propuesta y alcance')}</h2></div>${benefits}</section>`
+    if (semanticMode) fail('UNSUPPORTED_SEMANTIC_SECTION_CONTENT', 'La sección semántica no tiene un renderer de contenido soportado.', { sectionId: section, role: descriptorFor(section).role, kind: descriptorFor(section).kind, contentRef: descriptorFor(section).contentRef })
     return renderSectionLegacy(section)
   }
   return `<header class="site-nav${railClass}">${identity}<nav>${nav}</nav><button class="theme-toggle" type="button" aria-pressed="false">Cambiar tema</button></header><main class="site-main">${sections.map(renderSection).join('')}</main><footer>Una experiencia local pensada para avanzar con claridad.</footer>`

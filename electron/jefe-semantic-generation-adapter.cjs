@@ -3,9 +3,36 @@ const { validateProductPlanning } = require('./jefe-product-planning.cjs')
 
 function hash(value) { return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex') }
 function fail(message) { throw Object.assign(new Error(message), { code: 'INVALID_SEMANTIC_GENERATION_SPEC' }) }
-function buildContentSectionCatalog(contentPlan) {
+function contractFail(code, message, details = {}) { throw Object.assign(new Error(message), { code, details }) }
+const SEMANTIC_CONTENT_REFS = new Set(['hero', 'presentation', 'services', 'trust', 'faq', 'contact'])
+function canonicalSemanticContentRef(value) {
+  const normalized = String(value || '').trim().toLowerCase()
+  const aliases = new Map([
+    ['hero', 'hero'], ['home-hero', 'hero'], ['portada', 'hero'], ['encabezado', 'hero'],
+    ['presentation', 'presentation'], ['narrative', 'presentation'], ['value-prop', 'presentation'], ['propuesta-valor', 'presentation'], ['propuesta de valor', 'presentation'],
+    ['services', 'services'], ['service', 'services'], ['service-catalog', 'services'], ['packages-overview', 'services'], ['services-overview', 'services'], ['servicios-resumen', 'services'],
+    ['trust', 'trust'], ['proof', 'trust'], ['trust-drivers', 'trust'],
+    ['faq', 'faq'], ['question', 'faq'],
+    ['contact', 'contact'], ['conversion', 'contact'], ['conversion-form', 'contact']
+  ])
+  return aliases.get(normalized) || null
+}
+function validateSemanticContentCatalog(catalog) {
+  const seen = new Map()
+  for (const item of catalog) {
+    const refs = [item.contentRef, item.role, item.kind].map(canonicalSemanticContentRef).filter(Boolean)
+    const canonical = canonicalSemanticContentRef(item.contentRef) || refs[0]
+    if (!canonical || !SEMANTIC_CONTENT_REFS.has(canonical)) contractFail('UNSUPPORTED_SEMANTIC_SECTION_CONTENT', 'La sección semántica no tiene un contrato de contenido soportado.', { sectionId: item.id, role: item.role, kind: item.kind, contentRef: item.contentRef })
+    if (refs.some((ref) => ref !== canonical)) contractFail('SEMANTIC_SECTION_CONTENT_MISMATCH', 'role, kind y contentRef no resuelven al mismo contrato semántico.', { sectionId: item.id, role: item.role, kind: item.kind, contentRef: item.contentRef })
+    if (seen.has(canonical)) contractFail('DUPLICATE_SEMANTIC_CONTENT_REF', 'Varias secciones semánticas dependen del mismo payload sin contenido independiente.', { sectionId: item.id, duplicateOf: seen.get(canonical), contentRef: canonical, role: item.role, kind: item.kind })
+    seen.set(canonical, item.id)
+  }
+  return catalog
+}
+function buildContentSectionCatalog(contentPlan, { validate = true } = {}) {
   if (Array.isArray(contentPlan?.sections) && contentPlan.sections.length > 0) {
-    return contentPlan.sections.map((item) => ({ id: item.id, role: item.role || item.id, label: item.label || item.id, kind: item.kind || item.id, required: item.required === true, contentRef: item.contentRef || item.id, ...(Array.isArray(item.aliases) ? { aliases: item.aliases } : {}) }))
+    const catalog = contentPlan.sections.map((item) => ({ id: item.id, role: item.role || item.id, label: item.label || item.id, kind: item.kind || item.id, required: item.required === true, contentRef: item.contentRef || item.id, ...(Array.isArray(item.aliases) ? { aliases: item.aliases } : {}) }))
+    return validate ? validateSemanticContentCatalog(catalog) : catalog
   }
   const fields = [
     ['inicio', 'hero', 'hero', 'hero', 'hero'],
@@ -114,7 +141,7 @@ function adaptSemanticPlansToPlanning({ sourcePlanning, businessUnderstanding, c
   if (!content.hero || !content.presentation || !services.length || !trust.length || faq.length < 4 || !content.contact) fail('ContentPlanV2 customer-facing content is incomplete.')
   const nextBrief = { ...sourcePlanning.brief, audience: bu.audience || sourcePlanning.brief.audience, objective: bu.primaryGoal || sourcePlanning.brief.objective }
   const nextStrategy = { ...sourcePlanning.strategy, audience: bu.audience || sourcePlanning.strategy.audience, primaryMessage: sentence(content.hero, sourcePlanning.strategy.primaryMessage) }
-  const nextContent = { ...sourcePlanning.content, title: sentence(content.hero, sourcePlanning.content.title), subtitle: bodySentence(content.presentation, sourcePlanning.content.subtitle), benefits: services.map((item) => item.description), services, trust, trustItems, faq, ctas: [sentence(content.contact, sourcePlanning.content.ctas[0])], contact: { ...sourcePlanning.content.contact, title: sentence(content.contact, sourcePlanning.content.contact.title), description: bodySentence(content.contact, sourcePlanning.content.contact.description), primaryAction: sentence(content.contact, sourcePlanning.content.ctas[0]), source: 'ContentPlanV2.contact' }, hero: { ...sourcePlanning.content.hero, title: sentence(content.hero, sourcePlanning.content.title), description: bodySentence(content.presentation, sourcePlanning.content.subtitle), primaryCTA: sentence(content.contact, sourcePlanning.content.ctas[0]), source: 'ContentPlanV2.hero' }, businessUnderstanding: { ...bu, schemaVersion: 'business-understanding-v2' } }
+  const nextContent = { ...sourcePlanning.content, title: sentence(content.hero, sourcePlanning.content.title), presentation: bodySentence(content.presentation, sourcePlanning.content.subtitle), subtitle: bodySentence(content.presentation, sourcePlanning.content.subtitle), benefits: services.map((item) => item.description), services, trust, trustItems, faq, ctas: [sentence(content.contact, sourcePlanning.content.ctas[0])], contact: { ...sourcePlanning.content.contact, title: sentence(content.contact, sourcePlanning.content.contact.title), description: bodySentence(content.contact, sourcePlanning.content.contact.description), primaryAction: sentence(content.contact, sourcePlanning.content.ctas[0]), source: 'ContentPlanV2.contact' }, hero: { ...sourcePlanning.content.hero, title: sentence(content.hero, sourcePlanning.content.title), description: bodySentence(content.presentation, sourcePlanning.content.subtitle), primaryCTA: sentence(content.contact, sourcePlanning.content.ctas[0]), source: 'ContentPlanV2.hero' }, businessUnderstanding: { ...bu, schemaVersion: 'business-understanding-v2' } }
   nextContent.sections = content.sections
   const ctaPositions = resolveSectionOrder(experience.ctaPositions, sourcePlanning, 'ExperiencePlanV2 ctaPositions', catalog)
   const nextExperience = { ...sourcePlanning.experience, sections, navigation: sections.filter((item) => item !== 'inicio'), forms: [{ fields: ['name', 'email'], submitAction: sentence(content.contact, sourcePlanning.content.ctas[0]), persistence: 'local_only' }], responsive: true, archetype: experience.archetype, heroVariant: experience.heroVariant, sectionTreatments: experience.sectionTreatments, contentDensity: experience.contentDensity, ctaPositions, servicesTreatment: experience.servicesTreatment, trustTreatment: experience.trustTreatment, faqTreatment: experience.faqTreatment, conversionStrategy: experience.conversionStrategy }
@@ -136,4 +163,4 @@ function adaptSemanticGenerationSpec(spec) {
   const ctaPositions = spec.ctaPositions === undefined ? undefined : resolveSectionOrder(spec.ctaPositions, spec.planning, 'ctaPositions')
   return { schemaVersion: 'normalized-generation-plan-v1', planning: spec.planning, sectionOrder, heroVariant: spec.heroVariant, treatments: [...(spec.treatments || [])], ...(ctaPositions ? { ctaPositions } : {}), creativeDirection: spec.creativeDirection || null, contentDensity: spec.contentDensity || 'balanced', ctaStrategy: spec.ctaStrategy || null, preservedQualities: [...(spec.preservedQualities || [])], prohibitedChanges: [...(spec.prohibitedChanges || [])], semanticGenerationSpecHash: hash(spec) }
 }
-module.exports = { adaptSemanticGenerationSpec, adaptSemanticPlansToPlanning, bodySentence, buildContentSectionCatalog, contentSectionCatalogHash }
+module.exports = { adaptSemanticGenerationSpec, adaptSemanticPlansToPlanning, bodySentence, buildContentSectionCatalog, canonicalSemanticContentRef, contentSectionCatalogHash, validateSemanticContentCatalog }
