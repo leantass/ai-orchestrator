@@ -67,6 +67,10 @@ function faqAnswer(value) { const clean = copy(value).replace(/\s+/gu, ' '); ret
 function sentence(value, fallback) {
   return copy(value, fallback)
 }
+function bodySentence(value, fallback) {
+  const clean = copy(value, fallback).replace(/\s+/gu, ' ')
+  return /[.!?]$/u.test(clean) ? clean : `${clean}.`
+}
 function question(value) {
   return copy(value)
 }
@@ -82,13 +86,13 @@ function semanticFaq(value) {
 }
 function semanticServices(values) {
   return values.map((value) => {
-    if (value && typeof value === 'object') return { title: copy(value.title), description: copy(value.description), source: 'brief.services', ...(value.value ? { value: copy(value.value) } : {}) }
+    if (value && typeof value === 'object') return { title: copy(value.title), description: bodySentence(value.description), source: 'brief.services', ...(value.value ? { value: copy(value.value) } : {}) }
     const exact = copy(value)
-    return { title: exact, description: exact, source: 'brief.services' }
+    return { title: exact, description: bodySentence(exact), source: 'brief.services' }
   })
 }
 function semanticTrust(values, businessUnderstanding) {
-  return values.map((value, index) => value && typeof value === 'object' ? { title: copy(value.title), description: copy(value.description), source: 'businessUnderstanding.trustDrivers' } : { title: `Criterio ${index + 1}`, description: copy(value), source: 'businessUnderstanding.trustDrivers' })
+  return values.map((value, index) => value && typeof value === 'object' ? { title: copy(value.title), description: bodySentence(value.description), source: 'businessUnderstanding.trustDrivers' } : { title: `Criterio ${index + 1}`, description: bodySentence(value), source: 'businessUnderstanding.trustDrivers' })
 }
 function buildSectionContracts(sections) {
   return sections.map((section) => ({ id: section, component: section === 'inicio' ? 'hero' : section === 'contacto' ? 'conversion-form' : section, source: `ExperiencePlan.sections.${section}`, qaCriteria: 'section exists exactly once and is customer-facing' }))
@@ -104,13 +108,13 @@ function adaptSemanticPlansToPlanning({ sourcePlanning, businessUnderstanding, c
   const sections = resolveSectionOrder(experience.sectionOrder, sourcePlanning, 'ExperiencePlanV2 sectionOrder', catalog)
   if (catalog.some((item) => item.required && !sections.includes(item.id))) fail('ExperiencePlanV2 omits a required content section.')
   const services = semanticServices(content.services)
-  const trust = content.trust.map((item) => sentence(item, 'Criterio explicado para avanzar'))
+  const trust = content.trust.map((item) => bodySentence(item, 'Criterio explicado para avanzar'))
   const trustItems = semanticTrust(content.trust, bu)
   const faq = content.faq.map((item, index) => semanticFaq(item, bu, index))
   if (!content.hero || !content.presentation || !services.length || !trust.length || faq.length < 4 || !content.contact) fail('ContentPlanV2 customer-facing content is incomplete.')
   const nextBrief = { ...sourcePlanning.brief, audience: bu.audience || sourcePlanning.brief.audience, objective: bu.primaryGoal || sourcePlanning.brief.objective }
   const nextStrategy = { ...sourcePlanning.strategy, audience: bu.audience || sourcePlanning.strategy.audience, primaryMessage: sentence(content.hero, sourcePlanning.strategy.primaryMessage) }
-  const nextContent = { ...sourcePlanning.content, title: sentence(content.hero, sourcePlanning.content.title), subtitle: sentence(content.presentation, sourcePlanning.content.subtitle), benefits: services.map((item) => item.description), services, trust, trustItems, faq, ctas: [sentence(content.contact, sourcePlanning.content.ctas[0])], contact: { ...sourcePlanning.content.contact, title: sentence(content.contact, sourcePlanning.content.contact.title), description: sentence(content.contact, sourcePlanning.content.contact.description), primaryAction: sentence(content.contact, sourcePlanning.content.ctas[0]), source: 'ContentPlanV2.contact' }, hero: { ...sourcePlanning.content.hero, title: sentence(content.hero, sourcePlanning.content.title), description: sentence(content.presentation, sourcePlanning.content.subtitle), primaryCTA: sentence(content.contact, sourcePlanning.content.ctas[0]), source: 'ContentPlanV2.hero' }, businessUnderstanding: { ...bu, schemaVersion: 'business-understanding-v2' } }
+  const nextContent = { ...sourcePlanning.content, title: sentence(content.hero, sourcePlanning.content.title), subtitle: bodySentence(content.presentation, sourcePlanning.content.subtitle), benefits: services.map((item) => item.description), services, trust, trustItems, faq, ctas: [sentence(content.contact, sourcePlanning.content.ctas[0])], contact: { ...sourcePlanning.content.contact, title: sentence(content.contact, sourcePlanning.content.contact.title), description: bodySentence(content.contact, sourcePlanning.content.contact.description), primaryAction: sentence(content.contact, sourcePlanning.content.ctas[0]), source: 'ContentPlanV2.contact' }, hero: { ...sourcePlanning.content.hero, title: sentence(content.hero, sourcePlanning.content.title), description: bodySentence(content.presentation, sourcePlanning.content.subtitle), primaryCTA: sentence(content.contact, sourcePlanning.content.ctas[0]), source: 'ContentPlanV2.hero' }, businessUnderstanding: { ...bu, schemaVersion: 'business-understanding-v2' } }
   nextContent.sections = content.sections
   const ctaPositions = resolveSectionOrder(experience.ctaPositions, sourcePlanning, 'ExperiencePlanV2 ctaPositions', catalog)
   const nextExperience = { ...sourcePlanning.experience, sections, navigation: sections.filter((item) => item !== 'inicio'), forms: [{ fields: ['name', 'email'], submitAction: sentence(content.contact, sourcePlanning.content.ctas[0]), persistence: 'local_only' }], responsive: true, archetype: experience.archetype, heroVariant: experience.heroVariant, sectionTreatments: experience.sectionTreatments, contentDensity: experience.contentDensity, ctaPositions, servicesTreatment: experience.servicesTreatment, trustTreatment: experience.trustTreatment, faqTreatment: experience.faqTreatment, conversionStrategy: experience.conversionStrategy }
@@ -132,4 +136,4 @@ function adaptSemanticGenerationSpec(spec) {
   const ctaPositions = spec.ctaPositions === undefined ? undefined : resolveSectionOrder(spec.ctaPositions, spec.planning, 'ctaPositions')
   return { schemaVersion: 'normalized-generation-plan-v1', planning: spec.planning, sectionOrder, heroVariant: spec.heroVariant, treatments: [...(spec.treatments || [])], ...(ctaPositions ? { ctaPositions } : {}), creativeDirection: spec.creativeDirection || null, contentDensity: spec.contentDensity || 'balanced', ctaStrategy: spec.ctaStrategy || null, preservedQualities: [...(spec.preservedQualities || [])], prohibitedChanges: [...(spec.prohibitedChanges || [])], semanticGenerationSpecHash: hash(spec) }
 }
-module.exports = { adaptSemanticGenerationSpec, adaptSemanticPlansToPlanning, buildContentSectionCatalog, contentSectionCatalogHash }
+module.exports = { adaptSemanticGenerationSpec, adaptSemanticPlansToPlanning, bodySentence, buildContentSectionCatalog, contentSectionCatalogHash }
