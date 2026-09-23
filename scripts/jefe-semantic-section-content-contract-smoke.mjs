@@ -7,6 +7,7 @@ import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
 const { createFirstVersionFromRun } = require('../electron/jefe-project-creation.cjs')
 const { adaptSemanticPlansToPlanning } = require('../electron/jefe-semantic-generation-adapter.cjs')
+const { CONTENT_PLAN_SCHEMA, validateContentPlanDecision, validateStructuredOutputSchema } = require('../electron/jefe-semantic-provider.cjs')
 const { assessCrossSectionRepetition } = require('../electron/jefe-generator-quality.cjs')
 const { evaluateCandidate } = require('../electron/jefe-semantic-quality-promotion.cjs')
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'jefe-section-content-contract-'))
@@ -24,6 +25,13 @@ const content = {
   ]
 }
 const experience = { schemaVersion: 'experience-plan-v2', sectionOrder: content.sections.map((item) => item.id), ctaPositions: ['inicio-principal', 'accion-final'], archetype: 'guided', heroVariant: 'focused', sectionTreatments: ['semantic'], contentDensity: 'balanced', servicesTreatment: 'cards', trustTreatment: 'proof', faqTreatment: 'accordion', conversionStrategy: 'consultation' }
+validateStructuredOutputSchema(CONTENT_PLAN_SCHEMA)
+const providerContent = { ...content, sections: content.sections.map((item) => ({ ...item, aliases: [] })) }
+assert.equal(validateContentPlanDecision(providerContent), providerContent)
+assert.throws(() => validateContentPlanDecision({ ...providerContent, sections: providerContent.sections.map((item) => item.id === 'oferta-profesional' ? { ...item, kind: 'proof' } : item) }), { code: 'SEMANTIC_SECTION_CONTENT_MISMATCH' })
+assert.throws(() => validateContentPlanDecision({ ...providerContent, sections: providerContent.sections.map((item) => item.id === 'oferta-profesional' ? { ...item, kind: 'packages-overview' } : item) }), { code: 'SEMANTIC_SECTION_CONTENT_MISMATCH' })
+assert.throws(() => validateContentPlanDecision({ ...providerContent, sections: [...providerContent.sections, { ...providerContent.sections[2], id: 'otra-oferta' }] }), { code: 'DUPLICATE_SEMANTIC_CONTENT_REF' })
+assert.throws(() => validateContentPlanDecision({ ...providerContent, sections: [...providerContent.sections, { id: 'paquete-claridad', role: 'package-detail', label: 'Claridad', kind: 'package', required: false, contentRef: 'package-clarity', aliases: [] }] }), { code: 'UNSUPPORTED_SEMANTIC_SECTION_CONTENT' })
 const planning = adaptSemanticPlansToPlanning({ sourcePlanning: source.project.planning, businessUnderstanding: bu, contentPlan: content, experiencePlan: experience })
 assert.deepEqual(planning.experience.sections, content.sections.map((item) => item.id))
 assert.equal(planning.content.services.length, 4)

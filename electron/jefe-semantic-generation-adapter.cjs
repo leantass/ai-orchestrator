@@ -4,17 +4,19 @@ const { validateProductPlanning } = require('./jefe-product-planning.cjs')
 function hash(value) { return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex') }
 function fail(message) { throw Object.assign(new Error(message), { code: 'INVALID_SEMANTIC_GENERATION_SPEC' }) }
 function contractFail(code, message, details = {}) { throw Object.assign(new Error(message), { code, details }) }
-const SEMANTIC_CONTENT_REFS = new Set(['hero', 'presentation', 'services', 'trust', 'faq', 'contact'])
+const SEMANTIC_SECTION_CONTRACTS = Object.freeze({
+  hero: Object.freeze({ role: 'hero', kind: 'hero', contentRef: 'hero' }),
+  presentation: Object.freeze({ role: 'presentation', kind: 'narrative', contentRef: 'presentation' }),
+  services: Object.freeze({ role: 'services', kind: 'service-catalog', contentRef: 'services' }),
+  trust: Object.freeze({ role: 'trust', kind: 'proof', contentRef: 'trust' }),
+  faq: Object.freeze({ role: 'faq', kind: 'faq', contentRef: 'faq' }),
+  contact: Object.freeze({ role: 'contact', kind: 'conversion-form', contentRef: 'contact' }),
+})
+const SEMANTIC_CONTENT_REFS = new Set(Object.keys(SEMANTIC_SECTION_CONTRACTS))
 function canonicalSemanticContentRef(value) {
   const normalized = String(value || '').trim().toLowerCase()
-  const aliases = new Map([
-    ['hero', 'hero'], ['home-hero', 'hero'], ['portada', 'hero'], ['encabezado', 'hero'],
-    ['presentation', 'presentation'], ['narrative', 'presentation'], ['value-prop', 'presentation'], ['propuesta-valor', 'presentation'], ['propuesta de valor', 'presentation'],
-    ['services', 'services'], ['service', 'services'], ['service-catalog', 'services'], ['packages-overview', 'services'], ['services-overview', 'services'], ['servicios-resumen', 'services'],
-    ['trust', 'trust'], ['proof', 'trust'], ['trust-drivers', 'trust'],
-    ['faq', 'faq'], ['question', 'faq'],
-    ['contact', 'contact'], ['conversion', 'contact'], ['conversion-form', 'contact']
-  ])
+  const aliases = new Map(Object.entries(SEMANTIC_SECTION_CONTRACTS).flatMap(([contentRef, contract]) => [[contentRef, contentRef], [contract.role, contentRef], [contract.kind, contentRef]]))
+  for (const [contentRef, values] of Object.entries({ hero: ['home-hero', 'portada', 'encabezado'], presentation: ['value-prop', 'propuesta-valor', 'propuesta de valor'], services: ['service', 'packages-overview', 'services-overview', 'servicios-resumen'], trust: ['trust-drivers'], faq: ['question'], contact: ['conversion'] })) for (const alias of values) aliases.set(alias, contentRef)
   return aliases.get(normalized) || null
 }
 function validateSemanticContentCatalog(catalog) {
@@ -28,6 +30,18 @@ function validateSemanticContentCatalog(catalog) {
     seen.set(canonical, item.id)
   }
   return catalog
+}
+function validateCanonicalSemanticContentCatalog(catalog) {
+  if (!Array.isArray(catalog) || catalog.length < 1 || catalog.length > 8) contractFail('SEMANTIC_CONTENT_PLAN_SECTIONS_INVALID', 'ContentPlanV2 sections debe ser un array válido.', {})
+  const ids = new Set()
+  for (const item of catalog) {
+    if (!item || typeof item !== 'object' || Array.isArray(item) || typeof item.id !== 'string' || !/^[a-z][a-z0-9-]{0,31}$/u.test(item.id) || ids.has(item.id) || typeof item.label !== 'string' || typeof item.required !== 'boolean' || typeof item.aliases === 'undefined' || !Array.isArray(item.aliases)) contractFail('SEMANTIC_CONTENT_PLAN_SECTIONS_INVALID', 'ContentPlanV2 sections tiene una estructura inválida.', { sectionId: item?.id || null })
+    ids.add(item.id)
+    const contract = SEMANTIC_SECTION_CONTRACTS[item.contentRef]
+    if (!contract) contractFail('UNSUPPORTED_SEMANTIC_SECTION_CONTENT', 'El contentRef semántico no está soportado.', { sectionId: item.id, role: item.role, kind: item.kind, contentRef: item.contentRef })
+    if (item.role !== contract.role || item.kind !== contract.kind || item.contentRef !== contract.contentRef) contractFail('SEMANTIC_SECTION_CONTENT_MISMATCH', 'role, kind y contentRef no resuelven al mismo contrato semántico.', { sectionId: item.id, role: item.role, kind: item.kind, contentRef: item.contentRef })
+  }
+  return validateSemanticContentCatalog(catalog)
 }
 function buildContentSectionCatalog(contentPlan, { validate = true } = {}) {
   if (Array.isArray(contentPlan?.sections) && contentPlan.sections.length > 0) {
@@ -163,4 +177,4 @@ function adaptSemanticGenerationSpec(spec) {
   const ctaPositions = spec.ctaPositions === undefined ? undefined : resolveSectionOrder(spec.ctaPositions, spec.planning, 'ctaPositions')
   return { schemaVersion: 'normalized-generation-plan-v1', planning: spec.planning, sectionOrder, heroVariant: spec.heroVariant, treatments: [...(spec.treatments || [])], ...(ctaPositions ? { ctaPositions } : {}), creativeDirection: spec.creativeDirection || null, contentDensity: spec.contentDensity || 'balanced', ctaStrategy: spec.ctaStrategy || null, preservedQualities: [...(spec.preservedQualities || [])], prohibitedChanges: [...(spec.prohibitedChanges || [])], semanticGenerationSpecHash: hash(spec) }
 }
-module.exports = { adaptSemanticGenerationSpec, adaptSemanticPlansToPlanning, bodySentence, buildContentSectionCatalog, canonicalSemanticContentRef, contentSectionCatalogHash, validateSemanticContentCatalog }
+module.exports = { SEMANTIC_SECTION_CONTRACTS, adaptSemanticGenerationSpec, adaptSemanticPlansToPlanning, bodySentence, buildContentSectionCatalog, canonicalSemanticContentRef, contentSectionCatalogHash, validateCanonicalSemanticContentCatalog, validateSemanticContentCatalog }

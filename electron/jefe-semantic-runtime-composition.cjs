@@ -90,12 +90,11 @@ function createSemanticRuntimeComposition({ root, feedbackProvider = null, decis
     const input = [{ role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ brief, correctionPlan, feedback, preservedQualities }) }] }]
     const bu = await decideSemantic({ operation: 'business_understanding', input, schema: SEMANTIC_SCHEMA, sourceRefs, outputBudgetRetryMax: 1, executionMode: 'background' })
     await onPhase('BUSINESS_UNDERSTANDING_READY', { semanticGenerationCalls: 1 })
-    onPhaseStart('CONTENT_PLAN_READY')
     const content = await decideSemantic({ operation: 'content_plan', input: [{ role: 'system', content: [{ type: 'input_text', text: 'ContentPlanV2 FAQ debe devolver al menos cuatro objetos con question y answer separados. La pregunta debe ser natural y la respuesta útil y específica; no repitas la pregunta como respuesta ni uses lenguaje administrativo.' }] }, { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ brief, businessUnderstanding: bu.decision, correctionPlan, preservedQualities }) }] }], schema: CONTENT_PLAN_SCHEMA, sourceRefs, outputBudgetRetryMax: 1, executionMode: 'background' })
     validateContentPlanDecision(content.decision)
-    await onPhase('CONTENT_PLAN_READY', { semanticGenerationCalls: 2 })
     const contentSectionCatalog = buildContentSectionCatalog(content.decision)
     const catalogHash = contentSectionCatalogHash(contentSectionCatalog)
+    await onPhase('CONTENT_PLAN_READY', { semanticGenerationCalls: 2 })
     onPhaseStart('EXPERIENCE_PLAN_READY')
     const experience = await decideSemantic({ operation: 'experience_plan', input: [{ role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ brief, businessUnderstanding: bu.decision, contentPlan: content.decision, contentSectionCatalog, contentSectionCatalogHash: catalogHash, correctionPlan, preservedQualities }) }] }], schema: experiencePlanSchemaForCatalog(contentSectionCatalog, catalogHash), sourceRefs, contentPlanRef: 'ContentPlanV2', contentSectionCatalogHash: catalogHash, outputBudgetRetryMax: 1, executionMode: 'background' })
     await onPhase('EXPERIENCE_PLAN_READY', { semanticGenerationCalls: 3 })
