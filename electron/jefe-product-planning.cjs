@@ -88,12 +88,23 @@ function decodeHtmlEntities(value) { return String(value || '').replace(/&amp;/g
 function visibleArtifactText(html) { return decodeHtmlEntities(String(html || '').replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/giu, ' ').replace(/<[^>]+>/gu, ' ')).replace(/\s+/gu, ' ').trim().normalize('NFC').toLocaleLowerCase('es-AR') }
 function normalizeVisibleSlot(value) { return decodeHtmlEntities(String(value || '')).replace(/\s+/gu, ' ').trim().normalize('NFC').toLocaleLowerCase('es-AR') }
 function sectionCatalogForPlanning(planning) {
-  if (Array.isArray(planning?.content?.sections) && planning.content.sections.length) return planning.content.sections.map((item) => ({ id: item.id, role: item.role || item.id, kind: item.kind || item.id, contentRef: item.contentRef || item.id, required: item.required === true }))
+  if (Array.isArray(planning?.content?.sections) && planning.content.sections.length) return planning.content.sections.map((item) => ({ id: item.id, role: item.role || item.id, kind: item.kind || item.id, contentRef: canonicalContentRef(item), required: item.required === true }))
   const contracts = Array.isArray(planning?.build?.sectionContracts) ? planning.build.sectionContracts : []
-  return (planning?.experience?.sections || []).map((id) => { const contract = contracts.find((item) => item?.id === id) || {}; const component = String(contract.component || id).toLowerCase(); const legacyRefs = { inicio: 'hero', relato: 'presentation', servicios: 'services', confianza: 'trust', faq: 'faq', contacto: 'contact' }; const contentRef = legacyRefs[component] || (component === 'hero' ? 'hero' : component === 'conversion-form' ? 'contact' : component); return { id, role: component, kind: component, contentRef, required: true } })
+  return (planning?.experience?.sections || []).map((id) => { const contract = contracts.find((item) => item?.id === id) || {}; const component = String(contract.component || id).toLowerCase(); const legacyRefs = { inicio: 'hero', relato: 'presentation', servicios: 'services', confianza: 'trust', faq: 'faq', contacto: 'contact' }; const contentRef = legacyRefs[component] || canonicalContentRef({ id, role: component, kind: component }); return { id, role: component, kind: component, contentRef, required: true } })
 }
 function sectionRefMatches(item, refs) {
   return [item?.contentRef, item?.role, item?.kind].some((value) => refs.has(String(value || '').toLowerCase()))
+}
+function canonicalContentRef(item) {
+  const values = new Set([item?.contentRef, item?.role, item?.kind].map((value) => String(value || '').trim().toLowerCase()).filter(Boolean))
+  const mappings = [
+    ['hero', 'hero'], ['presentation', 'presentation'], ['narrative', 'presentation'],
+    ['services', 'services'], ['service', 'services'], ['service-catalog', 'services'],
+    ['trust', 'trust'], ['proof', 'trust'],
+    ['faq', 'faq'], ['question', 'faq'],
+    ['contact', 'contact'], ['conversion', 'contact'], ['conversion-form', 'contact'],
+  ]
+  return mappings.find(([source]) => values.has(source))?.[1] || String(item?.contentRef || item?.role || item?.kind || item?.id || '').trim().toLowerCase()
 }
 function resolveArtifactContentSelection(planning) {
   const catalog = sectionCatalogForPlanning(planning)

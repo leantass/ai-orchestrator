@@ -124,7 +124,8 @@ function adaptSemanticGenerationSpec(spec) {
   if (!spec.planning || typeof spec.planning !== 'object') fail('SemanticGenerationSpec must contain structured planning.')
   validateProductPlanning(spec.planning)
   if (!Array.isArray(spec.sectionOrder) || spec.sectionOrder.length === 0) fail('sectionOrder is required.')
-  const sectionOrder = resolveSectionOrder(spec.sectionOrder, spec.planning)
+  resolveSectionOrder(spec.sectionOrder, spec.planning)
+  const sectionOrder = [...spec.planning.experience.sections]
   if (!spec.heroVariant || typeof spec.heroVariant !== 'string' || spec.heroVariant.includes('<')) fail('heroVariant is invalid.')
   if (spec.treatments && (!Array.isArray(spec.treatments) || spec.treatments.some((value) => typeof value !== 'string'))) fail('treatments are invalid.')
   if (spec.assets && (!Array.isArray(spec.assets) || spec.assets.some((value) => typeof value !== 'string' || value.includes('..') || value.startsWith('/')))) fail('assets must be safe relative references.')

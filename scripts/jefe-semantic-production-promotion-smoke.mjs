@@ -28,7 +28,7 @@ try {
   const candidateDestination = path.join(root, '.candidate-work'); const candidateRoot = path.join(candidateDestination, 'bike-production', 'version-v0002')
   const candidateProject = require('../electron/jefe-project-contract.cjs').normalizeProjectContract({ ...sourceResult.project, planning: semanticPlanning, activeVersionId: 'version-v0002', runId: 'run-v0002', physicalPaths: { projectRoot: candidateRoot, manifestPath: path.join(candidateRoot, 'manifest.json'), deliveryPath: null }, versions: [{ ...sourceResult.project.versions[0], versionId: 'version-v0002', runId: 'run-v0002' }] }, { allowedRoots: [root] })
   await materializeProject({ project: candidateProject, destinationRoot: candidateDestination, capabilities: {}, profileContext: { generationMode: 'semantic_correction', semanticGenerationSpec: spec, brief: 'Taller ficticio de reparación y mantenimiento de bicicletas con reserva previa.', businessType: 'servicio de reparación', audience: 'personas que usan bicicletas', proposition: 'Turnos claros para mantener tu bicicleta en movimiento.' } })
-  const browser = await service.browserQA(candidateRoot, spec.sectionOrder)
+  const browser = await service.browserQA(candidateRoot, candidateProject.planning)
   const html = await fs.readFile(path.join(candidateRoot, 'app', 'index.html'), 'utf8')
   const experience = experienceQuality({ html, spec })
   const quality = await evaluateCandidate({ candidateRoot, planning: candidateProject.planning, spec, browserQuality: browser, experienceQuality: experience })
