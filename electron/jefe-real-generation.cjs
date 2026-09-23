@@ -1,6 +1,6 @@
 const fs = require('fs')
 const path = require('path')
-const { validateProductPlanning, validateGeneratedArtifact } = require('./jefe-product-planning.cjs')
+const { validateProductPlanning, validateGeneratedArtifact, resolveSemanticCopyOwnership } = require('./jefe-product-planning.cjs')
 const { assertArtifactQuality, assertContentQuality } = require('./jefe-generator-quality.cjs')
 const { adaptSemanticGenerationSpec, buildContentSectionCatalog, canonicalSemanticContentRef, validateSemanticContentCatalog } = require('./jefe-semantic-generation-adapter.cjs')
 
@@ -47,6 +47,7 @@ function commercialLayoutV2(direction, brandName, action, logoAppPath = null, pl
   const semanticMode = planning?.semanticRefs?.contentPlan === 'ContentPlanV2'
   const catalog = buildContentSectionCatalog(content, { validate: semanticMode })
   if (semanticMode) validateSemanticContentCatalog(catalog)
+  const copyOwnership = semanticMode ? resolveSemanticCopyOwnership(planning) : null
   const catalogById = new Map(catalog.map((item) => [item.id, item]))
   const descriptorFor = (section) => catalogById.get(section) || { id: section, role: section, kind: section, contentRef: section, label: section }
   const sectionType = (section) => {
@@ -78,8 +79,13 @@ function commercialLayoutV2(direction, brandName, action, logoAppPath = null, pl
     return `<section id="${section}" class="feature-panel"><div class="section-heading"><p class="eyebrow">${escapeHtml(label(section))}</p><h2>${escapeHtml(content.businessUnderstanding?.businessModel || content.title || 'Contexto para avanzar')}</h2></div><div class="feature-copy"><p>${escapeHtml(content.hero?.description || content.subtitle || '')}</p><p>${escapeHtml(content.businessUnderstanding?.customerNeeds?.[0] || content.benefits?.[0] || '')}</p></div></section>`
   }
   const railClass = direction === 'expresiva' ? ' expressive-rail' : ''
+  const semanticHeroClass = `hero-${direction} ${direction === 'comercial' ? 'commercial-hero' : `${direction}-hero`}`
+  const renderSemanticHero = (section) => { const heroBody = copyOwnership.presentationOwner === 'hero' ? content.presentation : ''; return `<section id="${anchor(section)}" class="site-hero ${semanticHeroClass}"><div><p class="eyebrow">${escapeHtml(content.hero?.eyebrow || content.contextual?.businessType || 'Propuesta')}</p><h1>${escapeHtml(content.hero?.title || content.title)}</h1>${heroBody ? `<p class="lede">${escapeHtml(heroBody)}</p>` : ''}<a class="cta" href="#${anchor(contactSection)}">${escapeHtml(content.hero?.primaryCTA || action)}</a></div>${content.hero?.supportingNote ? `<aside class="hero-note"><strong>${escapeHtml(content.hero.supportingNote)}</strong></aside>` : ''}</section>` }
+  const renderSemanticPresentation = (section) => `<section id="${anchor(section)}" class="feature-panel"><div class="section-heading"><p class="eyebrow">${escapeHtml(label(section))}</p><h2>${escapeHtml(label(section) || 'Presentación')}</h2></div><div class="feature-copy"><p>${escapeHtml(copyOwnership.presentationOwner === 'presentation' ? content.presentation : '')}</p></div></section>`
   const renderSection = (section) => {
     const type = sectionType(section)
+    if (semanticMode && type === 'hero') return renderSemanticHero(section)
+    if (semanticMode && type === 'presentation') return renderSemanticPresentation(section)
     if (type === 'hero') return `<section id="${anchor(section)}" class="site-hero hero-${direction} ${direction === 'comercial' ? 'commercial-hero' : `${direction}-hero`}"><div><p class="eyebrow">${escapeHtml(content.hero?.eyebrow || content.contextual?.businessType || 'Propuesta')}</p><h1>${escapeHtml(content.hero?.title || content.title)}</h1><p class="lede">${escapeHtml(content.hero?.description || content.subtitle)}</p><a class="cta" href="#${anchor(contactSection)}">${escapeHtml(content.hero?.primaryCTA || action)}</a></div>${content.hero?.supportingNote ? `<aside class="hero-note"><strong>${escapeHtml(content.hero.supportingNote)}</strong></aside>` : ''}</section>`
     if (type === 'trust') return `<section id="${anchor(section)}" class="trust-grid"><div class="section-heading"><p class="eyebrow">Confianza</p><h2>${escapeHtml(content.trustItems?.[0]?.title || 'Criterios para avanzar')}</h2></div>${trust}</section>`
     if (type === 'faq') return `<section id="${anchor(section)}" class="faq-panel"><div class="section-heading"><p class="eyebrow">Preguntas frecuentes</p><h2>${escapeHtml(content.businessUnderstanding?.customerQuestions?.[0] || 'Preguntas para decidir')}</h2></div>${faq}</section>`

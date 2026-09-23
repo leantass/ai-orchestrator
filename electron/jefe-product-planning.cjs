@@ -121,9 +121,13 @@ function resolveArtifactContentSelection(planning) {
 function plannedContentSlots(planning) {
   const content = planning?.content || {}
   const selection = resolveArtifactContentSelection(planning)
+  const ownership = resolveSemanticCopyOwnership(planning, selection)
   const hasRef = (...refs) => refs.some((ref) => selection.isContentRefExpected(ref)) || selection.catalog.some((item) => (refs.includes(String(item.contentRef).toLowerCase()) || sectionRefMatches(item, new Set(refs.map((value) => value.toLowerCase())))) && (selection.activeSectionIds.includes(item.id) || item.required))
   return [
-    ...(hasRef('hero', 'presentation', 'narrative') ? [['hero.title', content.hero?.title || content.title], ['hero.subtitle', content.hero?.description || content.subtitle]] : []),
+    ...(ownership.presentationOwner === null && hasRef('hero', 'presentation', 'narrative') ? [['hero.title', content.hero?.title || content.title], ['hero.subtitle', content.hero?.description || content.subtitle]] : []),
+    ...(ownership.presentationOwner !== null && hasRef('hero') ? [['hero.title', content.hero?.title || content.title]] : []),
+    ...(ownership.presentationOwner === 'hero' ? [['hero.lede', content.presentation || content.subtitle]] : []),
+    ...(ownership.presentationOwner === 'presentation' ? [['presentation.body', content.presentation || content.subtitle]] : []),
     ...(hasRef('services', 'service', 'service-catalog') ? (content.services || content.benefits || []).flatMap((item, index) => { const service = typeof item === 'string' ? { title: item, description: item } : item; return [['services[' + index + '].title', service.title], ['services[' + index + '].description', service.description]] }) : []),
     ...(hasRef('trust', 'proof') ? (content.trustItems || content.trust || []).map((item, index) => ['trust[' + index + ']', typeof item === 'string' ? item : item.description]) : []),
     ...(hasRef('faq', 'question') ? (content.faq || []).flatMap((item, index) => [['faq[' + index + '].question', item.question], ['faq[' + index + '].answer', item.answer]]) : []),
@@ -140,9 +144,13 @@ function compareGeneratedContent(planning, html) {
 function grammarEntries(planning) {
   const content = planning?.content || {}
   const selection = resolveArtifactContentSelection(planning)
+  const ownership = resolveSemanticCopyOwnership(planning, selection)
   const expected = (...refs) => refs.some((ref) => selection.isContentRefExpected(ref))
   return [
-    ...(expected('hero', 'presentation', 'narrative') ? [['title', content.title, 'heading'], ['subtitle', content.subtitle, 'body']] : []),
+    ...(ownership.presentationOwner === null && expected('hero', 'presentation', 'narrative') ? [['title', content.title, 'heading'], ['subtitle', content.subtitle, 'body']] : []),
+    ...(ownership.presentationOwner !== null && expected('hero') ? [['title', content.title, 'heading']] : []),
+    ...(ownership.presentationOwner === 'hero' ? [['hero.lede', content.presentation || content.subtitle, 'body']] : []),
+    ...(ownership.presentationOwner === 'presentation' ? [['presentation.body', content.presentation || content.subtitle, 'body']] : []),
     ...(expected('services', 'service', 'service-catalog') && Array.isArray(content.benefits) ? content.benefits.map((value, index) => [`benefits[${index}]`, value, 'body']) : []),
     ...(expected('trust', 'proof') && Array.isArray(content.trust) ? content.trust.map((value, index) => [`trust[${index}]`, value, 'body']) : []),
     ...(expected('faq', 'question') && Array.isArray(content.faq) ? content.faq.flatMap((item, index) => [[`faq[${index}].question`, item?.question, 'question'], [`faq[${index}].answer`, item?.answer, 'answer']]) : []),
@@ -165,14 +173,23 @@ function inspectGeneratedArtifactGrammar(planning) {
 function expectedArtifactCustomerText(planning) {
   const content = planning?.content || {}
   const selection = resolveArtifactContentSelection(planning)
+  const ownership = resolveSemanticCopyOwnership(planning, selection)
   const expected = (...refs) => refs.some((ref) => selection.isContentRefExpected(ref))
   return [
-    ...(expected('hero', 'presentation', 'narrative') ? [content.title, content.subtitle] : []),
+    ...(ownership.presentationOwner === null && expected('hero', 'presentation', 'narrative') ? [content.title, content.subtitle] : []),
+    ...(ownership.presentationOwner !== null && expected('hero') ? [content.title] : []),
+    ...(ownership.presentationOwner ? [content.presentation || content.subtitle] : []),
     ...(expected('services', 'service', 'service-catalog') ? (content.benefits || []) : []),
     ...(expected('trust', 'proof') ? (content.trust || []) : []),
     ...(expected('faq', 'question') ? (content.faq || []).flatMap((item) => item.question === item.answer ? [item.question] : [item.question, item.answer]) : []),
     ...(expected('contact', 'conversion', 'conversion-form') ? [content.ctas?.[0]] : []),
   ].filter(Boolean).map((item) => String(item).trim().toLowerCase())
+}
+function resolveSemanticCopyOwnership(planning, selection = resolveArtifactContentSelection(planning)) {
+  if (planning?.semanticRefs?.contentPlan !== 'ContentPlanV2') return { presentationOwner: null, hero: [], presentation: [], services: [], trust: [], faq: [], contact: [] }
+  const heroExpected = selection.isContentRefExpected('hero')
+  const presentationExpected = selection.isContentRefExpected('presentation')
+  return { presentationOwner: presentationExpected ? 'presentation' : heroExpected ? 'hero' : null, hero: heroExpected ? ['title', ...(presentationExpected ? [] : ['lede'])] : [], presentation: presentationExpected ? ['body'] : [], services: selection.isContentRefExpected('services') ? ['items'] : [], trust: selection.isContentRefExpected('trust') ? ['items'] : [], faq: selection.isContentRefExpected('faq') ? ['items'] : [], contact: selection.isContentRefExpected('contact') ? ['action'] : [] }
 }
 function presenceDetails(selection, contentRef) {
   return { expectedContentRef: contentRef, expectedSectionIds: selection.sectionIdsFor(contentRef), activeContentRefs: selection.activeContentRefs, requiredContentRefs: selection.requiredContentRefs, omittedOptionalContentRefs: selection.omittedOptionalContentRefs }
@@ -481,4 +498,4 @@ function validateGeneratedArtifact(planning, artifacts) {
   return { ok: true, sections: planning.experience.sections.length, traceability: planning.build.traceability.length }
 }
 
-module.exports = { SCHEMA_VERSION, DIRECTIONS, PRODUCT_TYPES, ProductPlanningError, createProductPlanning, evolveProductPlanning, migrateLegacyPlanning, validateProductPlanning, validateGeneratedArtifact, compareGeneratedContent, inspectGeneratedArtifactGrammar, resolveArtifactContentSelection }
+module.exports = { SCHEMA_VERSION, DIRECTIONS, PRODUCT_TYPES, ProductPlanningError, createProductPlanning, evolveProductPlanning, migrateLegacyPlanning, validateProductPlanning, validateGeneratedArtifact, compareGeneratedContent, inspectGeneratedArtifactGrammar, resolveArtifactContentSelection, resolveSemanticCopyOwnership }
