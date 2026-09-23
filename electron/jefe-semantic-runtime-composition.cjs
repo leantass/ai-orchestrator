@@ -79,8 +79,7 @@ function createSemanticRuntimeComposition({ root, feedbackProvider = null, decis
   async function decideSemantic(input) {
     requireProductiveProvider()
     if (!brain || typeof brain.decide !== 'function') throw Object.assign(new Error('El adapter semántico no está configurado.'), { code: 'SEMANTIC_PROVIDER_NOT_READY' })
-    const complexity = input.operation === 'business_understanding' || input.operation === 'content_plan' || input.operation === 'experience_plan' ? 'complex' : 'medium'
-    const routing = modelRouter.route({ operation: input.operation, complexity, risk: productive ? 'high' : 'medium', qualityNeed: productive ? 'strict' : 'standard' })
+    const routing = modelRouter.route({ operation: input.operation, ...(productive ? {} : { complexity: 'medium', risk: 'medium', qualityNeed: 'standard' }) })
     if (!routing.llmRequired) throw Object.assign(new Error('DETERMINISTIC_OPERATION_DOES_NOT_USE_PROVIDER'), { code: 'DETERMINISTIC_OPERATION_DOES_NOT_USE_PROVIDER', routing })
     if (!routing.budgetAvailable) throw Object.assign(new Error('PROVIDER_CALL_BUDGET_EXHAUSTED'), { code: 'PROVIDER_CALL_BUDGET_EXHAUSTED', routing })
     return brain.decide({ ...input, model: routing.selectedModel, reasoningEffort: routing.reasoningEffort, executionMode: routing.executionMode, routing })
