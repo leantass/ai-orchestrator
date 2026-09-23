@@ -1,7 +1,7 @@
 const DEFAULT_FOREGROUND_TIMEOUT_MS = 30000
 const DEFAULT_RETRY_MAX = 1
 const crypto = require('node:crypto')
-const PROVIDER_ERROR_CATEGORIES = Object.freeze(['HTTP_ERROR', 'NETWORK_ERROR', 'FOREGROUND_TIMEOUT', 'BACKGROUND_DEADLINE_EXCEEDED', 'BACKGROUND_RESPONSE_FAILED', 'OUTPUT_BUDGET_EXHAUSTED', 'STRUCTURED_OUTPUT_INVALID', 'SEMANTIC_SCHEMA_INVALID', 'SEMANTIC_CONTRACT_INVALID', 'PROVIDER_CALL_BUDGET_EXHAUSTED', 'UNKNOWN_PROVIDER_ERROR'])
+const PROVIDER_ERROR_CATEGORIES = Object.freeze(['HTTP_ERROR', 'NETWORK_ERROR', 'FOREGROUND_TIMEOUT', 'BACKGROUND_DEADLINE_EXCEEDED', 'BACKGROUND_POLL_LIMIT_EXCEEDED', 'BACKGROUND_RESPONSE_FAILED', 'OUTPUT_BUDGET_EXHAUSTED', 'STRUCTURED_OUTPUT_INVALID', 'SEMANTIC_SCHEMA_INVALID', 'SEMANTIC_CONTRACT_INVALID', 'PROVIDER_CALL_BUDGET_EXHAUSTED', 'UNKNOWN_PROVIDER_ERROR'])
 const TRANSIENT_UPSTREAM_CODES = new Set(['server_error'])
 const OUTPUT_BUDGET_POLICY = Object.freeze({
   minimal_probe: Object.freeze({ initialOutputBudget: 128, retryOutputBudget: 256, maxRetries: 1 }),
@@ -13,8 +13,12 @@ const OUTPUT_BUDGET_POLICY = Object.freeze({
 })
 const OUTPUT_BUDGETS = Object.freeze(Object.fromEntries(Object.entries(OUTPUT_BUDGET_POLICY).map(([key, value]) => [key, value.initialOutputBudget])))
 function outputBudgetPolicy(operation) { return OUTPUT_BUDGET_POLICY[operation] || OUTPUT_BUDGET_POLICY.business_understanding }
-const BACKGROUND_DEFAULTS = Object.freeze({ deadlineMs: 300000, initialDelayMs: 2000, intervalMs: 2500, maxPollRequests: 80, pollRetryMax: 2 })
+const BACKGROUND_DEFAULTS = Object.freeze({ deadlineMs: 300000, initialDelayMs: 2000, intervalMs: 2500, pollRetryMax: 2 })
 const MAX_MODEL_OUTPUT_TOKENS = 65536
+function requiredPollCapacity({ deadlineMs, initialDelayMs, intervalMs }) {
+  if (intervalMs <= 0) return Math.max(1, deadlineMs - initialDelayMs + 1)
+  return Math.max(1, Math.ceil(Math.max(0, deadlineMs - initialDelayMs) / intervalMs) + 1)
+}
 
 class ProviderCallBudget {
   constructor(maxCalls = 3, runId = null) { this.runId = runId; this.maxCalls = maxCalls; this.callsUsed = 0; this.reservations = []; this.operationCounts = {}; this.queue = Promise.resolve() }
@@ -32,6 +36,13 @@ class ProviderCallBudget {
 class ProviderRunBudget extends ProviderCallBudget { constructor({ runId, maxCalls = 3 } = {}) { super(maxCalls, runId || `semantic-run-${Date.now()}`) } }
 
 function providerConfig({ env = process.env } = {}) {
+  const backgroundDeadlineMs = Math.max(1000, Number.parseInt(env.AI_ORCHESTRATOR_SEMANTIC_BACKGROUND_DEADLINE_MS || String(BACKGROUND_DEFAULTS.deadlineMs), 10) || BACKGROUND_DEFAULTS.deadlineMs)
+  const backgroundInitialDelayMs = Math.max(0, Number.parseInt(env.AI_ORCHESTRATOR_SEMANTIC_BACKGROUND_INITIAL_DELAY_MS || String(BACKGROUND_DEFAULTS.initialDelayMs), 10) || 0)
+  const backgroundIntervalMs = Math.min(5000, Math.max(0, Number.parseInt(env.AI_ORCHESTRATOR_SEMANTIC_BACKGROUND_INTERVAL_MS || String(BACKGROUND_DEFAULTS.intervalMs), 10) || 0))
+  const derivedMaxPollRequests = requiredPollCapacity({ deadlineMs: backgroundDeadlineMs, initialDelayMs: backgroundInitialDelayMs, intervalMs: backgroundIntervalMs })
+  const configuredPollValue = env.AI_ORCHESTRATOR_SEMANTIC_BACKGROUND_MAX_POLLS?.trim()
+  const explicitMaxPollRequests = configuredPollValue ? Math.max(1, Number.parseInt(configuredPollValue, 10) || derivedMaxPollRequests) : null
+  const configuredMaxPollRequests = explicitMaxPollRequests ?? derivedMaxPollRequests
   return {
     model: env.AI_ORCHESTRATOR_SEMANTIC_MODEL?.trim() || env.AI_ORCHESTRATOR_BRAIN_OPENAI_MODEL?.trim() || 'gpt-5',
     baseUrl: env.AI_ORCHESTRATOR_SEMANTIC_BASE_URL?.trim() || env.AI_ORCHESTRATOR_BRAIN_OPENAI_BASE_URL?.trim() || 'https://api.openai.com/v1/responses',
@@ -39,10 +50,13 @@ function providerConfig({ env = process.env } = {}) {
     reasoningEffort: env.AI_ORCHESTRATOR_SEMANTIC_REASONING?.trim() || 'low',
     foregroundTimeoutMs: Math.max(5000, Number.parseInt(env.AI_ORCHESTRATOR_SEMANTIC_FOREGROUND_TIMEOUT_MS || String(DEFAULT_FOREGROUND_TIMEOUT_MS), 10) || DEFAULT_FOREGROUND_TIMEOUT_MS),
     retryMax: Math.min(DEFAULT_RETRY_MAX, Math.max(0, Number.parseInt(env.AI_ORCHESTRATOR_SEMANTIC_RETRY_MAX || String(DEFAULT_RETRY_MAX), 10) || DEFAULT_RETRY_MAX)),
-    backgroundDeadlineMs: Math.max(1000, Number.parseInt(env.AI_ORCHESTRATOR_SEMANTIC_BACKGROUND_DEADLINE_MS || String(BACKGROUND_DEFAULTS.deadlineMs), 10) || BACKGROUND_DEFAULTS.deadlineMs),
-    backgroundInitialDelayMs: Math.max(0, Number.parseInt(env.AI_ORCHESTRATOR_SEMANTIC_BACKGROUND_INITIAL_DELAY_MS || String(BACKGROUND_DEFAULTS.initialDelayMs), 10) || 0),
-    backgroundIntervalMs: Math.min(5000, Math.max(0, Number.parseInt(env.AI_ORCHESTRATOR_SEMANTIC_BACKGROUND_INTERVAL_MS || String(BACKGROUND_DEFAULTS.intervalMs), 10) || 0)),
-    backgroundMaxPollRequests: Math.max(1, Number.parseInt(env.AI_ORCHESTRATOR_SEMANTIC_BACKGROUND_MAX_POLLS || String(BACKGROUND_DEFAULTS.maxPollRequests), 10) || BACKGROUND_DEFAULTS.maxPollRequests),
+    backgroundDeadlineMs,
+    backgroundInitialDelayMs,
+    backgroundIntervalMs,
+    configuredMaxPollRequests,
+    effectiveMaxPollRequests: configuredMaxPollRequests,
+    backgroundMaxPollRequests: configuredMaxPollRequests,
+    backgroundPollLimitExplicit: explicitMaxPollRequests !== null,
     backgroundPollRetryMax: Math.max(0, Number.parseInt(env.AI_ORCHESTRATOR_SEMANTIC_BACKGROUND_POLL_RETRY_MAX || String(BACKGROUND_DEFAULTS.pollRetryMax), 10) || 0),
     outputBudgets: OUTPUT_BUDGETS,
   }
@@ -172,17 +186,24 @@ function createOpenAISemanticProvider({ env = process.env, fetchImpl = fetch, no
         const responseId = payload?.id
         if (!responseId) return { ok: false, status: response.status, errorCategory: 'SCHEMA_ERROR', telemetry: { executionMode: 'background', durationMs: now() - startedAt, transportStats } }
         let status = payload.status || 'queued'; let completed = payload; let pollRequests = 0; let lastPollError = null
+        const createTelemetry = ({ terminationReason = null, cancelAttempted = false, cancelStatus = 'not_attempted', usage = null } = {}) => { const elapsedMs = now() - startedAt; return { executionMode: 'background', backgroundDeadlineMs: config.backgroundDeadlineMs, backgroundInitialDelayMs: config.backgroundInitialDelayMs, backgroundIntervalMs: config.backgroundIntervalMs, configuredMaxPollRequests: config.configuredMaxPollRequests, effectiveMaxPollRequests: config.effectiveMaxPollRequests, elapsedMs, remainingMs: Math.max(0, config.backgroundDeadlineMs - elapsedMs), pollCount: pollRequests, terminationReason, responseStatus: status, lastPollError, cancelAttempted, cancelStatus, responseId, maxOutputTokens: currentMaxOutputTokens, usage, transportStats: { ...transportStats } } }
+        const cancel = async () => { transport('cancel'); try { const cancelled = await fetchImpl(`${config.baseUrl}/${encodeURIComponent(responseId)}/cancel`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` } }); return { attempted: true, status: cancelled.ok ? 'accepted' : `http_${cancelled.status}` } } catch { return { attempted: true, status: 'failed' } } }
         while (['queued', 'in_progress'].includes(status)) {
-          if (now() - startedAt >= config.backgroundDeadlineMs || pollRequests >= config.backgroundMaxPollRequests) {
-            let cancelStatus = 'not_attempted'; transport('cancel')
-            try { const cancel = await fetchImpl(`${config.baseUrl}/${encodeURIComponent(responseId)}/cancel`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` } }); cancelStatus = cancel.ok ? 'accepted' : `http_${cancel.status}` } catch { cancelStatus = 'failed' }
-            return { ok: false, status, errorCategory: 'BACKGROUND_DEADLINE_EXCEEDED', errorEnvelope: providerErrorEnvelope({ category: 'BACKGROUND_DEADLINE_EXCEEDED', operation, executionMode: 'background', model, responseId, responseStatus: status, generationCallNumber: callBudget?.snapshot?.().callsUsed || null, pollCount: pollRequests }), responseId, telemetry: { executionMode: 'background', durationMs: now() - startedAt, pollRequests, cancelAttempted: true, cancelStatus, transportStats, lastPollError } }
+          const elapsedMs = now() - startedAt
+          if (elapsedMs >= config.backgroundDeadlineMs || pollRequests >= config.effectiveMaxPollRequests) {
+            const terminationReason = elapsedMs >= config.backgroundDeadlineMs ? 'DEADLINE' : 'POLL_LIMIT'
+            const cancelled = await cancel()
+            const category = terminationReason === 'DEADLINE' ? 'BACKGROUND_DEADLINE_EXCEEDED' : 'BACKGROUND_POLL_LIMIT_EXCEEDED'
+            return { ok: false, status, errorCategory: category, errorEnvelope: providerErrorEnvelope({ category, operation, executionMode: 'background', model, responseId, responseStatus: status, generationCallNumber: callBudget?.snapshot?.().callsUsed || null, pollCount: pollRequests }), responseId, telemetry: createTelemetry({ terminationReason, cancelAttempted: cancelled.attempted, cancelStatus: cancelled.status }) }
           }
-          await sleepImpl(pollRequests === 0 ? config.backgroundInitialDelayMs : config.backgroundIntervalMs)
+          const remainingMs = config.backgroundDeadlineMs - elapsedMs
+          const configuredDelay = pollRequests === 0 ? config.backgroundInitialDelayMs : config.backgroundIntervalMs
+          await sleepImpl(Math.min(configuredDelay, remainingMs))
+          if (now() - startedAt >= config.backgroundDeadlineMs) continue
           pollRequests += 1; transport('poll')
-          try { const polled = await fetchImpl(`${config.baseUrl}/${encodeURIComponent(responseId)}`, { method: 'GET', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` } }); if (!polled.ok) throw Object.assign(new Error('poll http'), { status: polled.status }); completed = parseProviderPayload(await polled.text()) || {}; status = completed.status || 'failed' } catch (error) { lastPollError = classifyError(error, { status: error.status || 0 }); if (pollRequests >= config.backgroundMaxPollRequests) return { ok: false, status, errorCategory: 'BACKGROUND_POLL_FAILED', responseId, telemetry: { executionMode: 'background', durationMs: now() - startedAt, pollRequests, transportStats, lastPollError } } }
+          try { const polled = await fetchImpl(`${config.baseUrl}/${encodeURIComponent(responseId)}`, { method: 'GET', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` } }); if (!polled.ok) throw Object.assign(new Error('poll http'), { status: polled.status }); completed = parseProviderPayload(await polled.text()) || {}; status = completed.status || 'failed' } catch (error) { lastPollError = classifyError(error, { status: error.status || 0 }); if (pollRequests >= config.effectiveMaxPollRequests) { const cancelled = await cancel(); return { ok: false, status, errorCategory: 'BACKGROUND_POLL_LIMIT_EXCEEDED', errorEnvelope: providerErrorEnvelope({ category: 'BACKGROUND_POLL_LIMIT_EXCEEDED', operation, executionMode: 'background', model, responseId, responseStatus: status, generationCallNumber: callBudget?.snapshot?.().callsUsed || null, pollCount: pollRequests }), responseId, telemetry: createTelemetry({ terminationReason: 'POLL_LIMIT', cancelAttempted: cancelled.attempted, cancelStatus: cancelled.status }) } } }
         }
-        const telemetry = { executionMode: 'background', durationMs: now() - startedAt, responseId, pollRequests, maxOutputTokens: currentMaxOutputTokens, usage: safeUsage(completed.usage), transportStats: { ...transportStats } }
+        const telemetry = createTelemetry({ terminationReason: status === 'completed' ? 'RESPONSE_COMPLETED' : 'RESPONSE_FAILED', usage: safeUsage(completed.usage) })
         if (status === 'incomplete' && completed.incomplete_details?.reason === 'max_output_tokens' && outputBudgetRetry < outputBudgetRetryMax) { outputBudgetRetry += 1; currentMaxOutputTokens = retryOutputBudget || currentMaxOutputTokens * 2; continue }
         if (status === 'incomplete') return { ok: false, status, incompleteReason: completed.incomplete_details?.reason || null, errorCategory: completed.incomplete_details?.reason === 'max_output_tokens' ? 'OUTPUT_BUDGET_EXHAUSTED' : 'SCHEMA_ERROR', errorEnvelope: providerErrorEnvelope({ category: completed.incomplete_details?.reason === 'max_output_tokens' ? 'OUTPUT_BUDGET_EXHAUSTED' : 'SEMANTIC_SCHEMA_INVALID', operation, executionMode: 'background', model, responseId, responseStatus: status, incompleteReason: completed.incomplete_details?.reason || null, generationCallNumber: callBudget?.snapshot?.().callsUsed || null, pollCount: pollRequests }), responseId, telemetry }
         if (status === 'failed' || status === 'cancelled') { const errorEnvelope = responseFailure({ payload: completed, operation, executionMode: 'background', model, generationCallNumber: callBudget?.snapshot?.().callsUsed || null, pollCount: pollRequests }); return { ok: false, status, errorCategory: 'MODEL_ERROR', errorEnvelope, responseId, telemetry } }

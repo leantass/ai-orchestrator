@@ -33,6 +33,9 @@ try {
   const providerDeadline = await run('provider-deadline', { timeoutMs: 200, resolveExecution: async (_identity, { onPhase, onPhaseStart }) => { onPhaseStart('CONTENT_PLAN_READY'); await onPhase('BUSINESS_UNDERSTANDING_READY', { semanticGenerationCalls: 1 }); throw Object.assign(new Error('BACKGROUND_DEADLINE_EXCEEDED'), { code: 'BACKGROUND_DEADLINE_EXCEEDED', errorEnvelope: { category: 'BACKGROUND_DEADLINE_EXCEEDED', operation: 'content_plan', generationCallNumber: 2, pollCount: 4 }, telemetry: { durationMs: 40, pollRequests: 4 } }) } })
   assert.equal(providerDeadline.result.status, 'BLOCKED'); assert.equal(providerDeadline.report.failureCategory, 'BACKGROUND_DEADLINE'); assert.equal(providerDeadline.report.timeoutDetails.timeoutLayer, 'BACKGROUND_DEADLINE'); assert.equal(providerDeadline.report.timeoutDetails.pollCount, 4)
 
+  const providerPollLimit = await run('provider-poll-limit', { timeoutMs: 200, resolveExecution: async (_identity, { onPhase, onPhaseStart }) => { onPhaseStart('CONTENT_PLAN_READY'); await onPhase('BUSINESS_UNDERSTANDING_READY', { semanticGenerationCalls: 1 }); throw Object.assign(new Error('BACKGROUND_POLL_LIMIT_EXCEEDED'), { code: 'BACKGROUND_POLL_LIMIT_EXCEEDED', errorEnvelope: { category: 'BACKGROUND_POLL_LIMIT_EXCEEDED', operation: 'content_plan', generationCallNumber: 2, pollCount: 5 }, telemetry: { backgroundDeadlineMs: 300000, configuredMaxPollRequests: 5, effectiveMaxPollRequests: 5, elapsedMs: 12000, remainingMs: 288000, terminationReason: 'POLL_LIMIT', responseStatus: 'in_progress', pollCount: 5, cancelAttempted: true, cancelStatus: 'accepted' } }) } })
+  assert.equal(providerPollLimit.result.status, 'BLOCKED'); assert.equal(providerPollLimit.result.failureCategory, 'BACKGROUND_POLL_LIMIT'); assert.equal(providerPollLimit.report.timeoutDetails.timeoutLayer, 'BACKGROUND_POLL_LIMIT'); assert.equal(providerPollLimit.report.timeoutDetails.terminationReason, 'POLL_LIMIT'); assert.equal(providerPollLimit.report.timeoutDetails.effectiveMaxPollRequests, 5)
+
   const global = await run('run-global', { timeoutMs: 20, resolveExecution: async () => new Promise(() => {}) })
   assert.equal(global.result.status, 'BLOCKED'); assert.equal(global.report.failureCategory, 'TIMEOUT'); assert.equal(global.report.timeoutDetails.timeoutLayer, 'RUN_GLOBAL')
 
@@ -46,5 +49,5 @@ try {
   const lateReport = await report('late-callback', late.result)
   assert.equal(late.result.status, 'BLOCKED'); assert.equal(lateReport.lastCompletedPhase, null); assert.equal(lateCallbackRan, true); assert.equal(lateReport.timeoutDetails.operation, 'content_plan')
 
-  console.log(JSON.stringify({ ok: true, smoke: 'jefe-semantic-timeout-budget', cases: { A: 'PASS', B: 'PASS', C: 'BLOCKED_BACKGROUND_DEADLINE', D: 'BLOCKED_RUN_GLOBAL', E: 'PASS', F: 'PASS_LATE_CALLBACK_IGNORED' }, ProviderCalls: 0 }))
+  console.log(JSON.stringify({ ok: true, smoke: 'jefe-semantic-timeout-budget', cases: { A: 'PASS', B: 'PASS', C: 'BLOCKED_BACKGROUND_DEADLINE', D: 'BLOCKED_BACKGROUND_POLL_LIMIT', E: 'BLOCKED_RUN_GLOBAL', F: 'PASS', G: 'PASS_LATE_CALLBACK_IGNORED' }, ProviderCalls: 0 }))
 } finally { await fs.rm(root, { recursive: true, force: true }) }
