@@ -16,7 +16,7 @@ const chromeCandidates = [
 ].filter(Boolean)
 const chromePath = chromeCandidates.find((candidate) => candidate && fs.existsSync(candidate))
 const openBrowser = chromePath ? (url) => { const child = spawn(chromePath, [url], { detached: true, stdio: 'ignore', windowsHide: false }); child.unref() } : null
-const semanticRuntime = createSemanticRuntimeComposition({ root })
+const semanticRuntime = createSemanticRuntimeComposition({ root, mode: 'productive' })
 const runtime = createJefeWebServer({ root, distRoot: path.join(repoRoot, 'dist'), port, openBrowser: process.env.JEFE_WEB_NO_BROWSER === '1' ? null : openBrowser, semanticRuntimeAdapter: semanticRuntime.adapter })
 await runtime.start()
 const shutdown = async () => { await runtime.close(); process.exit(0) }
