@@ -1,4 +1,5 @@
 const fs = require('fs')
+const { resolveArtifactContentSelection } = require('./jefe-product-planning.cjs')
 
 const WCAG_THRESHOLDS = Object.freeze({ normal: 4.5, large: 3, component: 3 })
 
@@ -114,6 +115,26 @@ function assessCrossSectionRepetition({ html } = {}) {
   }
   return { schemaVersion: 'cross-section-repetition/v1', status: findings.length ? 'NEEDS_CORRECTION' : 'PASS', pass: findings.length === 0, findingCount: findings.length, findings, sections: sections.map((item) => ({ sectionId: item.sectionId, heading: item.heading.slice(0, 160), bodyPreview: item.body.slice(0, 160) })) }
 }
+function customerQaText(value) { return String(value || '').replace(/&amp;/gu, '&').replace(/&lt;/gu, '<').replace(/&gt;/gu, '>').replace(/&quot;/gu, '"').replace(/&#39;/gu, "'").replace(/<[^>]+>/gu, ' ').replace(/\s+/gu, ' ').trim() }
+function customerQaSections(html) { return [...String(html || '').matchAll(/<section\b[^>]*\bid=["']([^"']+)["'][^>]*>([\s\S]*?)<\/section>/giu)].map((match) => ({ id: match[1], source: match[2] })) }
+function customerQaGate(findings) { return { status: findings.length ? 'NEEDS_CORRECTION' : 'PASS', pass: findings.length === 0, findingCount: findings.length, findings } }
+function assessCustomerFacingCopy({ html, planning } = {}) {
+  const sections = customerQaSections(html); const selection = resolveArtifactContentSelection(planning); const findings = (category, selector, expected, actual) => ({ category, selector, expected, actual: String(actual || '').slice(0, 300) })
+  const sectionFor = (ref) => { const ids = selection.sectionIdsFor(ref); return sections.find((item) => ids.includes(item.id)) }
+  const heroSection = sectionFor('hero'); const faqSection = sectionFor('faq'); const trustSection = sectionFor('trust'); const contactSection = sectionFor('contact')
+  const heroHeading = customerQaText(heroSection?.source.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/iu)?.[1])
+  const heroFindings = []
+  if (/\b[\w.+-]+@[\w.-]+\.[a-z]{2,}\b|https?:\/\/|www\.|\+?\d[\d\s().-]{7,}\d/iu.test(heroHeading) || /\b(?:1[.)]|2[.)]|3[.)])\s/u.test(heroHeading) || /\b(?:agend|escrib|llam|contact)[aáeéiíoóuú]?\b/iu.test(heroHeading)) heroFindings.push(findings('heroQuality', `#${heroSection?.id || 'hero'} h1`, 'propuesta de valor sin datos ni CTA', heroHeading))
+  const ctaElements = [...String(html || '').matchAll(/<(a|button)\b([^>]*)>([\s\S]*?)<\/(?:a|button)>/giu)].filter((match) => !/theme-toggle/iu.test(match[2]) && (/\bcta\b/iu.test(match[2]) || match[1].toLowerCase() === 'button')).map((match) => ({ selector: match[1].toLowerCase() === 'button' ? 'button' : 'a.cta', text: customerQaText(match[3]) }))
+  const ctaFindings = []
+  for (const cta of ctaElements) { if (cta.text.length > 72 || cta.text.split(/\s+/u).length > 9) ctaFindings.push(findings('ctaQuality', cta.selector, 'CTA breve de acción', cta.text)); if (/\b(?:1[.)]|2[.)]|3[.)])\s/u.test(cta.text)) ctaFindings.push(findings('ctaQuality', cta.selector, 'una sola acción, sin enumeración', cta.text)); if (cta.text.length > 40 && customerQaText(html).split(cta.text).length - 1 > 1) ctaFindings.push(findings('ctaQuality', cta.selector, 'supportingText separado del botón', cta.text)) }
+  const trustFindings = []
+  for (const match of [...String(trustSection?.source || '').matchAll(/<h3\b[^>]*>([\s\S]*?)<\/h3>/giu)]) if (/^(?:criterio|raz[oó]n|punto|item|confianza|calidad)\s*\d*$/iu.test(customerQaText(match[1]))) trustFindings.push(findings('trustHeadingQuality', `#${trustSection?.id || 'trust'} h3`, 'título de confianza concreto', match[1]))
+  const faqHeading = customerQaText(faqSection?.source.match(/<h2\b[^>]*>([\s\S]*?)<\/h2>/iu)?.[1]); const faqFindings = []
+  for (const match of [...String(faqSection?.source || '').matchAll(/<summary\b[^>]*>([\s\S]*?)<\/summary>/giu)]) { const question = customerQaText(match[1]); if (faqHeading && question && (faqHeading.toLocaleLowerCase() === question.toLocaleLowerCase() || lexicalSimilarity(faqHeading, question) >= 0.88)) faqFindings.push(findings('faqHeadingQuality', `#${faqSection?.id || 'faq'} h2`, 'heading distinto de las preguntas FAQ', faqHeading)) }
+  const languageFindings = []; const visibleLabels = [...String(html || '').matchAll(/<(?:h1|h2|h3|strong)\b[^>]*>([\s\S]*?)<\/(?:h1|h2|h3|strong)>/giu)].map((match) => customerQaText(match[1])); for (const value of visibleLabels) if (/^(?:entender\s+qu[eé]\s+ofrece|presentar\s+una\s+propuesta|conducir\s+a\s+la\s+conversaci[oó]n)\b/iu.test(value)) languageFindings.push(findings('customerFacingLanguage', 'customer-facing heading', 'copy dirigido al cliente', value))
+  return { heroQuality: customerQaGate(heroFindings), ctaQuality: customerQaGate(ctaFindings), trustHeadingQuality: customerQaGate(trustFindings), faqHeadingQuality: customerQaGate(faqFindings), customerFacingLanguage: customerQaGate(languageFindings), contactSectionId: contactSection?.id || null }
+}
 const SEMANTIC_FAQ_SOURCES = new Set(['businessUnderstanding.customerQuestions', 'ContentPlanV2.faq'])
 const SEMANTIC_TRUST_SOURCES = new Set(['businessUnderstanding.trustDrivers', 'ContentPlanV2.trust'])
 function provenanceSource(item) {
@@ -187,4 +208,4 @@ function snapshotFiles(root, relativePaths) {
   return Object.fromEntries(relativePaths.map((relativePath) => [relativePath, fs.readFileSync(`${root}/${relativePath}`).toString('hex')]))
 }
 
-module.exports = { WCAG_THRESHOLDS, contrastRatio, parseTokens, assessTheme, assessArtifact, assessCrossSectionRepetition, artifactSectionCopy, assertArtifactQuality, assessContentQuality, assertContentQuality, snapshotFiles }
+module.exports = { WCAG_THRESHOLDS, contrastRatio, parseTokens, assessTheme, assessArtifact, assessCrossSectionRepetition, assessCustomerFacingCopy, artifactSectionCopy, assertArtifactQuality, assessContentQuality, assertContentQuality, snapshotFiles }
