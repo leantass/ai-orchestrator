@@ -1,3 +1,9 @@
+# ESTADO VIGENTE — 2026-09-24
+
+Este encabezado supersede el estado histórico de agosto. Desde entonces se implementó y validó el pipeline semántico real: existe un ciclo aprobado `version-v0001 → version-v0006`, con rechazos humanos durables, provider OpenAI real, Model Router V2, BrowserQuality real y aprobación humana durable.
+
+Ver [ORQUESTADOR_REAL_SEMANTIC_CYCLE_2026-09-24.md](ORQUESTADOR_REAL_SEMANTIC_CYCLE_2026-09-24.md). Esto no significa production-ready: el ciclo fue un controlled smoke en `.codex-temp`, con ID `smoke` oculto para la UI y deep-link; falta demostrar `REAL_USER_PROJECT_FLOW_V1` desde creación normal hasta aprobación sin harness.
+
 # Estado actual canónico del Orquestador
 
 Fecha de cierre documental: 2026-08-26. Rama: `integration/orquestador-canonical-v1`.
