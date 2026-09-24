@@ -151,7 +151,7 @@ function grammarEntries(planning) {
     ...(ownership.presentationOwner !== null && expected('hero') ? [['title', content.title, 'heading']] : []),
     ...(ownership.presentationOwner === 'hero' ? [['hero.lede', content.presentation || content.subtitle, 'body']] : []),
     ...(ownership.presentationOwner === 'presentation' ? [['presentation.body', content.presentation || content.subtitle, 'body']] : []),
-    ...(expected('services', 'service', 'service-catalog') && Array.isArray(content.benefits) ? content.benefits.map((value, index) => [`benefits[${index}]`, value, 'body']) : []),
+    ...(expected('services', 'service', 'service-catalog') && planning?.semanticRefs?.contentPlan === 'ContentPlanV2' && Array.isArray(content.services) && content.services.some((item) => item?.source === 'ContentPlanV2.services') ? content.services.flatMap((item, index) => [[`services[${index}].title`, item.title, 'heading'], [`services[${index}].description`, item.description, 'body']]) : expected('services', 'service', 'service-catalog') && Array.isArray(content.benefits) ? content.benefits.map((value, index) => [`benefits[${index}]`, value, 'body']) : []),
     ...(expected('trust', 'proof') && Array.isArray(content.trust) ? content.trust.map((value, index) => [`trust[${index}]`, value, 'body']) : []),
     ...(expected('faq', 'question') && Array.isArray(content.faq) ? content.faq.flatMap((item, index) => [[`faq[${index}].question`, item?.question, 'question'], [`faq[${index}].answer`, item?.answer, 'answer']]) : []),
     ...(expected('contact', 'conversion', 'conversion-form') ? [['cta.label', content.ctas?.[0], 'cta']] : []),
@@ -179,7 +179,7 @@ function expectedArtifactCustomerText(planning) {
     ...(ownership.presentationOwner === null && expected('hero', 'presentation', 'narrative') ? [content.title, content.subtitle] : []),
     ...(ownership.presentationOwner !== null && expected('hero') ? [content.title] : []),
     ...(ownership.presentationOwner ? [content.presentation || content.subtitle] : []),
-    ...(expected('services', 'service', 'service-catalog') ? (content.benefits || []) : []),
+    ...(expected('services', 'service', 'service-catalog') ? (planning?.semanticRefs?.contentPlan === 'ContentPlanV2' && Array.isArray(content.services) && content.services.some((item) => item?.source === 'ContentPlanV2.services') ? content.services.flatMap((item) => [item.title, item.description]) : (content.benefits || [])) : []),
     ...(expected('trust', 'proof') ? (content.trust || []) : []),
     ...(expected('faq', 'question') ? (content.faq || []).flatMap((item) => item.question === item.answer ? [item.question] : [item.question, item.answer]) : []),
     ...(expected('contact', 'conversion', 'conversion-form') ? [content.ctas?.[0]] : []),
@@ -455,7 +455,7 @@ function validateProductPlanning(value) {
   if (!Array.isArray(value.content.benefits) || !Array.isArray(value.content.trust) || !Array.isArray(value.content.services) || !plain(value.content.hero) || !plain(value.content.contact) || !Array.isArray(value.content.faq) || !value.content.ctas?.length) fail('INVALID_PRODUCT_PLANNING', 'El contenido no tiene sus contratos customer-facing completos.')
   if (value.content.businessUnderstanding) {
     const understanding = value.content.businessUnderstanding
-    if (!Array.isArray(understanding.customerNeeds) || !Array.isArray(understanding.customerQuestions) || !Array.isArray(understanding.trustDrivers) || value.content.services.some((item) => !plain(item) || !item.title || !item.description || item.source !== 'brief.services') || !Array.isArray(value.content.trustItems) || value.content.trustItems.some((item) => !plain(item) || !item.title || !item.description || item.source !== 'businessUnderstanding.trustDrivers') || value.content.faq.some((item) => item.source !== 'businessUnderstanding.customerQuestions')) fail('INVALID_PRODUCT_PLANNING', 'El contenido semántico no tiene sus contratos customer-facing completos.')
+    if (!Array.isArray(understanding.customerNeeds) || !Array.isArray(understanding.customerQuestions) || !Array.isArray(understanding.trustDrivers) || value.content.services.some((item) => !plain(item) || !item.title || !item.description || !['brief.services', 'ContentPlanV2.services'].includes(item.source)) || !Array.isArray(value.content.trustItems) || value.content.trustItems.some((item) => !plain(item) || !item.title || !item.description || item.source !== 'businessUnderstanding.trustDrivers') || value.content.faq.some((item) => item.source !== 'businessUnderstanding.customerQuestions')) fail('INVALID_PRODUCT_PLANNING', 'El contenido semántico no tiene sus contratos customer-facing completos.')
   }
   return freeze(stable(value))
 }

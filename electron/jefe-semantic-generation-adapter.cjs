@@ -127,9 +127,9 @@ function semanticFaq(value) {
 }
 function semanticServices(values) {
   return values.map((value) => {
-    if (value && typeof value === 'object') return { title: copy(value.title), description: bodySentence(value.description), source: 'brief.services', ...(value.value ? { value: copy(value.value) } : {}) }
+    if (value && typeof value === 'object') return { title: copy(value.title), description: bodySentence(value.description), source: 'ContentPlanV2.services', ...(value.value ? { value: copy(value.value) } : {}) }
     const exact = copy(value)
-    return { title: exact, description: bodySentence(exact), source: 'brief.services' }
+    return { title: exact, description: bodySentence(exact), source: 'brief.services', legacy: true }
   })
 }
 function semanticTrust(values, businessUnderstanding) {

@@ -20,7 +20,8 @@ const sections = [
 const contentPlan = { schemaVersion: 'content-plan-v2', hero: 'Una propuesta clara.', presentation: 'Una explicación útil.', services: ['Servicios diferenciados.'], trust: ['Criterios verificables.'], faq: [{ question: '¿Cómo empieza?', answer: 'Empieza con un brief claro.' }, { question: '¿Qué incluye?', answer: 'Incluye alcance y seguimiento.' }, { question: '¿Cuánto tarda?', answer: 'Cada etapa tiene plazos visibles.' }, { question: '¿Cómo revisamos?', answer: 'Revisamos cada hito.' }], contact: 'Conversar', contentPriorities: ['claridad'], sections }
 const businessUnderstanding = { schemaVersion: 'business-understanding-v2', businessType: 'servicios', businessModel: 'consultoría', audience: 'equipos', primaryGoal: 'ordenar la operación', customerNeeds: ['claridad'], customerQuestions: ['alcance'], trustDrivers: ['criterios'], conversionActions: ['conversar'], serviceModel: 'acompañamiento', domainVocabulary: ['entregables'], tone: 'claro' }
 const experiencePlan = { schemaVersion: 'experience-plan-v2', contentSectionCatalogHash: null, archetype: 'guided', sectionOrder: sections.map((item) => item.id), heroVariant: 'focused', sectionTreatments: ['semantic'], contentDensity: 'balanced', ctaPositions: ['inicio-principal', 'accion-final'], servicesTreatment: 'cards', trustTreatment: 'proof', faqTreatment: 'accordion', conversionStrategy: 'consultation' }
-function fakeComposition(content = contentPlan) {
+const contentPlanV2 = { ...contentPlan, services: [{ title: 'Servicios diferenciados', description: 'Ofrecemos servicios concretos con alcance visible.' }], trust: [{ title: 'Criterios verificables', description: 'Cada entrega tiene criterios visibles.' }], contact: { ctaLabel: 'Conversar', supportingText: 'Podés conversar sobre el próximo paso.' } }
+function fakeComposition(content = contentPlanV2) {
   const provider = { providerId: 'offline-fixture', model: 'balanced-model', enabled: true, credentialAvailable: true }
   const brain = { async decide({ operation, input }) { if (operation === 'business_understanding') return { decision: businessUnderstanding }; if (operation === 'content_plan') return { decision: content }; const catalog = JSON.parse(input.at(-1).content[0].text).contentSectionCatalog; return { decision: { ...experiencePlan, sectionOrder: catalog.map((item) => item.id) } } } }
   return createSemanticRuntimeComposition({ root, mode: 'productive', semanticProvider: provider, semanticBrainAdapter: brain, callBudget: new ProviderRunBudget({ runId: `offline-${Date.now()}`, maxCalls: 6 }), env: { AI_ORCHESTRATOR_SEMANTIC_BRAIN_ENABLED: 'true' } })
@@ -29,7 +30,7 @@ const validPhases = []
 await fakeComposition().runSemanticPlans({ brief: { audience: 'equipos', objective: 'ordenar', services: ['servicio'], customerNeeds: ['claridad'], trustDrivers: ['criterios'], conversionActions: ['conversar'] }, onPhase: async (phase) => validPhases.push(phase) })
 assert.ok(validPhases.includes('CONTENT_PLAN_READY'))
 const invalidPhases = []
-const invalid = { ...contentPlan, sections: sections.map((item) => item.id === 'oferta-profesional' ? { ...item, kind: 'proof' } : item) }
+const invalid = { ...contentPlanV2, sections: sections.map((item) => item.id === 'oferta-profesional' ? { ...item, kind: 'proof' } : item) }
 await assert.rejects(() => fakeComposition(invalid).runSemanticPlans({ brief: { audience: 'equipos', objective: 'ordenar', services: ['servicio'], customerNeeds: ['claridad'], trustDrivers: ['criterios'], conversionActions: ['conversar'] }, onPhase: async (phase) => invalidPhases.push(phase) }), { code: 'SEMANTIC_SECTION_CONTENT_MISMATCH' })
 assert.deepEqual(invalidPhases, ['BUSINESS_UNDERSTANDING_READY'])
 await fs.rm(root, { recursive: true, force: true })

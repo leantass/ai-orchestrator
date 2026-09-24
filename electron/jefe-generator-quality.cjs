@@ -118,6 +118,33 @@ function assessCrossSectionRepetition({ html } = {}) {
 function customerQaText(value) { return String(value || '').replace(/&amp;/gu, '&').replace(/&lt;/gu, '<').replace(/&gt;/gu, '>').replace(/&quot;/gu, '"').replace(/&#39;/gu, "'").replace(/<[^>]+>/gu, ' ').replace(/\s+/gu, ' ').trim() }
 function customerQaSections(html) { return [...String(html || '').matchAll(/<section\b[^>]*\bid=["']([^"']+)["'][^>]*>([\s\S]*?)<\/section>/giu)].map((match) => ({ id: match[1], source: match[2] })) }
 function customerQaGate(findings) { return { status: findings.length ? 'NEEDS_CORRECTION' : 'PASS', pass: findings.length === 0, findingCount: findings.length, findings } }
+function serviceTitleGeneric(value) { return /^(?:pack|paquete|servicio|plan|opci[oó]n)\s*\d+\s*$/iu.test(String(value || '').trim()) }
+function serviceCardFinding(selector, expected, actual, similarity = null) { return { severity: 'error', category: 'serviceCardQuality', selector, expected, actual: String(actual || '').slice(0, 300), ...(Number.isFinite(similarity) ? { similarity: Number(similarity.toFixed(3)) } : {}) } }
+function serviceCardQuality(planning, html) {
+  const planningFindings = []
+  const services = Array.isArray(planning?.content?.services) ? planning.content.services : []
+  services.forEach((item, index) => {
+    if (!item || typeof item !== 'object') return
+    if (item.source && item.source !== 'ContentPlanV2.services') return
+    const selector = `.benefit-card:nth-child(${index + 1})`; const title = String(item.title || '').trim(); const description = String(item.description || '').trim(); const normalizedTitle = repetitionNormalization(title); const normalizedDescription = repetitionNormalization(description).replace(/[.!?]+$/u, '')
+    if (!title || !description) planningFindings.push(serviceCardFinding(selector, 'título y descripción no vacíos', title || description || 'vacío'))
+    if (serviceTitleGeneric(title)) planningFindings.push(serviceCardFinding(selector, 'título customer-facing significativo', title))
+    if (title.length > 80 || title.split(/\s+/u).length > 12) planningFindings.push(serviceCardFinding(selector, 'título de hasta 80 caracteres y 12 palabras', title))
+    if (normalizedTitle === normalizedDescription) planningFindings.push(serviceCardFinding(selector, 'título distinto de la descripción', title, 1))
+    else if (title.split(/\s+/u).length >= 4 && description.split(/\s+/u).length >= 8 && lexicalSimilarity(title, description) >= 0.9) planningFindings.push(serviceCardFinding(selector, 'descripción claramente más informativa', description, lexicalSimilarity(title, description)))
+  })
+  const decode = (value) => customerQaText(value)
+  const renderedFindings = []
+  if (planning?.semanticRefs?.contentPlan !== 'ContentPlanV2') return { serviceCardQuality: customerQaGate(planningFindings), renderedServiceCardQuality: customerQaGate(renderedFindings) }
+  const cards = [...String(html || '').matchAll(/<([a-z][a-z0-9-]*)\b[^>]*class=["'][^"']*benefit-card[^"']*["'][^>]*>([\s\S]*?)<\/\1>/giu)]
+  cards.forEach((match, index) => {
+    const source = match[2]; const title = decode(source.match(/<h3\b[^>]*>([\s\S]*?)<\/h3>/iu)?.[1]); const description = decode(source.match(/<p\b[^>]*>([\s\S]*?)<\/p>/iu)?.[1]); const selector = `.benefit-card:nth-child(${index + 1})`; const similarity = lexicalSimilarity(title, description)
+    if (!title || !description) renderedFindings.push(serviceCardFinding(selector, 'card con h3 y p separados', title || description || 'vacío'))
+    if (serviceTitleGeneric(title)) renderedFindings.push(serviceCardFinding(selector, 'título customer-facing significativo', title))
+    if (repetitionNormalization(title) === repetitionNormalization(description).replace(/[.!?]+$/u, '') || (title.split(/\s+/u).length >= 4 && description.split(/\s+/u).length >= 8 && similarity >= 0.9)) renderedFindings.push(serviceCardFinding(selector, 'h3 distinto del párrafo principal', description, similarity))
+  })
+  return { serviceCardQuality: customerQaGate(planningFindings), renderedServiceCardQuality: customerQaGate(renderedFindings) }
+}
 function assessCustomerFacingCopy({ html, planning } = {}) {
   const sections = customerQaSections(html); const selection = resolveArtifactContentSelection(planning); const findings = (category, selector, expected, actual) => ({ category, selector, expected, actual: String(actual || '').slice(0, 300) })
   const sectionFor = (ref) => { const ids = selection.sectionIdsFor(ref); return sections.find((item) => ids.includes(item.id)) }
@@ -208,4 +235,4 @@ function snapshotFiles(root, relativePaths) {
   return Object.fromEntries(relativePaths.map((relativePath) => [relativePath, fs.readFileSync(`${root}/${relativePath}`).toString('hex')]))
 }
 
-module.exports = { WCAG_THRESHOLDS, contrastRatio, parseTokens, assessTheme, assessArtifact, assessCrossSectionRepetition, assessCustomerFacingCopy, artifactSectionCopy, assertArtifactQuality, assessContentQuality, assertContentQuality, snapshotFiles }
+module.exports = { WCAG_THRESHOLDS, contrastRatio, parseTokens, assessTheme, assessArtifact, assessCrossSectionRepetition, assessCustomerFacingCopy, serviceCardQuality, artifactSectionCopy, assertArtifactQuality, assessContentQuality, assertContentQuality, snapshotFiles }
