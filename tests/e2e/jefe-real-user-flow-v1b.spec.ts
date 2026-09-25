@@ -90,7 +90,7 @@ test('normal user semantic correction flow', async ({ page }) => {
   await shot('11-correcting.png')
 
   await expect(page.getByText(/Pendiente de revisión|Nueva versión semántica preparada/u)).toBeVisible({ timeout: 7 * 60 * 1000 })
-  await expect(page.getByText(/Pendiente de revisión/u)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/Pendiente de revisión/u).first()).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('button', { name: /Aprobar preview/u })).toBeVisible()
   await shot('12-new-version.png')
 
