@@ -5,8 +5,9 @@ import path from 'node:path'
 test('normal user semantic correction flow', async ({ page }) => {
   const qaRoot = path.resolve(process.env.JEFE_QA_ROOT || '.codex-temp/autonomous-quality-closure/runs/local')
   const screenshots = path.join(qaRoot, 'screenshots')
-  const brief = `Quiero crear el sitio web de Impulso PyME, una consultora argentina que ayuda a pequeñas empresas y comercios a ordenar sus procesos, automatizar tareas y mejorar sus ventas.\n\nEl público principal son dueños y responsables de PyMEs que necesitan soluciones claras y prácticas, sin lenguaje técnico innecesario.\n\nLos servicios principales son diagnóstico de procesos, automatización operativa y acompañamiento en la implementación.\n\nQuiero que la web se vea profesional, moderna y cercana. Debe explicar claramente qué hacemos, cómo trabajamos, qué beneficios concretos obtiene el cliente, incluir preguntas frecuentes y una forma simple de contacto.\n\nLa acción principal debe ser solicitar una reunión.`
-  const objective = 'Generar reuniones con dueños y responsables de PyMEs mostrando de forma clara cómo Impulso PyME ordena procesos, automatiza tareas y acompaña la implementación con mejoras medibles.'
+  const projectName = process.env.JEFE_E2E_PROJECT_NAME || 'Impulso PyME'
+  const brief = `Quiero crear el sitio web de ${projectName}, una consultora argentina que ayuda a pequeñas empresas y comercios a ordenar sus procesos, automatizar tareas y mejorar sus ventas.\n\nEl público principal son dueños y responsables de PyMEs que necesitan soluciones claras y prácticas, sin lenguaje técnico innecesario.\n\nLos servicios principales son diagnóstico de procesos, automatización operativa y acompañamiento en la implementación.\n\nQuiero que la web se vea profesional, moderna y cercana. Debe explicar claramente qué hacemos, cómo trabajamos, qué beneficios concretos obtiene el cliente, incluir preguntas frecuentes y una forma simple de contacto.\n\nLa acción principal debe ser solicitar una reunión.`
+  const objective = `Generar reuniones con dueños y responsables de PyMEs mostrando de forma clara cómo ${projectName.replace(' Final', '')} ayuda a ordenar procesos, automatizar tareas y acompañar la implementación con mejoras medibles.`
   const business = 'Consultora para PyMEs'
   const audience = 'Dueños y responsables de pequeñas y medianas empresas, comercios y equipos que necesitan ordenar procesos, reducir tareas manuales y mejorar sus ventas sin depender de soluciones técnicas complejas.'
   const proposition = 'Ayudamos a PyMEs a detectar problemas operativos, simplificar procesos y automatizar tareas concretas. Trabajamos con diagnóstico, implementación práctica y acompañamiento para lograr mejoras medibles sin sumar complejidad innecesaria.'
@@ -18,7 +19,7 @@ test('normal user semantic correction flow', async ({ page }) => {
   await shot('01-step1.png')
   await page.getByRole('button', { name: /Sitio web/u }).click()
   await page.getByRole('button', { name: /Empezar/u }).click()
-  await fillLabel('Nombre del proyecto', 'Impulso PyME')
+  await fillLabel('Nombre del proyecto', projectName)
   await fillLabel('¿Qué necesitás construir?', brief)
   expect(brief.length).toBeGreaterThan(600)
   expect(brief.length).toBeLessThanOrEqual(4000)
@@ -34,7 +35,7 @@ test('normal user semantic correction flow', async ({ page }) => {
   await shot('02-step2.png')
   await page.getByRole('button', { name: 'Guardar borrador', exact: true }).click()
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('jefe-commercial-draft-v1') || 'null'))
-  expect(saved).toMatchObject({ name: 'Impulso PyME', need: brief, objective, businessType: business, audience, proposition, cta: 'Solicitar una reunión' })
+  expect(saved).toMatchObject({ name: projectName, need: brief, objective, businessType: business, audience, proposition, cta: 'Solicitar una reunión' })
   await page.reload()
   await expect(page.getByRole('button', { name: 'Continuar borrador', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Continuar borrador', exact: true }).click()
@@ -48,7 +49,7 @@ test('normal user semantic correction flow', async ({ page }) => {
   await page.getByRole('button', { name: /Comercial/u }).click()
   await shot('05-commercial.png')
   await page.getByRole('button', { name: /Continuar/u }).click()
-  await expect(page.getByText('Impulso PyME', { exact: true })).toBeVisible()
+  await expect(page.getByText(projectName, { exact: true })).toBeVisible()
   await expect(page.locator('[data-review-field="objective"]')).toHaveAttribute('data-review-value', objective)
   await expect(page.getByText('Solicitar una reunión', { exact: true })).toBeVisible()
   await shot('06-review.png', ['wizard-review.png'])
@@ -61,13 +62,14 @@ test('normal user semantic correction flow', async ({ page }) => {
   const projectPath = new URL(page.url()).pathname
   const projectId = decodeURIComponent(projectPath.split('/')[2])
   expect(projectId).toMatch(/^impulso-pyme-/u)
+  expect(projectId).not.toMatch(/(?:qa|test|fixture|smoke|factory|pipeline)/iu)
   await shot('07-workspace.png', ['workspace-initial.png'])
 
   await page.getByRole('button', { name: 'Inicio', exact: true }).click()
   await page.getByRole('button', { name: 'Proyectos', exact: true }).click()
-  const projectTile = page.getByRole('button', { name: /Impulso PyME/u }).first()
+  const projectTile = page.getByRole('button', { name: new RegExp(projectName, 'u') }).first()
   await expect(projectTile).toBeVisible()
-  await expect(page.getByRole('button', { name: /Impulso PyME/u })).toHaveCount(1)
+  await expect(page.getByRole('button', { name: new RegExp(projectName, 'u') })).toHaveCount(1)
   await shot('08-projects.png', ['projects-list.png'])
   await projectTile.click()
   await expect(page).toHaveURL(new RegExp(`/projects/${projectId}$`))
@@ -129,7 +131,7 @@ test('normal user semantic correction flow', async ({ page }) => {
   await expect(page.getByText(/Estado durable:/u)).toContainText('Aprobado')
   await shot('14-approved.png', ['approved.png'])
 
-  const projectRoot = path.resolve('.codex-temp/real-user-flow-v1b-e2e/appdata/ai-orchestrator/jefe-canonical-projects', projectId)
+  const projectRoot = path.resolve(process.env.JEFE_E2E_PROJECT_ROOT || path.join(process.env.APPDATA || '', 'ai-orchestrator', 'jefe-canonical-projects'), projectId)
   const manifests = await fs.readdir(projectRoot)
   expect(manifests).toContain('version-v0001')
   expect(manifests.length).toBeGreaterThanOrEqual(1)
