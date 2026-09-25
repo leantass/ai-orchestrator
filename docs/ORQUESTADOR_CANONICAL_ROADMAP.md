@@ -150,3 +150,8 @@ Esta sección supersede los estados históricos incompatibles que siguen más ab
 También existe el ciclo real previo `version-v0001 → version-v0006` con rechazos y aprobación humana durable, documentado en [ORQUESTADOR_REAL_SEMANTIC_CYCLE_2026-09-24.md](ORQUESTADOR_REAL_SEMANTIC_CYCLE_2026-09-24.md). La aprobación automatizada de QA no equivale a aprobación humana.
 
 Por lo tanto, las menciones históricas a Escalón 7 pendiente, Playwright no verificado, preview visual ausente o Browser QA no demostrado quedan supersedidas para el estado vigente. Esto no declara production-ready ni inicia automáticamente los Escalones 8–12. La aceptación del flujo normal de usuario se valida por separado.
+# ESTADO CANÓNICO VIGENTE — 2026-09-25
+
+Estados actuales: `ESCALON_1_STATUS=VERIFIED_CLOSED`, `ESCALON_2_STATUS=VERIFIED_CLOSED`, `ESCALON_3_STATUS=VERIFIED_CLOSED`, `ESCALON_4_STATUS=VERIFIED_CLOSED`, `ESCALON_5_STATUS=VERIFIED_CLOSED`, `ESCALON_6_STATUS=VERIFIED_CLOSED`, `ESCALON_7_STATUS=VERIFIED_CLOSED`, `ESCALON_8_STATUS=IN_PROGRESS`, `ESCALON_9_STATUS=NOT_STARTED`, `ESCALON_10_STATUS=PARTIAL_EXISTING_FOUNDATION`, `ESCALON_11_STATUS=NOT_STARTED`, `ESCALON_12_STATUS=NOT_STARTED`.
+
+La cabecera histórica debajo se conserva como registro y no es autoridad vigente. Escalón 7 está cerrado localmente con Human Gate durable, preview real, BrowserQuality y Playwright; esto no afirma autenticación remota/multiusuario ni production-ready. Playwright está `INTEGRATED_VERIFIED_LOCAL`; Vitest, axe-core y Lighthouse no se declaran verificados por este roadmap.

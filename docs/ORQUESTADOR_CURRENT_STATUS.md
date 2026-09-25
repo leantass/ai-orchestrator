@@ -123,3 +123,8 @@ El flujo normal de usuario fue aceptado mediante Playwright Chromium headless us
 La evidencia está en [NORMAL_USER_FLOW_ACCEPTANCE_2026-09-25.md](NORMAL_USER_FLOW_ACCEPTANCE_2026-09-25.md). La aceptación creó un proyecto normal nuevo, ejecutó borrador, creación, Projects, preview, rechazo, corrección semántica real, nueva versión, quality y aprobación automatizada. `AutomatedAcceptanceApproval=true`; `RealHumanApproval=false`. Esto no declara production-ready.
 
 El primer proyecto de esta fase quedó bloqueado por el gate de legibilidad del hero; se hizo fix-forward con regresión y se creó un segundo proyecto normal nuevo. El segundo run terminó `PROMOTED`, preservó la versión fuente y dejó `version-v0001` aprobado mecánicamente. Los proyectos y screenshots son evidencia local deliberada y no deben limpiarse sin decisión de retención.
+# ESTADO VIGENTE — 2026-09-25 · ESCALÓN 8A
+
+Escalón 7 está `VERIFIED_CLOSED` en alcance local demostrado. Escalón 8 está `IN_PROGRESS`; 8A (`Git / CI / Delivery Contract + Policy`) está `COMPLETED`, mientras 8B, 8C y 8D siguen `NOT_STARTED`. El contrato separa aprobación, delivery local, commit preparado, autorización remota, CI remoto, release y deploy; no ejecuta mutaciones remotas.
+
+La especificación es [ORQUESTADOR_ESCALON_8_GIT_CI_DELIVERY.md](ORQUESTADOR_ESCALON_8_GIT_CI_DELIVERY.md). `NEXT=ESCALON_8B_DURABLE_ORCHESTRATION`. El lint global conserva deuda histórica no relacionada; el lint focal y las validaciones de 8A fueron ejecutados por separado.
