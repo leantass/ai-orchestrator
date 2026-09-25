@@ -62,9 +62,10 @@ test('normal user semantic correction flow', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Inicio', exact: true }).click()
   await page.getByRole('button', { name: 'Proyectos', exact: true }).click()
-  await expect(page.getByRole('button', { name: /Impulso PyME/u })).toBeVisible()
+  const projectTile = page.getByRole('button', { name: /Impulso PyME/u }).first()
+  await expect(projectTile).toBeVisible()
   await shot('08-projects.png')
-  await page.getByRole('button', { name: /Impulso PyME/u }).click()
+  await projectTile.click()
   await expect(page).toHaveURL(new RegExp(`/projects/${projectId}$`))
 
   const initialPopup = page.waitForEvent('popup')
