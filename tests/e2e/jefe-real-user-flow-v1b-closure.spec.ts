@@ -17,7 +17,7 @@ test('close persisted real semantic correction without another provider run', as
   await expect(preview.locator('body')).toContainText('Solicitar una reunión')
   for (const width of [1440, 1280, 1024, 768, 390]) {
     await preview.setViewportSize({ width, height: width < 600 ? 844 : 900 })
-    const layout = await preview.evaluate(() => ({ overflow: document.documentElement.scrollWidth - window.innerWidth, services: Boolean(document.querySelector('.benefit-grid')), faq: Boolean(document.querySelector('#faq')), contact: Boolean(document.querySelector('#primary-contact')) }))
+    const layout = await preview.evaluate(() => ({ overflow: document.documentElement.scrollWidth - window.innerWidth, services: Boolean(document.querySelector('#beneficios, .benefit-grid')), faq: Boolean(document.querySelector('#faq')), contact: Boolean(document.querySelector('#primary-contact')) }))
     expect(layout.overflow).toBeLessThanOrEqual(1)
     expect(layout.services).toBe(true)
     expect(layout.faq).toBe(true)
