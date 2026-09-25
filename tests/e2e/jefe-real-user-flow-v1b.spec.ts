@@ -90,6 +90,7 @@ test('normal user semantic correction flow', async ({ page }) => {
   await shot('10-rejected.png', ['rejected.png'])
 
   const correctionButton = page.getByRole('button', { name: 'Corregir versión', exact: true })
+  if (process.env.JEFE_E2E_PRE_CORRECTION_ONLY === '1') return
   await correctionButton.click()
   await expect(page.getByRole('button', { name: /JEFE está preparando una nueva versión/u })).toBeDisabled()
   await shot('11-correcting.png', ['correcting.png'])
