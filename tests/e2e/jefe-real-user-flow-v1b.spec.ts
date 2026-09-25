@@ -48,7 +48,7 @@ test('normal user semantic correction flow', async ({ page }) => {
   await shot('05-commercial.png')
   await page.getByRole('button', { name: /Continuar/u }).click()
   await expect(page.getByText('Impulso PyME', { exact: true })).toBeVisible()
-  await expect(page.getByText(objective, { exact: true })).toBeVisible()
+  await expect(page.locator('[data-review-field="objective"]')).toHaveAttribute('data-review-value', objective)
   await expect(page.getByText('Solicitar una reunión', { exact: true })).toBeVisible()
   await shot('06-review.png')
 
