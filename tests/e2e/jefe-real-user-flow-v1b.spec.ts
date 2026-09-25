@@ -3,14 +3,15 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 
 test('normal user semantic correction flow', async ({ page }) => {
-  const screenshots = path.resolve('.codex-temp/real-user-flow-v1b-e2e/screenshots')
+  const qaRoot = path.resolve(process.env.JEFE_QA_ROOT || '.codex-temp/autonomous-quality-closure/runs/local')
+  const screenshots = path.join(qaRoot, 'screenshots')
   const brief = `Quiero crear el sitio web de Impulso PyME, una consultora argentina que ayuda a pequeñas empresas y comercios a ordenar sus procesos, automatizar tareas y mejorar sus ventas.\n\nEl público principal son dueños y responsables de PyMEs que necesitan soluciones claras y prácticas, sin lenguaje técnico innecesario.\n\nLos servicios principales son diagnóstico de procesos, automatización operativa y acompañamiento en la implementación.\n\nQuiero que la web se vea profesional, moderna y cercana. Debe explicar claramente qué hacemos, cómo trabajamos, qué beneficios concretos obtiene el cliente, incluir preguntas frecuentes y una forma simple de contacto.\n\nLa acción principal debe ser solicitar una reunión.`
   const objective = 'Generar reuniones con dueños y responsables de PyMEs mostrando de forma clara cómo Impulso PyME ordena procesos, automatiza tareas y acompaña la implementación con mejoras medibles.'
   const business = 'Consultora para PyMEs'
   const audience = 'Dueños y responsables de pequeñas y medianas empresas, comercios y equipos que necesitan ordenar procesos, reducir tareas manuales y mejorar sus ventas sin depender de soluciones técnicas complejas.'
   const proposition = 'Ayudamos a PyMEs a detectar problemas operativos, simplificar procesos y automatizar tareas concretas. Trabajamos con diagnóstico, implementación práctica y acompañamiento para lograr mejoras medibles sin sumar complejidad innecesaria.'
   const rejection = 'Quiero que el hero sea más específico para PyMEs y que explique con mayor claridad el resultado esperado: ordenar procesos, reducir trabajo manual y mejorar ventas. Mantené la dirección comercial y la acción principal "Solicitar una reunión". Evitá repetir el mismo mensaje entre el hero y las secciones siguientes.'
-  const shot = async (name: string) => page.screenshot({ path: path.join(screenshots, name), fullPage: true })
+  const shot = async (name: string, aliases: string[] = []) => { const target = path.join(screenshots, name); await page.screenshot({ path: target, fullPage: true }); for (const alias of aliases) await fs.copyFile(target, path.join(screenshots, alias)) }
   const fillLabel = async (label: string, value: string) => { await page.getByLabel(label, { exact: false }).fill(value) }
 
   await page.goto('/')
@@ -50,21 +51,24 @@ test('normal user semantic correction flow', async ({ page }) => {
   await expect(page.getByText('Impulso PyME', { exact: true })).toBeVisible()
   await expect(page.locator('[data-review-field="objective"]')).toHaveAttribute('data-review-value', objective)
   await expect(page.getByText('Solicitar una reunión', { exact: true })).toBeVisible()
-  await shot('06-review.png')
+  await shot('06-review.png', ['wizard-review.png'])
 
   await page.getByRole('button', { name: /Crear primera versión/u }).click()
   await expect(page).toHaveURL(/\/projects\/[^/]+$/u, { timeout: 30_000 })
   await expect(page.getByText('Preview real', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Aprobar preview/u })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Rechazar preview', exact: true })).toHaveCount(0)
   const projectPath = new URL(page.url()).pathname
   const projectId = decodeURIComponent(projectPath.split('/')[2])
   expect(projectId).toMatch(/^impulso-pyme-/u)
-  await shot('07-workspace.png')
+  await shot('07-workspace.png', ['workspace-initial.png'])
 
   await page.getByRole('button', { name: 'Inicio', exact: true }).click()
   await page.getByRole('button', { name: 'Proyectos', exact: true }).click()
   const projectTile = page.getByRole('button', { name: /Impulso PyME/u }).first()
   await expect(projectTile).toBeVisible()
-  await shot('08-projects.png')
+  await expect(page.getByRole('button', { name: /Impulso PyME/u })).toHaveCount(1)
+  await shot('08-projects.png', ['projects-list.png'])
   await projectTile.click()
   await expect(page).toHaveURL(new RegExp(`/projects/${projectId}$`))
 
@@ -76,23 +80,24 @@ test('normal user semantic correction flow', async ({ page }) => {
   await expect(initialPreview.locator('body')).toContainText(/faq|preguntas/iu)
   await expect(initialPreview.locator('body')).toContainText(/Contacto|Solicitar/u)
   await initialPreview.screenshot({ path: path.join(screenshots, '09-initial-preview.png'), fullPage: true })
+  await fs.copyFile(path.join(screenshots, '09-initial-preview.png'), path.join(screenshots, 'initial-preview.png'))
   await initialPreview.close()
 
   await fillLabel('Motivo del rechazo', rejection)
   await page.getByRole('button', { name: 'Rechazar preview', exact: true }).click()
   await expect(page.getByText(/Estado durable:/u)).toContainText('Rechazado')
   await expect(page.getByRole('button', { name: 'Corregir versión', exact: true })).toBeVisible()
-  await shot('10-rejected.png')
+  await shot('10-rejected.png', ['rejected.png'])
 
   const correctionButton = page.getByRole('button', { name: 'Corregir versión', exact: true })
   await correctionButton.click()
   await expect(page.getByRole('button', { name: /JEFE está preparando una nueva versión/u })).toBeDisabled()
-  await shot('11-correcting.png')
+  await shot('11-correcting.png', ['correcting.png'])
 
   await expect(page.getByText(/Pendiente de revisión|Nueva versión semántica preparada/u)).toBeVisible({ timeout: 7 * 60 * 1000 })
   await expect(page.getByText(/Pendiente de revisión/u).first()).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('button', { name: /Aprobar preview/u })).toBeVisible()
-  await shot('12-new-version.png')
+  await shot('12-new-version.png', ['new-version.png'])
 
   const correctedPopup = page.waitForEvent('popup')
   await page.getByRole('button', { name: /Abrir preview real/u }).click()
@@ -100,12 +105,23 @@ test('normal user semantic correction flow', async ({ page }) => {
   await correctedPreview.waitForLoadState('domcontentloaded')
   await expect(correctedPreview.locator('body')).toContainText('Solicitar una reunión')
   await expect(correctedPreview.locator('h1').first()).toBeVisible()
-  await correctedPreview.screenshot({ path: path.join(screenshots, '13-corrected-preview.png'), fullPage: true })
+  const responsiveScreenshots = [1440, 1280, 1024, 768, 390]
+  for (const width of responsiveScreenshots) {
+    await correctedPreview.setViewportSize({ width, height: width < 600 ? 844 : 900 })
+    const layout = await correctedPreview.evaluate(() => ({ overflow: document.documentElement.scrollWidth - window.innerWidth, h1: Boolean(document.querySelector('h1')), cta: [...document.querySelectorAll('a.cta, form button, button')].some((item) => item.textContent?.trim() === 'Solicitar una reunión'), services: Boolean(document.querySelector('.benefit-grid')), faq: Boolean(document.querySelector('#faq')), contact: Boolean(document.querySelector('#primary-contact')) }))
+    expect(layout.overflow).toBeLessThanOrEqual(1)
+    expect(layout.h1).toBe(true)
+    expect(layout.cta).toBe(true)
+    expect(layout.services).toBe(true)
+    expect(layout.faq).toBe(true)
+    expect(layout.contact).toBe(true)
+    await correctedPreview.screenshot({ path: path.join(screenshots, `corrected-preview-${width}.png`), fullPage: true })
+  }
   await correctedPreview.close()
 
   await page.getByRole('button', { name: /Aprobar preview/u }).click()
   await expect(page.getByText(/Estado durable:/u)).toContainText('Aprobado')
-  await shot('14-approved.png')
+  await shot('14-approved.png', ['approved.png'])
 
   const projectRoot = path.resolve('.codex-temp/real-user-flow-v1b-e2e/appdata/ai-orchestrator/jefe-canonical-projects', projectId)
   const manifests = await fs.readdir(projectRoot)

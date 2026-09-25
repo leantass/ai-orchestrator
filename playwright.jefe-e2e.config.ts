@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test'
 import path from 'node:path'
 
-const qaRoot = path.resolve('.codex-temp/real-user-flow-v1b-e2e')
+const qaRoot = path.resolve(process.env.JEFE_QA_ROOT || '.codex-temp/autonomous-quality-closure/runs/local')
 const qaAppData = path.join(qaRoot, 'appdata')
 const qaPort = 55129
 
@@ -12,6 +12,7 @@ export default defineConfig({
   timeout: 8 * 60 * 1000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
+  globalSetup: path.resolve('tests/e2e/jefe-real-user-flow-v1b.setup.ts'),
   reporter: [['line'], ['json', { outputFile: path.join(qaRoot, 'test-results', 'playwright.json') }]],
   outputDir: path.join(qaRoot, 'test-results'),
   use: {
