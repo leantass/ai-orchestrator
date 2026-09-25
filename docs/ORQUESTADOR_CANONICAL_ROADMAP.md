@@ -143,3 +143,10 @@ El alcance operativo detallado de `ESCALON_6_QA_SECURITY` está definido en su e
 ## Errata de estado vigente 2026-08-26
 
 Las referencias históricas de Escalón 6 como pendiente o en progreso quedan superseded por el estado prevalente: `ESCALON_6_STATUS=VERIFIED_CLOSED`; el estado vigente de 7 es `IMPLEMENTED_PENDING_HUMAN_GATE`. El cierre documental usa la evidencia v4-final aprobada externamente sobre `factory-qa-electron` (`factory_typed`).
+# ESTADO VIGENTE — 2026-09-25
+
+Esta sección supersede los estados históricos incompatibles que siguen más abajo como registro. El cierre autónomo documentado en [AUTONOMOUS_QUALITY_CLOSURE_2026-09-25.md](AUTONOMOUS_QUALITY_CLOSURE_2026-09-25.md) verificó Playwright Chromium headless, preview visual, BrowserQuality, corrección semántica real, grounding de claims, CTA human-owned y el Human Gate mecánico en un root QA aislado.
+
+También existe el ciclo real previo `version-v0001 → version-v0006` con rechazos y aprobación humana durable, documentado en [ORQUESTADOR_REAL_SEMANTIC_CYCLE_2026-09-24.md](ORQUESTADOR_REAL_SEMANTIC_CYCLE_2026-09-24.md). La aprobación automatizada de QA no equivale a aprobación humana.
+
+Por lo tanto, las menciones históricas a Escalón 7 pendiente, Playwright no verificado, preview visual ausente o Browser QA no demostrado quedan supersedidas para el estado vigente. Esto no declara production-ready ni inicia automáticamente los Escalones 8–12. La aceptación del flujo normal de usuario se valida por separado.
