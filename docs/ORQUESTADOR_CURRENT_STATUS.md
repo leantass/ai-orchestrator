@@ -116,3 +116,10 @@ Existe un cierre automatizado del flujo `REAL_USER_PROJECT_FLOW_V1B` con dos run
 La evidencia completa está en [AUTONOMOUS_QUALITY_CLOSURE_2026-09-25.md](AUTONOMOUS_QUALITY_CLOSURE_2026-09-25.md). La evidencia visual y los datos QA permanecen fuera de Git bajo `.codex-temp/autonomous-quality-closure`.
 
 Limitaciones vigentes: no hubo deploy ni producción externa, no se usaron conectores externos, y la validación browser fue aislada. La próxima fase es trasladar esta cobertura al flujo normal de proyecto de usuario sin harness especial, conservando los gates y la separación del Human Gate.
+# ESTADO VIGENTE — 2026-09-25 · NORMAL USER FLOW ACCEPTANCE
+
+El flujo normal de usuario fue aceptado mediante Playwright Chromium headless usando el `APPDATA` normal y el root default real de JEFE, sin `JEFE_WEB_DATA_ROOT`, controlled smoke, deep-link ni runner especial de persistencia. El proyecto histórico fue protegido por snapshot/hash y terminó con `ExistingProjectsMutated=0`.
+
+La evidencia está en [NORMAL_USER_FLOW_ACCEPTANCE_2026-09-25.md](NORMAL_USER_FLOW_ACCEPTANCE_2026-09-25.md). La aceptación creó un proyecto normal nuevo, ejecutó borrador, creación, Projects, preview, rechazo, corrección semántica real, nueva versión, quality y aprobación automatizada. `AutomatedAcceptanceApproval=true`; `RealHumanApproval=false`. Esto no declara production-ready.
+
+El primer proyecto de esta fase quedó bloqueado por el gate de legibilidad del hero; se hizo fix-forward con regresión y se creó un segundo proyecto normal nuevo. El segundo run terminó `PROMOTED`, preservó la versión fuente y dejó `version-v0001` aprobado mecánicamente. Los proyectos y screenshots son evidencia local deliberada y no deben limpiarse sin decisión de retención.
