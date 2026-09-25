@@ -100,7 +100,7 @@ test('normal user semantic correction flow', async ({ page }) => {
 
   await expect(page.getByText(/Pendiente de revisión|Nueva versión semántica preparada/u).first()).toBeVisible({ timeout: 7 * 60 * 1000 })
   await expect(page.getByText(/Pendiente de revisión/u).first()).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByRole('button', { name: /Aprobar preview/u })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Aprobar preview/u })).toHaveCount(0)
   await shot('12-new-version.png', ['new-version.png'])
 
   const correctedPopup = page.waitForEvent('popup')
@@ -122,6 +122,8 @@ test('normal user semantic correction flow', async ({ page }) => {
     await correctedPreview.screenshot({ path: path.join(screenshots, `corrected-preview-${width}.png`), fullPage: true })
   }
   await correctedPreview.close()
+
+  await expect(page.getByRole('button', { name: /Aprobar preview/u })).toBeVisible()
 
   await page.getByRole('button', { name: /Aprobar preview/u }).click()
   await expect(page.getByText(/Estado durable:/u)).toContainText('Aprobado')
