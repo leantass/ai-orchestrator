@@ -16,9 +16,9 @@ Ver [ORQUESTADOR_REAL_SEMANTIC_CYCLE_2026-09-24.md](ORQUESTADOR_REAL_SEMANTIC_CY
 
 Fecha de cierre documental: 2026-08-26. Rama: `integration/orquestador-canonical-v1`.
 
-Estado vigente posterior a la aprobación externa: `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`; `ESCALON_8_STATUS=NOT_STARTED`. La evidencia del 6 es `orquestador-visual-evidence-2026-08-26-v4-final.zip`; el 7 tiene implementación local, smoke de 25 casos y evidencia visual parcial en `orquestador-visual-evidence-escalon-7-final11.zip`, pero requiere gate humano y evidencia runtime del Bridge/workspace Electron.
+Registro histórico posterior a la aprobación externa, conservado sin borrar: en esa fecha el documento indicaba `ESCALON_6_STATUS=VERIFIED_CLOSED`, `ESCALON_7_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE` y `ESCALON_8_STATUS=NOT_STARTED`. No supersede el estado vigente de 2026-09-25.
 
-Registro histórico previo a la implementación local de 7: la evidencia v4-final fue revisada y aprobada externamente. El estado vigente de 7 es `IMPLEMENTED_PENDING_HUMAN_GATE`, como se declara arriba.
+Registro histórico previo a la implementación local de 7: la evidencia v4-final fue revisada y aprobada externamente.
 
 Estado prevalente de cierre: `ESCALON_1_STATUS=VERIFIED_CLOSED`; `ESCALON_2A_STATUS=COMPLETED`; `ESCALON_2B_STATUS=COMPLETED`; `ESCALON_2C_STATUS=COMPLETED`; `ESCALON_2D_STATUS=COMPLETED`; `ESCALON_2_STATUS=VERIFIED_CLOSED`; `RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`.
 

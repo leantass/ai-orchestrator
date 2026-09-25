@@ -8,7 +8,7 @@ Escalón 8B acredita persistencia durable, replay, CAS, locks locales al proceso
 
 El catálogo de pruebas queda en `Playwright=INTEGRATED_VERIFIED_LOCAL`; no se infiere integración de Vitest, axe-core o Lighthouse. Las líneas antiguas que indiquen Escalón 7 pendiente o Playwright no verificado se conservan como historia, pero no son el estado actual.
 
-Esta es la única autoridad posterior a Escalón 2. Estados: `ESCALON_1_STATUS=VERIFIED_CLOSED`, `ESCALON_2_STATUS=VERIFIED_CLOSED`, `ESCALON_3_STATUS=VERIFIED_CLOSED`, `ESCALON_4_STATUS=VERIFIED_CLOSED`, `ESCALON_5_STATUS=VERIFIED_CLOSED`, `ESCALON_6_STATUS=VERIFIED_CLOSED`, `ESCALON_7_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`, `ESCALON_8_STATUS=NOT_STARTED`, `ESCALON_9_STATUS=NOT_STARTED`, `ESCALON_10_STATUS=PARTIAL_EXISTING_FOUNDATION`, `ESCALON_11_STATUS=NOT_STARTED`, `ESCALON_12_STATUS=NOT_STARTED`.
+Registro histórico conservado de una fecha anterior al cierre de los escalones 7 y 8; no supersede el estado vigente de esta página.
 
 ## Estado vigente de cierre documental
 
