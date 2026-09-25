@@ -1,3 +1,11 @@
+## ESTADO VIGENTE — 2026-09-25
+
+Esta sección supersede las afirmaciones históricas incompatibles de agosto y de los cierres anteriores. El pipeline semántico real y el flujo normal de usuario ya fueron demostrados; la aprobación automatizada de QA no equivale a aprobación humana. El estado vigente de Git/CI/entrega es `ESCALON_8_STATUS=IN_PROGRESS`, `ESCALON_8A_STATUS=COMPLETED`, `ESCALON_8B_STATUS=COMPLETED`, `ESCALON_8C_STATUS=NOT_STARTED`, `ESCALON_8D_STATUS=NOT_STARTED`.
+
+8B es una capa durable de contratos: requests inmutables, flows CAS, autorizaciones separadas, outbox de intención, replay/reconciliación, detección stale, corrupción visible e índices derivados reconstruibles. No ejecuta commit, push, CI remoto, release ni deploy. `NEXT=ESCALON_8C_EXPLICIT_GIT_REMOTE_CI_DELIVERY`.
+
+La calidad remota no se fabrica desde la local: `.github/workflows/ci.yml` existe, pero `npm run quality:ci` continúa bloqueado por deuda histórica de lint global (`306` errores documentados), sin cambios de reglas.
+
 # ESTADO VIGENTE — 2026-09-24
 
 Este encabezado supersede el estado histórico de agosto. Desde entonces se implementó y validó el pipeline semántico real: existe un ciclo aprobado `version-v0001 → version-v0006`, con rechazos humanos durables, provider OpenAI real, Model Router V2, BrowserQuality real y aprobación humana durable.

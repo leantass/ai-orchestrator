@@ -3,10 +3,10 @@
 ## Estado vigente — 2026-09-25
 
 - `ESCALON_8A_STATUS=COMPLETED`
-- `ESCALON_8B_STATUS=NOT_STARTED`
+- `ESCALON_8B_STATUS=COMPLETED`
 - `ESCALON_8C_STATUS=NOT_STARTED`
 - `ESCALON_8D_STATUS=NOT_STARTED`
-- `NEXT=ESCALON_8B_DURABLE_ORCHESTRATION`
+- `NEXT=ESCALON_8C_EXPLICIT_GIT_REMOTE_CI_DELIVERY`
 
 Esta especificación define el contrato y la política de 8A. No ejecuta commit, push, merge, pull request, CI remoto, release tag ni deploy.
 
@@ -49,6 +49,16 @@ El `requestId` se deriva de project/version/snapshot/approval/delivery/repositor
 ## QA
 
 `scripts/jefe-release-contract-smoke.mjs` cubre aprobación exacta, aprobación stale, snapshots, delivery ausente/corrupto, artifact tampered, drift de branch/HEAD, paths y branch inyectados, acciones prohibidas, CI local versus remoto, autorización remota e idempotencia. No se ejecutó provider, Git mutation, CI remoto ni deploy.
+
+## Escalón 8B — orquestación durable
+
+`ESCALON_8B_STATUS=COMPLETED`. `electron/jefe-release-persistence.cjs` mantiene stores separados bajo `<root>/.jefe-release` para requests, flows, autorizaciones, outbox e índices. Los writes son stage/rename atómicos, las requests/autorizaciones/outbox son inmutables por identidad y los flows avanzan mediante CAS con revisión y allowlist de transiciones. Los locks son locales al proceso; no se afirma coordinación multiproceso ni exactly-once distribuido.
+
+`electron/jefe-release-orchestrator.cjs` implementa replay y reconciliación explícita: reconstruye un flow faltante desde una request durable y un único intent de outbox cuando ya existe autorización válida. `prepare_local_delivery` puede comenzar sin delivery y delega la preparación local a un adapter inyectado; la integridad posterior exige manifest y hashes. `request_ci` requiere autorización durable `trigger_ci`; `prepare_release` requiere evidencia remota `github-actions` pasada, commit ligado y autorización durable `release_tag`. 8B no ejecuta Git, red, CI, release ni deploy.
+
+La rehidratación vuelve a validar schema, identidad, hashes, bindings y referencias. JSON/schema corruptos permanecen visibles y el índice se reconstruye desde records físicos; el índice no es autoridad. El smoke `scripts/jefe-release-orchestration-smoke.mjs` cubre colisiones, CAS, drift de HEAD/branch, replay, delivery tampered, autorización cruzada, outbox duplicado, crash boundaries, corrupción y aislamiento A/B.
+
+La configuración CI continúa siendo `CONFIGURED_BUT_LOCAL_QUALITY_GATE_FAILING`: el workflow existe, pero la deuda histórica de lint global mantiene `npm run quality:ci` bloqueado. La calidad local no se presenta como evidencia CI remota.
 
 ## Fases futuras
 
