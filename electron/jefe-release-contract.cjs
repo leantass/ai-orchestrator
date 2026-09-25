@@ -4,7 +4,7 @@ const RELEASE_REQUEST_SCHEMA = 'jefe-release-request/v1'
 const CI_EVIDENCE_SCHEMA = 'jefe-ci-evidence/v1'
 const REMOTE_AUTH_SCHEMA = 'jefe-remote-action-authorization/v1'
 const RELEASE_ACTIONS = Object.freeze(['prepare_local_delivery', 'prepare_git_commit', 'request_ci', 'prepare_release'])
-const REMOTE_ACTIONS = Object.freeze(['git_push', 'create_pr', 'merge', 'release_tag', 'deploy'])
+const REMOTE_ACTIONS = Object.freeze(['trigger_ci', 'git_push', 'create_pr', 'merge', 'release_tag', 'deploy'])
 const CI_STATUSES = Object.freeze(['pending', 'passed', 'failed', 'cancelled', 'unavailable'])
 
 class ReleaseContractError extends Error {
@@ -61,7 +61,7 @@ function requireQualityPass(quality) {
   if (!quality || quality.overallStatus !== 'PASS' || quality.eligibleForPromotion !== true) fail('QUALITY_EVIDENCE_REQUIRED', 'Quality evidence must be PASS and eligible for promotion.')
   return { overallStatus: 'PASS', eligibleForPromotion: true, evidenceId: quality.evidenceId ? text(quality.evidenceId, 'quality.evidenceId', 180) : null }
 }
-function normalizeEvidence(evidence) {
+function normalizeEvidence(evidence, { requireDelivery = true } = {}) {
   if (!evidence || typeof evidence !== 'object') fail('DURABLE_EVIDENCE_REQUIRED', 'Durable release evidence is required.')
   assertNoCallerOverrides(evidence, 'evidence')
   const projectId = safeId(evidence.project?.projectId, 'project.projectId')
@@ -72,7 +72,9 @@ function normalizeEvidence(evidence) {
   if (evidence.approval.state !== 'approved' || evidence.approval.decision !== 'approved') fail('APPROVAL_REQUIRED', 'The exact version must have a durable approved gate.')
   if (evidence.sourceVersion?.immutable !== true) fail('SOURCE_VERSION_MUTABLE', 'The source version must remain immutable.')
   const delivery = evidence.delivery
-  if (!delivery || delivery.projectId !== projectId || delivery.versionId !== versionId) fail('DELIVERY_VERSION_MISMATCH', 'Delivery must bind to the exact approved version.')
+  if (!delivery && requireDelivery) fail('DELIVERY_REQUIRED', 'This release action requires a prepared delivery.')
+  if (!delivery) return { projectId, versionId, snapshotSha256, approvalId: safeId(evidence.approval.approvalId, 'approval.approvalId'), approvalSnapshotSha256: snapshotSha256, quality: requireQualityPass(evidence.quality), delivery: null, repository: normalizeRepository(evidence.repository), deliveryIntegrity: null }
+  if (delivery.projectId !== projectId || delivery.versionId !== versionId) fail('DELIVERY_VERSION_MISMATCH', 'Delivery must bind to the exact approved version.')
   const deliveryIntegrity = validateDeliveryIntegrity(delivery)
   return { projectId, versionId, snapshotSha256, approvalId: safeId(evidence.approval.approvalId, 'approval.approvalId'), approvalSnapshotSha256: snapshotSha256, quality: requireQualityPass(evidence.quality), delivery: { deliveryId: safeId(delivery.manifest.deliveryId, 'delivery.deliveryId'), deliveryManifestSha256: deliveryIntegrity.deliveryManifestSha256, fileCount: deliveryIntegrity.fileCount }, repository: normalizeRepository(evidence.repository), deliveryIntegrity }
 }
@@ -80,20 +82,18 @@ function normalizeEvidence(evidence) {
 function validateReleaseRequest(request) {
   if (!request || request.schemaVersion !== RELEASE_REQUEST_SCHEMA) fail('RELEASE_REQUEST_INVALID', 'Unsupported release request schema.')
   if (!RELEASE_ACTIONS.includes(request.policy?.requestedAction)) fail('RELEASE_ACTION_INVALID', 'The requested release action is not allowed.')
+  safeId(request.requestId, 'requestId'); safeSha(request.idempotencyKey, 'idempotencyKey')
   if (!request.identity?.projectId || !request.identity?.versionId || !request.identity?.snapshotSha256 || !request.identity?.approvalId || request.identity?.snapshotSha256 !== request.identity?.approvalSnapshotSha256) fail('RELEASE_REQUEST_INVALID', 'Release identity is incomplete or inconsistent.')
-  if (!request.delivery?.deliveryId || !request.delivery?.deliveryManifestSha256) fail('RELEASE_REQUEST_INVALID', 'Delivery identity is incomplete.')
-  if (!request.repository?.repoIdentity || !request.repository?.expectedBranch || !request.repository?.expectedHeadSha) fail('RELEASE_REQUEST_INVALID', 'Repository binding is incomplete.')
+  safeId(request.identity.projectId, 'identity.projectId'); safeId(request.identity.versionId, 'identity.versionId'); safeSha(request.identity.snapshotSha256, 'identity.snapshotSha256'); safeId(request.identity.approvalId, 'identity.approvalId')
+  if (request.policy.requestedAction !== 'prepare_local_delivery' && (!request.delivery?.deliveryId || !request.delivery?.deliveryManifestSha256)) fail('RELEASE_REQUEST_INVALID', 'Delivery identity is incomplete.')
+  if (request.delivery) { safeId(request.delivery.deliveryId, 'delivery.deliveryId'); safeSha(request.delivery.deliveryManifestSha256, 'delivery.deliveryManifestSha256') }
+  normalizeRepository(request.repository)
+  if (request.status !== 'prepared') fail('RELEASE_REQUEST_INVALID', 'Release request status is invalid.')
   return request
 }
 function createReleaseRequest({ evidence, requestedAction } = {}) {
   if (!RELEASE_ACTIONS.includes(requestedAction)) fail('RELEASE_ACTION_INVALID', 'The requested release action is not allowed.')
-  const durable = normalizeEvidence(evidence)
-  if (requestedAction === 'prepare_release') {
-    if (!evidence.ci) fail('REMOTE_CI_REQUIRED', 'prepare_release requires remote CI evidence.')
-    const ci = validateCiEvidence(evidence.ci)
-    if (ci.status !== 'passed' || ci.commitSha !== durable.repository.expectedHeadSha) fail('REMOTE_CI_REQUIRED', 'prepare_release requires passed remote CI for the bound HEAD.')
-    if (evidence.releaseAuthorization?.authorized !== true) fail('RELEASE_AUTHORIZATION_REQUIRED', 'prepare_release requires explicit release authorization.')
-  }
+  const durable = normalizeEvidence(evidence, { requireDelivery: requestedAction !== 'prepare_local_delivery' })
   const identity = { projectId: durable.projectId, versionId: durable.versionId, snapshotSha256: durable.snapshotSha256, approvalId: durable.approvalId, approvalSnapshotSha256: durable.approvalSnapshotSha256 }
   const repository = durable.repository
   const delivery = durable.delivery
@@ -112,7 +112,13 @@ function createCiEvidence({ provider, workflow, repository, commitSha, status, s
   if (status === 'passed' && !/^github-actions$/iu.test(result.provider)) fail('REMOTE_CI_EVIDENCE_REQUIRED', 'Only verified remote CI evidence may be marked passed.')
   return result
 }
-function validateCiEvidence(evidence) { if (!evidence || evidence.schemaVersion !== CI_EVIDENCE_SCHEMA || !CI_STATUSES.includes(evidence.status)) fail('CI_EVIDENCE_INVALID', 'CI evidence is invalid.'); return evidence }
+function validateCiEvidence(evidence) {
+  if (!evidence || evidence.schemaVersion !== CI_EVIDENCE_SCHEMA || !CI_STATUSES.includes(evidence.status)) fail('CI_EVIDENCE_INVALID', 'CI evidence is invalid.')
+  const normalized = createCiEvidence(evidence)
+  const expectedKeys = ['schemaVersion', 'provider', 'workflow', 'repository', 'commitSha', 'status', 'startedAt', 'completedAt', 'checks', 'evidenceSource']
+  if (Object.keys(evidence).some((key) => !expectedKeys.includes(key)) || canonicalJson(normalized) !== canonicalJson({ ...evidence, schemaVersion: CI_EVIDENCE_SCHEMA })) fail('CI_EVIDENCE_INVALID', 'CI evidence normalization mismatch.')
+  return normalized
+}
 function createRemoteActionAuthorization({ request, action, authorized = false, actor, reason, authorizationId } = {}) {
   validateReleaseRequest(request)
   if (!REMOTE_ACTIONS.includes(action)) fail('REMOTE_ACTION_INVALID', 'Remote action is not recognized.')
@@ -120,4 +126,14 @@ function createRemoteActionAuthorization({ request, action, authorized = false, 
   return { schemaVersion: REMOTE_AUTH_SCHEMA, authorizationId: safeId(authorizationId, 'authorizationId'), requestId: request.requestId, action, authorized: true, actor: text(actor, 'actor', 160), reason: text(reason, 'reason', 500), createdAt: new Date().toISOString() }
 }
 
-module.exports = { RELEASE_REQUEST_SCHEMA, CI_EVIDENCE_SCHEMA, REMOTE_AUTH_SCHEMA, RELEASE_ACTIONS, REMOTE_ACTIONS, CI_STATUSES, ReleaseContractError, hashDeliveryManifest, validateDeliveryIntegrity, createReleaseRequest, validateReleaseRequest, assertRepositoryBaseline, createCiEvidence, validateCiEvidence, createRemoteActionAuthorization, sanitizeRemoteUrl }
+function validateRemoteActionAuthorization(authorization, { requestId, action } = {}) {
+  if (!authorization || authorization.schemaVersion !== REMOTE_AUTH_SCHEMA || authorization.authorized !== true) fail('REMOTE_ACTION_AUTHORIZATION_INVALID', 'Remote action authorization is invalid.')
+  const normalized = { schemaVersion: REMOTE_AUTH_SCHEMA, authorizationId: safeId(authorization.authorizationId, 'authorizationId'), requestId: safeId(authorization.requestId, 'requestId'), action: text(authorization.action, 'action', 80), authorized: true, actor: text(authorization.actor, 'actor', 160), reason: text(authorization.reason, 'reason', 500), createdAt: text(authorization.createdAt, 'createdAt', 80) }
+  if (Object.keys(authorization).some((key) => !Object.hasOwn(normalized, key)) || Number.isNaN(Date.parse(normalized.createdAt))) fail('REMOTE_ACTION_AUTHORIZATION_INVALID', 'Authorization fields are invalid.')
+  if (!REMOTE_ACTIONS.includes(normalized.action)) fail('REMOTE_ACTION_INVALID', 'Remote action is not recognized.')
+  if (requestId && normalized.requestId !== requestId) fail('REMOTE_ACTION_REQUEST_MISMATCH', 'Authorization does not belong to this request.')
+  if (action && normalized.action !== action) fail('REMOTE_ACTION_MISMATCH', 'Authorization action does not match the requested action.')
+  return normalized
+}
+
+module.exports = { RELEASE_REQUEST_SCHEMA, CI_EVIDENCE_SCHEMA, REMOTE_AUTH_SCHEMA, RELEASE_ACTIONS, REMOTE_ACTIONS, CI_STATUSES, ReleaseContractError, hashDeliveryManifest, validateDeliveryIntegrity, createReleaseRequest, validateReleaseRequest, assertRepositoryBaseline, createCiEvidence, validateCiEvidence, createRemoteActionAuthorization, validateRemoteActionAuthorization, sanitizeRemoteUrl }

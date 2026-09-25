@@ -7,6 +7,7 @@ import {
   hashDeliveryManifest,
   assertRepositoryBaseline,
   validateDeliveryIntegrity,
+  validateRemoteActionAuthorization,
 } from '../electron/jefe-release-contract.cjs'
 
 const digest = (value) => crypto.createHash('sha256').update(value).digest('hex')
@@ -41,10 +42,13 @@ expectCode('RELEASE_ACTION_INVALID', () => createReleaseRequest({ evidence, requ
 expectCode('SOURCE_VERSION_MUTABLE', () => createReleaseRequest({ evidence: { ...evidence, sourceVersion: { immutable: false } }, requestedAction: 'prepare_local_delivery' }))
 expectCode('REPOSITORY_BASELINE_CHANGED', () => assertRepositoryBaseline(request, { repoIdentity: 'ai-orchestrator', branch: 'feature/continue-orchestrator', headSha: digest('other') }))
 expectCode('REPOSITORY_BASELINE_CHANGED', () => assertRepositoryBaseline(request, { repoIdentity: 'ai-orchestrator', branch: 'main', headSha: digest('head-v1') }))
-expectCode('REMOTE_CI_REQUIRED', () => createReleaseRequest({ evidence, requestedAction: 'prepare_release' }))
+const noDelivery = { ...evidence, delivery: undefined }
+const localWithoutDelivery = createReleaseRequest({ evidence: noDelivery, requestedAction: 'prepare_local_delivery' })
+assert.equal(localWithoutDelivery.delivery, null)
+expectCode('DELIVERY_REQUIRED', () => createReleaseRequest({ evidence: noDelivery, requestedAction: 'prepare_release' }))
 expectCode('REMOTE_CI_EVIDENCE_REQUIRED', () => createCiEvidence({ provider: 'local', workflow: 'quality', repository: 'ai-orchestrator', commitSha: digest('head-v1'), status: 'passed', startedAt: '2026-09-25T00:00:00.000Z', evidenceSource: 'local' }))
 const ci = createCiEvidence({ provider: 'github-actions', workflow: 'quality', repository: 'ai-orchestrator', commitSha: digest('head-v1'), status: 'passed', startedAt: '2026-09-25T00:00:00.000Z', completedAt: '2026-09-25T00:01:00.000Z', evidenceSource: 'github-actions-run' })
-const release = createReleaseRequest({ evidence: { ...evidence, ci, releaseAuthorization: { authorized: true } }, requestedAction: 'prepare_release' })
+const release = createReleaseRequest({ evidence: { ...evidence, ci }, requestedAction: 'prepare_release' })
 assert.equal(release.policy.requestedAction, 'prepare_release')
 const replay = createReleaseRequest({ evidence, requestedAction: 'prepare_local_delivery' })
 assert.equal(replay.requestId, request.requestId)
@@ -52,4 +56,5 @@ expectCode('REMOTE_ACTION_AUTHORIZATION_REQUIRED', () => createRemoteActionAutho
 expectCode('REMOTE_ACTION_INVALID', () => createRemoteActionAuthorization({ request, action: 'push_main', authorized: true, authorizationId: 'auth-v1', actor: 'operator', reason: 'explicit test' }))
 const auth = createRemoteActionAuthorization({ request, action: 'git_push', authorized: true, authorizationId: 'auth-v1', actor: 'operator', reason: 'future explicit gate' })
 assert.equal(auth.authorized, true)
+assert.equal(validateRemoteActionAuthorization(auth, { requestId: request.requestId, action: 'git_push' }).authorizationId, 'auth-v1')
 console.log('PASS jefe-release-contract-smoke: approval, delivery, repository, CI, remote authorization, idempotency and adversarial policy gates')
