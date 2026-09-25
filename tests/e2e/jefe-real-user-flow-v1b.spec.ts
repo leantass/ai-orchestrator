@@ -82,8 +82,9 @@ test('normal user semantic correction flow', async ({ page }) => {
   await initialPreview.screenshot({ path: path.join(screenshots, '09-initial-preview.png'), fullPage: true })
   await fs.copyFile(path.join(screenshots, '09-initial-preview.png'), path.join(screenshots, 'initial-preview.png'))
   await initialPreview.close()
-  const initialFallback = page.getByRole('link', { name: 'Abrir preview en otra pestaÃ±a', exact: true })
-  if (await initialFallback.isVisible().catch(() => false)) await initialFallback.click()
+  const initialFallback = page.locator('.jefe-preview-fallback')
+  if (await initialFallback.isVisible().catch(() => false)) await initialFallback.click({ force: true })
+  await expect(page.getByRole('button', { name: 'Rechazar preview', exact: true })).toBeVisible({ timeout: 10_000 })
 
   await fillLabel('Motivo del rechazo', rejection)
   await page.getByRole('button', { name: 'Rechazar preview', exact: true }).click()
