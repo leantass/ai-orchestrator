@@ -48,7 +48,7 @@ async function setField(mainWindow, labelText, value) {
 
 async function measureReview(mainWindow) {
   return evaluate(mainWindow, `(() => {
-    const fieldNames = ['project-name', 'project-type', 'need', 'business-type', 'audience', 'proposition', 'colors', 'direction', 'notes', 'cta', 'materials', 'urls']
+    const fieldNames = ['project-name', 'project-type', 'need', 'objective', 'business-type', 'audience', 'proposition', 'colors', 'direction', 'notes', 'cta', 'materials', 'urls']
     const fields = Object.fromEntries(fieldNames.map((name) => [name, document.querySelector('[data-review-field="' + name + '"]')?.innerText?.trim() || '']))
     const fullValues = Object.fromEntries(fieldNames.map((name) => [name, document.querySelector('[data-review-field="' + name + '"]')?.getAttribute('data-review-value') || '']))
     const buttons = [...document.querySelectorAll('.jefe-wizard-actions button')].map((button) => {
@@ -88,6 +88,7 @@ export async function runElectronVisualE2E({ mainWindow }) {
   await setField(mainWindow, '¿Qué necesitás construir?', 'Un sitio institucional premium para presentar servicios de arquitectura.')
   assert.equal(await clickButton(mainWindow, 'Continuar'), true, 'No se pudo avanzar al paso 2')
   await waitForStep(mainWindow, 2)
+  await setField(mainWindow, 'Objetivo principal', 'Ayudar a equipos a ordenar sus procesos y mejorar resultados.')
   await setField(mainWindow, 'Tipo de negocio', 'Estudio de arquitectura')
   await setField(mainWindow, '¿Para quién es?', 'Personas y desarrolladores que buscan diseño residencial.')
   await setField(mainWindow, 'Propuesta', 'Convertimos necesidades complejas en espacios claros, habitables y duraderos.')
@@ -109,6 +110,7 @@ export async function runElectronVisualE2E({ mainWindow }) {
     'project-name': 'Proyecto\nEstudio Horizonte',
     'project-type': 'Tipo de proyecto\nSitio web',
     need: 'Qué necesitás construir\nUn sitio institucional premium para presentar servicios de arquitectura.',
+    objective: 'Objetivo principal\nAyudar a equipos a ordenar sus procesos y mejorar resultados.',
     'business-type': 'Tipo de negocio\nEstudio de arquitectura',
     audience: 'Público objetivo\nPersonas y desarrolladores que buscan diseño residencial.',
     proposition: 'Propuesta\nConvertimos necesidades complejas en espacios claros, habitables y duraderos.',
