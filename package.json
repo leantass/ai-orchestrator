@@ -27,7 +27,8 @@
     "orchestrator-execution-5d-smoke": "node scripts/orchestrator-canonical-execution-5d-smoke.mjs",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit",
-    "preview": "vite preview --config vite.config.ts --configLoader native"
+    "preview": "vite preview --config vite.config.ts --configLoader native",
+    "test:e2e:jefe": "playwright test --config=playwright.jefe-e2e.config.ts"
   },
   "dependencies": {
     "concurrently": "^9.2.1",
@@ -42,6 +43,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.2.2",
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
