@@ -98,7 +98,7 @@ test('normal user semantic correction flow', async ({ page }) => {
   await expect(page.getByRole('button', { name: /JEFE está preparando una nueva versión/u })).toBeDisabled()
   await shot('11-correcting.png', ['correcting.png'])
 
-  await expect(page.getByText(/Pendiente de revisión|Nueva versión semántica preparada/u)).toBeVisible({ timeout: 7 * 60 * 1000 })
+  await expect(page.getByText(/Pendiente de revisión|Nueva versión semántica preparada/u).first()).toBeVisible({ timeout: 7 * 60 * 1000 })
   await expect(page.getByText(/Pendiente de revisión/u).first()).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('button', { name: /Aprobar preview/u })).toBeVisible()
   await shot('12-new-version.png', ['new-version.png'])
