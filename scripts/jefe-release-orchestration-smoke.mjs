@@ -29,6 +29,12 @@ const localResult = await orchestrator.prepareLocalDelivery(localRequest.request
 assert.equal(localResult.flow.state, 'completed_local')
 assert.equal(prepared, true)
 assert.equal((await orchestrator.prepareLocalDelivery(localRequest.requestId)).idempotent, true)
+const tamperRoot = path.resolve('.codex-temp', 'release-orchestration-tamper-smoke')
+await fs.rm(tamperRoot, { recursive: true, force: true })
+const tamperStore = createReleasePersistence({ root: tamperRoot })
+const tamperOrchestrator = createReleaseOrchestrator({ root: tamperRoot, persistence: tamperStore, readDelivery: async () => ({ ...delivery, artifactHashes: { 'app/index.html': digest('tampered') } }) })
+const tamperRequest = (await tamperOrchestrator.createRequest({ evidence: evidenceWithoutDelivery, requestedAction: 'prepare_local_delivery' })).request
+assert.equal((await tamperOrchestrator.prepareLocalDelivery(tamperRequest.requestId)).flow.state, 'blocked')
 
 const ciRequest = (await orchestrator.createRequest({ evidence: evidenceWithDelivery, requestedAction: 'request_ci' })).request
 const waiting = await orchestrator.requestCi(ciRequest.requestId)

@@ -37,8 +37,9 @@ function createReleaseOrchestrator({ root, persistence, prepareDelivery, readDel
     if (!prior) await store.saveFlow(flowFromRequest(request, clock()))
     return { request: saved.record, flow: await store.readFlow(flowFromRequest(request, clock()).releaseFlowId), idempotent: saved.idempotent }
   }
-  async function transition(flow, nextState, patch = {}, expectedRevision = flow.revision) {
+  async function transition(flow, nextState, patch = {}, expectedRevision = flow.revision, expectedState = flow.state) {
     if (flow.revision !== expectedRevision) fail('STALE_RELEASE_FLOW', 'Release flow revision is stale.')
+    if (flow.state !== expectedState) fail('STALE_RELEASE_FLOW', 'Release flow state is stale.')
     if (!TRANSITIONS[flow.state]?.includes(nextState)) fail('INVALID_RELEASE_FLOW_TRANSITION', `${flow.state} cannot transition to ${nextState}.`)
     const next = { ...flow, ...patch, state: nextState, revision: flow.revision + 1, updatedAt: clock() }
     if (next.releaseFlowId !== flow.releaseFlowId || next.requestId !== flow.requestId || next.requestedAction !== flow.requestedAction || canonical(next.identity) !== canonical(flow.identity)) fail('RELEASE_FLOW_IDENTITY_MUTATION', 'Release flow identity is immutable.')
@@ -57,7 +58,8 @@ function createReleaseOrchestrator({ root, persistence, prepareDelivery, readDel
     let delivery = existing
     if (!delivery) delivery = await prepareDelivery(request.identity.projectId, request.identity.versionId)
     if (!delivery?.manifest || !delivery?.artifactHashes) fail('DELIVERY_EVIDENCE_UNAVAILABLE', 'The delivery adapter did not return verifiable evidence.')
-    const integrity = validateDeliveryIntegrity(delivery)
+    let integrity
+    try { integrity = validateDeliveryIntegrity(delivery) } catch (error) { if (error.code === 'DELIVERY_INTEGRITY_MISMATCH') return { request, flow: await transition(flow, 'blocked', { failureCode: error.code }) }; throw error }
     if (delivery.manifest.projectId !== request.identity.projectId || delivery.manifest.versionId !== request.identity.versionId) fail('DELIVERY_VERSION_MISMATCH', 'Delivery does not bind to the approved version.')
     const binding = { deliveryId: delivery.manifest.deliveryId, deliveryManifestSha256: integrity.deliveryManifestSha256, fileCount: integrity.fileCount }
     flow = await transition(flow, 'preflight_passed', { deliveryBinding: binding })
