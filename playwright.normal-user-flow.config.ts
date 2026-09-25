@@ -6,7 +6,7 @@ const port = 55139
 
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: /jefe-real-user-flow-v1b\.spec\.ts/u,
+  testMatch: /jefe-real-user-flow-v1b(?:-closure)?\.spec\.ts/u,
   workers: 1,
   retries: 0,
   timeout: 12 * 60 * 1000,
