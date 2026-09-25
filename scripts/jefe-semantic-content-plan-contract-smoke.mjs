@@ -21,17 +21,23 @@ const contentPlan = { schemaVersion: 'content-plan-v2', hero: 'Una propuesta cla
 const businessUnderstanding = { schemaVersion: 'business-understanding-v2', businessType: 'servicios', businessModel: 'consultoría', audience: 'equipos', primaryGoal: 'ordenar la operación', customerNeeds: ['claridad'], customerQuestions: ['alcance'], trustDrivers: ['criterios'], conversionActions: ['conversar'], serviceModel: 'acompañamiento', domainVocabulary: ['entregables'], tone: 'claro' }
 const experiencePlan = { schemaVersion: 'experience-plan-v2', contentSectionCatalogHash: null, archetype: 'guided', sectionOrder: sections.map((item) => item.id), heroVariant: 'focused', sectionTreatments: ['semantic'], contentDensity: 'balanced', ctaPositions: ['inicio-principal', 'accion-final'], servicesTreatment: 'cards', trustTreatment: 'proof', faqTreatment: 'accordion', conversionStrategy: 'consultation' }
 const contentPlanV2 = { ...contentPlan, services: [{ title: 'Servicios diferenciados', description: 'Ofrecemos servicios concretos con alcance visible.' }], trust: [{ title: 'Criterios verificables', description: 'Cada entrega tiene criterios visibles.' }], contact: { ctaLabel: 'Conversar', supportingText: 'Podés conversar sobre el próximo paso.' } }
+const capturedInputs = []
 function fakeComposition(content = contentPlanV2) {
   const provider = { providerId: 'offline-fixture', model: 'balanced-model', enabled: true, credentialAvailable: true }
-  const brain = { async decide({ operation, input }) { if (operation === 'business_understanding') return { decision: businessUnderstanding }; if (operation === 'content_plan') return { decision: content }; const catalog = JSON.parse(input.at(-1).content[0].text).contentSectionCatalog; return { decision: { ...experiencePlan, sectionOrder: catalog.map((item) => item.id) } } } }
+const brain = { async decide({ operation, input }) { capturedInputs.push({ operation, payload: JSON.parse(input.at(-1).content[0].text) }); if (operation === 'business_understanding') return { decision: businessUnderstanding }; if (operation === 'content_plan') return { decision: content }; const catalog = JSON.parse(input.at(-1).content[0].text).contentSectionCatalog; return { decision: { ...experiencePlan, sectionOrder: catalog.map((item) => item.id) } } } }
   return createSemanticRuntimeComposition({ root, mode: 'productive', semanticProvider: provider, semanticBrainAdapter: brain, callBudget: new ProviderRunBudget({ runId: `offline-${Date.now()}`, maxCalls: 6 }), env: { AI_ORCHESTRATOR_SEMANTIC_BRAIN_ENABLED: 'true' } })
 }
 const validPhases = []
-await fakeComposition().runSemanticPlans({ brief: { audience: 'equipos', objective: 'ordenar', services: ['servicio'], customerNeeds: ['claridad'], trustDrivers: ['criterios'], conversionActions: ['conversar'] }, onPhase: async (phase) => validPhases.push(phase) })
+const feedback = { rejectionReason: 'Conservar la acción principal.', findings: [], correctionRound: 1, snapshot: { versionId: 'version-v0001', snapshotSha256: 'sha' }, correctionId: 'correction-1' }
+await fakeComposition().runSemanticPlans({ brief: { audience: 'equipos', objective: 'ordenar', services: ['servicio'], customerNeeds: ['claridad'], trustDrivers: ['criterios'], conversionActions: ['conversar'], primaryCta: 'Solicitar una reunión' }, feedback, protectedHumanFields: { primaryCta: 'Solicitar una reunión' }, onPhase: async (phase) => validPhases.push(phase) })
+assert.equal(capturedInputs[1].operation, 'content_plan')
+assert.ok(capturedInputs[1].payload.feedback)
+assert.ok(capturedInputs[1].payload.correctionPlan)
+assert.equal(capturedInputs[1].payload.protectedHumanFields.primaryCta, 'Solicitar una reunión')
 assert.ok(validPhases.includes('CONTENT_PLAN_READY'))
 const invalidPhases = []
 const invalid = { ...contentPlanV2, sections: sections.map((item) => item.id === 'oferta-profesional' ? { ...item, kind: 'proof' } : item) }
 await assert.rejects(() => fakeComposition(invalid).runSemanticPlans({ brief: { audience: 'equipos', objective: 'ordenar', services: ['servicio'], customerNeeds: ['claridad'], trustDrivers: ['criterios'], conversionActions: ['conversar'] }, onPhase: async (phase) => invalidPhases.push(phase) }), { code: 'SEMANTIC_SECTION_CONTENT_MISMATCH' })
-assert.deepEqual(invalidPhases, ['BUSINESS_UNDERSTANDING_READY'])
+assert.deepEqual(invalidPhases, ['BUSINESS_UNDERSTANDING_READY', 'CORRECTION_PLAN_READY'])
 await fs.rm(root, { recursive: true, force: true })
 console.log('PASS jefe-semantic-content-plan-contract-smoke: full ContentPlan validation precedes CONTENT_PLAN_READY and invalid contracts fail after business understanding')

@@ -1,5 +1,5 @@
 const crypto = require('node:crypto')
-const { validateProductPlanning } = require('./jefe-product-planning.cjs')
+const { validateProductPlanning, normalizePrimaryCta, resolveCanonicalPrimaryCta } = require('./jefe-product-planning.cjs')
 
 function hash(value) { return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex') }
 function fail(message) { throw Object.assign(new Error(message), { code: 'INVALID_SEMANTIC_GENERATION_SPEC' }) }
@@ -143,7 +143,7 @@ function semanticContact(value, fallback = '') {
 function buildSectionContracts(sections) {
   return sections.map((section) => ({ id: section, component: section === 'inicio' ? 'hero' : section === 'contacto' ? 'conversion-form' : section, source: `ExperiencePlan.sections.${section}`, qaCriteria: 'section exists exactly once and is customer-facing' }))
 }
-function adaptSemanticPlansToPlanning({ sourcePlanning, businessUnderstanding, contentPlan, experiencePlan, requireCatalogHash = false } = {}) {
+function adaptSemanticPlansToPlanning({ sourcePlanning, businessUnderstanding, contentPlan, experiencePlan, canonicalPrimaryCta = null, requireCatalogHash = false } = {}) {
   if (!sourcePlanning || typeof sourcePlanning !== 'object') fail('source planning is required.')
   const bu = requiredPlan(businessUnderstanding, 'BusinessUnderstandingV2', 'business-understanding-v2')
   const content = requiredPlan(contentPlan, 'ContentPlanV2', 'content-plan-v2')
@@ -158,15 +158,19 @@ function adaptSemanticPlansToPlanning({ sourcePlanning, businessUnderstanding, c
   const trust = trustItems.map((item) => item.description)
   const faq = content.faq.map((item, index) => semanticFaq(item, bu, index))
   if (!content.hero || !content.presentation || !services.length || !trust.length || faq.length < 4 || !content.contact) fail('ContentPlanV2 customer-facing content is incomplete.')
-  const contact = semanticContact(content.contact, sourcePlanning.content.ctas[0])
+  const canonicalCta = normalizePrimaryCta(canonicalPrimaryCta) || resolveCanonicalPrimaryCta(sourcePlanning)
+  const contact = semanticContact(content.contact, canonicalCta || sourcePlanning.content.ctas[0])
+  const providerProposedCta = normalizePrimaryCta(contact.ctaLabel)
+  const resolvedPrimaryCta = canonicalCta || providerProposedCta
+  const primaryCtaOverrideApplied = Boolean(canonicalCta && providerProposedCta && canonicalCta !== providerProposedCta)
   const nextBrief = { ...sourcePlanning.brief, audience: bu.audience || sourcePlanning.brief.audience, objective: bu.primaryGoal || sourcePlanning.brief.objective }
   const nextStrategy = { ...sourcePlanning.strategy, audience: bu.audience || sourcePlanning.strategy.audience, primaryMessage: sentence(content.hero, sourcePlanning.strategy.primaryMessage) }
-  const nextContent = { ...sourcePlanning.content, title: sentence(content.hero, sourcePlanning.content.title), presentation: bodySentence(content.presentation, sourcePlanning.content.subtitle), subtitle: bodySentence(content.presentation, sourcePlanning.content.subtitle), benefits: services.map((item) => item.description), services, trust, trustItems, faq, ctas: [contact.ctaLabel], contact: { ...sourcePlanning.content.contact, title: contact.ctaLabel, description: contact.supportingText, supportingText: contact.supportingText, primaryAction: contact.ctaLabel, source: 'ContentPlanV2.contact' }, hero: { ...sourcePlanning.content.hero, title: sentence(content.hero, sourcePlanning.content.title), description: bodySentence(content.presentation, sourcePlanning.content.subtitle), primaryCTA: contact.ctaLabel, supportingNote: null, source: 'ContentPlanV2.hero' }, businessUnderstanding: { ...bu, schemaVersion: 'business-understanding-v2' } }
+  const nextContent = { ...sourcePlanning.content, title: sentence(content.hero, sourcePlanning.content.title), presentation: bodySentence(content.presentation, sourcePlanning.content.subtitle), subtitle: bodySentence(content.presentation, sourcePlanning.content.subtitle), benefits: services.map((item) => item.description), services, trust, trustItems, faq, ctas: [resolvedPrimaryCta], contact: { ...sourcePlanning.content.contact, title: resolvedPrimaryCta, description: contact.supportingText, supportingText: contact.supportingText, primaryAction: resolvedPrimaryCta, source: 'ContentPlanV2.contact' }, hero: { ...sourcePlanning.content.hero, title: sentence(content.hero, sourcePlanning.content.title), description: bodySentence(content.presentation, sourcePlanning.content.subtitle), primaryCTA: resolvedPrimaryCta, supportingNote: null, source: 'ContentPlanV2.hero' }, businessUnderstanding: { ...bu, schemaVersion: 'business-understanding-v2' } }
   nextContent.sections = content.sections
   const ctaPositions = resolveSectionOrder(experience.ctaPositions, sourcePlanning, 'ExperiencePlanV2 ctaPositions', catalog)
-  const nextExperience = { ...sourcePlanning.experience, sections, navigation: sections.filter((item) => item !== 'inicio'), forms: [{ fields: ['name', 'email'], submitAction: contact.ctaLabel, persistence: 'local_only' }], responsive: true, archetype: experience.archetype, heroVariant: experience.heroVariant, sectionTreatments: experience.sectionTreatments, contentDensity: experience.contentDensity, ctaPositions, servicesTreatment: experience.servicesTreatment, trustTreatment: experience.trustTreatment, faqTreatment: experience.faqTreatment, conversionStrategy: experience.conversionStrategy }
+  const nextExperience = { ...sourcePlanning.experience, sections, navigation: sections.filter((item) => item !== 'inicio'), forms: [{ fields: ['name', 'email'], submitAction: resolvedPrimaryCta, persistence: 'local_only' }], responsive: true, archetype: experience.archetype, heroVariant: experience.heroVariant, sectionTreatments: experience.sectionTreatments, contentDensity: experience.contentDensity, ctaPositions, servicesTreatment: experience.servicesTreatment, trustTreatment: experience.trustTreatment, faqTreatment: experience.faqTreatment, conversionStrategy: experience.conversionStrategy }
   const nextBuild = { ...sourcePlanning.build, sectionContracts: buildSectionContracts(sections), traceability: [...sourcePlanning.build.traceability, { source: 'ContentPlanV2', decision: 'customer-facing copy', component: 'artifact content', qaCriteria: 'content is derived from semantic plan' }, { source: 'ExperiencePlanV2', decision: 'section order and treatments', component: 'artifact structure', qaCriteria: 'structure is derived from semantic plan' }] }
-  const result = { ...sourcePlanning, brief: nextBrief, strategy: nextStrategy, experience: nextExperience, content: nextContent, build: nextBuild, semanticRefs: { businessUnderstanding: 'BusinessUnderstandingV2', contentPlan: 'ContentPlanV2', experiencePlan: 'ExperiencePlanV2' } }
+  const result = { ...sourcePlanning, brief: { ...nextBrief, ...(resolvedPrimaryCta ? { primaryCta: resolvedPrimaryCta } : {}) }, strategy: nextStrategy, experience: nextExperience, content: nextContent, build: nextBuild, semanticCtaResolution: { canonicalPrimaryCta: resolvedPrimaryCta, providerProposedCta: providerProposedCta || null, primaryCtaOverrideApplied }, semanticRefs: { businessUnderstanding: 'BusinessUnderstandingV2', contentPlan: 'ContentPlanV2', experiencePlan: 'ExperiencePlanV2' } }
   validateProductPlanning(result)
   return { ...result, semanticRefs: { ...result.semanticRefs, contentSectionCatalogHash: catalogSha256 }, sectionCatalog: catalog }
 }
@@ -183,4 +187,4 @@ function adaptSemanticGenerationSpec(spec) {
   const ctaPositions = spec.ctaPositions === undefined ? undefined : resolveSectionOrder(spec.ctaPositions, spec.planning, 'ctaPositions')
   return { schemaVersion: 'normalized-generation-plan-v1', planning: spec.planning, sectionOrder, heroVariant: spec.heroVariant, treatments: [...(spec.treatments || [])], ...(ctaPositions ? { ctaPositions } : {}), creativeDirection: spec.creativeDirection || null, contentDensity: spec.contentDensity || 'balanced', ctaStrategy: spec.ctaStrategy || null, preservedQualities: [...(spec.preservedQualities || [])], prohibitedChanges: [...(spec.prohibitedChanges || [])], semanticGenerationSpecHash: hash(spec) }
 }
-module.exports = { SEMANTIC_SECTION_CONTRACTS, adaptSemanticGenerationSpec, adaptSemanticPlansToPlanning, bodySentence, buildContentSectionCatalog, canonicalSemanticContentRef, contentSectionCatalogHash, validateCanonicalSemanticContentCatalog, validateSemanticContentCatalog }
+module.exports = { SEMANTIC_SECTION_CONTRACTS, adaptSemanticGenerationSpec, adaptSemanticPlansToPlanning, bodySentence, buildContentSectionCatalog, canonicalSemanticContentRef, contentSectionCatalogHash, normalizePrimaryCta, resolveCanonicalPrimaryCta, validateCanonicalSemanticContentCatalog, validateSemanticContentCatalog }

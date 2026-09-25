@@ -118,6 +118,28 @@ function resolveArtifactContentSelection(planning) {
   const sectionIdsFor = (contentRef) => catalog.filter((item) => normalizeRef(item.contentRef) === normalizeRef(contentRef) && (activeIds.has(item.id) || item.required)).map((item) => item.id)
   return { catalog, activeSectionIds, activeContentRefs, requiredContentRefs, omittedOptionalContentRefs, isContentRefExpected: (contentRef) => expected.has(normalizeRef(contentRef)), sectionIdsFor }
 }
+function normalizePrimaryCta(value) { return String(value || '').trim().replace(/\s+/gu, ' ') }
+function resolveCanonicalPrimaryCta(planning) {
+  return normalizePrimaryCta(planning?.brief?.primaryCta) || normalizePrimaryCta(planning?.content?.ctas?.[0]) || normalizePrimaryCta(planning?.content?.contact?.primaryAction) || null
+}
+function assessPrimaryCtaFidelity(planning, html = '') {
+  const canonicalPrimaryCta = resolveCanonicalPrimaryCta(planning)
+  if (!canonicalPrimaryCta) return { status: 'NOT_RUN', pass: true, findingCount: 0, findings: [], canonicalPrimaryCta: null }
+  const content = planning?.content || {}
+  const expectedValues = [
+    ['planning.brief.primaryCta', planning?.brief?.primaryCta],
+    ['content.ctas[0]', content.ctas?.[0]],
+    ['content.contact.primaryAction', content.contact?.primaryAction],
+    ['content.hero.primaryCTA', content.hero?.primaryCTA],
+    ['experience.forms[0].submitAction', planning?.experience?.forms?.[0]?.submitAction],
+  ]
+  const findings = expectedValues.filter(([, value]) => normalizePrimaryCta(value) !== canonicalPrimaryCta).map(([selector, actual]) => ({ severity: 'error', category: 'primaryCtaFidelity', selector, expected: canonicalPrimaryCta, actual: normalizePrimaryCta(actual) || null }))
+  const controls = [...String(html || '').matchAll(/<(a|button)\b([^>]*)>([\s\S]*?)<\/(?:a|button)>/giu)].map((match) => ({ tag: match[1].toLowerCase(), attrs: match[2], text: decodeHtmlEntities(String(match[3]).replace(/<[^>]+>/gu, ' ').replace(/\s+/gu, ' ').trim()) })).filter((item) => item.tag === 'button' || /\bcta\b|primary-contact/iu.test(item.attrs))
+  const primaryControls = controls.filter((item) => !/theme-toggle/iu.test(item.attrs) && (item.tag === 'button' || /\bcta\b/iu.test(item.attrs)))
+  if (!primaryControls.length) findings.push({ severity: 'error', category: 'renderedPrimaryCtaFidelity', selector: 'primary action controls', expected: canonicalPrimaryCta, actual: null })
+  for (const control of primaryControls) if (normalizePrimaryCta(control.text) !== canonicalPrimaryCta) findings.push({ severity: 'error', category: 'renderedPrimaryCtaFidelity', selector: control.tag === 'button' ? 'form button' : 'a.cta', expected: canonicalPrimaryCta, actual: normalizePrimaryCta(control.text) || null })
+  return { status: findings.length ? 'NEEDS_CORRECTION' : 'PASS', pass: findings.length === 0, findingCount: findings.length, findings, canonicalPrimaryCta, renderedPrimaryCta: primaryControls.map((item) => item.text) }
+}
 function plannedContentSlots(planning) {
   const content = planning?.content || {}
   const selection = resolveArtifactContentSelection(planning)
@@ -476,6 +498,7 @@ function validateGeneratedArtifact(planning, artifacts) {
   if (selection.isContentRefExpected('trust') && !trustSectionIds.some((id) => sectionBlocks.some((section) => section.id === id && /\bclass=["'][^"']*trust[^"']*["']/iu.test(section.attrs)))) fail('GENERATED_ARTIFACT_MISSING_TRUST', 'La confianza planificada no fue renderizada.', presenceDetails(selection, 'trust'))
   if (actualSections.length !== plannedSections.length || new Set(actualSections).size !== actualSections.length || actualSections.some((item) => !plannedSections.includes(item))) fail('GENERATED_ARTIFACT_SECTION_DRIFT', 'Las secciones del artefacto no coinciden exactamente con ExperiencePlan.', { plannedSections, actualSections })
   const contentFidelity = compareGeneratedContent(planning, html); if (!contentFidelity.pass) fail('GENERATED_ARTIFACT_CONTENT_DRIFT', 'El artefacto no deriva del contenido planificado.', contentFidelity)
+  const primaryCtaFidelity = assessPrimaryCtaFidelity(planning, html); if (primaryCtaFidelity.status === 'NEEDS_CORRECTION') fail('GENERATED_ARTIFACT_PRIMARY_CTA_DRIFT', 'La acción principal renderizada no coincide con la acción declarada por la persona.', primaryCtaFidelity)
   const styleChecks = { links: /a\s*\{[^}]*text-decoration\s*:\s*none/iu.test(css), input: /input\s*\{[^}]*border\s*:/iu.test(css), button: /button\s*\{[^}]*appearance\s*:/iu.test(css), focus: /:focus-visible/iu.test(css), dark: /\[data-theme=["']dark["']\]/iu.test(css), responsive: /@media\s*\(/iu.test(css) }
   if (!Object.values(styleChecks).every(Boolean)) fail('GENERATED_ARTIFACT_DEFAULT_STYLE', 'El sistema visual no cubre estilos premium, foco, tema oscuro y responsive: ' + JSON.stringify(styleChecks), styleChecks)
   for (const token of Object.values(planning.visual.palette)) if (typeof token === 'string' && /^#/u.test(token) && !css.toUpperCase().includes(token.toUpperCase())) fail('GENERATED_ARTIFACT_TOKEN_DRIFT', 'Falta token visual ' + token + ' en CSS.')
@@ -498,4 +521,4 @@ function validateGeneratedArtifact(planning, artifacts) {
   return { ok: true, sections: planning.experience.sections.length, traceability: planning.build.traceability.length }
 }
 
-module.exports = { SCHEMA_VERSION, DIRECTIONS, PRODUCT_TYPES, ProductPlanningError, createProductPlanning, evolveProductPlanning, migrateLegacyPlanning, validateProductPlanning, validateGeneratedArtifact, compareGeneratedContent, inspectGeneratedArtifactGrammar, resolveArtifactContentSelection, resolveSemanticCopyOwnership }
+module.exports = { SCHEMA_VERSION, DIRECTIONS, PRODUCT_TYPES, ProductPlanningError, createProductPlanning, evolveProductPlanning, migrateLegacyPlanning, validateProductPlanning, validateGeneratedArtifact, compareGeneratedContent, inspectGeneratedArtifactGrammar, resolveArtifactContentSelection, resolveSemanticCopyOwnership, normalizePrimaryCta, resolveCanonicalPrimaryCta, assessPrimaryCtaFidelity }
