@@ -107,3 +107,12 @@ La matriz local completa pasa: contrato `20/20`, persistencia/orquestación `20/
 ## Errata de estado vigente 2026-08-26
 
 Las referencias históricas posteriores que mencionan `IN_PROGRESS` o `ESCALON_7_STATUS=NOT_STARTED` preceden a la implementación local actual. El estado prevalente es `ESCALON_6_STATUS=VERIFIED_CLOSED`; `ESCALON_7_STATUS=IMPLEMENTED_PENDING_HUMAN_GATE`, conforme al gate humano y la evidencia visual runtime aún pendientes.
+# ESTADO VIGENTE — 2026-09-25
+
+El estado vigente supersede las afirmaciones históricas incompatibles de agosto y el encabezado documental del 2026-09-24. El pipeline semántico real fue implementado y cerrado mediante QA autónoma aislada: contratos, persistencia, Human Gate mecánico, BrowserQuality, grounding de claims, CTA human-owned, corrección semántica, calidad y Playwright Chromium quedaron verificados.
+
+Existe un cierre automatizado del flujo `REAL_USER_PROJECT_FLOW_V1B` con dos runs semánticos reales en estados de código distintos y seis provider calls totales. El segundo run terminó promovido y el recorrido QA posterior aprobó automáticamente la versión en un root aislado. Esto demuestra la mecánica del flujo, no production-readiness ni juicio humano: `AutomatedQaApproval=true`, `RealHumanApproval=false`.
+
+La evidencia completa está en [AUTONOMOUS_QUALITY_CLOSURE_2026-09-25.md](AUTONOMOUS_QUALITY_CLOSURE_2026-09-25.md). La evidencia visual y los datos QA permanecen fuera de Git bajo `.codex-temp/autonomous-quality-closure`.
+
+Limitaciones vigentes: no hubo deploy ni producción externa, no se usaron conectores externos, y la validación browser fue aislada. La próxima fase es trasladar esta cobertura al flujo normal de proyecto de usuario sin harness especial, conservando los gates y la separación del Human Gate.
