@@ -3,8 +3,9 @@ import path from 'node:path'
 
 test('close persisted real semantic correction without another provider run', async ({ page }) => {
   const screenshots = path.join(path.resolve(process.env.JEFE_QA_ROOT || '.codex-temp/autonomous-quality-closure/runs/local'), 'screenshots')
+  const projectName = process.env.JEFE_E2E_PROJECT_NAME || 'Impulso PyME'
   await page.goto('/projects')
-  const project = page.getByRole('button', { name: /Impulso PyME/u })
+  const project = page.getByRole('button', { name: new RegExp(projectName, 'u') })
   await expect(project).toHaveCount(1)
   await project.click()
   await expect(page.getByText(/Pendiente de revisión/u).first()).toBeVisible()

@@ -124,6 +124,8 @@ test('normal user semantic correction flow', async ({ page }) => {
     await correctedPreview.screenshot({ path: path.join(screenshots, `corrected-preview-${width}.png`), fullPage: true })
   }
   await correctedPreview.close()
+  const correctedFallback = page.locator('.jefe-preview-fallback')
+  if (await correctedFallback.isVisible().catch(() => false)) await correctedFallback.click({ force: true })
 
   await expect(page.getByRole('button', { name: /Aprobar preview/u })).toBeVisible()
 
