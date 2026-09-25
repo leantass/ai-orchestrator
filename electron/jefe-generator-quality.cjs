@@ -118,6 +118,61 @@ function assessCrossSectionRepetition({ html } = {}) {
 function customerQaText(value) { return String(value || '').replace(/&amp;/gu, '&').replace(/&lt;/gu, '<').replace(/&gt;/gu, '>').replace(/&quot;/gu, '"').replace(/&#39;/gu, "'").replace(/<[^>]+>/gu, ' ').replace(/\s+/gu, ' ').trim() }
 function customerQaSections(html) { return [...String(html || '').matchAll(/<section\b[^>]*\bid=["']([^"']+)["'][^>]*>([\s\S]*?)<\/section>/giu)].map((match) => ({ id: match[1], source: match[2] })) }
 function customerQaGate(findings) { return { status: findings.length ? 'NEEDS_CORRECTION' : 'PASS', pass: findings.length === 0, findingCount: findings.length, findings } }
+const CUSTOMER_CLAIM_RULES = Object.freeze([
+  { pattern: /\b(?:en|dentro de)\s+\d+\s*(?:h|hs|horas|d[ií]as|semanas|mes(?:es)?)\b/iu, expected: 'plazo respaldado por input humano' },
+  { pattern: /\b\d+\s*(?:%|por ciento|clientes?|casos?|a[nñ]os?|horas?|d[ií]as?|semanas?|mes(?:es)?)\b/iu, expected: 'dato cuantitativo respaldado por input humano' },
+  { pattern: /\b(?:30\s*[-–]\s*60\s*[-–]\s*90|crm|low[-/]?code|no[-/]?code)\b/iu, expected: 'metodolog[ií]a o herramienta respaldada por input humano' },
+  { pattern: /\b(?:certificad[oa]s?|garantizad[oa]s?|garantizamos|comprobad[oa]s?|probado|probada|casos? de [eé]xito|sla|disponibilidad garantizada)\b/iu, expected: 'credencial, resultado o compromiso respaldado por input humano' },
+  { pattern: /\b(?:m[aá]s de \d+|\d+\s*clientes?)\b/iu, expected: 'credencial o volumen respaldado por input humano' },
+])
+function customerClaimCorpus(planning) {
+  const brief = planning?.brief || {}
+  const source = [brief.need, brief.objective, brief.businessType, brief.audience, brief.proposition, brief.primaryCta, brief.materials?.notes, ...(Array.isArray(brief.services) ? brief.services : []), JSON.stringify(brief), JSON.stringify(planning?.source || '')]
+  return normalizedCopy(source.filter(Boolean).join(' '))
+}
+function customerFacingPlanningValues(planning) {
+  const content = planning?.content || {}
+  return [
+    ['content.hero.title', content.hero?.title || content.title],
+    ['content.hero.description', content.hero?.description || content.subtitle],
+    ['content.presentation', content.presentation],
+    ...(Array.isArray(content.services) ? content.services.flatMap((item, index) => [[`content.services[${index}].title`, item?.title], [`content.services[${index}].description`, item?.description]]) : []),
+    ...(Array.isArray(content.trustItems) ? content.trustItems.flatMap((item, index) => [[`content.trustItems[${index}].title`, item?.title], [`content.trustItems[${index}].description`, item?.description]]) : []),
+    ...(Array.isArray(content.faq) ? content.faq.flatMap((item, index) => [[`content.faq[${index}].question`, item?.question], [`content.faq[${index}].answer`, item?.answer]]) : []),
+    ['content.contact.supportingText', content.contact?.supportingText || content.contact?.description],
+  ].filter(([, value]) => value)
+}
+function claimFindings(values, corpus, category) {
+  const findings = []
+  for (const [selector, rawValue] of values) {
+    const value = customerQaText(rawValue)
+    for (const rule of CUSTOMER_CLAIM_RULES) {
+      const match = value.match(rule.pattern)
+      if (match && !corpus.includes(normalizedCopy(match[0]))) findings.push({ severity: 'error', category, selector, expected: rule.expected, actual: value.slice(0, 300), claimPreview: match[0].slice(0, 160), groundingRef: null })
+    }
+  }
+  return findings
+}
+function assessCustomerClaimGrounding({ planning, html = '' } = {}) {
+  const corpus = customerClaimCorpus(planning)
+  const planningFindings = claimFindings(customerFacingPlanningValues(planning), corpus, 'customerClaimGrounding')
+  const renderedValues = [...String(html || '').matchAll(/<(?:h1|h2|h3|p|li|summary|button|a)\b[^>]*>([\s\S]*?)<\/(?:h1|h2|h3|p|li|summary|button|a)>/giu)].map((match, index) => [`rendered.customerText[${index}]`, customerQaText(match[1])]).filter(([, value]) => value)
+  const renderedFindings = claimFindings(renderedValues, corpus, 'renderedCustomerClaimGrounding')
+  return { customerClaimGrounding: customerQaGate(planningFindings), renderedCustomerClaimGrounding: customerQaGate(renderedFindings) }
+}
+function assessHeroScannability({ planning, html = '' } = {}) {
+  const selection = resolveArtifactContentSelection(planning)
+  const sections = customerQaSections(html)
+  const heroId = selection.sectionIdsFor('hero')[0]
+  const source = sections.find((item) => item.id === heroId)?.source || ''
+  const heading = customerQaText(source.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/iu)?.[1] || planning?.content?.hero?.title || planning?.content?.title)
+  const wordsCount = heading ? heading.split(/\s+/u).length : 0
+  const sentences = heading ? (heading.match(/[.!?]+(?=\s|$)/gu) || []).length : 0
+  const findings = []
+  if (!heading) findings.push({ severity: 'error', category: 'heroScannability', selector: `#${heroId || 'hero'} h1`, expected: 'heading principal customer-facing', actual: null })
+  if (heading.length > 220 || wordsCount > 32 || sentences > 2) findings.push({ severity: 'error', category: 'heroScannability', selector: `#${heroId || 'hero'} h1`, expected: 'heading específico y escaneable de hasta 220 caracteres y 32 palabras', actual: heading.slice(0, 300), wordCount: wordsCount, characterCount: heading.length, sentenceCount: sentences })
+  return customerQaGate(findings)
+}
 function serviceTitleGeneric(value) { return /^(?:pack|paquete|servicio|plan|opci[oó]n)\s*\d+\s*$/iu.test(String(value || '').trim()) }
 function serviceCardFinding(selector, expected, actual, similarity = null) { return { severity: 'error', category: 'serviceCardQuality', selector, expected, actual: String(actual || '').slice(0, 300), ...(Number.isFinite(similarity) ? { similarity: Number(similarity.toFixed(3)) } : {}) } }
 function serviceCardQuality(planning, html) {
@@ -160,7 +215,9 @@ function assessCustomerFacingCopy({ html, planning } = {}) {
   const faqHeading = customerQaText(faqSection?.source.match(/<h2\b[^>]*>([\s\S]*?)<\/h2>/iu)?.[1]); const faqFindings = []
   for (const match of [...String(faqSection?.source || '').matchAll(/<summary\b[^>]*>([\s\S]*?)<\/summary>/giu)]) { const question = customerQaText(match[1]); if (faqHeading && question && (faqHeading.toLocaleLowerCase() === question.toLocaleLowerCase() || lexicalSimilarity(faqHeading, question) >= 0.88)) faqFindings.push(findings('faqHeadingQuality', `#${faqSection?.id || 'faq'} h2`, 'heading distinto de las preguntas FAQ', faqHeading)) }
   const languageFindings = []; const visibleLabels = [...String(html || '').matchAll(/<(?:h1|h2|h3|strong)\b[^>]*>([\s\S]*?)<\/(?:h1|h2|h3|strong)>/giu)].map((match) => customerQaText(match[1])); for (const value of visibleLabels) if (/^(?:entender\s+qu[eé]\s+ofrece|presentar\s+una\s+propuesta|conducir\s+a\s+la\s+conversaci[oó]n)\b/iu.test(value)) languageFindings.push(findings('customerFacingLanguage', 'customer-facing heading', 'copy dirigido al cliente', value))
-  return { heroQuality: customerQaGate(heroFindings), ctaQuality: customerQaGate(ctaFindings), trustHeadingQuality: customerQaGate(trustFindings), faqHeadingQuality: customerQaGate(faqFindings), customerFacingLanguage: customerQaGate(languageFindings), contactSectionId: contactSection?.id || null }
+  const grounding = assessCustomerClaimGrounding({ planning, html })
+  const heroScannability = assessHeroScannability({ planning, html })
+  return { heroQuality: customerQaGate(heroFindings), heroScannability, ctaQuality: customerQaGate(ctaFindings), trustHeadingQuality: customerQaGate(trustFindings), faqHeadingQuality: customerQaGate(faqFindings), customerFacingLanguage: customerQaGate(languageFindings), ...grounding, contactSectionId: contactSection?.id || null }
 }
 const SEMANTIC_FAQ_SOURCES = new Set(['businessUnderstanding.customerQuestions', 'ContentPlanV2.faq'])
 const SEMANTIC_TRUST_SOURCES = new Set(['businessUnderstanding.trustDrivers', 'ContentPlanV2.trust'])
@@ -235,4 +292,4 @@ function snapshotFiles(root, relativePaths) {
   return Object.fromEntries(relativePaths.map((relativePath) => [relativePath, fs.readFileSync(`${root}/${relativePath}`).toString('hex')]))
 }
 
-module.exports = { WCAG_THRESHOLDS, contrastRatio, parseTokens, assessTheme, assessArtifact, assessCrossSectionRepetition, assessCustomerFacingCopy, serviceCardQuality, artifactSectionCopy, assertArtifactQuality, assessContentQuality, assertContentQuality, snapshotFiles }
+module.exports = { WCAG_THRESHOLDS, contrastRatio, parseTokens, assessTheme, assessArtifact, assessCrossSectionRepetition, assessCustomerFacingCopy, assessCustomerClaimGrounding, assessHeroScannability, serviceCardQuality, artifactSectionCopy, assertArtifactQuality, assessContentQuality, assertContentQuality, snapshotFiles }
