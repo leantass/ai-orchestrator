@@ -91,6 +91,7 @@ export async function runElectronVisualE2E({ mainWindow }) {
   await setField(mainWindow, 'Tipo de negocio', 'Estudio de arquitectura')
   await setField(mainWindow, '¿Para quién es?', 'Personas y desarrolladores que buscan diseño residencial.')
   await setField(mainWindow, 'Propuesta', 'Convertimos necesidades complejas en espacios claros, habitables y duraderos.')
+  await setField(mainWindow, 'Acción principal', 'Solicitar una reunión')
   assert.equal(await clickButton(mainWindow, 'Continuar'), true, 'No se pudo avanzar al paso 3')
   await waitForStep(mainWindow, 3)
   const colors = 'Azul noche profundo, marfil cálido y verde menta como color de acento. Evitar naranja, negro puro, magenta y gradientes fuertes. La combinación debe sentirse tecnológica, premium, confiable y diferente a JEFE.'
@@ -114,7 +115,7 @@ export async function runElectronVisualE2E({ mainWindow }) {
     colors: `Colores\n${colors}`,
     direction: 'Dirección visual\nEditorial',
     notes: 'Notas visuales\nEditorial, cálido y sobrio',
-    cta: 'Acción principal\nNo indicado todavía',
+    cta: 'Acción principal\nSolicitar una reunión',
     materials: 'Materiales\nNo se adjuntaron materiales',
     urls: 'URLs de referencia\nhttps://estudio-horizonte.example/referencias',
   }
