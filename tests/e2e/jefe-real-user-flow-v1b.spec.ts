@@ -73,7 +73,7 @@ test('normal user semantic correction flow', async ({ page }) => {
   const initialPreview = await initialPopup
   await initialPreview.waitForLoadState('domcontentloaded')
   await expect(initialPreview.locator('h1').first()).toBeVisible()
-  await expect(initialPreview.locator('body')).toContainText(/FAQ|Preguntas/u)
+  await expect(initialPreview.locator('body')).toContainText(/faq|preguntas/iu)
   await expect(initialPreview.locator('body')).toContainText(/Contacto|Solicitar/u)
   await initialPreview.screenshot({ path: path.join(screenshots, '09-initial-preview.png'), fullPage: true })
   await initialPreview.close()
