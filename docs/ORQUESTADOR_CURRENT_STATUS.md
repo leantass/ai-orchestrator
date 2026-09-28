@@ -140,4 +140,9 @@ Escalón 7 está `VERIFIED_CLOSED` en alcance local demostrado. Escalón 8 está
 La especificación es [ORQUESTADOR_ESCALON_8_GIT_CI_DELIVERY.md](ORQUESTADOR_ESCALON_8_GIT_CI_DELIVERY.md). `NEXT=ESCALON_8B_DURABLE_ORCHESTRATION`. El lint global conserva deuda histórica no relacionada; el lint focal y las validaciones de 8A fueron ejecutados por separado.
 ## Autoridad vigente — Escalón 10B
 
-`ESCALON_10_STATUS=IN_PROGRESS` · `ESCALON_10A_STATUS=COMPLETED` · `ESCALON_10B_STATUS=COMPLETED` · `ESCALON_10C_STATUS=NOT_STARTED` · `ESCALON_10D_STATUS=NOT_STARTED` · `NEXT=ESCALON_10C_CONNECTED_CONTROL_CENTER`. Navegación local truthful, sin proveedores ni red; `PRODUCTION_READY=false`; deuda histórica de lint: 306 errores.
+`ESCALON_10_STATUS=IN_PROGRESS` · `ESCALON_10A_STATUS=COMPLETED` · `ESCALON_10B_STATUS=COMPLETED` · `ESCALON_10C_STATUS=COMPLETED` · `ESCALON_10D_STATUS=NOT_STARTED` · `NEXT=ESCALON_10D_OPERATIONAL_SURFACES`. Navegación local truthful y control center conectado, sin proveedores ni mutaciones remotas; `PRODUCTION_READY=false`; deuda histórica de lint: 306 errores.
+## ESTADO VIGENTE — ESCALÓN 10C
+
+`ESCALON_10_STATUS=IN_PROGRESS` · `ESCALON_10A_STATUS=COMPLETED` · `ESCALON_10B_STATUS=COMPLETED` · `ESCALON_10C_STATUS=COMPLETED` · `ESCALON_10D_STATUS=NOT_STARTED` · `NEXT=ESCALON_10D_OPERATIONAL_SURFACES`.
+
+10C Connected Control Center está implementado con read models reales global/project, binding de proyecto/versión, unknown-by-default, superficies Web/Electron read-only y aislamiento entre salud global y estado de proyecto. `PRODUCTION_READY=false`; `REMOTE_CI_QUALITY=FAILING_HISTORICAL_LINT_DEBT`; `HISTORICAL_LINT_ERRORS=306`; `ProviderCalls=0`; `ExternalNetworkUsed=false`.

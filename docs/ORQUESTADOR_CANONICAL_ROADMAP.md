@@ -167,4 +167,9 @@ Estados actuales: `ESCALON_1_STATUS=VERIFIED_CLOSED`, `ESCALON_2_STATUS=VERIFIED
 La cabecera histórica debajo se conserva como registro y no es autoridad vigente. Escalón 7 está cerrado localmente con Human Gate durable, preview real, BrowserQuality y Playwright; esto no afirma autenticación remota/multiusuario ni production-ready. Playwright está `INTEGRATED_VERIFIED_LOCAL`; Vitest, axe-core y Lighthouse no se declaran verificados por este roadmap.
 ## Autoridad vigente — Escalón 10B
 
-`ESCALON_10_STATUS=IN_PROGRESS`, `ESCALON_10A_STATUS=COMPLETED`, `ESCALON_10B_STATUS=COMPLETED`, `ESCALON_10C_STATUS=NOT_STARTED`, `ESCALON_10D_STATUS=NOT_STARTED`, `NEXT=ESCALON_10C_CONNECTED_CONTROL_CENTER`.
+`ESCALON_10_STATUS=IN_PROGRESS`, `ESCALON_10A_STATUS=COMPLETED`, `ESCALON_10B_STATUS=COMPLETED`, `ESCALON_10C_STATUS=COMPLETED`, `ESCALON_10D_STATUS=NOT_STARTED`, `NEXT=ESCALON_10D_OPERATIONAL_SURFACES`.
+## ESTADO VIGENTE — ESCALÓN 10C
+
+`ESCALON_10_STATUS=IN_PROGRESS`, `ESCALON_10A_STATUS=COMPLETED`, `ESCALON_10B_STATUS=COMPLETED`, `ESCALON_10C_STATUS=COMPLETED`, `ESCALON_10D_STATUS=NOT_STARTED`, `NEXT=ESCALON_10D_OPERATIONAL_SURFACES`.
+
+10C conecta el Commercial Control Center con read models global/project, rutas Web, bridge Electron y superficies operativas read-only. No agrega mutaciones remotas ni proveedores. La calidad remota sigue bloqueada por 306 errores históricos de `src/factory/*`; `PRODUCTION_READY=false`.
