@@ -4,9 +4,9 @@
 
 - `ESCALON_8A_STATUS=COMPLETED`
 - `ESCALON_8B_STATUS=COMPLETED`
-- `ESCALON_8C_STATUS=NOT_STARTED`
+- `ESCALON_8C_STATUS=IMPLEMENTED_LOCAL_PASS`
 - `ESCALON_8D_STATUS=NOT_STARTED`
-- `NEXT=ESCALON_8C_EXPLICIT_GIT_REMOTE_CI_DELIVERY`
+- `NEXT=ESCALON_8C_LIVE_REMOTE_CANARY`
 
 Esta especificación define el contrato y la política de 8A. No ejecuta commit, push, merge, pull request, CI remoto, release tag ni deploy.
 
@@ -59,6 +59,16 @@ El `requestId` se deriva de project/version/snapshot/approval/delivery/repositor
 La rehidratación vuelve a validar schema, identidad, hashes, bindings y referencias. JSON/schema corruptos permanecen visibles y el índice se reconstruye desde records físicos; el índice no es autoridad. El smoke `scripts/jefe-release-orchestration-smoke.mjs` cubre colisiones, CAS, drift de HEAD/branch, replay, delivery tampered, autorización cruzada, outbox duplicado, crash boundaries, corrupción y aislamiento A/B.
 
 La configuración CI continúa siendo `CONFIGURED_BUT_LOCAL_QUALITY_GATE_FAILING`: el workflow existe, pero la deuda histórica de lint global mantiene `npm run quality:ci` bloqueado. La calidad local no se presenta como evidencia CI remota.
+
+## Escalón 8C — ejecución explícita local y evidencia remota
+
+`ESCALON_8C_STATUS=IMPLEMENTED_LOCAL_PASS`. `electron/jefe-release-execution-contract.cjs` define `jefe-release-execution-receipt/v1` con identidad de outbox/flow/request, acción, repository, branch, HEAD ligado, estado terminal y error sanitizado. `electron/jefe-release-git-adapter.cjs` usa `execFile` con argumentos fijos: lee identidad/baseline/status, valida hashes y allowlist exacta, ejecuta commit, push fast-forward y tag local; nunca usa `shell: true`, `git add .`, force push ni combina commit con push.
+
+`electron/jefe-release-executor.cjs` revalida request, flow, authorization, baseline e integridad antes de consumir cada intent. El claim/receipt durable evita doble dispatch dentro del proceso; un crash antes de ejecutar permite retry y un crash posterior a un commit se reconcilia sólo si el commit exacto (metadata, parent y archivos cambiados) es demostrable. De otro modo el estado queda ambiguo/bloqueado. La protección es local al proceso y no se afirma locking multiproceso.
+
+`electron/jefe-release-remote-adapter.cjs` deja trigger CI/PR/merge desconectados por defecto. La ingestión CI sólo acepta resultados provenientes de un adapter trusted, con provider `github-actions`, workflow esperado y commit exacto para `passed`; el resultado local `quality:ci` no se convierte en CI remoto. `scripts/jefe-release-execution-smoke.mjs` acredita commit, replay, doble dispatch, allowlist, push contra bare remote, divergencia sin force, tag local, auth, crash/reconciliación, aislamiento, CI fake y sanitización. Todas las mutaciones ocurren bajo `.codex-temp/escalon-8c`; no hubo red ni provider calls.
+
+El canary GitHub real (`push`, `workflow_dispatch`, PR, tag remoto o release) sigue sin autorización y no se declara demostrado. `LiveRemoteCanary=NOT_AUTHORIZED`.
 
 ## Fases futuras
 
