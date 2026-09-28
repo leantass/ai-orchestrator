@@ -70,13 +70,26 @@ function createReleaseOrchestrator({ root, persistence, prepareDelivery, readDel
     let { request, flow } = await current(requestId); flow = await preflight(request, flow); if (flow.state === 'stale') return { request, flow }
     requireDelivery(request, flow); if (flow.state === 'prepared') flow = await transition(flow, 'preflight_passed'); return { request, flow: await transition(flow, 'ready_for_execution') }
   }
+  async function enqueueAction(requestId, action, authorizationId) {
+    const { request, flow: initial } = await current(requestId); let flow = initial
+    if (!authorizationId) fail('REMOTE_ACTION_AUTHORIZATION_REQUIRED', 'A durable action authorization is required.')
+    const authorization = await store.readAuthorization(authorizationId)
+    if (!authorization) fail('REMOTE_ACTION_AUTHORIZATION_REQUIRED', 'A durable action authorization is required.')
+    validateRemoteActionAuthorization(authorization, { requestId, action })
+    if (action === 'git_commit') { requireDelivery(request, flow); if (flow.state === 'prepared' || flow.state === 'completed_local') flow = await transition(flow, 'preflight_passed'); if (flow.state === 'preflight_passed') flow = await transition(flow, 'ready_for_execution') }
+    else if (flow.state === 'prepared') { if (request.policy.requestedAction !== 'prepare_local_delivery') requireDelivery(request, flow); flow = await transition(flow, 'preflight_passed') }
+    return outboxFor(request, flow, action, authorization)
+  }
   async function persistAuthorization(requestId, authorization) {
     const { request } = await current(requestId); const valid = validateRemoteActionAuthorization(authorization, { requestId, action: authorization.action }); return store.saveAuthorization(valid).then((saved) => ({ ...saved, authorization: saved.record }))
   }
   async function outboxFor(request, flow, action, authorization) {
     const outboxId = `release-outbox-${digest({ requestId: request.requestId, action, authorizationId: authorization.authorizationId }).slice(0, 24)}`
     const item = { schemaVersion: OUTBOX_SCHEMA, outboxId, requestId: request.requestId, releaseFlowId: flow.releaseFlowId, projectId: request.identity.projectId, versionId: request.identity.versionId, action, authorizationId: authorization.authorizationId, repository: request.repository, payloadFingerprint: digest({ requestId: request.requestId, action, authorizationId: authorization.authorizationId, repository: request.repository }), createdAt: clock() }
-    const saved = await store.saveOutbox(item); const refs = flow.outboxRefs.includes(outboxId) ? flow.outboxRefs : [...flow.outboxRefs, outboxId]; const authRefs = flow.authorizationRefs.includes(authorization.authorizationId) ? flow.authorizationRefs : [...flow.authorizationRefs, authorization.authorizationId]; const next = flow.state === 'outbox_pending' ? flow : await transition(flow, 'outbox_pending', { outboxRefs: refs, authorizationRefs: authRefs }); return { request, flow: next, outbox: saved.record, idempotent: saved.idempotent }
+    const saved = await store.saveOutbox(item); const refs = flow.outboxRefs.includes(outboxId) ? flow.outboxRefs : [...flow.outboxRefs, outboxId]; const authRefs = flow.authorizationRefs.includes(authorization.authorizationId) ? flow.authorizationRefs : [...flow.authorizationRefs, authorization.authorizationId]
+    let next
+    if (flow.state === 'outbox_pending') { next = validateFlow({ ...flow, outboxRefs: refs, authorizationRefs: authRefs, revision: flow.revision + 1, updatedAt: clock() }); await store.saveFlow(next) } else next = await transition(flow, 'outbox_pending', { outboxRefs: refs, authorizationRefs: authRefs })
+    return { request, flow: next, outbox: saved.record, idempotent: saved.idempotent }
   }
   async function requestCi(requestId, authorizationId = null) {
     let { request, flow } = await current(requestId); requireDelivery(request, flow); if (flow.state === 'prepared' || flow.state === 'completed_local') flow = await transition(flow, 'preflight_passed')
@@ -94,7 +107,7 @@ function createReleaseOrchestrator({ root, persistence, prepareDelivery, readDel
     for (const auth of detail.authorizations.records) { const request = await store.readRequest(auth.requestId); if (!request) continue; const flow = await store.readFlow(flowFromRequest(request, request.createdAt || clock()).releaseFlowId); if (flow && auth.action === 'trigger_ci' && flow.requestedAction === 'request_ci' && !flow.outboxRefs.length) { await outboxFor(request, flow, 'trigger_ci', auth); recovered.push({ type: 'outbox', requestId: request.requestId }) } }
     await store.rebuildIndex(); return { recovered, corruptions: detail.requests.corruptions.concat(detail.flows.corruptions, detail.authorizations.corruptions, detail.outbox.corruptions) }
   }
-  return Object.freeze({ store, createRequest, prepareLocalDelivery, prepareGitCommit, persistAuthorization, requestCi, prepareRelease, reconcile, transition })
+  return Object.freeze({ store, createRequest, prepareLocalDelivery, prepareGitCommit, persistAuthorization, requestCi, prepareRelease, enqueueAction, reconcile, transition })
 }
 
 module.exports = { TRANSITIONS, ReleaseOrchestrationError, createReleaseOrchestrator }

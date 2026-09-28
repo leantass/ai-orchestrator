@@ -20,6 +20,7 @@ function id(value, field) { if (typeof value !== 'string' || !/^[a-z][a-z0-9]*(?
 function timestamp(value, field) { if (typeof value !== 'string' || !value.trim() || Number.isNaN(Date.parse(value))) fail('INVALID_RELEASE_FIELD', `${field} is invalid.`); return value }
 function locked(key, work) { const previous = locks.get(key) || Promise.resolve(); let release; const tail = new Promise((resolve) => { release = resolve }); locks.set(key, tail); return previous.then(work).finally(() => { release(); if (locks.get(key) === tail) locks.delete(key) }) }
 function safeAction(value) { if (!['prepare_local_delivery', 'prepare_git_commit', 'request_ci', 'prepare_release'].includes(value)) fail('RELEASE_ACTION_INVALID', 'Release action is not allowed.'); return value }
+function safeOutboxAction(value) { if (!['git_commit', 'git_push', 'trigger_ci', 'release_tag', 'create_pr', 'merge', 'deploy'].includes(value)) fail('RELEASE_ACTION_INVALID', 'Outbox action is not allowed.'); return value }
 function safeState(value) { if (!FLOW_STATES.includes(value)) fail('RELEASE_FLOW_STATE_INVALID', 'Release flow state is not allowed.'); return value }
 function validateFlow(flow) {
   if (!flow || flow.schemaVersion !== FLOW_SCHEMA) fail('CORRUPT_RELEASE_FLOW', 'Release flow schema is invalid.')
@@ -27,7 +28,7 @@ function validateFlow(flow) {
   if (!Number.isInteger(flow.revision) || flow.revision < 0) fail('CORRUPT_RELEASE_FLOW', 'Release flow revision is invalid.')
   const identity = flow.identity
   if (!identity || id(identity.projectId, 'identity.projectId') !== identity.projectId || id(identity.versionId, 'identity.versionId') !== identity.versionId || !/^[a-f0-9]{64}$/u.test(identity.snapshotSha256) || identity.snapshotSha256 !== identity.approvalSnapshotSha256 || id(identity.approvalId, 'identity.approvalId') !== identity.approvalId) fail('CORRUPT_RELEASE_FLOW', 'Release flow identity is invalid.')
-  if (!flow.repositoryBaseline || typeof flow.repositoryBaseline !== 'object' || typeof flow.repositoryBaseline.repoIdentity !== 'string' || typeof flow.repositoryBaseline.expectedBranch !== 'string' || !/^[a-f0-9]{64}$/u.test(flow.repositoryBaseline.expectedHeadSha)) fail('CORRUPT_RELEASE_FLOW', 'Release flow repository binding is invalid.')
+  if (!flow.repositoryBaseline || typeof flow.repositoryBaseline !== 'object' || typeof flow.repositoryBaseline.repoIdentity !== 'string' || typeof flow.repositoryBaseline.expectedBranch !== 'string' || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(flow.repositoryBaseline.expectedHeadSha)) fail('CORRUPT_RELEASE_FLOW', 'Release flow repository binding is invalid.')
   if (flow.deliveryBinding !== null && (!flow.deliveryBinding || typeof flow.deliveryBinding.deliveryId !== 'string' || !/^[a-f0-9]{64}$/u.test(flow.deliveryBinding.deliveryManifestSha256))) fail('CORRUPT_RELEASE_FLOW', 'Release flow delivery binding is invalid.')
   if (!Array.isArray(flow.authorizationRefs) || !Array.isArray(flow.outboxRefs)) fail('CORRUPT_RELEASE_FLOW', 'Release flow references are invalid.')
   timestamp(flow.createdAt, 'createdAt'); timestamp(flow.updatedAt, 'updatedAt')
@@ -36,8 +37,8 @@ function validateFlow(flow) {
 function validateOutbox(item) {
   if (!item || item.schemaVersion !== OUTBOX_SCHEMA) fail('CORRUPT_RELEASE_OUTBOX', 'Outbox schema is invalid.')
   for (const [field, value] of Object.entries({ outboxId: item.outboxId, requestId: item.requestId, releaseFlowId: item.releaseFlowId, projectId: item.projectId, versionId: item.versionId, authorizationId: item.authorizationId })) id(value, field)
-  safeAction(item.action === 'trigger_ci' ? 'request_ci' : item.action === 'release_tag' ? 'prepare_release' : item.action)
-  if (!item.repository || typeof item.repository.repoIdentity !== 'string' || typeof item.repository.expectedBranch !== 'string' || !/^[a-f0-9]{64}$/u.test(item.repository.expectedHeadSha)) fail('CORRUPT_RELEASE_OUTBOX', 'Outbox repository binding is invalid.')
+  safeOutboxAction(item.action)
+  if (!item.repository || typeof item.repository.repoIdentity !== 'string' || typeof item.repository.expectedBranch !== 'string' || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(item.repository.expectedHeadSha)) fail('CORRUPT_RELEASE_OUTBOX', 'Outbox repository binding is invalid.')
   if (!/^[a-f0-9]{64}$/u.test(item.payloadFingerprint)) fail('CORRUPT_RELEASE_OUTBOX', 'Outbox payload fingerprint is invalid.')
   timestamp(item.createdAt, 'createdAt'); return item
 }

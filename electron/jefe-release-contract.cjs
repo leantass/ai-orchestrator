@@ -4,7 +4,7 @@ const RELEASE_REQUEST_SCHEMA = 'jefe-release-request/v1'
 const CI_EVIDENCE_SCHEMA = 'jefe-ci-evidence/v1'
 const REMOTE_AUTH_SCHEMA = 'jefe-remote-action-authorization/v1'
 const RELEASE_ACTIONS = Object.freeze(['prepare_local_delivery', 'prepare_git_commit', 'request_ci', 'prepare_release'])
-const REMOTE_ACTIONS = Object.freeze(['trigger_ci', 'git_push', 'create_pr', 'merge', 'release_tag', 'deploy'])
+const REMOTE_ACTIONS = Object.freeze(['git_commit', 'trigger_ci', 'git_push', 'create_pr', 'merge', 'release_tag', 'deploy'])
 const CI_STATUSES = Object.freeze(['pending', 'passed', 'failed', 'cancelled', 'unavailable'])
 
 class ReleaseContractError extends Error {
@@ -17,6 +17,7 @@ function canonicalJson(value) { return JSON.stringify(stable(value)) }
 function sha256(value) { return crypto.createHash('sha256').update(typeof value === 'string' ? value : canonicalJson(value)).digest('hex') }
 function text(value, field, max = 300, required = true) { if (typeof value !== 'string') { if (!required && (value === null || value === undefined)) return null; fail('INVALID_RELEASE_FIELD', `${field} must be text.`) }; const result = value.trim().replace(/\s+/gu, ' '); if (!result && required) fail('INVALID_RELEASE_FIELD', `${field} is required.`); if (result.length > max) fail('INVALID_RELEASE_FIELD', `${field} is too long.`); return result || null }
 function safeSha(value, field) { const result = text(value, field, 64); if (!/^[a-f0-9]{64}$/iu.test(result)) fail('INVALID_SHA256', `${field} must be a SHA-256 digest.`); return result.toLowerCase() }
+function safeGitSha(value, field) { const result = text(value, field, 64); if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/iu.test(result)) fail('INVALID_GIT_SHA', `${field} must be a Git object ID.`); return result.toLowerCase() }
 function safeId(value, field) { const result = text(value, field, 180); if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+){0,30}$/u.test(result)) fail('INVALID_RELEASE_ID', `${field} is invalid.`); return result }
 function sanitizeRemoteUrl(value) {
   if (value === null || value === undefined || value === '') return null
@@ -55,7 +56,7 @@ function validateDeliveryIntegrity({ manifest, manifestSha256: expectedManifestS
 function normalizeRepository(repository) {
   if (!repository || typeof repository !== 'object') fail('REPOSITORY_EVIDENCE_REQUIRED', 'Repository evidence is required.')
   assertNoCallerOverrides(repository, 'repository')
-  return { repoIdentity: text(repository.repoIdentity, 'repository.repoIdentity', 200), expectedBranch: text(repository.expectedBranch, 'repository.expectedBranch', 200), expectedHeadSha: safeSha(repository.expectedHeadSha, 'repository.expectedHeadSha'), remoteUrl: sanitizeRemoteUrl(repository.remoteUrl) }
+  return { repoIdentity: text(repository.repoIdentity, 'repository.repoIdentity', 200), expectedBranch: text(repository.expectedBranch, 'repository.expectedBranch', 200), expectedHeadSha: safeGitSha(repository.expectedHeadSha, 'repository.expectedHeadSha'), remoteUrl: sanitizeRemoteUrl(repository.remoteUrl) }
 }
 function requireQualityPass(quality) {
   if (!quality || quality.overallStatus !== 'PASS' || quality.eligibleForPromotion !== true) fail('QUALITY_EVIDENCE_REQUIRED', 'Quality evidence must be PASS and eligible for promotion.')
@@ -108,7 +109,7 @@ function assertRepositoryBaseline(request, current) {
 }
 function createCiEvidence({ provider, workflow, repository, commitSha, status, startedAt, completedAt, checks = [], evidenceSource } = {}) {
   if (!CI_STATUSES.includes(status)) fail('CI_EVIDENCE_INVALID', 'Unsupported CI evidence status.')
-  const result = { schemaVersion: CI_EVIDENCE_SCHEMA, provider: text(provider, 'provider', 120), workflow: text(workflow, 'workflow', 200), repository: text(repository, 'repository', 240), commitSha: safeSha(commitSha, 'commitSha'), status, startedAt: text(startedAt, 'startedAt', 80), completedAt: completedAt ? text(completedAt, 'completedAt', 80) : null, checks: Array.isArray(checks) ? checks.map((check) => ({ name: text(check?.name, 'checks.name', 160), status: text(check?.status, 'checks.status', 40) })) : [], evidenceSource: text(evidenceSource, 'evidenceSource', 300) }
+  const result = { schemaVersion: CI_EVIDENCE_SCHEMA, provider: text(provider, 'provider', 120), workflow: text(workflow, 'workflow', 200), repository: text(repository, 'repository', 240), commitSha: safeGitSha(commitSha, 'commitSha'), status, startedAt: text(startedAt, 'startedAt', 80), completedAt: completedAt ? text(completedAt, 'completedAt', 80) : null, checks: Array.isArray(checks) ? checks.map((check) => ({ name: text(check?.name, 'checks.name', 160), status: text(check?.status, 'checks.status', 40) })) : [], evidenceSource: text(evidenceSource, 'evidenceSource', 300) }
   if (status === 'passed' && !/^github-actions$/iu.test(result.provider)) fail('REMOTE_CI_EVIDENCE_REQUIRED', 'Only verified remote CI evidence may be marked passed.')
   return result
 }
@@ -136,4 +137,4 @@ function validateRemoteActionAuthorization(authorization, { requestId, action } 
   return normalized
 }
 
-module.exports = { RELEASE_REQUEST_SCHEMA, CI_EVIDENCE_SCHEMA, REMOTE_AUTH_SCHEMA, RELEASE_ACTIONS, REMOTE_ACTIONS, CI_STATUSES, ReleaseContractError, hashDeliveryManifest, validateDeliveryIntegrity, createReleaseRequest, validateReleaseRequest, assertRepositoryBaseline, createCiEvidence, validateCiEvidence, createRemoteActionAuthorization, validateRemoteActionAuthorization, sanitizeRemoteUrl }
+module.exports = { RELEASE_REQUEST_SCHEMA, CI_EVIDENCE_SCHEMA, REMOTE_AUTH_SCHEMA, RELEASE_ACTIONS, REMOTE_ACTIONS, CI_STATUSES, ReleaseContractError, hashDeliveryManifest, validateDeliveryIntegrity, createReleaseRequest, validateReleaseRequest, assertRepositoryBaseline, createCiEvidence, validateCiEvidence, createRemoteActionAuthorization, validateRemoteActionAuthorization, sanitizeRemoteUrl, safeGitSha }
