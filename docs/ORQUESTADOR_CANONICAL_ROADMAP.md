@@ -165,3 +165,6 @@ Por lo tanto, las menciones históricas a Escalón 7 pendiente, Playwright no ve
 Estados actuales: `ESCALON_1_STATUS=VERIFIED_CLOSED`, `ESCALON_2_STATUS=VERIFIED_CLOSED`, `ESCALON_3_STATUS=VERIFIED_CLOSED`, `ESCALON_4_STATUS=VERIFIED_CLOSED`, `ESCALON_5_STATUS=VERIFIED_CLOSED`, `ESCALON_6_STATUS=VERIFIED_CLOSED`, `ESCALON_7_STATUS=VERIFIED_CLOSED`, `ESCALON_8_STATUS=IN_PROGRESS`, `ESCALON_9_STATUS=NOT_STARTED`, `ESCALON_10_STATUS=PARTIAL_EXISTING_FOUNDATION`, `ESCALON_11_STATUS=NOT_STARTED`, `ESCALON_12_STATUS=NOT_STARTED`.
 
 La cabecera histórica debajo se conserva como registro y no es autoridad vigente. Escalón 7 está cerrado localmente con Human Gate durable, preview real, BrowserQuality y Playwright; esto no afirma autenticación remota/multiusuario ni production-ready. Playwright está `INTEGRATED_VERIFIED_LOCAL`; Vitest, axe-core y Lighthouse no se declaran verificados por este roadmap.
+## Autoridad vigente — Escalón 10B
+
+`ESCALON_10_STATUS=IN_PROGRESS`, `ESCALON_10A_STATUS=COMPLETED`, `ESCALON_10B_STATUS=COMPLETED`, `ESCALON_10C_STATUS=NOT_STARTED`, `ESCALON_10D_STATUS=NOT_STARTED`, `NEXT=ESCALON_10C_CONNECTED_CONTROL_CENTER`.
