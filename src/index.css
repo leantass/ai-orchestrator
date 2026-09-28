@@ -2540,3 +2540,12 @@ html[data-theme="dark"] .jefe-commercial-backdrop {
 .jefe-control-center-summary p span, .jefe-control-center-summary small { color: var(--jefe-muted); font-size: 12px; }
 .jefe-control-center-summary p strong { color: var(--jefe-text-strong); font-size: 14px; }
 @media (max-width: 680px) { .jefe-control-center-summary > div { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.jefe-control-center-summary p small { display: block; margin-top: 4px; line-height: 1.4; }
+.jefe-operation-grid li, .jefe-operation-source-list li { min-width: 0; }
+.jefe-operation-grid li { position: relative; }
+.jefe-operation-grid li em { display: block; color: var(--jefe-muted); font-size: 12px; font-style: normal; margin-top: 6px; }
+.jefe-operation-sources { margin-top: 18px; }
+.jefe-operation-sources h2 { margin-bottom: 8px; }
+.jefe-empty-state button:focus-visible, .jefe-operation-content button:focus-visible, .jefe-product-shell button:focus-visible, .jefe-product-shell a:focus-visible, .jefe-product-shell input:focus-visible, .jefe-product-shell textarea:focus-visible, .jefe-product-shell select:focus-visible { outline: 3px solid var(--jefe-primary, #6d28d9); outline-offset: 3px; }
+@media (max-width: 768px) { .jefe-operation-content { padding: 18px; } .jefe-operation-header { align-items: flex-start; flex-direction: column; gap: 16px; } .jefe-operation-cards, .jefe-operation-grid { grid-template-columns: 1fr; } .jefe-operation-source-list li { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 480px) { .jefe-control-center-summary { margin: 12px; } .jefe-control-center-summary > div { grid-template-columns: 1fr; } .jefe-operation-content { padding: 12px; } .jefe-operation-cards article { min-width: 0; } .jefe-operation-cards strong, .jefe-operation-grid strong { overflow-wrap: anywhere; } }
