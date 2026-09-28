@@ -5,8 +5,9 @@
 - `ESCALON_8A_STATUS=COMPLETED`
 - `ESCALON_8B_STATUS=COMPLETED`
 - `ESCALON_8C_STATUS=COMPLETED`
-- `ESCALON_8D_STATUS=NOT_STARTED`
-- `NEXT=ESCALON_8D_RECOVERY_AND_CLOSURE`
+- `ESCALON_8D_STATUS=COMPLETED`
+- `ESCALON_8_STATUS=VERIFIED_CLOSED`
+- `NEXT=ESCALON_9A_OBSERVABILITY_CONTRACT`
 
 Esta especificación define el contrato y la política de 8A. No ejecuta commit, push, merge, pull request, CI remoto, release tag ni deploy.
 
@@ -67,6 +68,14 @@ La configuración CI continúa siendo `CONFIGURED_BUT_LOCAL_QUALITY_GATE_FAILING
 `electron/jefe-release-executor.cjs` revalida request, flow, authorization, baseline e integridad antes de consumir cada intent. El claim/receipt durable evita doble dispatch dentro del proceso; un crash antes de ejecutar permite retry y un crash posterior a un commit se reconcilia sólo si el commit exacto (metadata, parent y archivos cambiados) es demostrable. De otro modo el estado queda ambiguo/bloqueado. La protección es local al proceso y no se afirma locking multiproceso.
 
 `electron/jefe-release-remote-adapter.cjs` deja trigger CI/PR/merge desconectados por defecto. La ingestión CI sólo acepta resultados provenientes de un adapter trusted, con provider `github-actions`, workflow esperado y commit exacto para `passed`; el resultado local `quality:ci` no se convierte en CI remoto. `scripts/jefe-release-execution-smoke.mjs` acredita commit, replay, doble dispatch, allowlist, push contra bare remote, divergencia sin force, tag local, auth, crash/reconciliación, aislamiento, CI fake y sanitización. Todas las mutaciones ocurren bajo `.codex-temp/escalon-8c`; no hubo red ni provider calls.
+
+## Escalón 8D — recovery y cierre operativo
+
+`ESCALON_8D_STATUS=COMPLETED` y `ESCALON_8_STATUS=VERIFIED_CLOSED`. `electron/jefe-release-recovery.cjs` separa `diagnose()` (read-only), `derivePlan()` determinista y `applyPlan()` con allowlist cerrada, snapshot fingerprint y lock local al proceso. Define `jefe-release-incident/v1` y `jefe-release-recovery-plan/v1`; los incidentes preservan corrupción, stale, authorization mismatch, CI failure/unavailable y `execution_uncertain` sin fabricar autoridad ni evidencia.
+
+La recuperación reconstruye de forma idempotente flows, un único outbox, índices derivados y receipts únicamente cuando el estado Git/remote exacto es verificable. Un commit o push ambiguo queda bloqueado como `RELEASE_EXECUTION_UNCERTAIN`; una referencia remota divergente nunca provoca force push. Los planes stale se rechazan, los planes repetidos no agregan mutaciones y la concurrencia sólo afirma locking local al proceso. `releaseHealth()` expone flows saludables/stale/bloqueados, incertidumbres, corrupciones, outbox pendiente, CI fallida y última recuperación.
+
+La evidencia histórica local del canary remoto 8C se rehidrata como `CONSISTENT_TERMINAL`: push y dispatch exitosos, CI real fallida, release bloqueado y cleanup completado. 8D no ejecutó red ni GitHub, no recreó la rama borrada y no agrega capacidades remotas. La calidad global sigue bloqueada por deuda histórica (`306` errores de lint en `src/factory/*`); por eso `RELEASE_READINESS=BLOCKED` y `PRODUCTION_READY=false`, aunque el mecanismo del Escalón 8 esté cerrado.
 
 Canary remoto real verificado el 2026-09-28: base `5cd946865f2bb8e6f08cbfcdc45b5618a43b2af5`, commit canary `d1aa579a6266bc5ff155a3a9fa266f1450c551a7`, rama temporal `canary/jefe-release-8c-5cd9468`, run GitHub Actions `36447463345`, workflow `CI`, evento `workflow_dispatch`, conclusión `failure`. La evidencia indicó la deuda Hermes histórica (`src/factory`, `npm run quality:ci`); no se fabricó PASS. `RemoteExecutionPath=VERIFIED`, `RemoteCiEvidence=VERIFIED_FAILURE`, `ReleaseGateBlockedCorrectly=PASS`, `RemoteBranchCleanup=PASS`. No hubo PR, merge, tag remoto, release ni deploy. `LiveRemoteCanary=PASS`.
 
