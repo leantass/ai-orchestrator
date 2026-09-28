@@ -151,3 +151,8 @@ La especificación es [ORQUESTADOR_ESCALON_8_GIT_CI_DELIVERY.md](ORQUESTADOR_ESC
 `ESCALON_10_STATUS=VERIFIED_CLOSED` · `ESCALON_10A_STATUS=COMPLETED` · `ESCALON_10B_STATUS=COMPLETED` · `ESCALON_10C_STATUS=COMPLETED` · `ESCALON_10D_STATUS=COMPLETED` · `ESCALON_11_STATUS=NOT_STARTED` · `NEXT=ESCALON_11A_END_TO_END_INTEGRATION_AUDIT`.
 
 10D cerró las superficies operativas y la UX comercial con read models reales, estados de carga/error/unknown, aislamiento project/global, protección contra carreras, accesibilidad básica y responsive validado. `REMOTE_CI_QUALITY=FAILING_HISTORICAL_LINT_DEBT`; `RELEASE_READINESS=BLOCKED`; `PRODUCTION_READY=false`; `ProviderCalls=0`; `ExternalNetworkUsed=false`.
+## ESTADO VIGENTE — ESCALÓN 11A
+
+`ESCALON_11_STATUS=IN_PROGRESS` · `ESCALON_11A_STATUS=COMPLETED` · `ESCALON_11B_STATUS=NOT_STARTED` · `ESCALON_11C_STATUS=NOT_STARTED` · `ESCALON_11D_STATUS=NOT_STARTED` · `NEXT=ESCALON_11B_CANONICAL_E2E_ORCHESTRATION`.
+
+11A auditó el recorrido Web comercial real con servidor y browser controlados. Confirmó materialización, manifest, lifecycle, preview y Control Center; las capas canónicas no creadas por el POST comercial quedan clasificadas explícitamente en la auditoría. `ProviderCalls=0`; `ExternalNetworkUsed=false`; `RELEASE_READINESS=BLOCKED`; `PRODUCTION_READY=false`; `HISTORICAL_LINT_ERRORS=306`.

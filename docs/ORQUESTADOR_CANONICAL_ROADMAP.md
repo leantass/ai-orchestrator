@@ -178,3 +178,8 @@ La cabecera histórica debajo se conserva como registro y no es autoridad vigent
 `ESCALON_10_STATUS=VERIFIED_CLOSED`, `ESCALON_10A_STATUS=COMPLETED`, `ESCALON_10B_STATUS=COMPLETED`, `ESCALON_10C_STATUS=COMPLETED`, `ESCALON_10D_STATUS=COMPLETED`, `ESCALON_11_STATUS=NOT_STARTED`, `NEXT=ESCALON_11A_END_TO_END_INTEGRATION_AUDIT`.
 
 El Commercial Control Center queda cerrado como superficie operativa honesta: navegación truthful, read models global/project, UX de recovery read-only, accesibilidad básica, responsive y protección de carreras. El producto no queda release-ready ni production-ready mientras la calidad remota mantenga la deuda histórica de lint.
+## ESTADO VIGENTE — ESCALÓN 11A
+
+`ESCALON_11_STATUS=IN_PROGRESS`, `ESCALON_11A_STATUS=COMPLETED`, `ESCALON_11B_STATUS=NOT_STARTED`, `ESCALON_11C_STATUS=NOT_STARTED`, `ESCALON_11D_STATUS=NOT_STARTED`, `NEXT=ESCALON_11B_CANONICAL_E2E_ORCHESTRATION`.
+
+11A audita el flujo comercial real y no conecta seams nuevos. El siguiente paso exacto es 11B: identidad, correlación y orquestación canónica end-to-end con routing explícito.
