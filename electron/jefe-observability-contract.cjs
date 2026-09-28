@@ -15,7 +15,7 @@ const EVENT_TYPES = Object.freeze([
   'qa.correction.requested', 'release.request.prepared', 'release.flow.state_changed', 'release.authorization.created',
   'release.outbox.created', 'release.execution.started', 'release.execution.succeeded',
   'release.execution.failed', 'release.execution.uncertain', 'release.ci.evidence_ingested',
-  'release.recovery.completed', 'release.cleanup.completed', 'repository.baseline_changed', 'repository.remote_ref_observed', 'observability.source_record_mutated',
+  'release.recovery.completed', 'release.cleanup.completed', 'repository.baseline_changed', 'repository.remote_ref_observed', 'observability.source_record_mutated', 'observability.recovery.completed',
   'human.approval.recorded', 'operation.incident.derived'
 ])
 const SOURCES = Object.freeze(['jefe', 'git', 'github-actions', 'recovery', 'operator', 'test-fixture'])
