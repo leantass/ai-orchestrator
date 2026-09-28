@@ -3,12 +3,12 @@
 ## Estado vigente
 
 - `ESCALON_8_STATUS=VERIFIED_CLOSED`
-- `ESCALON_9_STATUS=IN_PROGRESS`
+- `ESCALON_9_STATUS=VERIFIED_CLOSED`
 - `ESCALON_9A_STATUS=COMPLETED`
 - `ESCALON_9B_STATUS=COMPLETED`
 - `ESCALON_9C_STATUS=COMPLETED`
-- `ESCALON_9D_STATUS=NOT_STARTED`
-- `NEXT=ESCALON_9D_RECOVERY_AND_CLOSURE`
+- `ESCALON_9D_STATUS=COMPLETED`
+- `NEXT=ESCALON_10A_COMMERCIAL_CONTROL_CENTER_AUDIT`
 
 9A define el contrato y la política de observabilidad sin agregar persistencia compleja, red ni terceros. `electron/jefe-observability-contract.cjs` implementa `jefe-observation-event/v1`, `jefe-observability-signal/v1`, `jefe-health-snapshot/v1`, `jefe-operational-incident/v1` y `jefe-operation-summary/v1`.
 
@@ -47,7 +47,15 @@ La integración con 8D es read-only mediante `releaseHealth()`: flows bloqueados
 
 `electron/jefe-observability-runtime.cjs` mantiene checkpoints `jefe-observability-source-checkpoint/v1`, backfill cuando falta checkpoint, sincronización incremental, replay idempotente, aislamiento por proyecto y detección `SOURCE_RECORD_MUTATED`. Un adapter fallido queda `unavailable` sin inventar pass/fail. El IPC allowlisted y `/operation` entregan un read model sin acciones de mutación.
 
-La vista operativa muestra salud, calidad remota, readiness, production readiness, fuentes e incidentes. Sin bridge o evidencia suficiente muestra `unknown`. La fixture histórica 8C conserva Git operacional, CI remoto fallido por los 306 errores históricos de `src/factory/*`, release bloqueado y `productionReady=false`. No se usan terceros, red ni retención destructiva. `ESCALON_9C_STATUS=COMPLETED`; `NEXT=ESCALON_9D_RECOVERY_AND_CLOSURE`.
+La vista operativa muestra salud, calidad remota, readiness, production readiness, fuentes e incidentes. Sin bridge o evidencia suficiente muestra `unknown`. La fixture histórica 8C conserva Git operacional, CI remoto fallido por los 306 errores históricos de `src/factory/*`, release bloqueado y `productionReady=false`. No se usan terceros, red ni retención destructiva. `ESCALON_9C_STATUS=COMPLETED`; 9D agrega recovery y cierre operativo.
+
+## 9D — recovery y cierre operativo
+
+`electron/jefe-observability-recovery.cjs` separa `diagnose()`, `derivePlan()` y `applyPlan()`. El diagnóstico es read-only y clasifica corrupción, divergencias de metadata, checkpoints faltantes/corruptos, sync parcial y mutaciones de fuente. El plan `jefe-observability-recovery-plan/v1` queda ligado a `snapshotFingerprint`, tiene allowlist cerrada y rechaza estado stale.
+
+Recovery sólo repara stores derivados de observabilidad y checkpoints de ingesta: índices, metadata de eventos, checkpoints/status, incidentes rederivables, health y summary. No modifica lifecycle, journal semántico, QA, human gate, release store ni MEMORIA. No borra corrupción, no inventa eventos/CI pass, no auto-resuelve incidentes y conserva la retención `CONSERVATIVE_NO_AUTOMATIC_DELETION`.
+
+Se probaron crash boundaries, restart, apply idempotente, aislamiento, sanitización, source mutation, reconstrucción de checkpoint/índice y ausencia de duplicados. La vista `/operation` permanece read-only y tolera evidencia parcial/unknown. `ESCALON_9_STATUS=VERIFIED_CLOSED`, `ESCALON_9D_STATUS=COMPLETED`, `RELEASE_READINESS=BLOCKED`, `PRODUCTION_READY=false`, `NEXT=ESCALON_10A_COMMERCIAL_CONTROL_CENTER_AUDIT`.
 
 ## Validación
 
