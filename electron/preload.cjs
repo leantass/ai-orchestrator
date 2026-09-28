@@ -343,6 +343,11 @@ contextBridge.exposeInMainWorld('jefeObservabilityBridge', {
   state: (projectId = null, limit = 25, cursor = null) => ipcRenderer.invoke('jefe-observability:state', { ...(projectId ? { projectId } : {}), limit, ...(cursor ? { cursor } : {}) }),
 })
 
+contextBridge.exposeInMainWorld('jefeControlCenterBridge', {
+  global: () => ipcRenderer.invoke('jefe-control-center:global'),
+  project: (projectId) => ipcRenderer.invoke('jefe-control-center:project', { projectId }),
+})
+
 contextBridge.exposeInMainWorld('jefeVisualEvidenceBridge', {
   capture: (payload) => ipcRenderer.invoke('jefe-visual-evidence:capture', payload),
   onOpenWorkspace: (listener) => {

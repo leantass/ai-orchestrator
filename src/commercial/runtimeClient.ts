@@ -5,6 +5,7 @@ type ElectronBridge = Record<string, (...args: any[]) => Promise<any>>
 
 const electron = () => (window as Window & { jefeProjectBridge?: ElectronBridge }).jefeProjectBridge
 const previewElectron = () => (window as Window & { jefePreviewApprovalBridge?: ElectronBridge }).jefePreviewApprovalBridge
+const controlElectron = () => (window as Window & { jefeControlCenterBridge?: ElectronBridge }).jefeControlCenterBridge
 
 async function request(path: string, options: RequestInit = {}) {
   const token = document.querySelector('meta[name="jefe-session"]')?.getAttribute('content') || ''
@@ -37,6 +38,8 @@ function webClient() {
     getContextSnapshot: (projectId: string) => call(`/api/projects/${encodeURIComponent(projectId)}/context/snapshot`),
     getContextTimeline: (projectId: string) => call(`/api/projects/${encodeURIComponent(projectId)}/context/timeline`),
     getContextSyncStatus: (projectId: string) => call(`/api/projects/${encodeURIComponent(projectId)}/context/status`),
+    getControlCenter: () => call('/api/control-center'),
+    getProjectControlCenter: (projectId: string) => call(`/api/projects/${encodeURIComponent(projectId)}/control-center`),
     uploadInputAssets: async (projectId: string, files: File[]) => { const form = new FormData(); files.forEach((file) => form.append('files', file, file.name)); return request(`/api/projects/${encodeURIComponent(projectId)}/assets`, { method: 'POST', body: form }) },
     removeInputAsset: (projectId: string, safeName: string) => call(`/api/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(safeName)}`, { method: 'DELETE' }),
     selectInputAssets: async () => {
@@ -49,7 +52,7 @@ function webClient() {
 
 export function createJefeRuntimeClient() {
   const bridge = electron()
-  if (bridge) return bridge
+  if (bridge) { const control = controlElectron(); return control ? { ...bridge, getControlCenter: () => control.global(), getProjectControlCenter: (projectId: string) => control.project(projectId) } : bridge }
   return webClient()
 }
 

@@ -99,6 +99,8 @@ const { createObservabilityOrchestrator } = require('./jefe-observability-orches
 const { createObservabilityRuntime } = require('./jefe-observability-runtime.cjs')
 const observabilitySources = require('./jefe-observability-source-adapters.cjs')
 const { registerObservabilityIpc } = require('./jefe-observability-ipc.cjs')
+const { createCommercialControlCenter } = require('./jefe-commercial-control-center.cjs')
+const { registerCommercialControlCenterIpc } = require('./jefe-commercial-control-center-ipc.cjs')
 const { createReleasePersistence } = require('./jefe-release-persistence.cjs')
 const { createReleaseRecovery } = require('./jefe-release-recovery.cjs')
 const { servePreview, closePreviewServers } = require('./jefe-preview-http-server.cjs')
@@ -60255,6 +60257,8 @@ const observabilityRuntime = createObservabilityRuntime({
   releaseHealth: releaseRecovery.releaseHealth,
 })
 registerObservabilityIpc({ ipcMain, runtime: observabilityRuntime })
+const commercialControlCenter = createCommercialControlCenter({ persistence: canonicalProjectRegistration.persistence, lifecycle: canonicalProjectRegistration.lifecycle, context: canonicalProjectRegistration.context, observability: observabilityRuntime, qa: qaSecurityRegistration.persistence, releaseHealth: releaseRecovery.releaseHealth })
+registerCommercialControlCenterIpc({ ipcMain, controlCenter: commercialControlCenter })
 ipcMain.handle('jefe-preview:open', async (_event, payload = {}) => {
   try {
     if (!payload || typeof payload !== 'object' || Object.keys(payload).some((key) => !['projectId', 'previewRequestId'].includes(key))) return { ok: false, error: { code: 'INVALID_PAYLOAD', message: 'El payload de apertura no es semántico.' } }

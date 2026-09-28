@@ -2534,3 +2534,9 @@ html[data-theme="dark"] .jefe-commercial-backdrop {
     padding-bottom: 0;
   }
 }
+.jefe-control-center-summary { margin: 18px; }
+.jefe-control-center-summary > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+.jefe-control-center-summary p { display: grid; gap: 4px; margin: 0; border-top: 1px solid var(--jefe-line); padding-top: 10px; }
+.jefe-control-center-summary p span, .jefe-control-center-summary small { color: var(--jefe-muted); font-size: 12px; }
+.jefe-control-center-summary p strong { color: var(--jefe-text-strong); font-size: 14px; }
+@media (max-width: 680px) { .jefe-control-center-summary > div { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
