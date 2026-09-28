@@ -17,6 +17,9 @@ function createGitAdapter({ repoRoot } = {}) {
   async function git(args, options = {}) {
     try { return (await execFileAsync('git', args, { cwd: repoRoot, shell: false, windowsHide: true, maxBuffer: 2 * 1024 * 1024, ...options })).stdout.trim() } catch (error) { fail(error.code === 'ENOENT' ? 'GIT_NOT_AVAILABLE' : 'GIT_COMMAND_FAILED', 'Git command failed.', { exitCode: error.code, stderr: String(error.stderr || '').slice(0, 500) }) }
   }
+  async function gitRaw(args) {
+    try { return (await execFileAsync('git', args, { cwd: repoRoot, shell: false, windowsHide: true, maxBuffer: 2 * 1024 * 1024 })).stdout } catch (error) { fail(error.code === 'ENOENT' ? 'GIT_NOT_AVAILABLE' : 'GIT_COMMAND_FAILED', 'Git command failed.', { exitCode: error.code, stderr: String(error.stderr || '').slice(0, 500) }) }
+  }
   async function readRepository() {
     const top = await git(['rev-parse', '--show-toplevel'])
     const branch = await git(['branch', '--show-current'])
@@ -42,14 +45,18 @@ function createGitAdapter({ repoRoot } = {}) {
     const commitSha = await git(['rev-parse', 'HEAD']); const treeSha = await git(['show', '-s', '--format=%T', commitSha]); const parentSha = await git(['show', '-s', '--format=%P', commitSha])
     return { commitSha, treeSha, parentSha, message, baseline }
   }
-  async function findCommit({ request, expectedFiles } = {}) {
+  async function findCommit({ request, expectedFiles = [], expectedHashes = {} } = {}) {
     const message = safeMessage(`release ${request.identity.projectId}/${request.identity.versionId}: approved delivery`)
     const output = await git(['log', '--all', '--format=%H%x00%T%x00%P%x00%s%x00'])
     const fields = output ? output.split('\0').filter(Boolean) : []
     for (let index = 0; index + 3 < fields.length; index += 4) if (fields[index + 3] === message) {
       const commitSha = fields[index]; const parentSha = fields[index + 2].split(/\s+/u)[0] || ''
       const changed = await git(['diff-tree', '--no-commit-id', '--name-only', '-r', commitSha]).then((value) => value ? value.split(/\r?\n/u).filter(Boolean) : [])
-      if (parentSha && changed.every((item) => expectedFiles.includes(item))) return { commitSha, treeSha: fields[index + 1], parentSha, message, reconciled: true }
+      if (parentSha && changed.every((item) => expectedFiles.includes(item))) {
+        let hashesMatch = true
+        for (const relativePath of expectedFiles) if (expectedHashes[relativePath]) { const content = await gitRaw(['show', `${commitSha}:${relativePath}`]); if (sha256(Buffer.from(content)) !== expectedHashes[relativePath]) hashesMatch = false }
+        if (hashesMatch) return { commitSha, treeSha: fields[index + 1], parentSha, message, reconciled: true }
+      }
     }
     return null
   }
@@ -64,7 +71,8 @@ function createGitAdapter({ repoRoot } = {}) {
     if (pushedSha !== expectedHeadSha) fail('REMOTE_REF_MISMATCH', 'Remote ref did not reach the expected commit.')
     return { remote, branch, commitSha: pushedSha, reconciled: false }
   }
+  async function readRemoteRef({ remote = 'origin', branch } = {}) { safeBranch(branch); const output = await git(['ls-remote', '--heads', remote, branch]); return output ? output.split(/\s+/u)[0] : null }
   async function tag({ tag, commitSha, message } = {}) { safeTag(tag); const existing = await git(['rev-parse', '-q', '--verify', `refs/tags/${tag}`]).catch(() => ''); if (existing) { if (existing === commitSha) return { tag, commitSha, reconciled: true }; fail('TAG_DIVERGED', 'Release tag already points elsewhere.') } await git(['tag', '-a', tag, commitSha, '-m', safeMessage(message)]); return { tag, commitSha, reconciled: false } }
-  return Object.freeze({ readRepository, status, assertAllowlist, commit, findCommit, push, tag })
+  return Object.freeze({ readRepository, status, assertAllowlist, commit, findCommit, push, readRemoteRef, tag })
 }
 module.exports = { createGitAdapter }
