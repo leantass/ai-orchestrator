@@ -2,7 +2,15 @@
 
 ## Estado
 
-`ESCALON_10_STATUS=IN_PROGRESS` · `ESCALON_10A_STATUS=COMPLETED` · `ESCALON_10B_STATUS=NOT_STARTED` · `ESCALON_10C_STATUS=NOT_STARTED` · `ESCALON_10D_STATUS=NOT_STARTED`.
+`ESCALON_10_STATUS=IN_PROGRESS` · `ESCALON_10A_STATUS=COMPLETED` · `ESCALON_10B_STATUS=COMPLETED` · `ESCALON_10C_STATUS=NOT_STARTED` · `ESCALON_10D_STATUS=NOT_STARTED`.
+
+## Escalón 10B — navegación e información truthful
+
+10B implementa la autoridad de ruta local en `src/commercial/routes.ts`: Inicio (`/`), Construir (`/build`), Proyectos (`/projects`), workspace de proyecto, deep-link de versión y Operación (`/operation`). Las rutas desconocidas, IDs inseguros, traversal y versiones/proyectos inexistentes terminan en un estado recuperable de no encontrado.
+
+La navegación actualiza URL y estado mediante una única transición, escucha `popstate` y conserva back/forward/reload. Construir se abre como wizard explícito; un borrador guardado sólo se rehidrata con “Continuar borrador”. La navegación global sólo expone Inicio, Proyectos y Operación. Versiones y entrega permanecen contextuales al proyecto; la entrega local no se presenta como release remoto.
+
+El CTA de materiales de Inicio ahora declara honestamente que los materiales se agregan en el siguiente paso. Operación es visible y read-only, con navegación sin reload. No se agregaron capacidades de release, Git, CI, QA detallado, MEMORIA detallada ni proveedores. Evidencia focal: `scripts/jefe-commercial-route-smoke.mjs` y `tests/e2e/commercial-navigation-10b.spec.ts`; Playwright Chromium headless pasó 1/1 y dejó capturas en `.codex-temp/escalon-10b/evidence/`. `ProviderCalls=0`, `ExternalNetworkUsed=false`, `ProductionReady=false`. La deuda histórica de calidad sigue documentada como 306 errores en `src/factory/*`.
 
 La auditoría no rediseña ni agrega capacidades. El producto sigue con `RELEASE_READINESS=BLOCKED`, `PRODUCTION_READY=false` y 306 errores históricos de lint en `src/factory/*`. La evidencia automática está en `.codex-temp/escalon-10a/evidence/` y no se versiona.
 

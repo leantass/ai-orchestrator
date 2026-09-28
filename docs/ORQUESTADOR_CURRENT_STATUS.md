@@ -138,3 +138,6 @@ El primer proyecto de esta fase quedó bloqueado por el gate de legibilidad del 
 Escalón 7 está `VERIFIED_CLOSED` en alcance local demostrado. Escalón 8 está `IN_PROGRESS`; 8A (`Git / CI / Delivery Contract + Policy`) está `COMPLETED`, mientras 8B, 8C y 8D siguen `NOT_STARTED`. El contrato separa aprobación, delivery local, commit preparado, autorización remota, CI remoto, release y deploy; no ejecuta mutaciones remotas.
 
 La especificación es [ORQUESTADOR_ESCALON_8_GIT_CI_DELIVERY.md](ORQUESTADOR_ESCALON_8_GIT_CI_DELIVERY.md). `NEXT=ESCALON_8B_DURABLE_ORCHESTRATION`. El lint global conserva deuda histórica no relacionada; el lint focal y las validaciones de 8A fueron ejecutados por separado.
+## Autoridad vigente — Escalón 10B
+
+`ESCALON_10_STATUS=IN_PROGRESS` · `ESCALON_10A_STATUS=COMPLETED` · `ESCALON_10B_STATUS=COMPLETED` · `ESCALON_10C_STATUS=NOT_STARTED` · `ESCALON_10D_STATUS=NOT_STARTED` · `NEXT=ESCALON_10C_CONNECTED_CONTROL_CENTER`. Navegación local truthful, sin proveedores ni red; `PRODUCTION_READY=false`; deuda histórica de lint: 306 errores.
