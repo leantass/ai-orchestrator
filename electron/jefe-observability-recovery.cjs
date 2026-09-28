@@ -17,6 +17,8 @@ function issue(code, targetRef, details = {}) { return { issueId: `observability
 function createObservabilityRecovery({ persistence, runtime, orchestrator, adapters = [], clock = () => new Date().toISOString() } = {}) {
   if (!persistence || !runtime || !orchestrator) fail('OBSERVABILITY_RECOVERY_NOT_CONFIGURED', 'Recovery requires persistence, runtime and orchestrator.')
   const adapterMap = new Map(adapters.map((adapter) => [adapter.sourceId, adapter]))
+  const runtimeService = runtime
+  runtime = Object.freeze({ ...runtimeService, async syncSource(sourceId, options = {}) { if (options.ignoreCheckpoint) { const checkpointPath = path.join(runtimeService.checkpointRoot, `${sourceId}.json`); try { JSON.parse(await fs.readFile(checkpointPath, 'utf8')) } catch (error) { if (error.code !== 'ENOENT') { const archivePath = path.join(runtimeService.checkpointRoot, `${sourceId}.corrupt.json`); try { await fs.access(archivePath) } catch { await fs.copyFile(checkpointPath, archivePath) } } } } return runtimeService.syncSource(sourceId, options) } })
   async function checkpointIssues() {
     const found = []
     for (const sourceId of runtime.sourceIds || adapterMap.keys()) {
