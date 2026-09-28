@@ -13,15 +13,15 @@ function createObservabilityOrchestrator({ persistence, clock = () => new Date()
     for (const incident of incidents) results.push(await persistence.saveIncident(incident))
     return { incidents, results, created: results.filter((item) => !item.idempotent).length }
   }
-  async function recordHealthSnapshot({ historicalCanary = null, signals = [], evidenceRefs = [], releaseHealth: suppliedReleaseHealth = null } = {}) {
+  async function recordHealthSnapshot({ historicalCanary = null, signals = [], evidenceRefs = [], sourceStatuses = [], releaseHealth: suppliedReleaseHealth = null } = {}) {
     const health = suppliedReleaseHealth || (typeof releaseHealth === 'function' ? await releaseHealth() : releaseHealth)
-    const snapshot = observation.buildHealthSnapshot({ observedAt: clock(), releaseHealth: health, historicalCanary, signals, evidenceRefs })
+    const snapshot = observation.buildHealthSnapshot({ observedAt: clock(), releaseHealth: health, historicalCanary, signals, sourceStatuses, evidenceRefs })
     return persistence.saveSnapshot(snapshot)
   }
   async function buildOperationSummary({ evidenceRefs = [] } = {}) {
     const health = await persistence.latestHealth()
     const incidents = (await persistence.scanDetailed()).incidents
-    return persistence.saveSummary(observation.summarizeOperation({ observedAt: clock(), healthSnapshot: health, incidents, evidenceRefs }))
+    return persistence.saveSummary(observation.summarizeOperation({ observedAt: health?.observedAt || clock(), healthSnapshot: health, incidents, evidenceRefs }))
   }
   async function rebuildIndexes() { return persistence.rebuildIndex() }
   return Object.freeze({ recordEvent, deriveAndPersistIncidents, recordHealthSnapshot, buildOperationSummary, rebuildIndexes })

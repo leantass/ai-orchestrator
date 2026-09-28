@@ -338,6 +338,11 @@ contextBridge.exposeInMainWorld('jefePreviewApprovalBridge', {
   open: (projectId, previewRequestId) => ipcRenderer.invoke('jefe-preview:open', { projectId, previewRequestId }),
 })
 
+contextBridge.exposeInMainWorld('jefeObservabilityBridge', {
+  refresh: (projectId = null) => ipcRenderer.invoke('jefe-observability:refresh', projectId ? { projectId } : {}),
+  state: (projectId = null, limit = 25, cursor = null) => ipcRenderer.invoke('jefe-observability:state', { ...(projectId ? { projectId } : {}), limit, ...(cursor ? { cursor } : {}) }),
+})
+
 contextBridge.exposeInMainWorld('jefeVisualEvidenceBridge', {
   capture: (payload) => ipcRenderer.invoke('jefe-visual-evidence:capture', payload),
   onOpenWorkspace: (listener) => {

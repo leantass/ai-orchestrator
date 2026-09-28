@@ -6,10 +6,16 @@ const SIGNAL_SCHEMA = 'jefe-observability-signal/v1'
 const INCIDENT_SCHEMA = 'jefe-operational-incident/v1'
 const OPERATION_SUMMARY_SCHEMA = 'jefe-operation-summary/v1'
 const EVENT_TYPES = Object.freeze([
-  'release.request.prepared', 'release.flow.state_changed', 'release.authorization.created',
+  'project.created', 'version.created', 'version.restored', 'delivery.prepared',
+  'preview.viewed', 'human.approval.approved', 'human.approval.rejected',
+  'semantic.run.started', 'semantic.phase.completed', 'semantic.run.passed',
+  'semantic.run.blocked', 'semantic.run.failed', 'semantic.promotion.completed',
+  'semantic.provider.unavailable', 'semantic.quality.failed', 'qa.run.started',
+  'qa.check.passed', 'qa.check.failed', 'qa.gates.passed', 'qa.gates.failed',
+  'qa.correction.requested', 'release.request.prepared', 'release.flow.state_changed', 'release.authorization.created',
   'release.outbox.created', 'release.execution.started', 'release.execution.succeeded',
   'release.execution.failed', 'release.execution.uncertain', 'release.ci.evidence_ingested',
-  'release.recovery.completed', 'release.cleanup.completed', 'repository.baseline_changed', 'repository.remote_ref_observed',
+  'release.recovery.completed', 'release.cleanup.completed', 'repository.baseline_changed', 'repository.remote_ref_observed', 'observability.source_record_mutated',
   'human.approval.recorded', 'operation.incident.derived'
 ])
 const SOURCES = Object.freeze(['jefe', 'git', 'github-actions', 'recovery', 'operator', 'test-fixture'])
@@ -20,6 +26,7 @@ const INCIDENT_STATUSES = Object.freeze(['open', 'acknowledged', 'resolved', 'su
 const HEALTH_STATES = Object.freeze(['healthy', 'degraded', 'blocked', 'unknown'])
 const READINESS_STATES = Object.freeze(['ready', 'blocked', 'unknown'])
 const QUALITY_STATES = Object.freeze(['passing', 'degraded', 'failing', 'unknown'])
+const SOURCE_STATES = Object.freeze(['available', 'degraded', 'unavailable', 'unknown'])
 
 class ObservabilityContractError extends Error {
   constructor(code, message, details = {}) { super(message); this.name = 'ObservabilityContractError'; this.code = code; this.details = details }
@@ -39,6 +46,7 @@ function sanitize(value, depth = 0) {
 }
 function evidenceRefs(values = [], field = 'evidenceRefs') { if (!Array.isArray(values)) fail('OBSERVABILITY_CONTRACT_INVALID', `${field} must be an array.`); return [...new Set(values.map((value) => text(value, `${field}[]`, 300)))].sort() }
 function source(value) { if (!value || typeof value !== 'object' || !SOURCES.includes(value.kind)) fail('OBSERVABILITY_TRUSTED_SOURCE_REQUIRED', 'Observation source is not trusted.'); return { kind: value.kind, sourceId: safeId(value.sourceId || `${value.kind}-source`, 'source.sourceId') } }
+function normalizeSourceStatus(value) { if (!value || !SOURCE_STATES.includes(value.status)) fail('OBSERVABILITY_CONTRACT_INVALID', 'Source status is invalid.'); return { sourceId: safeId(value.sourceId, 'sourceStatus.sourceId'), sourceKind: text(value.sourceKind, 'sourceStatus.sourceKind', 100), status: value.status, lastSuccessfulSync: value.lastSuccessfulSync ? timestamp(value.lastSuccessfulSync, 'sourceStatus.lastSuccessfulSync') : null, lastAttemptAt: timestamp(value.lastAttemptAt, 'sourceStatus.lastAttemptAt'), recordsObserved: Number.isInteger(value.recordsObserved) && value.recordsObserved >= 0 ? value.recordsObserved : 0, recordsIngested: Number.isInteger(value.recordsIngested) && value.recordsIngested >= 0 ? value.recordsIngested : 0, lastError: value.lastError ? sanitize(value.lastError) : null, checkpoint: value.checkpoint || null, evidenceRefs: evidenceRefs(value.evidenceRefs || []) } }
 function createObservationEvent({ eventType, occurredAt, source: eventSource, severity = 'info', outcome = 'observed', correlationId, causationId = null, evidenceRefs: refs = [], subject = {}, attributes = {} } = {}, shouldValidate = true) {
   if (!EVENT_TYPES.includes(eventType)) fail('OBSERVABILITY_CONTRACT_INVALID', 'eventType is not in the closed taxonomy.')
   if (!SEVERITIES.includes(severity) || !OUTCOMES.includes(outcome)) fail('OBSERVABILITY_CONTRACT_INVALID', 'severity or outcome is invalid.')
@@ -92,29 +100,32 @@ function validateHealthSnapshot(snapshot) {
   if (canonical(normalizedRefs) !== canonical(snapshot.health.evidenceRefs) || canonical(readinessRefs) !== canonical(snapshot.readiness.evidenceRefs) || canonical(qualityRefs) !== canonical(snapshot.quality.evidenceRefs)) fail('OBSERVABILITY_CONTRACT_INVALID', 'Health evidence references are not normalized.')
   const normalizedSignals = snapshot.signals.map((signal) => validateSignal(signal))
   if (canonical(normalizedSignals) !== canonical(snapshot.signals)) fail('OBSERVABILITY_CONTRACT_INVALID', 'Health signals are not normalized.')
-  const normalized = { schemaVersion: HEALTH_SNAPSHOT_SCHEMA, snapshotId: snapshot.snapshotId, observedAt: snapshot.observedAt, health: { status: snapshot.health.status, operational: snapshot.health.operational, evidenceRefs: normalizedRefs }, readiness: { status: snapshot.readiness.status, evidenceRefs: readinessRefs }, quality: { status: snapshot.quality.status, evidenceRefs: qualityRefs }, signals: normalizedSignals, productionReady: snapshot.productionReady, limitations: sanitize(snapshot.limitations) }
+  const normalizedSources = snapshot.sources.map(normalizeSourceStatus)
+  const normalized = { schemaVersion: HEALTH_SNAPSHOT_SCHEMA, snapshotId: snapshot.snapshotId, observedAt: snapshot.observedAt, health: { status: snapshot.health.status, operational: snapshot.health.operational, evidenceRefs: normalizedRefs }, readiness: { status: snapshot.readiness.status, evidenceRefs: readinessRefs }, quality: { status: snapshot.quality.status, evidenceRefs: qualityRefs }, sources: normalizedSources, signals: normalizedSignals, productionReady: snapshot.productionReady, limitations: sanitize(snapshot.limitations) }
   if (canonical(normalized) !== canonical(snapshot)) fail('OBSERVABILITY_CONTRACT_INVALID', 'Health snapshot normalization mismatch.')
-  const expectedId = `health-snapshot-${digest({ observedAt: normalized.observedAt, health: normalized.health, readiness: normalized.readiness, quality: normalized.quality, signals: normalizedSignals, productionReady: normalized.productionReady, limitations: normalized.limitations }).slice(0, 24)}`
+  const expectedId = `health-snapshot-${digest({ observedAt: normalized.observedAt, health: normalized.health, readiness: normalized.readiness, quality: normalized.quality, sources: normalizedSources, signals: normalizedSignals, productionReady: normalized.productionReady, limitations: normalized.limitations }).slice(0, 24)}`
   if (snapshot.snapshotId !== expectedId) fail('OBSERVABILITY_CONTRACT_INVALID', 'Health snapshot identity mismatch.')
   return snapshot
 }
-function buildHealthSnapshot({ observedAt, releaseHealth = null, historicalCanary = null, signals = [], evidenceRefs: refs = [] } = {}) {
+function buildHealthSnapshot({ observedAt, releaseHealth = null, historicalCanary = null, sourceStatuses = [], signals = [], evidenceRefs: refs = [] } = {}) {
   const canary = historicalCanary || {}
   const hasReleaseHealth = releaseHealth && typeof releaseHealth === 'object'
-  const healthStatus = canary.state === 'CONSISTENT_TERMINAL' || hasReleaseHealth ? (releaseHealth?.uncertainExecutions > 0 || releaseHealth?.corruptions > 0 ? 'degraded' : 'healthy') : 'unknown'
+  const normalizedSources = sourceStatuses.map(normalizeSourceStatus)
+  const unavailableSources = normalizedSources.filter((item) => item.status === 'unavailable').length
+  const healthStatus = canary.state === 'CONSISTENT_TERMINAL' || hasReleaseHealth ? (releaseHealth?.uncertainExecutions > 0 || releaseHealth?.corruptions > 0 || unavailableSources > 0 ? 'degraded' : 'healthy') : normalizedSources.length && unavailableSources < normalizedSources.length ? 'degraded' : 'unknown'
   const ciFailed = canary.remoteCiStatus === 'failed' || releaseHealth?.failedCi > 0
   const readinessStatus = ciFailed || releaseHealth?.blockedFlows > 0 ? 'blocked' : hasReleaseHealth ? 'ready' : 'unknown'
   const qualityStatus = ciFailed ? 'failing' : canary.remoteCiStatus === 'unavailable' ? 'unknown' : canary.remoteCiStatus === 'passed' ? 'passing' : 'unknown'
   const normalizedSignals = signals.map((signal) => createSignal(signal))
-  const result = { schemaVersion: HEALTH_SNAPSHOT_SCHEMA, snapshotId: null, observedAt: timestamp(observedAt, 'observedAt'), health: { status: healthStatus, operational: healthStatus === 'healthy', evidenceRefs: evidenceRefs(refs) }, readiness: { status: readinessStatus, evidenceRefs: evidenceRefs(refs) }, quality: { status: qualityStatus, evidenceRefs: evidenceRefs(refs) }, signals: normalizedSignals, productionReady: false, limitations: sanitize({ historicalLintErrors: canary.historicalLintErrors || null, reason: ciFailed ? 'remote-ci-failed' : null }) }
-  result.snapshotId = `health-snapshot-${digest({ observedAt: result.observedAt, health: result.health, readiness: result.readiness, quality: result.quality, signals: normalizedSignals, productionReady: result.productionReady, limitations: result.limitations }).slice(0, 24)}`
+  const result = { schemaVersion: HEALTH_SNAPSHOT_SCHEMA, snapshotId: null, observedAt: timestamp(observedAt, 'observedAt'), health: { status: healthStatus, operational: healthStatus === 'healthy', evidenceRefs: evidenceRefs(refs) }, readiness: { status: readinessStatus, evidenceRefs: evidenceRefs(refs) }, quality: { status: qualityStatus, evidenceRefs: evidenceRefs(refs) }, sources: normalizedSources, signals: normalizedSignals, productionReady: false, limitations: sanitize({ historicalLintErrors: canary.historicalLintErrors || null, reason: ciFailed ? 'remote-ci-failed' : null }) }
+  result.snapshotId = `health-snapshot-${digest({ observedAt: result.observedAt, health: result.health, readiness: result.readiness, quality: result.quality, sources: normalizedSources, signals: normalizedSignals, productionReady: result.productionReady, limitations: result.limitations }).slice(0, 24)}`
   return validateHealthSnapshot(result)
 }
 function deriveIncidents({ events = [], healthSnapshot = null } = {}) {
   const incidents = new Map()
   for (const event of events.map(validateObservationEvent)) {
     if (event.eventType === 'human.approval.recorded') continue
-    const map = { 'repository.baseline_changed': ['repository_baseline_changed', 'warning', 'Repository baseline changed.'], 'release.execution.uncertain': ['execution_uncertain', 'critical', 'Execution outcome cannot be demonstrated.'], 'release.ci.evidence_ingested': event.outcome === 'failed' ? ['ci_failed', 'warning', 'Remote CI evidence reports failure.'] : null }
+    const map = { 'repository.baseline_changed': ['repository_baseline_changed', 'warning', 'Repository baseline changed.'], 'observability.source_record_mutated': ['corrupt_record', 'critical', 'A durable source record changed after ingestion.'], 'release.execution.uncertain': ['execution_uncertain', 'critical', 'Execution outcome cannot be demonstrated.'], 'release.ci.evidence_ingested': event.outcome === 'failed' ? ['ci_failed', 'warning', 'Remote CI evidence reports failure.'] : null }
     const candidate = map[event.eventType]
     if (!candidate) continue
     const [category, severity, summary] = candidate
@@ -148,4 +159,4 @@ function createObservability({ clock = () => new Date().toISOString(), releaseHe
   return Object.freeze({ snapshot, deriveIncidents, summarizeOperation, createObservationEvent, validateObservationEvent, createSignal, validateSignal, createOperationalIncident, validateOperationalIncident, buildHealthSnapshot, validateHealthSnapshot, validateOperationSummary })
 }
 
-module.exports = { OBSERVATION_EVENT_SCHEMA, HEALTH_SNAPSHOT_SCHEMA, SIGNAL_SCHEMA, INCIDENT_SCHEMA, OPERATION_SUMMARY_SCHEMA, EVENT_TYPES, SOURCES, SEVERITIES, OUTCOMES, INCIDENT_CATEGORIES, INCIDENT_STATUSES, ObservabilityContractError, createObservationEvent, validateObservationEvent, createSignal, validateSignal, createOperationalIncident, validateOperationalIncident, validateHealthSnapshot, buildHealthSnapshot, deriveIncidents, summarizeOperation, validateOperationSummary, createObservability, sanitize, canonical, digest }
+module.exports = { OBSERVATION_EVENT_SCHEMA, HEALTH_SNAPSHOT_SCHEMA, SIGNAL_SCHEMA, INCIDENT_SCHEMA, OPERATION_SUMMARY_SCHEMA, EVENT_TYPES, SOURCES, SEVERITIES, OUTCOMES, INCIDENT_CATEGORIES, INCIDENT_STATUSES, SOURCE_STATES, ObservabilityContractError, createObservationEvent, validateObservationEvent, validateSignal, createSignal, createOperationalIncident, validateOperationalIncident, validateHealthSnapshot, buildHealthSnapshot, deriveIncidents, summarizeOperation, validateOperationSummary, createObservability, sanitize, canonical, digest }

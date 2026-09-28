@@ -1,5 +1,7 @@
 ## ESTADO VIGENTE — 2026-09-25
 
+Estado canónico actualizado: `ESCALON_9_STATUS=IN_PROGRESS`, `ESCALON_9A_STATUS=COMPLETED`, `ESCALON_9B_STATUS=COMPLETED`, `ESCALON_9C_STATUS=COMPLETED`, `ESCALON_9D_STATUS=NOT_STARTED`, `NEXT=ESCALON_9D_RECOVERY_AND_CLOSURE`.
+
 Esta sección supersede las afirmaciones históricas incompatibles de agosto y de los cierres anteriores. El pipeline semántico real y el flujo normal de usuario ya fueron demostrados; la aprobación automatizada de QA no equivale a aprobación humana. El estado vigente de Git/CI/entrega es `ESCALON_8_STATUS=VERIFIED_CLOSED`, `ESCALON_8A_STATUS=COMPLETED`, `ESCALON_8B_STATUS=COMPLETED`, `ESCALON_8C_STATUS=COMPLETED`, `ESCALON_8D_STATUS=COMPLETED`, `REMOTE_CI_QUALITY=FAILING_HISTORICAL_LINT_DEBT`, `RELEASE_READINESS=BLOCKED`, `PRODUCTION_READY=false`.
 
 8B es una capa durable de contratos: requests inmutables, flows CAS, autorizaciones separadas, outbox de intención, replay/reconciliación, detección stale, corrupción visible e índices derivados reconstruibles. 8C verificó el camino remoto real: push de la rama canary, un workflow dispatch, ingestión trusted de GitHub Actions, bloqueo de release ante CI fallido y cleanup exacto de la rama remota. 8D cerró recovery determinista, stale handling, corrupción visible, reconciliación segura y salud operativa. `RemoteExecutionPath=VERIFIED`, `RemoteCiEvidence=VERIFIED_FAILURE`, `ReleaseGateBlockedCorrectly=PASS`, `NEXT=ESCALON_9A_OBSERVABILITY_CONTRACT`.

@@ -6,9 +6,9 @@
 - `ESCALON_9_STATUS=IN_PROGRESS`
 - `ESCALON_9A_STATUS=COMPLETED`
 - `ESCALON_9B_STATUS=COMPLETED`
-- `ESCALON_9C_STATUS=NOT_STARTED`
+- `ESCALON_9C_STATUS=COMPLETED`
 - `ESCALON_9D_STATUS=NOT_STARTED`
-- `NEXT=ESCALON_9C_RUNTIME_INGESTION_AND_OPERATIONAL_VIEWS`
+- `NEXT=ESCALON_9D_RECOVERY_AND_CLOSURE`
 
 9A define el contrato y la política de observabilidad sin agregar persistencia compleja, red ni terceros. `electron/jefe-observability-contract.cjs` implementa `jefe-observation-event/v1`, `jefe-observability-signal/v1`, `jefe-health-snapshot/v1`, `jefe-operational-incident/v1` y `jefe-operation-summary/v1`.
 
@@ -40,6 +40,14 @@ La integración con 8D es read-only mediante `releaseHealth()`: flows bloqueados
 `electron/jefe-observability-orchestrator.cjs` expone `recordEvent()`, `deriveAndPersistIncidents()`, `recordHealthSnapshot()`, `buildOperationSummary()` y rebuild de índices. Replay por identidad es idempotente; colisiones se rechazan. Timeline usa secuencia persistida, filtros por proyecto/correlación/tipo, cursor estable y límite máximo. Causalidad exige que el evento referenciado exista. Incidentes aplican CAS local con revisiones y transiciones allowlisted; `resolved` exige razón, timestamp y evidencia posterior compatible. Decisions humanas se conservan como eventos y no se convierten en incidentes.
 
 `scanDetailed()` conserva records corruptos físicamente, los reporta y los excluye de índices. Los índices pueden reconstruirse desde records válidos. Snapshots son inmutables y equivalentes por evidencia no generan spam de reloj; summaries quedan ligados a snapshot e incidentes. El smoke `scripts/jefe-observability-persistence-smoke.mjs` cubre restart, replay, collision, timeline/pagination, CAS, history, resolución, corruption isolation, rebuild, failure injection, concurrencia, causalidad, aislamiento A/B y fixture histórica del canary 8C.
+
+## 9C — ingesta runtime y vistas operativas
+
+`electron/jefe-observability-source-adapters.cjs` conecta fuentes locales durables de lifecycle de proyectos, gates humanos, runtime semántico, QA/seguridad y release. MEMORIA queda como fuente parcial/no conectada. Los adapters son read-only: convierten records verificables en eventos trusted y nunca aceptan eventos enviados por renderer.
+
+`electron/jefe-observability-runtime.cjs` mantiene checkpoints `jefe-observability-source-checkpoint/v1`, backfill cuando falta checkpoint, sincronización incremental, replay idempotente, aislamiento por proyecto y detección `SOURCE_RECORD_MUTATED`. Un adapter fallido queda `unavailable` sin inventar pass/fail. El IPC allowlisted y `/operation` entregan un read model sin acciones de mutación.
+
+La vista operativa muestra salud, calidad remota, readiness, production readiness, fuentes e incidentes. Sin bridge o evidencia suficiente muestra `unknown`. La fixture histórica 8C conserva Git operacional, CI remoto fallido por los 306 errores históricos de `src/factory/*`, release bloqueado y `productionReady=false`. No se usan terceros, red ni retención destructiva. `ESCALON_9C_STATUS=COMPLETED`; `NEXT=ESCALON_9D_RECOVERY_AND_CLOSURE`.
 
 ## Validación
 

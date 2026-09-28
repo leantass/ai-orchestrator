@@ -94,6 +94,12 @@ const { registerCanonicalProjectIpc } = require('./jefe-project-ipc.cjs')
 const { createSemanticRuntimeComposition } = require('./jefe-semantic-runtime-composition.cjs')
 const { registerQaSecurityIpc } = require('./jefe-qa-security-ipc.cjs')
 const { registerPreviewApprovalIpc } = require('./jefe-preview-approval.cjs')
+const { createObservabilityPersistence } = require('./jefe-observability-persistence.cjs')
+const { createObservabilityOrchestrator } = require('./jefe-observability-orchestrator.cjs')
+const { createObservabilityRuntime } = require('./jefe-observability-runtime.cjs')
+const observabilitySources = require('./jefe-observability-source-adapters.cjs')
+const { registerObservabilityIpc } = require('./jefe-observability-ipc.cjs')
+const { createReleasePersistence } = require('./jefe-release-persistence.cjs')
 const { servePreview, closePreviewServers } = require('./jefe-preview-http-server.cjs')
 const { validateProductPlanning, validateGeneratedArtifact } = require('./jefe-product-planning.cjs')
 
@@ -60221,15 +60227,30 @@ ipcMain.handle('jefe-input-assets:select', async () => {
 
 const canonicalProjectRoot = path.join(app.getPath('userData'), 'jefe-canonical-projects')
 const semanticRuntimeComposition = createSemanticRuntimeComposition({ root: canonicalProjectRoot })
-registerCanonicalProjectIpc({
+const canonicalProjectRegistration = registerCanonicalProjectIpc({
   ipcMain,
   root: path.join(app.getPath('userData'), 'jefe-canonical-projects'),
   shell,
   clipboard: electronModule.clipboard,
   semanticRuntimeAdapter: semanticRuntimeComposition.adapter,
 })
-registerQaSecurityIpc({ ipcMain, projectRoot: canonicalProjectRoot })
+const qaSecurityRegistration = registerQaSecurityIpc({ ipcMain, projectRoot: canonicalProjectRoot })
 const previewApprovalRegistration = registerPreviewApprovalIpc({ ipcMain, root: canonicalProjectRoot })
+const observabilityPersistence = createObservabilityPersistence({ root: canonicalProjectRoot })
+const observabilityOrchestrator = createObservabilityOrchestrator({ persistence: observabilityPersistence })
+const observabilityRuntime = createObservabilityRuntime({
+  persistence: observabilityPersistence,
+  orchestrator: observabilityOrchestrator,
+  adapters: [
+    observabilitySources.createProjectLifecycleSource({ persistence: canonicalProjectRegistration.persistence, lifecycle: canonicalProjectRegistration.lifecycle }),
+    observabilitySources.createHumanGateSource({ persistence: canonicalProjectRegistration.persistence, previewApproval: previewApprovalRegistration.service }),
+    observabilitySources.createSemanticRuntimeSource({ root: canonicalProjectRoot }),
+    observabilitySources.createQaSource({ qaPersistence: qaSecurityRegistration.persistence }),
+    observabilitySources.createReleaseSource({ releasePersistence: createReleasePersistence({ root: canonicalProjectRoot }) }),
+    observabilitySources.createUnavailableSourceAdapter({ sourceId: 'memory', sourceKind: 'memory', reason: 'Memory observability source is not connected.' }),
+  ],
+})
+registerObservabilityIpc({ ipcMain, runtime: observabilityRuntime })
 ipcMain.handle('jefe-preview:open', async (_event, payload = {}) => {
   try {
     if (!payload || typeof payload !== 'object' || Object.keys(payload).some((key) => !['projectId', 'previewRequestId'].includes(key))) return { ok: false, error: { code: 'INVALID_PAYLOAD', message: 'El payload de apertura no es semántico.' } }
