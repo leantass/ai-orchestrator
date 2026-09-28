@@ -4,9 +4,9 @@
 
 - `ESCALON_8A_STATUS=COMPLETED`
 - `ESCALON_8B_STATUS=COMPLETED`
-- `ESCALON_8C_STATUS=IMPLEMENTED_LOCAL_PASS`
+- `ESCALON_8C_STATUS=COMPLETED`
 - `ESCALON_8D_STATUS=NOT_STARTED`
-- `NEXT=ESCALON_8C_LIVE_REMOTE_CANARY`
+- `NEXT=ESCALON_8D_RECOVERY_AND_CLOSURE`
 
 Esta especificación define el contrato y la política de 8A. No ejecuta commit, push, merge, pull request, CI remoto, release tag ni deploy.
 
@@ -62,13 +62,13 @@ La configuración CI continúa siendo `CONFIGURED_BUT_LOCAL_QUALITY_GATE_FAILING
 
 ## Escalón 8C — ejecución explícita local y evidencia remota
 
-`ESCALON_8C_STATUS=IMPLEMENTED_LOCAL_PASS`. `electron/jefe-release-execution-contract.cjs` define `jefe-release-execution-receipt/v1` con identidad de outbox/flow/request, acción, repository, branch, HEAD ligado, estado terminal y error sanitizado. `electron/jefe-release-git-adapter.cjs` usa `execFile` con argumentos fijos: lee identidad/baseline/status, valida hashes y allowlist exacta, ejecuta commit, push fast-forward y tag local; nunca usa `shell: true`, `git add .`, force push ni combina commit con push.
+`ESCALON_8C_STATUS=COMPLETED`. `electron/jefe-release-execution-contract.cjs` define `jefe-release-execution-receipt/v1` con identidad de outbox/flow/request, acción, repository, branch, HEAD ligado, estado terminal y error sanitizado. `electron/jefe-release-git-adapter.cjs` usa `execFile` con argumentos fijos: lee identidad/baseline/status, valida hashes y allowlist exacta, ejecuta commit, push fast-forward y tag local; nunca usa `shell: true`, `git add .`, force push ni combina commit con push.
 
 `electron/jefe-release-executor.cjs` revalida request, flow, authorization, baseline e integridad antes de consumir cada intent. El claim/receipt durable evita doble dispatch dentro del proceso; un crash antes de ejecutar permite retry y un crash posterior a un commit se reconcilia sólo si el commit exacto (metadata, parent y archivos cambiados) es demostrable. De otro modo el estado queda ambiguo/bloqueado. La protección es local al proceso y no se afirma locking multiproceso.
 
 `electron/jefe-release-remote-adapter.cjs` deja trigger CI/PR/merge desconectados por defecto. La ingestión CI sólo acepta resultados provenientes de un adapter trusted, con provider `github-actions`, workflow esperado y commit exacto para `passed`; el resultado local `quality:ci` no se convierte en CI remoto. `scripts/jefe-release-execution-smoke.mjs` acredita commit, replay, doble dispatch, allowlist, push contra bare remote, divergencia sin force, tag local, auth, crash/reconciliación, aislamiento, CI fake y sanitización. Todas las mutaciones ocurren bajo `.codex-temp/escalon-8c`; no hubo red ni provider calls.
 
-El canary GitHub real (`push`, `workflow_dispatch`, PR, tag remoto o release) sigue sin autorización y no se declara demostrado. `LiveRemoteCanary=NOT_AUTHORIZED`.
+Canary remoto real verificado el 2026-09-28: base `5cd946865f2bb8e6f08cbfcdc45b5618a43b2af5`, commit canary `d1aa579a6266bc5ff155a3a9fa266f1450c551a7`, rama temporal `canary/jefe-release-8c-5cd9468`, run GitHub Actions `36447463345`, workflow `CI`, evento `workflow_dispatch`, conclusión `failure`. La evidencia indicó la deuda Hermes histórica (`src/factory`, `npm run quality:ci`); no se fabricó PASS. `RemoteExecutionPath=VERIFIED`, `RemoteCiEvidence=VERIFIED_FAILURE`, `ReleaseGateBlockedCorrectly=PASS`, `RemoteBranchCleanup=PASS`. No hubo PR, merge, tag remoto, release ni deploy. `LiveRemoteCanary=PASS`.
 
 ## Fases futuras
 
