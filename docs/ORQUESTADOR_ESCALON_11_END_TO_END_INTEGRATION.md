@@ -137,3 +137,35 @@ Aceptar un flujo completo real con QA, Human Gate, delivery, release gating y ob
 Probar restart, crash, replay, stale, corrección y cierre completo del flujo conectado.
 
 Esta auditoría no cierra Escalón 11 ni altera la deuda histórica de calidad.
+
+## 11B — Canonical E2E Orchestration
+
+11B agrega una autoridad durable sin fusionar artificialmente los subsistemas existentes:
+
+`Commercial Request → E2E Flow → immutable Routing Decision → Discovery → conditional Research/Evidence → Product Planning → local Materialization → artifact QA → Preview → Human Gate → Delivery boundary → Release boundary → operational read model`.
+
+### Contratos y persistencia
+
+- `jefe-e2e-flow/v1` declara siempre las etapas `context`, `discovery`, `research`, `evidence`, `planning`, `execution`, `qa`, `preview`, `human_gate`, `delivery`, `release`, `observability` y `memory`.
+- Cada etapa tiene `mode`, `requirement`, `status`, `reasonCode`, `inputRefs` y `outputRefs`; un bypass es `skipped_by_policy` con razón durable.
+- `jefe-e2e-routing-policy/v1` es trusted, determinista e inmutable. El renderer no decide skips, QA ni release.
+- `.jefe-e2e/flows`, `routing` y `receipts` usan escrituras atómicas, identidad determinista y CAS/revision.
+- El manifest recibe metadata aditiva `jefe-e2e-lineage/v1` con flow, route, planning, execution y QA refs.
+
+### Routing actual
+
+Para un sitio comercial con brief de primera parte suficiente: Discovery se ejecuta realmente; Research y Evidence se `skipped_by_policy` por `FIRST_PARTY_INPUT_SUFFICIENT`/`REFERENCE_AS_INPUT`; Product Planning gobierna la materialización; Execution usa `local_materialization`; QA usa `semantic_artifact_quality`; Preview sólo se crea después de QA; Human Gate queda `waiting`; Delivery y Release permanecen en fronteras explícitas.
+
+Si una política trusted exige Research, el flow queda `blocked` en Research/Evidence sin provider, sin fabricar evidencia y sin materializar. La generación determinista no se disfraza de Codex execution y `jefe-planner-*` no se declara equivalente a `jefe-product-planning`.
+
+### QA, Human Gate y límites
+
+La evidencia QA durable está ligada a `e2eFlowId`, identidad exacta, execution receipt y manifest. Un fallo QA bloquea Preview y Human Gate. La aprobación humana continúa siendo la única autoridad de aprobación; QA no entrega ni libera automáticamente. Delivery es una acción posterior explícita y Release sigue requiriendo request/autorización del subsistema 8B/8C. No se ejecuta ninguna mutación remota.
+
+El Web POST y el create inicial IPC usan el mismo orquestador; la materialización existente queda detrás de un adapter estrecho. Control Center incorpora el resumen del flow como read model, no como autoridad mutante. La persistencia de MEMORIA no se fuerza: el stage queda explícitamente `skipped_by_policy` cuando no hay milestone-memory configurado.
+
+### Evidencia 11B
+
+`scripts/jefe-e2e-orchestration-smoke.mjs` cubre flujo simple, Discovery real, Research requerido/bloqueado, QA fail, replay, colisión, concurrencia, aislamiento y routing tamper. El flujo simple termina en `human_gate=waiting` con refs de intake, planning, execution receipt, QA evidence y preview. `ProviderCalls=0`, `ExternalNetworkUsed=false`, `RELEASE_READINESS=BLOCKED` y `PRODUCTION_READY=false`.
+
+P1-1, P1-2 y P1-4 de 11A quedan cerrados estructuralmente para la creación inicial. La ruta de requested-change/correction completa, delivery real y release request siguen siendo límites para 11C/11D; no se declaran cerrados por la existencia de null refs.

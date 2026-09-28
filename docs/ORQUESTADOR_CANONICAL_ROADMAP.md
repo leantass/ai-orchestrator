@@ -183,3 +183,9 @@ El Commercial Control Center queda cerrado como superficie operativa honesta: na
 `ESCALON_11_STATUS=IN_PROGRESS`, `ESCALON_11A_STATUS=COMPLETED`, `ESCALON_11B_STATUS=NOT_STARTED`, `ESCALON_11C_STATUS=NOT_STARTED`, `ESCALON_11D_STATUS=NOT_STARTED`, `NEXT=ESCALON_11B_CANONICAL_E2E_ORCHESTRATION`.
 
 11A audita el flujo comercial real y no conecta seams nuevos. El siguiente paso exacto es 11B: identidad, correlación y orquestación canónica end-to-end con routing explícito.
+
+## ESTADO VIGENTE — ESCALÓN 11B
+
+`ESCALON_11_STATUS=IN_PROGRESS`, `ESCALON_11A_STATUS=COMPLETED`, `ESCALON_11B_STATUS=COMPLETED`, `ESCALON_11C_STATUS=NOT_STARTED`, `ESCALON_11D_STATUS=NOT_STARTED`, `NEXT=ESCALON_11C_REAL_END_TO_END_ACCEPTANCE`.
+
+11B deja una autoridad única para el create inicial comercial: flow durable, routing inmutable, Discovery real, políticas explícitas de Research/Evidence, planificación consumida por materialización, QA antes de Preview, Human Gate pendiente y release sin autoejecución. El siguiente salto es aceptar el recorrido completo con correcciones, delivery y release gating reales en 11C.

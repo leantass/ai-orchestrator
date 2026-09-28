@@ -156,3 +156,9 @@ La especificación es [ORQUESTADOR_ESCALON_8_GIT_CI_DELIVERY.md](ORQUESTADOR_ESC
 `ESCALON_11_STATUS=IN_PROGRESS` · `ESCALON_11A_STATUS=COMPLETED` · `ESCALON_11B_STATUS=NOT_STARTED` · `ESCALON_11C_STATUS=NOT_STARTED` · `ESCALON_11D_STATUS=NOT_STARTED` · `NEXT=ESCALON_11B_CANONICAL_E2E_ORCHESTRATION`.
 
 11A auditó el recorrido Web comercial real con servidor y browser controlados. Confirmó materialización, manifest, lifecycle, preview y Control Center; las capas canónicas no creadas por el POST comercial quedan clasificadas explícitamente en la auditoría. `ProviderCalls=0`; `ExternalNetworkUsed=false`; `RELEASE_READINESS=BLOCKED`; `PRODUCTION_READY=false`; `HISTORICAL_LINT_ERRORS=306`.
+
+## ESTADO VIGENTE — ESCALÓN 11B
+
+`ESCALON_11_STATUS=IN_PROGRESS` · `ESCALON_11A_STATUS=COMPLETED` · `ESCALON_11B_STATUS=COMPLETED` · `ESCALON_11C_STATUS=NOT_STARTED` · `ESCALON_11D_STATUS=NOT_STARTED` · `NEXT=ESCALON_11C_REAL_END_TO_END_ACCEPTANCE`.
+
+11B conectó la creación comercial Web e IPC a una autoridad E2E durable con routing trusted/inmutable, Discovery real, bypass Research explícito, Product Planning consumido, materialización local, QA de artefactos, Preview/Human Gate y fronteras Delivery/Release/Observability. `ProviderCalls=0`; `ExternalNetworkUsed=false`; `RELEASE_READINESS=BLOCKED`; `PRODUCTION_READY=false`; `HISTORICAL_LINT_ERRORS=306`.
