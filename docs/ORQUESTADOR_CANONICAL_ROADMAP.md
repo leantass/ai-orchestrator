@@ -1,6 +1,6 @@
 # Roadmap canónico de finalización del Orquestador
 
-Estado canónico 10A: auditoría del Commercial Control Center completada sin rediseño. `ESCALON_9_STATUS=VERIFIED_CLOSED`, `ESCALON_10_STATUS=IN_PROGRESS`, `ESCALON_10A_STATUS=COMPLETED`, `ESCALON_10B_STATUS=NOT_STARTED`, `ESCALON_10C_STATUS=NOT_STARTED`, `ESCALON_10D_STATUS=NOT_STARTED`, `NEXT=ESCALON_10B_NAVIGATION_AND_INFORMATION_ARCHITECTURE`.
+Estado canónico 10D: cierre operativo del Commercial Control Center completado. `ESCALON_9_STATUS=VERIFIED_CLOSED`, `ESCALON_10_STATUS=VERIFIED_CLOSED`, `ESCALON_10A_STATUS=COMPLETED`, `ESCALON_10B_STATUS=COMPLETED`, `ESCALON_10C_STATUS=COMPLETED`, `ESCALON_10D_STATUS=COMPLETED`, `ESCALON_11_STATUS=NOT_STARTED`, `NEXT=ESCALON_11A_END_TO_END_INTEGRATION_AUDIT`.
 
 ## ESTADO VIGENTE — 2026-09-25
 
@@ -173,3 +173,8 @@ La cabecera histórica debajo se conserva como registro y no es autoridad vigent
 `ESCALON_10_STATUS=IN_PROGRESS`, `ESCALON_10A_STATUS=COMPLETED`, `ESCALON_10B_STATUS=COMPLETED`, `ESCALON_10C_STATUS=COMPLETED`, `ESCALON_10D_STATUS=NOT_STARTED`, `NEXT=ESCALON_10D_OPERATIONAL_SURFACES`.
 
 10C conecta el Commercial Control Center con read models global/project, rutas Web, bridge Electron y superficies operativas read-only. No agrega mutaciones remotas ni proveedores. La calidad remota sigue bloqueada por 306 errores históricos de `src/factory/*`; `PRODUCTION_READY=false`.
+## ESTADO VIGENTE — CIERRE ESCALÓN 10
+
+`ESCALON_10_STATUS=VERIFIED_CLOSED`, `ESCALON_10A_STATUS=COMPLETED`, `ESCALON_10B_STATUS=COMPLETED`, `ESCALON_10C_STATUS=COMPLETED`, `ESCALON_10D_STATUS=COMPLETED`, `ESCALON_11_STATUS=NOT_STARTED`, `NEXT=ESCALON_11A_END_TO_END_INTEGRATION_AUDIT`.
+
+El Commercial Control Center queda cerrado como superficie operativa honesta: navegación truthful, read models global/project, UX de recovery read-only, accesibilidad básica, responsive y protección de carreras. El producto no queda release-ready ni production-ready mientras la calidad remota mantenga la deuda histórica de lint.

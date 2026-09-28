@@ -2,7 +2,7 @@
 
 ## Estado
 
-`ESCALON_10_STATUS=IN_PROGRESS` · `ESCALON_10A_STATUS=COMPLETED` · `ESCALON_10B_STATUS=COMPLETED` · `ESCALON_10C_STATUS=COMPLETED` · `ESCALON_10D_STATUS=NOT_STARTED` · `NEXT=ESCALON_10D_OPERATIONAL_SURFACES`.
+`ESCALON_10_STATUS=VERIFIED_CLOSED` · `ESCALON_10A_STATUS=COMPLETED` · `ESCALON_10B_STATUS=COMPLETED` · `ESCALON_10C_STATUS=COMPLETED` · `ESCALON_10D_STATUS=COMPLETED` · `NEXT=ESCALON_11A_END_TO_END_INTEGRATION_AUDIT`.
 
 ## Escalón 10B — navegación e información truthful
 
@@ -144,3 +144,11 @@ Playwright Chromium headless, workers=1, retries=0, localhost only. Se capturaro
 Las superficies Web y Electron reciben el mismo contrato mediante `/api/control-center`, `/api/projects/:projectId/control-center` y `jefeControlCenterBridge`. Los estados sin evidencia son `unknown` o `not_started`, con fuente y disponibilidad explícitas. El workspace muestra generación, QA, revisión humana, MEMORIA, entrega local y release remoto como resumen read-only; Operación muestra build, calidad remota, release, producción, bloqueos e incidentes globales.
 
 Evidencia focal: `scripts/jefe-commercial-control-center-smoke.mjs`, `scripts/jefe-commercial-control-center-web-smoke.mjs` y `scripts/jefe-commercial-control-center-ipc-smoke.mjs`. `ProviderCalls=0`, `ExternalNetworkUsed=false`, `ProductionReady=false`; la deuda histórica de calidad continúa siendo 306 errores de lint en `src/factory/*`. 10C no afirma CI verde ni release listo.
+
+## Escalón 10D — Operational Surfaces + UX Hardening
+
+10D cierra las superficies comerciales sobre la autoridad de 10C. Operación consume un único read model global, refresca observabilidad y vuelve a leer el control center; no recrea estados ni números en React. Los bloqueos e incidentes se traducen a copy comercial con alcance, motivo y siguiente paso, mientras las fuentes se muestran como estados secundarios. El workspace mantiene el resumen project/version-bound separado del detalle contextual de Versiones y entrega.
+
+Se agregaron estados explícitos de carga, error y desconocido, protección contra respuestas tardías al cambiar de proyecto, `aria-current` en navegación, foco visible, labels de tabs y controles, copy de producción separada de construcción/release y responsive para 1440, 1280, 1024, 768 y 390 px. La UX sigue siendo read-only respecto de release, Git, CI e incidentes.
+
+Evidencia: `tests/e2e/commercial-surfaces-10d.spec.ts` (Chromium headless, 6/6), smokes 10C, rutas, workspace y build/typecheck/lint focal. No se ejecutaron proveedores ni red externa. Limitaciones: `quality:ci` continúa bloqueado por 306 errores históricos en `src/factory/*`; `RELEASE_READINESS=BLOCKED`; `PRODUCTION_READY=false`.
