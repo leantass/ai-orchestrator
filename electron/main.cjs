@@ -100,6 +100,7 @@ const { createObservabilityRuntime } = require('./jefe-observability-runtime.cjs
 const observabilitySources = require('./jefe-observability-source-adapters.cjs')
 const { registerObservabilityIpc } = require('./jefe-observability-ipc.cjs')
 const { createReleasePersistence } = require('./jefe-release-persistence.cjs')
+const { createReleaseRecovery } = require('./jefe-release-recovery.cjs')
 const { servePreview, closePreviewServers } = require('./jefe-preview-http-server.cjs')
 const { validateProductPlanning, validateGeneratedArtifact } = require('./jefe-product-planning.cjs')
 
@@ -60238,6 +60239,8 @@ const qaSecurityRegistration = registerQaSecurityIpc({ ipcMain, projectRoot: can
 const previewApprovalRegistration = registerPreviewApprovalIpc({ ipcMain, root: canonicalProjectRoot })
 const observabilityPersistence = createObservabilityPersistence({ root: canonicalProjectRoot })
 const observabilityOrchestrator = createObservabilityOrchestrator({ persistence: observabilityPersistence })
+const releasePersistence = createReleasePersistence({ root: canonicalProjectRoot })
+const releaseRecovery = createReleaseRecovery({ root: canonicalProjectRoot, persistence: releasePersistence })
 const observabilityRuntime = createObservabilityRuntime({
   persistence: observabilityPersistence,
   orchestrator: observabilityOrchestrator,
@@ -60246,9 +60249,10 @@ const observabilityRuntime = createObservabilityRuntime({
     observabilitySources.createHumanGateSource({ persistence: canonicalProjectRegistration.persistence, previewApproval: previewApprovalRegistration.service }),
     observabilitySources.createSemanticRuntimeSource({ root: canonicalProjectRoot }),
     observabilitySources.createQaSource({ qaPersistence: qaSecurityRegistration.persistence }),
-    observabilitySources.createReleaseSource({ releasePersistence: createReleasePersistence({ root: canonicalProjectRoot }) }),
+    observabilitySources.createReleaseSource({ releasePersistence }),
     observabilitySources.createUnavailableSourceAdapter({ sourceId: 'memory', sourceKind: 'memory', reason: 'Memory observability source is not connected.' }),
   ],
+  releaseHealth: releaseRecovery.releaseHealth,
 })
 registerObservabilityIpc({ ipcMain, runtime: observabilityRuntime })
 ipcMain.handle('jefe-preview:open', async (_event, payload = {}) => {
