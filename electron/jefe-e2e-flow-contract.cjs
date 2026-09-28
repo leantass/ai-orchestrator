@@ -26,7 +26,11 @@ function validateFlow(raw) {
   const cleanStages = {}
   for (const name of STAGES) cleanStages[name] = stage(raw.stages[name], name)
   if (Object.keys(raw.stages).sort().join('|') !== [...STAGES].sort().join('|')) fail('INVALID_FLOW', 'El flow debe declarar todas las etapas.')
-  return Object.freeze({ ...raw, identity: cleanIdentity, stages: Object.freeze(cleanStages), refs: Object.freeze({ ...raw.refs }) })
+  const refs = { ...raw.refs }
+  for (const [key, value] of Object.entries(refs)) if (value !== null && typeof value !== 'string') fail('INVALID_FLOW_REF', `${key} invalido.`)
+  const bindings = [['plannerPlanId', 'planning'], ['executionReceiptId', 'execution'], ['qaEvidenceId', 'qa'], ['previewRequestId', 'preview']]
+  for (const [refName, stageName] of bindings) if (refs[refName] !== null && cleanStages[stageName].outputRefs.length > 0 && !cleanStages[stageName].outputRefs.includes(refs[refName])) fail('STAGE_REF_MISMATCH', `${refName} no coincide con ${stageName}.`)
+  return Object.freeze({ ...raw, identity: cleanIdentity, stages: Object.freeze(cleanStages), refs: Object.freeze(refs) })
 }
 function createFlow({ identity: rawIdentity, flowKind = 'initial_project', routeDecisionId, inputFingerprint, now, stages, refs = {}, state = 'active' }) {
   const cleanIdentity = identity(rawIdentity); const e2eFlowId = deterministicFlowId({ identity: cleanIdentity, flowKind });
