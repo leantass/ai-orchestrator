@@ -2,7 +2,7 @@ const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 const contract = require('./jefe-project-contract.cjs')
-const { createFirstVersionFromRun } = require('./jefe-project-creation.cjs')
+const { materializeCommercialProject } = require('./jefe-e2e-materialization-adapter.cjs')
 const productPlanning = require('./jefe-product-planning.cjs')
 
 const LEDGER_SCHEMA = 'jefe-project-events/v1'
@@ -51,7 +51,7 @@ function createProjectLifecycle({ root, persistence }) {
       const ids = await identity(projectId)
       const visualDirection = options && Object.hasOwn(options, 'visualDirection') ? options.visualDirection : project.visualDirection
       if (visualDirection && !contract.VISUAL_DIRECTIONS.includes(visualDirection)) fail('INVALID_VISUAL_DIRECTION', 'La dirección visual no es válida.')
-      const result = await createFirstVersionFromRun({ destinationRoot: allowedRoot, allowedRoots: [allowedRoot], projectId, ...ids, projectType: project.projectType, platform: project.platform, generationProfile: project.generationProfile, creativeDirection: visualDirection, brandSpec: project.brandSpec, inputAssets: project.inputAssets, ...sourceContext(project, changeRequest, visualDirection), changeOrigin: { kind: 'commercial', reference: changeRequest }, summary: changeRequest })
+      const result = await materializeCommercialProject({ destinationRoot: allowedRoot, allowedRoots: [allowedRoot], projectId, ...ids, projectType: project.projectType, platform: project.platform, generationProfile: project.generationProfile, creativeDirection: visualDirection, brandSpec: project.brandSpec, inputAssets: project.inputAssets, ...sourceContext(project, changeRequest, visualDirection), changeOrigin: { kind: 'commercial', reference: changeRequest }, summary: changeRequest })
       if (!result.ok) { await appendEvent(projectId, 'version_creation_failed', { versionId: project.activeVersionId, requestEventId: requested.eventId, errorCode: result.error && result.error.code ? result.error.code : 'CREATION_FAILED' }); return result }
       await persistence.registerManifest(result.artifacts.manifestPath)
       const created = await appendEvent(projectId, 'version_created', { versionId: ids.versionId, runId: ids.runId, originVersionId: project.activeVersionId, changeRequest })

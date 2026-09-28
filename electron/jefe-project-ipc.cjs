@@ -1,11 +1,12 @@
 const fs = require('fs')
 const path = require('path')
-const { createFirstVersionFromRun } = require('./jefe-project-creation.cjs')
+const { materializeCommercialProject } = require('./jefe-e2e-materialization-adapter.cjs')
 const { createProjectPersistence } = require('./jefe-project-persistence.cjs')
 const { createProjectLifecycle } = require('./jefe-project-lifecycle.cjs')
 const { resolvePreview } = require('./jefe-project-preview.cjs')
 const { createContextIntegration } = require('./jefe-context-integration.cjs')
 const registry = require('./jefe-project-registry.cjs')
+const { createCommercialE2EOrchestrator } = require('./jefe-e2e-orchestrator.cjs')
 
 const CHANNELS = Object.freeze({ create: 'jefe-projects:create-first-version', list: 'jefe-projects:list', get: 'jefe-projects:get', versions: 'jefe-projects:list-versions', snapshot: 'jefe-projects:workspace-snapshot', open: 'jefe-projects:open', copy: 'jefe-projects:copy-location', capabilities: 'jefe-projects:capabilities', createVersion: 'jefe-projects:create-version', approveVersion: 'jefe-projects:approve-version', history: 'jefe-projects:history', compare: 'jefe-projects:compare', restore: 'jefe-projects:restore', prepareDelivery: 'jefe-projects:prepare-local-delivery', preview: 'jefe-projects:preview', semanticCorrection: 'jefe-projects:semantic-correction', contextSnapshot: 'jefe-context:snapshot', contextTimeline: 'jefe-context:timeline', contextStatus: 'jefe-context:status', contextReconcile: 'jefe-context:reconcile' })
 function safeError(error) { return { ok: false, error: { code: error && error.code ? error.code : 'IPC_FAILED', message: error instanceof Error ? error.message : 'La operacion no pudo completarse.' } } }
@@ -13,15 +14,16 @@ function id(value, field) { if (typeof value !== 'string' || !/^[a-z][a-z0-9]*(?
 function noPathPayload(payload) { if (!payload || typeof payload !== 'object' || ['path', 'filePath', 'destinationRoot', 'rootPath', 'manifestPath', 'ledgerPath', 'outboxPath', 'snapshotPath', 'candidateRoot', 'sourceManifestPath', 'executionPackage', 'qualityReport', 'correctionPlan', 'semanticGenerationSpec', 'plan'].some((field) => Object.hasOwn(payload, field))) { const error = new Error('El payload no admite paths, planes ni resultados arbitrarios.'); error.code = 'INVALID_PAYLOAD'; throw error } }
 function noContextIdentityPayload(payload) { if (Object.hasOwn(payload, 'runId') || Object.hasOwn(payload, 'versionId')) { const error = new Error('El contexto usa solo projectId semantico.'); error.code = 'INVALID_PAYLOAD'; throw error } }
 function contextSeed(payload) { if (!payload || typeof payload.brief !== 'string') return null; const objective = payload.brief.trim().replace(/\s+/gu, ' '); return objective && objective.length <= 500 ? { objective, origin: 'lean_semantic_intake' } : null }
-function registerCanonicalProjectIpc({ ipcMain, root, shell, clipboard, contextMemory = null, createFirstVersion = createFirstVersionFromRun, semanticRuntimeAdapter = null }) {
+function registerCanonicalProjectIpc({ ipcMain, root, shell, clipboard, contextMemory = null, createFirstVersion = materializeCommercialProject, semanticRuntimeAdapter = null }) {
   const persistence = createProjectPersistence({ root })
   const lifecycle = createProjectLifecycle({ root, persistence })
   const context = createContextIntegration({ root, persistence, lifecycle, memory: contextMemory })
+  const e2e = createCommercialE2EOrchestrator({ root, persistence, lifecycle, createMaterialization: createFirstVersion })
   const locks = new Set()
   const registered = ipcMain[Symbol.for('jefe.canonicalProjectChannels')] || new Set()
   ipcMain[Symbol.for('jefe.canonicalProjectChannels')] = registered
   function handle(channel, handler) { if (registered.has(channel)) return; registered.add(channel); ipcMain.handle(channel, async (_event, payload = {}) => { try { return await handler(payload) } catch (error) { return safeError(error) } }) }
-  handle(CHANNELS.create, async (payload) => { noPathPayload(payload); const key = `${payload.projectId}:${payload.versionId}`; if (locks.has(key)) { const error = new Error('La version ya esta siendo creada.'); error.code = 'VERSION_LOCKED'; throw error } locks.add(key); try { const result = await createFirstVersion({ ...payload, destinationRoot: root, allowedRoots: [root] }); if (!result.ok) return result; await persistence.registerManifest(result.artifacts.manifestPath); await lifecycle.ensureCreated(result.project); return { ...result, contextSync: await context.reconcile(result.project.projectId, contextSeed(payload)) } } finally { locks.delete(key) } })
+  handle(CHANNELS.create, async (payload) => { noPathPayload(payload); const request = { ...payload, generationProfile: payload.generationProfile || 'factory_typed', brief: payload.brief || payload.projectName || 'Local project creation' }; const key = `${request.projectId}:${request.versionId}`; if (locks.has(key)) { const error = new Error('La version ya esta siendo creada.'); error.code = 'VERSION_LOCKED'; throw error } locks.add(key); try { const result = await e2e.createInitialProject(request); if (!result.ok) return result; return { ...result, contextSync: await context.reconcile(result.project.projectId, contextSeed(payload)) } } finally { locks.delete(key) } })
   for (const [channel, action] of [[CHANNELS.createVersion, 'createVersion'], [CHANNELS.approveVersion, 'approval'], [CHANNELS.restore, 'restore'], [CHANNELS.prepareDelivery, 'prepareDelivery']]) {
     handle(channel, async (payload) => {
       noPathPayload(payload)

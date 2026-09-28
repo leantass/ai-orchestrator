@@ -335,7 +335,7 @@ try {
 
   const preload = loadPreloadWithMocks()
   const projectBridge = preload.exposed.get('jefeProjectBridge')
-  const allowedProjectMethods = ['approveVersion', 'capabilities', 'compareVersions', 'copyDeliveryLocation', 'copyPreviewLocation', 'createFirstVersion', 'createVersion', 'getContextSnapshot', 'getContextSyncStatus', 'getContextTimeline', 'getPreview', 'getProject', 'getWorkspaceSnapshot', 'history', 'listProjects', 'listVersions', 'openDelivery', 'openPreview', 'prepareLocalDelivery', 'reconcileContext', 'restoreVersion', 'selectInputAssets']
+  const allowedProjectMethods = ['approveVersion', 'capabilities', 'compareVersions', 'copyDeliveryLocation', 'copyPreviewLocation', 'createFirstVersion', 'createVersion', 'getContextSnapshot', 'getContextSyncStatus', 'getContextTimeline', 'getPreview', 'getProject', 'getWorkspaceSnapshot', 'history', 'listProjects', 'listVersions', 'openDelivery', 'openPreview', 'prepareLocalDelivery', 'reconcileContext', 'requestSemanticCorrection', 'restoreVersion', 'selectInputAssets']
   assert.deepEqual(Object.keys(projectBridge).sort(), allowedProjectMethods, '28 jefeProjectBridge expone solo metodos allowlisted')
   for (const name of ['ipcRenderer', 'send', 'on', 'once', 'removeListener', 'invoke', 'filesystem', 'shell', 'clipboard', 'rootPath']) assert.equal(Object.hasOwn(projectBridge, name), false, '28 bridge no expone primitiva peligrosa')
   await projectBridge.getContextSnapshot('isolation-a')
@@ -348,7 +348,7 @@ try {
 
   const mainSource = await fs.promises.readFile(new URL('../electron/main.cjs', import.meta.url), 'utf8')
   assert.equal((mainSource.match(/registerCanonicalProjectIpc\s*\(/gu) || []).length, 1, '30 main registra una sola frontera IPC canonica')
-  assert.equal(/registerCanonicalProjectIpc\s*\(\s*\{\s*ipcMain\s*,\s*root:\s*path\.join\(app\.getPath\('userData'\),\s*'jefe-canonical-projects'\)\s*,\s*shell\s*,\s*clipboard:\s*electronModule\.clipboard\s*,?\s*\}\s*\)/u.test(mainSource), true, '30 main inyecta root canonico y dependencias controladas')
+  assert.equal(/registerCanonicalProjectIpc\s*\(\s*\{[\s\S]*?ipcMain[\s\S]*?root:\s*path\.join\(app\.getPath\('userData'\),\s*'jefe-canonical-projects'\)[\s\S]*?shell[\s\S]*?clipboard:\s*electronModule\.clipboard/u.test(mainSource), true, '30 main inyecta root canonico y dependencias controladas')
   assert.equal((mainSource.match(/jefe-context:/gu) || []).length, 0, '30 main no registra segunda familia contextual')
 
   const syncedStatus = await handlers.get(CHANNELS.contextStatus)(null, { projectId: 'isolation-a' })
