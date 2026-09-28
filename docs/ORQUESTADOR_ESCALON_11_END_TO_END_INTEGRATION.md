@@ -2,11 +2,11 @@
 
 ## Estado canónico
 
-`ESCALON_11_STATUS=IN_PROGRESS`  
-`ESCALON_11A_STATUS=COMPLETED`  
-`ESCALON_11B_STATUS=NOT_STARTED`  
-`ESCALON_11C_STATUS=NOT_STARTED`  
-`ESCALON_11D_STATUS=NOT_STARTED`  
+`ESCALON_11_STATUS=IN_PROGRESS`
+`ESCALON_11A_STATUS=COMPLETED`
+`ESCALON_11B_STATUS=NOT_STARTED`
+`ESCALON_11C_STATUS=NOT_STARTED`
+`ESCALON_11D_STATUS=NOT_STARTED`
 `NEXT=ESCALON_11B_CANONICAL_E2E_ORCHESTRATION`
 
 Escalón 11A audita el recorrido real y sus costuras. No declara que todas las capas estén conectadas: distingue evidencia de código, evidencia de smoke, recorrido comercial real y stacks paralelos.
