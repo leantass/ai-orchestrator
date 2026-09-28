@@ -7,7 +7,7 @@
 - `ESCALON_8C_STATUS=COMPLETED`
 - `ESCALON_8D_STATUS=COMPLETED`
 - `ESCALON_8_STATUS=VERIFIED_CLOSED`
-- `NEXT=ESCALON_9A_OBSERVABILITY_CONTRACT`
+- `NEXT=ESCALON_9B_DURABLE_OBSERVABILITY`
 
 Esta especificación define el contrato y la política de 8A. No ejecuta commit, push, merge, pull request, CI remoto, release tag ni deploy.
 

@@ -1,0 +1,38 @@
+# Escalón 9 — Observabilidad y operación
+
+## Estado vigente
+
+- `ESCALON_8_STATUS=VERIFIED_CLOSED`
+- `ESCALON_9_STATUS=IN_PROGRESS`
+- `ESCALON_9A_STATUS=COMPLETED`
+- `ESCALON_9B_STATUS=NOT_STARTED`
+- `ESCALON_9C_STATUS=NOT_STARTED`
+- `ESCALON_9D_STATUS=NOT_STARTED`
+- `NEXT=ESCALON_9B_DURABLE_OBSERVABILITY`
+
+9A define el contrato y la política de observabilidad sin agregar persistencia compleja, red ni terceros. `electron/jefe-observability-contract.cjs` implementa `jefe-observation-event/v1`, `jefe-observability-signal/v1`, `jefe-health-snapshot/v1`, `jefe-operational-incident/v1` y `jefe-operation-summary/v1`.
+
+## ObservationEvent
+
+Cada evento tiene taxonomía cerrada, `correlationId`, `causationId` opcional, source trusted, severidad, outcome, sujeto y `evidenceRefs`. Los tipos de fuente y eventos desconocidos se rechazan. Attributes se sanitizan; no se conservan tokens, credenciales, secretos ni paths sensibles. Un evento `human.approval.recorded` documenta una decisión humana pero no deriva un incidente por sí mismo.
+
+## Health, readiness y quality
+
+Son dimensiones separadas. `HealthSnapshot` no inventa métricas: los valores numéricos requieren evidencia y fuente. Sin evidencia suficiente cada dimensión queda en `unknown`. `productionReady` permanece `false` en 9A. El estado histórico del canary 8C se representa como:
+
+- Git mechanism health: `healthy`, `operational=true`;
+- Remote CI quality: `failing` / degraded por la falla real de `quality:ci`;
+- Release readiness: `blocked`;
+- `productionReady=false`.
+
+La deuda histórica documentada continúa siendo `306` errores de lint en `src/factory/*`; 9A no la corrige ni baja reglas.
+
+## Incidentes y operación
+
+Los incidentes se derivan de eventos y snapshots verificables, con categorías cerradas, severidad, deduplication key, evidencia, estado (`open`, `acknowledged`, `resolved`, `suppressed`) y resolución. La deduplicación es determinista por categoría, correlación y evidencia. `summarizeOperation()` separa health/readiness/quality y cuenta sólo incidentes derivados. No se generan alertas, porcentajes ni métricas sin evidencia.
+
+La integración con 8D es read-only mediante `releaseHealth()`: flows bloqueados, CI fallida, corrupciones e incertidumbres alimentan el snapshot, pero 9A no muta recovery stores. No se integran OpenTelemetry, Prometheus, Grafana, Loki, Sentry, Datadog, New Relic ni ningún proveedor.
+
+## Validación
+
+`scripts/jefe-observability-contract-smoke.mjs` cubre taxonomía, correlación/causación, evidencia trusted, sanitización, unknown-by-default, separación de dimensiones, señales sin métricas inventadas, derivación/deduplicación/resolución de incidentes, decisiones humanas y la fixture histórica del canary 8C.
