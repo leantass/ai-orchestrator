@@ -1,0 +1,78 @@
+# ORQUESTADOR — Escalón 12A: auditoría de governance de release
+
+## Autoridad vigente — 2026-09-29
+
+`ESCALON_12_STATUS=IN_PROGRESS`  
+`ESCALON_12A_STATUS=COMPLETED`  
+`ESCALON_12B_STATUS=NOT_STARTED`  
+`ESCALON_12C_STATUS=NOT_STARTED`  
+`ESCALON_12D_STATUS=NOT_STARTED`  
+`NEXT=ESCALON_12B_RELEASE_GOVERNANCE_CONTRACT_AND_DECISION_ENGINE`
+
+Esta fase audita el gobierno de release existente. No agrega una decisión durable de release, decisión de producción, proveedor, red, CI, tag, deploy, merge ni ejecución remota.
+
+## Alcance y evidencia
+
+El audit harness `scripts/jefe-release-governance-audit-12a.mjs` ejerce los contratos reales de request, delivery, repository baseline, flow, authorization, outbox y CI evidence en roots temporales. Su salida queda en `.codex-temp/escalon-12a/audit-report.json`; no es versionada ni autoridad por sí misma.
+
+La auditoría confirmó:
+
+- aprobación humana, QA y delivery son prerequisitos distintos; ninguno por sí solo es un release candidate;
+- el ReleaseRequest liga proyecto, versión, snapshot de aprobación, delivery y baseline de repositorio;
+- `request_ci` requiere autorización durable `trigger_ci` y produce outbox, no ejecución;
+- CI `passed` sólo acepta provider `github-actions` y commit exacto; CI local no se convierte en evidencia remota;
+- `prepare_release` bloquea CI fallida, exige CI remota pasada y autorización `release_tag`; no crea por sí mismo un tag;
+- drift de branch/HEAD vuelve stale el flow; replay de la misma autorización/outbox es idempotente;
+- los errores de acción, request, proyecto y commit se rechazan fail-closed;
+- se corrigió una regresión pequeña: un flow `completed_local` puede volver a `preflight_passed` al solicitar CI, como ya esperaba la implementación de `requestCi()`.
+
+Workflow auditado: `.github/workflows/ci.yml`, nombre `CI`, `workflow_dispatch` habilitado, Windows, Node 24, `npm ci` y `npm run quality:ci`. La deuda histórica sigue siendo `306` errores en `src/factory/*`; por eso `REMOTE_CI_QUALITY=FAILING_HISTORICAL_LINT_DEBT`, `RELEASE_READINESS=BLOCKED` y `PRODUCTION_READY=false`.
+
+## Authority map
+
+| Boundary | Authority | Evidence | Current outcome |
+|---|---|---|---|
+| Version | immutable version/snapshot | snapshot hash | prerequisite |
+| Human gate | durable approval for exact version/snapshot | approval record | necessary, not release decision |
+| QA | promotion-eligible quality evidence | QA record | necessary, not remote CI |
+| Delivery | local manifest and artifact hashes | delivery evidence | necessary for release request |
+| Repository | exact identity, branch and HEAD | repository evidence | stale protection |
+| Release request/flow | durable identity and lifecycle | request/flow/outbox | current orchestration authority |
+| Action authorization | request/action binding | authorization record | required per action |
+| Remote CI | trusted provider/workflow/commit evidence | CI evidence | required before release preparation |
+| Release decision | separate durable governance decision | absent in 12A | gap for 12B |
+| Production decision | environment/target/deploy authority | absent in 12A | gap for 12B |
+
+Human approval is not a release decision. QA is not CI. An authorization is not execution. An outbox is not execution. A receipt is not remote evidence.
+
+## Definitions for the next contract
+
+- `RELEASE_CANDIDATE`: exact immutable version with human approval, passing QA, local delivery, healthy/unblocked E2E lineage, a bound ReleaseRequest and repository baseline. It is not currently a durable first-class decision.
+- `RELEASE_READY`: candidate plus trusted remote CI passed for the exact commit/workflow, no blocking incident, a separate release decision and exact action authorization. Current value: `false`.
+- `DEPLOY_READY`: release-ready plus release artifact/tag, explicit environment/target and deploy authority/adapter. Current value: `false`; deploy remains not connected.
+- `PRODUCTION_READY`: deploy completed with post-deploy verification, rollback and operational evidence. Current value: `false`.
+
+## Authorization audit
+
+The current authorization is immutable and bound to `requestId` and `action`, with actor/reason and creation timestamp. It does not model `expiresAt`, revocation, consumption/single-use, non-repudiation, environment or target. Repository, version, delivery and HEAD binding are principally transitive through the request and revalidated by orchestration, not independently carried as authorization fields. `git_commit` is named among remote actions although its current execution path is local and separate from push.
+
+These are governance gaps, not permission to infer authority. No authorization is recreated by the 12A audit.
+
+## Findings
+
+- `P0=0`: no unauthorised action, fake CI pass, cross-project authorization, force push or hidden provider execution was demonstrated.
+- `P1`: no durable `ReleaseDecision` or `ProductionDecision`; `prepare_release` currently prepares an action intent after gates rather than recording an explicit governance decision.
+- `P1`: authorization lifecycle lacks explicit expiry, revocation and consumption policy.
+- `P1`: deploy is an allowlisted contract action without an environment/target and production-decision model.
+- `P2`: mandatory-check completeness is not a first-class CI policy; action naming distinguishes local commit and remote push imperfectly.
+- Quality blocker (separate from governance): historical lint debt keeps remote quality failing and release readiness blocked.
+
+## Closed next steps
+
+1. `ESCALON_12B_RELEASE_GOVERNANCE_CONTRACT_AND_DECISION_ENGINE`: add durable governance snapshot, ReleaseDecision, ProductionDecision, expiry/revocation/staleness and truthful read models. Do not imply readiness.
+2. `ESCALON_12C_CONTROLLED_RELEASE_GOVERNANCE_ACCEPTANCE`: controlled local acceptance, or a separately authorized canary, proving decision/action separation. No live mutation is authorized by 12A.
+3. `ESCALON_12D_RELEASE_GOVERNANCE_RECOVERY_AND_FINAL_CLOSURE`: recover decisions and authorizations across stale, revoked, expired, crash and corruption boundaries, then close documentation.
+
+Historical Escalón 8 canary evidence remains: remote execution verified, CI failed honestly, release gate blocked correctly, cleanup passed. It is evidence of mechanism and fail-closed behavior, not a release-quality pass.
+
+`ProviderCalls=0` · `ExternalNetworkUsed=false` · `LiveGitHubPush=false` · `LiveWorkflowDispatch=false` · `LivePullRequest=false` · `LiveRemoteTag=false` · `LiveRelease=false` · `DeployPerformed=false`.

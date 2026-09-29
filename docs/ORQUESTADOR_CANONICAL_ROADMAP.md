@@ -201,3 +201,10 @@ El Commercial Control Center queda cerrado como superficie operativa honesta: na
 `ESCALON_11_STATUS=VERIFIED_CLOSED`, `ESCALON_11A_STATUS=COMPLETED`, `ESCALON_11B_STATUS=COMPLETED`, `ESCALON_11C_STATUS=COMPLETED`, `ESCALON_11D_STATUS=COMPLETED`, `NEXT=ESCALON_12A_RELEASE_GOVERNANCE_AUDIT`.
 
 11D cierra recovery y operación del E2E sin agregar capacidades remotas: diagnóstico puro, plan allowlisted y determinista, stale protection, journal durable, replay, crash/restart, corrupción preservada, lineage parent/child, requested-change Web/Electron, observability persistida y Release read model conectado al Control Center. La calidad remota continúa bloqueada por la deuda histórica de lint; no se declara release-ready ni production-ready.
+## Autoridad vigente — Escalón 12A — 2026-09-29
+
+`ESCALON_11_STATUS=VERIFIED_CLOSED` · `ESCALON_11A_STATUS=COMPLETED` · `ESCALON_11B_STATUS=COMPLETED` · `ESCALON_11C_STATUS=COMPLETED` · `ESCALON_11D_STATUS=COMPLETED`.
+
+`ESCALON_12_STATUS=IN_PROGRESS` · `ESCALON_12A_STATUS=COMPLETED` · `ESCALON_12B_STATUS=NOT_STARTED` · `ESCALON_12C_STATUS=NOT_STARTED` · `ESCALON_12D_STATUS=NOT_STARTED` · `NEXT=ESCALON_12B_RELEASE_GOVERNANCE_CONTRACT_AND_DECISION_ENGINE`.
+
+12A deja auditada la gobernanza de release sin declarar `RELEASE_READY` ni `PRODUCTION_READY`. Los encabezados anteriores que indiquen otro estado son históricos/superseded y no autoridad vigente. La especificación está en [ORQUESTADOR_ESCALON_12_RELEASE_GOVERNANCE.md](ORQUESTADOR_ESCALON_12_RELEASE_GOVERNANCE.md).

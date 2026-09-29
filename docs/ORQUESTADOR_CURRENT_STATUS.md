@@ -176,3 +176,12 @@ La especificación es [ORQUESTADOR_ESCALON_8_GIT_CI_DELIVERY.md](ORQUESTADOR_ESC
 11D agrega recovery E2E durable con `diagnose → derivePlan → applyPlan`, planes deterministas protegidos contra stale snapshots, journal de apply, replay idempotente, recuperación tras crash, corrupción visible sin borrar evidencia, reconstrucción de índices derivados, lineage parent/child y receipts de execution, QA, Preview, Human Gate, delivery y Observability. Web y Electron ya enrutan requested-change/correction, delivery y aprobación por la autoridad E2E; Control Center selecciona el flow por proyecto/versión y proyecta ReleaseRequest/ReleaseFlow reales cuando existen.
 
 `RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`; `ProviderCalls=0`; `ExternalNetworkUsed=false`; `REMOTE_CI_QUALITY=FAILING_HISTORICAL_LINT_DEBT`; `RELEASE_READINESS=BLOCKED`; `PRODUCTION_READY=false`; `HISTORICAL_LINT_ERRORS=306`.
+## Autoridad vigente — Escalón 12A — 2026-09-29
+
+`ESCALON_8_STATUS=VERIFIED_CLOSED` · `ESCALON_9_STATUS=VERIFIED_CLOSED` · `ESCALON_10_STATUS=VERIFIED_CLOSED` · `ESCALON_11_STATUS=VERIFIED_CLOSED`.
+
+`ESCALON_12_STATUS=IN_PROGRESS` · `ESCALON_12A_STATUS=COMPLETED` · `ESCALON_12B_STATUS=NOT_STARTED` · `ESCALON_12C_STATUS=NOT_STARTED` · `ESCALON_12D_STATUS=NOT_STARTED` · `NEXT=ESCALON_12B_RELEASE_GOVERNANCE_CONTRACT_AND_DECISION_ENGINE`.
+
+12A auditó la autoridad real de versión, aprobación, QA, delivery, ReleaseRequest/Flow, autorización, CI y ejecución. No existe todavía una decisión durable separada de release ni de producción; son gaps planificados para 12B. `RELEASE_READINESS=BLOCKED`, `REMOTE_CI_QUALITY=FAILING_HISTORICAL_LINT_DEBT`, `HISTORICAL_LINT_ERRORS=306`, `PRODUCTION_READY=false`, `ProviderCalls=0`, `ExternalNetworkUsed=false`.
+
+Las secciones antiguas de este documento se conservan como registro histórico; esta sección y [ORQUESTADOR_ESCALON_12_RELEASE_GOVERNANCE.md](ORQUESTADOR_ESCALON_12_RELEASE_GOVERNANCE.md) son la autoridad vigente.

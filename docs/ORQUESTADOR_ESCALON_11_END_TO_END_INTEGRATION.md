@@ -189,3 +189,6 @@ La persistencia conserva corrupción y expone `scan()`; `rebuildIndex()` sólo u
 La superficie Web y el IPC Electron ya envían requested-change/correction al orquestador E2E, sincronizan aprobación y delivery, y el Control Center selecciona la versión activa por identidad, nunca por posición de lista. El release read model muestra un ReleaseRequest/ReleaseFlow durable y su bloqueo de autorización remota. Retención: `CONSERVATIVE_NO_AUTOMATIC_DELETION`. Smoke: `scripts/jefe-e2e-recovery-11d-smoke.mjs`.
 
 Estado: `ESCALON_11_STATUS=VERIFIED_CLOSED`; `ESCALON_11D_STATUS=COMPLETED`; `NEXT=ESCALON_12A_RELEASE_GOVERNANCE_AUDIT`; `REMOTE_CI_QUALITY=FAILING_HISTORICAL_LINT_DEBT`; `RELEASE_READINESS=BLOCKED`; `PRODUCTION_READY=false`.
+## Corrección de autoridad documental — 2026-09-29
+
+El estado vigente de Escalón 11 es `VERIFIED_CLOSED`: 11A, 11B, 11C y 11D están `COMPLETED`, y el siguiente paso es `ESCALON_12A_RELEASE_GOVERNANCE_AUDIT`. Los encabezados anteriores que dicen `ESTADO VIGENTE` para 11A, 11B o 11C se conservan como registro histórico de cada fase y quedan superseded por el cierre 11D. La autoridad actual vive en `docs/ORQUESTADOR_CURRENT_STATUS.md`, `docs/ORQUESTADOR_CANONICAL_ROADMAP.md` y `docs/ORQUESTADOR_ESCALON_12_RELEASE_GOVERNANCE.md`.
