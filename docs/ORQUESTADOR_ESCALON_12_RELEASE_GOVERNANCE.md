@@ -76,3 +76,16 @@ These are governance gaps, not permission to infer authority. No authorization i
 Historical Escalón 8 canary evidence remains: remote execution verified, CI failed honestly, release gate blocked correctly, cleanup passed. It is evidence of mechanism and fail-closed behavior, not a release-quality pass.
 
 `ProviderCalls=0` · `ExternalNetworkUsed=false` · `LiveGitHubPush=false` · `LiveWorkflowDispatch=false` · `LivePullRequest=false` · `LiveRemoteTag=false` · `LiveRelease=false` · `DeployPerformed=false`.
+## Escalon 12B - contrato y motor de decisiones
+
+`ESCALON_12B_STATUS=COMPLETED`.
+
+`electron/jefe-release-governance.cjs` agrega stores locales separados para `jefe-release-governance-snapshot/v1`, `jefe-release-decision/v1`, `jefe-production-decision/v1` y el lifecycle enlazado de autorizaciones. El snapshot congela proyecto, version, E2E flow, QA, aprobacion humana, delivery, ReleaseRequest, repository/branch/commit, CI, incidentes, blockers, fingerprint y source refs.
+
+La decision de release no ejecuta ni autoriza push/deploy. La decision de produccion no se infiere de release approval y exige evidencia de produccion para `approved`. Las decisiones validan fingerprint e identidad y quedan stale si cambia la evidencia. CI tiene una policy read-only de mandatory checks; environment governance modela `local`, `staging` y `production`; deploy governance declara `NOT_CONNECTED` y no incorpora executor.
+
+El lifecycle compatible conserva intacto `jefe-remote-action-authorization/v1` y persiste un record paralelo por `authorizationId`, con estados `active`, `consumed`, `expired`, `revoked` y `superseded`, ademas de scope/decision/snapshot binding. `expiresAt` puede registrarse, pero la expiracion basada en reloj y la revocacion operativa completa quedan explicitamente pendientes de 12D.
+
+Smoke: `scripts/jefe-release-governance-12b-smoke.mjs`. No hubo red, provider, CI real, release, deploy ni mutacion GitHub.
+
+`NEXT=ESCALON_12C_CONTROLLED_RELEASE_GOVERNANCE_ACCEPTANCE`.

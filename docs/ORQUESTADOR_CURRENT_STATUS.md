@@ -185,3 +185,8 @@ La especificación es [ORQUESTADOR_ESCALON_8_GIT_CI_DELIVERY.md](ORQUESTADOR_ESC
 12A auditó la autoridad real de versión, aprobación, QA, delivery, ReleaseRequest/Flow, autorización, CI y ejecución. No existe todavía una decisión durable separada de release ni de producción; son gaps planificados para 12B. `RELEASE_READINESS=BLOCKED`, `REMOTE_CI_QUALITY=FAILING_HISTORICAL_LINT_DEBT`, `HISTORICAL_LINT_ERRORS=306`, `PRODUCTION_READY=false`, `ProviderCalls=0`, `ExternalNetworkUsed=false`.
 
 Las secciones antiguas de este documento se conservan como registro histórico; esta sección y [ORQUESTADOR_ESCALON_12_RELEASE_GOVERNANCE.md](ORQUESTADOR_ESCALON_12_RELEASE_GOVERNANCE.md) son la autoridad vigente.
+## Autoridad vigente - Escalon 12B - 2026-09-29
+
+`ESCALON_12_STATUS=IN_PROGRESS` · `ESCALON_12A_STATUS=COMPLETED` · `ESCALON_12B_STATUS=COMPLETED` · `ESCALON_12C_STATUS=NOT_STARTED` · `ESCALON_12D_STATUS=NOT_STARTED` · `NEXT=ESCALON_12C_CONTROLLED_RELEASE_GOVERNANCE_ACCEPTANCE`.
+
+12B implementa snapshots de evidencia, ReleaseDecision y ProductionDecision separados, staleness por fingerprint, lifecycle compatible de autorizaciones y governance read-only de CI/environment/deploy sin executor. `RELEASE_READINESS=BLOCKED`; `REMOTE_CI_QUALITY=FAILING_HISTORICAL_LINT_DEBT`; `HISTORICAL_LINT_ERRORS=306`; `PRODUCTION_READY=false`; `ProviderCalls=0`; `ExternalNetworkUsed=false`.
