@@ -7,7 +7,7 @@ const TRANSITIONS = Object.freeze({
   waiting_authorization: ['outbox_pending', 'stale', 'blocked'],
   ready_for_execution: ['outbox_pending', 'stale', 'blocked'],
   outbox_pending: [],
-  completed_local: [],
+  completed_local: ['preflight_passed', 'stale', 'blocked'],
   stale: [],
   blocked: [],
   executing: ['evidence_pending', 'completed', 'failed'],
