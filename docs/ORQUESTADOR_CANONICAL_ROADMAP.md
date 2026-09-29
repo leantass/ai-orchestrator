@@ -195,3 +195,9 @@ El Commercial Control Center queda cerrado como superficie operativa honesta: na
 `ESCALON_11_STATUS=IN_PROGRESS`, `ESCALON_11A_STATUS=COMPLETED`, `ESCALON_11B_STATUS=COMPLETED`, `ESCALON_11C_STATUS=COMPLETED`, `ESCALON_11D_STATUS=NOT_STARTED`, `NEXT=ESCALON_11D_E2E_RECOVERY_AND_CLOSURE`.
 
 11C demuestra la continuidad canónica de corrección: el rechazo durable de v1 es el único origen de un child flow `rejected_correction`; v2 pasa por QA, Preview y Human Gate nuevos; la entrega y el ReleaseRequest quedan ligados a v2. La autorización remota no se infiere ni se ejecuta: el release permanece bloqueado. `ProviderCalls=0`, `ExternalNetworkUsed=false`, `REMOTE_CI_QUALITY=FAILING_HISTORICAL_LINT_DEBT`, `PRODUCTION_READY=false`.
+
+## ESTADO VIGENTE — ESCALÓN 11D
+
+`ESCALON_11_STATUS=VERIFIED_CLOSED`, `ESCALON_11A_STATUS=COMPLETED`, `ESCALON_11B_STATUS=COMPLETED`, `ESCALON_11C_STATUS=COMPLETED`, `ESCALON_11D_STATUS=COMPLETED`, `NEXT=ESCALON_12A_RELEASE_GOVERNANCE_AUDIT`.
+
+11D cierra recovery y operación del E2E sin agregar capacidades remotas: diagnóstico puro, plan allowlisted y determinista, stale protection, journal durable, replay, crash/restart, corrupción preservada, lineage parent/child, requested-change Web/Electron, observability persistida y Release read model conectado al Control Center. La calidad remota continúa bloqueada por la deuda histórica de lint; no se declara release-ready ni production-ready.

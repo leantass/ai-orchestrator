@@ -179,3 +179,13 @@ El recorrido aceptado es:
 La corrección se crea únicamente desde un rechazo durable y recibe una identidad E2E propia (`flowKind=rejected_correction`), preservando `parentFlowId`, `sourceVersionId` y `correctionId`. El child flow vuelve a ejecutar QA y crea su propio preview. La aprobación sincroniza el Human Gate y el lifecycle; la entrega sincroniza `deliveryRef`; el ReleaseRequest valida manifest, hashes, approval, QA y repository baseline, y queda en `waiting_authorization` sin ejecutar acciones remotas.
 
 La prueba mantenible es `scripts/jefe-e2e-acceptance-11c-smoke.mjs`. Usa solamente un root temporal, no proveedores ni red. El Control Center consume el health read model y puede identificar el child flow, su v2, su entrega y su ReleaseRequest bloqueado. `ESCALON_11C_STATUS=COMPLETED`; `ESCALON_11D_STATUS=NOT_STARTED`; `NEXT=ESCALON_11D_E2E_RECOVERY_AND_CLOSURE`.
+
+## Escalón 11D — recovery y cierre operativo
+
+`electron/jefe-e2e-recovery.cjs` separa `diagnose`, `derivePlan` y `applyPlan`. El snapshot incluye flows, routing, receipts, índice derivado, corrupción y clasificación de incidentes. Las acciones están allowlisted: reconstruir índice o flow desde routing inmutable, registrar observability faltante, reconciliar evidencia de stage y bloquear flows incompatibles. No se reparan deliveries tampered, no se inventan aprobaciones, no se repiten providers y no se ejecutan mutaciones remotas.
+
+La persistencia conserva corrupción y expone `scan()`; `rebuildIndex()` sólo usa flows válidos. La validación exige lineage para `requested_change` y `rejected_correction`. Los receipts de execution, QA, Preview, Human Gate, delivery y Observability permiten distinguir evidencia real de un stage declarado. El journal permite reabrir y continuar un apply después de crash; un segundo apply es idempotente; un snapshot cambiado produce `STALE_RECOVERY_PLAN`.
+
+La superficie Web y el IPC Electron ya envían requested-change/correction al orquestador E2E, sincronizan aprobación y delivery, y el Control Center selecciona la versión activa por identidad, nunca por posición de lista. El release read model muestra un ReleaseRequest/ReleaseFlow durable y su bloqueo de autorización remota. Retención: `CONSERVATIVE_NO_AUTOMATIC_DELETION`. Smoke: `scripts/jefe-e2e-recovery-11d-smoke.mjs`.
+
+Estado: `ESCALON_11_STATUS=VERIFIED_CLOSED`; `ESCALON_11D_STATUS=COMPLETED`; `NEXT=ESCALON_12A_RELEASE_GOVERNANCE_AUDIT`; `REMOTE_CI_QUALITY=FAILING_HISTORICAL_LINT_DEBT`; `RELEASE_READINESS=BLOCKED`; `PRODUCTION_READY=false`.

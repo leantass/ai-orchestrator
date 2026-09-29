@@ -168,3 +168,11 @@ La especificación es [ORQUESTADOR_ESCALON_8_GIT_CI_DELIVERY.md](ORQUESTADOR_ESC
 `ESCALON_11_STATUS=IN_PROGRESS` · `ESCALON_11A_STATUS=COMPLETED` · `ESCALON_11B_STATUS=COMPLETED` · `ESCALON_11C_STATUS=COMPLETED` · `ESCALON_11D_STATUS=NOT_STARTED` · `NEXT=ESCALON_11D_E2E_RECOVERY_AND_CLOSURE`.
 
 11C acepta el recorrido real v1 → QA → Preview → rechazo → correction child → v2 → re-QA → nueva Preview → aprobación → entrega local v2 → ReleaseRequest ligado a esa entrega. La frontera de release queda bloqueada por autorización remota faltante; Observability y Control Center reciben el estado durable del child flow. No hubo red ni provider; `RELEASE_READINESS=BLOCKED`; `PRODUCTION_READY=false`; `HISTORICAL_LINT_ERRORS=306`.
+
+## ESTADO VIGENTE — ESCALÓN 11D
+
+`ESCALON_11_STATUS=VERIFIED_CLOSED` · `ESCALON_11A_STATUS=COMPLETED` · `ESCALON_11B_STATUS=COMPLETED` · `ESCALON_11C_STATUS=COMPLETED` · `ESCALON_11D_STATUS=COMPLETED` · `NEXT=ESCALON_12A_RELEASE_GOVERNANCE_AUDIT`.
+
+11D agrega recovery E2E durable con `diagnose → derivePlan → applyPlan`, planes deterministas protegidos contra stale snapshots, journal de apply, replay idempotente, recuperación tras crash, corrupción visible sin borrar evidencia, reconstrucción de índices derivados, lineage parent/child y receipts de execution, QA, Preview, Human Gate, delivery y Observability. Web y Electron ya enrutan requested-change/correction, delivery y aprobación por la autoridad E2E; Control Center selecciona el flow por proyecto/versión y proyecta ReleaseRequest/ReleaseFlow reales cuando existen.
+
+`RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`; `ProviderCalls=0`; `ExternalNetworkUsed=false`; `REMOTE_CI_QUALITY=FAILING_HISTORICAL_LINT_DEBT`; `RELEASE_READINESS=BLOCKED`; `PRODUCTION_READY=false`; `HISTORICAL_LINT_ERRORS=306`.
