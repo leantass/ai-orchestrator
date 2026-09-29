@@ -27,6 +27,10 @@ function validateFlow(raw) {
   for (const name of STAGES) cleanStages[name] = stage(raw.stages[name], name)
   if (Object.keys(raw.stages).sort().join('|') !== [...STAGES].sort().join('|')) fail('INVALID_FLOW', 'El flow debe declarar todas las etapas.')
   const refs = { ...raw.refs }
+  if (raw.flowKind !== 'initial_project') {
+    for (const key of ['parentFlowId', 'sourceVersionId', 'correctionId']) if (typeof refs[key] !== 'string' || !refs[key]) fail('LINEAGE_REQUIRED', `${key} es obligatorio para un flow hijo.`)
+    if (refs.sourceVersionId === cleanIdentity.versionId) fail('LINEAGE_INVALID', 'Un flow hijo no puede apuntar a su propia version.')
+  }
   for (const [key, value] of Object.entries(refs)) if (value !== null && typeof value !== 'string') fail('INVALID_FLOW_REF', `${key} invalido.`)
   const bindings = [['plannerPlanId', 'planning'], ['executionReceiptId', 'execution'], ['qaEvidenceId', 'qa'], ['previewRequestId', 'preview']]
   for (const [refName, stageName] of bindings) if (refs[refName] !== null && cleanStages[stageName].outputRefs.length > 0 && !cleanStages[stageName].outputRefs.includes(refs[refName])) fail('STAGE_REF_MISMATCH', `${refName} no coincide con ${stageName}.`)
@@ -35,7 +39,7 @@ function validateFlow(raw) {
 function createFlow({ identity: rawIdentity, flowKind = 'initial_project', routeDecisionId, inputFingerprint, now, stages, refs = {}, state = 'active' }) {
   const cleanIdentity = identity(rawIdentity); const e2eFlowId = deterministicFlowId({ identity: cleanIdentity, flowKind });
   if (!routeDecisionId || typeof routeDecisionId !== 'string' || !inputFingerprint || !stages) fail('INVALID_FLOW', 'Faltan datos del E2E flow.')
-  const flow = { schemaVersion: SCHEMA, e2eFlowId, identity: cleanIdentity, flowKind, routeDecisionId, inputFingerprint, revision: 0, state, stages, refs: { intakeId: null, researchPlanId: null, evidenceCaseId: null, plannerRequestId: null, plannerPlanId: null, plannerGateId: null, executionStageId: null, executionReceiptId: null, qaEvidenceId: null, qaRunId: null, previewRequestId: null, reviewId: null, approvalId: null, deliveryRef: null, releaseRequestId: null, releaseFlowId: null, observabilityCorrelationId: null, ...refs }, createdAt: now, updatedAt: now }
+  const flow = { schemaVersion: SCHEMA, e2eFlowId, identity: cleanIdentity, flowKind, routeDecisionId, inputFingerprint, revision: 0, state, stages, refs: { intakeId: null, researchPlanId: null, evidenceCaseId: null, plannerRequestId: null, plannerPlanId: null, plannerGateId: null, executionStageId: null, executionReceiptId: null, qaEvidenceId: null, qaRunId: null, previewRequestId: null, reviewId: null, approvalId: null, deliveryRef: null, releaseRequestId: null, releaseFlowId: null, observabilityCorrelationId: null, parentFlowId: null, sourceVersionId: null, correctionId: null, ...refs }, createdAt: now, updatedAt: now }
   return validateFlow(flow)
 }
 

@@ -6,6 +6,7 @@ import { createProjectLifecycle } from '../electron/jefe-project-lifecycle.cjs'
 import { createPreviewApprovalService } from '../electron/jefe-preview-approval.cjs'
 import { createReleaseOrchestrator } from '../electron/jefe-release-orchestrator.cjs'
 import { createCommercialE2EOrchestrator } from '../electron/jefe-e2e-orchestrator.cjs'
+import { createCommercialControlCenter } from '../electron/jefe-commercial-control-center.cjs'
 
 const root = path.resolve('.codex-temp', 'e2e-acceptance-11c')
 await fs.rm(root, { recursive: true, force: true })
@@ -50,4 +51,5 @@ const health = await e2e.health(input.projectId)
 const child = health.flows.find((flow) => flow.flowKind === 'rejected_correction')
 assert.equal(child.refs.releaseRequestId, linked.request.requestId)
 assert.equal(child.identity.versionId, version2)
+const controlCenter = createCommercialControlCenter({ persistence, lifecycle, e2e }); const projectReadModel = await controlCenter.project(input.projectId); assert.equal(projectReadModel.release.state, 'blocked'); assert.equal(projectReadModel.release.releaseRequestId, linked.request.requestId)
 console.log('PASS jefe-e2e-acceptance-11c-smoke: v1 rejection, correction child, v2 re-QA, preview approval, local delivery, linked release request, remote authorization block and control-center health')

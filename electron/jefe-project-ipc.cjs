@@ -19,6 +19,7 @@ function registerCanonicalProjectIpc({ ipcMain, root, shell, clipboard, contextM
   const lifecycle = createProjectLifecycle({ root, persistence })
   const context = createContextIntegration({ root, persistence, lifecycle, memory: contextMemory })
   const e2e = createCommercialE2EOrchestrator({ root, persistence, lifecycle, createMaterialization: createFirstVersion })
+  semanticRuntimeAdapter = { requestSemanticCorrection: async ({ projectId, sourceVersionId }) => e2e.requestRejectedCorrection({ projectId, sourceVersionId, changeRequest: 'Aplicar la corrección solicitada sobre la versión rechazada.' }) }
   const locks = new Set()
   const registered = ipcMain[Symbol.for('jefe.canonicalProjectChannels')] || new Set()
   ipcMain[Symbol.for('jefe.canonicalProjectChannels')] = registered
@@ -31,10 +32,10 @@ function registerCanonicalProjectIpc({ ipcMain, root, shell, clipboard, contextM
       const versionId = action === 'restore' ? id(payload.sourceVersionId, 'sourceVersionId') : action === 'approval' || action === 'prepareDelivery' ? id(payload.versionId, 'versionId') : null
       try {
         let result
-        if (action === 'createVersion') result = await lifecycle.createVersion({ projectId, changeRequest: payload.changeRequest, options: payload.options || {} })
-        else if (action === 'approval') result = await lifecycle.approval(projectId, versionId, payload.approved, payload.observation)
+        if (action === 'createVersion') result = await e2e.requestChange({ projectId, changeRequest: payload.changeRequest })
+        else if (action === 'approval') { result = await lifecycle.approval(projectId, versionId, payload.approved, payload.observation); const record = await persistence.getVersionRecord(projectId, versionId); const flow = record?.project?.runId ? await e2e.flowForVersion({ projectId, runId: record.project.runId, versionId }) : null; if (flow?.refs.previewRequestId) await e2e.syncHumanDecision({ projectId, previewRequestId: flow.refs.previewRequestId, decision: payload.approved ? 'approved' : 'rejected', approvalId: flow.refs.approvalId }) }
         else if (action === 'restore') result = await lifecycle.restore(projectId, versionId)
-        else result = await lifecycle.prepareDelivery(projectId, versionId)
+        else { result = await lifecycle.prepareDelivery(projectId, versionId); await e2e.syncDelivery({ projectId, versionId, deliveryId: result.delivery.deliveryId }) }
         return { ...result, contextSync: result.ok ? await context.reconcile(projectId) : { status: 'pending' } }
       } catch (error) {
         const contextSync = action === 'restore' ? await context.recordLifecycleFailure({ projectId, operation: action, versionId, error }) : { status: 'ignored' }
