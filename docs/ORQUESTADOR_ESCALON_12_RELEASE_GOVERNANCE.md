@@ -89,3 +89,16 @@ El lifecycle compatible conserva intacto `jefe-remote-action-authorization/v1` y
 Smoke: `scripts/jefe-release-governance-12b-smoke.mjs`. No hubo red, provider, CI real, release, deploy ni mutacion GitHub.
 
 `NEXT=ESCALON_12C_CONTROLLED_RELEASE_GOVERNANCE_ACCEPTANCE`.
+## Escalon 12C - controlled release governance acceptance
+
+`ESCALON_12C_STATUS=COMPLETED`.
+
+La aceptacion controlada usa exclusivamente `.codex-temp/escalon-12c/` y una fixture aislada que representa el flujo 11C completo: version v2, QA PASS, preview, aprobacion humana, delivery, ReleaseRequest, E2E flow, repository baseline y CI evidence. El smoke `scripts/jefe-release-governance-12c-smoke.mjs` crea el snapshot real, verifica fingerprint, deriva `candidate_ready`, persiste una `ReleaseDecision=approved` y demuestra un `ProductionDecision=blocked` por deploy no conectado.
+
+La matriz negativa cubre QA/aprobacion/delivery ausentes, snapshot y decision stale, snapshot/decision tampered, proyecto/version/commit incorrectos, CI local disfrazada, CI remota fallida, autorizacion release_tag reutilizada para deploy, scope cruzado, lifecycle active/consumed/expired/revoked/superseded y replay consumido. La identidad derivada de las decisiones se valida contra todos sus campos inmutables.
+
+El read model distingue `candidate`, `approved`, `blocked` y `stale`; no agrega botones ni ofrece `deploy now`. Build queda disponible como evidencia local, release readiness permanece `BLOCKED`, production readiness permanece `false`, y los 306 errores historicos de lint son un blocker global separado de la fixture.
+
+No hubo provider, red, workflow dispatch, GitHub release, tag remoto, PR, merge, deploy ni mutacion de release. El canary 8C historico sigue interpretado como mecanismo operativo con CI fallida y release bloqueado, no como aprobacion.
+
+`NEXT=ESCALON_12D_RELEASE_GOVERNANCE_RECOVERY_AND_FINAL_CLOSURE`.

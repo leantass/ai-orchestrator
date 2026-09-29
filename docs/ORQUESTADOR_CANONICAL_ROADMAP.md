@@ -213,3 +213,8 @@ El Commercial Control Center queda cerrado como superficie operativa honesta: na
 `ESCALON_12_STATUS=IN_PROGRESS` · `ESCALON_12A_STATUS=COMPLETED` · `ESCALON_12B_STATUS=COMPLETED` · `ESCALON_12C_STATUS=NOT_STARTED` · `ESCALON_12D_STATUS=NOT_STARTED` · `NEXT=ESCALON_12C_CONTROLLED_RELEASE_GOVERNANCE_ACCEPTANCE`.
 
 12B anade el contrato de snapshot, decisiones separadas de release/produccion, stale protection, lifecycle de autorizacion compatible y governance read-only de CI/environment/deploy. No ejecuta releases ni deploy y no declara readiness de release o produccion. Los detalles viven en [ORQUESTADOR_ESCALON_12_RELEASE_GOVERNANCE.md](ORQUESTADOR_ESCALON_12_RELEASE_GOVERNANCE.md).
+## Autoridad vigente - Escalon 12C - 2026-09-29
+
+`ESCALON_12_STATUS=IN_PROGRESS` · `ESCALON_12A_STATUS=COMPLETED` · `ESCALON_12B_STATUS=COMPLETED` · `ESCALON_12C_STATUS=COMPLETED` · `ESCALON_12D_STATUS=NOT_STARTED` · `NEXT=ESCALON_12D_RELEASE_GOVERNANCE_RECOVERY_AND_FINAL_CLOSURE`.
+
+12C demuestra que JEFE puede aceptar una release candidata gobernada y, aun con ReleaseDecision aprobada, mantener ProductionDecision bloqueada y sin ejecución. No acredita producción ni readiness de release. La evidencia y limitaciones están en [ORQUESTADOR_ESCALON_12_RELEASE_GOVERNANCE.md](ORQUESTADOR_ESCALON_12_RELEASE_GOVERNANCE.md).
