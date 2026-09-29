@@ -189,3 +189,9 @@ El Commercial Control Center queda cerrado como superficie operativa honesta: na
 `ESCALON_11_STATUS=IN_PROGRESS`, `ESCALON_11A_STATUS=COMPLETED`, `ESCALON_11B_STATUS=COMPLETED`, `ESCALON_11C_STATUS=NOT_STARTED`, `ESCALON_11D_STATUS=NOT_STARTED`, `NEXT=ESCALON_11C_REAL_END_TO_END_ACCEPTANCE`.
 
 11B deja una autoridad única para el create inicial comercial: flow durable, routing inmutable, Discovery real, políticas explícitas de Research/Evidence, planificación consumida por materialización, QA antes de Preview, Human Gate pendiente y release sin autoejecución. El siguiente salto es aceptar el recorrido completo con correcciones, delivery y release gating reales en 11C.
+
+## ESTADO VIGENTE — ESCALÓN 11C
+
+`ESCALON_11_STATUS=IN_PROGRESS`, `ESCALON_11A_STATUS=COMPLETED`, `ESCALON_11B_STATUS=COMPLETED`, `ESCALON_11C_STATUS=COMPLETED`, `ESCALON_11D_STATUS=NOT_STARTED`, `NEXT=ESCALON_11D_E2E_RECOVERY_AND_CLOSURE`.
+
+11C demuestra la continuidad canónica de corrección: el rechazo durable de v1 es el único origen de un child flow `rejected_correction`; v2 pasa por QA, Preview y Human Gate nuevos; la entrega y el ReleaseRequest quedan ligados a v2. La autorización remota no se infiere ni se ejecuta: el release permanece bloqueado. `ProviderCalls=0`, `ExternalNetworkUsed=false`, `REMOTE_CI_QUALITY=FAILING_HISTORICAL_LINT_DEBT`, `PRODUCTION_READY=false`.

@@ -162,3 +162,9 @@ La especificación es [ORQUESTADOR_ESCALON_8_GIT_CI_DELIVERY.md](ORQUESTADOR_ESC
 `ESCALON_11_STATUS=IN_PROGRESS` · `ESCALON_11A_STATUS=COMPLETED` · `ESCALON_11B_STATUS=COMPLETED` · `ESCALON_11C_STATUS=NOT_STARTED` · `ESCALON_11D_STATUS=NOT_STARTED` · `NEXT=ESCALON_11C_REAL_END_TO_END_ACCEPTANCE`.
 
 11B conectó la creación comercial Web e IPC a una autoridad E2E durable con routing trusted/inmutable, Discovery real, bypass Research explícito, Product Planning consumido, materialización local, QA de artefactos, Preview/Human Gate y fronteras Delivery/Release/Observability. `ProviderCalls=0`; `ExternalNetworkUsed=false`; `RELEASE_READINESS=BLOCKED`; `PRODUCTION_READY=false`; `HISTORICAL_LINT_ERRORS=306`.
+
+## ESTADO VIGENTE — ESCALÓN 11C
+
+`ESCALON_11_STATUS=IN_PROGRESS` · `ESCALON_11A_STATUS=COMPLETED` · `ESCALON_11B_STATUS=COMPLETED` · `ESCALON_11C_STATUS=COMPLETED` · `ESCALON_11D_STATUS=NOT_STARTED` · `NEXT=ESCALON_11D_E2E_RECOVERY_AND_CLOSURE`.
+
+11C acepta el recorrido real v1 → QA → Preview → rechazo → correction child → v2 → re-QA → nueva Preview → aprobación → entrega local v2 → ReleaseRequest ligado a esa entrega. La frontera de release queda bloqueada por autorización remota faltante; Observability y Control Center reciben el estado durable del child flow. No hubo red ni provider; `RELEASE_READINESS=BLOCKED`; `PRODUCTION_READY=false`; `HISTORICAL_LINT_ERRORS=306`.

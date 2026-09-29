@@ -169,3 +169,13 @@ El Web POST y el create inicial IPC usan el mismo orquestador; la materializaci�
 `scripts/jefe-e2e-orchestration-smoke.mjs` cubre flujo simple, Discovery real, Research requerido/bloqueado, QA fail, replay, colisión, concurrencia, aislamiento y routing tamper. El flujo simple termina en `human_gate=waiting` con refs de intake, planning, execution receipt, QA evidence y preview. `ProviderCalls=0`, `ExternalNetworkUsed=false`, `RELEASE_READINESS=BLOCKED` y `PRODUCTION_READY=false`.
 
 P1-1, P1-2 y P1-4 de 11A quedan cerrados estructuralmente para la creación inicial. La ruta de requested-change/correction completa, delivery real y release request siguen siendo límites para 11C/11D; no se declaran cerrados por la existencia de null refs.
+
+## Escalón 11C — aceptación end-to-end
+
+El recorrido aceptado es:
+
+`v1 → QA → Preview → Rechazo → correction child → v2 → re-QA → nueva Preview → aprobación → entrega local v2 → ReleaseRequest ligado a esa entrega → freno por autorización remota → Observability → Control Center`.
+
+La corrección se crea únicamente desde un rechazo durable y recibe una identidad E2E propia (`flowKind=rejected_correction`), preservando `parentFlowId`, `sourceVersionId` y `correctionId`. El child flow vuelve a ejecutar QA y crea su propio preview. La aprobación sincroniza el Human Gate y el lifecycle; la entrega sincroniza `deliveryRef`; el ReleaseRequest valida manifest, hashes, approval, QA y repository baseline, y queda en `waiting_authorization` sin ejecutar acciones remotas.
+
+La prueba mantenible es `scripts/jefe-e2e-acceptance-11c-smoke.mjs`. Usa solamente un root temporal, no proveedores ni red. El Control Center consume el health read model y puede identificar el child flow, su v2, su entrega y su ReleaseRequest bloqueado. `ESCALON_11C_STATUS=COMPLETED`; `ESCALON_11D_STATUS=NOT_STARTED`; `NEXT=ESCALON_11D_E2E_RECOVERY_AND_CLOSURE`.
