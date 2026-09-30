@@ -102,3 +102,16 @@ El read model distingue `candidate`, `approved`, `blocked` y `stale`; no agrega 
 No hubo provider, red, workflow dispatch, GitHub release, tag remoto, PR, merge, deploy ni mutacion de release. El canary 8C historico sigue interpretado como mecanismo operativo con CI fallida y release bloqueado, no como aprobacion.
 
 `NEXT=ESCALON_12D_RELEASE_GOVERNANCE_RECOVERY_AND_FINAL_CLOSURE`.
+## Escalon 12D - recovery y cierre de governance
+
+`ESCALON_12D_STATUS=COMPLETED` y `ESCALON_12_STATUS=VERIFIED_CLOSED`.
+
+`electron/jefe-release-governance-recovery.cjs` separa `diagnose -> derivePlan -> applyPlan`. El diagnostico valida snapshot, ReleaseDecision, ProductionDecision y authorization lifecycle sin mutar; clasifica stale, blocked, evidence missing, identity mismatch y corruption. El plan `jefe-release-governance-recovery-plan/v1` es determinista, allowlisted y ligado a `snapshotFingerprint`. `applyPlan` usa journal durable, audit history idempotente, stale protection y recovery tras crash/restart.
+
+Recovery solo puede marcar stale, registrar estados de authorization, registrar evidencia bloqueada, preservar corruption y reconstruir health. Nunca crea approval, ReleaseDecision approved, ProductionDecision approved, QA/CI, authorization ni ejecuta push/tag/merge/deploy. No borra evidencia.
+
+La matriz 12D cubre cambios de QA/delivery/commit, ProductionDecision stale, authorization active/consumed/expired/revoked/superseded, tamper, evidencia faltante, proyecto/version/action/environment incorrectos, replay, plan stale, crash despues de journal/audit y reapertura. El read model de health queda read-only: `releaseReadiness=BLOCKED`, `productionReady=false`, `deploy=not_connected`, `canary=historical_blocked`.
+
+El canary remoto 8C historico conserva su interpretacion terminal: mecanismo operativo, CI real fallida, release bloqueado y sin produccion. La deuda global continua en 306 errores de lint; no se asigna a la fixture ni se declara quality ready.
+
+`ProviderCalls=0` · `ExternalNetworkUsed=false` · `LiveReleaseMutations=false` · `DeployPerformed=false` · `NEXT=ESCALON_13A_OBSERVABILITY_AND_RELEASE_OPERATIONS`.

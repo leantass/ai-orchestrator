@@ -218,3 +218,8 @@ El Commercial Control Center queda cerrado como superficie operativa honesta: na
 `ESCALON_12_STATUS=IN_PROGRESS` · `ESCALON_12A_STATUS=COMPLETED` · `ESCALON_12B_STATUS=COMPLETED` · `ESCALON_12C_STATUS=COMPLETED` · `ESCALON_12D_STATUS=NOT_STARTED` · `NEXT=ESCALON_12D_RELEASE_GOVERNANCE_RECOVERY_AND_FINAL_CLOSURE`.
 
 12C demuestra que JEFE puede aceptar una release candidata gobernada y, aun con ReleaseDecision aprobada, mantener ProductionDecision bloqueada y sin ejecución. No acredita producción ni readiness de release. La evidencia y limitaciones están en [ORQUESTADOR_ESCALON_12_RELEASE_GOVERNANCE.md](ORQUESTADOR_ESCALON_12_RELEASE_GOVERNANCE.md).
+## Autoridad vigente - Escalon 12D - 2026-09-30
+
+`ESCALON_12_STATUS=VERIFIED_CLOSED` · `ESCALON_12A_STATUS=COMPLETED` · `ESCALON_12B_STATUS=COMPLETED` · `ESCALON_12C_STATUS=COMPLETED` · `ESCALON_12D_STATUS=COMPLETED` · `NEXT=ESCALON_13A_OBSERVABILITY_AND_RELEASE_OPERATIONS`.
+
+El Escalon 12 queda cerrado como governance verificable: las decisiones no se confunden con autorizacion o ejecucion, recovery preserva evidencia y bloquea estados stale/ambiguos, y el canary historico sigue sin habilitar produccion. No se inicia automaticamente el Escalon 13.

@@ -195,3 +195,8 @@ Las secciones antiguas de este documento se conservan como registro histórico; 
 `ESCALON_12_STATUS=IN_PROGRESS` · `ESCALON_12A_STATUS=COMPLETED` · `ESCALON_12B_STATUS=COMPLETED` · `ESCALON_12C_STATUS=COMPLETED` · `ESCALON_12D_STATUS=NOT_STARTED` · `NEXT=ESCALON_12D_RELEASE_GOVERNANCE_RECOVERY_AND_FINAL_CLOSURE`.
 
 12C acepta de punta a punta la governance controlada sobre fixture aislada: snapshot, candidate, ReleaseDecision, ProductionDecision bloqueada, lifecycle de autorizacion, staleness, scope, CI trust y deploy boundary. `RELEASE_READINESS=BLOCKED`; `REMOTE_CI_QUALITY=FAILING_HISTORICAL_LINT_DEBT`; `HISTORICAL_LINT_ERRORS=306`; `PRODUCTION_READY=false`; `ProviderCalls=0`; `ExternalNetworkUsed=false`.
+## Autoridad vigente - Escalon 12D - 2026-09-30
+
+`ESCALON_12_STATUS=VERIFIED_CLOSED` · `ESCALON_12A_STATUS=COMPLETED` · `ESCALON_12B_STATUS=COMPLETED` · `ESCALON_12C_STATUS=COMPLETED` · `ESCALON_12D_STATUS=COMPLETED` · `NEXT=ESCALON_13A_OBSERVABILITY_AND_RELEASE_OPERATIONS`.
+
+12D cierra recovery y governance de release con diagnostico puro, planes deterministas stale-protected, apply allowlisted, audit history durable, idempotencia, crash/restart, corruption visible, lifecycle de authorization y health/control-center read-only. `REMOTE_CI_QUALITY=FAILING_HISTORICAL_LINT_DEBT`; `HISTORICAL_LINT_ERRORS=306`; `RELEASE_READINESS=BLOCKED`; `PRODUCTION_READY=false`; `ProviderCalls=0`; `ExternalNetworkUsed=false`.
