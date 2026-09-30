@@ -2,10 +2,13 @@
 
 ## Autoridad vigente — 2026-09-30
 
-`ESCALON_13A_STATUS=COMPLETED`  
-`ESCALON_13_REQUIRED=true`  
-`HISTORICAL_LINT_DEBT_NEEDS_DEDICATED_PHASE=true`  
-`NEXT=ESCALON_13B_RELEASE_OPERATIONS_READ_MODEL_AND_RUNBOOKS`
+`ESCALON_13A_STATUS=COMPLETED`
+`ESCALON_13B_STATUS=COMPLETED`
+`ESCALON_13C_STATUS=NOT_STARTED`
+`ESCALON_13D_STATUS=NOT_STARTED`
+`ESCALON_13_REQUIRED=true`
+`HISTORICAL_LINT_DEBT_NEEDS_DEDICATED_PHASE=true`
+`NEXT=ESCALON_13C_OPERATIONAL_ACCEPTANCE`
 
 Escalón 13 no estaba especificado previamente. La auditoría demuestra que sí está justificado, pero únicamente para composición operativa, trazabilidad humana y runbooks. No debe duplicar E2E, Release, Governance, Observability ni el Commercial Control Center.
 
@@ -108,16 +111,28 @@ El canary 8C sigue siendo evidencia histórica: mecanismo remoto operativo, CI r
 
 `P3=1`: una expectativa Playwright histórica usaba el texto `Salud desconocida`; se corrigió a la etiqueta vigente `Desconocido` sin cambiar autoridad ni mutabilidad.
 
-Propuesta derivada, no iniciada:
+Propuesta histórica de la auditoría 13A:
 
 - `13B=ESCALON_13B_RELEASE_OPERATIONS_READ_MODEL_AND_RUNBOOKS`
 - `13C=ESCALON_13C_OPERATIONAL_ACCEPTANCE`
 - `13D=ESCALON_13D_OPERATIONAL_RECOVERY_AND_CLOSURE`
 
-`NEXT=ESCALON_13B_RELEASE_OPERATIONS_READ_MODEL_AND_RUNBOOKS`.
+`ESCALON_13B_STATUS=COMPLETED`
+13B queda completado; 13C permanece como siguiente fase y 13D no se inicia.
+`NEXT=ESCALON_13C_OPERATIONAL_ACCEPTANCE`.
 
 ## Límites y seguridad
 
 `RETENTION_MODE=CONSERVATIVE_NO_AUTOMATIC_DELETION`. No se propone TTL en 13A. Locks y exactly-once siguen siendo locales al proceso: `MultiprocessLocking=false`, `DistributedExactlyOnce=false`. La operación degrada fuentes no disponibles a unknown/unavailable sin fabricar datos. No se observaron tokens, headers, credenciales ni paths absolutos en el read model auditado.
 
 `ProviderCalls=0` · `ExternalNetworkUsed=false` · `LiveReleaseMutations=false` · `DeployPerformed=false` · `PRODUCTION_READY=false`.
+
+## Escalon 13B - Release Operations Read Model and Runbooks
+
+13B is completed as a read-only composition layer. `electron/jefe-release-operations.cjs` exposes `jefe-release-operations/v1` and combines existing E2E, release, governance, recovery and observability sources without becoming an authority or durable store. It binds project projections to `activeVersionId`, exposes global and project scope, preserves global-vs-project blockers, reports partial source failure, and keeps recovery status visible.
+
+`electron/jefe-release-operations-runbook.cjs` exposes `jefe-release-operations-runbook/v1` with a closed blocker taxonomy and safe next-action policy. Every action is informational (`automatic=false`); there are no approve, push, tag, release, deploy or recovery controls. The canonical operator matrix is [ORQUESTADOR_RELEASE_OPERATIONS_RUNBOOK.md](ORQUESTADOR_RELEASE_OPERATIONS_RUNBOOK.md).
+
+The existing Commercial Control Center and `/operation` route consume the projection when available. Web and Electron remain read-only. A source that cannot be read is represented as unavailable/unknown and does not produce invented health, readiness, metrics or authority. Historical CI debt remains global: `HistoricalLintErrors=306`, `REMOTE_CI_QUALITY=FAILING_HISTORICAL_LINT_DEBT`, `RELEASE_READINESS=BLOCKED`, `PRODUCTION_READY=false`.
+
+13B closes the 13A P1 gaps for composition, blocker traceability and recovery visibility, and the P2 gaps for a canonical runbook and differentiated degraded sources. Operational acceptance and broader UX evidence remain for 13C; no 13D work is started.

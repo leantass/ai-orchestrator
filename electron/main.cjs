@@ -103,6 +103,7 @@ const { createCommercialControlCenter } = require('./jefe-commercial-control-cen
 const { registerCommercialControlCenterIpc } = require('./jefe-commercial-control-center-ipc.cjs')
 const { createReleasePersistence } = require('./jefe-release-persistence.cjs')
 const { createReleaseRecovery } = require('./jefe-release-recovery.cjs')
+const { createReleaseOperations } = require('./jefe-release-operations.cjs')
 const { servePreview, closePreviewServers } = require('./jefe-preview-http-server.cjs')
 const { validateProductPlanning, validateGeneratedArtifact } = require('./jefe-product-planning.cjs')
 
@@ -60256,8 +60257,9 @@ const observabilityRuntime = createObservabilityRuntime({
   ],
   releaseHealth: releaseRecovery.releaseHealth,
 })
+const releaseOperations = createReleaseOperations({ lifecycle: canonicalProjectRegistration.lifecycle, persistence: canonicalProjectRegistration.persistence, releaseRecovery, observability: observabilityRuntime })
 registerObservabilityIpc({ ipcMain, runtime: observabilityRuntime })
-const commercialControlCenter = createCommercialControlCenter({ persistence: canonicalProjectRegistration.persistence, lifecycle: canonicalProjectRegistration.lifecycle, context: canonicalProjectRegistration.context, observability: observabilityRuntime, qa: qaSecurityRegistration.persistence, releaseHealth: releaseRecovery.releaseHealth })
+const commercialControlCenter = createCommercialControlCenter({ persistence: canonicalProjectRegistration.persistence, lifecycle: canonicalProjectRegistration.lifecycle, context: canonicalProjectRegistration.context, observability: observabilityRuntime, qa: qaSecurityRegistration.persistence, releaseHealth: releaseRecovery.releaseHealth, releaseOperations })
 registerCommercialControlCenterIpc({ ipcMain, controlCenter: commercialControlCenter })
 ipcMain.handle('jefe-preview:open', async (_event, payload = {}) => {
   try {
