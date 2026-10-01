@@ -89,6 +89,18 @@ Reconciliación machine-readable: `BEFORE=254`, `BEFORE_ONLY=9`, `AFTER_ONLY=0`,
 
 Validación: caracterización BEFORE PASS; equivalencia hermética BEFORE/AFTER PASS con 6 fixtures; lint focal/global PASS; typecheck PASS; build PASS; 13B PASS; 13C PASS 4/4; `git diff --check` PASS. El smoke oficial quedó `BLOCKED_EXTERNAL_FIXTURE` por falta del fixture externo pinneado; no se descargó ni generó. Evidencia: `C:\Users\PC\Desktop\JEFE-QUALITY-DEBT\batch-4\4A\`.
 
+## Batch 4B — hermes-wrapper-no-tool-mode-verification-planning
+
+Estado: `QUALITY_BATCH_4B=PASS`. Baseline canónico: `ff99b0b9b7606733af45c2a995e63815275693c4`.
+
+El lote quedó limitado al único `verification-planning/index.ts`, con 13 incidencias `no-explicit-any`: siete inputs de gates previos e inspección, dos guards de implementation/approval y cuatro fronteras de validación/serialización/parse/summarize. La caracterización BEFORE cubrió válido, bloqueado, planning/implementation/approval ausentes o incompletos, adapter aprobado, code inspection válido/ausente/null/inválido, gates de no ejecución, warnings, blockers, decisions y serialización.
+
+Se aplicaron interfaces explícitas para implementation, approval, adapter approval, code inspection y planning inputs. Las funciones de validación/serialización usan el tipo inferido del evaluator; los guards se normalizan a booleanos sin relajar ni endurecer condiciones. No se modificaron verification-approval, otros wrappers, OperationalView, defaults ni consumers externos.
+
+Reconciliación machine-readable: `BEFORE=245`, `BEFORE_ONLY=13`, `AFTER_ONLY=0`, `COMMON=232`, `AFTER=232`. Factory `240→227`; externos `5→5`. Reglas: `no-explicit-any 242→229`, `no-empty-object-type 2→2`, `ban-ts-comment 1→1`.
+
+Validación: caracterización BEFORE PASS; equivalencia hermética BEFORE/AFTER PASS con 7 fixtures, gates de seguridad, summaries y serialización; lint focal/global PASS; typecheck PASS; build PASS; 13B PASS; 13C PASS 4/4; `git diff --check` PASS. El smoke oficial quedó `BLOCKED_EXTERNAL_FIXTURE` por falta del fixture externo pinneado; no se descargó ni generó. Evidencia: `C:\Users\PC\Desktop\JEFE-QUALITY-DEBT\batch-4\4B\`.
+
 ## Batch 1 — hermes-wrapper-no-tool-mode-planning
 
 Estado: `BLOCKED` para cierre semántico. Alcance:
