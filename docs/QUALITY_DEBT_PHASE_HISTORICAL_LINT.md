@@ -65,6 +65,18 @@ La reconciliación de lint por archivo fue: planning types `5→0`, runtime type
 
 Validación limpia: test hermético cache BEFORE/AFTER PASS con fixtures opcionales, runtime bloqueado y runtime exitoso; lint focal/global `277` errores históricos; typecheck PASS; build PASS; 13B PASS (`node scripts/jefe-release-operations-13b-smoke.mjs`); 13C PASS (4/4 Playwright); `git diff --check` PASS. Evidencia completa: `C:\Users\PC\Desktop\JEFE-QUALITY-DEBT\batch-2-recovery\clean-reconstruction\`.
 
+## Batch 3 — hermes-wrapper-no-tool-mode approval
+
+Estado: `QUALITY_BATCH_3=PASS`. Baseline canónico: `d27925b436abfffbcff23bab48409bbf4f578141`.
+
+El dominio cohesivo contiene cuatro archivos: approval `types.ts` y `evaluate.ts`, e implementation-approval `types.ts` y `evaluate.ts`. Los evaluadores consumen los shapes de planning, runtime-selection, toolset approval e implementation planning; sus consumidores directos son los índices, validadores, serializadores y smokes de las mismas dos puertas. No se modificaron runtime Electron, red, Hermes, credenciales, UI ni configuración.
+
+La reconstrucción reemplazó `any` por interfaces de entrada, records de resultados y tipos explícitos para checks/blockers/warnings. Los guards conservan las mismas condiciones; cuatro resultados booleanos fueron normalizados con `Boolean(...)` sólo para satisfacer el contrato requerido, sin cambio de comportamiento.
+
+Lint machine-readable: `BEFORE=277`, `BEFORE_ONLY=23`, `AFTER_ONLY=0`, `COMMON=254`, `AFTER=254`. Factory `272→249`; externos `5→5`. Reglas: `no-explicit-any 274→251`, `no-empty-object-type 2→2`, `ban-ts-comment 1→1`.
+
+Validación: hermético BEFORE/AFTER PASS con casos aprobados, bloqueados, opcionales y serialización; lint focal PASS; typecheck PASS; build PASS; 13B PASS; 13C PASS 4/4; `git diff --check` PASS. Los dos smokes oficiales wrapper quedaron `BLOCKED_EXTERNAL_FIXTURE` por ausencia de los artefactos externos pinneados ya documentados; no se generaron ni descargaron. Evidencia: `C:\Users\PC\Desktop\JEFE-QUALITY-DEBT\batch-3\`.
+
 ## Batch 1 — hermes-wrapper-no-tool-mode-planning
 
 Estado: `BLOCKED` para cierre semántico. Alcance:
