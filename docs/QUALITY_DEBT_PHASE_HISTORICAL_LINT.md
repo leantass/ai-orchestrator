@@ -101,6 +101,29 @@ Reconciliación machine-readable: `BEFORE=245`, `BEFORE_ONLY=13`, `AFTER_ONLY=0`
 
 Validación: caracterización BEFORE PASS; equivalencia hermética BEFORE/AFTER PASS con 7 fixtures, gates de seguridad, summaries y serialización; lint focal/global PASS; typecheck PASS; build PASS; 13B PASS; 13C PASS 4/4; `git diff --check` PASS. El smoke oficial quedó `BLOCKED_EXTERNAL_FIXTURE` por falta del fixture externo pinneado; no se descargó ni generó. Evidencia: `C:\Users\PC\Desktop\JEFE-QUALITY-DEBT\batch-4\4B\`.
 
+## Batch 4C — hermes-wrapper-no-tool-mode-verification-approval
+
+Estado: `QUALITY_BATCH_4C=PASS`. Baseline canónico: `17b4f2259670e91fcead1d3c2fec1ebe6f6af5bc`.
+
+El lote quedó limitado al único `verification-approval/index.ts`, con 13 incidencias `no-explicit-any`: seis inputs de planning/implementation/adapter y cinco superficies de guards/resultado/validación/serialización, más summaries. La caracterización BEFORE cubrió approval válido y bloqueado, planning/implementation ausentes o incompletos, adapter aprobado, opcionales/null, input inválido, decision record, blocker plan, warning, summary y serialización.
+
+Se aplicaron interfaces explícitas para planning, implementation, adapter e input; un resultado tipado con flags de seguridad y fronteras de parse/serialize/validate/summarize tipadas. Las condiciones de approval y todos los estados autorizados permanecen iguales.
+
+Reconciliación machine-readable: `BEFORE=232`, `BEFORE_ONLY=13`, `AFTER_ONLY=0`, `COMMON=219`, `AFTER=219`. Factory `227→214`; externos `5→5`. Reglas: `no-explicit-any 229→216`, `no-empty-object-type 2→2`, `ban-ts-comment 1→1`.
+
+Validación: caracterización BEFORE PASS; equivalencia hermética BEFORE/AFTER PASS con 7 fixtures, approval decisions, blockers, summaries y serialización; lint focal/global PASS; typecheck PASS; build PASS; 13B PASS; 13C PASS 4/4; `git diff --check` PASS. El smoke oficial quedó `BLOCKED_EXTERNAL_FIXTURE` por falta del fixture externo pinneado; no se descargó ni generó. Evidencia: `C:\Users\PC\Desktop\JEFE-QUALITY-DEBT\batch-4\4C\`.
+
+## Resumen consolidado Batch 4
+
+| Sublote | Dominio | Incidencias eliminadas | Resultado |
+|---|---|---:|---|
+| 4A | wrapper no-tool implementation planning | 9 | PASS |
+| 4B | wrapper no-tool verification planning | 13 | PASS |
+| 4C | wrapper no-tool verification approval | 13 | PASS |
+| **Total** | **candidato wrapper no-tool completo** | **35** | **PASS** |
+
+La deuda total pasó de `277` al cierre de Batch 3 a `219` tras 4A–4C: Factory `272→214`, externos `5→5`. Se agregaron seis artefactos herméticos de caracterización/equivalencia: dos por cada sublote. Los smokes oficiales de Hermes permanecen `BLOCKED_EXTERNAL_FIXTURE`; las superficies modificadas quedaron cubiertas con equivalencia hermética local.
+
 ## Batch 1 — hermes-wrapper-no-tool-mode-planning
 
 Estado: `BLOCKED` para cierre semántico. Alcance:
