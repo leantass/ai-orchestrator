@@ -4,11 +4,13 @@
 
 `ESCALON_13A_STATUS=COMPLETED`
 `ESCALON_13B_STATUS=COMPLETED`
-`ESCALON_13C_STATUS=NOT_STARTED`
-`ESCALON_13D_STATUS=NOT_STARTED`
+`ESCALON_13C_STATUS=CLOSED_PASS`
+`ESCALON_13D_STATUS=NOT_AUTHORIZED`
 `ESCALON_13_REQUIRED=true`
 `HISTORICAL_LINT_DEBT_NEEDS_DEDICATED_PHASE=true`
-`NEXT=ESCALON_13C_OPERATIONAL_ACCEPTANCE`
+`NEXT=HISTORICAL_QUALITY_DEBT_PHASE`
+
+13C quedó implementado, aceptado y cerrado en `574c457b10ac833133177c8d5057dca39cf88600`. 13D no está autorizado ni definido ejecutablemente. La fase siguiente es deuda histórica de calidad/lint y se documenta en [QUALITY_DEBT_PHASE_HISTORICAL_LINT.md](QUALITY_DEBT_PHASE_HISTORICAL_LINT.md).
 
 Escalón 13 no estaba especificado previamente. La auditoría demuestra que sí está justificado, pero únicamente para composición operativa, trazabilidad humana y runbooks. No debe duplicar E2E, Release, Governance, Observability ni el Commercial Control Center.
 
@@ -114,12 +116,12 @@ El canary 8C sigue siendo evidencia histórica: mecanismo remoto operativo, CI r
 Propuesta histórica de la auditoría 13A:
 
 - `13B=ESCALON_13B_RELEASE_OPERATIONS_READ_MODEL_AND_RUNBOOKS`
-- `13C=ESCALON_13C_OPERATIONAL_ACCEPTANCE`
-- `13D=ESCALON_13D_OPERATIONAL_RECOVERY_AND_CLOSURE`
+- `13C=ESCALON_13C_OPERATIONAL_ACCEPTANCE` (histórico; cerrado)
+- `13D=ESCALON_13D_OPERATIONAL_RECOVERY_AND_CLOSURE` (histórico; no autorizado)
 
 `ESCALON_13B_STATUS=COMPLETED`
-13B queda completado; 13C permanece como siguiente fase y 13D no se inicia.
-`NEXT=ESCALON_13C_OPERATIONAL_ACCEPTANCE`.
+La redacción anterior se conserva como histórico. El estado vigente es 13C cerrado y la siguiente fase activa es deuda histórica de calidad/lint; 13D no se inicia.
+`NEXT=HISTORICAL_QUALITY_DEBT_PHASE`.
 
 ## Límites y seguridad
 

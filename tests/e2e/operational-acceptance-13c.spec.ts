@@ -34,8 +34,13 @@ test.describe('13C deterministic operational fixtures', () => {
 
   test('loading, unavailable, empty and source failure stay human and safe', async ({ page }) => {
     let calls = 0
-    await page.route('**/api/control-center', async route => { calls += 1; if (calls === 1) { await new Promise(resolve => setTimeout(resolve, 500)); return route.fulfill({ contentType: 'application/json', body: JSON.stringify(operation()) }) } return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ ok: false, error: { message: 'source failure' } }) }) })
-    const pending = page.goto('/operation', { waitUntil: 'commit' }); await expect(page.getByText('Cargando estado operativo...')).toBeVisible(); await pending; await expect(page.getByText('CI remota falló')).toBeVisible()
+    let markRequestStarted!: () => void
+    let releaseInitialResponse!: () => void
+    let initialPhase = true
+    const requestStarted = new Promise<void>(resolve => { markRequestStarted = resolve })
+    const initialResponseReleased = new Promise<void>(resolve => { releaseInitialResponse = resolve })
+    await page.route('**/api/control-center', async route => { calls += 1; if (initialPhase) { markRequestStarted(); await initialResponseReleased; return route.fulfill({ contentType: 'application/json', body: JSON.stringify(operation()) }) } return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ ok: false, error: { message: 'source failure' } }) }) })
+    const pending = page.goto('/operation', { waitUntil: 'commit' }); await requestStarted; await expect(page.getByText('Cargando estado operativo...')).toBeVisible(); initialPhase = false; releaseInitialResponse(); await pending; await expect(page.getByText('CI remota falló')).toBeVisible()
     await page.getByRole('button', { name: 'Actualizar estado' }).click(); await expect(page.getByText('No pudimos actualizar.')).toBeVisible(); await expect(page.getByText('CI remota falló')).toBeVisible(); await expect(page.getByText('No lista')).toBeVisible()
     await write('source-failure-preserves-last-good.json', { calls, preserved: true, productionReady: false, message: 'No pudimos actualizar.' })
   })
