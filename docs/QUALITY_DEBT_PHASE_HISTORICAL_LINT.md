@@ -55,6 +55,16 @@ No se autoriza modificar `src/commercial/*` en esta fase ni cambiar reglas/confi
 
 ## Resultado del bloque inicial
 
+## Batch 2 — hermes-build-dependency-cache — reconstrucción limpia
+
+Estado: `QUALITY_BATCH_2=PASS`. Baseline canónico: `bed669bda04cafd7f883127e6169a520cbaa82b0`.
+
+El alcance quedó limitado a `hermes-build-dependency-cache`. Los tres archivos `*.types.ts` fueron `BATCH_2_CORE` y `hermes-build-dependency-cache-verification.evaluate.ts` fue `BATCH_2_REQUIRED_CONSUMER`: al precisar `cacheRuntimeResult` desde `any`, el evaluator necesitó únicamente cambiar `r` a acceso opcional (`r?.`) para conservar exactamente las decisiones, estados, checks, outputs y serialización anteriores. Los cuatro archivos `hermes-wrapper-*` y su test fueron contaminación fuera de alcance y se retiraron.
+
+La reconciliación de lint por archivo fue: planning types `5→0`, runtime types `6→0`, verification types `12→0`, verification evaluator `0→0`; total autorizado `23`. Los cuatro archivos wrapper eliminados habían aportado `3+9+2+9=23` incidencias adicionales. Por eso el delta contaminado anterior `300→254` se explica como `23` cache + `23` wrapper; el lote limpio mide `300→277`, sin incidencias nuevas.
+
+Validación limpia: test hermético cache BEFORE/AFTER PASS con fixtures opcionales, runtime bloqueado y runtime exitoso; lint focal/global `277` errores históricos; typecheck PASS; build PASS; 13B PASS (`node scripts/jefe-release-operations-13b-smoke.mjs`); 13C PASS (4/4 Playwright); `git diff --check` PASS. Evidencia completa: `C:\Users\PC\Desktop\JEFE-QUALITY-DEBT\batch-2-recovery\clean-reconstruction\`.
+
 ## Batch 1 — hermes-wrapper-no-tool-mode-planning
 
 Estado: `BLOCKED` para cierre semántico. Alcance:

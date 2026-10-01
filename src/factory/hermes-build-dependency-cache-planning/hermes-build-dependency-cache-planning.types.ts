@@ -2,6 +2,8 @@ export type FactoryHermesBuildDependencyCachePlanningVersion = '1.0'
 export type FactoryHermesBuildDependencyCachePlanningKind = 'factory-hermes-build-dependency-cache-planning'
 export type FactoryHermesBuildDependencyCachePlanningStatus = 'plan_candidate_created' | 'manual_review_required' | 'blocked'
 export type FactoryHermesBuildDependencyCachePlanningDecision = 'hermes_build_dependency_cache_plan_candidate_created' | 'hermes_build_dependency_cache_requires_manual_hash_review' | 'blocked_missing_materialization_jefe_review' | 'blocked_jefe_review_not_approved_for_cache_planning' | 'blocked_missing_build_dependency_identity' | 'blocked_source_missing' | 'blocked_uv_cache_root_missing' | 'request_build_dependency_cache_review'
+export interface FactoryHermesBuildDependencyCacheInspection { sourceRootExists?: boolean; pyprojectExists?: boolean; uvLockExists?: boolean; cacheRootExists?: boolean; [key: string]: unknown }
+export interface FactoryHermesBuildDependencyCacheMaterializationReview { status?: string; decision?: string; missingBuildDependency?: string; buildBackend?: string; selectedCandidateId?: string; commandName?: string; pythonEntrypoint?: string; setupPyPresent?: boolean; buildDependencyCachePlanningEnvelope?: FactoryHermesBuildDependencyCacheMaterializationReview; uvCacheRootRef?: string; uvExecutableRef?: string; sourceRootRef?: string; pythonEnvRootRef?: string; [key: string]: unknown }
 
 export interface FactoryHermesBuildDependencyCachePlanningPolicy {
   requireMaterializationJefeReviewApproved: boolean
@@ -35,9 +37,9 @@ export interface FactoryHermesBuildDependencyCachePlanningInput {
   plannedAt: string
   plannedBy: string
   humanApprovalRef?: string
-  materializationJefeReviewResult?: any
-  sourceInspection?: any
-  cacheInspection?: any
+  materializationJefeReviewResult?: FactoryHermesBuildDependencyCacheMaterializationReview
+  sourceInspection?: FactoryHermesBuildDependencyCacheInspection
+  cacheInspection?: FactoryHermesBuildDependencyCacheInspection
   policy?: Partial<FactoryHermesBuildDependencyCachePlanningPolicy>
   planningNotes?: string
 }
@@ -118,8 +120,8 @@ export interface FactoryHermesBuildDependencyCachePlanningResult {
   uvCacheRootRef: string
   sourceRootRef: string
   pythonEnvRootRef: string
-  sourceInspectionSummary: any
-  cacheInspectionSummary: any
+  sourceInspectionSummary: FactoryHermesBuildDependencyCacheInspection
+  cacheInspectionSummary: FactoryHermesBuildDependencyCacheInspection
   methodCandidates: FactoryHermesBuildDependencyCacheMethodCandidate[]
   selectedMethodCandidate?: string
   buildDependencyCachePlanningReceipt?: FactoryHermesBuildDependencyCachePlanningReceipt
