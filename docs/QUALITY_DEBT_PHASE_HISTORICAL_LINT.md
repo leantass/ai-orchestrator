@@ -77,6 +77,18 @@ Lint machine-readable: `BEFORE=277`, `BEFORE_ONLY=23`, `AFTER_ONLY=0`, `COMMON=2
 
 Validación: hermético BEFORE/AFTER PASS con casos aprobados, bloqueados, opcionales y serialización; lint focal PASS; typecheck PASS; build PASS; 13B PASS; 13C PASS 4/4; `git diff --check` PASS. Los dos smokes oficiales wrapper quedaron `BLOCKED_EXTERNAL_FIXTURE` por ausencia de los artefactos externos pinneados ya documentados; no se generaron ni descargaron. Evidencia: `C:\Users\PC\Desktop\JEFE-QUALITY-DEBT\batch-3\`.
 
+## Batch 4A — hermes-wrapper-no-tool-mode-implementation-planning
+
+Estado: `QUALITY_BATCH_4A=PASS`. Baseline canónico: `5a5a4698fe263d4a2cb38fbe4fd548476f5b6723`.
+
+El lote quedó limitado al gate `hermes-wrapper-no-tool-mode-implementation-planning`: `evaluate.ts` aportaba 3 incidencias y `types.ts` 6. La caracterización BEFORE cubrió planning aprobado y bloqueado, aprobación incompleta/ausente, `sourceInspection` válido/ausente/inválido, opcionales/null, warnings de schema desconocido, checks/blockers, decisiones, guards y serialización estable.
+
+Se agregaron interfaces explícitas para approval/planning previos, source inspection, checks, blockers y warnings. Los guards del evaluator preservan las condiciones originales; no se modificaron defaults, decisiones, blockers, warnings ni consumidores externos.
+
+Reconciliación machine-readable: `BEFORE=254`, `BEFORE_ONLY=9`, `AFTER_ONLY=0`, `COMMON=245`, `AFTER=245`. Factory `249→240`; externos `5→5`. Reglas: `no-explicit-any 251→242`, `no-empty-object-type 2→2`, `ban-ts-comment 1→1`.
+
+Validación: caracterización BEFORE PASS; equivalencia hermética BEFORE/AFTER PASS con 6 fixtures; lint focal/global PASS; typecheck PASS; build PASS; 13B PASS; 13C PASS 4/4; `git diff --check` PASS. El smoke oficial quedó `BLOCKED_EXTERNAL_FIXTURE` por falta del fixture externo pinneado; no se descargó ni generó. Evidencia: `C:\Users\PC\Desktop\JEFE-QUALITY-DEBT\batch-4\4A\`.
+
 ## Batch 1 — hermes-wrapper-no-tool-mode-planning
 
 Estado: `BLOCKED` para cierre semántico. Alcance:
