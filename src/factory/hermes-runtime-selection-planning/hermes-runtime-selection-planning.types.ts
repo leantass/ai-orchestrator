@@ -3,12 +3,14 @@ export type FactoryHermesRuntimeSelectionPlanningKind = 'factory-hermes-runtime-
 export type FactoryHermesRuntimeSelectionPlanningStatus = 'runtime_selection_plan_created' | 'blocked'
 export type FactoryHermesRuntimeSelectionPlanningDecision = 'hermes_runtime_selection_plan_created_manual_selection_required' | 'blocked_invalid_research_execution_approval'
 
+export type FactoryHermesRuntimeSelectionUpstreamRecord = Record<string, unknown>
+
 export interface FactoryHermesRuntimeSelectionPlanningInput {
   plannedAt: string
   plannedBy: string
-  researchExecutionApprovalResult?: any
-  researchExecutionBoundaryPlanningResult?: any
-  policyPlanningResults?: Record<string, any>
+  researchExecutionApprovalResult?: FactoryHermesRuntimeSelectionUpstreamRecord
+  researchExecutionBoundaryPlanningResult?: FactoryHermesRuntimeSelectionUpstreamRecord
+  policyPlanningResults?: Record<string, FactoryHermesRuntimeSelectionUpstreamRecord>
   policy?: Partial<FactoryHermesRuntimeSelectionPlanningPolicy>
   planningNotes?: string
 }

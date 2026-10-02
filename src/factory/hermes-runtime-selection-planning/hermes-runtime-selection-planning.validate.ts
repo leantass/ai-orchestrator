@@ -27,7 +27,7 @@ export function validateFactoryHermesRuntimeSelectionPlanningResult(result: Fact
   for (const key of ['promptSelectionCandidates', 'providerSelectionCandidates', 'modelSelectionCandidates', 'credentialSelectionCandidates', 'networkHostSelectionCandidates', 'toolsetSelectionCandidates', 'runtimeRunRootSelectionCandidates'] as const) if (!result[key].length) errors.push(`${key} required.`)
   if (!result.finalApprovalSelectionCandidate) errors.push('finalApprovalSelectionCandidate required.')
   const plan = result.hermesRuntimeSelectionPlanCandidate
-  if (plan) for (const [key, expected] of Object.entries({ allSelectionsResolvedNow: false, finalHumanDecisionRequired: true, executionApprovalRetryAllowedNow: false, runtimeAdapterAllowedNow: false, researchExecutionAllowedNow: false })) if ((plan as any)[key] !== expected) errors.push(`${key} must be ${expected}.`)
+  if (plan) for (const [key, expected] of Object.entries({ allSelectionsResolvedNow: false, finalHumanDecisionRequired: true, executionApprovalRetryAllowedNow: false, runtimeAdapterAllowedNow: false, researchExecutionAllowedNow: false })) if (plan[key as keyof typeof plan] !== expected) errors.push(`${key} must be ${expected}.`)
   if (!result.credentialSelectionCandidates.every((item) => item.valueRead === false && item.selectedNow === false)) errors.push('credential values must not be read or selected.')
   if (!result.runtimeRunRootSelectionCandidates.every((item) => item.runRootCreatedNow === false)) errors.push('run root must not be created now.')
   if (result.canProceedToRuntimeSelectionDecision !== true) errors.push('canProceedToRuntimeSelectionDecision must be true.')

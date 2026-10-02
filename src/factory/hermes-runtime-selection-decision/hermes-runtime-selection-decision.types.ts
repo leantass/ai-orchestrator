@@ -4,12 +4,14 @@ export type FactoryHermesRuntimeSelectionDecisionStatus = 'runtime_selection_dec
 export type FactoryHermesRuntimeSelectionDecisionDecision = 'hermes_runtime_selection_decision_recorded_for_approval_retry' | 'blocked_invalid_runtime_selection_planning' | 'blocked_invalid_runtime_selection'
 export type FactoryHermesRuntimeSelectionStatus = 'selected_for_approval_retry' | 'blocked'
 
+export type FactoryHermesRuntimeSelectionDecisionUpstreamRecord = Record<string, unknown>
+
 export interface FactoryHermesRuntimeSelectionDecisionInput {
   decidedAt: string
   decidedBy: string
-  runtimeSelectionPlanningResult?: any
-  researchExecutionApprovalResult?: any
-  policyPlanningResults?: Record<string, any>
+  runtimeSelectionPlanningResult?: FactoryHermesRuntimeSelectionDecisionUpstreamRecord
+  researchExecutionApprovalResult?: FactoryHermesRuntimeSelectionDecisionUpstreamRecord
+  policyPlanningResults?: Record<string, FactoryHermesRuntimeSelectionDecisionUpstreamRecord>
   selection?: Partial<FactoryHermesRuntimeSelectionDecisionRecord>
   policy?: Partial<FactoryHermesRuntimeSelectionDecisionPolicy>
   decisionNotes?: string

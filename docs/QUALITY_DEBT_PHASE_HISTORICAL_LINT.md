@@ -207,6 +207,18 @@ Los tres smokes oficiales quedan `BLOCKED_EXTERNAL_FIXTURE`: 9A por `C:\Users\PC
 Validación: lint focal PASS; lint global `108` hallazgos (`103` Factory, `5` externos); lint JSON preservado; typecheck PASS; build PASS; 13B PASS; 13C PASS `4/4`; `git diff --check` PASS. Familias diferidas por riesgo: runtime-selection planning/decision, wrapper, adapters y gates con autoridad ambigua; separados: `2` `no-empty-object-type` y `5` externos `OperationalView`. Evidencia: `C:\Users\PC\Desktop\JEFE-QUALITY-DEBT\batch-9\`.
 ## Batch 10 — result-ingestion-contract-planning safe shape
 
+## Batch 11A — runtime-selection planning + decision
+
+Estado: `QUALITY_BATCH_11A=PASS`. Baseline `34627f0`; global `103→87`, Factory `98→82`, externos `5→5`; `BEFORE_ONLY=16`, `AFTER_ONLY=0`.
+
+Se eliminaron 16 incidencias de runtime-selection con equivalencia hermética BEFORE/AFTER (`12` checks), preservando decisiones, precedencia, denials, defaults y permisos de ejecución (`false`).
+
+`RUNTIME_SELECTION_FINDING-001=HISTORICAL_RUNTIME_SMOKES=BLOCKED_UPSTREAM_FIXTURE`: los fixtures de `factory-hermes-runtime-selection-planning-smoke.mjs` y `factory-hermes-runtime-selection-decision-smoke.mjs` provienen del upstream approval/planning y contienen `canProceedToRuntimeSelectionPlanning=false`. Ambos fallan en esa precondición antes de entrar a los módulos modificados por 11A. Los artefactos históricos no fueron modificados ni se declaran PASS; la cobertura hermética ejercita directamente planning/decision.
+
+`RUNTIME_SELECTION_FINDING-002=RESOLVED_COMMAND_DISCOVERY`: `npx playwright test --config=.codex-temp/batch-7-13c.config.ts tests/e2e/operational-acceptance-13c.spec.ts`, cwd `C:\Users\PC\ai-orchestrator`. Fuente: config histórico, test preservado y commit `574c457`. Resultado: 4/4 PASS, exit code 0.
+
+Validación: hermético PASS; lint global/JSON `87` hallazgos históricos con `AFTER_ONLY=0` (ESLint retorna `1` por deuda deliberada); typecheck PASS; build PASS; 13B PASS; 13C PASS 4/4; `git diff --check` PASS. Transcripts completos en `.codex-temp/batch-11a-final-*.txt` y los transcripts históricos de planificación/decisión, lint, typecheck, build, 13B y hermético. No hubo regresiones reales del dominio 11A. Deuda Factory restante: `82`; `productionReady=false`; `BATCH_11B_STARTED=false`; `13D_STARTED=false`.
+
 Estado: `QUALITY_BATCH_10=PASS`. Baseline reproducible: `059c34c6f995d7d043e6cad0bf408494c8d9724d`; lint global `108`, Factory `103`, externos `5`.
 
 El lote SAFE ejecutado fue `hermes-result-ingestion-contract-planning`, con `5` incidencias `@typescript-eslint/no-explicit-any` en fronteras de input. Se agregaron aliases/records abiertos con los campos discriminantes y de policy observados por sus consumers, sin cambiar decisiones, defaults, blockers, warnings, serialización ni autoridad.
