@@ -25,7 +25,7 @@ export function validateFactoryHermesEntrypointMaterializationVerificationResult
   if (result.executableStatus !== 'present' || !result.executableSha256) errors.push('executable must be present with sha256')
   if (result.canProceedToResearchRuntimeAdapterRetry !== true) errors.push('adapter retry handoff required')
   for (const [k, v] of Object.entries({ canRetryResearchAdapterNow: result.canRetryResearchAdapterNow, canExecuteHermesNow: result.canExecuteHermesNow, canTreatAsResearchResult: result.canTreatAsResearchResult, canUseFindings: result.canUseFindings, canUseNetwork: result.canUseNetwork, canUseCredentials: result.canUseCredentials, canCallModels: result.canCallModels, canMutateProjectFiles: result.canMutateProjectFiles, canDeploy: result.canDeploy })) if (v !== false) errors.push(`${k} must be false`)
-  const actions = result.entrypointMaterializationVerificationReceipt?.notAuthorizedActions || []
+  const actions = Array.isArray(result.entrypointMaterializationVerificationReceipt?.notAuthorizedActions) ? result.entrypointMaterializationVerificationReceipt.notAuthorizedActions as unknown[] : []
   for (const action of ['execute_hermes_now', 'execute_entrypoint_now', 'retry_research_adapter_now', 'use_network_now']) if (!actions.includes(action)) errors.push(`missing ${action}`)
   if (!result.recommendedNextStep) errors.push('recommendedNextStep required')
   return { ok: errors.length === 0, errors, warnings: [] }

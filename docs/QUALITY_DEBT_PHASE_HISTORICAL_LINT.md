@@ -181,3 +181,14 @@ El lote quedó limitado a la familia cohesionada `hermes-toolset-disable-verific
 Reconciliación machine-readable: `BEFORE=219`, `BEFORE_ONLY=13`, `AFTER_ONLY=0`, `COMMON=206`, `AFTER=206`. Factory `214→201`; externos `5→5`. Reglas Factory: `no-explicit-any 212→199`, `no-empty-object-type 2→2`; `ban-ts-comment 1` permanece externo. La caída 219→206 coincide exactamente con los 13 hallazgos de la familia seleccionada.
 
 Validación: typecheck PASS; caracterización hermética del gate PASS; build PASS; 13B PASS; 13C PASS 4/4; `git diff --check` PASS. El smoke oficial quedó `BLOCKED_EXTERNAL_FIXTURE` antes de evaluar por ausencia del resultado externo de planificación Hermes; no se generó ni descargó. Evidencia completa: `C:\Users\PC\Desktop\JEFE-QUALITY-DEBT\batch-5\`.
+## Batch 8 — hermes-entrypoint-materialization-verification + hermes-output-contract-policy-planning
+
+Estado: `QUALITY_BATCH_8=PASS`. Baseline canónico: `00a257055db3c909c40fc6e9fcc141a71f0cd7e4`; AFTER: worktree Batch 8.
+
+Se eliminaron 17 incidencias de deuda de calidad sin cambiar la semántica de producción. La reconciliación es `BEFORE=147`, `BEFORE_ONLY=17`, `AFTER_ONLY=0`, `AFTER=130`; Factory `142→125`; externos `5→5`.
+
+La equivalencia hermética BEFORE/AFTER pasó para ambas familias con los mismos fixtures: Familia A `13` fixtures y Familia B `10` fixtures. Se compararon estructuralmente outputs, decisions, checks, blockers, warnings, defaults, validación, serialización/parsing, summaries/receipts y estados derivados. No se detectó regresión.
+
+Los smokes oficiales no se declaran exitosos: `OFFICIAL_SMOKE_A=BLOCKED_EXTERNAL_FIXTURE` por ausencia de `.codex-temp/external-tools/hermes-agent/install/75b300f/entrypoint-materialization-runtime-retry-result.json`; `OFFICIAL_SMOKE_B=BLOCKED_EXTERNAL_FIXTURE` por ausencia del fixture `toolsets-policy-planning-result.json` en el conjunto externo de planificación. Esos artefactos no forman parte de la semántica tipada de los contratos; la cobertura hermética los sustituye mediante fixtures mínimos tipados que ejercitan las ramas de entrada, gates, estados, validadores, serialización y summaries sin ejecutar Hermes ni depender del runtime externo. No se generaron ni descargaron.
+
+Validación final: lint focal PASS; lint global `130` hallazgos históricos; lint JSON preservado; typecheck PASS; build PASS; 13B PASS; 13C PASS `4/4`; `git diff --check` PASS. Evidencia: `C:\Users\PC\Desktop\JEFE-QUALITY-DEBT\batch-8\`.

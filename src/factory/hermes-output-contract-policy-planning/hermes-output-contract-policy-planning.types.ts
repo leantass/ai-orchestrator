@@ -13,17 +13,36 @@ export interface FactoryHermesOutputContractPolicyPlanningInput {
   plannedAt: string
   plannedBy: string
   humanApprovalRef?: string
-  toolsetsPolicyPlanningResult?: any
-  networkPolicyPlanningResult?: any
-  credentialsPolicyPlanningResult?: any
-  modelProviderPolicyPlanningResult?: any
-  promptPolicyPlanningResult?: any
-  policyChainPlanningResult?: any
-  deepSourceReview?: any
-  outputSourceInspection?: any
+  toolsetsPolicyPlanningResult?: FactoryHermesToolsetsPolicyPlanningResult
+  networkPolicyPlanningResult?: FactoryHermesJsonObject
+  credentialsPolicyPlanningResult?: FactoryHermesJsonObject
+  modelProviderPolicyPlanningResult?: FactoryHermesJsonObject
+  promptPolicyPlanningResult?: FactoryHermesJsonObject
+  policyChainPlanningResult?: FactoryHermesJsonObject
+  deepSourceReview?: FactoryHermesJsonObject
+  outputSourceInspection?: FactoryHermesOutputSourceInspection
   policy?: Partial<FactoryHermesOutputContractPolicyPlanningPolicy>
   planningNotes?: string
 }
+
+export type FactoryHermesJsonObject = Record<string, unknown>
+export type FactoryHermesToolsetsPolicyPlanningResult = FactoryHermesJsonObject & {
+  status?: string
+  decision?: string
+  canProceedToOutputContractPolicyPlanning?: boolean
+  canProceedToResearchExecutionApproval?: boolean
+  canRunResearchNow?: boolean
+  canExecuteHermesNow?: boolean
+  canPassPromptNow?: boolean
+  canUseNetworkNow?: boolean
+  canUseCredentialsNow?: boolean
+  canReadEnvSecretsNow?: boolean
+  canCallModelsNow?: boolean
+  canEnableToolsetsNow?: boolean
+  canUseFindings?: boolean
+  hermesToolsetsPolicyPlanCandidate?: { toolsetsAllowedNow?: boolean; toolsetsApprovedNow?: unknown[] }
+}
+export type FactoryHermesOutputSourceInspection = FactoryHermesJsonObject & { hermesExecuted?: boolean; promptSent?: boolean; outputUsedAsFindings?: boolean; networkUsed?: boolean; envValuesRead?: boolean; dotEnvRead?: boolean }
 
 export interface FactoryHermesOutputContractPolicyPlanningPolicy {
   requireToolsetsPolicyPlanning: boolean

@@ -3,7 +3,30 @@ export type FactoryHermesEntrypointMaterializationVerificationKind = 'factory-he
 export type FactoryHermesEntrypointMaterializationVerificationStatus = 'verified' | 'warning_verified' | 'blocked'
 export type FactoryHermesEntrypointMaterializationVerificationDecision = 'hermes_entrypoint_materialization_verified_for_research_runtime_adapter_retry' | 'blocked_missing_runtime_retry_result' | 'blocked_runtime_retry_not_success' | 'blocked_entrypoint_executable_missing' | 'blocked_entrypoint_executable_empty' | 'blocked_entrypoint_path_not_contained' | 'blocked_unexpected_source_mutation' | 'blocked_boundary_violation_detected' | 'request_materialization_retry_repair_before_verification'
 export type FactoryHermesEntrypointMaterializationVerificationValidationResult = { ok: boolean; errors: string[]; warnings: string[] }
-export type FactoryHermesEntrypointMaterializationVerificationInput = { verifiedAt: string; verifiedBy: string; runtimeRetryResult?: any; runtimeRetryManifest?: any; executableInspection?: any; sourceInspection?: any; cacheVerificationResult?: any; policy?: Partial<FactoryHermesEntrypointMaterializationVerificationPolicy>; verificationNotes?: string[] }
+export type FactoryHermesJsonObject = Record<string, unknown>
+export type FactoryHermesEntrypointMaterializationRuntimeRetryResult = FactoryHermesJsonObject & {
+  status?: string
+  decision?: string
+  materializationStatus?: string
+  executableStatusAfter?: string
+  expectedExecutableRef?: string
+  canProceedToEntrypointMaterializationVerification?: boolean
+  canRetryResearchAdapterNow?: boolean
+  canExecuteHermesNow?: boolean
+  canTreatAsResearchResult?: boolean
+  networkStatus?: string
+  credentialsStatus?: string
+  modelCallStatus?: string
+  pipStatus?: string
+  pythonDirectStatus?: string
+  setupPyDirectStatus?: string
+  hermesExecutionStatus?: string
+  scriptsStatus?: string
+  researchAdapterRetryStatus?: string
+}
+export type FactoryHermesEntrypointMaterializationExecutableInspection = FactoryHermesJsonObject & { exists?: boolean; contained?: boolean; sizeBytes?: number; sha256?: string }
+export type FactoryHermesEntrypointMaterializationSourceInspection = FactoryHermesJsonObject & { keyFileHashesUnchanged?: boolean; unexpectedSourceMutation?: boolean; knownWarnings?: string[]; sourceMutationStatus?: string }
+export type FactoryHermesEntrypointMaterializationVerificationInput = { verifiedAt: string; verifiedBy: string; runtimeRetryResult?: FactoryHermesEntrypointMaterializationRuntimeRetryResult; runtimeRetryManifest?: FactoryHermesJsonObject; executableInspection?: FactoryHermesEntrypointMaterializationExecutableInspection; sourceInspection?: FactoryHermesEntrypointMaterializationSourceInspection; cacheVerificationResult?: FactoryHermesJsonObject; policy?: Partial<FactoryHermesEntrypointMaterializationVerificationPolicy>; verificationNotes?: string[] }
 export type FactoryHermesEntrypointMaterializationVerificationPolicy = Record<string, boolean>
 export type FactoryHermesEntrypointMaterializationVerificationResult = {
   verificationId: string
@@ -22,10 +45,10 @@ export type FactoryHermesEntrypointMaterializationVerificationResult = {
   sourceMutationStatus: string
   knownWarnings: string[]
   runtimeRetryDecision: string
-  entrypointMaterializationVerificationReceipt?: Record<string, any>
-  hermesEntrypointMaterializationVerificationRecord?: Record<string, any>
-  approvedResearchRuntimeAdapterRetryEnvelope?: Record<string, any>
-  checks: Array<Record<string, any>>
+  entrypointMaterializationVerificationReceipt?: FactoryHermesJsonObject
+  hermesEntrypointMaterializationVerificationRecord?: FactoryHermesJsonObject
+  approvedResearchRuntimeAdapterRetryEnvelope?: FactoryHermesJsonObject
+  checks: FactoryHermesJsonObject[]
   blockers: Array<{ blockerId: string; message: string }>
   warnings: Array<{ warningId: string; message: string }>
   status: FactoryHermesEntrypointMaterializationVerificationStatus
