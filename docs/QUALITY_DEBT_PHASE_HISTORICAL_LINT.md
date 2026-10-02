@@ -148,6 +148,18 @@ El smoke integral oficial queda clasificado como `BLOCKED_EXTERNAL_FIXTURE`: req
 
 No existe Batch 1 seguro bajo los criterios autorizados. No se modificó `src/factory/*`; no se ejecutaron correcciones, refactors, deploy, red, commit ni push. `quality:ci` queda pendiente y previsiblemente bloqueado por la deuda medida.
 
+## Batch 6B — hermes-runtime-selection-revision-planning
+
+Estado: `QUALITY_BATCH_6B=PASS`. Baseline canónico: `8d8ff7950046b508173f6dd67f4696ff35d4765b`.
+
+Este gate revisa una selección runtime previa inválida para el adapter por `no_toolsets_text_only`. Consume approvals bloqueadas y la selección previa, produce opciones de revisión y un decision pack, y sólo habilita planificación de wrapper o decisión de revisión. No aprueba runtime, no selecciona un candidato nuevo ni ejecuta Hermes.
+
+Las 11 incidencias fueron `SAFE_UNKNOWN_WITH_GUARD` en fronteras de approvals/selection. Se agregaron records abiertos, guards de objetos/arrays y protección para `null`, sin cambiar candidate selection, condiciones, approvals, policies, defaults, blockers, warnings ni serialización.
+
+Reconciliación: `BEFORE=193`, `BEFORE_ONLY=11`, `AFTER_ONLY=0`, `COMMON=182`, `AFTER=182`. Factory `188→177`; externos `5→5`. Reglas Factory: `no-explicit-any 186→175`; `no-empty-object-type 2→2`.
+
+Validación: equivalencia hermética BEFORE/AFTER con 8 fixtures; lint focal/global, typecheck, build, 13B, 13C 4/4 y `git diff --check` PASS. Smoke oficial `BLOCKED_EXTERNAL_FIXTURE`; no se ejecutó Hermes. Evidencia: `C:\Users\PC\Desktop\JEFE-QUALITY-DEBT\batch-6\6B\`.
+
 ## Batch 6A — hermes-research-execution-boundary-planning
 
 Estado: `QUALITY_BATCH_6A=PASS`. Baseline canónico: `0396062ad7fb6af16c7f6fd83596057f6648aecc`.

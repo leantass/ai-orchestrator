@@ -1,26 +1,31 @@
 import { DEFAULT_FACTORY_HERMES_RUNTIME_SELECTION_REVISION_PLANNING_POLICY, FACTORY_HERMES_RUNTIME_SELECTION_REVISION_PLANNING_KIND, FACTORY_HERMES_RUNTIME_SELECTION_REVISION_PLANNING_VERSION, RUNTIME_SELECTION_REVISION_NOT_AUTHORIZED_ACTIONS, RUNTIME_SELECTION_REVISION_PLANNING_NEXT_STEP } from './hermes-runtime-selection-revision-planning.defaults.ts'
-import type { FactoryHermesBlockedRuntimeSelectionSummary, FactoryHermesRuntimeSelectionRevisionPlanningInput, FactoryHermesRuntimeSelectionRevisionPlanningResult } from './hermes-runtime-selection-revision-planning.types.ts'
+import type { FactoryHermesBlockedRuntimeSelectionSummary, FactoryHermesRuntimeSelectionRevisionPlanningInput, FactoryHermesRuntimeSelectionRevisionPlanningOpenResult, FactoryHermesRuntimeSelectionRevisionPlanningResult } from './hermes-runtime-selection-revision-planning.types.ts'
 
-function validToolsetApproval(r: any): boolean {
-  return r?.status === 'toolset_disable_verification_approval_blocked' && r?.decision === 'hermes_toolset_disable_verification_approval_blocked_no_safe_probe_shape' && r?.approvalStatus === 'blocked' && r?.canProceedToRuntimeSelectionRevisionPlanning === true && r?.canProceedToResearchRuntimeAdapterApprovalRetry === false && r?.canProceedToResearchRuntimeAdapter === false && r?.canRunResearchNow === false
+function readRecord(value: unknown): FactoryHermesRuntimeSelectionRevisionPlanningOpenResult { return value && typeof value === 'object' ? value as FactoryHermesRuntimeSelectionRevisionPlanningOpenResult : {} }
+function validToolsetApproval(r: unknown): boolean {
+  const value = readRecord(r)
+  return value.status === 'toolset_disable_verification_approval_blocked' && value.decision === 'hermes_toolset_disable_verification_approval_blocked_no_safe_probe_shape' && value.approvalStatus === 'blocked' && value.canProceedToRuntimeSelectionRevisionPlanning === true && value.canProceedToResearchRuntimeAdapterApprovalRetry === false && value.canProceedToResearchRuntimeAdapter === false && value.canRunResearchNow === false
 }
 
-function validAdapterApproval(r: any): boolean {
-  return r?.status === 'research_runtime_adapter_approval_blocked' && r?.decision === 'hermes_research_runtime_adapter_approval_blocked_toolset_mode_unverified' && r?.runtimeAdapterApprovalStatus === 'blocked' && r?.canProceedToResearchRuntimeAdapter === false
+function validAdapterApproval(r: unknown): boolean {
+  const value = readRecord(r)
+  return value.status === 'research_runtime_adapter_approval_blocked' && value.decision === 'hermes_research_runtime_adapter_approval_blocked_toolset_mode_unverified' && value.runtimeAdapterApprovalStatus === 'blocked' && value.canProceedToResearchRuntimeAdapter === false
 }
 
-function validSelection(r: any): boolean {
-  return r?.selectedProvider?.providerId === 'openai' && r?.selectedModel?.modelId === 'gpt-4o-mini' && r?.selectedCredentialRef?.credentialRefName === 'OPENAI_API_KEY' && r?.selectedNetworkHosts?.selectedHosts?.includes('api.openai.com') && r?.selectedToolsetMode?.selectedToolsetMode === 'no_toolsets_text_only' && r?.selectedRunRoot?.selectedRunRoot?.startsWith('.codex-temp/external-tools/hermes-agent/install/75b300f/research-runs/')
+function validSelection(r: unknown): boolean {
+  const value = readRecord(r); const provider = readRecord(value.selectedProvider); const model = readRecord(value.selectedModel); const credential = readRecord(value.selectedCredentialRef); const hosts = readRecord(value.selectedNetworkHosts); const toolset = readRecord(value.selectedToolsetMode); const runRoot = readRecord(value.selectedRunRoot); const selectedHosts = Array.isArray(hosts.selectedHosts) ? hosts.selectedHosts : []
+  return provider.providerId === 'openai' && model.modelId === 'gpt-4o-mini' && credential.credentialRefName === 'OPENAI_API_KEY' && selectedHosts.includes('api.openai.com') && toolset.selectedToolsetMode === 'no_toolsets_text_only' && typeof runRoot.selectedRunRoot === 'string' && runRoot.selectedRunRoot.startsWith('.codex-temp/external-tools/hermes-agent/install/75b300f/research-runs/')
 }
 
-function blockedSummary(selection: any): FactoryHermesBlockedRuntimeSelectionSummary {
+function blockedSummary(selection: unknown): FactoryHermesBlockedRuntimeSelectionSummary {
+  const runRoot = readRecord(readRecord(selection).selectedRunRoot)
   return {
     previousProvider: 'openai',
     previousModel: 'gpt-4o-mini',
     previousCredentialRef: 'OPENAI_API_KEY',
     previousHost: 'api.openai.com',
     previousToolsetMode: 'no_toolsets_text_only',
-    previousRunRoot: selection?.selectedRunRoot?.selectedRunRoot || '.codex-temp/external-tools/hermes-agent/install/75b300f/research-runs/hermes-first-controlled-run-001/',
+    previousRunRoot: typeof runRoot.selectedRunRoot === 'string' ? runRoot.selectedRunRoot : '.codex-temp/external-tools/hermes-agent/install/75b300f/research-runs/hermes-first-controlled-run-001/',
     blockedReason: 'toolset_mode_not_supported',
     noToolModeProven: false,
     noSafeProbeShape: true,
