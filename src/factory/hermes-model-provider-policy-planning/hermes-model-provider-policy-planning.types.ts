@@ -10,14 +10,45 @@ export type FactoryHermesModelProviderPolicyPlanningDecision =
   | 'blocked_deep_source_review_not_policy_chain'
   | 'blocked_unsafe_prior_execution_state'
 
+export interface FactoryHermesPromptPolicyPlanningResult {
+  status?: string
+  decision?: string
+  canProceedToModelProviderPolicyPlanning?: boolean
+  canProceedToResearchExecutionApproval?: boolean
+  canRunResearchNow?: boolean
+  canExecuteHermesNow?: boolean
+  canPassPromptNow?: boolean
+  canUseNetworkNow?: boolean
+  canUseCredentialsNow?: boolean
+  canCallModelsNow?: boolean
+  hermesPromptPolicyPlanCandidate?: { promptCandidate?: { candidateOnly?: boolean; notApprovedForExecutionYet?: boolean } }
+}
+
+export interface FactoryHermesPolicyChainPlanningResult {
+  status?: string
+  requiredPolicies?: Array<{ policyName?: string }>
+  proposedGateSequence?: Array<{ gateName?: string }>
+}
+
+export interface FactoryHermesDeepSourceReview {
+  commandContractCandidates?: Array<{ id?: string; recommendation?: string }>
+  providerModelFindings?: { providerMockOrOfflineFound?: boolean; credentialEnvNamesObserved?: unknown }
+}
+
+export interface FactoryHermesProviderSourceInspection {
+  providersObserved?: unknown
+  credentialEnvRefsObserved?: unknown
+  mockOfflineProviderFound?: boolean
+}
+
 export interface FactoryHermesModelProviderPolicyPlanningInput {
   plannedAt: string
   plannedBy: string
   humanApprovalRef?: string
-  promptPolicyPlanningResult?: any
-  policyChainPlanningResult?: any
-  deepSourceReview?: any
-  providerSourceInspection?: any
+  promptPolicyPlanningResult?: FactoryHermesPromptPolicyPlanningResult
+  policyChainPlanningResult?: FactoryHermesPolicyChainPlanningResult
+  deepSourceReview?: FactoryHermesDeepSourceReview
+  providerSourceInspection?: FactoryHermesProviderSourceInspection
   policy?: Partial<FactoryHermesModelProviderPolicyPlanningPolicy>
   planningNotes?: string
 }
