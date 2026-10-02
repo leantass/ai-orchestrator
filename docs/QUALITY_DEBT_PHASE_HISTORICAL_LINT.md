@@ -147,3 +147,13 @@ La reconciliación exacta contra el commit `574c457b10ac833133177c8d5057dca39cf8
 El smoke integral oficial queda clasificado como `BLOCKED_EXTERNAL_FIXTURE`: requiere checkout/resultado externo gitignored pinneado a `75b300f13af40878ad6482b2ecb39c55c86679fe`. No se descargó ni generó ese artefacto; no participa de la semántica modificada. El test hermético BEFORE/AFTER cubre el contrato afectado.
 
 No existe Batch 1 seguro bajo los criterios autorizados. No se modificó `src/factory/*`; no se ejecutaron correcciones, refactors, deploy, red, commit ni push. `quality:ci` queda pendiente y previsiblemente bloqueado por la deuda medida.
+
+## Batch 5 — hermes-toolset-disable-verification-approval
+
+Estado: `QUALITY_BATCH_5=PASS`. Baseline canónico: `b8a97ea4cd0770cf0251d4595bc3cb33e95f10f5`.
+
+El lote quedó limitado a la familia cohesionada `hermes-toolset-disable-verification-approval`: 13 incidencias `no-explicit-any` en `types.ts` y `evaluate.ts`. Es un gate declarativo; no ejecuta Hermes, no accede a red/credenciales y no cambia autoridad. Se reemplazaron fronteras `any` por records desconocidos, un contrato explícito para source-safety assessment y guards estructurales, preservando decisiones, estados, flags, blockers, warnings y serialización.
+
+Reconciliación machine-readable: `BEFORE=219`, `BEFORE_ONLY=13`, `AFTER_ONLY=0`, `COMMON=206`, `AFTER=206`. Factory `214→201`; externos `5→5`. Reglas Factory: `no-explicit-any 212→199`, `no-empty-object-type 2→2`; `ban-ts-comment 1` permanece externo. La caída 219→206 coincide exactamente con los 13 hallazgos de la familia seleccionada.
+
+Validación: typecheck PASS; caracterización hermética del gate PASS; build PASS; 13B PASS; 13C PASS 4/4; `git diff --check` PASS. El smoke oficial quedó `BLOCKED_EXTERNAL_FIXTURE` antes de evaluar por ausencia del resultado externo de planificación Hermes; no se generó ni descargó. Evidencia completa: `C:\Users\PC\Desktop\JEFE-QUALITY-DEBT\batch-5\`.

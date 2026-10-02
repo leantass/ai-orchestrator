@@ -1,27 +1,29 @@
 import { DEFAULT_FACTORY_HERMES_TOOLSET_DISABLE_VERIFICATION_APPROVAL_POLICY, FACTORY_HERMES_TOOLSET_DISABLE_VERIFICATION_APPROVAL_KIND, FACTORY_HERMES_TOOLSET_DISABLE_VERIFICATION_APPROVAL_VERSION, TOOLSET_DISABLE_VERIFICATION_APPROVAL_NEXT_STEP_BLOCKED, TOOLSET_DISABLE_VERIFICATION_APPROVAL_NEXT_STEP_GRANTED, TOOLSET_DISABLE_VERIFICATION_APPROVAL_NOT_AUTHORIZED_ACTIONS } from './hermes-toolset-disable-verification-approval.defaults.ts'
-import type { FactoryHermesControlledToolsetProbeEnvelope, FactoryHermesToolsetDisableVerificationApprovalInput, FactoryHermesToolsetDisableVerificationApprovalResult } from './hermes-toolset-disable-verification-approval.types.ts'
+import type { FactoryHermesControlledToolsetProbeEnvelope, FactoryHermesToolsetDisableVerificationApprovalInput, FactoryHermesToolsetDisableVerificationApprovalResult, FactoryHermesToolsetDisableVerificationApprovalSourceSafetyAssessment, FactoryHermesToolsetDisableVerificationApprovalUnknownRecord } from './hermes-toolset-disable-verification-approval.types.ts'
 
 const INSTALL_ROOT = '.codex-temp/external-tools/hermes-agent/install/75b300f'
 
-function validPlanning(r: any): boolean {
-  const proofLevel = r?.toolsetDisableEvidence?.proofLevel || r?.proofLevel
-  const noToolModeProven = r?.toolsetDisableEvidence?.noToolModeProven ?? r?.noToolModeProven
-  return r?.status === 'toolset_disable_verification_plan_created'
-    && r?.canProceedToToolsetDisableVerificationApproval === true
-    && r?.canProceedToResearchRuntimeAdapterApprovalRetry === false
-    && r?.canProceedToResearchRuntimeAdapter === false
+function readRecord(value: unknown): FactoryHermesToolsetDisableVerificationApprovalUnknownRecord { return value && typeof value === 'object' ? value as FactoryHermesToolsetDisableVerificationApprovalUnknownRecord : {} }
+function validPlanning(r: FactoryHermesToolsetDisableVerificationApprovalUnknownRecord = {}): boolean {
+  const evidence = readRecord(r.toolsetDisableEvidence)
+  const proofLevel = evidence.proofLevel || r.proofLevel
+  const noToolModeProven = evidence.noToolModeProven ?? r.noToolModeProven
+  return r.status === 'toolset_disable_verification_plan_created'
+    && r.canProceedToToolsetDisableVerificationApproval === true
+    && r.canProceedToResearchRuntimeAdapterApprovalRetry === false
+    && r.canProceedToResearchRuntimeAdapter === false
     && noToolModeProven === false
     && ['not_supported', 'inconclusive'].includes(proofLevel)
 }
 
-function validAdapterApproval(r: any): boolean {
-  return r?.status === 'research_runtime_adapter_approval_blocked'
-    && r?.decision === 'hermes_research_runtime_adapter_approval_blocked_toolset_mode_unverified'
-    && r?.runtimeAdapterApprovalStatus === 'blocked'
-    && r?.canProceedToResearchRuntimeAdapter === false
+function validAdapterApproval(r: FactoryHermesToolsetDisableVerificationApprovalUnknownRecord = {}): boolean {
+  return r.status === 'research_runtime_adapter_approval_blocked'
+    && r.decision === 'hermes_research_runtime_adapter_approval_blocked_toolset_mode_unverified'
+    && r.runtimeAdapterApprovalStatus === 'blocked'
+    && r.canProceedToResearchRuntimeAdapter === false
 }
 
-function makeBlockedSourceAssessment(inputAssessment: any = {}) {
+function makeBlockedSourceAssessment(inputAssessment: FactoryHermesToolsetDisableVerificationApprovalUnknownRecord = {}): FactoryHermesToolsetDisableVerificationApprovalSourceSafetyAssessment {
   return {
     sourceFilesInspected: inputAssessment.sourceFilesInspected || ['hermes_cli/main.py', 'hermes_cli/oneshot.py', 'hermes_cli/tools_config.py', 'hermes_cli/config.py', 'README.md'],
     hasToolsetsArgument: inputAssessment.hasToolsetsArgument === true,
@@ -41,7 +43,7 @@ function makeBlockedSourceAssessment(inputAssessment: any = {}) {
   }
 }
 
-function canApproveProbe(sourceSafetyAssessment: any, policy: any): boolean {
+function canApproveProbe(sourceSafetyAssessment: FactoryHermesToolsetDisableVerificationApprovalSourceSafetyAssessment, policy: typeof DEFAULT_FACTORY_HERMES_TOOLSET_DISABLE_VERIFICATION_APPROVAL_POLICY): boolean {
   return (!policy.requireSafeProbeShapeProven || sourceSafetyAssessment.safeProbeShapeProven === true)
     && (!policy.requireProbeWithoutPrompt || sourceSafetyAssessment.probeDoesNotRequirePrompt === true)
     && (!policy.requireProbeCannotReachProviderModelNetwork || sourceSafetyAssessment.probeCannotReachProviderModelNetwork === true)
@@ -50,7 +52,7 @@ function canApproveProbe(sourceSafetyAssessment: any, policy: any): boolean {
     && sourceSafetyAssessment.exactCommandCandidateProven === true
 }
 
-function makeEnvelope(id: string, sourceSafetyAssessment: any): FactoryHermesControlledToolsetProbeEnvelope {
+function makeEnvelope(id: string, sourceSafetyAssessment: FactoryHermesToolsetDisableVerificationApprovalSourceSafetyAssessment): FactoryHermesControlledToolsetProbeEnvelope {
   return {
     envelopeId: `${id}:controlled-probe-envelope`,
     probeType: 'toolset_disable_cli_validation_probe',
@@ -70,7 +72,7 @@ function makeEnvelope(id: string, sourceSafetyAssessment: any): FactoryHermesCon
     autoRetryAllowed: false,
     outputUseAsFindings: false,
     expectedClassification: ['controlled_probe_success', 'controlled_probe_failure', 'toolset_mode_not_supported'],
-    exactCommandCandidate: sourceSafetyAssessment.exactCommandCandidate,
+    exactCommandCandidate: sourceSafetyAssessment.exactCommandCandidate || [],
     safetyEvidenceRefs: sourceSafetyAssessment.evidenceRefs,
     nextGate: 'Factory Hermes Toolset Disable Verification Runtime Adapter v1',
   }

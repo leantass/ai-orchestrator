@@ -3,16 +3,17 @@ export type FactoryHermesToolsetDisableVerificationApprovalKind = 'factory-herme
 export type FactoryHermesToolsetDisableVerificationApprovalStatus = 'toolset_disable_verification_approval_granted' | 'toolset_disable_verification_approval_blocked' | 'blocked'
 export type FactoryHermesToolsetDisableVerificationApprovalDecision = 'hermes_toolset_disable_verification_approved_for_controlled_probe_runtime_candidate' | 'hermes_toolset_disable_verification_approval_blocked_no_safe_probe_shape' | 'blocked_invalid_toolset_disable_verification_planning' | 'blocked_invalid_research_runtime_adapter_approval'
 export type FactoryHermesToolsetDisableVerificationApprovalStatusValue = 'approved_for_controlled_probe_runtime_candidate' | 'blocked'
+export type FactoryHermesToolsetDisableVerificationApprovalUnknownRecord = Record<string, unknown>
 
 export interface FactoryHermesToolsetDisableVerificationApprovalInput {
   evaluatedAt: string
   evaluatedBy: string
-  toolsetDisableVerificationPlanningResult?: any
-  researchRuntimeAdapterApprovalResult?: any
-  finalExecutionApprovalResult?: any
-  runtimeSelectionDecisionResult?: any
-  toolsetsPolicyPlanningResult?: any
-  sourceSafetyAssessment?: any
+  toolsetDisableVerificationPlanningResult?: FactoryHermesToolsetDisableVerificationApprovalUnknownRecord
+  researchRuntimeAdapterApprovalResult?: FactoryHermesToolsetDisableVerificationApprovalUnknownRecord
+  finalExecutionApprovalResult?: FactoryHermesToolsetDisableVerificationApprovalUnknownRecord
+  runtimeSelectionDecisionResult?: FactoryHermesToolsetDisableVerificationApprovalUnknownRecord
+  toolsetsPolicyPlanningResult?: FactoryHermesToolsetDisableVerificationApprovalUnknownRecord
+  sourceSafetyAssessment?: FactoryHermesToolsetDisableVerificationApprovalUnknownRecord
   policy?: Partial<FactoryHermesToolsetDisableVerificationApprovalPolicy>
   approvalNotes?: string
 }
@@ -54,7 +55,7 @@ export interface FactoryHermesToolsetDisableVerificationApprovalResult {
   toolId: 'hermes_agent'
   planningDecisionRef?: string
   adapterApprovalDecisionRef?: string
-  sourceSafetyAssessment: any
+  sourceSafetyAssessment: FactoryHermesToolsetDisableVerificationApprovalSourceSafetyAssessment
   controlledToolsetProbeEnvelope?: FactoryHermesControlledToolsetProbeEnvelope
   toolsetDisableVerificationApprovalDecision: FactoryHermesToolsetDisableVerificationApprovalDecisionRecord
   toolsetDisableVerificationApprovalReceipt: FactoryHermesToolsetDisableVerificationApprovalReceipt
@@ -80,6 +81,25 @@ export interface FactoryHermesToolsetDisableVerificationApprovalResult {
   canMutateFilesystemNow: false
   canUseFindings: false
   recommendedNextStep: string
+}
+
+export interface FactoryHermesToolsetDisableVerificationApprovalSourceSafetyAssessment {
+  sourceFilesInspected: string[]
+  hasToolsetsArgument: boolean
+  validatesKnownToolsetNames: boolean
+  rejectsAllInvalidToolsets: boolean
+  omittingToolsetsMayUseDefaults: boolean
+  noMcpDisablesAllTools: boolean
+  noToolsetsTextOnlyIsHermesSyntax: boolean
+  toolsetValidationBeforeAIAgent: boolean
+  safeProbeShapeProven: boolean
+  probeDoesNotRequirePrompt: boolean
+  probeCannotReachProviderModelNetwork: boolean
+  probeCannotReadCredentials: boolean
+  exactCommandCandidateProven: boolean
+  riskSummary: string[]
+  evidenceRefs: string[]
+  exactCommandCandidate?: string[]
 }
 
 export interface FactoryHermesToolsetDisableVerificationApprovalValidationResult { ok: boolean; errors: string[]; warnings: string[] }
