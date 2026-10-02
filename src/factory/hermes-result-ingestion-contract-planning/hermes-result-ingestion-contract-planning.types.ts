@@ -9,15 +9,37 @@ export type FactoryHermesResultIngestionContractPlanningDecision =
   | 'blocked_network_policy_not_ready_for_result_ingestion_contract'
   | 'blocked_credentials_policy_not_ready_for_result_ingestion_contract'
 
+export type FactoryHermesResultIngestionContractPlanningJsonObject = Record<string, unknown> & {
+  status?: string
+  canEnableToolsetsNow?: boolean
+  canUseNetworkNow?: boolean
+  canUseCredentialsNow?: boolean
+  canReadEnvSecretsNow?: boolean
+  outputAllowedNow?: boolean
+  findingsAllowedNow?: boolean
+  rawOutputPromotableNow?: boolean
+  stdoutPolicy?: Record<string, unknown>
+  usageFilePolicy?: Record<string, unknown>
+  resultPromotionPolicy?: Record<string, unknown>
+  hermesOutputContractPolicyPlanCandidate?: {
+    outputAllowedNow?: boolean
+    findingsAllowedNow?: boolean
+    rawOutputPromotableNow?: boolean
+    stdoutPolicy?: { usableAsFindingsBeforeIngestion?: boolean }
+    usageFilePolicy?: { metadataOnly?: boolean }
+    resultPromotionPolicy?: { requiresResultIngestion?: boolean; requiresJefeReview?: boolean }
+  }
+}
+
 export interface FactoryHermesResultIngestionContractPlanningInput {
   plannedAt: string
   plannedBy: string
   humanApprovalRef?: string
-  outputContractPolicyPlanningResult?: any
-  toolsetsPolicyPlanningResult?: any
-  networkPolicyPlanningResult?: any
-  credentialsPolicyPlanningResult?: any
-  deepSourceReview?: any
+  outputContractPolicyPlanningResult?: FactoryHermesResultIngestionContractPlanningJsonObject
+  toolsetsPolicyPlanningResult?: FactoryHermesResultIngestionContractPlanningJsonObject
+  networkPolicyPlanningResult?: FactoryHermesResultIngestionContractPlanningJsonObject
+  credentialsPolicyPlanningResult?: FactoryHermesResultIngestionContractPlanningJsonObject
+  deepSourceReview?: FactoryHermesResultIngestionContractPlanningJsonObject
   policy?: Partial<FactoryHermesResultIngestionContractPlanningPolicy>
   planningNotes?: string
 }

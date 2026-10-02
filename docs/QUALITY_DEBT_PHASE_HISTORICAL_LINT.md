@@ -205,3 +205,17 @@ Reconciliación: `BEFORE=130`, `BEFORE_ONLY=22`, `AFTER_ONLY=0`, `COMMON=108`, `
 Los tres smokes oficiales quedan `BLOCKED_EXTERNAL_FIXTURE`: 9A por `C:\Users\PC\ai-orchestrator\.codex-temp\external-tools\hermes-agent\install\75b300f\research-runtime-adapter-retry-result.json`; 9B por `research-result-ingestion-v2-result.json`; 9C por `runtime-selection-decision-result.json` y sus resultados upstream requeridos. No se descargaron, generaron ni fabricaron artefactos externos; la equivalencia hermética cubre las fronteras tipadas localmente.
 
 Validación: lint focal PASS; lint global `108` hallazgos (`103` Factory, `5` externos); lint JSON preservado; typecheck PASS; build PASS; 13B PASS; 13C PASS `4/4`; `git diff --check` PASS. Familias diferidas por riesgo: runtime-selection planning/decision, wrapper, adapters y gates con autoridad ambigua; separados: `2` `no-empty-object-type` y `5` externos `OperationalView`. Evidencia: `C:\Users\PC\Desktop\JEFE-QUALITY-DEBT\batch-9\`.
+## Batch 10 — result-ingestion-contract-planning safe shape
+
+Estado: `QUALITY_BATCH_10=PASS`. Baseline reproducible: `059c34c6f995d7d043e6cad0bf408494c8d9724d`; lint global `108`, Factory `103`, externos `5`.
+
+El lote SAFE ejecutado fue `hermes-result-ingestion-contract-planning`, con `5` incidencias `@typescript-eslint/no-explicit-any` en fronteras de input. Se agregaron aliases/records abiertos con los campos discriminantes y de policy observados por sus consumers, sin cambiar decisiones, defaults, blockers, warnings, serialización ni autoridad.
+
+Equivalencia hermética BEFORE/AFTER: `PASS` con `8` fixtures: válido, cada upstream bloqueante, opcional/null, input inválido y JSON anidado; incluyó evaluator, validator, parser/serializer y summary. No hubo diferencias.
+
+Los markers `FactoryHermesFilesystemWritePathRule` y `FactoryHermesFilesystemReadPathRule` no se cambiaron. La auditoría confirmó consumers en `readPathRules`/`writePathRules`, `readRules()`/`writeRules()` y el evaluator, pero el módulo también contiene `3` incidencias adicionales; un alias aislado no sería una corrección autocontenida. No se encontró module augmentation/declaration merging. `SAFE_MARKER_ALIAS_FIX=NOT_APPLIED`; reducción markers `0`.
+
+Reconciliación: `BEFORE=108`, `BEFORE_ONLY=5`, `AFTER_ONLY=0`, `COMMON=103`, `AFTER=103`; Factory `103→98`; externos `5→5`. Reglas: `no-explicit-any 105→100`; permanecen `2` `no-empty-object-type`, `1` `ban-ts-comment` externo y las familias SAFE/HIGH_RISK no seleccionadas.
+
+El smoke oficial de la familia quedó `BLOCKED_EXTERNAL_FIXTURE` por ausencia de `output-contract-policy-planning-result.json` en `.codex-temp/external-tools/hermes-agent/install/75b300f/`. No se descargó, generó ni fabricó. La equivalencia hermética cubre la frontera tipada localmente.
+HIGH_RISK restante: `hermes-runtime-selection-planning`, `hermes-runtime-selection-decision`, `hermes-wrapper-no-tool-mode-implementation`, adapters y evaluators/gates con autoridad o posible deuda funcional. También quedan SAFE no seleccionadas para lotes posteriores. Validación: lint focal PASS; lint global `103` hallazgos (`98` Factory, `5` externos); lint JSON preservado; typecheck PASS; build PASS; 13B PASS; 13C PASS `4/4`; `git diff --check` PASS. Evidencia: `C:\Users\PC\Desktop\JEFE-QUALITY-DEBT\batch-10\`.
