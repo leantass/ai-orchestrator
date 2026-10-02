@@ -192,3 +192,16 @@ La equivalencia hermética BEFORE/AFTER pasó para ambas familias con los mismos
 Los smokes oficiales no se declaran exitosos: `OFFICIAL_SMOKE_A=BLOCKED_EXTERNAL_FIXTURE` por ausencia de `.codex-temp/external-tools/hermes-agent/install/75b300f/entrypoint-materialization-runtime-retry-result.json`; `OFFICIAL_SMOKE_B=BLOCKED_EXTERNAL_FIXTURE` por ausencia del fixture `toolsets-policy-planning-result.json` en el conjunto externo de planificación. Esos artefactos no forman parte de la semántica tipada de los contratos; la cobertura hermética los sustituye mediante fixtures mínimos tipados que ejercitan las ramas de entrada, gates, estados, validadores, serialización y summaries sin ejecutar Hermes ni depender del runtime externo. No se generaron ni descargaron.
 
 Validación final: lint focal PASS; lint global `130` hallazgos históricos; lint JSON preservado; typecheck PASS; build PASS; 13B PASS; 13C PASS `4/4`; `git diff --check` PASS. Evidencia: `C:\Users\PC\Desktop\JEFE-QUALITY-DEBT\batch-8\`.
+## Batch 9 — research-result-ingestion-v2 + research-jefe-review-v2 + research-execution-approval-retry
+
+Estado: `QUALITY_BATCH_9=PASS`. Baseline reproducible: `dc4e3bc65b5d2319d21d966269a4fa77d4b340d5`; lint global `130`, Factory `125`, externos `5`.
+
+Se eliminaron `22` incidencias `@typescript-eslint/no-explicit-any` en tres sublotes independientes: 9A `hermes-research-result-ingestion-v2` (`8`), 9B `hermes-research-jefe-review-v2` (`7`) y 9C `hermes-research-execution-approval-retry` (`7`). Se usaron records abiertos genuinos, shapes locales y tipos discriminados; no se cambiaron decisiones, defaults, blockers, warnings, serialización ni capacidades externas.
+
+Equivalencia hermética BEFORE/AFTER: 9A `PASS` con `10` fixtures; 9B `PASS` con `10`; 9C `PASS` con `7`. La cobertura incluyó estados válidos y bloqueados, inputs inválidos, opcionales/null, JSON anidado, boundaries, validadores, parse/serialize, summaries, receipts y estados derivados. Se detectó y corrigió durante 9A una divergencia de acceso a previews raíz; la comparación final quedó exacta.
+
+Reconciliación: `BEFORE=130`, `BEFORE_ONLY=22`, `AFTER_ONLY=0`, `COMMON=108`, `AFTER=108`; Factory `125→103`; externos `5→5`. Por sublote: 9A `8`, 9B `7`, 9C `7`. `.codex-temp` dentro del lint: `0` archivos.
+
+Los tres smokes oficiales quedan `BLOCKED_EXTERNAL_FIXTURE`: 9A por `C:\Users\PC\ai-orchestrator\.codex-temp\external-tools\hermes-agent\install\75b300f\research-runtime-adapter-retry-result.json`; 9B por `research-result-ingestion-v2-result.json`; 9C por `runtime-selection-decision-result.json` y sus resultados upstream requeridos. No se descargaron, generaron ni fabricaron artefactos externos; la equivalencia hermética cubre las fronteras tipadas localmente.
+
+Validación: lint focal PASS; lint global `108` hallazgos (`103` Factory, `5` externos); lint JSON preservado; typecheck PASS; build PASS; 13B PASS; 13C PASS `4/4`; `git diff --check` PASS. Familias diferidas por riesgo: runtime-selection planning/decision, wrapper, adapters y gates con autoridad ambigua; separados: `2` `no-empty-object-type` y `5` externos `OperationalView`. Evidencia: `C:\Users\PC\Desktop\JEFE-QUALITY-DEBT\batch-9\`.

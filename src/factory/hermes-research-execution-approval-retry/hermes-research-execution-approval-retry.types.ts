@@ -6,13 +6,33 @@ export type FactoryHermesResearchExecutionApprovalRetryDecision = 'hermes_resear
 export interface FactoryHermesResearchExecutionApprovalRetryInput {
   evaluatedAt: string
   evaluatedBy: string
-  runtimeSelectionDecisionResult?: any
-  runtimeSelectionPlanningResult?: any
-  researchExecutionApprovalResult?: any
-  researchExecutionBoundaryPlanningResult?: any
-  policyPlanningResults?: Record<string, any>
+  runtimeSelectionDecisionResult?: FactoryHermesRuntimeSelectionDecisionResult
+  runtimeSelectionPlanningResult?: FactoryHermesApprovalRetryJsonObject
+  researchExecutionApprovalResult?: FactoryHermesApprovalRetryJsonObject & { approvalId?: string }
+  researchExecutionBoundaryPlanningResult?: FactoryHermesApprovalRetryJsonObject & { planningId?: string }
+  policyPlanningResults?: Record<string, FactoryHermesApprovalRetryJsonObject>
   policy?: Partial<FactoryHermesResearchExecutionApprovalRetryPolicy>
   evaluationNotes?: string
+}
+
+export type FactoryHermesApprovalRetryJsonObject = Record<string, unknown>
+export type FactoryHermesRuntimeSelectionDecisionResult = FactoryHermesApprovalRetryJsonObject & {
+  decisionId?: string
+  status?: string
+  decision?: string
+  selectionStatus?: string
+  selectedPrompt?: { promptHash?: string }
+  selectedProvider?: { providerId?: string }
+  selectedModel?: { modelId?: string }
+  selectedCredentialRef?: { credentialRefName?: string; valueRead?: boolean }
+  selectedNetworkHosts?: { selectedHosts?: string[]; dnsResolvedNow?: boolean; endpointsTestedNow?: boolean }
+  selectedToolsetMode?: { selectedToolsetMode?: string }
+  selectedRunRoot?: { selectedRunRoot?: string; runRootCreatedNow?: boolean }
+  selectedFinalApproval?: { approvedNow?: boolean }
+  allSelectionsResolvedForApprovalRetry?: boolean
+  canProceedToResearchExecutionApprovalRetry?: boolean
+  canProceedToResearchRuntimeAdapter?: boolean
+  canRunResearchNow?: boolean
 }
 
 export interface FactoryHermesResearchExecutionApprovalRetryPolicy {
