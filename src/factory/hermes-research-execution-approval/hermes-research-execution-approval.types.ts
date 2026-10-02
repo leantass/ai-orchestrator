@@ -4,12 +4,47 @@ export type FactoryHermesResearchExecutionApprovalStatus = 'research_execution_a
 export type FactoryHermesResearchExecutionApprovalDecision = 'hermes_research_execution_approval_blocked_missing_runtime_selections' | 'hermes_research_execution_approval_blocked_invalid_boundary'
 export type FactoryHermesResearchExecutionApprovalStatusValue = 'not_approved'
 
+export interface FactoryHermesMissingRuntimeSelection {
+  selectionId: string
+  requiredByGate?: string
+  status: string
+  blocksExecutionNow: boolean
+  reason?: string
+}
+
+export interface FactoryHermesResearchExecutionBoundaryPlan {
+  allPoliciesConsolidated?: boolean
+  approvalGateCanEvaluate?: boolean
+  finalApprovalRequired?: boolean
+  executionAllowedNow?: boolean
+  researchExecutionAllowedNow?: boolean
+}
+
+export interface FactoryHermesResearchExecutionBoundaryPlanningResult {
+  planningId?: string
+  status?: string
+  decision?: string
+  hermesResearchExecutionBoundaryPlanCandidate?: FactoryHermesResearchExecutionBoundaryPlan
+  missingRuntimeSelections?: FactoryHermesMissingRuntimeSelection[]
+  canProceedToResearchExecutionApproval?: boolean
+  canRunResearchNow?: boolean
+  canExecuteHermesNow?: boolean
+  canPassPromptNow?: boolean
+  canUseNetworkNow?: boolean
+  canUseCredentialsNow?: boolean
+  canReadEnvSecretsNow?: boolean
+  canCallModelsNow?: boolean
+  canEnableToolsetsNow?: boolean
+  canMutateFilesystemNow?: boolean
+  canUseFindings?: boolean
+}
+
 export interface FactoryHermesResearchExecutionApprovalInput {
   approvedAt: string
   approvedBy: string
   humanApprovalRef?: string
-  researchExecutionBoundaryPlanningResult?: any
-  policyPlanningResults?: Record<string, any>
+  researchExecutionBoundaryPlanningResult?: FactoryHermesResearchExecutionBoundaryPlanningResult
+  policyPlanningResults?: Record<string, unknown>
   approvalPolicy?: Partial<FactoryHermesResearchExecutionApprovalPolicy>
   approvalNotes?: string
 }

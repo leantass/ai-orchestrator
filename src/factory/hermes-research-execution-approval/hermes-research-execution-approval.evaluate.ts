@@ -1,5 +1,5 @@
 import { DEFAULT_FACTORY_HERMES_RESEARCH_EXECUTION_APPROVAL_POLICY, FACTORY_HERMES_RESEARCH_EXECUTION_APPROVAL_KIND, FACTORY_HERMES_RESEARCH_EXECUTION_APPROVAL_NEXT_STEP, FACTORY_HERMES_RESEARCH_EXECUTION_APPROVAL_VERSION, NO_EXECUTION_AUTHORIZED_ACTIONS, RESEARCH_EXECUTION_APPROVAL_NOT_AUTHORIZED_ACTIONS } from './hermes-research-execution-approval.defaults.ts'
-import type { FactoryHermesResearchExecutionApprovalBlocker, FactoryHermesResearchExecutionApprovalDecision, FactoryHermesResearchExecutionApprovalInput, FactoryHermesResearchExecutionApprovalResult, FactoryHermesRuntimeSelectionRequirement } from './hermes-research-execution-approval.types.ts'
+import type { FactoryHermesMissingRuntimeSelection, FactoryHermesResearchExecutionApprovalBlocker, FactoryHermesResearchExecutionApprovalDecision, FactoryHermesResearchExecutionApprovalInput, FactoryHermesResearchExecutionApprovalResult, FactoryHermesRuntimeSelectionRequirement } from './hermes-research-execution-approval.types.ts'
 
 const EXPECTED_MISSING = ['promptApprovalMissing', 'providerSelectionMissing', 'modelSelectionMissing', 'credentialSelectionMissing', 'networkHostApprovalMissing', 'toolsetSelectionApprovalMissing', 'runtimeRunRootApprovalMissing', 'finalExecutionApprovalMissing']
 
@@ -14,14 +14,14 @@ const REQUIREMENT_DETAILS: Record<string, { requirementId: string; expectedFutur
   finalExecutionApprovalMissing: { requirementId: 'finalExecutionApproval', expectedFutureEvidence: ['human/gate final approval before runtime adapter'] },
 }
 
-function requirements(missingSelections: any[]): FactoryHermesRuntimeSelectionRequirement[] {
+function requirements(missingSelections: FactoryHermesMissingRuntimeSelection[]): FactoryHermesRuntimeSelectionRequirement[] {
   return missingSelections.map((item) => {
     const details = REQUIREMENT_DETAILS[item.selectionId] || { requirementId: item.selectionId, expectedFutureEvidence: ['future approved evidence required'] }
     return { requirementId: details.requirementId, sourceMissingSelectionId: item.selectionId, requiredBefore: 'research_runtime_adapter', requiredByGate: item.requiredByGate || 'Factory Hermes Runtime Selection Planning Gate v1', status: 'required_not_satisfied', blocksExecutionNow: true, reason: item.reason || 'Runtime selection is required before execution.', expectedFutureEvidence: details.expectedFutureEvidence }
   })
 }
 
-function build(input: FactoryHermesResearchExecutionApprovalInput, decision: FactoryHermesResearchExecutionApprovalDecision, boundaryValid: boolean, missingSelections: any[], blockers: FactoryHermesResearchExecutionApprovalBlocker[]): FactoryHermesResearchExecutionApprovalResult {
+function build(input: FactoryHermesResearchExecutionApprovalInput, decision: FactoryHermesResearchExecutionApprovalDecision, boundaryValid: boolean, missingSelections: FactoryHermesMissingRuntimeSelection[], blockers: FactoryHermesResearchExecutionApprovalBlocker[]): FactoryHermesResearchExecutionApprovalResult {
   const approvalId = `hermes-research-execution-approval:75b300f:${input.approvedAt}`
   const runtimeSelectionRequirements = requirements(missingSelections)
   const canProceed = boundaryValid && runtimeSelectionRequirements.length > 0
@@ -38,9 +38,9 @@ export function evaluateFactoryHermesResearchExecutionApproval(input: FactoryHer
   const missing = boundary?.missingRuntimeSelections || []
   const validBoundary = !!boundary && boundary.status === 'research_execution_boundary_plan_created' && boundary.decision === 'hermes_research_execution_boundary_plan_created' && plan?.allPoliciesConsolidated === true && plan?.approvalGateCanEvaluate === true && plan?.finalApprovalRequired === true && plan?.executionAllowedNow === false && plan?.researchExecutionAllowedNow === false && boundary.canProceedToResearchExecutionApproval === true && boundary.canRunResearchNow === false && boundary.canExecuteHermesNow === false && boundary.canPassPromptNow === false && boundary.canUseNetworkNow === false && boundary.canUseCredentialsNow === false && boundary.canReadEnvSecretsNow === false && boundary.canCallModelsNow === false && boundary.canEnableToolsetsNow === false && boundary.canMutateFilesystemNow === false && boundary.canUseFindings === false
   if (policy.requireBoundaryPlanning && !validBoundary) return build(input, 'hermes_research_execution_approval_blocked_invalid_boundary', false, [], [{ blockerId: 'invalid_boundary', message: 'Research execution boundary planning result is missing or invalid.' }])
-  const missingIds = new Set(missing.map((item: any) => item.selectionId))
+  const missingIds = new Set(missing.map((item) => item.selectionId))
   const missingBlockers = EXPECTED_MISSING.filter((id) => !missingIds.has(id)).map((id) => ({ blockerId: 'missing_expected_runtime_selection', sourceMissingSelectionId: id, message: `${id} is required in boundary missingRuntimeSelections.` }))
-  const invalidState = missing.filter((item: any) => item.status !== 'required_before_runtime' || item.blocksExecutionNow !== true).map((item: any) => ({ blockerId: 'invalid_runtime_selection_state', sourceMissingSelectionId: item.selectionId, message: `${item.selectionId} must be required_before_runtime and block execution now.` }))
-  const blockers = missing.map((item: any) => ({ blockerId: 'runtime_selection_required', sourceMissingSelectionId: item.selectionId, message: item.reason || `${item.selectionId} is required before runtime.` })).concat(missingBlockers, invalidState)
+  const invalidState = missing.filter((item) => item.status !== 'required_before_runtime' || item.blocksExecutionNow !== true).map((item) => ({ blockerId: 'invalid_runtime_selection_state', sourceMissingSelectionId: item.selectionId, message: `${item.selectionId} must be required_before_runtime and block execution now.` }))
+  const blockers = missing.map((item) => ({ blockerId: 'runtime_selection_required', sourceMissingSelectionId: item.selectionId, message: item.reason || `${item.selectionId} is required before runtime.` })).concat(missingBlockers, invalidState)
   return build(input, missingBlockers.length || invalidState.length ? 'hermes_research_execution_approval_blocked_invalid_boundary' : 'hermes_research_execution_approval_blocked_missing_runtime_selections', missingBlockers.length === 0 && invalidState.length === 0, missing, blockers)
 }
