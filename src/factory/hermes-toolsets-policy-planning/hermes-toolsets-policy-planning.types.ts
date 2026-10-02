@@ -9,17 +9,48 @@ export type FactoryHermesToolsetsPolicyPlanningDecision =
   | 'blocked_missing_toolsets_source_inspection'
   | 'blocked_toolsets_or_network_used_during_planning'
 
+export interface FactoryHermesToolsetsNetworkPolicyResult {
+  status?: string
+  decision?: string
+  canProceedToToolsetsPolicyPlanning?: boolean
+  canProceedToResearchExecutionApproval?: boolean
+  canRunResearchNow?: boolean
+  canExecuteHermesNow?: boolean
+  canPassPromptNow?: boolean
+  canUseNetworkNow?: boolean
+  canUseCredentialsNow?: boolean
+  canReadEnvSecretsNow?: boolean
+  canCallModelsNow?: boolean
+  hermesNetworkPolicyPlanCandidate?: { allowedHostsNow?: unknown[]; wildcardHostsAllowed?: boolean; arbitraryInternetAllowed?: boolean; toolsetsDependency?: { toolsetNetworkDisabledUntilToolsetsPolicy?: boolean; webBrowserSearchDisabledUntilToolsetsPolicy?: boolean } }
+}
+
+export interface FactoryHermesToolsetsCredentialsPolicyResult {
+  status?: string
+  canUseCredentialsNow?: boolean
+  hermesCredentialsPolicyPlanCandidate?: { credentialInjectionPlan?: { credentialValuesReadHere?: boolean; credentialValuesDefinedHere?: boolean } }
+}
+
+export interface FactoryHermesToolsetsSourceInspection {
+  toolsetsEnabled?: boolean
+  networkUsed?: boolean
+  dnsResolved?: boolean
+  endpointsTested?: boolean
+  envValuesRead?: boolean
+  dotEnvRead?: boolean
+  noToolsetsTextOnlySupported?: boolean
+}
+
 export interface FactoryHermesToolsetsPolicyPlanningInput {
   plannedAt: string
   plannedBy: string
   humanApprovalRef?: string
-  networkPolicyPlanningResult?: any
-  credentialsPolicyPlanningResult?: any
-  modelProviderPolicyPlanningResult?: any
-  promptPolicyPlanningResult?: any
-  policyChainPlanningResult?: any
-  deepSourceReview?: any
-  toolsetsSourceInspection?: any
+  networkPolicyPlanningResult?: FactoryHermesToolsetsNetworkPolicyResult
+  credentialsPolicyPlanningResult?: FactoryHermesToolsetsCredentialsPolicyResult
+  modelProviderPolicyPlanningResult?: unknown
+  promptPolicyPlanningResult?: unknown
+  policyChainPlanningResult?: unknown
+  deepSourceReview?: unknown
+  toolsetsSourceInspection?: FactoryHermesToolsetsSourceInspection
   policy?: Partial<FactoryHermesToolsetsPolicyPlanningPolicy>
   planningNotes?: string
 }
