@@ -4,16 +4,18 @@ import type { FactoryHermesControlledToolsetProbeEnvelope, FactoryHermesToolsetD
 const INSTALL_ROOT = '.codex-temp/external-tools/hermes-agent/install/75b300f'
 
 function readRecord(value: unknown): FactoryHermesToolsetDisableVerificationApprovalUnknownRecord { return value && typeof value === 'object' ? value as FactoryHermesToolsetDisableVerificationApprovalUnknownRecord : {} }
+function readString(value: unknown): string | undefined { return typeof value === 'string' ? value : undefined }
+function readStringArray(value: unknown, fallback: string[]): string[] { return Array.isArray(value) && value.every((item): item is string => typeof item === 'string') ? value : fallback }
 function validPlanning(r: FactoryHermesToolsetDisableVerificationApprovalUnknownRecord = {}): boolean {
   const evidence = readRecord(r.toolsetDisableEvidence)
-  const proofLevel = evidence.proofLevel || r.proofLevel
+  const proofLevel = readString(evidence.proofLevel || r.proofLevel)
   const noToolModeProven = evidence.noToolModeProven ?? r.noToolModeProven
   return r.status === 'toolset_disable_verification_plan_created'
     && r.canProceedToToolsetDisableVerificationApproval === true
     && r.canProceedToResearchRuntimeAdapterApprovalRetry === false
     && r.canProceedToResearchRuntimeAdapter === false
     && noToolModeProven === false
-    && ['not_supported', 'inconclusive'].includes(proofLevel)
+    && (proofLevel === 'not_supported' || proofLevel === 'inconclusive')
 }
 
 function validAdapterApproval(r: FactoryHermesToolsetDisableVerificationApprovalUnknownRecord = {}): boolean {
@@ -25,7 +27,7 @@ function validAdapterApproval(r: FactoryHermesToolsetDisableVerificationApproval
 
 function makeBlockedSourceAssessment(inputAssessment: FactoryHermesToolsetDisableVerificationApprovalUnknownRecord = {}): FactoryHermesToolsetDisableVerificationApprovalSourceSafetyAssessment {
   return {
-    sourceFilesInspected: inputAssessment.sourceFilesInspected || ['hermes_cli/main.py', 'hermes_cli/oneshot.py', 'hermes_cli/tools_config.py', 'hermes_cli/config.py', 'README.md'],
+    sourceFilesInspected: readStringArray(inputAssessment.sourceFilesInspected, ['hermes_cli/main.py', 'hermes_cli/oneshot.py', 'hermes_cli/tools_config.py', 'hermes_cli/config.py', 'README.md']),
     hasToolsetsArgument: inputAssessment.hasToolsetsArgument === true,
     validatesKnownToolsetNames: inputAssessment.validatesKnownToolsetNames === true,
     rejectsAllInvalidToolsets: inputAssessment.rejectsAllInvalidToolsets === true,
@@ -38,8 +40,8 @@ function makeBlockedSourceAssessment(inputAssessment: FactoryHermesToolsetDisabl
     probeCannotReachProviderModelNetwork: inputAssessment.probeCannotReachProviderModelNetwork === true,
     probeCannotReadCredentials: inputAssessment.probeCannotReadCredentials === true,
     exactCommandCandidateProven: inputAssessment.exactCommandCandidateProven === true,
-    riskSummary: inputAssessment.riskSummary || ['No command path was proven that validates --toolsets without prompt/oneshot risk.', 'Omitting --toolsets can use hidden defaults.', 'no_mcp is not a complete no-tools mode.'],
-    evidenceRefs: inputAssessment.evidenceRefs || ['hermes_cli/oneshot.py:_validate_explicit_toolsets', 'hermes_cli/oneshot.py:run_oneshot', 'hermes_cli/tools_config.py:no_mcp'],
+    riskSummary: readStringArray(inputAssessment.riskSummary, ['No command path was proven that validates --toolsets without prompt/oneshot risk.', 'Omitting --toolsets can use hidden defaults.', 'no_mcp is not a complete no-tools mode.']),
+    evidenceRefs: readStringArray(inputAssessment.evidenceRefs, ['hermes_cli/oneshot.py:_validate_explicit_toolsets', 'hermes_cli/oneshot.py:run_oneshot', 'hermes_cli/tools_config.py:no_mcp']),
   }
 }
 
@@ -96,8 +98,8 @@ export function evaluateFactoryHermesToolsetDisableVerificationApproval(input: F
     evaluatedAt: input.evaluatedAt,
     evaluatedBy: input.evaluatedBy,
     toolId: 'hermes_agent',
-    planningDecisionRef: input.toolsetDisableVerificationPlanningResult?.planningId,
-    adapterApprovalDecisionRef: input.researchRuntimeAdapterApprovalResult?.adapterApprovalId,
+    planningDecisionRef: readString(input.toolsetDisableVerificationPlanningResult?.planningId),
+    adapterApprovalDecisionRef: readString(input.researchRuntimeAdapterApprovalResult?.adapterApprovalId),
     sourceSafetyAssessment,
     checks: [],
     blockers: granted ? [] : [{ blockerId: 'no_safe_probe_shape', message: 'Source does not prove a toolset-disable probe that avoids prompt, provider/model, credentials, and network paths.' }],
