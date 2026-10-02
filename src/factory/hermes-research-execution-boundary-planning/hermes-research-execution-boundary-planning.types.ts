@@ -15,22 +15,24 @@ export type FactoryHermesResearchExecutionBoundaryPlanningDecision =
   | 'blocked_timeout_policy_not_ready_for_boundary_planning'
   | 'blocked_filesystem_policy_not_ready_for_boundary_planning'
 
+export type FactoryHermesResearchExecutionBoundaryPlanningOpenResult = Record<string, unknown>
+
 export interface FactoryHermesResearchExecutionBoundaryPlanningInput {
   plannedAt: string
   plannedBy: string
   humanApprovalRef?: string
-  filesystemMutationPolicyPlanningResult?: any
-  timeoutKillSwitchPolicyPlanningResult?: any
-  resultIngestionContractPlanningResult?: any
-  outputContractPolicyPlanningResult?: any
-  toolsetsPolicyPlanningResult?: any
-  networkPolicyPlanningResult?: any
-  credentialsPolicyPlanningResult?: any
-  modelProviderPolicyPlanningResult?: any
-  promptPolicyPlanningResult?: any
-  policyChainPlanningResult?: any
-  deepSourceReview?: any
-  commandShapeReview?: any
+  filesystemMutationPolicyPlanningResult?: FactoryHermesResearchExecutionBoundaryPlanningOpenResult
+  timeoutKillSwitchPolicyPlanningResult?: FactoryHermesResearchExecutionBoundaryPlanningOpenResult
+  resultIngestionContractPlanningResult?: FactoryHermesResearchExecutionBoundaryPlanningOpenResult
+  outputContractPolicyPlanningResult?: FactoryHermesResearchExecutionBoundaryPlanningOpenResult
+  toolsetsPolicyPlanningResult?: FactoryHermesResearchExecutionBoundaryPlanningOpenResult
+  networkPolicyPlanningResult?: FactoryHermesResearchExecutionBoundaryPlanningOpenResult
+  credentialsPolicyPlanningResult?: FactoryHermesResearchExecutionBoundaryPlanningOpenResult
+  modelProviderPolicyPlanningResult?: FactoryHermesResearchExecutionBoundaryPlanningOpenResult
+  promptPolicyPlanningResult?: FactoryHermesResearchExecutionBoundaryPlanningOpenResult
+  policyChainPlanningResult?: FactoryHermesResearchExecutionBoundaryPlanningOpenResult
+  deepSourceReview?: FactoryHermesResearchExecutionBoundaryPlanningOpenResult
+  commandShapeReview?: FactoryHermesResearchExecutionBoundaryPlanningOpenResult
   policy?: Partial<FactoryHermesResearchExecutionBoundaryPlanningPolicy>
   planningNotes?: string
 }

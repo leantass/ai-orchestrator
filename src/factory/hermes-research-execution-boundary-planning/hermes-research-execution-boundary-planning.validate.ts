@@ -26,7 +26,8 @@ export function validateFactoryHermesResearchExecutionBoundaryPlanningResult(res
   if (!receipt) errors.push('researchExecutionBoundaryPlanningReceipt is required.')
   if (!plan) errors.push('hermesResearchExecutionBoundaryPlanCandidate is required.')
   if (plan) {
-    for (const [key, expected] of Object.entries({ allPoliciesConsolidated: true, approvalGateCanEvaluate: true, finalApprovalRequired: true, executionAllowedNow: false, researchExecutionAllowedNow: false })) if ((plan as any)[key] !== expected) errors.push(`${key} must be ${expected}.`)
+    const expectedFlags = { allPoliciesConsolidated: true, approvalGateCanEvaluate: true, finalApprovalRequired: true, executionAllowedNow: false, researchExecutionAllowedNow: false } as const
+    for (const key of Object.keys(expectedFlags) as (keyof typeof expectedFlags)[]) if (plan[key] !== expectedFlags[key]) errors.push(`${key} must be ${expectedFlags[key]}.`)
   }
   if (result.boundaryCommandShape.shell !== false) errors.push('boundaryCommandShape.shell must be false.')
   if (result.boundaryCommandShape.oneShotOnly !== true) errors.push('boundaryCommandShape.oneShotOnly must be true.')

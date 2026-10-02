@@ -148,6 +148,18 @@ El smoke integral oficial queda clasificado como `BLOCKED_EXTERNAL_FIXTURE`: req
 
 No existe Batch 1 seguro bajo los criterios autorizados. No se modificó `src/factory/*`; no se ejecutaron correcciones, refactors, deploy, red, commit ni push. `quality:ci` queda pendiente y previsiblemente bloqueado por la deuda medida.
 
+## Batch 6A — hermes-research-execution-boundary-planning
+
+Estado: `QUALITY_BATCH_6A=PASS`. Baseline canónico: `0396062ad7fb6af16c7f6fd83596057f6648aecc`.
+
+El contrato BEFORE fue reconstruido para el gate de consolidación de boundary: requiere las diez planificaciones de política, produce shapes de comando, entorno, filesystem, network, credentials, toolsets, output, timeout e ingestion, y ocho selecciones runtime faltantes. Puede permitir únicamente la evaluación del siguiente gate; nunca ejecuta Hermes, pasa prompts, habilita toolsets, usa red/credenciales/modelos, ingiere output ni muta filesystem. La caracterización hermética cubrió 14 fixtures: válido, cada rama de política bloqueante, input vacío/inválido, opcionales/null, guards de seguridad, validación, decisions, blockers, summaries y serialización.
+
+Las 13 incidencias fueron clasificadas como `SAFE_EXPLICIT_SHAPE`, `SAFE_UNKNOWN_WITH_GUARD` o `SAFE_EXISTING_TYPE`. No hubo `AMBIGUOUS_CONTRACT` ni `POSSIBLE_FUNCTIONAL_DEBT`. Se reemplazaron `any` por records abiertos en fronteras de entrada, guards `unknown` para lecturas anidadas y un conjunto cerrado de flags; no cambiaron políticas, defaults, decisiones, blockers, warnings ni consumers.
+
+Reconciliación machine-readable: `BEFORE=206`, `BEFORE_ONLY=13`, `AFTER_ONLY=0`, `COMMON=193`, `AFTER=193`. Factory `201→188`; externos `5→5`. Reglas Factory: `no-explicit-any 199→186`; `no-empty-object-type 2→2`.
+
+Validación: caracterización y equivalencia hermética BEFORE/AFTER PASS con 14 fixtures; lint focal/global PASS; typecheck PASS; `git diff --check` PASS. El smoke oficial queda `BLOCKED_EXTERNAL_FIXTURE` por ausencia de artifacts externos pinneados; no se ejecutó Hermes. Evidencia: `C:\Users\PC\Desktop\JEFE-QUALITY-DEBT\batch-6\6A\`.
+
 ## Batch 5 — hermes-toolset-disable-verification-approval
 
 Estado: `QUALITY_BATCH_5=PASS`. Baseline canónico: `b8a97ea4cd0770cf0251d4595bc3cb33e95f10f5`.
