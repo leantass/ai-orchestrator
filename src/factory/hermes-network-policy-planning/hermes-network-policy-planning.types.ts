@@ -10,16 +10,49 @@ export type FactoryHermesNetworkPolicyPlanningDecision =
   | 'blocked_missing_network_source_inspection'
   | 'blocked_network_was_used_during_planning'
 
+export interface FactoryHermesCredentialsPolicyPlanningResult {
+  status?: string
+  decision?: string
+  canProceedToNetworkPolicyPlanning?: boolean
+  canProceedToResearchExecutionApproval?: boolean
+  canRunResearchNow?: boolean
+  canExecuteHermesNow?: boolean
+  canPassPromptNow?: boolean
+  canUseNetworkNow?: boolean
+  canUseCredentialsNow?: boolean
+  canReadEnvSecretsNow?: boolean
+  canCallModelsNow?: boolean
+  hermesCredentialsPolicyPlanCandidate?: { credentialInjectionPlan?: { credentialValuesReadHere?: boolean; credentialValuesDefinedHere?: boolean } }
+}
+
+export interface FactoryHermesModelProviderPolicyPlanningResult {
+  hermesModelProviderPolicyPlanCandidate?: { providerSelection?: { selectedProvider?: unknown; selectedModel?: unknown; providerSelectionRequired?: boolean; noImplicitProviderFromEnv?: boolean; noImplicitModelFromEnv?: boolean; noDefaultFallbackProvider?: boolean } }
+}
+
+export interface FactoryHermesNetworkPolicyChainResult {
+  requiredPolicies?: Array<{ policyName?: unknown } | string>
+  proposedGateSequence?: unknown
+}
+
+export interface FactoryHermesNetworkSourceInspection {
+  providerHostCandidates?: unknown
+  networkUsed?: boolean
+  dnsResolved?: boolean
+  endpointsTested?: boolean
+  envValuesRead?: boolean
+  dotEnvRead?: boolean
+}
+
 export interface FactoryHermesNetworkPolicyPlanningInput {
   plannedAt: string
   plannedBy: string
   humanApprovalRef?: string
-  credentialsPolicyPlanningResult?: any
-  modelProviderPolicyPlanningResult?: any
-  promptPolicyPlanningResult?: any
-  policyChainPlanningResult?: any
-  deepSourceReview?: any
-  networkSourceInspection?: any
+  credentialsPolicyPlanningResult?: FactoryHermesCredentialsPolicyPlanningResult
+  modelProviderPolicyPlanningResult?: FactoryHermesModelProviderPolicyPlanningResult
+  promptPolicyPlanningResult?: unknown
+  policyChainPlanningResult?: FactoryHermesNetworkPolicyChainResult
+  deepSourceReview?: unknown
+  networkSourceInspection?: FactoryHermesNetworkSourceInspection
   policy?: Partial<FactoryHermesNetworkPolicyPlanningPolicy>
   planningNotes?: string
 }

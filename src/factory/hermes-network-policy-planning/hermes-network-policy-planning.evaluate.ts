@@ -1,5 +1,5 @@
 import { DEFAULT_FACTORY_HERMES_NETWORK_POLICY_PLANNING_POLICY, FACTORY_HERMES_NETWORK_POLICY_PLANNING_KIND, FACTORY_HERMES_NETWORK_POLICY_PLANNING_NEXT_STEP, FACTORY_HERMES_NETWORK_POLICY_PLANNING_VERSION, NETWORK_NOT_AUTHORIZED_ACTIONS, NETWORK_REQUIRED_NEXT_POLICIES } from './hermes-network-policy-planning.defaults.ts'
-import type { FactoryHermesNetworkPolicyPlanningInput, FactoryHermesNetworkPolicyPlanningResult, FactoryHermesNetworkPolicyRule, FactoryHermesNetworkProviderCandidate, FactoryHermesNetworkSurfaceCandidate } from './hermes-network-policy-planning.types.ts'
+import type { FactoryHermesNetworkPolicyPlanningInput, FactoryHermesNetworkPolicyPlanningResult, FactoryHermesNetworkPolicyRule, FactoryHermesNetworkProviderCandidate, FactoryHermesNetworkSourceInspection, FactoryHermesNetworkSurfaceCandidate } from './hermes-network-policy-planning.types.ts'
 
 function networkSurfaces(): FactoryHermesNetworkSurfaceCandidate[] {
   return [
@@ -13,8 +13,8 @@ function networkSurfaces(): FactoryHermesNetworkSurfaceCandidate[] {
   ]
 }
 
-function providerCandidates(inspection?: any): FactoryHermesNetworkProviderCandidate[] {
-  const byProvider = inspection?.providerHostCandidates || {}
+function providerCandidates(inspection?: FactoryHermesNetworkSourceInspection): FactoryHermesNetworkProviderCandidate[] {
+  const byProvider = inspection?.providerHostCandidates && typeof inspection.providerHostCandidates === 'object' ? inspection.providerHostCandidates as Record<string, unknown> : {}
   return (['openai', 'anthropic', 'gemini_google'] as const).map((providerCandidate) => ({
     providerCandidate,
     hostCandidates: Array.isArray(byProvider[providerCandidate]) ? byProvider[providerCandidate] : [],
@@ -54,7 +54,7 @@ export function evaluateFactoryHermesNetworkPolicyPlanning(input: FactoryHermesN
   if (credentials.status !== 'credentials_policy_plan_created' || credentials.decision !== 'hermes_credentials_policy_plan_created' || credentials.canProceedToNetworkPolicyPlanning !== true || credentials.canProceedToResearchExecutionApproval !== false || credentials.canRunResearchNow !== false || credentials.canExecuteHermesNow !== false || credentials.canPassPromptNow !== false || credentials.canUseNetworkNow !== false || credentials.canUseCredentialsNow !== false || credentials.canReadEnvSecretsNow !== false || credentials.canCallModelsNow !== false || injection?.credentialValuesReadHere !== false || injection?.credentialValuesDefinedHere !== false) return { ...out, decision: 'blocked_credentials_policy_not_ready_for_network_policy', blockers: [{ blockerId: 'blocked_credentials_policy_not_ready_for_network_policy', message: 'Credentials policy planning is not ready for network policy.' }] }
   const selection = model?.hermesModelProviderPolicyPlanCandidate?.providerSelection
   if (policy.requireModelProviderPolicyPlanning && (!model || selection?.selectedProvider !== null || selection?.selectedModel !== null || selection?.providerSelectionRequired !== true || selection?.noImplicitProviderFromEnv !== true || selection?.noImplicitModelFromEnv !== true || selection?.noDefaultFallbackProvider !== true)) return { ...out, decision: 'blocked_model_provider_policy_not_ready_for_network_policy', blockers: [{ blockerId: 'blocked_model_provider_policy_not_ready_for_network_policy', message: 'Model provider policy planning must keep provider/model unselected.' }] }
-  if (chain && (!chain.requiredPolicies?.some?.((p: any) => String(p.policyName || p).includes('Network Policy')) || !JSON.stringify(chain.proposedGateSequence || []).includes('Factory Hermes Network Policy Planning Gate v1'))) return { ...out, decision: 'blocked_policy_chain_missing_network_policy', blockers: [{ blockerId: 'blocked_policy_chain_missing_network_policy', message: 'Policy chain does not include Network Policy Planning.' }] }
+  if (chain && (!chain.requiredPolicies?.some((p) => (typeof p === 'string' ? p : String(p.policyName || p)).includes('Network Policy')) || !JSON.stringify(chain.proposedGateSequence || []).includes('Factory Hermes Network Policy Planning Gate v1'))) return { ...out, decision: 'blocked_policy_chain_missing_network_policy', blockers: [{ blockerId: 'blocked_policy_chain_missing_network_policy', message: 'Policy chain does not include Network Policy Planning.' }] }
   if (policy.requireNetworkSourceInspection && !inspection) return { ...out, decision: 'blocked_missing_network_source_inspection', blockers: [{ blockerId: 'blocked_missing_network_source_inspection', message: 'Network source inspection is required.' }] }
   if (inspection?.networkUsed === true || inspection?.dnsResolved === true || inspection?.endpointsTested === true || inspection?.envValuesRead === true || inspection?.dotEnvRead === true) return { ...out, decision: 'blocked_network_was_used_during_planning', blockers: [{ blockerId: 'blocked_network_was_used_during_planning', message: 'Network inspection must be text-only and must not use network, DNS, endpoints, env values or dotenv.' }] }
   const networkSurfaceCandidates = networkSurfaces()
